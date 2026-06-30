@@ -116,6 +116,22 @@ export function TaskDetail({
           />
         </label>
         <label>
+          Start time
+          <input
+            type="time"
+            value={task.startTime}
+            onChange={(event) => onUpdateTask(task.id, { startTime: event.target.value })}
+          />
+        </label>
+        <label>
+          End time
+          <input
+            type="time"
+            value={task.endTime}
+            onChange={(event) => onUpdateTask(task.id, { endTime: event.target.value })}
+          />
+        </label>
+        <label>
           Project
           <select
             value={task.projectId}

@@ -5,3 +5,4 @@ dist/
 *.err
 *.tsbuildinfo
 vite.config.d.ts
+.claude/

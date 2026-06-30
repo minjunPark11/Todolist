@@ -12,6 +12,8 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   dueDate: string;
+  startTime: string;
+  endTime: string;
   projectId: string;
   tags: string[];
   notes: string;
@@ -124,6 +126,8 @@ export interface TaskDraft {
   title: string;
   description?: string;
   dueDate?: string;
+  startTime?: string;
+  endTime?: string;
   projectId?: string;
   priority?: TaskPriority;
   status?: TaskStatus;

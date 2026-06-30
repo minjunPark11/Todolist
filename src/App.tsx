@@ -66,6 +66,7 @@ export default function App() {
   const [sortKey, setSortKey] = useState<SortKey>("dueDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [groupKey, setGroupKey] = useState<GroupBy>("date");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [importMessage, setImportMessage] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -261,6 +262,10 @@ export default function App() {
   }
 
   function renderTaskDetail() {
+    if (!planner.selectedTask) {
+      return null;
+    }
+
     return (
       <TaskDetail
         task={planner.selectedTask}
@@ -276,22 +281,28 @@ export default function App() {
     );
   }
 
+  function pageGridClass(extra = "") {
+    const base = planner.selectedTask ? "page-grid" : "page-grid no-detail";
+    return extra ? `${base} ${extra}` : base;
+  }
+
   function renderPage() {
     if (activePage === "today") {
       return (
-        <section className="page-grid">
+        <section className={pageGridClass()}>
           <div className="content-stack">
-            <header className="today-hero">
-              <p className="eyebrow">{formatDate(today)}</p>
-              <h1>Today</h1>
-              <p className="today-hero-sub">{completedToday} done today</p>
+            <header className="today-list-header">
+              <div>
+                <p className="eyebrow">{formatDate(today)}</p>
+                <h1>Today</h1>
+              </div>
+              <div className="today-inline-stats">
+                <span>{completedToday} done</span>
+                <span>{overdueTasks.length} overdue</span>
+                <span>{focusMinutesToday} focus min</span>
+              </div>
             </header>
             <QuickAdd projects={planner.projects} defaultDueDate={today} onAddTask={planner.addTask} />
-            <div className="today-summary-grid">
-              <SummaryCard label="Recurring due" value={recurringTasksDueToday.length} />
-              <SummaryCard label="Habits done" value={`${habitsCompletedToday}/${planner.habits.length}`} />
-              <SummaryCard label="Focus today" value={`${focusMinutesToday} min`} />
-            </div>
             <TaskSection
               title="Today's Tasks"
               tasks={todayTasks}
@@ -309,6 +320,11 @@ export default function App() {
               planner={planner}
             />
             <TodayHabits habits={planner.habits} habitLogs={planner.habitLogs} onToggleHabit={planner.toggleHabitLog} />
+            <div className="today-summary-grid compact">
+              <SummaryCard label="Recurring" value={recurringTasksDueToday.length} />
+              <SummaryCard label="Habits" value={`${habitsCompletedToday}/${planner.habits.length}`} />
+              <SummaryCard label="Focus" value={`${focusSessionsToday.length} sessions`} />
+            </div>
             <TaskSection
               title="Overdue"
               tasks={overdueTasks}
@@ -340,7 +356,7 @@ export default function App() {
 
     if (activePage === "tomorrow") {
       return (
-        <section className="page-grid">
+        <section className={pageGridClass()}>
           <div className="content-stack">
             <header className="page-header">
               <h1>Tomorrow</h1>
@@ -363,7 +379,7 @@ export default function App() {
 
     if (activePage === "next7") {
       return (
-        <section className="page-grid">
+        <section className={pageGridClass()}>
           <div className="content-stack">
             <header className="page-header">
               <h1>Next 7 Days</h1>
@@ -385,7 +401,7 @@ export default function App() {
 
     if (activePage === "inbox") {
       return (
-        <section className="page-grid">
+        <section className={pageGridClass()}>
           <div className="content-stack">
             <header className="page-header">
               <h1>Inbox</h1>
@@ -414,11 +430,41 @@ export default function App() {
 
     if (activePage === "tasks") {
       return (
-        <section className="page-grid">
+        <section className={pageGridClass()}>
           <div className="content-stack">
             <header className="page-header">
-              <h1>Tasks</h1>
-              <div className="stat-pill">{filteredTasks.length} shown</div>
+              <div>
+                <p className="eyebrow">All lists</p>
+                <h1>Tasks</h1>
+              </div>
+              <div className="task-toolbar">
+                <button
+                  className={filtersOpen ? "toolbar-button active" : "toolbar-button"}
+                  onClick={() => setFiltersOpen((open) => !open)}
+                >
+                  Filter
+                </button>
+                <label>
+                  Sort
+                  <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)}>
+                    <option value="dueDate">Due date</option>
+                    <option value="priority">Priority</option>
+                    <option value="createdAt">Created</option>
+                    <option value="updatedAt">Updated</option>
+                    <option value="title">Title</option>
+                  </select>
+                </label>
+                <label>
+                  Group
+                  <select value={groupKey} onChange={(event) => setGroupKey(event.target.value as GroupBy)}>
+                    <option value="date">Date</option>
+                    <option value="priority">Priority</option>
+                    <option value="project">Project</option>
+                    <option value="none">None</option>
+                  </select>
+                </label>
+                <div className="stat-pill">{filteredTasks.length} shown</div>
+              </div>
             </header>
             <QuickAdd projects={planner.projects} onAddTask={planner.addTask} />
             <TemplateControls
@@ -427,6 +473,7 @@ export default function App() {
               onCreateFromTemplate={planner.createTaskFromTemplate}
               onSaveTemplate={planner.saveTaskAsTemplate}
             />
+            {filtersOpen ? (
             <div className="filters">
               <FilterSelect label="Status" value={statusFilter} options={statusOptions} onChange={setStatusFilter} />
               <FilterSelect
@@ -478,16 +525,6 @@ export default function App() {
                 onChange={setUrgencyFilter}
               />
               <label>
-                Sort by
-                <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)}>
-                  <option value="dueDate">due date</option>
-                  <option value="priority">priority</option>
-                  <option value="createdAt">created date</option>
-                  <option value="updatedAt">updated date</option>
-                  <option value="title">title</option>
-                </select>
-              </label>
-              <label>
                 Direction
                 <select
                   value={sortDirection}
@@ -497,19 +534,11 @@ export default function App() {
                   <option value="desc">descending</option>
                 </select>
               </label>
-              <label>
-                Group by
-                <select value={groupKey} onChange={(event) => setGroupKey(event.target.value as GroupBy)}>
-                  <option value="date">date</option>
-                  <option value="priority">priority</option>
-                  <option value="project">project</option>
-                  <option value="none">none</option>
-                </select>
-              </label>
               <button className="filter-reset" onClick={resetFilters}>
                 Reset filters
               </button>
             </div>
+            ) : null}
             <TaskList
               tasks={filteredTasks}
               projects={planner.projects}
@@ -527,7 +556,7 @@ export default function App() {
 
     if (activePage === "board") {
       return (
-        <section className="page-grid wide-detail">
+        <section className={pageGridClass("wide-detail")}>
           <div className="content-stack">
             <header className="page-header">
               <h1>Board</h1>
@@ -557,11 +586,12 @@ export default function App() {
               <span className="soft">this week</span>
             </div>
           </header>
-          <CalendarView
-            tasks={planner.tasks}
-            onSelectTask={planner.selectTask}
-            onUpdateTask={planner.updateTask}
-          />
+            <CalendarView
+              tasks={planner.tasks}
+              projects={planner.projects}
+              onSelectTask={planner.selectTask}
+              onUpdateTask={planner.updateTask}
+            />
         </section>
       );
     }
@@ -612,7 +642,7 @@ export default function App() {
       const projectUpcoming = projectTasks.filter((task) => task.status !== "done" && isThisWeek(task.dueDate)).length;
 
       return (
-        <section className="page-grid">
+        <section className={pageGridClass()}>
           <div className="content-stack">
             <header className="page-header">
               <h1>{isProjectDetailOpen && currentProject ? currentProject.name : "Projects"}</h1>
