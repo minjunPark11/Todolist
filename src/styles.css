@@ -577,6 +577,44 @@ textarea {
   gap: 8px;
 }
 
+.task-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.task-group {
+  display: grid;
+  gap: 8px;
+}
+
+.task-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-bottom: 1px solid var(--color-hairline);
+  padding: 0 2px 8px;
+  color: var(--color-ink);
+  background: transparent;
+  font-weight: 600;
+}
+
+.task-group-label {
+  font-size: 0.95rem;
+}
+
+.task-group-count {
+  margin-left: auto;
+  color: var(--color-ink-muted-48);
+  font-size: 0.83rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-repeat-icon {
+  flex: 0 0 auto;
+  color: var(--color-ink-muted-48);
+}
+
 .task-row {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
@@ -611,6 +649,22 @@ textarea {
   line-height: 18px;
 }
 
+.check-high {
+  border-color: #e24b4a;
+}
+
+.check-medium {
+  border-color: #ef9f27;
+}
+
+.check-low {
+  border-color: #639922;
+}
+
+.check-none {
+  border-color: var(--color-ink-muted-48);
+}
+
 .is-done .check-button {
   border-color: #1f9d55;
   background: #1f9d55;
@@ -623,7 +677,7 @@ textarea {
 .task-title-line {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
 }
 

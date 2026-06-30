@@ -6,7 +6,7 @@ import { getHabitStreak, HabitsPage } from "./components/HabitsPage";
 import { QuickAdd } from "./components/QuickAdd";
 import { Sidebar } from "./components/Sidebar";
 import { TaskDetail } from "./components/TaskDetail";
-import { TaskList } from "./components/TaskList";
+import { TaskList, type GroupBy } from "./components/TaskList";
 import { usePlannerData } from "./hooks/usePlannerData";
 import type {
   Habit,
@@ -72,6 +72,7 @@ export default function App() {
   const [urgencyFilter, setUrgencyFilter] = useState<TaskLevel | "all">("all");
   const [sortKey, setSortKey] = useState<SortKey>("dueDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [groupKey, setGroupKey] = useState<GroupBy>("date");
   const [searchQuery, setSearchQuery] = useState("");
   const [importMessage, setImportMessage] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -232,6 +233,7 @@ export default function App() {
     setUrgencyFilter("all");
     setSortKey("dueDate");
     setSortDirection("asc");
+    setGroupKey("date");
   }
 
   function exportJson() {
@@ -502,6 +504,15 @@ export default function App() {
                   <option value="desc">descending</option>
                 </select>
               </label>
+              <label>
+                Group by
+                <select value={groupKey} onChange={(event) => setGroupKey(event.target.value as GroupBy)}>
+                  <option value="date">date</option>
+                  <option value="priority">priority</option>
+                  <option value="project">project</option>
+                  <option value="none">none</option>
+                </select>
+              </label>
               <button className="filter-reset" onClick={resetFilters}>
                 Reset filters
               </button>
@@ -511,6 +522,7 @@ export default function App() {
               projects={planner.projects}
               subtasks={planner.subtasks}
               emptyMessage="No tasks match these filters."
+              groupBy={groupKey}
               onToggleDone={planner.toggleTaskDone}
               onSelectTask={planner.selectTask}
             />
