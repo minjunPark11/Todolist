@@ -63,172 +63,187 @@ export function TaskDetail({
 
   return (
     <aside className="detail-panel">
-      <h2>{task.title}</h2>
-      <label>
-        Title
+      <div className="detail-handle" />
+      <header className="detail-header">
         <input
+          className="detail-title-input"
           value={task.title}
+          aria-label="Task title"
           onChange={(event) => onUpdateTask(task.id, { title: event.target.value })}
         />
-      </label>
-      <label>
-        Description
         <textarea
+          className="detail-description-input"
+          placeholder="Add description"
           value={task.description}
+          aria-label="Task description"
           onChange={(event) => onUpdateTask(task.id, { description: event.target.value })}
         />
-      </label>
-      <div className="field-grid">
-        <label>
-          Status
-          <select
-            value={task.status}
-            onChange={(event) => onUpdateTask(task.id, { status: event.target.value as TaskStatus })}
-          >
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {status.replace("_", " ")}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Priority
-          <select
-            value={task.priority}
-            onChange={(event) =>
-              onUpdateTask(task.id, { priority: event.target.value as TaskPriority })
-            }
-          >
-            {priorities.map((priority) => (
-              <option key={priority} value={priority}>
-                {priority}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Due date
-          <input
-            type="date"
-            value={task.dueDate}
-            onChange={(event) => onUpdateTask(task.id, { dueDate: event.target.value })}
-          />
-        </label>
-        <label>
-          Start time
-          <input
-            type="time"
-            value={task.startTime}
-            onChange={(event) => onUpdateTask(task.id, { startTime: event.target.value })}
-          />
-        </label>
-        <label>
-          End time
-          <input
-            type="time"
-            value={task.endTime}
-            onChange={(event) => onUpdateTask(task.id, { endTime: event.target.value })}
-          />
-        </label>
-        <label>
-          Project
-          <select
-            value={task.projectId}
-            onChange={(event) => onUpdateTask(task.id, { projectId: event.target.value })}
-          >
-            <option value="">Inbox</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Importance
-          <select
-            value={task.importance}
-            onChange={(event) =>
-              onUpdateTask(task.id, { importance: event.target.value as TaskLevel })
-            }
-          >
-            {levels.map((level) => (
-              <option key={level} value={level}>
-                {level}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Urgency
-          <select
-            value={task.urgency}
-            onChange={(event) => onUpdateTask(task.id, { urgency: event.target.value as TaskLevel })}
-          >
-            {levels.map((level) => (
-              <option key={level} value={level}>
-                {level}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Blocked by
-          <select
-            value={task.blockedByTaskId}
-            onChange={(event) =>
-              onUpdateTask(task.id, {
-                blockedByTaskId: event.target.value,
-                status: event.target.value ? "blocked" : task.status === "blocked" ? "todo" : task.status,
-              })
-            }
-          >
-            <option value="">No dependency</option>
-            {tasks
-              .filter((candidate) => candidate.id !== task.id)
-              .map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.title}
+      </header>
+
+      <section className="detail-section">
+        <h3>Schedule</h3>
+        <div className="detail-field-list">
+          <label>
+            <span>Due date</span>
+            <input
+              type="date"
+              value={task.dueDate}
+              onChange={(event) => onUpdateTask(task.id, { dueDate: event.target.value })}
+            />
+          </label>
+          <label>
+            <span>Start time</span>
+            <input
+              type="time"
+              value={task.startTime}
+              onChange={(event) => onUpdateTask(task.id, { startTime: event.target.value })}
+            />
+          </label>
+          <label>
+            <span>End time</span>
+            <input
+              type="time"
+              value={task.endTime}
+              onChange={(event) => onUpdateTask(task.id, { endTime: event.target.value })}
+            />
+          </label>
+          <label>
+            <span>Repeat</span>
+            <select
+              value={task.repeatType}
+              onChange={(event) =>
+                onUpdateTask(task.id, { repeatType: event.target.value as RepeatType })
+              }
+            >
+              {repeatTypes.map((repeatType) => (
+                <option key={repeatType} value={repeatType}>
+                  {repeatType}
                 </option>
               ))}
-          </select>
-        </label>
-        <label>
-          Repeat
-          <select
-            value={task.repeatType}
-            onChange={(event) =>
-              onUpdateTask(task.id, { repeatType: event.target.value as RepeatType })
-            }
-          >
-            {repeatTypes.map((repeatType) => (
-              <option key={repeatType} value={repeatType}>
-                {repeatType}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Repeat interval
-          <input
-            type="number"
-            min="1"
-            value={task.repeatInterval}
-            onChange={(event) =>
-              onUpdateTask(task.id, { repeatInterval: Number(event.target.value) || 1 })
-            }
-          />
-        </label>
-        <label>
-          Repeat end
-          <input
-            type="date"
-            value={task.repeatEndDate}
-            onChange={(event) => onUpdateTask(task.id, { repeatEndDate: event.target.value })}
-          />
-        </label>
-      </div>
+            </select>
+          </label>
+          {task.repeatType !== "none" ? (
+            <>
+              <label>
+                <span>Repeat interval</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={task.repeatInterval}
+                  onChange={(event) =>
+                    onUpdateTask(task.id, { repeatInterval: Number(event.target.value) || 1 })
+                  }
+                />
+              </label>
+              <label>
+                <span>Repeat end</span>
+                <input
+                  type="date"
+                  value={task.repeatEndDate}
+                  onChange={(event) => onUpdateTask(task.id, { repeatEndDate: event.target.value })}
+                />
+              </label>
+            </>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="detail-section">
+        <h3>Planning</h3>
+        <div className="detail-field-list">
+          <label>
+            <span>Status</span>
+            <select
+              value={task.status}
+              onChange={(event) => onUpdateTask(task.id, { status: event.target.value as TaskStatus })}
+            >
+              {statuses.map((status) => (
+                <option key={status} value={status}>
+                  {status.replace("_", " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Priority</span>
+            <select
+              value={task.priority}
+              onChange={(event) =>
+                onUpdateTask(task.id, { priority: event.target.value as TaskPriority })
+              }
+            >
+              {priorities.map((priority) => (
+                <option key={priority} value={priority}>
+                  {priority}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>List</span>
+            <select
+              value={task.projectId}
+              onChange={(event) => onUpdateTask(task.id, { projectId: event.target.value })}
+            >
+              <option value="">Inbox</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Importance</span>
+            <select
+              value={task.importance}
+              onChange={(event) =>
+                onUpdateTask(task.id, { importance: event.target.value as TaskLevel })
+              }
+            >
+              {levels.map((level) => (
+                <option key={level} value={level}>
+                  {level}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Urgency</span>
+            <select
+              value={task.urgency}
+              onChange={(event) => onUpdateTask(task.id, { urgency: event.target.value as TaskLevel })}
+            >
+              {levels.map((level) => (
+                <option key={level} value={level}>
+                  {level}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Blocked by</span>
+            <select
+              value={task.blockedByTaskId}
+              onChange={(event) =>
+                onUpdateTask(task.id, {
+                  blockedByTaskId: event.target.value,
+                  status: event.target.value ? "blocked" : task.status === "blocked" ? "todo" : task.status,
+                })
+              }
+            >
+              <option value="">No dependency</option>
+              {tasks
+                .filter((candidate) => candidate.id !== task.id)
+                .map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.title}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </div>
+      </section>
       {blockingTask ? (
         <div className={blockingTask.status === "done" ? "dependency-note ready" : "dependency-note"}>
           <strong>Blocked by:</strong> {blockingTask.title}
@@ -239,7 +254,7 @@ export function TaskDetail({
           ) : null}
         </div>
       ) : null}
-      <section className="subtask-panel">
+      <section className="subtask-panel detail-section">
         <div className="subtask-heading">
           <h3>Subtasks</h3>
           <span>
@@ -275,13 +290,15 @@ export function TaskDetail({
           ))}
         </div>
       </section>
-      <label>
-        Notes
+      <section className="detail-section">
+        <h3>Notes</h3>
         <textarea
+          className="detail-notes"
+          placeholder="Add notes"
           value={task.notes}
           onChange={(event) => onUpdateTask(task.id, { notes: event.target.value })}
         />
-      </label>
+      </section>
       <button className="danger-action" onClick={() => onDeleteTask(task.id)}>
         Delete task
       </button>

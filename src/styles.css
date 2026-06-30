@@ -841,9 +841,11 @@ textarea {
   position: sticky;
   top: 32px;
   display: grid;
-  gap: 14px;
+  gap: 16px;
   max-height: calc(100vh - 64px);
   overflow: auto;
+  align-self: start;
+  padding: 0;
 }
 
 .detail-panel label,
@@ -853,6 +855,112 @@ textarea {
   color: var(--color-ink-muted-80);
   font-size: 0.83rem;
   font-weight: 600;
+}
+
+.detail-handle {
+  display: none;
+}
+
+.detail-header,
+.detail-section,
+.dependency-note,
+.danger-action {
+  margin-right: 18px;
+  margin-left: 18px;
+}
+
+.detail-header {
+  display: grid;
+  gap: 8px;
+  padding-top: 18px;
+}
+
+.detail-title-input,
+.detail-description-input {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.detail-title-input {
+  color: var(--color-ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui,
+    sans-serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.detail-description-input {
+  min-height: 44px;
+  color: var(--color-ink-muted-80);
+  font-size: 0.92rem;
+}
+
+.detail-title-input:focus,
+.detail-description-input:focus,
+.detail-notes:focus {
+  outline: none;
+}
+
+.detail-section {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--color-divider-soft);
+  padding-top: 14px;
+}
+
+.detail-section h3 {
+  margin: 0;
+  color: var(--color-ink-muted-48);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.detail-field-list {
+  display: grid;
+  gap: 2px;
+}
+
+.detail-field-list label {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  border-radius: var(--rounded-sm);
+  color: var(--color-ink-muted-80);
+  font-size: 0.86rem;
+}
+
+.detail-field-list label > span {
+  color: var(--color-ink-muted-48);
+}
+
+.detail-field-list input,
+.detail-field-list select {
+  min-height: 34px;
+  border-color: transparent;
+  background: var(--color-canvas-parchment);
+}
+
+.detail-field-list input:hover,
+.detail-field-list select:hover,
+.detail-field-list input:focus,
+.detail-field-list select:focus {
+  border-color: var(--color-hairline);
+}
+
+.detail-notes {
+  min-height: 120px;
+  border: 0;
+  border-radius: var(--rounded-sm);
+  padding: 10px;
+  background: var(--color-canvas-parchment);
 }
 
 .field-grid,
@@ -900,6 +1008,8 @@ textarea {
 }
 
 .danger-action {
+  justify-self: start;
+  margin-bottom: 18px;
   color: #b42318;
   background: #fee4e2;
 }
@@ -907,8 +1017,6 @@ textarea {
 .subtask-panel {
   display: grid;
   gap: 10px;
-  border-top: 1px solid var(--color-divider-soft);
-  padding-top: 14px;
 }
 
 .subtask-heading,
@@ -1904,7 +2012,27 @@ textarea {
   }
 
   .detail-panel {
-    position: static;
+    position: fixed;
+    z-index: 40;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    top: auto;
+    max-height: min(82vh, 720px);
+    border-radius: 18px 18px 0 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    box-shadow: var(--product-shadow);
+  }
+
+  .detail-handle {
+    display: block;
+    width: 42px;
+    height: 5px;
+    border-radius: var(--rounded-pill);
+    margin: 10px auto 0;
+    background: var(--color-hairline);
   }
 
   .calendar-layout {
