@@ -107,6 +107,8 @@ export interface PlannerData {
 
 export type PageId =
   | "today"
+  | "tomorrow"
+  | "next7"
   | "inbox"
   | "tasks"
   | "board"

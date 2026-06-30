@@ -4,6 +4,7 @@ import { CalendarView } from "./components/CalendarView";
 import { FocusPage } from "./components/FocusPage";
 import { getHabitStreak, HabitsPage } from "./components/HabitsPage";
 import { QuickAdd } from "./components/QuickAdd";
+import { Sidebar } from "./components/Sidebar";
 import { TaskDetail } from "./components/TaskDetail";
 import { TaskList } from "./components/TaskList";
 import { usePlannerData } from "./hooks/usePlannerData";
@@ -19,21 +20,7 @@ import type {
   TaskStatus,
   TaskTemplate,
 } from "./types";
-import { formatDate, isDateThisWeek, isOverdue, isThisWeek, todayValue } from "./utils/date";
-
-const navItems: Array<{ id: PageId; label: string }> = [
-  { id: "today", label: "Today" },
-  { id: "inbox", label: "Inbox" },
-  { id: "tasks", label: "Tasks" },
-  { id: "board", label: "Board" },
-  { id: "calendar", label: "Calendar" },
-  { id: "matrix", label: "Matrix" },
-  { id: "projects", label: "Projects" },
-  { id: "dashboard", label: "Dashboard" },
-  { id: "habits", label: "Habits" },
-  { id: "focus", label: "Focus" },
-  { id: "settings", label: "Settings" },
-];
+import { addDays, formatDate, isDateThisWeek, isOverdue, isThisWeek, todayValue } from "./utils/date";
 
 const statusOptions: Array<TaskStatus | "all"> = [
   "all",
@@ -93,8 +80,10 @@ export default function App() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const today = todayValue();
+  const tomorrow = addDays(today, 1);
   const openTasks = planner.tasks.filter((task) => task.status !== "done");
   const todayTasks = sortTasks(planner.tasks.filter((task) => task.dueDate === today));
+  const tomorrowTasks = sortTasks(planner.tasks.filter((task) => task.dueDate === tomorrow));
   const recurringTasksDueToday = sortTasks(
     planner.tasks.filter((task) => task.repeatType !== "none" && task.dueDate === today),
   );
@@ -348,6 +337,51 @@ export default function App() {
               </div>
               <p className="empty-state">{focusMinutesToday} focus minutes completed today.</p>
             </section>
+          </div>
+          {renderTaskDetail()}
+        </section>
+      );
+    }
+
+    if (activePage === "tomorrow") {
+      return (
+        <section className="page-grid">
+          <div className="content-stack">
+            <header className="page-header">
+              <h1>Tomorrow</h1>
+              <div className="stat-pill">{tomorrowTasks.length} tasks</div>
+            </header>
+            <QuickAdd projects={planner.projects} defaultDueDate={tomorrow} onAddTask={planner.addTask} />
+            <TaskList
+              tasks={tomorrowTasks}
+              projects={planner.projects}
+              subtasks={planner.subtasks}
+              emptyMessage="Nothing due tomorrow."
+              onToggleDone={planner.toggleTaskDone}
+              onSelectTask={planner.selectTask}
+            />
+          </div>
+          {renderTaskDetail()}
+        </section>
+      );
+    }
+
+    if (activePage === "next7") {
+      return (
+        <section className="page-grid">
+          <div className="content-stack">
+            <header className="page-header">
+              <h1>Next 7 Days</h1>
+              <div className="stat-pill">{thisWeekTasks.length} tasks</div>
+            </header>
+            <TaskList
+              tasks={thisWeekTasks}
+              projects={planner.projects}
+              subtasks={planner.subtasks}
+              emptyMessage="No tasks in the next 7 days."
+              onToggleDone={planner.toggleTaskDone}
+              onSelectTask={planner.selectTask}
+            />
           </div>
           {renderTaskDetail()}
         </section>
@@ -720,48 +754,44 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div>
-          <p className="app-kicker">Personal MVP</p>
-          <h1>Todo Planner</h1>
-        </div>
-        <SearchBox
-          query={searchQuery}
-          inputRef={searchInputRef}
-          results={searchResults}
-          onChange={setSearchQuery}
-          onSelectTask={(taskId) => {
-            planner.selectTask(taskId);
-            setActivePage("tasks");
-            setSearchQuery("");
-          }}
-          onSelectProject={(projectId) => {
-            setSelectedProjectId(projectId);
-            setIsProjectDetailOpen(true);
-            setActivePage("projects");
-            setSearchQuery("");
-          }}
-          onSelectHabit={() => {
-            setActivePage("habits");
-            setSearchQuery("");
-          }}
-        />
-        <nav>
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              className={activePage === item.id ? "active" : ""}
-              onClick={() => setActivePage(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-summary">
-          <strong>{openTasks.length}</strong>
-          <span>open tasks</span>
-        </div>
-      </aside>
+      <Sidebar
+        activePage={activePage}
+        onNavigate={setActivePage}
+        tasks={planner.tasks}
+        projects={planner.projects}
+        selectedProjectId={selectedProjectId}
+        userEmail={planner.auth.userEmail}
+        onSelectProject={(projectId) => {
+          setSelectedProjectId(projectId);
+          setIsProjectDetailOpen(true);
+          setActivePage("projects");
+        }}
+        onAddProject={(name) => planner.addProject(name, "#0066cc")}
+        onOpenSettings={() => setActivePage("settings")}
+        search={
+          <SearchBox
+            query={searchQuery}
+            inputRef={searchInputRef}
+            results={searchResults}
+            onChange={setSearchQuery}
+            onSelectTask={(taskId) => {
+              planner.selectTask(taskId);
+              setActivePage("tasks");
+              setSearchQuery("");
+            }}
+            onSelectProject={(projectId) => {
+              setSelectedProjectId(projectId);
+              setIsProjectDetailOpen(true);
+              setActivePage("projects");
+              setSearchQuery("");
+            }}
+            onSelectHabit={() => {
+              setActivePage("habits");
+              setSearchQuery("");
+            }}
+          />
+        }
+      />
       <main>{renderPage()}</main>
     </div>
   );

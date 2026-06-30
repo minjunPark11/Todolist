@@ -104,9 +104,10 @@ button:focus-visible {
   top: 0;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 14px;
   height: 100vh;
-  padding: 28px 18px;
+  overflow-y: auto;
+  padding: 20px 14px;
   color: var(--color-on-dark);
   background: var(--color-surface-tile-1);
 }
@@ -134,9 +135,9 @@ button:focus-visible {
   font-size: 1.55rem;
 }
 
-.sidebar nav {
+.side-list {
   display: grid;
-  gap: 6px;
+  gap: 2px;
 }
 
 .global-search {
@@ -188,20 +189,145 @@ button:focus-visible {
   color: var(--color-ink-muted-48);
 }
 
-.sidebar button {
-  min-height: 44px;
-  border: 0;
-  border-radius: var(--rounded-sm);
-  padding: 0 12px;
-  color: rgba(255, 255, 255, 0.8);
-  background: transparent;
-  text-align: left;
+.side-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.sidebar button:hover,
-.sidebar button.active {
+.side-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: var(--rounded-pill);
+  color: var(--color-on-dark);
+  background: var(--color-primary);
+  font-weight: 600;
+}
+
+.side-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.side-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--rounded-sm);
+  color: rgba(255, 255, 255, 0.7);
+  background: transparent;
+}
+
+.side-icon-btn:hover {
   color: var(--color-on-dark);
   background: rgba(255, 255, 255, 0.12);
+}
+
+.side-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  border-radius: var(--rounded-sm);
+  padding: 0 10px;
+  color: rgba(255, 255, 255, 0.82);
+  background: transparent;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.side-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.side-item.active {
+  color: var(--color-on-dark);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.side-item-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.side-item.active .side-item-icon {
+  color: var(--color-primary-on-dark);
+}
+
+.side-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-item-badge {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.side-dot {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.side-section {
+  display: grid;
+  gap: 2px;
+}
+
+.side-section-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 4px 6px;
+  color: rgba(255, 255, 255, 0.5);
+  background: transparent;
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.side-chevron {
+  display: inline-block;
+  font-size: 0.9rem;
+  transition: transform 0.15s ease;
+}
+
+.side-add input {
+  height: 36px;
+  border: 0;
+  border-radius: var(--rounded-sm);
+  padding: 0 10px;
+  color: var(--color-on-dark);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.side-add input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .sidebar-summary {
@@ -1451,24 +1577,8 @@ textarea {
     padding: 18px;
   }
 
-  .sidebar nav {
-    position: fixed;
-    z-index: 30;
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    max-height: 132px;
-    overflow: auto;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: var(--rounded-md);
-    padding: 8px;
-    background: var(--color-surface-tile-1);
-    box-shadow: var(--product-shadow);
-  }
-
   main {
-    padding: 20px 20px 160px;
+    padding: 20px;
   }
 
   .quick-add,
@@ -1500,15 +1610,9 @@ textarea {
     flex-direction: column;
   }
 
-  .sidebar-summary {
-    display: none;
-  }
-
-  .sidebar button {
-    min-height: 38px;
-    padding: 0 8px;
-    font-size: 0.82rem;
-    text-align: center;
+  .sidebar {
+    height: auto;
+    overflow: visible;
   }
 
   .board-grid {
