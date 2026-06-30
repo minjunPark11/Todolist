@@ -76,7 +76,7 @@ function normalizeProject(project: Partial<Project>): Project {
     id: project.id ?? createId("project"),
     name: project.name ?? "Untitled project",
     description: project.description ?? "",
-    color: project.color ?? "#2f80ed",
+    color: project.color ?? "#0066cc",
     createdAt: project.createdAt ?? now,
     updatedAt: project.updatedAt ?? now,
   };
@@ -104,7 +104,7 @@ function normalizeHabit(habit: Partial<Habit>): Habit {
     description: habit.description ?? "",
     frequency: oneOf(habit.frequency, habitFrequencies, "daily"),
     targetCount: habit.targetCount ?? 1,
-    color: habit.color ?? "#2f80ed",
+    color: habit.color ?? "#0066cc",
     createdAt: habit.createdAt ?? now,
     updatedAt: habit.updatedAt ?? now,
   };
@@ -717,7 +717,7 @@ export function usePlannerData() {
       description: "",
       frequency,
       targetCount: 1,
-      color: "#2f80ed",
+      color: "#0066cc",
       createdAt: now,
       updatedAt: now,
     };

@@ -1,5 +1,6 @@
 import { ChangeEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { BoardView } from "./components/BoardView";
+import { CalendarView } from "./components/CalendarView";
 import { FocusPage } from "./components/FocusPage";
 import { getHabitStreak, HabitsPage } from "./components/HabitsPage";
 import { QuickAdd } from "./components/QuickAdd";
@@ -18,7 +19,7 @@ import type {
   TaskStatus,
   TaskTemplate,
 } from "./types";
-import { formatDate, getMonthDays, isDateThisWeek, isOverdue, isThisWeek, todayValue } from "./utils/date";
+import { formatDate, isDateThisWeek, isOverdue, isThisWeek, todayValue } from "./utils/date";
 
 const navItems: Array<{ id: PageId; label: string }> = [
   { id: "today", label: "Today" },
@@ -296,12 +297,10 @@ export default function App() {
       return (
         <section className="page-grid">
           <div className="content-stack">
-            <header className="page-header">
-              <div>
-                <p className="eyebrow">{formatDate(today)}</p>
-                <h1>Today</h1>
-              </div>
-              <div className="stat-pill">{completedToday} done today</div>
+            <header className="today-hero">
+              <p className="eyebrow">{formatDate(today)}</p>
+              <h1>Today</h1>
+              <p className="today-hero-sub">{completedToday} done today</p>
             </header>
             <QuickAdd projects={planner.projects} defaultDueDate={today} onAddTask={planner.addTask} />
             <div className="today-summary-grid">
@@ -509,7 +508,6 @@ export default function App() {
     }
 
     if (activePage === "calendar") {
-      const days = getMonthDays();
       return (
         <section className="content-stack">
           <header className="page-header">
@@ -520,22 +518,11 @@ export default function App() {
               <span className="soft">this week</span>
             </div>
           </header>
-          <div className="calendar-grid">
-            {days.map((day) => {
-              const dayTasks = sortTasks(planner.tasks.filter((task) => task.dueDate === day));
-              return (
-                <section key={day} className={day === today ? "calendar-day is-today" : "calendar-day"}>
-                  <h2>{formatDate(day)}</h2>
-                  {dayTasks.length === 0 ? <p>No tasks</p> : null}
-                  {dayTasks.map((task) => (
-                    <button key={task.id} className="calendar-task" onClick={() => planner.selectTask(task.id)}>
-                      {task.title}
-                    </button>
-                  ))}
-                </section>
-              );
-            })}
-          </div>
+          <CalendarView
+            tasks={planner.tasks}
+            onSelectTask={planner.selectTask}
+            onUpdateTask={planner.updateTask}
+          />
         </section>
       );
     }
@@ -596,7 +583,7 @@ export default function App() {
               className="project-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                planner.addProject(newProjectName, "#2f80ed");
+                planner.addProject(newProjectName, "#0066cc");
                 setNewProjectName("");
               }}
             >

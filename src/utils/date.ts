@@ -85,3 +85,57 @@ export function getMonthDays(anchor = new Date()): string[] {
 
   return days;
 }
+
+export interface CalendarCell {
+  date: string;
+  inMonth: boolean;
+}
+
+export function getMonthGrid(year: number, month: number): CalendarCell[] {
+  const startDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const totalCells = Math.ceil((startDay + daysInMonth) / 7) * 7;
+  const gridStart = new Date(year, month, 1 - startDay);
+
+  return Array.from({ length: totalCells }, (_, index) => {
+    const date = new Date(
+      gridStart.getFullYear(),
+      gridStart.getMonth(),
+      gridStart.getDate() + index,
+    );
+    return { date: toDateInputValue(date), inMonth: date.getMonth() === month };
+  });
+}
+
+export function getMonthLabel(year: number, month: number): string {
+  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(
+    new Date(year, month, 1),
+  );
+}
+
+export function getDayNumber(dateValue: string): number {
+  return Number(dateValue.slice(8, 10));
+}
+
+export function getWeekDays(anchor = todayValue()): string[] {
+  const start = getWeekStart(anchor);
+  return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+}
+
+export function getWeekLabel(anchor: string): string {
+  const start = getWeekStart(anchor);
+  const end = addDays(start, 6);
+  const formatter = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
+  return `${formatter.format(new Date(`${start}T00:00:00`))} – ${formatter.format(
+    new Date(`${end}T00:00:00`),
+  )}, ${start.slice(0, 4)}`;
+}
+
+export function getDayLabel(dateValue: string): string {
+  return new Intl.DateTimeFormat("en", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(`${dateValue}T00:00:00`));
+}
