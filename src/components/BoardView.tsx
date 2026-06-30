@@ -1,4 +1,5 @@
-import type { Project, Subtask, Task, TaskStatus } from "../types";
+import { FormEvent, useState } from "react";
+import type { Project, Subtask, Task, TaskDraft } from "../types";
 import { formatDate } from "../utils/date";
 
 interface BoardViewProps {
@@ -7,34 +8,61 @@ interface BoardViewProps {
   subtasks: Subtask[];
   onSelectTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
+  onAddTask: (draft: TaskDraft) => void;
 }
 
-const columns: Array<{ status: TaskStatus; label: string }> = [
-  { status: "todo", label: "To Do" },
-  { status: "in_progress", label: "In Progress" },
-  { status: "waiting", label: "Waiting" },
-  { status: "blocked", label: "Blocked" },
-  { status: "done", label: "Done" },
-];
+const columns = [
+  { id: "inbox", label: "Inbox" },
+  { id: "todo", label: "To Do" },
+  { id: "in_progress", label: "Doing" },
+  { id: "waiting", label: "Waiting" },
+  { id: "done", label: "Done" },
+] as const;
 
-export function BoardView({ tasks, projects, subtasks, onSelectTask, onUpdateTask }: BoardViewProps) {
+export function BoardView({ tasks, projects, subtasks, onSelectTask, onUpdateTask, onAddTask }: BoardViewProps) {
+  const [draftByColumn, setDraftByColumn] = useState<Record<string, string>>({});
   const projectMap = new Map(projects.map((project) => [project.id, project]));
+
+  function submitColumnTask(event: FormEvent, columnId: (typeof columns)[number]["id"]) {
+    event.preventDefault();
+    const title = (draftByColumn[columnId] ?? "").trim();
+    if (!title || columnId === "done") {
+      return;
+    }
+
+    onAddTask(
+      columnId === "inbox"
+        ? { title, status: "todo", projectId: "", dueDate: "" }
+        : { title, status: columnId },
+    );
+    setDraftByColumn((current) => ({ ...current, [columnId]: "" }));
+  }
 
   return (
     <div className="board-grid">
       {columns.map((column) => {
-        const columnTasks = tasks.filter((task) => task.status === column.status);
+        const columnTasks = tasks.filter((task) => {
+          if (column.id === "inbox") {
+            return task.status !== "done" && task.status !== "archived" && !task.projectId && !task.dueDate;
+          }
+          return task.status === column.id;
+        });
 
         return (
           <section
-            key={column.status}
+            key={column.id}
             className="board-column"
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
               const taskId = event.dataTransfer.getData("text/plain");
               if (taskId) {
-                onUpdateTask(taskId, { status: column.status });
+                onUpdateTask(
+                  taskId,
+                  column.id === "inbox"
+                    ? { status: "todo", projectId: "", dueDate: "" }
+                    : { status: column.id },
+                );
               }
             }}
           >
@@ -42,6 +70,18 @@ export function BoardView({ tasks, projects, subtasks, onSelectTask, onUpdateTas
               <h2>{column.label}</h2>
               <span>{columnTasks.length}</span>
             </div>
+            {column.id !== "done" ? (
+              <form className="board-inline-add" onSubmit={(event) => submitColumnTask(event, column.id)}>
+                <input
+                  aria-label={`Add task to ${column.label}`}
+                  placeholder="+ Add Task"
+                  value={draftByColumn[column.id] ?? ""}
+                  onChange={(event) =>
+                    setDraftByColumn((current) => ({ ...current, [column.id]: event.target.value }))
+                  }
+                />
+              </form>
+            ) : null}
             <div className="board-card-list">
               {columnTasks.length === 0 ? <p className="empty-state">No tasks.</p> : null}
               {columnTasks.map((task) => {
@@ -75,11 +115,11 @@ export function BoardView({ tasks, projects, subtasks, onSelectTask, onUpdateTas
                       value={task.status}
                       onClick={(event) => event.stopPropagation()}
                       onChange={(event) =>
-                        onUpdateTask(task.id, { status: event.target.value as TaskStatus })
+                        onUpdateTask(task.id, { status: event.target.value as Task["status"] })
                       }
                     >
-                      {columns.map((option) => (
-                        <option key={option.status} value={option.status}>
+                      {columns.filter((option) => option.id !== "inbox").map((option) => (
+                        <option key={option.id} value={option.id}>
                           {option.label}
                         </option>
                       ))}

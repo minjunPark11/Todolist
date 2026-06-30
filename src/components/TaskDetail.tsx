@@ -7,13 +7,15 @@ interface TaskDetailProps {
   projects: Project[];
   subtasks: Subtask[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
-  onDeleteTask: (taskId: string) => void;
+  onRequestDeleteTask: (taskId: string) => void;
+  onArchiveTask: (taskId: string) => void;
+  onDuplicateTask: (taskId: string) => void;
   onAddSubtask: (taskId: string, title: string) => void;
   onToggleSubtask: (subtaskId: string) => void;
   onDeleteSubtask: (subtaskId: string) => void;
 }
 
-const statuses: TaskStatus[] = ["todo", "in_progress", "waiting", "blocked", "done"];
+const statuses: TaskStatus[] = ["todo", "in_progress", "waiting", "blocked", "done", "archived"];
 const priorities: TaskPriority[] = ["none", "low", "medium", "high"];
 const levels: TaskLevel[] = ["low", "high"];
 const repeatTypes: RepeatType[] = ["none", "daily", "weekly", "monthly"];
@@ -24,7 +26,9 @@ export function TaskDetail({
   projects,
   subtasks,
   onUpdateTask,
-  onDeleteTask,
+  onRequestDeleteTask,
+  onArchiveTask,
+  onDuplicateTask,
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
@@ -299,9 +303,16 @@ export function TaskDetail({
           onChange={(event) => onUpdateTask(task.id, { notes: event.target.value })}
         />
       </section>
-      <button className="danger-action" onClick={() => onDeleteTask(task.id)}>
-        Delete task
-      </button>
+      <section className="detail-section task-actions-section">
+        <h3>Actions</h3>
+        <div className="task-action-row">
+          <button onClick={() => onDuplicateTask(task.id)}>Duplicate</button>
+          <button onClick={() => onArchiveTask(task.id)}>Archive</button>
+          <button className="danger-button-inline" onClick={() => onRequestDeleteTask(task.id)}>
+            Delete
+          </button>
+        </div>
+      </section>
     </aside>
   );
 }

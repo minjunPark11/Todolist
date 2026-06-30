@@ -1,4 +1,4 @@
-export type TaskStatus = "todo" | "in_progress" | "waiting" | "blocked" | "done";
+export type TaskStatus = "todo" | "in_progress" | "waiting" | "blocked" | "done" | "archived";
 export type TaskPriority = "none" | "low" | "medium" | "high";
 export type TaskLevel = "high" | "low";
 export type RepeatType = "none" | "daily" | "weekly" | "monthly";
@@ -22,6 +22,8 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   completedAt: string;
+  archivedAt?: string;
+  previousStatus?: TaskStatus;
   blockedByTaskId: string;
   repeatType: RepeatType;
   repeatInterval: number;
@@ -43,6 +45,8 @@ export interface Project {
   name: string;
   description: string;
   color: string;
+  status?: "active" | "paused" | "completed" | "archived";
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -108,6 +112,9 @@ export interface PlannerData {
 }
 
 export type PageId =
+  | "planning"
+  | "study"
+  | "archive"
   | "today"
   | "tomorrow"
   | "next7"

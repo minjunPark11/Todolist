@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import type { PageId, Project, Task } from "../types";
-import { addDays, isThisWeek, todayValue } from "../utils/date";
+import { isOverdue, todayValue } from "../utils/date";
 
 interface SidebarProps {
   activePage: PageId;
@@ -15,20 +15,7 @@ interface SidebarProps {
   search: ReactNode;
 }
 
-type IconName =
-  | "all"
-  | "today"
-  | "tomorrow"
-  | "next7"
-  | "calendar"
-  | "inbox"
-  | "board"
-  | "matrix"
-  | "dashboard"
-  | "habits"
-  | "focus"
-  | "settings"
-  | "gear";
+type IconName = "inbox" | "today" | "projects" | "planning" | "study" | "archive" | "settings" | "gear";
 
 function Icon({ name }: { name: IconName }) {
   const common = {
@@ -43,14 +30,11 @@ function Icon({ name }: { name: IconName }) {
   };
 
   const paths: Record<IconName, ReactNode> = {
-    all: (
+    inbox: (
       <>
-        <line x1="9" y1="6" x2="20" y2="6" />
-        <line x1="9" y1="12" x2="20" y2="12" />
-        <line x1="9" y1="18" x2="20" y2="18" />
-        <circle cx="4.5" cy="6" r="1" />
-        <circle cx="4.5" cy="12" r="1" />
-        <circle cx="4.5" cy="18" r="1" />
+        <path d="M4 13l2.4-7h11.2L20 13" />
+        <path d="M4 13v5a1 1 0 001 1h14a1 1 0 001-1v-5" />
+        <path d="M4 13h4l1.5 2.5h5L16 13h4" />
       </>
     ),
     today: (
@@ -60,66 +44,27 @@ function Icon({ name }: { name: IconName }) {
         <circle cx="12" cy="14.5" r="2" />
       </>
     ),
-    tomorrow: (
-      <>
-        <rect x="4" y="5" width="16" height="15" rx="2" />
-        <line x1="4" y1="9" x2="20" y2="9" />
-        <path d="M9 15h6m0 0l-2-2m2 2l-2 2" />
-      </>
+    projects: (
+      <path d="M4 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2z" />
     ),
-    next7: (
-      <>
-        <rect x="4" y="5" width="16" height="15" rx="2" />
-        <line x1="4" y1="9" x2="20" y2="9" />
-        <line x1="9" y1="13" x2="9" y2="17" />
-        <line x1="12" y1="13" x2="12" y2="17" />
-        <line x1="15" y1="13" x2="15" y2="17" />
-      </>
-    ),
-    calendar: (
-      <>
-        <rect x="4" y="5" width="16" height="15" rx="2" />
-        <line x1="4" y1="9" x2="20" y2="9" />
-        <line x1="8" y1="3" x2="8" y2="7" />
-        <line x1="16" y1="3" x2="16" y2="7" />
-      </>
-    ),
-    inbox: (
-      <>
-        <path d="M4 13l2.4-7h11.2L20 13" />
-        <path d="M4 13v5a1 1 0 001 1h14a1 1 0 001-1v-5" />
-        <path d="M4 13h4l1.5 2.5h5L16 13h4" />
-      </>
-    ),
-    board: (
+    planning: (
       <>
         <rect x="4" y="5" width="6" height="14" rx="1" />
         <rect x="14" y="5" width="6" height="9" rx="1" />
       </>
     ),
-    matrix: (
+    study: (
       <>
-        <rect x="4" y="4" width="16" height="16" rx="2" />
-        <line x1="12" y1="4" x2="12" y2="20" />
-        <line x1="4" y1="12" x2="20" y2="12" />
+        <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+        <path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5z" />
       </>
     ),
-    dashboard: (
+    archive: (
       <>
-        <line x1="5" y1="20" x2="5" y2="13" />
-        <line x1="12" y1="20" x2="12" y2="7" />
-        <line x1="19" y1="20" x2="19" y2="11" />
-      </>
-    ),
-    habits: (
-      <>
-        <path d="M5 13l4 4L19 7" />
-      </>
-    ),
-    focus: (
-      <>
-        <circle cx="12" cy="12" r="8" />
-        <path d="M12 8v4l3 2" />
+        <path d="M4 7h16" />
+        <path d="M6 7v12a1 1 0 001 1h10a1 1 0 001-1V7" />
+        <path d="M9 11h6" />
+        <path d="M8 4h8l1 3H7z" />
       </>
     ),
     settings: (
@@ -151,73 +96,62 @@ export function Sidebar({
   onOpenSettings,
   search,
 }: SidebarProps) {
-  const [listsOpen, setListsOpen] = useState(true);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [newList, setNewList] = useState("");
-
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const [newProject, setNewProject] = useState("");
   const today = todayValue();
-  const tomorrow = addDays(today, 1);
-  const isOpen = (task: Task) => task.status !== "done";
+  const isOpen = (task: Task) => task.status !== "done" && task.status !== "archived";
 
-  const smartLists: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
-    { id: "tasks", label: "All", icon: "all", count: tasks.filter(isOpen).length },
+  const navItems: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
+    {
+      id: "inbox",
+      label: "Inbox",
+      icon: "inbox",
+      count: tasks.filter((task) => isOpen(task) && !task.projectId && !task.dueDate).length,
+    },
     {
       id: "today",
       label: "Today",
       icon: "today",
       count: tasks.filter((task) => isOpen(task) && task.dueDate === today).length,
     },
+    { id: "projects", label: "Projects", icon: "projects", count: projects.length },
     {
-      id: "tomorrow",
-      label: "Tomorrow",
-      icon: "tomorrow",
-      count: tasks.filter((task) => isOpen(task) && task.dueDate === tomorrow).length,
+      id: "planning",
+      label: "Planning",
+      icon: "planning",
+      count: tasks.filter((task) => isOpen(task) && (isOverdue(task.dueDate) || task.status === "waiting")).length,
     },
     {
-      id: "next7",
-      label: "Next 7 Days",
-      icon: "next7",
-      count: tasks.filter((task) => isOpen(task) && isThisWeek(task.dueDate)).length,
+      id: "study",
+      label: "Study",
+      icon: "study",
+      count: tasks.filter((task) => isOpen(task) && task.tags.some((tag) => tag.toLowerCase().includes("study"))).length,
     },
-    {
-      id: "calendar",
-      label: "Calendar",
-      icon: "calendar",
-      count: tasks.filter((task) => isOpen(task) && Boolean(task.dueDate)).length,
-    },
-    {
-      id: "inbox",
-      label: "Inbox",
-      icon: "inbox",
-      count: tasks.filter((task) => !task.projectId && !task.dueDate).length,
-    },
+    { id: "archive", label: "Archive", icon: "archive", count: tasks.filter((task) => task.status === "done").length },
+    { id: "settings", label: "Settings", icon: "settings", count: 0 },
   ];
 
-  const moreItems: Array<{ id: PageId; label: string; icon: IconName }> = [
-    { id: "board", label: "Board", icon: "board" },
-    { id: "matrix", label: "Matrix", icon: "matrix" },
-    { id: "dashboard", label: "Dashboard", icon: "dashboard" },
-    { id: "habits", label: "Habits", icon: "habits" },
-    { id: "focus", label: "Focus", icon: "focus" },
-    { id: "settings", label: "Settings", icon: "settings" },
-  ];
+  const initial = (userEmail || "Junghoon").charAt(0).toUpperCase();
 
-  const initial = (userEmail || "Guest").charAt(0).toUpperCase();
-
-  function submitNewList() {
-    const trimmed = newList.trim();
+  function submitNewProject() {
+    const trimmed = newProject.trim();
     if (!trimmed) {
       return;
     }
     onAddProject(trimmed);
-    setNewList("");
+    setNewProject("");
   }
 
   return (
     <aside className="sidebar">
+      <div className="brand-lockup">
+        <span className="brand-mark">F</span>
+        <strong>FocusFlow</strong>
+      </div>
+
       <div className="side-profile">
         <span className="side-avatar">{initial}</span>
-        <span className="side-name">{userEmail || "Guest"}</span>
+        <span className="side-name">{userEmail || "Junghoon"}</span>
         <button className="side-icon-btn" aria-label="Settings" onClick={onOpenSettings}>
           <Icon name="gear" />
         </button>
@@ -226,7 +160,7 @@ export function Sidebar({
       <div className="global-search">{search}</div>
 
       <nav className="side-list">
-        {smartLists.map((item) => (
+        {navItems.map((item) => (
           <button
             key={item.id}
             className={activePage === item.id ? "side-item active" : "side-item"}
@@ -242,18 +176,16 @@ export function Sidebar({
       </nav>
 
       <div className="side-section">
-        <button className="side-section-title" onClick={() => setListsOpen((open) => !open)}>
-          <span className="side-chevron" style={{ transform: listsOpen ? "rotate(90deg)" : "none" }}>
-            ›
+        <button className="side-section-title" onClick={() => setProjectsOpen((open) => !open)}>
+          <span className="side-chevron" style={{ transform: projectsOpen ? "rotate(90deg)" : "none" }}>
+            &rsaquo;
           </span>
-          Lists
+          Project Shortcuts
         </button>
-        {listsOpen ? (
+        {projectsOpen ? (
           <div className="side-list">
             {projects.map((project) => {
-              const count = tasks.filter(
-                (task) => task.projectId === project.id && isOpen(task),
-              ).length;
+              const count = tasks.filter((task) => task.projectId === project.id && isOpen(task)).length;
               const active = activePage === "projects" && selectedProjectId === project.id;
               return (
                 <button
@@ -271,41 +203,16 @@ export function Sidebar({
               className="side-add"
               onSubmit={(event) => {
                 event.preventDefault();
-                submitNewList();
+                submitNewProject();
               }}
             >
               <input
-                placeholder="+ Add List"
-                value={newList}
-                onChange={(event) => setNewList(event.target.value)}
+                placeholder="+ Add Project"
+                value={newProject}
+                onChange={(event) => setNewProject(event.target.value)}
               />
             </form>
           </div>
-        ) : null}
-      </div>
-
-      <div className="side-section">
-        <button className="side-section-title" onClick={() => setMoreOpen((open) => !open)}>
-          <span className="side-chevron" style={{ transform: moreOpen ? "rotate(90deg)" : "none" }}>
-            ›
-          </span>
-          More
-        </button>
-        {moreOpen ? (
-          <nav className="side-list">
-            {moreItems.map((item) => (
-              <button
-                key={item.id}
-                className={activePage === item.id ? "side-item active" : "side-item"}
-                onClick={() => onNavigate(item.id)}
-              >
-                <span className="side-item-icon">
-                  <Icon name={item.icon} />
-                </span>
-                <span className="side-item-label">{item.label}</span>
-              </button>
-            ))}
-          </nav>
         ) : null}
       </div>
     </aside>

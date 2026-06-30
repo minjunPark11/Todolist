@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import type { Project, TaskDraft } from "../types";
 import { todayValue } from "../utils/date";
 
@@ -6,6 +6,8 @@ interface QuickAddProps {
   projects: Project[];
   defaultDueDate?: string;
   defaultProjectId?: string;
+  defaultStatus?: TaskDraft["status"];
+  defaultPriority?: TaskDraft["priority"];
   compact?: boolean;
   onAddTask: (draft: TaskDraft) => void;
 }
@@ -14,21 +16,32 @@ export function QuickAdd({
   projects,
   defaultDueDate = "",
   defaultProjectId = "",
+  defaultStatus = "todo",
+  defaultPriority = "none",
   compact = false,
   onAddTask,
 }: QuickAddProps) {
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState(defaultDueDate);
   const [projectId, setProjectId] = useState(defaultProjectId);
-  const [priority, setPriority] = useState<TaskDraft["priority"]>("none");
+  const [priority, setPriority] = useState<TaskDraft["priority"]>(defaultPriority);
+
+  useEffect(() => {
+    setDueDate(defaultDueDate);
+    setProjectId(defaultProjectId);
+    setPriority(defaultPriority);
+  }, [defaultDueDate, defaultPriority, defaultProjectId]);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    onAddTask({ title, dueDate, projectId, priority });
+    if (!title.trim()) {
+      return;
+    }
+    onAddTask({ title, dueDate, projectId, priority, status: defaultStatus });
     setTitle("");
     setDueDate(defaultDueDate);
     setProjectId(defaultProjectId);
-    setPriority("none");
+    setPriority(defaultPriority);
   }
 
   return (

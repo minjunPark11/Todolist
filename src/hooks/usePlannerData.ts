@@ -19,7 +19,7 @@ import type {
 import { addDays, addMonths } from "../utils/date";
 
 const STORAGE_KEY = "todo-planner-data";
-const taskStatuses = ["todo", "in_progress", "waiting", "blocked", "done"] as const;
+const taskStatuses = ["todo", "in_progress", "waiting", "blocked", "done", "archived"] as const;
 const taskPriorities = ["none", "low", "medium", "high"] as const;
 const taskLevels = ["low", "high"] as const;
 const repeatTypes = ["none", "daily", "weekly", "monthly"] as const;
@@ -63,6 +63,8 @@ function normalizeTask(task: Partial<Task>): Task {
     createdAt: task.createdAt ?? now,
     updatedAt: task.updatedAt ?? now,
     completedAt: task.completedAt ?? "",
+    archivedAt: task.archivedAt ?? "",
+    previousStatus: oneOf(task.previousStatus, taskStatuses, "todo"),
     blockedByTaskId: task.blockedByTaskId ?? "",
     repeatType: oneOf(task.repeatType, repeatTypes, "none"),
     repeatInterval: task.repeatInterval ?? 1,
@@ -79,6 +81,8 @@ function normalizeProject(project: Partial<Project>): Project {
     name: project.name ?? "Untitled project",
     description: project.description ?? "",
     color: project.color ?? "#0066cc",
+    status: project.status === "archived" || project.status === "paused" || project.status === "completed" ? project.status : "active",
+    archivedAt: project.archivedAt ?? "",
     createdAt: project.createdAt ?? now,
     updatedAt: project.updatedAt ?? now,
   };
@@ -496,6 +500,8 @@ export function usePlannerData() {
       createdAt: now,
       updatedAt: now,
       completedAt: "",
+      archivedAt: "",
+      previousStatus: "todo",
       blockedByTaskId: draft.blockedByTaskId ?? "",
       repeatType: draft.repeatType ?? "none",
       repeatInterval: draft.repeatInterval ?? 1,
@@ -538,6 +544,8 @@ export function usePlannerData() {
       createdAt: now,
       updatedAt: now,
       completedAt: "",
+      archivedAt: "",
+      previousStatus: "todo",
       blockedByTaskId: "",
       repeatType: "none",
       repeatInterval: 1,
@@ -603,6 +611,83 @@ export function usePlannerData() {
     setSelectedTaskId("");
   }
 
+  function archiveTask(taskId: string) {
+    const now = new Date().toISOString();
+
+    setData((current) => ({
+      ...current,
+      tasks: current.tasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              previousStatus: task.status === "archived" ? task.previousStatus : task.status,
+              status: "archived",
+              archivedAt: now,
+              updatedAt: now,
+            }
+          : task,
+      ),
+    }));
+    setSelectedTaskId("");
+  }
+
+  function restoreTask(taskId: string) {
+    const now = new Date().toISOString();
+
+    setData((current) => ({
+      ...current,
+      tasks: current.tasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              status: task.previousStatus && task.previousStatus !== "archived" ? task.previousStatus : "todo",
+              archivedAt: "",
+              updatedAt: now,
+            }
+          : task,
+      ),
+    }));
+  }
+
+  function duplicateTask(taskId: string) {
+    const source = data.tasks.find((task) => task.id === taskId);
+    if (!source) {
+      return "";
+    }
+
+    const now = new Date().toISOString();
+    const newTaskId = createId("task");
+    const copy: Task = {
+      ...source,
+      id: newTaskId,
+      title: `${source.title} Copy`,
+      status: source.status === "done" || source.status === "archived" ? "todo" : source.status,
+      completedAt: "",
+      archivedAt: "",
+      previousStatus: "todo",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const copiedSubtasks = data.subtasks
+      .filter((subtask) => subtask.taskId === taskId)
+      .map((subtask) => ({
+        ...subtask,
+        id: createId("subtask"),
+        taskId: newTaskId,
+        completed: false,
+        createdAt: now,
+        updatedAt: now,
+      }));
+
+    setData((current) => ({
+      ...current,
+      tasks: [copy, ...current.tasks],
+      subtasks: [...current.subtasks, ...copiedSubtasks],
+    }));
+    setSelectedTaskId(newTaskId);
+    return newTaskId;
+  }
+
   function toggleTaskDone(taskId: string) {
     const now = new Date().toISOString();
 
@@ -651,6 +736,8 @@ export function usePlannerData() {
       name: trimmed,
       description: "",
       color,
+      status: "active",
+      archivedAt: "",
       createdAt: now,
       updatedAt: now,
     };
@@ -658,6 +745,42 @@ export function usePlannerData() {
     setData((current) => ({
       ...current,
       projects: [...current.projects, project],
+    }));
+  }
+
+  function archiveProject(projectId: string) {
+    const now = new Date().toISOString();
+
+    setData((current) => ({
+      ...current,
+      projects: current.projects.map((project) =>
+        project.id === projectId
+          ? { ...project, status: "archived", archivedAt: now, updatedAt: now }
+          : project,
+      ),
+    }));
+  }
+
+  function restoreProject(projectId: string) {
+    const now = new Date().toISOString();
+
+    setData((current) => ({
+      ...current,
+      projects: current.projects.map((project) =>
+        project.id === projectId
+          ? { ...project, status: "active", archivedAt: "", updatedAt: now }
+          : project,
+      ),
+    }));
+  }
+
+  function deleteProject(projectId: string) {
+    setData((current) => ({
+      ...current,
+      projects: current.projects.filter((project) => project.id !== projectId),
+      tasks: current.tasks.map((task) =>
+        task.projectId === projectId ? { ...task, projectId: "", updatedAt: new Date().toISOString() } : task,
+      ),
     }));
   }
 
@@ -864,8 +987,14 @@ export function usePlannerData() {
     createTaskFromTemplate,
     updateTask,
     deleteTask,
+    archiveTask,
+    restoreTask,
+    duplicateTask,
     toggleTaskDone,
     addProject,
+    archiveProject,
+    restoreProject,
+    deleteProject,
     addSubtask,
     toggleSubtask,
     deleteSubtask,
