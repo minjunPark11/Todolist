@@ -1,6 +1,7 @@
 import { ChangeEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { BoardView } from "./components/BoardView";
 import { CalendarView } from "./components/CalendarView";
+import { DashboardView } from "./components/DashboardView";
 import { FocusPage } from "./components/FocusPage";
 import { getHabitStreak, HabitsPage } from "./components/HabitsPage";
 import { QuickAdd } from "./components/QuickAdd";
@@ -38,14 +39,6 @@ type SortDirection = "asc" | "desc";
 
 function getProjectName(projects: Project[], projectId: string) {
   return projects.find((project) => project.id === projectId)?.name ?? "Inbox";
-}
-
-function getTaskCompletion(tasks: Task[]) {
-  if (tasks.length === 0) {
-    return 0;
-  }
-
-  return Math.round((tasks.filter((task) => task.status === "done").length / tasks.length) * 100);
 }
 
 function sortTasks(tasks: Task[]) {
@@ -691,21 +684,13 @@ export default function App() {
 
     if (activePage === "dashboard") {
       return (
-        <DashboardPage
+        <DashboardView
           tasks={planner.tasks}
           projects={planner.projects}
           habits={planner.habits}
           habitLogs={planner.habitLogs}
-          totalTasks={planner.tasks.length}
-          completedTasks={completedTasks.length}
-          inProgressTasks={inProgressTasks.length}
-          blockedTasks={blockedTasks.length}
-          overdueTasks={overdueTasks.length}
-          dueThisWeek={thisWeekTasks.length}
-          habitsCompletedToday={habitsCompletedToday}
-          currentHabitStreak={currentHabitStreak}
-          focusMinutesThisWeek={focusMinutesThisWeek}
-          recurringDueToday={recurringTasksDueToday.length}
+          focusSessions={planner.focusSessions}
+          onExport={exportJson}
         />
       );
     }
@@ -1132,131 +1117,12 @@ function ProjectDetailSummary({
   );
 }
 
-function DashboardPage({
-  tasks,
-  projects,
-  habits,
-  habitLogs,
-  totalTasks,
-  completedTasks,
-  inProgressTasks,
-  blockedTasks,
-  overdueTasks,
-  dueThisWeek,
-  habitsCompletedToday,
-  currentHabitStreak,
-  focusMinutesThisWeek,
-  recurringDueToday,
-}: {
-  tasks: Task[];
-  projects: Project[];
-  habits: Habit[];
-  habitLogs: HabitLog[];
-  totalTasks: number;
-  completedTasks: number;
-  inProgressTasks: number;
-  blockedTasks: number;
-  overdueTasks: number;
-  dueThisWeek: number;
-  habitsCompletedToday: number;
-  currentHabitStreak: number;
-  focusMinutesThisWeek: number;
-  recurringDueToday: number;
-}) {
-  const completionRate = getTaskCompletion(tasks);
-  const statusCounts: Array<{ label: string; value: number }> = statusOptions
-    .filter((status) => status !== "all")
-    .map((status) => ({
-      label: status.replace("_", " "),
-      value: tasks.filter((task) => task.status === status).length,
-    }));
-  const priorityCounts: Array<{ label: string; value: number }> = priorityOptions
-    .filter((priority) => priority !== "all")
-    .map((priority) => ({
-      label: priority,
-      value: tasks.filter((task) => task.priority === priority).length,
-    }));
-  const projectCounts = projects.map((project) => ({
-    label: project.name,
-    value: tasks.filter((task) => task.projectId === project.id).length,
-  }));
-  const inboxCount = tasks.filter((task) => !task.projectId).length;
-
-  return (
-    <section className="content-stack">
-      <header className="page-header">
-        <h1>Dashboard</h1>
-        <div className="stat-pill">{completionRate}% complete</div>
-      </header>
-      <div className="metric-grid dashboard-metrics">
-        <MetricCard label="Total tasks" value={totalTasks} />
-        <MetricCard label="Completed" value={completedTasks} />
-        <MetricCard label="In progress" value={inProgressTasks} />
-        <MetricCard label="Blocked" value={blockedTasks} tone="danger" />
-        <MetricCard label="Overdue" value={overdueTasks} tone="danger" />
-        <MetricCard label="Due this week" value={dueThisWeek} />
-        <MetricCard label="Habits today" value={habitsCompletedToday} />
-        <MetricCard label="Best streak" value={currentHabitStreak} />
-        <MetricCard label="Focus this week" value={focusMinutesThisWeek} />
-        <MetricCard label="Recurring today" value={recurringDueToday} />
-      </div>
-      <section className="dashboard-section">
-        <h2>Completion</h2>
-        <div className="chart-row">
-          <div>
-            <strong>All tasks</strong>
-            <span>{completionRate}%</span>
-          </div>
-          <div className="progress-bar">
-            <span style={{ width: `${completionRate}%` }} />
-          </div>
-        </div>
-      </section>
-      <div className="dashboard-grid">
-        <BarPanel title="By project" items={[...projectCounts, { label: "Inbox", value: inboxCount }]} />
-        <BarPanel title="By status" items={statusCounts} />
-        <BarPanel title="By priority" items={priorityCounts} />
-        <BarPanel
-          title="Habit streaks"
-          items={habits.map((habit) => ({
-            label: habit.name,
-            value: getHabitStreak(habit.id, habitLogs),
-          }))}
-        />
-      </div>
-    </section>
-  );
-}
-
 function MetricCard({ label, value, tone = "" }: { label: string; value: number; tone?: string }) {
   return (
     <article className="metric-card">
       <span>{label}</span>
       <strong className={tone}>{value}</strong>
     </article>
-  );
-}
-
-function BarPanel({ title, items }: { title: string; items: Array<{ label: string; value: number }> }) {
-  const max = Math.max(...items.map((item) => item.value), 1);
-
-  return (
-    <section className="dashboard-section">
-      <h2>{title}</h2>
-      <div className="bar-list">
-        {items.map((item) => (
-          <div key={item.label} className="bar-row">
-            <div>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </div>
-            <div className="bar-track">
-              <span style={{ width: `${(item.value / max) * 100}%` }} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 
