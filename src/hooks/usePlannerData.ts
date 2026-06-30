@@ -2,26 +2,77 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { sampleData } from "../data/sampleData";
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 import type {
+  AppSettings,
+  ConceptNote,
   FocusMode,
   FocusSession,
   Habit,
   HabitFrequency,
   HabitLog,
+  NoteDifficulty,
+  NoteType,
   PlannerData,
   PlannerSettings,
   Project,
+  ProjectType,
+  RawPlannerData,
+  RecentItem,
   RepeatType,
+  ReviewDifficulty,
+  StoredReviewStatus,
+  StudyTopic,
+  StudyTopicCategory,
   Subtask,
   Task,
   TaskDraft,
   TaskTemplate,
 } from "../types";
-import { addDays, addMonths } from "../utils/date";
+import { addDays, addMonths, todayValue } from "../utils/date";
+import { defaultConceptNotes, defaultStudyTopics } from "../data/studySeed";
 
-const STORAGE_KEY = "todo-planner-data";
-const taskStatuses = ["todo", "in_progress", "waiting", "blocked", "done", "archived"] as const;
+const STORAGE_KEY = "focusflow.appData.v1";
+const LEGACY_STORAGE_KEY = "todo-planner-data";
+const taskStatuses = ["inbox", "todo", "doing", "waiting", "done", "archived"] as const;
 const taskPriorities = ["none", "low", "medium", "high"] as const;
 const taskLevels = ["low", "high"] as const;
+const projectTypes = ["project", "area"] as const;
+const projectStatuses = ["active", "paused", "completed", "archived"] as const;
+const topicCategories = [
+  "Python",
+  "LeetCode",
+  "Research",
+  "fNIRS",
+  "English",
+  "Presentation",
+  "Other",
+] as const;
+const topicStatuses = ["active", "paused", "mastered", "archived"] as const;
+const noteTypes = ["concept", "leetcode", "research", "english", "presentation", "other"] as const;
+const noteDifficulties = ["unknown", "hard", "medium", "easy"] as const;
+const storedReviewStatuses = ["not_scheduled", "reviewed", "mastered"] as const;
+const accentColors = ["blue", "purple", "green", "pink", "orange"] as const;
+const themeModes = ["light", "dark", "system"] as const;
+const fontSizes = ["small", "medium", "large"] as const;
+
+const DEFAULT_APP_SETTINGS: AppSettings = {
+  theme: "light",
+  accentColor: "blue",
+  fontSize: "medium",
+  defaultView: "/today",
+  showCompletedInToday: true,
+  confirmBeforeDelete: true,
+  showSidebarCounts: true,
+  sidebarCollapsed: false,
+  reduceMotion: false,
+};
+
+// Review interval (days) by difficulty. `mastered` clears the schedule.
+const REVIEW_INTERVALS: Record<ReviewDifficulty, number | null> = {
+  hard: 1,
+  medium: 3,
+  easy: 7,
+  mastered: null,
+};
 const repeatTypes = ["none", "daily", "weekly", "monthly"] as const;
 const habitFrequencies = ["daily", "weekly"] as const;
 const focusModes = ["focus", "short_break", "long_break"] as const;
@@ -46,31 +97,49 @@ function oneOf<T extends readonly string[]>(value: unknown, options: T, fallback
 function normalizeTask(task: Partial<Task>): Task {
   const now = new Date().toISOString();
 
+  // Migrate legacy statuses to the canonical lifecycle (spec §0.1.2).
+  const rawStatus = migrateStatus(task.status);
+  const rawPrevious = task.previousStatus ? migrateStatus(task.previousStatus) : undefined;
+
   return {
     id: task.id ?? createId("task"),
     title: task.title ?? "Untitled task",
     description: task.description ?? "",
-    status: oneOf(task.status, taskStatuses, "todo"),
+    status: oneOf(rawStatus, taskStatuses, "todo"),
     priority: oneOf(task.priority, taskPriorities, "none"),
     dueDate: task.dueDate ?? "",
+    scheduledDate: task.scheduledDate ?? "",
     startTime: task.startTime ?? "",
     endTime: task.endTime ?? "",
     projectId: task.projectId ?? "",
+    parentTaskId: task.parentTaskId ?? "",
     tags: Array.isArray(task.tags) ? task.tags : [],
     notes: task.notes ?? "",
     importance: oneOf(task.importance, taskLevels, "low"),
     urgency: oneOf(task.urgency, taskLevels, "low"),
+    isFocus: Boolean(task.isFocus),
+    isSomeday: Boolean(task.isSomeday),
+    waitingReason: task.waitingReason ?? "",
+    waitingFollowUpDate: task.waitingFollowUpDate ?? "",
+    order: typeof task.order === "number" ? task.order : 0,
     createdAt: task.createdAt ?? now,
     updatedAt: task.updatedAt ?? now,
     completedAt: task.completedAt ?? "",
     archivedAt: task.archivedAt ?? "",
-    previousStatus: oneOf(task.previousStatus, taskStatuses, "todo"),
+    deletedAt: task.deletedAt,
+    previousStatus: rawPrevious ? oneOf(rawPrevious, taskStatuses, "todo") : undefined,
     blockedByTaskId: task.blockedByTaskId ?? "",
     repeatType: oneOf(task.repeatType, repeatTypes, "none"),
     repeatInterval: task.repeatInterval ?? 1,
     repeatDays: Array.isArray(task.repeatDays) ? task.repeatDays : [],
     repeatEndDate: task.repeatEndDate ?? "",
   };
+}
+
+function migrateStatus(status: unknown): string {
+  if (status === "in_progress") return "doing";
+  if (status === "blocked") return "waiting";
+  return typeof status === "string" ? status : "todo";
 }
 
 function normalizeProject(project: Partial<Project>): Project {
@@ -80,8 +149,13 @@ function normalizeProject(project: Partial<Project>): Project {
     id: project.id ?? createId("project"),
     name: project.name ?? "Untitled project",
     description: project.description ?? "",
-    color: project.color ?? "#0066cc",
-    status: project.status === "archived" || project.status === "paused" || project.status === "completed" ? project.status : "active",
+    color: project.color ?? "#007AFF",
+    type: oneOf(project.type, projectTypes, "project") as ProjectType,
+    icon: project.icon,
+    dueDate: project.dueDate ?? "",
+    pinned: Boolean(project.pinned),
+    order: typeof project.order === "number" ? project.order : 0,
+    status: oneOf(project.status, projectStatuses, "active"),
     archivedAt: project.archivedAt ?? "",
     createdAt: project.createdAt ?? now,
     updatedAt: project.updatedAt ?? now,
@@ -168,13 +242,94 @@ function normalizeSettings(settings?: Partial<PlannerSettings>): PlannerSettings
   };
 }
 
-function normalizeData(data: Partial<PlannerData>): PlannerData {
+function normalizeStudyTopic(topic: Partial<StudyTopic>): StudyTopic {
+  const now = new Date().toISOString();
+
+  return {
+    id: topic.id ?? createId("topic"),
+    name: topic.name ?? "Untitled topic",
+    category: oneOf(topic.category, topicCategories, "Other") as StudyTopicCategory,
+    description: topic.description ?? "",
+    status: oneOf(topic.status, topicStatuses, "active"),
+    color: topic.color ?? "#007AFF",
+    icon: topic.icon,
+    order: typeof topic.order === "number" ? topic.order : 0,
+    createdAt: topic.createdAt ?? now,
+    updatedAt: topic.updatedAt ?? now,
+    archivedAt: topic.archivedAt,
+  };
+}
+
+function normalizeConceptNote(note: Partial<ConceptNote>): ConceptNote {
+  const now = new Date().toISOString();
+
+  return {
+    id: note.id ?? createId("note"),
+    topicId: note.topicId ?? "",
+    title: note.title ?? "Untitled note",
+    noteType: oneOf(note.noteType, noteTypes, "concept") as NoteType,
+    summary: note.summary ?? "",
+    content: note.content ?? "",
+    examples: note.examples ?? "",
+    personalExplanation: note.personalExplanation ?? "",
+    confusionPoint: note.confusionPoint ?? "",
+    difficulty: oneOf(note.difficulty, noteDifficulties, "unknown") as NoteDifficulty,
+    reviewStatus: oneOf(note.reviewStatus, storedReviewStatuses, "not_scheduled") as StoredReviewStatus,
+    nextReviewDate: note.nextReviewDate ?? "",
+    lastReviewedAt: note.lastReviewedAt ?? "",
+    reviewHistory: Array.isArray(note.reviewHistory) ? note.reviewHistory : [],
+    leetcode: note.leetcode,
+    research: note.research,
+    english: note.english,
+    source: note.source ?? "",
+    tags: Array.isArray(note.tags) ? note.tags : [],
+    order: typeof note.order === "number" ? note.order : 0,
+    createdAt: note.createdAt ?? now,
+    updatedAt: note.updatedAt ?? now,
+    deletedAt: note.deletedAt,
+  };
+}
+
+function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
+  return {
+    theme: oneOf(settings?.theme, themeModes, DEFAULT_APP_SETTINGS.theme),
+    accentColor: oneOf(settings?.accentColor, accentColors, DEFAULT_APP_SETTINGS.accentColor),
+    fontSize: oneOf(settings?.fontSize, fontSizes, DEFAULT_APP_SETTINGS.fontSize),
+    defaultView: settings?.defaultView === "/inbox" ? "/inbox" : "/today",
+    showCompletedInToday: settings?.showCompletedInToday ?? DEFAULT_APP_SETTINGS.showCompletedInToday,
+    confirmBeforeDelete: settings?.confirmBeforeDelete ?? DEFAULT_APP_SETTINGS.confirmBeforeDelete,
+    showSidebarCounts: settings?.showSidebarCounts ?? DEFAULT_APP_SETTINGS.showSidebarCounts,
+    sidebarCollapsed: settings?.sidebarCollapsed ?? DEFAULT_APP_SETTINGS.sidebarCollapsed,
+    reduceMotion: settings?.reduceMotion ?? DEFAULT_APP_SETTINGS.reduceMotion,
+  };
+}
+
+function normalizeRecentItem(item: Partial<RecentItem>): RecentItem {
+  return {
+    id: item.id ?? createId("recent"),
+    type: (item.type ?? "task") as RecentItem["type"],
+    refId: item.refId ?? "",
+    title: item.title ?? "",
+    openedAt: item.openedAt ?? new Date().toISOString(),
+  };
+}
+
+function normalizeData(data: RawPlannerData): PlannerData {
+  const hasStudy =
+    Array.isArray(data.studyTopics) || Array.isArray(data.conceptNotes);
+
   return {
     tasks: Array.isArray(data.tasks) ? data.tasks.map(normalizeTask) : [],
     projects: Array.isArray(data.projects) ? data.projects.map(normalizeProject) : [],
     subtasks: Array.isArray(data.subtasks)
       ? data.subtasks.map(normalizeSubtask).filter((subtask) => subtask.taskId)
       : [],
+    studyTopics: hasStudy
+      ? (data.studyTopics ?? []).map(normalizeStudyTopic)
+      : defaultStudyTopics.map(normalizeStudyTopic),
+    conceptNotes: hasStudy
+      ? (data.conceptNotes ?? []).map(normalizeConceptNote).filter((note) => !note.deletedAt)
+      : defaultConceptNotes.map(normalizeConceptNote),
     habits: Array.isArray(data.habits) ? data.habits.map(normalizeHabit) : [],
     habitLogs: Array.isArray(data.habitLogs)
       ? data.habitLogs.map(normalizeHabitLog).filter((log) => log.habitId && log.date)
@@ -185,8 +340,14 @@ function normalizeData(data: Partial<PlannerData>): PlannerData {
     taskTemplates: Array.isArray(data.taskTemplates)
       ? data.taskTemplates.map(normalizeTaskTemplate)
       : [],
+    recentItems: Array.isArray(data.recentItems) ? data.recentItems.map(normalizeRecentItem) : [],
     settings: normalizeSettings(data.settings),
+    appSettings: normalizeAppSettings(data.appSettings),
   };
+}
+
+function emptyData(): PlannerData {
+  return normalizeData({ studyTopics: [], conceptNotes: [] });
 }
 
 function countDataItems(data: PlannerData): number {
@@ -223,16 +384,25 @@ function getNextDueDate(task: Task): string {
 function readStorage(): PlannerData {
   const raw = localStorage.getItem(STORAGE_KEY);
 
-  if (!raw) {
-    return normalizeData(sampleData);
+  if (raw) {
+    try {
+      return normalizeData(JSON.parse(raw) as Partial<PlannerData>);
+    } catch {
+      return normalizeData(sampleData);
+    }
   }
 
-  try {
-    const parsed = JSON.parse(raw) as Partial<PlannerData>;
-    return normalizeData(parsed);
-  } catch {
-    return normalizeData(sampleData);
+  // One-time migration from the legacy storage key (statuses remapped on normalize).
+  const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (legacy) {
+    try {
+      return normalizeData(JSON.parse(legacy) as Partial<PlannerData>);
+    } catch {
+      return normalizeData(sampleData);
+    }
   }
+
+  return normalizeData(sampleData);
 }
 
 export function usePlannerData() {
@@ -481,42 +651,32 @@ export function usePlannerData() {
     return true;
   }
 
-  function addTask(draft: TaskDraft) {
+  function addTask(draft: TaskDraft): string {
     const now = new Date().toISOString();
-    const task: Task = {
+    const title = draft.title.trim();
+    if (!title) {
+      return "";
+    }
+
+    const task = normalizeTask({
+      ...(draft as Partial<Task>),
       id: createId("task"),
-      title: draft.title.trim(),
-      description: draft.description ?? "",
+      title,
       status: draft.status ?? "todo",
-      priority: draft.priority ?? "none",
-      dueDate: draft.dueDate ?? "",
-      startTime: draft.startTime ?? "",
-      endTime: draft.endTime ?? "",
-      projectId: draft.projectId ?? "",
-      tags: draft.tags ?? [],
-      notes: draft.notes ?? "",
-      importance: draft.importance ?? "low",
-      urgency: draft.urgency ?? "low",
       createdAt: now,
       updatedAt: now,
-      completedAt: "",
-      archivedAt: "",
-      previousStatus: "todo",
-      blockedByTaskId: draft.blockedByTaskId ?? "",
-      repeatType: draft.repeatType ?? "none",
-      repeatInterval: draft.repeatInterval ?? 1,
-      repeatDays: draft.repeatDays ?? [],
-      repeatEndDate: draft.repeatEndDate ?? "",
-    };
-
-    if (!task.title) {
-      return;
-    }
+    });
 
     setData((current) => ({
       ...current,
       tasks: [task, ...current.tasks],
     }));
+    return task.id;
+  }
+
+  // Spec §0.1.1 alias: capture goes to Inbox by default unless context overrides.
+  function createTask(draft: TaskDraft, context?: Partial<TaskDraft>): string {
+    return addTask({ status: "inbox", ...context, ...draft });
   }
 
   function createTaskFromTemplate(templateId: string) {
@@ -527,31 +687,18 @@ export function usePlannerData() {
 
     const now = new Date().toISOString();
     const taskId = createId("task");
-    const task: Task = {
+    const task: Task = normalizeTask({
       id: taskId,
       title: template.title,
       description: template.description,
       status: "todo",
       priority: template.priority,
-      dueDate: "",
-      startTime: "",
-      endTime: "",
       projectId: template.projectId,
       tags: template.tags,
       notes: template.notes,
-      importance: "low",
-      urgency: "low",
       createdAt: now,
       updatedAt: now,
-      completedAt: "",
-      archivedAt: "",
-      previousStatus: "todo",
-      blockedByTaskId: "",
-      repeatType: "none",
-      repeatInterval: 1,
-      repeatDays: [],
-      repeatEndDate: "",
-    };
+    });
     const subtasks = template.subtasks.map((title) => ({
       id: createId("subtask"),
       taskId,
@@ -579,23 +726,26 @@ export function usePlannerData() {
           return task;
         }
 
-        const nextBlockedByTaskId = patch.blockedByTaskId ?? task.blockedByTaskId;
-        const nextStatus =
-          nextBlockedByTaskId && patch.status !== "done"
-            ? "blocked"
-            : (patch.status ?? task.status);
+        const nextStatus = patch.status ?? task.status;
+        const statusChanged = nextStatus !== task.status;
 
         return {
           ...task,
           ...patch,
-          blockedByTaskId: nextBlockedByTaskId,
           status: nextStatus,
+          previousStatus: statusChanged ? task.status : task.previousStatus,
           completedAt:
             nextStatus === "done"
               ? task.completedAt || now
-              : nextStatus !== task.status
+              : statusChanged
                 ? ""
                 : (patch.completedAt ?? task.completedAt),
+          archivedAt:
+            nextStatus === "archived"
+              ? task.archivedAt || now
+              : statusChanged
+                ? ""
+                : task.archivedAt,
           updatedAt: now,
         };
       }),
@@ -929,6 +1079,220 @@ export function usePlannerData() {
     }));
   }
 
+  // === Shared task lifecycle (spec §0.1.1) ===
+  function updateTaskStatus(taskId: string, nextStatus: Task["status"], options?: Partial<Task>) {
+    updateTask(taskId, { status: nextStatus, ...options });
+  }
+
+  function completeTask(taskId: string) {
+    updateTask(taskId, { status: "done" });
+  }
+
+  function setTaskFocus(taskId: string, isFocus: boolean) {
+    updateTask(taskId, { isFocus });
+  }
+
+  // Snooze moves the planned work date only — never the deadline (spec §0.5.9).
+  function snoozeTask(taskId: string, date?: string) {
+    updateTask(taskId, { scheduledDate: date ?? addDays(todayValue(), 1) });
+  }
+
+  function rescheduleTask(taskId: string, date: string) {
+    updateTask(taskId, { scheduledDate: date });
+  }
+
+  function moveToWaiting(taskId: string, reason?: string, followUpDate?: string) {
+    updateTask(taskId, {
+      status: "waiting",
+      waitingReason: reason ?? "",
+      waitingFollowUpDate: followUpDate ?? "",
+    });
+  }
+
+  // === Projects ===
+  function createProject(input: {
+    name: string;
+    color?: string;
+    type?: ProjectType;
+    description?: string;
+    dueDate?: string;
+    icon?: string;
+  }): string {
+    const name = input.name.trim();
+    if (!name) {
+      return "";
+    }
+    const project = normalizeProject({
+      id: createId("project"),
+      name,
+      color: input.color ?? "#007AFF",
+      type: input.type ?? "project",
+      description: input.description ?? "",
+      dueDate: input.dueDate ?? "",
+      icon: input.icon,
+    });
+    setData((current) => ({ ...current, projects: [...current.projects, project] }));
+    return project.id;
+  }
+
+  function updateProject(projectId: string, patch: Partial<Project>) {
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      projects: current.projects.map((project) =>
+        project.id === projectId ? { ...project, ...patch, updatedAt: now } : project,
+      ),
+    }));
+  }
+
+  function toggleProjectPinned(projectId: string) {
+    setData((current) => ({
+      ...current,
+      projects: current.projects.map((project) =>
+        project.id === projectId ? { ...project, pinned: !project.pinned } : project,
+      ),
+    }));
+  }
+
+  // === Study topics ===
+  function createTopic(input: {
+    name: string;
+    category?: StudyTopicCategory;
+    description?: string;
+    color?: string;
+  }): string {
+    const name = input.name.trim();
+    if (!name) {
+      return "";
+    }
+    const topic = normalizeStudyTopic({
+      id: createId("topic"),
+      name,
+      category: input.category ?? "Other",
+      description: input.description ?? "",
+      color: input.color ?? "#007AFF",
+    });
+    setData((current) => ({ ...current, studyTopics: [...current.studyTopics, topic] }));
+    return topic.id;
+  }
+
+  function updateTopic(topicId: string, patch: Partial<StudyTopic>) {
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      studyTopics: current.studyTopics.map((topic) =>
+        topic.id === topicId ? { ...topic, ...patch, updatedAt: now } : topic,
+      ),
+    }));
+  }
+
+  function archiveTopic(topicId: string) {
+    updateTopic(topicId, { status: "archived", archivedAt: new Date().toISOString() });
+  }
+
+  function deleteTopic(topicId: string) {
+    setData((current) => ({
+      ...current,
+      studyTopics: current.studyTopics.filter((topic) => topic.id !== topicId),
+      conceptNotes: current.conceptNotes.map((note) =>
+        note.topicId === topicId ? { ...note, topicId: "" } : note,
+      ),
+    }));
+  }
+
+  // === Concept notes ===
+  function createNote(input: Partial<ConceptNote> & { title: string; topicId: string }): string {
+    const title = input.title.trim();
+    if (!title) {
+      return "";
+    }
+    const note = normalizeConceptNote({
+      ...input,
+      id: createId("note"),
+      title,
+      reviewStatus: input.nextReviewDate ? "reviewed" : input.reviewStatus ?? "not_scheduled",
+    });
+    setData((current) => ({ ...current, conceptNotes: [note, ...current.conceptNotes] }));
+    return note.id;
+  }
+
+  function updateNote(noteId: string, patch: Partial<ConceptNote>) {
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      conceptNotes: current.conceptNotes.map((note) =>
+        note.id === noteId ? { ...note, ...patch, updatedAt: now } : note,
+      ),
+    }));
+  }
+
+  function moveNote(noteId: string, topicId: string) {
+    updateNote(noteId, { topicId });
+  }
+
+  function deleteNote(noteId: string) {
+    setData((current) => ({
+      ...current,
+      conceptNotes: current.conceptNotes.filter((note) => note.id !== noteId),
+    }));
+  }
+
+  function scheduleReview(noteId: string, nextReviewDate: string) {
+    updateNote(noteId, { nextReviewDate, reviewStatus: nextReviewDate ? "reviewed" : "not_scheduled" });
+  }
+
+  // Mark a note reviewed: append history and schedule next review by difficulty (spec §9.6A.11).
+  function markNoteReviewed(noteId: string, difficulty: ReviewDifficulty) {
+    const now = new Date().toISOString();
+    const today = todayValue();
+    const interval = REVIEW_INTERVALS[difficulty];
+    const nextReviewDate = interval === null ? "" : addDays(today, interval);
+    const storedStatus: StoredReviewStatus = difficulty === "mastered" ? "mastered" : "reviewed";
+
+    setData((current) => ({
+      ...current,
+      conceptNotes: current.conceptNotes.map((note) => {
+        if (note.id !== noteId) {
+          return note;
+        }
+        const mappedDifficulty: NoteDifficulty = difficulty === "mastered" ? note.difficulty : difficulty;
+        return {
+          ...note,
+          difficulty: mappedDifficulty,
+          reviewStatus: storedStatus,
+          nextReviewDate,
+          lastReviewedAt: now,
+          reviewHistory: [
+            ...note.reviewHistory,
+            {
+              id: createId("review"),
+              reviewedAt: now,
+              difficulty,
+              previousNextReviewDate: note.nextReviewDate || undefined,
+              nextReviewDate: nextReviewDate || undefined,
+            },
+          ],
+          updatedAt: now,
+        };
+      }),
+    }));
+  }
+
+  // === App settings + recent items ===
+  function updateAppSettings(patch: Partial<AppSettings>) {
+    setData((current) => ({ ...current, appSettings: { ...current.appSettings, ...patch } }));
+  }
+
+  function pushRecentItem(item: Omit<RecentItem, "id" | "openedAt">) {
+    setData((current) => {
+      const filtered = current.recentItems.filter(
+        (existing) => !(existing.type === item.type && existing.refId === item.refId),
+      );
+      const next: RecentItem = { ...item, id: createId("recent"), openedAt: new Date().toISOString() };
+      return { ...current, recentItems: [next, ...filtered].slice(0, 12) };
+    });
+  }
+
   function importData(raw: unknown): boolean {
     if (!raw || typeof raw !== "object") {
       return false;
@@ -945,16 +1309,7 @@ export function usePlannerData() {
   }
 
   function resetData() {
-    setData({
-      tasks: [],
-      projects: [],
-      subtasks: [],
-      habits: [],
-      habitLogs: [],
-      focusSessions: [],
-      taskTemplates: [],
-      settings: normalizeSettings(),
-    });
+    setData(emptyData());
     setSelectedTaskId("");
   }
 
@@ -967,11 +1322,15 @@ export function usePlannerData() {
     tasks: data.tasks,
     projects: data.projects,
     subtasks: data.subtasks,
+    studyTopics: data.studyTopics,
+    conceptNotes: data.conceptNotes,
     habits: data.habits,
     habitLogs: data.habitLogs,
     focusSessions: data.focusSessions,
     taskTemplates: data.taskTemplates,
+    recentItems: data.recentItems,
     settings: data.settings,
+    appSettings: data.appSettings,
     selectedTask,
     auth: {
       isConfigured: isSupabaseConfigured,
@@ -984,20 +1343,42 @@ export function usePlannerData() {
       migrationPreviewCount: localMigrationData ? countDataItems(localMigrationData) : 0,
     },
     addTask,
+    createTask,
     createTaskFromTemplate,
     updateTask,
+    updateTaskStatus,
+    completeTask,
+    setTaskFocus,
+    snoozeTask,
+    rescheduleTask,
+    moveToWaiting,
     deleteTask,
     archiveTask,
     restoreTask,
     duplicateTask,
     toggleTaskDone,
     addProject,
+    createProject,
+    updateProject,
+    toggleProjectPinned,
     archiveProject,
     restoreProject,
     deleteProject,
     addSubtask,
     toggleSubtask,
     deleteSubtask,
+    createTopic,
+    updateTopic,
+    archiveTopic,
+    deleteTopic,
+    createNote,
+    updateNote,
+    moveNote,
+    deleteNote,
+    scheduleReview,
+    markNoteReviewed,
+    updateAppSettings,
+    pushRecentItem,
     saveTaskAsTemplate,
     addHabit,
     toggleHabitLog,

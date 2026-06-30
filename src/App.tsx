@@ -5,6 +5,13 @@ import { DashboardView } from "./components/DashboardView";
 import { FocusPage } from "./components/FocusPage";
 import { getHabitStreak, HabitsPage } from "./components/HabitsPage";
 import { QuickAdd } from "./components/QuickAdd";
+import { InboxPage } from "./components/InboxPage";
+import { TodayPage } from "./components/TodayPage";
+import { ProjectsPage } from "./components/ProjectsPage";
+import { PlanningPage } from "./components/PlanningPage";
+import { StudyPage } from "./components/StudyPage";
+import { ArchivePage } from "./components/ArchivePage";
+import { SettingsPage } from "./components/SettingsPage";
 import { Sidebar } from "./components/Sidebar";
 import { TaskDetail } from "./components/TaskDetail";
 import { TaskList, type GroupBy } from "./components/TaskList";
@@ -22,6 +29,7 @@ import type {
   TaskTemplate,
 } from "./types";
 import { addDays, formatDate, isOverdue, isThisWeek, todayValue } from "./utils/date";
+import { getDueReviewCount } from "./utils/planner";
 
 const statusOptions: Array<TaskStatus | "all"> = [
   "all",
@@ -125,6 +133,8 @@ type StudyTopic = {
 
 export default function App() {
   const planner = usePlannerData();
+  const appSettings = planner.appSettings;
+  const dueReviewCount = getDueReviewCount(planner.conceptNotes);
   const [activePage, setActivePage] = useState<PageId>("today");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all");
@@ -285,6 +295,20 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [planner]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const resolvedTheme =
+      appSettings.theme === "system"
+        ? window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light"
+        : appSettings.theme;
+    root.dataset.theme = resolvedTheme;
+    root.dataset.accent = appSettings.accentColor;
+    root.dataset.font = appSettings.fontSize;
+    root.dataset.reduceMotion = appSettings.reduceMotion ? "true" : "false";
+  }, [appSettings.theme, appSettings.accentColor, appSettings.fontSize, appSettings.reduceMotion]);
 
   const filteredTasks = useMemo(() => {
     const sourceTasks = statusFilter === "archived" ? planner.tasks : activeTasks;
@@ -499,6 +523,27 @@ export default function App() {
     showToast({ message: "Note saved." });
   }
 
+  function requestDeleteTask(taskId: string) {
+    if (appSettings.confirmBeforeDelete) {
+      setPendingDeleteTaskId(taskId);
+    } else {
+      planner.deleteTask(taskId);
+      showToast({ message: "Task deleted." });
+    }
+  }
+
+  function requestDeleteProject(projectId: string) {
+    if (appSettings.confirmBeforeDelete) {
+      setPendingDeleteProjectId(projectId);
+    } else {
+      planner.deleteProject(projectId);
+      setIsProjectDetailOpen(false);
+      setSelectedProjectId("");
+      planner.selectTask("");
+      showToast({ message: "Project deleted. Tasks moved to Inbox." });
+    }
+  }
+
   function confirmDeleteTask() {
     if (!pendingDeleteTaskId) {
       return;
@@ -550,74 +595,26 @@ export default function App() {
   function renderPage() {
     if (activePage === "today") {
       return (
-        <section className={pageGridClass("today-focusflow")}>
-          <div className="content-stack">
-            <header className="today-list-header">
-              <div>
-                <h1>Today</h1>
-                <p>{formatDate(today)}</p>
-                <span>Focus on what matters today.</span>
-              </div>
-              <div className="today-inline-stats">
-                <button className="primary-action" onClick={() => document.querySelector<HTMLInputElement>('[aria-label="Task title"]')?.focus()}>
-                  + Add Task
-                </button>
-                <span>{completedToday} done</span>
-                <span>{overdueTasks.length} overdue</span>
-              </div>
-            </header>
-            <QuickAdd projects={activeProjects} defaultDueDate={today} onAddTask={planner.addTask} />
-            <div className="today-board-grid">
-              <TaskSection
-                title="Focus"
-                tasks={focusTasks}
-                projects={planner.projects}
-                subtasks={planner.subtasks}
-                emptyMessage="Pick one high-priority task for today."
-                planner={planner}
-              />
-              <TaskSection
-                title="Due Today"
-                tasks={dueTodayTasks}
-                projects={planner.projects}
-                subtasks={planner.subtasks}
-                emptyMessage="Nothing due today."
-                planner={planner}
-              />
-              <TaskSection
-                title="Waiting"
-                tasks={waitingTasks}
-                projects={planner.projects}
-                subtasks={planner.subtasks}
-                emptyMessage="No waiting tasks."
-                planner={planner}
-              />
-              <TaskSection
-                title="Done Today"
-                tasks={doneTodayTasks}
-                projects={planner.projects}
-                subtasks={planner.subtasks}
-                emptyMessage="Completed tasks will land here."
-                planner={planner}
-              />
-              <TaskSection
-                title="In Progress"
-                tasks={inProgressTodayTasks}
-                projects={planner.projects}
-                subtasks={planner.subtasks}
-                emptyMessage="No active task yet."
-                planner={planner}
-              />
-              <TaskSection
-                title="Overdue"
-                tasks={overdueTodayTasks}
-                projects={planner.projects}
-                subtasks={planner.subtasks}
-                emptyMessage="No overdue tasks."
-                planner={planner}
-              />
-            </div>
-          </div>
+        <section className={pageGridClass()}>
+          <TodayPage
+            tasks={planner.tasks}
+            projects={activeProjects}
+            subtasks={planner.subtasks}
+            selectedTaskId={planner.selectedTask?.id ?? ""}
+            showCompleted={appSettings.showCompletedInToday}
+            onOpenTask={planner.selectTask}
+            onToggleDone={planner.toggleTaskDone}
+            onUpdateTask={planner.updateTask}
+            onCreateTask={planner.createTask}
+            onUpdateStatus={planner.updateTaskStatus}
+            onSnooze={planner.snoozeTask}
+            onMoveToWaiting={planner.moveToWaiting}
+            onSetFocus={planner.setTaskFocus}
+            onArchiveTask={handleArchiveTask}
+            onDuplicateTask={handleDuplicateTask}
+            onRequestDelete={requestDeleteTask}
+            showToast={showToast}
+          />
           {renderTaskDetail()}
         </section>
       );
@@ -671,27 +668,20 @@ export default function App() {
     if (activePage === "inbox") {
       return (
         <section className={pageGridClass()}>
-          <div className="content-stack">
-            <header className="page-header">
-              <h1>Inbox</h1>
-              <div className="stat-pill">{inboxTasks.length} unsorted</div>
-            </header>
-            <QuickAdd projects={activeProjects} onAddTask={planner.addTask} />
-            <TemplateControls
-              templates={planner.taskTemplates}
-              selectedTask={planner.selectedTask}
-              onCreateFromTemplate={planner.createTaskFromTemplate}
-              onSaveTemplate={planner.saveTaskAsTemplate}
-            />
-            <TaskList
-              tasks={inboxTasks}
-              projects={planner.projects}
-              subtasks={planner.subtasks}
-              emptyMessage="Your inbox is clear."
-              onToggleDone={planner.toggleTaskDone}
-              onSelectTask={planner.selectTask}
-            />
-          </div>
+          <InboxPage
+            tasks={planner.tasks}
+            projects={activeProjects}
+            subtasks={planner.subtasks}
+            selectedTaskId={planner.selectedTask?.id ?? ""}
+            onOpenTask={planner.selectTask}
+            onToggleDone={planner.toggleTaskDone}
+            onUpdateTask={planner.updateTask}
+            onCreateTask={planner.createTask}
+            onArchiveTask={handleArchiveTask}
+            onDuplicateTask={handleDuplicateTask}
+            onRequestDelete={requestDeleteTask}
+            showToast={showToast}
+          />
           {renderTaskDetail()}
         </section>
       );
@@ -824,64 +814,19 @@ export default function App() {
     }
 
     if (activePage === "planning") {
-      const quadrants = [
-        ["Do Now", "high", "high"],
-        ["Schedule", "high", "low"],
-        ["Quick Handle", "low", "high"],
-        ["Later", "low", "low"],
-      ] as const;
-
       return (
-        <section className={pageGridClass("wide-detail")}>
-          <div className="content-stack">
-            <header className="page-header">
-              <div>
-                <h1>Planning</h1>
-                <p className="page-subtitle">Prioritize, schedule, and keep work moving.</p>
-              </div>
-              <div className="stat-pill">{openTasks.length} open tasks</div>
-            </header>
-            <SegmentedTabs
-              tabs={[
-                ["board", "Board"],
-                ["matrix", "Eisenhower Matrix"],
-              ]}
-              active={planningTab}
-              onChange={(tab) => setPlanningTab(tab as typeof planningTab)}
-            />
-            {planningTab === "board" ? (
-              <BoardView
-                tasks={planner.tasks}
-                projects={planner.projects}
-                subtasks={planner.subtasks}
-                onSelectTask={planner.selectTask}
-                onUpdateTask={planner.updateTask}
-                onAddTask={planner.addTask}
-              />
-            ) : null}
-            {planningTab === "matrix" ? (
-              <div className="matrix-grid">
-                {quadrants.map(([title, importance, urgency]) => {
-                  const tasks = openTasks.filter(
-                    (task) => task.importance === importance && task.urgency === urgency,
-                  );
-                  return (
-                    <section key={title} className="matrix-cell">
-                      <h2>{title}</h2>
-                      <TaskList
-                        tasks={tasks}
-                        projects={planner.projects}
-                        subtasks={planner.subtasks}
-                        emptyMessage="No tasks here."
-                        onToggleDone={planner.toggleTaskDone}
-                        onSelectTask={planner.selectTask}
-                      />
-                    </section>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
+        <section className={pageGridClass()}>
+          <PlanningPage
+            tasks={planner.tasks}
+            projects={activeProjects}
+            selectedTaskId={planner.selectedTask?.id ?? ""}
+            view={planningTab}
+            onChangeView={(v) => setPlanningTab(v)}
+            onOpenTask={planner.selectTask}
+            onUpdateStatus={planner.updateTaskStatus}
+            onUpdateTask={planner.updateTask}
+            onCreateTask={planner.createTask}
+          />
           {renderTaskDetail()}
         </section>
       );
@@ -890,91 +835,19 @@ export default function App() {
     if (activePage === "study") {
       return (
         <section className={pageGridClass()}>
-          <div className="content-stack">
-            <header className="page-header">
-              <div>
-                <h1>Study</h1>
-                <p className="page-subtitle">Track topics, concept notes, and review dates.</p>
-              </div>
-              <div className="study-header-actions">
-                <button className="toolbar-button" onClick={() => setStudyModal("topic")}>New Topic</button>
-                <button className="primary-action" onClick={() => setStudyModal("note")}>New Note</button>
-                <div className="stat-pill">{dueReviewNotes.length} due reviews</div>
-              </div>
-            </header>
-            <SegmentedTabs
-              tabs={[
-                ["topics", "Topics"],
-                ["notes", "Notes"],
-                ["reviews", "Reviews"],
-              ]}
-              active={studyTab}
-              onChange={(tab) => setStudyTab(tab as typeof studyTab)}
-            />
-            {studyTab === "topics" ? (
-              <>
-                <div className="study-metrics">
-                  <SummaryCard label="Total Topics" value={studyTopics.length} />
-                  <SummaryCard label="Concept Notes" value={conceptNotes.length} />
-                  <SummaryCard label="Due Reviews" value={dueReviewNotes.length} />
-                  <SummaryCard label="Study Streak" value={`${currentHabitStreak} days`} />
-                </div>
-                <div className="topic-grid">
-                  {studyTopics.map((topic) => {
-                    const notes = conceptNotes.filter((note) => note.topic === topic.name);
-                    const due = notes.filter((note) => note.nextReviewDate && note.nextReviewDate <= today).length;
-                    return (
-                      <article className="topic-card" key={topic.id}>
-                        <span className="topic-dot" style={{ backgroundColor: topic.color }} />
-                        <strong>{topic.name}</strong>
-                        <small>{topic.category} · {topic.status}</small>
-                        <span>{notes.length} notes</span>
-                        {topic.description ? <p>{topic.description}</p> : null}
-                        <p className="empty-state">{due} due reviews</p>
-                      </article>
-                    );
-                  })}
-                </div>
-              </>
-            ) : null}
-            {studyTab === "notes" ? (
-              <div className="note-grid">
-                {conceptNotes.map((note) => (
-                  <article className="note-card" key={note.id}>
-                    <div>
-                      <strong>{note.title}</strong>
-                      <p>{note.summary}</p>
-                    </div>
-                    <div className="task-meta">
-                      <span>{note.topic}</span>
-                      <span>{note.difficulty}</span>
-                      <span>{note.nextReviewDate || "No review"}</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : null}
-            {studyTab === "reviews" ? (
-              <div className="note-grid">
-                {dueReviewNotes.length === 0 ? <p className="empty-state">No reviews due.</p> : null}
-                {dueReviewNotes.map((note) => (
-                  <article className="note-card review-card" key={note.id}>
-                    <div>
-                      <strong>{note.title}</strong>
-                      <p>{note.summary}</p>
-                    </div>
-                    <div className="review-actions">
-                      <button onClick={() => markConceptReviewed(note.id, "hard")}>Hard</button>
-                      <button onClick={() => markConceptReviewed(note.id, "medium")}>Medium</button>
-                      <button onClick={() => markConceptReviewed(note.id, "easy")}>Easy</button>
-                      <button onClick={() => markConceptReviewed(note.id, "unknown")}>Mastered</button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : null}
-          </div>
-          {renderTaskDetail()}
+          <StudyPage
+            topics={planner.studyTopics}
+            notes={planner.conceptNotes}
+            tab={studyTab}
+            onChangeTab={setStudyTab}
+            onCreateTopic={planner.createTopic}
+            onDeleteTopic={planner.deleteTopic}
+            onCreateNote={planner.createNote}
+            onUpdateNote={planner.updateNote}
+            onDeleteNote={planner.deleteNote}
+            onMarkReviewed={planner.markNoteReviewed}
+            showToast={showToast}
+          />
         </section>
       );
     }
@@ -982,42 +855,15 @@ export default function App() {
     if (activePage === "archive") {
       return (
         <section className={pageGridClass()}>
-          <div className="content-stack">
-            <header className="page-header">
-              <div>
-                <h1>Archive</h1>
-                <p className="page-subtitle">Completed and parked work.</p>
-              </div>
-              <div className="stat-pill">{archivedTasks.length + archivedProjects.length} archived</div>
-            </header>
-            <section className="panel-section">
-              <div className="section-title">
-                <h2>Archived Projects</h2>
-                <span>{archivedProjects.length}</span>
-              </div>
-              <div className="project-list-grid">
-                {archivedProjects.length === 0 ? <p className="empty-state">No archived projects yet.</p> : null}
-                {archivedProjects.map((project) => (
-                  <article className="project-card project-tile" key={project.id}>
-                    <span style={{ backgroundColor: project.color }} />
-                    <strong>{project.name}</strong>
-                    <small>{project.description || "Archived project"}</small>
-                    <button className="text-button" onClick={() => planner.restoreProject(project.id)}>
-                      Restore
-                    </button>
-                  </article>
-                ))}
-              </div>
-            </section>
-            <TaskSection
-              title="Archived Tasks"
-              tasks={archivedTasks}
-              projects={planner.projects}
-              subtasks={planner.subtasks}
-              emptyMessage="No archived tasks yet."
-              planner={planner}
-            />
-          </div>
+          <ArchivePage
+            tasks={planner.tasks}
+            projects={planner.projects}
+            onOpenTask={planner.selectTask}
+            onRestoreTask={planner.restoreTask}
+            onRestoreProject={planner.restoreProject}
+            onDeleteTask={requestDeleteTask}
+            onDeleteProject={requestDeleteProject}
+          />
           {renderTaskDetail()}
         </section>
       );
@@ -1105,178 +951,37 @@ export default function App() {
     }
 
     if (activePage === "projects") {
-      const currentProject = activeProjects.find((project) => project.id === selectedProjectId);
-      const projectTasks = sortTasks(planner.tasks.filter((task) => task.projectId === selectedProjectId));
-      const projectCompleted = projectTasks.filter((task) => task.status === "done").length;
-      const projectOverdue = projectTasks.filter((task) => task.status !== "done" && isOverdue(task.dueDate)).length;
-      const projectUpcoming = projectTasks.filter((task) => task.status !== "done" && isThisWeek(task.dueDate)).length;
-      const projectSubtasks = planner.subtasks.filter((subtask) =>
-        projectTasks.some((task) => task.id === subtask.taskId),
-      );
-      const projectCompletionRate = projectTasks.length > 0 ? Math.round((projectCompleted / projectTasks.length) * 100) : 0;
-      const projectNote = selectedProjectId ? projectNotes[selectedProjectId] ?? currentProject?.description ?? "" : "";
-
       return (
-        <section className={isProjectDetailOpen && currentProject ? "page-grid project-detail-page" : pageGridClass()}>
-          <div className="content-stack">
-            <header className="page-header">
-              <div>
-                {isProjectDetailOpen && currentProject ? (
-                  <button className="text-button" onClick={() => setIsProjectDetailOpen(false)}>
-                    Back to Projects
-                  </button>
-                ) : null}
-                <h1>{isProjectDetailOpen && currentProject ? currentProject.name : "Projects"}</h1>
-                {isProjectDetailOpen && currentProject ? (
-                  <p className="page-subtitle">{currentProject.description || "Project detail workspace."}</p>
-                ) : null}
-              </div>
-              <div className="stat-pill">{isProjectDetailOpen && currentProject ? `${projectCompletionRate}% done` : `${activeProjects.length} projects`}</div>
-            </header>
-            {!isProjectDetailOpen || !currentProject ? (
-              <>
-                <form
-                  className="project-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    planner.addProject(newProjectName, "#0066cc");
-                    setNewProjectName("");
-                  }}
-                >
-                  <input
-                    placeholder="New project"
-                    value={newProjectName}
-                    onChange={(event) => setNewProjectName(event.target.value)}
-                  />
-                  <button type="submit">Add project</button>
-                </form>
-                <div className="project-list-grid">
-                  {activeProjects.map((project) => {
-                    const tasks = planner.tasks.filter((task) => task.projectId === project.id);
-                    const done = tasks.filter((task) => task.status === "done").length;
-                    const count = tasks.length;
-                    const progress = count > 0 ? Math.round((done / count) * 100) : 0;
-                    return (
-                      <button
-                        key={project.id}
-                        className={selectedProjectId === project.id ? "project-card active project-tile" : "project-card project-tile"}
-                        onClick={() => {
-                          setSelectedProjectId(project.id);
-                          setIsProjectDetailOpen(true);
-                          setProjectTab("overview");
-                          planner.selectTask("");
-                        }}
-                      >
-                        <span style={{ backgroundColor: project.color }} />
-                        <strong>{project.name}</strong>
-                        <small>{count} tasks</small>
-                        <div className="mini-progress" aria-label="Project progress">
-                          <i style={{ width: `${progress}%` }} />
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <>
-                <QuickAdd
-                  projects={activeProjects}
-                  defaultProjectId={currentProject.id}
-                  onAddTask={planner.addTask}
-                />
-                <SegmentedTabs
-                  tabs={[
-                    ["overview", "Overview"],
-                    ["tasks", "Tasks"],
-                    ["subtasks", "Subtasks"],
-                    ["notes", "Notes"],
-                  ]}
-                  active={projectTab}
-                  onChange={(tab) => setProjectTab(tab as typeof projectTab)}
-                />
-                {projectTab === "overview" ? (
-                  <ProjectDetailSummary
-                    project={currentProject}
-                    total={projectTasks.length}
-                    completed={projectCompleted}
-                    overdue={projectOverdue}
-                    upcoming={projectUpcoming}
-                  />
-                ) : null}
-                {projectTab === "tasks" ? (
-                  <TaskList
-                    tasks={projectTasks}
-                    projects={planner.projects}
-                    subtasks={planner.subtasks}
-                    emptyMessage="No tasks in this project yet."
-                    onToggleDone={planner.toggleTaskDone}
-                    onSelectTask={planner.selectTask}
-                  />
-                ) : null}
-                {projectTab === "subtasks" ? (
-                  <section className="panel-section">
-                    <div className="section-title">
-                      <h2>Subtasks</h2>
-                      <span>{projectSubtasks.length}</span>
-                    </div>
-                    <div className="subtask-project-list">
-                      {projectSubtasks.length === 0 ? <p className="empty-state">No subtasks yet.</p> : null}
-                      {projectSubtasks.map((subtask) => {
-                        const parent = projectTasks.find((task) => task.id === subtask.taskId);
-                        return (
-                          <label className="project-subtask-row" key={subtask.id}>
-                            <input
-                              type="checkbox"
-                              checked={subtask.completed}
-                              onChange={() => planner.toggleSubtask(subtask.id)}
-                            />
-                            <span>{subtask.title}</span>
-                            <small>{parent?.title ?? "Task"}</small>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </section>
-                ) : null}
-                {projectTab === "notes" ? (
-                  <section className="panel-section">
-                    <div className="section-title">
-                      <h2>Project Notes</h2>
-                      <span>autosaved</span>
-                    </div>
-                    <textarea
-                      className="project-note-editor"
-                      value={projectNote}
-                      placeholder="Write project notes, feedback, links, or decisions here."
-                      onChange={(event) =>
-                        setProjectNotes((current) => ({
-                          ...current,
-                          [currentProject.id]: event.target.value,
-                        }))
-                      }
-                    />
-                  </section>
-                ) : null}
-              </>
-            )}
-          </div>
-          {isProjectDetailOpen && currentProject
-            ? planner.selectedTask
-              ? renderTaskDetail()
-              : (
-                <ProjectInfoPanel
-                  project={currentProject}
-                  total={projectTasks.length}
-                  completed={projectCompleted}
-                  overdue={projectOverdue}
-                  upcoming={projectUpcoming}
-                  onArchive={() => handleArchiveProject(currentProject.id)}
-                  onDelete={() => setPendingDeleteProjectId(currentProject.id)}
-                />
-              )
-            : renderTaskDetail()}
-        </section>
+        <ProjectsPage
+          projects={planner.projects}
+          tasks={planner.tasks}
+          subtasks={planner.subtasks}
+          selectedTaskId={planner.selectedTask?.id ?? ""}
+          taskDetail={renderTaskDetail()}
+          selectedProjectId={selectedProjectId}
+          detailOpen={isProjectDetailOpen}
+          projectNotes={projectNotes}
+          onOpenProject={(id) => {
+            setSelectedProjectId(id);
+            setIsProjectDetailOpen(true);
+            planner.selectTask("");
+          }}
+          onCloseProject={() => {
+            setIsProjectDetailOpen(false);
+            planner.selectTask("");
+          }}
+          onOpenTask={planner.selectTask}
+          onToggleDone={planner.toggleTaskDone}
+          onUpdateTask={planner.updateTask}
+          onCreateTask={planner.createTask}
+          onCreateProject={planner.createProject}
+          onUpdateProject={planner.updateProject}
+          onToggleStar={planner.toggleProjectPinned}
+          onArchiveProject={handleArchiveProject}
+          onRequestDeleteProject={requestDeleteProject}
+          onSaveNotes={(id, value) => setProjectNotes((current) => ({ ...current, [id]: value }))}
+          showToast={showToast}
+        />
       );
     }
 
@@ -1315,35 +1020,25 @@ export default function App() {
     }
 
     return (
-      <section className="content-stack settings-page">
-        <header className="page-header">
-          <h1>Settings</h1>
-        </header>
-        <AccountSection
-          auth={planner.auth}
-          onSignIn={planner.signIn}
-          onSignUp={planner.signUp}
-          onSignOut={planner.signOut}
-          onUploadLocal={planner.uploadLocalDataToSupabase}
-          onRefresh={planner.refreshSupabaseData}
-        />
-        <section className="settings-card">
-          <h2>Data</h2>
-          <p>Local data is stored in this browser with localStorage.</p>
-          <div className="settings-actions">
-            <button onClick={exportJson}>Export JSON</button>
-            <label className="import-button">
-              Import JSON
-              <input type="file" accept="application/json" onChange={handleImport} />
-            </label>
-            <button onClick={planner.loadSamples}>Load sample data</button>
-            <button className="danger-button" onClick={planner.resetData}>
-              Reset data
-            </button>
-          </div>
-          {importMessage ? <p className="settings-message">{importMessage}</p> : null}
-        </section>
-      </section>
+      <SettingsPage
+        settings={appSettings}
+        onUpdate={planner.updateAppSettings}
+        onExport={exportJson}
+        onImport={handleImport}
+        onLoadSamples={planner.loadSamples}
+        onReset={planner.resetData}
+        importMessage={importMessage}
+        accountSlot={
+          <AccountSection
+            auth={planner.auth}
+            onSignIn={planner.signIn}
+            onSignUp={planner.signUp}
+            onSignOut={planner.signOut}
+            onUploadLocal={planner.uploadLocalDataToSupabase}
+            onRefresh={planner.refreshSupabaseData}
+          />
+        }
+      />
     );
   }
 
@@ -1356,6 +1051,8 @@ export default function App() {
         projects={activeProjects}
         selectedProjectId={selectedProjectId}
         userEmail={planner.auth.userEmail}
+        dueReviewCount={dueReviewCount}
+        showCounts={appSettings.showSidebarCounts}
         onSelectProject={(projectId) => {
           setSelectedProjectId(projectId);
           setIsProjectDetailOpen(true);

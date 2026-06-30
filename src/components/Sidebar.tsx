@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import type { PageId, Project, Task } from "../types";
-import { isOverdue, todayValue } from "../utils/date";
+import { todayValue } from "../utils/date";
+import { getTodayBuckets } from "../utils/planner";
 
 interface SidebarProps {
   activePage: PageId;
@@ -9,6 +10,8 @@ interface SidebarProps {
   projects: Project[];
   selectedProjectId: string;
   userEmail: string;
+  dueReviewCount?: number;
+  showCounts?: boolean;
   onSelectProject: (projectId: string) => void;
   onAddProject: (name: string) => void;
   onOpenSettings: () => void;
@@ -91,6 +94,8 @@ export function Sidebar({
   projects,
   selectedProjectId,
   userEmail,
+  dueReviewCount = 0,
+  showCounts = true,
   onSelectProject,
   onAddProject,
   onOpenSettings,
@@ -101,37 +106,44 @@ export function Sidebar({
   const today = todayValue();
   const isOpen = (task: Task) => task.status !== "done" && task.status !== "archived";
 
-  const navItems: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
-    {
-      id: "inbox",
-      label: "Inbox",
-      icon: "inbox",
-      count: tasks.filter((task) => isOpen(task) && !task.projectId && !task.dueDate).length,
-    },
-    {
-      id: "today",
-      label: "Today",
-      icon: "today",
-      count: tasks.filter((task) => isOpen(task) && task.dueDate === today).length,
-    },
-    { id: "projects", label: "Projects", icon: "projects", count: projects.length },
-    {
-      id: "planning",
-      label: "Planning",
-      icon: "planning",
-      count: tasks.filter((task) => isOpen(task) && (isOverdue(task.dueDate) || task.status === "waiting")).length,
-    },
-    {
-      id: "study",
-      label: "Study",
-      icon: "study",
-      count: tasks.filter((task) => isOpen(task) && task.tags.some((tag) => tag.toLowerCase().includes("study"))).length,
-    },
-    { id: "archive", label: "Archive", icon: "archive", count: tasks.filter((task) => task.status === "done").length },
+  const buckets = getTodayBuckets(tasks, today);
+  const todayCount =
+    buckets.waiting.length +
+    buckets.inProgress.length +
+    buckets.overdue.length +
+    buckets.focus.length +
+    buckets.dueToday.length +
+    buckets.scheduledToday.length;
+  const inboxCount = tasks.filter((task) => task.status === "inbox").length;
+  const activeProjectCount = projects.filter((project) => project.status !== "archived").length;
+
+  const primaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
+    { id: "inbox", label: "Inbox", icon: "inbox", count: inboxCount },
+    { id: "today", label: "Today", icon: "today", count: todayCount },
+    { id: "projects", label: "Projects", icon: "projects", count: activeProjectCount },
+    { id: "planning", label: "Planning", icon: "planning", count: 0 },
+    { id: "study", label: "Study", icon: "study", count: dueReviewCount },
+  ];
+  const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
+    { id: "archive", label: "Archive", icon: "archive", count: 0 },
     { id: "settings", label: "Settings", icon: "settings", count: 0 },
   ];
 
   const initial = (userEmail || "Junghoon").charAt(0).toUpperCase();
+
+  const renderNavItem = (item: { id: PageId; label: string; icon: IconName; count: number }) => (
+    <button
+      key={item.id}
+      className={activePage === item.id ? "side-item active" : "side-item"}
+      onClick={() => onNavigate(item.id)}
+    >
+      <span className="side-item-icon">
+        <Icon name={item.icon} />
+      </span>
+      <span className="side-item-label">{item.label}</span>
+      {showCounts && item.count > 0 ? <span className="side-item-badge">{item.count}</span> : null}
+    </button>
+  );
 
   function submitNewProject() {
     const trimmed = newProject.trim();
@@ -159,21 +171,7 @@ export function Sidebar({
 
       <div className="global-search">{search}</div>
 
-      <nav className="side-list">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            className={activePage === item.id ? "side-item active" : "side-item"}
-            onClick={() => onNavigate(item.id)}
-          >
-            <span className="side-item-icon">
-              <Icon name={item.icon} />
-            </span>
-            <span className="side-item-label">{item.label}</span>
-            {item.count > 0 ? <span className="side-item-badge">{item.count}</span> : null}
-          </button>
-        ))}
-      </nav>
+      <nav className="side-list">{primaryNav.map(renderNavItem)}</nav>
 
       <div className="side-section">
         <button className="side-section-title" onClick={() => setProjectsOpen((open) => !open)}>
@@ -215,6 +213,8 @@ export function Sidebar({
           </div>
         ) : null}
       </div>
+
+      <nav className="side-list side-list-secondary">{secondaryNav.map(renderNavItem)}</nav>
     </aside>
   );
 }
