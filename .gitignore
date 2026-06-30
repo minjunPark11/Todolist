@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.local
+*.log
+*.err
+*.tsbuildinfo
+vite.config.d.ts
