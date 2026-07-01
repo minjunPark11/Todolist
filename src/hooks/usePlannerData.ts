@@ -411,7 +411,7 @@ function readStorage(): PlannerData {
     try {
       return normalizeData(JSON.parse(raw) as Partial<PlannerData>);
     } catch {
-      return normalizeData(sampleData);
+      return emptyData();
     }
   }
 
@@ -421,11 +421,13 @@ function readStorage(): PlannerData {
     try {
       return normalizeData(JSON.parse(legacy) as Partial<PlannerData>);
     } catch {
-      return normalizeData(sampleData);
+      return emptyData();
     }
   }
 
-  return normalizeData(sampleData);
+  // First run, no saved data anywhere: start completely blank. Demo content
+  // is opt-in only, via the "Load Samples" button in Settings.
+  return emptyData();
 }
 
 export function usePlannerData() {
