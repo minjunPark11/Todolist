@@ -13,6 +13,7 @@ import { StudyPage } from "./components/StudyPage";
 import { ArchivePage } from "./components/ArchivePage";
 import { SettingsPage } from "./components/SettingsPage";
 import { Sidebar } from "./components/Sidebar";
+import { OllamaChat } from "./components/OllamaChat";
 import { TaskDetail } from "./components/TaskDetail";
 import { TaskList, type GroupBy } from "./components/TaskList";
 import { usePlannerData } from "./hooks/usePlannerData";
@@ -1013,6 +1014,7 @@ export default function App() {
         }
       />
       <main>{renderPage()}</main>
+      <OllamaChat />
       {pendingDeleteTaskId ? (
         <div className="modal-backdrop" role="presentation">
           <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-task-title">
