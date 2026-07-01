@@ -1,6 +1,7 @@
 import { ChangeEvent, ReactNode, useState } from "react";
-import type { AccentColor, AppSettings, FontSize, ThemeMode } from "../types";
+import type { AccentColor, AppSettings, FontSize, Language, ThemeMode } from "../types";
 import { SegmentedTabs } from "./kit";
+import { useT } from "../i18n";
 
 interface SettingsPageProps {
   settings: AppSettings;
@@ -31,33 +32,42 @@ export function SettingsPage({
   importMessage,
   accountSlot,
 }: SettingsPageProps) {
+  const { t } = useT();
   const [tab, setTab] = useState<"appearance" | "behavior" | "data">("appearance");
 
   return (
     <div className="ff-page">
       <header className="ff-page-head">
         <div>
-          <h1 className="ff-page-title">Settings</h1>
-          <p className="ff-page-sub">Personalize FocusFlow and manage your local data.</p>
+          <h1 className="ff-page-title">{t("settings.title")}</h1>
+          <p className="ff-page-sub">{t("settings.subtitle")}</p>
         </div>
       </header>
 
       <SegmentedTabs
-        tabs={[["appearance", "Appearance"], ["behavior", "Behavior"], ["data", "Data"]]}
+        tabs={[
+          ["appearance", t("settings.tabAppearance")],
+          ["behavior", t("settings.tabBehavior")],
+          ["data", t("settings.tabData")],
+        ]}
         active={tab}
         onChange={setTab}
       />
 
       {tab === "appearance" ? (
         <div className="ff-settings-card">
-          <Row title="Theme" hint="Choose your preferred color theme.">
+          <Row title={t("settings.theme")} hint={t("settings.themeHint")}>
             <SegmentedTabs
-              tabs={[["light", "Light"], ["dark", "Dark"], ["system", "System"]]}
+              tabs={[
+                ["light", t("settings.themeLight")],
+                ["dark", t("settings.themeDark")],
+                ["system", t("settings.themeSystem")],
+              ]}
               active={settings.theme}
               onChange={(t) => onUpdate({ theme: t as ThemeMode })}
             />
           </Row>
-          <Row title="Accent Color" hint="Used for buttons, highlights, and links.">
+          <Row title={t("settings.accentColor")} hint={t("settings.accentColorHint")}>
             <div className="ff-color-row">
               {ACCENTS.map((a) => (
                 <button
@@ -71,11 +81,25 @@ export function SettingsPage({
               ))}
             </div>
           </Row>
-          <Row title="Font Size" hint="Adjust the base font size.">
+          <Row title={t("settings.fontSize")} hint={t("settings.fontSizeHint")}>
             <SegmentedTabs
-              tabs={[["small", "Small"], ["medium", "Medium"], ["large", "Large"]]}
+              tabs={[
+                ["small", t("settings.fontSmall")],
+                ["medium", t("settings.fontMedium")],
+                ["large", t("settings.fontLarge")],
+              ]}
               active={settings.fontSize}
               onChange={(t) => onUpdate({ fontSize: t as FontSize })}
+            />
+          </Row>
+          <Row title={t("settings.language")} hint={t("settings.languageHint")}>
+            <SegmentedTabs
+              tabs={[
+                ["ko", t("settings.languageKo")],
+                ["en", t("settings.languageEn")],
+              ]}
+              active={settings.language}
+              onChange={(t) => onUpdate({ language: t as Language })}
             />
           </Row>
         </div>
@@ -83,36 +107,56 @@ export function SettingsPage({
 
       {tab === "behavior" ? (
         <div className="ff-settings-card">
-          <Row title="Default Start Page" hint="Which page opens when the app starts.">
+          <Row title={t("settings.defaultStartPage")} hint={t("settings.defaultStartPageHint")}>
             <select value={settings.defaultView} onChange={(e) => onUpdate({ defaultView: e.target.value as "/today" | "/inbox" })}>
-              <option value="/today">Today</option>
-              <option value="/inbox">Inbox</option>
+              <option value="/today">{t("sidebar.today")}</option>
+              <option value="/inbox">{t("sidebar.inbox")}</option>
             </select>
           </Row>
-          <Toggle label="Show Completed Tasks" hint="Show completed tasks in Today." value={settings.showCompletedInToday} onChange={(v) => onUpdate({ showCompletedInToday: v })} />
-          <Toggle label="Confirm Before Delete" hint="Ask for confirmation before deleting tasks or projects." value={settings.confirmBeforeDelete} onChange={(v) => onUpdate({ confirmBeforeDelete: v })} />
-          <Toggle label="Show Sidebar Counts" hint="Display task counts next to sidebar items." value={settings.showSidebarCounts} onChange={(v) => onUpdate({ showSidebarCounts: v })} />
-          <Toggle label="Reduce Motion" hint="Minimize animations and transitions." value={settings.reduceMotion} onChange={(v) => onUpdate({ reduceMotion: v })} />
+          <Toggle
+            label={t("settings.showCompletedTasks")}
+            hint={t("settings.showCompletedTasksHint")}
+            value={settings.showCompletedInToday}
+            onChange={(v) => onUpdate({ showCompletedInToday: v })}
+          />
+          <Toggle
+            label={t("settings.confirmBeforeDelete")}
+            hint={t("settings.confirmBeforeDeleteHint")}
+            value={settings.confirmBeforeDelete}
+            onChange={(v) => onUpdate({ confirmBeforeDelete: v })}
+          />
+          <Toggle
+            label={t("settings.showSidebarCounts")}
+            hint={t("settings.showSidebarCountsHint")}
+            value={settings.showSidebarCounts}
+            onChange={(v) => onUpdate({ showSidebarCounts: v })}
+          />
+          <Toggle
+            label={t("settings.reduceMotion")}
+            hint={t("settings.reduceMotionHint")}
+            value={settings.reduceMotion}
+            onChange={(v) => onUpdate({ reduceMotion: v })}
+          />
         </div>
       ) : null}
 
       {tab === "data" ? (
         <>
           <div className="ff-settings-card">
-            <Row title="Export Data" hint="Download all your data as a JSON file.">
-              <button type="button" className="ff-btn" onClick={onExport}>Export JSON</button>
+            <Row title={t("settings.exportData")} hint={t("settings.exportDataHint")}>
+              <button type="button" className="ff-btn" onClick={onExport}>{t("settings.exportJson")}</button>
             </Row>
-            <Row title="Import Data" hint="Restore previously exported data.">
+            <Row title={t("settings.importData")} hint={t("settings.importDataHint")}>
               <label className="ff-btn ff-import-btn">
-                Import JSON
+                {t("settings.importJson")}
                 <input type="file" accept="application/json" onChange={onImport} hidden />
               </label>
             </Row>
-            <Row title="Sample Data" hint="Load a demo dataset to explore the app.">
-              <button type="button" className="ff-btn" onClick={onLoadSamples}>Load Samples</button>
+            <Row title={t("settings.sampleData")} hint={t("settings.sampleDataHint")}>
+              <button type="button" className="ff-btn" onClick={onLoadSamples}>{t("settings.loadSamples")}</button>
             </Row>
-            <Row title="Reset All Data" hint="Permanently delete all tasks, projects, and notes. This cannot be undone.">
-              <button type="button" className="ff-btn ff-btn-danger" onClick={onReset}>Reset All Data</button>
+            <Row title={t("settings.resetAllData")} hint={t("settings.resetAllDataHint")}>
+              <button type="button" className="ff-btn ff-btn-danger" onClick={onReset}>{t("settings.resetAllData")}</button>
             </Row>
             {importMessage ? <p className="ff-settings-msg">{importMessage}</p> : null}
           </div>

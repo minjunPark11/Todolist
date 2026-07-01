@@ -1,7 +1,11 @@
-const dateFormatter = new Intl.DateTimeFormat("en", {
-  month: "short",
-  day: "numeric",
-});
+import type { Language } from "../types";
+
+// Intl locale tag per app language. Callers that already have `lang` from
+// useT() should pass it through; everything else defaults to English so this
+// stays backwards compatible with call sites that haven't been updated yet.
+function toIntlLocale(locale: Language): string {
+  return locale === "ko" ? "ko" : "en";
+}
 
 export function toDateInputValue(date: Date): string {
   const year = date.getFullYear();
@@ -66,12 +70,14 @@ export function isDateThisWeek(dateValue: string): boolean {
   return dateValue >= weekStart && dateValue <= weekEnd;
 }
 
-export function formatDate(dateValue: string): string {
+export function formatDate(dateValue: string, locale: Language = "en"): string {
   if (!dateValue) {
-    return "No date";
+    return locale === "ko" ? "날짜 없음" : "No date";
   }
 
-  return dateFormatter.format(new Date(`${dateValue}T00:00:00`));
+  return new Intl.DateTimeFormat(toIntlLocale(locale), { month: "short", day: "numeric" }).format(
+    new Date(`${dateValue}T00:00:00`),
+  );
 }
 
 export function getMonthDays(anchor = new Date()): string[] {
@@ -107,8 +113,8 @@ export function getMonthGrid(year: number, month: number): CalendarCell[] {
   });
 }
 
-export function getMonthLabel(year: number, month: number): string {
-  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(
+export function getMonthLabel(year: number, month: number, locale: Language = "en"): string {
+  return new Intl.DateTimeFormat(toIntlLocale(locale), { month: "long", year: "numeric" }).format(
     new Date(year, month, 1),
   );
 }
@@ -122,17 +128,17 @@ export function getWeekDays(anchor = todayValue()): string[] {
   return Array.from({ length: 7 }, (_, index) => addDays(start, index));
 }
 
-export function getWeekLabel(anchor: string): string {
+export function getWeekLabel(anchor: string, locale: Language = "en"): string {
   const start = getWeekStart(anchor);
   const end = addDays(start, 6);
-  const formatter = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
+  const formatter = new Intl.DateTimeFormat(toIntlLocale(locale), { month: "short", day: "numeric" });
   return `${formatter.format(new Date(`${start}T00:00:00`))} – ${formatter.format(
     new Date(`${end}T00:00:00`),
   )}, ${start.slice(0, 4)}`;
 }
 
-export function getDayLabel(dateValue: string): string {
-  return new Intl.DateTimeFormat("en", {
+export function getDayLabel(dateValue: string, locale: Language = "en"): string {
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
     weekday: "long",
     month: "long",
     day: "numeric",

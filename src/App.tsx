@@ -35,6 +35,7 @@ import type {
 } from "./types";
 import { addDays, formatDate, isOverdue, isThisWeek, todayValue } from "./utils/date";
 import { getDueReviewCount } from "./utils/planner";
+import { I18nProvider, translate, useT } from "./i18n";
 
 const statusOptions: Array<TaskStatus | "all"> = [
   "all",
@@ -119,6 +120,9 @@ function getTodayBuckets(tasks: Task[], today: string) {
 export default function App() {
   const planner = usePlannerData();
   const appSettings = planner.appSettings;
+  // Renders before the <I18nProvider> below exists in the tree, so this can't
+  // use the useT() context hook — call the plain translate() helper instead.
+  const t = (key: string, vars?: Record<string, string | number>) => translate(appSettings.language, key, vars);
   const dueReviewCount = getDueReviewCount(planner.conceptNotes);
   const [activePage, setActivePage] = useState<PageId>(
     appSettings.defaultView === "/inbox" ? "inbox" : "today",
@@ -252,7 +256,8 @@ export default function App() {
     root.dataset.accent = appSettings.accentColor;
     root.dataset.font = appSettings.fontSize;
     root.dataset.reduceMotion = appSettings.reduceMotion ? "true" : "false";
-  }, [appSettings.theme, appSettings.accentColor, appSettings.fontSize, appSettings.reduceMotion]);
+    root.lang = appSettings.language;
+  }, [appSettings.theme, appSettings.accentColor, appSettings.fontSize, appSettings.reduceMotion, appSettings.language]);
 
   const filteredTasks = useMemo(() => {
     const sourceTasks = statusFilter === "archived" ? planner.tasks : activeTasks;
@@ -364,15 +369,15 @@ export default function App() {
   function handleArchiveTask(taskId: string) {
     planner.archiveTask(taskId);
     showToast({
-      message: "Task archived.",
-      actionLabel: "Undo",
+      message: t("app.toastTaskArchived"),
+      actionLabel: t("app.undo"),
       onAction: () => planner.restoreTask(taskId),
     });
   }
 
   function handleDuplicateTask(taskId: string) {
     planner.duplicateTask(taskId);
-    showToast({ message: "Task duplicated." });
+    showToast({ message: t("app.toastTaskDuplicated") });
   }
 
   function handleArchiveProject(projectId: string) {
@@ -381,8 +386,8 @@ export default function App() {
     setSelectedProjectId("");
     planner.selectTask("");
     showToast({
-      message: "Project archived.",
-      actionLabel: "Undo",
+      message: t("app.toastProjectArchived"),
+      actionLabel: t("app.undo"),
       onAction: () => planner.restoreProject(projectId),
     });
   }
@@ -392,7 +397,7 @@ export default function App() {
       setPendingDeleteTaskId(taskId);
     } else {
       planner.deleteTask(taskId);
-      showToast({ message: "Task deleted." });
+      showToast({ message: t("app.toastTaskDeleted") });
     }
   }
 
@@ -404,7 +409,7 @@ export default function App() {
       setIsProjectDetailOpen(false);
       setSelectedProjectId("");
       planner.selectTask("");
-      showToast({ message: "Project deleted. Tasks moved to Inbox." });
+      showToast({ message: t("app.toastProjectDeleted") });
     }
   }
 
@@ -414,7 +419,7 @@ export default function App() {
     }
     planner.deleteTask(pendingDeleteTaskId);
     setPendingDeleteTaskId("");
-    showToast({ message: "Task deleted." });
+    showToast({ message: t("app.toastTaskDeleted") });
   }
 
   function confirmDeleteProject() {
@@ -426,7 +431,7 @@ export default function App() {
     setIsProjectDetailOpen(false);
     setSelectedProjectId("");
     planner.selectTask("");
-    showToast({ message: "Project deleted. Tasks were moved to Inbox." });
+    showToast({ message: t("app.toastProjectDeleted") });
   }
 
   function openTaskInOfficialPage(taskId: string) {
@@ -571,11 +576,13 @@ export default function App() {
 
   if (planner.auth.isConfigured && !planner.auth.isSignedIn) {
     return (
-      <AuthGate
-        auth={planner.auth}
-        onSignIn={planner.signIn}
-        onSignUp={planner.signUp}
-      />
+      <I18nProvider lang={appSettings.language}>
+        <AuthGate
+          auth={planner.auth}
+          onSignIn={planner.signIn}
+          onSignUp={planner.signUp}
+        />
+      </I18nProvider>
     );
   }
 
@@ -1057,6 +1064,7 @@ export default function App() {
   }
 
   return (
+    <I18nProvider lang={appSettings.language}>
     <div className={mobileMenuOpen ? "app-shell mobile-menu-open" : "app-shell"}>
       <button
         type="button"
@@ -1140,12 +1148,12 @@ export default function App() {
       {pendingDeleteTaskId ? (
         <div className="modal-backdrop" role="presentation">
           <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-task-title">
-            <h2 id="delete-task-title">Delete task?</h2>
-            <p>This removes the task and its subtasks. This action cannot be undone.</p>
+            <h2 id="delete-task-title">{t("app.deleteTaskTitle")}</h2>
+            <p>{t("app.deleteTaskBody")}</p>
             <div className="confirm-actions">
-              <button onClick={() => setPendingDeleteTaskId("")}>Cancel</button>
+              <button onClick={() => setPendingDeleteTaskId("")}>{t("common.cancel")}</button>
               <button className="danger-button-inline" onClick={confirmDeleteTask}>
-                Delete
+                {t("common.delete")}
               </button>
             </div>
           </section>
@@ -1154,12 +1162,12 @@ export default function App() {
       {pendingDeleteProjectId ? (
         <div className="modal-backdrop" role="presentation">
           <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-project-title">
-            <h2 id="delete-project-title">Delete project?</h2>
-            <p>This removes the project only. Its tasks will stay unchanged and move to Inbox.</p>
+            <h2 id="delete-project-title">{t("app.deleteProjectTitle")}</h2>
+            <p>{t("app.deleteProjectBody")}</p>
             <div className="confirm-actions">
-              <button onClick={() => setPendingDeleteProjectId("")}>Cancel</button>
+              <button onClick={() => setPendingDeleteProjectId("")}>{t("common.cancel")}</button>
               <button className="danger-button-inline" onClick={confirmDeleteProject}>
-                Delete Project
+                {t("app.deleteProjectConfirm")}
               </button>
             </div>
           </section>
@@ -1181,6 +1189,7 @@ export default function App() {
         </div>
       ) : null}
     </div>
+    </I18nProvider>
   );
 }
 
@@ -1193,6 +1202,7 @@ function AuthGate({
   onSignIn: (email: string, password: string) => Promise<boolean>;
   onSignUp: (email: string, password: string) => Promise<{ ok: boolean; needsEmailConfirmation: boolean }>;
 }) {
+  const { t } = useT();
   const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -1203,12 +1213,12 @@ function AuthGate({
 
   const isSignUp = mode === "signUp";
   const canSubmit = Boolean(email.trim()) && password.length >= 6 && !submitting && !auth.isLoading;
-  const authError = formatAuthError(auth.syncError);
+  const authError = formatAuthError(auth.syncError, t);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit) {
-      setMessage(password && password.length < 6 ? "Password must be at least 6 characters." : "Enter your email and password.");
+      setMessage(password && password.length < 6 ? t("auth.passwordTooShort") : t("auth.enterCredentials"));
       return;
     }
 
@@ -1220,15 +1230,15 @@ function AuthGate({
     setSubmitting(false);
 
     if (!result.ok) {
-      setMessage(isSignUp ? "Sign up failed. Please check your details." : "Login failed. Please check your email and password.");
+      setMessage(isSignUp ? t("auth.signUpFailed") : t("auth.signInFailed"));
       return;
     }
 
     if (result.needsEmailConfirmation) {
-      setMessage("Verification email sent. Please check your inbox, then log in.");
+      setMessage(t("auth.verificationSent"));
       setMode("signIn");
     } else {
-      setMessage(isSignUp ? "Account created." : "Signed in.");
+      setMessage(isSignUp ? t("auth.accountCreated") : t("auth.signedIn"));
     }
     setPassword("");
   }
@@ -1240,18 +1250,18 @@ function AuthGate({
           <div className="auth-logo" aria-hidden="true">
             <span />
           </div>
-          <h1 id="auth-title">FOCUSFLOW</h1>
-          <p>{isSignUp ? "Create your personal focus space" : "Your day starts here"}</p>
+          <h1 id="auth-title">{t("auth.brandTitle")}</h1>
+          <p>{isSignUp ? t("auth.signUpSubtitle") : t("auth.signInSubtitle")}</p>
         </div>
 
         <form className="auth-gate-form" onSubmit={submit}>
           <label>
-            Email
+            {t("auth.email")}
             <div className="auth-input-wrap">
               <span aria-hidden="true">M</span>
               <input
                 type="email"
-                placeholder="Enter your email"
+                placeholder={t("auth.emailPlaceholder")}
                 value={email}
                 autoComplete="email"
                 onChange={(event) => setEmail(event.target.value)}
@@ -1260,12 +1270,12 @@ function AuthGate({
           </label>
 
           <label>
-            Password
+            {t("auth.password")}
             <div className="auth-input-wrap">
               <span aria-hidden="true">L</span>
               <input
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
+                placeholder={t("auth.passwordPlaceholder")}
                 value={password}
                 autoComplete={isSignUp ? "new-password" : "current-password"}
                 onChange={(event) => setPassword(event.target.value)}
@@ -1273,10 +1283,10 @@ function AuthGate({
               <button
                 type="button"
                 className="auth-icon-button"
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? t("auth.hide") : t("auth.show")}
                 onClick={() => setShowPassword((visible) => !visible)}
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? t("auth.hide") : t("auth.show")}
               </button>
             </div>
           </label>
@@ -1288,26 +1298,26 @@ function AuthGate({
                 checked={remember}
                 onChange={(event) => setRemember(event.target.checked)}
               />
-              Keep me signed in
+              {t("auth.keepSignedIn")}
             </label>
-            <button type="button" className="auth-link" onClick={() => setMessage("Password reset will be connected in a later step.")}>
-              Forgot password
+            <button type="button" className="auth-link" onClick={() => setMessage(t("auth.forgotPasswordMessage"))}>
+              {t("auth.forgotPassword")}
             </button>
           </div>
 
           <button type="submit" className="auth-submit" disabled={!canSubmit}>
-            {submitting || auth.isLoading ? "Processing..." : isSignUp ? "Sign up" : "Log in"}
+            {submitting || auth.isLoading ? t("auth.processing") : isSignUp ? t("auth.signUp") : t("auth.logIn")}
           </button>
         </form>
 
         <div className="auth-divider">
           <span />
-          <em>or</em>
+          <em>{t("auth.orDivider")}</em>
           <span />
         </div>
 
         <p className="auth-switch">
-          {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+          {isSignUp ? t("auth.alreadyHaveAccount") : t("auth.noAccount")}{" "}
           <button
             type="button"
             onClick={() => {
@@ -1315,7 +1325,7 @@ function AuthGate({
               setMessage("");
             }}
           >
-            {isSignUp ? "Log in" : "Sign up"}
+            {isSignUp ? t("auth.logIn") : t("auth.signUp")}
           </button>
         </p>
 
@@ -1329,17 +1339,17 @@ function AuthGate({
   );
 }
 
-function formatAuthError(error: string): string {
+function formatAuthError(error: string, t: (key: string) => string): string {
   if (!error) {
     return "";
   }
 
   if (error.includes("Invalid path specified")) {
-    return "Supabase URL is misconfigured. Use the project URL in the form https://...supabase.co.";
+    return t("auth.supabaseUrlMisconfigured");
   }
 
   if (error.toLowerCase().includes("invalid login credentials")) {
-    return "Email or password is incorrect.";
+    return t("auth.invalidCredentials");
   }
 
   return error;
@@ -1360,6 +1370,7 @@ function AccountSection({
   onUploadLocal: () => Promise<boolean>;
   onRefresh: () => Promise<void>;
 }) {
+  const { t } = useT();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -1371,11 +1382,11 @@ function AccountSection({
     setMessage(
       result.ok
         ? action === "signIn"
-          ? "Signed in."
+          ? t("auth.signedIn")
           : result.needsEmailConfirmation
-            ? "Verification email sent. Please check your inbox."
-            : "Account created."
-        : "Authentication failed.",
+            ? t("auth.verificationSent")
+            : t("auth.accountCreated")
+        : t("auth.authFailed"),
     );
     if (result.ok) {
       setPassword("");
@@ -1385,55 +1396,55 @@ function AccountSection({
   return (
     <section className="settings-card account-card">
       <div className="section-title">
-        <h2>Account</h2>
+        <h2>{t("auth.accountTitle")}</h2>
         <span>{auth.mode}</span>
       </div>
       {!auth.isConfigured ? (
-        <p className="empty-state">Supabase env vars are not configured. The app is using localStorage.</p>
+        <p className="empty-state">{t("auth.notConfigured")}</p>
       ) : null}
       {auth.isSignedIn ? (
         <div className="account-stack">
           <p>
-            Signed in as <strong>{auth.userEmail}</strong>
+            {t("auth.signedInAs")} <strong>{auth.userEmail}</strong>
           </p>
           <div className="settings-actions">
-            <button onClick={onRefresh}>Refresh cloud data</button>
-            <button onClick={onSignOut}>Log out</button>
+            <button onClick={onRefresh}>{t("auth.refreshCloud")}</button>
+            <button onClick={onSignOut}>{t("auth.logOut")}</button>
           </div>
         </div>
       ) : (
         <div className="auth-form">
           <input
             type="email"
-            placeholder="Email"
+            placeholder={t("auth.email")}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
           <input
             type="password"
-            placeholder="Password"
+            placeholder={t("auth.password")}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
           <button onClick={() => submit("signIn")} disabled={!auth.isConfigured || auth.isLoading}>
-            Log in
+            {t("auth.logIn")}
           </button>
           <button onClick={() => submit("signUp")} disabled={!auth.isConfigured || auth.isLoading}>
-            Sign up
+            {t("auth.signUp")}
           </button>
         </div>
       )}
       {auth.migrationPreviewCount > 0 && auth.isSignedIn ? (
         <div className="migration-box">
-          <strong>{auth.migrationPreviewCount} local items can be uploaded.</strong>
-          <p>Upload your existing localStorage data to Supabase. Matching ids are upserted to avoid duplicates.</p>
+          <strong>{t("auth.migrationCount", { n: auth.migrationPreviewCount })}</strong>
+          <p>{t("auth.migrationBody")}</p>
           <button
             onClick={async () => {
               const success = await onUploadLocal();
-              setMessage(success ? "Local data uploaded to Supabase." : "No local data to upload.");
+              setMessage(success ? t("auth.uploadSuccess") : t("auth.uploadNoData"));
             }}
           >
-            Upload local data
+            {t("auth.uploadLocal")}
           </button>
         </div>
       ) : null}
@@ -1525,6 +1536,7 @@ function SearchBox({
   onSelectTopic: (topicId: string) => void;
   onSelectNote: (note: ConceptNote) => void;
 }) {
+  const { t } = useT();
   const hasResults =
     results.tasks.length > 0 ||
     results.projects.length > 0 ||
@@ -1536,35 +1548,35 @@ function SearchBox({
       <input
         ref={inputRef}
         aria-label="Global search"
-        placeholder="Search /"
+        placeholder={t("app.searchPlaceholder")}
         value={query}
         onChange={(event) => onChange(event.target.value)}
       />
       {query.trim() ? (
         <div className="search-results">
-          {!hasResults ? <p className="empty-state">No results.</p> : null}
+          {!hasResults ? <p className="empty-state">{t("app.searchNoResults")}</p> : null}
           {results.tasks.slice(0, 6).map((task) => (
             <button key={task.id} onClick={() => onSelectTask(task.id)}>
               <strong>{task.title}</strong>
-              <small>Task - {task.status} - {task.tags.join(", ") || "no tags"}</small>
+              <small>{t("app.taskLabel")} - {task.status} - {task.tags.join(", ") || t("app.noTags")}</small>
             </button>
           ))}
           {results.projects.slice(0, 4).map((project) => (
             <button key={project.id} onClick={() => onSelectProject(project.id)}>
               <strong>{project.name}</strong>
-              <small>Project</small>
+              <small>{t("app.projectLabel")}</small>
             </button>
           ))}
           {results.topics.slice(0, 4).map((topic) => (
             <button key={topic.id} onClick={() => onSelectTopic(topic.id)}>
               <strong>{topic.name}</strong>
-              <small>Study topic - {topic.category}</small>
+              <small>{t("app.studyTopicLabel")} - {topic.category}</small>
             </button>
           ))}
           {results.notes.slice(0, 4).map((note) => (
             <button key={note.id} onClick={() => onSelectNote(note)}>
               <strong>{note.title}</strong>
-              <small>Study note - {note.noteType}</small>
+              <small>{t("app.studyNoteLabel")} - {note.noteType}</small>
             </button>
           ))}
         </div>

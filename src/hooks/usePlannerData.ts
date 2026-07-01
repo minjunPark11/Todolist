@@ -9,6 +9,7 @@ import type {
   Habit,
   HabitFrequency,
   HabitLog,
+  Language,
   NoteDifficulty,
   NoteType,
   PlannerData,
@@ -53,11 +54,19 @@ const storedReviewStatuses = ["not_scheduled", "reviewed", "mastered"] as const;
 const accentColors = ["blue", "purple", "green", "pink", "orange"] as const;
 const themeModes = ["light", "dark", "system"] as const;
 const fontSizes = ["small", "medium", "large"] as const;
+const languages = ["ko", "en"] as const;
+
+// First-run default only — the user's explicit choice always wins once saved.
+function detectDefaultLanguage(): Language {
+  const browserLanguage = typeof navigator !== "undefined" ? navigator.language : "";
+  return browserLanguage?.toLowerCase().startsWith("ko") ? "ko" : "en";
+}
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
   theme: "light",
   accentColor: "blue",
   fontSize: "medium",
+  language: detectDefaultLanguage(),
   defaultView: "/today",
   showCompletedInToday: true,
   confirmBeforeDelete: true,
@@ -308,6 +317,7 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
     theme: oneOf(settings?.theme, themeModes, DEFAULT_APP_SETTINGS.theme),
     accentColor: oneOf(settings?.accentColor, accentColors, DEFAULT_APP_SETTINGS.accentColor),
     fontSize: oneOf(settings?.fontSize, fontSizes, DEFAULT_APP_SETTINGS.fontSize),
+    language: oneOf(settings?.language, languages, DEFAULT_APP_SETTINGS.language),
     defaultView: settings?.defaultView === "/inbox" ? "/inbox" : "/today",
     showCompletedInToday: settings?.showCompletedInToday ?? DEFAULT_APP_SETTINGS.showCompletedInToday,
     confirmBeforeDelete: settings?.confirmBeforeDelete ?? DEFAULT_APP_SETTINGS.confirmBeforeDelete,

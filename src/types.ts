@@ -231,11 +231,13 @@ export interface PlannerSettings {
 export type AccentColor = "blue" | "purple" | "green" | "pink" | "orange";
 export type ThemeMode = "light" | "dark" | "system";
 export type FontSize = "small" | "medium" | "large";
+export type Language = "ko" | "en";
 
 export interface AppSettings {
   theme: ThemeMode;
   accentColor: AccentColor;
   fontSize: FontSize;
+  language: Language;
   defaultView: "/today" | "/inbox";
   showCompletedInToday: boolean;
   confirmBeforeDelete: boolean;
