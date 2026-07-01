@@ -1653,6 +1653,15 @@ textarea {
   color: var(--color-ink);
 }
 
+/* The global `input { width: 100% }` rule stretches these checkboxes to the
+   full row width, shoving the label to the far edge. Keep them intrinsic. */
+.gcal-layer-toggle input[type="checkbox"] {
+  width: auto;
+  flex: none;
+  margin: 0;
+  padding: 0;
+}
+
 .gcal-project-dot {
   width: 8px;
   height: 8px;
