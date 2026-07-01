@@ -1664,7 +1664,7 @@ textarea {
 
 .gcal-main-column {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) clamp(280px, 24vw, 340px);
   gap: 16px;
   align-items: start;
   min-width: 0;
@@ -1814,6 +1814,13 @@ textarea {
 .gcal-timegrid {
   display: grid;
   gap: 0;
+  /* Below this width the 7 day columns become unreadable; let .gcal-main
+     scroll horizontally instead of crushing the headers into each other. */
+  min-width: 640px;
+}
+
+.gcal-timegrid.is-day {
+  min-width: 320px;
 }
 
 .gcal-timegrid-head {
@@ -1875,6 +1882,12 @@ textarea {
   grid-template-columns: 56px repeat(7, minmax(0, 1fr));
   border-bottom: 1px solid var(--color-divider-soft);
   min-height: 32px;
+  /* Cap the band so a busy day can't push the time grid off-screen; extra
+     chips scroll instead. align-items:start keeps a light day's single chip
+     from stretching to the tallest column's height. */
+  max-height: 104px;
+  overflow-y: auto;
+  align-items: start;
 }
 
 .gcal-allday-cell {
@@ -1883,6 +1896,8 @@ textarea {
   padding: 3px;
   border-left: 1px solid var(--color-divider-soft);
   cursor: pointer;
+  /* Keep chips at their natural height (no vertical stretch to fill the cell). */
+  align-content: start;
 }
 
 .gcal-allday-cell.is-drop {
@@ -2236,6 +2251,19 @@ textarea {
   font-size: 0.9rem;
   background: var(--color-canvas);
   color: var(--color-ink);
+}
+
+/* Laptop range: the fixed side panels leave too little room for the week
+   grid, crushing the day headers. Stack the contextual panel below the
+   calendar (sidebar stays) so the grid gets the full width. */
+@media (max-width: 1280px) {
+  .gcal-main-column {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gcal-panel {
+    max-height: none;
+  }
 }
 
 @media (max-width: 900px) {
