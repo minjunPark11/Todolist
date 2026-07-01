@@ -129,6 +129,10 @@ export function TaskList({
     waiting: t("status.waiting"),
     done: t("status.done"),
     archived: t("status.archived"),
+    // Legacy values normalized away on load (see migrateStatus); kept here
+    // only so this satisfies Record<TaskStatus, string>.
+    in_progress: t("status.doing"),
+    blocked: t("status.waiting"),
   };
 
   if (tasks.length === 0) {

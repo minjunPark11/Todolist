@@ -238,7 +238,7 @@ function ProjectDetail({
   editOpen: boolean;
   setEditOpen: (v: boolean) => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const projectTasks = useMemo(() => getProjectTasks(tasks, project.id), [tasks, project.id]);
   const progress = getProjectProgress(tasks, project.id);
   const prioritySummary = getProjectPrioritySummary(tasks, project.id);
