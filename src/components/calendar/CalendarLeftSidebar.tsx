@@ -1,6 +1,7 @@
 import type { Project } from "../../types";
 import type { CalendarLayerToggles, ProjectFilter } from "../../utils/calendarItems";
 import { getDayNumber, getMonthGrid, getMonthLabel, todayValue } from "../../utils/date";
+import { useT } from "../../i18n";
 
 interface CalendarLeftSidebarProps {
   anchor: string;
@@ -17,12 +18,12 @@ interface CalendarLeftSidebarProps {
   onExpand: () => void;
 }
 
-const LAYER_ITEMS: Array<{ key: keyof CalendarLayerToggles; label: string }> = [
-  { key: "task", label: "Tasks" },
-  { key: "deadline", label: "Deadlines" },
-  { key: "studyReview", label: "Study Reviews" },
-  { key: "projectDeadline", label: "Projects" },
-  { key: "completed", label: "Completed" },
+const LAYER_ITEMS: Array<{ key: keyof CalendarLayerToggles; labelKey: string }> = [
+  { key: "task", labelKey: "calendar.layerTasks" },
+  { key: "deadline", labelKey: "calendar.layerDeadlines" },
+  { key: "studyReview", labelKey: "calendar.layerStudyReviews" },
+  { key: "projectDeadline", labelKey: "calendar.layerProjects" },
+  { key: "completed", labelKey: "calendar.layerCompleted" },
 ];
 
 export function CalendarLeftSidebar({
@@ -39,6 +40,7 @@ export function CalendarLeftSidebar({
   collapsed,
   onExpand,
 }: CalendarLeftSidebarProps) {
+  const { t, lang } = useT();
   const today = todayValue();
   const anchorDate = new Date(`${anchor}T00:00:00`);
   const year = anchorDate.getFullYear();
@@ -54,8 +56,8 @@ export function CalendarLeftSidebar({
         <button
           type="button"
           className="gcal-icon-btn"
-          aria-label="Expand sidebar"
-          title="Expand sidebar"
+          aria-label={t("calendar.expandSidebar")}
+          title={t("calendar.expandSidebar")}
           onClick={onExpand}
         >
           »
@@ -63,8 +65,8 @@ export function CalendarLeftSidebar({
         <button
           type="button"
           className="gcal-create-btn is-rail"
-          aria-label="Create"
-          title="Create"
+          aria-label={t("calendar.createAria")}
+          title={t("calendar.createAria")}
           onClick={onCreateClick}
         >
           +
@@ -76,11 +78,11 @@ export function CalendarLeftSidebar({
   return (
     <aside className="gcal-sidebar">
       <button type="button" className="gcal-create-btn" onClick={onCreateClick}>
-        + Create
+        {t("calendar.create")}
       </button>
 
       <div className="gcal-mini-month">
-        <div className="gcal-mini-month-head">{getMonthLabel(year, month)}</div>
+        <div className="gcal-mini-month-head">{getMonthLabel(year, month, lang)}</div>
         <div className="gcal-mini-month-grid">
           {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => (
             <span key={`${label}-${index}`} className="gcal-mini-weekday">
@@ -108,7 +110,7 @@ export function CalendarLeftSidebar({
       </div>
 
       <div className="gcal-sidebar-section">
-        <h3>Layers</h3>
+        <h3>{t("calendar.layers")}</h3>
         {LAYER_ITEMS.map((item) => (
           <label key={item.key} className="gcal-layer-toggle">
             <input
@@ -116,20 +118,20 @@ export function CalendarLeftSidebar({
               checked={layers[item.key]}
               onChange={() => onToggleLayer(item.key)}
             />
-            {item.label}
+            {t(item.labelKey)}
           </label>
         ))}
       </div>
 
       <div className="gcal-sidebar-section">
-        <h3>Projects</h3>
+        <h3>{t("calendar.projects")}</h3>
         <label className="gcal-layer-toggle">
           <input
             type="checkbox"
             checked={projectFilter === "all"}
             onChange={onSelectAllProjects}
           />
-          All Projects
+          {t("calendar.allProjects")}
         </label>
         {projects.map((project) => (
           <label key={project.id} className="gcal-layer-toggle">

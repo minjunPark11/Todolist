@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import type { Project } from "../../types";
 import { formatDate } from "../../utils/date";
 import { Modal, useAutoFocus } from "../kit";
+import { useT } from "../../i18n";
 
 export interface QuickCreateDefaults {
   date: string;
@@ -27,6 +28,7 @@ interface QuickCreatePopoverProps {
 }
 
 export function QuickCreatePopover({ defaults, projects, onClose, onSave }: QuickCreatePopoverProps) {
+  const { t, lang } = useT();
   const [title, setTitle] = useState("");
   const [type, setType] = useState<"task" | "deadline">("task");
   const [date, setDate] = useState(defaults.date);
@@ -44,22 +46,26 @@ export function QuickCreatePopover({ defaults, projects, onClose, onSave }: Quic
 
   return (
     <Modal
-      title={defaults.allDay ? `New item — ${formatDate(defaults.date)}` : `New task — ${formatDate(defaults.date)}`}
+      title={
+        defaults.allDay
+          ? t("calendar.newItemOn", { date: formatDate(defaults.date, lang) })
+          : t("calendar.newTaskOn", { date: formatDate(defaults.date, lang) })
+      }
       onClose={onClose}
       footer={
         <>
           <button type="button" className="ff-btn" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="button" className="ff-btn ff-btn-primary" onClick={() => submit()}>
-            Save
+            {t("common.save")}
           </button>
         </>
       }
     >
       <form className="gcal-quick-create-form" onSubmit={submit}>
         <label>
-          <span>Title</span>
+          <span>{t("common.titleLabel")}</span>
           <input
             ref={titleRef}
             value={title}
@@ -68,42 +74,42 @@ export function QuickCreatePopover({ defaults, projects, onClose, onSave }: Quic
               if (event.key === "Enter") submit();
               if (event.key === "Escape") onClose();
             }}
-            placeholder="What do you need to do?"
+            placeholder={t("calendar.titlePlaceholderQuestion")}
           />
         </label>
 
         {defaults.allDay ? (
           <label>
-            <span>Type</span>
+            <span>{t("calendar.type")}</span>
             <select value={type} onChange={(event) => setType(event.target.value as "task" | "deadline")}>
-              <option value="task">Task (scheduled)</option>
-              <option value="deadline">Deadline</option>
+              <option value="task">{t("calendar.typeTaskScheduled")}</option>
+              <option value="deadline">{t("calendar.typeDeadline")}</option>
             </select>
           </label>
         ) : null}
 
         <label>
-          <span>Date</span>
+          <span>{t("calendar.date")}</span>
           <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
         </label>
 
         {!defaults.allDay ? (
           <>
             <label>
-              <span>Start time</span>
+              <span>{t("calendar.startTime")}</span>
               <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
             </label>
             <label>
-              <span>End time</span>
+              <span>{t("calendar.endTime")}</span>
               <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
             </label>
           </>
         ) : null}
 
         <label>
-          <span>Project</span>
+          <span>{t("common.project")}</span>
           <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-            <option value="">Inbox</option>
+            <option value="">{t("inbox.title")}</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}

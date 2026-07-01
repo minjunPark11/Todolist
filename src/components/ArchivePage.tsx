@@ -3,6 +3,7 @@ import type { Project, Task } from "../types";
 import { formatDate } from "../utils/date";
 import { getProjectProgress } from "../utils/planner";
 import { EmptyState, SegmentedTabs } from "./kit";
+import { useT } from "../i18n";
 
 interface ArchivePageProps {
   tasks: Task[];
@@ -23,44 +24,45 @@ export function ArchivePage({
   onDeleteTask,
   onDeleteProject,
 }: ArchivePageProps) {
+  const { t, lang } = useT();
   const [tab, setTab] = useState<"tasks" | "projects">("tasks");
-  const archivedTasks = tasks.filter((t) => t.status === "archived" || t.archivedAt);
+  const archivedTasks = tasks.filter((task) => task.status === "archived" || task.archivedAt);
   const archivedProjects = projects.filter((p) => p.status === "archived");
 
   return (
     <div className="ff-page">
       <header className="ff-page-head">
         <div>
-          <h1 className="ff-page-title">Archive</h1>
-          <p className="ff-page-sub">Items here are hidden from your main views. Restore or permanently delete them.</p>
+          <h1 className="ff-page-title">{t("archive.title")}</h1>
+          <p className="ff-page-sub">{t("archive.subtitle")}</p>
         </div>
       </header>
 
       <SegmentedTabs
-        tabs={[["tasks", `Tasks (${archivedTasks.length})`], ["projects", `Projects (${archivedProjects.length})`]]}
+        tabs={[["tasks", t("archive.tabTasks", { n: archivedTasks.length })], ["projects", t("archive.tabProjects", { n: archivedProjects.length })]]}
         active={tab}
         onChange={setTab}
       />
 
       {tab === "tasks" ? (
         archivedTasks.length === 0 ? (
-          <EmptyState icon="🗄" title="No archived tasks" text="Archived tasks will appear here." />
+          <EmptyState icon="🗄" title={t("archive.noArchivedTasks")} text={t("archive.noArchivedTasksHint")} />
         ) : (
           <div className="ff-archive-table">
             <div className="ff-archive-head">
-              <span>Task</span>
-              <span>Project</span>
-              <span>Archived</span>
+              <span>{t("archive.colTask")}</span>
+              <span>{t("common.project")}</span>
+              <span>{t("archive.colArchived")}</span>
               <span></span>
             </div>
             {archivedTasks.map((task) => (
               <div className="ff-archive-row" key={task.id}>
                 <button type="button" className="ff-archive-title" onClick={() => onOpenTask(task.id)}>{task.title}</button>
                 <span className="ff-archive-cell">{projects.find((p) => p.id === task.projectId)?.name ?? "—"}</span>
-                <span className="ff-archive-cell">{task.archivedAt ? formatDate(task.archivedAt.slice(0, 10)) : "—"}</span>
+                <span className="ff-archive-cell">{task.archivedAt ? formatDate(task.archivedAt.slice(0, 10), lang) : "—"}</span>
                 <span className="ff-archive-actions">
-                  <button type="button" className="ff-btn ff-btn-sm" onClick={() => onRestoreTask(task.id)}>Restore</button>
-                  <button type="button" className="ff-btn ff-btn-sm ff-btn-danger" onClick={() => onDeleteTask(task.id)}>Delete</button>
+                  <button type="button" className="ff-btn ff-btn-sm" onClick={() => onRestoreTask(task.id)}>{t("common.restore")}</button>
+                  <button type="button" className="ff-btn ff-btn-sm ff-btn-danger" onClick={() => onDeleteTask(task.id)}>{t("common.delete")}</button>
                 </span>
               </div>
             ))}
@@ -70,7 +72,7 @@ export function ArchivePage({
 
       {tab === "projects" ? (
         archivedProjects.length === 0 ? (
-          <EmptyState icon="🗄" title="No archived projects" text="Archived projects will appear here." />
+          <EmptyState icon="🗄" title={t("archive.noArchivedProjects")} text={t("archive.noArchivedProjectsHint")} />
         ) : (
           <div className="ff-project-grid">
             {archivedProjects.map((project) => {
@@ -81,13 +83,13 @@ export function ArchivePage({
                     <span className="ff-project-icon" style={{ background: project.color }}>📁</span>
                     <div className="ff-project-card-titles">
                       <strong>{project.name}</strong>
-                      <small>Archived · {progress.total} tasks</small>
+                      <small>{t("archive.archivedTasksCount", { n: progress.total })}</small>
                     </div>
                   </div>
                   {project.description ? <p className="ff-project-desc">{project.description}</p> : null}
                   <div className="ff-archive-actions">
-                    <button type="button" className="ff-btn ff-btn-sm" onClick={() => onRestoreProject(project.id)}>Restore</button>
-                    <button type="button" className="ff-btn ff-btn-sm ff-btn-danger" onClick={() => onDeleteProject(project.id)}>Delete</button>
+                    <button type="button" className="ff-btn ff-btn-sm" onClick={() => onRestoreProject(project.id)}>{t("common.restore")}</button>
+                    <button type="button" className="ff-btn ff-btn-sm ff-btn-danger" onClick={() => onDeleteProject(project.id)}>{t("common.delete")}</button>
                   </div>
                 </article>
               );

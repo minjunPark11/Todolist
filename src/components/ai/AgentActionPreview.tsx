@@ -5,6 +5,7 @@ import {
   type AgentAction,
 } from "../../lib/ai/agent/actions";
 import type { ToolValidationResult } from "../../lib/ai/tools/toolExecutor";
+import { useT } from "../../i18n";
 
 type AgentActionPreviewProps = {
   actions: AgentAction[];
@@ -45,6 +46,8 @@ export function AgentActionPreview({
   onDismiss,
   onRequestApply,
 }: AgentActionPreviewProps) {
+  const { t } = useT();
+
   if (actions.length === 0) {
     return null;
   }
@@ -53,10 +56,10 @@ export function AgentActionPreview({
   const canRequestApply = canApply && actions.length > 0 && !hasInvalidAction;
 
   return (
-    <div className="agent-action-preview" aria-label="AI suggested actions">
+    <div className="agent-action-preview" aria-label={t("ai.suggestedActionsLabel")}>
       <div className="agent-action-preview-head">
-        <strong>Suggested actions</strong>
-        <span>{canRequestApply ? "Needs confirmation" : "Review needed"}</span>
+        <strong>{t("ai.suggestedActions")}</strong>
+        <span>{canRequestApply ? t("ai.needsConfirmation") : t("ai.reviewNeeded")}</span>
       </div>
       <div className="agent-action-list">
         {actions.map((action) => (
@@ -73,20 +76,20 @@ export function AgentActionPreview({
             </div>
             <em>
               {getValidationForAction(action.id, validationResults)?.status === "invalid"
-                ? "Invalid"
+                ? t("ai.invalid")
                 : requiresConfirmation(action)
                   ? getActionRiskLabel(action.risk)
-                  : "Read only"}
+                  : t("ai.readOnly")}
             </em>
           </article>
         ))}
       </div>
       <div className="agent-action-preview-actions">
         <button type="button" disabled={!canRequestApply} onClick={onRequestApply}>
-          Apply
+          {t("ai.apply")}
         </button>
         <button type="button" onClick={onDismiss}>
-          Dismiss
+          {t("ai.dismiss")}
         </button>
       </div>
     </div>

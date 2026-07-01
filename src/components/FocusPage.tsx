@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FocusMode, FocusSession, Task } from "../types";
 import { todayValue } from "../utils/date";
+import { useT } from "../i18n";
 
 interface FocusPageProps {
   tasks: Task[];
@@ -14,10 +15,10 @@ interface FocusPageProps {
   ) => void;
 }
 
-const modes: Array<{ id: FocusMode; label: string; minutes: number }> = [
-  { id: "focus", label: "Focus", minutes: 25 },
-  { id: "short_break", label: "Short Break", minutes: 5 },
-  { id: "long_break", label: "Long Break", minutes: 15 },
+const modes: Array<{ id: FocusMode; labelKey: string; minutes: number }> = [
+  { id: "focus", labelKey: "focus.modeFocus", minutes: 25 },
+  { id: "short_break", labelKey: "focus.modeShortBreak", minutes: 5 },
+  { id: "long_break", labelKey: "focus.modeLongBreak", minutes: 15 },
 ];
 
 function formatTimer(seconds: number): string {
@@ -27,6 +28,7 @@ function formatTimer(seconds: number): string {
 }
 
 export function FocusPage({ tasks, focusSessions, onAddFocusSession }: FocusPageProps) {
+  const { t } = useT();
   const [mode, setMode] = useState<FocusMode>("focus");
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [remainingSeconds, setRemainingSeconds] = useState(25 * 60);
@@ -97,8 +99,8 @@ export function FocusPage({ tasks, focusSessions, onAddFocusSession }: FocusPage
   return (
     <section className="content-stack">
       <header className="page-header">
-        <h1>Focus</h1>
-        <div className="stat-pill">{todayFocusTime} min today</div>
+        <h1>{t("focus.title")}</h1>
+        <div className="stat-pill">{t("focus.minutesToday", { n: todayFocusTime })}</div>
       </header>
       <section className="focus-layout">
         <div className="focus-timer-card">
@@ -109,15 +111,15 @@ export function FocusPage({ tasks, focusSessions, onAddFocusSession }: FocusPage
                 className={mode === item.id ? "active" : ""}
                 onClick={() => chooseMode(item.id)}
               >
-                {item.label}
+                {t(item.labelKey)}
               </button>
             ))}
           </div>
           <div className="timer-display">{formatTimer(remainingSeconds)}</div>
           <label>
-            Focus task
+            {t("focus.focusTask")}
             <select value={selectedTaskId} onChange={(event) => setSelectedTaskId(event.target.value)}>
-              <option value="">No linked task</option>
+              <option value="">{t("focus.noLinkedTask")}</option>
               {openTasks.map((task) => (
                 <option key={task.id} value={task.id}>
                   {task.title}
@@ -127,18 +129,18 @@ export function FocusPage({ tasks, focusSessions, onAddFocusSession }: FocusPage
           </label>
           <div className="timer-actions">
             <button onClick={startTimer} disabled={isRunning}>
-              Start
+              {t("focus.start")}
             </button>
             <button onClick={() => setIsRunning(false)} disabled={!isRunning}>
-              Pause
+              {t("focus.pause")}
             </button>
-            <button onClick={resetTimer}>Reset</button>
+            <button onClick={resetTimer}>{t("focus.reset")}</button>
           </div>
         </div>
         <div className="focus-summary">
-          <Metric label="Sessions today" value={todaySessions.length} />
-          <Metric label="Focus sessions" value={todayFocusSessions.length} />
-          <Metric label="Focus minutes" value={todayFocusTime} />
+          <Metric label={t("focus.sessionsToday")} value={todaySessions.length} />
+          <Metric label={t("focus.focusSessions")} value={todayFocusSessions.length} />
+          <Metric label={t("focus.focusMinutes")} value={todayFocusTime} />
         </div>
       </section>
     </section>

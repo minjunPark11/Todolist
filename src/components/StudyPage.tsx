@@ -10,6 +10,7 @@ import type {
 import { formatDate, todayValue } from "../utils/date";
 import { getComputedReviewStatus, getStudyReviewQueue } from "../utils/planner";
 import { EmptyState, Modal, MoreMenu, SegmentedTabs, ToastState, useAutoFocus } from "./kit";
+import { useT } from "../i18n";
 
 type StudyTab = "topics" | "notes" | "reviews";
 
@@ -36,6 +37,7 @@ interface StudyPageProps {
 
 export function StudyPage(props: StudyPageProps) {
   const { topics, notes, tab, onChangeTab, focusNoteId, onFocusNoteHandled } = props;
+  const { t } = useT();
   const today = todayValue();
   const [topicModal, setTopicModal] = useState(false);
   const [noteEditor, setNoteEditor] = useState<{ mode: "create" | "edit"; note?: ConceptNote } | null>(null);
@@ -54,29 +56,29 @@ export function StudyPage(props: StudyPageProps) {
   const streak = useMemo(() => computeStreak(notes), [notes]);
 
   const visibleNotes = topicFilter === "all" ? notes : notes.filter((n) => n.topicId === topicFilter);
-  const topicName = (id: string) => topics.find((t) => t.id === id)?.name ?? "No topic";
+  const topicName = (id: string) => topics.find((t) => t.id === id)?.name ?? t("study.noTopic");
   const topicColor = (id: string) => topics.find((t) => t.id === id)?.color ?? "#8e8e93";
 
   return (
     <div className="ff-page">
       <header className="ff-page-head">
         <div>
-          <h1 className="ff-page-title">Study</h1>
-          <p className="ff-page-sub">Track topics, concept notes, and spaced reviews.</p>
+          <h1 className="ff-page-title">{t("study.title")}</h1>
+          <p className="ff-page-sub">{t("study.subtitle")}</p>
         </div>
         <div className="ff-page-actions">
           {dueCount > 0 ? (
             <button type="button" className="ff-badge ff-badge-danger" onClick={() => onChangeTab("reviews")}>
-              {dueCount} due reviews
+              {t("study.dueReviewsCount", { n: dueCount })}
             </button>
           ) : null}
-          <button type="button" className="ff-btn" onClick={() => setTopicModal(true)}>+ New Topic</button>
-          <button type="button" className="ff-btn ff-btn-primary" onClick={() => setNoteEditor({ mode: "create" })}>+ New Note</button>
+          <button type="button" className="ff-btn" onClick={() => setTopicModal(true)}>+ {t("study.newTopic")}</button>
+          <button type="button" className="ff-btn ff-btn-primary" onClick={() => setNoteEditor({ mode: "create" })}>+ {t("study.newNote")}</button>
         </div>
       </header>
 
       <SegmentedTabs
-        tabs={[["topics", "Topics"], ["notes", "Notes"], ["reviews", "Reviews"]]}
+        tabs={[["topics", t("study.tabTopics")], ["notes", t("study.tabNotes")], ["reviews", t("study.tabReviews")]]}
         active={tab}
         onChange={onChangeTab}
       />
@@ -84,13 +86,13 @@ export function StudyPage(props: StudyPageProps) {
       {tab === "topics" ? (
         <>
           <div className="ff-study-metrics">
-            <MetricCard label="Total Topics" value={topics.length} tone="accent" onClick={() => onChangeTab("topics")} />
-            <MetricCard label="Concept Notes" value={notes.length} tone="purple" onClick={() => onChangeTab("notes")} />
-            <MetricCard label="Due Reviews" value={dueCount} tone="danger" onClick={() => onChangeTab("reviews")} />
-            <MetricCard label="Study Streak" value={`${streak} day${streak === 1 ? "" : "s"}`} tone="success" />
+            <MetricCard label={t("study.totalTopics")} value={topics.length} tone="accent" onClick={() => onChangeTab("topics")} />
+            <MetricCard label={t("study.conceptNotes")} value={notes.length} tone="purple" onClick={() => onChangeTab("notes")} />
+            <MetricCard label={t("study.dueReviews")} value={dueCount} tone="danger" onClick={() => onChangeTab("reviews")} />
+            <MetricCard label={t("study.studyStreak")} value={streak === 1 ? t("study.streakDaySingular", { n: streak }) : t("study.streakDayPlural", { n: streak })} tone="success" />
           </div>
           {topics.length === 0 ? (
-            <EmptyState icon="📚" title="No topics yet" text="Create a topic to start organizing your study notes." actionLabel="New Topic" onAction={() => setTopicModal(true)} />
+            <EmptyState icon="📚" title={t("study.noTopicsYet")} text={t("study.noTopicsYetHint")} actionLabel={t("study.newTopic")} onAction={() => setTopicModal(true)} />
           ) : (
             <div className="ff-topic-grid">
               {topics.map((topic) => {
@@ -108,13 +110,13 @@ export function StudyPage(props: StudyPageProps) {
                     <div className="ff-topic-card-top">
                       <span className="ff-topic-dot" style={{ background: topic.color }} />
                       <strong>{topic.name}</strong>
-                      <MoreMenu items={[{ label: "Delete topic", danger: true, onClick: () => props.onDeleteTopic(topic.id) }]} />
+                      <MoreMenu items={[{ label: t("study.deleteTopic"), danger: true, onClick: () => props.onDeleteTopic(topic.id) }]} />
                     </div>
                     <small className="ff-topic-cat">{topic.category}</small>
                     {topic.description ? <p>{topic.description}</p> : null}
                     <div className="ff-topic-foot">
-                      <span>{topicNotes.length} notes</span>
-                      {due > 0 ? <span className="ff-badge ff-badge-danger">{due} due</span> : <span className="ff-topic-ok">Up to date</span>}
+                      <span>{t("study.notesCount", { n: topicNotes.length })}</span>
+                      {due > 0 ? <span className="ff-badge ff-badge-danger">{t("study.dueCount", { n: due })}</span> : <span className="ff-topic-ok">{t("study.upToDate")}</span>}
                     </div>
                   </article>
                 );
@@ -128,14 +130,14 @@ export function StudyPage(props: StudyPageProps) {
         <>
           <div className="ff-tasks-filterbar">
             <select className="ff-topic-select" value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)}>
-              <option value="all">All Topics</option>
-              {topics.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+              <option value="all">{t("study.allTopics")}</option>
+              {topics.map((topic) => (
+                <option key={topic.id} value={topic.id}>{topic.name}</option>
               ))}
             </select>
           </div>
           {visibleNotes.length === 0 ? (
-            <EmptyState icon="📝" title="No notes yet" text="Capture a concept, example, and your own explanation." actionLabel="New Note" onAction={() => setNoteEditor({ mode: "create" })} />
+            <EmptyState icon="📝" title={t("study.noNotesYet")} text={t("study.noNotesYetHint")} actionLabel={t("study.newNote")} onAction={() => setNoteEditor({ mode: "create" })} />
           ) : (
             <div className="ff-note-grid">
               {visibleNotes.map((note) => {
@@ -153,17 +155,17 @@ export function StudyPage(props: StudyPageProps) {
                       <strong>{note.title}</strong>
                       <MoreMenu
                         items={[
-                          { label: "Edit", onClick: () => setNoteEditor({ mode: "edit", note }) },
-                          { label: "Mark as mastered", onClick: () => props.onMarkReviewed(note.id, "mastered") },
+                          { label: t("common.edit"), onClick: () => setNoteEditor({ mode: "edit", note }) },
+                          { label: t("study.markAsMastered"), onClick: () => props.onMarkReviewed(note.id, "mastered") },
                           { separator: true },
-                          { label: "Delete", danger: true, onClick: () => props.onDeleteNote(note.id) },
+                          { label: t("common.delete"), danger: true, onClick: () => props.onDeleteNote(note.id) },
                         ]}
                       />
                     </div>
                     {note.summary ? <p>{note.summary}</p> : null}
                     <div className="ff-note-card-foot">
                       <span className="ff-projbadge"><span className="ff-dot" style={{ background: topicColor(note.topicId) }} />{topicName(note.topicId)}</span>
-                      <span className={`ff-badge ff-badge-${difficultyTone(note.difficulty)}`}>{note.difficulty}</span>
+                      <span className={`ff-badge ff-badge-${difficultyTone(note.difficulty)}`}>{t(`study.difficulty.${note.difficulty}`)}</span>
                       <ReviewStatusBadge status={status} note={note} />
                     </div>
                   </article>
@@ -176,11 +178,11 @@ export function StudyPage(props: StudyPageProps) {
 
       {tab === "reviews" ? (
         <div className="ff-review-stack">
-          <ReviewSection title="Due" tone="danger" notes={queue.due} topicName={topicName} onReview={props.onMarkReviewed} onOpen={setOpenNote} showActions />
-          <ReviewSection title="Upcoming" tone="accent" notes={queue.upcoming} topicName={topicName} onReview={props.onMarkReviewed} onOpen={setOpenNote} />
-          <ReviewSection title="Mastered" tone="success" notes={queue.mastered} topicName={topicName} onReview={props.onMarkReviewed} onOpen={setOpenNote} />
+          <ReviewSection title={t("study.due")} tone="danger" notes={queue.due} topicName={topicName} onReview={props.onMarkReviewed} onOpen={setOpenNote} showActions />
+          <ReviewSection title={t("study.upcoming")} tone="accent" notes={queue.upcoming} topicName={topicName} onReview={props.onMarkReviewed} onOpen={setOpenNote} />
+          <ReviewSection title={t("study.mastered")} tone="success" notes={queue.mastered} topicName={topicName} onReview={props.onMarkReviewed} onOpen={setOpenNote} />
           {queue.due.length === 0 && queue.upcoming.length === 0 && queue.mastered.length === 0 ? (
-            <EmptyState icon="✅" title="No reviews scheduled" text="Add notes and schedule reviews to build your spaced-repetition queue." />
+            <EmptyState icon="✅" title={t("study.noReviewsScheduled")} text={t("study.noReviewsScheduledHint")} />
           ) : null}
         </div>
       ) : null}
@@ -191,7 +193,7 @@ export function StudyPage(props: StudyPageProps) {
           onCreate={(values) => {
             props.onCreateTopic(values);
             setTopicModal(false);
-            props.showToast({ message: "Topic created" });
+            props.showToast({ message: t("study.topicCreated") });
           }}
         />
       ) : null}
@@ -209,7 +211,7 @@ export function StudyPage(props: StudyPageProps) {
               props.onCreateNote(values as Partial<ConceptNote> & { title: string; topicId: string });
             }
             setNoteEditor(null);
-            props.showToast({ message: "Note saved" });
+            props.showToast({ message: t("study.noteSaved") });
           }}
         />
       ) : null}
@@ -237,10 +239,11 @@ function MetricCard({ label, value, tone, onClick }: { label: string; value: num
 }
 
 function ReviewStatusBadge({ status, note }: { status: string; note: ConceptNote }) {
-  if (status === "due") return <span className="ff-badge ff-badge-danger">Due</span>;
-  if (status === "upcoming") return <span className="ff-badge ff-badge-accent">{formatDate(note.nextReviewDate)}</span>;
-  if (status === "mastered") return <span className="ff-badge ff-badge-success">Mastered</span>;
-  return <span className="ff-badge ff-badge-muted">Not scheduled</span>;
+  const { t, lang } = useT();
+  if (status === "due") return <span className="ff-badge ff-badge-danger">{t("study.due")}</span>;
+  if (status === "upcoming") return <span className="ff-badge ff-badge-accent">{formatDate(note.nextReviewDate, lang)}</span>;
+  if (status === "mastered") return <span className="ff-badge ff-badge-success">{t("study.mastered")}</span>;
+  return <span className="ff-badge ff-badge-muted">{t("study.notScheduled")}</span>;
 }
 
 function ReviewSection({
@@ -260,6 +263,7 @@ function ReviewSection({
   onOpen: (note: ConceptNote) => void;
   showActions?: boolean;
 }) {
+  const { t } = useT();
   if (notes.length === 0) return null;
   return (
     <section className={`ff-today-card ff-tone-${tone}`}>
@@ -274,14 +278,14 @@ function ReviewSection({
           <div key={note.id} className="ff-review-row">
             <button type="button" className="ff-review-main" onClick={() => onOpen(note)}>
               <strong>{note.title}</strong>
-              <small>{topicName(note.topicId)} · {note.summary || "No summary"}</small>
+              <small>{topicName(note.topicId)} · {note.summary || t("study.noSummary")}</small>
             </button>
             {showActions ? (
               <div className="ff-review-actions">
-                <button type="button" className="ff-rev-btn rev-hard" onClick={() => onReview(note.id, "hard")}>Hard</button>
-                <button type="button" className="ff-rev-btn rev-medium" onClick={() => onReview(note.id, "medium")}>Medium</button>
-                <button type="button" className="ff-rev-btn rev-easy" onClick={() => onReview(note.id, "easy")}>Easy</button>
-                <button type="button" className="ff-rev-btn rev-master" onClick={() => onReview(note.id, "mastered")}>Mastered</button>
+                <button type="button" className="ff-rev-btn rev-hard" onClick={() => onReview(note.id, "hard")}>{t("study.hard")}</button>
+                <button type="button" className="ff-rev-btn rev-medium" onClick={() => onReview(note.id, "medium")}>{t("study.medium")}</button>
+                <button type="button" className="ff-rev-btn rev-easy" onClick={() => onReview(note.id, "easy")}>{t("study.easy")}</button>
+                <button type="button" className="ff-rev-btn rev-master" onClick={() => onReview(note.id, "mastered")}>{t("study.mastered")}</button>
               </div>
             ) : null}
           </div>
@@ -304,6 +308,7 @@ function NoteDetail({
   onEdit: () => void;
   onReview: (difficulty: ReviewDifficulty) => void;
 }) {
+  const { t, lang } = useT();
   return (
     <Modal
       title={note.title}
@@ -311,31 +316,31 @@ function NoteDetail({
       onClose={onClose}
       footer={
         <>
-          <button className="ff-btn" onClick={onEdit}>✎ Edit</button>
-          <button className="ff-btn ff-btn-primary" onClick={() => onReview("medium")}>Review Now</button>
+          <button className="ff-btn" onClick={onEdit}>✎ {t("common.edit")}</button>
+          <button className="ff-btn ff-btn-primary" onClick={() => onReview("medium")}>{t("study.reviewNow")}</button>
         </>
       }
     >
       <div className="ff-note-detail-meta">
         <span className="ff-projbadge">{topicName}</span>
-        <span className={`ff-badge ff-badge-${difficultyTone(note.difficulty)}`}>{note.difficulty}</span>
-        <span className="ff-badge ff-badge-muted">{note.noteType}</span>
-        {note.nextReviewDate ? <span className="ff-badge ff-badge-accent">Next: {formatDate(note.nextReviewDate)}</span> : null}
+        <span className={`ff-badge ff-badge-${difficultyTone(note.difficulty)}`}>{t(`study.difficulty.${note.difficulty}`)}</span>
+        <span className="ff-badge ff-badge-muted">{t(`study.noteType.${note.noteType}`)}</span>
+        {note.nextReviewDate ? <span className="ff-badge ff-badge-accent">{t("study.nextReviewLabel", { date: formatDate(note.nextReviewDate, lang) })}</span> : null}
       </div>
-      {note.summary ? <Field label="Summary" value={note.summary} /> : null}
-      {note.content ? <Field label="Explanation" value={note.content} /> : null}
-      {note.examples ? <Field label="Examples" value={note.examples} /> : null}
-      {note.personalExplanation ? <Field label="My explanation" value={note.personalExplanation} /> : null}
-      {note.confusionPoint ? <Field label="Confusion point" value={note.confusionPoint} /> : null}
+      {note.summary ? <Field label={t("study.summary")} value={note.summary} /> : null}
+      {note.content ? <Field label={t("study.explanation")} value={note.content} /> : null}
+      {note.examples ? <Field label={t("study.examples")} value={note.examples} /> : null}
+      {note.personalExplanation ? <Field label={t("study.myExplanation")} value={note.personalExplanation} /> : null}
+      {note.confusionPoint ? <Field label={t("study.confusionPoint")} value={note.confusionPoint} /> : null}
       {note.leetcode?.relatedProblems?.length ? (
-        <Field label="Related problems" value={note.leetcode.relatedProblems.join("\n")} />
+        <Field label={t("study.relatedProblems")} value={note.leetcode.relatedProblems.join("\n")} />
       ) : null}
       {note.reviewHistory.length > 0 ? (
         <div className="ff-field">
-          <span className="ff-field-label">Review history</span>
+          <span className="ff-field-label">{t("study.reviewHistory")}</span>
           <ul className="ff-history">
             {note.reviewHistory.slice(-5).reverse().map((h) => (
-              <li key={h.id}>{formatDate(h.reviewedAt.slice(0, 10))} · {h.difficulty}</li>
+              <li key={h.id}>{formatDate(h.reviewedAt.slice(0, 10), lang)} · {t(`study.${h.difficulty}`)}</li>
             ))}
           </ul>
         </div>
@@ -360,6 +365,7 @@ function TopicModal({
   onClose: () => void;
   onCreate: (values: { name: string; category: StudyTopicCategory; description: string; color: string }) => void;
 }) {
+  const { t } = useT();
   const nameRef = useAutoFocus<HTMLInputElement>();
   const [name, setName] = useState("");
   const [category, setCategory] = useState<StudyTopicCategory>("LeetCode");
@@ -369,30 +375,30 @@ function TopicModal({
 
   return (
     <Modal
-      title="New Topic"
+      title={t("study.newTopicTitle")}
       onClose={onClose}
       footer={
         <>
-          <button className="ff-btn" onClick={onClose}>Cancel</button>
-          <button className="ff-btn ff-btn-primary" onClick={() => { if (!name.trim()) { setError(true); return; } onCreate({ name: name.trim(), category, description, color }); }}>Create Topic</button>
+          <button className="ff-btn" onClick={onClose}>{t("common.cancel")}</button>
+          <button className="ff-btn ff-btn-primary" onClick={() => { if (!name.trim()) { setError(true); return; } onCreate({ name: name.trim(), category, description, color }); }}>{t("study.createTopic")}</button>
         </>
       }
     >
       <div className="ff-form">
         <label>
-          Topic name
+          {t("study.topicName")}
           <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); setError(false); }} />
-          {error ? <span className="ff-quickadd-error" style={{ position: "static" }}>Topic name is required.</span> : null}
+          {error ? <span className="ff-quickadd-error" style={{ position: "static" }}>{t("study.topicNameRequired")}</span> : null}
         </label>
         <div className="ff-form-grid">
           <label>
-            Category
+            {t("study.category")}
             <select value={category} onChange={(e) => setCategory(e.target.value as StudyTopicCategory)}>
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </label>
           <label>
-            Color
+            {t("common.color")}
             <div className="ff-color-row">
               {TOPIC_COLORS.map((c) => (
                 <button key={c} type="button" className={`ff-color-swatch${color === c ? " active" : ""}`} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />
@@ -401,7 +407,7 @@ function TopicModal({
           </label>
         </div>
         <label>
-          Description
+          {t("common.description")}
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
       </div>
@@ -422,6 +428,7 @@ function NoteEditor({
   onClose: () => void;
   onSave: (values: Partial<ConceptNote> & { title: string; topicId: string }, id?: string) => void;
 }) {
+  const { t } = useT();
   const titleRef = useAutoFocus<HTMLInputElement>();
   const [title, setTitle] = useState(note?.title ?? "");
   const [topicId, setTopicId] = useState(note?.topicId ?? topics[0]?.id ?? "");
@@ -465,78 +472,78 @@ function NoteEditor({
 
   return (
     <Modal
-      title={mode === "edit" ? "Edit Note" : "New Note"}
+      title={mode === "edit" ? t("study.editNote") : t("study.newNoteTitle")}
       wide
       onClose={onClose}
       footer={
         <>
-          <button className="ff-btn" onClick={onClose}>Cancel</button>
-          <button className="ff-btn ff-btn-primary" onClick={submit}>Save Note</button>
+          <button className="ff-btn" onClick={onClose}>{t("common.cancel")}</button>
+          <button className="ff-btn ff-btn-primary" onClick={submit}>{t("study.saveNote")}</button>
         </>
       }
     >
       <div className="ff-form">
         <label>
-          Title
+          {t("study.noteTitleLabel")}
           <input ref={titleRef} value={title} onChange={(e) => { setTitle(e.target.value); setError(false); }} />
-          {error ? <span className="ff-quickadd-error" style={{ position: "static" }}>Note title is required.</span> : null}
+          {error ? <span className="ff-quickadd-error" style={{ position: "static" }}>{t("study.noteTitleRequired")}</span> : null}
         </label>
         <div className="ff-form-grid">
           <label>
-            Topic
+            {t("study.topic")}
             <select value={topicId} onChange={(e) => setTopicId(e.target.value)}>
-              {topics.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
             </select>
           </label>
           <label>
-            Note type
+            {t("study.noteType")}
             <select value={noteType} onChange={(e) => setNoteType(e.target.value as NoteType)}>
-              {NOTE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              {NOTE_TYPES.map((nt) => <option key={nt} value={nt}>{t(`study.noteType.${nt}`)}</option>)}
             </select>
           </label>
         </div>
         <label>
-          Summary
+          {t("study.summary")}
           <textarea value={summary} onChange={(e) => setSummary(e.target.value)} />
         </label>
         <label>
-          Explanation / content
+          {t("study.explanationContent")}
           <textarea value={content} onChange={(e) => setContent(e.target.value)} />
         </label>
         <label>
-          Examples
+          {t("study.examples")}
           <textarea value={examples} onChange={(e) => setExamples(e.target.value)} />
         </label>
         <label>
-          My explanation
+          {t("study.myExplanation")}
           <textarea value={personalExplanation} onChange={(e) => setPersonalExplanation(e.target.value)} />
         </label>
 
         {noteType === "leetcode" ? (
           <div className="ff-form-grid">
-            <label>Pattern<input value={pattern} onChange={(e) => setPattern(e.target.value)} /></label>
-            <label className="ff-form-full">Related problems (one per line)<textarea value={related} onChange={(e) => setRelated(e.target.value)} /></label>
+            <label>{t("study.pattern")}<input value={pattern} onChange={(e) => setPattern(e.target.value)} /></label>
+            <label className="ff-form-full">{t("study.relatedProblemsLines")}<textarea value={related} onChange={(e) => setRelated(e.target.value)} /></label>
           </div>
         ) : null}
         {noteType === "research" ? (
-          <label>Paper source<input value={paperSource} onChange={(e) => setPaperSource(e.target.value)} /></label>
+          <label>{t("study.paperSource")}<input value={paperSource} onChange={(e) => setPaperSource(e.target.value)} /></label>
         ) : null}
         {noteType === "english" || noteType === "presentation" ? (
-          <label>Expression<input value={expression} onChange={(e) => setExpression(e.target.value)} /></label>
+          <label>{t("study.expression")}<input value={expression} onChange={(e) => setExpression(e.target.value)} /></label>
         ) : null}
 
         <div className="ff-form-grid">
           <label>
-            Difficulty
+            {t("study.difficultyLabel")}
             <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as NoteDifficulty)}>
-              <option value="unknown">Unknown</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
+              <option value="unknown">{t("study.difficulty.unknown")}</option>
+              <option value="easy">{t("study.difficulty.easy")}</option>
+              <option value="medium">{t("study.difficulty.medium")}</option>
+              <option value="hard">{t("study.difficulty.hard")}</option>
             </select>
           </label>
           <label>
-            Next review
+            {t("study.nextReview")}
             <input type="date" value={nextReviewDate} onChange={(e) => setNextReviewDate(e.target.value)} />
           </label>
         </div>

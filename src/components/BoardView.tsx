@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import type { Project, Subtask, Task, TaskDraft } from "../types";
 import { formatDate } from "../utils/date";
+import { useT } from "../i18n";
 
 interface BoardViewProps {
   tasks: Task[];
@@ -12,14 +13,15 @@ interface BoardViewProps {
 }
 
 const columns = [
-  { id: "inbox", label: "Inbox" },
-  { id: "todo", label: "To Do" },
-  { id: "doing", label: "Doing" },
-  { id: "waiting", label: "Waiting" },
-  { id: "done", label: "Done" },
+  { id: "inbox", labelKey: "status.inbox" },
+  { id: "todo", labelKey: "status.todo" },
+  { id: "doing", labelKey: "status.doing" },
+  { id: "waiting", labelKey: "status.waiting" },
+  { id: "done", labelKey: "status.done" },
 ] as const;
 
 export function BoardView({ tasks, projects, subtasks, onSelectTask, onUpdateTask, onAddTask }: BoardViewProps) {
+  const { t, lang } = useT();
   const [draftByColumn, setDraftByColumn] = useState<Record<string, string>>({});
   const projectMap = new Map(projects.map((project) => [project.id, project]));
 
@@ -67,14 +69,14 @@ export function BoardView({ tasks, projects, subtasks, onSelectTask, onUpdateTas
             }}
           >
             <div className="board-column-header">
-              <h2>{column.label}</h2>
+              <h2>{t(column.labelKey)}</h2>
               <span>{columnTasks.length}</span>
             </div>
             {column.id !== "done" ? (
               <form className="board-inline-add" onSubmit={(event) => submitColumnTask(event, column.id)}>
                 <input
-                  aria-label={`Add task to ${column.label}`}
-                  placeholder="+ Add Task"
+                  aria-label={t("board.addTaskToColumnAria", { column: t(column.labelKey) })}
+                  placeholder={t("board.addTaskPlaceholder")}
                   value={draftByColumn[column.id] ?? ""}
                   onChange={(event) =>
                     setDraftByColumn((current) => ({ ...current, [column.id]: event.target.value }))
@@ -83,7 +85,7 @@ export function BoardView({ tasks, projects, subtasks, onSelectTask, onUpdateTas
               </form>
             ) : null}
             <div className="board-card-list">
-              {columnTasks.length === 0 ? <p className="empty-state">No tasks.</p> : null}
+              {columnTasks.length === 0 ? <p className="empty-state">{t("board.noTasks")}</p> : null}
               {columnTasks.map((task) => {
                 const project = projectMap.get(task.projectId);
                 const taskSubtasks = subtasks.filter((subtask) => subtask.taskId === task.id);
@@ -102,12 +104,12 @@ export function BoardView({ tasks, projects, subtasks, onSelectTask, onUpdateTas
                   >
                     <h3>{task.title}</h3>
                     <div className="task-meta">
-                      <span>{formatDate(task.dueDate)}</span>
-                      <span className={`priority priority-${task.priority}`}>{task.priority}</span>
-                      <span>{project?.name ?? "Inbox"}</span>
+                      <span>{formatDate(task.dueDate, lang)}</span>
+                      <span className={`priority priority-${task.priority}`}>{t(`priority.${task.priority}`)}</span>
+                      <span>{project?.name ?? t("status.inbox")}</span>
                     </div>
                     {taskSubtasks.length > 0 ? (
-                      <div className="mini-progress" aria-label="Subtask progress">
+                      <div className="mini-progress" aria-label={t("taskList.subtaskProgress")}>
                         <span style={{ width: `${(completed / taskSubtasks.length) * 100}%` }} />
                       </div>
                     ) : null}
@@ -120,7 +122,7 @@ export function BoardView({ tasks, projects, subtasks, onSelectTask, onUpdateTas
                     >
                       {columns.filter((option) => option.id !== "inbox").map((option) => (
                         <option key={option.id} value={option.id}>
-                          {option.label}
+                          {t(option.labelKey)}
                         </option>
                       ))}
                     </select>

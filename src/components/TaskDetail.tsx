@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import type { Project, RepeatType, Subtask, Task, TaskLevel, TaskPriority, TaskStatus } from "../types";
 import { todayValue } from "../utils/date";
+import { useT } from "../i18n";
 
 interface TaskDetailProps {
   task: Task | null;
@@ -34,6 +35,7 @@ export function TaskDetail({
   onToggleSubtask,
   onDeleteSubtask,
 }: TaskDetailProps) {
+  const { t } = useT();
   const [subtaskTitle, setSubtaskTitle] = useState("");
 
   const taskSubtasks = useMemo(
@@ -50,11 +52,36 @@ export function TaskDetail({
   if (!task) {
     return (
       <aside className="detail-panel muted-panel">
-        <h2>Task Detail</h2>
-        <p>Select a task to review its details and planning fields.</p>
+        <h2>{t("taskDetail.title")}</h2>
+        <p>{t("taskDetail.selectTaskHint")}</p>
       </aside>
     );
   }
+
+  const repeatLabels: Record<RepeatType, string> = {
+    none: t("taskDetail.repeatNone"),
+    daily: t("taskDetail.repeatDaily"),
+    weekly: t("taskDetail.repeatWeekly"),
+    monthly: t("taskDetail.repeatMonthly"),
+  };
+  const levelLabels: Record<TaskLevel, string> = {
+    low: t("taskDetail.levelLow"),
+    high: t("taskDetail.levelHigh"),
+  };
+  const statusLabels: Record<TaskStatus, string> = {
+    inbox: t("status.inbox"),
+    todo: t("status.todo"),
+    doing: t("status.doing"),
+    waiting: t("status.waiting"),
+    done: t("status.done"),
+    archived: t("status.archived"),
+  };
+  const priorityLabels: Record<TaskPriority, string> = {
+    high: t("priority.high"),
+    medium: t("priority.medium"),
+    low: t("priority.low"),
+    none: t("priority.none"),
+  };
 
   function handleAddSubtask(event: FormEvent) {
     event.preventDefault();
@@ -73,23 +100,23 @@ export function TaskDetail({
         <input
           className="detail-title-input"
           value={task.title}
-          aria-label="Task title"
+          aria-label={t("taskDetail.taskTitleAria")}
           onChange={(event) => onUpdateTask(task.id, { title: event.target.value })}
         />
         <textarea
           className="detail-description-input"
-          placeholder="Add description"
+          placeholder={t("taskDetail.addDescription")}
           value={task.description}
-          aria-label="Task description"
+          aria-label={t("taskDetail.taskDescriptionAria")}
           onChange={(event) => onUpdateTask(task.id, { description: event.target.value })}
         />
       </header>
 
       <section className="detail-section">
-        <h3>Schedule</h3>
+        <h3>{t("taskDetail.schedule")}</h3>
         <div className="detail-field-list">
           <label>
-            <span>Scheduled date</span>
+            <span>{t("taskDetail.scheduledDate")}</span>
             <input
               type="date"
               value={task.scheduledDate}
@@ -97,7 +124,7 @@ export function TaskDetail({
             />
           </label>
           <label>
-            <span>Start time</span>
+            <span>{t("taskDetail.startTime")}</span>
             <input
               type="time"
               value={task.startTime}
@@ -105,7 +132,7 @@ export function TaskDetail({
             />
           </label>
           <label>
-            <span>End time</span>
+            <span>{t("taskDetail.endTime")}</span>
             <input
               type="time"
               value={task.endTime}
@@ -113,7 +140,7 @@ export function TaskDetail({
             />
           </label>
           <label>
-            <span>Due date</span>
+            <span>{t("common.dueDate")}</span>
             <input
               type="date"
               value={task.dueDate}
@@ -121,7 +148,7 @@ export function TaskDetail({
             />
           </label>
           <label>
-            <span>Repeat</span>
+            <span>{t("taskDetail.repeat")}</span>
             <select
               value={task.repeatType}
               onChange={(event) =>
@@ -130,7 +157,7 @@ export function TaskDetail({
             >
               {repeatTypes.map((repeatType) => (
                 <option key={repeatType} value={repeatType}>
-                  {repeatType}
+                  {repeatLabels[repeatType]}
                 </option>
               ))}
             </select>
@@ -138,7 +165,7 @@ export function TaskDetail({
           {task.repeatType !== "none" ? (
             <>
               <label>
-                <span>Repeat interval</span>
+                <span>{t("taskDetail.repeatInterval")}</span>
                 <input
                   type="number"
                   min="1"
@@ -149,7 +176,7 @@ export function TaskDetail({
                 />
               </label>
               <label>
-                <span>Repeat end</span>
+                <span>{t("taskDetail.repeatEnd")}</span>
                 <input
                   type="date"
                   value={task.repeatEndDate}
@@ -162,23 +189,23 @@ export function TaskDetail({
       </section>
 
       <section className="detail-section">
-        <h3>Planning</h3>
+        <h3>{t("taskDetail.planning")}</h3>
         <div className="detail-field-list">
           <label>
-            <span>Status</span>
+            <span>{t("common.status")}</span>
             <select
               value={task.status}
               onChange={(event) => onUpdateTask(task.id, { status: event.target.value as TaskStatus })}
             >
               {statuses.map((status) => (
                 <option key={status} value={status}>
-                  {status.replace("_", " ")}
+                  {statusLabels[status]}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            <span>Priority</span>
+            <span>{t("common.priority")}</span>
             <select
               value={task.priority}
               onChange={(event) =>
@@ -187,18 +214,18 @@ export function TaskDetail({
             >
               {priorities.map((priority) => (
                 <option key={priority} value={priority}>
-                  {priority}
+                  {priorityLabels[priority]}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            <span>List</span>
+            <span>{t("taskDetail.list")}</span>
             <select
               value={task.projectId}
               onChange={(event) => onUpdateTask(task.id, { projectId: event.target.value })}
             >
-              <option value="">Inbox</option>
+              <option value="">{t("status.inbox")}</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
@@ -207,7 +234,7 @@ export function TaskDetail({
             </select>
           </label>
           <label>
-            <span>Importance</span>
+            <span>{t("taskDetail.importance")}</span>
             <select
               value={task.importance}
               onChange={(event) =>
@@ -216,26 +243,26 @@ export function TaskDetail({
             >
               {levels.map((level) => (
                 <option key={level} value={level}>
-                  {level}
+                  {levelLabels[level]}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            <span>Urgency</span>
+            <span>{t("taskDetail.urgency")}</span>
             <select
               value={task.urgency}
               onChange={(event) => onUpdateTask(task.id, { urgency: event.target.value as TaskLevel })}
             >
               {levels.map((level) => (
                 <option key={level} value={level}>
-                  {level}
+                  {levelLabels[level]}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            <span>Blocked by</span>
+            <span>{t("taskDetail.blockedBy")}</span>
             <select
               value={task.blockedByTaskId}
               onChange={(event) =>
@@ -245,7 +272,7 @@ export function TaskDetail({
                 })
               }
             >
-              <option value="">No dependency</option>
+              <option value="">{t("taskDetail.noDependency")}</option>
               {tasks
                 .filter((candidate) => candidate.id !== task.id)
                 .map((candidate) => (
@@ -259,35 +286,35 @@ export function TaskDetail({
       </section>
       {blockingTask ? (
         <div className={blockingTask.status === "done" ? "dependency-note ready" : "dependency-note"}>
-          <strong>Blocked by:</strong> {blockingTask.title}
+          <strong>{t("taskDetail.blockedByLabel")}</strong> {blockingTask.title}
           {blockingTask.status === "done" ? (
             <button onClick={() => onUpdateTask(task.id, { blockedByTaskId: "", status: "todo" })}>
-              Clear block
+              {t("taskDetail.clearBlock")}
             </button>
           ) : null}
         </div>
       ) : null}
       <section className="subtask-panel detail-section">
         <div className="subtask-heading">
-          <h3>Subtasks</h3>
+          <h3>{t("taskDetail.subtasks")}</h3>
           <span>
-            {completedSubtasks}/{taskSubtasks.length} done
+            {t("taskDetail.subtasksDone", { done: completedSubtasks, total: taskSubtasks.length })}
           </span>
         </div>
         <div className="progress-bar">
           <span style={{ width: `${subtaskProgress}%` }} />
         </div>
-        <p className="progress-label">{subtaskProgress}% complete</p>
+        <p className="progress-label">{t("taskDetail.percentComplete", { percent: subtaskProgress })}</p>
         <form className="subtask-form" onSubmit={handleAddSubtask}>
           <input
-            placeholder="Add subtask"
+            placeholder={t("taskDetail.addSubtask")}
             value={subtaskTitle}
             onChange={(event) => setSubtaskTitle(event.target.value)}
           />
-          <button type="submit">Add</button>
+          <button type="submit">{t("common.add")}</button>
         </form>
         <div className="subtask-list">
-          {taskSubtasks.length === 0 ? <p className="empty-state">No subtasks yet.</p> : null}
+          {taskSubtasks.length === 0 ? <p className="empty-state">{t("taskDetail.noSubtasksYet")}</p> : null}
           {taskSubtasks.map((subtask) => (
             <div key={subtask.id} className="subtask-row">
               <label>
@@ -298,30 +325,30 @@ export function TaskDetail({
                 />
                 <span>{subtask.title}</span>
               </label>
-              <button onClick={() => onDeleteSubtask(subtask.id)}>Delete</button>
+              <button onClick={() => onDeleteSubtask(subtask.id)}>{t("common.delete")}</button>
             </div>
           ))}
         </div>
       </section>
       <section className="detail-section">
-        <h3>Notes</h3>
+        <h3>{t("taskDetail.notes")}</h3>
         <textarea
           className="detail-notes"
-          placeholder="Add notes"
+          placeholder={t("taskDetail.addNotes")}
           value={task.notes}
           onChange={(event) => onUpdateTask(task.id, { notes: event.target.value })}
         />
       </section>
       <section className="detail-section task-actions-section">
-        <h3>Actions</h3>
+        <h3>{t("taskDetail.actions")}</h3>
         <div className="task-action-row">
           <button onClick={() => onUpdateTask(task.id, { scheduledDate: todayValue() })}>
-            Move to Today
+            {t("today.moveToToday")}
           </button>
-          <button onClick={() => onDuplicateTask(task.id)}>Duplicate</button>
-          <button onClick={() => onArchiveTask(task.id)}>Archive</button>
+          <button onClick={() => onDuplicateTask(task.id)}>{t("common.duplicate")}</button>
+          <button onClick={() => onArchiveTask(task.id)}>{t("common.archive")}</button>
           <button className="danger-button-inline" onClick={() => onRequestDeleteTask(task.id)}>
-            Delete
+            {t("common.delete")}
           </button>
         </div>
       </section>

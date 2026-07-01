@@ -2,6 +2,7 @@ import { ReactNode, useState } from "react";
 import type { PageId, Project, Task } from "../types";
 import { todayValue } from "../utils/date";
 import { getTodayBuckets } from "../utils/planner";
+import { useT } from "../i18n";
 
 interface SidebarProps {
   activePage: PageId;
@@ -123,6 +124,7 @@ export function Sidebar({
   onOpenSettings,
   search,
 }: SidebarProps) {
+  const { t } = useT();
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [newProject, setNewProject] = useState("");
   const today = todayValue();
@@ -140,16 +142,16 @@ export function Sidebar({
   const activeProjectCount = projects.filter((project) => project.status !== "archived").length;
 
   const primaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
-    { id: "inbox", label: "Inbox", icon: "inbox", count: inboxCount },
-    { id: "today", label: "Today", icon: "today", count: todayCount },
-    { id: "calendar", label: "Calendar", icon: "calendar", count: 0 },
-    { id: "projects", label: "Projects", icon: "projects", count: activeProjectCount },
-    { id: "planning", label: "Planning", icon: "planning", count: 0 },
-    { id: "study", label: "Study", icon: "study", count: dueReviewCount },
+    { id: "inbox", label: t("sidebar.inbox"), icon: "inbox", count: inboxCount },
+    { id: "today", label: t("sidebar.today"), icon: "today", count: todayCount },
+    { id: "calendar", label: t("sidebar.calendar"), icon: "calendar", count: 0 },
+    { id: "projects", label: t("sidebar.projects"), icon: "projects", count: activeProjectCount },
+    { id: "planning", label: t("sidebar.planning"), icon: "planning", count: 0 },
+    { id: "study", label: t("sidebar.study"), icon: "study", count: dueReviewCount },
   ];
   const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
-    { id: "archive", label: "Archive", icon: "archive", count: 0 },
-    { id: "settings", label: "Settings", icon: "settings", count: 0 },
+    { id: "archive", label: t("sidebar.archive"), icon: "archive", count: 0 },
+    { id: "settings", label: t("sidebar.settings"), icon: "settings", count: 0 },
   ];
 
   const initial = (userEmail || "Junghoon").charAt(0).toUpperCase();
@@ -181,13 +183,13 @@ export function Sidebar({
     <aside className="sidebar">
       <div className="brand-lockup">
         <span className="brand-mark">F</span>
-        <strong>FocusFlow</strong>
+        <strong>{t("sidebar.brand")}</strong>
       </div>
 
       <div className="side-profile">
         <span className="side-avatar">{initial}</span>
         <span className="side-name">{userEmail || "Junghoon"}</span>
-        <button className="side-icon-btn" aria-label="Settings" onClick={onOpenSettings}>
+        <button className="side-icon-btn" aria-label={t("sidebar.settingsAria")} onClick={onOpenSettings}>
           <Icon name="gear" />
         </button>
       </div>
@@ -201,7 +203,7 @@ export function Sidebar({
           <span className="side-chevron" style={{ transform: projectsOpen ? "rotate(90deg)" : "none" }}>
             &rsaquo;
           </span>
-          Project Shortcuts
+          {t("sidebar.projectShortcuts")}
         </button>
         {projectsOpen ? (
           <div className="side-list">
@@ -228,7 +230,7 @@ export function Sidebar({
               }}
             >
               <input
-                placeholder="+ Add Project"
+                placeholder={t("sidebar.addProjectPlaceholder")}
                 value={newProject}
                 onChange={(event) => setNewProject(event.target.value)}
               />

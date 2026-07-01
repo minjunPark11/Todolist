@@ -12,6 +12,7 @@ import {
 import type { AiMessage, AiProviderName } from "../lib/ai/types";
 import { buildCalendarContextText, type CalendarContextInput } from "../lib/calendarContext";
 import type { PageId } from "../types";
+import { useT } from "../i18n";
 
 type ChatMessage = AiMessage & {
   id: string;
@@ -32,17 +33,18 @@ interface OllamaChatProps {
   onExecuteActions?: (actions: AgentAction[]) => ToolExecutionResult[];
 }
 
-function getProviderLabel(provider?: AiProviderName) {
-  if (provider === "server") return "Server AI";
-  if (provider === "remote-ollama") return "Remote Ollama";
-  if (provider === "ollama") return "Local Ollama";
-  return "Local-first AI";
+function getProviderLabel(t: (key: string) => string, provider?: AiProviderName) {
+  if (provider === "server") return t("ai.provider.server");
+  if (provider === "remote-ollama") return t("ai.provider.remoteOllama");
+  if (provider === "ollama") return t("ai.provider.localOllama");
+  return t("ai.provider.localFirst");
 }
 
 export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteActions }: OllamaChatProps = {}) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    createMessage("assistant", "Hi, I'm your personal local-first AI assistant. Ask me anything."),
+    createMessage("assistant", t("ai.greeting")),
   ]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
@@ -111,7 +113,7 @@ export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteAc
       );
       setMessages((current) => [...current, createMessage("assistant", response.content)]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI chat failed.");
+      setError(err instanceof Error ? err.message : t("ai.error.chatFailed"));
     } finally {
       setLoading(false);
       window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -126,7 +128,7 @@ export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteAc
   }
 
   function clearChat() {
-    setMessages([createMessage("assistant", "Chat cleared. What should we think through next?")]);
+    setMessages([createMessage("assistant", t("ai.chatCleared"))]);
     setError("");
     setDraft("");
     setSuggestedActions([]);
@@ -138,61 +140,65 @@ export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteAc
   function dismissActions() {
     setSuggestedActions([]);
     setValidationResults([]);
-    setActionNotice("Suggestion dismissed. No app data changed.");
+    setActionNotice(t("ai.notice.dismissed"));
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   function requestApplyActions() {
     const hasInvalidAction = validationResults.some((result) => result.status === "invalid");
     if (!onExecuteActions) {
-      setActionNotice("Action executor is not connected yet. No app data changed.");
+      setActionNotice(t("ai.notice.executorNotConnected"));
       return;
     }
     if (hasInvalidAction) {
-      setActionNotice("Some suggested actions are invalid. No app data changed.");
+      setActionNotice(t("ai.notice.someActionsInvalid"));
       return;
     }
 
     const results = onExecuteActions(suggestedActions);
     const failed = results.filter((result) => !result.ok);
     if (failed.length > 0) {
-      setActionNotice(`Some actions failed: ${failed.map((result) => result.message).join(" ")}`);
+      setActionNotice(t("ai.notice.someActionsFailed", { messages: failed.map((result) => result.message).join(" ") }));
       return;
     }
 
     setSuggestedActions([]);
     setValidationResults([]);
-    setActionNotice(`${results.length} action${results.length === 1 ? "" : "s"} applied.`);
+    setActionNotice(
+      results.length === 1
+        ? t("ai.notice.actionsAppliedOne")
+        : t("ai.notice.actionsAppliedMany", { n: results.length }),
+    );
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   return (
     <div className={open ? "ollama-chat open" : "ollama-chat"}>
       {open ? (
-        <section className="ollama-chat-panel" aria-label="Ollama chat">
+        <section className="ollama-chat-panel" aria-label={t("ai.panelLabel")}>
           <header className="ollama-chat-head">
             <div>
-              <span>{getProviderLabel(provider)}</span>
-              <h2>Personal AI</h2>
+              <span>{getProviderLabel(t, provider)}</span>
+              <h2>{t("ai.personalAiTitle")}</h2>
               <small>{getIntentLabel(intent)}</small>
             </div>
             <div className="ollama-chat-actions">
-              <button type="button" onClick={clearChat}>Clear</button>
-              <button type="button" aria-label="Close Ollama chat" onClick={() => setOpen(false)}>x</button>
+              <button type="button" onClick={clearChat}>{t("ai.clear")}</button>
+              <button type="button" aria-label={t("ai.closeChat")} onClick={() => setOpen(false)}>x</button>
             </div>
           </header>
 
           <div className="ollama-chat-messages" role="log" aria-live="polite">
             {messages.map((message) => (
               <div key={message.id} className={`ollama-chat-message ${message.role}`}>
-                <span>{message.role === "user" ? "You" : "AI"}</span>
+                <span>{message.role === "user" ? t("ai.youLabel") : t("ai.aiLabel")}</span>
                 <p>{message.content}</p>
               </div>
             ))}
             {loading ? (
               <div className="ollama-chat-message assistant">
-                <span>AI</span>
-                <p>Thinking...</p>
+                <span>{t("ai.aiLabel")}</span>
+                <p>{t("ai.thinking")}</p>
               </div>
             ) : null}
           </div>
@@ -212,11 +218,11 @@ export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteAc
               ref={inputRef}
               value={draft}
               rows={2}
-              placeholder="Message Personal AI..."
+              placeholder={t("ai.messagePlaceholder")}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleKeyDown}
             />
-            <button type="submit" disabled={!draft.trim() || loading}>Send</button>
+            <button type="submit" disabled={!draft.trim() || loading}>{t("ai.send")}</button>
           </form>
         </section>
       ) : null}
@@ -224,11 +230,11 @@ export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteAc
       <button
         type="button"
         className="ollama-chat-fab"
-        aria-label={open ? "Close Ollama chat" : "Open Ollama chat"}
+        aria-label={open ? t("ai.closeChat") : t("ai.openChat")}
         aria-expanded={open}
         onClick={toggleOpen}
       >
-        {open ? "x" : "AI"}
+        {open ? "x" : t("ai.aiLabel")}
       </button>
     </div>
   );

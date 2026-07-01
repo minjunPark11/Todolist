@@ -16,6 +16,7 @@ import {
   ToastState,
   useAutoFocus,
 } from "./kit";
+import { useT } from "../i18n";
 
 type ProjectTab = "overview" | "tasks" | "subtasks" | "notes";
 
@@ -46,6 +47,7 @@ interface ProjectsPageProps {
 
 export function ProjectsPage(props: ProjectsPageProps) {
   const { projects, tasks, subtasks, selectedProjectId, detailOpen } = props;
+  const { t } = useT();
   const [tab, setTab] = useState<ProjectTab>("overview");
   const [tasksFilter, setTasksFilter] = useState<TaskPriority | "all">("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -77,28 +79,31 @@ export function ProjectsPage(props: ProjectsPageProps) {
     <div className="ff-page">
       <header className="ff-page-head">
         <div>
-          <h1 className="ff-page-title">Projects</h1>
-          <p className="ff-page-sub">Organize tasks by goals, research, study, and personal areas.</p>
+          <h1 className="ff-page-title">{t("projects.title")}</h1>
+          <p className="ff-page-sub">{t("projects.subtitle")}</p>
         </div>
         <div className="ff-page-actions">
           <button type="button" className="ff-btn ff-btn-primary" onClick={() => setCreateOpen(true)}>
-            + New Project
+            {t("projects.newProject")}
           </button>
         </div>
       </header>
 
       <SegmentedTabs
-        tabs={[["active", `Active (${activeProjects.length})`], ["archived", `Archived (${archivedProjects.length})`]]}
+        tabs={[
+          ["active", t("projects.activeTab", { n: activeProjects.length })],
+          ["archived", t("projects.archivedTab", { n: archivedProjects.length })],
+        ]}
         active={archivedView ? "archived" : "active"}
-        onChange={(t) => setArchivedView(t === "archived")}
+        onChange={(tab) => setArchivedView(tab === "archived")}
       />
 
       {shown.length === 0 ? (
         <EmptyState
           icon="Folder"
-          title={archivedView ? "No archived projects" : "No projects yet"}
-          text={archivedView ? "Archived projects will appear here." : "Create a project to group related tasks."}
-          actionLabel={archivedView ? undefined : "New Project"}
+          title={archivedView ? t("projects.noArchived") : t("projects.noProjects")}
+          text={archivedView ? t("projects.noArchivedHint") : t("projects.noProjectsHint")}
+          actionLabel={archivedView ? undefined : t("projects.newProject")}
           onAction={archivedView ? undefined : () => setCreateOpen(true)}
         />
       ) : (
@@ -121,13 +126,13 @@ export function ProjectsPage(props: ProjectsPageProps) {
 
       {createOpen ? (
         <ProjectFormModal
-          title="New Project"
+          title={t("projects.newProjectTitle")}
           onClose={() => setCreateOpen(false)}
           onSubmit={(values) => {
             const id = props.onCreateProject(values);
             setCreateOpen(false);
             if (id) {
-              props.showToast({ message: "Project created", actionLabel: "Open", onAction: () => props.onOpenProject(id) });
+              props.showToast({ message: t("projects.projectCreated"), actionLabel: t("common.open"), onAction: () => props.onOpenProject(id) });
             }
           }}
         />
@@ -155,6 +160,7 @@ function ProjectCard({
   onRestore: () => void;
   onDelete: () => void;
 }) {
+  const { t, lang } = useT();
   const progress = getProjectProgress(tasks, project.id);
   return (
     <article
@@ -170,12 +176,12 @@ function ProjectCard({
         </span>
         <div className="ff-project-card-titles">
           <strong>{project.name}</strong>
-          <small>{project.type === "area" ? "Area" : "Project"} - {progress.total} tasks</small>
+          <small>{project.type === "area" ? t("projects.area") : t("projects.project")} - {t("projects.tasksCount", { n: progress.total })}</small>
         </div>
         <button
           type="button"
           className={`ff-star${project.pinned ? " active" : ""}`}
-          aria-label="Pin project"
+          aria-label={t("projects.pinAria")}
           onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
         >
           {project.pinned ? "*" : "+"}
@@ -183,8 +189,8 @@ function ProjectCard({
         <MoreMenu
           items={
             archived
-              ? [{ label: "Restore", onClick: onRestore }, { label: "Delete", danger: true, onClick: onDelete }]
-              : [{ label: "Archive", onClick: onArchive }, { label: "Delete", danger: true, onClick: onDelete }]
+              ? [{ label: t("common.restore"), onClick: onRestore }, { label: t("common.delete"), danger: true, onClick: onDelete }]
+              : [{ label: t("common.archive"), onClick: onArchive }, { label: t("common.delete"), danger: true, onClick: onDelete }]
           }
         />
       </div>
@@ -194,8 +200,8 @@ function ProjectCard({
         <span className="ff-progress-pct">{progress.percent}%</span>
       </div>
       <div className="ff-project-card-foot">
-        <span>{project.dueDate ? `Due ${formatDate(project.dueDate)}` : "No due date"}</span>
-        <span>{progress.completed}/{progress.total} done</span>
+        <span>{project.dueDate ? t("projects.dueDatePrefix", { date: formatDate(project.dueDate, lang) }) : t("projects.noDueDate")}</span>
+        <span>{t("projects.doneCount", { done: progress.completed, total: progress.total })}</span>
       </div>
     </article>
   );
@@ -232,6 +238,7 @@ function ProjectDetail({
   editOpen: boolean;
   setEditOpen: (v: boolean) => void;
 }) {
+  const { t } = useT();
   const projectTasks = useMemo(() => getProjectTasks(tasks, project.id), [tasks, project.id]);
   const progress = getProjectProgress(tasks, project.id);
   const prioritySummary = getProjectPrioritySummary(tasks, project.id);
@@ -258,7 +265,7 @@ function ProjectDetail({
     <div className="ff-detail-layout">
       <div className="ff-page ff-detail-main">
         <button type="button" className="ff-link ff-back" onClick={onCloseProject}>
-          &lt; Projects
+          {t("projects.backToProjects")}
         </button>
         <header className="ff-page-head">
           <div>
@@ -275,23 +282,28 @@ function ProjectDetail({
             </h1>
             <p className="ff-page-sub">
               <span className="ff-dot" style={{ background: project.color }} />{" "}
-              {project.type === "area" ? "Area" : "Project"}
-              {project.dueDate ? ` - Due ${formatDate(project.dueDate)}` : ""}
+              {project.type === "area" ? t("projects.area") : t("projects.project")}
+              {project.dueDate ? ` - ${t("projects.dueDatePrefix", { date: formatDate(project.dueDate, lang) })}` : ""}
             </p>
           </div>
           <div className="ff-page-actions">
-            <button type="button" className="ff-btn" onClick={() => setEditOpen(true)}>Edit</button>
+            <button type="button" className="ff-btn" onClick={() => setEditOpen(true)}>{t("projects.editProject")}</button>
             <MoreMenu
               items={[
-                { label: "Archive Project", onClick: () => onArchiveProject(project.id) },
-                { label: "Delete Project", danger: true, onClick: () => onRequestDeleteProject(project.id) },
+                { label: t("projects.archiveProject"), onClick: () => onArchiveProject(project.id) },
+                { label: t("projects.deleteProject"), danger: true, onClick: () => onRequestDeleteProject(project.id) },
               ]}
             />
           </div>
         </header>
 
         <SegmentedTabs
-          tabs={[["overview", "Overview"], ["tasks", "Tasks"], ["subtasks", "Subtasks"], ["notes", "Notes"]]}
+          tabs={[
+            ["overview", t("projects.tabOverview")],
+            ["tasks", t("projects.tabTasks")],
+            ["subtasks", t("projects.tabSubtasks")],
+            ["notes", t("projects.tabNotes")],
+          ]}
           active={tab}
           onChange={setTab}
         />
@@ -299,32 +311,32 @@ function ProjectDetail({
         {tab === "overview" ? (
           <div className="ff-overview-grid">
             <div className="ff-stat-card">
-              <span className="ff-stat-label">Progress</span>
+              <span className="ff-stat-label">{t("projects.progress")}</span>
               <strong className="ff-stat-big">{progress.percent}%</strong>
               <div className="ff-progress-track"><span style={{ width: `${progress.percent}%`, background: project.color }} /></div>
-              <small>{progress.completed} / {progress.total} tasks</small>
+              <small>{t("projects.tasksOfTotal", { completed: progress.completed, total: progress.total })}</small>
             </div>
             <div className="ff-stat-card">
-              <span className="ff-stat-label">Priority Summary</span>
+              <span className="ff-stat-label">{t("projects.prioritySummary")}</span>
               <ul className="ff-stat-list">
-                <li onClick={() => { setTab("tasks"); setTasksFilter("high"); }}><span className="ff-dot ff-dot-danger" /> High <b>{prioritySummary.high}</b></li>
-                <li onClick={() => { setTab("tasks"); setTasksFilter("medium"); }}><span className="ff-dot ff-dot-warning" /> Medium <b>{prioritySummary.medium}</b></li>
-                <li onClick={() => { setTab("tasks"); setTasksFilter("low"); }}><span className="ff-dot ff-dot-success" /> Low <b>{prioritySummary.low}</b></li>
+                <li onClick={() => { setTab("tasks"); setTasksFilter("high"); }}><span className="ff-dot ff-dot-danger" /> {t("priority.high")} <b>{prioritySummary.high}</b></li>
+                <li onClick={() => { setTab("tasks"); setTasksFilter("medium"); }}><span className="ff-dot ff-dot-warning" /> {t("priority.medium")} <b>{prioritySummary.medium}</b></li>
+                <li onClick={() => { setTab("tasks"); setTasksFilter("low"); }}><span className="ff-dot ff-dot-success" /> {t("priority.low")} <b>{prioritySummary.low}</b></li>
               </ul>
             </div>
             <div className="ff-stat-card">
-              <span className="ff-stat-label">Status Summary</span>
+              <span className="ff-stat-label">{t("projects.statusSummary")}</span>
               <ul className="ff-stat-list">
-                <li><span className="ff-dot ff-dot-muted" /> To Do <b>{statusSummary.todo}</b></li>
-                <li><span className="ff-dot ff-dot-accent" /> In Progress <b>{statusSummary.doing}</b></li>
-                <li><span className="ff-dot ff-dot-muted" /> Waiting <b>{statusSummary.waiting}</b></li>
-                <li><span className="ff-dot ff-dot-success" /> Done <b>{statusSummary.done}</b></li>
+                <li><span className="ff-dot ff-dot-muted" /> {t("status.todo")} <b>{statusSummary.todo}</b></li>
+                <li><span className="ff-dot ff-dot-accent" /> {t("status.doing")} <b>{statusSummary.doing}</b></li>
+                <li><span className="ff-dot ff-dot-muted" /> {t("status.waiting")} <b>{statusSummary.waiting}</b></li>
+                <li><span className="ff-dot ff-dot-success" /> {t("status.done")} <b>{statusSummary.done}</b></li>
               </ul>
             </div>
             <div className="ff-stat-card ff-stat-recent">
               <div className="ff-section-head">
-                <span className="ff-stat-label">Recent Tasks</span>
-                <button type="button" className="ff-link" onClick={() => setTab("tasks")}>View all</button>
+                <span className="ff-stat-label">{t("projects.recentTasks")}</span>
+                <button type="button" className="ff-link" onClick={() => setTab("tasks")}>{t("common.viewAll")}</button>
               </div>
               {projectTasks.slice(0, 5).map((task) => (
                 <button key={task.id} type="button" className="ff-recent-row" onClick={() => onOpenTask(task.id)}>
@@ -332,7 +344,7 @@ function ProjectDetail({
                   <span className="ff-pill ff-pill-muted">{task.status}</span>
                 </button>
               ))}
-              {projectTasks.length === 0 ? <p className="ff-today-empty">No tasks yet.</p> : null}
+              {projectTasks.length === 0 ? <p className="ff-today-empty">{t("projects.noTasksYet")}</p> : null}
             </div>
           </div>
         ) : null}
@@ -347,13 +359,13 @@ function ProjectDetail({
                   className={tasksFilter === p ? "ff-chip active" : "ff-chip"}
                   onClick={() => setTasksFilter(p)}
                 >
-                  {p === "all" ? "All" : p}
+                  {p === "all" ? t("common.all") : t(`priority.${p}`)}
                 </button>
               ))}
             </div>
             <InlineProjectAdd onAdd={(title) => onCreateTask({ title, status: "todo", projectId: project.id })} />
             {filteredTasks.length === 0 ? (
-              <EmptyState icon="Tasks" title="No tasks" text="Add a task to this project." />
+              <EmptyState icon="Tasks" title={t("projects.noTasks")} text={t("projects.noTasksHint")} />
             ) : (
               <div className="ff-task-list">
                 {filteredTasks.map((task) => (
@@ -377,7 +389,7 @@ function ProjectDetail({
         {tab === "subtasks" ? (
           <div className="ff-task-list">
             {projectSubtasks.length === 0 ? (
-              <EmptyState icon="Subtasks" title="No subtasks" text="Subtasks from this project's tasks appear here." />
+              <EmptyState icon="Subtasks" title={t("projects.noSubtasks")} text={t("projects.noSubtasksHint")} />
             ) : (
               projectSubtasks.map((sub) => {
                 const parent = projectTasks.find((t) => t.id === sub.taskId);
@@ -398,27 +410,27 @@ function ProjectDetail({
         {tab === "notes" ? (
           <div className="ff-notes-pane">
             <div className="ff-section-head">
-              <h2 className="ff-section-title">Project Notes</h2>
+              <h2 className="ff-section-title">{t("projects.projectNotes")}</h2>
               {editingNotes ? (
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className="ff-btn ff-btn-sm" onClick={() => { setDraftNotes(notes); setEditingNotes(false); }}>Cancel</button>
-                  <button type="button" className="ff-btn ff-btn-sm ff-btn-primary" onClick={() => { onSaveNotes(project.id, draftNotes); setEditingNotes(false); }}>Save</button>
+                  <button type="button" className="ff-btn ff-btn-sm" onClick={() => { setDraftNotes(notes); setEditingNotes(false); }}>{t("common.cancel")}</button>
+                  <button type="button" className="ff-btn ff-btn-sm ff-btn-primary" onClick={() => { onSaveNotes(project.id, draftNotes); setEditingNotes(false); }}>{t("common.save")}</button>
                 </div>
               ) : (
-                <button type="button" className="ff-link" onClick={() => { setDraftNotes(notes); setEditingNotes(true); }}>Edit</button>
+                <button type="button" className="ff-link" onClick={() => { setDraftNotes(notes); setEditingNotes(true); }}>{t("common.edit")}</button>
               )}
             </div>
             {editingNotes ? (
-              <textarea className="ff-notes-editor" value={draftNotes} onChange={(e) => setDraftNotes(e.target.value)} placeholder="Write project notes, decisions, links..." />
+              <textarea className="ff-notes-editor" value={draftNotes} onChange={(e) => setDraftNotes(e.target.value)} placeholder={t("projects.notesPlaceholder")} />
             ) : (
-              <div className="ff-notes-read">{notes || <span className="ff-today-empty">No notes yet.</span>}</div>
+              <div className="ff-notes-read">{notes || <span className="ff-today-empty">{t("projects.noNotes")}</span>}</div>
             )}
           </div>
         ) : null}
 
         {editOpen ? (
           <ProjectFormModal
-            title="Edit Project"
+            title={t("projects.editProjectTitle")}
             initial={project}
             onClose={() => setEditOpen(false)}
             onSubmit={(values) => { onUpdateProject(project.id, values); setEditOpen(false); }}
@@ -446,31 +458,33 @@ function ProjectInfoPanel({
   onArchive: () => void;
   onDelete: () => void;
 }) {
+  const { t, lang } = useT();
   return (
     <div className="ff-info-panel">
-      <h3>Project Info</h3>
+      <h3>{t("projects.info")}</h3>
       <dl className="ff-info-list">
-        <div><dt>Type</dt><dd>{project.type === "area" ? "Area" : "Project"}</dd></div>
-        <div><dt>Due Date</dt><dd>{project.dueDate ? formatDate(project.dueDate) : "-"}</dd></div>
-        <div><dt>Tasks</dt><dd>{taskCount}</dd></div>
-        <div><dt>Completed</dt><dd>{progress.completed}</dd></div>
-        <div><dt>Progress</dt><dd>{progress.percent}%</dd></div>
-        <div><dt>Status</dt><dd>{project.status ?? "active"}</dd></div>
+        <div><dt>{t("projects.type")}</dt><dd>{project.type === "area" ? t("projects.area") : t("projects.project")}</dd></div>
+        <div><dt>{t("projects.dueDate")}</dt><dd>{project.dueDate ? formatDate(project.dueDate, lang) : "-"}</dd></div>
+        <div><dt>{t("projects.tasks")}</dt><dd>{taskCount}</dd></div>
+        <div><dt>{t("projects.completed")}</dt><dd>{progress.completed}</dd></div>
+        <div><dt>{t("projects.progress")}</dt><dd>{progress.percent}%</dd></div>
+        <div><dt>{t("projects.status")}</dt><dd>{project.status ?? "active"}</dd></div>
       </dl>
       <div className="ff-info-actions">
-        <button type="button" className="ff-btn ff-btn-sm" onClick={onArchive}>Archive Project</button>
-        <button type="button" className="ff-btn ff-btn-sm ff-btn-danger" onClick={onDelete}>Delete Project</button>
+        <button type="button" className="ff-btn ff-btn-sm" onClick={onArchive}>{t("projects.archiveProject")}</button>
+        <button type="button" className="ff-btn ff-btn-sm ff-btn-danger" onClick={onDelete}>{t("projects.deleteProject")}</button>
       </div>
     </div>
   );
 }
 
 function InlineProjectAdd({ onAdd }: { onAdd: (title: string) => void }) {
+  const { t } = useT();
   const [value, setValue] = useState("");
   return (
     <div className="ff-inline-add ff-inline-add-bordered">
       <input
-        placeholder="+ Add task to this project"
+        placeholder={t("projects.addTaskToProject")}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
@@ -492,6 +506,7 @@ function ProjectFormModal({
   onClose: () => void;
   onSubmit: (values: { name: string; color: string; type: ProjectType; description: string; dueDate: string }) => void;
 }) {
+  const { t } = useT();
   const nameRef = useAutoFocus<HTMLInputElement>();
   const [name, setName] = useState(initial?.name ?? "");
   const [color, setColor] = useState(initial?.color ?? PROJECT_COLORS[0]);
@@ -511,36 +526,36 @@ function ProjectFormModal({
       onClose={onClose}
       footer={
         <>
-          <button className="ff-btn" onClick={onClose}>Cancel</button>
-          <button className="ff-btn ff-btn-primary" onClick={submit}>{initial ? "Save" : "Create"}</button>
+          <button className="ff-btn" onClick={onClose}>{t("common.cancel")}</button>
+          <button className="ff-btn ff-btn-primary" onClick={submit}>{initial ? t("common.save") : t("common.create")}</button>
         </>
       }
     >
       <div className="ff-form">
         <label>
-          Name
+          {t("common.name")}
           <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); setError(false); }} />
-          {error ? <span className="ff-quickadd-error" style={{ position: "static" }}>Project name is required.</span> : null}
+          {error ? <span className="ff-quickadd-error" style={{ position: "static" }}>{t("projects.nameRequired")}</span> : null}
         </label>
         <label>
-          Description
+          {t("common.description")}
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
         <div className="ff-form-grid">
           <label>
-            Type
+            {t("common.type")}
             <select value={type} onChange={(e) => setType(e.target.value as ProjectType)}>
-              <option value="project">Project</option>
-              <option value="area">Area</option>
+              <option value="project">{t("projects.project")}</option>
+              <option value="area">{t("projects.area")}</option>
             </select>
           </label>
           <label>
-            Due date
+            {t("common.dueDate")}
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </label>
         </div>
         <label>
-          Color
+          {t("common.color")}
           <div className="ff-color-row">
             {PROJECT_COLORS.map((c) => (
               <button
@@ -549,7 +564,7 @@ function ProjectFormModal({
                 className={`ff-color-swatch${color === c ? " active" : ""}`}
                 style={{ background: c }}
                 onClick={() => setColor(c)}
-                aria-label={`Color ${c}`}
+                aria-label={t("projects.colorAria", { color: c })}
               />
             ))}
           </div>

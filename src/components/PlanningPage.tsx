@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Project, Task, TaskDraft, TaskLevel, TaskStatus } from "../types";
 import { isActiveTask } from "../utils/planner";
 import { MoreMenu, SegmentedTabs } from "./kit";
+import { useT } from "../i18n";
 
 interface PlanningPageProps {
   tasks: Task[];
@@ -15,19 +16,19 @@ interface PlanningPageProps {
   onCreateTask: (draft: TaskDraft) => string;
 }
 
-const BOARD_COLUMNS: Array<{ status: TaskStatus; label: string }> = [
-  { status: "inbox", label: "Inbox" },
-  { status: "todo", label: "To Do" },
-  { status: "doing", label: "Doing" },
-  { status: "waiting", label: "Waiting" },
-  { status: "done", label: "Done" },
+const BOARD_COLUMNS: Array<{ status: TaskStatus; labelKey: string }> = [
+  { status: "inbox", labelKey: "status.inbox" },
+  { status: "todo", labelKey: "status.todo" },
+  { status: "doing", labelKey: "status.doing" },
+  { status: "waiting", labelKey: "status.waiting" },
+  { status: "done", labelKey: "status.done" },
 ];
 
-const QUADRANTS: Array<{ key: string; label: string; hint: string; importance: TaskLevel; urgency: TaskLevel }> = [
-  { key: "do", label: "Do Now", hint: "Important · Urgent", importance: "high", urgency: "high" },
-  { key: "schedule", label: "Schedule", hint: "Important · Not urgent", importance: "high", urgency: "low" },
-  { key: "delegate", label: "Quick Handle", hint: "Not important · Urgent", importance: "low", urgency: "high" },
-  { key: "later", label: "Later", hint: "Not important · Not urgent", importance: "low", urgency: "low" },
+const QUADRANTS: Array<{ key: string; labelKey: string; hintKey: string; importance: TaskLevel; urgency: TaskLevel }> = [
+  { key: "do", labelKey: "planning.doNow", hintKey: "planning.doNowHint", importance: "high", urgency: "high" },
+  { key: "schedule", labelKey: "planning.schedule", hintKey: "planning.scheduleHint", importance: "high", urgency: "low" },
+  { key: "delegate", labelKey: "planning.quickHandle", hintKey: "planning.quickHandleHint", importance: "low", urgency: "high" },
+  { key: "later", labelKey: "planning.later", hintKey: "planning.laterHint", importance: "low", urgency: "low" },
 ];
 
 export function PlanningPage({
@@ -41,19 +42,20 @@ export function PlanningPage({
   onUpdateTask,
   onCreateTask,
 }: PlanningPageProps) {
+  const { t } = useT();
   const active = tasks.filter(isActiveTask);
 
   return (
     <div className="ff-page">
       <header className="ff-page-head">
         <div>
-          <h1 className="ff-page-title">Planning</h1>
-          <p className="ff-page-sub">Prioritize, schedule, and keep work moving.</p>
+          <h1 className="ff-page-title">{t("planning.title")}</h1>
+          <p className="ff-page-sub">{t("planning.subtitle")}</p>
         </div>
       </header>
 
       <SegmentedTabs
-        tabs={[["board", "Board"], ["matrix", "Matrix"]]}
+        tabs={[["board", t("planning.tabBoard")], ["matrix", t("planning.tabMatrix")]]}
         active={view}
         onChange={onChangeView}
       />
@@ -65,7 +67,7 @@ export function PlanningPage({
             return (
               <BoardColumn
                 key={col.status}
-                label={col.label}
+                label={t(col.labelKey)}
                 count={colTasks.length}
                 onDropTask={(taskId) => onUpdateStatus(taskId, col.status)}
                 onAdd={(title) => onCreateTask({ title, status: col.status })}
@@ -78,7 +80,7 @@ export function PlanningPage({
                     selected={task.id === selectedTaskId}
                     onOpen={() => onOpenTask(task.id)}
                     moveMenu={BOARD_COLUMNS.filter((c) => c.status !== task.status).map((c) => ({
-                      label: `Move to ${c.label}`,
+                      label: t("planning.moveTo", { target: t(c.labelKey) }),
                       onClick: () => onUpdateStatus(task.id, c.status),
                     }))}
                   />
@@ -96,8 +98,8 @@ export function PlanningPage({
             return (
               <MatrixCell
                 key={q.key}
-                label={q.label}
-                hint={q.hint}
+                label={t(q.labelKey)}
+                hint={t(q.hintKey)}
                 count={qTasks.length}
                 onDropTask={(taskId) => onUpdateTask(taskId, { importance: q.importance, urgency: q.urgency })}
                 onAdd={(title) => onCreateTask({ title, status: "todo", importance: q.importance, urgency: q.urgency })}
@@ -110,7 +112,7 @@ export function PlanningPage({
                     selected={task.id === selectedTaskId}
                     onOpen={() => onOpenTask(task.id)}
                     moveMenu={QUADRANTS.filter((other) => other.key !== q.key).map((other) => ({
-                      label: `Move to ${other.label}`,
+                      label: t("planning.moveTo", { target: t(other.labelKey) }),
                       onClick: () => onUpdateTask(task.id, { importance: other.importance, urgency: other.urgency }),
                     }))}
                   />
@@ -137,6 +139,7 @@ function BoardColumn({
   onDropTask: (taskId: string) => void;
   onAdd: (title: string) => void;
 }) {
+  const { t } = useT();
   const [over, setOver] = useState(false);
   const [adding, setAdding] = useState(false);
   const [value, setValue] = useState("");
@@ -162,7 +165,7 @@ function BoardColumn({
         <input
           className="ff-board-add-input"
           autoFocus
-          placeholder="Task title..."
+          placeholder={t("planning.taskTitlePlaceholder")}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
@@ -172,7 +175,7 @@ function BoardColumn({
           onBlur={() => { if (value.trim()) onAdd(value.trim()); setValue(""); setAdding(false); }}
         />
       ) : (
-        <button type="button" className="ff-board-add" onClick={() => setAdding(true)}>+ Add Task</button>
+        <button type="button" className="ff-board-add" onClick={() => setAdding(true)}>+ {t("planning.addTask")}</button>
       )}
     </section>
   );
@@ -193,6 +196,7 @@ function MatrixCell({
   onDropTask: (taskId: string) => void;
   onAdd: (title: string) => void;
 }) {
+  const { t } = useT();
   const [over, setOver] = useState(false);
   const [adding, setAdding] = useState(false);
   const [value, setValue] = useState("");
@@ -221,7 +225,7 @@ function MatrixCell({
           className="ff-board-add-input"
           autoFocus
           value={value}
-          placeholder="Task title..."
+          placeholder={t("planning.taskTitlePlaceholder")}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && value.trim()) { onAdd(value.trim()); setValue(""); setAdding(false); }
@@ -230,7 +234,7 @@ function MatrixCell({
           onBlur={() => { if (value.trim()) onAdd(value.trim()); setValue(""); setAdding(false); }}
         />
       ) : (
-        <button type="button" className="ff-board-add" onClick={() => setAdding(true)}>+ Add Task</button>
+        <button type="button" className="ff-board-add" onClick={() => setAdding(true)}>+ {t("planning.addTask")}</button>
       )}
     </section>
   );
@@ -249,6 +253,7 @@ function BoardCard({
   onOpen: () => void;
   moveMenu: { label: string; onClick: () => void }[];
 }) {
+  const { t } = useT();
   const priorityTone =
     task.priority === "high" ? "danger" : task.priority === "medium" ? "warning" : task.priority === "low" ? "success" : "muted";
   return (
@@ -267,7 +272,7 @@ function BoardCard({
       </div>
       <div className="ff-board-card-meta">
         {project ? <span className="ff-projbadge"><span className="ff-dot" style={{ background: project.color }} />{project.name}</span> : null}
-        {task.priority !== "none" ? <span className={`ff-badge ff-badge-${priorityTone}`}>{task.priority}</span> : null}
+        {task.priority !== "none" ? <span className={`ff-badge ff-badge-${priorityTone}`}>{t(`priority.${task.priority}`)}</span> : null}
         {task.dueDate ? <span className="ff-pill ff-pill-muted">{task.dueDate.slice(5)}</span> : null}
       </div>
     </article>

@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { Project, Task, TaskPriority, TaskStatus } from "../types";
 import { formatDate, todayValue } from "../utils/date";
+import { useT } from "../i18n";
 
 // ============================================================================
 // Primitives
@@ -53,14 +54,16 @@ export function Popover({
   );
 }
 
-export function MoreMenu({ items, label = "More" }: { items: MoreMenuItem[]; label?: string }) {
+export function MoreMenu({ items, label }: { items: MoreMenuItem[]; label?: string }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
+  const resolvedLabel = label ?? t("common.more");
   return (
     <div className="ff-anchor" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         className="ff-icon-btn"
-        aria-label={label}
+        aria-label={resolvedLabel}
         onClick={() => setOpen((v) => !v)}
       >
         ⋯
@@ -99,12 +102,15 @@ export interface MoreMenuItem {
 // Badges & pills
 // ============================================================================
 
-const PRIORITY_META: Record<TaskPriority, { label: string; tone: string; arrow: string }> = {
-  high: { label: "High", tone: "danger", arrow: "↑" },
-  medium: { label: "Medium", tone: "warning", arrow: "—" },
-  low: { label: "Low", tone: "success", arrow: "↓" },
-  none: { label: "No priority", tone: "muted", arrow: "" },
-};
+function usePriorityMeta(): Record<TaskPriority, { label: string; tone: string; arrow: string }> {
+  const { t } = useT();
+  return {
+    high: { label: t("priority.high"), tone: "danger", arrow: "↑" },
+    medium: { label: t("priority.medium"), tone: "warning", arrow: "—" },
+    low: { label: t("priority.low"), tone: "success", arrow: "↓" },
+    none: { label: t("priority.none"), tone: "muted", arrow: "" },
+  };
+}
 
 export function PriorityBadge({
   priority,
@@ -114,6 +120,7 @@ export function PriorityBadge({
   onChange?: (next: TaskPriority) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const PRIORITY_META = usePriorityMeta();
   const meta = PRIORITY_META[priority];
   return (
     <div className="ff-anchor" onClick={(e) => e.stopPropagation()}>
@@ -147,14 +154,17 @@ export function PriorityBadge({
   );
 }
 
-const STATUS_META: Record<string, { label: string; tone: string }> = {
-  inbox: { label: "Inbox", tone: "muted" },
-  todo: { label: "To Do", tone: "muted" },
-  doing: { label: "In Progress", tone: "accent" },
-  waiting: { label: "Waiting", tone: "purple" },
-  done: { label: "Done", tone: "success" },
-  archived: { label: "Archived", tone: "muted" },
-};
+function useStatusMeta(): Record<string, { label: string; tone: string }> {
+  const { t } = useT();
+  return {
+    inbox: { label: t("status.inbox"), tone: "muted" },
+    todo: { label: t("status.todo"), tone: "muted" },
+    doing: { label: t("status.doing"), tone: "accent" },
+    waiting: { label: t("status.waiting"), tone: "purple" },
+    done: { label: t("status.done"), tone: "success" },
+    archived: { label: t("status.archived"), tone: "muted" },
+  };
+}
 const STATUS_OPTIONS: TaskStatus[] = ["inbox", "todo", "doing", "waiting", "done"];
 
 export function StatusBadge({
@@ -165,6 +175,7 @@ export function StatusBadge({
   onChange?: (next: TaskStatus) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const STATUS_META = useStatusMeta();
   const meta = STATUS_META[status] ?? STATUS_META.todo;
   return (
     <div className="ff-anchor" onClick={(e) => e.stopPropagation()}>
@@ -205,22 +216,23 @@ export function DueDatePill({
   field?: "dueDate" | "scheduledDate";
   onChange?: (value: string) => void;
 }) {
+  const { t, lang } = useT();
   const [open, setOpen] = useState(false);
   const value = field === "dueDate" ? task.dueDate : task.scheduledDate;
   const today = todayValue();
   let tone = "muted";
   let label: string;
   if (!value) {
-    label = field === "dueDate" ? "Needs date" : "Not scheduled";
+    label = field === "dueDate" ? t("kit.needsDate") : t("kit.notScheduled");
     tone = field === "dueDate" ? "danger-ghost" : "muted";
   } else if (value < today) {
-    label = formatDate(value);
+    label = formatDate(value, lang);
     tone = "danger";
   } else if (value === today) {
-    label = field === "dueDate" ? "Today" : "Planned Today";
+    label = field === "dueDate" ? t("common.today") : t("kit.plannedToday");
     tone = field === "dueDate" ? "warning" : "accent";
   } else {
-    label = formatDate(value);
+    label = formatDate(value, lang);
     tone = "muted";
   }
 
@@ -245,12 +257,12 @@ export function DueDatePill({
               }}
             />
             <div className="ff-datepicker-quick">
-              <button type="button" onClick={() => { onChange(today); setOpen(false); }}>Today</button>
+              <button type="button" onClick={() => { onChange(today); setOpen(false); }}>{t("common.today")}</button>
               <button type="button" onClick={() => { onChange(addDaysLocal(today, 1)); setOpen(false); }}>
-                Tomorrow
+                {t("common.tomorrow")}
               </button>
               <button type="button" className="danger" onClick={() => { onChange(""); setOpen(false); }}>
-                Clear
+                {t("common.clear")}
               </button>
             </div>
           </div>
@@ -269,6 +281,7 @@ export function ProjectBadge({
   projects: Project[];
   onChange?: (projectId: string) => void;
 }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const project = projects.find((p) => p.id === task.projectId);
   return (
@@ -279,7 +292,7 @@ export function ProjectBadge({
         onClick={() => onChange && setOpen((v) => !v)}
       >
         {project ? <span className="ff-dot" style={{ backgroundColor: project.color }} /> : null}
-        {project ? project.name : "No project"}
+        {project ? project.name : t("common.noProject")}
       </button>
       {onChange ? (
         <Popover open={open} onClose={() => setOpen(false)}>
@@ -288,7 +301,7 @@ export function ProjectBadge({
             className="ff-menu-item"
             onClick={() => { setOpen(false); onChange(""); }}
           >
-            No project
+            {t("common.noProject")}
           </button>
           {projects.map((p) => (
             <button
@@ -347,6 +360,7 @@ export function TaskRow({
   rightSlot,
   metaSlot,
 }: TaskRowProps) {
+  const { t } = useT();
   const done = task.status === "done";
   const update = onUpdate ? (patch: Partial<Task>) => onUpdate(task.id, patch) : undefined;
 
@@ -366,7 +380,7 @@ export function TaskRow({
       <button
         type="button"
         className={`ff-check${done ? " checked" : ""}`}
-        aria-label={done ? "Mark not done" : "Mark done"}
+        aria-label={done ? t("kit.markNotDone") : t("kit.markDone")}
         onClick={(e) => {
           e.stopPropagation();
           onToggleDone(task.id);
@@ -469,7 +483,7 @@ export function SegmentedTabs<T extends string>({
 export function ConfirmModal({
   title,
   body,
-  confirmLabel = "Confirm",
+  confirmLabel,
   danger = true,
   onCancel,
   onConfirm,
@@ -481,6 +495,7 @@ export function ConfirmModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useT();
   const ref = useOutsideClose(onCancel);
   return (
     <div className="ff-modal-backdrop" role="presentation">
@@ -489,14 +504,14 @@ export function ConfirmModal({
         {body ? <div className="ff-confirm-body">{body}</div> : null}
         <div className="ff-modal-actions">
           <button type="button" className="ff-btn" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
             className={danger ? "ff-btn ff-btn-danger" : "ff-btn ff-btn-primary"}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmLabel ?? t("common.confirm")}
           </button>
         </div>
       </section>
@@ -542,6 +557,7 @@ export function Modal({
   footer?: ReactNode;
   wide?: boolean;
 }) {
+  const { t } = useT();
   const ref = useOutsideClose(onClose);
   return (
     <div className="ff-modal-backdrop" role="presentation">
@@ -553,7 +569,7 @@ export function Modal({
       >
         <header className="ff-modal-head">
           <h2>{title}</h2>
-          <button type="button" className="ff-icon-btn" aria-label="Close" onClick={onClose}>
+          <button type="button" className="ff-icon-btn" aria-label={t("kit.close")} onClick={onClose}>
             ✕
           </button>
         </header>

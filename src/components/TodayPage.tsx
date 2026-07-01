@@ -10,6 +10,7 @@ import {
   ToastState,
   useAutoFocus,
 } from "./kit";
+import { useT } from "../i18n";
 
 interface TodayPageProps {
   tasks: Task[];
@@ -54,6 +55,7 @@ export function TodayPage(props: TodayPageProps) {
     onViewInCalendar,
   } = props;
 
+  const { t, lang } = useT();
   const today = todayValue();
   const [waitingFor, setWaitingFor] = useState<Task | null>(null);
   const [startDayOpen, setStartDayOpen] = useState(false);
@@ -69,12 +71,12 @@ export function TodayPage(props: TodayPageProps) {
   }
 
   const baseMore = (task: Task) => [
-    { label: "Open", onClick: () => onOpenTask(task.id) },
-    ...(onViewInCalendar ? [{ label: "View in Calendar", onClick: () => onViewInCalendar(task.id) }] : []),
-    { label: "Duplicate", onClick: () => onDuplicateTask(task.id) },
+    { label: t("common.open"), onClick: () => onOpenTask(task.id) },
+    ...(onViewInCalendar ? [{ label: t("today.viewInCalendar"), onClick: () => onViewInCalendar(task.id) }] : []),
+    { label: t("common.duplicate"), onClick: () => onDuplicateTask(task.id) },
     { separator: true },
-    { label: "Archive", onClick: () => onArchiveTask(task.id) },
-    { label: "Delete", danger: true, onClick: () => onRequestDelete(task.id) },
+    { label: t("common.archive"), onClick: () => onArchiveTask(task.id) },
+    { label: t("common.delete"), danger: true, onClick: () => onRequestDelete(task.id) },
   ];
 
   function rowFor(task: Task, opts: {
@@ -100,26 +102,26 @@ export function TodayPage(props: TodayPageProps) {
   }
 
   const focusMore = (task: Task) => [
-    { label: "Start Focus", onClick: () => { onUpdateStatus(task.id, "doing"); onOpenTask(task.id); showToast({ message: "Focus started" }); } },
-    { label: "Remove from Focus", onClick: () => onSetFocus(task.id, false) },
-    { label: "Move to Waiting", onClick: () => setWaitingFor(task) },
+    { label: t("today.startFocus"), onClick: () => { onUpdateStatus(task.id, "doing"); onOpenTask(task.id); showToast({ message: t("today.focusStarted") }); } },
+    { label: t("today.removeFromFocus"), onClick: () => onSetFocus(task.id, false) },
+    { label: t("today.moveToWaiting"), onClick: () => setWaitingFor(task) },
   ];
   const dueMore = (task: Task) => [
-    { label: "Snooze to tomorrow", onClick: () => { onSnooze(task.id); showToast({ message: "Snoozed to tomorrow", actionLabel: "Undo", onAction: () => onUpdateTask(task.id, { scheduledDate: task.scheduledDate }) }); } },
-    { label: "Move to Focus", onClick: () => onSetFocus(task.id, true) },
-    { label: "Move to Waiting", onClick: () => setWaitingFor(task) },
+    { label: t("today.snoozeToTomorrow"), onClick: () => { onSnooze(task.id); showToast({ message: t("today.snoozedToTomorrow"), actionLabel: t("app.undo"), onAction: () => onUpdateTask(task.id, { scheduledDate: task.scheduledDate }) }); } },
+    { label: t("today.moveToFocus"), onClick: () => onSetFocus(task.id, true) },
+    { label: t("today.moveToWaiting"), onClick: () => setWaitingFor(task) },
   ];
   const progressMore = (task: Task) => [
-    { label: "Pause (To Do)", onClick: () => onUpdateStatus(task.id, "todo") },
-    { label: "Move to Waiting", onClick: () => setWaitingFor(task) },
+    { label: t("today.pauseToDo"), onClick: () => onUpdateStatus(task.id, "todo") },
+    { label: t("today.moveToWaiting"), onClick: () => setWaitingFor(task) },
   ];
   const waitingMore = (task: Task) => [
-    { label: "Resume (To Do)", onClick: () => onUpdateStatus(task.id, "todo") },
-    { label: "Resume (Doing)", onClick: () => onUpdateStatus(task.id, "doing") },
+    { label: t("today.resumeToDo"), onClick: () => onUpdateStatus(task.id, "todo") },
+    { label: t("today.resumeDoing"), onClick: () => onUpdateStatus(task.id, "doing") },
   ];
   const overdueMore = (task: Task) => [
-    { label: "Move to Today", onClick: () => onUpdateTask(task.id, { dueDate: today }) },
-    { label: "Snooze to tomorrow", onClick: () => onSnooze(task.id) },
+    { label: t("today.moveToToday"), onClick: () => onUpdateTask(task.id, { dueDate: today }) },
+    { label: t("today.snoozeToTomorrow"), onClick: () => onSnooze(task.id) },
   ];
 
   const hasOverdue = buckets.overdue.length > 0;
@@ -128,16 +130,16 @@ export function TodayPage(props: TodayPageProps) {
     <div className="ff-page">
       <header className="ff-page-head">
         <div>
-          <h1 className="ff-page-title">Today</h1>
-          <p className="ff-page-date">{getDayLabel(today)}</p>
-          <p className="ff-page-sub">Focus on what matters today.</p>
+          <h1 className="ff-page-title">{t("today.title")}</h1>
+          <p className="ff-page-date">{getDayLabel(today, lang)}</p>
+          <p className="ff-page-sub">{t("today.subtitle")}</p>
         </div>
         <div className="ff-page-actions">
           <button type="button" className="ff-btn" onClick={() => setStartDayOpen(true)}>
-            ▶ Start Day
+            ▶ {t("today.startDay")}
           </button>
           <button type="button" className="ff-btn ff-btn-primary" onClick={() => setStartDayOpen(true)}>
-            + Add Task
+            + {t("today.addTask")}
           </button>
           <button type="button" className="ff-icon-btn ff-icon-btn-bordered" onClick={() => setEndDayOpen(true)}>
             ⋯
@@ -146,55 +148,55 @@ export function TodayPage(props: TodayPageProps) {
       </header>
 
       <TodaySection
-        title="Focus"
+        title={t("today.focus")}
         icon="🎯"
         tone="purple"
         count={buckets.focus.length}
-        emptyText="Pick one high-priority task for today."
+        emptyText={t("today.focusEmpty")}
         onAdd={(title) => onCreateTask({ title, status: "todo", isFocus: true, scheduledDate: today })}
       >
         {buckets.focus.map((task) => rowFor(task, { dateField: "scheduledDate", extraMore: focusMore(task) }))}
       </TodaySection>
 
       <TodaySection
-        title="Due Today"
+        title={t("today.dueToday")}
         icon="📅"
         tone="warning"
         count={buckets.dueToday.length}
-        emptyText="Nothing due today."
+        emptyText={t("today.dueTodayEmpty")}
         onAdd={(title) => onCreateTask({ title, status: "todo", dueDate: today })}
       >
         {buckets.dueToday.map((task) => rowFor(task, { dateField: "dueDate", extraMore: dueMore(task) }))}
       </TodaySection>
 
       <TodaySection
-        title="Scheduled Today"
+        title={t("today.scheduledToday")}
         icon="🗓"
         tone="accent"
         count={buckets.scheduledToday.length}
-        emptyText="Nothing planned for today."
+        emptyText={t("today.scheduledTodayEmpty")}
         onAdd={(title) => onCreateTask({ title, status: "todo", scheduledDate: today })}
       >
         {buckets.scheduledToday.map((task) => rowFor(task, { dateField: "scheduledDate", extraMore: dueMore(task) }))}
       </TodaySection>
 
       <TodaySection
-        title="In Progress"
+        title={t("today.inProgress")}
         icon="▶"
         tone="success"
         count={buckets.inProgress.length}
-        emptyText="No active task yet."
+        emptyText={t("today.inProgressEmpty")}
         onAdd={(title) => onCreateTask({ title, status: "doing", scheduledDate: today })}
       >
         {buckets.inProgress.map((task) => rowFor(task, { extraMore: progressMore(task) }))}
       </TodaySection>
 
       <TodaySection
-        title="Waiting"
+        title={t("today.waiting")}
         icon="⏳"
         tone="purple"
         count={buckets.waiting.length}
-        emptyText="No waiting tasks."
+        emptyText={t("today.waitingEmpty")}
       >
         {buckets.waiting.map((task) =>
           rowFor(task, {
@@ -205,22 +207,22 @@ export function TodayPage(props: TodayPageProps) {
       </TodaySection>
 
       {hasOverdue ? (
-        <TodaySection title="Overdue" icon="⚠" tone="danger" count={buckets.overdue.length} emptyText="">
+        <TodaySection title={t("today.overdue")} icon="⚠" tone="danger" count={buckets.overdue.length} emptyText="">
           {buckets.overdue.map((task) => rowFor(task, { dateField: "dueDate", extraMore: overdueMore(task) }))}
         </TodaySection>
       ) : null}
 
       {showCompleted ? (
         <TodaySection
-          title="Done Today"
+          title={t("today.doneToday")}
           icon="✓"
           tone="muted"
           count={buckets.doneToday.length}
-          emptyText="Completed tasks will land here."
+          emptyText={t("today.doneTodayEmpty")}
           headerAction={
             buckets.doneToday.length > 0 ? (
               <button type="button" className="ff-link" onClick={() => setClearDoneConfirm(true)}>
-                Clear
+                {t("today.clear")}
               </button>
             ) : null
           }
@@ -236,7 +238,7 @@ export function TodayPage(props: TodayPageProps) {
           onSave={(reason, follow) => {
             onMoveToWaiting(waitingFor.id, reason, follow);
             setWaitingFor(null);
-            showToast({ message: "Moved to Waiting" });
+            showToast({ message: t("today.moveToWaitingTitle") });
           }}
         />
       ) : null}
@@ -253,21 +255,21 @@ export function TodayPage(props: TodayPageProps) {
 
       {endDayOpen ? (
         <Modal
-          title="End Day Review"
+          title={t("today.endDayReviewTitle")}
           onClose={() => setEndDayOpen(false)}
-          footer={<button className="ff-btn ff-btn-primary" onClick={() => setEndDayOpen(false)}>Done</button>}
+          footer={<button className="ff-btn ff-btn-primary" onClick={() => setEndDayOpen(false)}>{t("common.done")}</button>}
         >
           <p className="ff-page-sub" style={{ margin: 0 }}>
-            You completed <strong>{buckets.doneToday.length}</strong> task(s) today.
+            {t("today.completedTodaySummary", { n: buckets.doneToday.length })}
           </p>
           {buckets.waiting.length > 0 ? (
             <p className="ff-page-sub" style={{ margin: 0 }}>
-              {buckets.waiting.length} task(s) still waiting.
+              {t("today.stillWaitingSummary", { n: buckets.waiting.length })}
             </p>
           ) : null}
           {hasOverdue ? (
             <p className="ff-page-sub" style={{ margin: 0, color: "var(--danger)" }}>
-              {buckets.overdue.length} overdue task(s) to reschedule.
+              {t("today.overdueSummary", { n: buckets.overdue.length })}
             </p>
           ) : null}
         </Modal>
@@ -275,9 +277,9 @@ export function TodayPage(props: TodayPageProps) {
 
       {clearDoneConfirm ? (
         <ConfirmModal
-          title="Clear Done Today?"
-          body="This only hides completed tasks from Today. It does not delete them."
-          confirmLabel="Clear"
+          title={t("today.clearDoneTitle")}
+          body={t("today.clearDoneBody")}
+          confirmLabel={t("today.clear")}
           danger={false}
           onCancel={() => setClearDoneConfirm(false)}
           onConfirm={() => { setHideDone(true); setClearDoneConfirm(false); }}
@@ -306,6 +308,7 @@ function TodaySection({
   onAdd?: (title: string) => void;
   headerAction?: ReactNode;
 }) {
+  const { t } = useT();
   const [collapsed, setCollapsed] = useState(false);
   const [adding, setAdding] = useState(false);
   const [value, setValue] = useState("");
@@ -338,7 +341,7 @@ function TodaySection({
               <div className="ff-inline-add">
                 <input
                   autoFocus
-                  placeholder="Add task..."
+                  placeholder={t("today.addTaskPlaceholder")}
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   onKeyDown={(e) => {
@@ -350,7 +353,7 @@ function TodaySection({
               </div>
             ) : (
               <button type="button" className="ff-inline-add-btn" onClick={() => setAdding(true)}>
-                + Add task
+                {t("today.addTaskInline")}
               </button>
             )
           ) : null}
@@ -369,27 +372,28 @@ function WaitingModal({
   onClose: () => void;
   onSave: (reason: string, followUp: string) => void;
 }) {
+  const { t } = useT();
   const ref = useAutoFocus<HTMLInputElement>();
   const [reason, setReason] = useState(task.waitingReason ?? "");
   const [follow, setFollow] = useState(task.waitingFollowUpDate ?? "");
   return (
     <Modal
-      title="Move to Waiting"
+      title={t("today.moveToWaitingTitle")}
       onClose={onClose}
       footer={
         <>
-          <button className="ff-btn" onClick={onClose}>Cancel</button>
-          <button className="ff-btn ff-btn-primary" onClick={() => onSave(reason, follow)}>Save</button>
+          <button className="ff-btn" onClick={onClose}>{t("common.cancel")}</button>
+          <button className="ff-btn ff-btn-primary" onClick={() => onSave(reason, follow)}>{t("common.save")}</button>
         </>
       }
     >
       <div className="ff-form">
         <label>
-          Waiting reason (optional)
-          <input ref={ref} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Waiting for lab data" />
+          {t("today.waitingReasonLabel")}
+          <input ref={ref} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("today.waitingReasonPlaceholder")} />
         </label>
         <label>
-          Follow-up date (optional)
+          {t("today.followUpDateLabel")}
           <input type="date" value={follow} onChange={(e) => setFollow(e.target.value)} />
         </label>
       </div>
@@ -410,19 +414,20 @@ function StartDayModal({
   onCreateTask: (draft: TaskDraft) => string;
   onSetFocus: (id: string, value: boolean) => void;
 }) {
+  const { t } = useT();
   const today = todayValue();
   const [title, setTitle] = useState("");
   const candidates = [...buckets.dueToday, ...buckets.scheduledToday];
 
   return (
-    <Modal title="Start Day" onClose={onClose} footer={<button className="ff-btn ff-btn-primary" onClick={onClose}>Let's go</button>}>
+    <Modal title={t("today.startDayTitle")} onClose={onClose} footer={<button className="ff-btn ff-btn-primary" onClick={onClose}>{t("common.letsGo")}</button>}>
       <div className="ff-form">
         <label>
-          Add a focus task for today
+          {t("today.addFocusLabel")}
           <div className="ff-inline-add" style={{ marginTop: 4 }}>
             <input
               value={title}
-              placeholder="What's the one thing today?"
+              placeholder={t("today.addFocusPlaceholder")}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && title.trim()) {
@@ -436,7 +441,7 @@ function StartDayModal({
       </div>
       {candidates.length > 0 ? (
         <>
-          <p className="ff-section-title" style={{ marginTop: 8 }}>Promote to Focus</p>
+          <p className="ff-section-title" style={{ marginTop: 8 }}>{t("today.promoteToFocus")}</p>
           <div className="ff-task-list ff-task-list-flat">
             {candidates.slice(0, 6).map((task) => {
               const project = projects.find((p) => p.id === task.projectId);
@@ -446,14 +451,14 @@ function StartDayModal({
                     <span className="ff-task-title">{task.title}</span>
                     {project ? <span className="ff-projbadge"><span className="ff-dot" style={{ background: project.color }} />{project.name}</span> : null}
                   </div>
-                  <button className="ff-btn ff-btn-sm" onClick={() => onSetFocus(task.id, true)}>★ Focus</button>
+                  <button className="ff-btn ff-btn-sm" onClick={() => onSetFocus(task.id, true)}>{t("today.focusStar")}</button>
                 </div>
               );
             })}
           </div>
         </>
       ) : (
-        <EmptyState icon="🌅" title="No tasks scheduled" text="Add a focus task above to begin your day." />
+        <EmptyState icon="🌅" title={t("today.noTasksScheduled")} text={t("today.noTasksScheduledHint")} />
       )}
     </Modal>
   );

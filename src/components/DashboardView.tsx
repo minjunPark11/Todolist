@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { FocusSession, Habit, HabitLog, Project, Task } from "../types";
 import { getHabitStreak } from "./HabitsPage";
 import { addDays, getWeekStart, todayValue } from "../utils/date";
+import { useT } from "../i18n";
 
 interface DashboardViewProps {
   tasks: Task[];
@@ -153,6 +154,7 @@ function TrendCard({
   period: TrendPeriod;
   onPeriodChange: (period: TrendPeriod) => void;
 }) {
+  const { t } = useT();
   const [hover, setHover] = useState<number | null>(null);
   const count = series.length;
   const max = Math.max(...series.map((point) => point.value), 1);
@@ -178,7 +180,7 @@ function TrendCard({
               className={period === option ? "active" : ""}
               onClick={() => onPeriodChange(option)}
             >
-              {option === "day" ? "Day" : option === "week" ? "Week" : "Month"}
+              {option === "day" ? t("dashboard.periodDay") : option === "week" ? t("dashboard.periodWeek") : t("dashboard.periodMonth")}
             </button>
           ))}
         </div>
@@ -235,6 +237,7 @@ export function DashboardView({
   focusSessions,
   onExport,
 }: DashboardViewProps) {
+  const { t } = useT();
   const [tab, setTab] = useState<DashTab>("overview");
   const [period, setPeriod] = useState<TrendPeriod>("day");
 
@@ -332,12 +335,12 @@ export function DashboardView({
 
   const statusCounts = (["todo", "doing", "waiting", "done"] as const).map(
     (status) => ({
-      label: status.replace("_", " "),
+      label: t(`status.${status}`),
       value: tasks.filter((task) => task.status === status).length,
     }),
   );
   const priorityCounts = (["none", "low", "medium", "high"] as const).map((priority) => ({
-    label: priority,
+    label: t(`priority.${priority}`),
     value: tasks.filter((task) => task.priority === priority).length,
   }));
   const projectCounts = [
@@ -345,19 +348,19 @@ export function DashboardView({
       label: project.name,
       value: tasks.filter((task) => task.projectId === project.id).length,
     })),
-    { label: "Inbox", value: tasks.filter((task) => !task.projectId).length },
+    { label: t("status.inbox"), value: tasks.filter((task) => !task.projectId).length },
   ];
 
-  const tabs: Array<{ id: DashTab; label: string }> = [
-    { id: "overview", label: "Overview" },
-    { id: "tasks", label: "Tasks" },
-    { id: "focus", label: "Focus" },
+  const tabs: Array<{ id: DashTab; labelKey: string }> = [
+    { id: "overview", labelKey: "dashboard.tabOverview" },
+    { id: "tasks", labelKey: "dashboard.tabTasks" },
+    { id: "focus", labelKey: "dashboard.tabFocus" },
   ];
 
   return (
     <section className="content-stack dashboard-dark">
       <header className="dash-topbar">
-        <h1>Dashboard</h1>
+        <h1>{t("dashboard.title")}</h1>
         <div className="dash-tabs">
           {tabs.map((item) => (
             <button
@@ -365,12 +368,12 @@ export function DashboardView({
               className={tab === item.id ? "active" : ""}
               onClick={() => setTab(item.id)}
             >
-              {item.label}
+              {t(item.labelKey)}
             </button>
           ))}
         </div>
         <button className="dash-export" onClick={onExport}>
-          Export
+          {t("dashboard.export")}
         </button>
       </header>
 
@@ -378,27 +381,27 @@ export function DashboardView({
         <>
           <div className="kpi-grid">
             <KpiCard
-              label="Completed today"
+              label={t("dashboard.completedToday")}
               value={stats.completedToday}
               delta={stats.completedTodayDelta}
-              sub={`${stats.completed} total`}
+              sub={t("dashboard.totalCount", { n: stats.completed })}
             />
-            <KpiCard label="Open tasks" value={stats.open} sub={`${stats.total} total`} />
-            <KpiCard label="Overdue" value={stats.overdue} sub="needs attention" />
-            <KpiCard label="Completion" value={`${stats.completionRate}%`} sub="all tasks" />
+            <KpiCard label={t("dashboard.openTasks")} value={stats.open} sub={t("dashboard.totalCount", { n: stats.total })} />
+            <KpiCard label={t("dashboard.overdue")} value={stats.overdue} sub={t("dashboard.needsAttention")} />
+            <KpiCard label={t("dashboard.completion")} value={`${stats.completionRate}%`} sub={t("dashboard.allTasks")} />
           </div>
           <TrendCard
-            title="Completed tasks"
+            title={t("dashboard.completedTasks")}
             series={completedSeries}
             period={period}
             onPeriodChange={setPeriod}
           />
           <div className="dash-grid">
-            <BarCard title="By status" items={statusCounts} />
-            <BarCard title="By priority" items={priorityCounts} />
-            <BarCard title="By project" items={projectCounts} />
+            <BarCard title={t("dashboard.byStatus")} items={statusCounts} />
+            <BarCard title={t("dashboard.byPriority")} items={priorityCounts} />
+            <BarCard title={t("dashboard.byProject")} items={projectCounts} />
             <BarCard
-              title="Habit streaks"
+              title={t("dashboard.habitStreaks")}
               items={habits.map((habit) => ({
                 label: habit.name,
                 value: getHabitStreak(habit.id, habitLogs),
@@ -412,35 +415,35 @@ export function DashboardView({
         <>
           <div className="kpi-grid">
             <KpiCard
-              label="Completed today"
+              label={t("dashboard.completedToday")}
               value={stats.completedToday}
               delta={stats.completedTodayDelta}
-              sub={`${stats.completed} total`}
+              sub={t("dashboard.totalCount", { n: stats.completed })}
             />
             <KpiCard
-              label="Completed this week"
+              label={t("dashboard.completedThisWeek")}
               value={stats.completedThisWeek}
               delta={stats.completedThisWeekDelta}
-              sub="vs last week"
+              sub={t("dashboard.vsLastWeek")}
             />
             <KpiCard
-              label="Created today"
+              label={t("dashboard.createdToday")}
               value={stats.createdToday}
               delta={stats.createdTodayDelta}
-              sub={`${stats.total} total`}
+              sub={t("dashboard.totalCount", { n: stats.total })}
             />
-            <KpiCard label="Open tasks" value={stats.open} sub={`${stats.overdue} overdue`} />
+            <KpiCard label={t("dashboard.openTasks")} value={stats.open} sub={t("dashboard.overdueCount", { n: stats.overdue })} />
           </div>
           <TrendCard
-            title="Completed tasks"
+            title={t("dashboard.completedTasks")}
             series={completedSeries}
             period={period}
             onPeriodChange={setPeriod}
           />
           <div className="dash-grid">
-            <BarCard title="By status" items={statusCounts} />
-            <BarCard title="By priority" items={priorityCounts} />
-            <BarCard title="By project" items={projectCounts} />
+            <BarCard title={t("dashboard.byStatus")} items={statusCounts} />
+            <BarCard title={t("dashboard.byPriority")} items={priorityCounts} />
+            <BarCard title={t("dashboard.byProject")} items={projectCounts} />
           </div>
         </>
       ) : null}
@@ -449,25 +452,25 @@ export function DashboardView({
         <>
           <div className="kpi-grid">
             <KpiCard
-              label="Focus today"
+              label={t("dashboard.focusToday")}
               value={`${stats.focusToday}m`}
               delta={stats.focusTodayDelta}
-              sub="minutes"
+              sub={t("dashboard.minutes")}
             />
             <KpiCard
-              label="Focus this week"
+              label={t("dashboard.focusThisWeek")}
               value={`${stats.focusThisWeek}m`}
               delta={stats.focusThisWeekDelta}
-              sub="vs last week"
+              sub={t("dashboard.vsLastWeek")}
             />
             <KpiCard
-              label="Sessions"
+              label={t("dashboard.sessions")}
               value={stats.focusSessionsTotal}
-              sub="completed focus"
+              sub={t("dashboard.completedFocus")}
             />
           </div>
           <TrendCard
-            title="Focus minutes"
+            title={t("dashboard.focusMinutesTitle")}
             series={focusSeries}
             period={period}
             onPeriodChange={setPeriod}

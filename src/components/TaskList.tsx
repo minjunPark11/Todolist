@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Project, Subtask, Task } from "../types";
 import { addDays, formatDate, isOverdue, isThisWeek, isToday, todayValue } from "../utils/date";
+import { useT } from "../i18n";
 
 export type GroupBy = "none" | "date" | "priority" | "project";
 
@@ -20,14 +21,9 @@ interface TaskGroup {
   tasks: Task[];
 }
 
-const priorityOrder: Array<{ key: Task["priority"]; label: string }> = [
-  { key: "high", label: "High priority" },
-  { key: "medium", label: "Medium priority" },
-  { key: "low", label: "Low priority" },
-  { key: "none", label: "No priority" },
-];
+type T = (key: string, vars?: Record<string, string | number>) => string;
 
-function buildGroups(tasks: Task[], groupBy: GroupBy, projects: Project[]): TaskGroup[] {
+function buildGroups(tasks: Task[], groupBy: GroupBy, projects: Project[], t: T): TaskGroup[] {
   if (groupBy === "date") {
     const today = todayValue();
     const tomorrow = addDays(today, 1);
@@ -50,16 +46,22 @@ function buildGroups(tasks: Task[], groupBy: GroupBy, projects: Project[]): Task
     }
 
     return [
-      { key: "overdue", label: "Overdue", tasks: buckets.overdue },
-      { key: "today", label: "Today", tasks: buckets.today },
-      { key: "tomorrow", label: "Tomorrow", tasks: buckets.tomorrow },
-      { key: "week", label: "This week", tasks: buckets.week },
-      { key: "later", label: "Later", tasks: buckets.later },
-      { key: "none", label: "No date", tasks: buckets.none },
+      { key: "overdue", label: t("today.overdue"), tasks: buckets.overdue },
+      { key: "today", label: t("common.today"), tasks: buckets.today },
+      { key: "tomorrow", label: t("common.tomorrow"), tasks: buckets.tomorrow },
+      { key: "week", label: t("taskList.thisWeek"), tasks: buckets.week },
+      { key: "later", label: t("taskList.later"), tasks: buckets.later },
+      { key: "none", label: t("taskList.noDate"), tasks: buckets.none },
     ].filter((group) => group.tasks.length > 0);
   }
 
   if (groupBy === "priority") {
+    const priorityOrder: Array<{ key: Task["priority"]; label: string }> = [
+      { key: "high", label: t("taskList.highPriority") },
+      { key: "medium", label: t("taskList.mediumPriority") },
+      { key: "low", label: t("taskList.lowPriority") },
+      { key: "none", label: t("priority.none") },
+    ];
     return priorityOrder
       .map((entry) => ({
         key: entry.key,
@@ -77,7 +79,7 @@ function buildGroups(tasks: Task[], groupBy: GroupBy, projects: Project[]): Task
     }));
     groups.push({
       key: "inbox",
-      label: "Inbox",
+      label: t("status.inbox"),
       tasks: tasks.filter((task) => !task.projectId),
     });
     return groups.filter((group) => group.tasks.length > 0);
@@ -86,7 +88,7 @@ function buildGroups(tasks: Task[], groupBy: GroupBy, projects: Project[]): Task
   return [{ key: "all", label: "", tasks }];
 }
 
-function RepeatIcon() {
+function RepeatIcon({ label }: { label: string }) {
   return (
     <svg
       className="task-repeat-icon"
@@ -98,7 +100,7 @@ function RepeatIcon() {
       strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-label="Repeats"
+      aria-label={label}
     >
       <path d="M17 2l4 4-4 4" />
       <path d="M3 11V9a4 4 0 014-4h14" />
@@ -117,8 +119,17 @@ export function TaskList({
   onToggleDone,
   onSelectTask,
 }: TaskListProps) {
+  const { t, lang } = useT();
   const projectMap = new Map(projects.map((project) => [project.id, project]));
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const statusLabels: Record<Task["status"], string> = {
+    inbox: t("status.inbox"),
+    todo: t("status.todo"),
+    doing: t("status.doing"),
+    waiting: t("status.waiting"),
+    done: t("status.done"),
+    archived: t("status.archived"),
+  };
 
   if (tasks.length === 0) {
     return <p className="empty-state">{emptyMessage}</p>;
@@ -144,7 +155,7 @@ export function TaskList({
       >
         <button
           className={`check-button check-${task.priority}`}
-          aria-label={task.status === "done" ? "Mark task incomplete" : "Mark task done"}
+          aria-label={task.status === "done" ? t("common.markNotDone") : t("common.markDone")}
           onClick={(event) => {
             event.stopPropagation();
             onToggleDone(task.id);
@@ -155,21 +166,21 @@ export function TaskList({
         <div className="task-main">
           <div className="task-title-line">
             <h3>{task.title}</h3>
-            {task.repeatType !== "none" ? <RepeatIcon /> : null}
+            {task.repeatType !== "none" ? <RepeatIcon label={t("taskList.repeats")} /> : null}
           </div>
           {task.description ? <p>{task.description}</p> : null}
           <div className="task-meta">
-            {task.dueDate ? <span className={dateTone}>{formatDate(task.dueDate)}</span> : null}
-            <span>{project?.name ?? "Inbox"}</span>
-            <span>{task.status.replace("_", " ")}</span>
+            {task.dueDate ? <span className={dateTone}>{formatDate(task.dueDate, lang)}</span> : null}
+            <span>{project?.name ?? t("status.inbox")}</span>
+            <span>{statusLabels[task.status]}</span>
             {taskSubtasks.length > 0 ? (
               <span>
-                {completedSubtasks}/{taskSubtasks.length} subtasks
+                {t("taskList.subtasksCount", { done: completedSubtasks, total: taskSubtasks.length })}
               </span>
             ) : null}
           </div>
           {taskSubtasks.length > 0 ? (
-            <div className="mini-progress" aria-label="Subtask progress">
+            <div className="mini-progress" aria-label={t("taskList.subtaskProgress")}>
               <span style={{ width: `${(completedSubtasks / taskSubtasks.length) * 100}%` }} />
             </div>
           ) : null}
@@ -182,7 +193,7 @@ export function TaskList({
     return <div className="task-list">{tasks.map(renderRow)}</div>;
   }
 
-  const groups = buildGroups(tasks, groupBy, projects);
+  const groups = buildGroups(tasks, groupBy, projects, t);
 
   return (
     <div className="task-groups">

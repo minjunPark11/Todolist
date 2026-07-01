@@ -3,6 +3,7 @@ import type { Project, Task } from "../../types";
 import type { CalendarDraftBlock } from "../../utils/calendarTime";
 import { formatDate } from "../../utils/date";
 import { NewTaskForm, type NewTaskFormResult } from "./NewTaskForm";
+import { useT } from "../../i18n";
 
 export interface TodaySummary {
   scheduled: number;
@@ -44,6 +45,7 @@ export function CalendarRightPanel({
   onSelectTask,
   onDragStartTask,
 }: CalendarRightPanelProps) {
+  const { t, lang } = useT();
   if (draft) {
     return (
       <aside className="gcal-panel" data-calendar-interactive="true">
@@ -69,11 +71,11 @@ export function CalendarRightPanel({
   return (
     <aside className="gcal-panel gcal-panel-summary" data-calendar-interactive="true">
       <div className="gcal-panel-summary-header">
-        <h2>Today</h2>
+        <h2>{t("calendar.todaySummary")}</h2>
         <div className="gcal-summary-stats">
-          <span>{todaySummary.scheduled} scheduled</span>
-          <span>{todaySummary.deadlines} deadlines</span>
-          <span>{todaySummary.reviews} reviews</span>
+          <span>{t("calendar.scheduled", { n: todaySummary.scheduled })}</span>
+          <span>{t("calendar.deadlines", { n: todaySummary.deadlines })}</span>
+          <span>{t("calendar.reviews", { n: todaySummary.reviews })}</span>
         </div>
       </div>
 
@@ -84,11 +86,11 @@ export function CalendarRightPanel({
         onDrop={onDropUnscheduled}
       >
         <div className="gcal-backlog-header">
-          <h2>Unscheduled</h2>
+          <h2>{t("calendar.unscheduled")}</h2>
           <span>{unscheduled.length}</span>
         </div>
         {unscheduled.length === 0 ? (
-          <p className="gcal-hint">All clear.</p>
+          <p className="gcal-hint">{t("calendar.allClear")}</p>
         ) : (
           <div className="gcal-backlog-list">
             {unscheduled.map((task) => (
@@ -103,8 +105,8 @@ export function CalendarRightPanel({
                 {task.title}
                 <span className="gcal-backlog-due">
                   {task.dueDate
-                    ? `Due ${formatDate(task.dueDate)} · Not scheduled yet`
-                    : "No deadline · Not scheduled yet"}
+                    ? t("calendar.dueOn", { date: formatDate(task.dueDate, lang) })
+                    : t("calendar.noDeadline")}
                 </span>
               </button>
             ))}

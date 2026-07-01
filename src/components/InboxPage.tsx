@@ -11,6 +11,7 @@ import {
   ToastState,
   useAutoFocus,
 } from "./kit";
+import { useT } from "../i18n";
 
 interface InboxPageProps {
   tasks: Task[];
@@ -43,6 +44,7 @@ export function InboxPage({
   onRequestDelete,
   showToast,
 }: InboxPageProps) {
+  const { t } = useT();
   const [filter, setFilter] = useState<NeedsFilter>("all");
   const [cleanupOpen, setCleanupOpen] = useState(false);
 
@@ -78,18 +80,18 @@ export function InboxPage({
 
   function moreItems(task: Task) {
     return [
-      { label: "Edit", onClick: () => onOpenTask(task.id) },
-      { label: "Duplicate", onClick: () => onDuplicateTask(task.id) },
+      { label: t("common.edit"), onClick: () => onOpenTask(task.id) },
+      { label: t("common.duplicate"), onClick: () => onDuplicateTask(task.id) },
       { separator: true },
-      { label: "Archive", onClick: () => onArchiveTask(task.id) },
-      { label: "Delete", danger: true, onClick: () => onRequestDelete(task.id) },
+      { label: t("common.archive"), onClick: () => onArchiveTask(task.id) },
+      { label: t("common.delete"), danger: true, onClick: () => onRequestDelete(task.id) },
     ];
   }
 
   function handleAdd(draft: TaskDraft) {
     const id = onCreateTask({ ...draft, status: "inbox" });
     if (id) {
-      showToast({ message: "Added to Inbox", actionLabel: "Edit", onAction: () => onOpenTask(id) });
+      showToast({ message: t("inbox.addedToInbox"), actionLabel: t("common.edit"), onAction: () => onOpenTask(id) });
     }
   }
 
@@ -97,8 +99,8 @@ export function InboxPage({
     <div className="ff-page">
       <header className="ff-page-head">
         <div>
-          <h1 className="ff-page-title">Inbox</h1>
-          <p className="ff-page-sub">Capture tasks quickly. Organize them when you are ready.</p>
+          <h1 className="ff-page-title">{t("inbox.title")}</h1>
+          <p className="ff-page-sub">{t("inbox.subtitle")}</p>
         </div>
         <div className="ff-page-actions">
           <button
@@ -106,7 +108,7 @@ export function InboxPage({
             className="ff-btn ff-btn-primary"
             onClick={() => document.querySelector<HTMLInputElement>(".ff-quickadd input")?.focus()}
           >
-            + Add Task
+            + {t("inbox.addTask")}
           </button>
           <button type="button" className="ff-icon-btn ff-icon-btn-bordered" onClick={() => setCleanupOpen(true)}>
             ⋯
@@ -117,32 +119,32 @@ export function InboxPage({
       <QuickAddBar projects={projects} onAdd={handleAdd} />
 
       <section className="ff-section">
-        <h2 className="ff-section-title">Needs attention</h2>
+        <h2 className="ff-section-title">{t("inbox.needsAttention")}</h2>
         <div className="ff-attention-grid">
           <AttentionCard
             tone="accent"
             icon="📅"
-            label="Needs Date"
+            label={t("inbox.needsDate")}
             count={needsDate.length}
-            hint="Tasks missing a date"
+            hint={t("inbox.needsDateHint")}
             active={filter === "date"}
             onClick={() => setFilter(filter === "date" ? "all" : "date")}
           />
           <AttentionCard
             tone="warning"
             icon="📁"
-            label="Needs Project"
+            label={t("inbox.needsProject")}
             count={needsProject.length}
-            hint="Tasks not assigned to a project"
+            hint={t("inbox.needsProjectHint")}
             active={filter === "project"}
             onClick={() => setFilter(filter === "project" ? "all" : "project")}
           />
           <AttentionCard
             tone="purple"
             icon="🏳"
-            label="Needs Priority"
+            label={t("inbox.needsPriority")}
             count={needsPriority.length}
-            hint="Tasks with no priority"
+            hint={t("inbox.needsPriorityHint")}
             active={filter === "priority"}
             onClick={() => setFilter(filter === "priority" ? "all" : "priority")}
           />
@@ -151,22 +153,22 @@ export function InboxPage({
 
       <section className="ff-section">
         <div className="ff-section-head">
-          <h2 className="ff-section-title">Unsorted Tasks</h2>
+          <h2 className="ff-section-title">{t("inbox.unsortedTasks")}</h2>
           {filter !== "all" ? (
             <button type="button" className="ff-link" onClick={() => setFilter("all")}>
-              Clear filter
+              {t("inbox.clearFilter")}
             </button>
           ) : (
             <button type="button" className="ff-link" onClick={() => setCleanupOpen(true)}>
-              Clean Up
+              {t("inbox.cleanUp")}
             </button>
           )}
         </div>
         {filtered.length === 0 ? (
           <EmptyState
             icon="📥"
-            title="Inbox is clear"
-            text="Nothing waiting to be organized. Capture new tasks whenever they come up."
+            title={t("inbox.inboxClear")}
+            text={t("inbox.inboxClearHint")}
           />
         ) : (
           <div className="ff-task-list">
@@ -181,7 +183,7 @@ export function InboxPage({
                 onToggleDone={onToggleDone}
                 onUpdate={onUpdateTask}
                 moreItems={moreItems(task)}
-                rightSlot={<span className="ff-loc">📥 Inbox</span>}
+                rightSlot={<span className="ff-loc">📥 {t("inbox.inboxBadge")}</span>}
               />
             ))}
           </div>
@@ -190,7 +192,7 @@ export function InboxPage({
 
       {recentlyAdded.length > 0 ? (
         <section className="ff-section">
-          <h2 className="ff-section-title">Recently Added</h2>
+          <h2 className="ff-section-title">{t("inbox.recentlyAdded")}</h2>
           <div className="ff-task-list">
             {recentlyAdded.map((task) => (
               <TaskRow
@@ -201,7 +203,7 @@ export function InboxPage({
                 onOpen={onOpenTask}
                 onToggleDone={onToggleDone}
                 onUpdate={onUpdateTask}
-                metaSlot={<span className="ff-ago">{relativeTime(task.createdAt)}</span>}
+                metaSlot={<span className="ff-ago">{relativeTime(task.createdAt, t)}</span>}
               />
             ))}
           </div>
@@ -262,6 +264,7 @@ function AttentionCard({
 // Quick Add bar (spec §0.5.2)
 // ---------------------------------------------------------------------------
 function QuickAddBar({ projects, onAdd }: { projects: Project[]; onAdd: (draft: TaskDraft) => void }) {
+  const { t } = useT();
   const [title, setTitle] = useState("");
   const [scheduledToday, setScheduledToday] = useState(false);
   const [projectId, setProjectId] = useState("");
@@ -294,7 +297,7 @@ function QuickAddBar({ projects, onAdd }: { projects: Project[]; onAdd: (draft: 
     <div className={`ff-quickadd${error ? " has-error" : ""}`}>
       <span className="ff-quickadd-check" />
       <input
-        placeholder="Add a task..."
+        placeholder={t("inbox.addTaskPlaceholder")}
         value={title}
         onChange={(e) => {
           setTitle(e.target.value);
@@ -310,15 +313,15 @@ function QuickAddBar({ projects, onAdd }: { projects: Project[]; onAdd: (draft: 
           className={scheduledToday ? "ff-chip active" : "ff-chip"}
           onClick={() => setScheduledToday((v) => !v)}
         >
-          📅 Today
+          📅 {t("common.today")}
         </button>
         <div className="ff-anchor">
           <button type="button" className={projectId ? "ff-chip active" : "ff-chip"} onClick={() => setProjOpen((v) => !v)}>
-            📁 {selectedProject ? selectedProject.name : "Project"}
+            📁 {selectedProject ? selectedProject.name : t("common.project")}
           </button>
           <Popover open={projOpen} onClose={() => setProjOpen(false)}>
             <button type="button" className="ff-menu-item" onClick={() => { setProjectId(""); setProjOpen(false); }}>
-              No project
+              {t("common.noProject")}
             </button>
             {projects.map((p) => (
               <button
@@ -336,9 +339,9 @@ function QuickAddBar({ projects, onAdd }: { projects: Project[]; onAdd: (draft: 
         <PriorityBadge priority={priority} onChange={setPriority} />
       </div>
       <button type="button" className="ff-btn ff-btn-primary ff-quickadd-add" onClick={submit}>
-        Add
+        {t("common.add")}
       </button>
-      {error ? <span className="ff-quickadd-error">Task title is required</span> : null}
+      {error ? <span className="ff-quickadd-error">{t("inbox.titleRequired")}</span> : null}
     </div>
   );
 }
@@ -359,6 +362,7 @@ function CleanUpFlow({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { t } = useT();
   const [index, setIndex] = useState(0);
   const [confirmClose, setConfirmClose] = useState(false);
   const firstRef = useAutoFocus<HTMLSelectElement>();
@@ -372,8 +376,8 @@ function CleanUpFlow({
 
   if (!task) {
     return (
-      <Modal title="Clean up Inbox" onClose={onClose} footer={<button className="ff-btn ff-btn-primary" onClick={onDone}>Done</button>}>
-        <EmptyState icon="✨" title="Nothing to clean up" text="Every inbox task already has a project, date, and priority." />
+      <Modal title={t("inbox.cleanUpTitle")} onClose={onClose} footer={<button className="ff-btn ff-btn-primary" onClick={onDone}>{t("common.done")}</button>}>
+        <EmptyState icon="✨" title={t("inbox.nothingToCleanUp")} text={t("inbox.nothingToCleanUpHint")} />
       </Modal>
     );
   }
@@ -417,21 +421,21 @@ function CleanUpFlow({
   return (
     <>
       <Modal
-        title="Clean up Inbox"
+        title={t("inbox.cleanUpTitle")}
         onClose={requestClose}
         footer={
           <>
             <button type="button" className="ff-btn" onClick={goNext}>
-              Skip
+              {t("common.skip")}
             </button>
             <button type="button" className="ff-btn ff-btn-primary" onClick={saveAndNext}>
-              {index + 1 >= tasks.length ? "Save & Done" : "Save & Next"}
+              {index + 1 >= tasks.length ? t("common.saveAndDone") : t("common.saveAndNext")}
             </button>
           </>
         }
       >
         <p className="ff-cleanup-progress">
-          {index + 1} of {tasks.length}
+          {t("inbox.progressLabel", { current: index + 1, total: tasks.length })}
         </p>
         <div className="ff-cleanup-card">
           <strong>{task.title}</strong>
@@ -439,47 +443,47 @@ function CleanUpFlow({
         </div>
         <div className="ff-form-grid">
           <label>
-            Project
+            {t("common.project")}
             <select
               ref={firstRef}
               value={projectId}
               onChange={(e) => { setProjectId(e.target.value); setDirty(true); }}
             >
-              <option value="">No project</option>
+              <option value="">{t("common.noProject")}</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </label>
           <label>
-            Date
+            {t("inbox.date")}
             <input type="date" value={date} onChange={(e) => { setDate(e.target.value); setDirty(true); }} />
           </label>
           <label>
-            Priority
+            {t("common.priority")}
             <select value={priority} onChange={(e) => { setPriority(e.target.value as TaskPriority); setDirty(true); }}>
-              <option value="none">None</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
+              <option value="none">{t("priority.none")}</option>
+              <option value="low">{t("priority.low")}</option>
+              <option value="medium">{t("priority.medium")}</option>
+              <option value="high">{t("priority.high")}</option>
             </select>
           </label>
           <label>
-            Status
+            {t("common.status")}
             <select value={status} onChange={(e) => { setStatus(e.target.value as Task["status"]); setDirty(true); }}>
-              <option value="inbox">Inbox</option>
-              <option value="todo">To Do</option>
-              <option value="doing">Doing</option>
-              <option value="waiting">Waiting</option>
+              <option value="inbox">{t("status.inbox")}</option>
+              <option value="todo">{t("status.todo")}</option>
+              <option value="doing">{t("status.doing")}</option>
+              <option value="waiting">{t("status.waiting")}</option>
             </select>
           </label>
         </div>
       </Modal>
       {confirmClose ? (
         <ConfirmModal
-          title="Discard unsaved changes?"
-          body="This task has unsaved changes. Close anyway?"
-          confirmLabel="Discard"
+          title={t("inbox.discardChangesTitle")}
+          body={t("inbox.discardChangesBody")}
+          confirmLabel={t("inbox.discard")}
           onCancel={() => setConfirmClose(false)}
           onConfirm={() => { setConfirmClose(false); onClose(); }}
         />
@@ -488,15 +492,15 @@ function CleanUpFlow({
   );
 }
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, t: (key: string, vars?: Record<string, string | number>) => string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
   const diff = Date.now() - then;
   const min = Math.round(diff / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m ago`;
+  if (min < 1) return t("inbox.justNow");
+  if (min < 60) return t("inbox.minutesAgo", { n: min });
   const hr = Math.round(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("inbox.hoursAgo", { n: hr });
   const day = Math.round(hr / 24);
-  return `${day}d ago`;
+  return t("inbox.daysAgo", { n: day });
 }

@@ -3,6 +3,7 @@ import type { Project } from "../../types";
 import type { CalendarDraftBlock } from "../../utils/calendarTime";
 import { formatDate } from "../../utils/date";
 import { useAutoFocus } from "../kit";
+import { useT } from "../../i18n";
 
 export interface NewTaskFormResult {
   title: string;
@@ -21,6 +22,7 @@ interface NewTaskFormProps {
 // this form only owns "what" (title/project/dueDate), so Cancel/remount never
 // touches the draft's time range.
 export function NewTaskForm({ draft, projects, onCancel, onCreate }: NewTaskFormProps) {
+  const { t, lang } = useT();
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -31,7 +33,7 @@ export function NewTaskForm({ draft, projects, onCancel, onCreate }: NewTaskForm
     event?.preventDefault();
     const trimmed = title.trim();
     if (!trimmed) {
-      setError("Task title is required.");
+      setError(t("calendar.taskTitleRequired"));
       return;
     }
     onCreate({ title: trimmed, projectId, dueDate });
@@ -40,14 +42,14 @@ export function NewTaskForm({ draft, projects, onCancel, onCreate }: NewTaskForm
   return (
     <form className="gcal-newtask-form" onSubmit={submit}>
       <header className="gcal-newtask-head">
-        <h2>New Task</h2>
-        <button type="button" className="ff-icon-btn" aria-label="Cancel new task" onClick={onCancel}>
+        <h2>{t("calendar.quickCreateTitle")}</h2>
+        <button type="button" className="ff-icon-btn" aria-label={t("calendar.cancelNewTaskAria")} onClick={onCancel}>
           ✕
         </button>
       </header>
 
       <label>
-        <span>Title</span>
+        <span>{t("common.titleLabel")}</span>
         <input
           ref={titleRef}
           value={title}
@@ -58,23 +60,23 @@ export function NewTaskForm({ draft, projects, onCancel, onCreate }: NewTaskForm
           onKeyDown={(event) => {
             if (event.key === "Escape") onCancel();
           }}
-          placeholder="What do you need to do?"
+          placeholder={t("calendar.titlePlaceholderQuestion")}
         />
       </label>
       {error ? <p className="gcal-newtask-error">{error}</p> : null}
 
       <div className="gcal-newtask-when">
-        <span className="gcal-newtask-when-label">When</span>
-        <strong>{formatDate(draft.date)}</strong>
+        <span className="gcal-newtask-when-label">{t("calendar.when")}</span>
+        <strong>{formatDate(draft.date, lang)}</strong>
         <span>
           {draft.startTime} – {draft.endTime}
         </span>
       </div>
 
       <label>
-        <span>Project</span>
+        <span>{t("common.project")}</span>
         <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-          <option value="">Inbox</option>
+          <option value="">{t("inbox.title")}</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
               {project.name}
@@ -84,21 +86,21 @@ export function NewTaskForm({ draft, projects, onCancel, onCreate }: NewTaskForm
       </label>
 
       <label>
-        <span>Due date</span>
+        <span>{t("common.dueDate")}</span>
         <input
           type="date"
           value={dueDate}
           onChange={(event) => setDueDate(event.target.value)}
-          placeholder="Optional"
+          placeholder={t("calendar.optional")}
         />
       </label>
 
       <div className="gcal-newtask-actions">
         <button type="button" className="ff-btn" onClick={onCancel}>
-          Cancel
+          {t("common.cancel")}
         </button>
         <button type="submit" className="ff-btn ff-btn-primary">
-          Create task
+          {t("calendar.createTask")}
         </button>
       </div>
     </form>

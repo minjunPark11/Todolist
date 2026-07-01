@@ -25,6 +25,7 @@ import { MonthView } from "./calendar/MonthView";
 import { CalendarRightPanel } from "./calendar/CalendarRightPanel";
 import type { NewTaskFormResult } from "./calendar/NewTaskForm";
 import { QuickCreatePopover, type QuickCreateDefaults, type QuickCreateResult } from "./calendar/QuickCreatePopover";
+import { useT } from "../i18n";
 
 type CalendarMode = "month" | "week" | "day";
 
@@ -57,6 +58,7 @@ export function CalendarView({
   taskDetail,
   showToast,
 }: CalendarViewProps) {
+  const { t, lang } = useT();
   const [mode, setMode] = useState<CalendarMode>("week");
   const [anchor, setAnchor] = useState(todayValue());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -97,11 +99,11 @@ export function CalendarView({
 
   let rangeLabel: string;
   if (mode === "month") {
-    rangeLabel = getMonthLabel(anchorDate.getFullYear(), anchorDate.getMonth());
+    rangeLabel = getMonthLabel(anchorDate.getFullYear(), anchorDate.getMonth(), lang);
   } else if (mode === "week") {
-    rangeLabel = getWeekLabel(anchor);
+    rangeLabel = getWeekLabel(anchor, lang);
   } else {
-    rangeLabel = getDayLabel(anchor);
+    rangeLabel = getDayLabel(anchor, lang);
   }
 
   function shift(delta: number) {
@@ -259,7 +261,7 @@ export function CalendarView({
     });
     setDraft(null);
     onSelectTask(taskId);
-    showToast?.({ message: `Created "${result.title}"` });
+    showToast?.({ message: t("calendar.createdToast", { title: result.title }) });
   }
 
   const days = mode === "day" ? [anchor] : getWeekDays(anchor);

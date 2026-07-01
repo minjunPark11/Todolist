@@ -1,8 +1,11 @@
 import { DragEvent } from "react";
 import type { CalendarItem } from "../../utils/calendarItems";
 import { getDayNumber, getMonthGrid, todayValue, type CalendarCell } from "../../utils/date";
+import { useT } from "../../i18n";
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// Sunday-first order preserved to match the date grid logic (getMonthGrid).
+const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS_KO = ["일", "월", "화", "수", "목", "금", "토"];
 const CHIP_CAP = 3;
 
 function layerPrefix(layer: CalendarItem["layer"]) {
@@ -35,6 +38,8 @@ export function MonthView({
   onClickItem,
   onClickCell,
 }: MonthViewProps) {
+  const { t, lang } = useT();
+  const weekdays = lang === "ko" ? WEEKDAYS_KO : WEEKDAYS_EN;
   const today = todayValue();
   const anchorDate = new Date(`${anchor}T00:00:00`);
   const cells = getMonthGrid(anchorDate.getFullYear(), anchorDate.getMonth());
@@ -80,7 +85,7 @@ export function MonthView({
             </button>
           ))}
           {dayItems.length > CHIP_CAP ? (
-            <span className="gcal-month-more">+{dayItems.length - CHIP_CAP} more</span>
+            <span className="gcal-month-more">{t("calendar.moreCount", { n: dayItems.length - CHIP_CAP })}</span>
           ) : null}
         </div>
       </div>
@@ -90,7 +95,7 @@ export function MonthView({
   return (
     <>
       <div className="gcal-month-weekdays">
-        {WEEKDAYS.map((day) => (
+        {weekdays.map((day) => (
           <span key={day}>{day}</span>
         ))}
       </div>

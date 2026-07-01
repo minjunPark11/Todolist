@@ -1,4 +1,4 @@
-import { DragEvent, PointerEvent as ReactPointerEvent, useState } from "react";
+import { DragEvent, PointerEvent as ReactPointerEvent, useMemo, useState } from "react";
 import type { CalendarItem } from "../../utils/calendarItems";
 import {
   clickDefaultRange,
@@ -12,11 +12,11 @@ import {
   type CalendarDraftBlock,
 } from "../../utils/calendarTime";
 import { getDayNumber, todayValue } from "../../utils/date";
+import { useT } from "../../i18n";
 
 export { DAY_END, DAY_START, SLOT_HEIGHT };
 
 const hours = Array.from({ length: DAY_END - DAY_START }, (_, index) => DAY_START + index);
-const weekdayFormatter = new Intl.DateTimeFormat("en", { weekday: "short" });
 const timeLabelFormatter = new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 // V3 §2.1: only the live drag preview lives here; the confirmed draft is
@@ -80,6 +80,11 @@ export function WeekView({
   onSelectionStart,
   onDraftCreate,
 }: WeekViewProps) {
+  const { t, lang } = useT();
+  const weekdayFormatter = useMemo(
+    () => new Intl.DateTimeFormat(lang === "ko" ? "ko" : "en", { weekday: "short" }),
+    [lang],
+  );
   const [selection, setSelection] = useState<LiveSelection | null>(null);
 
   const today = todayValue();
@@ -173,7 +178,7 @@ export function WeekView({
       </div>
 
       <div className="gcal-allday-row">
-        <div className="gcal-time-corner small">All day</div>
+        <div className="gcal-time-corner small">{t("calendar.allDay")}</div>
         {days.map((day) => {
           const allDayItems = items.filter((item) => item.date === day && item.allDay);
           const id = `allday:${day}`;
@@ -223,7 +228,7 @@ export function WeekView({
           ))}
         </div>
         {showEmptyHint ? (
-          <div className="gcal-empty-hint">Drag on the calendar to create a task</div>
+          <div className="gcal-empty-hint">{t("calendar.dragToCreate")}</div>
         ) : null}
         {days.map((day) => {
           const timedItems = items.filter((item) => item.date === day && !item.allDay);
@@ -283,7 +288,7 @@ export function WeekView({
                     ),
                   }}
                 >
-                  <span className="gcal-draft-label">New task</span>
+                  <span className="gcal-draft-label">{t("calendar.newTask")}</span>
                   <span className="gcal-draft-time">
                     {draftHere.startTime}–{draftHere.endTime}
                   </span>
