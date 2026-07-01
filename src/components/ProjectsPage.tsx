@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import type { Project, ProjectType, Subtask, Task, TaskDraft, TaskPriority } from "../types";
 import { formatDate } from "../utils/date";
 import {
@@ -29,7 +29,6 @@ interface ProjectsPageProps {
   taskDetail: ReactNode;
   selectedProjectId: string;
   detailOpen: boolean;
-  projectNotes: Record<string, string>;
   onOpenProject: (id: string) => void;
   onCloseProject: () => void;
   onOpenTask: (id: string) => void;
@@ -96,7 +95,7 @@ export function ProjectsPage(props: ProjectsPageProps) {
 
       {shown.length === 0 ? (
         <EmptyState
-          icon="📁"
+          icon="Folder"
           title={archivedView ? "No archived projects" : "No projects yet"}
           text={archivedView ? "Archived projects will appear here." : "Create a project to group related tasks."}
           actionLabel={archivedView ? undefined : "New Project"}
@@ -167,11 +166,11 @@ function ProjectCard({
     >
       <div className="ff-project-card-top">
         <span className="ff-project-icon" style={{ background: project.color }}>
-          {project.type === "area" ? "▦" : "📁"}
+          {project.type === "area" ? "A" : "P"}
         </span>
         <div className="ff-project-card-titles">
           <strong>{project.name}</strong>
-          <small>{project.type === "area" ? "Area" : "Project"} · {progress.total} tasks</small>
+          <small>{project.type === "area" ? "Area" : "Project"} - {progress.total} tasks</small>
         </div>
         <button
           type="button"
@@ -179,7 +178,7 @@ function ProjectCard({
           aria-label="Pin project"
           onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
         >
-          {project.pinned ? "★" : "☆"}
+          {project.pinned ? "*" : "+"}
         </button>
         <MoreMenu
           items={
@@ -206,7 +205,6 @@ function ProjectDetail({
   project,
   tasks,
   subtasks,
-  projectNotes,
   selectedTaskId,
   taskDetail,
   tab,
@@ -238,9 +236,14 @@ function ProjectDetail({
   const progress = getProjectProgress(tasks, project.id);
   const prioritySummary = getProjectPrioritySummary(tasks, project.id);
   const statusSummary = getProjectStatusSummary(tasks, project.id);
-  const notes = projectNotes[project.id] ?? project.description ?? "";
+  const notes = project.notes ?? "";
   const [draftNotes, setDraftNotes] = useState(notes);
   const [editingNotes, setEditingNotes] = useState(false);
+
+  useEffect(() => {
+    setDraftNotes(notes);
+    setEditingNotes(false);
+  }, [notes, project.id]);
 
   const filteredTasks =
     tasksFilter === "all" ? projectTasks : projectTasks.filter((t) => t.priority === tasksFilter);
@@ -255,7 +258,7 @@ function ProjectDetail({
     <div className="ff-detail-layout">
       <div className="ff-page ff-detail-main">
         <button type="button" className="ff-link ff-back" onClick={onCloseProject}>
-          ‹ Projects
+          &lt; Projects
         </button>
         <header className="ff-page-head">
           <div>
@@ -267,17 +270,17 @@ function ProjectDetail({
                 onClick={() => onToggleStar(project.id)}
                 aria-label="Pin"
               >
-                {project.pinned ? "★" : "☆"}
+                {project.pinned ? "*" : "+"}
               </button>
             </h1>
             <p className="ff-page-sub">
               <span className="ff-dot" style={{ background: project.color }} />{" "}
               {project.type === "area" ? "Area" : "Project"}
-              {project.dueDate ? ` · Due ${formatDate(project.dueDate)}` : ""}
+              {project.dueDate ? ` - Due ${formatDate(project.dueDate)}` : ""}
             </p>
           </div>
           <div className="ff-page-actions">
-            <button type="button" className="ff-btn" onClick={() => setEditOpen(true)}>✎ Edit</button>
+            <button type="button" className="ff-btn" onClick={() => setEditOpen(true)}>Edit</button>
             <MoreMenu
               items={[
                 { label: "Archive Project", onClick: () => onArchiveProject(project.id) },
@@ -350,7 +353,7 @@ function ProjectDetail({
             </div>
             <InlineProjectAdd onAdd={(title) => onCreateTask({ title, status: "todo", projectId: project.id })} />
             {filteredTasks.length === 0 ? (
-              <EmptyState icon="📋" title="No tasks" text="Add a task to this project." />
+              <EmptyState icon="Tasks" title="No tasks" text="Add a task to this project." />
             ) : (
               <div className="ff-task-list">
                 {filteredTasks.map((task) => (
@@ -374,13 +377,13 @@ function ProjectDetail({
         {tab === "subtasks" ? (
           <div className="ff-task-list">
             {projectSubtasks.length === 0 ? (
-              <EmptyState icon="☑" title="No subtasks" text="Subtasks from this project's tasks appear here." />
+              <EmptyState icon="Subtasks" title="No subtasks" text="Subtasks from this project's tasks appear here." />
             ) : (
               projectSubtasks.map((sub) => {
                 const parent = projectTasks.find((t) => t.id === sub.taskId);
                 return (
                   <div key={sub.id} className="ff-task-row" style={{ cursor: "default" }}>
-                    <span className={`ff-check${sub.completed ? " checked" : ""}`}>{sub.completed ? "✓" : ""}</span>
+                    <span className={`ff-check${sub.completed ? " checked" : ""}`}>{sub.completed ? "Done" : ""}</span>
                     <div className="ff-task-main">
                       <span className={`ff-task-title${sub.completed ? "" : ""}`}>{sub.title}</span>
                       <span className="ff-subcount">{parent?.title}</span>
@@ -448,7 +451,7 @@ function ProjectInfoPanel({
       <h3>Project Info</h3>
       <dl className="ff-info-list">
         <div><dt>Type</dt><dd>{project.type === "area" ? "Area" : "Project"}</dd></div>
-        <div><dt>Due Date</dt><dd>{project.dueDate ? formatDate(project.dueDate) : "—"}</dd></div>
+        <div><dt>Due Date</dt><dd>{project.dueDate ? formatDate(project.dueDate) : "-"}</dd></div>
         <div><dt>Tasks</dt><dd>{taskCount}</dd></div>
         <div><dt>Completed</dt><dd>{progress.completed}</dd></div>
         <div><dt>Progress</dt><dd>{progress.percent}%</dd></div>

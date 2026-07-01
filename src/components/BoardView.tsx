@@ -14,7 +14,7 @@ interface BoardViewProps {
 const columns = [
   { id: "inbox", label: "Inbox" },
   { id: "todo", label: "To Do" },
-  { id: "in_progress", label: "Doing" },
+  { id: "doing", label: "Doing" },
   { id: "waiting", label: "Waiting" },
   { id: "done", label: "Done" },
 ] as const;

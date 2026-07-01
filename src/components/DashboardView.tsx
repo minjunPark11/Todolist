@@ -330,7 +330,7 @@ export function DashboardView({
     [focusSessions, period, today],
   );
 
-  const statusCounts = (["todo", "in_progress", "waiting", "blocked", "done"] as const).map(
+  const statusCounts = (["todo", "doing", "waiting", "done"] as const).map(
     (status) => ({
       label: status.replace("_", " "),
       value: tasks.filter((task) => task.status === status).length,

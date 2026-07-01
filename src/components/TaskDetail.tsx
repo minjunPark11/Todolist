@@ -15,7 +15,7 @@ interface TaskDetailProps {
   onDeleteSubtask: (subtaskId: string) => void;
 }
 
-const statuses: TaskStatus[] = ["todo", "in_progress", "waiting", "blocked", "done", "archived"];
+const statuses: TaskStatus[] = ["inbox", "todo", "doing", "waiting", "done", "archived"];
 const priorities: TaskPriority[] = ["none", "low", "medium", "high"];
 const levels: TaskLevel[] = ["low", "high"];
 const repeatTypes: RepeatType[] = ["none", "daily", "weekly", "monthly"];
@@ -232,7 +232,7 @@ export function TaskDetail({
               onChange={(event) =>
                 onUpdateTask(task.id, {
                   blockedByTaskId: event.target.value,
-                  status: event.target.value ? "blocked" : task.status === "blocked" ? "todo" : task.status,
+                  status: event.target.value ? "waiting" : task.status === "waiting" ? "todo" : task.status,
                 })
               }
             >

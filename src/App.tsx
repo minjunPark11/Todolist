@@ -17,10 +17,12 @@ import { TaskDetail } from "./components/TaskDetail";
 import { TaskList, type GroupBy } from "./components/TaskList";
 import { usePlannerData } from "./hooks/usePlannerData";
 import type {
+  ConceptNote,
   Habit,
   HabitLog,
   PageId,
   Project,
+  StudyTopic,
   Subtask,
   Task,
   TaskLevel,
@@ -33,10 +35,10 @@ import { getDueReviewCount } from "./utils/planner";
 
 const statusOptions: Array<TaskStatus | "all"> = [
   "all",
+  "inbox",
   "todo",
-  "in_progress",
+  "doing",
   "waiting",
-  "blocked",
   "done",
   "archived",
 ];
@@ -87,7 +89,7 @@ function getTodayBuckets(tasks: Task[], today: string) {
       buckets.waiting.push(task);
       continue;
     }
-    if (task.status === "in_progress") {
+    if (task.status === "doing") {
       buckets.inProgress.push(task);
       continue;
     }
@@ -111,31 +113,13 @@ function getTodayBuckets(tasks: Task[], today: string) {
   return buckets;
 }
 
-type ConceptNote = {
-  id: string;
-  topic: string;
-  title: string;
-  summary: string;
-  difficulty: "easy" | "medium" | "hard" | "unknown";
-  reviewStatus: "not_scheduled" | "due" | "reviewed" | "mastered";
-  nextReviewDate: string;
-  lastReviewedAt: string;
-};
-
-type StudyTopic = {
-  id: string;
-  name: string;
-  category: "Python" | "fNIRS" | "Research" | "English" | "Presentation" | "Other";
-  description: string;
-  status: "active" | "paused" | "mastered" | "archived";
-  color: string;
-};
-
 export default function App() {
   const planner = usePlannerData();
   const appSettings = planner.appSettings;
   const dueReviewCount = getDueReviewCount(planner.conceptNotes);
-  const [activePage, setActivePage] = useState<PageId>("today");
+  const [activePage, setActivePage] = useState<PageId>(
+    appSettings.defaultView === "/inbox" ? "inbox" : "today",
+  );
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all");
   const [projectFilter, setProjectFilter] = useState("all");
@@ -151,62 +135,11 @@ export default function App() {
   const [importMessage, setImportMessage] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [isProjectDetailOpen, setIsProjectDetailOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState("");
   const [planningTab, setPlanningTab] = useState<"board" | "matrix">("board");
   const [studyTab, setStudyTab] = useState<"topics" | "notes" | "reviews">("topics");
-  const [projectTab, setProjectTab] = useState<"overview" | "tasks" | "subtasks" | "notes">("overview");
-  const [projectNotes, setProjectNotes] = useState<Record<string, string>>({});
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState("");
   const [toast, setToast] = useState<{ message: string; actionLabel?: string; onAction?: () => void } | null>(null);
-  const [studyModal, setStudyModal] = useState<"" | "topic" | "note">("");
-  const [topicDraft, setTopicDraft] = useState({ name: "", category: "Python" as StudyTopic["category"], description: "" });
-  const [noteDraft, setNoteDraft] = useState({
-    title: "",
-    topic: "Python",
-    summary: "",
-    difficulty: "unknown" as ConceptNote["difficulty"],
-    nextReviewDate: "",
-  });
-  const [studyTopics, setStudyTopics] = useState<StudyTopic[]>([
-    { id: "topic-python", name: "Python", category: "Python", description: "Coding concepts and LeetCode patterns.", status: "active", color: "#007aff" },
-    { id: "topic-fnirs", name: "fNIRS", category: "fNIRS", description: "Thesis concepts and analysis methods.", status: "active", color: "#af52de" },
-    { id: "topic-research", name: "Research", category: "Research", description: "Methods, theory, and writing.", status: "active", color: "#34c759" },
-    { id: "topic-english", name: "English", category: "English", description: "Academic and presentation English.", status: "active", color: "#ff9500" },
-    { id: "topic-presentation", name: "Presentation", category: "Presentation", description: "Scripts, Q&A, and delivery.", status: "active", color: "#ff2d55" },
-  ]);
-  const [conceptNotes, setConceptNotes] = useState<ConceptNote[]>([
-    {
-      id: "note-gcd",
-      topic: "Python",
-      title: "GCD of Strings",
-      summary: "Use shared divisors of string lengths to test repeated base patterns.",
-      difficulty: "medium",
-      reviewStatus: "due",
-      nextReviewDate: todayValue(),
-      lastReviewedAt: "",
-    },
-    {
-      id: "note-fnirs-connectivity",
-      topic: "fNIRS",
-      title: "fNIRS connectivity",
-      summary: "Connectivity describes functional relationships between measured brain regions.",
-      difficulty: "hard",
-      reviewStatus: "due",
-      nextReviewDate: todayValue(),
-      lastReviewedAt: "",
-    },
-    {
-      id: "note-hbo-hbr",
-      topic: "fNIRS",
-      title: "HbO / HbR",
-      summary: "Oxy- and deoxyhemoglobin signals are interpreted together in fNIRS analysis.",
-      difficulty: "unknown",
-      reviewStatus: "not_scheduled",
-      nextReviewDate: "",
-      lastReviewedAt: "",
-    },
-  ]);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const today = todayValue();
@@ -226,14 +159,14 @@ export default function App() {
   const inProgressTodayTasks = sortTasks(todayBuckets.inProgress);
   const overdueTodayTasks = sortTasks(todayBuckets.overdue);
   const doneTodayTasks = sortTasks(todayBuckets.doneToday);
-  const dueReviewNotes = conceptNotes.filter(
+  const dueReviewNotes = planner.conceptNotes.filter(
     (note) => note.nextReviewDate && note.nextReviewDate <= today && note.reviewStatus !== "mastered",
   );
   const completedToday = planner.tasks.filter((task) => task.completedAt.startsWith(today)).length;
   const completedTasks = activeTasks.filter((task) => task.status === "done");
   const archivedTasks = planner.tasks.filter((task) => task.status === "archived");
-  const inProgressTasks = activeTasks.filter((task) => task.status === "in_progress");
-  const blockedTasks = activeTasks.filter((task) => task.status === "blocked");
+  const inProgressTasks = activeTasks.filter((task) => task.status === "doing");
+  const blockedTasks = activeTasks.filter((task) => task.status === "waiting");
   const currentHabitStreak = Math.max(
     0,
     ...planner.habits.map((habit) => getHabitStreak(habit.id, planner.habitLogs)),
@@ -242,7 +175,7 @@ export default function App() {
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
-      return { tasks: [], projects: [], habits: [] };
+      return { tasks: [], projects: [], topics: [], notes: [] };
     }
 
     return {
@@ -255,11 +188,17 @@ export default function App() {
       projects: activeProjects.filter((project) =>
         [project.name, project.description].join(" ").toLowerCase().includes(query),
       ),
-      habits: planner.habits.filter((habit) =>
-        [habit.name, habit.description].join(" ").toLowerCase().includes(query),
+      topics: planner.studyTopics.filter((topic) =>
+        [topic.name, topic.description, topic.category].join(" ").toLowerCase().includes(query),
+      ),
+      notes: planner.conceptNotes.filter((note) =>
+        [note.title, note.summary, note.content, note.tags.join(" ")]
+          .join(" ")
+          .toLowerCase()
+          .includes(query),
       ),
     };
-  }, [planner.habits, activeProjects, planner.tasks, searchQuery]);
+  }, [activeProjects, planner.conceptNotes, planner.studyTopics, planner.tasks, searchQuery]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -410,31 +349,6 @@ export default function App() {
     reader.readAsText(file);
   }
 
-  function markConceptReviewed(noteId: string, difficulty: ConceptNote["difficulty"]) {
-    const nextReviewDate =
-      difficulty === "hard"
-        ? addDays(today, 1)
-        : difficulty === "medium"
-          ? addDays(today, 3)
-          : difficulty === "easy"
-            ? addDays(today, 7)
-            : "";
-
-    setConceptNotes((current) =>
-      current.map((note) =>
-        note.id === noteId
-          ? {
-              ...note,
-              difficulty,
-              reviewStatus: difficulty === "unknown" ? "mastered" : "reviewed",
-              nextReviewDate,
-              lastReviewedAt: new Date().toISOString(),
-            }
-          : note,
-      ),
-    );
-  }
-
   function showToast(nextToast: { message: string; actionLabel?: string; onAction?: () => void }) {
     setToast(nextToast);
     window.setTimeout(() => {
@@ -466,61 +380,6 @@ export default function App() {
       actionLabel: "Undo",
       onAction: () => planner.restoreProject(projectId),
     });
-  }
-
-  function createStudyTopic() {
-    const name = topicDraft.name.trim();
-    if (!name) {
-      return;
-    }
-
-    setStudyTopics((current) => [
-      ...current,
-      {
-        id: `topic-${crypto.randomUUID()}`,
-        name,
-        category: topicDraft.category,
-        description: topicDraft.description.trim(),
-        status: "active",
-        color: "#007aff",
-      },
-    ]);
-    setNoteDraft((current) => ({ ...current, topic: name }));
-    setTopicDraft({ name: "", category: "Python", description: "" });
-    setStudyModal("");
-    setStudyTab("topics");
-    showToast({ message: "Topic created." });
-  }
-
-  function createConceptNote() {
-    const title = noteDraft.title.trim();
-    if (!title) {
-      return;
-    }
-
-    setConceptNotes((current) => [
-      {
-        id: `note-${crypto.randomUUID()}`,
-        topic: noteDraft.topic,
-        title,
-        summary: noteDraft.summary.trim() || "No summary yet.",
-        difficulty: noteDraft.difficulty,
-        reviewStatus: noteDraft.nextReviewDate ? "due" : "not_scheduled",
-        nextReviewDate: noteDraft.nextReviewDate,
-        lastReviewedAt: "",
-      },
-      ...current,
-    ]);
-    setNoteDraft({
-      title: "",
-      topic: studyTopics[0]?.name ?? "Python",
-      summary: "",
-      difficulty: "unknown",
-      nextReviewDate: "",
-    });
-    setStudyModal("");
-    setStudyTab("notes");
-    showToast({ message: "Note saved." });
   }
 
   function requestDeleteTask(taskId: string) {
@@ -563,6 +422,45 @@ export default function App() {
     setSelectedProjectId("");
     planner.selectTask("");
     showToast({ message: "Project deleted. Tasks were moved to Inbox." });
+  }
+
+  function openTaskInOfficialPage(taskId: string) {
+    const task = planner.tasks.find((item) => item.id === taskId);
+    if (!task) {
+      return;
+    }
+
+    planner.selectTask(taskId);
+    setSearchQuery("");
+
+    if (task.status === "inbox") {
+      setActivePage("inbox");
+      return;
+    }
+
+    if (task.status === "archived" || task.archivedAt) {
+      setActivePage("archive");
+      return;
+    }
+
+    if (task.projectId) {
+      setSelectedProjectId(task.projectId);
+      setIsProjectDetailOpen(true);
+      setActivePage("projects");
+      return;
+    }
+
+    setActivePage("planning");
+  }
+
+  function openStudyResult(note?: ConceptNote) {
+    if (note) {
+      setStudyTab(note.nextReviewDate ? "reviews" : "notes");
+    } else {
+      setStudyTab("topics");
+    }
+    setActivePage("study");
+    setSearchQuery("");
   }
 
   function renderTaskDetail() {
@@ -960,7 +858,6 @@ export default function App() {
           taskDetail={renderTaskDetail()}
           selectedProjectId={selectedProjectId}
           detailOpen={isProjectDetailOpen}
-          projectNotes={projectNotes}
           onOpenProject={(id) => {
             setSelectedProjectId(id);
             setIsProjectDetailOpen(true);
@@ -979,7 +876,7 @@ export default function App() {
           onToggleStar={planner.toggleProjectPinned}
           onArchiveProject={handleArchiveProject}
           onRequestDeleteProject={requestDeleteProject}
-          onSaveNotes={(id, value) => setProjectNotes((current) => ({ ...current, [id]: value }))}
+          onSaveNotes={(id, value) => planner.updateProject(id, { notes: value })}
           showToast={showToast}
         />
       );
@@ -1066,21 +963,15 @@ export default function App() {
             inputRef={searchInputRef}
             results={searchResults}
             onChange={setSearchQuery}
-            onSelectTask={(taskId) => {
-              planner.selectTask(taskId);
-              setActivePage("tasks");
-              setSearchQuery("");
-            }}
+            onSelectTask={openTaskInOfficialPage}
             onSelectProject={(projectId) => {
               setSelectedProjectId(projectId);
               setIsProjectDetailOpen(true);
               setActivePage("projects");
               setSearchQuery("");
             }}
-            onSelectHabit={() => {
-              setActivePage("habits");
-              setSearchQuery("");
-            }}
+            onSelectTopic={() => openStudyResult()}
+            onSelectNote={openStudyResult}
           />
         }
       />
@@ -1108,102 +999,6 @@ export default function App() {
               <button onClick={() => setPendingDeleteProjectId("")}>Cancel</button>
               <button className="danger-button-inline" onClick={confirmDeleteProject}>
                 Delete Project
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-      {studyModal ? (
-        <div className="modal-backdrop" role="presentation">
-          <section className="confirm-modal study-modal" role="dialog" aria-modal="true" aria-labelledby="study-modal-title">
-            <h2 id="study-modal-title">{studyModal === "topic" ? "New Topic" : "New Note"}</h2>
-            {studyModal === "topic" ? (
-              <div className="modal-form">
-                <label>
-                  Topic name
-                  <input
-                    value={topicDraft.name}
-                    onChange={(event) => setTopicDraft((current) => ({ ...current, name: event.target.value }))}
-                    autoFocus
-                  />
-                </label>
-                <label>
-                  Category
-                  <select
-                    value={topicDraft.category}
-                    onChange={(event) =>
-                      setTopicDraft((current) => ({ ...current, category: event.target.value as StudyTopic["category"] }))
-                    }
-                  >
-                    {["Python", "fNIRS", "Research", "English", "Presentation", "Other"].map((category) => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Description
-                  <textarea
-                    value={topicDraft.description}
-                    onChange={(event) => setTopicDraft((current) => ({ ...current, description: event.target.value }))}
-                  />
-                </label>
-              </div>
-            ) : (
-              <div className="modal-form">
-                <label>
-                  Title
-                  <input
-                    value={noteDraft.title}
-                    onChange={(event) => setNoteDraft((current) => ({ ...current, title: event.target.value }))}
-                    autoFocus
-                  />
-                </label>
-                <label>
-                  Topic
-                  <select
-                    value={noteDraft.topic}
-                    onChange={(event) => setNoteDraft((current) => ({ ...current, topic: event.target.value }))}
-                  >
-                    {studyTopics.map((topic) => (
-                      <option key={topic.id} value={topic.name}>{topic.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Summary
-                  <textarea
-                    value={noteDraft.summary}
-                    onChange={(event) => setNoteDraft((current) => ({ ...current, summary: event.target.value }))}
-                  />
-                </label>
-                <label>
-                  Difficulty
-                  <select
-                    value={noteDraft.difficulty}
-                    onChange={(event) =>
-                      setNoteDraft((current) => ({ ...current, difficulty: event.target.value as ConceptNote["difficulty"] }))
-                    }
-                  >
-                    <option value="unknown">Unknown</option>
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </label>
-                <label>
-                  Next review
-                  <input
-                    type="date"
-                    value={noteDraft.nextReviewDate}
-                    onChange={(event) => setNoteDraft((current) => ({ ...current, nextReviewDate: event.target.value }))}
-                  />
-                </label>
-              </div>
-            )}
-            <div className="confirm-actions">
-              <button onClick={() => setStudyModal("")}>Cancel</button>
-              <button className="primary-action" onClick={studyModal === "topic" ? createStudyTopic : createConceptNote}>
-                {studyModal === "topic" ? "Create Topic" : "Save Note"}
               </button>
             </div>
           </section>
@@ -1386,17 +1181,23 @@ function SearchBox({
   onChange,
   onSelectTask,
   onSelectProject,
-  onSelectHabit,
+  onSelectTopic,
+  onSelectNote,
 }: {
   query: string;
   inputRef: RefObject<HTMLInputElement>;
-  results: { tasks: Task[]; projects: Project[]; habits: Habit[] };
+  results: { tasks: Task[]; projects: Project[]; topics: StudyTopic[]; notes: ConceptNote[] };
   onChange: (value: string) => void;
   onSelectTask: (taskId: string) => void;
   onSelectProject: (projectId: string) => void;
-  onSelectHabit: (habitId: string) => void;
+  onSelectTopic: (topicId: string) => void;
+  onSelectNote: (note: ConceptNote) => void;
 }) {
-  const hasResults = results.tasks.length > 0 || results.projects.length > 0 || results.habits.length > 0;
+  const hasResults =
+    results.tasks.length > 0 ||
+    results.projects.length > 0 ||
+    results.topics.length > 0 ||
+    results.notes.length > 0;
 
   return (
     <div className="global-search">
@@ -1413,7 +1214,7 @@ function SearchBox({
           {results.tasks.slice(0, 6).map((task) => (
             <button key={task.id} onClick={() => onSelectTask(task.id)}>
               <strong>{task.title}</strong>
-              <small>Task · {task.tags.join(", ") || "no tags"}</small>
+              <small>Task - {task.status} - {task.tags.join(", ") || "no tags"}</small>
             </button>
           ))}
           {results.projects.slice(0, 4).map((project) => (
@@ -1422,10 +1223,16 @@ function SearchBox({
               <small>Project</small>
             </button>
           ))}
-          {results.habits.slice(0, 4).map((habit) => (
-            <button key={habit.id} onClick={() => onSelectHabit(habit.id)}>
-              <strong>{habit.name}</strong>
-              <small>Habit</small>
+          {results.topics.slice(0, 4).map((topic) => (
+            <button key={topic.id} onClick={() => onSelectTopic(topic.id)}>
+              <strong>{topic.name}</strong>
+              <small>Study topic - {topic.category}</small>
+            </button>
+          ))}
+          {results.notes.slice(0, 4).map((note) => (
+            <button key={note.id} onClick={() => onSelectNote(note)}>
+              <strong>{note.title}</strong>
+              <small>Study note - {note.noteType}</small>
             </button>
           ))}
         </div>

@@ -149,6 +149,7 @@ function normalizeProject(project: Partial<Project>): Project {
     id: project.id ?? createId("project"),
     name: project.name ?? "Untitled project",
     description: project.description ?? "",
+    notes: project.notes ?? "",
     color: project.color ?? "#007AFF",
     type: oneOf(project.type, projectTypes, "project") as ProjectType,
     icon: project.icon,

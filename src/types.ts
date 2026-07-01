@@ -68,6 +68,7 @@ export interface Project {
   id: string;
   name: string;
   description: string;
+  notes?: string;
   color: string;
   type?: ProjectType;
   icon?: string;
