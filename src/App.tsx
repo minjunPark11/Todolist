@@ -1,4 +1,4 @@
-import { ChangeEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { BoardView } from "./components/BoardView";
 import { CalendarView } from "./components/CalendarView";
 import { DashboardView } from "./components/DashboardView";
@@ -462,6 +462,16 @@ export default function App() {
     }
     setActivePage("study");
     setSearchQuery("");
+  }
+
+  if (planner.auth.isConfigured && !planner.auth.isSignedIn) {
+    return (
+      <AuthGate
+        auth={planner.auth}
+        onSignIn={planner.signIn}
+        onSignUp={planner.signUp}
+      />
+    );
   }
 
   function renderTaskDetail() {
@@ -1047,6 +1057,145 @@ export default function App() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AuthGate({
+  auth,
+  onSignIn,
+  onSignUp,
+}: {
+  auth: ReturnType<typeof usePlannerData>["auth"];
+  onSignIn: (email: string, password: string) => Promise<boolean>;
+  onSignUp: (email: string, password: string) => Promise<boolean>;
+}) {
+  const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const isSignUp = mode === "signUp";
+  const canSubmit = Boolean(email.trim()) && password.length >= 6 && !submitting && !auth.isLoading;
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit) {
+      setMessage(password && password.length < 6 ? "비밀번호는 6자 이상 입력해주세요." : "이메일과 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    setSubmitting(true);
+    setMessage("");
+    const success = isSignUp
+      ? await onSignUp(email.trim(), password)
+      : await onSignIn(email.trim(), password);
+    setSubmitting(false);
+
+    if (!success) {
+      setMessage(isSignUp ? "회원가입에 실패했습니다. 입력값을 확인해주세요." : "로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.");
+      return;
+    }
+
+    setMessage(isSignUp ? "회원가입이 완료되었습니다." : "로그인되었습니다.");
+    setPassword("");
+  }
+
+  return (
+    <main className="auth-screen">
+      <section className="auth-card" aria-labelledby="auth-title">
+        <div className="auth-brand">
+          <div className="auth-logo" aria-hidden="true">
+            <span />
+          </div>
+          <h1 id="auth-title">FOCUSFLOW</h1>
+          <p>{isSignUp ? "나만의 집중 공간을 만들어보세요" : "Your day starts here"}</p>
+        </div>
+
+        <form className="auth-gate-form" onSubmit={submit}>
+          <label>
+            이메일
+            <div className="auth-input-wrap">
+              <span aria-hidden="true">M</span>
+              <input
+                type="email"
+                placeholder="이메일을 입력하세요"
+                value={email}
+                autoComplete="email"
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </div>
+          </label>
+
+          <label>
+            비밀번호
+            <div className="auth-input-wrap">
+              <span aria-hidden="true">L</span>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="비밀번호를 입력하세요"
+                value={password}
+                autoComplete={isSignUp ? "new-password" : "current-password"}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <button
+                type="button"
+                className="auth-icon-button"
+                aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 보기"}
+                onClick={() => setShowPassword((visible) => !visible)}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+          </label>
+
+          <div className="auth-options">
+            <label className="auth-check">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(event) => setRemember(event.target.checked)}
+              />
+              로그인 상태 유지
+            </label>
+            <button type="button" className="auth-link" onClick={() => setMessage("비밀번호 찾기는 다음 단계에서 연결할게요.")}>
+              비밀번호 찾기
+            </button>
+          </div>
+
+          <button type="submit" className="auth-submit" disabled={!canSubmit}>
+            {submitting || auth.isLoading ? "처리 중..." : isSignUp ? "회원가입" : "로그인"}
+          </button>
+        </form>
+
+        <div className="auth-divider">
+          <span />
+          <em>또는</em>
+          <span />
+        </div>
+
+        <p className="auth-switch">
+          {isSignUp ? "이미 계정이 있으신가요?" : "계정이 없으신가요?"}{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setMode(isSignUp ? "signIn" : "signUp");
+              setMessage("");
+            }}
+          >
+            {isSignUp ? "로그인" : "회원가입"}
+          </button>
+        </p>
+
+        {message || auth.syncError ? (
+          <p className={auth.syncError ? "auth-message error" : "auth-message"}>
+            {auth.syncError || message}
+          </p>
+        ) : null}
+      </section>
+    </main>
   );
 }
 

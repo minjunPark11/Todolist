@@ -626,7 +626,7 @@ export function usePlannerData() {
       return false;
     }
     setSyncError("");
-    setSyncStatus("Account created. Check email confirmation settings in Supabase if sign-in is blocked.");
+    setSyncStatus("Account created.");
     return true;
   }
 
