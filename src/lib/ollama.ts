@@ -23,7 +23,7 @@ function getOllamaModel() {
   return configured?.trim() || DEFAULT_OLLAMA_MODEL;
 }
 
-export async function askOllamaChat(messages: OllamaChatMessage[]): Promise<string> {
+export async function askOllamaChat(messages: OllamaChatMessage[], contextText?: string): Promise<string> {
   const baseUrl = getOllamaBaseUrl();
   let response: Response;
 
@@ -40,6 +40,7 @@ export async function askOllamaChat(messages: OllamaChatMessage[]): Promise<stri
             content:
               "You are FocusFlow's local AI assistant. Be practical, concise, and helpful. You can discuss planning, studying, coding, and the user's app, but never claim that you changed app data unless the user explicitly asks and a tool actually did it.",
           },
+          ...(contextText ? [{ role: "system", content: contextText }] : []),
           ...messages,
         ],
       }),

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   ConceptNote,
   NoteDifficulty,
@@ -29,15 +29,25 @@ interface StudyPageProps {
   onDeleteNote: (id: string) => void;
   onMarkReviewed: (id: string, difficulty: ReviewDifficulty) => void;
   showToast: (toast: ToastState) => void;
+  // §9.11 / Phase 4: lets Calendar's study-review blocks open a specific note here.
+  focusNoteId?: string;
+  onFocusNoteHandled?: () => void;
 }
 
 export function StudyPage(props: StudyPageProps) {
-  const { topics, notes, tab, onChangeTab } = props;
+  const { topics, notes, tab, onChangeTab, focusNoteId, onFocusNoteHandled } = props;
   const today = todayValue();
   const [topicModal, setTopicModal] = useState(false);
   const [noteEditor, setNoteEditor] = useState<{ mode: "create" | "edit"; note?: ConceptNote } | null>(null);
   const [openNote, setOpenNote] = useState<ConceptNote | null>(null);
   const [topicFilter, setTopicFilter] = useState<string>("all");
+
+  useEffect(() => {
+    if (!focusNoteId) return;
+    const note = notes.find((candidate) => candidate.id === focusNoteId);
+    if (note) setOpenNote(note);
+    onFocusNoteHandled?.();
+  }, [focusNoteId]);
 
   const queue = useMemo(() => getStudyReviewQueue(notes, today), [notes, today]);
   const dueCount = queue.due.length;

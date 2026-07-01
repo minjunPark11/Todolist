@@ -1,73 +1,107 @@
-import { DragEvent, useState } from "react";
-import type { Project, Task } from "../types";
+import { DragEvent, ReactNode, useMemo, useState } from "react";
+import type { ConceptNote, Project, Task, TaskDraft } from "../types";
 import {
   addDays,
   addMonths,
   getDayLabel,
-  getDayNumber,
-  getMonthGrid,
-  getMonthLabel,
   getWeekDays,
   getWeekLabel,
+  getMonthLabel,
   todayValue,
-  type CalendarCell,
 } from "../utils/date";
+import {
+  buildCalendarItems,
+  defaultCalendarLayers,
+  type CalendarItem,
+  type CalendarLayerToggles,
+  type ProjectFilter,
+} from "../utils/calendarItems";
+import { DAY_END, type CalendarDraftBlock } from "../utils/calendarTime";
+import type { ToastState } from "./kit";
+import { CalendarToolbar } from "./calendar/CalendarToolbar";
+import { CalendarLeftSidebar } from "./calendar/CalendarLeftSidebar";
+import { WeekView } from "./calendar/WeekView";
+import { MonthView } from "./calendar/MonthView";
+import { CalendarRightPanel } from "./calendar/CalendarRightPanel";
+import type { NewTaskFormResult } from "./calendar/NewTaskForm";
+import { QuickCreatePopover, type QuickCreateDefaults, type QuickCreateResult } from "./calendar/QuickCreatePopover";
+
+type CalendarMode = "month" | "week" | "day";
 
 interface CalendarViewProps {
   tasks: Task[];
   projects: Project[];
+  conceptNotes: ConceptNote[];
   onSelectTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
-}
-
-type CalendarMode = "month" | "week" | "day";
-
-const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const modes: Array<{ id: CalendarMode; label: string }> = [
-  { id: "month", label: "Month" },
-  { id: "week", label: "Week" },
-  { id: "day", label: "Day" },
-];
-
-const DAY_START = 8;
-const DAY_END = 20;
-const SLOT_HEIGHT = 44;
-const hours = Array.from({ length: DAY_END - DAY_START }, (_, index) => DAY_START + index);
-const weekdayShortFormatter = new Intl.DateTimeFormat("en", { weekday: "short" });
-
-function asDate(value: string) {
-  return new Date(`${value}T00:00:00`);
-}
-
-function timeToMinutes(value: string): number | null {
-  if (!value) {
-    return null;
-  }
-  const [hour, minute] = value.split(":").map(Number);
-  return hour * 60 + minute;
+  onCreateTask: (draft: TaskDraft) => string;
+  onOpenProject?: (projectId: string) => void;
+  onOpenStudyReview?: (noteId: string) => void;
+  taskDetail?: ReactNode;
+  showToast?: (toast: ToastState) => void;
 }
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
 }
 
-export function CalendarView({ tasks, projects, onSelectTask, onUpdateTask }: CalendarViewProps) {
-  const [mode, setMode] = useState<CalendarMode>("month");
+export function CalendarView({
+  tasks,
+  projects,
+  conceptNotes,
+  onSelectTask,
+  onUpdateTask,
+  onCreateTask,
+  onOpenProject,
+  onOpenStudyReview,
+  taskDetail,
+  showToast,
+}: CalendarViewProps) {
+  const [mode, setMode] = useState<CalendarMode>("week");
   const [anchor, setAnchor] = useState(todayValue());
-  const [dragOver, setDragOver] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [layers, setLayers] = useState<CalendarLayerToggles>(defaultCalendarLayers);
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
+  const [dragOverId, setDragOverId] = useState("");
+  const [quickCreate, setQuickCreate] = useState<QuickCreateDefaults | null>(null);
+  // V3 §7/§8: the confirmed draft block. Never written to localStorage/task
+  // list — only createTask() (via handleCreateFromDraft) touches real data.
+  const [draft, setDraft] = useState<CalendarDraftBlock | null>(null);
 
   const today = todayValue();
-  const anchorDate = asDate(anchor);
-  const projectColor = new Map(projects.map((project) => [project.id, project.color]));
-  const unscheduled = tasks.filter((task) => !task.dueDate && task.status !== "done");
+  const anchorDate = new Date(`${anchor}T00:00:00`);
 
-  let label: string;
+  const items = useMemo(
+    () => buildCalendarItems({ tasks, projects, conceptNotes, layers, projectFilter }),
+    [tasks, projects, conceptNotes, layers, projectFilter],
+  );
+
+  const monthPrefix = `${anchorDate.getFullYear()}-${pad(anchorDate.getMonth() + 1)}`;
+  const datesWithItems = useMemo(
+    () => new Set(items.filter((item) => item.date.startsWith(monthPrefix)).map((item) => item.date)),
+    [items, monthPrefix],
+  );
+
+  const unscheduled = tasks.filter(
+    (task) => !task.scheduledDate && task.status !== "done" && task.status !== "archived",
+  );
+
+  const todaySummary = useMemo(() => {
+    const todays = items.filter((item) => item.date === today);
+    return {
+      scheduled: todays.filter((item) => item.layer === "task").length,
+      deadlines: todays.filter((item) => item.layer === "deadline").length,
+      reviews: todays.filter((item) => item.layer === "study-review").length,
+    };
+  }, [items, today]);
+
+  let rangeLabel: string;
   if (mode === "month") {
-    label = getMonthLabel(anchorDate.getFullYear(), anchorDate.getMonth());
+    rangeLabel = getMonthLabel(anchorDate.getFullYear(), anchorDate.getMonth());
   } else if (mode === "week") {
-    label = getWeekLabel(anchor);
+    rangeLabel = getWeekLabel(anchor);
   } else {
-    label = getDayLabel(anchor);
+    rangeLabel = getDayLabel(anchor);
   }
 
   function shift(delta: number) {
@@ -80,6 +114,27 @@ export function CalendarView({ tasks, projects, onSelectTask, onUpdateTask }: Ca
     }
   }
 
+  function toggleLayer(key: keyof CalendarLayerToggles) {
+    setLayers((current) => ({ ...current, [key]: !current[key] }));
+  }
+
+  function toggleProjectFilter(projectId: string) {
+    setProjectFilter((current) => {
+      if (current === "all") {
+        const next = new Set(projects.map((project) => project.id));
+        next.delete(projectId);
+        return next;
+      }
+      const next = new Set(current);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next.size === projects.length ? "all" : next;
+    });
+  }
+
   function handleDragStart(event: DragEvent, taskId: string) {
     event.dataTransfer.setData("text/plain", taskId);
     event.dataTransfer.effectAllowed = "move";
@@ -88,265 +143,217 @@ export function CalendarView({ tasks, projects, onSelectTask, onUpdateTask }: Ca
   function over(id: string) {
     return (event: DragEvent) => {
       event.preventDefault();
-      if (dragOver !== id) setDragOver(id);
+      if (dragOverId !== id) setDragOverId(id);
     };
   }
 
   function leave(id: string) {
-    return () => setDragOver((current) => (current === id ? "" : current));
+    return () => setDragOverId((current) => (current === id ? "" : current));
   }
 
-  function dropDate(event: DragEvent, dueDate: string) {
+  // §4.2/D2: drag & drop only ever changes scheduledDate — dueDate (deadline)
+  // markers are non-draggable (WeekView/MonthView never call onDragStart for them).
+  function dropTime(event: DragEvent, day: string, hour: number) {
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain");
     if (taskId) {
-      onUpdateTask(taskId, { dueDate });
-    }
-    setDragOver("");
-  }
-
-  function dropAllDay(event: DragEvent, dueDate: string) {
-    event.preventDefault();
-    const taskId = event.dataTransfer.getData("text/plain");
-    if (taskId) {
-      onUpdateTask(taskId, { dueDate, startTime: "", endTime: "" });
-    }
-    setDragOver("");
-  }
-
-  function dropTime(event: DragEvent, dueDate: string) {
-    event.preventDefault();
-    const taskId = event.dataTransfer.getData("text/plain");
-    if (taskId) {
-      const rect = event.currentTarget.getBoundingClientRect();
-      const offset = event.clientY - rect.top;
-      const hour = Math.min(DAY_END - 1, Math.max(DAY_START, DAY_START + Math.floor(offset / SLOT_HEIGHT)));
       onUpdateTask(taskId, {
-        dueDate,
+        scheduledDate: day,
         startTime: `${pad(hour)}:00`,
         endTime: `${pad(Math.min(hour + 1, DAY_END))}:00`,
       });
     }
-    setDragOver("");
+    setDragOverId("");
+  }
+
+  function dropAllDay(event: DragEvent, day: string) {
+    event.preventDefault();
+    const taskId = event.dataTransfer.getData("text/plain");
+    if (taskId) {
+      onUpdateTask(taskId, { scheduledDate: day, startTime: "", endTime: "" });
+    }
+    setDragOverId("");
+  }
+
+  function dropCell(event: DragEvent, day: string) {
+    event.preventDefault();
+    const taskId = event.dataTransfer.getData("text/plain");
+    if (taskId) {
+      onUpdateTask(taskId, { scheduledDate: day });
+    }
+    setDragOverId("");
   }
 
   function dropUnschedule(event: DragEvent) {
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain");
     if (taskId) {
-      onUpdateTask(taskId, { dueDate: "", startTime: "", endTime: "" });
+      onUpdateTask(taskId, { scheduledDate: "", startTime: "", endTime: "" });
     }
-    setDragOver("");
+    setDragOverId("");
   }
 
-  function renderCell(cell: CalendarCell, cap: number) {
-    const dayTasks = tasks.filter((task) => task.dueDate === cell.date);
-    const classes = ["calendar-cell"];
-    if (!cell.inMonth) classes.push("is-outside");
-    if (cell.date === today) classes.push("is-today");
-    if (cell.date === dragOver) classes.push("is-drop");
-    const visible = cap > 0 ? dayTasks.slice(0, cap) : dayTasks;
-
-    return (
-      <div
-        key={cell.date}
-        className={classes.join(" ")}
-        onDragOver={over(cell.date)}
-        onDragLeave={leave(cell.date)}
-        onDrop={(event) => dropDate(event, cell.date)}
-      >
-        <span className="calendar-date">{getDayNumber(cell.date)}</span>
-        <div className="calendar-chip-list">
-          {visible.map((task) => (
-            <button
-              key={task.id}
-              className={`calendar-chip priority-${task.priority}`}
-              draggable
-              onDragStart={(event) => handleDragStart(event, task.id)}
-              onClick={() => onSelectTask(task.id)}
-            >
-              {task.title}
-            </button>
-          ))}
-          {cap > 0 && dayTasks.length > cap ? (
-            <span className="calendar-more">+{dayTasks.length - cap} more</span>
-          ) : null}
-        </div>
-      </div>
-    );
+  // §12.4: opening any existing item drops a pending draft — the user's
+  // attention has moved on, so the unsaved "new task" attempt is discarded.
+  function selectTaskAndClearDraft(taskId: string) {
+    setDraft(null);
+    onSelectTask(taskId);
   }
 
-  function renderTimeGrid(days: string[]) {
-    return (
-      <div className={mode === "day" ? "time-grid is-day" : "time-grid"}>
-        <div className="time-grid-head">
-          <div className="time-corner" />
-          {days.map((day) => (
-            <div key={day} className={day === today ? "time-col-head is-today" : "time-col-head"}>
-              <span className="tch-weekday">{weekdayShortFormatter.format(asDate(day))}</span>
-              <span className="tch-date">{getDayNumber(day)}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="time-allday-row">
-          <div className="time-corner small">All day</div>
-          {days.map((day) => {
-            const allDay = tasks.filter((task) => task.dueDate === day && !task.startTime);
-            const id = `allday:${day}`;
-            return (
-              <div
-                key={day}
-                className={dragOver === id ? "time-allday-cell is-drop" : "time-allday-cell"}
-                onDragOver={over(id)}
-                onDragLeave={leave(id)}
-                onDrop={(event) => dropAllDay(event, day)}
-              >
-                {allDay.map((task) => (
-                  <button
-                    key={task.id}
-                    className={`calendar-chip priority-${task.priority}`}
-                    draggable
-                    onDragStart={(event) => handleDragStart(event, task.id)}
-                    onClick={() => onSelectTask(task.id)}
-                  >
-                    {task.title}
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="time-grid-body" style={{ height: hours.length * SLOT_HEIGHT }}>
-          <div className="time-gutter">
-            {hours.map((hour) => (
-              <div key={hour} className="time-label" style={{ height: SLOT_HEIGHT }}>
-                {hour}:00
-              </div>
-            ))}
-          </div>
-          {days.map((day) => {
-            const timed = tasks.filter((task) => task.dueDate === day && task.startTime);
-            const id = `col:${day}`;
-            return (
-              <div
-                key={day}
-                className={dragOver === id ? "time-col is-drop" : "time-col"}
-                onDragOver={over(id)}
-                onDragLeave={leave(id)}
-                onDrop={(event) => dropTime(event, day)}
-              >
-                {hours.map((hour) => (
-                  <div key={hour} className="time-slot" style={{ height: SLOT_HEIGHT }} />
-                ))}
-                {timed.map((task) => {
-                  const startMin = timeToMinutes(task.startTime);
-                  if (startMin === null) {
-                    return null;
-                  }
-                  const endMin = timeToMinutes(task.endTime) ?? startMin + 60;
-                  const top = ((startMin - DAY_START * 60) / 60) * SLOT_HEIGHT;
-                  const height = Math.max(((endMin - startMin) / 60) * SLOT_HEIGHT, 24);
-                  const color = projectColor.get(task.projectId) ?? "#0066cc";
-                  return (
-                    <button
-                      key={task.id}
-                      className="time-block"
-                      draggable
-                      onDragStart={(event) => handleDragStart(event, task.id)}
-                      onClick={() => onSelectTask(task.id)}
-                      style={{
-                        top,
-                        height,
-                        borderLeft: `3px solid ${color}`,
-                        background: `${color}22`,
-                      }}
-                    >
-                      <span className="tb-time">{task.startTime}</span>
-                      <span className="tb-title">{task.title}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+  function handleClickItem(item: CalendarItem) {
+    setDraft(null);
+    if (item.sourceType === "task") {
+      onSelectTask(item.sourceId);
+    } else if (item.sourceType === "project") {
+      onOpenProject?.(item.sourceId);
+    } else if (item.sourceType === "note") {
+      onOpenStudyReview?.(item.sourceId);
+    }
   }
+
+  function handleQuickCreateSave(result: QuickCreateResult) {
+    if (result.type === "deadline") {
+      onCreateTask({
+        title: result.title,
+        status: "todo",
+        dueDate: result.date,
+        projectId: result.projectId || undefined,
+      });
+    } else {
+      onCreateTask({
+        title: result.title,
+        status: "todo",
+        scheduledDate: result.date,
+        startTime: result.startTime || undefined,
+        endTime: result.endTime || undefined,
+        projectId: result.projectId || undefined,
+      });
+    }
+    setQuickCreate(null);
+  }
+
+  // §2.3/§12.3: any new empty-grid selection replaces a pending draft.
+  function handleSelectionStart() {
+    setDraft(null);
+  }
+
+  function handleDraftCreate(day: string, startTime: string, endTime: string) {
+    setDraft({ date: day, startTime, endTime });
+  }
+
+  function handleCancelDraft() {
+    setDraft(null);
+  }
+
+  // §8/§13.5: the only place a real task gets created from a draft.
+  function handleCreateFromDraft(result: NewTaskFormResult) {
+    if (!draft) return;
+    const taskId = onCreateTask({
+      title: result.title,
+      status: "todo",
+      scheduledDate: draft.date,
+      startTime: draft.startTime,
+      endTime: draft.endTime,
+      dueDate: result.dueDate || undefined,
+      projectId: result.projectId || undefined,
+    });
+    setDraft(null);
+    onSelectTask(taskId);
+    showToast?.({ message: `Created "${result.title}"` });
+  }
+
+  const days = mode === "day" ? [anchor] : getWeekDays(anchor);
 
   return (
-    <div className="calendar-layout">
-      <section className="calendar-main">
-        <div className="calendar-toolbar">
-          <div className="calendar-modes">
-            {modes.map((option) => (
-              <button
-                key={option.id}
-                className={mode === option.id ? "active" : ""}
-                onClick={() => setMode(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <h2>{label}</h2>
-          <div className="calendar-nav">
-            <button onClick={() => shift(-1)} aria-label="Previous">
-              ‹
-            </button>
-            <button onClick={() => setAnchor(today)}>Today</button>
-            <button onClick={() => shift(1)} aria-label="Next">
-              ›
-            </button>
-          </div>
-        </div>
+    <div className="gcal-shell">
+      <CalendarToolbar
+        mode={mode}
+        rangeLabel={rangeLabel}
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        onModeChange={setMode}
+        onToday={() => setAnchor(today)}
+        onPrev={() => shift(-1)}
+        onNext={() => shift(1)}
+      />
 
-        {mode === "month" ? (
-          <>
-            <div className="calendar-weekdays">
-              {weekdays.map((day) => (
-                <span key={day}>{day}</span>
-              ))}
-            </div>
-            <div className="calendar-grid mode-month">
-              {getMonthGrid(anchorDate.getFullYear(), anchorDate.getMonth()).map((cell) =>
-                renderCell(cell, 3),
-              )}
-            </div>
-          </>
-        ) : (
-          renderTimeGrid(mode === "week" ? getWeekDays(anchor) : [anchor])
-        )}
-      </section>
+      <div className="gcal-body">
+        {!sidebarCollapsed ? (
+          <CalendarLeftSidebar
+            anchor={anchor}
+            datesWithItems={datesWithItems}
+            onSelectDate={setAnchor}
+            layers={layers}
+            onToggleLayer={toggleLayer}
+            projects={projects}
+            projectFilter={projectFilter}
+            onToggleProject={toggleProjectFilter}
+            onSelectAllProjects={() => setProjectFilter("all")}
+            onCreateClick={() =>
+              setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
+            }
+          />
+        ) : null}
 
-      <aside
-        className={dragOver === "unscheduled" ? "calendar-backlog is-drop" : "calendar-backlog"}
-        onDragOver={over("unscheduled")}
-        onDragLeave={leave("unscheduled")}
-        onDrop={dropUnschedule}
-      >
-        <div className="calendar-backlog-header">
-          <h2>Unscheduled</h2>
-          <span>{unscheduled.length}</span>
+        <div className="gcal-main-column">
+          <section className="gcal-main">
+            {mode === "month" ? (
+              <MonthView
+                anchor={anchor}
+                items={items}
+                dragOverId={dragOverId}
+                onDragStart={handleDragStart}
+                onOverCell={over}
+                onLeaveCell={leave}
+                onDropCell={dropCell}
+                onClickItem={handleClickItem}
+                onClickCell={(date) => setQuickCreate({ date, allDay: true })}
+              />
+            ) : (
+              <WeekView
+                days={days}
+                items={items}
+                dragOverId={dragOverId}
+                onDragStart={handleDragStart}
+                onOverSlot={over}
+                onLeaveSlot={leave}
+                onDropTime={dropTime}
+                onDropAllDay={dropAllDay}
+                onClickItem={handleClickItem}
+                onClickAllDaySlot={(day) => setQuickCreate({ date: day, allDay: true })}
+                draft={draft}
+                onSelectionStart={handleSelectionStart}
+                onDraftCreate={handleDraftCreate}
+              />
+            )}
+          </section>
+
+          <CalendarRightPanel
+            draft={draft}
+            taskDetail={taskDetail}
+            unscheduled={unscheduled}
+            todaySummary={todaySummary}
+            projects={projects}
+            dragOverUnscheduled={dragOverId === "unscheduled"}
+            onDragOverUnscheduled={over("unscheduled")}
+            onDragLeaveUnscheduled={leave("unscheduled")}
+            onDropUnscheduled={dropUnschedule}
+            onCancelDraft={handleCancelDraft}
+            onCreateFromDraft={handleCreateFromDraft}
+            onSelectTask={selectTaskAndClearDraft}
+            onDragStartTask={handleDragStart}
+          />
         </div>
-        <p className="calendar-hint">Drag a task onto a day or time slot to schedule it.</p>
-        <div className="calendar-backlog-list">
-          {unscheduled.length === 0 ? <p className="empty-state">Nothing to schedule.</p> : null}
-          {unscheduled.map((task) => (
-            <button
-              key={task.id}
-              className={`calendar-backlog-item priority-${task.priority}`}
-              draggable
-              onDragStart={(event) => handleDragStart(event, task.id)}
-              onClick={() => onSelectTask(task.id)}
-            >
-              {task.title}
-            </button>
-          ))}
-        </div>
-      </aside>
+      </div>
+
+      {quickCreate ? (
+        <QuickCreatePopover
+          defaults={quickCreate}
+          projects={projects}
+          onClose={() => setQuickCreate(null)}
+          onSave={handleQuickCreateSave}
+        />
+      ) : null}
     </div>
   );
 }

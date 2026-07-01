@@ -1,5 +1,7 @@
 import { FormEvent, KeyboardEvent, useMemo, useRef, useState } from "react";
 import { askOllamaChat, type OllamaChatMessage } from "../lib/ollama";
+import { buildCalendarContextText, type CalendarContextInput } from "../lib/calendarContext";
+import type { PageId } from "../types";
 
 type ChatMessage = OllamaChatMessage & {
   id: string;
@@ -13,7 +15,12 @@ function createMessage(role: ChatMessage["role"], content: string): ChatMessage 
   };
 }
 
-export function OllamaChat() {
+interface OllamaChatProps {
+  activePage?: PageId;
+  calendarContext?: CalendarContextInput;
+}
+
+export function OllamaChat({ activePage, calendarContext }: OllamaChatProps = {}) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     createMessage("assistant", "Hi, I'm your local Ollama assistant. Ask me anything."),
@@ -27,6 +34,11 @@ export function OllamaChat() {
     () => messages.map(({ role, content }) => ({ role, content })),
     [messages],
   );
+
+  const contextText = useMemo(() => {
+    if (activePage !== "calendar" || !calendarContext) return undefined;
+    return buildCalendarContextText(calendarContext);
+  }, [activePage, calendarContext]);
 
   function toggleOpen() {
     setOpen((currentOpen) => {
@@ -52,7 +64,7 @@ export function OllamaChat() {
     setLoading(true);
 
     try {
-      const reply = await askOllamaChat([...chatHistory, { role: "user", content }]);
+      const reply = await askOllamaChat([...chatHistory, { role: "user", content }], contextText);
       setMessages((current) => [...current, createMessage("assistant", reply)]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ollama chat failed.");

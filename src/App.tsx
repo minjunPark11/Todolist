@@ -138,6 +138,7 @@ export default function App() {
   const [isProjectDetailOpen, setIsProjectDetailOpen] = useState(false);
   const [planningTab, setPlanningTab] = useState<"board" | "matrix">("board");
   const [studyTab, setStudyTab] = useState<"topics" | "notes" | "reviews">("topics");
+  const [studyFocusNoteId, setStudyFocusNoteId] = useState("");
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState("");
   const [toast, setToast] = useState<{ message: string; actionLabel?: string; onAction?: () => void } | null>(null);
@@ -465,6 +466,26 @@ export default function App() {
     setSearchQuery("");
   }
 
+  // Phase 4 (CALENDAR_DESIGN.md §9.11): Calendar's study-review blocks route
+  // here to open a specific ConceptNote inside StudyPage.
+  function openStudyReviewFromCalendar(noteId: string) {
+    const note = planner.conceptNotes.find((candidate) => candidate.id === noteId);
+    setStudyTab(note?.nextReviewDate ? "reviews" : "notes");
+    setStudyFocusNoteId(noteId);
+    setActivePage("study");
+  }
+
+  function openProjectFromCalendar(projectId: string) {
+    setSelectedProjectId(projectId);
+    setIsProjectDetailOpen(true);
+    setActivePage("projects");
+  }
+
+  function viewTaskInCalendar(taskId: string) {
+    planner.selectTask(taskId);
+    setActivePage("calendar");
+  }
+
   if (planner.auth.isConfigured && !planner.auth.isSignedIn) {
     return (
       <AuthGate
@@ -524,6 +545,7 @@ export default function App() {
             onDuplicateTask={handleDuplicateTask}
             onRequestDelete={requestDeleteTask}
             showToast={showToast}
+            onViewInCalendar={viewTaskInCalendar}
           />
           {renderTaskDetail()}
         </section>
@@ -757,6 +779,8 @@ export default function App() {
             onDeleteNote={planner.deleteNote}
             onMarkReviewed={planner.markNoteReviewed}
             showToast={showToast}
+            focusNoteId={studyFocusNoteId}
+            onFocusNoteHandled={() => setStudyFocusNoteId("")}
           />
         </section>
       );
@@ -803,21 +827,19 @@ export default function App() {
 
     if (activePage === "calendar") {
       return (
-        <section className="content-stack">
-          <header className="page-header">
-            <h1>Calendar</h1>
-            <div className="legend">
-              <span className="danger">overdue</span>
-              <span className="accent">today</span>
-              <span className="soft">this week</span>
-            </div>
-          </header>
-            <CalendarView
-              tasks={planner.tasks}
-              projects={planner.projects}
-              onSelectTask={planner.selectTask}
-              onUpdateTask={planner.updateTask}
-            />
+        <section className="gcal-page-shell">
+          <CalendarView
+            tasks={planner.tasks}
+            projects={activeProjects}
+            conceptNotes={planner.conceptNotes}
+            onSelectTask={planner.selectTask}
+            onUpdateTask={planner.updateTask}
+            onCreateTask={planner.createTask}
+            onOpenProject={openProjectFromCalendar}
+            onOpenStudyReview={openStudyReviewFromCalendar}
+            taskDetail={renderTaskDetail()}
+            showToast={showToast}
+          />
         </section>
       );
     }
@@ -1014,7 +1036,14 @@ export default function App() {
         }
       />
       <main>{renderPage()}</main>
-      <OllamaChat />
+      <OllamaChat
+        activePage={activePage}
+        calendarContext={{
+          tasks: planner.tasks,
+          projects: planner.projects,
+          conceptNotes: planner.conceptNotes,
+        }}
+      />
       {pendingDeleteTaskId ? (
         <div className="modal-backdrop" role="presentation">
           <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-task-title">

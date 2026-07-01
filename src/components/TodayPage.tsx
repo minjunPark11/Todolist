@@ -29,6 +29,7 @@ interface TodayPageProps {
   onDuplicateTask: (id: string) => void;
   onRequestDelete: (id: string) => void;
   showToast: (toast: ToastState) => void;
+  onViewInCalendar?: (taskId: string) => void;
 }
 
 export function TodayPage(props: TodayPageProps) {
@@ -50,6 +51,7 @@ export function TodayPage(props: TodayPageProps) {
     onDuplicateTask,
     onRequestDelete,
     showToast,
+    onViewInCalendar,
   } = props;
 
   const today = todayValue();
@@ -68,6 +70,7 @@ export function TodayPage(props: TodayPageProps) {
 
   const baseMore = (task: Task) => [
     { label: "Open", onClick: () => onOpenTask(task.id) },
+    ...(onViewInCalendar ? [{ label: "View in Calendar", onClick: () => onViewInCalendar(task.id) }] : []),
     { label: "Duplicate", onClick: () => onDuplicateTask(task.id) },
     { separator: true },
     { label: "Archive", onClick: () => onArchiveTask(task.id) },

@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import type { Project, RepeatType, Subtask, Task, TaskLevel, TaskPriority, TaskStatus } from "../types";
+import { todayValue } from "../utils/date";
 
 interface TaskDetailProps {
   task: Task | null;
@@ -88,11 +89,11 @@ export function TaskDetail({
         <h3>Schedule</h3>
         <div className="detail-field-list">
           <label>
-            <span>Due date</span>
+            <span>Scheduled date</span>
             <input
               type="date"
-              value={task.dueDate}
-              onChange={(event) => onUpdateTask(task.id, { dueDate: event.target.value })}
+              value={task.scheduledDate}
+              onChange={(event) => onUpdateTask(task.id, { scheduledDate: event.target.value })}
             />
           </label>
           <label>
@@ -109,6 +110,14 @@ export function TaskDetail({
               type="time"
               value={task.endTime}
               onChange={(event) => onUpdateTask(task.id, { endTime: event.target.value })}
+            />
+          </label>
+          <label>
+            <span>Due date</span>
+            <input
+              type="date"
+              value={task.dueDate}
+              onChange={(event) => onUpdateTask(task.id, { dueDate: event.target.value })}
             />
           </label>
           <label>
@@ -306,6 +315,9 @@ export function TaskDetail({
       <section className="detail-section task-actions-section">
         <h3>Actions</h3>
         <div className="task-action-row">
+          <button onClick={() => onUpdateTask(task.id, { scheduledDate: todayValue() })}>
+            Move to Today
+          </button>
           <button onClick={() => onDuplicateTask(task.id)}>Duplicate</button>
           <button onClick={() => onArchiveTask(task.id)}>Archive</button>
           <button className="danger-button-inline" onClick={() => onRequestDeleteTask(task.id)}>

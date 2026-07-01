@@ -101,15 +101,27 @@ function normalizeTask(task: Partial<Task>): Task {
   const rawStatus = migrateStatus(task.status);
   const rawPrevious = task.previousStatus ? migrateStatus(task.previousStatus) : undefined;
 
+  // CALENDAR_DESIGN.md §1.2/§10.2: startTime/endTime now belong to scheduledDate
+  // (not dueDate). Older records saved by the pre-redesign calendar drag/drop
+  // have a time but no scheduledDate — promote dueDate into scheduledDate so
+  // the timed block keeps showing up. Additive only, and guarded by
+  // `!scheduledDate` so it never re-fires once applied (idempotent).
+  const dueDate = task.dueDate ?? "";
+  const startTime = task.startTime ?? "";
+  let scheduledDate = task.scheduledDate ?? "";
+  if (startTime && !scheduledDate && dueDate) {
+    scheduledDate = dueDate;
+  }
+
   return {
     id: task.id ?? createId("task"),
     title: task.title ?? "Untitled task",
     description: task.description ?? "",
     status: oneOf(rawStatus, taskStatuses, "todo"),
     priority: oneOf(task.priority, taskPriorities, "none"),
-    dueDate: task.dueDate ?? "",
-    scheduledDate: task.scheduledDate ?? "",
-    startTime: task.startTime ?? "",
+    dueDate,
+    scheduledDate,
+    startTime,
     endTime: task.endTime ?? "",
     projectId: task.projectId ?? "",
     parentTaskId: task.parentTaskId ?? "",

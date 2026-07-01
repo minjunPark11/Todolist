@@ -1,0 +1,163 @@
+// Calendar derived-item model (CALENDAR_DESIGN.md §1.3/§1.4).
+// Shared by CalendarView rendering and the Ollama calendar context builder.
+import type { ConceptNote, Project, Task, TaskPriority, TaskStatus } from "../types";
+
+export type CalendarLayer = "task" | "deadline" | "study-review" | "project-deadline";
+
+export interface CalendarLayerToggles {
+  task: boolean;
+  deadline: boolean;
+  studyReview: boolean;
+  projectDeadline: boolean;
+  completed: boolean;
+}
+
+export const defaultCalendarLayers: CalendarLayerToggles = {
+  task: true,
+  deadline: true,
+  studyReview: true,
+  projectDeadline: true,
+  completed: false,
+};
+
+export interface CalendarItem {
+  key: string;
+  layer: CalendarLayer;
+  sourceType: "task" | "project" | "note";
+  sourceId: string;
+  title: string;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  allDay: boolean;
+  color: string;
+  priority?: TaskPriority;
+  status?: TaskStatus;
+  draggable: boolean;
+  repeating?: boolean;
+}
+
+// §9.5: task blocks use project color; other layers use a fixed layer tone.
+const LAYER_COLOR: Record<CalendarLayer, string> = {
+  task: "#0066cc",
+  deadline: "#ff9500",
+  "study-review": "#af52de",
+  "project-deadline": "#ff2d55",
+};
+
+export type ProjectFilter = "all" | Set<string>;
+
+// §9.6: tasks/projects with no project id always show; filter only hides
+// items that belong to a project the user explicitly excluded.
+function projectAllowed(projectId: string, projectFilter: ProjectFilter): boolean {
+  if (!projectId) return true;
+  if (projectFilter === "all") return true;
+  return projectFilter.has(projectId);
+}
+
+export interface BuildCalendarItemsInput {
+  tasks: Task[];
+  projects: Project[];
+  conceptNotes: ConceptNote[];
+  layers: CalendarLayerToggles;
+  projectFilter: ProjectFilter;
+}
+
+export function buildCalendarItems({
+  tasks,
+  projects,
+  conceptNotes,
+  layers,
+  projectFilter,
+}: BuildCalendarItemsInput): CalendarItem[] {
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const items: CalendarItem[] = [];
+
+  for (const task of tasks) {
+    if (task.status === "archived" || task.deletedAt) continue;
+    // Done items only appear when the Completed layer is explicitly on (§9.8).
+    if (task.status === "done" && !layers.completed) continue;
+    if (!projectAllowed(task.projectId, projectFilter)) continue;
+
+    const project = projectById.get(task.projectId);
+    const repeating = task.repeatType !== "none";
+
+    // D1: scheduledDate drives the work-time block; startTime/endTime belong to it.
+    if (layers.task && task.scheduledDate) {
+      items.push({
+        key: `task-block:${task.id}`,
+        layer: "task",
+        sourceType: "task",
+        sourceId: task.id,
+        title: task.title,
+        date: task.scheduledDate,
+        startTime: task.startTime || undefined,
+        endTime: task.endTime || undefined,
+        allDay: !task.startTime,
+        color: project?.color ?? LAYER_COLOR.task,
+        priority: task.priority,
+        status: task.status,
+        draggable: true,
+        repeating,
+      });
+    }
+
+    // D2: dueDate is always an all-day, non-draggable deadline marker.
+    if (layers.deadline && task.dueDate) {
+      items.push({
+        key: `deadline:${task.id}`,
+        layer: "deadline",
+        sourceType: "task",
+        sourceId: task.id,
+        title: task.title,
+        date: task.dueDate,
+        allDay: true,
+        color: LAYER_COLOR.deadline,
+        priority: task.priority,
+        status: task.status,
+        draggable: false,
+        repeating,
+      });
+    }
+  }
+
+  if (layers.projectDeadline) {
+    for (const project of projects) {
+      if (!project.dueDate) continue;
+      if (project.status !== "active" && project.status !== "paused") continue;
+      if (!projectAllowed(project.id, projectFilter)) continue;
+      items.push({
+        key: `proj:${project.id}`,
+        layer: "project-deadline",
+        sourceType: "project",
+        sourceId: project.id,
+        title: project.name,
+        date: project.dueDate,
+        allDay: true,
+        color: project.color || LAYER_COLOR["project-deadline"],
+        draggable: false,
+      });
+    }
+  }
+
+  if (layers.studyReview) {
+    for (const note of conceptNotes) {
+      if (note.deletedAt) continue;
+      if (!note.nextReviewDate) continue;
+      if (note.reviewStatus === "mastered") continue;
+      items.push({
+        key: `review:${note.id}`,
+        layer: "study-review",
+        sourceType: "note",
+        sourceId: note.id,
+        title: note.title,
+        date: note.nextReviewDate,
+        allDay: true,
+        color: LAYER_COLOR["study-review"],
+        draggable: false,
+      });
+    }
+  }
+
+  return items;
+}

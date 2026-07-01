@@ -1423,6 +1423,835 @@ textarea {
   cursor: grabbing;
 }
 
+/* ============================================================================
+   Google-Calendar-style Week Planner (CALENDAR_DESIGN.md)
+   ============================================================================ */
+
+.gcal-page-shell {
+  min-width: 0;
+}
+
+.gcal-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.gcal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 4px;
+}
+
+.gcal-toolbar-left,
+.gcal-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gcal-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--rounded-pill);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 0.95rem;
+}
+
+.gcal-icon-btn:hover:not(:disabled) {
+  background: var(--color-canvas-parchment);
+}
+
+.gcal-icon-btn:disabled {
+  color: var(--color-ink-muted-48);
+  cursor: default;
+}
+
+.gcal-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-right: 4px;
+}
+
+.gcal-today-btn {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-sm);
+  padding: 6px 14px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-weight: 400;
+}
+
+.gcal-nav {
+  display: flex;
+  gap: 2px;
+}
+
+.gcal-nav button {
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  border-radius: var(--rounded-pill);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 1rem;
+}
+
+.gcal-nav button:hover {
+  background: var(--color-canvas-parchment);
+}
+
+.gcal-range-label {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 400;
+}
+
+.gcal-modes {
+  display: inline-flex;
+  gap: 4px;
+  border-radius: var(--rounded-pill);
+  padding: 3px;
+  background: var(--color-canvas-parchment);
+}
+
+.gcal-modes button {
+  border: 0;
+  border-radius: var(--rounded-pill);
+  padding: 6px 14px;
+  color: var(--color-ink);
+  background: transparent;
+  font-weight: 400;
+}
+
+.gcal-modes button.active {
+  color: var(--color-on-dark);
+  background: var(--color-ink);
+}
+
+.gcal-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* --- Left sidebar: create, mini month, layers, project filters --- */
+
+.gcal-sidebar {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.gcal-create-btn {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-pill);
+  padding: 10px 18px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
+  justify-self: start;
+}
+
+.gcal-create-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.gcal-mini-month {
+  display: grid;
+  gap: 6px;
+}
+
+.gcal-mini-month-head {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-ink-muted-80);
+}
+
+.gcal-mini-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.gcal-mini-weekday {
+  text-align: center;
+  font-size: 0.62rem;
+  color: var(--color-ink-muted-48);
+  padding-bottom: 2px;
+}
+
+.gcal-mini-day {
+  position: relative;
+  border: 0;
+  border-radius: var(--rounded-pill);
+  aspect-ratio: 1;
+  min-height: 24px;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 0.72rem;
+}
+
+.gcal-mini-day:hover {
+  background: var(--color-canvas-parchment);
+}
+
+.gcal-mini-day.is-outside {
+  color: var(--color-ink-muted-48);
+}
+
+.gcal-mini-day.is-today {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.gcal-mini-day.is-selected {
+  background: var(--color-primary);
+  color: var(--color-on-dark);
+}
+
+.gcal-mini-dot {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.gcal-sidebar-section {
+  display: grid;
+  gap: 6px;
+}
+
+.gcal-sidebar-section h3 {
+  margin: 0 0 2px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-ink-muted-48);
+}
+
+.gcal-layer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  color: var(--color-ink);
+}
+
+.gcal-project-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* --- Main column: month/week/day view + unscheduled backlog --- */
+
+.gcal-main-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+  min-width: 0;
+}
+
+.gcal-main {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-lg);
+  padding: 12px;
+  background: var(--color-canvas);
+  overflow: auto;
+}
+
+/* Month view */
+
+.gcal-month-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.gcal-month-weekdays span {
+  color: var(--color-ink-muted-48);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.gcal-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.gcal-month-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 104px;
+  border: 1px solid var(--color-divider-soft);
+  border-radius: var(--rounded-sm);
+  padding: 8px 6px 6px;
+  background: var(--color-canvas);
+}
+
+.gcal-month-cell.is-outside {
+  background: var(--color-canvas-parchment);
+}
+
+.gcal-month-cell.is-outside .gcal-month-date {
+  color: var(--color-body-muted);
+}
+
+.gcal-month-cell.is-today {
+  border-color: var(--color-primary);
+}
+
+.gcal-month-cell.is-today .gcal-month-date {
+  color: var(--color-on-dark);
+  background: var(--color-primary);
+}
+
+.gcal-month-cell.is-drop {
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+
+.gcal-month-date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  min-width: 22px;
+  height: 22px;
+  border-radius: var(--rounded-pill);
+  padding: 0 5px;
+  color: var(--color-ink-muted-80);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.gcal-month-chip-list {
+  display: grid;
+  gap: 4px;
+}
+
+.gcal-month-more {
+  color: var(--color-ink-muted-48);
+  font-size: 0.7rem;
+  padding-left: 2px;
+}
+
+/* Shared chip styling (month cells + all-day row) */
+
+.gcal-chip {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: var(--rounded-xs);
+  padding: 3px 6px;
+  color: var(--color-ink);
+  background: var(--color-primary-tint);
+  font-size: 0.76rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: grab;
+}
+
+.gcal-chip:disabled,
+.gcal-chip[draggable="false"] {
+  cursor: pointer;
+}
+
+.gcal-chip.gcal-chip-deadline {
+  background: var(--warning-soft);
+  color: #b5650b;
+  border-left-color: var(--warning);
+  cursor: pointer;
+}
+
+.gcal-chip.gcal-chip-study-review {
+  background: var(--purple-soft);
+  color: var(--purple);
+  border-left-color: var(--purple);
+  cursor: pointer;
+}
+
+.gcal-chip.gcal-chip-project-deadline {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-left-color: var(--danger);
+  cursor: pointer;
+}
+
+.gcal-chip.is-repeating {
+  font-style: italic;
+}
+
+/* Week/Day time grid */
+
+.gcal-timegrid {
+  display: grid;
+  gap: 0;
+}
+
+.gcal-timegrid-head {
+  display: grid;
+  grid-template-columns: 56px repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid var(--color-divider-soft);
+}
+
+.gcal-timegrid.is-day .gcal-timegrid-head,
+.gcal-timegrid.is-day .gcal-allday-row,
+.gcal-timegrid.is-day .gcal-timegrid-body {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
+.gcal-time-corner {
+  border-right: 1px solid var(--color-divider-soft);
+}
+
+.gcal-time-corner.small {
+  display: flex;
+  align-items: center;
+  font-size: 0.68rem;
+  color: var(--color-ink-muted-48);
+  padding: 4px 6px;
+}
+
+.gcal-col-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  gap: 2px;
+}
+
+.gcal-col-weekday {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--color-ink-muted-48);
+}
+
+.gcal-col-date {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.gcal-col-head.is-today .gcal-col-date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  border-radius: var(--rounded-pill);
+  background: var(--color-primary);
+  color: var(--color-on-dark);
+}
+
+.gcal-allday-row {
+  display: grid;
+  grid-template-columns: 56px repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid var(--color-divider-soft);
+  min-height: 32px;
+}
+
+.gcal-allday-cell {
+  display: grid;
+  gap: 3px;
+  padding: 3px;
+  border-left: 1px solid var(--color-divider-soft);
+  cursor: pointer;
+}
+
+.gcal-allday-cell.is-drop {
+  background: var(--color-primary-tint);
+}
+
+.gcal-timegrid-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px repeat(7, minmax(0, 1fr));
+}
+
+.gcal-time-gutter {
+  border-right: 1px solid var(--color-divider-soft);
+}
+
+.gcal-time-label {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 0 6px;
+  transform: translateY(-7px);
+  font-size: 0.68rem;
+  color: var(--color-ink-muted-48);
+}
+
+.gcal-time-col {
+  position: relative;
+  border-left: 1px solid var(--color-divider-soft);
+  touch-action: none;
+}
+
+.gcal-time-col.is-drop {
+  background: var(--color-primary-tint);
+}
+
+.gcal-time-slot {
+  border-bottom: 1px solid var(--color-divider-soft);
+  cursor: crosshair;
+}
+
+.gcal-empty-hint {
+  position: absolute;
+  top: 40%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: var(--color-ink-muted-48);
+  font-size: 0.86rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.gcal-selection-block {
+  position: absolute;
+  left: 2%;
+  width: 96%;
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--rounded-xs);
+  background: var(--color-primary-tint);
+  padding: 4px 6px;
+  font-size: 0.72rem;
+  color: var(--color-primary);
+  pointer-events: none;
+  z-index: 25;
+}
+
+.gcal-draft-block {
+  position: absolute;
+  left: 2%;
+  width: 96%;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1.5px dashed var(--color-primary);
+  border-radius: var(--rounded-xs);
+  background: var(--color-primary-tint);
+  padding: 4px 6px;
+  z-index: 26;
+  overflow: hidden;
+}
+
+.gcal-draft-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.gcal-draft-time {
+  font-size: 0.7rem;
+  color: var(--color-primary);
+}
+
+.gcal-time-slot:hover {
+  background: var(--color-canvas-parchment);
+}
+
+.gcal-time-block {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 0;
+  border-radius: var(--rounded-xs);
+  padding: 3px 6px;
+  overflow: hidden;
+  text-align: left;
+  color: var(--color-ink);
+  cursor: grab;
+  box-shadow: var(--shadow-card);
+}
+
+.gcal-tb-time {
+  font-size: 0.66rem;
+  color: var(--color-ink-muted-48);
+}
+
+.gcal-tb-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gcal-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1.5px solid var(--danger);
+  z-index: 20;
+}
+
+.gcal-now-dot {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.gcal-now-time {
+  position: absolute;
+  left: 4px;
+  top: -16px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--danger);
+  background: var(--color-canvas);
+  padding: 0 3px;
+}
+
+/* Right panel (V3 §1: replaces the old backlog aside + global TaskDetail split) */
+
+.gcal-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+
+.gcal-panel-summary {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-lg);
+  padding: 14px;
+  background: var(--color-canvas);
+  gap: 16px;
+}
+
+.gcal-panel-summary-header h2 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+}
+
+.gcal-summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--color-ink-muted-80);
+}
+
+.gcal-summary-stats span {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-pill);
+  padding: 3px 9px;
+}
+
+/* New task form */
+
+.gcal-newtask-form {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-lg);
+  padding: 14px;
+  background: var(--color-canvas);
+}
+
+.gcal-newtask-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gcal-newtask-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.gcal-newtask-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--color-ink-muted-80);
+}
+
+.gcal-newtask-form input,
+.gcal-newtask-form select {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-sm);
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.gcal-newtask-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.78rem;
+}
+
+.gcal-newtask-when {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px dashed var(--color-primary);
+  border-radius: var(--rounded-sm);
+  padding: 8px 10px;
+  background: var(--color-primary-tint);
+  font-size: 0.86rem;
+  color: var(--color-primary);
+}
+
+.gcal-newtask-when-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: var(--color-ink-muted-48);
+}
+
+.gcal-newtask-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Unscheduled backlog */
+
+.gcal-backlog {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-lg);
+  padding: 14px;
+  background: var(--color-canvas);
+}
+
+.gcal-backlog.is-drop {
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+
+.gcal-backlog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gcal-backlog-header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.gcal-backlog-header span {
+  color: var(--color-ink-muted-48);
+  font-weight: 600;
+}
+
+.gcal-hint {
+  margin: 0;
+  color: var(--color-ink-muted-48);
+  font-size: 0.78rem;
+}
+
+.gcal-backlog-list {
+  display: grid;
+  gap: 8px;
+}
+
+.gcal-backlog-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-sm);
+  padding: 8px 10px;
+  color: var(--color-ink);
+  background: var(--color-canvas);
+  font-size: 0.84rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: grab;
+}
+
+.gcal-backlog-item:active {
+  cursor: grabbing;
+}
+
+.gcal-backlog-due {
+  font-size: 0.7rem;
+  color: var(--warning);
+}
+
+/* Quick create popover form */
+
+.gcal-quick-create-form {
+  display: grid;
+  gap: 12px;
+}
+
+.gcal-quick-create-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--color-ink-muted-80);
+}
+
+.gcal-quick-create-form input,
+.gcal-quick-create-form select {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-sm);
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+@media (max-width: 900px) {
+  .gcal-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gcal-sidebar {
+    display: none;
+  }
+
+  .gcal-main-column {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .board-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(220px, 1fr));

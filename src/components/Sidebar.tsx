@@ -18,7 +18,16 @@ interface SidebarProps {
   search: ReactNode;
 }
 
-type IconName = "inbox" | "today" | "projects" | "planning" | "study" | "archive" | "settings" | "gear";
+type IconName =
+  | "inbox"
+  | "today"
+  | "calendar"
+  | "projects"
+  | "planning"
+  | "study"
+  | "archive"
+  | "settings"
+  | "gear";
 
 function Icon({ name }: { name: IconName }) {
   const common = {
@@ -45,6 +54,19 @@ function Icon({ name }: { name: IconName }) {
         <rect x="4" y="5" width="16" height="15" rx="2" />
         <line x1="4" y1="9" x2="20" y2="9" />
         <circle cx="12" cy="14.5" r="2" />
+      </>
+    ),
+    calendar: (
+      <>
+        <rect x="4" y="5" width="16" height="15" rx="2" />
+        <line x1="4" y1="9" x2="20" y2="9" />
+        <line x1="8" y1="3" x2="8" y2="7" />
+        <line x1="16" y1="3" x2="16" y2="7" />
+        <line x1="8" y1="13" x2="8" y2="13.01" />
+        <line x1="12" y1="13" x2="12" y2="13.01" />
+        <line x1="16" y1="13" x2="16" y2="13.01" />
+        <line x1="8" y1="17" x2="8" y2="17.01" />
+        <line x1="12" y1="17" x2="12" y2="17.01" />
       </>
     ),
     projects: (
@@ -120,6 +142,7 @@ export function Sidebar({
   const primaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
     { id: "inbox", label: "Inbox", icon: "inbox", count: inboxCount },
     { id: "today", label: "Today", icon: "today", count: todayCount },
+    { id: "calendar", label: "Calendar", icon: "calendar", count: 0 },
     { id: "projects", label: "Projects", icon: "projects", count: activeProjectCount },
     { id: "planning", label: "Planning", icon: "planning", count: 0 },
     { id: "study", label: "Study", icon: "study", count: dueReviewCount },
