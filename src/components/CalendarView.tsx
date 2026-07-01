@@ -277,23 +277,23 @@ export function CalendarView({
         onNext={() => shift(1)}
       />
 
-      <div className="gcal-body">
-        {!sidebarCollapsed ? (
-          <CalendarLeftSidebar
-            anchor={anchor}
-            datesWithItems={datesWithItems}
-            onSelectDate={setAnchor}
-            layers={layers}
-            onToggleLayer={toggleLayer}
-            projects={projects}
-            projectFilter={projectFilter}
-            onToggleProject={toggleProjectFilter}
-            onSelectAllProjects={() => setProjectFilter("all")}
-            onCreateClick={() =>
-              setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
-            }
-          />
-        ) : null}
+      <div className={sidebarCollapsed ? "gcal-body is-sidebar-rail" : "gcal-body"}>
+        <CalendarLeftSidebar
+          anchor={anchor}
+          datesWithItems={datesWithItems}
+          onSelectDate={setAnchor}
+          layers={layers}
+          onToggleLayer={toggleLayer}
+          projects={projects}
+          projectFilter={projectFilter}
+          onToggleProject={toggleProjectFilter}
+          onSelectAllProjects={() => setProjectFilter("all")}
+          onCreateClick={() =>
+            setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
+          }
+          collapsed={sidebarCollapsed}
+          onExpand={() => setSidebarCollapsed(false)}
+        />
 
         <div className="gcal-main-column">
           <section className="gcal-main">

@@ -13,6 +13,8 @@ interface CalendarLeftSidebarProps {
   onToggleProject: (projectId: string) => void;
   onSelectAllProjects: () => void;
   onCreateClick: () => void;
+  collapsed: boolean;
+  onExpand: () => void;
 }
 
 const LAYER_ITEMS: Array<{ key: keyof CalendarLayerToggles; label: string }> = [
@@ -34,12 +36,42 @@ export function CalendarLeftSidebar({
   onToggleProject,
   onSelectAllProjects,
   onCreateClick,
+  collapsed,
+  onExpand,
 }: CalendarLeftSidebarProps) {
   const today = todayValue();
   const anchorDate = new Date(`${anchor}T00:00:00`);
   const year = anchorDate.getFullYear();
   const month = anchorDate.getMonth();
   const cells = getMonthGrid(year, month);
+
+  // Collapsed: a slim icon rail (expand + create) instead of hiding the
+  // sidebar entirely, so the calendar keeps its left anchor and stays quick
+  // to reopen.
+  if (collapsed) {
+    return (
+      <aside className="gcal-sidebar is-rail">
+        <button
+          type="button"
+          className="gcal-icon-btn"
+          aria-label="Expand sidebar"
+          title="Expand sidebar"
+          onClick={onExpand}
+        >
+          »
+        </button>
+        <button
+          type="button"
+          className="gcal-create-btn is-rail"
+          aria-label="Create"
+          title="Create"
+          onClick={onCreateClick}
+        >
+          +
+        </button>
+      </aside>
+    );
+  }
 
   return (
     <aside className="gcal-sidebar">

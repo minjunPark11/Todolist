@@ -1538,7 +1538,8 @@ textarea {
 
 .gcal-body {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  /* First track sizes to the sidebar itself (220px full, ~48px rail). */
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -1549,6 +1550,27 @@ textarea {
   display: grid;
   gap: 16px;
   align-content: start;
+  width: 220px;
+}
+
+/* Collapsed icon rail */
+.gcal-sidebar.is-rail {
+  width: 48px;
+  gap: 10px;
+  justify-items: center;
+}
+
+.gcal-create-btn.is-rail {
+  width: 36px;
+  height: 36px;
+  min-width: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  line-height: 1;
+  border-radius: 50%;
 }
 
 .gcal-create-btn {
