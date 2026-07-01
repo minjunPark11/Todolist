@@ -1067,7 +1067,7 @@ function AuthGate({
 }: {
   auth: ReturnType<typeof usePlannerData>["auth"];
   onSignIn: (email: string, password: string) => Promise<boolean>;
-  onSignUp: (email: string, password: string) => Promise<boolean>;
+  onSignUp: (email: string, password: string) => Promise<{ ok: boolean; needsEmailConfirmation: boolean }>;
 }) {
   const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
   const [email, setEmail] = useState("");
@@ -1090,17 +1090,22 @@ function AuthGate({
 
     setSubmitting(true);
     setMessage("");
-    const success = isSignUp
+    const result = isSignUp
       ? await onSignUp(email.trim(), password)
-      : await onSignIn(email.trim(), password);
+      : { ok: await onSignIn(email.trim(), password), needsEmailConfirmation: false };
     setSubmitting(false);
 
-    if (!success) {
+    if (!result.ok) {
       setMessage(isSignUp ? "Sign up failed. Please check your details." : "Login failed. Please check your email and password.");
       return;
     }
 
-    setMessage(isSignUp ? "Account created." : "Signed in.");
+    if (result.needsEmailConfirmation) {
+      setMessage("Verification email sent. Please check your inbox, then log in.");
+      setMode("signIn");
+    } else {
+      setMessage(isSignUp ? "Account created." : "Signed in.");
+    }
     setPassword("");
   }
 
@@ -1226,7 +1231,7 @@ function AccountSection({
 }: {
   auth: ReturnType<typeof usePlannerData>["auth"];
   onSignIn: (email: string, password: string) => Promise<boolean>;
-  onSignUp: (email: string, password: string) => Promise<boolean>;
+  onSignUp: (email: string, password: string) => Promise<{ ok: boolean; needsEmailConfirmation: boolean }>;
   onSignOut: () => Promise<void>;
   onUploadLocal: () => Promise<boolean>;
   onRefresh: () => Promise<void>;
@@ -1236,9 +1241,19 @@ function AccountSection({
   const [message, setMessage] = useState("");
 
   async function submit(action: "signIn" | "signUp") {
-    const success = action === "signIn" ? await onSignIn(email, password) : await onSignUp(email, password);
-    setMessage(success ? (action === "signIn" ? "Signed in." : "Account created.") : "Authentication failed.");
-    if (success) {
+    const result = action === "signIn"
+      ? { ok: await onSignIn(email, password), needsEmailConfirmation: false }
+      : await onSignUp(email, password);
+    setMessage(
+      result.ok
+        ? action === "signIn"
+          ? "Signed in."
+          : result.needsEmailConfirmation
+            ? "Verification email sent. Please check your inbox."
+            : "Account created."
+        : "Authentication failed.",
+    );
+    if (result.ok) {
       setPassword("");
     }
   }

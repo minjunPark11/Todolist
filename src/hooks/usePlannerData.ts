@@ -617,17 +617,18 @@ export function usePlannerData() {
   async function signUp(email: string, password: string) {
     if (!supabase) {
       setSyncError("Supabase environment variables are not configured.");
-      return false;
+      return { ok: false, needsEmailConfirmation: false };
     }
 
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data: signUpData, error } = await supabase.auth.signUp({ email, password });
     if (error) {
       setSyncError(error.message);
-      return false;
+      return { ok: false, needsEmailConfirmation: false };
     }
+    const needsEmailConfirmation = !signUpData.session;
     setSyncError("");
-    setSyncStatus("Account created.");
-    return true;
+    setSyncStatus(needsEmailConfirmation ? "Verification email sent. Please check your inbox." : "Account created.");
+    return { ok: true, needsEmailConfirmation };
   }
 
   async function signOut() {
