@@ -52,7 +52,7 @@ AI는 다음을 하지 않는다.
   -> sendAiChat()
   -> ollamaProvider.isAvailable()
   -> ollamaProvider.chat()
-  -> 실패 시 serverProvider.chat()
+  -> 실패 시 remoteOllamaProvider.chat()
   -> 응답 표시
 ```
 
@@ -65,7 +65,7 @@ src/lib/ai/context/buildAiContext.ts
 src/lib/ai/agent/personalAgent.ts
 src/lib/ai/gateway.ts
 src/lib/ai/providers/ollamaProvider.ts
-src/lib/ai/providers/serverProvider.ts
+src/lib/ai/providers/remoteOllamaProvider.ts
 ```
 
 ### 2.2 Local-first fallback 흐름
@@ -74,14 +74,16 @@ AI Gateway는 provider를 이 순서로 시도한다.
 
 ```text
 1. Local Ollama
-2. Server fallback
+2. Remote Ollama fallback (선택, 기본 비활성화)
 ```
 
 구현 위치:
 
 ```ts
-const providers: AiProvider[] = [ollamaProvider, serverProvider];
+const providers: AiProvider[] = [ollamaProvider, remoteOllamaProvider];
 ```
+
+서버(유료/원격 backend) provider는 이 목록에 포함되지 않는다. `serverProvider.ts`는 나중에 필요할 때 붙일 수 있도록 남겨둔 미사용 코드일 뿐, 현재 흐름에서는 호출되지 않는다.
 
 파일:
 
