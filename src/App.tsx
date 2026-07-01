@@ -1079,11 +1079,12 @@ function AuthGate({
 
   const isSignUp = mode === "signUp";
   const canSubmit = Boolean(email.trim()) && password.length >= 6 && !submitting && !auth.isLoading;
+  const authError = formatAuthError(auth.syncError);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit) {
-      setMessage(password && password.length < 6 ? "비밀번호는 6자 이상 입력해주세요." : "이메일과 비밀번호를 입력해주세요.");
+      setMessage(password && password.length < 6 ? "Password must be at least 6 characters." : "Enter your email and password.");
       return;
     }
 
@@ -1095,11 +1096,11 @@ function AuthGate({
     setSubmitting(false);
 
     if (!success) {
-      setMessage(isSignUp ? "회원가입에 실패했습니다. 입력값을 확인해주세요." : "로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.");
+      setMessage(isSignUp ? "Sign up failed. Please check your details." : "Login failed. Please check your email and password.");
       return;
     }
 
-    setMessage(isSignUp ? "회원가입이 완료되었습니다." : "로그인되었습니다.");
+    setMessage(isSignUp ? "Account created." : "Signed in.");
     setPassword("");
   }
 
@@ -1111,17 +1112,17 @@ function AuthGate({
             <span />
           </div>
           <h1 id="auth-title">FOCUSFLOW</h1>
-          <p>{isSignUp ? "나만의 집중 공간을 만들어보세요" : "Your day starts here"}</p>
+          <p>{isSignUp ? "Create your personal focus space" : "Your day starts here"}</p>
         </div>
 
         <form className="auth-gate-form" onSubmit={submit}>
           <label>
-            이메일
+            Email
             <div className="auth-input-wrap">
               <span aria-hidden="true">M</span>
               <input
                 type="email"
-                placeholder="이메일을 입력하세요"
+                placeholder="Enter your email"
                 value={email}
                 autoComplete="email"
                 onChange={(event) => setEmail(event.target.value)}
@@ -1130,12 +1131,12 @@ function AuthGate({
           </label>
 
           <label>
-            비밀번호
+            Password
             <div className="auth-input-wrap">
               <span aria-hidden="true">L</span>
               <input
                 type={showPassword ? "text" : "password"}
-                placeholder="비밀번호를 입력하세요"
+                placeholder="Enter your password"
                 value={password}
                 autoComplete={isSignUp ? "new-password" : "current-password"}
                 onChange={(event) => setPassword(event.target.value)}
@@ -1143,7 +1144,7 @@ function AuthGate({
               <button
                 type="button"
                 className="auth-icon-button"
-                aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 보기"}
+                aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword((visible) => !visible)}
               >
                 {showPassword ? "Hide" : "Show"}
@@ -1158,26 +1159,26 @@ function AuthGate({
                 checked={remember}
                 onChange={(event) => setRemember(event.target.checked)}
               />
-              로그인 상태 유지
+              Keep me signed in
             </label>
-            <button type="button" className="auth-link" onClick={() => setMessage("비밀번호 찾기는 다음 단계에서 연결할게요.")}>
-              비밀번호 찾기
+            <button type="button" className="auth-link" onClick={() => setMessage("Password reset will be connected in a later step.")}>
+              Forgot password
             </button>
           </div>
 
           <button type="submit" className="auth-submit" disabled={!canSubmit}>
-            {submitting || auth.isLoading ? "처리 중..." : isSignUp ? "회원가입" : "로그인"}
+            {submitting || auth.isLoading ? "Processing..." : isSignUp ? "Sign up" : "Log in"}
           </button>
         </form>
 
         <div className="auth-divider">
           <span />
-          <em>또는</em>
+          <em>or</em>
           <span />
         </div>
 
         <p className="auth-switch">
-          {isSignUp ? "이미 계정이 있으신가요?" : "계정이 없으신가요?"}{" "}
+          {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
             type="button"
             onClick={() => {
@@ -1185,18 +1186,34 @@ function AuthGate({
               setMessage("");
             }}
           >
-            {isSignUp ? "로그인" : "회원가입"}
+            {isSignUp ? "Log in" : "Sign up"}
           </button>
         </p>
 
-        {message || auth.syncError ? (
-          <p className={auth.syncError ? "auth-message error" : "auth-message"}>
-            {auth.syncError || message}
+        {message || authError ? (
+          <p className={authError ? "auth-message error" : "auth-message"}>
+            {authError || message}
           </p>
         ) : null}
       </section>
     </main>
   );
+}
+
+function formatAuthError(error: string): string {
+  if (!error) {
+    return "";
+  }
+
+  if (error.includes("Invalid path specified")) {
+    return "Supabase URL is misconfigured. Use the project URL in the form https://...supabase.co.";
+  }
+
+  if (error.toLowerCase().includes("invalid login credentials")) {
+    return "Email or password is incorrect.";
+  }
+
+  return error;
 }
 
 function AccountSection({
