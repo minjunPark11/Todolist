@@ -140,6 +140,7 @@ export default function App() {
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState("");
   const [toast, setToast] = useState<{ message: string; actionLabel?: string; onAction?: () => void } | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const today = todayValue();
@@ -940,10 +941,32 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={mobileMenuOpen ? "app-shell mobile-menu-open" : "app-shell"}>
+      <button
+        type="button"
+        className="mobile-menu-button"
+        aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+        aria-expanded={mobileMenuOpen}
+        onClick={() => setMobileMenuOpen((open) => !open)}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+      {mobileMenuOpen ? (
+        <button
+          type="button"
+          className="mobile-menu-backdrop"
+          aria-label="Close menu"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      ) : null}
       <Sidebar
         activePage={activePage}
-        onNavigate={setActivePage}
+        onNavigate={(page) => {
+          setActivePage(page);
+          setMobileMenuOpen(false);
+        }}
         tasks={planner.tasks}
         projects={activeProjects}
         selectedProjectId={selectedProjectId}
@@ -954,9 +977,13 @@ export default function App() {
           setSelectedProjectId(projectId);
           setIsProjectDetailOpen(true);
           setActivePage("projects");
+          setMobileMenuOpen(false);
         }}
         onAddProject={(name) => planner.addProject(name, "#0066cc")}
-        onOpenSettings={() => setActivePage("settings")}
+        onOpenSettings={() => {
+          setActivePage("settings");
+          setMobileMenuOpen(false);
+        }}
         search={
           <SearchBox
             query={searchQuery}

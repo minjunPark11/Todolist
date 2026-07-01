@@ -203,6 +203,11 @@ button:focus-visible {
   min-height: 100vh;
 }
 
+.mobile-menu-button,
+.mobile-menu-backdrop {
+  display: none;
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -3319,6 +3324,176 @@ main {
   .ff-attention-grid { grid-template-columns: 1fr; }
   .ff-form-grid { grid-template-columns: 1fr; }
   .ff-page { padding: 20px 16px 64px; }
+}
+
+@media (max-width: 860px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-shell {
+    display: block;
+    min-height: 100vh;
+  }
+
+  .mobile-menu-button {
+    position: fixed;
+    z-index: 220;
+    top: 12px;
+    left: 12px;
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 0 10px;
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .mobile-menu-button span {
+    display: block;
+    width: 100%;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--text-primary);
+  }
+
+  .mobile-menu-open .mobile-menu-button span:nth-child(1) {
+    transform: translateY(6px) rotate(45deg);
+  }
+
+  .mobile-menu-open .mobile-menu-button span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .mobile-menu-open .mobile-menu-button span:nth-child(3) {
+    transform: translateY(-6px) rotate(-45deg);
+  }
+
+  .mobile-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 180;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.34);
+  }
+
+  .sidebar {
+    position: fixed;
+    z-index: 210;
+    top: 0;
+    left: 0;
+    width: min(82vw, 320px);
+    max-width: 320px;
+    height: 100dvh;
+    transform: translateX(calc(-100% - 16px));
+    transition: transform var(--motion-base);
+    border-right: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .mobile-menu-open .sidebar {
+    transform: translateX(0);
+  }
+
+  main {
+    width: 100%;
+    padding: 68px clamp(12px, 4vw, 22px) 28px;
+  }
+
+  .page-grid,
+  .page-grid.no-detail,
+  .page-grid.wide-detail,
+  .page-grid.no-detail.wide-detail {
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+    gap: 16px;
+  }
+
+  .detail-panel {
+    position: static;
+    width: 100%;
+    max-height: none;
+    border-left: 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .ff-page {
+    max-width: none;
+    padding: 18px 0 52px;
+    gap: 20px;
+  }
+
+  .ff-page-head,
+  .page-header,
+  .today-list-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ff-page-actions,
+  .today-inline-stats {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .ff-page-title,
+  .page-header h1,
+  .today-list-header h1 {
+    font-size: clamp(1.75rem, 8vw, 2.25rem);
+    line-height: 1.08;
+  }
+
+  .today-board-grid,
+  .planning-columns,
+  .study-metrics,
+  .study-layout,
+  .ff-study-metrics,
+  .ff-project-grid,
+  .ff-topic-grid,
+  .ff-note-grid,
+  .ff-board,
+  .ff-matrix,
+  .ff-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ff-detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ff-detail-panel {
+    border-left: 0;
+    border-top: 1px solid var(--border-subtle);
+    min-height: auto;
+  }
+
+  .quick-add,
+  .filters,
+  .project-form,
+  .ff-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .segmented-tabs,
+  .ff-segmented {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .toast,
+  .ff-toast {
+    left: 12px;
+    right: 12px;
+    bottom: 14px;
+    width: auto;
+    transform: none;
+  }
 }
 
 /* Today section cards */
