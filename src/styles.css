@@ -1739,6 +1739,15 @@ textarea {
   background: var(--color-primary);
 }
 
+.gcal-month-cell.is-selected {
+  border-color: var(--color-primary);
+}
+
+.gcal-month-cell.is-selected .gcal-month-date {
+  color: var(--color-primary);
+  border: 1.5px solid var(--color-primary);
+}
+
 .gcal-month-cell.is-drop {
   border-color: var(--color-primary);
   background: var(--color-primary-tint);
@@ -1884,6 +1893,19 @@ textarea {
   border-radius: var(--rounded-pill);
   background: var(--color-primary);
   color: var(--color-on-dark);
+}
+
+/* Selected (mini-calendar pick) day that isn't today: outlined ring so the
+   main view reflects which date the sidebar has selected. */
+.gcal-col-head.is-selected .gcal-col-date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  border-radius: var(--rounded-pill);
+  border: 1.5px solid var(--color-primary);
+  color: var(--color-primary);
 }
 
 .gcal-allday-row {

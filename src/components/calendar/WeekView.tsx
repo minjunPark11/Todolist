@@ -49,6 +49,7 @@ function heightFor(startMin: number, endMin: number) {
 
 interface WeekViewProps {
   days: string[];
+  anchor: string;
   items: CalendarItem[];
   dragOverId: string;
   onDragStart: (event: DragEvent, itemKey: string) => void;
@@ -65,6 +66,7 @@ interface WeekViewProps {
 
 export function WeekView({
   days,
+  anchor,
   items,
   dragOverId,
   onDragStart,
@@ -157,12 +159,17 @@ export function WeekView({
     <div className={days.length === 1 ? "gcal-timegrid is-day" : "gcal-timegrid"}>
       <div className="gcal-timegrid-head">
         <div className="gcal-time-corner" />
-        {days.map((day) => (
-          <div key={day} className={day === today ? "gcal-col-head is-today" : "gcal-col-head"}>
-            <span className="gcal-col-weekday">{weekdayFormatter.format(asDate(day))}</span>
-            <span className="gcal-col-date">{getDayNumber(day)}</span>
-          </div>
-        ))}
+        {days.map((day) => {
+          const headClasses = ["gcal-col-head"];
+          if (day === today) headClasses.push("is-today");
+          else if (day === anchor) headClasses.push("is-selected");
+          return (
+            <div key={day} className={headClasses.join(" ")}>
+              <span className="gcal-col-weekday">{weekdayFormatter.format(asDate(day))}</span>
+              <span className="gcal-col-date">{getDayNumber(day)}</span>
+            </div>
+          );
+        })}
       </div>
 
       <div className="gcal-allday-row">

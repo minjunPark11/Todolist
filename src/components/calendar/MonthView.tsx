@@ -44,6 +44,7 @@ export function MonthView({
     const classes = ["gcal-month-cell"];
     if (!cell.inMonth) classes.push("is-outside");
     if (cell.date === today) classes.push("is-today");
+    else if (cell.date === anchor) classes.push("is-selected");
     if (cell.date === dragOverId) classes.push("is-drop");
     const visible = dayItems.slice(0, CHIP_CAP);
 

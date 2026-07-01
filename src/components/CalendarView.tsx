@@ -312,6 +312,7 @@ export function CalendarView({
             ) : (
               <WeekView
                 days={days}
+                anchor={anchor}
                 items={items}
                 dragOverId={dragOverId}
                 onDragStart={handleDragStart}
