@@ -166,6 +166,7 @@ export const sampleData: RawPlannerData = {
       endedAt: now,
     },
   ],
+  activeSessionId: "",
   taskTemplates: [
     {
       id: "template-weekly-review",

@@ -1,6 +1,7 @@
-import { DragEvent, ReactNode } from "react";
+import { DragEvent, FormEvent, ReactNode, useMemo, useState } from "react";
 import type { Project, Task } from "../../types";
 import type { CalendarDraftBlock } from "../../utils/calendarTime";
+import type { CalendarLayerToggles, ProjectFilter } from "../../utils/calendarItems";
 import { formatDate } from "../../utils/date";
 import { NewTaskForm, type NewTaskFormResult } from "./NewTaskForm";
 import { useT } from "../../i18n";
@@ -25,11 +26,47 @@ interface CalendarRightPanelProps {
   onCreateFromDraft: (result: NewTaskFormResult) => void;
   onSelectTask: (taskId: string) => void;
   onDragStartTask: (event: DragEvent, taskId: string) => void;
+  onDragEndTask: () => void;
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
+  layerFilters: CalendarLayerToggles;
+  projectFilter: ProjectFilter;
+  currentWeekDays: string[];
+  onOpenScheduleModal: (taskId: string) => void;
+  onQuickAddTask: (title: string) => void;
+  aiStatus: "idle" | "loading" | "preview" | "error";
+  aiPlacementsCount: number;
+  onSuggestSchedule: () => void;
+  onApplySuggestion: () => void;
+  onCancelSuggestion: () => void;
 }
 
-// CALENDAR_V3_DESIGN.md §1: the old 5-column layout (backlog aside + global
-// TaskDetail) collapses into one contextual panel: draft form takes priority
-// over a selected task, which takes priority over the idle summary view.
+type TaskGroup = {
+  id: string;
+  title: string;
+  hint: string;
+  tasks: Task[];
+};
+
+function projectName(task: Task, projects: Project[]) {
+  return projects.find((project) => project.id === task.projectId)?.name ?? "";
+}
+
+function estimateMinutes(task: Task) {
+  const match = `${task.title} ${task.description} ${task.notes}`.match(/(\d+)\s*(m|min|분)/i);
+  if (!match) return 40;
+  return Math.max(10, Math.round(Number(match[1]) / 10) * 10);
+}
+
+function isReviewTask(task: Task, project: string) {
+  const haystack = `${task.title} ${task.description} ${task.tags.join(" ")} ${project}`.toLowerCase();
+  return ["review", "복습", "leetcode", "study", "algorithm"].some((token) => haystack.includes(token));
+}
+
+function isDueThisWeek(task: Task, days: string[]) {
+  return Boolean(task.dueDate && days.includes(task.dueDate));
+}
+
 export function CalendarRightPanel({
   draft,
   taskDetail,
@@ -44,8 +81,77 @@ export function CalendarRightPanel({
   onCreateFromDraft,
   onSelectTask,
   onDragStartTask,
+  onDragEndTask,
+  searchQuery,
+  onSearchChange,
+  layerFilters,
+  projectFilter,
+  currentWeekDays,
+  onOpenScheduleModal,
+  onQuickAddTask,
+  aiStatus,
+  aiPlacementsCount,
+  onSuggestSchedule,
+  onApplySuggestion,
+  onCancelSuggestion,
 }: CalendarRightPanelProps) {
   const { t, lang } = useT();
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [quickTitle, setQuickTitle] = useState("");
+
+  const projectCount = projectFilter === "all" ? projects.length : projectFilter.size;
+  const activeLayers = Object.values(layerFilters).filter(Boolean).length;
+
+  const filtered = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return unscheduled;
+    return unscheduled.filter((task) => {
+      const project = projectName(task, projects);
+      return `${task.title} ${task.description} ${task.notes} ${task.tags.join(" ")} ${project}`
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [projects, searchQuery, unscheduled]);
+
+  const groups = useMemo<TaskGroup[]>(() => {
+    const due: Task[] = [];
+    const review: Task[] = [];
+    const projectWork: Task[] = [];
+    const other: Task[] = [];
+
+    for (const task of filtered) {
+      const project = projectName(task, projects);
+      if (isDueThisWeek(task, currentWeekDays) || task.priority === "high") due.push(task);
+      else if (isReviewTask(task, project)) review.push(task);
+      else if (task.projectId) projectWork.push(task);
+      else other.push(task);
+    }
+
+    return [
+      { id: "deadline", title: "Deadlines & high impact", hint: "Time-sensitive work", tasks: due },
+      { id: "review", title: "Review due", hint: "Study and review items", tasks: review },
+      { id: "project", title: "From spaces", hint: "Project-linked tasks", tasks: projectWork },
+      { id: "other", title: "Inbox & manual", hint: "Everything else", tasks: other },
+    ].filter((group) => group.tasks.length > 0);
+  }, [currentWeekDays, filtered, projects]);
+
+  function toggleGroup(groupId: string) {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
+
+  function submitQuickTask(event: FormEvent) {
+    event.preventDefault();
+    const title = quickTitle.trim();
+    if (!title) return;
+    onQuickAddTask(title);
+    setQuickTitle("");
+  }
+
   if (draft) {
     return (
       <aside className="gcal-panel" data-calendar-interactive="true">
@@ -69,50 +175,133 @@ export function CalendarRightPanel({
   }
 
   return (
-    <aside className="gcal-panel gcal-panel-summary" data-calendar-interactive="true">
-      <div className="gcal-panel-summary-header">
-        <h2>{t("calendar.todaySummary")}</h2>
-        <div className="gcal-summary-stats">
-          <span>{t("calendar.scheduled", { n: todaySummary.scheduled })}</span>
-          <span>{t("calendar.deadlines", { n: todaySummary.deadlines })}</span>
-          <span>{t("calendar.reviews", { n: todaySummary.reviews })}</span>
+    <aside
+      className={dragOverUnscheduled ? "gcal-panel gcal-panel-summary is-drop" : "gcal-panel gcal-panel-summary"}
+      data-calendar-interactive="true"
+      onDragOver={onDragOverUnscheduled}
+      onDragLeave={onDragLeaveUnscheduled}
+      onDrop={onDropUnscheduled}
+    >
+      <div className="gcal-schedule-head">
+        <div>
+          <span className="gcal-panel-kicker">To schedule</span>
+          <h2>Place work on the calendar</h2>
+          <p>
+            {unscheduled.length} unscheduled · {todaySummary.scheduled} today · {todaySummary.deadlines} deadlines
+          </p>
         </div>
+        <button
+          type="button"
+          className="gcal-icon-button"
+          onClick={onSuggestSchedule}
+          disabled={aiStatus === "loading" || unscheduled.length === 0}
+          title="Suggest schedule"
+        >
+          {aiStatus === "loading" ? "..." : "AI"}
+        </button>
       </div>
 
-      <div
-        className={dragOverUnscheduled ? "gcal-backlog is-drop" : "gcal-backlog"}
-        onDragOver={onDragOverUnscheduled}
-        onDragLeave={onDragLeaveUnscheduled}
-        onDrop={onDropUnscheduled}
-      >
-        <div className="gcal-backlog-header">
-          <h2>{t("calendar.unscheduled")}</h2>
-          <span>{unscheduled.length}</span>
-        </div>
-        {unscheduled.length === 0 ? (
-          <p className="gcal-hint">{t("calendar.allClear")}</p>
-        ) : (
-          <div className="gcal-backlog-list">
-            {unscheduled.map((task) => (
-              <button
-                key={task.id}
-                type="button"
-                className={`gcal-backlog-item priority-${task.priority}`}
-                draggable
-                onDragStart={(event) => onDragStartTask(event, task.id)}
-                onClick={() => onSelectTask(task.id)}
-              >
-                {task.title}
-                <span className="gcal-backlog-due">
-                  {task.dueDate
-                    ? t("calendar.dueOn", { date: formatDate(task.dueDate, lang) })
-                    : t("calendar.noDeadline")}
-                </span>
-              </button>
-            ))}
+      {aiStatus === "preview" ? (
+        <div className="gcal-suggestion-bar">
+          <div>
+            <strong>{aiPlacementsCount} suggested placements</strong>
+            <span>Previewed on the week grid.</span>
           </div>
+          <button type="button" onClick={onApplySuggestion}>
+            Apply
+          </button>
+          <button type="button" onClick={onCancelSuggestion}>
+            Cancel
+          </button>
+        </div>
+      ) : null}
+
+      {aiStatus === "error" ? <p className="gcal-alert">No open slots found for the current week.</p> : null}
+
+      <label className="gcal-schedule-search">
+        <span>Search</span>
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Search tasks, spaces, or tags..."
+        />
+      </label>
+
+      <div className="gcal-filter-note">
+        <span>{activeLayers} layers on</span>
+        <span>{projectFilter === "all" ? "All spaces" : `${projectCount} spaces`}</span>
+      </div>
+
+      <div className="gcal-task-groups">
+        {groups.length === 0 ? (
+          <p className="gcal-hint">{searchQuery ? "No matching tasks." : t("calendar.allClear")}</p>
+        ) : (
+          groups.map((group) => {
+            const isCollapsed = collapsed.has(group.id);
+            return (
+              <section key={group.id} className="gcal-task-group">
+                <button type="button" className="gcal-task-group-head" onClick={() => toggleGroup(group.id)}>
+                  <span>{isCollapsed ? "+" : "-"}</span>
+                  <strong>{group.title}</strong>
+                  <small>{group.tasks.length}</small>
+                </button>
+                {!isCollapsed ? (
+                  <div className="gcal-schedule-list">
+                    {group.tasks.map((task) => {
+                      const project = projectName(task, projects);
+                      return (
+                        <article
+                          key={task.id}
+                          className={`gcal-schedule-card priority-${task.priority}`}
+                          draggable
+                          tabIndex={0}
+                          onDragStart={(event) => onDragStartTask(event, task.id)}
+                          onDragEnd={onDragEndTask}
+                          onClick={() => onSelectTask(task.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") onSelectTask(task.id);
+                          }}
+                        >
+                          <span className="gcal-drag-handle">::</span>
+                          <div className="gcal-task-card-main">
+                            <strong>{task.title}</strong>
+                            <span>
+                              {project || "Inbox"}
+                              {task.dueDate ? ` · Due ${formatDate(task.dueDate, lang)}` : " · No deadline"}
+                            </span>
+                          </div>
+                          <span className="gcal-task-duration">{estimateMinutes(task)}m</span>
+                          <button
+                            type="button"
+                            className="gcal-schedule-menu"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onOpenScheduleModal(task.id);
+                            }}
+                            title="Schedule task"
+                          >
+                            +
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </section>
+            );
+          })
         )}
       </div>
+
+      <form className="gcal-quick-add-row" onSubmit={submitQuickTask}>
+        <input
+          value={quickTitle}
+          onChange={(event) => setQuickTitle(event.target.value)}
+          placeholder="Quick add task..."
+        />
+        <button type="submit">Add</button>
+      </form>
     </aside>
   );
 }

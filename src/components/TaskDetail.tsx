@@ -15,6 +15,7 @@ interface TaskDetailProps {
   onAddSubtask: (taskId: string, title: string) => void;
   onToggleSubtask: (subtaskId: string) => void;
   onDeleteSubtask: (subtaskId: string) => void;
+  onClose?: () => void;
 }
 
 const statuses: TaskStatus[] = ["inbox", "todo", "doing", "waiting", "done", "archived"];
@@ -34,6 +35,7 @@ export function TaskDetail({
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
+  onClose,
 }: TaskDetailProps) {
   const { t } = useT();
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -100,6 +102,11 @@ export function TaskDetail({
   return (
     <aside className="detail-panel">
       <div className="detail-handle" />
+      {onClose ? (
+        <button type="button" className="detail-close-button" aria-label="Close task detail" onClick={onClose}>
+          x
+        </button>
+      ) : null}
       <header className="detail-header">
         <input
           className="detail-title-input"
@@ -131,6 +138,7 @@ export function TaskDetail({
             <span>{t("taskDetail.startTime")}</span>
             <input
               type="time"
+              step={600}
               value={task.startTime}
               onChange={(event) => onUpdateTask(task.id, { startTime: event.target.value })}
             />
@@ -139,6 +147,7 @@ export function TaskDetail({
             <span>{t("taskDetail.endTime")}</span>
             <input
               type="time"
+              step={600}
               value={task.endTime}
               onChange={(event) => onUpdateTask(task.id, { endTime: event.target.value })}
             />

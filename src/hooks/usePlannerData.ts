@@ -85,6 +85,8 @@ const REVIEW_INTERVALS: Record<ReviewDifficulty, number | null> = {
 const repeatTypes = ["none", "daily", "weekly", "monthly"] as const;
 const habitFrequencies = ["daily", "weekly"] as const;
 const focusModes = ["focus", "short_break", "long_break"] as const;
+const focusStatuses = ["running", "paused", "completed", "cancelled"] as const;
+const focusSources = ["focus_page", "today_page", "calendar_event", "global_bar"] as const;
 const collectionTables = [
   ["tasks", "tasks"],
   ["projects", "projects"],
@@ -141,6 +143,9 @@ function normalizeTask(task: Partial<Task>): Task {
     importance: oneOf(task.importance, taskLevels, "low"),
     urgency: oneOf(task.urgency, taskLevels, "low"),
     isFocus: Boolean(task.isFocus),
+    actualSeconds: Number.isFinite(task.actualSeconds) ? Number(task.actualSeconds) : 0,
+    activeSessionId: task.activeSessionId ?? "",
+    lastFocusedAt: task.lastFocusedAt ?? "",
     isSomeday: Boolean(task.isSomeday),
     waitingReason: task.waitingReason ?? "",
     waitingFollowUpDate: task.waitingFollowUpDate ?? "",
@@ -225,15 +230,34 @@ function normalizeHabitLog(log: Partial<HabitLog>): HabitLog {
 
 function normalizeFocusSession(session: Partial<FocusSession>): FocusSession {
   const now = new Date().toISOString();
+  const startedAt = session.startedAt ?? session.startAt ?? now;
+  const endedAt = session.endedAt ?? session.endAt ?? "";
+  const accumulatedSeconds =
+    Number.isFinite(session.accumulatedSeconds)
+      ? Number(session.accumulatedSeconds)
+      : Math.max(0, Math.round((session.durationMinutes ?? 0) * 60));
+  const status = session.status ?? (session.completed ? "completed" : "completed");
 
   return {
     id: session.id ?? createId("focus"),
     taskId: session.taskId ?? "",
+    title: session.title ?? "",
     mode: oneOf(session.mode, focusModes, "focus"),
-    durationMinutes: session.durationMinutes ?? 25,
-    completed: Boolean(session.completed),
-    startedAt: session.startedAt ?? now,
-    endedAt: session.endedAt ?? "",
+    status: oneOf(status, focusStatuses, "completed"),
+    durationMinutes: session.durationMinutes ?? Math.max(1, Math.round(accumulatedSeconds / 60)),
+    accumulatedSeconds,
+    completed: session.completed ?? status === "completed",
+    startAt: session.startAt ?? startedAt,
+    endAt: session.endAt ?? endedAt,
+    startedAt,
+    endedAt,
+    pausedAt: session.pausedAt ?? "",
+    source: oneOf(session.source, focusSources, "focus_page"),
+    projectId: session.projectId ?? "",
+    projectName: session.projectName ?? "",
+    focusNote: session.focusNote ?? "",
+    createdAt: session.createdAt ?? startedAt,
+    updatedAt: session.updatedAt ?? now,
   };
 }
 
@@ -362,6 +386,7 @@ function normalizeData(data: RawPlannerData): PlannerData {
     focusSessions: Array.isArray(data.focusSessions)
       ? data.focusSessions.map(normalizeFocusSession)
       : [],
+    activeSessionId: typeof data.activeSessionId === "string" ? data.activeSessionId : "",
     taskTemplates: Array.isArray(data.taskTemplates)
       ? data.taskTemplates.map(normalizeTaskTemplate)
       : [],
@@ -1073,19 +1098,203 @@ export function usePlannerData() {
     completed: boolean,
   ) {
     const now = new Date().toISOString();
+    const task = data.tasks.find((item) => item.id === taskId);
+    const project = data.projects.find((item) => item.id === task?.projectId);
     const session: FocusSession = {
       id: createId("focus"),
       taskId,
+      title: task?.title ?? "",
       mode,
+      status: completed ? "completed" : "running",
       durationMinutes,
+      accumulatedSeconds: completed ? durationMinutes * 60 : 0,
       completed,
+      startAt: startedAt,
+      endAt: completed ? now : "",
       startedAt,
-      endedAt: now,
+      endedAt: completed ? now : "",
+      pausedAt: "",
+      source: "focus_page",
+      projectId: task?.projectId ?? "",
+      projectName: project?.name ?? "",
+      focusNote: "",
+      createdAt: startedAt,
+      updatedAt: now,
     };
 
     setData((current) => ({
       ...current,
       focusSessions: [session, ...current.focusSessions],
+      activeSessionId: completed ? current.activeSessionId : session.id,
+      tasks: current.tasks.map((item) =>
+        item.id === taskId
+          ? {
+              ...item,
+              actualSeconds: item.actualSeconds + session.accumulatedSeconds,
+              activeSessionId: completed ? "" : session.id,
+              lastFocusedAt: now,
+              updatedAt: now,
+            }
+          : item,
+      ),
+    }));
+  }
+
+  function getSessionSeconds(session: FocusSession, nowMs = Date.now()) {
+    if (session.status !== "running") return session.accumulatedSeconds;
+    return session.accumulatedSeconds + Math.max(0, Math.floor((nowMs - new Date(session.startAt).getTime()) / 1000));
+  }
+
+  function startFocusSession(taskId: string, source: FocusSession["source"] = "focus_page") {
+    const now = new Date().toISOString();
+
+    setData((current) => {
+      const active = current.focusSessions.find((session) => session.id === current.activeSessionId);
+      if (active && (active.status === "running" || active.status === "paused")) return current;
+
+      const task = current.tasks.find((item) => item.id === taskId);
+      if (!task) return current;
+      const project = current.projects.find((item) => item.id === task.projectId);
+      const start = task.startTime && task.endTime ? task.startTime : "";
+      const durationMinutes =
+        start && task.endTime
+          ? Math.max(1, Math.round((new Date(`2000-01-01T${task.endTime}`).getTime() - new Date(`2000-01-01T${task.startTime}`).getTime()) / 60000))
+          : task.priority === "high"
+            ? 50
+            : 30;
+      const session: FocusSession = {
+        id: createId("focus"),
+        taskId,
+        title: task.title,
+        mode: "focus",
+        status: "running",
+        durationMinutes,
+        accumulatedSeconds: 0,
+        completed: false,
+        startAt: now,
+        endAt: "",
+        startedAt: now,
+        endedAt: "",
+        pausedAt: "",
+        source,
+        projectId: task.projectId,
+        projectName: project?.name ?? "",
+        focusNote: "",
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      return {
+        ...current,
+        activeSessionId: session.id,
+        focusSessions: [session, ...current.focusSessions],
+        tasks: current.tasks.map((item) =>
+          item.id === taskId ? { ...item, activeSessionId: session.id, lastFocusedAt: now, updatedAt: now } : item,
+        ),
+      };
+    });
+  }
+
+  function pauseFocusSession(sessionId: string) {
+    const now = new Date().toISOString();
+    const nowMs = Date.now();
+    setData((current) => ({
+      ...current,
+      focusSessions: current.focusSessions.map((session) =>
+        session.id === sessionId && session.status === "running"
+          ? {
+              ...session,
+              status: "paused",
+              accumulatedSeconds: getSessionSeconds(session, nowMs),
+              pausedAt: now,
+              updatedAt: now,
+            }
+          : session,
+      ),
+    }));
+  }
+
+  function resumeFocusSession(sessionId: string) {
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      activeSessionId: sessionId,
+      focusSessions: current.focusSessions.map((session) =>
+        session.id === sessionId && session.status === "paused"
+          ? { ...session, status: "running", startAt: now, pausedAt: "", updatedAt: now }
+          : session,
+      ),
+    }));
+  }
+
+  function stopFocusSession(sessionId: string, completeTask = false) {
+    const now = new Date().toISOString();
+    const nowMs = Date.now();
+    setData((current) => {
+      const session = current.focusSessions.find((item) => item.id === sessionId);
+      if (!session || (session.status !== "running" && session.status !== "paused")) return current;
+      const finalSeconds = getSessionSeconds(session, nowMs);
+      return {
+        ...current,
+        activeSessionId: current.activeSessionId === sessionId ? "" : current.activeSessionId,
+        focusSessions: current.focusSessions.map((item) =>
+          item.id === sessionId
+            ? {
+                ...item,
+                status: "completed",
+                completed: true,
+                accumulatedSeconds: finalSeconds,
+                durationMinutes: Math.max(1, Math.round(finalSeconds / 60)),
+                endAt: now,
+                endedAt: now,
+                pausedAt: "",
+                updatedAt: now,
+              }
+            : item,
+        ),
+        tasks: current.tasks.map((task) =>
+          task.id === session.taskId
+            ? {
+                ...task,
+                actualSeconds: task.actualSeconds + finalSeconds,
+                activeSessionId: "",
+                lastFocusedAt: now,
+                status: completeTask ? "done" : task.status,
+                completedAt: completeTask ? now : task.completedAt,
+                updatedAt: now,
+              }
+            : task,
+        ),
+      };
+    });
+  }
+
+  function cancelFocusSession(sessionId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const session = current.focusSessions.find((item) => item.id === sessionId);
+      return {
+        ...current,
+        activeSessionId: current.activeSessionId === sessionId ? "" : current.activeSessionId,
+        focusSessions: current.focusSessions.map((item) =>
+          item.id === sessionId ? { ...item, status: "cancelled", endAt: now, endedAt: now, updatedAt: now } : item,
+        ),
+        tasks: session
+          ? current.tasks.map((task) =>
+              task.id === session.taskId ? { ...task, activeSessionId: "", updatedAt: now } : task,
+            )
+          : current.tasks,
+      };
+    });
+  }
+
+  function updateFocusSessionNote(sessionId: string, focusNote: string) {
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      focusSessions: current.focusSessions.map((session) =>
+        session.id === sessionId ? { ...session, focusNote, updatedAt: now } : session,
+      ),
     }));
   }
 
@@ -1357,6 +1566,12 @@ export function usePlannerData() {
     habits: data.habits,
     habitLogs: data.habitLogs,
     focusSessions: data.focusSessions,
+    activeSessionId: data.activeSessionId,
+    activeFocusSession:
+      data.focusSessions.find(
+        (session) =>
+          session.id === data.activeSessionId && (session.status === "running" || session.status === "paused"),
+      ) ?? null,
     taskTemplates: data.taskTemplates,
     recentItems: data.recentItems,
     settings: data.settings,
@@ -1413,6 +1628,12 @@ export function usePlannerData() {
     addHabit,
     toggleHabitLog,
     addFocusSession,
+    startFocusSession,
+    pauseFocusSession,
+    resumeFocusSession,
+    stopFocusSession,
+    cancelFocusSession,
+    updateFocusSessionNote,
     resetData,
     loadSamples,
     importData,

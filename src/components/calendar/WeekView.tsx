@@ -2,6 +2,7 @@ import { DragEvent, PointerEvent as ReactPointerEvent, useMemo, useState } from 
 import type { CalendarItem } from "../../utils/calendarItems";
 import {
   clickDefaultRange,
+  clampMinutes,
   minutesFromPointerY,
   minutesToTime,
   shouldStartTimeSelection,
@@ -9,6 +10,7 @@ import {
   DAY_END,
   DAY_START,
   SLOT_HEIGHT,
+  TIME_SNAP_MINUTES,
   type CalendarDraftBlock,
 } from "../../utils/calendarTime";
 import { getDayNumber, todayValue } from "../../utils/date";
@@ -53,13 +55,30 @@ interface WeekViewProps {
   items: CalendarItem[];
   dragOverId: string;
   onDragStart: (event: DragEvent, itemKey: string) => void;
+  onDragEnd: () => void;
   onOverSlot: (id: string) => (event: DragEvent) => void;
   onLeaveSlot: (id: string) => () => void;
-  onDropTime: (event: DragEvent, day: string, hour: number) => void;
+  onDragHover: (day: string, startTime: string) => void;
+  onDropTime: (event: DragEvent, day: string, startTime: string) => void;
   onDropAllDay: (event: DragEvent, day: string) => void;
   onClickItem: (item: CalendarItem) => void;
   onClickAllDaySlot: (day: string) => void;
   draft: CalendarDraftBlock | null;
+  dragPreview: {
+    taskId: string;
+    day: string;
+    startTime: string;
+    endTime: string;
+    isValid: boolean;
+  } | null;
+  draggingTaskTitle: string;
+  aiPlacements: Array<{
+    taskId: string;
+    day: string;
+    startTime: string;
+    endTime: string;
+    title: string;
+  }>;
   onSelectionStart: () => void;
   onDraftCreate: (day: string, startTime: string, endTime: string) => void;
 }
@@ -70,13 +89,18 @@ export function WeekView({
   items,
   dragOverId,
   onDragStart,
+  onDragEnd,
   onOverSlot,
   onLeaveSlot,
+  onDragHover,
   onDropTime,
   onDropAllDay,
   onClickItem,
   onClickAllDaySlot,
   draft,
+  dragPreview,
+  draggingTaskTitle,
+  aiPlacements,
   onSelectionStart,
   onDraftCreate,
 }: WeekViewProps) {
@@ -135,7 +159,7 @@ export function WeekView({
     } else {
       ({ startMin, endMin } = snappedDragRange(sel.startMinutes, sel.currentMinutes));
     }
-    if (endMin - startMin < 30) return;
+    if (endMin - startMin < TIME_SNAP_MINUTES) return;
     onDraftCreate(sel.day, minutesToTime(startMin), minutesToTime(endMin));
   }
 
@@ -158,6 +182,17 @@ export function WeekView({
     if (!selection || event.pointerId !== selection.pointerId) return;
     releaseCaptureSafely(event.currentTarget, event.pointerId);
     setSelection(null);
+  }
+
+  function dragStartTimeFromEvent(event: DragEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const minutes = minutesFromPointerY(event.clientY, rect.top);
+    const snapped = clampMinutes(
+      Math.floor(minutes / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES,
+      DAY_START * 60,
+      DAY_END * 60 - TIME_SNAP_MINUTES,
+    );
+    return minutesToTime(snapped);
   }
 
   return (
@@ -201,6 +236,7 @@ export function WeekView({
                   className={`gcal-chip gcal-chip-${item.layer}${item.repeating ? " is-repeating" : ""}`}
                   draggable={item.draggable}
                   onDragStart={item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined}
+                  onDragEnd={item.draggable ? onDragEnd : undefined}
                   onClick={(event) => {
                     event.stopPropagation();
                     onClickItem(item);
@@ -243,17 +279,12 @@ export function WeekView({
             <div
               key={day}
               className={dragOverId === id ? "gcal-time-col is-drop" : "gcal-time-col"}
-              onDragOver={onOverSlot(id)}
-              onDragLeave={onLeaveSlot(id)}
-              onDrop={(event) => {
-                const rect = event.currentTarget.getBoundingClientRect();
-                const offset = event.clientY - rect.top;
-                const hour = Math.min(
-                  DAY_END - 1,
-                  Math.max(DAY_START, DAY_START + Math.floor(offset / SLOT_HEIGHT)),
-                );
-                onDropTime(event, day, hour);
+              onDragOver={(event) => {
+                onOverSlot(id)(event);
+                onDragHover(day, dragStartTimeFromEvent(event));
               }}
+              onDragLeave={onLeaveSlot(id)}
+              onDrop={(event) => onDropTime(event, day, dragStartTimeFromEvent(event))}
               onPointerDown={(event) => handlePointerDown(event, day)}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
@@ -294,6 +325,41 @@ export function WeekView({
                   </span>
                 </div>
               ) : null}
+              {dragPreview && dragPreview.day === day ? (
+                <div
+                  className={dragPreview.isValid ? "gcal-drop-preview" : "gcal-drop-preview is-invalid"}
+                  style={{
+                    top: topFor(timeToMinutesOrNull(dragPreview.startTime) ?? DAY_START * 60),
+                    height: heightFor(
+                      timeToMinutesOrNull(dragPreview.startTime) ?? DAY_START * 60,
+                      timeToMinutesOrNull(dragPreview.endTime) ?? (DAY_START * 60 + 30),
+                    ),
+                  }}
+                >
+                  <span>{draggingTaskTitle || "Task"}</span>
+                  <small>
+                    {dragPreview.startTime}-{dragPreview.endTime}
+                  </small>
+                </div>
+              ) : null}
+              {aiPlacements
+                .filter((placement) => placement.day === day)
+                .map((placement) => (
+                  <div
+                    key={placement.taskId}
+                    className="gcal-ai-preview-block"
+                    style={{
+                      top: topFor(timeToMinutesOrNull(placement.startTime) ?? DAY_START * 60),
+                      height: heightFor(
+                        timeToMinutesOrNull(placement.startTime) ?? DAY_START * 60,
+                        timeToMinutesOrNull(placement.endTime) ?? (DAY_START * 60 + 30),
+                      ),
+                    }}
+                  >
+                    <span>AI</span>
+                    <strong>{placement.title}</strong>
+                  </div>
+                ))}
               {/* §9.1 (D8): overlapping blocks simply stack with a small offset + border, no collision layout. */}
               {timedItems.map((item, index) => {
                 const startMin = timeToMinutesOrNull(item.startTime ?? "");
@@ -310,6 +376,7 @@ export function WeekView({
                     className="gcal-time-block"
                     draggable={item.draggable}
                     onDragStart={item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined}
+                    onDragEnd={item.draggable ? onDragEnd : undefined}
                     onClick={(event) => {
                       event.stopPropagation();
                       onClickItem(item);

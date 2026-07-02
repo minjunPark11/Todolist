@@ -97,11 +97,11 @@ export function QuickCreatePopover({ defaults, projects, onClose, onSave }: Quic
           <>
             <label>
               <span>{t("calendar.startTime")}</span>
-              <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+              <input type="time" step={600} value={startTime} onChange={(event) => setStartTime(event.target.value)} />
             </label>
             <label>
               <span>{t("calendar.endTime")}</span>
-              <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+              <input type="time" step={600} value={endTime} onChange={(event) => setEndTime(event.target.value)} />
             </label>
           </>
         ) : null}

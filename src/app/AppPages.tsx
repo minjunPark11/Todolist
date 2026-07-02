@@ -1,9 +1,10 @@
 import { ReactNode } from "react";
 import { ArchivePage } from "../components/ArchivePage";
 import { CalendarView } from "../components/CalendarView";
+import { FocusPage } from "../components/FocusPage";
 import { InboxPage } from "../components/InboxPage";
 import { PlanningPage } from "../components/PlanningPage";
-import { ProjectsPage } from "../components/ProjectsPage";
+import { SpacesPage } from "../components/SpacesPage";
 import { SettingsPage } from "../components/SettingsPage";
 import { StudyPage } from "../components/StudyPage";
 import { TodayPage } from "../components/TodayPage";
@@ -196,18 +197,40 @@ export function AppPages({
           onOpenProject={openProjectFromCalendar}
           onOpenStudyReview={openStudyReviewFromCalendar}
           taskDetail={renderTaskDetail()}
+          onClearTaskSelection={() => planner.selectTask("")}
           showToast={showToast}
         />
       </section>
     );
   }
 
+  if (activePage === "focus") {
+    return (
+      <FocusPage
+        tasks={planner.tasks}
+        projects={activeProjects}
+        focusSessions={planner.focusSessions}
+        activeSession={planner.activeFocusSession}
+        onStartFocus={planner.startFocusSession}
+        onPauseFocus={planner.pauseFocusSession}
+        onResumeFocus={planner.resumeFocusSession}
+        onStopFocus={planner.stopFocusSession}
+        onUpdateFocusNote={planner.updateFocusSessionNote}
+        onCompleteTask={planner.completeTask}
+        onOpenTask={planner.selectTask}
+        onNavigate={onNavigate}
+      />
+    );
+  }
+
   if (activePage === "projects") {
     return (
-      <ProjectsPage
+      <SpacesPage
         projects={planner.projects}
         tasks={planner.tasks}
         subtasks={planner.subtasks}
+        studyTopics={planner.studyTopics}
+        conceptNotes={planner.conceptNotes}
         selectedTaskId={planner.selectedTask?.id ?? ""}
         taskDetail={renderTaskDetail()}
         selectedProjectId={selectedProjectId}

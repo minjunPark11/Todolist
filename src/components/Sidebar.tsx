@@ -24,6 +24,7 @@ type IconName =
   | "today"
   | "calendar"
   | "projects"
+  | "focus"
   | "planning"
   | "study"
   | "archive"
@@ -71,7 +72,18 @@ function Icon({ name }: { name: IconName }) {
       </>
     ),
     projects: (
-      <path d="M4 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2z" />
+      <>
+        <path d="M12 3l8 4.5-8 4.5-8-4.5z" />
+        <path d="M4 12l8 4.5 8-4.5" />
+        <path d="M4 16.5l8 4.5 8-4.5" />
+      </>
+    ),
+    focus: (
+      <>
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      </>
     ),
     planning: (
       <>
@@ -145,9 +157,8 @@ export function Sidebar({
     { id: "inbox", label: t("sidebar.inbox"), icon: "inbox", count: inboxCount },
     { id: "today", label: t("sidebar.today"), icon: "today", count: todayCount },
     { id: "calendar", label: t("sidebar.calendar"), icon: "calendar", count: 0 },
-    { id: "projects", label: t("sidebar.projects"), icon: "projects", count: activeProjectCount },
-    { id: "planning", label: t("sidebar.planning"), icon: "planning", count: 0 },
-    { id: "study", label: t("sidebar.study"), icon: "study", count: dueReviewCount },
+    { id: "projects", label: "Spaces", icon: "projects", count: activeProjectCount + dueReviewCount },
+    { id: "focus", label: "Focus", icon: "focus", count: tasks.filter((task) => task.activeSessionId).length },
   ];
   const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
     { id: "archive", label: t("sidebar.archive"), icon: "archive", count: 0 },

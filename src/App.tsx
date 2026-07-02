@@ -2,6 +2,7 @@ import { FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "reac
 import { Sidebar } from "./components/Sidebar";
 import { OllamaChat } from "./components/OllamaChat";
 import { TaskDetail } from "./components/TaskDetail";
+import { GlobalFocusBar } from "./components/GlobalFocusBar";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
@@ -256,6 +257,7 @@ export default function App() {
   }
 
   function openStudyResult(note?: ConceptNote) {
+    planner.selectTask("");
     if (note) {
       setStudyTab(note.nextReviewDate ? "reviews" : "notes");
     } else {
@@ -269,12 +271,14 @@ export default function App() {
   // here to open a specific ConceptNote inside StudyPage.
   function openStudyReviewFromCalendar(noteId: string) {
     const note = planner.conceptNotes.find((candidate) => candidate.id === noteId);
+    planner.selectTask("");
     setStudyTab(note?.nextReviewDate ? "reviews" : "notes");
     setStudyFocusNoteId(noteId);
     setActivePage("study");
   }
 
   function openProjectFromCalendar(projectId: string) {
+    planner.selectTask("");
     setSelectedProjectId(projectId);
     setIsProjectDetailOpen(true);
     setActivePage("projects");
@@ -283,6 +287,11 @@ export default function App() {
   function viewTaskInCalendar(taskId: string) {
     planner.selectTask(taskId);
     setActivePage("calendar");
+  }
+
+  function navigateSection(page: PageId) {
+    setActivePage(page);
+    planner.selectTask("");
   }
 
   if (currentPath === "/login" && !planner.auth.isSignedIn) {
@@ -316,6 +325,7 @@ export default function App() {
         onAddSubtask={planner.addSubtask}
         onToggleSubtask={planner.toggleSubtask}
         onDeleteSubtask={planner.deleteSubtask}
+        onClose={() => planner.selectTask("")}
       />
     );
   }
@@ -347,7 +357,7 @@ export default function App() {
         openProjectFromCalendar={openProjectFromCalendar}
         openStudyReviewFromCalendar={openStudyReviewFromCalendar}
         viewTaskInCalendar={viewTaskInCalendar}
-        onNavigate={setActivePage}
+        onNavigate={navigateSection}
         exportJson={exportJson}
         handleImport={handleImport}
         importMessage={importMessage}
@@ -391,7 +401,7 @@ export default function App() {
       <Sidebar
         activePage={activePage}
         onNavigate={(page) => {
-          setActivePage(page);
+          navigateSection(page);
           setMobileMenuOpen(false);
         }}
         tasks={planner.tasks}
@@ -403,12 +413,12 @@ export default function App() {
         onSelectProject={(projectId) => {
           setSelectedProjectId(projectId);
           setIsProjectDetailOpen(true);
-          setActivePage("projects");
+          navigateSection("projects");
           setMobileMenuOpen(false);
         }}
         onAddProject={(name) => planner.addProject(name, "#0066cc")}
         onOpenSettings={() => {
-          setActivePage("settings");
+          navigateSection("settings");
           setMobileMenuOpen(false);
         }}
         search={
@@ -421,7 +431,7 @@ export default function App() {
             onSelectProject={(projectId) => {
               setSelectedProjectId(projectId);
               setIsProjectDetailOpen(true);
-              setActivePage("projects");
+              navigateSection("projects");
               setSearchQuery("");
             }}
             onSelectTopic={() => openStudyResult()}
@@ -430,6 +440,14 @@ export default function App() {
         }
       />
       <main>{renderPage()}</main>
+      <GlobalFocusBar
+        session={planner.activeFocusSession}
+        task={planner.activeFocusSession ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null : null}
+        onOpenFocus={() => navigateSection("focus")}
+        onPause={planner.pauseFocusSession}
+        onResume={planner.resumeFocusSession}
+        onStop={(sessionId) => planner.stopFocusSession(sessionId, false)}
+      />
       <OllamaChat
         activePage={activePage}
         aiContext={{

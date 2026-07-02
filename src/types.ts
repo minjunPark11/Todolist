@@ -35,6 +35,9 @@ export interface Task {
   importance: TaskLevel;
   urgency: TaskLevel;
   isFocus: boolean;
+  actualSeconds: number;
+  activeSessionId: string;
+  lastFocusedAt: string;
   isSomeday: boolean;
   waitingReason: string;
   waitingFollowUpDate: string;
@@ -199,11 +202,23 @@ export interface HabitLog {
 export interface FocusSession {
   id: string;
   taskId: string;
+  title: string;
   mode: FocusMode;
+  status: "running" | "paused" | "completed" | "cancelled";
   durationMinutes: number;
+  accumulatedSeconds: number;
   completed: boolean;
+  startAt: string;
+  endAt: string;
   startedAt: string;
   endedAt: string;
+  pausedAt: string;
+  source: "focus_page" | "today_page" | "calendar_event" | "global_bar";
+  projectId: string;
+  projectName: string;
+  focusNote: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TaskTemplate {
@@ -273,6 +288,7 @@ export interface PlannerData {
   habits: Habit[];
   habitLogs: HabitLog[];
   focusSessions: FocusSession[];
+  activeSessionId: string;
   taskTemplates: TaskTemplate[];
   recentItems: RecentItem[];
   settings: PlannerSettings;
@@ -283,6 +299,7 @@ export type PageId =
   | "inbox"
   | "today"
   | "projects"
+  | "focus"
   | "planning"
   | "study"
   | "archive"
@@ -305,6 +322,9 @@ export interface TaskDraft {
   importance?: TaskLevel;
   urgency?: TaskLevel;
   isFocus?: boolean;
+  actualSeconds?: number;
+  activeSessionId?: string;
+  lastFocusedAt?: string;
   waitingReason?: string;
   waitingFollowUpDate?: string;
   blockedByTaskId?: string;

@@ -4,6 +4,7 @@
 export const DAY_START = 6;
 export const DAY_END = 23;
 export const SLOT_HEIGHT = 44;
+export const TIME_SNAP_MINUTES = 10;
 
 export interface CalendarDraftBlock {
   date: string;
@@ -22,12 +23,12 @@ export function minutesToTime(minutes: number): string {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
-export function snapDown30(minutes: number): number {
-  return Math.floor(minutes / 30) * 30;
+export function snapDownToStep(minutes: number, step = TIME_SNAP_MINUTES): number {
+  return Math.floor(minutes / step) * step;
 }
 
-export function snapUp30(minutes: number): number {
-  return Math.ceil(minutes / 30) * 30;
+export function snapUpToStep(minutes: number, step = TIME_SNAP_MINUTES): number {
+  return Math.ceil(minutes / step) * step;
 }
 
 export function clampMinutes(minutes: number, min: number, max: number): number {
@@ -44,13 +45,13 @@ export function minutesFromPointerY(clientY: number, containerTop: number): numb
   return clampMinutes(minutes, DAY_START * 60, DAY_END * 60);
 }
 
-// Drag-selection range: snap start down / end up to 30min, minimum 30min, clamped to the grid.
+// Drag-selection range: snap start down / end up to TIME_SNAP_MINUTES, minimum one step, clamped to the grid.
 export function snappedDragRange(aMinutes: number, bMinutes: number): { startMin: number; endMin: number } {
   const rawStart = Math.min(aMinutes, bMinutes);
   const rawEnd = Math.max(aMinutes, bMinutes);
-  let startMin = snapDown30(rawStart);
-  let endMin = snapUp30(rawEnd);
-  if (endMin - startMin < 30) endMin = startMin + 30;
+  let startMin = snapDownToStep(rawStart);
+  let endMin = snapUpToStep(rawEnd);
+  if (endMin - startMin < TIME_SNAP_MINUTES) endMin = startMin + TIME_SNAP_MINUTES;
   startMin = clampMinutes(startMin, DAY_START * 60, DAY_END * 60);
   endMin = clampMinutes(endMin, DAY_START * 60, DAY_END * 60);
   return { startMin, endMin };
@@ -58,7 +59,7 @@ export function snappedDragRange(aMinutes: number, bMinutes: number): { startMin
 
 // Click (no meaningful drag) range: default 1 hour from the snapped-down click point.
 export function clickDefaultRange(clickMinutes: number): { startMin: number; endMin: number } {
-  const startMin = clampMinutes(snapDown30(clickMinutes), DAY_START * 60, DAY_END * 60);
+  const startMin = clampMinutes(snapDownToStep(clickMinutes), DAY_START * 60, DAY_END * 60);
   const endMin = clampMinutes(startMin + 60, DAY_START * 60, DAY_END * 60);
   return { startMin, endMin };
 }
