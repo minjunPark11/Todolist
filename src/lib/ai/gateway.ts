@@ -1,8 +1,11 @@
 import type { AiChatRequest, AiChatResponse, AiProvider } from "./types";
 import { ollamaProvider } from "./providers/ollamaProvider";
 import { remoteOllamaProvider } from "./providers/remoteOllamaProvider";
+import { serverProvider } from "./providers/serverProvider";
 
-const providers: AiProvider[] = [ollamaProvider, remoteOllamaProvider];
+// Local-first provider order. Each provider owns its own availability check, so
+// optional fallbacks stay inert unless their env configuration is present.
+const providers: AiProvider[] = [ollamaProvider, remoteOllamaProvider, serverProvider];
 
 export async function sendAiChat(request: AiChatRequest): Promise<AiChatResponse> {
   const errors: string[] = [];
@@ -24,7 +27,7 @@ export async function sendAiChat(request: AiChatRequest): Promise<AiChatResponse
   throw new Error(
     [
       "AI provider is not available.",
-      "Run local Ollama, or configure remote Ollama fallback.",
+      "Run local Ollama, configure remote Ollama fallback, or configure the server AI endpoint.",
       errors.length ? `Details: ${errors.join(" | ")}` : "",
     ]
       .filter(Boolean)

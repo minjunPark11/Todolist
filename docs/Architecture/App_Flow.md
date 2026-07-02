@@ -46,7 +46,7 @@
 
 - 추정: `App.tsx`가 페이지 분기, modal, AI action execution, import/export, auth UI까지 많이 들고 있어 장기적으로 feature별 container 분리가 필요하다.
 - 추정: hidden/non-MVP page들이 `PageId`와 `renderPage()`에 남아 있어 navigation 정책과 코드 소유권을 정리할 필요가 있다.
-- 개선 필요: `serverProvider`가 파일로는 존재하지만 `gateway.ts` provider 배열에는 포함되어 있지 않다.
+- 구현됨: `serverProvider`는 `gateway.ts` provider 배열에 최종 fallback으로 포함되어 있다.
 
 ## 1차 App Shell 리팩토링 결과
 
@@ -57,3 +57,11 @@
 - 구현됨: JSON export/import 로직은 `C:\Users\minju\Todolist\src\app\useDataPortability.ts`로 분리했다.
 - 구현됨: AI action execution 로직은 `C:\Users\minju\Todolist\src\app\executeAgentActions.ts`로 분리했다.
 - 개선 필요: `AppPages.tsx`가 아직 모든 page switch를 한 파일에 모으고 있으므로, 다음 단계에서는 feature별 route group으로 더 나눌 수 있다.
+
+## 2차 AI Gateway 정리 결과
+
+- 구현됨: `C:\Users\minju\Todolist\src\components\OllamaChat.tsx`는 AI provider를 직접 호출하지 않는다.
+- 구현됨: `OllamaChat.tsx` -> `C:\Users\minju\Todolist\src\lib\ai\agent\personalAgent.ts` -> `C:\Users\minju\Todolist\src\lib\ai\gateway.ts` -> provider 순서로 호출한다.
+- 구현됨: gateway provider 순서는 local Ollama, remote Ollama, server endpoint fallback이다.
+- 구현됨: `C:\Users\minju\Todolist\src\lib\ollama.ts` legacy wrapper를 제거했다.
+- 문서화됨: provider 순서와 의도는 [[Architecture_Decisions]]에 기록했다.

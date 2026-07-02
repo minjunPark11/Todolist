@@ -50,7 +50,6 @@
 
 - `C:\Users\minju\Todolist\src\components\OllamaChat.tsx`
 - `C:\Users\minju\Todolist\src\components\ai\AgentActionPreview.tsx`
-- `C:\Users\minju\Todolist\src\lib\ollama.ts`
 - `C:\Users\minju\Todolist\src\lib\ai`
 - `C:\Users\minju\Todolist\src\lib\calendarContext.ts`
 
@@ -72,7 +71,7 @@
 ## 중복/정리 후보
 
 - 추정: `App.tsx`와 `utils\planner.ts`에 Today bucket 계산이 중복된 흔적이 있다. `App.tsx` 내부 `getTodayBuckets()`와 `utils\planner.ts` export 버전을 비교해 단일화 후보.
-- 추정: `src\lib\ollama.ts`와 `src\lib\ai\providers\ollamaProvider.ts`의 역할이 겹칠 가능성이 있어 확인 필요.
+- 해결됨: `src\lib\ollama.ts` legacy wrapper를 제거했고 AI 호출은 `src\lib\ai\gateway.ts`와 provider 구조로 단일화했다.
 - 개선 필요: hidden page 컴포넌트가 실제 제품 navigation에서 빠진 상태로 남아 있어 유지/삭제/문서화 기준 필요.
 
 ## App Shell 리팩토링 후 src/app
@@ -82,3 +81,13 @@
 - `C:\Users\minju\Todolist\src\app\useDataPortability.ts`: JSON export/import hook
 - `C:\Users\minju\Todolist\src\app\executeAgentActions.ts`: AI agent action validation/execution adapter
 - 현재 `C:\Users\minju\Todolist\src\App.tsx`는 layout shell, Sidebar/OllamaChat 연결, search, auth gate, selected task detail adapter를 담당한다.
+
+## AI Gateway 정리 후 파일 역할
+
+- `C:\Users\minju\Todolist\src\components\OllamaChat.tsx`: chat UI, intent/context 준비, personal agent 호출
+- `C:\Users\minju\Todolist\src\lib\ai\agent\personalAgent.ts`: system prompt/context/messages 조합, action block parsing
+- `C:\Users\minju\Todolist\src\lib\ai\gateway.ts`: AI 호출 단일 gateway, provider fallback orchestration
+- `C:\Users\minju\Todolist\src\lib\ai\providers\ollamaProvider.ts`: local Ollama provider
+- `C:\Users\minju\Todolist\src\lib\ai\providers\remoteOllamaProvider.ts`: explicitly enabled remote Ollama fallback provider
+- `C:\Users\minju\Todolist\src\lib\ai\providers\serverProvider.ts`: configured server endpoint fallback provider
+- 제거됨: `C:\Users\minju\Todolist\src\lib\ollama.ts` legacy wrapper

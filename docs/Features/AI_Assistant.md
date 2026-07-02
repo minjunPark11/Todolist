@@ -36,18 +36,37 @@
 
 1. `ollamaProvider`
 2. `remoteOllamaProvider`
+3. `serverProvider`
 
 ## 미구현 또는 개선 필요
 
-- 개선 필요: `serverProvider` 파일은 있지만 현재 `gateway.ts`의 provider 배열에 포함되어 있지 않다.
+- 구현됨: `serverProvider`는 `gateway.ts`의 provider 배열에 최종 fallback으로 포함되어 있다.
 - 개선 필요: AI action은 task/calendar 중심이며 Study note 생성, project update, archive 등은 아직 action type에 없다.
 - 개선 필요: AI는 앱 데이터를 직접 바꾸지 않고 action suggestion만 한다. 이 정책은 안전하지만 사용자가 기대하는 자동 실행과는 다를 수 있다.
 - 추정: 최근 작업은 local Ollama 중심에서 remote fallback과 agent action preview 쪽으로 확장된 것으로 보인다.
 
 ## 리팩토링 후보
 
-- provider registry를 설정 기반으로 만들고 `serverProvider` 연결 여부를 명확히 결정.
+- provider registry를 설정 기반으로 확장할지 검토.
 - action type별 executor를 `App.tsx`에서 분리해 `lib\ai\tools` 또는 feature command layer로 이동.
 - context builder 테스트 추가. 특히 date filtering과 context limit truncation은 회귀 위험이 있다.
 
 관련 문서: [[Architecture/App_Flow]], [[Features/Calendar]]
+
+## 2차 AI/Ollama 구조 정리 결과
+
+- 구현됨: UI는 `C:\Users\minju\Todolist\src\components\OllamaChat.tsx`에서 provider를 직접 호출하지 않고 `runPersonalAgent()`만 호출한다.
+- 구현됨: AI 호출 단일 진입점은 `C:\Users\minju\Todolist\src\lib\ai\gateway.ts`이다.
+- 구현됨: provider fallback 순서는 local Ollama -> remote Ollama -> server endpoint이다.
+- 구현됨: `serverProvider`는 `C:\Users\minju\Todolist\src\lib\ai\gateway.ts` provider chain에 연결되었다.
+- 구현됨: 미사용 legacy wrapper `C:\Users\minju\Todolist\src\lib\ollama.ts`는 제거했다.
+- 유지됨: `remoteOllamaProvider`는 `VITE_REMOTE_OLLAMA_ENABLED=true`일 때만 활성화된다.
+- 유지됨: `serverProvider`는 `VITE_AI_SERVER_URL`이 설정된 경우에만 fallback 후보가 된다.
+
+현재 provider chain:
+
+1. `ollamaProvider`
+2. `remoteOllamaProvider`
+3. `serverProvider`
+
+관련 결정: [[Architecture_Decisions]]

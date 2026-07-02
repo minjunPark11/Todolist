@@ -12,7 +12,7 @@
 
 ## 기능/구조 이슈
 
-- 개선 필요: `C:\Users\minju\Todolist\src\lib\ai\providers\serverProvider.ts`가 존재하지만 `C:\Users\minju\Todolist\src\lib\ai\gateway.ts` provider list에 없다.
+- 해결됨: `C:\Users\minju\Todolist\src\lib\ai\providers\serverProvider.ts`가 `C:\Users\minju\Todolist\src\lib\ai\gateway.ts` fallback provider list에 연결되었다.
 - 개선 필요: Study collection이 Supabase migration/load/save collection 목록에 보이지 않는다.
 - 개선 필요: `C:\Users\minju\Todolist\src\App.tsx`가 많은 책임을 갖고 있다.
 - 개선 필요: Calendar context는 실제 calendar anchor/mode가 아닌 오늘 기준 week snapshot을 사용한다.
@@ -21,7 +21,7 @@
 ## 중복 구현 후보
 
 - 추정: Today bucket 계산이 `C:\Users\minju\Todolist\src\App.tsx`와 `C:\Users\minju\Todolist\src\utils\planner.ts`에 모두 존재한다.
-- 추정: Ollama 관련 파일 `C:\Users\minju\Todolist\src\lib\ollama.ts`와 provider 기반 구현의 역할 중복 여부 확인 필요.
+- 해결됨: Ollama 관련 legacy wrapper `C:\Users\minju\Todolist\src\lib\ollama.ts`는 제거했고, provider 기반 구현으로 단일화했다.
 - 추정: 루트의 설계/보고 문서와 `docs` Vault 문서가 동시에 존재해 문서 source of truth 정리가 필요하다.
 
 ## 아직 하지 않은 일

@@ -25,4 +25,4 @@
 - 구현됨: Inbox, Today, Calendar, Projects, Planning, Study, Archive, Settings, AI Assistant 기본 흐름
 - 구현됨: localStorage 기반 데이터 저장, 선택적 Supabase 동기화, 한국어/영어 i18n
 - 개선 필요: `dist` 디렉터리 쓰기 문제로 production build 산출물 생성 실패
-- 개선 필요: AI `serverProvider` 파일은 있으나 현재 gateway provider 체인에는 연결되어 있지 않음
+- 구현됨: AI provider chain은 local Ollama -> remote Ollama -> server endpoint fallback 순서로 정리됨
