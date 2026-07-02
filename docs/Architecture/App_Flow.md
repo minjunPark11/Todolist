@@ -4,10 +4,18 @@
 
 1. `C:\Users\minju\Todolist\src\main.tsx`가 `App`을 mount한다.
 2. `C:\Users\minju\Todolist\src\App.tsx`가 `usePlannerData()`로 전체 앱 데이터를 가져온다.
-3. `App.tsx` 내부 `activePage` 상태가 현재 화면을 결정한다.
-4. `Sidebar`에서 `onNavigate(page)`가 호출되면 `activePage`가 변경된다.
-5. 각 페이지 컴포넌트는 `planner` hook에서 받은 데이터와 mutation 함수를 props로 받는다.
-6. `OllamaChat`은 모든 페이지 위에 floating assistant로 렌더링된다.
+3. 첫 로드 시 랜딩 페이지나 강제 로그인 없이 곧바로 메인 앱이 렌더링된다.
+4. `App.tsx` 내부 `activePage` 상태가 현재 화면을 결정한다.
+5. `Sidebar`에서 `onNavigate(page)`가 호출되면 `activePage`가 변경된다.
+6. 각 페이지 컴포넌트는 `planner` hook에서 받은 데이터와 mutation 함수를 props로 받는다.
+7. `OllamaChat`은 모든 페이지 위에 floating assistant로 렌더링된다.
+
+## URL 경로와 인증 (2026-07-02 갱신)
+
+- 구현됨: 랜딩 페이지(`LandingPage`)와 강제 auth gate는 제거되었다. 어떤 경로로 들어와도 메인 앱이 뜬다.
+- 구현됨: `/login`으로 직접 접근하면 `AuthGate` 로그인 화면이 뜬다 (로그인 상태면 `/app`으로 redirect).
+- 구현됨: 로그인은 선택 사항이며, Settings > Data 탭의 `AccountSection`에서 로그인/회원가입/로그아웃을 할 수 있다.
+- 구현됨: `App.tsx`는 `currentPath` 상태와 `navigate()` helper, popstate listener로 최소한의 path 라우팅만 유지한다.
 
 ## 페이지 라우팅
 
@@ -50,7 +58,7 @@
 
 ## 1차 App Shell 리팩토링 결과
 
-- 구현됨: `C:\Users\minju\Todolist\src\App.tsx`는 app shell, global navigation/search, selected task detail 연결, auth gate, 주요 상태 연결을 담당한다.
+- 구현됨: `C:\Users\minju\Todolist\src\App.tsx`는 app shell, global navigation/search, selected task detail 연결, 선택적 `/login` 라우트, 주요 상태 연결을 담당한다.
 - 구현됨: page routing/renderPage 로직은 `C:\Users\minju\Todolist\src\app\AppPages.tsx`로 분리했다.
 - 구현됨: tasks page의 filter/sort/group 상태도 `C:\Users\minju\Todolist\src\app\AppPages.tsx`로 이동했다.
 - 구현됨: task/project delete modal과 toast 렌더링은 `C:\Users\minju\Todolist\src\app\AppModals.tsx`로 분리했다.

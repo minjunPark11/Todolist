@@ -627,18 +627,9 @@ actions가 있음
 invalid action이 없음
 ```
 
-### 6.14 `src/lib/ollama.ts`
+### 6.14 `src/lib/ollama.ts` (제거됨)
 
-기존 compatibility wrapper다.
-
-이전에는 Ollama를 직접 호출했지만, 현재는 내부적으로 `runPersonalAgent()`를 호출한다.
-
-이 파일을 남긴 이유:
-
-```text
-기존 import 호환성 유지
-나중에 다른 화면이 askOllamaChat을 import해도 깨지지 않게 함
-```
+기존 compatibility wrapper였으나 2차 AI Gateway 정리에서 제거했다. AI 호출은 `src/lib/ai/gateway.ts`의 `sendAiChat()`으로 단일화되었다.
 
 ### 6.15 `src/lib/calendarContext.ts`
 

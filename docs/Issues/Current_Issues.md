@@ -20,7 +20,7 @@
 
 ## 중복 구현 후보
 
-- 추정: Today bucket 계산이 `C:\Users\minju\Todolist\src\App.tsx`와 `C:\Users\minju\Todolist\src\utils\planner.ts`에 모두 존재한다.
+- 해결됨 (2026-07-02): Today bucket 계산 중복은 제거했다. `C:\Users\minju\Todolist\src\app\AppPages.tsx`에 있던 미사용 로컬 `getTodayBuckets()` 사본을 삭제했고, 단일 구현은 `C:\Users\minju\Todolist\src\utils\planner.ts`의 export 버전만 남았다 (`TodayPage.tsx`에서 사용).
 - 해결됨: Ollama 관련 legacy wrapper `C:\Users\minju\Todolist\src\lib\ollama.ts`는 제거했고, provider 기반 구현으로 단일화했다.
 - 추정: 루트의 설계/보고 문서와 `docs` Vault 문서가 동시에 존재해 문서 source of truth 정리가 필요하다.
 

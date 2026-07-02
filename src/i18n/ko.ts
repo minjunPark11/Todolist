@@ -96,22 +96,6 @@ export const ko: Dictionary = {
   "app.studyNoteLabel": "학습 노트",
   "app.noTags": "태그 없음",
 
-  // ---- Landing ----
-  "landing.eyebrow": "일과 학습, 복습을 위한 차분한 플래너",
-  "landing.title": "FocusFlow",
-  "landing.subtitle": "FocusFlow는 할 일, 프로젝트, 캘린더 계획, 학습 노트, 복습 큐, AI 어시스턴트를 하나의 개인 생산성 공간으로 묶습니다.",
-  "landing.demo": "데모 보기",
-  "landing.login": "로그인",
-  "landing.openApp": "앱 열기",
-  "landing.supabaseReady": "인증은 Supabase Auth로 처리됩니다. 이메일과 비밀번호는 전용 로그인 페이지에서만 입력합니다.",
-  "landing.supabaseLocal": "이 환경에는 Supabase Auth가 설정되어 있지 않아 localStorage 모드로 동작합니다.",
-  "landing.featureTasks": "할 일을 빠르게 수집하고 프로젝트와 Today 화면으로 정리합니다.",
-  "landing.featureCalendar": "작업 맥락을 유지한 채 캘린더에 일정을 배치합니다.",
-  "landing.featureStudy": "학습 주제, 개념 노트, 복습 큐를 함께 관리합니다.",
-  "landing.featureAi": "첫 화면에 로그인 입력창을 노출하지 않고 앱 게이트웨이를 통해 AI 어시스턴트를 사용합니다.",
-  "landing.previewLabel": "FocusFlow 앱 미리보기",
-  "landing.featuresLabel": "주요 기능",
-
   // ---- Auth ----
   "auth.brandTitle": "FOCUSFLOW",
   "auth.signUpSubtitle": "나만의 집중 공간을 만들어보세요",

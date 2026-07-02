@@ -47,55 +47,6 @@ function sortTasks(tasks: Task[]) {
   });
 }
 
-function getTodayBuckets(tasks: Task[], today: string) {
-  const buckets = {
-    doneToday: [] as Task[],
-    waiting: [] as Task[],
-    inProgress: [] as Task[],
-    overdue: [] as Task[],
-    focus: [] as Task[],
-    dueToday: [] as Task[],
-    scheduledToday: [] as Task[],
-  };
-
-  for (const task of tasks) {
-    const scheduledDate = (task as Task & { scheduledDate?: string }).scheduledDate;
-
-    if (task.completedAt.startsWith(today)) {
-      buckets.doneToday.push(task);
-      continue;
-    }
-    if (task.status === "done") {
-      continue;
-    }
-    if (task.status === "waiting") {
-      buckets.waiting.push(task);
-      continue;
-    }
-    if (task.status === "doing") {
-      buckets.inProgress.push(task);
-      continue;
-    }
-    if (isOverdue(task.dueDate)) {
-      buckets.overdue.push(task);
-      continue;
-    }
-    if ((task as Task & { isFocus?: boolean }).isFocus || (task.dueDate === today && task.priority === "high")) {
-      buckets.focus.push(task);
-      continue;
-    }
-    if (task.dueDate === today) {
-      buckets.dueToday.push(task);
-      continue;
-    }
-    if (scheduledDate === today) {
-      buckets.scheduledToday.push(task);
-    }
-  }
-
-  return buckets;
-}
-
 type AppPagesProps = {
   activePage: PageId;
   planner: Planner;
@@ -163,7 +114,6 @@ export function AppPages({
   const openTasks = activeTasks.filter((task) => task.status !== "done");
   const tomorrowTasks = sortTasks(planner.tasks.filter((task) => task.dueDate === tomorrow));
   const thisWeekTasks = sortTasks(openTasks.filter((task) => isThisWeek(task.dueDate)));
-  const todayBuckets = getTodayBuckets(activeTasks, today);
 
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all");
