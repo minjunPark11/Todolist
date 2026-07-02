@@ -4917,6 +4917,13 @@ main {
   align-items: flex-end;
   gap: 12px;
   pointer-events: none;
+  transition: bottom 0.2s ease;
+}
+/* When the global focus bar is on screen, lift the AI launcher above it
+   so the two no longer overlap. The bar renders as a preceding sibling
+   only while a focus session is active. */
+.foc-global-bar ~ .ollama-chat {
+  bottom: 112px;
 }
 .ollama-chat-panel,
 .ollama-chat-fab {
@@ -7814,6 +7821,12 @@ div.spc-signal-row {
     left: 12px;
     right: 12px;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The stacked focus bar is taller on small screens, so lift the AI
+     launcher further to keep it clear of the bar. */
+  .foc-global-bar ~ .ollama-chat {
+    bottom: 210px;
   }
 
   .foc-stat-grid,
