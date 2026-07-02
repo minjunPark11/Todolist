@@ -37,7 +37,7 @@
 - 데이터 정규화/저장: `C:\Users\minju\Todolist\src\hooks\usePlannerData.ts`
 - 기본 저장소: browser `localStorage`, key는 `focusflow.appData.v1`
 - legacy migration: `todo-planner-data`에서 읽어 canonical status로 변환
-- optional remote sync: `C:\Users\minju\Todolist\src\services\supabaseClient.ts`와 `C:\Users\minju\Todolist\supabase\migrations\001_initial_schema.sql`
+- optional remote sync: `C:\Users\minju\Todolist\src\services\supabaseClient.ts`와 `C:\Users\minju\Todolist\supabase\migrations\` (001 기본 schema, 002 study 테이블)
 
 ## AI 흐름
 

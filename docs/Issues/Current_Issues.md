@@ -13,7 +13,7 @@
 ## 기능/구조 이슈
 
 - 해결됨: `C:\Users\minju\Todolist\src\lib\ai\providers\serverProvider.ts`가 `C:\Users\minju\Todolist\src\lib\ai\gateway.ts` fallback provider list에 연결되었다.
-- 개선 필요: Study collection이 Supabase migration/load/save collection 목록에 보이지 않는다.
+- 해결됨 (2026-07-02): Study collection을 Supabase sync에 포함했다. `supabase/migrations/002_study_tables.sql`로 `study_topics`/`concept_notes` 테이블을 추가했고 `usePlannerData.ts`의 `collectionTables`에 두 collection을 등록했다.
 - 개선 필요: `C:\Users\minju\Todolist\src\App.tsx`가 많은 책임을 갖고 있다.
 - 개선 필요: Calendar context는 실제 calendar anchor/mode가 아닌 오늘 기준 week snapshot을 사용한다.
 - 개선 필요: hidden/non-MVP pages가 `PageId`와 `renderPage()`에 남아 있어 제품 범위가 흐려질 수 있다.

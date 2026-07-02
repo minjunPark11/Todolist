@@ -38,14 +38,13 @@
 ## 미구현 또는 개선 필요
 
 - 개선 필요: `StudyPage.tsx`가 modal, note editor, queue, streak 계산까지 한 파일에 많이 모여 있다.
-- 개선 필요: Supabase migration에는 `studyTopics`, `conceptNotes` 전용 table이 없다. 현재 원격 동기화 collectionTables에도 Study collection이 빠져 있다.
-- 추정: Study 데이터는 localStorage에서는 저장되지만 Supabase 동기화 대상에는 아직 완전히 포함되지 않은 상태로 보인다.
+- 해결됨 (2026-07-02): Supabase에 `study_topics`, `concept_notes` 테이블을 추가했고 (`C:\Users\minju\Todolist\supabase\migrations\002_study_tables.sql`), `usePlannerData.ts`의 `collectionTables`에도 Study collection을 포함해 로그인 시 원격 동기화된다.
 - 추정: note type별 필드가 UI와 타입에 함께 묶여 있어 확장 시 editor 분리가 필요해질 수 있다.
 
 ## 리팩토링 후보
 
 - `StudyPage.tsx`에서 TopicList, NoteEditor, ReviewQueue, StudyStats를 분리.
 - review interval 정책을 `usePlannerData.ts`가 아니라 별도 study utility로 이동.
-- Study collection을 Supabase schema와 save/load collectionTables에 포함할지 결정 필요.
+- 완료됨 (2026-07-02): Study collection을 Supabase schema와 save/load collectionTables에 포함했다.
 
 관련 문서: [[Architecture/App_Flow]], [[Code_Map/src_overview]]

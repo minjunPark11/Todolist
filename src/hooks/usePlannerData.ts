@@ -93,6 +93,8 @@ const collectionTables = [
   ["habitLogs", "habit_logs"],
   ["focusSessions", "focus_sessions"],
   ["taskTemplates", "task_templates"],
+  ["studyTopics", "study_topics"],
+  ["conceptNotes", "concept_notes"],
 ] as const;
 
 function createId(prefix: string): string {
@@ -381,7 +383,9 @@ function countDataItems(data: PlannerData): number {
     data.habits.length +
     data.habitLogs.length +
     data.focusSessions.length +
-    data.taskTemplates.length
+    data.taskTemplates.length +
+    data.studyTopics.length +
+    data.conceptNotes.length
   );
 }
 
