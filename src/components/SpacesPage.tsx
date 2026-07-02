@@ -1,6 +1,7 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import type { ConceptNote, Project, ProjectType, StudyTopic, Subtask, Task, TaskDraft } from "../types";
+import type { ConceptNote, FocusSession, PageId, Project, ProjectType, StudyTopic, Subtask, Task, TaskDraft } from "../types";
 import type { ToastState } from "./kit";
+import { SpaceDetailView } from "./spaces/SpaceDetailView";
 
 type SpaceType = "project" | "study" | "research" | "custom";
 type SpaceStatus = "Blocked" | "Needs Focus" | "Review Needed" | "In Progress" | "On Track" | "New";
@@ -60,6 +61,8 @@ type SpacesPageProps = {
   subtasks: Subtask[];
   studyTopics: StudyTopic[];
   conceptNotes: ConceptNote[];
+  focusSessions: FocusSession[];
+  activeFocusSession: FocusSession | null;
   selectedTaskId: string;
   taskDetail: ReactNode;
   selectedProjectId: string;
@@ -70,6 +73,10 @@ type SpacesPageProps = {
   onToggleDone: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
+  onCompleteTask: (id: string) => void;
+  onArchiveTask: (id: string) => void;
+  onStartFocus: (taskId: string, source?: FocusSession["source"]) => void;
+  onNavigate: (page: PageId) => void;
   onCreateProject: (input: { name: string; color?: string; type?: ProjectType; description?: string; dueDate?: string }) => string;
   onUpdateProject: (id: string, patch: Partial<Project>) => void;
   onToggleStar: (id: string) => void;
@@ -108,11 +115,20 @@ export function SpacesPage({
   tasks,
   studyTopics,
   conceptNotes,
+  focusSessions,
+  activeFocusSession,
   selectedProjectId,
   detailOpen,
   onOpenProject,
   onCloseProject,
   onCreateProject,
+  onCreateTask,
+  onUpdateTask,
+  onCompleteTask,
+  onArchiveTask,
+  onStartFocus,
+  onNavigate,
+  onUpdateProject,
   showToast,
 }: SpacesPageProps) {
   const [query, setQuery] = useState("");
@@ -242,13 +258,22 @@ export function SpacesPage({
 
   if (isDetailOpen && selectedSpace) {
     return (
-      <SpaceDetail
+      <SpaceDetailView
         space={selectedSpace}
-        signals={signals.filter((signal) => signal.spaceId === selectedSpace.id)}
-        tasks={tasks.filter((task) => task.projectId === selectedSpace.sourceId)}
-        notes={conceptNotes.filter((note) => selectedSpace.topics.some((topic) => note.tags.includes(topic)))}
-        highlightSignalId={highlightSignalId}
+        tasks={tasks}
+        projects={projects}
+        conceptNotes={conceptNotes}
+        focusSessions={focusSessions}
+        activeFocusSession={activeFocusSession}
         onBack={closeSpace}
+        onCreateTask={onCreateTask}
+        onUpdateTask={onUpdateTask}
+        onCompleteTask={onCompleteTask}
+        onArchiveTask={onArchiveTask}
+        onStartFocus={onStartFocus}
+        onUpdateProject={onUpdateProject}
+        onNavigate={onNavigate}
+        showToast={showToast}
       />
     );
   }
@@ -426,80 +451,6 @@ function SpaceCard({ space, onOpen }: { space: Space; onOpen: () => void }) {
       <small>AI Priority: <i className={space.aiPriority.toLowerCase()} /> {space.aiPriority}</small>
       <footer><span>Updated {space.updatedLabel}</span><ArrowIcon /></footer>
     </article>
-  );
-}
-
-function SpaceDetail({
-  space,
-  signals,
-  tasks,
-  notes,
-  highlightSignalId,
-  onBack,
-}: {
-  space: Space;
-  signals: ActivitySignal[];
-  tasks: Task[];
-  notes: ConceptNote[];
-  highlightSignalId: string;
-  onBack: () => void;
-}) {
-  return (
-    <div className="spc-detail">
-      <button type="button" className="spc-back" onClick={onBack}><ArrowLeftIcon /> Back to Spaces</button>
-      <header className="spc-detail-hero">
-        <span className="spc-card-icon" style={{ background: space.color }}><SpaceIcon type={space.type} /></span>
-        <div>
-          <h1>{space.name}</h1>
-          <p>{typeMeta[space.type].label} Space - {space.description || space.mainSignal}</p>
-        </div>
-        <span className={`spc-status ${statusClass(space.status)}`}>{space.status}</span>
-      </header>
-
-      <section className="spc-detail-grid">
-        <div className="spc-detail-card">
-          <h2>{detailTitle(space.type)}</h2>
-          <p>{detailBody(space)}</p>
-          <div className="spc-topic-list">
-            {(space.topics.length ? space.topics : ["Next step", "Signal", "Review"]).map((topic) => <span key={topic}>{topic}</span>)}
-          </div>
-        </div>
-        <div className="spc-detail-card">
-          <h2>Current Signal</h2>
-          <strong>{space.mainSignal}</strong>
-          <p>AI Priority: {space.aiPriority}. Recent activity count: {space.recentActivityCount}.</p>
-        </div>
-        <div className="spc-detail-card">
-          <h2>{space.type === "study" ? "Review Queue" : space.type === "research" ? "Evidence Trail" : "Work Records"}</h2>
-          <div className="spc-mini-list">
-            {space.type === "study"
-              ? notes.slice(0, 4).map((note) => <span key={note.id}>{note.title}</span>)
-              : tasks.slice(0, 5).map((task) => <span key={task.id}>{task.title}</span>)}
-            {(space.type === "study" ? notes.length : tasks.length) === 0 ? <p>No records yet. Add the first item to start using this Space.</p> : null}
-          </div>
-        </div>
-      </section>
-
-      <section className="spc-activity">
-        <div className="spc-section-head">
-          <div>
-            <h2>Recent Activity Signals</h2>
-            <p>Signals connected to this Space</p>
-          </div>
-        </div>
-        <div className="spc-signal-list">
-          {signals.map((signal) => (
-            <div key={signal.id} className={highlightSignalId === signal.id ? "spc-signal-row highlighted" : "spc-signal-row"}>
-              <span className={`spc-signal-severity ${signal.severity.toLowerCase()}`}>{signal.severity}</span>
-              <span>{signal.age}</span>
-              <strong>{signal.title}</strong>
-              <em>{signal.detail}</em>
-            </div>
-          ))}
-          {signals.length === 0 ? <p className="spc-empty">No signals yet.</p> : null}
-        </div>
-      </section>
-    </div>
   );
 }
 
@@ -811,20 +762,6 @@ function statusClass(status: SpaceStatus) {
   return "progress";
 }
 
-function detailTitle(type: SpaceType) {
-  if (type === "study") return "Topic Map";
-  if (type === "research") return "Research Direction";
-  if (type === "custom") return "Custom Sections";
-  return "Project Direction";
-}
-
-function detailBody(space: Space) {
-  if (space.type === "study") return space.learningGoal || "Track weak points, review needs, evidence, and recent learning records.";
-  if (space.type === "research") return space.researchGoal || "Organize research questions, sources, claims, and open evidence.";
-  if (space.type === "custom") return "Use flexible sections to gather notes, tasks, and activity.";
-  return space.objective || "Track the current outcome, blockers, milestones, and next work.";
-}
-
 function SpaceIcon({ type }: { type: SpaceType }) {
   if (type === "study") return <CodeIcon />;
   if (type === "research") return <BookIcon />;
@@ -839,7 +776,6 @@ function SignalIcon() { return <svg viewBox="0 0 24 24"><path d="M4 14h3l2-6 4 1
 function RefreshIcon() { return <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.7" /><path d="M20 4v6h-6" /></svg>; }
 function PlusIcon() { return <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>; }
 function ArrowIcon() { return <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg>; }
-function ArrowLeftIcon() { return <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></svg>; }
 function MoreIcon() { return <svg viewBox="0 0 24 24"><path d="M12 6h.01M12 12h.01M12 18h.01" /></svg>; }
 function CloseIcon() { return <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" /></svg>; }
 function ScreenIcon() { return <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="12" rx="2" /><path d="M8 21h8M12 17v4" /></svg>; }

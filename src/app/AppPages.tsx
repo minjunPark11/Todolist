@@ -231,6 +231,12 @@ export function AppPages({
         subtasks={planner.subtasks}
         studyTopics={planner.studyTopics}
         conceptNotes={planner.conceptNotes}
+        focusSessions={planner.focusSessions}
+        activeFocusSession={planner.activeFocusSession}
+        onCompleteTask={planner.completeTask}
+        onArchiveTask={handleArchiveTask}
+        onStartFocus={planner.startFocusSession}
+        onNavigate={onNavigate}
         selectedTaskId={planner.selectedTask?.id ?? ""}
         taskDetail={renderTaskDetail()}
         selectedProjectId={selectedProjectId}
