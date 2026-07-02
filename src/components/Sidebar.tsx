@@ -20,7 +20,6 @@ interface SidebarProps {
 }
 
 type IconName =
-  | "inbox"
   | "today"
   | "calendar"
   | "projects"
@@ -44,13 +43,6 @@ function Icon({ name }: { name: IconName }) {
   };
 
   const paths: Record<IconName, ReactNode> = {
-    inbox: (
-      <>
-        <path d="M4 13l2.4-7h11.2L20 13" />
-        <path d="M4 13v5a1 1 0 001 1h14a1 1 0 001-1v-5" />
-        <path d="M4 13h4l1.5 2.5h5L16 13h4" />
-      </>
-    ),
     today: (
       <>
         <rect x="4" y="5" width="16" height="15" rx="2" />
@@ -150,11 +142,9 @@ export function Sidebar({
     buckets.focus.length +
     buckets.dueToday.length +
     buckets.scheduledToday.length;
-  const inboxCount = tasks.filter((task) => task.status === "inbox").length;
   const activeProjectCount = projects.filter((project) => project.status !== "archived").length;
 
   const primaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
-    { id: "inbox", label: t("sidebar.inbox"), icon: "inbox", count: inboxCount },
     { id: "today", label: t("sidebar.today"), icon: "today", count: todayCount },
     { id: "calendar", label: t("sidebar.calendar"), icon: "calendar", count: 0 },
     { id: "projects", label: "Spaces", icon: "projects", count: activeProjectCount + dueReviewCount },

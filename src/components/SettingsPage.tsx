@@ -110,7 +110,7 @@ export function SettingsPage({
           <Row title={t("settings.defaultStartPage")} hint={t("settings.defaultStartPageHint")}>
             <select value={settings.defaultView} onChange={(e) => onUpdate({ defaultView: e.target.value as "/today" | "/inbox" })}>
               <option value="/today">{t("sidebar.today")}</option>
-              <option value="/inbox">{t("sidebar.inbox")}</option>
+              <option value="/inbox">{t("settings.defaultStartPageInboxOption")}</option>
             </select>
           </Row>
           <Toggle

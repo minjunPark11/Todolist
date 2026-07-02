@@ -2,12 +2,11 @@ import { ReactNode } from "react";
 import { ArchivePage } from "../components/ArchivePage";
 import { CalendarView } from "../components/CalendarView";
 import { FocusPage } from "../components/FocusPage";
-import { InboxPage } from "../components/InboxPage";
 import { PlanningPage } from "../components/PlanningPage";
 import { SpacesPage } from "../components/SpacesPage";
 import { SettingsPage } from "../components/SettingsPage";
 import { StudyPage } from "../components/StudyPage";
-import { TodayPage } from "../components/TodayPage";
+import { TodayPage, type TodayIntent } from "../components/TodayPage";
 import type { ToastState } from "../components/kit";
 import type { usePlannerData } from "../hooks/usePlannerData";
 import type { AppSettings, PageId, Project } from "../types";
@@ -29,10 +28,11 @@ type AppPagesProps = {
   setStudyTab: (tab: "topics" | "notes" | "reviews") => void;
   studyFocusNoteId: string;
   setStudyFocusNoteId: (id: string) => void;
+  todayIntent: TodayIntent;
+  onTodayIntentHandled: () => void;
   renderTaskDetail: () => ReactNode;
   showToast: (toast: ToastState) => void;
   handleArchiveTask: (taskId: string) => void;
-  handleDuplicateTask: (taskId: string) => void;
   handleArchiveProject: (projectId: string) => void;
   requestDeleteTask: (taskId: string) => void;
   requestDeleteProject: (projectId: string) => void;
@@ -61,10 +61,11 @@ export function AppPages({
   setStudyTab,
   studyFocusNoteId,
   setStudyFocusNoteId,
+  todayIntent,
+  onTodayIntentHandled,
   renderTaskDetail,
   showToast,
   handleArchiveTask,
-  handleDuplicateTask,
   handleArchiveProject,
   requestDeleteTask,
   requestDeleteProject,
@@ -97,28 +98,9 @@ export function AppPages({
           onArchiveTask={handleArchiveTask}
           onNavigate={onNavigate}
           onOpenProject={openProjectFromCalendar}
-          showToast={showToast}
-        />
-        {renderTaskDetail()}
-      </section>
-    );
-  }
-
-  if (activePage === "inbox") {
-    return (
-      <section className={pageGridClass()}>
-        <InboxPage
-          tasks={planner.tasks}
-          projects={activeProjects}
-          subtasks={planner.subtasks}
-          selectedTaskId={planner.selectedTask?.id ?? ""}
-          onOpenTask={planner.selectTask}
-          onToggleDone={planner.toggleTaskDone}
-          onUpdateTask={planner.updateTask}
-          onCreateTask={planner.createTask}
-          onArchiveTask={handleArchiveTask}
-          onDuplicateTask={handleDuplicateTask}
-          onRequestDelete={requestDeleteTask}
+          onScheduleInCalendar={viewTaskInCalendar}
+          intent={todayIntent}
+          onIntentHandled={onTodayIntentHandled}
           showToast={showToast}
         />
         {renderTaskDetail()}

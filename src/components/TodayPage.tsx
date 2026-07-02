@@ -23,6 +23,10 @@ import { QuickAddTaskModal, type QuickAddInput } from "./today/QuickAddTaskModal
 import { PlanTodayPreviewModal } from "./today/PlanTodayPreviewModal";
 import { useT } from "../i18n";
 
+// Cross-page requests into Today: opened once, then cleared by the caller
+// (see App.tsx's todayIntent / onTodayIntentHandled).
+export type TodayIntent = "" | "triage" | "quickAdd";
+
 interface TodayPageProps {
   tasks: Task[];
   projects: Project[];
@@ -35,6 +39,9 @@ interface TodayPageProps {
   onArchiveTask: (id: string) => void;
   onNavigate: (page: PageId) => void;
   onOpenProject: (projectId: string) => void;
+  onScheduleInCalendar: (taskId: string) => void;
+  intent?: TodayIntent;
+  onIntentHandled?: () => void;
   showToast: (toast: ToastState) => void;
 }
 
@@ -50,6 +57,9 @@ export function TodayPage({
   onArchiveTask,
   onNavigate,
   onOpenProject,
+  onScheduleInCalendar,
+  intent = "",
+  onIntentHandled,
   showToast,
 }: TodayPageProps) {
   const { t, lang } = useT();
@@ -65,12 +75,37 @@ export function TodayPage({
   const [planStatus, setPlanStatus] = useState<PlanStatus>("idle");
   const [plan, setPlan] = useState<TodayPlanResult | null>(null);
   const [hiddenSignalIds, setHiddenSignalIds] = useState<string[]>([]);
+  const sortNowButtonRef = useRef<HTMLButtonElement>(null);
+  const triageReturnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     saveBucketOverrides(overrides, today);
   }, [overrides, today]);
 
   useEffect(() => () => window.clearTimeout(planTimerRef.current), []);
+
+  // Cross-page open requests (keyboard shortcuts, search, /inbox deep link,
+  // §14 URL state) — handled once, then cleared by the caller.
+  useEffect(() => {
+    if (intent === "triage") {
+      openTriage();
+      onIntentHandled?.();
+    } else if (intent === "quickAdd") {
+      setQuickAddOpen(true);
+      onIntentHandled?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intent]);
+
+  function openTriage() {
+    triageReturnFocusRef.current = (document.activeElement as HTMLElement) ?? sortNowButtonRef.current;
+    setTriageOpen(true);
+  }
+
+  function closeTriage() {
+    setTriageOpen(false);
+    triageReturnFocusRef.current?.focus();
+  }
 
   // Cmd/Ctrl + K focuses the Today search (spec §25).
   useEffect(() => {
@@ -94,19 +129,12 @@ export function TodayPage({
     [tasks, projects, conceptNotes, today],
   );
 
+  // Inbox Triage shows only unsorted (status === "inbox") items. Scheduled
+  // "todo" tasks already appear in the Focus Queue above, so including them
+  // here too would duplicate the same task in both lists (spec §11).
   const triageItems = useMemo(
-    () =>
-      tasks.filter(
-        (task) =>
-          !task.deletedAt &&
-          !task.archivedAt &&
-          (task.status === "inbox" ||
-            // Space-less quick-add tasks also surface in triage (spec §4).
-            (task.status === "todo" &&
-              !task.projectId &&
-              (task.scheduledDate === today || task.dueDate === today))),
-      ),
-    [tasks, today],
+    () => tasks.filter((task) => task.status === "inbox" && !task.deletedAt && !task.archivedAt),
+    [tasks],
   );
 
   // Search filters every visible Today collection (spec §25).
@@ -155,19 +183,34 @@ export function TodayPage({
     setOverrides((current) => ({ ...current, [taskId]: bucket }));
   }
 
+  // Explicit "add to today" decides Today task vs. Inbox item (spec §10).
+  // Left unchecked, a title-only capture goes to Inbox instead of silently
+  // landing on today's Focus Queue.
   function handleCreateTask(input: QuickAddInput) {
-    const id = onCreateTask({
-      title: input.title,
-      status: "todo",
-      scheduledDate: today,
-      dueDate: input.dueDate,
-      priority: input.priority,
-      projectId: input.projectId || undefined,
-      notes: input.notes || undefined,
-    });
-    setBucket(id, input.bucket);
+    if (input.addToTodayNow) {
+      const id = onCreateTask({
+        title: input.title,
+        status: "todo",
+        scheduledDate: today,
+        dueDate: input.dueDate,
+        priority: input.priority,
+        projectId: input.projectId || undefined,
+        notes: input.notes || undefined,
+      });
+      setBucket(id, input.bucket);
+      showToast({ message: t("todayv.toastTaskAdded") });
+    } else {
+      onCreateTask({
+        title: input.title,
+        status: "inbox",
+        dueDate: input.dueDate,
+        priority: input.priority,
+        projectId: input.projectId || undefined,
+        notes: input.notes || undefined,
+      });
+      showToast({ message: t("todayv.toastAddedToInbox") });
+    }
     setQuickAddOpen(false);
-    showToast({ message: t("todayv.toastTaskAdded") });
   }
 
   function handleMoveAllLater() {
@@ -239,6 +282,9 @@ export function TodayPage({
     } else if (action.type === "addToToday") {
       onUpdateTask(taskId, { status: "todo", scheduledDate: today });
       showToast({ message: t("todayv.toastTaskAdded") });
+    } else if (action.type === "scheduleCalendar") {
+      closeTriage();
+      onScheduleInCalendar(taskId);
     } else if (action.type === "archive") {
       onArchiveTask(taskId);
     } else {
@@ -334,7 +380,7 @@ export function TodayPage({
             onOpenSpaces={() => onNavigate("projects")}
           />
 
-          <InboxTriageCard items={visibleTriageItems} onSortNow={() => setTriageOpen(true)} />
+          <InboxTriageCard items={visibleTriageItems} onSortNow={openTriage} sortNowRef={sortNowButtonRef} />
         </div>
 
         <aside className="tdy-side">
@@ -360,7 +406,7 @@ export function TodayPage({
           items={triageItems}
           projects={projects}
           onTriage={handleTriage}
-          onClose={() => setTriageOpen(false)}
+          onClose={closeTriage}
         />
       ) : null}
 

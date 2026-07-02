@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { RefObject, useState } from "react";
 import type { Project, Task } from "../../types";
 import { Modal } from "../kit";
 import { useT } from "../../i18n";
@@ -6,9 +6,10 @@ import { useT } from "../../i18n";
 interface InboxTriageCardProps {
   items: Task[];
   onSortNow: () => void;
+  sortNowRef?: RefObject<HTMLButtonElement>;
 }
 
-export function InboxTriageCard({ items, onSortNow }: InboxTriageCardProps) {
+export function InboxTriageCard({ items, onSortNow, sortNowRef }: InboxTriageCardProps) {
   const { t } = useT();
   const preview = items.slice(0, 3);
   const rest = items.length - preview.length;
@@ -26,6 +27,7 @@ export function InboxTriageCard({ items, onSortNow }: InboxTriageCardProps) {
         <h2>{t("todayv.inboxTriage")}</h2>
         {items.length > 0 ? <span className="tdy-bucket-count">{items.length}</span> : null}
         <button
+          ref={sortNowRef}
           type="button"
           className="tdy-btn tdy-btn-light tdy-btn-sm"
           aria-label={t("todayv.sortNowAria")}
@@ -62,6 +64,7 @@ export function InboxTriageCard({ items, onSortNow }: InboxTriageCardProps) {
 export type TriageAction =
   | { type: "assign"; projectId: string }
   | { type: "addToToday" }
+  | { type: "scheduleCalendar" }
   | { type: "archive" }
   | { type: "keep" };
 
@@ -78,7 +81,7 @@ export function InboxTriageDrawer({ items, projects, onTriage, onClose }: InboxT
   return (
     <Modal title={t("todayv.triageTitle")} onClose={onClose} wide>
       {items.length === 0 ? (
-        <p className="tdy-rail-empty">{t("todayv.inboxEmpty")}</p>
+        <p className="tdy-rail-empty">{t("todayv.triageEmpty")}</p>
       ) : (
         <div className="tdy-triage-list">
           {items.map((item) => (
@@ -107,20 +110,29 @@ function TriageRow({
     month: "short",
     day: "numeric",
   }).format(new Date(item.createdAt));
-  const isInbox = item.status === "inbox";
+  const hasNoDate = !item.dueDate && !item.scheduledDate;
+  const hasNoSpace = !item.projectId;
+  const hasNoPriority = item.priority === "none";
+  const hasProjects = projects.length > 0;
 
   return (
     <div className="tdy-triage-row">
       <div className="tdy-triage-info">
         <strong>{item.title}</strong>
         <small>
-          {isInbox ? t("todayv.triageTypeInbox") : t("todayv.triageTypeUnassigned")} · {created}
+          {t("todayv.triageTypeInbox")} · {created}
         </small>
+        <div className="tdy-triage-badges">
+          {hasNoDate ? <span className="tdy-badge">{t("todayv.badgeNoDate")}</span> : null}
+          {hasNoSpace ? <span className="tdy-badge">{t("todayv.badgeNoSpace")}</span> : null}
+          {hasNoPriority ? <span className="tdy-badge">{t("todayv.badgeNoPriority")}</span> : null}
+        </div>
       </div>
       <div className="tdy-triage-actions">
         <select
-          aria-label={t("todayv.assignSpace")}
+          aria-label={t("todayv.pickSpaceAria", { title: item.title })}
           value={projectId}
+          disabled={!hasProjects}
           onChange={(event) => setProjectId(event.target.value)}
         >
           <option value="">{t("todayv.pickSpace")}</option>
@@ -133,23 +145,33 @@ function TriageRow({
         <button
           type="button"
           className="tdy-btn tdy-btn-navy tdy-btn-sm"
-          disabled={!projectId}
+          aria-label={t("todayv.assignSpaceAria", { title: item.title })}
+          title={hasProjects ? undefined : t("todayv.needsSpaceFirst")}
+          disabled={!projectId || !hasProjects}
           onClick={() => onTriage(item.id, { type: "assign", projectId })}
         >
           {t("todayv.assignSpace")}
         </button>
-        {isInbox ? (
-          <button
-            type="button"
-            className="tdy-btn tdy-btn-light tdy-btn-sm"
-            onClick={() => onTriage(item.id, { type: "addToToday" })}
-          >
-            {t("todayv.addToToday")}
-          </button>
-        ) : null}
         <button
           type="button"
           className="tdy-btn tdy-btn-light tdy-btn-sm"
+          aria-label={t("todayv.addToTodayAria", { title: item.title })}
+          onClick={() => onTriage(item.id, { type: "addToToday" })}
+        >
+          {t("todayv.addToToday")}
+        </button>
+        <button
+          type="button"
+          className="tdy-btn tdy-btn-light tdy-btn-sm"
+          aria-label={t("todayv.scheduleCalendarAria", { title: item.title })}
+          onClick={() => onTriage(item.id, { type: "scheduleCalendar" })}
+        >
+          {t("todayv.scheduleCalendar")}
+        </button>
+        <button
+          type="button"
+          className="tdy-btn tdy-btn-light tdy-btn-sm"
+          aria-label={t("todayv.archiveAria", { title: item.title })}
           onClick={() => onTriage(item.id, { type: "archive" })}
         >
           {t("common.archive")}
@@ -157,6 +179,7 @@ function TriageRow({
         <button
           type="button"
           className="tdy-btn tdy-btn-light tdy-btn-sm"
+          aria-label={t("todayv.keepInboxAria", { title: item.title })}
           onClick={() => onTriage(item.id, { type: "keep" })}
         >
           {t("todayv.keepInbox")}

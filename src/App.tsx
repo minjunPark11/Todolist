@@ -6,6 +6,7 @@ import { GlobalFocusBar } from "./components/GlobalFocusBar";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
+import type { TodayIntent } from "./components/TodayPage";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { useDataPortability } from "./app/useDataPortability";
 import type { ToastState } from "./components/kit";
@@ -27,9 +28,16 @@ export default function App() {
   // use the useT() context hook — call the plain translate() helper instead.
   const t = (key: string, vars?: Record<string, string | number>) => translate(appSettings.language, key, vars);
   const dueReviewCount = getDueReviewCount(planner.conceptNotes);
-  const [activePage, setActivePage] = useState<PageId>(
-    appSettings.defaultView === "/inbox" ? "inbox" : "today",
-  );
+  const [activePage, setActivePage] = useState<PageId>("today");
+  // Inbox is folded into Today's triage drawer (no standalone page). This
+  // covers the legacy /inbox route, a ?triage=inbox deep link, and the
+  // "default start page" setting all landing on the same Today intent.
+  const [todayIntent, setTodayIntent] = useState<TodayIntent>(() => {
+    const hasInboxRedirect =
+      window.location.pathname === "/inbox" ||
+      new URLSearchParams(window.location.search).get("triage") === "inbox";
+    return hasInboxRedirect || appSettings.defaultView === "/inbox" ? "triage" : "";
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [isProjectDetailOpen, setIsProjectDetailOpen] = useState(false);
@@ -101,12 +109,11 @@ export default function App() {
       } else if (event.key.toLowerCase() === "t") {
         setActivePage("today");
       } else if (event.key.toLowerCase() === "i") {
-        setActivePage("inbox");
+        setActivePage("today");
+        setTodayIntent("triage");
       } else if (event.key.toLowerCase() === "n") {
-        setActivePage("inbox");
-        window.setTimeout(() => {
-          document.querySelector<HTMLInputElement>('[aria-label="Task title"]')?.focus();
-        }, 0);
+        setActivePage("today");
+        setTodayIntent("quickAdd");
       }
     }
 
@@ -151,6 +158,21 @@ export default function App() {
       navigate("/app", "replace");
     }
   }, [currentPath, planner.auth.isSignedIn]);
+
+  // One-time cleanup for the legacy /inbox route and ?triage=inbox deep
+  // links — the intent was already captured into todayIntent above.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (window.location.pathname === "/inbox") {
+      window.history.replaceState(null, "", "/app");
+      setCurrentPath("/app");
+    } else if (params.get("triage") === "inbox") {
+      params.delete("triage");
+      const query = params.toString();
+      const cleanPath = `${window.location.pathname}${query ? `?${query}` : ""}`;
+      window.history.replaceState(null, "", cleanPath);
+    }
+  }, []);
 
   function showToast(nextToast: { message: string; actionLabel?: string; onAction?: () => void }) {
     setToast(nextToast);
@@ -237,7 +259,8 @@ export default function App() {
     setSearchQuery("");
 
     if (task.status === "inbox") {
-      setActivePage("inbox");
+      setActivePage("today");
+      setTodayIntent("triage");
       return;
     }
 
@@ -347,10 +370,11 @@ export default function App() {
         setStudyTab={setStudyTab}
         studyFocusNoteId={studyFocusNoteId}
         setStudyFocusNoteId={setStudyFocusNoteId}
+        todayIntent={todayIntent}
+        onTodayIntentHandled={() => setTodayIntent("")}
         renderTaskDetail={renderTaskDetail}
         showToast={showToast}
         handleArchiveTask={handleArchiveTask}
-        handleDuplicateTask={handleDuplicateTask}
         handleArchiveProject={handleArchiveProject}
         requestDeleteTask={requestDeleteTask}
         requestDeleteProject={requestDeleteProject}

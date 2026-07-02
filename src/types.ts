@@ -296,7 +296,6 @@ export interface PlannerData {
 }
 
 export type PageId =
-  | "inbox"
   | "today"
   | "projects"
   | "focus"
