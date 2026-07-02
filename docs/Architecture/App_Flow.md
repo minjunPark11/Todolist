@@ -29,7 +29,7 @@
 - 구현됨: `calendar` -> `C:\Users\minju\Todolist\src\components\CalendarView.tsx`
 - 구현됨: `projects` -> `C:\Users\minju\Todolist\src\components\ProjectsPage.tsx`
 - 구현됨: `settings` -> `C:\Users\minju\Todolist\src\components\SettingsPage.tsx`
-- 구현됨/숨김: `tomorrow`, `next7`, `tasks`, `board`, `matrix`, `dashboard`, `habits`, `focus`
+- 삭제됨 (2026-07-02): hidden/non-MVP page였던 `tomorrow`, `next7`, `tasks`, `board`, `matrix`, `dashboard`, `habits`, `focus`는 `PageId`, `AppPages.tsx` 분기, 전용 컴포넌트(`BoardView`, `DashboardView`, `HabitsPage`, `FocusPage`)와 함께 코드에서 제거했다. 복구가 필요하면 git 히스토리에서 되살린다. habits/focusSessions/taskTemplates 데이터 모델과 Supabase 테이블은 유지 중이다.
 
 ## 데이터 흐름
 
@@ -53,7 +53,7 @@
 ## 리팩토링 후보
 
 - 추정: `App.tsx`가 페이지 분기, modal, AI action execution, import/export, auth UI까지 많이 들고 있어 장기적으로 feature별 container 분리가 필요하다.
-- 추정: hidden/non-MVP page들이 `PageId`와 `renderPage()`에 남아 있어 navigation 정책과 코드 소유권을 정리할 필요가 있다.
+- 해결됨 (2026-07-02): hidden/non-MVP page들은 코드에서 삭제했다. `PageId`는 MVP 8개 페이지만 남았다.
 - 구현됨: `serverProvider`는 `gateway.ts` provider 배열에 최종 fallback으로 포함되어 있다.
 
 ## 1차 App Shell 리팩토링 결과

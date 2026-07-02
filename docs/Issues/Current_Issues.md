@@ -16,7 +16,7 @@
 - 해결됨 (2026-07-02): Study collection을 Supabase sync에 포함했다. `supabase/migrations/002_study_tables.sql`로 `study_topics`/`concept_notes` 테이블을 추가했고 `usePlannerData.ts`의 `collectionTables`에 두 collection을 등록했다.
 - 개선 필요: `C:\Users\minju\Todolist\src\App.tsx`가 많은 책임을 갖고 있다.
 - 개선 필요: Calendar context는 실제 calendar anchor/mode가 아닌 오늘 기준 week snapshot을 사용한다.
-- 개선 필요: hidden/non-MVP pages가 `PageId`와 `renderPage()`에 남아 있어 제품 범위가 흐려질 수 있다.
+- 해결됨 (2026-07-02): hidden/non-MVP pages(`tomorrow`, `next7`, `tasks`, `board`, `matrix`, `dashboard`, `habits`, `focus`)를 `PageId`, `AppPages.tsx`, 전용 컴포넌트, 관련 i18n 키와 함께 삭제했다. habits/focusSessions/taskTemplates 데이터 모델은 유지.
 
 ## 중복 구현 후보
 

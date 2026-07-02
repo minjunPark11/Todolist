@@ -15,10 +15,7 @@
 - `C:\Users\minju\Todolist\src\components\StudyPage.tsx`: Study topics/notes/reviews
 - `C:\Users\minju\Todolist\src\components\ArchivePage.tsx`: archived task/project restore/delete
 - `C:\Users\minju\Todolist\src\components\SettingsPage.tsx`: app settings, export/import, sample load, reset
-- `C:\Users\minju\Todolist\src\components\BoardView.tsx`: board page
-- `C:\Users\minju\Todolist\src\components\DashboardView.tsx`: dashboard page
-- `C:\Users\minju\Todolist\src\components\HabitsPage.tsx`: habits page
-- `C:\Users\minju\Todolist\src\components\FocusPage.tsx`: focus timer/session page
+- 삭제됨 (2026-07-02): `BoardView.tsx`, `DashboardView.tsx`, `HabitsPage.tsx`, `FocusPage.tsx`는 hidden page 정리에서 제거했다.
 
 ## 주요 공통 컴포넌트
 
@@ -72,7 +69,7 @@
 
 - 추정: `App.tsx`와 `utils\planner.ts`에 Today bucket 계산이 중복된 흔적이 있다. `App.tsx` 내부 `getTodayBuckets()`와 `utils\planner.ts` export 버전을 비교해 단일화 후보.
 - 해결됨: `src\lib\ollama.ts` legacy wrapper를 제거했고 AI 호출은 `src\lib\ai\gateway.ts`와 provider 구조로 단일화했다.
-- 개선 필요: hidden page 컴포넌트가 실제 제품 navigation에서 빠진 상태로 남아 있어 유지/삭제/문서화 기준 필요.
+- 해결됨 (2026-07-02): hidden page 컴포넌트는 삭제했다. navigation에 노출되는 MVP 페이지만 코드에 남아 있다.
 
 ## App Shell 리팩토링 후 src/app
 

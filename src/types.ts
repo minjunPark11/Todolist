@@ -287,16 +287,7 @@ export type PageId =
   | "study"
   | "archive"
   | "settings"
-  | "calendar"
-  // Non-MVP pages — kept in code, hidden from nav:
-  | "tomorrow"
-  | "next7"
-  | "tasks"
-  | "board"
-  | "matrix"
-  | "dashboard"
-  | "habits"
-  | "focus";
+  | "calendar";
 
 export interface TaskDraft {
   title: string;
