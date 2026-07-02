@@ -347,6 +347,7 @@ export default function App() {
         openProjectFromCalendar={openProjectFromCalendar}
         openStudyReviewFromCalendar={openStudyReviewFromCalendar}
         viewTaskInCalendar={viewTaskInCalendar}
+        onNavigate={setActivePage}
         exportJson={exportJson}
         handleImport={handleImport}
         importMessage={importMessage}

@@ -38,6 +38,7 @@ type AppPagesProps = {
   openProjectFromCalendar: (projectId: string) => void;
   openStudyReviewFromCalendar: (noteId: string) => void;
   viewTaskInCalendar: (taskId: string) => void;
+  onNavigate: (page: PageId) => void;
   exportJson: () => void;
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
   importMessage: string;
@@ -69,6 +70,7 @@ export function AppPages({
   openProjectFromCalendar,
   openStudyReviewFromCalendar,
   viewTaskInCalendar,
+  onNavigate,
   exportJson,
   handleImport,
   importMessage,
@@ -81,26 +83,20 @@ export function AppPages({
 
   if (activePage === "today") {
     return (
-      <section className={pageGridClass()}>
+      <section className={pageGridClass("tdy-grid")}>
         <TodayPage
           tasks={planner.tasks}
           projects={activeProjects}
-          subtasks={planner.subtasks}
+          conceptNotes={planner.conceptNotes}
           selectedTaskId={planner.selectedTask?.id ?? ""}
-          showCompleted={appSettings.showCompletedInToday}
           onOpenTask={planner.selectTask}
           onToggleDone={planner.toggleTaskDone}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
-          onUpdateStatus={planner.updateTaskStatus}
-          onSnooze={planner.snoozeTask}
-          onMoveToWaiting={planner.moveToWaiting}
-          onSetFocus={planner.setTaskFocus}
           onArchiveTask={handleArchiveTask}
-          onDuplicateTask={handleDuplicateTask}
-          onRequestDelete={requestDeleteTask}
+          onNavigate={onNavigate}
+          onOpenProject={openProjectFromCalendar}
           showToast={showToast}
-          onViewInCalendar={viewTaskInCalendar}
         />
         {renderTaskDetail()}
       </section>
