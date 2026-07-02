@@ -74,3 +74,11 @@
 - 추정: `App.tsx`와 `utils\planner.ts`에 Today bucket 계산이 중복된 흔적이 있다. `App.tsx` 내부 `getTodayBuckets()`와 `utils\planner.ts` export 버전을 비교해 단일화 후보.
 - 추정: `src\lib\ollama.ts`와 `src\lib\ai\providers\ollamaProvider.ts`의 역할이 겹칠 가능성이 있어 확인 필요.
 - 개선 필요: hidden page 컴포넌트가 실제 제품 navigation에서 빠진 상태로 남아 있어 유지/삭제/문서화 기준 필요.
+
+## App Shell 리팩토링 후 src/app
+
+- `C:\Users\minju\Todolist\src\app\AppPages.tsx`: active page routing/rendering, page별 props 연결, tasks page filter/sort/group 상태
+- `C:\Users\minju\Todolist\src\app\AppModals.tsx`: task/project delete confirmation modal, toast rendering
+- `C:\Users\minju\Todolist\src\app\useDataPortability.ts`: JSON export/import hook
+- `C:\Users\minju\Todolist\src\app\executeAgentActions.ts`: AI agent action validation/execution adapter
+- 현재 `C:\Users\minju\Todolist\src\App.tsx`는 layout shell, Sidebar/OllamaChat 연결, search, auth gate, selected task detail adapter를 담당한다.
