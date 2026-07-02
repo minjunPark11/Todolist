@@ -96,6 +96,22 @@ export const en: Dictionary = {
   "app.studyNoteLabel": "Study note",
   "app.noTags": "no tags",
 
+  // ---- Landing ----
+  "landing.eyebrow": "A calmer planner for work, study, and review",
+  "landing.title": "FocusFlow",
+  "landing.subtitle": "FocusFlow brings tasks, projects, calendar planning, study notes, spaced review, and an AI assistant into a private productivity workspace.",
+  "landing.demo": "View demo",
+  "landing.login": "Log in",
+  "landing.openApp": "Open app",
+  "landing.supabaseReady": "Authentication is handled by Supabase Auth. Your email and password are requested only on the dedicated login page.",
+  "landing.supabaseLocal": "Supabase Auth is not configured in this environment, so the app will use localStorage mode.",
+  "landing.featureTasks": "Capture tasks, organize projects, and keep Today focused.",
+  "landing.featureCalendar": "Schedule work on a calendar without losing the task context.",
+  "landing.featureStudy": "Build study topics, concept notes, and review queues.",
+  "landing.featureAi": "Use the AI assistant through the app gateway without exposing login fields on the first screen.",
+  "landing.previewLabel": "FocusFlow app preview",
+  "landing.featuresLabel": "Key features",
+
   // ---- Auth ----
   "auth.brandTitle": "FOCUSFLOW",
   "auth.signUpSubtitle": "Create your personal focus space",

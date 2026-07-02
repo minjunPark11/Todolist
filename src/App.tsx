@@ -39,6 +39,7 @@ export default function App() {
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState("");
   const [toast, setToast] = useState<ToastState | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const today = todayValue();
@@ -126,6 +127,39 @@ export default function App() {
     root.dataset.reduceMotion = appSettings.reduceMotion ? "true" : "false";
     root.lang = appSettings.language;
   }, [appSettings.theme, appSettings.accentColor, appSettings.fontSize, appSettings.reduceMotion, appSettings.language]);
+
+  function navigate(path: string, mode: "push" | "replace" = "push") {
+    if (window.location.pathname === path) {
+      return;
+    }
+    window.history[mode === "replace" ? "replaceState" : "pushState"](null, "", path);
+    setCurrentPath(path);
+  }
+
+  useEffect(() => {
+    function handlePopState() {
+      setCurrentPath(window.location.pathname);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (currentPath === "/login" && planner.auth.isSignedIn) {
+      navigate("/app", "replace");
+      return;
+    }
+
+    if (currentPath.startsWith("/app") && planner.auth.isConfigured && !planner.auth.isSignedIn) {
+      navigate("/login", "replace");
+      return;
+    }
+
+    if (currentPath !== "/" && currentPath !== "/login" && !currentPath.startsWith("/app")) {
+      navigate("/", "replace");
+    }
+  }, [currentPath, planner.auth.isConfigured, planner.auth.isSignedIn]);
 
   function showToast(nextToast: { message: string; actionLabel?: string; onAction?: () => void }) {
     setToast(nextToast);
@@ -261,14 +295,44 @@ export default function App() {
     setActivePage("calendar");
   }
 
-  if (planner.auth.isConfigured && !planner.auth.isSignedIn) {
+  if (currentPath === "/") {
+    return (
+      <I18nProvider lang={appSettings.language}>
+        <LandingPage
+          isSignedIn={planner.auth.isSignedIn}
+          isSupabaseConfigured={planner.auth.isConfigured}
+          onOpenDemo={() => navigate("/app")}
+          onOpenLogin={() => navigate(planner.auth.isSignedIn ? "/app" : "/login")}
+        />
+      </I18nProvider>
+    );
+  }
+
+  if (currentPath === "/login" && planner.auth.isSignedIn) {
+    return (
+      <I18nProvider lang={appSettings.language}>
+        <main className="auth-screen" aria-live="polite" />
+      </I18nProvider>
+    );
+  }
+
+  if (currentPath === "/login") {
     return (
       <I18nProvider lang={appSettings.language}>
         <AuthGate
           auth={planner.auth}
           onSignIn={planner.signIn}
           onSignUp={planner.signUp}
+          onAuthenticated={() => navigate("/app", "replace")}
         />
+      </I18nProvider>
+    );
+  }
+
+  if (planner.auth.isConfigured && !planner.auth.isSignedIn) {
+    return (
+      <I18nProvider lang={appSettings.language}>
+        <main className="auth-screen" aria-live="polite" />
       </I18nProvider>
     );
   }
@@ -449,10 +513,12 @@ function AuthGate({
   auth,
   onSignIn,
   onSignUp,
+  onAuthenticated,
 }: {
   auth: ReturnType<typeof usePlannerData>["auth"];
   onSignIn: (email: string, password: string) => Promise<boolean>;
   onSignUp: (email: string, password: string) => Promise<{ ok: boolean; needsEmailConfirmation: boolean }>;
+  onAuthenticated: () => void;
 }) {
   const { t } = useT();
   const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
@@ -491,6 +557,7 @@ function AuthGate({
       setMode("signIn");
     } else {
       setMessage(isSignUp ? t("auth.accountCreated") : t("auth.signedIn"));
+      onAuthenticated();
     }
     setPassword("");
   }
@@ -586,6 +653,89 @@ function AuthGate({
             {authError || message}
           </p>
         ) : null}
+      </section>
+    </main>
+  );
+}
+
+function LandingPage({
+  isSignedIn,
+  isSupabaseConfigured,
+  onOpenDemo,
+  onOpenLogin,
+}: {
+  isSignedIn: boolean;
+  isSupabaseConfigured: boolean;
+  onOpenDemo: () => void;
+  onOpenLogin: () => void;
+}) {
+  const { t } = useT();
+  const features = [
+    t("landing.featureTasks"),
+    t("landing.featureCalendar"),
+    t("landing.featureStudy"),
+    t("landing.featureAi"),
+  ];
+
+  return (
+    <main className="landing-screen">
+      <nav className="landing-nav" aria-label="Landing">
+        <button type="button" className="landing-brand" onClick={onOpenDemo}>
+          FOCUSFLOW
+        </button>
+        <div className="landing-nav-actions">
+          <button type="button" className="landing-link-button" onClick={onOpenDemo}>
+            {t("landing.demo")}
+          </button>
+          <button type="button" className="landing-login-button" onClick={onOpenLogin}>
+            {isSignedIn ? t("landing.openApp") : t("landing.login")}
+          </button>
+        </div>
+      </nav>
+
+      <section className="landing-hero" aria-labelledby="landing-title">
+        <div className="landing-copy">
+          <p className="landing-eyebrow">{t("landing.eyebrow")}</p>
+          <h1 id="landing-title">{t("landing.title")}</h1>
+          <p className="landing-subtitle">{t("landing.subtitle")}</p>
+          <div className="landing-actions">
+            <button type="button" className="landing-primary" onClick={onOpenDemo}>
+              {t("landing.demo")}
+            </button>
+            <button type="button" className="landing-secondary" onClick={onOpenLogin}>
+              {isSignedIn ? t("landing.openApp") : t("landing.login")}
+            </button>
+          </div>
+          <p className="landing-auth-note">
+            {isSupabaseConfigured ? t("landing.supabaseReady") : t("landing.supabaseLocal")}
+          </p>
+        </div>
+
+        <div className="landing-preview" aria-label={t("landing.previewLabel")}>
+          <div className="landing-preview-header">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="landing-preview-body">
+            <div className="landing-preview-sidebar" />
+            <div className="landing-preview-main">
+              <span className="landing-preview-line wide" />
+              <span className="landing-preview-line" />
+              <span className="landing-preview-card" />
+              <span className="landing-preview-card compact" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-features" aria-label={t("landing.featuresLabel")}>
+        {features.map((feature) => (
+          <article key={feature}>
+            <span />
+            <p>{feature}</p>
+          </article>
+        ))}
       </section>
     </main>
   );
