@@ -1,6 +1,5 @@
 import { sendAiChat } from "../gateway";
 import type { AiChatResponse, AiMessage } from "../types";
-import { parseAgentActionBlock } from "./actionParser";
 import type { AgentAction } from "./actions";
 import { detectAgentIntent, type AgentIntent } from "./intent";
 import { PERSONAL_AGENT_SYSTEM_PROMPT } from "./prompts";
@@ -25,6 +24,7 @@ export async function runPersonalAgent({
   const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
   const resolvedIntent = intent ?? detectAgentIntent(lastUserMessage?.content ?? "");
   const response = await sendAiChat({
+    dataScope: contextText ? "full-app" : "compact",
     temperature: 0.2,
     messages: [
       {
@@ -43,13 +43,11 @@ export async function runPersonalAgent({
     ],
   });
 
-  const parsed = parseAgentActionBlock(response.content);
-
   return {
     ...response,
-    content: parsed.message || response.content,
+    content: response.content,
     intent: resolvedIntent,
-    suggestedActions: parsed.actions,
-    needsConfirmation: parsed.actions.length > 0,
+    suggestedActions: [],
+    needsConfirmation: false,
   };
 }

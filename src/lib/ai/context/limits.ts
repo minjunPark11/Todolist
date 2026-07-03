@@ -5,5 +5,5 @@ export const AI_CONTEXT_LIMITS = {
   calendarEvents: 30,
   studyTopics: 10,
   recentNotes: 5,
-  maxContextCharacters: 12000,
+  maxContextCharacters: 200000,
 };

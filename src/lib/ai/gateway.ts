@@ -12,6 +12,11 @@ export async function sendAiChat(request: AiChatRequest): Promise<AiChatResponse
 
   for (const provider of providers) {
     try {
+      if (request.dataScope === "full-app" && !provider.canHandleFullAppData?.()) {
+        errors.push(`${provider.name}: full app data is restricted to local providers`);
+        continue;
+      }
+
       const available = await provider.isAvailable();
       if (!available) {
         errors.push(`${provider.name}: unavailable`);

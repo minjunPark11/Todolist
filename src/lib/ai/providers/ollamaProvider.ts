@@ -20,6 +20,15 @@ function getOllamaModel() {
   return configured?.trim() || DEFAULT_OLLAMA_MODEL;
 }
 
+function isLocalOllamaUrl() {
+  try {
+    const url = new URL(getOllamaBaseUrl());
+    return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function withTimeout(milliseconds: number) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), milliseconds);
@@ -31,6 +40,10 @@ function withTimeout(milliseconds: number) {
 
 export const ollamaProvider: AiProvider = {
   name: "ollama",
+
+  canHandleFullAppData() {
+    return isLocalOllamaUrl();
+  },
 
   async isAvailable() {
     const baseUrl = getOllamaBaseUrl();

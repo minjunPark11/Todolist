@@ -21,6 +21,7 @@ export type AiChatRequest = {
   messages: AiMessage[];
   context?: AiAppContext;
   temperature?: number;
+  dataScope?: "compact" | "full-app";
 };
 
 export type AiChatResponse = {
@@ -33,5 +34,6 @@ export type AiChatResponse = {
 export type AiProvider = {
   name: AiProviderName;
   isAvailable: () => Promise<boolean>;
+  canHandleFullAppData?: () => boolean;
   chat: (request: AiChatRequest) => Promise<AiChatResponse>;
 };

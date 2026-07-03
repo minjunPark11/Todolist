@@ -549,9 +549,17 @@ export default function App() {
           userId: planner.auth.userEmail || "local-user",
           tasks: planner.tasks,
           projects: planner.projects,
+          subtasks: planner.subtasks,
+          studyTopics: planner.studyTopics,
           conceptNotes: planner.conceptNotes,
           habits: planner.habits,
           habitLogs: planner.habitLogs,
+          focusSessions: planner.focusSessions,
+          activeSessionId: planner.activeSessionId,
+          taskTemplates: planner.taskTemplates,
+          recentItems: planner.recentItems,
+          settings: planner.settings,
+          appSettings,
         }}
         calendarContext={{
           tasks: planner.tasks,
