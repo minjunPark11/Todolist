@@ -67,6 +67,8 @@ export const en: Dictionary = {
   "sidebar.today": "Today",
   "sidebar.calendar": "Calendar",
   "sidebar.projects": "Projects",
+  "sidebar.spaces": "Spaces",
+  "sidebar.focus": "Focus",
   "sidebar.planning": "Planning",
   "sidebar.study": "Study",
   "sidebar.archive": "Archive",
