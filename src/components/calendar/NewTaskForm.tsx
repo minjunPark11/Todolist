@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import type { Project } from "../../types";
+import type { CalendarCategoryGroup } from "../../lib/calendarCategories";
 import type { CalendarDraftBlock } from "../../utils/calendarTime";
 import { formatDate } from "../../utils/date";
 import { useAutoFocus } from "../kit";
@@ -7,36 +7,33 @@ import { useT } from "../../i18n";
 
 export interface NewTaskFormResult {
   title: string;
-  projectId: string;
+  categoryId: string;
   dueDate: string;
 }
 
 interface NewTaskFormProps {
   draft: CalendarDraftBlock;
-  projects: Project[];
+  categoryGroups: CalendarCategoryGroup[];
+  initialCategoryId: string;
   onCancel: () => void;
   onCreate: (result: NewTaskFormResult) => void;
 }
 
 // CALENDAR_V3_DESIGN.md §3/§6: draft time info lives in CalendarView state;
-// this form only owns "what" (title/project/dueDate), so Cancel/remount never
-// touches the draft's time range.
-export function NewTaskForm({ draft, projects, onCancel, onCreate }: NewTaskFormProps) {
+// this form only owns "what" (title/category/dueDate), so Cancel/remount never
+// touches the draft's time range. The category select is pre-filled with the
+// sidebar's active category (category spec §11.1); an empty title falls back
+// to the default event title instead of blocking creation (§17.4).
+export function NewTaskForm({ draft, categoryGroups, initialCategoryId, onCancel, onCreate }: NewTaskFormProps) {
   const { t, lang } = useT();
   const [title, setTitle] = useState("");
-  const [projectId, setProjectId] = useState("");
+  const [categoryId, setCategoryId] = useState(initialCategoryId);
   const [dueDate, setDueDate] = useState("");
-  const [error, setError] = useState("");
   const titleRef = useAutoFocus<HTMLInputElement>();
 
   function submit(event?: FormEvent) {
     event?.preventDefault();
-    const trimmed = title.trim();
-    if (!trimmed) {
-      setError(t("calendar.taskTitleRequired"));
-      return;
-    }
-    onCreate({ title: trimmed, projectId, dueDate });
+    onCreate({ title: title.trim() || t("calendar.newEventDefaultTitle"), categoryId, dueDate });
   }
 
   return (
@@ -53,17 +50,13 @@ export function NewTaskForm({ draft, projects, onCancel, onCreate }: NewTaskForm
         <input
           ref={titleRef}
           value={title}
-          onChange={(event) => {
-            setTitle(event.target.value);
-            if (error) setError("");
-          }}
+          onChange={(event) => setTitle(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") onCancel();
           }}
-          placeholder={t("calendar.titlePlaceholderQuestion")}
+          placeholder={t("calendar.newEventDefaultTitle")}
         />
       </label>
-      {error ? <p className="gcal-newtask-error">{error}</p> : null}
 
       <div className="gcal-newtask-when">
         <span className="gcal-newtask-when-label">{t("calendar.when")}</span>
@@ -74,14 +67,19 @@ export function NewTaskForm({ draft, projects, onCancel, onCreate }: NewTaskForm
       </div>
 
       <label>
-        <span>{t("common.project")}</span>
-        <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-          <option value="">{t("inbox.title")}</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
+        <span>{t("calendar.categoryLabel")}</span>
+        <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+          {categoryGroups.map((group) =>
+            group.categories.length === 0 ? null : (
+              <optgroup key={group.type} label={t(`calendar.group.${group.type}`)}>
+                {group.categories.map((category) => (
+                  <option key={category.id} value={category.id} disabled={category.isReadOnly}>
+                    {category.name}
+                  </option>
+                ))}
+              </optgroup>
+            ),
+          )}
         </select>
       </label>
 

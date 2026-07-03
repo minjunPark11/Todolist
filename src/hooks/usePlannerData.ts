@@ -136,6 +136,7 @@ function normalizeTask(task: Partial<Task>): Task {
     startTime,
     endTime: task.endTime ?? "",
     projectId: task.projectId ?? "",
+    categoryId: task.categoryId ?? "",
     parentTaskId: task.parentTaskId ?? "",
     tags: Array.isArray(task.tags) ? task.tags : [],
     notes: task.notes ?? "",

@@ -1,5 +1,5 @@
-import { DragEvent, ReactNode, useMemo, useState } from "react";
-import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, Project, Task, TaskDraft } from "../types";
+import { DragEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, Project, StudyTopic, Task, TaskDraft } from "../types";
 import {
   addDays,
   addMonths,
@@ -13,9 +13,18 @@ import {
   buildCalendarItems,
   defaultCalendarLayers,
   type CalendarItem,
-  type CalendarLayerToggles,
-  type ProjectFilter,
 } from "../utils/calendarItems";
+import {
+  buildCalendarCategories,
+  ensureCategoryVisible,
+  flattenCategories,
+  isCategoryVisible,
+  projectCategoryId,
+  setActiveCategory,
+  toggleCategoryVisibility,
+  useCalendarCategoryState,
+  type CalendarCategory,
+} from "../lib/calendarCategories";
 import {
   DAY_END,
   TIME_SNAP_MINUTES,
@@ -63,17 +72,19 @@ interface CalendarViewProps {
   tasks: Task[];
   projects: Project[];
   conceptNotes: ConceptNote[];
+  studyTopics: StudyTopic[];
   externalCalendars: ExternalCalendar[];
   externalCalendarEvents: ExternalCalendarEvent[];
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
-  // When set, the calendar mounts with only this project's items visible
-  // (space detail "Open Calendar" hand-off). The user can widen it any time.
+  // When set, the calendar mounts with this project's category selected
+  // (space detail "Open Calendar" hand-off).
   initialProjectId?: string;
   onSelectTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
   onOpenProject?: (projectId: string) => void;
   onOpenStudyReview?: (noteId: string) => void;
+  onOpenSettings?: () => void;
   taskDetail?: ReactNode;
   onClearTaskSelection?: () => void;
   showToast?: (toast: ToastState) => void;
@@ -87,6 +98,7 @@ export function CalendarView({
   tasks,
   projects,
   conceptNotes,
+  studyTopics,
   externalCalendars,
   externalCalendarEvents,
   onUpdateExternalCalendar,
@@ -96,6 +108,7 @@ export function CalendarView({
   onCreateTask,
   onOpenProject,
   onOpenStudyReview,
+  onOpenSettings,
   taskDetail,
   onClearTaskSelection,
   showToast,
@@ -104,10 +117,6 @@ export function CalendarView({
   const [mode, setMode] = useState<CalendarMode>("week");
   const [anchor, setAnchor] = useState(todayValue());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [layers, setLayers] = useState<CalendarLayerToggles>(defaultCalendarLayers);
-  const [projectFilter, setProjectFilter] = useState<ProjectFilter>(() =>
-    initialProjectId ? new Set([initialProjectId]) : "all",
-  );
   const [dragOverId, setDragOverId] = useState("");
   const [draggingTaskId, setDraggingTaskId] = useState("");
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
@@ -124,9 +133,55 @@ export function CalendarView({
   const today = todayValue();
   const anchorDate = new Date(`${anchor}T00:00:00`);
 
+  // Category spec §15: groups/categories derived from stored personal
+  // categories + study topics + projects + external calendars.
+  const categoryState = useCalendarCategoryState();
+  const categoryGroups = useMemo(
+    () => buildCalendarCategories({ state: categoryState, projects, studyTopics, externalCalendars }),
+    [categoryState, projects, studyTopics, externalCalendars],
+  );
+  const categoriesById = useMemo(() => flattenCategories(categoryGroups), [categoryGroups]);
+  const defaultCategoryId = categoryState.defaultCategoryId;
+  // Invalid persisted ids fall back to the default category (§15.6).
+  const activeCategoryId = categoriesById.has(categoryState.activeCategoryId)
+    ? categoryState.activeCategoryId
+    : defaultCategoryId;
+  const visibleCategoryIds = useMemo(
+    () =>
+      new Set(
+        [...categoriesById.keys()].filter((id) =>
+          isCategoryVisible(id, categoryState.hiddenCategoryIds, externalCalendars),
+        ),
+      ),
+    [categoriesById, categoryState.hiddenCategoryIds, externalCalendars],
+  );
+
+  // Space detail hand-off: select the project's category on mount.
+  useEffect(() => {
+    if (!initialProjectId) return;
+    const categoryId = projectCategoryId(initialProjectId);
+    if (categoriesById.has(categoryId)) {
+      setActiveCategory(categoryId);
+      ensureCategoryVisible(categoryId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProjectId]);
+
   const items = useMemo(
-    () => buildCalendarItems({ tasks, projects, conceptNotes, externalCalendars, externalCalendarEvents, layers, projectFilter }),
-    [tasks, projects, conceptNotes, externalCalendars, externalCalendarEvents, layers, projectFilter],
+    () =>
+      buildCalendarItems({
+        tasks,
+        projects,
+        conceptNotes,
+        externalCalendars,
+        externalCalendarEvents,
+        layers: defaultCalendarLayers,
+        projectFilter: "all",
+        categories: categoriesById,
+        defaultCategoryId,
+        visibleCategoryIds,
+      }),
+    [tasks, projects, conceptNotes, externalCalendars, externalCalendarEvents, categoriesById, defaultCategoryId, visibleCategoryIds],
   );
 
   const monthPrefix = `${anchorDate.getFullYear()}-${pad(anchorDate.getMonth() + 1)}`;
@@ -136,14 +191,8 @@ export function CalendarView({
   );
 
   const unscheduled = useMemo(
-    () =>
-      tasks.filter((task) => {
-        if (task.scheduledDate || task.status === "done" || task.status === "archived") return false;
-        if (!layers.task) return false;
-        if (projectFilter !== "all" && task.projectId && !projectFilter.has(task.projectId)) return false;
-        return true;
-      }),
-    [layers.task, projectFilter, tasks],
+    () => tasks.filter((task) => !(task.scheduledDate || task.status === "done" || task.status === "archived")),
+    [tasks],
   );
 
   let rangeLabel: string;
@@ -182,27 +231,36 @@ export function CalendarView({
     setMode(next);
   }
 
-  function toggleLayer(key: keyof CalendarLayerToggles) {
+  // §16.1: row click picks the category new events go into. readOnly
+  // (external) categories cannot become the active category; hidden ones are
+  // re-shown so the next created event is not invisible.
+  function handleSelectCategory(category: CalendarCategory) {
     onClearTaskSelection?.();
-    setLayers((current) => ({ ...current, [key]: !current[key] }));
+    if (category.isReadOnly) {
+      showToast?.({ message: t("calendar.readOnlyCategoryToast") });
+      return;
+    }
+    ensureCategoryVisible(category.id);
+    setActiveCategory(category.id);
   }
 
-  function toggleProjectFilter(projectId: string) {
+  // §16.2: checkbox only flips visibility — never the active category.
+  // External categories keep their visibility on the calendar record itself.
+  function handleToggleCategory(category: CalendarCategory) {
     onClearTaskSelection?.();
-    setProjectFilter((current) => {
-      if (current === "all") {
-        const next = new Set(projects.map((project) => project.id));
-        next.delete(projectId);
-        return next;
-      }
-      const next = new Set(current);
-      if (next.has(projectId)) {
-        next.delete(projectId);
-      } else {
-        next.add(projectId);
-      }
-      return next.size === projects.length ? "all" : next;
-    });
+    if (category.group === "external" && category.sourceId) {
+      const calendar = externalCalendars.find((item) => item.id === category.sourceId);
+      if (calendar) onUpdateExternalCalendar(calendar.id, { visible: !calendar.visible });
+      return;
+    }
+    toggleCategoryVisibility(category.id);
+  }
+
+  // Category → task field mapping: picking a project category also links the
+  // task to that project; other categories leave projectId alone.
+  function projectIdForCategory(categoryId: string): string | undefined {
+    const category = categoriesById.get(categoryId);
+    return category?.group === "project" ? category.sourceId : undefined;
   }
 
   function handleDragStart(event: DragEvent, taskId: string) {
@@ -396,6 +454,13 @@ export function CalendarView({
   function handleClickItem(item: CalendarItem, anchor: PopoverAnchor) {
     setDraft(null);
     setDraftAnchor(null);
+    // §16.5: clicking an event highlights its category in the sidebar and
+    // makes it the default for the next new event (readOnly ones excluded).
+    const itemCategory = item.categoryId ? categoriesById.get(item.categoryId) : undefined;
+    if (itemCategory && !itemCategory.isReadOnly) {
+      setActiveCategory(itemCategory.id);
+      ensureCategoryVisible(itemCategory.id);
+    }
     if (item.sourceType === "external") {
       setPopover({ kind: "event", item, anchor });
       return;
@@ -424,12 +489,18 @@ export function CalendarView({
   }
 
   function handleQuickCreateSave(result: QuickCreateResult) {
+    const category = categoriesById.get(result.categoryId);
+    if (category?.isReadOnly) {
+      showToast?.({ message: t("calendar.readOnlyCategoryToast") });
+      return;
+    }
     if (result.type === "deadline") {
       onCreateTask({
         title: result.title,
         status: "todo",
         dueDate: result.date,
-        projectId: result.projectId || undefined,
+        categoryId: result.categoryId,
+        projectId: projectIdForCategory(result.categoryId),
       });
     } else {
       onCreateTask({
@@ -438,9 +509,13 @@ export function CalendarView({
         scheduledDate: result.date,
         startTime: result.startTime || undefined,
         endTime: result.endTime || undefined,
-        projectId: result.projectId || undefined,
+        categoryId: result.categoryId,
+        projectId: projectIdForCategory(result.categoryId),
       });
     }
+    // §16.4: creating in a category re-shows it and keeps it active.
+    ensureCategoryVisible(result.categoryId);
+    setActiveCategory(result.categoryId);
     setQuickCreate(null);
   }
 
@@ -465,6 +540,11 @@ export function CalendarView({
   // §8/§13.5: the only place a real task gets created from a draft.
   function handleCreateFromDraft(result: NewTaskFormResult) {
     if (!draft) return;
+    const category = categoriesById.get(result.categoryId);
+    if (category?.isReadOnly) {
+      showToast?.({ message: t("calendar.readOnlyCategoryToast") });
+      return;
+    }
     const taskId = onCreateTask({
       title: result.title,
       status: "todo",
@@ -472,12 +552,30 @@ export function CalendarView({
       startTime: draft.startTime,
       endTime: draft.endTime,
       dueDate: result.dueDate || undefined,
-      projectId: result.projectId || undefined,
+      categoryId: result.categoryId,
+      projectId: projectIdForCategory(result.categoryId),
     });
+    ensureCategoryVisible(result.categoryId);
+    setActiveCategory(result.categoryId);
     setDraft(null);
     setDraftAnchor(null);
     if (mode === "day") onSelectTask(taskId);
     showToast?.({ message: t("calendar.createdToast", { title: result.title }) });
+  }
+
+  // §13.3: changing an event's category from the popover updates the task,
+  // recolors the block, and moves the sidebar highlight.
+  function handleChangeItemCategory(item: CalendarItem, categoryId: string) {
+    const category = categoriesById.get(categoryId);
+    if (!category || category.isReadOnly) {
+      showToast?.({ message: t("calendar.readOnlyCategoryToast") });
+      return;
+    }
+    const projectId = projectIdForCategory(categoryId);
+    onUpdateTask(item.sourceId, projectId ? { categoryId, projectId } : { categoryId });
+    setActiveCategory(categoryId);
+    ensureCategoryVisible(categoryId);
+    setPopover(null);
   }
 
   function openDay(date: string) {
@@ -519,20 +617,12 @@ export function CalendarView({
             clearTransient();
             setAnchor(date);
           }}
-          layers={layers}
-          onToggleLayer={toggleLayer}
-          projects={projects}
-          projectFilter={projectFilter}
-          externalCalendars={externalCalendars}
-          onToggleExternalCalendar={(calendarId) => {
-            const calendar = externalCalendars.find((item) => item.id === calendarId);
-            if (calendar) onUpdateExternalCalendar(calendarId, { visible: !calendar.visible });
-          }}
-          onToggleProject={toggleProjectFilter}
-          onSelectAllProjects={() => {
-            onClearTaskSelection?.();
-            setProjectFilter("all");
-          }}
+          groups={categoryGroups}
+          activeCategoryId={activeCategoryId}
+          isCategoryVisible={(categoryId) => visibleCategoryIds.has(categoryId)}
+          onToggleCategory={handleToggleCategory}
+          onSelectCategory={handleSelectCategory}
+          onOpenSettings={onOpenSettings}
           onCreateClick={() =>
             setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
           }
@@ -612,7 +702,8 @@ export function CalendarView({
             <DayDetailPanel
               draft={draft}
               taskDetail={taskDetail}
-              projects={projects}
+              categoryGroups={categoryGroups}
+              initialCategoryId={activeCategoryId}
               onCancelDraft={handleCancelDraft}
               onCreateFromDraft={handleCreateFromDraft}
             />
@@ -624,6 +715,8 @@ export function CalendarView({
         <EventPopover
           item={popover.item}
           anchor={popover.anchor}
+          categoryGroups={categoryGroups}
+          onChangeCategory={handleChangeItemCategory}
           onClose={() => setPopover(null)}
           onOpenDetail={openDetailFromPopover}
         />
@@ -642,7 +735,8 @@ export function CalendarView({
           <NewTaskForm
             key={`${draft.date}-${draft.startTime}-${draft.endTime}`}
             draft={draft}
-            projects={projects}
+            categoryGroups={categoryGroups}
+            initialCategoryId={activeCategoryId}
             onCancel={handleCancelDraft}
             onCreate={handleCreateFromDraft}
           />
@@ -652,7 +746,8 @@ export function CalendarView({
       {quickCreate ? (
         <QuickCreatePopover
           defaults={quickCreate}
-          projects={projects}
+          categoryGroups={categoryGroups}
+          initialCategoryId={activeCategoryId}
           onClose={() => setQuickCreate(null)}
           onSave={handleQuickCreateSave}
         />

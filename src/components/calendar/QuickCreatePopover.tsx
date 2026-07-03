@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import type { Project } from "../../types";
+import type { CalendarCategoryGroup } from "../../lib/calendarCategories";
 import { formatDate } from "../../utils/date";
 import { Modal, useAutoFocus } from "../kit";
 import { useT } from "../../i18n";
@@ -17,31 +17,31 @@ export interface QuickCreateResult {
   date: string;
   startTime: string;
   endTime: string;
-  projectId: string;
+  categoryId: string;
 }
 
 interface QuickCreatePopoverProps {
   defaults: QuickCreateDefaults;
-  projects: Project[];
+  categoryGroups: CalendarCategoryGroup[];
+  initialCategoryId: string;
   onClose: () => void;
   onSave: (result: QuickCreateResult) => void;
 }
 
-export function QuickCreatePopover({ defaults, projects, onClose, onSave }: QuickCreatePopoverProps) {
+export function QuickCreatePopover({ defaults, categoryGroups, initialCategoryId, onClose, onSave }: QuickCreatePopoverProps) {
   const { t, lang } = useT();
   const [title, setTitle] = useState("");
   const [type, setType] = useState<"task" | "deadline">("task");
   const [date, setDate] = useState(defaults.date);
   const [startTime, setStartTime] = useState(defaults.startTime ?? "");
   const [endTime, setEndTime] = useState(defaults.endTime ?? "");
-  const [projectId, setProjectId] = useState("");
+  const [categoryId, setCategoryId] = useState(initialCategoryId);
   const titleRef = useAutoFocus<HTMLInputElement>();
 
   function submit(event?: FormEvent) {
     event?.preventDefault();
-    const trimmed = title.trim();
-    if (!trimmed) return;
-    onSave({ title: trimmed, type, date, startTime, endTime, projectId });
+    const trimmed = title.trim() || t("calendar.newEventDefaultTitle");
+    onSave({ title: trimmed, type, date, startTime, endTime, categoryId });
   }
 
   return (
@@ -74,7 +74,7 @@ export function QuickCreatePopover({ defaults, projects, onClose, onSave }: Quic
               if (event.key === "Enter") submit();
               if (event.key === "Escape") onClose();
             }}
-            placeholder={t("calendar.titlePlaceholderQuestion")}
+            placeholder={t("calendar.newEventDefaultTitle")}
           />
         </label>
 
@@ -107,14 +107,19 @@ export function QuickCreatePopover({ defaults, projects, onClose, onSave }: Quic
         ) : null}
 
         <label>
-          <span>{t("common.project")}</span>
-          <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-            <option value="">{t("inbox.title")}</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
+          <span>{t("calendar.categoryLabel")}</span>
+          <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+            {categoryGroups.map((group) =>
+              group.categories.length === 0 ? null : (
+                <optgroup key={group.type} label={t(`calendar.group.${group.type}`)}>
+                  {group.categories.map((category) => (
+                    <option key={category.id} value={category.id} disabled={category.isReadOnly}>
+                      {category.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ),
+            )}
           </select>
         </label>
       </form>

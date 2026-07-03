@@ -10766,3 +10766,264 @@ div.spc-signal-row {
     border-radius: 20px;
   }
 }
+
+/* ===== Calendar categories (category management spec) ===== */
+
+/* Sidebar category rows: checkbox = show/hide, row = active category. */
+.gcal-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.gcal-cat-row:hover {
+  background: var(--color-fill-quaternary, rgba(0, 0, 0, 0.04));
+}
+
+.gcal-cat-row input[type="checkbox"] {
+  flex-shrink: 0;
+}
+
+.gcal-cat-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gcal-cat-row.is-active .gcal-cat-name {
+  font-weight: 600;
+}
+
+.gcal-cat-badge {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  padding: 1px 6px;
+  border-radius: var(--rounded-pill, 999px);
+  background: var(--color-fill-tertiary, rgba(0, 0, 0, 0.06));
+  color: var(--color-ink-muted-48, #8e8e93);
+}
+
+.gcal-sidebar-settings {
+  margin-top: auto;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-ink-muted-80, #6b7280);
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gcal-sidebar-settings:hover {
+  background: var(--color-fill-quaternary, rgba(0, 0, 0, 0.04));
+}
+
+/* Event popover: category color button + dropdown (§12–§13). */
+.gcal-popover-category-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--color-divider-soft);
+  border-radius: 6px;
+  background: transparent;
+  padding: 2px 5px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  color: var(--color-ink-muted-80, #6b7280);
+}
+
+.gcal-popover-category-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.gcal-popover-category-list {
+  margin: 6px 0;
+  border: 1px solid var(--color-divider-soft);
+  border-radius: 10px;
+  padding: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  gap: 4px;
+}
+
+.gcal-popover-category-group {
+  display: grid;
+  gap: 2px;
+}
+
+.gcal-popover-category-group-name {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--color-ink-muted-48, #8e8e93);
+  padding: 2px 6px;
+  text-transform: uppercase;
+}
+
+.gcal-popover-category-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.gcal-popover-category-item:hover:not(:disabled) {
+  background: var(--color-fill-quaternary, rgba(0, 0, 0, 0.04));
+}
+
+.gcal-popover-category-item.is-current {
+  background: var(--color-primary-tint, rgba(0, 102, 204, 0.08));
+  font-weight: 600;
+}
+
+.gcal-popover-category-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.gcal-popover-category-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Settings > 캘린더 > 카테고리 관리 */
+.ff-cat-settings {
+  display: grid;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-divider-soft);
+}
+
+.ff-cat-settings-head strong {
+  display: block;
+}
+
+.ff-cat-settings-head small {
+  color: var(--color-ink-muted-48, #8e8e93);
+}
+
+.ff-cat-list {
+  display: grid;
+  gap: 6px;
+}
+
+.ff-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-divider-soft);
+  border-radius: 10px;
+}
+
+.ff-cat-row input[type="color"] {
+  width: 26px;
+  height: 26px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ff-cat-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.ff-cat-name-input {
+  flex: 1;
+  font-size: 0.9rem;
+  padding: 4px 8px;
+}
+
+.ff-cat-default-badge {
+  font-style: normal;
+  font-size: 0.65rem;
+  padding: 1px 7px;
+  border-radius: var(--rounded-pill, 999px);
+  background: var(--color-primary-tint, rgba(0, 102, 204, 0.1));
+  color: var(--color-primary, #0066cc);
+}
+
+.ff-cat-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.ff-cat-actions .ff-btn {
+  padding: 3px 8px;
+  font-size: 0.8rem;
+}
+
+.ff-cat-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.ff-cat-add-form input[type="text"],
+.ff-cat-add-form input:not([type]) {
+  flex: 1;
+  min-width: 160px;
+  padding: 6px 10px;
+}
+
+.ff-cat-color-palette {
+  display: flex;
+  gap: 6px;
+}
+
+.ff-cat-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ff-cat-color-swatch.active {
+  border-color: var(--color-ink, #1c1c1e);
+}
+
+.ff-cat-default-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ff-cat-default-row small {
+  display: block;
+  color: var(--color-ink-muted-48, #8e8e93);
+}
+
+.ff-cat-delete-body {
+  display: grid;
+  gap: 10px;
+}

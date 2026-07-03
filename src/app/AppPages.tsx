@@ -211,6 +211,7 @@ export function AppPages({
           tasks={planner.tasks}
           projects={activeProjects}
           conceptNotes={planner.conceptNotes}
+          studyTopics={planner.studyTopics}
           externalCalendars={externalCalendars}
           externalCalendarEvents={externalCalendarEvents}
           onUpdateExternalCalendar={onUpdateExternalCalendar}
@@ -220,6 +221,7 @@ export function AppPages({
           onCreateTask={planner.createTask}
           onOpenProject={openProjectFromCalendar}
           onOpenStudyReview={openStudyReviewFromCalendar}
+          onOpenSettings={() => onNavigate("settings")}
           taskDetail={renderTaskDetail()}
           onClearTaskSelection={() => planner.selectTask("")}
           showToast={showToast}
@@ -304,6 +306,8 @@ export function AppPages({
       onReset={requestResetAllData}
       importMessage={importMessage}
         accountSlot={accountSlot}
+        tasks={planner.tasks}
+        onUpdateTask={planner.updateTask}
         externalCalendars={externalCalendars}
         onAddExternalCalendar={onAddExternalCalendar}
         onUpdateExternalCalendar={onUpdateExternalCalendar}

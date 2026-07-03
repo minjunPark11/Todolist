@@ -29,6 +29,9 @@ export interface Task {
   startTime: string;
   endTime: string;
   projectId: string;
+  // Calendar category id ("" = unset; display falls back to the project
+  // category, then the default personal category).
+  categoryId: string;
   parentTaskId: string;
   tags: string[];
   notes: string;
@@ -348,6 +351,7 @@ export interface TaskDraft {
   startTime?: string;
   endTime?: string;
   projectId?: string;
+  categoryId?: string;
   parentTaskId?: string;
   priority?: TaskPriority;
   status?: TaskStatus;

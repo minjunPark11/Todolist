@@ -1,6 +1,7 @@
 import { ChangeEvent, ReactNode, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
-import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, ThemeMode } from "../types";
+import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, Task, ThemeMode } from "../types";
+import { CalendarCategorySettings } from "./calendar/CalendarCategorySettings";
 import { SegmentedTabs } from "./kit";
 import { useT } from "../i18n";
 
@@ -13,6 +14,8 @@ interface SettingsPageProps {
   onReset: () => void;
   importMessage: string;
   accountSlot: ReactNode;
+  tasks: Task[];
+  onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   externalCalendars: ExternalCalendar[];
   onAddExternalCalendar: (input: { name: string; icsUrl: string; color: string }) => void;
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
@@ -43,6 +46,8 @@ export function SettingsPage({
   onReset,
   importMessage,
   accountSlot,
+  tasks,
+  onUpdateTask,
   externalCalendars,
   onAddExternalCalendar,
   onUpdateExternalCalendar,
@@ -181,6 +186,8 @@ export function SettingsPage({
 
       {tab === "calendar" ? (
         <div className="ff-settings-card">
+          <CalendarCategorySettings tasks={tasks} onUpdateTask={onUpdateTask} />
+
           <Row title="내 캘린더 공유" hint="상대방이 구독할 수 있는 읽기 전용 ICS 링크를 만듭니다. 제목, 날짜, 시간만 공유됩니다.">
             <div className="ff-calendar-share-panel">
               <div className="ff-calendar-share-status">

@@ -2,7 +2,7 @@
 // form while a draft is pending, or an empty state. No mini calendar, no
 // backlog — week/month/year views render no right panel at all.
 import { ReactNode } from "react";
-import type { Project } from "../../types";
+import type { CalendarCategoryGroup } from "../../lib/calendarCategories";
 import type { CalendarDraftBlock } from "../../utils/calendarTime";
 import { NewTaskForm, type NewTaskFormResult } from "./NewTaskForm";
 import { useT } from "../../i18n";
@@ -10,12 +10,13 @@ import { useT } from "../../i18n";
 interface DayDetailPanelProps {
   draft: CalendarDraftBlock | null;
   taskDetail: ReactNode;
-  projects: Project[];
+  categoryGroups: CalendarCategoryGroup[];
+  initialCategoryId: string;
   onCancelDraft: () => void;
   onCreateFromDraft: (result: NewTaskFormResult) => void;
 }
 
-export function DayDetailPanel({ draft, taskDetail, projects, onCancelDraft, onCreateFromDraft }: DayDetailPanelProps) {
+export function DayDetailPanel({ draft, taskDetail, categoryGroups, initialCategoryId, onCancelDraft, onCreateFromDraft }: DayDetailPanelProps) {
   const { t } = useT();
 
   if (draft) {
@@ -24,7 +25,8 @@ export function DayDetailPanel({ draft, taskDetail, projects, onCancelDraft, onC
         <NewTaskForm
           key={`${draft.date}-${draft.startTime}-${draft.endTime}`}
           draft={draft}
-          projects={projects}
+          categoryGroups={categoryGroups}
+          initialCategoryId={initialCategoryId}
           onCancel={onCancelDraft}
           onCreate={onCreateFromDraft}
         />

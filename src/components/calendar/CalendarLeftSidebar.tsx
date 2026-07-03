@@ -1,5 +1,4 @@
-import type { ExternalCalendar, Project } from "../../types";
-import type { CalendarLayerToggles, ProjectFilter } from "../../utils/calendarItems";
+import type { CalendarCategory, CalendarCategoryGroup } from "../../lib/calendarCategories";
 import { getDayNumber, getMonthGrid, getMonthLabel, todayValue } from "../../utils/date";
 import { useT } from "../../i18n";
 
@@ -7,39 +6,30 @@ interface CalendarLeftSidebarProps {
   anchor: string;
   datesWithItems: Set<string>;
   onSelectDate: (date: string) => void;
-  layers: CalendarLayerToggles;
-  onToggleLayer: (key: keyof CalendarLayerToggles) => void;
-  projects: Project[];
-  projectFilter: ProjectFilter;
-  externalCalendars: ExternalCalendar[];
-  onToggleExternalCalendar: (calendarId: string) => void;
-  onToggleProject: (projectId: string) => void;
-  onSelectAllProjects: () => void;
+  // Category spec §3.1: the sidebar only *uses* categories — checkbox =
+  // show/hide, row click = pick the default category for new events.
+  // Add / rename / delete live in Settings.
+  groups: CalendarCategoryGroup[];
+  activeCategoryId: string;
+  isCategoryVisible: (categoryId: string) => boolean;
+  onToggleCategory: (category: CalendarCategory) => void;
+  onSelectCategory: (category: CalendarCategory) => void;
+  onOpenSettings?: () => void;
   onCreateClick: () => void;
   collapsed: boolean;
   onExpand: () => void;
 }
 
-const LAYER_ITEMS: Array<{ key: keyof CalendarLayerToggles; labelKey: string }> = [
-  { key: "task", labelKey: "calendar.layerTasks" },
-  { key: "deadline", labelKey: "calendar.layerDeadlines" },
-  { key: "studyReview", labelKey: "calendar.layerStudyReviews" },
-  { key: "projectDeadline", labelKey: "calendar.layerProjects" },
-  { key: "completed", labelKey: "calendar.layerCompleted" },
-];
-
 export function CalendarLeftSidebar({
   anchor,
   datesWithItems,
   onSelectDate,
-  layers,
-  onToggleLayer,
-  projects,
-  projectFilter,
-  externalCalendars,
-  onToggleExternalCalendar,
-  onToggleProject,
-  onSelectAllProjects,
+  groups,
+  activeCategoryId,
+  isCategoryVisible,
+  onToggleCategory,
+  onSelectCategory,
+  onOpenSettings,
   onCreateClick,
   collapsed,
   onExpand,
@@ -113,71 +103,55 @@ export function CalendarLeftSidebar({
         </div>
       </div>
 
-      <div className="gcal-sidebar-section">
-        <h3>{t("calendar.layers")}</h3>
-        {LAYER_ITEMS.map((item) => (
-          <label key={item.key} className="gcal-layer-toggle">
-            <input
-              type="checkbox"
-              checked={layers[item.key]}
-              onChange={() => onToggleLayer(item.key)}
-            />
-            {t(item.labelKey)}
-          </label>
-        ))}
-      </div>
-
-      <div className="gcal-sidebar-section">
-        <h3>{t("calendar.projects")}</h3>
-        <label className="gcal-layer-toggle">
-          <input
-            type="checkbox"
-            checked={projectFilter === "all"}
-            onChange={onSelectAllProjects}
-          />
-          {t("calendar.allProjects")}
-        </label>
-        {projects.map((project) => (
-          <label key={project.id} className="gcal-layer-toggle">
-            <input
-              type="checkbox"
-              checked={projectFilter === "all" || projectFilter.has(project.id)}
-              onChange={() => onToggleProject(project.id)}
-            />
-            <span className="gcal-project-dot" style={{ backgroundColor: project.color }} />
-            {project.name}
-          </label>
-        ))}
-      </div>
-
-      <div className="gcal-sidebar-section">
-        <h3>외부 캘린더</h3>
-        {externalCalendars.length === 0 ? (
-          <p className="gcal-sidebar-empty">추가된 외부 캘린더가 없습니다.</p>
-        ) : null}
-        {externalCalendars.map((calendar) => (
-          <label key={calendar.id} className="gcal-layer-toggle">
-            <input
-              type="checkbox"
-              checked={calendar.visible && calendar.enabled}
-              disabled={!calendar.enabled}
-              aria-label={`${calendar.name} 표시`}
-              onChange={() => onToggleExternalCalendar(calendar.id)}
-            />
-            {calendar.syncStatus === "failed" ? (
-              <span
-                className="gcal-external-warning"
-                title="동기화 실패. 설정 > 캘린더에서 확인하세요."
-                aria-label="동기화 실패"
+      {groups.map((group) => (
+        <div key={group.type} className="gcal-sidebar-section">
+          <h3>{t(`calendar.group.${group.type}`)}</h3>
+          {group.categories.length === 0 ? (
+            <p className="gcal-sidebar-empty">{t(`calendar.groupEmpty.${group.type}`)}</p>
+          ) : null}
+          {group.categories.map((category) => {
+            const active = category.id === activeCategoryId;
+            const rowClasses = ["gcal-cat-row"];
+            if (active) rowClasses.push("is-active");
+            if (category.isReadOnly) rowClasses.push("is-readonly");
+            return (
+              <div
+                key={category.id}
+                className={rowClasses.join(" ")}
+                role="button"
+                tabIndex={0}
+                style={active ? { background: `${category.color}1a` } : undefined}
+                onClick={() => onSelectCategory(category)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelectCategory(category);
+                  }
+                }}
               >
-                !
-              </span>
-            ) : null}
-            <span className="gcal-project-dot" style={{ backgroundColor: calendar.color }} />
-            {calendar.name}
-          </label>
-        ))}
-      </div>
+                {/* §16.3: the checkbox must never trigger the row's select. */}
+                <input
+                  type="checkbox"
+                  checked={isCategoryVisible(category.id)}
+                  aria-label={t("calendar.toggleCategoryAria", { name: category.name })}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={() => onToggleCategory(category)}
+                />
+                <span className="gcal-project-dot" style={{ backgroundColor: category.color }} />
+                <span className="gcal-cat-name">{category.name}</span>
+                {category.isDefault ? <span className="gcal-cat-badge">{t("calendar.defaultBadge")}</span> : null}
+                {category.isReadOnly ? <span className="gcal-cat-badge">{t("calendar.readOnlyBadge")}</span> : null}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      {onOpenSettings ? (
+        <button type="button" className="gcal-sidebar-settings" onClick={onOpenSettings}>
+          {t("calendar.manageCategories")}
+        </button>
+      ) : null}
     </aside>
   );
 }
