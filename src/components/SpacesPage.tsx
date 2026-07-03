@@ -2,6 +2,9 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import type { ConceptNote, FocusSession, PageId, Project, ProjectType, StudyTopic, Subtask, Task, TaskDraft } from "../types";
 import type { ToastState } from "./kit";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
+import { useT } from "../i18n";
+
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
 type SpaceType = "project" | "study" | "research" | "custom";
 type SpaceStatus = "Blocked" | "Needs Focus" | "Review Needed" | "In Progress" | "On Track" | "New";
@@ -86,12 +89,34 @@ type SpacesPageProps = {
   showToast: (toast: ToastState) => void;
 };
 
-const typeMeta: Record<SpaceType, { label: string; description: string; color: string }> = {
-  project: { label: "Project", description: "Outcomes, tasks, milestones, blockers, and decisions.", color: "#7c3aed" },
-  study: { label: "Study", description: "Topics, weak points, reviews, mistakes, and notes.", color: "#2563eb" },
-  research: { label: "Research", description: "Questions, sources, claims, evidence, and drafts.", color: "#16a34a" },
-  custom: { label: "Custom", description: "A flexible space with your own sections.", color: "#f97316" },
+const typeColor: Record<SpaceType, string> = {
+  project: "#7c3aed",
+  study: "#2563eb",
+  research: "#16a34a",
+  custom: "#f97316",
 };
+
+const STATUS_KEY: Record<SpaceStatus, string> = {
+  Blocked: "blocked",
+  "Needs Focus": "needsFocus",
+  "Review Needed": "reviewNeeded",
+  "In Progress": "inProgress",
+  "On Track": "onTrack",
+  New: "new",
+};
+
+function typeLabel(t: TFn, type: SpaceType) {
+  return t(`spaces.type.${type}`);
+}
+function typeDesc(t: TFn, type: SpaceType) {
+  return t(`spaces.typeDesc.${type}`);
+}
+function statusLabel(t: TFn, status: SpaceStatus) {
+  return t(`spaces.status.${STATUS_KEY[status]}`);
+}
+function priorityLabel(t: TFn, priority: AiPriority) {
+  return t(`spaces.priority.${priority.toLowerCase()}`);
+}
 
 const emptyDraft: AddSpaceDraft = {
   type: null,
@@ -131,9 +156,10 @@ export function SpacesPage({
   onUpdateProject,
   showToast,
 }: SpacesPageProps) {
+  const { t } = useT();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
-  const [localSpaces, setLocalSpaces] = useState<Space[]>(seedSpaces);
+  const [localSpaces, setLocalSpaces] = useState<Space[]>(() => seedSpaces(t));
   const [selectedSpaceId, setSelectedSpaceId] = useState("");
   const [highlightSignalId, setHighlightSignalId] = useState("");
   const [analysisState, setAnalysisState] = useState<"empty" | "loading" | "success" | "insufficient" | "error">("empty");
@@ -147,10 +173,10 @@ export function SpacesPage({
   const [formError, setFormError] = useState("");
 
   const spaces = useMemo(
-    () => [...deriveProjectSpaces(projects, tasks), ...deriveStudySpaces(studyTopics, conceptNotes), ...localSpaces],
-    [conceptNotes, localSpaces, projects, studyTopics, tasks],
+    () => [...deriveProjectSpaces(projects, tasks, t), ...deriveStudySpaces(studyTopics, conceptNotes, t), ...localSpaces],
+    [conceptNotes, localSpaces, projects, studyTopics, tasks, t],
   );
-  const signals = useMemo(() => deriveSignals(spaces, tasks, conceptNotes), [conceptNotes, spaces, tasks]);
+  const signals = useMemo(() => deriveSignals(spaces, tasks, conceptNotes, t), [conceptNotes, spaces, tasks, t]);
   const selectedSpace = spaces.find((space) => space.id === selectedSpaceId) ?? spaces.find((space) => space.sourceId === selectedProjectId);
   const isDetailOpen = Boolean(selectedSpace) && (detailOpen || selectedSpaceId);
   const normalizedQuery = query.trim().toLowerCase();
@@ -193,9 +219,9 @@ export function SpacesPage({
     const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
-    if (isToday) return `Last analyzed: Today, ${time}`;
+    if (isToday) return t("spaces.brief.lastAnalyzedToday", { time });
     const day = date.toLocaleDateString([], { month: "short", day: "numeric" });
-    return `Last analyzed: ${day}, ${time}`;
+    return t("spaces.brief.lastAnalyzedOn", { date: day, time });
   }
 
   function analyzeSpaces() {
@@ -234,7 +260,7 @@ export function SpacesPage({
 
   function submitAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const error = validateDraft(draft, spaces);
+    const error = validateDraft(draft, spaces, t);
     if (error) {
       setFormError(error);
       setAddState("form_validation_error");
@@ -244,7 +270,7 @@ export function SpacesPage({
     setAddState("creating");
     window.setTimeout(() => {
       try {
-        const space = createSpaceFromDraft(draft);
+        const space = createSpaceFromDraft(draft, t);
         let nextSpace = space;
         if (space.type === "project") {
           const projectId = onCreateProject({
@@ -260,10 +286,10 @@ export function SpacesPage({
         }
         setLocalSpaces((current) => [nextSpace, ...current]);
         setSelectedSpaceId(nextSpace.id);
-        showToast({ message: `${nextSpace.name} created.` });
+        showToast({ message: t("spaces.add.created", { name: nextSpace.name }) });
         resetAdd();
       } catch {
-        setFormError("Could not create Space. Your input was not lost.");
+        setFormError(t("spaces.add.createError"));
         setAddState("create_error");
       }
     }, 520);
@@ -295,16 +321,16 @@ export function SpacesPage({
     <div className="spc-page">
       <header className="spc-header">
         <div>
-          <h1>Spaces</h1>
-          <p>Projects, study areas, and research in one place.</p>
+          <h1>{t("spaces.title")}</h1>
+          <p>{t("spaces.subtitle")}</p>
         </div>
         <label className="spc-search">
           <SearchIcon />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search spaces, signals, or topics..."
-            aria-label="Search spaces, signals, or topics"
+            placeholder={t("spaces.searchPlaceholder")}
+            aria-label={t("spaces.searchLabel")}
           />
         </label>
       </header>
@@ -312,67 +338,67 @@ export function SpacesPage({
       <section className={analysisState === "success" ? "spc-brief analyzed" : "spc-brief"}>
         <div className="spc-brief-icon"><SparkIcon /></div>
         <div className="spc-brief-copy">
-          <h2>AI Overall Brief</h2>
+          <h2>{t("spaces.brief.title")}</h2>
           {analysisState === "empty" ? (
             <>
-              <strong>No AI analysis yet</strong>
-              <p>Run analysis when you want a focus recommendation based on recent signals.</p>
+              <strong>{t("spaces.brief.emptyTitle")}</strong>
+              <p>{t("spaces.brief.emptyBody")}</p>
             </>
           ) : analysisState === "loading" ? (
             <>
-              <strong>Analyzing spaces...</strong>
-              <p>Checking recent records, repeated signals, urgency, and blocked work.</p>
+              <strong>{t("spaces.brief.loadingTitle")}</strong>
+              <p>{t("spaces.brief.loadingBody")}</p>
             </>
           ) : analysisState === "insufficient" ? (
             <>
-              <strong>Not enough signals yet</strong>
-              <p>Add more tasks, notes, or records before analysis can recommend a focus.</p>
+              <strong>{t("spaces.brief.insufficientTitle")}</strong>
+              <p>{t("spaces.brief.insufficientBody")}</p>
             </>
           ) : (
             <>
-              <strong>Recommended focus: <span>LeetCode</span> and <span>Personal App</span></strong>
-              <p>LeetCode needs attention because Binary Search boundary mistakes are repeating. Personal App is blocked by a Calendar UX issue.</p>
+              <strong>{t("spaces.brief.recommendPrefix")} <span>LeetCode</span> {t("spaces.brief.and")} <span>Personal App</span></strong>
+              <p>{t("spaces.brief.recommendBody")}</p>
             </>
           )}
         </div>
         <div className="spc-brief-actions">
           {analysisState === "success" && lastAnalyzedAt ? <span>{formatAnalyzedAt(lastAnalyzedAt)}</span> : null}
           <button type="button" className="spc-btn spc-btn-soft" onClick={() => setReasonOpen(true)} disabled={analysisState !== "success"}>
-            <InfoIcon /> Why this?
+            <InfoIcon /> {t("spaces.brief.whyThis")}
           </button>
           <button type="button" className="spc-btn spc-btn-primary" onClick={() => setSignalsOpen(true)} disabled={analysisState !== "success"}>
-            <SignalIcon /> View signals
+            <SignalIcon /> {t("spaces.brief.viewSignals")}
           </button>
           <button type="button" className="spc-btn" onClick={analyzeSpaces} disabled={analysisState === "loading"}>
-            <RefreshIcon /> {analysisState === "success" ? "Refresh Analysis" : "Analyze Spaces"}
+            <RefreshIcon /> {analysisState === "success" ? t("spaces.brief.refresh") : t("spaces.brief.analyze")}
           </button>
         </div>
       </section>
 
-      <section className="spc-filter-bar" aria-label="Space type filters">
+      <section className="spc-filter-bar" aria-label={t("spaces.filterLabel")}>
         {(["all", "project", "study", "research", "custom"] as FilterType[]).map((item) => (
           <button key={item} type="button" className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>
-            {item === "all" ? "All" : typeMeta[item].label}
+            {item === "all" ? t("spaces.filter.all") : typeLabel(t, item)}
           </button>
         ))}
       </section>
 
-      <section className="spc-grid" aria-label="Space cards">
+      <section className="spc-grid" aria-label={t("spaces.cardsLabel")}>
         {visibleSpaces.map((space) => <SpaceCard key={space.id} space={space} onOpen={() => openSpace(space)} />)}
         <button type="button" className="spc-add-card" onClick={() => setAddOpen(true)}>
           <span><PlusIcon /></span>
-          <strong>Add Space</strong>
-          <small>Create a new project, study area, or research space.</small>
+          <strong>{t("spaces.addCard.title")}</strong>
+          <small>{t("spaces.addCard.subtitle")}</small>
         </button>
       </section>
 
       <section className="spc-activity">
         <div className="spc-section-head">
           <div>
-            <h2>Recent Activity Signals</h2>
-            <p>Recent records mapped to spaces</p>
+            <h2>{t("spaces.activity.title")}</h2>
+            <p>{t("spaces.activity.subtitle")}</p>
           </div>
-          <button type="button" onClick={() => setSignalsOpen(true)}>View all signals <ArrowIcon /></button>
+          <button type="button" onClick={() => setSignalsOpen(true)}>{t("spaces.activity.viewAll")} <ArrowIcon /></button>
         </div>
         <div className="spc-signal-list">
           {signals.slice(0, 6).map((signal) => {
@@ -380,7 +406,7 @@ export function SpacesPage({
             if (!space) return null;
             return (
               <button key={signal.id} type="button" className="spc-signal-row" onClick={() => openSpace(space, signal.id)}>
-                <span className={`spc-signal-severity ${signal.severity.toLowerCase()}`}>{signal.severity}</span>
+                <span className={`spc-signal-severity ${signal.severity.toLowerCase()}`}>{priorityLabel(t, signal.severity)}</span>
                 <span>{signal.age}</span>
                 <strong>{signal.title}</strong>
                 <em style={{ color: space.color }}>{space.name}</em>
@@ -421,17 +447,17 @@ export function SpacesPage({
       ) : null}
 
       {reasonOpen ? (
-        <SimpleModal title="Why this?" onClose={() => setReasonOpen(false)}>
+        <SimpleModal title={t("spaces.reason.title")} onClose={() => setReasonOpen(false)}>
           <ul className="spc-reason-list">
-            <li>High urgency signals are clustered around LeetCode and Personal App.</li>
-            <li>Repeated Binary Search mistakes suggest review should happen soon.</li>
-            <li>Calendar UX work is blocking the main app experience.</li>
+            <li>{t("spaces.reason.item1")}</li>
+            <li>{t("spaces.reason.item2")}</li>
+            <li>{t("spaces.reason.item3")}</li>
           </ul>
         </SimpleModal>
       ) : null}
 
       {signalsOpen ? (
-        <SimpleModal title="Signals used for analysis" onClose={() => setSignalsOpen(false)}>
+        <SimpleModal title={t("spaces.signalsModal.title")} onClose={() => setSignalsOpen(false)}>
           <div className="spc-modal-signal-list">
             {signals.map((signal) => (
               <div key={signal.id}>
@@ -447,22 +473,23 @@ export function SpacesPage({
 }
 
 function SpaceCard({ space, onOpen }: { space: Space; onOpen: () => void }) {
+  const { t } = useT();
   return (
     <article className="spc-card" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(event) => event.key === "Enter" && onOpen()}>
       <div className="spc-card-top">
         <span className="spc-card-icon" style={{ background: space.color }}><SpaceIcon type={space.type} /></span>
-        <button type="button" aria-label={`Open ${space.name} menu`} onClick={(event) => event.stopPropagation()}><MoreIcon /></button>
+        <button type="button" aria-label={t("spaces.card.openMenu", { name: space.name })} onClick={(event) => event.stopPropagation()}><MoreIcon /></button>
       </div>
       <strong>{space.name}</strong>
-      <span className="spc-type" style={{ color: typeMeta[space.type].color }}>{typeMeta[space.type].label}</span>
+      <span className="spc-type" style={{ color: typeColor[space.type] }}>{typeLabel(t, space.type)}</span>
       <p>{space.description}</p>
       <div className="spc-card-badges">
-        <span className={`spc-status ${statusClass(space.status)}`}>{space.status}</span>
-        <span>{space.recentActivityCount} signals</span>
+        <span className={`spc-status ${statusClass(space.status)}`}>{statusLabel(t, space.status)}</span>
+        <span>{t("spaces.card.signals", { n: space.recentActivityCount })}</span>
       </div>
-      <small>Main Signal: {space.mainSignal}</small>
-      <small>AI Priority: <i className={space.aiPriority.toLowerCase()} /> {space.aiPriority}</small>
-      <footer><span>Updated {space.updatedLabel}</span><ArrowIcon /></footer>
+      <small>{t("spaces.card.mainSignal", { signal: space.mainSignal })}</small>
+      <small>{t("spaces.card.aiPriority")} <i className={space.aiPriority.toLowerCase()} /> {priorityLabel(t, space.aiPriority)}</small>
+      <footer><span>{t("spaces.card.updated", { when: space.updatedLabel })}</span><ArrowIcon /></footer>
     </article>
   );
 }
@@ -494,15 +521,16 @@ function AddSpaceModal({
   onKeepEditing: () => void;
   onDiscard: () => void;
 }) {
+  const { t } = useT();
   if (state === "discard_confirm") {
     return (
       <div className="spc-modal-backdrop">
         <section className="spc-modal spc-confirm" role="dialog" aria-modal="true" aria-labelledby="discard-title">
-          <h2 id="discard-title">Discard changes?</h2>
-          <p>You have unsaved space setup details. If you discard, your current input will be lost.</p>
+          <h2 id="discard-title">{t("spaces.add.discardTitle")}</h2>
+          <p>{t("spaces.add.discardBody")}</p>
           <div className="spc-modal-actions">
-            <button type="button" className="spc-btn" onClick={onKeepEditing}>Keep editing</button>
-            <button type="button" className="spc-btn spc-btn-danger" onClick={onDiscard}>Discard</button>
+            <button type="button" className="spc-btn" onClick={onKeepEditing}>{t("spaces.add.keepEditing")}</button>
+            <button type="button" className="spc-btn spc-btn-danger" onClick={onDiscard}>{t("spaces.add.discard")}</button>
           </div>
         </section>
       </div>
@@ -513,29 +541,29 @@ function AddSpaceModal({
     <div className="spc-modal-backdrop">
       <form className="spc-modal" role="dialog" aria-modal="true" aria-labelledby="add-space-title" onSubmit={onSubmit}>
         <div className="spc-modal-head">
-          <h2 id="add-space-title">Add Space</h2>
-          <button type="button" aria-label="Close add space modal" onClick={onClose}><CloseIcon /></button>
+          <h2 id="add-space-title">{t("spaces.add.title")}</h2>
+          <button type="button" aria-label={t("spaces.add.close")} onClick={onClose}><CloseIcon /></button>
         </div>
         <div className="spc-steps">
-          <span className={step === "choose_type" ? "active" : ""}>1. Choose Type</span>
-          <span className={step === "form" ? "active" : ""}>2. Setup Details</span>
+          <span className={step === "choose_type" ? "active" : ""}>{t("spaces.add.step1")}</span>
+          <span className={step === "form" ? "active" : ""}>{t("spaces.add.step2")}</span>
         </div>
 
         {step === "choose_type" ? (
           <>
-            <p className="spc-field-title">Select Space Type</p>
+            <p className="spc-field-title">{t("spaces.add.selectType")}</p>
             <div className="spc-type-grid">
               {(["project", "study", "research", "custom"] as SpaceType[]).map((type) => (
                 <button key={type} type="button" className={draft.type === type ? "selected" : ""} aria-pressed={draft.type === type} onClick={() => onChooseType(type)}>
-                  <span style={{ color: typeMeta[type].color }}><SpaceIcon type={type} /></span>
-                  <strong>{typeMeta[type].label}</strong>
-                  <small>{typeMeta[type].description}</small>
+                  <span style={{ color: typeColor[type] }}><SpaceIcon type={type} /></span>
+                  <strong>{typeLabel(t, type)}</strong>
+                  <small>{typeDesc(t, type)}</small>
                 </button>
               ))}
             </div>
             <div className="spc-modal-actions">
-              <button type="button" className="spc-btn" onClick={onClose}>Cancel</button>
-              <button type="button" className="spc-btn spc-btn-primary" disabled={!draft.type} onClick={onContinue}>Continue</button>
+              <button type="button" className="spc-btn" onClick={onClose}>{t("spaces.add.cancel")}</button>
+              <button type="button" className="spc-btn spc-btn-primary" disabled={!draft.type} onClick={onContinue}>{t("spaces.add.continue")}</button>
             </div>
           </>
         ) : (
@@ -543,10 +571,10 @@ function AddSpaceModal({
             <SpaceFormFields draft={draft} error={error} onUpdate={onUpdate} />
             {error ? <p id="space-form-error" className="spc-form-error">{error}</p> : null}
             <div className="spc-modal-actions">
-              <button type="button" className="spc-btn" onClick={onClose}>Cancel</button>
-              <button type="button" className="spc-btn" onClick={onBack}>Back</button>
+              <button type="button" className="spc-btn" onClick={onClose}>{t("spaces.add.cancel")}</button>
+              <button type="button" className="spc-btn" onClick={onBack}>{t("spaces.add.back")}</button>
               <button type="submit" className="spc-btn spc-btn-primary" disabled={state === "creating"}>
-                {state === "creating" ? "Creating..." : state === "create_error" ? "Try again" : "Create Space"}
+                {state === "creating" ? t("spaces.add.creating") : state === "create_error" ? t("spaces.add.tryAgain") : t("spaces.add.create")}
               </button>
             </div>
           </>
@@ -557,47 +585,49 @@ function AddSpaceModal({
 }
 
 function SpaceFormFields({ draft, error, onUpdate }: { draft: AddSpaceDraft; error: string; onUpdate: (patch: Partial<AddSpaceDraft>) => void }) {
+  const { t } = useT();
   const type = draft.type ?? "project";
   return (
     <div className="spc-form">
-      <label>Space Name<input value={draft.name} onChange={(event) => onUpdate({ name: event.target.value })} aria-describedby={error ? "space-form-error" : undefined} autoFocus /></label>
+      <label>{t("spaces.form.name")}<input value={draft.name} onChange={(event) => onUpdate({ name: event.target.value })} aria-describedby={error ? "space-form-error" : undefined} autoFocus /></label>
       {type === "project" ? (
         <>
-          <label>Objective<input value={draft.objective} onChange={(event) => onUpdate({ objective: event.target.value })} /></label>
-          <label>Deadline<input type="date" value={draft.deadline} onChange={(event) => onUpdate({ deadline: event.target.value })} /></label>
-          <label>Initial Milestones<textarea value={draft.initialMilestonesText} onChange={(event) => onUpdate({ initialMilestonesText: event.target.value })} placeholder={"Dashboard\nCalendar\nSpaces"} /></label>
-          <label>Initial Tasks<textarea value={draft.initialTasksText} onChange={(event) => onUpdate({ initialTasksText: event.target.value })} /></label>
+          <label>{t("spaces.form.objective")}<input value={draft.objective} onChange={(event) => onUpdate({ objective: event.target.value })} /></label>
+          <label>{t("spaces.form.deadline")}<input type="date" value={draft.deadline} onChange={(event) => onUpdate({ deadline: event.target.value })} /></label>
+          <label>{t("spaces.form.milestones")}<textarea value={draft.initialMilestonesText} onChange={(event) => onUpdate({ initialMilestonesText: event.target.value })} placeholder={"Dashboard\nCalendar\nSpaces"} /></label>
+          <label>{t("spaces.form.tasks")}<textarea value={draft.initialTasksText} onChange={(event) => onUpdate({ initialTasksText: event.target.value })} /></label>
         </>
       ) : null}
       {type === "study" ? (
         <>
-          <label>Learning Goal<input value={draft.learningGoal} onChange={(event) => onUpdate({ learningGoal: event.target.value })} /></label>
-          <label>Initial Topics<input value={draft.initialTopicsText} onChange={(event) => onUpdate({ initialTopicsText: event.target.value })} placeholder="Array/String, Hash Map, Stack" /></label>
-          <label>Tracking Style<select value={draft.trackingStyle} onChange={(event) => onUpdate({ trackingStyle: event.target.value as AddSpaceDraft["trackingStyle"] })}><option value="problems">Problems</option><option value="concepts">Concepts</option><option value="notes">Notes</option><option value="mixed">Mixed</option></select></label>
+          <label>{t("spaces.form.learningGoal")}<input value={draft.learningGoal} onChange={(event) => onUpdate({ learningGoal: event.target.value })} /></label>
+          <label>{t("spaces.form.topics")}<input value={draft.initialTopicsText} onChange={(event) => onUpdate({ initialTopicsText: event.target.value })} placeholder="Array/String, Hash Map, Stack" /></label>
+          <label>{t("spaces.form.trackingStyle")}<select value={draft.trackingStyle} onChange={(event) => onUpdate({ trackingStyle: event.target.value as AddSpaceDraft["trackingStyle"] })}><option value="problems">{t("spaces.form.trackProblems")}</option><option value="concepts">{t("spaces.form.trackConcepts")}</option><option value="notes">{t("spaces.form.trackNotes")}</option><option value="mixed">{t("spaces.form.trackMixed")}</option></select></label>
         </>
       ) : null}
       {type === "research" ? (
         <>
-          <label>Research Goal<input value={draft.researchGoal} onChange={(event) => onUpdate({ researchGoal: event.target.value })} /></label>
-          <label>Research Questions<textarea value={draft.researchQuestionsText} onChange={(event) => onUpdate({ researchQuestionsText: event.target.value })} /></label>
-          <label>Source Types<input value={draft.sourceTypesText} onChange={(event) => onUpdate({ sourceTypesText: event.target.value })} placeholder="papers, notes, experiments" /></label>
+          <label>{t("spaces.form.researchGoal")}<input value={draft.researchGoal} onChange={(event) => onUpdate({ researchGoal: event.target.value })} /></label>
+          <label>{t("spaces.form.researchQuestions")}<textarea value={draft.researchQuestionsText} onChange={(event) => onUpdate({ researchQuestionsText: event.target.value })} /></label>
+          <label>{t("spaces.form.sourceTypes")}<input value={draft.sourceTypesText} onChange={(event) => onUpdate({ sourceTypesText: event.target.value })} placeholder={t("spaces.form.sourceTypesPlaceholder")} /></label>
         </>
       ) : null}
       {type === "custom" ? (
-        <label>Custom Sections<textarea value={draft.customSectionsText} onChange={(event) => onUpdate({ customSectionsText: event.target.value })} placeholder={"Notes\nTasks\nActivity"} /></label>
+        <label>{t("spaces.form.customSections")}<textarea value={draft.customSectionsText} onChange={(event) => onUpdate({ customSectionsText: event.target.value })} placeholder={"Notes\nTasks\nActivity"} /></label>
       ) : null}
-      <label>Description<textarea value={draft.description} onChange={(event) => onUpdate({ description: event.target.value })} /></label>
+      <label>{t("spaces.form.description")}<textarea value={draft.description} onChange={(event) => onUpdate({ description: event.target.value })} /></label>
     </div>
   );
 }
 
 function SimpleModal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  const { t } = useT();
   return (
     <div className="spc-modal-backdrop">
       <section className="spc-modal" role="dialog" aria-modal="true" aria-labelledby="simple-modal-title">
         <div className="spc-modal-head">
           <h2 id="simple-modal-title">{title}</h2>
-          <button type="button" aria-label="Close modal" onClick={onClose}><CloseIcon /></button>
+          <button type="button" aria-label={t("spaces.closeModal")} onClick={onClose}><CloseIcon /></button>
         </div>
         {children}
       </section>
@@ -605,7 +635,7 @@ function SimpleModal({ title, children, onClose }: { title: string; children: Re
   );
 }
 
-function deriveProjectSpaces(projects: Project[], tasks: Task[]): Space[] {
+function deriveProjectSpaces(projects: Project[], tasks: Task[], t: TFn): Space[] {
   return projects
     .filter((project) => project.status !== "archived")
     .map((project) => {
@@ -619,12 +649,12 @@ function deriveProjectSpaces(projects: Project[], tasks: Task[]): Space[] {
         name: project.name,
         type,
         status,
-        mainSignal: waiting ? "Waiting blocker" : high ? "High priority work" : "Work moving normally",
+        mainSignal: waiting ? t("spaces.mainSignal.waitingBlocker") : high ? t("spaces.mainSignal.highPriority") : t("spaces.mainSignal.normal"),
         aiPriority: waiting || high > 1 ? "High" : high ? "Medium" : "Low",
         recentActivityCount: Math.max(1, projectTasks.length),
-        description: project.description || `${typeMeta[type].label} space`,
+        description: project.description || t("spaces.desc.typeSpace", { type: typeLabel(t, type) }),
         color: project.color,
-        updatedLabel: relativeUpdated(project.updatedAt),
+        updatedLabel: relativeUpdated(t, project.updatedAt),
         topics: projectTasks.flatMap((task) => task.tags).filter(Boolean).slice(0, 6),
         objective: project.description,
         sourceRef: "project",
@@ -633,7 +663,7 @@ function deriveProjectSpaces(projects: Project[], tasks: Task[]): Space[] {
     });
 }
 
-function deriveStudySpaces(studyTopics: StudyTopic[], notes: ConceptNote[]): Space[] {
+function deriveStudySpaces(studyTopics: StudyTopic[], notes: ConceptNote[], t: TFn): Space[] {
   return studyTopics
     .filter((topic) => topic.status !== "archived")
     .map((topic) => {
@@ -645,12 +675,12 @@ function deriveStudySpaces(studyTopics: StudyTopic[], notes: ConceptNote[]): Spa
         name: topic.name,
         type,
         status: due ? "Review Needed" : "On Track",
-        mainSignal: due ? "Review queue needs attention" : "Concepts are organized",
+        mainSignal: due ? t("spaces.mainSignal.reviewQueue") : t("spaces.mainSignal.organized"),
         aiPriority: due > 3 ? "High" : due ? "Medium" : "Low",
         recentActivityCount: Math.max(1, topicNotes.length),
-        description: topic.description || `${topic.category} learning space`,
-        color: topic.color || typeMeta[type].color,
-        updatedLabel: relativeUpdated(topic.updatedAt),
+        description: topic.description || t("spaces.desc.learningSpace", { category: topic.category }),
+        color: topic.color || typeColor[type],
+        updatedLabel: relativeUpdated(t, topic.updatedAt),
         topics: topicNotes.flatMap((note) => note.tags).filter(Boolean).slice(0, 6),
         learningGoal: topic.description,
         sourceRef: "study",
@@ -659,30 +689,30 @@ function deriveStudySpaces(studyTopics: StudyTopic[], notes: ConceptNote[]): Spa
     });
 }
 
-function seedSpaces(): Space[] {
+function seedSpaces(t: TFn): Space[] {
   return [
-    { id: "space-personal-app-demo", name: "Personal App", type: "project", status: "Blocked", mainSignal: "Calendar UX blocker", aiPriority: "Medium", recentActivityCount: 5, description: "Personal productivity app development project", color: "#7c3aed", updatedLabel: "1h ago", topics: ["Calendar", "UX", "AI"], sourceRef: "local" },
-    { id: "space-leetcode-demo", name: "LeetCode", type: "study", status: "Review Needed", mainSignal: "Binary Search boundary", aiPriority: "High", recentActivityCount: 8, description: "Algorithm patterns and mistake review", color: "#2563eb", updatedLabel: "30m ago", topics: ["Binary Search", "Hash Map", "Stack"], sourceRef: "local" },
-    { id: "space-fyp-demo", name: "FYP Research", type: "research", status: "Needs Focus", mainSignal: "notes need organization", aiPriority: "Low", recentActivityCount: 3, description: "Graduation research project", color: "#16a34a", updatedLabel: "3h ago", topics: ["fNIRS", "methods", "evidence"], sourceRef: "local" },
-    { id: "space-conference-demo", name: "Conference PPT", type: "project", status: "In Progress", mainSignal: "structure refinement", aiPriority: "Low", recentActivityCount: 2, description: "Academic presentation deck", color: "#f97316", updatedLabel: "1d ago", topics: ["slides", "script"], sourceRef: "local" },
+    { id: "space-personal-app-demo", name: t("spaces.seed.personalApp.name"), type: "project", status: "Blocked", mainSignal: t("spaces.seed.personalApp.signal"), aiPriority: "Medium", recentActivityCount: 5, description: t("spaces.seed.personalApp.desc"), color: "#7c3aed", updatedLabel: relativeLabel(t, 0, 1, 0), topics: ["Calendar", "UX", "AI"], sourceRef: "local" },
+    { id: "space-leetcode-demo", name: t("spaces.seed.leetcode.name"), type: "study", status: "Review Needed", mainSignal: t("spaces.seed.leetcode.signal"), aiPriority: "High", recentActivityCount: 8, description: t("spaces.seed.leetcode.desc"), color: "#2563eb", updatedLabel: relativeLabel(t, 30, 0, 0), topics: ["Binary Search", "Hash Map", "Stack"], sourceRef: "local" },
+    { id: "space-fyp-demo", name: t("spaces.seed.fyp.name"), type: "research", status: "Needs Focus", mainSignal: t("spaces.seed.fyp.signal"), aiPriority: "Low", recentActivityCount: 3, description: t("spaces.seed.fyp.desc"), color: "#16a34a", updatedLabel: relativeLabel(t, 0, 3, 0), topics: ["fNIRS", "methods", "evidence"], sourceRef: "local" },
+    { id: "space-conference-demo", name: t("spaces.seed.conference.name"), type: "project", status: "In Progress", mainSignal: t("spaces.seed.conference.signal"), aiPriority: "Low", recentActivityCount: 2, description: t("spaces.seed.conference.desc"), color: "#f97316", updatedLabel: relativeLabel(t, 0, 0, 1), topics: ["slides", "script"], sourceRef: "local" },
   ];
 }
 
-function deriveSignals(spaces: Space[], tasks: Task[], notes: ConceptNote[]): ActivitySignal[] {
+function deriveSignals(spaces: Space[], tasks: Task[], notes: ConceptNote[], t: TFn): ActivitySignal[] {
   const base: ActivitySignal[] = [
-    { id: "signal-calendar", title: "Calendar UX decision is delayed", detail: "Progress blocked", age: "10m ago", severity: "Medium", spaceId: "space-personal-app-demo" },
-    { id: "signal-binary", title: "Binary Search boundary mistakes repeating", detail: "Mistake pattern detected", age: "35m ago", severity: "High", spaceId: "space-leetcode-demo" },
-    { id: "signal-list", title: "Reviewed list methods: append, extend, pop", detail: "Review completed", age: "1h ago", severity: "Low", spaceId: "space-leetcode-demo" },
-    { id: "signal-methods", title: "Related paper methods need comparison", detail: "More evidence needed", age: "2h ago", severity: "Medium", spaceId: "space-fyp-demo" },
-    { id: "signal-slides", title: "Updated slide structure for methodology section", detail: "Draft progress", age: "3h ago", severity: "Low", spaceId: "space-conference-demo" },
+    { id: "signal-calendar", title: t("spaces.sig.calendar.title"), detail: t("spaces.sig.calendar.detail"), age: t("spaces.time.minutesAgo", { n: 10 }), severity: "Medium", spaceId: "space-personal-app-demo" },
+    { id: "signal-binary", title: t("spaces.sig.binary.title"), detail: t("spaces.sig.binary.detail"), age: t("spaces.time.minutesAgo", { n: 35 }), severity: "High", spaceId: "space-leetcode-demo" },
+    { id: "signal-list", title: t("spaces.sig.list.title"), detail: t("spaces.sig.list.detail"), age: t("spaces.time.hoursAgo", { n: 1 }), severity: "Low", spaceId: "space-leetcode-demo" },
+    { id: "signal-methods", title: t("spaces.sig.methods.title"), detail: t("spaces.sig.methods.detail"), age: t("spaces.time.hoursAgo", { n: 2 }), severity: "Medium", spaceId: "space-fyp-demo" },
+    { id: "signal-slides", title: t("spaces.sig.slides.title"), detail: t("spaces.sig.slides.detail"), age: t("spaces.time.hoursAgo", { n: 3 }), severity: "Low", spaceId: "space-conference-demo" },
   ];
   const taskSignals = tasks.slice(0, 5).map((task, index): ActivitySignal => {
     const space = spaces.find((item) => item.sourceId === task.projectId) ?? spaces[index % Math.max(spaces.length, 1)];
     return {
       id: `task-signal-${task.id}`,
       title: task.title,
-      detail: task.status === "waiting" ? "Waiting signal" : task.priority === "high" ? "High priority task" : "Task activity",
-      age: index < 2 ? "30m ago" : `${index + 1}h ago`,
+      detail: task.status === "waiting" ? t("spaces.signalDetail.waiting") : task.priority === "high" ? t("spaces.signalDetail.highPriorityTask") : t("spaces.signalDetail.taskActivity"),
+      age: index < 2 ? t("spaces.time.minutesAgo", { n: 30 }) : t("spaces.time.hoursAgo", { n: index + 1 }),
       severity: task.priority === "high" ? "High" : task.priority === "medium" ? "Medium" : "Low",
       spaceId: space?.id ?? "space-personal-app-demo",
     };
@@ -692,8 +722,8 @@ function deriveSignals(spaces: Space[], tasks: Task[], notes: ConceptNote[]): Ac
     return {
       id: `note-signal-${note.id}`,
       title: note.title,
-      detail: note.nextReviewDate ? "Review signal" : "Study note",
-      age: `${index + 2}h ago`,
+      detail: note.nextReviewDate ? t("spaces.signalDetail.review") : t("spaces.signalDetail.studyNote"),
+      age: t("spaces.time.hoursAgo", { n: index + 2 }),
       severity: note.difficulty === "hard" ? "High" : note.difficulty === "medium" ? "Medium" : "Low",
       spaceId: space?.id ?? "space-leetcode-demo",
     };
@@ -701,18 +731,18 @@ function deriveSignals(spaces: Space[], tasks: Task[], notes: ConceptNote[]): Ac
   return [...base, ...taskSignals, ...noteSignals];
 }
 
-function validateDraft(draft: AddSpaceDraft, spaces: Space[]) {
-  if (!draft.type) return "Choose a Space type first.";
-  if (!draft.name.trim()) return "Space name is required.";
-  if (draft.name.trim().length < 2) return "Name is too short.";
-  if (spaces.some((space) => space.name.trim().toLowerCase() === draft.name.trim().toLowerCase())) return "A Space with this name already exists.";
-  if (draft.type === "project" && !draft.objective.trim()) return "Project objective is required.";
-  if (draft.type === "study" && !draft.learningGoal.trim()) return "Learning goal is required.";
-  if (draft.type === "research" && !draft.researchGoal.trim()) return "Research goal is required.";
+function validateDraft(draft: AddSpaceDraft, spaces: Space[], t: TFn) {
+  if (!draft.type) return t("spaces.validate.chooseType");
+  if (!draft.name.trim()) return t("spaces.validate.nameRequired");
+  if (draft.name.trim().length < 2) return t("spaces.validate.nameShort");
+  if (spaces.some((space) => space.name.trim().toLowerCase() === draft.name.trim().toLowerCase())) return t("spaces.validate.nameDup");
+  if (draft.type === "project" && !draft.objective.trim()) return t("spaces.validate.objectiveRequired");
+  if (draft.type === "study" && !draft.learningGoal.trim()) return t("spaces.validate.learningRequired");
+  if (draft.type === "research" && !draft.researchGoal.trim()) return t("spaces.validate.researchRequired");
   return "";
 }
 
-function createSpaceFromDraft(draft: AddSpaceDraft): Space {
+function createSpaceFromDraft(draft: AddSpaceDraft, t: TFn): Space {
   const type = draft.type ?? "custom";
   const topics =
     type === "study" ? parseTags(draft.initialTopicsText)
@@ -724,12 +754,12 @@ function createSpaceFromDraft(draft: AddSpaceDraft): Space {
     name: draft.name.trim(),
     type,
     status: "New",
-    mainSignal: `New ${typeMeta[type].label.toLowerCase()} space`,
+    mainSignal: t("spaces.mainSignal.newSpace", { type: typeLabel(t, type) }),
     aiPriority: type === "custom" ? "Low" : "Medium",
     recentActivityCount: 0,
-    description: draft.description.trim() || draft.objective || draft.learningGoal || draft.researchGoal || "New space",
-    color: typeMeta[type].color,
-    updatedLabel: "just now",
+    description: draft.description.trim() || draft.objective || draft.learningGoal || draft.researchGoal || t("spaces.desc.newSpace"),
+    color: typeColor[type],
+    updatedLabel: t("spaces.time.justNow"),
     topics,
     objective: draft.objective,
     learningGoal: draft.learningGoal,
@@ -757,15 +787,21 @@ function inferProjectType(project: Project): SpaceType {
   return "project";
 }
 
-function relativeUpdated(value: string) {
-  if (!value) return "recently";
+function relativeUpdated(t: TFn, value: string) {
+  if (!value) return t("spaces.time.recently");
   const diff = Date.now() - new Date(value).getTime();
-  if (!Number.isFinite(diff) || diff < 0) return "recently";
+  if (!Number.isFinite(diff) || diff < 0) return t("spaces.time.recently");
   const minutes = Math.max(1, Math.round(diff / 60000));
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t("spaces.time.minutesAgo", { n: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
+  if (hours < 24) return t("spaces.time.hoursAgo", { n: hours });
+  return t("spaces.time.daysAgo", { n: Math.round(hours / 24) });
+}
+
+function relativeLabel(t: TFn, minutes: number, hours: number, days: number) {
+  if (days > 0) return t("spaces.time.daysAgo", { n: days });
+  if (hours > 0) return t("spaces.time.hoursAgo", { n: hours });
+  return t("spaces.time.minutesAgo", { n: minutes });
 }
 
 function statusClass(status: SpaceStatus) {
