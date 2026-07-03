@@ -44,6 +44,24 @@ interface LiveResize {
   endMin: number;
 }
 
+// Pointer-based block move (no HTML5 drag ghost): the block itself follows
+// the cursor with a 15-minute snap; horizontal movement switches the day.
+// While a move is live the original block is hidden and a single overlay
+// block is drawn in the target column — no duplicate visuals.
+interface LiveMove {
+  key: string;
+  sourceId: string;
+  title: string;
+  color: string;
+  repeating: boolean;
+  day: string;
+  startMin: number;
+  endMin: number;
+  // Becomes true after the pointer travels past the click threshold; until
+  // then nothing is drawn and pointerup falls through to a normal click.
+  moved: boolean;
+}
+
 function asDate(value: string) {
   return new Date(`${value}T00:00:00`);
 }
@@ -77,6 +95,7 @@ interface WeekViewProps {
   onClickItem: (item: CalendarItem, anchor: PopoverAnchor) => void;
   onClickAllDaySlot: (day: string) => void;
   onResizeItem: (sourceId: string, day: string, startTime: string, endTime: string) => void;
+  onMoveItem: (sourceId: string, day: string, startTime: string, endTime: string) => void;
   draft: CalendarDraftBlock | null;
   dragPreview: {
     taskId: string;
@@ -112,6 +131,7 @@ export function WeekView({
   onClickItem,
   onClickAllDaySlot,
   onResizeItem,
+  onMoveItem,
   draft,
   dragPreview,
   draggingTaskTitle,
@@ -137,6 +157,8 @@ export function WeekView({
   // Mirrors `resize` so the pointerup listener can read the final range
   // without doing side effects inside a setState updater.
   const resizeRef = useRef<LiveResize | null>(null);
+  const [move, setMove] = useState<LiveMove | null>(null);
+  const moveRef = useRef<LiveMove | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const suppressClickRef = useRef(false);
   const isDay = days.length === 1;
@@ -163,7 +185,7 @@ export function WeekView({
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>, day: string) {
     if (event.button !== 0) return;
-    if (resize) return;
+    if (resize || move) return;
     if (!shouldStartTimeSelection(event.target)) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const startMinutes = minutesFromPointerY(event.clientY, rect.top);
@@ -278,6 +300,106 @@ export function WeekView({
     }
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp, { once: true });
+  }
+
+  function startMove(event: ReactPointerEvent<HTMLElement>, item: CalendarItem, startMin: number, endMin: number) {
+    if (event.button !== 0) return;
+    const blockEl = event.currentTarget as HTMLElement;
+    const body = blockEl.closest(".gcal-timegrid-body");
+    const column = blockEl.closest(".gcal-time-col");
+    if (!body || !column) return;
+    event.preventDefault();
+    const duration = endMin - startMin;
+    const startClientX = event.clientX;
+    const startClientY = event.clientY;
+    // Keep the grab point stable: the block moves relative to where it was
+    // grabbed instead of snapping its top edge to the cursor.
+    const grabOffsetMin = minutesFromPointerY(event.clientY, column.getBoundingClientRect().top) - startMin;
+
+    const state: LiveMove = {
+      key: item.key,
+      sourceId: item.sourceId,
+      title: item.title,
+      color: item.color,
+      repeating: Boolean(item.repeating),
+      day: item.date,
+      startMin,
+      endMin,
+      moved: false,
+    };
+    moveRef.current = state;
+    setMove(state);
+
+    function targetDayFromX(clientX: number): { day: string; columnEl: Element } {
+      const cols = [...body!.querySelectorAll(".gcal-time-col")];
+      let index = cols.findIndex((col) => {
+        const rect = col.getBoundingClientRect();
+        return clientX >= rect.left && clientX < rect.right;
+      });
+      if (index === -1) {
+        index = clientX < cols[0].getBoundingClientRect().left ? 0 : cols.length - 1;
+      }
+      return { day: days[index] ?? days[0], columnEl: cols[index] };
+    }
+
+    function onPointerMove(moveEvent: PointerEvent) {
+      const current = moveRef.current;
+      if (!current) return;
+      if (!current.moved) {
+        const distance = Math.hypot(moveEvent.clientX - startClientX, moveEvent.clientY - startClientY);
+        if (distance <= 4) return;
+      }
+      // Auto-scroll when dragging near the scroller's edges so times outside
+      // the viewport stay reachable.
+      const scroller = scrollRef.current;
+      if (scroller) {
+        const scrollRect = scroller.getBoundingClientRect();
+        if (moveEvent.clientY < scrollRect.top + 110) scroller.scrollTop -= 14;
+        else if (moveEvent.clientY > scrollRect.bottom - 48) scroller.scrollTop += 14;
+      }
+      const target = targetDayFromX(moveEvent.clientX);
+      const rect = target.columnEl.getBoundingClientRect();
+      const pointerMin = minutesFromPointerY(moveEvent.clientY, rect.top);
+      const nextStart = clampMinutes(
+        snapDownToStep(pointerMin - grabOffsetMin),
+        DAY_START * 60,
+        DAY_END * 60 - duration,
+      );
+      const next: LiveMove = { ...current, moved: true, day: target.day, startMin: nextStart, endMin: nextStart + duration };
+      moveRef.current = next;
+      setMove(next);
+    }
+
+    function finishMove(commit: boolean) {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("keydown", onKeyDown, true);
+      const current = moveRef.current;
+      moveRef.current = null;
+      setMove(null);
+      if (!current?.moved) return;
+      suppressClickRef.current = true;
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+      if (commit) {
+        onMoveItem(current.sourceId, current.day, minutesToTime(current.startMin), minutesToTime(current.endMin));
+      }
+    }
+
+    function onPointerUp() {
+      finishMove(true);
+    }
+
+    function onKeyDown(keyEvent: KeyboardEvent) {
+      if (keyEvent.key !== "Escape") return;
+      keyEvent.stopPropagation();
+      finishMove(false);
+    }
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("keydown", onKeyDown, true);
   }
 
   function dragStartTimeFromEvent(event: DragEvent<HTMLDivElement>) {
@@ -475,8 +597,31 @@ export function WeekView({
                       <strong>{placement.title}</strong>
                     </div>
                   ))}
+                {/* Live pointer-move overlay: the single visual for a block being moved. */}
+                {move?.moved && move.day === day ? (
+                  <div
+                    className="gcal-move-block"
+                    style={{
+                      top: topFor(move.startMin),
+                      height: heightFor(move.startMin, move.endMin),
+                      borderLeft: `3px solid ${move.color}`,
+                      background: `${move.color}22`,
+                    }}
+                  >
+                    <span className="gcal-tb-title">
+                      {move.repeating ? "↺ " : null}
+                      {move.title}
+                    </span>
+                    <span className="gcal-tb-time">
+                      {minutesToTime(move.startMin)} – {minutesToTime(move.endMin)}
+                    </span>
+                  </div>
+                ) : null}
                 {/* §9.1 (D8): overlapping blocks simply stack with a small offset + border, no collision layout. */}
                 {timedItems.map((item, index) => {
+                  // While a pointer move is live the original block disappears;
+                  // only the overlay above represents it.
+                  if (move?.moved && move.key === item.key) return null;
                   let startMin = timeToMinutesOrNull(item.startTime ?? "");
                   if (startMin === null) return null;
                   let endMin = timeToMinutesOrNull(item.endTime ?? "") ?? startMin + 60;
@@ -494,9 +639,7 @@ export function WeekView({
                       type="button"
                       data-calendar-interactive="true"
                       className={resize?.key === item.key ? "gcal-time-block is-resizing" : "gcal-time-block"}
-                      draggable={item.draggable && !resize}
-                      onDragStart={item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined}
-                      onDragEnd={item.draggable ? onDragEnd : undefined}
+                      onPointerDown={item.draggable ? (event) => startMove(event, item, startMin, endMin) : undefined}
                       onClick={(event) => {
                         event.stopPropagation();
                         if (suppressClickRef.current) return;

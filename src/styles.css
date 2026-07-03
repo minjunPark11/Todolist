@@ -2235,6 +2235,8 @@ textarea {
   color: var(--color-ink);
   cursor: grab;
   box-shadow: var(--shadow-card);
+  touch-action: none;
+  user-select: none;
 }
 
 .gcal-tb-time {
@@ -2263,6 +2265,24 @@ textarea {
 .gcal-time-block.is-resizing {
   opacity: 0.85;
   cursor: ns-resize;
+}
+
+/* Pointer-move overlay: the only visual while a block is being dragged. */
+.gcal-move-block {
+  position: absolute;
+  left: 2%;
+  width: 96%;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--rounded-xs);
+  padding: 3px 6px;
+  overflow: hidden;
+  text-align: left;
+  color: var(--color-ink);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.22);
+  z-index: 40;
+  pointer-events: none;
 }
 
 .gcal-tb-title {

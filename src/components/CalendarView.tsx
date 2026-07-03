@@ -316,6 +316,16 @@ export function CalendarView({
     onUpdateTask(taskId, { scheduledDate: day, startTime, endTime });
   }
 
+  // Pointer-based block move: same conflict rule as drop, silently committed
+  // (the moving block itself already previews the exact target slot).
+  function handleMoveItem(taskId: string, day: string, startTime: string, endTime: string) {
+    if (hasConflict(day, startTime, endTime, taskId)) {
+      showToast?.({ message: "This time is not available. Choose another slot." });
+      return;
+    }
+    onUpdateTask(taskId, { scheduledDate: day, startTime, endTime });
+  }
+
   function suggestSchedule() {
     if (unscheduled.length === 0) {
       showToast?.({ message: t("calendar.noUnscheduled") });
@@ -563,6 +573,7 @@ export function CalendarView({
                 onClickItem={handleClickItem}
                 onClickAllDaySlot={(day) => setQuickCreate({ date: day, allDay: true })}
                 onResizeItem={handleResizeItem}
+                onMoveItem={handleMoveItem}
                 draft={draft}
                 dragPreview={dragPreview}
                 draggingTaskTitle={tasks.find((task) => task.id === draggingTaskId)?.title ?? ""}
