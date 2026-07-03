@@ -167,7 +167,7 @@ export function SpacesPage({
   const { t } = useT();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
-  const [localSpaces, setLocalSpaces] = useState<Space[]>(() => seedSpaces(t));
+  const [localSpaces, setLocalSpaces] = useState<Space[]>([]);
   const [selectedSpaceId, setSelectedSpaceId] = useState("");
   const [highlightSignalId, setHighlightSignalId] = useState("");
   const [analysisState, setAnalysisState] = useState<"empty" | "loading" | "success" | "insufficient" | "error">("empty");
@@ -939,23 +939,7 @@ function deriveStudySpaces(studyTopics: StudyTopic[], notes: ConceptNote[], t: T
     });
 }
 
-function seedSpaces(t: TFn): Space[] {
-  return [
-    { id: "space-personal-app-demo", name: t("spaces.seed.personalApp.name"), type: "project", status: "Blocked", mainSignal: t("spaces.seed.personalApp.signal"), aiPriority: "Medium", recentActivityCount: 5, description: t("spaces.seed.personalApp.desc"), color: "#7c3aed", updatedLabel: relativeLabel(t, 0, 1, 0), topics: ["Calendar", "UX", "AI"], sourceRef: "local" },
-    { id: "space-leetcode-demo", name: t("spaces.seed.leetcode.name"), type: "study", status: "Review Needed", mainSignal: t("spaces.seed.leetcode.signal"), aiPriority: "High", recentActivityCount: 8, description: t("spaces.seed.leetcode.desc"), color: "#2563eb", updatedLabel: relativeLabel(t, 30, 0, 0), topics: ["Binary Search", "Hash Map", "Stack"], sourceRef: "local" },
-    { id: "space-fyp-demo", name: t("spaces.seed.fyp.name"), type: "research", status: "Needs Focus", mainSignal: t("spaces.seed.fyp.signal"), aiPriority: "Low", recentActivityCount: 3, description: t("spaces.seed.fyp.desc"), color: "#16a34a", updatedLabel: relativeLabel(t, 0, 3, 0), topics: ["fNIRS", "methods", "evidence"], sourceRef: "local" },
-    { id: "space-conference-demo", name: t("spaces.seed.conference.name"), type: "project", status: "In Progress", mainSignal: t("spaces.seed.conference.signal"), aiPriority: "Low", recentActivityCount: 2, description: t("spaces.seed.conference.desc"), color: "#f97316", updatedLabel: relativeLabel(t, 0, 0, 1), topics: ["slides", "script"], sourceRef: "local" },
-  ];
-}
-
 function deriveSignals(spaces: Space[], tasks: Task[], notes: ConceptNote[], t: TFn): ActivitySignal[] {
-  const base: ActivitySignal[] = [
-    { id: "signal-calendar", title: t("spaces.sig.calendar.title"), detail: t("spaces.sig.calendar.detail"), age: t("spaces.time.minutesAgo", { n: 10 }), severity: "Medium", spaceId: "space-personal-app-demo" },
-    { id: "signal-binary", title: t("spaces.sig.binary.title"), detail: t("spaces.sig.binary.detail"), age: t("spaces.time.minutesAgo", { n: 35 }), severity: "High", spaceId: "space-leetcode-demo" },
-    { id: "signal-list", title: t("spaces.sig.list.title"), detail: t("spaces.sig.list.detail"), age: t("spaces.time.hoursAgo", { n: 1 }), severity: "Low", spaceId: "space-leetcode-demo" },
-    { id: "signal-methods", title: t("spaces.sig.methods.title"), detail: t("spaces.sig.methods.detail"), age: t("spaces.time.hoursAgo", { n: 2 }), severity: "Medium", spaceId: "space-fyp-demo" },
-    { id: "signal-slides", title: t("spaces.sig.slides.title"), detail: t("spaces.sig.slides.detail"), age: t("spaces.time.hoursAgo", { n: 3 }), severity: "Low", spaceId: "space-conference-demo" },
-  ];
   const taskSignals = tasks.slice(0, 5).map((task, index): ActivitySignal => {
     const space = spaces.find((item) => item.sourceId === task.projectId) ?? spaces[index % Math.max(spaces.length, 1)];
     return {
@@ -978,7 +962,7 @@ function deriveSignals(spaces: Space[], tasks: Task[], notes: ConceptNote[], t: 
       spaceId: space?.id ?? "space-leetcode-demo",
     };
   });
-  return [...base, ...taskSignals, ...noteSignals];
+  return [...taskSignals, ...noteSignals];
 }
 
 function validateDraft(draft: AddSpaceDraft, spaces: Space[], t: TFn) {

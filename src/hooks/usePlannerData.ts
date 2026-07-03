@@ -29,7 +29,6 @@ import type {
   TaskTemplate,
 } from "../types";
 import { addDays, addMonths, todayValue } from "../utils/date";
-import { defaultConceptNotes, defaultStudyTopics } from "../data/studySeed";
 
 const STORAGE_KEY = "focusflow.appData.v1";
 const LEGACY_STORAGE_KEY = "todo-planner-data";
@@ -375,10 +374,10 @@ function normalizeData(data: RawPlannerData): PlannerData {
       : [],
     studyTopics: hasStudy
       ? (data.studyTopics ?? []).map(normalizeStudyTopic)
-      : defaultStudyTopics.map(normalizeStudyTopic),
+      : [],
     conceptNotes: hasStudy
       ? (data.conceptNotes ?? []).map(normalizeConceptNote).filter((note) => !note.deletedAt)
-      : defaultConceptNotes.map(normalizeConceptNote),
+      : [],
     habits: Array.isArray(data.habits) ? data.habits.map(normalizeHabit) : [],
     habitLogs: Array.isArray(data.habitLogs)
       ? data.habitLogs.map(normalizeHabitLog).filter((log) => log.habitId && log.date)
