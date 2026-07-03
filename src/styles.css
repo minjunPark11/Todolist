@@ -6684,6 +6684,15 @@ main {
   min-width: 0;
 }
 
+[data-theme="dark"] .spc-page,
+[data-theme="dark"] .spc-detail {
+  --spc-purple: #9b86ff;
+  --spc-purple-soft: rgba(155, 134, 255, 0.18);
+  --spc-blue: #7aa2ff;
+  --spc-green: #5fe08d;
+  --spc-orange: #ffb25f;
+}
+
 .spc-page svg,
 .spc-detail svg,
 .spc-modal svg {
@@ -6761,6 +6770,19 @@ main {
   background:
     radial-gradient(circle at 78% 50%, rgba(37, 99, 235, 0.10), transparent 28%),
     linear-gradient(135deg, rgba(241, 237, 255, 0.75), rgba(255, 255, 255, 0.95));
+}
+
+[data-theme="dark"] .spc-brief {
+  border-color: rgba(155, 134, 255, 0.26);
+  background:
+    radial-gradient(circle at 78% 50%, rgba(155, 134, 255, 0.16), transparent 30%),
+    linear-gradient(135deg, rgba(31, 31, 35, 0.98), rgba(24, 24, 27, 0.98));
+}
+
+[data-theme="dark"] .spc-brief.analyzed {
+  background:
+    radial-gradient(circle at 78% 50%, rgba(122, 162, 255, 0.18), transparent 28%),
+    linear-gradient(135deg, rgba(37, 32, 52, 0.96), rgba(24, 24, 27, 0.98));
 }
 
 .spc-brief-icon {
@@ -7089,6 +7111,26 @@ main {
   background: #e9f0ff;
 }
 
+[data-theme="dark"] .spc-status.blocked {
+  color: #ffb4ab;
+  background: rgba(255, 69, 58, 0.18);
+}
+
+[data-theme="dark"] .spc-status.focus {
+  color: #ffd08a;
+  background: rgba(255, 159, 10, 0.18);
+}
+
+[data-theme="dark"] .spc-status.track {
+  color: #8df0b4;
+  background: rgba(48, 209, 88, 0.16);
+}
+
+[data-theme="dark"] .spc-status.progress {
+  color: #aec9ff;
+  background: rgba(122, 162, 255, 0.18);
+}
+
 .spc-card footer {
   display: flex;
   align-items: center;
@@ -7108,6 +7150,21 @@ main {
   color: var(--text-primary);
   background: rgba(255, 255, 255, 0.62);
   text-align: center;
+}
+
+[data-theme="dark"] .spc-add-card {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  background: rgba(28, 28, 30, 0.92);
+}
+
+[data-theme="dark"] .spc-add-card span {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+[data-theme="dark"] .spc-add-card small {
+  color: var(--text-secondary);
 }
 
 .spc-add-card span {

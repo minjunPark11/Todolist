@@ -128,12 +128,12 @@ export function CalendarRightPanel({
     }
 
     return [
-      { id: "deadline", title: "Deadlines & high impact", hint: "Time-sensitive work", tasks: due },
-      { id: "review", title: "Review due", hint: "Study and review items", tasks: review },
-      { id: "project", title: "From spaces", hint: "Project-linked tasks", tasks: projectWork },
-      { id: "other", title: "Inbox & manual", hint: "Everything else", tasks: other },
+      { id: "deadline", title: t("calendar.groupDeadline"), hint: t("calendar.groupDeadlineHint"), tasks: due },
+      { id: "review", title: t("calendar.groupReview"), hint: t("calendar.groupReviewHint"), tasks: review },
+      { id: "project", title: t("calendar.groupSpaces"), hint: t("calendar.groupSpacesHint"), tasks: projectWork },
+      { id: "other", title: t("calendar.groupOther"), hint: t("calendar.groupOtherHint"), tasks: other },
     ].filter((group) => group.tasks.length > 0);
-  }, [currentWeekDays, filtered, projects]);
+  }, [currentWeekDays, filtered, projects, t]);
 
   function toggleGroup(groupId: string) {
     setCollapsed((current) => {
@@ -184,10 +184,14 @@ export function CalendarRightPanel({
     >
       <div className="gcal-schedule-head">
         <div>
-          <span className="gcal-panel-kicker">To schedule</span>
-          <h2>Place work on the calendar</h2>
+          <span className="gcal-panel-kicker">{t("calendar.scheduleKicker")}</span>
+          <h2>{t("calendar.scheduleTitle")}</h2>
           <p>
-            {unscheduled.length} unscheduled · {todaySummary.scheduled} today · {todaySummary.deadlines} deadlines
+            {t("calendar.scheduleSummary", {
+              unscheduled: unscheduled.length,
+              today: todaySummary.scheduled,
+              deadlines: todaySummary.deadlines,
+            })}
           </p>
         </div>
         <button
@@ -195,7 +199,7 @@ export function CalendarRightPanel({
           className="gcal-icon-button"
           onClick={onSuggestSchedule}
           disabled={aiStatus === "loading" || unscheduled.length === 0}
-          title="Suggest schedule"
+          title={t("calendar.suggestSchedule")}
         >
           {aiStatus === "loading" ? "..." : "AI"}
         </button>
@@ -204,38 +208,38 @@ export function CalendarRightPanel({
       {aiStatus === "preview" ? (
         <div className="gcal-suggestion-bar">
           <div>
-            <strong>{aiPlacementsCount} suggested placements</strong>
-            <span>Previewed on the week grid.</span>
+            <strong>{t("calendar.suggestionCount", { n: aiPlacementsCount })}</strong>
+            <span>{t("calendar.suggestionPreview")}</span>
           </div>
           <button type="button" onClick={onApplySuggestion}>
-            Apply
+            {t("calendar.apply")}
           </button>
           <button type="button" onClick={onCancelSuggestion}>
-            Cancel
+            {t("common.cancel")}
           </button>
         </div>
       ) : null}
 
-      {aiStatus === "error" ? <p className="gcal-alert">No open slots found for the current week.</p> : null}
+      {aiStatus === "error" ? <p className="gcal-alert">{t("calendar.noOpenSlots")}</p> : null}
 
       <label className="gcal-schedule-search">
-        <span>Search</span>
+        <span>{t("calendar.search")}</span>
         <input
           type="search"
           value={searchQuery}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Search tasks, spaces, or tags..."
+          placeholder={t("calendar.scheduleSearchPlaceholder")}
         />
       </label>
 
       <div className="gcal-filter-note">
-        <span>{activeLayers} layers on</span>
-        <span>{projectFilter === "all" ? "All spaces" : `${projectCount} spaces`}</span>
+        <span>{t("calendar.layersOn", { n: activeLayers })}</span>
+        <span>{projectFilter === "all" ? t("calendar.allSpaces") : t("calendar.spacesCount", { n: projectCount })}</span>
       </div>
 
       <div className="gcal-task-groups">
         {groups.length === 0 ? (
-          <p className="gcal-hint">{searchQuery ? "No matching tasks." : t("calendar.allClear")}</p>
+          <p className="gcal-hint">{searchQuery ? t("calendar.noMatchingTasks") : t("calendar.allClear")}</p>
         ) : (
           groups.map((group) => {
             const isCollapsed = collapsed.has(group.id);
@@ -267,8 +271,10 @@ export function CalendarRightPanel({
                           <div className="gcal-task-card-main">
                             <strong>{task.title}</strong>
                             <span>
-                              {project || "Inbox"}
-                              {task.dueDate ? ` · Due ${formatDate(task.dueDate, lang)}` : " · No deadline"}
+                              {project || t("calendar.inbox")}
+                              {task.dueDate
+                                ? ` · ${t("calendar.dueShort", { date: formatDate(task.dueDate, lang) })}`
+                                : ` · ${t("calendar.noDeadlineShort")}`}
                             </span>
                           </div>
                           <span className="gcal-task-duration">{estimateMinutes(task)}m</span>
@@ -279,7 +285,7 @@ export function CalendarRightPanel({
                               event.stopPropagation();
                               onOpenScheduleModal(task.id);
                             }}
-                            title="Schedule task"
+                            title={t("calendar.scheduleTask")}
                           >
                             +
                           </button>
@@ -298,9 +304,9 @@ export function CalendarRightPanel({
         <input
           value={quickTitle}
           onChange={(event) => setQuickTitle(event.target.value)}
-          placeholder="Quick add task..."
+          placeholder={t("calendar.quickAddTaskPlaceholder")}
         />
-        <button type="submit">Add</button>
+        <button type="submit">{t("common.add")}</button>
       </form>
     </aside>
   );
