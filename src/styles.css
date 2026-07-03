@@ -2122,14 +2122,14 @@ textarea {
 .gcal-allday-row {
   display: grid;
   grid-template-columns: 56px repeat(7, minmax(0, 1fr));
-  border-bottom: 1px solid var(--color-divider-soft);
   min-height: 32px;
   /* Cap the band so a busy day can't push the time grid off-screen; extra
-     chips scroll instead. align-items:start keeps a light day's single chip
-     from stretching to the tallest column's height. */
+     chips scroll instead. The user can drag the resizer below to change the
+     height (WeekView then sets height/max-height inline). Cells stretch to
+     the full band height so the per-day dividers span the whole band. */
   max-height: 104px;
   overflow-y: auto;
-  align-items: start;
+  align-items: stretch;
 }
 
 .gcal-allday-cell {
@@ -2144,6 +2144,38 @@ textarea {
 
 .gcal-allday-cell.is-drop {
   background: var(--color-primary-tint);
+}
+
+/* Drag bar under the all-day band: resizes the band height. */
+.gcal-allday-resizer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 7px;
+  cursor: row-resize;
+  border-bottom: 1px solid var(--color-divider-soft);
+  touch-action: none;
+}
+
+.gcal-allday-resizer span {
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-divider-soft);
+  transition: background 120ms ease;
+}
+
+.gcal-allday-resizer:hover span,
+.gcal-allday-resizer:active span {
+  background: var(--color-primary);
+}
+
+/* Ghost chip shown in the target all-day cell while a time block is dragged
+   over the band. */
+.gcal-chip.is-move-preview {
+  opacity: 0.55;
+  pointer-events: none;
+  border-style: dashed;
 }
 
 .gcal-timegrid-body {

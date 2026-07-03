@@ -332,6 +332,12 @@ export function CalendarView({
     onUpdateTask(taskId, { scheduledDate: day, startTime, endTime });
   }
 
+  // Dropping a time block on the all-day band keeps the date but clears the
+  // times, turning it into an all-day item.
+  function handleMoveItemToAllDay(taskId: string, day: string) {
+    onUpdateTask(taskId, { scheduledDate: day, startTime: "", endTime: "" });
+  }
+
   function suggestSchedule() {
     if (unscheduled.length === 0) {
       showToast?.({ message: t("calendar.noUnscheduled") });
@@ -588,6 +594,7 @@ export function CalendarView({
                 onClickAllDaySlot={(day) => setQuickCreate({ date: day, allDay: true })}
                 onResizeItem={handleResizeItem}
                 onMoveItem={handleMoveItem}
+                onMoveItemToAllDay={handleMoveItemToAllDay}
                 draft={draft}
                 dragPreview={dragPreview}
                 draggingTaskTitle={tasks.find((task) => task.id === draggingTaskId)?.title ?? ""}

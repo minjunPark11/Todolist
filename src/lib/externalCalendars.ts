@@ -57,8 +57,23 @@ function parseIcsDate(value: string) {
   return { value: iso, allDay: false };
 }
 
-function timePart(value: string) {
-  return value.includes("T") ? value.slice(11, 16) : undefined;
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+// UTC ("...Z") stamps are converted to the device's local date/time so events
+// land on the day/slot the user actually experiences them; floating times are
+// taken as-is.
+function localDateTimeParts(value: string): { date: string; time?: string } {
+  if (!value.includes("T")) return { date: value.slice(0, 10) };
+  if (value.endsWith("Z")) {
+    const date = new Date(value);
+    return {
+      date: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`,
+      time: `${pad2(date.getHours())}:${pad2(date.getMinutes())}`,
+    };
+  }
+  return { date: value.slice(0, 10), time: value.slice(11, 16) };
 }
 
 export function parseIcsEvents(text: string, calendarId: string): ExternalCalendarEvent[] {
@@ -197,13 +212,18 @@ export async function fetchExternalCalendarEvents(calendar: ExternalCalendar) {
 }
 
 export function externalEventDate(event: ExternalCalendarEvent) {
-  return event.start.slice(0, 10);
+  return localDateTimeParts(event.start).date;
+}
+
+// End date (exclusive for all-day events per RFC 5545), or undefined.
+export function externalEventEndDate(event: ExternalCalendarEvent) {
+  return event.end ? localDateTimeParts(event.end).date : undefined;
 }
 
 export function externalEventStartTime(event: ExternalCalendarEvent) {
-  return event.allDay ? undefined : timePart(event.start);
+  return event.allDay ? undefined : localDateTimeParts(event.start).time;
 }
 
 export function externalEventEndTime(event: ExternalCalendarEvent) {
-  return event.allDay || !event.end ? undefined : timePart(event.end);
+  return event.allDay || !event.end ? undefined : localDateTimeParts(event.end).time;
 }

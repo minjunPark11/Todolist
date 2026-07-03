@@ -60,6 +60,25 @@ interface LiveMove {
   // Becomes true after the pointer travels past the click threshold; until
   // then nothing is drawn and pointerup falls through to a normal click.
   moved: boolean;
+  // True while the pointer hovers the all-day band: dropping there converts
+  // the block to an all-day item (scheduledDate kept, times cleared).
+  allDay: boolean;
+}
+
+const ALLDAY_MIN_HEIGHT = 32;
+const ALLDAY_MAX_HEIGHT = 320;
+const ALLDAY_HEIGHT_STORAGE_KEY = "focusflow.calendar.alldayHeight";
+
+function loadAlldayHeight(): number | null {
+  try {
+    const raw = window.localStorage.getItem(ALLDAY_HEIGHT_STORAGE_KEY);
+    if (!raw) return null;
+    const value = Number(raw);
+    if (!Number.isFinite(value)) return null;
+    return Math.min(ALLDAY_MAX_HEIGHT, Math.max(ALLDAY_MIN_HEIGHT, Math.round(value)));
+  } catch {
+    return null;
+  }
 }
 
 function asDate(value: string) {
@@ -96,6 +115,7 @@ interface WeekViewProps {
   onClickAllDaySlot: (day: string) => void;
   onResizeItem: (sourceId: string, day: string, startTime: string, endTime: string) => void;
   onMoveItem: (sourceId: string, day: string, startTime: string, endTime: string) => void;
+  onMoveItemToAllDay: (sourceId: string, day: string) => void;
   draft: CalendarDraftBlock | null;
   dragPreview: {
     taskId: string;
@@ -132,6 +152,7 @@ export function WeekView({
   onClickAllDaySlot,
   onResizeItem,
   onMoveItem,
+  onMoveItemToAllDay,
   draft,
   dragPreview,
   draggingTaskTitle,
@@ -160,7 +181,10 @@ export function WeekView({
   const [move, setMove] = useState<LiveMove | null>(null);
   const moveRef = useRef<LiveMove | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const alldayRowRef = useRef<HTMLDivElement>(null);
   const suppressClickRef = useRef(false);
+  // User-resizable all-day band height (null = automatic sizing).
+  const [alldayHeight, setAlldayHeight] = useState<number | null>(loadAlldayHeight);
   const isDay = days.length === 1;
 
   const today = todayValue();
@@ -332,6 +356,7 @@ export function WeekView({
       startMin,
       endMin,
       moved: false,
+      allDay: false,
     };
     moveRef.current = state;
     setMove(state);
@@ -355,6 +380,16 @@ export function WeekView({
         const distance = Math.hypot(moveEvent.clientX - startClientX, moveEvent.clientY - startClientY);
         if (distance <= 4) return;
       }
+      const target = targetDayFromX(moveEvent.clientX);
+      // Hovering the all-day band (or the header above it) targets an
+      // all-day drop instead of a time slot — no auto-scroll in that case.
+      const alldayRect = alldayRowRef.current?.getBoundingClientRect();
+      if (alldayRect && moveEvent.clientY <= alldayRect.bottom) {
+        const next: LiveMove = { ...current, moved: true, allDay: true, day: target.day };
+        moveRef.current = next;
+        setMove(next);
+        return;
+      }
       // Auto-scroll when dragging near the scroller's edges so times outside
       // the viewport stay reachable.
       const scroller = scrollRef.current;
@@ -363,7 +398,6 @@ export function WeekView({
         if (moveEvent.clientY < scrollRect.top + 110) scroller.scrollTop -= 14;
         else if (moveEvent.clientY > scrollRect.bottom - 48) scroller.scrollTop += 14;
       }
-      const target = targetDayFromX(moveEvent.clientX);
       const rect = target.columnEl.getBoundingClientRect();
       const pointerMin = minutesFromPointerY(moveEvent.clientY, rect.top);
       const nextStart = clampMinutes(
@@ -371,7 +405,7 @@ export function WeekView({
         DAY_START * 60,
         DAY_END * 60 - duration,
       );
-      const next: LiveMove = { ...current, moved: true, day: target.day, startMin: nextStart, endMin: nextStart + duration };
+      const next: LiveMove = { ...current, moved: true, allDay: false, day: target.day, startMin: nextStart, endMin: nextStart + duration };
       moveRef.current = next;
       setMove(next);
     }
@@ -389,7 +423,11 @@ export function WeekView({
         suppressClickRef.current = false;
       }, 0);
       if (commit) {
-        onMoveItem(current.sourceId, current.day, minutesToTime(current.startMin), minutesToTime(current.endMin));
+        if (current.allDay) {
+          onMoveItemToAllDay(current.sourceId, current.day);
+        } else {
+          onMoveItem(current.sourceId, current.day, minutesToTime(current.startMin), minutesToTime(current.endMin));
+        }
       }
     }
 
@@ -406,6 +444,36 @@ export function WeekView({
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("keydown", onKeyDown, true);
+  }
+
+  // Drag the bar under the all-day band to change its height (persisted).
+  function startAlldayResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const row = alldayRowRef.current;
+    if (!row) return;
+    const startY = event.clientY;
+    const startHeight = row.getBoundingClientRect().height;
+
+    function heightFromPointer(clientY: number) {
+      return Math.min(ALLDAY_MAX_HEIGHT, Math.max(ALLDAY_MIN_HEIGHT, Math.round(startHeight + clientY - startY)));
+    }
+
+    function onPointerMove(moveEvent: PointerEvent) {
+      setAlldayHeight(heightFromPointer(moveEvent.clientY));
+    }
+    function onPointerUp(upEvent: PointerEvent) {
+      window.removeEventListener("pointermove", onPointerMove);
+      const next = heightFromPointer(upEvent.clientY);
+      setAlldayHeight(next);
+      try {
+        window.localStorage.setItem(ALLDAY_HEIGHT_STORAGE_KEY, String(next));
+      } catch {
+        // Keep the in-memory height when storage is unavailable.
+      }
+    }
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp, { once: true });
   }
 
   function dragStartTimeFromEvent(event: DragEvent<HTMLDivElement>) {
@@ -445,15 +513,22 @@ export function WeekView({
           </div>
         )}
 
-        <div className="gcal-allday-row">
+        <div
+          className="gcal-allday-row"
+          ref={alldayRowRef}
+          style={alldayHeight ? { height: alldayHeight, maxHeight: alldayHeight } : undefined}
+        >
           <div className="gcal-time-corner small">{t("calendar.allDay")}</div>
           {days.map((day) => {
             const allDayItems = items.filter((item) => item.date === day && item.allDay);
             const id = `allday:${day}`;
+            const isMoveTarget = Boolean(move?.moved && move.allDay && move.day === day);
             return (
               <div
                 key={day}
-                className={dragOverId === id ? "gcal-allday-cell is-drop" : "gcal-allday-cell"}
+                className={
+                  dragOverId === id || isMoveTarget ? "gcal-allday-cell is-drop" : "gcal-allday-cell"
+                }
                 onDragOver={onOverSlot(id)}
                 onDragLeave={onLeaveSlot(id)}
                 onDrop={(event) => onDropAllDay(event, day)}
@@ -461,6 +536,15 @@ export function WeekView({
                   if (event.target === event.currentTarget) onClickAllDaySlot(day);
                 }}
               >
+                {isMoveTarget && move ? (
+                  <span
+                    className="gcal-chip gcal-chip-task is-move-preview"
+                    style={{ borderLeftColor: move.color }}
+                  >
+                    {move.repeating ? "↺ " : null}
+                    {move.title}
+                  </span>
+                ) : null}
                 {allDayItems.map((item) => (
                   <button
                     key={item.key}
@@ -487,6 +571,16 @@ export function WeekView({
               </div>
             );
           })}
+        </div>
+        <div
+          className="gcal-allday-resizer"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label={t("calendar.allDayResize")}
+          title={t("calendar.allDayResize")}
+          onPointerDown={startAlldayResize}
+        >
+          <span />
         </div>
       </div>
 
@@ -609,7 +703,7 @@ export function WeekView({
                     </div>
                   ))}
                 {/* Live pointer-move overlay: the single visual for a block being moved. */}
-                {move?.moved && move.day === day ? (
+                {move?.moved && !move.allDay && move.day === day ? (
                   <div
                     className="gcal-move-block"
                     style={{

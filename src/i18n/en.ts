@@ -579,6 +579,7 @@ export const en: Dictionary = {
 
   // ---- Calendar Month/Week/Forms (additions) ----
   "calendar.allDay": "All day",
+  "calendar.allDayResize": "Resize all-day area",
   "calendar.cancelNewTaskAria": "Cancel new task",
   "calendar.titlePlaceholderQuestion": "What do you need to do?",
   "calendar.optional": "Optional",

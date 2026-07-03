@@ -1,7 +1,8 @@
 // Calendar derived-item model (CALENDAR_DESIGN.md §1.3/§1.4).
 // Shared by CalendarView rendering and the Ollama calendar context builder.
 import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, Project, Task, TaskPriority, TaskStatus } from "../types";
-import { externalEventDate, externalEventEndTime, externalEventStartTime } from "../lib/externalCalendars";
+import { externalEventDate, externalEventEndDate, externalEventEndTime, externalEventStartTime } from "../lib/externalCalendars";
+import { addDays } from "./date";
 
 export type CalendarLayer = "task" | "deadline" | "study-review" | "project-deadline" | "external";
 
@@ -177,22 +178,39 @@ export function buildCalendarItems({
   for (const event of externalCalendarEvents) {
     const calendar = externalCalendarById.get(event.externalCalendarId);
     if (!calendar) continue;
-    items.push({
-      key: `external:${event.id}`,
-      layer: "external",
-      sourceType: "external",
-      sourceId: event.id,
-      externalCalendarId: calendar.id,
-      externalCalendarName: calendar.name,
-      title: event.title,
-      date: externalEventDate(event),
-      startTime: externalEventStartTime(event),
-      endTime: externalEventEndTime(event),
-      allDay: event.allDay,
-      color: calendar.color,
-      draggable: false,
-      readOnly: true,
-    });
+    // All-day events can span several days (DTEND is exclusive per RFC 5545):
+    // emit one chip per covered day so the whole range shows in the all-day
+    // band, capped at 62 days as a runaway guard.
+    const startDate = externalEventDate(event);
+    const dates = [startDate];
+    if (event.allDay) {
+      const endDate = externalEventEndDate(event);
+      let cursor = startDate;
+      while (endDate && dates.length < 62) {
+        const next = addDays(cursor, 1);
+        if (next >= endDate) break;
+        dates.push(next);
+        cursor = next;
+      }
+    }
+    for (const date of dates) {
+      items.push({
+        key: `external:${event.id}:${date}`,
+        layer: "external",
+        sourceType: "external",
+        sourceId: event.id,
+        externalCalendarId: calendar.id,
+        externalCalendarName: calendar.name,
+        title: event.title,
+        date,
+        startTime: externalEventStartTime(event),
+        endTime: externalEventEndTime(event),
+        allDay: event.allDay,
+        color: calendar.color,
+        draggable: false,
+        readOnly: true,
+      });
+    }
   }
 
   return items;

@@ -579,6 +579,7 @@ export const ko: Dictionary = {
 
   // ---- Calendar Month/Week/Forms (additions) ----
   "calendar.allDay": "종일",
+  "calendar.allDayResize": "종일 영역 크기 조절",
   "calendar.cancelNewTaskAria": "새 할 일 취소",
   "calendar.titlePlaceholderQuestion": "무엇을 해야 하나요?",
   "calendar.optional": "선택 사항",
