@@ -82,6 +82,8 @@ type SpacesPageProps = {
   onArchiveTask: (id: string) => void;
   onStartFocus: (taskId: string, source?: FocusSession["source"]) => void;
   onNavigate: (page: PageId) => void;
+  // Opens the main Calendar, optionally pre-filtered to one project.
+  onOpenCalendar: (projectId?: string) => void;
   onCreateProject: (input: { name: string; color?: string; type?: ProjectType; description?: string; dueDate?: string }) => string;
   onUpdateProject: (id: string, patch: Partial<Project>) => void;
   onUpdateTopic: (id: string, patch: Partial<StudyTopic>) => void;
@@ -157,6 +159,7 @@ export function SpacesPage({
   onArchiveTask,
   onStartFocus,
   onNavigate,
+  onOpenCalendar,
   onUpdateProject,
   onUpdateTopic,
   onToggleStar,
@@ -430,6 +433,9 @@ export function SpacesPage({
         onUpdateProject={onUpdateProject}
         onDeleteSpace={() => deleteSpace(selectedSpace)}
         onNavigate={onNavigate}
+        onOpenCalendar={() =>
+          onOpenCalendar(selectedSpace.sourceRef === "project" ? selectedSpace.sourceId : undefined)
+        }
         showToast={showToast}
       />
     );

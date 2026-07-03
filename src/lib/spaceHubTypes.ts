@@ -4,9 +4,12 @@
 
 export type SpaceHubType = "project" | "study" | "research" | "personal" | "custom";
 
-export type SpaceTab = "overview" | "tasks" | "calendar" | "focus" | "notes" | "records";
+// The per-space "calendar" tab was removed (PROJECT_DETAIL_REMOVE_CALENDAR_TAB
+// spec) — scheduling lives in the main Calendar page. Legacy ?tab=calendar
+// URLs fall back to "overview" because the value is no longer in SPACE_TABS.
+export type SpaceTab = "overview" | "tasks" | "focus" | "notes" | "records";
 
-export const SPACE_TABS: SpaceTab[] = ["overview", "tasks", "calendar", "focus", "notes", "records"];
+export const SPACE_TABS: SpaceTab[] = ["overview", "tasks", "focus", "notes", "records"];
 
 export type SpaceSignalStatus =
   | "on_track"

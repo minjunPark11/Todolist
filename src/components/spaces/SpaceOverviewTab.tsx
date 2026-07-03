@@ -5,9 +5,7 @@ import {
   isTaskDone,
   relativeTime,
   sessionSeconds,
-  type SpaceCalendarItem,
 } from "../../lib/spaceSelectors";
-import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
 import { presetText, noteTypeText } from "../../lib/spaceHubI18n";
 
@@ -28,7 +26,6 @@ export function SpaceOverviewTab({
   preset,
   spaceTasks,
   activities,
-  calendarItems,
   recentSessions,
   spaceNotes,
   aiSummary,
@@ -41,7 +38,6 @@ export function SpaceOverviewTab({
   onAddNote,
   onOpenNote,
   onOpenSession,
-  onOpenFullCalendar,
   onOpenTab,
   onGenerateAiSummary,
   onAiSuggestSchedule,
@@ -50,7 +46,6 @@ export function SpaceOverviewTab({
   preset: SpaceTypePreset;
   spaceTasks: Task[];
   activities: SpaceActivity[];
-  calendarItems: SpaceCalendarItem[];
   recentSessions: FocusSession[];
   spaceNotes: SpaceNote[];
   aiSummary: { state: "idle" | "loading" | "ready" | "error"; text: string; tips: string[] };
@@ -63,7 +58,6 @@ export function SpaceOverviewTab({
   onAddNote: () => void;
   onOpenNote: (noteId: string) => void;
   onOpenSession: (sessionId: string) => void;
-  onOpenFullCalendar: () => void;
   onOpenTab: (tab: SpaceTab) => void;
   onGenerateAiSummary: () => void;
   onAiSuggestSchedule: () => void;
@@ -76,8 +70,9 @@ export function SpaceOverviewTab({
     .slice(0, 5);
 
   return (
-    <div className="sdv-content-grid">
-      <div className="sdv-main-col">
+    <div className="sdv-overview-layout">
+      {/* Row 1: tasks + AI summary */}
+      <div className="sdv-overview-top">
         {/* Tasks card (§15) */}
         <section className="sdv-card">
           <header className="sdv-card-head">
@@ -130,79 +125,6 @@ export function SpaceOverviewTab({
           )}
         </section>
 
-        <div className="sdv-bottom-row">
-          {/* Activity timeline (§16) */}
-          <section className="sdv-card">
-            <header className="sdv-card-head">
-              <h2>{t("spaceHub.section.activityTimeline")}</h2>
-              <button type="button" className="sdv-link" onClick={() => onOpenTab("records")}>
-                {t("spaceHub.action.viewAll")}
-              </button>
-            </header>
-            {activities.length === 0 ? (
-              <div className="sdv-empty">
-                <p>{t("spaceHub.empty.noActivity")}</p>
-              </div>
-            ) : (
-              <ul className="sdv-activity-list">
-                {activities.slice(0, 6).map((activity) => (
-                  <li key={activity.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (activity.relatedTaskId) onOpenTask(activity.relatedTaskId);
-                        else if (activity.relatedSessionId) onOpenSession(activity.relatedSessionId);
-                        else if (activity.relatedNoteId) onOpenNote(activity.relatedNoteId);
-                      }}
-                    >
-                      <span className="sdv-activity-icon" aria-hidden="true">
-                        {activityIcons[activity.type]}
-                      </span>
-                      <span className="sdv-activity-body">
-                        <strong>{activity.title}</strong>
-                        {activity.description ? <em>{activity.description}</em> : null}
-                      </span>
-                      <small>{relativeTime(activity.createdAt, t)}</small>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* Space calendar preview (§17) — read-only */}
-          <section className="sdv-card">
-            <header className="sdv-card-head">
-              <h2>{t("spaceHub.section.spaceCalendar")}</h2>
-              <button type="button" className="sdv-link" onClick={onOpenFullCalendar}>
-                {t("spaceHub.action.openFullCalendar")}
-              </button>
-            </header>
-            {calendarItems.length === 0 ? (
-              <div className="sdv-empty">
-                <p>{t("spaceHub.empty.noCalendarWeek")}</p>
-              </div>
-            ) : (
-              <ul className="sdv-calendar-list">
-                {calendarItems.slice(0, 6).map((item) => (
-                  <li key={item.id}>
-                    <button type="button" onClick={() => (item.taskId ? onOpenTask(item.taskId) : undefined)}>
-                      <span className={`sdv-cal-dot sdv-kind-${item.kind}`} aria-hidden="true" />
-                      <span className="sdv-cal-when">
-                        {formatDate(item.date)}
-                        {item.time ? ` ${item.time}` : ""}
-                      </span>
-                      <strong>{item.title}</strong>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
-      </div>
-
-      <aside className="sdv-insight-col">
         {/* AI Space Summary (§18) — never auto-runs */}
         <section className="sdv-card sdv-ai-card">
           <header className="sdv-card-head">
@@ -241,6 +163,49 @@ export function SpaceOverviewTab({
                 </button>
               </div>
             </>
+          )}
+        </section>
+
+      </div>
+
+      {/* Row 2: activity timeline, focus records, notes */}
+      <div className="sdv-overview-bottom">
+        {/* Activity timeline (§16) */}
+        <section className="sdv-card">
+          <header className="sdv-card-head">
+            <h2>{t("spaceHub.section.activityTimeline")}</h2>
+            <button type="button" className="sdv-link" onClick={() => onOpenTab("records")}>
+              {t("spaceHub.action.viewAll")}
+            </button>
+          </header>
+          {activities.length === 0 ? (
+            <div className="sdv-empty">
+              <p>{t("spaceHub.empty.noActivity")}</p>
+            </div>
+          ) : (
+            <ul className="sdv-activity-list">
+              {activities.slice(0, 6).map((activity) => (
+                <li key={activity.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activity.relatedTaskId) onOpenTask(activity.relatedTaskId);
+                      else if (activity.relatedSessionId) onOpenSession(activity.relatedSessionId);
+                      else if (activity.relatedNoteId) onOpenNote(activity.relatedNoteId);
+                    }}
+                  >
+                    <span className="sdv-activity-icon" aria-hidden="true">
+                      {activityIcons[activity.type]}
+                    </span>
+                    <span className="sdv-activity-body">
+                      <strong>{activity.title}</strong>
+                      {activity.description ? <em>{activity.description}</em> : null}
+                    </span>
+                    <small>{relativeTime(activity.createdAt, t)}</small>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
 
@@ -300,7 +265,7 @@ export function SpaceOverviewTab({
             </ul>
           )}
         </section>
-      </aside>
+      </div>
     </div>
   );
 }

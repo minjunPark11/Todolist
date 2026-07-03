@@ -1,17 +1,15 @@
 import { useMemo, useState } from "react";
-import type { ConceptNote, FocusSession, Task } from "../../types";
+import type { FocusSession, Task } from "../../types";
 import type { SpaceSectionGroup, SpaceTypePreset } from "../../lib/spaceHubTypes";
 import {
   formatSeconds,
-  getSpaceCalendarItems,
-  getSpaceTaskCounts,
   isTaskDone,
   isTaskUnscheduled,
   relativeTime,
   resolveTaskGroupLabel,
   sessionSeconds,
 } from "../../lib/spaceSelectors";
-import { addDays, formatDate, getWeekDays, getWeekStart, todayValue } from "../../utils/date";
+import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { useT } from "../../i18n";
 import { presetText, groupText } from "../../lib/spaceHubI18n";
 
@@ -156,125 +154,6 @@ export function SpaceTasksTab({
           ),
         )
       )}
-    </section>
-  );
-}
-
-// === Calendar tab (§22) — schedule-modal centric, no drag/drop (§22.7) ===
-export function SpaceCalendarTab({
-  spaceTasks,
-  reviewNotes,
-  onOpenTask,
-  onSchedule,
-  onOpenFullCalendar,
-}: {
-  spaceTasks: Task[];
-  reviewNotes: ConceptNote[];
-  onOpenTask: (taskId: string) => void;
-  onSchedule: (taskId: string) => void;
-  onOpenFullCalendar: () => void;
-}) {
-  const { t } = useT();
-  const today = todayValue();
-  const [weekAnchor, setWeekAnchor] = useState(getWeekStart(today));
-  const weekDays = getWeekDays(weekAnchor);
-  const weekEnd = addDays(weekAnchor, 6);
-  const items = getSpaceCalendarItems(spaceTasks, reviewNotes, weekAnchor, weekEnd);
-  const counts = getSpaceTaskCounts(spaceTasks, today);
-  const dueSoon = spaceTasks.filter(
-    (task) => !isTaskDone(task) && task.dueDate && task.dueDate >= today && task.dueDate <= addDays(today, 3),
-  );
-  const unscheduled = spaceTasks.filter(isTaskUnscheduled);
-
-  return (
-    <section className="sdv-card sdv-tab-panel">
-      <header className="sdv-cal-head">
-        <div className="sdv-cal-summary">
-          <span>{t("spaceHub.cal.scheduledWeek", { n: items.filter((item) => item.kind === "scheduled").length })}</span>
-          <span>{t("spaceHub.cal.dueSoon", { n: dueSoon.length })}</span>
-          <span>{t("spaceHub.cal.unscheduled", { n: counts.unscheduled })}</span>
-        </div>
-        <div className="sdv-cal-nav">
-          <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => setWeekAnchor(addDays(weekAnchor, -7))} aria-label={t("spaceHub.aria.prevWeek")}>
-            ←
-          </button>
-          <span>
-            {formatDate(weekAnchor)} – {formatDate(weekEnd)}
-          </span>
-          <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => setWeekAnchor(addDays(weekAnchor, 7))} aria-label={t("spaceHub.aria.nextWeek")}>
-            →
-          </button>
-          <button type="button" className="sdv-link" onClick={onOpenFullCalendar}>
-            {t("spaceHub.action.openFullCalendar")}
-          </button>
-        </div>
-      </header>
-
-      <div className="sdv-week-strip" role="list" aria-label={t("spaceHub.aria.thisWeek")}>
-        {weekDays.map((day) => {
-          const dayItems = items.filter((item) => item.date === day);
-          return (
-            <div key={day} role="listitem" className={day === today ? "sdv-week-day today" : "sdv-week-day"}>
-              <strong>{formatDate(day)}</strong>
-              {dayItems.length === 0 ? (
-                <small>—</small>
-              ) : (
-                dayItems.slice(0, 3).map((item) => (
-                  <button key={item.id} type="button" className={`sdv-week-item sdv-kind-${item.kind}`} onClick={() => (item.taskId ? onOpenTask(item.taskId) : undefined)}>
-                    {item.time ? `${item.time} ` : ""}
-                    {item.title}
-                  </button>
-                ))
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {items.length === 0 ? (
-        <div className="sdv-empty">
-          <p>{t("spaceHub.empty.noCalendarWeek")}</p>
-        </div>
-      ) : null}
-
-      <div className="sdv-cal-lists">
-        <div>
-          <h3>{t("spaceHub.section.deadlines")}</h3>
-          {dueSoon.length === 0 ? (
-            <p className="sdv-empty-inline">{t("spaceHub.empty.noDeadlines")}</p>
-          ) : (
-            <ul className="sdv-record-list">
-              {dueSoon.map((task) => (
-                <li key={task.id}>
-                  <button type="button" onClick={() => onOpenTask(task.id)}>
-                    <strong>{task.title}</strong>
-                    <small>{t("spaceHub.meta.due", { date: formatDate(task.dueDate) })}</small>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <h3>{t("spaceHub.section.unscheduledTasks")}</h3>
-          {unscheduled.length === 0 ? (
-            <p className="sdv-empty-inline">{t("spaceHub.empty.allPlaced")}</p>
-          ) : (
-            <ul className="sdv-record-list">
-              {unscheduled.map((task) => (
-                <li key={task.id}>
-                  <button type="button" onClick={() => onOpenTask(task.id)}>
-                    <strong>{task.title}</strong>
-                  </button>
-                  <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => onSchedule(task.id)}>
-                    {t("spaceHub.action.schedule")}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
     </section>
   );
 }

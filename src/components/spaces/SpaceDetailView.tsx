@@ -17,7 +17,6 @@ import {
   formatSeconds,
   getNextActionTask,
   getRecentSpaceFocusSessions,
-  getSpaceCalendarItems,
   getSpaceSignal,
   getSpaceTaskCounts,
   getSpaceTasks,
@@ -29,9 +28,9 @@ import {
   spaceTaskTag,
 } from "../../lib/spaceSelectors";
 import { useSpaceHubData } from "../../hooks/useSpaceHubData";
-import { addDays, formatDate, getWeekStart, todayValue } from "../../utils/date";
+import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { SpaceOverviewTab } from "./SpaceOverviewTab";
-import { SpaceCalendarTab, SpaceFocusTab, SpaceTasksTab } from "./SpaceWorkTabs";
+import { SpaceFocusTab, SpaceTasksTab } from "./SpaceWorkTabs";
 import { SpaceNotesTab, SpaceRecordsTab } from "./SpaceNotesRecordsTabs";
 import {
   AddSpaceNoteModal,
@@ -70,6 +69,8 @@ export type SpaceDetailViewProps = {
   onUpdateProject: (id: string, patch: Partial<Project>) => void;
   onDeleteSpace: () => void;
   onNavigate: (page: PageId) => void;
+  // Opens the main Calendar page with this space's project filter pre-applied.
+  onOpenCalendar: () => void;
   showToast: (toast: ToastState) => void;
 };
 
@@ -113,6 +114,7 @@ export function SpaceDetailView({
   onUpdateProject,
   onDeleteSpace,
   onNavigate,
+  onOpenCalendar,
   showToast,
 }: SpaceDetailViewProps) {
   const { t } = useT();
@@ -166,7 +168,6 @@ export function SpaceDetailView({
   const todayFocusSeconds = getTodaySpaceFocusSeconds(spaceSessions, today);
   const weekFocusSeconds = getWeekSpaceFocusSeconds(spaceSessions, weekStart);
   const upcoming = getUpcomingSpaceItems(spaceTasks, reviewNotes, today);
-  const weekCalendarItems = getSpaceCalendarItems(spaceTasks, reviewNotes, weekStart, addDays(weekStart, 6));
   const recentSessions = getRecentSpaceFocusSessions(spaceSessions, 3);
   const unscheduledTasks = spaceTasks.filter(isTaskUnscheduled);
 
@@ -537,10 +538,11 @@ export function SpaceDetailView({
               </ul>
             )}
             <div className="sdv-metric-actions">
-              <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => setTab("calendar")}>
-                {t("spaceHub.action.openCalendar")}
+              <button type="button" className="sdv-btn sdv-btn-sm" onClick={onOpenCalendar}>
+                {t("spaceHub.action.openCalendar")} ↗
               </button>
             </div>
+            <p className="sdv-upcoming-hint">ⓘ {t("spaceHub.upcoming.hint")}</p>
           </article>
         ) : null}
       </section>
@@ -566,7 +568,6 @@ export function SpaceDetailView({
           preset={preset}
           spaceTasks={spaceTasks}
           activities={activities}
-          calendarItems={weekCalendarItems}
           recentSessions={recentSessions}
           spaceNotes={spaceNotes}
           aiSummary={aiSummary}
@@ -579,7 +580,6 @@ export function SpaceDetailView({
           onAddNote={() => setModal({ kind: "add_note" })}
           onOpenNote={(noteId) => setDrawer({ kind: "note", noteId })}
           onOpenSession={(sessionId) => setDrawer({ kind: "session", sessionId })}
-          onOpenFullCalendar={() => onNavigate("calendar")}
           onOpenTab={setTab}
           onGenerateAiSummary={handleGenerateAiSummary}
           onAiSuggestSchedule={handleAiSuggestSchedule}
@@ -597,15 +597,6 @@ export function SpaceDetailView({
           onStartFocus={handleStartFocus}
           onSchedule={openScheduleModal}
           onAddTask={() => setModal({ kind: "add_task" })}
-        />
-      ) : null}
-      {tab === "calendar" ? (
-        <SpaceCalendarTab
-          spaceTasks={spaceTasks}
-          reviewNotes={reviewNotes}
-          onOpenTask={openTaskDrawer}
-          onSchedule={openScheduleModal}
-          onOpenFullCalendar={() => onNavigate("calendar")}
         />
       ) : null}
       {tab === "focus" ? (

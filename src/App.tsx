@@ -47,8 +47,19 @@ export default function App() {
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState("");
   const [pendingResetAllData, setPendingResetAllData] = useState(false);
+  // When set, the Calendar page opens pre-filtered to this project (space
+  // detail's "Open Calendar" — PROJECT_DETAIL_REMOVE_CALENDAR_TAB spec §8.2).
+  const [calendarFocusProjectId, setCalendarFocusProjectId] = useState("");
   const [toast, setToast] = useState<ToastState | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Desktop-only sidebar rail collapse; ignored by the mobile overlay menu.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("focusflow-sidebar-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -334,11 +345,32 @@ export default function App() {
 
   function viewTaskInCalendar(taskId: string) {
     planner.selectTask(taskId);
+    setCalendarFocusProjectId("");
     setActivePage("calendar");
+  }
+
+  function openCalendarForProject(projectId?: string) {
+    planner.selectTask("");
+    setCalendarFocusProjectId(projectId ?? "");
+    setActivePage("calendar");
+  }
+
+  function toggleSidebarCollapsed() {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem("focusflow-sidebar-collapsed", next ? "1" : "0");
+      } catch {
+        // Collapse still works for this session without persistence.
+      }
+      return next;
+    });
   }
 
   function navigateSection(page: PageId) {
     setActivePage(page);
+    // Plain navigation (sidebar etc.) always shows the unfiltered calendar.
+    setCalendarFocusProjectId("");
     planner.selectTask("");
   }
 
@@ -406,6 +438,8 @@ export default function App() {
         openProjectFromCalendar={openProjectFromCalendar}
         openStudyReviewFromCalendar={openStudyReviewFromCalendar}
         viewTaskInCalendar={viewTaskInCalendar}
+        openCalendarForProject={openCalendarForProject}
+        calendarFocusProjectId={calendarFocusProjectId}
         onNavigate={navigateSection}
         exportJson={exportJson}
         handleImport={handleImport}
@@ -428,7 +462,15 @@ export default function App() {
 
   return (
     <I18nProvider lang={appSettings.language}>
-    <div className={mobileMenuOpen ? "app-shell mobile-menu-open" : "app-shell"}>
+    <div
+      className={[
+        "app-shell",
+        mobileMenuOpen ? "mobile-menu-open" : "",
+        sidebarCollapsed ? "sidebar-collapsed" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <button
         type="button"
         className="mobile-menu-button"
@@ -460,6 +502,8 @@ export default function App() {
         userEmail={planner.auth.userEmail}
         dueReviewCount={dueReviewCount}
         showCounts={appSettings.showSidebarCounts}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapsed}
         onSelectProject={(projectId) => {
           setSelectedProjectId(projectId);
           setIsProjectDetailOpen(true);

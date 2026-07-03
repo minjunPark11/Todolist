@@ -13,6 +13,8 @@ interface SidebarProps {
   userEmail: string;
   dueReviewCount?: number;
   showCounts?: boolean;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
   onSelectProject: (projectId: string) => void;
   onAddProject: (name: string) => void;
   onOpenSettings: () => void;
@@ -123,6 +125,8 @@ export function Sidebar({
   userEmail,
   dueReviewCount = 0,
   showCounts = true,
+  collapsed,
+  onToggleCollapse,
   onSelectProject,
   onAddProject,
   onOpenSettings,
@@ -161,6 +165,7 @@ export function Sidebar({
     <button
       key={item.id}
       className={activePage === item.id ? "side-item active" : "side-item"}
+      title={collapsed ? item.label : undefined}
       onClick={() => onNavigate(item.id)}
     >
       <span className="side-item-icon">
@@ -180,11 +185,35 @@ export function Sidebar({
     setNewProject("");
   }
 
+  const collapseLabel = collapsed ? t("sidebar.expand") : t("sidebar.collapse");
+
   return (
     <aside className="sidebar">
       <div className="brand-lockup">
         <span className="brand-mark">F</span>
         <strong>{t("sidebar.brand")}</strong>
+        <button
+          type="button"
+          className="side-icon-btn side-collapse-btn"
+          aria-label={collapseLabel}
+          title={collapseLabel}
+          onClick={onToggleCollapse}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ transform: collapsed ? "scaleX(-1)" : "none" }}
+          >
+            <path d="M12 5l-6 7 6 7" />
+            <path d="M18 5l-6 7 6 7" />
+          </svg>
+        </button>
       </div>
 
       <div className="side-profile">

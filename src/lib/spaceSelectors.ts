@@ -205,46 +205,6 @@ export function getUpcomingSpaceItems(
   return items.sort((a, b) => a.when.localeCompare(b.when)).slice(0, limit);
 }
 
-export interface SpaceCalendarItem {
-  id: string;
-  date: string;
-  time: string;
-  title: string;
-  kind: "deadline" | "scheduled" | "review";
-  taskId?: string;
-  noteId?: string;
-}
-
-export function getSpaceCalendarItems(
-  spaceTasks: Task[],
-  reviewNotes: ConceptNote[],
-  rangeStart: string,
-  rangeEnd: string,
-): SpaceCalendarItem[] {
-  const items: SpaceCalendarItem[] = [];
-  for (const task of spaceTasks) {
-    if (task.scheduledDate && task.scheduledDate >= rangeStart && task.scheduledDate <= rangeEnd) {
-      items.push({
-        id: `sch-${task.id}`,
-        date: task.scheduledDate,
-        time: task.startTime,
-        title: task.title,
-        kind: "scheduled",
-        taskId: task.id,
-      });
-    }
-    if (task.dueDate && task.dueDate >= rangeStart && task.dueDate <= rangeEnd && !isTaskDone(task)) {
-      items.push({ id: `due-${task.id}`, date: task.dueDate, time: "", title: `${task.title} due`, kind: "deadline", taskId: task.id });
-    }
-  }
-  for (const note of reviewNotes) {
-    if (note.nextReviewDate && note.nextReviewDate >= rangeStart && note.nextReviewDate <= rangeEnd) {
-      items.push({ id: `rev-${note.id}`, date: note.nextReviewDate, time: "", title: `${note.title} review`, kind: "review", noteId: note.id });
-    }
-  }
-  return items.sort((a, b) => `${a.date}${a.time || "99:99"}`.localeCompare(`${b.date}${b.time || "99:99"}`));
-}
-
 // Task -> configured group. Falls back on status heuristics so preset groups
 // fill up without the user assigning every task manually.
 export function resolveTaskGroupLabel(task: Task, groupLabels: string[]): string {

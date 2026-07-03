@@ -56,6 +56,9 @@ interface CalendarViewProps {
   tasks: Task[];
   projects: Project[];
   conceptNotes: ConceptNote[];
+  // When set, the calendar mounts with only this project's items visible
+  // (space detail "Open Calendar" hand-off). The user can widen it any time.
+  initialProjectId?: string;
   onSelectTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
@@ -74,6 +77,7 @@ export function CalendarView({
   tasks,
   projects,
   conceptNotes,
+  initialProjectId,
   onSelectTask,
   onUpdateTask,
   onCreateTask,
@@ -88,7 +92,9 @@ export function CalendarView({
   const [anchor, setAnchor] = useState(todayValue());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [layers, setLayers] = useState<CalendarLayerToggles>(defaultCalendarLayers);
-  const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>(() =>
+    initialProjectId ? new Set([initialProjectId]) : "all",
+  );
   const [dragOverId, setDragOverId] = useState("");
   const [draggingTaskId, setDraggingTaskId] = useState("");
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);

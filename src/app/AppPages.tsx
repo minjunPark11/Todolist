@@ -39,6 +39,8 @@ type AppPagesProps = {
   openProjectFromCalendar: (projectId: string) => void;
   openStudyReviewFromCalendar: (noteId: string) => void;
   viewTaskInCalendar: (taskId: string) => void;
+  openCalendarForProject: (projectId?: string) => void;
+  calendarFocusProjectId: string;
   onNavigate: (page: PageId) => void;
   exportJson: () => void;
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -73,6 +75,8 @@ export function AppPages({
   openProjectFromCalendar,
   openStudyReviewFromCalendar,
   viewTaskInCalendar,
+  openCalendarForProject,
+  calendarFocusProjectId,
   onNavigate,
   exportJson,
   handleImport,
@@ -175,6 +179,7 @@ export function AppPages({
           tasks={planner.tasks}
           projects={activeProjects}
           conceptNotes={planner.conceptNotes}
+          initialProjectId={calendarFocusProjectId}
           onSelectTask={planner.selectTask}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
@@ -221,6 +226,7 @@ export function AppPages({
         onArchiveTask={handleArchiveTask}
         onStartFocus={planner.startFocusSession}
         onNavigate={onNavigate}
+        onOpenCalendar={openCalendarForProject}
         selectedTaskId={planner.selectedTask?.id ?? ""}
         taskDetail={renderTaskDetail()}
         selectedProjectId={selectedProjectId}
