@@ -22,8 +22,17 @@ import {
   type FocusUserSettings,
 } from "./lib/focusSettingsStorage";
 import { updateMiniFocusTimer } from "./lib/miniFocusTimer";
+import {
+  createExternalCalendarDraft,
+  fetchExternalCalendarEvents,
+  loadExternalCalendarState,
+  saveExternalCalendarState,
+  shouldSyncExternalCalendar,
+  type ExternalCalendarState,
+} from "./lib/externalCalendars";
 import type {
   ConceptNote,
+  ExternalCalendar,
   PageId,
   Project,
   StudyTopic,
@@ -64,6 +73,7 @@ export default function App() {
   const [calendarFocusProjectId, setCalendarFocusProjectId] = useState("");
   const [toast, setToast] = useState<ToastState | null>(null);
   const [focusSettings, setFocusSettings] = useState<FocusUserSettings>(() => loadFocusUserSettings());
+  const [externalCalendarState, setExternalCalendarState] = useState<ExternalCalendarState>(() => loadExternalCalendarState());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Desktop-only sidebar rail collapse; ignored by the mobile overlay menu.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -77,6 +87,8 @@ export default function App() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const originalTitleRef = useRef(document.title || "FocusFlow");
   const completedNotificationRef = useRef<Set<string>>(new Set());
+  const syncingExternalCalendarsRef = useRef<Set<string>>(new Set());
+  const initialExternalCalendarSyncRef = useRef(false);
 
   const today = todayValue();
   const focusNow = useNowTick(Boolean(planner.activeFocusSession && planner.activeFocusSession.status === "running"));
@@ -244,6 +256,25 @@ export default function App() {
     window.dispatchEvent(new CustomEvent("focusflow:page-change", { detail: { page: activePage } }));
   }, [activePage]);
 
+  useEffect(() => {
+    if (activePage !== "calendar") return;
+    externalCalendarState.calendars
+      .filter((calendar) => calendar.enabled && calendar.syncStatus !== "syncing" && calendar.syncStatus !== "failed" && shouldSyncExternalCalendar(calendar))
+      .forEach((calendar) => {
+        void syncExternalCalendar(calendar.id);
+      });
+  }, [activePage, externalCalendarState.calendars]);
+
+  useEffect(() => {
+    if (initialExternalCalendarSyncRef.current) return;
+    initialExternalCalendarSyncRef.current = true;
+    externalCalendarState.calendars
+      .filter((calendar) => calendar.enabled && calendar.visible && calendar.syncStatus !== "failed" && shouldSyncExternalCalendar(calendar))
+      .forEach((calendar) => {
+        void syncExternalCalendar(calendar.id);
+      });
+  }, [externalCalendarState.calendars]);
+
   // One-time cleanup for the legacy /inbox route and ?triage=inbox deep
   // links — the intent was already captured into todayIntent above.
   useEffect(() => {
@@ -297,6 +328,104 @@ export default function App() {
   function stopFocusWithNotification(sessionId: string, completeTask = false) {
     planner.stopFocusSession(sessionId, completeTask);
     notifyFocusCompleted(sessionId);
+  }
+
+  function saveExternalState(updater: (current: ExternalCalendarState) => ExternalCalendarState) {
+    setExternalCalendarState((current) => {
+      const next = updater(current);
+      saveExternalCalendarState(next);
+      return next;
+    });
+  }
+
+  async function syncExternalCalendar(calendarId: string, calendarOverride?: ExternalCalendar) {
+    if (syncingExternalCalendarsRef.current.has(calendarId)) return;
+    const calendar = calendarOverride ?? externalCalendarState.calendars.find((item) => item.id === calendarId);
+    if (!calendar || !calendar.enabled) return;
+    syncingExternalCalendarsRef.current.add(calendarId);
+    const attemptedAt = new Date().toISOString();
+    saveExternalState((current) => ({
+      ...current,
+      calendars: current.calendars.map((item) =>
+        item.id === calendarId ? { ...item, syncStatus: "syncing", lastAttemptedAt: attemptedAt, updatedAt: attemptedAt } : item,
+      ),
+    }));
+
+    try {
+      const events = await fetchExternalCalendarEvents(calendar);
+      const syncedAt = new Date().toISOString();
+      saveExternalState((current) => ({
+        calendars: current.calendars.map((item) =>
+          item.id === calendarId
+            ? {
+                ...item,
+                syncStatus: item.visible ? "success" : "hidden",
+                lastSyncedAt: syncedAt,
+                lastAttemptedAt: attemptedAt,
+                lastError: "",
+                eventCount: events.length,
+                updatedAt: syncedAt,
+              }
+            : item,
+        ),
+        events: [...current.events.filter((event) => event.externalCalendarId !== calendarId), ...events],
+      }));
+    } catch (error) {
+      const failedAt = new Date().toISOString();
+      saveExternalState((current) => ({
+        ...current,
+        calendars: current.calendars.map((item) =>
+          item.id === calendarId
+            ? {
+                ...item,
+                syncStatus: "failed",
+                lastAttemptedAt: attemptedAt,
+                lastError: error instanceof Error ? error.message : "Sync failed",
+                updatedAt: failedAt,
+              }
+            : item,
+        ),
+      }));
+    } finally {
+      syncingExternalCalendarsRef.current.delete(calendarId);
+    }
+  }
+
+  function syncAllExternalCalendars() {
+    externalCalendarState.calendars.filter((calendar) => calendar.enabled).forEach((calendar) => {
+      void syncExternalCalendar(calendar.id);
+    });
+  }
+
+  function addExternalCalendar(input: { name: string; icsUrl: string; color: string }) {
+    const calendar = createExternalCalendarDraft(input.name, input.icsUrl, input.color);
+    saveExternalState((current) => ({ ...current, calendars: [...current.calendars, calendar] }));
+    void syncExternalCalendar(calendar.id, calendar);
+  }
+
+  function updateExternalCalendar(calendarId: string, patch: Partial<ExternalCalendar>) {
+    const now = new Date().toISOString();
+    saveExternalState((current) => ({
+      ...current,
+      calendars: current.calendars.map((calendar) =>
+        calendar.id === calendarId
+          ? {
+              ...calendar,
+              ...patch,
+              syncStatus:
+                patch.enabled === false ? "disabled" : patch.visible === false ? "hidden" : patch.visible === true ? "success" : calendar.syncStatus,
+              updatedAt: now,
+            }
+          : calendar,
+      ),
+    }));
+  }
+
+  function deleteExternalCalendar(calendarId: string) {
+    saveExternalState((current) => ({
+      calendars: current.calendars.filter((calendar) => calendar.id !== calendarId),
+      events: current.events.filter((event) => event.externalCalendarId !== calendarId),
+    }));
   }
 
   function handleArchiveTask(taskId: string) {
@@ -550,6 +679,13 @@ export default function App() {
         focusSettings={focusSettings}
         onUpdateFocusSettings={updateFocusSettings}
         onStopFocus={stopFocusWithNotification}
+        externalCalendars={externalCalendarState.calendars}
+        externalCalendarEvents={externalCalendarState.events}
+        onAddExternalCalendar={addExternalCalendar}
+        onUpdateExternalCalendar={updateExternalCalendar}
+        onDeleteExternalCalendar={deleteExternalCalendar}
+        onSyncExternalCalendar={(calendarId) => void syncExternalCalendar(calendarId)}
+        onSyncAllExternalCalendars={syncAllExternalCalendars}
         accountSlot={
           <AccountSection
             auth={planner.auth}

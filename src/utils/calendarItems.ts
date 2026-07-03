@@ -1,8 +1,9 @@
 // Calendar derived-item model (CALENDAR_DESIGN.md §1.3/§1.4).
 // Shared by CalendarView rendering and the Ollama calendar context builder.
-import type { ConceptNote, Project, Task, TaskPriority, TaskStatus } from "../types";
+import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, Project, Task, TaskPriority, TaskStatus } from "../types";
+import { externalEventDate, externalEventEndTime, externalEventStartTime } from "../lib/externalCalendars";
 
-export type CalendarLayer = "task" | "deadline" | "study-review" | "project-deadline";
+export type CalendarLayer = "task" | "deadline" | "study-review" | "project-deadline" | "external";
 
 export interface CalendarLayerToggles {
   task: boolean;
@@ -23,8 +24,11 @@ export const defaultCalendarLayers: CalendarLayerToggles = {
 export interface CalendarItem {
   key: string;
   layer: CalendarLayer;
-  sourceType: "task" | "project" | "note";
+  sourceType: "task" | "project" | "note" | "external";
   sourceId: string;
+  externalCalendarId?: string;
+  externalCalendarName?: string;
+  readOnly?: boolean;
   title: string;
   date: string;
   startTime?: string;
@@ -43,6 +47,7 @@ const LAYER_COLOR: Record<CalendarLayer, string> = {
   deadline: "#ff9500",
   "study-review": "#af52de",
   "project-deadline": "#ff2d55",
+  external: "#4f73ff",
 };
 
 export type ProjectFilter = "all" | Set<string>;
@@ -59,6 +64,8 @@ export interface BuildCalendarItemsInput {
   tasks: Task[];
   projects: Project[];
   conceptNotes: ConceptNote[];
+  externalCalendars?: ExternalCalendar[];
+  externalCalendarEvents?: ExternalCalendarEvent[];
   layers: CalendarLayerToggles;
   projectFilter: ProjectFilter;
 }
@@ -67,6 +74,8 @@ export function buildCalendarItems({
   tasks,
   projects,
   conceptNotes,
+  externalCalendars = [],
+  externalCalendarEvents = [],
   layers,
   projectFilter,
 }: BuildCalendarItemsInput): CalendarItem[] {
@@ -157,6 +166,33 @@ export function buildCalendarItems({
         draggable: false,
       });
     }
+  }
+
+  const externalCalendarById = new Map(
+    externalCalendars
+      .filter((calendar) => calendar.enabled && calendar.visible)
+      .map((calendar) => [calendar.id, calendar]),
+  );
+
+  for (const event of externalCalendarEvents) {
+    const calendar = externalCalendarById.get(event.externalCalendarId);
+    if (!calendar) continue;
+    items.push({
+      key: `external:${event.id}`,
+      layer: "external",
+      sourceType: "external",
+      sourceId: event.id,
+      externalCalendarId: calendar.id,
+      externalCalendarName: calendar.name,
+      title: event.title,
+      date: externalEventDate(event),
+      startTime: externalEventStartTime(event),
+      endTime: externalEventEndTime(event),
+      allDay: event.allDay,
+      color: calendar.color,
+      draggable: false,
+      readOnly: true,
+    });
   }
 
   return items;

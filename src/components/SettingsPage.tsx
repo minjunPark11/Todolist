@@ -1,5 +1,5 @@
 import { ChangeEvent, ReactNode, useState } from "react";
-import type { AccentColor, AppSettings, FontSize, Language, ThemeMode } from "../types";
+import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, ThemeMode } from "../types";
 import { SegmentedTabs } from "./kit";
 import { useT } from "../i18n";
 
@@ -12,6 +12,12 @@ interface SettingsPageProps {
   onReset: () => void;
   importMessage: string;
   accountSlot: ReactNode;
+  externalCalendars: ExternalCalendar[];
+  onAddExternalCalendar: (input: { name: string; icsUrl: string; color: string }) => void;
+  onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
+  onDeleteExternalCalendar: (calendarId: string) => void;
+  onSyncExternalCalendar: (calendarId: string) => void;
+  onSyncAllExternalCalendars: () => void;
 }
 
 const ACCENTS: { id: AccentColor; color: string }[] = [
@@ -31,9 +37,16 @@ export function SettingsPage({
   onReset,
   importMessage,
   accountSlot,
+  externalCalendars,
+  onAddExternalCalendar,
+  onUpdateExternalCalendar,
+  onDeleteExternalCalendar,
+  onSyncExternalCalendar,
+  onSyncAllExternalCalendars,
 }: SettingsPageProps) {
   const { t } = useT();
-  const [tab, setTab] = useState<"appearance" | "behavior" | "data">("appearance");
+  const [tab, setTab] = useState<"appearance" | "behavior" | "calendar" | "data">("appearance");
+  const [calendarDraft, setCalendarDraft] = useState({ name: "", icsUrl: "", color: "#4f73ff" });
 
   return (
     <div className="ff-page">
@@ -48,6 +61,7 @@ export function SettingsPage({
         tabs={[
           ["appearance", t("settings.tabAppearance")],
           ["behavior", t("settings.tabBehavior")],
+          ["calendar", "캘린더"],
           ["data", t("settings.tabData")],
         ]}
         active={tab}
@@ -137,6 +151,84 @@ export function SettingsPage({
             value={settings.reduceMotion}
             onChange={(v) => onUpdate({ reduceMotion: v })}
           />
+        </div>
+      ) : null}
+
+      {tab === "calendar" ? (
+        <div className="ff-settings-card">
+          <Row title="외부 캘린더 추가" hint="공개 ICS 주소를 추가하면 Calendar 화면에서 읽기 전용으로 표시됩니다.">
+            <div className="ff-external-calendar-form">
+              <input
+                value={calendarDraft.name}
+                placeholder="캘린더 이름"
+                onChange={(event) => setCalendarDraft((draft) => ({ ...draft, name: event.target.value }))}
+              />
+              <input
+                value={calendarDraft.icsUrl}
+                placeholder="https://.../calendar.ics"
+                onChange={(event) => setCalendarDraft((draft) => ({ ...draft, icsUrl: event.target.value }))}
+              />
+              <input
+                type="color"
+                value={calendarDraft.color}
+                aria-label="캘린더 색상"
+                onChange={(event) => setCalendarDraft((draft) => ({ ...draft, color: event.target.value }))}
+              />
+              <button
+                type="button"
+                className="ff-btn"
+                disabled={!calendarDraft.name.trim() || !calendarDraft.icsUrl.trim()}
+                onClick={() => {
+                  onAddExternalCalendar(calendarDraft);
+                  setCalendarDraft({ name: "", icsUrl: "", color: "#4f73ff" });
+                }}
+              >
+                추가
+              </button>
+            </div>
+          </Row>
+
+          <Row title="동기화 상태" hint="실패해도 마지막 성공 일정 캐시는 유지됩니다.">
+            <button type="button" className="ff-btn" onClick={onSyncAllExternalCalendars}>
+              전체 새로고침
+            </button>
+          </Row>
+
+          <div className="ff-external-calendar-list">
+            {externalCalendars.length === 0 ? <p className="ff-settings-msg">추가된 외부 캘린더가 없습니다.</p> : null}
+            {externalCalendars.map((calendar) => (
+              <article key={calendar.id} className="ff-external-calendar-item">
+                <span className="ff-external-dot" style={{ background: calendar.color }} />
+                <div>
+                  <strong>{calendar.name}</strong>
+                  <small>
+                    {calendar.syncStatus === "syncing"
+                      ? "동기화 중..."
+                      : calendar.syncStatus === "failed"
+                        ? `동기화 실패${calendar.lastError ? `: ${calendar.lastError}` : ""}`
+                        : calendar.enabled
+                          ? `정상 · ${calendar.eventCount ?? 0}개`
+                          : "비활성화됨"}
+                  </small>
+                  <small>{calendar.lastSyncedAt ? `마지막 동기화 ${new Date(calendar.lastSyncedAt).toLocaleString()}` : "아직 동기화되지 않음"}</small>
+                </div>
+                <div className="ff-external-calendar-actions">
+                  <button type="button" className="ff-btn" onClick={() => onUpdateExternalCalendar(calendar.id, { visible: !calendar.visible })}>
+                    {calendar.visible ? "숨김" : "표시"}
+                  </button>
+                  <button type="button" className="ff-btn" onClick={() => onUpdateExternalCalendar(calendar.id, { enabled: !calendar.enabled })}>
+                    {calendar.enabled ? "비활성" : "활성"}
+                  </button>
+                  <button type="button" className="ff-btn" disabled={!calendar.enabled} onClick={() => onSyncExternalCalendar(calendar.id)}>
+                    지금 새로고침
+                  </button>
+                  <button type="button" className="ff-btn ff-btn-danger" onClick={() => onDeleteExternalCalendar(calendar.id)}>
+                    삭제
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       ) : null}
 

@@ -271,6 +271,41 @@ export interface RecentItem {
   openedAt: string;
 }
 
+export type ExternalCalendarSyncStatus = "idle" | "syncing" | "success" | "failed" | "hidden" | "disabled";
+
+export interface ExternalCalendar {
+  id: string;
+  name: string;
+  icsUrl: string;
+  color: string;
+  visible: boolean;
+  enabled: boolean;
+  syncStatus?: ExternalCalendarSyncStatus;
+  lastSyncedAt?: string;
+  lastAttemptedAt?: string;
+  lastError?: string;
+  eventCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExternalCalendarEvent {
+  id: string;
+  externalCalendarId: string;
+  externalUid: string;
+  title: string;
+  description?: string;
+  location?: string;
+  start: string;
+  end?: string;
+  allDay: boolean;
+  timezone?: string;
+  sourceUrl?: string;
+  readOnly: true;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Loose shape for seed/imported/persisted data before normalization: every
 // collection may hold partial records and any top-level key may be omitted.
 export type RawPlannerData = {

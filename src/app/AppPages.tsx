@@ -10,7 +10,7 @@ import { TodayPage, type TodayIntent } from "../components/TodayPage";
 import type { ToastState } from "../components/kit";
 import type { usePlannerData } from "../hooks/usePlannerData";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
-import type { AppSettings, PageId, Project } from "../types";
+import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Project } from "../types";
 
 type Planner = ReturnType<typeof usePlannerData>;
 
@@ -50,6 +50,13 @@ type AppPagesProps = {
   focusSettings: FocusUserSettings;
   onUpdateFocusSettings: (patch: Partial<FocusUserSettings>) => void;
   onStopFocus: (sessionId: string, completeTask?: boolean) => void;
+  externalCalendars: ExternalCalendar[];
+  externalCalendarEvents: ExternalCalendarEvent[];
+  onAddExternalCalendar: (input: { name: string; icsUrl: string; color: string }) => void;
+  onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
+  onDeleteExternalCalendar: (calendarId: string) => void;
+  onSyncExternalCalendar: (calendarId: string) => void;
+  onSyncAllExternalCalendars: () => void;
   accountSlot: ReactNode;
 };
 
@@ -89,6 +96,13 @@ export function AppPages({
   focusSettings,
   onUpdateFocusSettings,
   onStopFocus,
+  externalCalendars,
+  externalCalendarEvents,
+  onAddExternalCalendar,
+  onUpdateExternalCalendar,
+  onDeleteExternalCalendar,
+  onSyncExternalCalendar,
+  onSyncAllExternalCalendars,
   accountSlot,
 }: AppPagesProps) {
   function pageGridClass(extra = "") {
@@ -186,6 +200,9 @@ export function AppPages({
           tasks={planner.tasks}
           projects={activeProjects}
           conceptNotes={planner.conceptNotes}
+          externalCalendars={externalCalendars}
+          externalCalendarEvents={externalCalendarEvents}
+          onUpdateExternalCalendar={onUpdateExternalCalendar}
           initialProjectId={calendarFocusProjectId}
           onSelectTask={planner.selectTask}
           onUpdateTask={planner.updateTask}
@@ -275,7 +292,13 @@ export function AppPages({
       onLoadSamples={planner.loadSamples}
       onReset={requestResetAllData}
       importMessage={importMessage}
-      accountSlot={accountSlot}
-    />
+        accountSlot={accountSlot}
+        externalCalendars={externalCalendars}
+        onAddExternalCalendar={onAddExternalCalendar}
+        onUpdateExternalCalendar={onUpdateExternalCalendar}
+        onDeleteExternalCalendar={onDeleteExternalCalendar}
+        onSyncExternalCalendar={onSyncExternalCalendar}
+        onSyncAllExternalCalendars={onSyncAllExternalCalendars}
+      />
   );
 }

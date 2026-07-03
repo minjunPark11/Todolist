@@ -1,4 +1,4 @@
-import type { Project } from "../../types";
+import type { ExternalCalendar, Project } from "../../types";
 import type { CalendarLayerToggles, ProjectFilter } from "../../utils/calendarItems";
 import { getDayNumber, getMonthGrid, getMonthLabel, todayValue } from "../../utils/date";
 import { useT } from "../../i18n";
@@ -11,6 +11,8 @@ interface CalendarLeftSidebarProps {
   onToggleLayer: (key: keyof CalendarLayerToggles) => void;
   projects: Project[];
   projectFilter: ProjectFilter;
+  externalCalendars: ExternalCalendar[];
+  onToggleExternalCalendar: (calendarId: string) => void;
   onToggleProject: (projectId: string) => void;
   onSelectAllProjects: () => void;
   onCreateClick: () => void;
@@ -34,6 +36,8 @@ export function CalendarLeftSidebar({
   onToggleLayer,
   projects,
   projectFilter,
+  externalCalendars,
+  onToggleExternalCalendar,
   onToggleProject,
   onSelectAllProjects,
   onCreateClick,
@@ -142,6 +146,35 @@ export function CalendarLeftSidebar({
             />
             <span className="gcal-project-dot" style={{ backgroundColor: project.color }} />
             {project.name}
+          </label>
+        ))}
+      </div>
+
+      <div className="gcal-sidebar-section">
+        <h3>외부 캘린더</h3>
+        {externalCalendars.length === 0 ? (
+          <p className="gcal-sidebar-empty">추가된 외부 캘린더가 없습니다.</p>
+        ) : null}
+        {externalCalendars.map((calendar) => (
+          <label key={calendar.id} className="gcal-layer-toggle">
+            <input
+              type="checkbox"
+              checked={calendar.visible && calendar.enabled}
+              disabled={!calendar.enabled}
+              aria-label={`${calendar.name} 표시`}
+              onChange={() => onToggleExternalCalendar(calendar.id)}
+            />
+            {calendar.syncStatus === "failed" ? (
+              <span
+                className="gcal-external-warning"
+                title="동기화 실패. 설정 > 캘린더에서 확인하세요."
+                aria-label="동기화 실패"
+              >
+                !
+              </span>
+            ) : null}
+            <span className="gcal-project-dot" style={{ backgroundColor: calendar.color }} />
+            {calendar.name}
           </label>
         ))}
       </div>

@@ -1790,6 +1790,25 @@ textarea {
   flex-shrink: 0;
 }
 
+.gcal-sidebar-empty {
+  margin: 0;
+  color: var(--color-ink-muted-48);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.gcal-external-warning {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff4d6;
+  color: #9a6700;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 /* --- Main column: month/week/day view + unscheduled backlog --- */
 
 .gcal-main-column {
@@ -1976,6 +1995,13 @@ textarea {
   color: var(--danger);
   border-left-color: var(--danger);
   cursor: pointer;
+}
+
+.gcal-chip.gcal-chip-external {
+  background: rgba(79, 115, 255, 0.1);
+  color: var(--color-ink);
+  cursor: pointer;
+  font-style: italic;
 }
 
 .gcal-chip.is-repeating {
@@ -2265,6 +2291,11 @@ textarea {
 .gcal-time-block.is-resizing {
   opacity: 0.85;
   cursor: ns-resize;
+}
+
+.gcal-time-block.is-external {
+  cursor: default;
+  outline: 1px dashed rgba(15, 23, 42, 0.18);
 }
 
 /* Pointer-move overlay: the only visual while a block is being dragged. */
@@ -6233,6 +6264,59 @@ main {
 }
 .ff-import-btn { cursor: pointer; }
 .ff-settings-msg { color: var(--success); font-size: 13px; padding: 8px 0; }
+
+.ff-external-calendar-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(180px, 1.6fr) 44px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.ff-external-calendar-form input[type="color"] {
+  min-width: 44px;
+  height: 40px;
+  padding: 4px;
+}
+
+.ff-external-calendar-list {
+  display: grid;
+  gap: 10px;
+  padding: 8px 0 12px;
+}
+
+.ff-external-calendar-item {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: var(--bg-surface-muted);
+}
+
+.ff-external-calendar-item strong,
+.ff-external-calendar-item small {
+  display: block;
+}
+
+.ff-external-calendar-item small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.ff-external-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.ff-external-calendar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
 
 .ff-toggle {
   width: 46px;

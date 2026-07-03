@@ -1,5 +1,5 @@
 import { DragEvent, ReactNode, useMemo, useState } from "react";
-import type { ConceptNote, Project, Task, TaskDraft } from "../types";
+import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, Project, Task, TaskDraft } from "../types";
 import {
   addDays,
   addMonths,
@@ -63,6 +63,9 @@ interface CalendarViewProps {
   tasks: Task[];
   projects: Project[];
   conceptNotes: ConceptNote[];
+  externalCalendars: ExternalCalendar[];
+  externalCalendarEvents: ExternalCalendarEvent[];
+  onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
   // When set, the calendar mounts with only this project's items visible
   // (space detail "Open Calendar" hand-off). The user can widen it any time.
   initialProjectId?: string;
@@ -84,6 +87,9 @@ export function CalendarView({
   tasks,
   projects,
   conceptNotes,
+  externalCalendars,
+  externalCalendarEvents,
+  onUpdateExternalCalendar,
   initialProjectId,
   onSelectTask,
   onUpdateTask,
@@ -119,8 +125,8 @@ export function CalendarView({
   const anchorDate = new Date(`${anchor}T00:00:00`);
 
   const items = useMemo(
-    () => buildCalendarItems({ tasks, projects, conceptNotes, layers, projectFilter }),
-    [tasks, projects, conceptNotes, layers, projectFilter],
+    () => buildCalendarItems({ tasks, projects, conceptNotes, externalCalendars, externalCalendarEvents, layers, projectFilter }),
+    [tasks, projects, conceptNotes, externalCalendars, externalCalendarEvents, layers, projectFilter],
   );
 
   const monthPrefix = `${anchorDate.getFullYear()}-${pad(anchorDate.getMonth() + 1)}`;
@@ -384,6 +390,10 @@ export function CalendarView({
   function handleClickItem(item: CalendarItem, anchor: PopoverAnchor) {
     setDraft(null);
     setDraftAnchor(null);
+    if (item.sourceType === "external") {
+      setPopover({ kind: "event", item, anchor });
+      return;
+    }
     if (mode === "day") {
       if (item.sourceType === "task") onSelectTask(item.sourceId);
       else if (item.sourceType === "project") onOpenProject?.(item.sourceId);
@@ -395,6 +405,7 @@ export function CalendarView({
 
   function openDetailFromPopover(item: CalendarItem) {
     setPopover(null);
+    if (item.sourceType === "external") return;
     if (item.sourceType === "task") {
       setMode("day");
       setAnchor(item.date);
@@ -506,6 +517,11 @@ export function CalendarView({
           onToggleLayer={toggleLayer}
           projects={projects}
           projectFilter={projectFilter}
+          externalCalendars={externalCalendars}
+          onToggleExternalCalendar={(calendarId) => {
+            const calendar = externalCalendars.find((item) => item.id === calendarId);
+            if (calendar) onUpdateExternalCalendar(calendarId, { visible: !calendar.visible });
+          }}
           onToggleProject={toggleProjectFilter}
           onSelectAllProjects={() => {
             onClearTaskSelection?.();

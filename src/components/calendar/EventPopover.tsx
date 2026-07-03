@@ -124,9 +124,15 @@ export function EventPopover({
         {formatDate(item.date, lang)}
         {timeLabel ? ` · ${timeLabel}` : ""}
       </p>
-      <button type="button" className="gcal-popover-memo" onClick={() => onOpenDetail(item)}>
-        {t("calendar.popoverAddMemo")}
-      </button>
+      {item.sourceType === "external" ? (
+        <p className="gcal-popover-when">
+          출처: {item.externalCalendarName} · 읽기 전용
+        </p>
+      ) : (
+        <button type="button" className="gcal-popover-memo" onClick={() => onOpenDetail(item)}>
+          {t("calendar.popoverAddMemo")}
+        </button>
+      )}
     </CalendarPopover>
   );
 }

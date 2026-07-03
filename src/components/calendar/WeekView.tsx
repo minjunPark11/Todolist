@@ -474,11 +474,12 @@ export function WeekView({
                       event.stopPropagation();
                       onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
                     }}
-                    style={item.layer === "task" ? { borderLeftColor: item.color } : undefined}
+                    style={item.layer === "task" || item.layer === "external" ? { borderLeftColor: item.color } : undefined}
                   >
                     {item.layer === "deadline" ? "⚠ " : null}
                     {item.layer === "study-review" ? "↻ " : null}
                     {item.layer === "project-deadline" ? "◆ " : null}
+                    {item.layer === "external" ? "• " : null}
                     {item.repeating ? "↺ " : null}
                     {item.title}
                   </button>
@@ -648,7 +649,11 @@ export function WeekView({
                       key={item.key}
                       type="button"
                       data-calendar-interactive="true"
-                      className={resize?.key === item.key ? "gcal-time-block is-resizing" : "gcal-time-block"}
+                      className={[
+                        "gcal-time-block",
+                        resize?.key === item.key ? "is-resizing" : "",
+                        item.layer === "external" ? "is-external" : "",
+                      ].filter(Boolean).join(" ")}
                       onPointerDown={item.draggable ? (event) => startMove(event, item, startMin, endMin) : undefined}
                       onClick={(event) => {
                         event.stopPropagation();
