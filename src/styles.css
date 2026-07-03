@@ -111,6 +111,7 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  --app-scale: 0.8;
 }
 
 * {
@@ -123,6 +124,21 @@ body {
   min-height: 100vh;
   color: var(--text-primary);
   background: var(--bg-app);
+}
+
+@supports (zoom: 1) {
+  body {
+    zoom: var(--app-scale);
+  }
+}
+
+@supports not (zoom: 1) {
+  #root {
+    width: calc(100% / var(--app-scale));
+    min-height: calc(100vh / var(--app-scale));
+    transform: scale(var(--app-scale));
+    transform-origin: top left;
+  }
 }
 
 /* Accent themes (spec §4.7 AppSettings.accentColor) */
