@@ -492,8 +492,6 @@ export function CalendarView({
         }}
         onPrev={() => shift(-1)}
         onNext={() => shift(1)}
-        aiDisabled={aiStatus === "loading"}
-        onAiClick={suggestSchedule}
       />
 
       <div className={sidebarCollapsed ? "gcal-body is-sidebar-rail" : "gcal-body"}>
