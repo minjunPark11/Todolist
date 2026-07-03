@@ -7,7 +7,8 @@ import {
   sessionSeconds,
 } from "../../lib/spaceSelectors";
 import { useT } from "../../i18n";
-import { presetText, noteTypeText } from "../../lib/spaceHubI18n";
+import { presetText } from "../../lib/spaceHubI18n";
+import { OVERVIEW_NOTES_LIMIT } from "./SpaceNotesPanel";
 
 const activityIcons: Record<SpaceActivity["type"], string> = {
   task_created: "＋",
@@ -37,6 +38,7 @@ export function SpaceOverviewTab({
   onAddTask,
   onAddNote,
   onOpenNote,
+  onOpenNoteInSplit,
   onOpenSession,
   onOpenTab,
   onGenerateAiSummary,
@@ -57,6 +59,8 @@ export function SpaceOverviewTab({
   onAddTask: () => void;
   onAddNote: () => void;
   onOpenNote: (noteId: string) => void;
+  // Notes card titles open the note in the notes tab Split View (§24.5).
+  onOpenNoteInSplit: (noteId: string) => void;
   onOpenSession: (sessionId: string) => void;
   onOpenTab: (tab: SpaceTab) => void;
   onGenerateAiSummary: () => void;
@@ -236,7 +240,7 @@ export function SpaceOverviewTab({
           )}
         </section>
 
-        {/* Notes / resources (§20) */}
+        {/* Notes / resources — title-only preview list (notes spec §24) */}
         <section className="sdv-card">
           <header className="sdv-card-head">
             <h2>{t("spaceHub.section.notesResources")}</h2>
@@ -252,17 +256,20 @@ export function SpaceOverviewTab({
               </button>
             </div>
           ) : (
-            <ul className="sdv-record-list">
-              {spaceNotes.slice(0, 3).map((note) => (
-                <li key={note.id}>
-                  <button type="button" onClick={() => onOpenNote(note.id)}>
-                    <strong>{note.title}</strong>
-                    <small>{noteTypeText(t, note.type)}</small>
-                    {note.url ? <span aria-hidden="true">🔗</span> : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="sdv-overview-note-list">
+                {spaceNotes.slice(0, OVERVIEW_NOTES_LIMIT).map((note) => (
+                  <li key={note.id}>
+                    <button type="button" onClick={() => onOpenNoteInSplit(note.id)}>
+                      <span className="sdv-overview-note-title">{note.title.trim() || t("notes.untitled")}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button type="button" className="sdv-btn sdv-btn-sm sdv-overview-note-add" onClick={onAddNote}>
+                {presetText(t, preset.addNoteLabel)}
+              </button>
+            </>
           )}
         </section>
       </div>

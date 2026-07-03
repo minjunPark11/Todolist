@@ -1,83 +1,10 @@
 import { useState } from "react";
-import type { SpaceActivity, SpaceNote, SpaceTypePreset } from "../../lib/spaceHubTypes";
+import type { SpaceActivity } from "../../lib/spaceHubTypes";
 import { relativeTime } from "../../lib/spaceSelectors";
 import { useT } from "../../i18n";
-import { presetText, noteTypeText, recordTypeText } from "../../lib/spaceHubI18n";
+import { recordTypeText } from "../../lib/spaceHubI18n";
 
-// === Notes tab (§24) ===
-export function SpaceNotesTab({
-  preset,
-  notes,
-  onAddNote,
-  onOpenNote,
-}: {
-  preset: SpaceTypePreset;
-  notes: SpaceNote[];
-  onAddNote: () => void;
-  onOpenNote: (noteId: string) => void;
-}) {
-  const { t } = useT();
-  const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-
-  const noteTypes = Array.from(new Set([...preset.noteTypes, ...notes.map((note) => note.type)]));
-  const normalizedQuery = query.trim().toLowerCase();
-  const visible = notes.filter((note) => {
-    if (typeFilter !== "all" && note.type !== typeFilter) return false;
-    if (!normalizedQuery) return true;
-    return `${note.title} ${note.body} ${note.tags.join(" ")}`.toLowerCase().includes(normalizedQuery);
-  });
-
-  return (
-    <section className="sdv-card sdv-tab-panel">
-      <header className="sdv-toolbar">
-        <input
-          type="search"
-          placeholder={t("spaceHub.search.notes")}
-          aria-label={t("spaceHub.aria.searchNotes")}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <select aria-label={t("spaceHub.aria.noteTypeFilter")} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-          <option value="all">{t("spaceHub.filter.allTypes")}</option>
-          {noteTypes.map((type) => (
-            <option key={type} value={type}>
-              {noteTypeText(t, type)}
-            </option>
-          ))}
-        </select>
-        <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onAddNote}>
-          {presetText(t, preset.addNoteLabel)}
-        </button>
-      </header>
-
-      {notes.length === 0 ? (
-        <div className="sdv-empty">
-          <p>{t("spaceHub.empty.noNotes")}</p>
-          <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onAddNote}>
-            {presetText(t, preset.addNoteLabel)}
-          </button>
-        </div>
-      ) : visible.length === 0 ? (
-        <p className="sdv-empty-inline">{t("spaceHub.empty.noNotesMatch")}</p>
-      ) : (
-        <div className="sdv-note-grid">
-          {visible.map((note) => (
-            <button key={note.id} type="button" className="sdv-note-card" onClick={() => onOpenNote(note.id)}>
-              <span className="sdv-note-type">{noteTypeText(t, note.type)}</span>
-              <strong>{note.title}</strong>
-              {note.body ? <p>{note.body.slice(0, 120)}</p> : null}
-              <small>
-                {note.url ? "🔗 " : ""}
-                {relativeTime(note.updatedAt, t)}
-              </small>
-            </button>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
+// Notes tab moved to SpaceNotesPanel.tsx (popup + split view spec).
 
 // === Records tab (§25) ===
 type RecordFilter = "all" | "task" | "focus" | "note" | "manual";

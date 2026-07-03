@@ -31,9 +31,9 @@ import { useSpaceHubData } from "../../hooks/useSpaceHubData";
 import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { SpaceOverviewTab } from "./SpaceOverviewTab";
 import { SpaceFocusTab, SpaceTasksTab } from "./SpaceWorkTabs";
-import { SpaceNotesTab, SpaceRecordsTab } from "./SpaceNotesRecordsTabs";
+import { SpaceRecordsTab } from "./SpaceNotesRecordsTabs";
+import { NoteQuickCreateModal, SpaceNotesView, type NotesPanelMode } from "./SpaceNotesPanel";
 import {
-  AddSpaceNoteModal,
   AddSpaceTaskModal,
   DeleteSpaceConfirmModal,
   FocusConflictModal,
@@ -122,6 +122,11 @@ export function SpaceDetailView({
   const [tab, setTabState] = useState<SpaceTab>(readTabFromUrl);
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [drawer, setDrawer] = useState<DrawerState>({ kind: "none" });
+  // Notes popup/split-view spec (§4): panel mode + selection + fullscreen are
+  // separate so fullscreen only changes presentation, never edit state.
+  const [notesPanelMode, setNotesPanelMode] = useState<NotesPanelMode>("home");
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [isNotesSplitFullscreen, setIsNotesSplitFullscreen] = useState(false);
   const [aiSummary, setAiSummary] = useState<{ state: "idle" | "loading" | "ready" | "error"; text: string; tips: string[] }>({
     state: "idle",
     text: "",
@@ -199,12 +204,20 @@ export function SpaceDetailView({
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      // The quick note popup owns ESC (save/discard rules) via a capture listener.
+      if (modal.kind === "add_note") return;
       if (modal.kind !== "none") setModal({ kind: "none" });
       else if (drawer.kind !== "none") setDrawer({ kind: "none" });
+      // Notes spec §20.4: fullscreen exits first, then split falls back to home.
+      else if (isNotesSplitFullscreen) setIsNotesSplitFullscreen(false);
+      else if (tab === "notes" && notesPanelMode === "split") {
+        setNotesPanelMode("home");
+        setSelectedNoteId(null);
+      }
     }
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [modal.kind, drawer.kind]);
+  }, [modal.kind, drawer.kind, isNotesSplitFullscreen, tab, notesPanelMode]);
 
   // === Handlers (§31) ===
 
@@ -226,10 +239,27 @@ export function SpaceDetailView({
     setModal({ kind: "none" });
   }
 
-  function handleCreateSpaceNote(input: Parameters<typeof hub.addNote>[1]) {
-    hub.addNote(space.id, input);
-    showToast({ message: t("spaceHub.toast.noteAdded") });
+  // === Notes popup + split view handlers (NOTES_POPUP_SPLIT spec) ===
+
+  function openNoteInSplit(noteId: string) {
+    if (tab !== "notes") setTab("notes");
+    setSelectedNoteId(noteId);
+    setNotesPanelMode("split");
+  }
+
+  function closeNotesSplit() {
+    setNotesPanelMode("home");
+    setSelectedNoteId(null);
+    setIsNotesSplitFullscreen(false);
+  }
+
+  function handleQuickNoteCreate(draft: { title: string; body: string }): string {
+    return hub.addNote(space.id, { title: draft.title, body: draft.body, type: "Quick Note" });
+  }
+
+  function handleQuickNoteClose(savedNoteId: string | null) {
     setModal({ kind: "none" });
+    if (savedNoteId) showToast({ message: t("spaceHub.toast.noteAdded") });
   }
 
   function handleScheduleTask(taskId: string, input: ScheduleInput) {
@@ -579,8 +609,13 @@ export function SpaceDetailView({
           onAddTask={() => setModal({ kind: "add_task" })}
           onAddNote={() => setModal({ kind: "add_note" })}
           onOpenNote={(noteId) => setDrawer({ kind: "note", noteId })}
+          onOpenNoteInSplit={openNoteInSplit}
           onOpenSession={(sessionId) => setDrawer({ kind: "session", sessionId })}
-          onOpenTab={setTab}
+          onOpenTab={(next) => {
+            // "View all" from the overview notes card lands on the notes Home list (§24.5).
+            if (next === "notes") closeNotesSplit();
+            setTab(next);
+          }}
           onGenerateAiSummary={handleGenerateAiSummary}
           onAiSuggestSchedule={handleAiSuggestSchedule}
           onGenerateNextAction={handleGenerateNextAction}
@@ -613,11 +648,24 @@ export function SpaceDetailView({
         />
       ) : null}
       {tab === "notes" ? (
-        <SpaceNotesTab
+        <SpaceNotesView
           preset={preset}
           notes={spaceNotes}
+          mode={notesPanelMode}
+          selectedNoteId={selectedNoteId}
+          isFullscreen={isNotesSplitFullscreen}
+          onSelectNote={(noteId) => {
+            setSelectedNoteId(noteId);
+            setNotesPanelMode("split");
+          }}
+          onCloseSplit={closeNotesSplit}
+          onToggleFullscreen={() => setIsNotesSplitFullscreen((current) => !current)}
           onAddNote={() => setModal({ kind: "add_note" })}
-          onOpenNote={(noteId) => setDrawer({ kind: "note", noteId })}
+          onUpdateNote={(noteId, patch) => hub.updateNote(noteId, patch)}
+          onDeleteNote={(noteId) => {
+            hub.deleteNote(noteId);
+            showToast({ message: t("spaceHub.toast.noteDeleted") });
+          }}
         />
       ) : null}
       {tab === "records" ? (
@@ -646,11 +694,15 @@ export function SpaceDetailView({
         />
       ) : null}
       {modal.kind === "add_note" ? (
-        <AddSpaceNoteModal
-          preset={preset}
-          spaceTasks={spaceTasks}
-          onSubmit={handleCreateSpaceNote}
-          onClose={() => setModal({ kind: "none" })}
+        <NoteQuickCreateModal
+          onCreate={handleQuickNoteCreate}
+          onUpdate={(noteId, patch) => hub.updateNote(noteId, patch)}
+          onDelete={(noteId) => hub.deleteNote(noteId)}
+          onClose={handleQuickNoteClose}
+          onOpenInSplit={(noteId) => {
+            setModal({ kind: "none" });
+            openNoteInSplit(noteId);
+          }}
         />
       ) : null}
       {modal.kind === "schedule" ? (

@@ -1,11 +1,10 @@
 import { FormEvent, ReactNode, useState } from "react";
 import type { Task, TaskPriority } from "../../types";
 import type { SpaceTypePreset } from "../../lib/spaceHubTypes";
-import type { SpaceNoteDraft } from "../../hooks/useSpaceHubData";
 import { isTaskDone, isTaskUnscheduled } from "../../lib/spaceSelectors";
 import { formatDate, todayValue } from "../../utils/date";
 import { useT } from "../../i18n";
-import { groupText, noteTypeText } from "../../lib/spaceHubI18n";
+import { groupText } from "../../lib/spaceHubI18n";
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const { t } = useT();
@@ -133,100 +132,7 @@ export function AddSpaceTaskModal({
   );
 }
 
-// § 32.2 Add Space Note Modal
-export function AddSpaceNoteModal({
-  preset,
-  spaceTasks,
-  onSubmit,
-  onClose,
-}: {
-  preset: SpaceTypePreset;
-  spaceTasks: Task[];
-  onSubmit: (input: SpaceNoteDraft) => void;
-  onClose: () => void;
-}) {
-  const { t } = useT();
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState(preset.noteTypes[0] ?? "Quick Note");
-  const [body, setBody] = useState("");
-  const [url, setUrl] = useState("");
-  const [relatedTaskId, setRelatedTaskId] = useState("");
-  const [tagsText, setTagsText] = useState("");
-  const [error, setError] = useState("");
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!title.trim()) {
-      setError(t("spaceHub.error.titleRequired"));
-      return;
-    }
-    onSubmit({
-      title,
-      type,
-      body,
-      url,
-      relatedTaskId,
-      tags: tagsText.split(",").map((tag) => tag.trim()).filter(Boolean),
-    });
-  }
-
-  return (
-    <ModalShell title={t("spaceHub.modal.addNoteTitle")} onClose={onClose}>
-      <form className="sdv-form" onSubmit={submit}>
-        <label>
-          {t("spaceHub.field.title")}
-          <input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus />
-        </label>
-        <div className="sdv-form-row">
-          <label>
-            {t("spaceHub.field.type")}
-            <select value={type} onChange={(event) => setType(event.target.value)}>
-              {preset.noteTypes.map((item) => (
-                <option key={item} value={item}>
-                  {noteTypeText(t, item)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {t("spaceHub.field.relatedTask")}
-            <select value={relatedTaskId} onChange={(event) => setRelatedTaskId(event.target.value)}>
-              <option value="">{t("spaceHub.option.none")}</option>
-              {spaceTasks
-                .filter((task) => !isTaskDone(task))
-                .map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {task.title}
-                  </option>
-                ))}
-            </select>
-          </label>
-        </div>
-        <label>
-          {t("spaceHub.field.body")}
-          <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={4} />
-        </label>
-        <label>
-          {t("spaceHub.field.url")}
-          <input type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://" />
-        </label>
-        <label>
-          {t("spaceHub.field.tags")}
-          <input value={tagsText} onChange={(event) => setTagsText(event.target.value)} />
-        </label>
-        {error ? <p className="sdv-form-error">{error}</p> : null}
-        <div className="sdv-modal-actions">
-          <button type="button" className="sdv-btn" onClick={onClose}>
-            {t("spaceHub.action.cancel")}
-          </button>
-          <button type="submit" className="sdv-btn sdv-btn-primary">
-            {t("spaceHub.action.addNote")}
-          </button>
-        </div>
-      </form>
-    </ModalShell>
-  );
-}
+// § 32.2 note modal was replaced by NoteQuickCreateModal (SpaceNotesPanel.tsx).
 
 // § 32.3 Schedule Space Task Modal
 export interface ScheduleInput {
