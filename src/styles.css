@@ -7192,18 +7192,26 @@ main {
   color: var(--danger);
 }
 
-.tdy-check-field {
+.ff-form label.tdy-check-field {
   display: flex !important;
   flex-direction: row;
   align-items: center;
   gap: 8px;
   font-size: 13.5px;
+  justify-content: flex-start;
+  line-height: 1.35;
 }
 
-.tdy-check-field input {
+.ff-form label.tdy-check-field input[type="checkbox"] {
+  flex: 0 0 16px;
   width: 16px;
   height: 16px;
+  min-width: 16px;
+  margin: 0;
+  padding: 0;
+  border-radius: 4px;
   accent-color: var(--accent);
+  background: var(--bg-surface);
 }
 
 .tdy-field-hint {
@@ -9304,7 +9312,11 @@ div.spc-signal-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.sdv-overview-bottom > .sdv-card {
+  height: 100%;
 }
 
 .sdv-card {
@@ -10402,7 +10414,7 @@ div.spc-signal-row {
 
 .sdvn-list-tools input[type="search"] {
   flex: 1;
-  min-width: 120px;
+  min-width: 0;
   height: 34px;
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
@@ -10471,7 +10483,7 @@ div.spc-signal-row {
 .sdvn-split {
   position: relative;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
   min-height: 520px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -10580,6 +10592,11 @@ div.spc-signal-row {
   background: var(--bg-surface);
   overflow-y: auto;
   min-width: 0;
+}
+
+.sdvn-empty-editor {
+  flex: 1;
+  min-height: 320px;
 }
 
 .sdvn-editor-top {

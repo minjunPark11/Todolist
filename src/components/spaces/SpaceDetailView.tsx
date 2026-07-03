@@ -124,7 +124,7 @@ export function SpaceDetailView({
   const [drawer, setDrawer] = useState<DrawerState>({ kind: "none" });
   // Notes popup/split-view spec (§4): panel mode + selection + fullscreen are
   // separate so fullscreen only changes presentation, never edit state.
-  const [notesPanelMode, setNotesPanelMode] = useState<NotesPanelMode>("home");
+  const [notesPanelMode, setNotesPanelMode] = useState<NotesPanelMode>("split");
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [isNotesSplitFullscreen, setIsNotesSplitFullscreen] = useState(false);
   const [aiSummary, setAiSummary] = useState<{ state: "idle" | "loading" | "ready" | "error"; text: string; tips: string[] }>({
@@ -210,10 +210,6 @@ export function SpaceDetailView({
       else if (drawer.kind !== "none") setDrawer({ kind: "none" });
       // Notes spec §20.4: fullscreen exits first, then split falls back to home.
       else if (isNotesSplitFullscreen) setIsNotesSplitFullscreen(false);
-      else if (tab === "notes" && notesPanelMode === "split") {
-        setNotesPanelMode("home");
-        setSelectedNoteId(null);
-      }
     }
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
@@ -248,7 +244,7 @@ export function SpaceDetailView({
   }
 
   function closeNotesSplit() {
-    setNotesPanelMode("home");
+    setNotesPanelMode("split");
     setSelectedNoteId(null);
     setIsNotesSplitFullscreen(false);
   }

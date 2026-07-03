@@ -71,7 +71,9 @@ export function QuickCreatePopover({ defaults, categoryGroups, initialCategoryId
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") submit();
+              // isComposing: an Enter that commits Korean IME composition must
+              // not submit — only the next real Enter does.
+              if (event.key === "Enter" && !event.nativeEvent.isComposing) submit();
               if (event.key === "Escape") onClose();
             }}
             placeholder={t("calendar.newEventDefaultTitle")}

@@ -266,9 +266,6 @@ export function FocusPage({
         <section className="foc-card foc-queue">
           <header className="foc-card-head">
             <h2>오늘 시작할 일</h2>
-            <button type="button" onClick={() => onNavigate("calendar")} title="Calendar">
-              ...
-            </button>
           </header>
           {groups.length === 0 ? (
             <div className="foc-empty">

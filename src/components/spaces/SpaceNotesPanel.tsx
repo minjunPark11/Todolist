@@ -2,11 +2,11 @@
 // Two entry points: the "+ Note" buttons open the resizable quick-create popup
 // (NoteQuickCreateModal); clicking a note in the list opens the Split View
 // editor (SpaceNotesView), which can expand to a fullscreen layer.
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { SpaceNote, SpaceTypePreset } from "../../lib/spaceHubTypes";
 import { relativeTime } from "../../lib/spaceSelectors";
 import { useT } from "../../i18n";
-import { presetText, noteTypeText } from "../../lib/spaceHubI18n";
+import { presetText } from "../../lib/spaceHubI18n";
 
 export type NotesPanelMode = "home" | "split";
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -316,7 +316,6 @@ export function SpaceNotesView({
 }) {
   const { t } = useT();
   const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
   const [editorStatus, setEditorStatus] = useState<SaveStatus>("idle");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -329,13 +328,8 @@ export function SpaceNotesView({
 
   const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? null;
 
-  const noteTypes = useMemo(
-    () => Array.from(new Set([...preset.noteTypes, ...notes.map((note) => note.type)])),
-    [preset.noteTypes, notes],
-  );
   const normalizedQuery = query.trim().toLowerCase();
   const visibleNotes = notes.filter((note) => {
-    if (typeFilter !== "all" && note.type !== typeFilter) return false;
     if (!normalizedQuery) return true;
     return `${note.title} ${note.body} ${note.tags.join(" ")}`.toLowerCase().includes(normalizedQuery);
   });
@@ -452,14 +446,6 @@ export function SpaceNotesView({
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
-      <select aria-label={t("spaceHub.aria.noteTypeFilter")} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-        <option value="all">{t("spaceHub.filter.allTypes")}</option>
-        {noteTypes.map((type) => (
-          <option key={type} value={type}>
-            {noteTypeText(t, type)}
-          </option>
-        ))}
-      </select>
       <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onAddNote}>
         {presetText(t, preset.addNoteLabel)}
       </button>
@@ -484,7 +470,7 @@ export function SpaceNotesView({
   ) : null;
 
   // --- Home/List state (§23) ---
-  if (mode === "home") {
+  if (false && mode === "home") {
     return (
       <section className="sdv-card sdv-tab-panel sdvn-home">
         <header className="sdv-toolbar">{searchToolbar}</header>
@@ -552,7 +538,7 @@ export function SpaceNotesView({
                   <span className="sdvn-item-text">
                     <strong>{displayTitle(note)}</strong>
                     <small>
-                      {noteTypeText(t, note.type)} · {relativeTime(note.updatedAt, t)}
+                      {relativeTime(note.updatedAt, t)}
                     </small>
                   </span>
                 </button>
@@ -681,7 +667,7 @@ export function SpaceNotesView({
             />
           </>
         ) : (
-          <p className="sdv-empty-inline">{t("notes.noSelection")}</p>
+          <div className="sdvn-empty-editor" aria-label={t("notes.noSelection")} />
         )}
       </div>
       {deleteConfirm}

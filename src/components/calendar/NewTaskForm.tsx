@@ -37,7 +37,20 @@ export function NewTaskForm({ draft, categoryGroups, initialCategoryId, onCancel
   }
 
   return (
-    <form className="gcal-newtask-form" onSubmit={submit}>
+    <form
+      className="gcal-newtask-form"
+      onSubmit={submit}
+      onKeyDown={(event) => {
+        // Enter creates the task from any field, not just the submit button.
+        // isComposing: an Enter that commits Korean IME composition must not
+        // submit — only the next real Enter does.
+        if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+          event.preventDefault();
+          submit();
+        }
+        if (event.key === "Escape") onCancel();
+      }}
+    >
       <header className="gcal-newtask-head">
         <h2>{t("calendar.quickCreateTitle")}</h2>
         <button type="button" className="ff-icon-btn" aria-label={t("calendar.cancelNewTaskAria")} onClick={onCancel}>
@@ -51,9 +64,6 @@ export function NewTaskForm({ draft, categoryGroups, initialCategoryId, onCancel
           ref={titleRef}
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") onCancel();
-          }}
           placeholder={t("calendar.newEventDefaultTitle")}
         />
       </label>
