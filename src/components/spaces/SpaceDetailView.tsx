@@ -34,6 +34,7 @@ import { SpaceNotesTab, SpaceRecordsTab } from "./SpaceNotesRecordsTabs";
 import {
   AddSpaceNoteModal,
   AddSpaceTaskModal,
+  DeleteSpaceConfirmModal,
   FocusConflictModal,
   FocusStartPickerModal,
   ManualRecordModal,
@@ -65,6 +66,7 @@ export type SpaceDetailViewProps = {
   onArchiveTask: (id: string) => void;
   onStartFocus: (taskId: string, source?: FocusSession["source"]) => void;
   onUpdateProject: (id: string, patch: Partial<Project>) => void;
+  onDeleteSpace: () => void;
   onNavigate: (page: PageId) => void;
   showToast: (toast: ToastState) => void;
 };
@@ -77,6 +79,7 @@ type ModalState =
   | { kind: "manual_record" }
   | { kind: "focus_picker" }
   | { kind: "focus_conflict" }
+  | { kind: "delete_space" }
   | { kind: "ai_schedule_preview"; suggestions: ScheduleSuggestion[] };
 
 type DrawerState =
@@ -106,6 +109,7 @@ export function SpaceDetailView({
   onArchiveTask,
   onStartFocus,
   onUpdateProject,
+  onDeleteSpace,
   onNavigate,
   showToast,
 }: SpaceDetailViewProps) {
@@ -367,6 +371,12 @@ export function SpaceDetailView({
     }
     showToast({ message: "Space settings saved." });
     setDrawer({ kind: "none" });
+  }
+
+  function handleDeleteSpace() {
+    setModal({ kind: "none" });
+    setDrawer({ kind: "none" });
+    onDeleteSpace();
   }
 
   const openTaskDrawer = (taskId: string) => setDrawer({ kind: "task", taskId });
@@ -667,6 +677,14 @@ export function SpaceDetailView({
           onClose={() => setModal({ kind: "none" })}
         />
       ) : null}
+      {modal.kind === "delete_space" ? (
+        <DeleteSpaceConfirmModal
+          spaceName={displayName}
+          isProject={Boolean(sourceProjectId)}
+          onConfirm={handleDeleteSpace}
+          onClose={() => setModal({ kind: "none" })}
+        />
+      ) : null}
       {modal.kind === "ai_schedule_preview" ? (
         <ScheduleSuggestionModal
           suggestions={modal.suggestions}
@@ -744,6 +762,7 @@ export function SpaceDetailView({
           overviewCards={config.overviewCards}
           defaults={config.defaults}
           onSave={handleSaveSettings}
+          onRequestDelete={() => setModal({ kind: "delete_space" })}
           onClose={() => setDrawer({ kind: "none" })}
         />
       ) : null}

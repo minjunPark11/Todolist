@@ -129,6 +129,7 @@ export function SpacesPage({
   onStartFocus,
   onNavigate,
   onUpdateProject,
+  onRequestDeleteProject,
   showToast,
 }: SpacesPageProps) {
   const [query, setQuery] = useState("");
@@ -187,6 +188,16 @@ export function SpacesPage({
     setSelectedSpaceId("");
     setHighlightSignalId("");
     onCloseProject();
+  }
+
+  function deleteSpace(space: Space) {
+    if (space.sourceRef === "project" && space.sourceId) {
+      onRequestDeleteProject(space.sourceId);
+      return;
+    }
+    setLocalSpaces((current) => current.filter((item) => item.id !== space.id));
+    closeSpace();
+    showToast({ message: `${space.name} deleted.` });
   }
 
   function formatAnalyzedAt(date: Date) {
@@ -285,6 +296,7 @@ export function SpacesPage({
         onArchiveTask={onArchiveTask}
         onStartFocus={onStartFocus}
         onUpdateProject={onUpdateProject}
+        onDeleteSpace={() => deleteSpace(selectedSpace)}
         onNavigate={onNavigate}
         showToast={showToast}
       />

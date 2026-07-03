@@ -401,6 +401,37 @@ export function FocusConflictModal({ onGoToFocus, onClose }: { onGoToFocus: () =
   );
 }
 
+export function DeleteSpaceConfirmModal({
+  spaceName,
+  isProject,
+  onConfirm,
+  onClose,
+}: {
+  spaceName: string;
+  isProject: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <ModalShell title="Delete Space" onClose={onClose}>
+      <p className="sdv-modal-copy">
+        Delete "{spaceName}"?{" "}
+        {isProject
+          ? "This will use the project delete flow, and its tasks will move to Inbox."
+          : "This removes this Space and its local setup."}
+      </p>
+      <div className="sdv-modal-actions">
+        <button type="button" className="sdv-btn" onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" className="sdv-btn sdv-btn-danger" onClick={onConfirm}>
+          Delete Space
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
 // § 18.7 AI schedule suggestion preview — nothing is applied until confirmed.
 export interface ScheduleSuggestion {
   taskId: string;

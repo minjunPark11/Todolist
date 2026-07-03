@@ -384,6 +384,7 @@ export function SpaceSettingsDrawer({
   overviewCards,
   defaults,
   onSave,
+  onRequestDelete,
   onClose,
 }: {
   name: string;
@@ -400,6 +401,7 @@ export function SpaceSettingsDrawer({
     overviewCards: SpaceCustomConfig["overviewCards"];
     defaults: SpaceCustomConfig["defaults"];
   }) => void;
+  onRequestDelete: () => void;
   onClose: () => void;
 }) {
   const [draftName, setDraftName] = useState(name);
@@ -561,6 +563,9 @@ export function SpaceSettingsDrawer({
           </button>
           <button type="button" className="sdv-btn" onClick={onClose}>
             Cancel
+          </button>
+          <button type="button" className="sdv-btn sdv-btn-danger" onClick={onRequestDelete}>
+            Delete Space
           </button>
         </div>
       </div>
