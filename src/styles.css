@@ -6264,6 +6264,52 @@ main {
 }
 .ff-import-btn { cursor: pointer; }
 .ff-settings-msg { color: var(--success); font-size: 13px; padding: 8px 0; }
+.ff-settings-error { color: var(--danger); font-size: 13px; margin: 0; }
+
+.ff-calendar-share-panel {
+  display: grid;
+  gap: 10px;
+  min-width: min(560px, 100%);
+}
+
+.ff-calendar-share-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.ff-calendar-share-status strong {
+  font-size: 14px;
+}
+
+.ff-calendar-share-status small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.ff-calendar-share-url {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.ff-calendar-share-url input {
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  background: var(--bg-surface-muted);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.ff-calendar-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
 
 .ff-external-calendar-form {
   display: grid;

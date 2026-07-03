@@ -23,6 +23,15 @@ import {
 } from "./lib/focusSettingsStorage";
 import { updateMiniFocusTimer } from "./lib/miniFocusTimer";
 import {
+  buildCalendarShareSnapshot,
+  createShareToken,
+  disableCalendarShare,
+  emptyCalendarShareState,
+  loadCalendarShare,
+  publishCalendarShare,
+  type CalendarShareState,
+} from "./lib/calendarShare";
+import {
   createExternalCalendarDraft,
   fetchExternalCalendarEvents,
   loadExternalCalendarState,
@@ -74,6 +83,7 @@ export default function App() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [focusSettings, setFocusSettings] = useState<FocusUserSettings>(() => loadFocusUserSettings());
   const [externalCalendarState, setExternalCalendarState] = useState<ExternalCalendarState>(() => loadExternalCalendarState());
+  const [calendarShare, setCalendarShare] = useState<CalendarShareState>(emptyCalendarShareState);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Desktop-only sidebar rail collapse; ignored by the mobile overlay menu.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -89,6 +99,7 @@ export default function App() {
   const completedNotificationRef = useRef<Set<string>>(new Set());
   const syncingExternalCalendarsRef = useRef<Set<string>>(new Set());
   const initialExternalCalendarSyncRef = useRef(false);
+  const sharePublishTimerRef = useRef<number | null>(null);
 
   const today = todayValue();
   const focusNow = useNowTick(Boolean(planner.activeFocusSession && planner.activeFocusSession.status === "running"));
@@ -275,6 +286,42 @@ export default function App() {
       });
   }, [externalCalendarState.calendars]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setCalendarShare((current) => ({ ...current, status: current.status === "unavailable" ? "unavailable" : "loading", error: "" }));
+    loadCalendarShare()
+      .then((share) => {
+        if (!cancelled) setCalendarShare(share);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setCalendarShare((current) => ({
+            ...current,
+            status: "error",
+            error: error instanceof Error ? error.message : "공유 링크를 불러오지 못했습니다.",
+          }));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [planner.auth.isSignedIn]);
+
+  useEffect(() => {
+    if (!calendarShare.enabled || !calendarShare.token) return;
+    if (sharePublishTimerRef.current) {
+      window.clearTimeout(sharePublishTimerRef.current);
+    }
+    sharePublishTimerRef.current = window.setTimeout(() => {
+      void publishCurrentCalendarShare(calendarShare.token, true, { silent: true });
+    }, 1800);
+    return () => {
+      if (sharePublishTimerRef.current) {
+        window.clearTimeout(sharePublishTimerRef.current);
+      }
+    };
+  }, [calendarShare.enabled, calendarShare.token, planner.tasks, planner.projects, planner.conceptNotes]);
+
   // One-time cleanup for the legacy /inbox route and ?triage=inbox deep
   // links — the intent was already captured into todayIntent above.
   useEffect(() => {
@@ -426,6 +473,57 @@ export default function App() {
       calendars: current.calendars.filter((calendar) => calendar.id !== calendarId),
       events: current.events.filter((event) => event.externalCalendarId !== calendarId),
     }));
+  }
+
+  function buildCurrentShareSnapshot() {
+    return buildCalendarShareSnapshot({
+      tasks: planner.tasks,
+      projects: activeProjects,
+      conceptNotes: planner.conceptNotes,
+    });
+  }
+
+  async function publishCurrentCalendarShare(token = calendarShare.token || createShareToken(), enabled = true, options?: { silent?: boolean }) {
+    setCalendarShare((current) => ({ ...current, status: "saving", error: "" }));
+    try {
+      const next = await publishCalendarShare({
+        token,
+        enabled,
+        snapshot: buildCurrentShareSnapshot(),
+      });
+      setCalendarShare(next);
+      if (!options?.silent) showToast({ message: "구독 링크가 업데이트되었습니다." });
+    } catch (error) {
+      setCalendarShare((current) => ({
+        ...current,
+        status: "error",
+        error: error instanceof Error ? error.message : "구독 링크를 업데이트하지 못했습니다.",
+      }));
+    }
+  }
+
+  async function enableCalendarShare() {
+    await publishCurrentCalendarShare(calendarShare.token || createShareToken(), true);
+  }
+
+  async function disableCurrentCalendarShare() {
+    if (!calendarShare.token) return;
+    setCalendarShare((current) => ({ ...current, status: "saving", error: "" }));
+    try {
+      const next = await disableCalendarShare(calendarShare.token);
+      setCalendarShare(next);
+      showToast({ message: "구독 링크가 비활성화되었습니다." });
+    } catch (error) {
+      setCalendarShare((current) => ({
+        ...current,
+        status: "error",
+        error: error instanceof Error ? error.message : "구독 링크를 끄지 못했습니다.",
+      }));
+    }
+  }
+
+  async function regenerateCalendarShare() {
+    await publishCurrentCalendarShare(createShareToken(), true);
   }
 
   function handleArchiveTask(taskId: string) {
@@ -686,6 +784,11 @@ export default function App() {
         onDeleteExternalCalendar={deleteExternalCalendar}
         onSyncExternalCalendar={(calendarId) => void syncExternalCalendar(calendarId)}
         onSyncAllExternalCalendars={syncAllExternalCalendars}
+        calendarShare={calendarShare}
+        onEnableCalendarShare={() => void enableCalendarShare()}
+        onDisableCalendarShare={() => void disableCurrentCalendarShare()}
+        onRegenerateCalendarShare={() => void regenerateCalendarShare()}
+        onPublishCalendarShare={() => void publishCurrentCalendarShare()}
         accountSlot={
           <AccountSection
             auth={planner.auth}

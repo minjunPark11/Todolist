@@ -9,6 +9,7 @@ import { StudyPage } from "../components/StudyPage";
 import { TodayPage, type TodayIntent } from "../components/TodayPage";
 import type { ToastState } from "../components/kit";
 import type { usePlannerData } from "../hooks/usePlannerData";
+import type { CalendarShareState } from "../lib/calendarShare";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Project } from "../types";
 
@@ -57,6 +58,11 @@ type AppPagesProps = {
   onDeleteExternalCalendar: (calendarId: string) => void;
   onSyncExternalCalendar: (calendarId: string) => void;
   onSyncAllExternalCalendars: () => void;
+  calendarShare: CalendarShareState;
+  onEnableCalendarShare: () => void;
+  onDisableCalendarShare: () => void;
+  onRegenerateCalendarShare: () => void;
+  onPublishCalendarShare: () => void;
   accountSlot: ReactNode;
 };
 
@@ -103,6 +109,11 @@ export function AppPages({
   onDeleteExternalCalendar,
   onSyncExternalCalendar,
   onSyncAllExternalCalendars,
+  calendarShare,
+  onEnableCalendarShare,
+  onDisableCalendarShare,
+  onRegenerateCalendarShare,
+  onPublishCalendarShare,
   accountSlot,
 }: AppPagesProps) {
   function pageGridClass(extra = "") {
@@ -299,6 +310,11 @@ export function AppPages({
         onDeleteExternalCalendar={onDeleteExternalCalendar}
         onSyncExternalCalendar={onSyncExternalCalendar}
         onSyncAllExternalCalendars={onSyncAllExternalCalendars}
+        calendarShare={calendarShare}
+        onEnableCalendarShare={onEnableCalendarShare}
+        onDisableCalendarShare={onDisableCalendarShare}
+        onRegenerateCalendarShare={onRegenerateCalendarShare}
+        onPublishCalendarShare={onPublishCalendarShare}
       />
   );
 }

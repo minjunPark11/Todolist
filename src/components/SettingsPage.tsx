@@ -1,4 +1,5 @@
 import { ChangeEvent, ReactNode, useState } from "react";
+import type { CalendarShareState } from "../lib/calendarShare";
 import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, ThemeMode } from "../types";
 import { SegmentedTabs } from "./kit";
 import { useT } from "../i18n";
@@ -18,6 +19,11 @@ interface SettingsPageProps {
   onDeleteExternalCalendar: (calendarId: string) => void;
   onSyncExternalCalendar: (calendarId: string) => void;
   onSyncAllExternalCalendars: () => void;
+  calendarShare: CalendarShareState;
+  onEnableCalendarShare: () => void;
+  onDisableCalendarShare: () => void;
+  onRegenerateCalendarShare: () => void;
+  onPublishCalendarShare: () => void;
 }
 
 const ACCENTS: { id: AccentColor; color: string }[] = [
@@ -43,10 +49,29 @@ export function SettingsPage({
   onDeleteExternalCalendar,
   onSyncExternalCalendar,
   onSyncAllExternalCalendars,
+  calendarShare,
+  onEnableCalendarShare,
+  onDisableCalendarShare,
+  onRegenerateCalendarShare,
+  onPublishCalendarShare,
 }: SettingsPageProps) {
   const { t } = useT();
   const [tab, setTab] = useState<"appearance" | "behavior" | "calendar" | "data">("appearance");
   const [calendarDraft, setCalendarDraft] = useState({ name: "", icsUrl: "", color: "#4f73ff" });
+  const [shareCopyLabel, setShareCopyLabel] = useState("복사");
+  const shareBusy = calendarShare.status === "loading" || calendarShare.status === "saving";
+
+  async function copyShareUrl() {
+    if (!calendarShare.url) return;
+    try {
+      await navigator.clipboard.writeText(calendarShare.url);
+      setShareCopyLabel("복사됨");
+      window.setTimeout(() => setShareCopyLabel("복사"), 1500);
+    } catch {
+      setShareCopyLabel("복사 실패");
+      window.setTimeout(() => setShareCopyLabel("복사"), 1500);
+    }
+  }
 
   return (
     <div className="ff-page">
@@ -156,6 +181,62 @@ export function SettingsPage({
 
       {tab === "calendar" ? (
         <div className="ff-settings-card">
+          <Row title="내 캘린더 공유" hint="상대방이 구독할 수 있는 읽기 전용 ICS 링크를 만듭니다. 제목, 날짜, 시간만 공유됩니다.">
+            <div className="ff-calendar-share-panel">
+              <div className="ff-calendar-share-status">
+                <strong>{calendarShare.enabled ? "공유 중" : "공유 꺼짐"}</strong>
+                <small>
+                  {calendarShare.status === "unavailable"
+                    ? "Supabase 로그인 상태에서 사용할 수 있습니다."
+                    : calendarShare.updatedAt
+                      ? `마지막 업데이트 ${new Date(calendarShare.updatedAt).toLocaleString()}`
+                      : "아직 공유 링크가 없습니다."}
+                </small>
+              </div>
+              {calendarShare.url ? (
+                <div className="ff-calendar-share-url">
+                  <input value={calendarShare.url} readOnly aria-label="내 캘린더 구독 링크" />
+                  <button type="button" className="ff-btn" onClick={copyShareUrl}>
+                    {shareCopyLabel}
+                  </button>
+                </div>
+              ) : null}
+              {calendarShare.error ? <p className="ff-settings-error">{calendarShare.error}</p> : null}
+              <div className="ff-calendar-share-actions">
+                {calendarShare.enabled ? (
+                  <button type="button" className="ff-btn" disabled={shareBusy} onClick={onDisableCalendarShare}>
+                    공유 끄기
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="ff-btn"
+                    disabled={shareBusy || calendarShare.status === "unavailable"}
+                    onClick={onEnableCalendarShare}
+                  >
+                    링크 생성
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="ff-btn"
+                  disabled={shareBusy || !calendarShare.token || calendarShare.status === "unavailable"}
+                  onClick={onPublishCalendarShare}
+                >
+                  지금 업데이트
+                </button>
+                <button
+                  type="button"
+                  className="ff-btn ff-btn-danger"
+                  disabled={shareBusy || calendarShare.status === "unavailable"}
+                  onClick={onRegenerateCalendarShare}
+                >
+                  링크 재생성
+                </button>
+              </div>
+            </div>
+          </Row>
+
           <Row title="외부 캘린더 추가" hint="공개 ICS 주소를 추가하면 Calendar 화면에서 읽기 전용으로 표시됩니다.">
             <div className="ff-external-calendar-form">
               <input
