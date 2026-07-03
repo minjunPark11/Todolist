@@ -241,12 +241,16 @@ export function SpacesPage({
     document.addEventListener("pointerdown", handlePointerDown);
     window.addEventListener("scroll", closeMenu, true);
     window.addEventListener("popstate", closeMenu);
+    window.addEventListener("pageshow", closeMenu);
     window.addEventListener("blur", closeMenu);
+    window.addEventListener("focusflow:page-change", closeMenu);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("scroll", closeMenu, true);
       window.removeEventListener("popstate", closeMenu);
+      window.removeEventListener("pageshow", closeMenu);
       window.removeEventListener("blur", closeMenu);
+      window.removeEventListener("focusflow:page-change", closeMenu);
     };
   }, [openMenuSpaceId]);
 

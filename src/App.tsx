@@ -159,6 +159,10 @@ export default function App() {
     }
   }, [currentPath, planner.auth.isSignedIn]);
 
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("focusflow:page-change", { detail: { page: activePage } }));
+  }, [activePage]);
+
   // One-time cleanup for the legacy /inbox route and ?triage=inbox deep
   // links — the intent was already captured into todayIntent above.
   useEffect(() => {
