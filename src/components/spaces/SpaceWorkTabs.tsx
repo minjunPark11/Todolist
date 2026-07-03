@@ -21,7 +21,6 @@ export function SpaceTasksTab({
   preset,
   groups,
   spaceTasks,
-  estOf,
   onOpenTask,
   onToggleDone,
   onStartFocus,
@@ -31,7 +30,6 @@ export function SpaceTasksTab({
   preset: SpaceTypePreset;
   groups: SpaceSectionGroup[];
   spaceTasks: Task[];
-  estOf: (task: Task) => number;
   onOpenTask: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
   onStartFocus: (taskId: string) => void;
@@ -134,7 +132,6 @@ export function SpaceTasksTab({
                     <span className="sdv-task-meta">
                       {task.dueDate ? t("spaceHub.meta.due", { date: formatDate(task.dueDate) }) : task.scheduledDate ? formatDate(task.scheduledDate) : "—"}
                     </span>
-                    <span className="sdv-task-est">{isTaskDone(task) ? "—" : `${estOf(task)}m`}</span>
                     {isTaskDone(task) ? (
                       <span className="sdv-task-done-label">{t("spaceHub.taskDone")}</span>
                     ) : (
@@ -165,7 +162,6 @@ export function SpaceFocusTab({
   spaceSessions,
   activeFocusSession,
   weeklyGoalSeconds,
-  estOf,
   onStartFocus,
   onOpenSession,
   onOpenFocusPage,
@@ -175,7 +171,6 @@ export function SpaceFocusTab({
   spaceSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
   weeklyGoalSeconds: number;
-  estOf: (task: Task) => number;
   onStartFocus: (taskId: string) => void;
   onOpenSession: (sessionId: string) => void;
   onOpenFocusPage: () => void;
@@ -250,7 +245,6 @@ export function SpaceFocusTab({
                 <li key={task.id}>
                   <button type="button" onClick={() => onStartFocus(task.id)}>
                     <strong>{task.title}</strong>
-                    <small>{t("spaceHub.est.expected", { n: estOf(task) })}</small>
                     <span className="sdv-btn sdv-btn-sm sdv-btn-primary">{presetText(t, preset.startFocusLabel)}</span>
                   </button>
                 </li>
@@ -259,7 +253,7 @@ export function SpaceFocusTab({
           )}
         </div>
         <div>
-          <h3>{t("spaceHub.section.expectedActual")}</h3>
+          <h3>{t("spaceHub.field.actual")}</h3>
           {actualRows.length === 0 ? (
             <p className="sdv-empty-inline">{t("spaceHub.empty.noFocusPick")}</p>
           ) : (
@@ -268,9 +262,7 @@ export function SpaceFocusTab({
                 <li key={row.task.id}>
                   <div className="sdv-actual-row">
                     <strong>{row.task.title}</strong>
-                    <small>
-                      {t("spaceHub.est.expectedActual", { n: estOf(row.task), time: formatSeconds(row.seconds) })}
-                    </small>
+                    <small>{formatSeconds(row.seconds)}</small>
                   </div>
                 </li>
               ))}

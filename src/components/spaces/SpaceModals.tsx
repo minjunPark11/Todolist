@@ -33,7 +33,6 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 export interface SpaceTaskInput {
   title: string;
   group: string;
-  durationMinutes: number;
   dueDate: string;
   priority: TaskPriority;
   notes: string;
@@ -42,20 +41,17 @@ export interface SpaceTaskInput {
 export function AddSpaceTaskModal({
   preset,
   groups,
-  defaultDuration,
   onSubmit,
   onClose,
 }: {
   preset: SpaceTypePreset;
   groups: string[];
-  defaultDuration: number;
   onSubmit: (input: SpaceTaskInput) => void;
   onClose: () => void;
 }) {
   const { t } = useT();
   const [title, setTitle] = useState("");
   const [group, setGroup] = useState(groups[0] ?? "");
-  const [durationMinutes, setDurationMinutes] = useState(defaultDuration);
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("none");
   const [notes, setNotes] = useState("");
@@ -67,7 +63,7 @@ export function AddSpaceTaskModal({
       setError(t("spaceHub.error.titleRequired"));
       return;
     }
-    onSubmit({ title: title.trim(), group, durationMinutes, dueDate, priority, notes });
+    onSubmit({ title: title.trim(), group, dueDate, priority, notes });
   }
 
   return (
@@ -87,16 +83,6 @@ export function AddSpaceTaskModal({
                 </option>
               ))}
             </select>
-          </label>
-          <label>
-            {t("spaceHub.field.estimated")}
-            <input
-              type="number"
-              min={5}
-              step={5}
-              value={durationMinutes}
-              onChange={(event) => setDurationMinutes(Math.max(5, Number(event.target.value) || defaultDuration))}
-            />
           </label>
         </div>
         <div className="sdv-form-row">
@@ -145,14 +131,12 @@ export function ScheduleSpaceTaskModal({
   taskId,
   spaceTasks,
   defaultDuration,
-  estOf,
   onSubmit,
   onClose,
 }: {
   taskId: string;
   spaceTasks: Task[];
   defaultDuration: number;
-  estOf: (task: Task) => number;
   onSubmit: (taskId: string, input: ScheduleInput) => void;
   onClose: () => void;
 }) {
@@ -161,7 +145,13 @@ export function ScheduleSpaceTaskModal({
   const selected = spaceTasks.find((task) => task.id === selectedId);
   const [date, setDate] = useState(selected?.scheduledDate || todayValue());
   const [startTime, setStartTime] = useState(selected?.startTime || "14:00");
-  const [duration, setDuration] = useState(selected ? estOf(selected) : defaultDuration);
+  const [duration, setDuration] = useState(() => {
+    if (!selected?.startTime || !selected.endTime) return defaultDuration;
+    const start = selected.startTime.split(":").map(Number);
+    const end = selected.endTime.split(":").map(Number);
+    const minutes = end[0] * 60 + end[1] - (start[0] * 60 + start[1]);
+    return minutes > 0 ? minutes : defaultDuration;
+  });
   const candidates = spaceTasks.filter((task) => isTaskUnscheduled(task) || task.id === taskId);
 
   function submit(event: FormEvent) {

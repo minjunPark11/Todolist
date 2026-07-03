@@ -153,7 +153,7 @@ function FocusQueueRow({
   onArchiveTask: (taskId: string) => void;
 }) {
   const { t } = useT();
-  const { task, reason, completed, estimateMinutes, bucket } = entry;
+  const { task, reason, completed, bucket } = entry;
   const project = projects.find((candidate) => candidate.id === task.projectId);
   const pill = hexToSoft(project?.color);
 
@@ -212,9 +212,6 @@ function FocusQueueRow({
           <path d="M5 4h13l-2.5 4L18 12H5" />
         </svg>
         {t(`todayv.reason.${reason}`)}
-      </span>
-      <span className="tdy-estimate">
-        {estimateMinutes ? t("todayv.estimate", { n: estimateMinutes }) : ""}
       </span>
       <span
         className={`tdy-status-dot${bucket === "now" && !completed ? " is-now" : ""}${completed ? " is-done" : ""}`}

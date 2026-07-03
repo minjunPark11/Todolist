@@ -21,7 +21,6 @@ export interface TodayEntry {
   bucket: TodayBucketId;
   defaultBucket: TodayBucketId;
   reason: TodayReason;
-  estimateMinutes?: number;
   completed: boolean;
 }
 
@@ -58,13 +57,6 @@ function parseTimeToMinutes(value: string): number | undefined {
   const [h, m] = value.split(":").map((part) => Number(part));
   if (Number.isNaN(h) || Number.isNaN(m)) return undefined;
   return h * 60 + m;
-}
-
-function estimateFor(task: Task): number | undefined {
-  const start = parseTimeToMinutes(task.startTime);
-  const end = parseTimeToMinutes(task.endTime);
-  if (start === undefined || end === undefined || end <= start) return undefined;
-  return end - start;
 }
 
 function isTodayTask(task: Task, today: string): boolean {
@@ -118,7 +110,6 @@ export function collectTodayEntries(
       defaultBucket,
       bucket: overrides[task.id] ?? defaultBucket,
       reason: reasonFor(task, today),
-      estimateMinutes: estimateFor(task),
       completed: task.status === "done",
     });
   }

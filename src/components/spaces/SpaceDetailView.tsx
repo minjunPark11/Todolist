@@ -221,7 +221,6 @@ export function SpaceDetailView({
     const tags: string[] = [];
     if (!sourceProjectId) tags.push(spaceTaskTag(space.id));
     if (input.group) tags.push(`group:${input.group}`);
-    if (input.durationMinutes) tags.push(`est:${input.durationMinutes}`);
     onCreateTask({
       title: input.title,
       status: "todo",
@@ -311,8 +310,6 @@ export function SpaceDetailView({
       const tips: string[] = [];
       if (counts.overdue > 0) tips.push(t("spaceHub.tip.overdue", { n: counts.overdue }));
       if (unscheduledTasks.length > 0) tips.push(t("spaceHub.tip.place", { n: Math.min(unscheduledTasks.length, 3) }));
-      if (weekFocusSeconds < config.defaults.weeklyFocusGoalSeconds / 2)
-        tips.push(t("spaceHub.tip.reserve", { n: config.defaults.defaultDurationMinutes }));
       if (upcoming[0]) tips.push(t("spaceHub.tip.prepare", { title: upcoming[0].title, date: formatDate(upcoming[0].when) }));
       if (tips.length === 0) tips.push(t("spaceHub.tip.onTrack"));
       setAiSummary({
@@ -334,9 +331,8 @@ export function SpaceDetailView({
     // Naive placement preview: spread unscheduled tasks from 14:00 today.
     let hour = 14;
     return unscheduledTasks.slice(0, 3).map((task) => {
-      const est = Number(task.tags.find((tag) => tag.startsWith("est:"))?.slice(4)) || config.defaults.defaultDurationMinutes;
       const startTime = `${String(hour).padStart(2, "0")}:00`;
-      const endMinutes = hour * 60 + est;
+      const endMinutes = hour * 60 + config.defaults.defaultDurationMinutes;
       const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
       hour = Math.floor(endMinutes / 60) + 1;
       return { taskId: task.id, title: task.title, date: today, startTime, endTime };
@@ -422,9 +418,6 @@ export function SpaceDetailView({
   const drawerSession = drawer.kind === "session" ? spaceSessions.find((session) => session.id === drawer.sessionId) ?? null : null;
   const drawerNote = drawer.kind === "note" ? spaceNotes.find((note) => note.id === drawer.noteId) ?? null : null;
 
-  const estOf = (task: Task) =>
-    Number(task.tags.find((tag) => tag.startsWith("est:"))?.slice(4)) || config.defaults.defaultDurationMinutes;
-
   return (
     <div className="sdv-page" style={{ ["--sdv-accent" as string]: displayColor }}>
       <button type="button" className="sdv-back" onClick={onBack}>
@@ -491,10 +484,7 @@ export function SpaceDetailView({
             {nextAction ? (
               <>
                 <strong className="sdv-metric-title">{nextAction.title}</strong>
-                <small>
-                  {t("spaceHub.est.estimated", { n: estOf(nextAction) })}
-                  {nextAction.dueDate ? t("spaceHub.est.due", { date: formatDate(nextAction.dueDate) }) : ""}
-                </small>
+                {nextAction.dueDate ? <small>{t("spaceHub.est.due", { date: formatDate(nextAction.dueDate) })}</small> : null}
                 <div className="sdv-metric-actions">
                   <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={() => handleStartFocus(nextAction.id)}>
                     {presetText(t, preset.startFocusLabel)}
@@ -597,7 +587,6 @@ export function SpaceDetailView({
           recentSessions={recentSessions}
           spaceNotes={spaceNotes}
           aiSummary={aiSummary}
-          estOf={estOf}
           onOpenTask={openTaskDrawer}
           onToggleDone={handleCompleteTask}
           onStartFocus={handleStartFocus}
@@ -622,7 +611,6 @@ export function SpaceDetailView({
           preset={preset}
           groups={visibleGroups}
           spaceTasks={spaceTasks}
-          estOf={estOf}
           onOpenTask={openTaskDrawer}
           onToggleDone={handleCompleteTask}
           onStartFocus={handleStartFocus}
@@ -637,7 +625,6 @@ export function SpaceDetailView({
           spaceSessions={spaceSessions}
           activeFocusSession={activeFocusSession}
           weeklyGoalSeconds={config.defaults.weeklyFocusGoalSeconds}
-          estOf={estOf}
           onStartFocus={handleStartFocus}
           onOpenSession={(sessionId) => setDrawer({ kind: "session", sessionId })}
           onOpenFocusPage={() => onNavigate("focus")}
@@ -684,7 +671,6 @@ export function SpaceDetailView({
         <AddSpaceTaskModal
           preset={preset}
           groups={visibleGroups.map((group) => group.label)}
-          defaultDuration={config.defaults.defaultDurationMinutes}
           onSubmit={handleCreateSpaceTask}
           onClose={() => setModal({ kind: "none" })}
         />
@@ -706,7 +692,6 @@ export function SpaceDetailView({
           taskId={modal.taskId}
           spaceTasks={spaceTasks}
           defaultDuration={config.defaults.defaultDurationMinutes}
-          estOf={estOf}
           onSubmit={handleScheduleTask}
           onClose={() => setModal({ kind: "none" })}
         />
@@ -754,7 +739,6 @@ export function SpaceDetailView({
           projects={projects}
           sessions={spaceSessions.filter((session) => session.taskId === drawerTask.id)}
           notes={spaceNotes.filter((note) => note.relatedTaskId === drawerTask.id)}
-          estMinutes={estOf(drawerTask)}
           isPinned={config.pinnedNextActionTaskId === drawerTask.id}
           onStartFocus={() => handleStartFocus(drawerTask.id)}
           onSchedule={() => openScheduleModal(drawerTask.id)}

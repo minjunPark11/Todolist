@@ -35,7 +35,6 @@ export function TaskDetailDrawer({
   projects,
   sessions,
   notes,
-  estMinutes,
   isPinned,
   onStartFocus,
   onSchedule,
@@ -49,7 +48,6 @@ export function TaskDetailDrawer({
   projects: Project[];
   sessions: FocusSession[];
   notes: SpaceNote[];
-  estMinutes: number;
   isPinned: boolean;
   onStartFocus: () => void;
   onSchedule: () => void;
@@ -69,10 +67,6 @@ export function TaskDetailDrawer({
         <div>
           <dt>{t("spaceHub.field.status")}</dt>
           <dd>{t(`spaceHub.taskStatus.${task.status}`)}</dd>
-        </div>
-        <div>
-          <dt>{t("spaceHub.field.estimatedLabel")}</dt>
-          <dd>{estMinutes}m</dd>
         </div>
         <div>
           <dt>{t("spaceHub.field.actual")}</dt>
@@ -528,21 +522,6 @@ export function SpaceSettingsDrawer({
 
         <h4>{t("spaceHub.settings.defaults")}</h4>
         <div className="sdv-form-row">
-          <label>
-            {t("spaceHub.settings.defaultDuration")}
-            <input
-              type="number"
-              min={5}
-              step={5}
-              value={draftDefaults.defaultDurationMinutes}
-              onChange={(event) =>
-                setDraftDefaults((current) => ({
-                  ...current,
-                  defaultDurationMinutes: Math.max(5, Number(event.target.value) || current.defaultDurationMinutes),
-                }))
-              }
-            />
-          </label>
           <label>
             {t("spaceHub.settings.weeklyGoal")}
             <input

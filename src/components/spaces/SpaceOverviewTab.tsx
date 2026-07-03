@@ -30,7 +30,6 @@ export function SpaceOverviewTab({
   recentSessions,
   spaceNotes,
   aiSummary,
-  estOf,
   onOpenTask,
   onToggleDone,
   onStartFocus,
@@ -51,7 +50,6 @@ export function SpaceOverviewTab({
   recentSessions: FocusSession[];
   spaceNotes: SpaceNote[];
   aiSummary: { state: "idle" | "loading" | "ready" | "error"; text: string; tips: string[] };
-  estOf: (task: Task) => number;
   onOpenTask: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
   onStartFocus: (taskId: string) => void;
@@ -113,7 +111,6 @@ export function SpaceOverviewTab({
                   <span className="sdv-task-meta">
                     {task.status === "doing" ? t("spaceHub.taskMeta.inProgress") : task.scheduledDate ? t("spaceHub.taskMeta.scheduled") : t("spaceHub.taskMeta.toSchedule")}
                   </span>
-                  <span className="sdv-task-est">{estOf(task)}m</span>
                   {task.scheduledDate ? (
                     <button type="button" className="sdv-btn sdv-btn-sm sdv-btn-primary" onClick={() => onStartFocus(task.id)}>
                       {t("spaceHub.action.startFocus")}
