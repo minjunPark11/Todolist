@@ -137,7 +137,7 @@ export function getSpaceSignal(
     return { status: "on_track", label: t("spaceHub.signal.onTrack"), detail: t("spaceHub.signal.onTrackPersonalDetail") };
   }
 
-  // project / research / custom share the base rules.
+  // project / custom share the base rules.
   if (blocked > 0) return { status: "blocked", label: t("spaceHub.signal.blocked"), detail: t("spaceHub.signal.blockedDetail", { n: blocked }) };
   if (dueSoon > 0) return { status: "deadline_risk", label: t("spaceHub.signal.deadlineRisk"), detail: t("spaceHub.signal.deadlineRiskDetail", { n: dueSoon }) };
   if (!recentActivity && counts.open > 0) return { status: "inactive", label: t("spaceHub.signal.inactive"), detail: t("spaceHub.signal.inactiveDetail") };

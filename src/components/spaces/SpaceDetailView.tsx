@@ -136,7 +136,7 @@ export function SpaceDetailView({
   const today = todayValue();
   const weekStart = getWeekStart(today);
   const config = hub.getConfig(space.id);
-  const hubType = (["project", "study", "research", "personal", "custom"].includes(space.type) ? space.type : "custom") as SpaceHubType;
+  const hubType = (["project", "study", "personal", "custom"].includes(space.type) ? space.type : "custom") as SpaceHubType;
   const preset = getSpacePreset(hubType);
   const groups = resolveTaskGroups(preset, config);
   const visibleGroups = groups.filter((group) => !group.hidden);

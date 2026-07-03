@@ -7,7 +7,7 @@ import { useT } from "../i18n";
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
-type SpaceType = "project" | "study" | "research" | "custom";
+type SpaceType = "project" | "study" | "custom";
 type SpaceStatus = "Blocked" | "Needs Focus" | "Review Needed" | "In Progress" | "On Track" | "New";
 type AiPriority = "High" | "Medium" | "Low";
 type FilterType = "all" | SpaceType;
@@ -31,7 +31,6 @@ type Space = {
   pinned?: boolean;
   objective?: string;
   learningGoal?: string;
-  researchGoal?: string;
 };
 
 type ActivitySignal = {
@@ -54,9 +53,6 @@ type AddSpaceDraft = {
   learningGoal: string;
   initialTopicsText: string;
   trackingStyle: "problems" | "concepts" | "notes" | "mixed";
-  researchGoal: string;
-  researchQuestionsText: string;
-  sourceTypesText: string;
   customSectionsText: string;
 };
 
@@ -98,7 +94,6 @@ type SpacesPageProps = {
 const typeColor: Record<SpaceType, string> = {
   project: "#7c3aed",
   study: "#2563eb",
-  research: "#16a34a",
   custom: "#f97316",
 };
 
@@ -135,9 +130,6 @@ const emptyDraft: AddSpaceDraft = {
   learningGoal: "",
   initialTopicsText: "",
   trackingStyle: "mixed",
-  researchGoal: "",
-  researchQuestionsText: "",
-  sourceTypesText: "",
   customSectionsText: "",
 };
 
@@ -500,7 +492,7 @@ export function SpacesPage({
       </section>
 
       <section className="spc-filter-bar" aria-label={t("spaces.filterLabel")}>
-        {(["all", "project", "study", "research", "custom"] as FilterType[]).map((item) => (
+        {(["all", "project", "study", "custom"] as FilterType[]).map((item) => (
           <button key={item} type="button" className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>
             {item === "all" ? t("spaces.filter.all") : typeLabel(t, item)}
           </button>
@@ -765,7 +757,7 @@ function AddSpaceModal({
           <>
             <p className="spc-field-title">{t("spaces.add.selectType")}</p>
             <div className="spc-type-grid">
-              {(["project", "study", "research", "custom"] as SpaceType[]).map((type) => (
+              {(["project", "study", "custom"] as SpaceType[]).map((type) => (
                 <button key={type} type="button" className={draft.type === type ? "selected" : ""} aria-pressed={draft.type === type} onClick={() => onChooseType(type)}>
                   <span style={{ color: typeColor[type] }}><SpaceIcon type={type} /></span>
                   <strong>{typeLabel(t, type)}</strong>
@@ -815,13 +807,6 @@ function SpaceFormFields({ draft, error, onUpdate }: { draft: AddSpaceDraft; err
           <label>{t("spaces.form.learningGoal")}<input value={draft.learningGoal} onChange={(event) => onUpdate({ learningGoal: event.target.value })} /></label>
           <label>{t("spaces.form.topics")}<input value={draft.initialTopicsText} onChange={(event) => onUpdate({ initialTopicsText: event.target.value })} placeholder="Array/String, Hash Map, Stack" /></label>
           <label>{t("spaces.form.trackingStyle")}<select value={draft.trackingStyle} onChange={(event) => onUpdate({ trackingStyle: event.target.value as AddSpaceDraft["trackingStyle"] })}><option value="problems">{t("spaces.form.trackProblems")}</option><option value="concepts">{t("spaces.form.trackConcepts")}</option><option value="notes">{t("spaces.form.trackNotes")}</option><option value="mixed">{t("spaces.form.trackMixed")}</option></select></label>
-        </>
-      ) : null}
-      {type === "research" ? (
-        <>
-          <label>{t("spaces.form.researchGoal")}<input value={draft.researchGoal} onChange={(event) => onUpdate({ researchGoal: event.target.value })} /></label>
-          <label>{t("spaces.form.researchQuestions")}<textarea value={draft.researchQuestionsText} onChange={(event) => onUpdate({ researchQuestionsText: event.target.value })} /></label>
-          <label>{t("spaces.form.sourceTypes")}<input value={draft.sourceTypesText} onChange={(event) => onUpdate({ sourceTypesText: event.target.value })} placeholder={t("spaces.form.sourceTypesPlaceholder")} /></label>
         </>
       ) : null}
       {type === "custom" ? (
@@ -925,7 +910,7 @@ function deriveStudySpaces(studyTopics: StudyTopic[], notes: ConceptNote[], t: T
     .map((topic) => {
       const topicNotes = notes.filter((note) => note.topicId === topic.id);
       const due = topicNotes.filter((note) => note.nextReviewDate).length;
-      const type: SpaceType = topic.category === "Research" || topic.category === "fNIRS" ? "research" : "study";
+      const type: SpaceType = "study";
       return {
         id: `study-space-${topic.id}`,
         name: topic.name,
@@ -978,7 +963,6 @@ function validateDraft(draft: AddSpaceDraft, spaces: Space[], t: TFn) {
   if (spaces.some((space) => space.name.trim().toLowerCase() === draft.name.trim().toLowerCase())) return t("spaces.validate.nameDup");
   if (draft.type === "project" && !draft.objective.trim()) return t("spaces.validate.objectiveRequired");
   if (draft.type === "study" && !draft.learningGoal.trim()) return t("spaces.validate.learningRequired");
-  if (draft.type === "research" && !draft.researchGoal.trim()) return t("spaces.validate.researchRequired");
   return "";
 }
 
@@ -987,7 +971,6 @@ function createSpaceFromDraft(draft: AddSpaceDraft, t: TFn): Space {
   const topics =
     type === "study" ? parseTags(draft.initialTopicsText)
     : type === "project" ? parseLines(draft.initialMilestonesText)
-    : type === "research" ? parseLines(draft.researchQuestionsText)
     : parseLines(draft.customSectionsText || "Notes\nTasks\nActivity");
   return {
     id: `space-${Date.now()}`,
@@ -997,13 +980,12 @@ function createSpaceFromDraft(draft: AddSpaceDraft, t: TFn): Space {
     mainSignal: t("spaces.mainSignal.newSpace", { type: typeLabel(t, type) }),
     aiPriority: type === "custom" ? "Low" : "Medium",
     recentActivityCount: 0,
-    description: draft.description.trim() || draft.objective || draft.learningGoal || draft.researchGoal || t("spaces.desc.newSpace"),
+    description: draft.description.trim() || draft.objective || draft.learningGoal || t("spaces.desc.newSpace"),
     color: typeColor[type],
     updatedLabel: t("spaces.time.justNow"),
     topics,
     objective: draft.objective,
     learningGoal: draft.learningGoal,
-    researchGoal: draft.researchGoal,
     sourceRef: "local",
   };
 }
@@ -1022,7 +1004,6 @@ function parseTags(value: string) {
 
 function inferProjectType(project: Project): SpaceType {
   const text = `${project.name} ${project.description}`.toLowerCase();
-  if (text.includes("research") || text.includes("thesis") || text.includes("fnirs")) return "research";
   if (text.includes("study") || text.includes("leetcode") || text.includes("python")) return "study";
   return "project";
 }
@@ -1053,7 +1034,6 @@ function statusClass(status: SpaceStatus) {
 
 function SpaceIcon({ type }: { type: SpaceType }) {
   if (type === "study") return <CodeIcon />;
-  if (type === "research") return <BookIcon />;
   if (type === "custom") return <SlidersIcon />;
   return <ScreenIcon />;
 }
@@ -1069,5 +1049,4 @@ function MoreIcon() { return <svg viewBox="0 0 24 24"><path d="M12 6h.01M12 12h.
 function CloseIcon() { return <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" /></svg>; }
 function ScreenIcon() { return <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="12" rx="2" /><path d="M8 21h8M12 17v4" /></svg>; }
 function CodeIcon() { return <svg viewBox="0 0 24 24"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M14 5l-4 14" /></svg>; }
-function BookIcon() { return <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5z" /></svg>; }
 function SlidersIcon() { return <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" /><path d="M8 6v.01M14 12v.01M11 18v.01" /></svg>; }
