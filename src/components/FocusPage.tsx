@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FocusSession, PageId, Project, Task } from "../types";
 import { formatDate, isOverdue, todayValue } from "../utils/date";
+import type { FocusUserSettings } from "../lib/focusSettingsStorage";
+import { openMiniFocusTimer, supportsMiniFocusTimer } from "../lib/miniFocusTimer";
 import {
   formatFocusDuration,
   getDisplayedFocusSeconds,
@@ -14,6 +16,8 @@ interface FocusPageProps {
   projects: Project[];
   focusSessions: FocusSession[];
   activeSession: FocusSession | null;
+  settings: FocusUserSettings;
+  onUpdateSettings: (patch: Partial<FocusUserSettings>) => void;
   onStartFocus: (taskId: string, source?: FocusSession["source"], durationMinutes?: number) => void;
   onPauseFocus: (sessionId: string) => void;
   onResumeFocus: (sessionId: string) => void;
@@ -60,11 +64,36 @@ function todaySessionFilter(session: FocusSession, today: string) {
   return date === today && session.status === "completed";
 }
 
+function FocusOptionToggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="foc-option-row"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+    >
+      <span>{label}</span>
+      <i>{checked ? "ON" : "OFF"}</i>
+    </button>
+  );
+}
+
 export function FocusPage({
   tasks,
   projects,
   focusSessions,
   activeSession,
+  settings,
+  onUpdateSettings,
   onStartFocus,
   onPauseFocus,
   onResumeFocus,
@@ -81,6 +110,8 @@ export function FocusPage({
   const activeTask = activeSession ? tasks.find((task) => task.id === activeSession.taskId) ?? null : null;
   const [finishTaskId, setFinishTaskId] = useState("");
   const [durationDrafts, setDurationDrafts] = useState<Record<string, number>>({});
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const optionsRef = useRef<HTMLDivElement>(null);
 
   const openTasks = useMemo(
     () => tasks.filter((task) => task.status !== "done" && task.status !== "archived" && !task.deletedAt),
@@ -119,6 +150,27 @@ export function FocusPage({
 
   const targetSeconds = activeSession ? getFocusTargetSeconds(activeSession) : 0;
   const progress = targetSeconds ? Math.min(100, Math.round((elapsed / targetSeconds) * 100)) : 0;
+  const canOpenMiniTimer = Boolean(activeSession && activeTask && settings.showMiniTimerButton && supportsMiniFocusTimer());
+
+  useEffect(() => {
+    if (!optionsOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (optionsRef.current?.contains(event.target as Node)) return;
+      setOptionsOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOptionsOpen(false);
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [optionsOpen]);
 
   useEffect(() => {
     if (!activeSession || !activeTask || activeSession.status !== "running") return;
@@ -155,6 +207,16 @@ export function FocusPage({
     onStopFocus(session.id, false);
   }
 
+  function openMiniTimer() {
+    if (!activeSession || !activeTask) return;
+    openMiniFocusTimer({
+      sessionId: activeSession.id,
+      title: activeTask.title,
+      remaining: formatFocusDuration(remaining),
+      status: activeSession.status,
+    });
+  }
+
   return (
     <div className="foc-page">
       <header className="foc-header">
@@ -165,6 +227,38 @@ export function FocusPage({
         <div className="foc-header-chips">
           <span>{formatDate(today, "ko")}</span>
           <strong>오늘 {formatFocusDuration(todaySeconds, true)}</strong>
+          <div className="foc-options-wrap" ref={optionsRef}>
+            <button
+              type="button"
+              className="foc-options-button"
+              aria-expanded={optionsOpen}
+              aria-label="Open focus options"
+              onClick={() => setOptionsOpen((open) => !open)}
+            >
+              <span aria-hidden="true">⚙</span>
+              <b>Focus 옵션</b>
+            </button>
+            {optionsOpen ? (
+              <div className="foc-options-popover" role="dialog" aria-label="Focus options">
+                <h2>Focus 옵션</h2>
+                <FocusOptionToggle
+                  label="탭 제목 타이머"
+                  checked={settings.showTabTitleTimer}
+                  onChange={(checked) => onUpdateSettings({ showTabTitleTimer: checked })}
+                />
+                <FocusOptionToggle
+                  label="완료 알림"
+                  checked={settings.enableCompletionNotification}
+                  onChange={(checked) => onUpdateSettings({ enableCompletionNotification: checked })}
+                />
+                <FocusOptionToggle
+                  label="미니 타이머 버튼"
+                  checked={settings.showMiniTimerButton}
+                  onChange={(checked) => onUpdateSettings({ showMiniTimerButton: checked })}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -273,6 +367,11 @@ export function FocusPage({
                   <button type="button" onClick={() => onPauseFocus(activeSession.id)}>일시정지</button>
                 )}
                 <button type="button" className="danger" onClick={() => stopAndAsk(activeSession)}>끝내기</button>
+                {canOpenMiniTimer ? (
+                  <button type="button" className="foc-mini-open" onClick={openMiniTimer}>
+                    미니 타이머 열기 ↗
+                  </button>
+                ) : null}
               </div>
               <footer className="foc-meta">
                 <span>남은 시간 <strong>{formatFocusDuration(remaining, true)}</strong></span>

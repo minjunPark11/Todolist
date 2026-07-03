@@ -10,6 +10,18 @@ import type { TodayIntent } from "./components/TodayPage";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { useDataPortability } from "./app/useDataPortability";
 import type { ToastState } from "./components/kit";
+import {
+  formatFocusDuration,
+  getDisplayedFocusSeconds,
+  getFocusRemainingSeconds,
+  useNowTick,
+} from "./lib/focusTimer";
+import {
+  loadFocusUserSettings,
+  saveFocusUserSettings,
+  type FocusUserSettings,
+} from "./lib/focusSettingsStorage";
+import { updateMiniFocusTimer } from "./lib/miniFocusTimer";
 import type {
   ConceptNote,
   PageId,
@@ -51,6 +63,7 @@ export default function App() {
   // detail's "Open Calendar" — PROJECT_DETAIL_REMOVE_CALENDAR_TAB spec §8.2).
   const [calendarFocusProjectId, setCalendarFocusProjectId] = useState("");
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [focusSettings, setFocusSettings] = useState<FocusUserSettings>(() => loadFocusUserSettings());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Desktop-only sidebar rail collapse; ignored by the mobile overlay menu.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -62,8 +75,15 @@ export default function App() {
   });
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const originalTitleRef = useRef(document.title || "FocusFlow");
+  const completedNotificationRef = useRef<Set<string>>(new Set());
 
   const today = todayValue();
+  const focusNow = useNowTick(Boolean(planner.activeFocusSession && planner.activeFocusSession.status === "running"));
+  const activeFocusTask = planner.activeFocusSession
+    ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null
+    : null;
+  const activeFocusRemaining = getFocusRemainingSeconds(planner.activeFocusSession, focusNow);
   const activeProjects = planner.projects.filter((project) => project.status !== "archived");
   const { importMessage, exportJson, handleImport } = useDataPortability({
     today,
@@ -148,6 +168,55 @@ export default function App() {
     root.lang = appSettings.language;
   }, [appSettings.theme, appSettings.accentColor, appSettings.fontSize, appSettings.reduceMotion, appSettings.language]);
 
+  useEffect(() => {
+    const session = planner.activeFocusSession;
+    if (!session || !activeFocusTask || !focusSettings.showTabTitleTimer) {
+      document.title = originalTitleRef.current;
+      return;
+    }
+
+    if (session.status === "paused") {
+      document.title = `Paused · ${activeFocusTask.title}`;
+      return;
+    }
+
+    document.title = `${formatFocusDuration(activeFocusRemaining)} · ${activeFocusTask.title}`;
+  }, [activeFocusTask, activeFocusRemaining, focusSettings.showTabTitleTimer, planner.activeFocusSession]);
+
+  useEffect(() => {
+    const session = planner.activeFocusSession;
+    if (!session || !activeFocusTask) return;
+    updateMiniFocusTimer({
+      sessionId: session.id,
+      title: activeFocusTask.title,
+      remaining: formatFocusDuration(activeFocusRemaining),
+      status: session.status,
+    });
+  }, [activeFocusTask, activeFocusRemaining, planner.activeFocusSession]);
+
+  useEffect(() => {
+    const session = planner.activeFocusSession;
+    if (!session || !focusSettings.enableCompletionNotification || !("Notification" in window)) return;
+    if (window.Notification.permission !== "default") return;
+    window.Notification.requestPermission().catch(() => undefined);
+  }, [focusSettings.enableCompletionNotification, planner.activeFocusSession?.id]);
+
+  useEffect(() => {
+    function handleMiniTimerMessage(event: MessageEvent) {
+      if (event.source === window) return;
+      const data = event.data as { type?: string; action?: string; sessionId?: string };
+      if (data?.type !== "focusflow-mini-timer" || !data.sessionId) return;
+      const session = planner.activeFocusSession;
+      if (!session || session.id !== data.sessionId) return;
+      if (data.action === "pause") planner.pauseFocusSession(session.id);
+      if (data.action === "resume") planner.resumeFocusSession(session.id);
+      if (data.action === "finish") stopFocusWithNotification(session.id, false);
+    }
+
+    window.addEventListener("message", handleMiniTimerMessage);
+    return () => window.removeEventListener("message", handleMiniTimerMessage);
+  }, [planner.activeFocusSession, planner.pauseFocusSession, planner.resumeFocusSession]);
+
   function navigate(path: string, mode: "push" | "replace" = "push") {
     if (window.location.pathname === path) {
       return;
@@ -195,6 +264,39 @@ export default function App() {
     window.setTimeout(() => {
       setToast((current) => (current === nextToast ? null : current));
     }, 4500);
+  }
+
+  function updateFocusSettings(patch: Partial<FocusUserSettings>) {
+    setFocusSettings((current) => {
+      const next = { ...current, ...patch };
+      saveFocusUserSettings(next);
+      return next;
+    });
+  }
+
+  function notifyFocusCompleted(sessionId: string) {
+    const session = planner.focusSessions.find((item) => item.id === sessionId);
+    const task = session ? planner.tasks.find((item) => item.id === session.taskId) : null;
+    if (!session || completedNotificationRef.current.has(sessionId)) return;
+    completedNotificationRef.current.add(sessionId);
+    if (!focusSettings.enableCompletionNotification) return;
+
+    const title = "Focus 완료";
+    const body = `${formatFocusDuration(getDisplayedFocusSeconds(session), true)} 동안 ${task?.title || session.title || "작업"}에 집중했어요.`;
+    if ("Notification" in window && window.Notification.permission === "granted") {
+      try {
+        new window.Notification(title, { body });
+        return;
+      } catch {
+        // Fall back to in-app toast.
+      }
+    }
+    showToast({ message: `${title}: ${body}` });
+  }
+
+  function stopFocusWithNotification(sessionId: string, completeTask = false) {
+    planner.stopFocusSession(sessionId, completeTask);
+    notifyFocusCompleted(sessionId);
   }
 
   function handleArchiveTask(taskId: string) {
@@ -445,6 +547,9 @@ export default function App() {
         handleImport={handleImport}
         importMessage={importMessage}
         requestResetAllData={requestResetAllData}
+        focusSettings={focusSettings}
+        onUpdateFocusSettings={updateFocusSettings}
+        onStopFocus={stopFocusWithNotification}
         accountSlot={
           <AccountSection
             auth={planner.auth}
@@ -540,7 +645,8 @@ export default function App() {
         onOpenFocus={() => navigateSection("focus")}
         onPause={planner.pauseFocusSession}
         onResume={planner.resumeFocusSession}
-        onStop={(sessionId) => planner.stopFocusSession(sessionId, false)}
+        onStop={(sessionId) => stopFocusWithNotification(sessionId, false)}
+        settings={focusSettings}
       />
       <OllamaChat
         activePage={activePage}

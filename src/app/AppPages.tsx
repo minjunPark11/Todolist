@@ -9,6 +9,7 @@ import { StudyPage } from "../components/StudyPage";
 import { TodayPage, type TodayIntent } from "../components/TodayPage";
 import type { ToastState } from "../components/kit";
 import type { usePlannerData } from "../hooks/usePlannerData";
+import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import type { AppSettings, PageId, Project } from "../types";
 
 type Planner = ReturnType<typeof usePlannerData>;
@@ -46,6 +47,9 @@ type AppPagesProps = {
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
   importMessage: string;
   requestResetAllData: () => void;
+  focusSettings: FocusUserSettings;
+  onUpdateFocusSettings: (patch: Partial<FocusUserSettings>) => void;
+  onStopFocus: (sessionId: string, completeTask?: boolean) => void;
   accountSlot: ReactNode;
 };
 
@@ -82,6 +86,9 @@ export function AppPages({
   handleImport,
   importMessage,
   requestResetAllData,
+  focusSettings,
+  onUpdateFocusSettings,
+  onStopFocus,
   accountSlot,
 }: AppPagesProps) {
   function pageGridClass(extra = "") {
@@ -200,10 +207,12 @@ export function AppPages({
         projects={activeProjects}
         focusSessions={planner.focusSessions}
         activeSession={planner.activeFocusSession}
+        settings={focusSettings}
+        onUpdateSettings={onUpdateFocusSettings}
         onStartFocus={planner.startFocusSession}
         onPauseFocus={planner.pauseFocusSession}
         onResumeFocus={planner.resumeFocusSession}
-        onStopFocus={planner.stopFocusSession}
+        onStopFocus={onStopFocus}
         onUpdateFocusNote={planner.updateFocusSessionNote}
         onCompleteTask={planner.completeTask}
         onOpenTask={planner.selectTask}

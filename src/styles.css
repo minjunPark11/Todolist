@@ -7841,6 +7841,7 @@ div.spc-signal-row {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+  position: relative;
 }
 
 .foc-header-chips span,
@@ -7854,6 +7855,80 @@ div.spc-signal-row {
   background: var(--bg-surface);
   box-shadow: var(--shadow-card);
   font-size: 14px;
+}
+
+.foc-options-wrap {
+  position: relative;
+}
+
+.foc-options-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 0 16px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-card);
+  font-weight: 800;
+}
+
+.foc-options-button b {
+  font: inherit;
+}
+
+.foc-options-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 80;
+  display: grid;
+  gap: 6px;
+  width: 280px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 16px;
+  background: var(--bg-surface);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
+}
+
+.foc-options-popover h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.foc-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 0;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  font-weight: 750;
+}
+
+.foc-option-row i {
+  display: inline-grid;
+  place-items: center;
+  min-width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.foc-option-row[aria-checked="false"] i {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 
 .foc-layout {
@@ -8152,7 +8227,7 @@ div.spc-signal-row {
 .foc-controls {
   width: 100%;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .foc-controls button,
@@ -8172,6 +8247,12 @@ div.spc-signal-row {
   color: var(--danger);
   border-color: rgba(255, 59, 48, 0.25);
   background: rgba(255, 59, 48, 0.05);
+}
+
+.foc-controls button.foc-mini-open {
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+  background: var(--bg-surface-muted);
 }
 
 .foc-meta {
@@ -8435,6 +8516,16 @@ div.spc-signal-row {
   .foc-header-chips,
   .foc-global-bar {
     display: grid;
+  }
+
+  .foc-options-button b {
+    display: none;
+  }
+
+  .foc-options-popover {
+    right: auto;
+    left: 0;
+    width: min(280px, calc(100vw - 36px));
   }
 
   .foc-global-bar {

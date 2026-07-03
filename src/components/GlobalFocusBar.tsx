@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { FocusSession, Task } from "../types";
+import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import {
   formatFocusDuration,
   getDisplayedFocusSeconds,
@@ -7,6 +8,7 @@ import {
   getFocusTargetSeconds,
   useNowTick,
 } from "../lib/focusTimer";
+import { openMiniFocusTimer, supportsMiniFocusTimer } from "../lib/miniFocusTimer";
 
 interface GlobalFocusBarProps {
   session: FocusSession | null;
@@ -15,9 +17,10 @@ interface GlobalFocusBarProps {
   onPause: (sessionId: string) => void;
   onResume: (sessionId: string) => void;
   onStop: (sessionId: string) => void;
+  settings: FocusUserSettings;
 }
 
-export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, onStop }: GlobalFocusBarProps) {
+export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, onStop, settings }: GlobalFocusBarProps) {
   const now = useNowTick(Boolean(session && session.status === "running"));
   const elapsed = getDisplayedFocusSeconds(session, now);
   const remaining = getFocusRemainingSeconds(session, now);
@@ -30,6 +33,17 @@ export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, 
   }, [elapsed, onStop, session]);
 
   if (!session || !task) return null;
+  const canOpenMiniTimer = settings.showMiniTimerButton && supportsMiniFocusTimer();
+
+  function openMiniTimer() {
+    if (!session || !task) return;
+    openMiniFocusTimer({
+      sessionId: session.id,
+      title: task.title,
+      remaining: formatFocusDuration(remaining),
+      status: session.status,
+    });
+  }
 
   return (
     <aside
@@ -56,6 +70,11 @@ export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, 
         <button type="button" className="foc-global-icon-action danger" aria-label="끝내기" title="끝내기" onClick={() => onStop(session.id)}>
           ■
         </button>
+        {canOpenMiniTimer ? (
+          <button type="button" className="foc-global-icon-action" aria-label="미니 타이머 열기" title="미니 타이머 열기" onClick={openMiniTimer}>
+            ↗
+          </button>
+        ) : null}
       </div>
     </aside>
   );
