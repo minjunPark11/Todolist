@@ -1500,8 +1500,14 @@ textarea {
 }
 
 .gcal-shell {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  /* Bound the calendar to the viewport (main has 40px vertical padding) so
+     the week/day time grid scrolls internally instead of the whole page
+     (spec §6.4: rows are never compressed to fit the screen). */
+  height: calc(100vh - 80px);
+  min-height: 480px;
 }
 
 .gcal-toolbar {
@@ -1599,9 +1605,30 @@ textarea {
   font-weight: 400;
 }
 
+/* Spec §3.3: active view uses a soft blue tint, not a heavy dark pill. */
 .gcal-modes button.active {
-  color: var(--color-on-dark);
-  background: var(--color-ink);
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+  font-weight: 600;
+}
+
+.gcal-ai-btn {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-pill);
+  padding: 6px 12px;
+  background: var(--color-canvas);
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.gcal-ai-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+.gcal-ai-btn:disabled {
+  color: var(--color-ink-muted-48);
+  cursor: default;
 }
 
 .gcal-body {
@@ -1609,7 +1636,9 @@ textarea {
   /* First track sizes to the sidebar itself (220px full, ~48px rail). */
   grid-template-columns: auto minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* --- Left sidebar: create, mini month, layers, project filters --- */
@@ -1619,6 +1648,8 @@ textarea {
   gap: 16px;
   align-content: start;
   width: 220px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* Collapsed icon rail */
@@ -1763,20 +1794,37 @@ textarea {
 
 .gcal-main-column {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(280px, 24vw, 340px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
   min-width: 0;
+  min-height: 0;
+}
+
+/* Spec §7: only the day view keeps a fixed right detail panel (280px). */
+.gcal-main-column.has-detail {
+  grid-template-columns: minmax(0, 1fr) 280px;
 }
 
 .gcal-main {
+  position: relative;
   display: grid;
   gap: 8px;
+  align-content: start;
   border: 1px solid var(--color-hairline);
   border-radius: var(--rounded-lg);
   padding: 12px;
   background: var(--color-canvas);
   overflow: auto;
+  min-height: 0;
+}
+
+/* Week/day: the section itself never scrolls — only .gcal-time-scroll inside. */
+.gcal-main.is-timegrid {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
 }
 
 /* Month view */
@@ -1804,11 +1852,12 @@ textarea {
 .gcal-month-cell {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-height: 104px;
+  gap: 4px;
+  /* Spec §5.3: 128px min cell height, dense 18px chips inside. */
+  min-height: 128px;
   border: 1px solid var(--color-divider-soft);
   border-radius: var(--rounded-sm);
-  padding: 8px 6px 6px;
+  padding: 6px;
   background: var(--color-canvas);
 }
 
@@ -1859,13 +1908,26 @@ textarea {
 
 .gcal-month-chip-list {
   display: grid;
-  gap: 4px;
+  /* Spec §5.4: chips packed with a 1px gap. */
+  gap: 1px;
 }
 
 .gcal-month-more {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
   color: var(--color-ink-muted-48);
-  font-size: 0.7rem;
-  padding-left: 2px;
+  font-size: 11px;
+  line-height: 18px;
+  height: 18px;
+  padding: 0 6px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gcal-month-more:hover {
+  color: var(--color-primary);
 }
 
 /* Shared chip styling (month cells + all-day row) */
@@ -1873,13 +1935,16 @@ textarea {
 .gcal-chip {
   display: block;
   width: 100%;
+  /* Spec §5.4: 18px-tall compact chip, 11px text, one-line ellipsis. */
+  height: 18px;
   border: 0;
   border-left: 3px solid transparent;
-  border-radius: var(--rounded-xs);
-  padding: 3px 6px;
+  border-radius: 6px;
+  padding: 0 6px;
   color: var(--color-ink);
   background: var(--color-primary-tint);
-  font-size: 0.76rem;
+  font-size: 11px;
+  line-height: 18px;
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
@@ -1920,15 +1985,45 @@ textarea {
 /* Week/Day time grid */
 
 .gcal-timegrid {
-  display: grid;
-  gap: 0;
-  /* Below this width the 7 day columns become unreadable; let .gcal-main
-     scroll horizontally instead of crushing the headers into each other. */
-  min-width: 640px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
 }
 
-.gcal-timegrid.is-day {
-  min-width: 320px;
+/* Spec §6.4/§7.5: only the time-grid body scrolls; the weekday header and
+   all-day band stay pinned via position: sticky inside the scroller. */
+.gcal-time-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.gcal-timegrid-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--color-canvas);
+}
+
+.gcal-day-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 16px 10px;
+}
+
+.gcal-day-title strong {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.gcal-day-title span {
+  font-size: 16px;
+  color: var(--color-ink-muted-80);
 }
 
 .gcal-timegrid-head {
@@ -2060,6 +2155,17 @@ textarea {
   cursor: crosshair;
 }
 
+/* 30-minute sub-line inside the 96px hour row (spec §6.5). */
+.gcal-time-slot-half {
+  height: 50%;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+  pointer-events: none;
+}
+
+.gcal-time-col.is-weekend {
+  background: rgba(15, 23, 42, 0.02);
+}
+
 .gcal-empty-hint {
   position: absolute;
   top: 40%;
@@ -2134,6 +2240,29 @@ textarea {
 .gcal-tb-time {
   font-size: 0.66rem;
   color: var(--color-ink-muted-48);
+}
+
+/* Spec §6.9: top/bottom resize handles on event blocks, 15-minute snap. */
+.gcal-resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 7px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.gcal-resize-handle.is-start {
+  top: -2px;
+}
+
+.gcal-resize-handle.is-end {
+  bottom: -2px;
+}
+
+.gcal-time-block.is-resizing {
+  opacity: 0.85;
+  cursor: ns-resize;
 }
 
 .gcal-tb-title {
@@ -2505,6 +2634,222 @@ textarea {
   padding: 9px 10px;
   color: var(--danger);
   font-size: 0.78rem;
+}
+
+/* --- Event / agenda popovers (spec §5.7, §6.8) --- */
+
+.gcal-popover {
+  position: fixed;
+  z-index: 1300;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 80px;
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: 14px;
+  padding: 16px;
+  background: var(--color-canvas);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+}
+
+.gcal-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gcal-popover-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.gcal-popover-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+
+.gcal-popover-close {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-muted-48);
+  font-size: 0.8rem;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.gcal-popover-when {
+  margin: 0;
+  color: var(--color-ink-muted-80);
+  font-size: 0.82rem;
+}
+
+.gcal-popover-memo {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  text-align: left;
+  font-size: 0.82rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.gcal-popover-agenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.gcal-popover-agenda button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 6px;
+  text-align: left;
+  font-size: 0.82rem;
+  color: var(--color-ink);
+}
+
+.gcal-popover-agenda button:hover {
+  background: var(--color-canvas-parchment);
+}
+
+.gcal-popover-agenda-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gcal-popover-agenda small {
+  color: var(--color-ink-muted-48);
+}
+
+/* NewTaskForm inside the week-view draft popover: drop its own card frame. */
+.gcal-popover .gcal-newtask-form {
+  border: 0;
+  padding: 0;
+}
+
+/* --- Day view right detail panel (spec §7.7) --- */
+
+.gcal-panel-empty {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-lg);
+  padding: 24px;
+  background: var(--color-canvas);
+  gap: 8px;
+  color: var(--color-ink-muted-80);
+}
+
+.gcal-panel-empty strong {
+  color: var(--color-ink);
+  font-size: 0.95rem;
+}
+
+.gcal-panel-empty p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+/* --- Year view (spec §8): 4x3 months, date numbers only --- */
+
+.gcal-year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(200px, 1fr));
+  column-gap: 56px;
+  row-gap: 48px;
+  padding: 16px 20px 28px;
+}
+
+@media (max-width: 1360px) {
+  .gcal-year-grid {
+    grid-template-columns: repeat(3, minmax(200px, 1fr));
+    column-gap: 40px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .gcal-year-grid {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+}
+
+.gcal-year-month {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  justify-items: start;
+}
+
+.gcal-year-month-title {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.gcal-year-weekdays,
+.gcal-year-dates {
+  display: grid;
+  grid-template-columns: repeat(7, 24px);
+  gap: 2px;
+}
+
+.gcal-year-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  color: var(--color-ink-muted-48);
+}
+
+.gcal-year-date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--rounded-pill);
+  padding: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.gcal-year-date:hover {
+  background: var(--color-canvas-parchment);
+}
+
+.gcal-year-date.is-today {
+  height: 24px;
+  background: var(--color-primary);
+  color: var(--color-on-dark);
+  font-weight: 600;
+}
+
+.gcal-year-date.is-empty {
+  pointer-events: none;
 }
 
 .gcal-schedule-search {
@@ -7548,7 +7893,7 @@ div.spc-signal-row {
 
 .foc-task {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) 76px auto;
   gap: 10px;
   align-items: center;
   min-height: 74px;
@@ -7615,6 +7960,38 @@ div.spc-signal-row {
 .foc-task-main small {
   color: var(--text-secondary);
   font-size: 12.5px;
+}
+
+.foc-duration {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 0 8px;
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.foc-duration input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.foc-duration input:disabled {
+  color: var(--text-secondary);
 }
 
 .foc-tag,
@@ -8009,6 +8386,16 @@ div.spc-signal-row {
   .foc-stat-grid,
   .foc-controls {
     grid-template-columns: 1fr;
+  }
+
+  .foc-task {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .foc-duration,
+  .foc-tag {
+    grid-column: 2;
+    justify-self: start;
   }
 }
 

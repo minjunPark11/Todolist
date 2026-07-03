@@ -18,7 +18,6 @@ import {
 } from "../utils/calendarItems";
 import {
   DAY_END,
-  DAY_START,
   TIME_SNAP_MINUTES,
   minutesToTime,
   timeToMinutes,
@@ -29,12 +28,14 @@ import { CalendarToolbar } from "./calendar/CalendarToolbar";
 import { CalendarLeftSidebar } from "./calendar/CalendarLeftSidebar";
 import { WeekView } from "./calendar/WeekView";
 import { MonthView } from "./calendar/MonthView";
-import { CalendarRightPanel } from "./calendar/CalendarRightPanel";
-import type { NewTaskFormResult } from "./calendar/NewTaskForm";
+import { YearView } from "./calendar/YearView";
+import { DayDetailPanel } from "./calendar/CalendarRightPanel";
+import { CalendarPopover, DayAgendaPopover, EventPopover, type PopoverAnchor } from "./calendar/EventPopover";
+import { NewTaskForm, type NewTaskFormResult } from "./calendar/NewTaskForm";
 import { QuickCreatePopover, type QuickCreateDefaults, type QuickCreateResult } from "./calendar/QuickCreatePopover";
 import { useT } from "../i18n";
 
-type CalendarMode = "month" | "week" | "day";
+type CalendarMode = "month" | "week" | "day" | "year";
 
 type DragPreview = {
   taskId: string;
@@ -51,6 +52,12 @@ type AiPlacement = {
   endTime: string;
   reason: string;
 };
+
+// Spec §5.7/§6.8: small popovers replace the fixed right panel outside day view.
+type PopoverState =
+  | { kind: "event"; item: CalendarItem; anchor: PopoverAnchor }
+  | { kind: "agenda"; date: string; anchor: PopoverAnchor }
+  | null;
 
 interface CalendarViewProps {
   tasks: Task[];
@@ -99,13 +106,14 @@ export function CalendarView({
   const [draggingTaskId, setDraggingTaskId] = useState("");
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [quickCreate, setQuickCreate] = useState<QuickCreateDefaults | null>(null);
-  const [rightPanelSearch, setRightPanelSearch] = useState("");
-  const [scheduleModalTaskId, setScheduleModalTaskId] = useState("");
+  const [popover, setPopover] = useState<PopoverState>(null);
   const [aiStatus, setAiStatus] = useState<"idle" | "loading" | "preview" | "error">("idle");
   const [aiPlacements, setAiPlacements] = useState<AiPlacement[]>([]);
   // V3 §7/§8: the confirmed draft block. Never written to localStorage/task
   // list — only createTask() (via handleCreateFromDraft) touches real data.
   const [draft, setDraft] = useState<CalendarDraftBlock | null>(null);
+  // Where the week view's draft popover should open (day view uses the panel).
+  const [draftAnchor, setDraftAnchor] = useState<PopoverAnchor | null>(null);
 
   const today = todayValue();
   const anchorDate = new Date(`${anchor}T00:00:00`);
@@ -132,33 +140,40 @@ export function CalendarView({
     [layers.task, projectFilter, tasks],
   );
 
-  const todaySummary = useMemo(() => {
-    const todays = items.filter((item) => item.date === today);
-    return {
-      scheduled: todays.filter((item) => item.layer === "task").length,
-      deadlines: todays.filter((item) => item.layer === "deadline").length,
-      reviews: todays.filter((item) => item.layer === "study-review").length,
-    };
-  }, [items, today]);
-
   let rangeLabel: string;
   if (mode === "month") {
     rangeLabel = getMonthLabel(anchorDate.getFullYear(), anchorDate.getMonth(), lang);
   } else if (mode === "week") {
     rangeLabel = getWeekLabel(anchor, lang);
+  } else if (mode === "year") {
+    rangeLabel = t("calendar.yearTitle", { year: anchorDate.getFullYear() });
   } else {
     rangeLabel = getDayLabel(anchor, lang);
   }
 
-  function shift(delta: number) {
+  function clearTransient() {
+    setDraft(null);
+    setDraftAnchor(null);
+    setPopover(null);
     onClearTaskSelection?.();
+  }
+
+  function shift(delta: number) {
+    clearTransient();
     if (mode === "month") {
       setAnchor(addMonths(anchor, delta));
+    } else if (mode === "year") {
+      setAnchor(addMonths(anchor, delta * 12));
     } else if (mode === "week") {
       setAnchor(addDays(anchor, delta * 7));
     } else {
       setAnchor(addDays(anchor, delta));
     }
+  }
+
+  function switchMode(next: CalendarMode) {
+    clearTransient();
+    setMode(next);
   }
 
   function toggleLayer(key: keyof CalendarLayerToggles) {
@@ -188,6 +203,7 @@ export function CalendarView({
     event.dataTransfer.setData("text/plain", taskId);
     event.dataTransfer.effectAllowed = "move";
     setDraggingTaskId(taskId);
+    setPopover(null);
   }
 
   function over(id: string) {
@@ -290,37 +306,19 @@ export function CalendarView({
     handleDragEnd();
   }
 
-  function dropUnschedule(event: DragEvent) {
-    event.preventDefault();
-    const taskId = event.dataTransfer.getData("text/plain");
-    if (taskId) {
-      onUpdateTask(taskId, { scheduledDate: "", startTime: "", endTime: "" });
-    }
-    handleDragEnd();
-  }
-
-  function handleScheduleTask(taskId: string, date: string, startTime: string, durationMinutes: number) {
-    const start = timeToMinutes(startTime);
-    const end = Math.min(DAY_END * 60, start + durationMinutes);
-    const endTime = minutesToTime(end);
-    if (end <= start || hasConflict(date, startTime, endTime, taskId)) {
+  // Spec §6.9: resize handles commit through here with a conflict check.
+  function handleResizeItem(taskId: string, day: string, startTime: string, endTime: string) {
+    if (timeToMinutes(endTime) - timeToMinutes(startTime) < TIME_SNAP_MINUTES) return;
+    if (hasConflict(day, startTime, endTime, taskId)) {
       showToast?.({ message: "This time is not available. Choose another slot." });
-      return false;
+      return;
     }
-    onUpdateTask(taskId, { scheduledDate: date, startTime, endTime });
-    setScheduleModalTaskId("");
-    showToast?.({ message: "Task scheduled." });
-    return true;
-  }
-
-  function handleQuickAddTask(title: string) {
-    const id = onCreateTask({ title, status: "todo", scheduledDate: "", priority: "medium" });
-    showToast?.({ message: "Task added to scheduling queue.", actionLabel: "Open", onAction: () => onSelectTask(id) });
+    onUpdateTask(taskId, { scheduledDate: day, startTime, endTime });
   }
 
   function suggestSchedule() {
     if (unscheduled.length === 0) {
-      showToast?.({ message: "No unscheduled tasks to suggest." });
+      showToast?.({ message: t("calendar.noUnscheduled") });
       return;
     }
     setAiStatus("loading");
@@ -371,20 +369,29 @@ export function CalendarView({
     setAiStatus("idle");
   }
 
-  // §12.4: opening any existing item drops a pending draft — the user's
-  // attention has moved on, so the unsaved "new task" attempt is discarded.
-  function selectTaskAndClearDraft(taskId: string) {
+  // Spec §2/§12: week & month show a small popover on event click; only the
+  // day view routes the click into the fixed right detail panel.
+  function handleClickItem(item: CalendarItem, anchor: PopoverAnchor) {
     setDraft(null);
-    onSelectTask(taskId);
+    setDraftAnchor(null);
+    if (mode === "day") {
+      if (item.sourceType === "task") onSelectTask(item.sourceId);
+      else if (item.sourceType === "project") onOpenProject?.(item.sourceId);
+      else onOpenStudyReview?.(item.sourceId);
+      return;
+    }
+    setPopover({ kind: "event", item, anchor });
   }
 
-  function handleClickItem(item: CalendarItem) {
-    setDraft(null);
+  function openDetailFromPopover(item: CalendarItem) {
+    setPopover(null);
     if (item.sourceType === "task") {
+      setMode("day");
+      setAnchor(item.date);
       onSelectTask(item.sourceId);
     } else if (item.sourceType === "project") {
       onOpenProject?.(item.sourceId);
-    } else if (item.sourceType === "note") {
+    } else {
       onOpenStudyReview?.(item.sourceId);
     }
   }
@@ -413,15 +420,19 @@ export function CalendarView({
   // §2.3/§12.3: any new empty-grid selection replaces a pending draft.
   function handleSelectionStart() {
     setDraft(null);
+    setDraftAnchor(null);
+    setPopover(null);
     onClearTaskSelection?.();
   }
 
-  function handleDraftCreate(day: string, startTime: string, endTime: string) {
+  function handleDraftCreate(day: string, startTime: string, endTime: string, anchor: PopoverAnchor) {
     setDraft({ date: day, startTime, endTime });
+    setDraftAnchor(anchor);
   }
 
   function handleCancelDraft() {
     setDraft(null);
+    setDraftAnchor(null);
   }
 
   // §8/§13.5: the only place a real task gets created from a draft.
@@ -437,11 +448,25 @@ export function CalendarView({
       projectId: result.projectId || undefined,
     });
     setDraft(null);
-    onSelectTask(taskId);
+    setDraftAnchor(null);
+    if (mode === "day") onSelectTask(taskId);
     showToast?.({ message: t("calendar.createdToast", { title: result.title }) });
   }
 
+  function openDay(date: string) {
+    clearTransient();
+    setAnchor(date);
+    setMode("day");
+  }
+
+  function openMonth(date: string) {
+    clearTransient();
+    setAnchor(date);
+    setMode("month");
+  }
+
   const days = mode === "day" ? [anchor] : getWeekDays(anchor);
+  const isTimeGrid = mode === "week" || mode === "day";
 
   return (
     <div className="gcal-shell">
@@ -450,16 +475,15 @@ export function CalendarView({
         rangeLabel={rangeLabel}
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={() => setSidebarCollapsed((collapsed) => !collapsed)}
-        onModeChange={(nextMode) => {
-          onClearTaskSelection?.();
-          setMode(nextMode);
-        }}
+        onModeChange={switchMode}
         onToday={() => {
-          onClearTaskSelection?.();
+          clearTransient();
           setAnchor(today);
         }}
         onPrev={() => shift(-1)}
         onNext={() => shift(1)}
+        aiDisabled={aiStatus === "loading"}
+        onAiClick={suggestSchedule}
       />
 
       <div className={sidebarCollapsed ? "gcal-body is-sidebar-rail" : "gcal-body"}>
@@ -467,7 +491,7 @@ export function CalendarView({
           anchor={anchor}
           datesWithItems={datesWithItems}
           onSelectDate={(date) => {
-            onClearTaskSelection?.();
+            clearTransient();
             setAnchor(date);
           }}
           layers={layers}
@@ -486,8 +510,24 @@ export function CalendarView({
           onExpand={() => setSidebarCollapsed(false)}
         />
 
-        <div className="gcal-main-column">
-          <section className="gcal-main">
+        <div className={mode === "day" ? "gcal-main-column has-detail" : "gcal-main-column"}>
+          <section className={isTimeGrid ? "gcal-main is-timegrid" : "gcal-main"}>
+            {aiStatus === "preview" ? (
+              <div className="gcal-suggestion-bar">
+                <div>
+                  <strong>{t("calendar.suggestionCount", { n: aiPlacements.length })}</strong>
+                  <span>{t("calendar.suggestionPreview")}</span>
+                </div>
+                <button type="button" onClick={applyAiPlacements}>
+                  {t("calendar.apply")}
+                </button>
+                <button type="button" onClick={cancelAiPlacements}>
+                  {t("common.cancel")}
+                </button>
+              </div>
+            ) : null}
+            {aiStatus === "error" ? <p className="gcal-alert">{t("calendar.noOpenSlots")}</p> : null}
+
             {mode === "month" ? (
               <MonthView
                 anchor={anchor}
@@ -498,8 +538,15 @@ export function CalendarView({
                 onLeaveCell={leave}
                 onDropCell={dropCell}
                 onClickItem={handleClickItem}
-                onClickCell={(date) => setQuickCreate({ date, allDay: true })}
+                onClickCell={(date) => {
+                  setPopover(null);
+                  setAnchor(date);
+                }}
+                onOpenDay={openDay}
+                onShowAgenda={(date, anchor) => setPopover({ kind: "agenda", date, anchor })}
               />
+            ) : mode === "year" ? (
+              <YearView anchor={anchor} onOpenMonth={openMonth} onOpenDay={openDay} />
             ) : (
               <WeekView
                 days={days}
@@ -515,6 +562,7 @@ export function CalendarView({
                 onDropAllDay={dropAllDay}
                 onClickItem={handleClickItem}
                 onClickAllDaySlot={(day) => setQuickCreate({ date: day, allDay: true })}
+                onResizeItem={handleResizeItem}
                 draft={draft}
                 dragPreview={dragPreview}
                 draggingTaskTitle={tasks.find((task) => task.id === draggingTaskId)?.title ?? ""}
@@ -528,36 +576,46 @@ export function CalendarView({
             )}
           </section>
 
-          <CalendarRightPanel
-            draft={draft}
-            taskDetail={taskDetail}
-            unscheduled={unscheduled}
-            todaySummary={todaySummary}
-            projects={projects}
-            dragOverUnscheduled={dragOverId === "unscheduled"}
-            onDragOverUnscheduled={over("unscheduled")}
-            onDragLeaveUnscheduled={leave("unscheduled")}
-            onDropUnscheduled={dropUnschedule}
-            onCancelDraft={handleCancelDraft}
-            onCreateFromDraft={handleCreateFromDraft}
-            onSelectTask={selectTaskAndClearDraft}
-            onDragStartTask={handleDragStart}
-            onDragEndTask={handleDragEnd}
-            searchQuery={rightPanelSearch}
-            onSearchChange={setRightPanelSearch}
-            layerFilters={layers}
-            projectFilter={projectFilter}
-            currentWeekDays={getWeekDays(anchor)}
-            onOpenScheduleModal={setScheduleModalTaskId}
-            onQuickAddTask={handleQuickAddTask}
-            aiStatus={aiStatus}
-            aiPlacementsCount={aiPlacements.length}
-            onSuggestSchedule={suggestSchedule}
-            onApplySuggestion={applyAiPlacements}
-            onCancelSuggestion={cancelAiPlacements}
-          />
+          {mode === "day" ? (
+            <DayDetailPanel
+              draft={draft}
+              taskDetail={taskDetail}
+              projects={projects}
+              onCancelDraft={handleCancelDraft}
+              onCreateFromDraft={handleCreateFromDraft}
+            />
+          ) : null}
         </div>
       </div>
+
+      {popover?.kind === "event" ? (
+        <EventPopover
+          item={popover.item}
+          anchor={popover.anchor}
+          onClose={() => setPopover(null)}
+          onOpenDetail={openDetailFromPopover}
+        />
+      ) : null}
+      {popover?.kind === "agenda" ? (
+        <DayAgendaPopover
+          date={popover.date}
+          items={items.filter((item) => item.date === popover.date)}
+          anchor={popover.anchor}
+          onClose={() => setPopover(null)}
+          onClickItem={(item, anchor) => setPopover({ kind: "event", item, anchor })}
+        />
+      ) : null}
+      {mode === "week" && draft && draftAnchor ? (
+        <CalendarPopover anchor={draftAnchor} onClose={handleCancelDraft} label={t("calendar.newTask")}>
+          <NewTaskForm
+            key={`${draft.date}-${draft.startTime}-${draft.endTime}`}
+            draft={draft}
+            projects={projects}
+            onCancel={handleCancelDraft}
+            onCreate={handleCreateFromDraft}
+          />
+        </CalendarPopover>
+      ) : null}
 
       {quickCreate ? (
         <QuickCreatePopover
@@ -567,87 +625,6 @@ export function CalendarView({
           onSave={handleQuickCreateSave}
         />
       ) : null}
-      {scheduleModalTaskId ? (
-        <ScheduleTaskModal
-          task={tasks.find((task) => task.id === scheduleModalTaskId) ?? null}
-          defaultDate={anchor}
-          defaultDuration={getTaskDuration(tasks.find((task) => task.id === scheduleModalTaskId))}
-          onClose={() => setScheduleModalTaskId("")}
-          onSchedule={handleScheduleTask}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function ScheduleTaskModal({
-  task,
-  defaultDate,
-  defaultDuration,
-  onClose,
-  onSchedule,
-}: {
-  task: Task | null;
-  defaultDate: string;
-  defaultDuration: number;
-  onClose: () => void;
-  onSchedule: (taskId: string, date: string, startTime: string, durationMinutes: number) => boolean;
-}) {
-  const [date, setDate] = useState(defaultDate);
-  const [startTime, setStartTime] = useState("09:00");
-  const [duration, setDuration] = useState(defaultDuration);
-
-  if (!task) return null;
-
-  return (
-    <div className="gcal-schedule-modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <form
-        className="gcal-schedule-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="schedule-task-title"
-        onMouseDown={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSchedule(task.id, date, startTime, duration);
-        }}
-      >
-        <div className="gcal-schedule-modal-head">
-          <div>
-            <h2 id="schedule-task-title">Schedule Task</h2>
-            <p>{task.title}</p>
-          </div>
-          <button type="button" aria-label="Close schedule task modal" onClick={onClose}>x</button>
-        </div>
-        <label>
-          Date
-          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-        </label>
-        <label>
-          Start time
-          <input
-            type="time"
-            step={TIME_SNAP_MINUTES * 60}
-            value={startTime}
-            onChange={(event) => setStartTime(event.target.value)}
-          />
-        </label>
-        <label>
-          Duration
-          <select value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
-            <option value={10}>10m</option>
-            <option value={20}>20m</option>
-            <option value={30}>30m</option>
-            <option value={40}>40m</option>
-            <option value={60}>1h</option>
-            <option value={90}>1h 30m</option>
-          </select>
-        </label>
-        <div className="gcal-schedule-modal-actions">
-          <button type="button" onClick={onClose}>Cancel</button>
-          <button type="submit">Schedule</button>
-        </div>
-      </form>
     </div>
   );
 }

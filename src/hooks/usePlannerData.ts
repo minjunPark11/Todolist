@@ -1144,7 +1144,11 @@ export function usePlannerData() {
     return session.accumulatedSeconds + Math.max(0, Math.floor((nowMs - new Date(session.startAt).getTime()) / 1000));
   }
 
-  function startFocusSession(taskId: string, source: FocusSession["source"] = "focus_page") {
+  function startFocusSession(
+    taskId: string,
+    source: FocusSession["source"] = "focus_page",
+    requestedDurationMinutes?: number,
+  ) {
     const now = new Date().toISOString();
 
     setData((current) => {
@@ -1155,12 +1159,13 @@ export function usePlannerData() {
       if (!task) return current;
       const project = current.projects.find((item) => item.id === task.projectId);
       const start = task.startTime && task.endTime ? task.startTime : "";
-      const durationMinutes =
+      const inferredDurationMinutes =
         start && task.endTime
           ? Math.max(1, Math.round((new Date(`2000-01-01T${task.endTime}`).getTime() - new Date(`2000-01-01T${task.startTime}`).getTime()) / 60000))
           : task.priority === "high"
             ? 50
             : 30;
+      const durationMinutes = Math.max(1, Math.min(240, Math.round(requestedDurationMinutes || inferredDurationMinutes)));
       const session: FocusSession = {
         id: createId("focus"),
         taskId,
@@ -1243,7 +1248,6 @@ export function usePlannerData() {
                 status: "completed",
                 completed: true,
                 accumulatedSeconds: finalSeconds,
-                durationMinutes: Math.max(1, Math.round(finalSeconds / 60)),
                 endAt: now,
                 endedAt: now,
                 pausedAt: "",

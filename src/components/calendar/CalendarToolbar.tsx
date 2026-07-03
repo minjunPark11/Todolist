@@ -1,6 +1,6 @@
 import { useT } from "../../i18n";
 
-type CalendarMode = "month" | "week" | "day";
+type CalendarMode = "month" | "week" | "day" | "year";
 
 interface CalendarToolbarProps {
   mode: CalendarMode;
@@ -11,12 +11,15 @@ interface CalendarToolbarProps {
   onToday: () => void;
   onPrev: () => void;
   onNext: () => void;
+  aiDisabled: boolean;
+  onAiClick: () => void;
 }
 
 const MODES: Array<{ id: CalendarMode; labelKey: string }> = [
   { id: "day", labelKey: "calendar.day" },
   { id: "week", labelKey: "calendar.week" },
   { id: "month", labelKey: "calendar.month" },
+  { id: "year", labelKey: "calendar.yearMode" },
 ];
 
 export function CalendarToolbar({
@@ -28,6 +31,8 @@ export function CalendarToolbar({
   onToday,
   onPrev,
   onNext,
+  aiDisabled,
+  onAiClick,
 }: CalendarToolbarProps) {
   const { t } = useT();
   return (
@@ -56,15 +61,6 @@ export function CalendarToolbar({
         <h2 className="gcal-range-label">{rangeLabel}</h2>
       </div>
       <div className="gcal-toolbar-right">
-        <button type="button" className="gcal-icon-btn" aria-label={t("calendar.search")} disabled>
-          🔍
-        </button>
-        <button type="button" className="gcal-icon-btn" aria-label={t("calendar.help")} disabled>
-          ?
-        </button>
-        <button type="button" className="gcal-icon-btn" aria-label={t("calendar.settingsAria")} disabled>
-          ⚙
-        </button>
         <div className="gcal-modes">
           {MODES.map((option) => (
             <button
@@ -77,6 +73,21 @@ export function CalendarToolbar({
             </button>
           ))}
         </div>
+        <button type="button" className="gcal-icon-btn" aria-label={t("calendar.search")} disabled>
+          🔍
+        </button>
+        <button type="button" className="gcal-icon-btn" aria-label={t("calendar.settingsAria")} disabled>
+          ⚙
+        </button>
+        <button
+          type="button"
+          className="gcal-ai-btn"
+          onClick={onAiClick}
+          disabled={aiDisabled}
+          title={t("calendar.suggestSchedule")}
+        >
+          AI
+        </button>
       </div>
     </div>
   );

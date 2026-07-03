@@ -1,4 +1,4 @@
-import { DragEvent, PointerEvent as ReactPointerEvent, useMemo, useState } from "react";
+import { DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarItem } from "../../utils/calendarItems";
 import {
   clickDefaultRange,
@@ -6,6 +6,8 @@ import {
   minutesFromPointerY,
   minutesToTime,
   shouldStartTimeSelection,
+  snapDownToStep,
+  snapUpToStep,
   snappedDragRange,
   DAY_END,
   DAY_START,
@@ -14,6 +16,7 @@ import {
   type CalendarDraftBlock,
 } from "../../utils/calendarTime";
 import { getDayNumber, todayValue } from "../../utils/date";
+import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { useT } from "../../i18n";
 
 export { DAY_END, DAY_START, SLOT_HEIGHT };
@@ -29,6 +32,16 @@ interface LiveSelection {
   startClientY: number;
   startMinutes: number;
   currentMinutes: number;
+}
+
+// Spec §6.9: resize an event block from its top/bottom edge, 15-minute snap.
+interface LiveResize {
+  key: string;
+  sourceId: string;
+  day: string;
+  edge: "start" | "end";
+  startMin: number;
+  endMin: number;
 }
 
 function asDate(value: string) {
@@ -61,8 +74,9 @@ interface WeekViewProps {
   onDragHover: (day: string, startTime: string) => void;
   onDropTime: (event: DragEvent, day: string, startTime: string) => void;
   onDropAllDay: (event: DragEvent, day: string) => void;
-  onClickItem: (item: CalendarItem) => void;
+  onClickItem: (item: CalendarItem, anchor: PopoverAnchor) => void;
   onClickAllDaySlot: (day: string) => void;
+  onResizeItem: (sourceId: string, day: string, startTime: string, endTime: string) => void;
   draft: CalendarDraftBlock | null;
   dragPreview: {
     taskId: string;
@@ -80,7 +94,7 @@ interface WeekViewProps {
     title: string;
   }>;
   onSelectionStart: () => void;
-  onDraftCreate: (day: string, startTime: string, endTime: string) => void;
+  onDraftCreate: (day: string, startTime: string, endTime: string, anchor: PopoverAnchor) => void;
 }
 
 export function WeekView({
@@ -97,6 +111,7 @@ export function WeekView({
   onDropAllDay,
   onClickItem,
   onClickAllDaySlot,
+  onResizeItem,
   draft,
   dragPreview,
   draggingTaskTitle,
@@ -109,7 +124,22 @@ export function WeekView({
     () => new Intl.DateTimeFormat(lang === "ko" ? "ko" : "en", { weekday: "short" }),
     [lang],
   );
+  const longWeekdayFormatter = useMemo(
+    () => new Intl.DateTimeFormat(lang === "ko" ? "ko" : "en", { weekday: "long" }),
+    [lang],
+  );
+  const dayTitleFormatter = useMemo(
+    () => new Intl.DateTimeFormat(lang === "ko" ? "ko" : "en", { year: "numeric", month: "long", day: "numeric" }),
+    [lang],
+  );
   const [selection, setSelection] = useState<LiveSelection | null>(null);
+  const [resize, setResize] = useState<LiveResize | null>(null);
+  // Mirrors `resize` so the pointerup listener can read the final range
+  // without doing side effects inside a setState updater.
+  const resizeRef = useRef<LiveResize | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const suppressClickRef = useRef(false);
+  const isDay = days.length === 1;
 
   const today = todayValue();
   const now = new Date();
@@ -118,11 +148,22 @@ export function WeekView({
   const nowTop = topFor(nowMinutes);
   const nowLabel = timeLabelFormatter.format(now);
 
+  // Spec §6.4: rows are never compressed — the body scrolls instead, opening
+  // near the current time (or 08:00 when the view has no "today").
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const target = days.includes(today) ? Math.max(DAY_START * 60, nowMinutes - 60) : 8 * 60;
+    el.scrollTop = Math.max(0, topFor(target));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days.join(",")]);
+
   const hasAnyItemInView = items.some((item) => days.includes(item.date));
   const showEmptyHint = !hasAnyItemInView && !draft && !selection;
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>, day: string) {
     if (event.button !== 0) return;
+    if (resize) return;
     if (!shouldStartTimeSelection(event.target)) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const startMinutes = minutesFromPointerY(event.clientY, rect.top);
@@ -151,7 +192,7 @@ export function WeekView({
     setSelection((current) => (current ? { ...current, currentMinutes } : current));
   }
 
-  function finalizeSelection(sel: LiveSelection, movedPixels: number) {
+  function finalizeSelection(sel: LiveSelection, movedPixels: number, columnRect: DOMRect) {
     let startMin: number;
     let endMin: number;
     if (movedPixels <= 4) {
@@ -160,7 +201,13 @@ export function WeekView({
       ({ startMin, endMin } = snappedDragRange(sel.startMinutes, sel.currentMinutes));
     }
     if (endMin - startMin < TIME_SNAP_MINUTES) return;
-    onDraftCreate(sel.day, minutesToTime(startMin), minutesToTime(endMin));
+    const top = columnRect.top + topFor(startMin);
+    onDraftCreate(sel.day, minutesToTime(startMin), minutesToTime(endMin), {
+      left: columnRect.left,
+      right: columnRect.right,
+      top,
+      bottom: top + heightFor(startMin, endMin),
+    });
   }
 
   function releaseCaptureSafely(target: HTMLDivElement, pointerId: number) {
@@ -174,7 +221,7 @@ export function WeekView({
   function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
     if (!selection || event.pointerId !== selection.pointerId) return;
     releaseCaptureSafely(event.currentTarget, event.pointerId);
-    finalizeSelection(selection, Math.abs(event.clientY - selection.startClientY));
+    finalizeSelection(selection, Math.abs(event.clientY - selection.startClientY), event.currentTarget.getBoundingClientRect());
     setSelection(null);
   }
 
@@ -182,6 +229,55 @@ export function WeekView({
     if (!selection || event.pointerId !== selection.pointerId) return;
     releaseCaptureSafely(event.currentTarget, event.pointerId);
     setSelection(null);
+  }
+
+  function startResize(
+    event: ReactPointerEvent<HTMLElement>,
+    item: CalendarItem,
+    edge: "start" | "end",
+    startMin: number,
+    endMin: number,
+  ) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const column = (event.currentTarget as HTMLElement).closest(".gcal-time-col");
+    if (!column) return;
+    const state: LiveResize = { key: item.key, sourceId: item.sourceId, day: item.date, edge, startMin, endMin };
+    resizeRef.current = state;
+    setResize(state);
+
+    function onMove(move: PointerEvent) {
+      const rect = column!.getBoundingClientRect();
+      const minutes = clampMinutes(minutesFromPointerY(move.clientY, rect.top), DAY_START * 60, DAY_END * 60);
+      const current = resizeRef.current;
+      if (!current) return;
+      let next: LiveResize;
+      if (current.edge === "start") {
+        const value = Math.min(snapDownToStep(minutes), current.endMin - TIME_SNAP_MINUTES);
+        next = { ...current, startMin: Math.max(DAY_START * 60, value) };
+      } else {
+        const value = Math.max(snapUpToStep(minutes), current.startMin + TIME_SNAP_MINUTES);
+        next = { ...current, endMin: Math.min(DAY_END * 60, value) };
+      }
+      resizeRef.current = next;
+      setResize(next);
+    }
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      suppressClickRef.current = true;
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+      const current = resizeRef.current;
+      resizeRef.current = null;
+      setResize(null);
+      if (current) {
+        onResizeItem(current.sourceId, current.day, minutesToTime(current.startMin), minutesToTime(current.endMin));
+      }
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
   }
 
   function dragStartTimeFromEvent(event: DragEvent<HTMLDivElement>) {
@@ -196,212 +292,266 @@ export function WeekView({
   }
 
   return (
-    <div className={days.length === 1 ? "gcal-timegrid is-day" : "gcal-timegrid"}>
-      <div className="gcal-timegrid-head">
-        <div className="gcal-time-corner" />
-        {days.map((day) => {
-          const headClasses = ["gcal-col-head"];
-          if (day === today) headClasses.push("is-today");
-          else if (day === anchor) headClasses.push("is-selected");
-          return (
-            <div key={day} className={headClasses.join(" ")}>
-              <span className="gcal-col-weekday">{weekdayFormatter.format(asDate(day))}</span>
-              <span className="gcal-col-date">{getDayNumber(day)}</span>
-            </div>
-          );
-        })}
-      </div>
+    <div className={isDay ? "gcal-timegrid is-day" : "gcal-timegrid"}>
+      <div className="gcal-time-scroll" ref={scrollRef}>
+      <div className="gcal-timegrid-sticky">
+        {isDay ? (
+          <div className="gcal-day-title">
+            <strong>{dayTitleFormatter.format(asDate(days[0]))}</strong>
+            <span>{longWeekdayFormatter.format(asDate(days[0]))}</span>
+          </div>
+        ) : (
+          <div className="gcal-timegrid-head">
+            <div className="gcal-time-corner" />
+            {days.map((day) => {
+              const headClasses = ["gcal-col-head"];
+              if (day === today) headClasses.push("is-today");
+              else if (day === anchor) headClasses.push("is-selected");
+              return (
+                <div key={day} className={headClasses.join(" ")}>
+                  <span className="gcal-col-weekday">{weekdayFormatter.format(asDate(day))}</span>
+                  <span className="gcal-col-date">{getDayNumber(day)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-      <div className="gcal-allday-row">
-        <div className="gcal-time-corner small">{t("calendar.allDay")}</div>
-        {days.map((day) => {
-          const allDayItems = items.filter((item) => item.date === day && item.allDay);
-          const id = `allday:${day}`;
-          return (
-            <div
-              key={day}
-              className={dragOverId === id ? "gcal-allday-cell is-drop" : "gcal-allday-cell"}
-              onDragOver={onOverSlot(id)}
-              onDragLeave={onLeaveSlot(id)}
-              onDrop={(event) => onDropAllDay(event, day)}
-              onClick={(event) => {
-                if (event.target === event.currentTarget) onClickAllDaySlot(day);
-              }}
-            >
-              {allDayItems.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  data-calendar-interactive="true"
-                  className={`gcal-chip gcal-chip-${item.layer}${item.repeating ? " is-repeating" : ""}`}
-                  draggable={item.draggable}
-                  onDragStart={item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined}
-                  onDragEnd={item.draggable ? onDragEnd : undefined}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onClickItem(item);
-                  }}
-                  style={item.layer === "task" ? { borderLeftColor: item.color } : undefined}
-                >
-                  {item.layer === "deadline" ? "⚠ " : null}
-                  {item.layer === "study-review" ? "↻ " : null}
-                  {item.layer === "project-deadline" ? "◆ " : null}
-                  {item.repeating ? "↺ " : null}
-                  {item.title}
-                </button>
-              ))}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="gcal-timegrid-body" style={{ height: hours.length * SLOT_HEIGHT }}>
-        <div className="gcal-time-gutter">
-          {hours.map((hour) => (
-            <div key={hour} className="gcal-time-label" style={{ height: SLOT_HEIGHT }}>
-              {String(hour).padStart(2, "0")}:00
-            </div>
-          ))}
-        </div>
-        {showEmptyHint ? (
-          <div className="gcal-empty-hint">{t("calendar.dragToCreate")}</div>
-        ) : null}
-        {days.map((day) => {
-          const timedItems = items.filter((item) => item.date === day && !item.allDay);
-          const id = `col:${day}`;
-          const liveRange =
-            selection && selection.day === day
-              ? snappedDragRange(selection.startMinutes, selection.currentMinutes)
-              : null;
-          const draftHere = draft && draft.date === day ? draft : null;
-
-          return (
-            <div
-              key={day}
-              className={dragOverId === id ? "gcal-time-col is-drop" : "gcal-time-col"}
-              onDragOver={(event) => {
-                onOverSlot(id)(event);
-                onDragHover(day, dragStartTimeFromEvent(event));
-              }}
-              onDragLeave={onLeaveSlot(id)}
-              onDrop={(event) => onDropTime(event, day, dragStartTimeFromEvent(event))}
-              onPointerDown={(event) => handlePointerDown(event, day)}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerCancel}
-            >
-              {hours.map((hour) => (
-                <div key={hour} className="gcal-time-slot" style={{ height: SLOT_HEIGHT }} />
-              ))}
-              {day === today && showNowLine ? (
-                <div className="gcal-now-line" style={{ top: nowTop }}>
-                  <span className="gcal-now-time">{nowLabel}</span>
-                  <span className="gcal-now-dot" />
-                </div>
-              ) : null}
-              {liveRange ? (
-                <div
-                  className="gcal-selection-block"
-                  style={{ top: topFor(liveRange.startMin), height: heightFor(liveRange.startMin, liveRange.endMin) }}
-                >
-                  {minutesToTime(liveRange.startMin)}–{minutesToTime(liveRange.endMin)}
-                </div>
-              ) : null}
-              {draftHere ? (
-                <div
-                  data-calendar-interactive="true"
-                  className="gcal-draft-block"
-                  style={{
-                    top: topFor(timeToMinutesOrNull(draftHere.startTime) ?? 0),
-                    height: heightFor(
-                      timeToMinutesOrNull(draftHere.startTime) ?? 0,
-                      timeToMinutesOrNull(draftHere.endTime) ?? 0,
-                    ),
-                  }}
-                >
-                  <span className="gcal-draft-label">{t("calendar.newTask")}</span>
-                  <span className="gcal-draft-time">
-                    {draftHere.startTime}–{draftHere.endTime}
-                  </span>
-                </div>
-              ) : null}
-              {dragPreview && dragPreview.day === day ? (
-                <div
-                  className={dragPreview.isValid ? "gcal-drop-preview" : "gcal-drop-preview is-invalid"}
-                  style={{
-                    top: topFor(timeToMinutesOrNull(dragPreview.startTime) ?? DAY_START * 60),
-                    height: heightFor(
-                      timeToMinutesOrNull(dragPreview.startTime) ?? DAY_START * 60,
-                      timeToMinutesOrNull(dragPreview.endTime) ?? (DAY_START * 60 + 30),
-                    ),
-                  }}
-                >
-                  <span>{draggingTaskTitle || "Task"}</span>
-                  <small>
-                    {dragPreview.startTime}-{dragPreview.endTime}
-                  </small>
-                </div>
-              ) : null}
-              {aiPlacements
-                .filter((placement) => placement.day === day)
-                .map((placement) => (
-                  <div
-                    key={placement.taskId}
-                    className="gcal-ai-preview-block"
-                    style={{
-                      top: topFor(timeToMinutesOrNull(placement.startTime) ?? DAY_START * 60),
-                      height: heightFor(
-                        timeToMinutesOrNull(placement.startTime) ?? DAY_START * 60,
-                        timeToMinutesOrNull(placement.endTime) ?? (DAY_START * 60 + 30),
-                      ),
-                    }}
-                  >
-                    <span>AI</span>
-                    <strong>{placement.title}</strong>
-                  </div>
-                ))}
-              {/* §9.1 (D8): overlapping blocks simply stack with a small offset + border, no collision layout. */}
-              {timedItems.map((item, index) => {
-                const startMin = timeToMinutesOrNull(item.startTime ?? "");
-                if (startMin === null) return null;
-                const endMin = timeToMinutesOrNull(item.endTime ?? "") ?? startMin + 60;
-                const top = topFor(startMin);
-                const height = heightFor(startMin, endMin);
-                const offset = Math.min(index, 4) * 10;
-                return (
+        <div className="gcal-allday-row">
+          <div className="gcal-time-corner small">{t("calendar.allDay")}</div>
+          {days.map((day) => {
+            const allDayItems = items.filter((item) => item.date === day && item.allDay);
+            const id = `allday:${day}`;
+            return (
+              <div
+                key={day}
+                className={dragOverId === id ? "gcal-allday-cell is-drop" : "gcal-allday-cell"}
+                onDragOver={onOverSlot(id)}
+                onDragLeave={onLeaveSlot(id)}
+                onDrop={(event) => onDropAllDay(event, day)}
+                onClick={(event) => {
+                  if (event.target === event.currentTarget) onClickAllDaySlot(day);
+                }}
+              >
+                {allDayItems.map((item) => (
                   <button
                     key={item.key}
                     type="button"
                     data-calendar-interactive="true"
-                    className="gcal-time-block"
+                    className={`gcal-chip gcal-chip-${item.layer}${item.repeating ? " is-repeating" : ""}`}
                     draggable={item.draggable}
                     onDragStart={item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined}
                     onDragEnd={item.draggable ? onDragEnd : undefined}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onClickItem(item);
+                      onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
                     }}
+                    style={item.layer === "task" ? { borderLeftColor: item.color } : undefined}
+                  >
+                    {item.layer === "deadline" ? "⚠ " : null}
+                    {item.layer === "study-review" ? "↻ " : null}
+                    {item.layer === "project-deadline" ? "◆ " : null}
+                    {item.repeating ? "↺ " : null}
+                    {item.title}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+        <div className="gcal-timegrid-body" style={{ height: hours.length * SLOT_HEIGHT }}>
+          <div className="gcal-time-gutter">
+            {hours.map((hour) => (
+              <div key={hour} className="gcal-time-label" style={{ height: SLOT_HEIGHT }}>
+                {String(hour).padStart(2, "0")}:00
+              </div>
+            ))}
+          </div>
+          {showEmptyHint ? (
+            <div className="gcal-empty-hint">{t("calendar.dragToCreate")}</div>
+          ) : null}
+          {days.map((day) => {
+            const timedItems = items.filter((item) => item.date === day && !item.allDay);
+            const id = `col:${day}`;
+            const liveRange =
+              selection && selection.day === day
+                ? snappedDragRange(selection.startMinutes, selection.currentMinutes)
+                : null;
+            const draftHere = draft && draft.date === day ? draft : null;
+            const weekend = asDate(day).getDay() === 0 || asDate(day).getDay() === 6;
+
+            return (
+              <div
+                key={day}
+                className={[
+                  "gcal-time-col",
+                  dragOverId === id ? "is-drop" : "",
+                  weekend && !isDay ? "is-weekend" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onDragOver={(event) => {
+                  onOverSlot(id)(event);
+                  onDragHover(day, dragStartTimeFromEvent(event));
+                }}
+                onDragLeave={onLeaveSlot(id)}
+                onDrop={(event) => onDropTime(event, day, dragStartTimeFromEvent(event))}
+                onPointerDown={(event) => handlePointerDown(event, day)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
+              >
+                {hours.map((hour) => (
+                  <div key={hour} className="gcal-time-slot" style={{ height: SLOT_HEIGHT }}>
+                    <div className="gcal-time-slot-half" />
+                  </div>
+                ))}
+                {day === today && showNowLine ? (
+                  <div className="gcal-now-line" style={{ top: nowTop }}>
+                    <span className="gcal-now-time">{nowLabel}</span>
+                    <span className="gcal-now-dot" />
+                  </div>
+                ) : null}
+                {liveRange ? (
+                  <div
+                    className="gcal-selection-block"
+                    style={{ top: topFor(liveRange.startMin), height: heightFor(liveRange.startMin, liveRange.endMin) }}
+                  >
+                    {minutesToTime(liveRange.startMin)}–{minutesToTime(liveRange.endMin)}
+                  </div>
+                ) : null}
+                {draftHere ? (
+                  <div
+                    data-calendar-interactive="true"
+                    className="gcal-draft-block"
                     style={{
-                      top,
-                      height,
-                      left: `${offset}%`,
-                      width: `${100 - offset}%`,
-                      zIndex: 10 + index,
-                      borderLeft: `3px solid ${item.color}`,
-                      background: `${item.color}22`,
+                      top: topFor(timeToMinutesOrNull(draftHere.startTime) ?? 0),
+                      height: heightFor(
+                        timeToMinutesOrNull(draftHere.startTime) ?? 0,
+                        timeToMinutesOrNull(draftHere.endTime) ?? 0,
+                      ),
                     }}
                   >
-                    <span className="gcal-tb-time">{item.startTime}</span>
-                    <span className="gcal-tb-title">
-                      {item.repeating ? "↺ " : null}
-                      {item.title}
+                    <span className="gcal-draft-label">{t("calendar.newTask")}</span>
+                    <span className="gcal-draft-time">
+                      {draftHere.startTime}–{draftHere.endTime}
                     </span>
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })}
+                  </div>
+                ) : null}
+                {dragPreview && dragPreview.day === day ? (
+                  <div
+                    className={dragPreview.isValid ? "gcal-drop-preview" : "gcal-drop-preview is-invalid"}
+                    style={{
+                      top: topFor(timeToMinutesOrNull(dragPreview.startTime) ?? DAY_START * 60),
+                      height: heightFor(
+                        timeToMinutesOrNull(dragPreview.startTime) ?? DAY_START * 60,
+                        timeToMinutesOrNull(dragPreview.endTime) ?? (DAY_START * 60 + 30),
+                      ),
+                    }}
+                  >
+                    <span>{draggingTaskTitle || "Task"}</span>
+                    <small>
+                      {dragPreview.startTime}-{dragPreview.endTime}
+                    </small>
+                  </div>
+                ) : null}
+                {aiPlacements
+                  .filter((placement) => placement.day === day)
+                  .map((placement) => (
+                    <div
+                      key={placement.taskId}
+                      className="gcal-ai-preview-block"
+                      style={{
+                        top: topFor(timeToMinutesOrNull(placement.startTime) ?? DAY_START * 60),
+                        height: heightFor(
+                          timeToMinutesOrNull(placement.startTime) ?? DAY_START * 60,
+                          timeToMinutesOrNull(placement.endTime) ?? (DAY_START * 60 + 30),
+                        ),
+                      }}
+                    >
+                      <span>AI</span>
+                      <strong>{placement.title}</strong>
+                    </div>
+                  ))}
+                {/* §9.1 (D8): overlapping blocks simply stack with a small offset + border, no collision layout. */}
+                {timedItems.map((item, index) => {
+                  let startMin = timeToMinutesOrNull(item.startTime ?? "");
+                  if (startMin === null) return null;
+                  let endMin = timeToMinutesOrNull(item.endTime ?? "") ?? startMin + 60;
+                  if (endMin <= DAY_START * 60) return null;
+                  if (resize && resize.key === item.key) {
+                    startMin = resize.startMin;
+                    endMin = resize.endMin;
+                  }
+                  const top = topFor(Math.max(startMin, DAY_START * 60));
+                  const height = heightFor(Math.max(startMin, DAY_START * 60), endMin);
+                  const offset = Math.min(index, 4) * 10;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      data-calendar-interactive="true"
+                      className={resize?.key === item.key ? "gcal-time-block is-resizing" : "gcal-time-block"}
+                      draggable={item.draggable && !resize}
+                      onDragStart={item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined}
+                      onDragEnd={item.draggable ? onDragEnd : undefined}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (suppressClickRef.current) return;
+                        onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
+                      }}
+                      style={{
+                        top,
+                        height,
+                        left: `${offset}%`,
+                        width: `${100 - offset}%`,
+                        zIndex: 10 + index,
+                        borderLeft: `3px solid ${item.color}`,
+                        background: `${item.color}22`,
+                      }}
+                    >
+                      <span className="gcal-tb-title">
+                        {item.repeating ? "↺ " : null}
+                        {item.title}
+                      </span>
+                      <span className="gcal-tb-time">
+                        {resize?.key === item.key
+                          ? `${minutesToTime(startMin)} – ${minutesToTime(endMin)}`
+                          : `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`}
+                      </span>
+                      {item.draggable ? (
+                        <>
+                          <span
+                            role="presentation"
+                            className="gcal-resize-handle is-start"
+                            data-calendar-interactive="true"
+                            onPointerDown={(event) => startResize(event, item, "start", startMin, endMin)}
+                            onDragStart={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                            }}
+                          />
+                          <span
+                            role="presentation"
+                            className="gcal-resize-handle is-end"
+                            data-calendar-interactive="true"
+                            onPointerDown={(event) => startResize(event, item, "end", startMin, endMin)}
+                            onDragStart={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                            }}
+                          />
+                        </>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

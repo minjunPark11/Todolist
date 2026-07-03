@@ -1,12 +1,14 @@
 import { DragEvent } from "react";
 import type { CalendarItem } from "../../utils/calendarItems";
 import { getDayNumber, getMonthGrid, todayValue, type CalendarCell } from "../../utils/date";
+import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { useT } from "../../i18n";
 
 // Sunday-first order preserved to match the date grid logic (getMonthGrid).
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_KO = ["일", "월", "화", "수", "목", "금", "토"];
-const CHIP_CAP = 3;
+// Spec §5.5: 128px cells fit at most 5 compact 18px chips before "+N".
+const CHIP_CAP = 5;
 
 function layerPrefix(layer: CalendarItem["layer"]) {
   if (layer === "deadline") return "⚠ ";
@@ -23,8 +25,10 @@ interface MonthViewProps {
   onOverCell: (id: string) => (event: DragEvent) => void;
   onLeaveCell: (id: string) => () => void;
   onDropCell: (event: DragEvent, date: string) => void;
-  onClickItem: (item: CalendarItem) => void;
+  onClickItem: (item: CalendarItem, anchor: PopoverAnchor) => void;
   onClickCell: (date: string) => void;
+  onOpenDay: (date: string) => void;
+  onShowAgenda: (date: string, anchor: PopoverAnchor) => void;
 }
 
 export function MonthView({
@@ -37,6 +41,8 @@ export function MonthView({
   onDropCell,
   onClickItem,
   onClickCell,
+  onOpenDay,
+  onShowAgenda,
 }: MonthViewProps) {
   const { t, lang } = useT();
   const weekdays = lang === "ko" ? WEEKDAYS_KO : WEEKDAYS_EN;
@@ -61,7 +67,11 @@ export function MonthView({
         onDragLeave={onLeaveCell(cell.date)}
         onDrop={(event) => onDropCell(event, cell.date)}
         onClick={(event) => {
+          // Spec §5.6: click selects the date, double-click opens the day view.
           if (event.target === event.currentTarget) onClickCell(cell.date);
+        }}
+        onDoubleClick={(event) => {
+          if (event.target === event.currentTarget) onOpenDay(cell.date);
         }}
       >
         <span className="gcal-month-date">{getDayNumber(cell.date)}</span>
@@ -75,7 +85,7 @@ export function MonthView({
               onDragStart={item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined}
               onClick={(event) => {
                 event.stopPropagation();
-                onClickItem(item);
+                onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
               }}
               style={item.layer === "task" ? { borderLeftColor: item.color } : undefined}
             >
@@ -85,7 +95,16 @@ export function MonthView({
             </button>
           ))}
           {dayItems.length > CHIP_CAP ? (
-            <span className="gcal-month-more">{t("calendar.moreCount", { n: dayItems.length - CHIP_CAP })}</span>
+            <button
+              type="button"
+              className="gcal-month-more"
+              onClick={(event) => {
+                event.stopPropagation();
+                onShowAgenda(cell.date, anchorFromRect(event.currentTarget.getBoundingClientRect()));
+              }}
+            >
+              {t("calendar.moreCount", { n: dayItems.length - CHIP_CAP })}
+            </button>
           ) : null}
         </div>
       </div>
