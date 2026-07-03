@@ -183,6 +183,12 @@ export function WeekView({
   const hasAnyItemInView = items.some((item) => days.includes(item.date));
   const showEmptyHint = !hasAnyItemInView && !draft && !selection;
 
+  // Now-indicator geometry: one grid-wide overlay (badge in the time gutter,
+  // muted line across all days, solid segment + dot over today's column).
+  const todayIndex = days.indexOf(today);
+  const nowTodayLeft = `calc(56px + (100% - 56px) * ${todayIndex} / ${days.length})`;
+  const nowTodayWidth = `calc((100% - 56px) / ${days.length})`;
+
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>, day: string) {
     if (event.button !== 0) return;
     if (resize || move) return;
@@ -487,10 +493,20 @@ export function WeekView({
           <div className="gcal-time-gutter">
             {hours.map((hour) => (
               <div key={hour} className="gcal-time-label" style={{ height: SLOT_HEIGHT }}>
-                {String(hour).padStart(2, "0")}:00
+                {/* The now badge replaces the nearest hour label instead of overlapping it. */}
+                {showNowLine && Math.abs(nowMinutes - hour * 60) < 15 ? "" : `${String(hour).padStart(2, "0")}:00`}
               </div>
             ))}
           </div>
+          {showNowLine ? (
+            <div className="gcal-now-indicator" style={{ top: nowTop }}>
+              <span className="gcal-now-badge">
+                <span>{nowLabel}</span>
+              </span>
+              <span className="gcal-now-track" />
+              <span className="gcal-now-today-line" style={{ left: nowTodayLeft, width: nowTodayWidth }} />
+            </div>
+          ) : null}
           {showEmptyHint ? (
             <div className="gcal-empty-hint">{t("calendar.dragToCreate")}</div>
           ) : null}
@@ -530,12 +546,6 @@ export function WeekView({
                     <div className="gcal-time-slot-half" />
                   </div>
                 ))}
-                {day === today && showNowLine ? (
-                  <div className="gcal-now-line" style={{ top: nowTop }}>
-                    <span className="gcal-now-time">{nowLabel}</span>
-                    <span className="gcal-now-dot" />
-                  </div>
-                ) : null}
                 {liveRange ? (
                   <div
                     className="gcal-selection-block"

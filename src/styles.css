@@ -2293,34 +2293,70 @@ textarea {
   white-space: nowrap;
 }
 
-.gcal-now-line {
+/* Current-time indicator: one grid-wide overlay. Softer red than --danger;
+   badge sits in the time gutter on the same line, muted track spans every
+   day, and only today's column gets the solid segment + dot. */
+.gcal-timegrid {
+  --calendar-now-color: #e06055;
+  --calendar-now-line-muted: rgba(224, 96, 85, 0.3);
+}
+
+.gcal-now-indicator {
   position: absolute;
   left: 0;
   right: 0;
   height: 0;
-  border-top: 1.5px solid var(--danger);
   z-index: 20;
+  pointer-events: none;
 }
 
-.gcal-now-dot {
+.gcal-now-badge {
   position: absolute;
-  left: -4px;
-  top: -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--danger);
+  left: 0;
+  top: 0;
+  width: 56px;
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 4px;
+  transform: translateY(-50%);
+  box-sizing: border-box;
 }
 
-.gcal-now-time {
-  position: absolute;
-  left: 4px;
-  top: -16px;
+.gcal-now-badge span {
+  background: var(--calendar-now-color);
+  color: #fff;
   font-size: 0.66rem;
   font-weight: 600;
-  color: var(--danger);
-  background: var(--color-canvas);
-  padding: 0 3px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--rounded-pill);
+}
+
+.gcal-now-track {
+  position: absolute;
+  left: 56px;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: var(--calendar-now-line-muted);
+}
+
+.gcal-now-today-line {
+  position: absolute;
+  top: -0.5px;
+  height: 2px;
+  background: var(--calendar-now-color);
+}
+
+.gcal-now-today-line::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -2.5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--calendar-now-color);
 }
 
 /* Right panel (V3 §1: replaces the old backlog aside + global TaskDetail split) */
