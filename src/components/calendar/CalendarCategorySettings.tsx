@@ -1,13 +1,13 @@
 // Settings > 캘린더 > 카테고리 관리 (category spec §4–§9).
 // Personal categories are fully managed here; study / project / external
 // categories are derived from topics, projects, and calendar subscriptions,
-// so they are listed read-only with a pointer to where they are managed.
-import { useState } from "react";
+// so they are only mentioned in the footnote below the list.
+import { useEffect, useState, type DragEvent } from "react";
 import type { Task } from "../../types";
 import {
   addPersonalCategory,
   deletePersonalCategory,
-  movePersonalCategory,
+  movePersonalCategoryTo,
   setDefaultCategory,
   updatePersonalCategory,
   useCalendarCategoryState,
@@ -21,17 +21,24 @@ interface CalendarCategorySettingsProps {
 
 const CATEGORY_COLORS = ["#0066cc", "#34c759", "#ff2d55", "#ff9500", "#af52de", "#5856d6", "#00b8a9", "#8e8e93"];
 
+type EditorState = {
+  mode: "add" | "edit";
+  categoryId: string;
+  name: string;
+  color: string;
+  error: string;
+};
+
 export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCategorySettingsProps) {
   const state = useCalendarCategoryState();
   const categories = [...state.personal].sort((a, b) => a.order - b.order);
 
-  const [draftName, setDraftName] = useState("");
-  const [draftColor, setDraftColor] = useState(CATEGORY_COLORS[1]);
-  const [addError, setAddError] = useState("");
-  const [editingId, setEditingId] = useState("");
-  const [editingName, setEditingName] = useState("");
+  const [editor, setEditor] = useState<EditorState | null>(null);
+  const [openMenuId, setOpenMenuId] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState("");
   const [moveTargetId, setMoveTargetId] = useState("");
+  const [dragId, setDragId] = useState("");
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const pendingDelete = categories.find((category) => category.id === pendingDeleteId);
   // Events keep working without a rewrite (display falls back to the default
@@ -40,26 +47,45 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
     ? tasks.filter((task) => task.categoryId === pendingDelete.id && task.status !== "archived" && !task.deletedAt).length
     : 0;
 
-  function submitAdd() {
-    const name = draftName.trim();
-    if (!name) {
-      setAddError("카테고리 이름을 입력하세요.");
-      return;
+  useEffect(() => {
+    if (!openMenuId) return;
+    function handlePointerDown(event: globalThis.PointerEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".ff-cat-menu-wrap")) return;
+      setOpenMenuId("");
     }
-    if (categories.some((category) => category.name.trim().toLowerCase() === name.toLowerCase())) {
-      setAddError("같은 이름의 카테고리가 이미 있어요.");
-      return;
-    }
-    addPersonalCategory(name, draftColor);
-    setDraftName("");
-    setAddError("");
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [openMenuId]);
+
+  function openAdd() {
+    setEditor({ mode: "add", categoryId: "", name: "", color: CATEGORY_COLORS[1], error: "" });
   }
 
-  function commitRename(categoryId: string) {
-    const name = editingName.trim();
-    if (name) updatePersonalCategory(categoryId, { name });
-    setEditingId("");
-    setEditingName("");
+  function openEdit(categoryId: string) {
+    const category = categories.find((item) => item.id === categoryId);
+    if (!category) return;
+    setOpenMenuId("");
+    setEditor({ mode: "edit", categoryId, name: category.name, color: category.color, error: "" });
+  }
+
+  function submitEditor() {
+    if (!editor) return;
+    const name = editor.name.trim();
+    if (!name) {
+      setEditor({ ...editor, error: "카테고리 이름을 입력하세요." });
+      return;
+    }
+    const duplicated = categories.some(
+      (category) => category.id !== editor.categoryId && category.name.trim().toLowerCase() === name.toLowerCase(),
+    );
+    if (duplicated) {
+      setEditor({ ...editor, error: "같은 이름의 카테고리가 이미 있어요." });
+      return;
+    }
+    if (editor.mode === "add") addPersonalCategory(name, editor.color);
+    else updatePersonalCategory(editor.categoryId, { name, color: editor.color });
+    setEditor(null);
   }
 
   function confirmDelete() {
@@ -75,143 +101,178 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
     setMoveTargetId("");
   }
 
+  function handleDrop(event: DragEvent, index: number) {
+    // dataTransfer is the source of truth; dragId state may lag a render behind.
+    const sourceId = event.dataTransfer.getData("text/plain") || dragId;
+    if (sourceId) movePersonalCategoryTo(sourceId, index);
+    setDragId("");
+    setDragOverIndex(null);
+  }
+
   return (
-    <div className="ff-cat-settings">
-      <div className="ff-cat-settings-head">
-        <div>
+    <>
+      <div className="ff-cal-card-head">
+        <span className="ff-cal-card-icon" aria-hidden="true">
+          <FolderIcon />
+        </span>
+        <div className="ff-cal-card-text">
           <strong>카테고리 관리</strong>
-          <small>캘린더 카테고리를 추가하고 이름, 색상, 순서, 기본 카테고리를 관리하세요.</small>
+          <small>일정 분류와 색상을 관리합니다.</small>
+        </div>
+        <div className="ff-cal-card-actions">
+          <button type="button" className="ff-btn ff-cal-btn-outline" onClick={openAdd}>
+            + 새 카테고리
+          </button>
         </div>
       </div>
 
-      <div className="ff-cat-list">
+      <div className="ff-cat-list" role="list">
         {categories.map((category, index) => (
-          <div key={category.id} className="ff-cat-row">
-            <input
-              type="color"
-              value={category.color}
-              aria-label={`${category.name} 색상`}
-              onChange={(event) => updatePersonalCategory(category.id, { color: event.target.value })}
-            />
-            {editingId === category.id ? (
-              <input
-                className="ff-cat-name-input"
-                value={editingName}
-                autoFocus
-                onChange={(event) => setEditingName(event.target.value)}
-                onBlur={() => commitRename(category.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") commitRename(category.id);
-                  if (event.key === "Escape") {
-                    setEditingId("");
-                    setEditingName("");
-                  }
-                }}
-              />
-            ) : (
-              <span className="ff-cat-name">
-                {category.name}
-                {category.id === state.defaultCategoryId ? <em className="ff-cat-default-badge">기본</em> : null}
-              </span>
-            )}
-            <div className="ff-cat-actions">
+          <div
+            key={category.id}
+            role="listitem"
+            className={[
+              "ff-cat-row",
+              dragId === category.id ? "dragging" : "",
+              dragOverIndex === index && dragId && dragId !== category.id ? "drag-over" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            draggable
+            onDragStart={(event) => {
+              setDragId(category.id);
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", category.id);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              if (dragOverIndex !== index) setDragOverIndex(index);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              handleDrop(event, index);
+            }}
+            onDragEnd={() => {
+              setDragId("");
+              setDragOverIndex(null);
+            }}
+          >
+            <span className="ff-cat-drag-handle" aria-label={`${category.name} 순서 이동`} title="드래그해서 순서 변경">
+              <DragHandleIcon />
+            </span>
+            <span className="ff-cat-color-chip" style={{ background: category.color }} aria-hidden="true" />
+            <span className="ff-cat-name">
+              {category.name}
+              {category.id === state.defaultCategoryId ? <em className="ff-cat-default-badge">기본</em> : null}
+            </span>
+            <div className="ff-cat-menu-wrap">
               <button
                 type="button"
-                className="ff-btn"
-                aria-label={`${category.name} 이름 변경`}
-                onClick={() => {
-                  setEditingId(category.id);
-                  setEditingName(category.name);
-                }}
+                className="ff-btn ff-btn-ghost ff-cat-menu-btn"
+                aria-label={`${category.name} 메뉴`}
+                aria-expanded={openMenuId === category.id}
+                onClick={() => setOpenMenuId(openMenuId === category.id ? "" : category.id)}
               >
-                ✎
+                ⋯
               </button>
-              <button
-                type="button"
-                className="ff-btn"
-                aria-label={`${category.name} 위로`}
-                disabled={index === 0}
-                onClick={() => movePersonalCategory(category.id, -1)}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className="ff-btn"
-                aria-label={`${category.name} 아래로`}
-                disabled={index === categories.length - 1}
-                onClick={() => movePersonalCategory(category.id, 1)}
-              >
-                ↓
-              </button>
-              <button
-                type="button"
-                className="ff-btn ff-btn-danger"
-                aria-label={`${category.name} 삭제`}
-                disabled={category.id === state.defaultCategoryId}
-                title={category.id === state.defaultCategoryId ? "기본 카테고리는 삭제할 수 없습니다. 먼저 기본 카테고리를 변경하세요." : undefined}
-                onClick={() => {
-                  setPendingDeleteId(category.id);
-                  setMoveTargetId(state.defaultCategoryId);
-                }}
-              >
-                🗑
-              </button>
+              {openMenuId === category.id ? (
+                <div className="ff-cat-menu" role="menu">
+                  <button type="button" role="menuitem" onClick={() => openEdit(category.id)}>
+                    이름 · 색상 변경
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={category.id === state.defaultCategoryId}
+                    onClick={() => {
+                      setDefaultCategory(category.id);
+                      setOpenMenuId("");
+                    }}
+                  >
+                    기본 카테고리로 설정
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="danger"
+                    disabled={category.id === state.defaultCategoryId}
+                    title={category.id === state.defaultCategoryId ? "기본 카테고리는 삭제할 수 없습니다." : undefined}
+                    onClick={() => {
+                      setOpenMenuId("");
+                      setPendingDeleteId(category.id);
+                      setMoveTargetId(state.defaultCategoryId);
+                    }}
+                  >
+                    삭제
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         ))}
       </div>
 
-      <div className="ff-cat-add-form">
-        <input
-          value={draftName}
-          placeholder="새 카테고리 이름"
-          onChange={(event) => {
-            setDraftName(event.target.value);
-            setAddError("");
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") submitAdd();
-          }}
-        />
-        <div className="ff-cat-color-palette" role="radiogroup" aria-label="카테고리 색상">
-          {CATEGORY_COLORS.map((color) => (
-            <button
-              key={color}
-              type="button"
-              role="radio"
-              aria-checked={draftColor === color}
-              className={draftColor === color ? "ff-cat-color-swatch active" : "ff-cat-color-swatch"}
-              style={{ background: color }}
-              aria-label={color}
-              onClick={() => setDraftColor(color)}
-            />
-          ))}
-        </div>
-        <button type="button" className="ff-btn" onClick={submitAdd}>
-          + 카테고리 추가
-        </button>
-      </div>
-      {addError ? <p className="ff-settings-error">{addError}</p> : null}
-
-      <div className="ff-cat-default-row">
-        <div>
-          <strong>기본 카테고리</strong>
-          <small>새 이벤트를 생성할 때 기본으로 선택되는 카테고리입니다.</small>
-        </div>
-        <select value={state.defaultCategoryId} onChange={(event) => setDefaultCategory(event.target.value)}>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <p className="ff-settings-msg">
-        학습 · 프로젝트 카테고리는 학습 주제와 공간(프로젝트)에서 자동으로 만들어집니다. 이름과 색상은 각 페이지에서
-        변경하세요. 외부 캘린더는 아래 외부 캘린더 섹션에서 관리합니다.
+      <p className="ff-cat-footnote">
+        <InfoIcon /> 학습/프로젝트 카테고리는 각 페이지에서 자동 생성됩니다.
       </p>
+
+      {editor ? (
+        <Modal
+          title={editor.mode === "add" ? "새 카테고리" : "카테고리 수정"}
+          onClose={() => setEditor(null)}
+          footer={
+            <>
+              <button type="button" className="ff-btn" onClick={() => setEditor(null)}>
+                취소
+              </button>
+              <button type="button" className="ff-btn ff-btn-primary" onClick={submitEditor}>
+                {editor.mode === "add" ? "추가" : "저장"}
+              </button>
+            </>
+          }
+        >
+          <div className="ff-cat-editor">
+            <label className="ff-cat-editor-field">
+              이름
+              <input
+                value={editor.name}
+                autoFocus
+                placeholder="카테고리 이름"
+                onChange={(event) => setEditor({ ...editor, name: event.target.value, error: "" })}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") submitEditor();
+                }}
+              />
+            </label>
+            <div className="ff-cat-editor-field">
+              색상
+              <div className="ff-cat-color-palette" role="radiogroup" aria-label="카테고리 색상">
+                {CATEGORY_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    role="radio"
+                    aria-checked={editor.color === color}
+                    className={editor.color === color ? "ff-cat-color-swatch active" : "ff-cat-color-swatch"}
+                    style={{ background: color }}
+                    aria-label={color}
+                    onClick={() => setEditor({ ...editor, color })}
+                  />
+                ))}
+                <input
+                  type="color"
+                  className="ff-cat-color-custom"
+                  value={editor.color}
+                  aria-label="직접 색상 선택"
+                  onChange={(event) => setEditor({ ...editor, color: event.target.value })}
+                />
+              </div>
+            </div>
+            {editor.error ? <p className="ff-settings-error">{editor.error}</p> : null}
+          </div>
+        </Modal>
+      ) : null}
 
       {pendingDelete ? (
         <Modal
@@ -260,6 +321,36 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
           )}
         </Modal>
       ) : null}
-    </div>
+    </>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <path d="M4 7a2 2 0 012-2h3.2a2 2 0 011.6.8l.9 1.2H18a2 2 0 012 2V17a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
+    </svg>
+  );
+}
+
+function DragHandleIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <circle cx="9" cy="6" r="1.2" />
+      <circle cx="15" cy="6" r="1.2" />
+      <circle cx="9" cy="12" r="1.2" />
+      <circle cx="15" cy="12" r="1.2" />
+      <circle cx="9" cy="18" r="1.2" />
+      <circle cx="15" cy="18" r="1.2" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="ff-cat-footnote-icon">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </svg>
   );
 }

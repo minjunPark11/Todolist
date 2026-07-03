@@ -119,6 +119,29 @@ function priorityLabel(t: TFn, priority: AiPriority) {
   return t(`spaces.priority.${priority.toLowerCase()}`);
 }
 
+// Locally created spaces (study/custom) have no planner-side record, so they
+// persist in their own localStorage bucket alongside local pin state.
+const LOCAL_SPACES_KEY = "todo-planner-local-spaces-v1";
+
+interface LocalSpacesStore {
+  spaces: Space[];
+  pinnedIds: string[];
+}
+
+function loadLocalSpacesStore(): LocalSpacesStore {
+  try {
+    const raw = localStorage.getItem(LOCAL_SPACES_KEY);
+    if (!raw) return { spaces: [], pinnedIds: [] };
+    const parsed = JSON.parse(raw) as Partial<LocalSpacesStore>;
+    return {
+      spaces: Array.isArray(parsed.spaces) ? parsed.spaces : [],
+      pinnedIds: Array.isArray(parsed.pinnedIds) ? parsed.pinnedIds : [],
+    };
+  } catch {
+    return { spaces: [], pinnedIds: [] };
+  }
+}
+
 const emptyDraft: AddSpaceDraft = {
   type: null,
   name: "",
@@ -162,7 +185,7 @@ export function SpacesPage({
   const { t } = useT();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
-  const [localSpaces, setLocalSpaces] = useState<Space[]>([]);
+  const [localSpaces, setLocalSpaces] = useState<Space[]>(() => loadLocalSpacesStore().spaces);
   const [selectedSpaceId, setSelectedSpaceId] = useState("");
   const [highlightSignalId, setHighlightSignalId] = useState("");
   const [analysisState, setAnalysisState] = useState<"empty" | "loading" | "success" | "insufficient" | "error">("empty");
@@ -176,7 +199,7 @@ export function SpacesPage({
   const [formError, setFormError] = useState("");
   const [openMenuSpaceId, setOpenMenuSpaceId] = useState("");
   const [pendingDeleteSpaceId, setPendingDeleteSpaceId] = useState("");
-  const [localPinnedSpaceIds, setLocalPinnedSpaceIds] = useState<string[]>([]);
+  const [localPinnedSpaceIds, setLocalPinnedSpaceIds] = useState<string[]>(() => loadLocalSpacesStore().pinnedIds);
   const [pendingRenameSpaceId, setPendingRenameSpaceId] = useState("");
   const [renameDraft, setRenameDraft] = useState("");
   const [renameError, setRenameError] = useState("");
@@ -205,6 +228,23 @@ export function SpacesPage({
         .includes(normalizedQuery);
     })
     .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_SPACES_KEY, JSON.stringify({ spaces: localSpaces, pinnedIds: localPinnedSpaceIds }));
+    } catch {
+      // localStorage full/unavailable: keep in-memory state working.
+    }
+  }, [localSpaces, localPinnedSpaceIds]);
+
+  useEffect(() => {
+    function resetLocalSpaces() {
+      setLocalSpaces([]);
+      setLocalPinnedSpaceIds([]);
+    }
+    window.addEventListener("focusflow:space-hub-reset", resetLocalSpaces);
+    return () => window.removeEventListener("focusflow:space-hub-reset", resetLocalSpaces);
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(event: globalThis.KeyboardEvent) {
@@ -383,7 +423,6 @@ export function SpacesPage({
     window.setTimeout(() => {
       try {
         const space = createSpaceFromDraft(draft, t);
-        let nextSpace = space;
         if (space.type === "project") {
           const projectId = onCreateProject({
             name: space.name,
@@ -393,12 +432,17 @@ export function SpacesPage({
             dueDate: draft.deadline,
           });
           if (projectId) {
-            nextSpace = { ...space, sourceRef: "project", sourceId: projectId };
+            // The planner project persists this space; a local copy would
+            // render as a duplicate card next to the derived one.
+            setSelectedSpaceId(`project-space-${projectId}`);
+            showToast({ message: t("spaces.add.created", { name: space.name }) });
+            resetAdd();
+            return;
           }
         }
-        setLocalSpaces((current) => [nextSpace, ...current]);
-        setSelectedSpaceId(nextSpace.id);
-        showToast({ message: t("spaces.add.created", { name: nextSpace.name }) });
+        setLocalSpaces((current) => [space, ...current]);
+        setSelectedSpaceId(space.id);
+        showToast({ message: t("spaces.add.created", { name: space.name }) });
         resetAdd();
       } catch {
         setFormError(t("spaces.add.createError"));

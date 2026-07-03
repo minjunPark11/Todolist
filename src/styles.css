@@ -10907,120 +10907,287 @@ div.spc-signal-row {
   white-space: nowrap;
 }
 
-/* Settings > 캘린더 > 카테고리 관리 */
-.ff-cat-settings {
+/* Settings > 캘린더 (card layout) */
+.ff-cal-settings-stack {
   display: grid;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--color-divider-soft);
+  gap: 16px;
 }
 
-.ff-cat-settings-head strong {
-  display: block;
+.ff-cal-card {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
 }
 
-.ff-cat-settings-head small {
-  color: var(--color-ink-muted-48, #8e8e93);
+.ff-cal-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
+.ff-cal-card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--accent-soft, #eaf3ff);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ff-cal-card-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ff-cal-card-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ff-cal-card-text strong {
+  font-size: 15px;
+}
+
+.ff-cal-card-text small {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.ff-cal-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.ff-btn.ff-cal-btn-outline {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-surface);
+}
+
+.ff-btn.ff-cal-btn-outline:hover {
+  background: var(--accent-soft, #eaf3ff);
+}
+
+.ff-cal-chip {
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ff-cal-chip.on {
+  color: var(--accent);
+  background: var(--accent-soft, #eaf3ff);
+  border-color: transparent;
+}
+
+.ff-cal-card-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.ff-calendar-share-actions .ff-cal-card-note {
+  margin-right: auto;
+  align-self: center;
+}
+
+/* 카테고리 관리 */
 .ff-cat-list {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .ff-cat-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border: 1px solid var(--color-divider-soft);
-  border-radius: 10px;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
 }
 
-.ff-cat-row input[type="color"] {
-  width: 26px;
-  height: 26px;
-  border: none;
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
+.ff-cat-row.dragging {
+  opacity: 0.45;
+}
+
+.ff-cat-row.drag-over {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.ff-cat-drag-handle {
+  display: inline-flex;
+  color: var(--text-tertiary);
+  cursor: grab;
+}
+
+.ff-cat-drag-handle svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.ff-cat-color-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
 }
 
 .ff-cat-name {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.9rem;
-}
-
-.ff-cat-name-input {
-  flex: 1;
-  font-size: 0.9rem;
-  padding: 4px 8px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .ff-cat-default-badge {
   font-style: normal;
-  font-size: 0.65rem;
-  padding: 1px 7px;
-  border-radius: var(--rounded-pill, 999px);
-  background: var(--color-primary-tint, rgba(0, 102, 204, 0.1));
-  color: var(--color-primary, #0066cc);
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--accent-soft, rgba(0, 102, 204, 0.1));
+  color: var(--accent);
 }
 
-.ff-cat-actions {
+.ff-cat-menu-wrap {
+  position: relative;
+}
+
+.ff-cat-menu-btn {
+  font-size: 16px;
+  padding: 2px 10px;
+  color: var(--text-tertiary);
+}
+
+.ff-cat-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 180px;
+  display: grid;
+  padding: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.ff-cat-menu button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.ff-cat-menu button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.ff-cat-menu button:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+.ff-cat-menu button.danger:not(:disabled) {
+  color: var(--danger);
+}
+
+.ff-cat-footnote {
   display: flex;
-  gap: 4px;
-}
-
-.ff-cat-actions .ff-btn {
-  padding: 3px 8px;
-  font-size: 0.8rem;
-}
-
-.ff-cat-add-form {
-  display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
 }
 
-.ff-cat-add-form input[type="text"],
-.ff-cat-add-form input:not([type]) {
-  flex: 1;
-  min-width: 160px;
-  padding: 6px 10px;
+.ff-cat-footnote-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+/* 카테고리 추가/수정 모달 */
+.ff-cat-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.ff-cat-editor-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ff-cat-editor-field input:not([type="color"]) {
+  padding: 9px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 400;
+  background: var(--bg-surface);
+  color: var(--text-primary);
 }
 
 .ff-cat-color-palette {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .ff-cat-color-swatch {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   border: 2px solid transparent;
   cursor: pointer;
   padding: 0;
 }
 
 .ff-cat-color-swatch.active {
-  border-color: var(--color-ink, #1c1c1e);
+  border-color: var(--text-primary);
 }
 
-.ff-cat-default-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.ff-cat-default-row small {
-  display: block;
-  color: var(--color-ink-muted-48, #8e8e93);
+.ff-cat-color-custom {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
 }
 
 .ff-cat-delete-body {

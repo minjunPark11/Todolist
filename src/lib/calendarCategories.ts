@@ -181,6 +181,18 @@ export function movePersonalCategory(categoryId: string, direction: -1 | 1) {
   setState({ ...state, personal: sorted.map((category, order) => ({ ...category, order })) });
 }
 
+// Drag & drop reorder: drops the category at targetIndex in the sorted list.
+export function movePersonalCategoryTo(categoryId: string, targetIndex: number) {
+  const sorted = [...state.personal].sort((a, b) => a.order - b.order);
+  const from = sorted.findIndex((category) => category.id === categoryId);
+  if (from === -1) return;
+  const to = Math.max(0, Math.min(sorted.length - 1, targetIndex));
+  if (from === to) return;
+  const [moved] = sorted.splice(from, 1);
+  sorted.splice(to, 0, moved);
+  setState({ ...state, personal: sorted.map((category, order) => ({ ...category, order })) });
+}
+
 export function setDefaultCategory(categoryId: string) {
   if (!state.personal.some((category) => category.id === categoryId)) return;
   setState({

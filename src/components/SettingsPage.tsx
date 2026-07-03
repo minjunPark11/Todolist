@@ -63,8 +63,13 @@ export function SettingsPage({
   const { t } = useT();
   const [tab, setTab] = useState<"appearance" | "behavior" | "calendar" | "data">("appearance");
   const [calendarDraft, setCalendarDraft] = useState({ name: "", icsUrl: "", color: "#4f73ff" });
+  const [externalFormOpen, setExternalFormOpen] = useState(false);
   const [shareCopyLabel, setShareCopyLabel] = useState("복사");
   const shareBusy = calendarShare.status === "loading" || calendarShare.status === "saving";
+  const lastExternalSyncedAt = externalCalendars.reduce(
+    (latest, calendar) => (calendar.lastSyncedAt && calendar.lastSyncedAt > latest ? calendar.lastSyncedAt : latest),
+    "",
+  );
 
   async function copyShareUrl() {
     if (!calendarShare.url) return;
@@ -185,31 +190,24 @@ export function SettingsPage({
       ) : null}
 
       {tab === "calendar" ? (
-        <div className="ff-settings-card">
-          <CalendarCategorySettings tasks={tasks} onUpdateTask={onUpdateTask} />
+        <div className="ff-cal-settings-stack">
+          <section className="ff-settings-card ff-cal-card">
+            <CalendarCategorySettings tasks={tasks} onUpdateTask={onUpdateTask} />
+          </section>
 
-          <Row title="내 캘린더 공유" hint="상대방이 구독할 수 있는 읽기 전용 ICS 링크를 만듭니다. 제목, 날짜, 시간만 공유됩니다.">
-            <div className="ff-calendar-share-panel">
-              <div className="ff-calendar-share-status">
-                <strong>{calendarShare.enabled ? "공유 중" : "공유 꺼짐"}</strong>
-                <small>
-                  {calendarShare.status === "unavailable"
-                    ? "Supabase 로그인 상태에서 사용할 수 있습니다."
-                    : calendarShare.updatedAt
-                      ? `마지막 업데이트 ${new Date(calendarShare.updatedAt).toLocaleString()}`
-                      : "아직 공유 링크가 없습니다."}
-                </small>
+          <section className="ff-settings-card ff-cal-card">
+            <div className="ff-cal-card-head">
+              <span className="ff-cal-card-icon" aria-hidden="true">
+                <ShareIcon />
+              </span>
+              <div className="ff-cal-card-text">
+                <strong>내 캘린더 공유</strong>
+                <small>다른 사람이 구독할 수 있는 읽기 전용 ICS 링크를 생성합니다.</small>
               </div>
-              {calendarShare.url ? (
-                <div className="ff-calendar-share-url">
-                  <input value={calendarShare.url} readOnly aria-label="내 캘린더 구독 링크" />
-                  <button type="button" className="ff-btn" onClick={copyShareUrl}>
-                    {shareCopyLabel}
-                  </button>
-                </div>
-              ) : null}
-              {calendarShare.error ? <p className="ff-settings-error">{calendarShare.error}</p> : null}
-              <div className="ff-calendar-share-actions">
+              <div className="ff-cal-card-actions">
+                <span className={`ff-cal-chip${calendarShare.enabled ? " on" : ""}`}>
+                  {calendarShare.enabled ? "공유 중" : "공유 꺼짐"}
+                </span>
                 {calendarShare.enabled ? (
                   <button type="button" className="ff-btn" disabled={shareBusy} onClick={onDisableCalendarShare}>
                     공유 끄기
@@ -217,106 +215,159 @@ export function SettingsPage({
                 ) : (
                   <button
                     type="button"
-                    className="ff-btn"
+                    className="ff-btn ff-btn-primary"
                     disabled={shareBusy || calendarShare.status === "unavailable"}
                     onClick={onEnableCalendarShare}
                   >
-                    링크 생성
+                    공유 링크 만들기
                   </button>
                 )}
+              </div>
+            </div>
+            {calendarShare.status === "unavailable" ? (
+              <p className="ff-cal-card-note">Supabase 로그인 상태에서 사용할 수 있습니다.</p>
+            ) : null}
+            {calendarShare.error ? <p className="ff-settings-error">{calendarShare.error}</p> : null}
+            {calendarShare.enabled ? (
+              <div className="ff-calendar-share-panel">
+                {calendarShare.url ? (
+                  <div className="ff-calendar-share-url">
+                    <input value={calendarShare.url} readOnly aria-label="내 캘린더 구독 링크" />
+                    <button type="button" className="ff-btn" onClick={copyShareUrl}>
+                      {shareCopyLabel}
+                    </button>
+                  </div>
+                ) : null}
+                <div className="ff-calendar-share-actions">
+                  <small className="ff-cal-card-note">
+                    {calendarShare.updatedAt
+                      ? `마지막 업데이트 ${new Date(calendarShare.updatedAt).toLocaleString()}`
+                      : "아직 게시된 적이 없습니다."}
+                  </small>
+                  <button
+                    type="button"
+                    className="ff-btn"
+                    disabled={shareBusy || !calendarShare.token}
+                    onClick={onPublishCalendarShare}
+                  >
+                    지금 업데이트
+                  </button>
+                  <button type="button" className="ff-btn ff-btn-danger" disabled={shareBusy} onClick={onRegenerateCalendarShare}>
+                    링크 재생성
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="ff-settings-card ff-cal-card">
+            <div className="ff-cal-card-head">
+              <span className="ff-cal-card-icon" aria-hidden="true">
+                <GlobeIcon />
+              </span>
+              <div className="ff-cal-card-text">
+                <strong>외부 캘린더</strong>
+                <small>외부 ICS 캘린더를 추가할 수 있습니다.</small>
+              </div>
+              <div className="ff-cal-card-actions">
                 <button
                   type="button"
-                  className="ff-btn"
-                  disabled={shareBusy || !calendarShare.token || calendarShare.status === "unavailable"}
-                  onClick={onPublishCalendarShare}
+                  className="ff-btn ff-cal-btn-outline"
+                  aria-expanded={externalFormOpen}
+                  onClick={() => setExternalFormOpen((open) => !open)}
                 >
-                  지금 업데이트
-                </button>
-                <button
-                  type="button"
-                  className="ff-btn ff-btn-danger"
-                  disabled={shareBusy || calendarShare.status === "unavailable"}
-                  onClick={onRegenerateCalendarShare}
-                >
-                  링크 재생성
+                  + 외부 캘린더 추가
                 </button>
               </div>
             </div>
-          </Row>
+            {externalFormOpen ? (
+              <div className="ff-external-calendar-form">
+                <input
+                  value={calendarDraft.name}
+                  placeholder="캘린더 이름"
+                  onChange={(event) => setCalendarDraft((draft) => ({ ...draft, name: event.target.value }))}
+                />
+                <input
+                  value={calendarDraft.icsUrl}
+                  placeholder="https://.../calendar.ics"
+                  onChange={(event) => setCalendarDraft((draft) => ({ ...draft, icsUrl: event.target.value }))}
+                />
+                <input
+                  type="color"
+                  value={calendarDraft.color}
+                  aria-label="캘린더 색상"
+                  onChange={(event) => setCalendarDraft((draft) => ({ ...draft, color: event.target.value }))}
+                />
+                <button
+                  type="button"
+                  className="ff-btn"
+                  disabled={!calendarDraft.name.trim() || !calendarDraft.icsUrl.trim()}
+                  onClick={() => {
+                    onAddExternalCalendar(calendarDraft);
+                    setCalendarDraft({ name: "", icsUrl: "", color: "#4f73ff" });
+                    setExternalFormOpen(false);
+                  }}
+                >
+                  추가
+                </button>
+              </div>
+            ) : null}
+            {externalCalendars.length > 0 ? (
+              <div className="ff-external-calendar-list">
+                {externalCalendars.map((calendar) => (
+                  <article key={calendar.id} className="ff-external-calendar-item">
+                    <span className="ff-external-dot" style={{ background: calendar.color }} />
+                    <div>
+                      <strong>{calendar.name}</strong>
+                      <small>
+                        {calendar.syncStatus === "syncing"
+                          ? "동기화 중..."
+                          : calendar.syncStatus === "failed"
+                            ? `동기화 실패${calendar.lastError ? `: ${calendar.lastError}` : ""}`
+                            : calendar.enabled
+                              ? `정상 · ${calendar.eventCount ?? 0}개`
+                              : "비활성화됨"}
+                      </small>
+                      <small>
+                        {calendar.lastSyncedAt ? `마지막 동기화 ${new Date(calendar.lastSyncedAt).toLocaleString()}` : "아직 동기화되지 않음"}
+                      </small>
+                    </div>
+                    <div className="ff-external-calendar-actions">
+                      <button type="button" className="ff-btn" onClick={() => onUpdateExternalCalendar(calendar.id, { visible: !calendar.visible })}>
+                        {calendar.visible ? "숨김" : "표시"}
+                      </button>
+                      <button type="button" className="ff-btn" onClick={() => onUpdateExternalCalendar(calendar.id, { enabled: !calendar.enabled })}>
+                        {calendar.enabled ? "비활성" : "활성"}
+                      </button>
+                      <button type="button" className="ff-btn" disabled={!calendar.enabled} onClick={() => onSyncExternalCalendar(calendar.id)}>
+                        지금 새로고침
+                      </button>
+                      <button type="button" className="ff-btn ff-btn-danger" onClick={() => onDeleteExternalCalendar(calendar.id)}>
+                        삭제
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </section>
 
-          <Row title="외부 캘린더 추가" hint="공개 ICS 주소를 추가하면 Calendar 화면에서 읽기 전용으로 표시됩니다.">
-            <div className="ff-external-calendar-form">
-              <input
-                value={calendarDraft.name}
-                placeholder="캘린더 이름"
-                onChange={(event) => setCalendarDraft((draft) => ({ ...draft, name: event.target.value }))}
-              />
-              <input
-                value={calendarDraft.icsUrl}
-                placeholder="https://.../calendar.ics"
-                onChange={(event) => setCalendarDraft((draft) => ({ ...draft, icsUrl: event.target.value }))}
-              />
-              <input
-                type="color"
-                value={calendarDraft.color}
-                aria-label="캘린더 색상"
-                onChange={(event) => setCalendarDraft((draft) => ({ ...draft, color: event.target.value }))}
-              />
-              <button
-                type="button"
-                className="ff-btn"
-                disabled={!calendarDraft.name.trim() || !calendarDraft.icsUrl.trim()}
-                onClick={() => {
-                  onAddExternalCalendar(calendarDraft);
-                  setCalendarDraft({ name: "", icsUrl: "", color: "#4f73ff" });
-                }}
-              >
-                추가
-              </button>
+          <section className="ff-settings-card ff-cal-card">
+            <div className="ff-cal-card-head">
+              <span className="ff-cal-card-icon" aria-hidden="true">
+                <SyncIcon />
+              </span>
+              <div className="ff-cal-card-text">
+                <strong>동기화 상태</strong>
+                <small>{lastExternalSyncedAt ? `마지막 동기화 ${new Date(lastExternalSyncedAt).toLocaleString()}` : "마지막 동기화 없음"}</small>
+              </div>
+              <div className="ff-cal-card-actions">
+                <button type="button" className="ff-btn" onClick={onSyncAllExternalCalendars}>
+                  전체 새로고침
+                </button>
+              </div>
             </div>
-          </Row>
-
-          <Row title="동기화 상태" hint="실패해도 마지막 성공 일정 캐시는 유지됩니다.">
-            <button type="button" className="ff-btn" onClick={onSyncAllExternalCalendars}>
-              전체 새로고침
-            </button>
-          </Row>
-
-          <div className="ff-external-calendar-list">
-            {externalCalendars.length === 0 ? <p className="ff-settings-msg">추가된 외부 캘린더가 없습니다.</p> : null}
-            {externalCalendars.map((calendar) => (
-              <article key={calendar.id} className="ff-external-calendar-item">
-                <span className="ff-external-dot" style={{ background: calendar.color }} />
-                <div>
-                  <strong>{calendar.name}</strong>
-                  <small>
-                    {calendar.syncStatus === "syncing"
-                      ? "동기화 중..."
-                      : calendar.syncStatus === "failed"
-                        ? `동기화 실패${calendar.lastError ? `: ${calendar.lastError}` : ""}`
-                        : calendar.enabled
-                          ? `정상 · ${calendar.eventCount ?? 0}개`
-                          : "비활성화됨"}
-                  </small>
-                  <small>{calendar.lastSyncedAt ? `마지막 동기화 ${new Date(calendar.lastSyncedAt).toLocaleString()}` : "아직 동기화되지 않음"}</small>
-                </div>
-                <div className="ff-external-calendar-actions">
-                  <button type="button" className="ff-btn" onClick={() => onUpdateExternalCalendar(calendar.id, { visible: !calendar.visible })}>
-                    {calendar.visible ? "숨김" : "표시"}
-                  </button>
-                  <button type="button" className="ff-btn" onClick={() => onUpdateExternalCalendar(calendar.id, { enabled: !calendar.enabled })}>
-                    {calendar.enabled ? "비활성" : "활성"}
-                  </button>
-                  <button type="button" className="ff-btn" disabled={!calendar.enabled} onClick={() => onSyncExternalCalendar(calendar.id)}>
-                    지금 새로고침
-                  </button>
-                  <button type="button" className="ff-btn ff-btn-danger" onClick={() => onDeleteExternalCalendar(calendar.id)}>
-                    삭제
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+          </section>
         </div>
       ) : null}
 
@@ -344,6 +395,35 @@ export function SettingsPage({
         </>
       ) : null}
     </div>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <circle cx="6" cy="12" r="2.4" />
+      <circle cx="17" cy="6" r="2.4" />
+      <circle cx="17" cy="18" r="2.4" />
+      <path d="M8.2 10.9l6.6-3.8M8.2 13.1l6.6 3.8" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.6 2.5 4 5.6 4 9s-1.4 6.5-4 9c-2.6-2.5-4-5.6-4-9s1.4-6.5 4-9z" />
+    </svg>
+  );
+}
+
+function SyncIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <path d="M20 12a8 8 0 11-2.3-5.7" />
+      <path d="M20 4v6h-6" />
+    </svg>
   );
 }
 

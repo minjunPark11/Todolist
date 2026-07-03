@@ -607,6 +607,7 @@ export default function App() {
     planner.selectTask("");
     try {
       localStorage.removeItem("todo-planner-space-hub-v1");
+      localStorage.removeItem("todo-planner-local-spaces-v1");
     } catch {
       // Keep reset working even if localStorage is unavailable.
     }
