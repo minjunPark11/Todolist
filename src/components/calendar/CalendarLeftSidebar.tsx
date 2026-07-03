@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { CalendarCategory, CalendarCategoryGroup } from "../../lib/calendarCategories";
 import { getDayNumber, getMonthGrid, getMonthLabel, todayValue } from "../../utils/date";
 import { useT } from "../../i18n";
@@ -14,7 +15,6 @@ interface CalendarLeftSidebarProps {
   isCategoryVisible: (categoryId: string) => boolean;
   onToggleCategory: (category: CalendarCategory) => void;
   onSelectCategory: (category: CalendarCategory) => void;
-  onOpenSettings?: () => void;
   onCreateClick: () => void;
   collapsed: boolean;
   onExpand: () => void;
@@ -29,7 +29,6 @@ export function CalendarLeftSidebar({
   isCategoryVisible,
   onToggleCategory,
   onSelectCategory,
-  onOpenSettings,
   onCreateClick,
   collapsed,
   onExpand,
@@ -129,15 +128,17 @@ export function CalendarLeftSidebar({
                   }
                 }}
               >
-                {/* §16.3: the checkbox must never trigger the row's select. */}
+                {/* §16.3: the checkbox must never trigger the row's select.
+                    The checkbox carries the category color itself (Apple
+                    Calendar style), so no separate color dot. */}
                 <input
                   type="checkbox"
                   checked={isCategoryVisible(category.id)}
+                  style={{ "--cat-color": category.color } as CSSProperties}
                   aria-label={t("calendar.toggleCategoryAria", { name: category.name })}
                   onClick={(event) => event.stopPropagation()}
                   onChange={() => onToggleCategory(category)}
                 />
-                <span className="gcal-project-dot" style={{ backgroundColor: category.color }} />
                 <span className="gcal-cat-name">{category.name}</span>
                 {category.isDefault ? <span className="gcal-cat-badge">{t("calendar.defaultBadge")}</span> : null}
                 {category.isReadOnly ? <span className="gcal-cat-badge">{t("calendar.readOnlyBadge")}</span> : null}
@@ -147,11 +148,6 @@ export function CalendarLeftSidebar({
         </div>
       ))}
 
-      {onOpenSettings ? (
-        <button type="button" className="gcal-sidebar-settings" onClick={onOpenSettings}>
-          {t("calendar.manageCategories")}
-        </button>
-      ) : null}
     </aside>
   );
 }

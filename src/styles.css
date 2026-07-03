@@ -10786,7 +10786,44 @@ div.spc-signal-row {
 }
 
 .gcal-cat-row input[type="checkbox"] {
+  /* Apple Calendar style: the checkbox itself is tinted with the category
+     color (--cat-color set inline per row). Explicit size also guards against
+     the global `input { width: 100% }` rule squashing the flex:1 name span. */
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
   flex-shrink: 0;
+  border: none;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--cat-color, #8e8e93) 22%, transparent);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.gcal-cat-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 5' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 5' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  background: color-mix(in srgb, var(--cat-color, #8e8e93) 45%, transparent);
+}
+
+.gcal-cat-row input[type="checkbox"]:checked {
+  background: var(--cat-color, #8e8e93);
+}
+
+.gcal-cat-row input[type="checkbox"]:checked::after {
+  background: #fff;
+}
+
+.gcal-cat-row input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .gcal-cat-name {
@@ -10808,22 +10845,6 @@ div.spc-signal-row {
   border-radius: var(--rounded-pill, 999px);
   background: var(--color-fill-tertiary, rgba(0, 0, 0, 0.06));
   color: var(--color-ink-muted-48, #8e8e93);
-}
-
-.gcal-sidebar-settings {
-  margin-top: auto;
-  padding: 8px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--color-ink-muted-80, #6b7280);
-  font-size: 0.8rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.gcal-sidebar-settings:hover {
-  background: var(--color-fill-quaternary, rgba(0, 0, 0, 0.04));
 }
 
 /* Event popover: category color button + dropdown (§12–§13). */

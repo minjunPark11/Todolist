@@ -119,7 +119,7 @@ export async function loadCalendarShare(): Promise<CalendarShareState> {
     .eq("user_id", userData.user.id)
     .maybeSingle<ShareRow>();
 
-  if (error) throw error;
+  if (error) throw new Error(formatCalendarShareError(error));
   if (!data) return { ...emptyCalendarShareState, status: "idle" };
 
   return {
@@ -152,7 +152,7 @@ export async function publishCalendarShare(input: {
     },
     { onConflict: "user_id" },
   );
-  if (error) throw error;
+  if (error) throw new Error(formatCalendarShareError(error));
 
   return {
     enabled: input.enabled,
@@ -174,7 +174,7 @@ export async function disableCalendarShare(token: string): Promise<CalendarShare
     .from("calendar_shares")
     .update({ enabled: false, updated_at: now })
     .eq("user_id", userData.user.id);
-  if (error) throw error;
+  if (error) throw new Error(formatCalendarShareError(error));
 
   return {
     enabled: false,
@@ -192,4 +192,15 @@ function isDate(value?: string): value is string {
 
 function isTime(value?: string): value is string {
   return Boolean(value && /^\d{2}:\d{2}$/.test(value));
+}
+
+function formatCalendarShareError(error: { message?: string; code?: string; details?: string }) {
+  const message = error.message || error.details || "공유 링크 작업에 실패했습니다.";
+  if (error.code === "42P01" || message.includes("calendar_shares") || message.includes("does not exist")) {
+    return "공유 테이블이 아직 없습니다. Supabase에 003_calendar_shares.sql 마이그레이션을 적용해주세요.";
+  }
+  if (message.toLowerCase().includes("row-level security")) {
+    return "공유 테이블 권한 정책이 맞지 않습니다. calendar_shares RLS 정책을 확인해주세요.";
+  }
+  return message;
 }

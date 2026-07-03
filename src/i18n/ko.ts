@@ -591,7 +591,6 @@ export const ko: Dictionary = {
   "calendar.toggleCategoryAria": "{{name}} 표시",
   "calendar.defaultBadge": "기본",
   "calendar.readOnlyBadge": "읽기 전용",
-  "calendar.manageCategories": "카테고리 관리 (설정)",
   "calendar.categoryLabel": "카테고리",
   "calendar.newEventDefaultTitle": "새로운 이벤트",
   "calendar.changeCategoryAria": "카테고리 변경",

@@ -221,7 +221,6 @@ export function AppPages({
           onCreateTask={planner.createTask}
           onOpenProject={openProjectFromCalendar}
           onOpenStudyReview={openStudyReviewFromCalendar}
-          onOpenSettings={() => onNavigate("settings")}
           taskDetail={renderTaskDetail()}
           onClearTaskSelection={() => planner.selectTask("")}
           showToast={showToast}
@@ -284,6 +283,7 @@ export function AppPages({
         onUpdateTask={planner.updateTask}
         onCreateTask={planner.createTask}
         onCreateProject={planner.createProject}
+        onCreateTopic={planner.createTopic}
         onUpdateProject={planner.updateProject}
         onUpdateTopic={planner.updateTopic}
         onToggleStar={planner.toggleProjectPinned}

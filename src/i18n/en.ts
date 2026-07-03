@@ -591,7 +591,6 @@ export const en: Dictionary = {
   "calendar.toggleCategoryAria": "Show {{name}}",
   "calendar.defaultBadge": "Default",
   "calendar.readOnlyBadge": "Read-only",
-  "calendar.manageCategories": "Manage categories (Settings)",
   "calendar.categoryLabel": "Category",
   "calendar.newEventDefaultTitle": "New event",
   "calendar.changeCategoryAria": "Change category",

@@ -84,7 +84,6 @@ interface CalendarViewProps {
   onCreateTask: (draft: TaskDraft) => string;
   onOpenProject?: (projectId: string) => void;
   onOpenStudyReview?: (noteId: string) => void;
-  onOpenSettings?: () => void;
   taskDetail?: ReactNode;
   onClearTaskSelection?: () => void;
   showToast?: (toast: ToastState) => void;
@@ -108,7 +107,6 @@ export function CalendarView({
   onCreateTask,
   onOpenProject,
   onOpenStudyReview,
-  onOpenSettings,
   taskDetail,
   onClearTaskSelection,
   showToast,
@@ -622,7 +620,6 @@ export function CalendarView({
           isCategoryVisible={(categoryId) => visibleCategoryIds.has(categoryId)}
           onToggleCategory={handleToggleCategory}
           onSelectCategory={handleSelectCategory}
-          onOpenSettings={onOpenSettings}
           onCreateClick={() =>
             setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
           }

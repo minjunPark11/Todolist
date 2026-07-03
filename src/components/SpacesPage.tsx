@@ -81,6 +81,7 @@ type SpacesPageProps = {
   // Opens the main Calendar, optionally pre-filtered to one project.
   onOpenCalendar: (projectId?: string) => void;
   onCreateProject: (input: { name: string; color?: string; type?: ProjectType; description?: string; dueDate?: string }) => string;
+  onCreateTopic: (input: { name: string; description?: string; color?: string }) => string;
   onUpdateProject: (id: string, patch: Partial<Project>) => void;
   onUpdateTopic: (id: string, patch: Partial<StudyTopic>) => void;
   onToggleStar: (id: string) => void;
@@ -168,6 +169,7 @@ export function SpacesPage({
   onOpenProject,
   onCloseProject,
   onCreateProject,
+  onCreateTopic,
   onCreateTask,
   onUpdateTask,
   onCompleteTask,
@@ -435,6 +437,21 @@ export function SpacesPage({
             // The planner project persists this space; a local copy would
             // render as a duplicate card next to the derived one.
             setSelectedSpaceId(`project-space-${projectId}`);
+            showToast({ message: t("spaces.add.created", { name: space.name }) });
+            resetAdd();
+            return;
+          }
+        }
+        if (space.type === "study") {
+          // Study spaces are backed by a planner study topic so the calendar's
+          // 학습 category list and the Study page stay in sync.
+          const topicId = onCreateTopic({
+            name: space.name,
+            description: draft.learningGoal.trim() || space.description,
+            color: space.color,
+          });
+          if (topicId) {
+            setSelectedSpaceId(`study-space-${topicId}`);
             showToast({ message: t("spaces.add.created", { name: space.name }) });
             resetAdd();
             return;
