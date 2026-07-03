@@ -187,29 +187,17 @@ export function TodayPage({
   // Left unchecked, a title-only capture goes to Inbox instead of silently
   // landing on today's Focus Queue.
   function handleCreateTask(input: QuickAddInput) {
-    if (input.addToTodayNow) {
-      const id = onCreateTask({
-        title: input.title,
-        status: "todo",
-        scheduledDate: today,
-        dueDate: input.dueDate,
-        priority: input.priority,
-        projectId: input.projectId || undefined,
-        notes: input.notes || undefined,
-      });
-      setBucket(id, input.bucket);
-      showToast({ message: t("todayv.toastTaskAdded") });
-    } else {
-      onCreateTask({
-        title: input.title,
-        status: "inbox",
-        dueDate: input.dueDate,
-        priority: input.priority,
-        projectId: input.projectId || undefined,
-        notes: input.notes || undefined,
-      });
-      showToast({ message: t("todayv.toastAddedToInbox") });
-    }
+    const id = onCreateTask({
+      title: input.title,
+      status: "todo",
+      scheduledDate: today,
+      dueDate: input.dueDate,
+      priority: input.priority,
+      projectId: input.projectId || undefined,
+      notes: input.notes || undefined,
+    });
+    setBucket(id, input.bucket);
+    showToast({ message: t("todayv.toastTaskAdded") });
     setQuickAddOpen(false);
   }
 

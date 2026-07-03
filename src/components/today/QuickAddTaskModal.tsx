@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { Project, TaskPriority } from "../../types";
 import type { TodayBucketId } from "../../utils/todayView";
-import { todayValue } from "../../utils/date";
 import { Modal, useAutoFocus } from "../kit";
 import { useT } from "../../i18n";
 
@@ -14,7 +13,6 @@ export interface QuickAddInput {
   notes: string;
   // Checked: creates a Today task right away. Unchecked (default): a
   // title-only capture becomes an Inbox item instead (spec §10).
-  addToTodayNow: boolean;
 }
 
 interface QuickAddTaskModalProps {
@@ -32,7 +30,6 @@ export function QuickAddTaskModal({ projects, onCreate, onClose }: QuickAddTaskM
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [addToTodayNow, setAddToTodayNow] = useState(false);
   const [error, setError] = useState("");
 
   const canSave = Boolean(title.trim());
@@ -48,9 +45,8 @@ export function QuickAddTaskModal({ projects, onCreate, onClose }: QuickAddTaskM
       projectId,
       bucket,
       priority,
-      dueDate: dueDate || (addToTodayNow ? todayValue() : ""),
+      dueDate,
       notes: notes.trim(),
-      addToTodayNow,
     });
   }
 
@@ -87,18 +83,6 @@ export function QuickAddTaskModal({ projects, onCreate, onClose }: QuickAddTaskM
         </label>
         {error ? <p className="tdy-form-error">{error}</p> : null}
 
-        <label className="tdy-check-field">
-          <input
-            type="checkbox"
-            checked={addToTodayNow}
-            onChange={(event) => setAddToTodayNow(event.target.checked)}
-          />
-          {t("todayv.addToTodayNow")}
-        </label>
-        <p className="tdy-field-hint">
-          {addToTodayNow ? t("todayv.addToTodayNowHintOn") : t("todayv.addToTodayNowHintOff")}
-        </p>
-
         <label>
           {t("todayv.fieldSpace")}
           <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
@@ -111,25 +95,23 @@ export function QuickAddTaskModal({ projects, onCreate, onClose }: QuickAddTaskM
           </select>
         </label>
 
-        {addToTodayNow ? (
-          <label>
-            {t("todayv.fieldBucket")}
-            <div className="tdy-bucket-picker" role="radiogroup" aria-label={t("todayv.fieldBucket")}>
-              {(["now", "next", "later"] as TodayBucketId[]).map((candidate) => (
-                <button
-                  key={candidate}
-                  type="button"
-                  role="radio"
-                  aria-checked={bucket === candidate}
-                  className={bucket === candidate ? "active" : ""}
-                  onClick={() => setBucket(candidate)}
-                >
-                  {t(`todayv.bucket.${candidate}`)}
-                </button>
-              ))}
-            </div>
-          </label>
-        ) : null}
+        <label>
+          {t("todayv.fieldBucket")}
+          <div className="tdy-bucket-picker" role="radiogroup" aria-label={t("todayv.fieldBucket")}>
+            {(["now", "next", "later"] as TodayBucketId[]).map((candidate) => (
+              <button
+                key={candidate}
+                type="button"
+                role="radio"
+                aria-checked={bucket === candidate}
+                className={bucket === candidate ? "active" : ""}
+                onClick={() => setBucket(candidate)}
+              >
+                {t(`todayv.bucket.${candidate}`)}
+              </button>
+            ))}
+          </div>
+        </label>
 
         <label>
           {t("todayv.fieldPriority")}
