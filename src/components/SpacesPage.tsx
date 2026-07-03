@@ -213,13 +213,42 @@ export function SpacesPage({
 
   useEffect(() => {
     function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape" && openMenuSpaceId) {
+        setOpenMenuSpaceId("");
+        return;
+      }
       if (event.key === "Escape" && addOpen) {
         tryCloseAdd();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [addOpen, draft]);
+  }, [addOpen, draft, openMenuSpaceId]);
+
+  useEffect(() => {
+    if (!openMenuSpaceId) return;
+
+    function closeMenu() {
+      setOpenMenuSpaceId("");
+    }
+
+    function handlePointerDown(event: globalThis.PointerEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".spc-card-menu-wrap")) return;
+      closeMenu();
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("popstate", closeMenu);
+    window.addEventListener("blur", closeMenu);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("popstate", closeMenu);
+      window.removeEventListener("blur", closeMenu);
+    };
+  }, [openMenuSpaceId]);
 
   function openSpace(space: Space, signalId = "") {
     setOpenMenuSpaceId("");
