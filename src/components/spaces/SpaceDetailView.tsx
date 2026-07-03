@@ -439,7 +439,7 @@ export function SpaceDetailView({
             aria-label="Space settings"
             onClick={() => setDrawer({ kind: "settings" })}
           >
-            ⋯
+            <span className="sdv-more-dots" aria-hidden="true">...</span>
           </button>
         </div>
       </header>

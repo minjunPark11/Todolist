@@ -2,6 +2,7 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import type { ConceptNote, FocusSession, PageId, Project, ProjectType, StudyTopic, Subtask, Task, TaskDraft } from "../types";
 import type { ToastState } from "./kit";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
+import { DeleteSpaceConfirmModal } from "./spaces/SpaceModals";
 import { useT } from "../i18n";
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
@@ -172,6 +173,8 @@ export function SpacesPage({
   const [addState, setAddState] = useState<AddState>("choose_type_idle");
   const [draft, setDraft] = useState<AddSpaceDraft>(emptyDraft);
   const [formError, setFormError] = useState("");
+  const [openMenuSpaceId, setOpenMenuSpaceId] = useState("");
+  const [pendingDeleteSpaceId, setPendingDeleteSpaceId] = useState("");
 
   const spaces = useMemo(
     () => [...deriveProjectSpaces(projects, tasks, t), ...deriveStudySpaces(studyTopics, conceptNotes, t), ...localSpaces],
@@ -179,6 +182,7 @@ export function SpacesPage({
   );
   const signals = useMemo(() => deriveSignals(spaces, tasks, conceptNotes, t), [conceptNotes, spaces, tasks, t]);
   const selectedSpace = spaces.find((space) => space.id === selectedSpaceId) ?? spaces.find((space) => space.sourceId === selectedProjectId);
+  const pendingDeleteSpace = spaces.find((space) => space.id === pendingDeleteSpaceId);
   const isDetailOpen = Boolean(selectedSpace) && (detailOpen || selectedSpaceId);
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -203,6 +207,7 @@ export function SpacesPage({
   }, [addOpen, draft]);
 
   function openSpace(space: Space, signalId = "") {
+    setOpenMenuSpaceId("");
     setSelectedSpaceId(space.id);
     setHighlightSignalId(signalId);
     if (space.sourceRef === "project" && space.sourceId) {
@@ -219,9 +224,11 @@ export function SpacesPage({
   function deleteSpace(space: Space) {
     if (space.sourceRef === "project" && space.sourceId) {
       onRequestDeleteProject(space.sourceId);
+      setPendingDeleteSpaceId("");
       return;
     }
     setLocalSpaces((current) => current.filter((item) => item.id !== space.id));
+    setPendingDeleteSpaceId("");
     closeSpace();
     showToast({ message: `${space.name} deleted.` });
   }
@@ -396,7 +403,19 @@ export function SpacesPage({
       </section>
 
       <section className="spc-grid" aria-label={t("spaces.cardsLabel")}>
-        {visibleSpaces.map((space) => <SpaceCard key={space.id} space={space} onOpen={() => openSpace(space)} />)}
+        {visibleSpaces.map((space) => (
+          <SpaceCard
+            key={space.id}
+            space={space}
+            menuOpen={openMenuSpaceId === space.id}
+            onOpen={() => openSpace(space)}
+            onToggleMenu={() => setOpenMenuSpaceId((current) => (current === space.id ? "" : space.id))}
+            onRequestDelete={() => {
+              setOpenMenuSpaceId("");
+              setPendingDeleteSpaceId(space.id);
+            }}
+          />
+        ))}
         <button type="button" className="spc-add-card" onClick={() => setAddOpen(true)}>
           <span><PlusIcon /></span>
           <strong>{t("spaces.addCard.title")}</strong>
@@ -480,17 +499,62 @@ export function SpacesPage({
           </div>
         </SimpleModal>
       ) : null}
+
+      {pendingDeleteSpace ? (
+        <DeleteSpaceConfirmModal
+          spaceName={pendingDeleteSpace.name}
+          isProject={pendingDeleteSpace.sourceRef === "project"}
+          onConfirm={() => deleteSpace(pendingDeleteSpace)}
+          onClose={() => setPendingDeleteSpaceId("")}
+        />
+      ) : null}
     </div>
   );
 }
 
-function SpaceCard({ space, onOpen }: { space: Space; onOpen: () => void }) {
+function SpaceCard({
+  space,
+  menuOpen,
+  onOpen,
+  onToggleMenu,
+  onRequestDelete,
+}: {
+  space: Space;
+  menuOpen: boolean;
+  onOpen: () => void;
+  onToggleMenu: () => void;
+  onRequestDelete: () => void;
+}) {
   const { t } = useT();
   return (
     <article className="spc-card" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(event) => event.key === "Enter" && onOpen()}>
       <div className="spc-card-top">
         <span className="spc-card-icon" style={{ background: space.color }}><SpaceIcon type={space.type} /></span>
-        <button type="button" aria-label={t("spaces.card.openMenu", { name: space.name })} onClick={(event) => event.stopPropagation()}><MoreIcon /></button>
+        <div className="spc-card-menu-wrap">
+          <button
+            type="button"
+            className="spc-more-button"
+            aria-label={t("spaces.card.openMenu", { name: space.name })}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleMenu();
+            }}
+          >
+            <MoreIcon />
+          </button>
+          {menuOpen ? (
+            <div className="spc-card-menu" role="menu" onClick={(event) => event.stopPropagation()}>
+              <button type="button" role="menuitem" onClick={onOpen}>
+                {t("spaces.card.menuOpen")}
+              </button>
+              <button type="button" role="menuitem" className="danger" onClick={onRequestDelete}>
+                {t("spaces.card.menuDelete")}
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
       <strong>{space.name}</strong>
       <span className="spc-type" style={{ color: typeColor[space.type] }}>{typeLabel(t, space.type)}</span>

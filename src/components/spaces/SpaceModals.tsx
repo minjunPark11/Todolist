@@ -4,6 +4,7 @@ import type { SpaceTypePreset } from "../../lib/spaceHubTypes";
 import type { SpaceNoteDraft } from "../../hooks/useSpaceHubData";
 import { isTaskDone, isTaskUnscheduled } from "../../lib/spaceSelectors";
 import { formatDate, todayValue } from "../../utils/date";
+import { useT } from "../../i18n";
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
@@ -412,20 +413,21 @@ export function DeleteSpaceConfirmModal({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   return (
-    <ModalShell title="Delete Space" onClose={onClose}>
+    <ModalShell title={t("spaces.delete.title")} onClose={onClose}>
       <p className="sdv-modal-copy">
-        Delete "{spaceName}"?{" "}
+        {t("spaces.delete.body", { name: spaceName })}{" "}
         {isProject
-          ? "This will use the project delete flow, and its tasks will move to Inbox."
-          : "This removes this Space and its local setup."}
+          ? t("spaces.delete.projectHint")
+          : t("spaces.delete.localHint")}
       </p>
       <div className="sdv-modal-actions">
         <button type="button" className="sdv-btn" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </button>
         <button type="button" className="sdv-btn sdv-btn-danger" onClick={onConfirm}>
-          Delete Space
+          {t("spaces.delete.confirm")}
         </button>
       </div>
     </ModalShell>
