@@ -8,6 +8,8 @@ import type {
 } from "./spaceHubTypes";
 import { addDays, todayValue } from "../utils/date";
 
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
+
 // A space collects tasks either through its source project or through an
 // explicit `space:<id>` tag (used by study/local spaces that have no project).
 export function spaceTaskTag(spaceId: string): string {
@@ -105,6 +107,7 @@ export function getSpaceSignal(
   spaceTasks: Task[],
   spaceSessions: FocusSession[],
   reviewNotes: ConceptNote[],
+  t: TFn,
   today = todayValue(),
 ): SpaceSignal {
   const counts = getSpaceTaskCounts(spaceTasks, today);
@@ -120,28 +123,28 @@ export function getSpaceSignal(
     const dueReviews = reviewNotes.filter((note) => note.nextReviewDate && note.nextReviewDate <= today).length;
     const behindReviews = reviewNotes.filter((note) => note.nextReviewDate && note.nextReviewDate <= addDays(today, -2)).length;
     const studiedToday = spaceSessions.some((session) => session.status === "completed" && session.startAt.slice(0, 10) === today);
-    if (behindReviews > 0) return { status: "needs_attention", label: "Falling Behind", detail: `${behindReviews} reviews overdue by 2+ days` };
-    if (dueReviews > 0) return { status: "review_due", label: "Review Due", detail: `${dueReviews} reviews waiting` };
-    if (!recentActivity) return { status: "inactive", label: "Inactive", detail: "No study records in the last 7 days" };
-    if (studiedToday) return { status: "on_track", label: "On Track", detail: "Studied today and reviews are clear" };
-    return { status: "on_track", label: "On Track", detail: "Reviews are clear" };
+    if (behindReviews > 0) return { status: "needs_attention", label: t("spaceHub.signal.fallingBehind"), detail: t("spaceHub.signal.fallingBehindDetail", { n: behindReviews }) };
+    if (dueReviews > 0) return { status: "review_due", label: t("spaceHub.signal.reviewDue"), detail: t("spaceHub.signal.reviewDueDetail", { n: dueReviews }) };
+    if (!recentActivity) return { status: "inactive", label: t("spaceHub.signal.inactive"), detail: t("spaceHub.signal.inactiveStudyDetail") };
+    if (studiedToday) return { status: "on_track", label: t("spaceHub.signal.onTrack"), detail: t("spaceHub.signal.onTrackStudiedDetail") };
+    return { status: "on_track", label: t("spaceHub.signal.onTrack"), detail: t("spaceHub.signal.onTrackReviewsDetail") };
   }
 
   if (type === "personal") {
-    if (counts.overdue > 0) return { status: "deadline_risk", label: "Overdue", detail: `${counts.overdue} life tasks past due` };
-    if (counts.unscheduled > 0) return { status: "pending_items", label: "Pending Items", detail: `${counts.unscheduled} personal tasks unhandled` };
-    if (!recentActivity) return { status: "inactive", label: "Inactive", detail: "No activity in the last 7 days" };
-    return { status: "on_track", label: "On Track", detail: "Routines and tasks are under control" };
+    if (counts.overdue > 0) return { status: "deadline_risk", label: t("spaceHub.signal.overdue"), detail: t("spaceHub.signal.overdueDetail", { n: counts.overdue }) };
+    if (counts.unscheduled > 0) return { status: "pending_items", label: t("spaceHub.signal.pendingItems"), detail: t("spaceHub.signal.pendingItemsDetail", { n: counts.unscheduled }) };
+    if (!recentActivity) return { status: "inactive", label: t("spaceHub.signal.inactive"), detail: t("spaceHub.signal.inactiveDetail") };
+    return { status: "on_track", label: t("spaceHub.signal.onTrack"), detail: t("spaceHub.signal.onTrackPersonalDetail") };
   }
 
   // project / research / custom share the base rules.
-  if (blocked > 0) return { status: "blocked", label: "Blocked", detail: `${blocked} blocked or waiting tasks` };
-  if (dueSoon > 0) return { status: "deadline_risk", label: "Deadline Risk", detail: `${dueSoon} tasks due within 48h are unscheduled` };
-  if (!recentActivity && counts.open > 0) return { status: "inactive", label: "Inactive", detail: "No activity in the last 7 days" };
+  if (blocked > 0) return { status: "blocked", label: t("spaceHub.signal.blocked"), detail: t("spaceHub.signal.blockedDetail", { n: blocked }) };
+  if (dueSoon > 0) return { status: "deadline_risk", label: t("spaceHub.signal.deadlineRisk"), detail: t("spaceHub.signal.deadlineRiskDetail", { n: dueSoon }) };
+  if (!recentActivity && counts.open > 0) return { status: "inactive", label: t("spaceHub.signal.inactive"), detail: t("spaceHub.signal.inactiveDetail") };
   if (counts.open > 0 && recentSessions.length === 0)
-    return { status: "needs_attention", label: "Needs Attention", detail: `${counts.unscheduled} unscheduled · no recent focus` };
-  if (counts.overdue > 0) return { status: "needs_attention", label: "Needs Attention", detail: `${counts.overdue} overdue tasks` };
-  return { status: "on_track", label: "On Track", detail: "Recent activity and no overdue tasks" };
+    return { status: "needs_attention", label: t("spaceHub.signal.needsAttention"), detail: t("spaceHub.signal.needsAttentionUnscheduledDetail", { n: counts.unscheduled }) };
+  if (counts.overdue > 0) return { status: "needs_attention", label: t("spaceHub.signal.needsAttention"), detail: t("spaceHub.signal.needsAttentionOverdueDetail", { n: counts.overdue }) };
+  return { status: "on_track", label: t("spaceHub.signal.onTrack"), detail: t("spaceHub.signal.onTrackBaseDetail") };
 }
 
 export function sessionSeconds(session: FocusSession): number {
@@ -266,16 +269,18 @@ export function deriveSpaceActivities(
   spaceSessions: FocusSession[],
   spaceNotes: SpaceNote[],
   storedActivities: SpaceActivity[],
+  t: TFn,
   limit = 30,
 ): SpaceActivity[] {
   const derived: SpaceActivity[] = [];
+  const untitled = t("spaceHub.untitled");
 
   for (const task of spaceTasks) {
     derived.push({
       id: `act-created-${task.id}`,
       spaceId,
       type: "task_created",
-      title: `Task created: ${task.title}`,
+      title: t("spaceHub.activity.taskCreated", { title: task.title }),
       description: "",
       relatedTaskId: task.id,
       relatedSessionId: "",
@@ -287,7 +292,7 @@ export function deriveSpaceActivities(
         id: `act-done-${task.id}`,
         spaceId,
         type: "task_completed",
-        title: `Task completed: ${task.title}`,
+        title: t("spaceHub.activity.taskCompleted", { title: task.title }),
         description: "",
         relatedTaskId: task.id,
         relatedSessionId: "",
@@ -302,7 +307,7 @@ export function deriveSpaceActivities(
         id: `act-focus-${session.id}`,
         spaceId,
         type: "focus_completed",
-        title: `Focus completed: ${session.title || "Untitled"}`,
+        title: t("spaceHub.activity.focusCompleted", { title: session.title || untitled }),
         description: `${Math.max(1, Math.round(sessionSeconds(session) / 60))}m`,
         relatedTaskId: session.taskId,
         relatedSessionId: session.id,
@@ -314,7 +319,7 @@ export function deriveSpaceActivities(
         id: `act-focus-start-${session.id}`,
         spaceId,
         type: "focus_started",
-        title: `Focus started: ${session.title || "Untitled"}`,
+        title: t("spaceHub.activity.focusStarted", { title: session.title || untitled }),
         description: "",
         relatedTaskId: session.taskId,
         relatedSessionId: session.id,
@@ -328,7 +333,7 @@ export function deriveSpaceActivities(
       id: `act-note-${note.id}`,
       spaceId,
       type: "note_created",
-      title: `Note added: ${note.title}`,
+      title: t("spaceHub.activity.noteAdded", { title: note.title }),
       description: note.type,
       relatedTaskId: "",
       relatedSessionId: "",
@@ -352,14 +357,14 @@ export function formatSeconds(totalSeconds: number): string {
   return rest ? `${hours}h ${rest}m` : `${hours}h`;
 }
 
-export function relativeTime(iso: string): string {
+export function relativeTime(iso: string, t: TFn): string {
   if (!iso) return "";
   const diff = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(diff) || diff < 0) return "just now";
+  if (!Number.isFinite(diff) || diff < 0) return t("spaces.time.justNow");
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t("spaces.time.justNow");
+  if (minutes < 60) return t("spaces.time.minutesAgo", { n: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  if (hours < 24) return t("spaces.time.hoursAgo", { n: hours });
+  return t("spaces.time.daysAgo", { n: Math.floor(hours / 24) });
 }

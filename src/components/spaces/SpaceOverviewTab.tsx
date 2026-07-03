@@ -8,6 +8,8 @@ import {
   type SpaceCalendarItem,
 } from "../../lib/spaceSelectors";
 import { formatDate } from "../../utils/date";
+import { useT } from "../../i18n";
+import { presetText, noteTypeText } from "../../lib/spaceHubI18n";
 
 const activityIcons: Record<SpaceActivity["type"], string> = {
   task_created: "＋",
@@ -67,6 +69,7 @@ export function SpaceOverviewTab({
   onAiSuggestSchedule: () => void;
   onGenerateNextAction: () => void;
 }) {
+  const { t } = useT();
   const openTasks = spaceTasks.filter((task) => !isTaskDone(task));
   const previewTasks = [...openTasks]
     .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
@@ -78,21 +81,21 @@ export function SpaceOverviewTab({
         {/* Tasks card (§15) */}
         <section className="sdv-card">
           <header className="sdv-card-head">
-            <h2>{preset.primaryTaskSectionLabel}</h2>
+            <h2>{presetText(t, preset.primaryTaskSectionLabel)}</h2>
             <div className="sdv-card-head-actions">
               <button type="button" className="sdv-btn sdv-btn-sm" onClick={onAddTask}>
-                {preset.addTaskLabel}
+                {presetText(t, preset.addTaskLabel)}
               </button>
               <button type="button" className="sdv-link" onClick={() => onOpenTab("tasks")}>
-                View all
+                {t("spaceHub.action.viewAll")}
               </button>
             </div>
           </header>
           {previewTasks.length === 0 ? (
             <div className="sdv-empty">
-              <p>No tasks in this Space yet. Add the first one.</p>
+              <p>{t("spaceHub.empty.noTasks")}</p>
               <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onAddTask}>
-                {preset.addTaskLabel}
+                {presetText(t, preset.addTaskLabel)}
               </button>
             </div>
           ) : (
@@ -102,23 +105,23 @@ export function SpaceOverviewTab({
                   <input
                     type="checkbox"
                     checked={false}
-                    aria-label={`Complete ${task.title}`}
+                    aria-label={t("spaceHub.aria.complete", { title: task.title })}
                     onChange={() => onToggleDone(task.id)}
                   />
                   <button type="button" className="sdv-task-title" onClick={() => onOpenTask(task.id)}>
                     {task.title}
                   </button>
                   <span className="sdv-task-meta">
-                    {task.status === "doing" ? "In progress" : task.scheduledDate ? "Scheduled" : "To schedule"}
+                    {task.status === "doing" ? t("spaceHub.taskMeta.inProgress") : task.scheduledDate ? t("spaceHub.taskMeta.scheduled") : t("spaceHub.taskMeta.toSchedule")}
                   </span>
                   <span className="sdv-task-est">{estOf(task)}m</span>
                   {task.scheduledDate ? (
                     <button type="button" className="sdv-btn sdv-btn-sm sdv-btn-primary" onClick={() => onStartFocus(task.id)}>
-                      Start Focus
+                      {t("spaceHub.action.startFocus")}
                     </button>
                   ) : (
                     <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => onSchedule(task.id)}>
-                      Schedule
+                      {t("spaceHub.action.schedule")}
                     </button>
                   )}
                 </li>
@@ -131,14 +134,14 @@ export function SpaceOverviewTab({
           {/* Activity timeline (§16) */}
           <section className="sdv-card">
             <header className="sdv-card-head">
-              <h2>Activity Timeline</h2>
+              <h2>{t("spaceHub.section.activityTimeline")}</h2>
               <button type="button" className="sdv-link" onClick={() => onOpenTab("records")}>
-                View all
+                {t("spaceHub.action.viewAll")}
               </button>
             </header>
             {activities.length === 0 ? (
               <div className="sdv-empty">
-                <p>No activity yet. Task, focus, and note events will show up here.</p>
+                <p>{t("spaceHub.empty.noActivity")}</p>
               </div>
             ) : (
               <ul className="sdv-activity-list">
@@ -159,7 +162,7 @@ export function SpaceOverviewTab({
                         <strong>{activity.title}</strong>
                         {activity.description ? <em>{activity.description}</em> : null}
                       </span>
-                      <small>{relativeTime(activity.createdAt)}</small>
+                      <small>{relativeTime(activity.createdAt, t)}</small>
                     </button>
                   </li>
                 ))}
@@ -170,14 +173,14 @@ export function SpaceOverviewTab({
           {/* Space calendar preview (§17) — read-only */}
           <section className="sdv-card">
             <header className="sdv-card-head">
-              <h2>Space Calendar</h2>
+              <h2>{t("spaceHub.section.spaceCalendar")}</h2>
               <button type="button" className="sdv-link" onClick={onOpenFullCalendar}>
-                Open full calendar
+                {t("spaceHub.action.openFullCalendar")}
               </button>
             </header>
             {calendarItems.length === 0 ? (
               <div className="sdv-empty">
-                <p>No Space events scheduled this week. Place a task on the calendar.</p>
+                <p>{t("spaceHub.empty.noCalendarWeek")}</p>
               </div>
             ) : (
               <ul className="sdv-calendar-list">
@@ -203,22 +206,22 @@ export function SpaceOverviewTab({
         {/* AI Space Summary (§18) — never auto-runs */}
         <section className="sdv-card sdv-ai-card">
           <header className="sdv-card-head">
-            <h2>{preset.aiSummaryLabel}</h2>
+            <h2>{presetText(t, preset.aiSummaryLabel)}</h2>
           </header>
           {aiSummary.state === "idle" ? (
             <div className="sdv-empty">
-              <p>Generate a summary of this Space and get next-step suggestions.</p>
+              <p>{t("spaceHub.ai.generatePrompt")}</p>
               <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onGenerateAiSummary}>
-                Generate summary
+                {t("spaceHub.ai.generate")}
               </button>
             </div>
           ) : aiSummary.state === "loading" ? (
-            <p className="sdv-empty-inline">Building the Space summary...</p>
+            <p className="sdv-empty-inline">{t("spaceHub.ai.building")}</p>
           ) : aiSummary.state === "error" ? (
             <div className="sdv-empty">
-              <p>Could not build the summary. Try again.</p>
+              <p>{t("spaceHub.ai.error")}</p>
               <button type="button" className="sdv-btn sdv-btn-sm" onClick={onGenerateAiSummary}>
-                Retry
+                {t("spaceHub.action.retry")}
               </button>
             </div>
           ) : (
@@ -231,10 +234,10 @@ export function SpaceOverviewTab({
               </ul>
               <div className="sdv-metric-actions">
                 <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onAiSuggestSchedule}>
-                  Suggest schedule
+                  {t("spaceHub.ai.suggestSchedule")}
                 </button>
                 <button type="button" className="sdv-btn sdv-btn-sm" onClick={onGenerateNextAction}>
-                  Generate next action
+                  {t("spaceHub.ai.generateNextAction")}
                 </button>
               </div>
             </>
@@ -244,22 +247,22 @@ export function SpaceOverviewTab({
         {/* Focus records (§19) */}
         <section className="sdv-card">
           <header className="sdv-card-head">
-            <h2>Focus Records</h2>
+            <h2>{t("spaceHub.section.focusRecords")}</h2>
             <button type="button" className="sdv-link" onClick={() => onOpenTab("focus")}>
-              View all
+              {t("spaceHub.action.viewAll")}
             </button>
           </header>
           {recentSessions.length === 0 ? (
             <div className="sdv-empty">
-              <p>No focus records for this Space yet.</p>
+              <p>{t("spaceHub.empty.noFocusRecords")}</p>
             </div>
           ) : (
             <ul className="sdv-record-list">
               {recentSessions.map((session) => (
                 <li key={session.id}>
                   <button type="button" onClick={() => onOpenSession(session.id)}>
-                    <strong>{session.title || "Untitled focus"}</strong>
-                    <small>{relativeTime(session.endAt || session.createdAt)}</small>
+                    <strong>{session.title || t("spaceHub.untitledFocus")}</strong>
+                    <small>{relativeTime(session.endAt || session.createdAt, t)}</small>
                     <span>{formatSeconds(sessionSeconds(session))}</span>
                   </button>
                 </li>
@@ -271,16 +274,16 @@ export function SpaceOverviewTab({
         {/* Notes / resources (§20) */}
         <section className="sdv-card">
           <header className="sdv-card-head">
-            <h2>Notes / Resources</h2>
+            <h2>{t("spaceHub.section.notesResources")}</h2>
             <button type="button" className="sdv-link" onClick={() => onOpenTab("notes")}>
-              View all
+              {t("spaceHub.action.viewAll")}
             </button>
           </header>
           {spaceNotes.length === 0 ? (
             <div className="sdv-empty">
-              <p>No notes yet. Add feedback, meeting notes, or reference links.</p>
+              <p>{t("spaceHub.empty.noNotes")}</p>
               <button type="button" className="sdv-btn sdv-btn-sm" onClick={onAddNote}>
-                {preset.addNoteLabel}
+                {presetText(t, preset.addNoteLabel)}
               </button>
             </div>
           ) : (
@@ -289,7 +292,7 @@ export function SpaceOverviewTab({
                 <li key={note.id}>
                   <button type="button" onClick={() => onOpenNote(note.id)}>
                     <strong>{note.title}</strong>
-                    <small>{note.type}</small>
+                    <small>{noteTypeText(t, note.type)}</small>
                     {note.url ? <span aria-hidden="true">🔗</span> : null}
                   </button>
                 </li>

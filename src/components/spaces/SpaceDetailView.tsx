@@ -10,6 +10,8 @@ import {
   type SpaceTab,
 } from "../../lib/spaceHubTypes";
 import { getSpacePreset, resolveTaskGroups } from "../../lib/spaceTypeConfig";
+import { useT } from "../../i18n";
+import { presetText, tabText, hubTypeText, upcomingKindText } from "../../lib/spaceHubI18n";
 import {
   deriveSpaceActivities,
   formatSeconds,
@@ -113,6 +115,7 @@ export function SpaceDetailView({
   onNavigate,
   showToast,
 }: SpaceDetailViewProps) {
+  const { t } = useT();
   const hub = useSpaceHubData();
   const [tab, setTabState] = useState<SpaceTab>(readTabFromUrl);
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
@@ -153,13 +156,13 @@ export function SpaceDetailView({
     [hub.notes, space.id],
   );
   const activities = useMemo(
-    () => deriveSpaceActivities(space.id, spaceTasks, spaceSessions, spaceNotes, hub.activities),
-    [space.id, spaceTasks, spaceSessions, spaceNotes, hub.activities],
+    () => deriveSpaceActivities(space.id, spaceTasks, spaceSessions, spaceNotes, hub.activities, t),
+    [space.id, spaceTasks, spaceSessions, spaceNotes, hub.activities, t],
   );
 
   const counts = getSpaceTaskCounts(spaceTasks, today);
   const nextAction = getNextActionTask(spaceTasks, config, today);
-  const signal = getSpaceSignal(hubType, spaceTasks, spaceSessions, reviewNotes, today);
+  const signal = getSpaceSignal(hubType, spaceTasks, spaceSessions, reviewNotes, t, today);
   const todayFocusSeconds = getTodaySpaceFocusSeconds(spaceSessions, today);
   const weekFocusSeconds = getWeekSpaceFocusSeconds(spaceSessions, weekStart);
   const upcoming = getUpcomingSpaceItems(spaceTasks, reviewNotes, today);
@@ -218,13 +221,13 @@ export function SpaceDetailView({
       projectId: sourceProjectId ?? "",
       tags,
     });
-    showToast({ message: `Task added to ${displayName}.` });
+    showToast({ message: t("spaceHub.toast.taskAdded", { name: displayName }) });
     setModal({ kind: "none" });
   }
 
   function handleCreateSpaceNote(input: Parameters<typeof hub.addNote>[1]) {
     hub.addNote(space.id, input);
-    showToast({ message: "Note added." });
+    showToast({ message: t("spaceHub.toast.noteAdded") });
     setModal({ kind: "none" });
   }
 
@@ -239,11 +242,11 @@ export function SpaceDetailView({
     });
     hub.addActivity(space.id, {
       type: "task_scheduled",
-      title: `Task scheduled: ${task.title}`,
+      title: t("spaceHub.activity.taskScheduled", { title: task.title }),
       description: `${formatDate(input.date)} ${input.startTime}`,
       relatedTaskId: taskId,
     });
-    showToast({ message: "Task scheduled." });
+    showToast({ message: t("spaceHub.toast.taskScheduled") });
     setModal({ kind: "none" });
   }
 
@@ -259,18 +262,18 @@ export function SpaceDetailView({
       return;
     }
     onStartFocus(targetId, "focus_page");
-    showToast({ message: "Focus started." });
+    showToast({ message: t("spaceHub.toast.focusStarted") });
     setModal({ kind: "none" });
   }
 
   function handleCompleteTask(taskId: string) {
     onCompleteTask(taskId);
-    showToast({ message: "Task completed." });
+    showToast({ message: t("spaceHub.toast.taskCompleted") });
   }
 
   function handlePinNextAction(taskId: string) {
     hub.updateConfig(space.id, { pinnedNextActionTaskId: taskId });
-    showToast({ message: "Pinned as next action." });
+    showToast({ message: t("spaceHub.toast.pinned") });
   }
 
   // AI summary is generated only on explicit user action (§2.3) and is
@@ -279,15 +282,22 @@ export function SpaceDetailView({
     setAiSummary({ state: "loading", text: "", tips: [] });
     window.setTimeout(() => {
       const tips: string[] = [];
-      if (counts.overdue > 0) tips.push(`Handle ${counts.overdue} overdue task${counts.overdue > 1 ? "s" : ""} first.`);
-      if (unscheduledTasks.length > 0) tips.push(`Place ${Math.min(unscheduledTasks.length, 3)} unscheduled tasks on the calendar.`);
+      if (counts.overdue > 0) tips.push(t("spaceHub.tip.overdue", { n: counts.overdue }));
+      if (unscheduledTasks.length > 0) tips.push(t("spaceHub.tip.place", { n: Math.min(unscheduledTasks.length, 3) }));
       if (weekFocusSeconds < config.defaults.weeklyFocusGoalSeconds / 2)
-        tips.push(`Reserve a ${config.defaults.defaultDurationMinutes}m focus block today to stay on the weekly goal.`);
-      if (upcoming[0]) tips.push(`Prepare for "${upcoming[0].title}" (${formatDate(upcoming[0].when)}).`);
-      if (tips.length === 0) tips.push("Everything looks on track. Keep the current rhythm.");
+        tips.push(t("spaceHub.tip.reserve", { n: config.defaults.defaultDurationMinutes }));
+      if (upcoming[0]) tips.push(t("spaceHub.tip.prepare", { title: upcoming[0].title, date: formatDate(upcoming[0].when) }));
+      if (tips.length === 0) tips.push(t("spaceHub.tip.onTrack"));
       setAiSummary({
         state: "ready",
-        text: `${signal.label}: ${signal.detail}. This week ${formatSeconds(weekFocusSeconds)} focused, ${counts.open} open tasks (${counts.unscheduled} unscheduled, ${counts.overdue} overdue).`,
+        text: t("spaceHub.aiSummary.text", {
+          label: signal.label,
+          detail: signal.detail,
+          focus: formatSeconds(weekFocusSeconds),
+          open: counts.open,
+          unscheduled: counts.unscheduled,
+          overdue: counts.overdue,
+        }),
         tips,
       });
     }, 500);
@@ -309,7 +319,7 @@ export function SpaceDetailView({
   function handleAiSuggestSchedule() {
     const suggestions = buildScheduleSuggestions();
     if (suggestions.length === 0) {
-      showToast({ message: "No unscheduled tasks to place." });
+      showToast({ message: t("spaceHub.toast.noUnscheduled") });
       return;
     }
     setModal({ kind: "ai_schedule_preview", suggestions });
@@ -328,17 +338,17 @@ export function SpaceDetailView({
     }
     hub.addActivity(space.id, {
       type: "ai_suggestion_applied",
-      title: `AI schedule applied: ${suggestions.length} task${suggestions.length > 1 ? "s" : ""} placed`,
+      title: t("spaceHub.activity.aiApplied", { n: suggestions.length }),
       description: suggestions.map((item) => item.title).join(", "),
     });
-    showToast({ message: `${suggestions.length} tasks scheduled.` });
+    showToast({ message: t("spaceHub.toast.tasksScheduled", { n: suggestions.length }) });
     setModal({ kind: "none" });
   }
 
   function handleGenerateNextAction() {
     const candidate = getNextActionTask(spaceTasks, { ...config, pinnedNextActionTaskId: undefined }, today);
     if (!candidate) {
-      showToast({ message: "No open tasks to recommend." });
+      showToast({ message: t("spaceHub.toast.noRecommend") });
       return;
     }
     handlePinNextAction(candidate.id);
@@ -346,7 +356,7 @@ export function SpaceDetailView({
 
   function handleManualRecord(input: { title: string; description: string }) {
     hub.addActivity(space.id, { type: "manual_record", title: input.title, description: input.description });
-    showToast({ message: "Record added." });
+    showToast({ message: t("spaceHub.toast.recordAdded") });
     setModal({ kind: "none" });
   }
 
@@ -369,7 +379,7 @@ export function SpaceDetailView({
     if (sourceProjectId) {
       onUpdateProject(sourceProjectId, { name: input.name, description: input.description });
     }
-    showToast({ message: "Space settings saved." });
+    showToast({ message: t("spaceHub.toast.settingsSaved") });
     setDrawer({ kind: "none" });
   }
 
@@ -391,7 +401,7 @@ export function SpaceDetailView({
   return (
     <div className="sdv-page" style={{ ["--sdv-accent" as string]: displayColor }}>
       <button type="button" className="sdv-back" onClick={onBack}>
-        <span aria-hidden="true">←</span> Back to Spaces
+        <span aria-hidden="true">←</span> {t("spaceHub.backToSpaces")}
       </button>
 
       {/* Space Header Card (§7) */}
@@ -403,20 +413,22 @@ export function SpaceDetailView({
           <div>
             <h1>{displayName}</h1>
             <p className="sdv-header-subtitle">
-              {preset.headerSubtitle === displayDescription ? displayDescription : `${capitalize(hubType)} Space · ${displayDescription}`}
+              {preset.headerSubtitle === displayDescription
+                ? presetText(t, displayDescription)
+                : t("spaceHub.headerSubtitle", { type: hubTypeText(t, hubType), desc: displayDescription })}
             </p>
             <p className="sdv-header-counts">
-              {counts.total} tasks · {counts.scheduled} scheduled ·{" "}
-              <span className={counts.overdue > 0 ? "sdv-overdue" : ""}>{counts.overdue} overdue</span>
+              {t("spaceHub.header.tasksScheduled", { total: counts.total, scheduled: counts.scheduled })} ·{" "}
+              <span className={counts.overdue > 0 ? "sdv-overdue" : ""}>{t("spaceHub.header.overdue", { n: counts.overdue })}</span>
             </p>
           </div>
         </div>
         <div className="sdv-header-actions">
           <button type="button" className="sdv-btn" onClick={() => setModal({ kind: "add_task" })}>
-            {preset.addTaskLabel}
+            {presetText(t, preset.addTaskLabel)}
           </button>
           <button type="button" className="sdv-btn" onClick={() => setModal({ kind: "add_note" })}>
-            {preset.addNoteLabel}
+            {presetText(t, preset.addNoteLabel)}
           </button>
           <button
             type="button"
@@ -424,19 +436,19 @@ export function SpaceDetailView({
             onClick={() => {
               const target = unscheduledTasks[0];
               if (target) openScheduleModal(target.id);
-              else showToast({ message: "No unscheduled tasks in this Space." });
+              else showToast({ message: t("spaceHub.toast.noUnscheduledInSpace") });
             }}
           >
-            {preset.scheduleLabel}
+            {presetText(t, preset.scheduleLabel)}
           </button>
           <button type="button" className="sdv-btn sdv-btn-primary" onClick={() => handleStartFocus()}>
-            {preset.startFocusLabel}
+            {presetText(t, preset.startFocusLabel)}
           </button>
           <span className={`sdv-status-pill sdv-status-${signal.status}`}>{signal.label}</span>
           <button
             type="button"
             className="sdv-btn sdv-btn-icon"
-            aria-label="Space settings"
+            aria-label={t("spaceHub.aria.settings")}
             onClick={() => setDrawer({ kind: "settings" })}
           >
             <span className="sdv-more-dots" aria-hidden="true">...</span>
@@ -445,51 +457,53 @@ export function SpaceDetailView({
       </header>
 
       {/* Overview metric cards (§8-12) */}
-      <section className="sdv-metric-grid" aria-label="Space overview cards">
+      <section className="sdv-metric-grid" aria-label={t("spaceHub.aria.overviewCards")}>
         {config.overviewCards.nextAction ? (
           <article className="sdv-metric-card">
-            <h3>{preset.nextActionLabel}</h3>
+            <h3>{presetText(t, preset.nextActionLabel)}</h3>
             {nextAction ? (
               <>
                 <strong className="sdv-metric-title">{nextAction.title}</strong>
                 <small>
-                  {estOf(nextAction)}m estimated
-                  {nextAction.dueDate ? ` · due ${formatDate(nextAction.dueDate)}` : ""}
+                  {t("spaceHub.est.estimated", { n: estOf(nextAction) })}
+                  {nextAction.dueDate ? t("spaceHub.est.due", { date: formatDate(nextAction.dueDate) }) : ""}
                 </small>
                 <div className="sdv-metric-actions">
                   <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={() => handleStartFocus(nextAction.id)}>
-                    {preset.startFocusLabel}
+                    {presetText(t, preset.startFocusLabel)}
                   </button>
                   <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => openScheduleModal(nextAction.id)}>
-                    Schedule
+                    {t("spaceHub.action.schedule")}
                   </button>
                 </div>
               </>
             ) : (
-              <p className="sdv-empty-inline">No open tasks. Add the first one.</p>
+              <p className="sdv-empty-inline">{t("spaceHub.empty.noOpenTasks")}</p>
             )}
           </article>
         ) : null}
         {config.overviewCards.signal ? (
           <article className="sdv-metric-card">
-            <h3>{preset.signalLabel}</h3>
+            <h3>{presetText(t, preset.signalLabel)}</h3>
             <strong className={`sdv-metric-title sdv-signal-${signal.status}`}>{signal.label}</strong>
             <small>{signal.detail}</small>
             <div className="sdv-metric-actions">
               <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => setTab("records")}>
-                View details
+                {t("spaceHub.action.viewDetails")}
               </button>
             </div>
           </article>
         ) : null}
         {config.overviewCards.focusTime ? (
           <article className="sdv-metric-card">
-            <h3>{preset.focusTimeLabel}</h3>
-            <strong className="sdv-metric-title">{formatSeconds(weekFocusSeconds)} this week</strong>
+            <h3>{presetText(t, preset.focusTimeLabel)}</h3>
+            <strong className="sdv-metric-title">{t("spaceHub.focus.thisWeek", { time: formatSeconds(weekFocusSeconds) })}</strong>
             <small>
-              Today {formatSeconds(todayFocusSeconds)} · goal{" "}
-              {Math.min(100, Math.round((weekFocusSeconds / Math.max(config.defaults.weeklyFocusGoalSeconds, 1)) * 100))}% of{" "}
-              {formatSeconds(config.defaults.weeklyFocusGoalSeconds)}
+              {t("spaceHub.focus.todayGoal", {
+                today: formatSeconds(todayFocusSeconds),
+                pct: Math.min(100, Math.round((weekFocusSeconds / Math.max(config.defaults.weeklyFocusGoalSeconds, 1)) * 100)),
+                goal: formatSeconds(config.defaults.weeklyFocusGoalSeconds),
+              })}
             </small>
             <div
               className="sdv-progress"
@@ -508,14 +522,14 @@ export function SpaceDetailView({
         ) : null}
         {config.overviewCards.upcoming ? (
           <article className="sdv-metric-card">
-            <h3>{preset.upcomingLabel}</h3>
+            <h3>{presetText(t, preset.upcomingLabel)}</h3>
             {upcoming.length === 0 ? (
-              <p className="sdv-empty-inline">Nothing coming up this week.</p>
+              <p className="sdv-empty-inline">{t("spaceHub.empty.nothingUpcoming")}</p>
             ) : (
               <ul className="sdv-upcoming-list">
                 {upcoming.map((item) => (
                   <li key={item.id}>
-                    <span className={`sdv-upcoming-kind sdv-kind-${item.kind}`}>{item.kind}</span>
+                    <span className={`sdv-upcoming-kind sdv-kind-${item.kind}`}>{upcomingKindText(t, item.kind)}</span>
                     <span className="sdv-upcoming-title">{item.title}</span>
                     <small>{formatDate(item.when)}</small>
                   </li>
@@ -524,7 +538,7 @@ export function SpaceDetailView({
             )}
             <div className="sdv-metric-actions">
               <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => setTab("calendar")}>
-                Open calendar
+                {t("spaceHub.action.openCalendar")}
               </button>
             </div>
           </article>
@@ -532,7 +546,7 @@ export function SpaceDetailView({
       </section>
 
       {/* Tab navigation (§13) */}
-      <nav className="sdv-tab-nav" role="tablist" aria-label="Space sections">
+      <nav className="sdv-tab-nav" role="tablist" aria-label={t("spaceHub.aria.sections")}>
         {SPACE_TABS.map((item) => (
           <button
             key={item}
@@ -542,7 +556,7 @@ export function SpaceDetailView({
             className={tab === item ? "active" : ""}
             onClick={() => setTab(item)}
           >
-            {capitalize(item)}
+            {tabText(t, item)}
           </button>
         ))}
       </nav>
@@ -626,7 +640,7 @@ export function SpaceDetailView({
       ) : null}
 
       {/* Floating AI button (§26) */}
-      <button type="button" className="sdv-floating-ai" aria-label="Open Space AI assistant" onClick={() => setDrawer({ kind: "ai" })}>
+      <button type="button" className="sdv-floating-ai" aria-label={t("spaceHub.aria.aiAssistant")} onClick={() => setDrawer({ kind: "ai" })}>
         ✦
       </button>
 
@@ -732,7 +746,7 @@ export function SpaceDetailView({
           onDelete={() => {
             hub.deleteNote(drawerNote.id);
             setDrawer({ kind: "none" });
-            showToast({ message: "Note deleted." });
+            showToast({ message: t("spaceHub.toast.noteDeleted") });
           }}
           onClose={() => setDrawer({ kind: "none" })}
         />
@@ -768,8 +782,4 @@ export function SpaceDetailView({
       ) : null}
     </div>
   );
-}
-
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }

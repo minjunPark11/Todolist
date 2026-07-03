@@ -9,14 +9,17 @@ import {
   type UpcomingItem,
 } from "../../lib/spaceSelectors";
 import { formatDate } from "../../utils/date";
+import { useT } from "../../i18n";
+import { noteTypeText } from "../../lib/spaceHubI18n";
 
 function DrawerShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const { t } = useT();
   return (
     <div className="sdv-drawer-backdrop" onClick={onClose}>
       <aside className="sdv-drawer" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
         <header className="sdv-drawer-head">
           <h2>{title}</h2>
-          <button type="button" aria-label={`Close ${title}`} onClick={onClose}>
+          <button type="button" aria-label={t("spaceHub.aria.close", { title })} onClick={onClose}>
             ✕
           </button>
         </header>
@@ -56,41 +59,42 @@ export function TaskDetailDrawer({
   onOpenNote: (noteId: string) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const project = projects.find((item) => item.id === task.projectId);
   const done = task.status === "done";
   return (
-    <DrawerShell title="Task" onClose={onClose}>
+    <DrawerShell title={t("spaceHub.drawer.task")} onClose={onClose}>
       <h3 className="sdv-drawer-title">{task.title}</h3>
       <dl className="sdv-detail-list">
         <div>
-          <dt>Status</dt>
-          <dd>{task.status}</dd>
+          <dt>{t("spaceHub.field.status")}</dt>
+          <dd>{t(`spaceHub.taskStatus.${task.status}`)}</dd>
         </div>
         <div>
-          <dt>Estimated</dt>
+          <dt>{t("spaceHub.field.estimatedLabel")}</dt>
           <dd>{estMinutes}m</dd>
         </div>
         <div>
-          <dt>Actual</dt>
+          <dt>{t("spaceHub.field.actual")}</dt>
           <dd>{task.actualSeconds ? formatSeconds(task.actualSeconds) : "—"}</dd>
         </div>
         <div>
-          <dt>Due date</dt>
+          <dt>{t("spaceHub.field.dueDate")}</dt>
           <dd>{task.dueDate ? formatDate(task.dueDate) : "—"}</dd>
         </div>
         <div>
-          <dt>Scheduled</dt>
+          <dt>{t("spaceHub.field.scheduled")}</dt>
           <dd>
-            {task.scheduledDate ? `${formatDate(task.scheduledDate)}${task.startTime ? ` ${task.startTime}` : ""}` : "Unscheduled"}
+            {task.scheduledDate ? `${formatDate(task.scheduledDate)}${task.startTime ? ` ${task.startTime}` : ""}` : t("spaceHub.value.unscheduled")}
           </dd>
         </div>
         <div>
-          <dt>Priority</dt>
-          <dd>{task.priority}</dd>
+          <dt>{t("spaceHub.field.priority")}</dt>
+          <dd>{t(`spaceHub.priority.${task.priority}`)}</dd>
         </div>
         {project ? (
           <div>
-            <dt>Project</dt>
+            <dt>{t("spaceHub.field.project")}</dt>
             <dd>{project.name}</dd>
           </div>
         ) : null}
@@ -99,7 +103,7 @@ export function TaskDetailDrawer({
 
       {sessions.length > 0 ? (
         <>
-          <h4>Focus sessions</h4>
+          <h4>{t("spaceHub.section.focusSessions")}</h4>
           <ul className="sdv-record-list">
             {sessions.slice(0, 4).map((session) => (
               <li key={session.id}>
@@ -114,13 +118,13 @@ export function TaskDetailDrawer({
       ) : null}
       {notes.length > 0 ? (
         <>
-          <h4>Linked notes</h4>
+          <h4>{t("spaceHub.section.linkedNotes")}</h4>
           <ul className="sdv-record-list">
             {notes.map((note) => (
               <li key={note.id}>
                 <button type="button" onClick={() => onOpenNote(note.id)}>
                   <strong>{note.title}</strong>
-                  <small>{note.type}</small>
+                  <small>{noteTypeText(t, note.type)}</small>
                 </button>
               </li>
             ))}
@@ -132,21 +136,21 @@ export function TaskDetailDrawer({
         {!done ? (
           <>
             <button type="button" className="sdv-btn sdv-btn-primary" onClick={onStartFocus}>
-              Start Focus
+              {t("spaceHub.action.startFocus")}
             </button>
             <button type="button" className="sdv-btn" onClick={onSchedule}>
-              Schedule
+              {t("spaceHub.action.schedule")}
             </button>
             <button type="button" className="sdv-btn" onClick={onComplete}>
-              Mark complete
+              {t("spaceHub.action.markComplete")}
             </button>
             <button type="button" className="sdv-btn" onClick={onPin} disabled={isPinned}>
-              {isPinned ? "Pinned as next action" : "Pin as next action"}
+              {isPinned ? t("spaceHub.action.pinnedNext") : t("spaceHub.action.pinNext")}
             </button>
           </>
         ) : null}
         <button type="button" className="sdv-btn sdv-btn-danger" onClick={onArchive}>
-          Archive
+          {t("spaceHub.action.archive")}
         </button>
       </div>
     </DrawerShell>
@@ -163,25 +167,26 @@ export function SessionDetailDrawer({
   task: Task | null;
   onClose: () => void;
 }) {
+  const { t } = useT();
   return (
-    <DrawerShell title="Focus session" onClose={onClose}>
-      <h3 className="sdv-drawer-title">{session.title || task?.title || "Untitled focus"}</h3>
+    <DrawerShell title={t("spaceHub.drawer.session")} onClose={onClose}>
+      <h3 className="sdv-drawer-title">{session.title || task?.title || t("spaceHub.untitledFocus")}</h3>
       <dl className="sdv-detail-list">
         <div>
-          <dt>Duration</dt>
+          <dt>{t("spaceHub.field.duration2")}</dt>
           <dd>{formatSeconds(sessionSeconds(session))}</dd>
         </div>
         <div>
-          <dt>Started</dt>
+          <dt>{t("spaceHub.field.started")}</dt>
           <dd>{new Date(session.startAt).toLocaleString()}</dd>
         </div>
         <div>
-          <dt>Ended</dt>
-          <dd>{session.endAt ? new Date(session.endAt).toLocaleString() : "In progress"}</dd>
+          <dt>{t("spaceHub.field.ended")}</dt>
+          <dd>{session.endAt ? new Date(session.endAt).toLocaleString() : t("spaceHub.value.inProgress")}</dd>
         </div>
         <div>
-          <dt>Status</dt>
-          <dd>{session.status}</dd>
+          <dt>{t("spaceHub.field.status")}</dt>
+          <dd>{t(`spaceHub.sessionStatus.${session.status}`)}</dd>
         </div>
       </dl>
       {session.focusNote ? <p className="sdv-drawer-notes">{session.focusNote}</p> : null}
@@ -203,20 +208,21 @@ export function NoteDetailDrawer({
   onDelete: () => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(note.title);
   const [body, setBody] = useState(note.body);
 
   return (
-    <DrawerShell title="Note" onClose={onClose}>
+    <DrawerShell title={t("spaceHub.drawer.note")} onClose={onClose}>
       {editing ? (
         <div className="sdv-form">
           <label>
-            Title
+            {t("spaceHub.field.title")}
             <input value={title} onChange={(event) => setTitle(event.target.value)} />
           </label>
           <label>
-            Body
+            {t("spaceHub.field.body")}
             <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={6} />
           </label>
           <div className="sdv-drawer-actions">
@@ -228,27 +234,27 @@ export function NoteDetailDrawer({
                 setEditing(false);
               }}
             >
-              Save
+              {t("spaceHub.action.save")}
             </button>
             <button type="button" className="sdv-btn" onClick={() => setEditing(false)}>
-              Cancel
+              {t("spaceHub.action.cancel")}
             </button>
           </div>
         </div>
       ) : (
         <>
           <h3 className="sdv-drawer-title">{note.title}</h3>
-          <span className="sdv-note-type">{note.type}</span>
+          <span className="sdv-note-type">{noteTypeText(t, note.type)}</span>
           {note.body ? <p className="sdv-drawer-notes">{note.body}</p> : null}
           {note.url ? (
             <a className="sdv-btn sdv-btn-sm" href={note.url} target="_blank" rel="noreferrer">
-              Open link ↗
+              {t("spaceHub.action.openLink")}
             </a>
           ) : null}
           {relatedTask ? (
             <dl className="sdv-detail-list">
               <div>
-                <dt>Related task</dt>
+                <dt>{t("spaceHub.field.relatedTask")}</dt>
                 <dd>{relatedTask.title}</dd>
               </div>
             </dl>
@@ -264,10 +270,10 @@ export function NoteDetailDrawer({
           ) : null}
           <div className="sdv-drawer-actions">
             <button type="button" className="sdv-btn" onClick={() => setEditing(true)}>
-              Edit
+              {t("spaceHub.action.edit")}
             </button>
             <button type="button" className="sdv-btn sdv-btn-danger" onClick={onDelete}>
-              Delete
+              {t("spaceHub.action.delete")}
             </button>
           </div>
         </>
@@ -298,6 +304,7 @@ export function SpaceAiDrawer({
   onGenerateNextAction: () => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [messages, setMessages] = useState<{ id: number; command: string; reply: string }[]>([]);
 
   function respond(command: string, reply: string) {
@@ -306,46 +313,54 @@ export function SpaceAiDrawer({
 
   const commands: { label: string; run: () => void }[] = [
     {
-      label: "Summarize this Space",
+      label: t("spaceHub.cmd.summarize"),
       run: () =>
         respond(
-          "Summarize this Space",
-          `${spaceName}: ${signal.label} (${signal.detail}). ${counts.open} open tasks, ${counts.unscheduled} unscheduled, ${counts.overdue} overdue. ${formatSeconds(weekFocusSeconds)} focused this week.`,
+          t("spaceHub.cmd.summarize"),
+          t("spaceHub.cmd.summarizeReply", {
+            name: spaceName,
+            label: signal.label,
+            detail: signal.detail,
+            open: counts.open,
+            unscheduled: counts.unscheduled,
+            overdue: counts.overdue,
+            focus: formatSeconds(weekFocusSeconds),
+          }),
         ),
     },
     {
-      label: "Recommend next action",
+      label: t("spaceHub.cmd.recommend"),
       run: () =>
         respond(
-          "Recommend next action",
-          nextAction ? `Start with "${nextAction.title}". Use the button below to pin it as the next action.` : "No open tasks to recommend — add a task first.",
+          t("spaceHub.cmd.recommend"),
+          nextAction ? t("spaceHub.cmd.recommendReply", { title: nextAction.title }) : t("spaceHub.cmd.recommendEmpty"),
         ),
     },
     {
-      label: "Check deadline risk",
+      label: t("spaceHub.cmd.deadline"),
       run: () =>
         respond(
-          "Check deadline risk",
+          t("spaceHub.cmd.deadline"),
           counts.overdue > 0
-            ? `${counts.overdue} tasks are overdue — handle these first.`
+            ? t("spaceHub.cmd.deadlineOverdue", { n: counts.overdue })
             : upcoming.length > 0
-              ? `Nearest item: "${upcoming[0].title}" on ${formatDate(upcoming[0].when)}. No overdue tasks.`
-              : "No deadlines at risk this week.",
+              ? t("spaceHub.cmd.deadlineNearest", { title: upcoming[0].title, date: formatDate(upcoming[0].when) })
+              : t("spaceHub.cmd.deadlineNone"),
         ),
     },
     {
-      label: "Review recent records",
+      label: t("spaceHub.cmd.review"),
       run: () =>
         respond(
-          "Review recent records",
-          `This week: ${formatSeconds(weekFocusSeconds)} of focus. ${counts.done} tasks done in this Space overall. Check the Records tab for the full timeline.`,
+          t("spaceHub.cmd.review"),
+          t("spaceHub.cmd.reviewReply", { focus: formatSeconds(weekFocusSeconds), done: counts.done }),
         ),
     },
   ];
 
   return (
-    <DrawerShell title={`${spaceName} AI`} onClose={onClose}>
-      <p className="sdv-modal-copy">Ask about this Space. Suggestions never change data until you apply them.</p>
+    <DrawerShell title={t("spaceHub.drawer.aiTitle", { name: spaceName })} onClose={onClose}>
+      <p className="sdv-modal-copy">{t("spaceHub.ai.drawerIntro")}</p>
       <div className="sdv-ai-commands">
         {commands.map((command) => (
           <button key={command.label} type="button" className="sdv-chip" onClick={command.run}>
@@ -353,15 +368,15 @@ export function SpaceAiDrawer({
           </button>
         ))}
         <button type="button" className="sdv-chip" onClick={onSuggestSchedule}>
-          Place this week's tasks
+          {t("spaceHub.cmd.placeWeek")}
         </button>
         <button type="button" className="sdv-chip" onClick={onGenerateNextAction}>
-          Generate next action
+          {t("spaceHub.ai.generateNextAction")}
         </button>
       </div>
       <div className="sdv-ai-log" aria-live="polite">
         {messages.length === 0 ? (
-          <p className="sdv-empty-inline">Pick a command above to get started.</p>
+          <p className="sdv-empty-inline">{t("spaceHub.ai.pickCommand")}</p>
         ) : (
           messages.map((message) => (
             <div key={message.id} className="sdv-ai-message">
@@ -404,6 +419,7 @@ export function SpaceSettingsDrawer({
   onRequestDelete: () => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [draftName, setDraftName] = useState(name);
   const [draftDescription, setDraftDescription] = useState(description);
   const [draftColor, setDraftColor] = useState(color);
@@ -423,37 +439,37 @@ export function SpaceSettingsDrawer({
   }
 
   return (
-    <DrawerShell title="Space settings" onClose={onClose}>
+    <DrawerShell title={t("spaceHub.drawer.settings")} onClose={onClose}>
       <div className="sdv-form">
-        <h4>General</h4>
+        <h4>{t("spaceHub.settings.general")}</h4>
         <label>
-          Name
+          {t("spaceHub.field.name")}
           <input value={draftName} onChange={(event) => setDraftName(event.target.value)} />
         </label>
         <label>
-          Description
+          {t("spaceHub.field.description")}
           <textarea value={draftDescription} onChange={(event) => setDraftDescription(event.target.value)} rows={2} />
         </label>
         <label>
-          Color
+          {t("spaceHub.field.color")}
           <input type="color" value={normalizeColor(draftColor)} onChange={(event) => setDraftColor(event.target.value)} />
         </label>
 
-        <h4>Task groups</h4>
+        <h4>{t("spaceHub.settings.taskGroups")}</h4>
         <ul className="sdv-group-editor">
           {draftGroups.map((group, index) => (
             <li key={group.id}>
               <input
                 value={group.label}
-                aria-label={`Group ${index + 1} name`}
+                aria-label={t("spaceHub.aria.groupName", { n: index + 1 })}
                 onChange={(event) =>
                   setDraftGroups((current) => current.map((item) => (item.id === group.id ? { ...item, label: event.target.value } : item)))
                 }
               />
-              <button type="button" aria-label="Move up" onClick={() => moveGroup(index, -1)} disabled={index === 0}>
+              <button type="button" aria-label={t("spaceHub.aria.moveUp")} onClick={() => moveGroup(index, -1)} disabled={index === 0}>
                 ↑
               </button>
-              <button type="button" aria-label="Move down" onClick={() => moveGroup(index, 1)} disabled={index === draftGroups.length - 1}>
+              <button type="button" aria-label={t("spaceHub.aria.moveDown")} onClick={() => moveGroup(index, 1)} disabled={index === draftGroups.length - 1}>
                 ↓
               </button>
               <button
@@ -463,7 +479,7 @@ export function SpaceSettingsDrawer({
                   setDraftGroups((current) => current.map((item) => (item.id === group.id ? { ...item, hidden: !item.hidden } : item)))
                 }
               >
-                {group.hidden ? "Hidden" : "Visible"}
+                {group.hidden ? t("spaceHub.settings.hidden") : t("spaceHub.settings.visible")}
               </button>
             </li>
           ))}
@@ -471,8 +487,8 @@ export function SpaceSettingsDrawer({
         <div className="sdv-form-row sdv-add-group">
           <input
             value={newGroupLabel}
-            placeholder="New group name"
-            aria-label="New group name"
+            placeholder={t("spaceHub.settings.newGroupName")}
+            aria-label={t("spaceHub.settings.newGroupName")}
             onChange={(event) => setNewGroupLabel(event.target.value)}
           />
           <button
@@ -487,33 +503,33 @@ export function SpaceSettingsDrawer({
               setNewGroupLabel("");
             }}
           >
-            Add group
+            {t("spaceHub.action.addGroup")}
           </button>
         </div>
 
-        <h4>Overview cards</h4>
+        <h4>{t("spaceHub.settings.overviewCards")}</h4>
         {(
           [
-            ["nextAction", "Next Action"],
-            ["signal", "Signal"],
-            ["focusTime", "Focus Time"],
-            ["upcoming", "Upcoming"],
+            ["nextAction", "spaceHub.settings.card.nextAction"],
+            ["signal", "spaceHub.settings.card.signal"],
+            ["focusTime", "spaceHub.settings.card.focusTime"],
+            ["upcoming", "spaceHub.settings.card.upcoming"],
           ] as const
-        ).map(([key, label]) => (
+        ).map(([key, labelKey]) => (
           <label key={key} className="sdv-check-row">
             <input
               type="checkbox"
               checked={draftCards[key]}
               onChange={(event) => setDraftCards((current) => ({ ...current, [key]: event.target.checked }))}
             />
-            {label}
+            {t(labelKey)}
           </label>
         ))}
 
-        <h4>Defaults</h4>
+        <h4>{t("spaceHub.settings.defaults")}</h4>
         <div className="sdv-form-row">
           <label>
-            Default duration (min)
+            {t("spaceHub.settings.defaultDuration")}
             <input
               type="number"
               min={5}
@@ -528,7 +544,7 @@ export function SpaceSettingsDrawer({
             />
           </label>
           <label>
-            Weekly focus goal (hours)
+            {t("spaceHub.settings.weeklyGoal")}
             <input
               type="number"
               min={1}
@@ -559,13 +575,13 @@ export function SpaceSettingsDrawer({
               })
             }
           >
-            Save settings
+            {t("spaceHub.action.saveSettings")}
           </button>
           <button type="button" className="sdv-btn" onClick={onClose}>
-            Cancel
+            {t("spaceHub.action.cancel")}
           </button>
           <button type="button" className="sdv-btn sdv-btn-danger" onClick={onRequestDelete}>
-            Delete Space
+            {t("spaceHub.action.deleteSpace")}
           </button>
         </div>
       </div>

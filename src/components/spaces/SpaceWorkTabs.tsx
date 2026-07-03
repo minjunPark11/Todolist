@@ -12,6 +12,8 @@ import {
   sessionSeconds,
 } from "../../lib/spaceSelectors";
 import { addDays, formatDate, getWeekDays, getWeekStart, todayValue } from "../../utils/date";
+import { useT } from "../../i18n";
+import { presetText, groupText } from "../../lib/spaceHubI18n";
 
 type StatusFilter = "all" | "open" | "scheduled" | "unscheduled" | "done";
 type SortMode = "updated" | "due" | "title";
@@ -38,6 +40,7 @@ export function SpaceTasksTab({
   onSchedule: (taskId: string) => void;
   onAddTask: () => void;
 }) {
+  const { t } = useT();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [groupFilter, setGroupFilter] = useState("all");
@@ -73,41 +76,41 @@ export function SpaceTasksTab({
       <header className="sdv-toolbar">
         <input
           type="search"
-          placeholder="Search tasks..."
-          aria-label="Search tasks in this Space"
+          placeholder={t("spaceHub.search.tasks")}
+          aria-label={t("spaceHub.aria.searchTasks")}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <select aria-label="Status filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
-          <option value="all">All statuses</option>
-          <option value="open">Open</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="unscheduled">Unscheduled</option>
-          <option value="done">Done</option>
+        <select aria-label={t("spaceHub.aria.statusFilter")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+          <option value="all">{t("spaceHub.filter.allStatuses")}</option>
+          <option value="open">{t("spaceHub.filter.open")}</option>
+          <option value="scheduled">{t("spaceHub.filter.scheduled")}</option>
+          <option value="unscheduled">{t("spaceHub.filter.unscheduled")}</option>
+          <option value="done">{t("spaceHub.filter.done")}</option>
         </select>
-        <select aria-label="Group filter" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
-          <option value="all">All groups</option>
+        <select aria-label={t("spaceHub.aria.groupFilter")} value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
+          <option value="all">{t("spaceHub.filter.allGroups")}</option>
           {groupLabels.map((label) => (
             <option key={label} value={label}>
-              {label}
+              {groupText(t, label)}
             </option>
           ))}
         </select>
-        <select aria-label="Sort tasks" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
-          <option value="updated">Recently updated</option>
-          <option value="due">Due date</option>
-          <option value="title">Title</option>
+        <select aria-label={t("spaceHub.aria.sortTasks")} value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
+          <option value="updated">{t("spaceHub.sort.updated")}</option>
+          <option value="due">{t("spaceHub.sort.due")}</option>
+          <option value="title">{t("spaceHub.sort.title")}</option>
         </select>
         <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onAddTask}>
-          {preset.addTaskLabel}
+          {presetText(t, preset.addTaskLabel)}
         </button>
       </header>
 
       {spaceTasks.length === 0 ? (
         <div className="sdv-empty">
-          <p>No tasks in this Space yet. Add the first one.</p>
+          <p>{t("spaceHub.empty.noTasks")}</p>
           <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onAddTask}>
-            {preset.addTaskLabel}
+            {presetText(t, preset.addTaskLabel)}
           </button>
         </div>
       ) : (
@@ -115,7 +118,7 @@ export function SpaceTasksTab({
           section.tasks.length === 0 ? null : (
             <div key={section.label} className="sdv-task-group">
               <h3>
-                {section.label} <span>{section.tasks.length}</span>
+                {groupText(t, section.label)} <span>{section.tasks.length}</span>
               </h3>
               <ul className="sdv-task-list">
                 {section.tasks.map((task) => (
@@ -123,7 +126,7 @@ export function SpaceTasksTab({
                     <input
                       type="checkbox"
                       checked={isTaskDone(task)}
-                      aria-label={`Complete ${task.title}`}
+                      aria-label={t("spaceHub.aria.complete", { title: task.title })}
                       onChange={() => onToggleDone(task.id)}
                       disabled={isTaskDone(task)}
                     />
@@ -131,18 +134,18 @@ export function SpaceTasksTab({
                       {task.title}
                     </button>
                     <span className="sdv-task-meta">
-                      {task.dueDate ? `due ${formatDate(task.dueDate)}` : task.scheduledDate ? formatDate(task.scheduledDate) : "—"}
+                      {task.dueDate ? t("spaceHub.meta.due", { date: formatDate(task.dueDate) }) : task.scheduledDate ? formatDate(task.scheduledDate) : "—"}
                     </span>
                     <span className="sdv-task-est">{isTaskDone(task) ? "—" : `${estOf(task)}m`}</span>
                     {isTaskDone(task) ? (
-                      <span className="sdv-task-done-label">Done</span>
+                      <span className="sdv-task-done-label">{t("spaceHub.taskDone")}</span>
                     ) : (
                       <div className="sdv-row-actions">
                         <button type="button" className="sdv-btn sdv-btn-sm sdv-btn-primary" onClick={() => onStartFocus(task.id)}>
-                          {preset.startFocusLabel}
+                          {presetText(t, preset.startFocusLabel)}
                         </button>
                         <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => onSchedule(task.id)}>
-                          Schedule
+                          {t("spaceHub.action.schedule")}
                         </button>
                       </div>
                     )}
@@ -171,6 +174,7 @@ export function SpaceCalendarTab({
   onSchedule: (taskId: string) => void;
   onOpenFullCalendar: () => void;
 }) {
+  const { t } = useT();
   const today = todayValue();
   const [weekAnchor, setWeekAnchor] = useState(getWeekStart(today));
   const weekDays = getWeekDays(weekAnchor);
@@ -186,33 +190,27 @@ export function SpaceCalendarTab({
     <section className="sdv-card sdv-tab-panel">
       <header className="sdv-cal-head">
         <div className="sdv-cal-summary">
-          <span>
-            <strong>{items.filter((item) => item.kind === "scheduled").length}</strong> scheduled this week
-          </span>
-          <span>
-            <strong>{dueSoon.length}</strong> due soon
-          </span>
-          <span>
-            <strong>{counts.unscheduled}</strong> unscheduled
-          </span>
+          <span>{t("spaceHub.cal.scheduledWeek", { n: items.filter((item) => item.kind === "scheduled").length })}</span>
+          <span>{t("spaceHub.cal.dueSoon", { n: dueSoon.length })}</span>
+          <span>{t("spaceHub.cal.unscheduled", { n: counts.unscheduled })}</span>
         </div>
         <div className="sdv-cal-nav">
-          <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => setWeekAnchor(addDays(weekAnchor, -7))} aria-label="Previous week">
+          <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => setWeekAnchor(addDays(weekAnchor, -7))} aria-label={t("spaceHub.aria.prevWeek")}>
             ←
           </button>
           <span>
             {formatDate(weekAnchor)} – {formatDate(weekEnd)}
           </span>
-          <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => setWeekAnchor(addDays(weekAnchor, 7))} aria-label="Next week">
+          <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => setWeekAnchor(addDays(weekAnchor, 7))} aria-label={t("spaceHub.aria.nextWeek")}>
             →
           </button>
           <button type="button" className="sdv-link" onClick={onOpenFullCalendar}>
-            Open full calendar
+            {t("spaceHub.action.openFullCalendar")}
           </button>
         </div>
       </header>
 
-      <div className="sdv-week-strip" role="list" aria-label="This week">
+      <div className="sdv-week-strip" role="list" aria-label={t("spaceHub.aria.thisWeek")}>
         {weekDays.map((day) => {
           const dayItems = items.filter((item) => item.date === day);
           return (
@@ -235,22 +233,22 @@ export function SpaceCalendarTab({
 
       {items.length === 0 ? (
         <div className="sdv-empty">
-          <p>No Space events this week. Place a task on the calendar.</p>
+          <p>{t("spaceHub.empty.noCalendarWeek")}</p>
         </div>
       ) : null}
 
       <div className="sdv-cal-lists">
         <div>
-          <h3>Deadlines</h3>
+          <h3>{t("spaceHub.section.deadlines")}</h3>
           {dueSoon.length === 0 ? (
-            <p className="sdv-empty-inline">No deadlines in the next 3 days.</p>
+            <p className="sdv-empty-inline">{t("spaceHub.empty.noDeadlines")}</p>
           ) : (
             <ul className="sdv-record-list">
               {dueSoon.map((task) => (
                 <li key={task.id}>
                   <button type="button" onClick={() => onOpenTask(task.id)}>
                     <strong>{task.title}</strong>
-                    <small>due {formatDate(task.dueDate)}</small>
+                    <small>{t("spaceHub.meta.due", { date: formatDate(task.dueDate) })}</small>
                   </button>
                 </li>
               ))}
@@ -258,9 +256,9 @@ export function SpaceCalendarTab({
           )}
         </div>
         <div>
-          <h3>Unscheduled tasks</h3>
+          <h3>{t("spaceHub.section.unscheduledTasks")}</h3>
           {unscheduled.length === 0 ? (
-            <p className="sdv-empty-inline">Everything is placed. Nice.</p>
+            <p className="sdv-empty-inline">{t("spaceHub.empty.allPlaced")}</p>
           ) : (
             <ul className="sdv-record-list">
               {unscheduled.map((task) => (
@@ -269,7 +267,7 @@ export function SpaceCalendarTab({
                     <strong>{task.title}</strong>
                   </button>
                   <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => onSchedule(task.id)}>
-                    Schedule
+                    {t("spaceHub.action.schedule")}
                   </button>
                 </li>
               ))}
@@ -303,6 +301,7 @@ export function SpaceFocusTab({
   onOpenSession: (sessionId: string) => void;
   onOpenFocusPage: () => void;
 }) {
+  const { t } = useT();
   const today = todayValue();
   const weekStart = getWeekStart(today);
   const completed = spaceSessions.filter((session) => session.status === "completed");
@@ -330,23 +329,23 @@ export function SpaceFocusTab({
     <section className="sdv-card sdv-tab-panel">
       <div className="sdv-focus-stats">
         <div>
-          <small>Today</small>
+          <small>{t("spaceHub.focusStat.today")}</small>
           <strong>{formatSeconds(todaySeconds)}</strong>
         </div>
         <div>
-          <small>This week</small>
+          <small>{t("spaceHub.focusStat.thisWeek")}</small>
           <strong>{formatSeconds(weekSeconds)}</strong>
         </div>
         <div>
-          <small>Sessions</small>
+          <small>{t("spaceHub.focusStat.sessions")}</small>
           <strong>{completed.length}</strong>
         </div>
         <div>
-          <small>Average</small>
+          <small>{t("spaceHub.focusStat.average")}</small>
           <strong>{formatSeconds(average)}</strong>
         </div>
         <div>
-          <small>Goal</small>
+          <small>{t("spaceHub.focusStat.goal")}</small>
           <strong>{goalPct}%</strong>
         </div>
       </div>
@@ -354,26 +353,26 @@ export function SpaceFocusTab({
       {activeFocusSession ? (
         <div className="sdv-active-focus">
           <span className="sdv-pulse" aria-hidden="true" />
-          <strong>Focus in progress: {activeFocusSession.title || "Untitled"}</strong>
+          <strong>{t("spaceHub.focus.inProgress", { title: activeFocusSession.title || t("spaceHub.untitled") })}</strong>
           <button type="button" className="sdv-btn sdv-btn-sm" onClick={onOpenFocusPage}>
-            Open Focus page
+            {t("spaceHub.action.openFocusPage")}
           </button>
         </div>
       ) : null}
 
       <div className="sdv-focus-grid">
         <div>
-          <h3>Start queue</h3>
+          <h3>{t("spaceHub.section.startQueue")}</h3>
           {openTasks.length === 0 ? (
-            <p className="sdv-empty-inline">No open tasks. Add one first.</p>
+            <p className="sdv-empty-inline">{t("spaceHub.empty.noOpenTasksAddOne")}</p>
           ) : (
             <ul className="sdv-record-list">
               {openTasks.slice(0, 6).map((task) => (
                 <li key={task.id}>
                   <button type="button" onClick={() => onStartFocus(task.id)}>
                     <strong>{task.title}</strong>
-                    <small>{estOf(task)}m expected</small>
-                    <span className="sdv-btn sdv-btn-sm sdv-btn-primary">{preset.startFocusLabel}</span>
+                    <small>{t("spaceHub.est.expected", { n: estOf(task) })}</small>
+                    <span className="sdv-btn sdv-btn-sm sdv-btn-primary">{presetText(t, preset.startFocusLabel)}</span>
                   </button>
                 </li>
               ))}
@@ -381,9 +380,9 @@ export function SpaceFocusTab({
           )}
         </div>
         <div>
-          <h3>Expected vs actual</h3>
+          <h3>{t("spaceHub.section.expectedActual")}</h3>
           {actualRows.length === 0 ? (
-            <p className="sdv-empty-inline">No focus records for this Space yet. Pick a task and start.</p>
+            <p className="sdv-empty-inline">{t("spaceHub.empty.noFocusPick")}</p>
           ) : (
             <ul className="sdv-record-list">
               {actualRows.map((row) => (
@@ -391,7 +390,7 @@ export function SpaceFocusTab({
                   <div className="sdv-actual-row">
                     <strong>{row.task.title}</strong>
                     <small>
-                      {estOf(row.task)}m expected · {formatSeconds(row.seconds)} actual
+                      {t("spaceHub.est.expectedActual", { n: estOf(row.task), time: formatSeconds(row.seconds) })}
                     </small>
                   </div>
                 </li>
@@ -401,10 +400,10 @@ export function SpaceFocusTab({
         </div>
       </div>
 
-      <h3>Recent sessions</h3>
+      <h3>{t("spaceHub.section.recentSessions")}</h3>
       {completed.length === 0 ? (
         <div className="sdv-empty">
-          <p>No focus records for this Space yet. Pick a task and start a focus.</p>
+          <p>{t("spaceHub.empty.noFocusPick")}</p>
         </div>
       ) : (
         <ul className="sdv-record-list">
@@ -414,8 +413,8 @@ export function SpaceFocusTab({
             .map((session) => (
               <li key={session.id}>
                 <button type="button" onClick={() => onOpenSession(session.id)}>
-                  <strong>{session.title || "Untitled focus"}</strong>
-                  <small>{relativeTime(session.endAt || session.createdAt)}</small>
+                  <strong>{session.title || t("spaceHub.untitledFocus")}</strong>
+                  <small>{relativeTime(session.endAt || session.createdAt, t)}</small>
                   <span>{formatSeconds(sessionSeconds(session))}</span>
                 </button>
               </li>

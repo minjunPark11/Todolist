@@ -5,8 +5,10 @@ import type { SpaceNoteDraft } from "../../hooks/useSpaceHubData";
 import { isTaskDone, isTaskUnscheduled } from "../../lib/spaceSelectors";
 import { formatDate, todayValue } from "../../utils/date";
 import { useT } from "../../i18n";
+import { groupText, noteTypeText } from "../../lib/spaceHubI18n";
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const { t } = useT();
   return (
     <div className="sdv-modal-backdrop" onClick={onClose}>
       <section
@@ -18,7 +20,7 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
       >
         <header className="sdv-modal-head">
           <h2>{title}</h2>
-          <button type="button" aria-label={`Close ${title}`} onClick={onClose}>
+          <button type="button" aria-label={t("spaceHub.aria.close", { title })} onClick={onClose}>
             ✕
           </button>
         </header>
@@ -51,6 +53,7 @@ export function AddSpaceTaskModal({
   onSubmit: (input: SpaceTaskInput) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [title, setTitle] = useState("");
   const [group, setGroup] = useState(groups[0] ?? "");
   const [durationMinutes, setDurationMinutes] = useState(defaultDuration);
@@ -62,32 +65,32 @@ export function AddSpaceTaskModal({
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!title.trim()) {
-      setError("Title is required.");
+      setError(t("spaceHub.error.titleRequired"));
       return;
     }
     onSubmit({ title: title.trim(), group, durationMinutes, dueDate, priority, notes });
   }
 
   return (
-    <ModalShell title={preset.addTaskLabel.replace(/^\+\s*/, "Add ")} onClose={onClose}>
+    <ModalShell title={t("spaceHub.modal.addTaskTitle")} onClose={onClose}>
       <form className="sdv-form" onSubmit={submit}>
         <label>
-          Title
+          {t("spaceHub.field.title")}
           <input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus />
         </label>
         <div className="sdv-form-row">
           <label>
-            Group
+            {t("spaceHub.field.group")}
             <select value={group} onChange={(event) => setGroup(event.target.value)}>
               {groups.map((label) => (
                 <option key={label} value={label}>
-                  {label}
+                  {groupText(t, label)}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Estimated (min)
+            {t("spaceHub.field.estimated")}
             <input
               type="number"
               min={5}
@@ -99,30 +102,30 @@ export function AddSpaceTaskModal({
         </div>
         <div className="sdv-form-row">
           <label>
-            Due date
+            {t("spaceHub.field.dueDate")}
             <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
           </label>
           <label>
-            Priority
+            {t("spaceHub.field.priority")}
             <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)}>
-              <option value="none">None</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
+              <option value="none">{t("spaceHub.priority.none")}</option>
+              <option value="low">{t("spaceHub.priority.low")}</option>
+              <option value="medium">{t("spaceHub.priority.medium")}</option>
+              <option value="high">{t("spaceHub.priority.high")}</option>
             </select>
           </label>
         </div>
         <label>
-          Notes
+          {t("spaceHub.field.notes")}
           <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} />
         </label>
         {error ? <p className="sdv-form-error">{error}</p> : null}
         <div className="sdv-modal-actions">
           <button type="button" className="sdv-btn" onClick={onClose}>
-            Cancel
+            {t("spaceHub.action.cancel")}
           </button>
           <button type="submit" className="sdv-btn sdv-btn-primary">
-            Add task
+            {t("spaceHub.action.addTask")}
           </button>
         </div>
       </form>
@@ -142,6 +145,7 @@ export function AddSpaceNoteModal({
   onSubmit: (input: SpaceNoteDraft) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [title, setTitle] = useState("");
   const [type, setType] = useState(preset.noteTypes[0] ?? "Quick Note");
   const [body, setBody] = useState("");
@@ -153,7 +157,7 @@ export function AddSpaceNoteModal({
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!title.trim()) {
-      setError("Title is required.");
+      setError(t("spaceHub.error.titleRequired"));
       return;
     }
     onSubmit({
@@ -167,27 +171,27 @@ export function AddSpaceNoteModal({
   }
 
   return (
-    <ModalShell title={preset.addNoteLabel.replace(/^\+\s*/, "Add ")} onClose={onClose}>
+    <ModalShell title={t("spaceHub.modal.addNoteTitle")} onClose={onClose}>
       <form className="sdv-form" onSubmit={submit}>
         <label>
-          Title
+          {t("spaceHub.field.title")}
           <input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus />
         </label>
         <div className="sdv-form-row">
           <label>
-            Type
+            {t("spaceHub.field.type")}
             <select value={type} onChange={(event) => setType(event.target.value)}>
               {preset.noteTypes.map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {noteTypeText(t, item)}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Related task
+            {t("spaceHub.field.relatedTask")}
             <select value={relatedTaskId} onChange={(event) => setRelatedTaskId(event.target.value)}>
-              <option value="">None</option>
+              <option value="">{t("spaceHub.option.none")}</option>
               {spaceTasks
                 .filter((task) => !isTaskDone(task))
                 .map((task) => (
@@ -199,24 +203,24 @@ export function AddSpaceNoteModal({
           </label>
         </div>
         <label>
-          Body
+          {t("spaceHub.field.body")}
           <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={4} />
         </label>
         <label>
-          URL (optional)
+          {t("spaceHub.field.url")}
           <input type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://" />
         </label>
         <label>
-          Tags (comma separated)
+          {t("spaceHub.field.tags")}
           <input value={tagsText} onChange={(event) => setTagsText(event.target.value)} />
         </label>
         {error ? <p className="sdv-form-error">{error}</p> : null}
         <div className="sdv-modal-actions">
           <button type="button" className="sdv-btn" onClick={onClose}>
-            Cancel
+            {t("spaceHub.action.cancel")}
           </button>
           <button type="submit" className="sdv-btn sdv-btn-primary">
-            Add note
+            {t("spaceHub.action.addNote")}
           </button>
         </div>
       </form>
@@ -246,6 +250,7 @@ export function ScheduleSpaceTaskModal({
   onSubmit: (taskId: string, input: ScheduleInput) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [selectedId, setSelectedId] = useState(taskId);
   const selected = spaceTasks.find((task) => task.id === selectedId);
   const [date, setDate] = useState(selected?.scheduledDate || todayValue());
@@ -263,10 +268,10 @@ export function ScheduleSpaceTaskModal({
   }
 
   return (
-    <ModalShell title="Schedule task" onClose={onClose}>
+    <ModalShell title={t("spaceHub.modal.scheduleTitle")} onClose={onClose}>
       <form className="sdv-form" onSubmit={submit}>
         <label>
-          Task
+          {t("spaceHub.field.task")}
           <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
             {candidates.map((task) => (
               <option key={task.id} value={task.id}>
@@ -277,15 +282,15 @@ export function ScheduleSpaceTaskModal({
         </label>
         <div className="sdv-form-row">
           <label>
-            Date
+            {t("spaceHub.field.date")}
             <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
           </label>
           <label>
-            Start time
+            {t("spaceHub.field.startTime")}
             <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
           </label>
           <label>
-            Duration (min)
+            {t("spaceHub.field.duration")}
             <input
               type="number"
               min={5}
@@ -297,10 +302,10 @@ export function ScheduleSpaceTaskModal({
         </div>
         <div className="sdv-modal-actions">
           <button type="button" className="sdv-btn" onClick={onClose}>
-            Cancel
+            {t("spaceHub.action.cancel")}
           </button>
           <button type="submit" className="sdv-btn sdv-btn-primary" disabled={!selectedId}>
-            Schedule
+            {t("spaceHub.action.schedule")}
           </button>
         </div>
       </form>
@@ -316,6 +321,7 @@ export function ManualRecordModal({
   onSubmit: (input: { title: string; description: string }) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
@@ -323,30 +329,30 @@ export function ManualRecordModal({
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!title.trim()) {
-      setError("Title is required.");
+      setError(t("spaceHub.error.titleRequired"));
       return;
     }
     onSubmit({ title: title.trim(), description: description.trim() });
   }
 
   return (
-    <ModalShell title="Add manual record" onClose={onClose}>
+    <ModalShell title={t("spaceHub.modal.manualTitle")} onClose={onClose}>
       <form className="sdv-form" onSubmit={submit}>
         <label>
-          What happened?
+          {t("spaceHub.field.whatHappened")}
           <input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus />
         </label>
         <label>
-          Details (optional)
+          {t("spaceHub.field.details")}
           <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} />
         </label>
         {error ? <p className="sdv-form-error">{error}</p> : null}
         <div className="sdv-modal-actions">
           <button type="button" className="sdv-btn" onClick={onClose}>
-            Cancel
+            {t("spaceHub.action.cancel")}
           </button>
           <button type="submit" className="sdv-btn sdv-btn-primary">
-            Add record
+            {t("spaceHub.action.addRecord")}
           </button>
         </div>
       </form>
@@ -364,18 +370,19 @@ export function FocusStartPickerModal({
   onPick: (taskId: string) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const open = spaceTasks.filter((task) => !isTaskDone(task) && task.status !== "waiting");
   return (
-    <ModalShell title="Pick a task to focus on" onClose={onClose}>
+    <ModalShell title={t("spaceHub.modal.pickTitle")} onClose={onClose}>
       {open.length === 0 ? (
-        <p className="sdv-empty-inline">No open tasks in this Space. Add a task first.</p>
+        <p className="sdv-empty-inline">{t("spaceHub.empty.noOpenTasksAdd")}</p>
       ) : (
         <ul className="sdv-record-list sdv-picker-list">
           {open.map((task) => (
             <li key={task.id}>
               <button type="button" onClick={() => onPick(task.id)}>
                 <strong>{task.title}</strong>
-                {task.dueDate ? <small>due {formatDate(task.dueDate)}</small> : null}
+                {task.dueDate ? <small>{t("spaceHub.meta.due", { date: formatDate(task.dueDate) })}</small> : null}
               </button>
             </li>
           ))}
@@ -387,15 +394,16 @@ export function FocusStartPickerModal({
 
 // § 33.9 Focus conflict — only one active session allowed.
 export function FocusConflictModal({ onGoToFocus, onClose }: { onGoToFocus: () => void; onClose: () => void }) {
+  const { t } = useT();
   return (
-    <ModalShell title="Focus already running" onClose={onClose}>
-      <p className="sdv-modal-copy">A focus session is already in progress. Finish or stop it before starting a new one.</p>
+    <ModalShell title={t("spaceHub.modal.conflictTitle")} onClose={onClose}>
+      <p className="sdv-modal-copy">{t("spaceHub.modal.conflictBody")}</p>
       <div className="sdv-modal-actions">
         <button type="button" className="sdv-btn" onClick={onClose}>
-          Cancel
+          {t("spaceHub.action.cancel")}
         </button>
         <button type="button" className="sdv-btn sdv-btn-primary" onClick={onGoToFocus}>
-          Go to current focus
+          {t("spaceHub.action.goToFocus")}
         </button>
       </div>
     </ModalShell>
@@ -452,6 +460,7 @@ export function ScheduleSuggestionModal({
   onApply: (suggestions: ScheduleSuggestion[]) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [selected, setSelected] = useState<Set<string>>(new Set(suggestions.map((item) => item.taskId)));
 
   function toggle(taskId: string) {
@@ -464,8 +473,8 @@ export function ScheduleSuggestionModal({
   }
 
   return (
-    <ModalShell title="Suggested schedule (preview)" onClose={onClose}>
-      <p className="sdv-modal-copy">Nothing is placed until you apply. Uncheck anything you don't want scheduled.</p>
+    <ModalShell title={t("spaceHub.modal.suggestTitle")} onClose={onClose}>
+      <p className="sdv-modal-copy">{t("spaceHub.modal.suggestBody")}</p>
       <ul className="sdv-record-list sdv-picker-list">
         {suggestions.map((item) => (
           <li key={item.taskId}>
@@ -481,7 +490,7 @@ export function ScheduleSuggestionModal({
       </ul>
       <div className="sdv-modal-actions">
         <button type="button" className="sdv-btn" onClick={onClose}>
-          Cancel
+          {t("spaceHub.action.cancel")}
         </button>
         <button
           type="button"
@@ -489,7 +498,7 @@ export function ScheduleSuggestionModal({
           disabled={selected.size === 0}
           onClick={() => onApply(suggestions.filter((item) => selected.has(item.taskId)))}
         >
-          Apply {selected.size} task{selected.size === 1 ? "" : "s"}
+          {t("spaceHub.action.applyN", { n: selected.size })}
         </button>
       </div>
     </ModalShell>
