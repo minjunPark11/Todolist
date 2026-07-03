@@ -28,6 +28,7 @@ type Space = {
   topics: string[];
   sourceId?: string;
   sourceRef?: "project" | "study" | "local";
+  pinned?: boolean;
   objective?: string;
   learningGoal?: string;
   researchGoal?: string;
@@ -83,9 +84,11 @@ type SpacesPageProps = {
   onNavigate: (page: PageId) => void;
   onCreateProject: (input: { name: string; color?: string; type?: ProjectType; description?: string; dueDate?: string }) => string;
   onUpdateProject: (id: string, patch: Partial<Project>) => void;
+  onUpdateTopic: (id: string, patch: Partial<StudyTopic>) => void;
   onToggleStar: (id: string) => void;
   onArchiveProject: (id: string) => void;
   onRequestDeleteProject: (id: string) => void;
+  onDeleteTopic: (id: string) => void;
   onSaveNotes: (id: string, value: string) => void;
   showToast: (toast: ToastState) => void;
 };
@@ -155,7 +158,10 @@ export function SpacesPage({
   onStartFocus,
   onNavigate,
   onUpdateProject,
+  onUpdateTopic,
+  onToggleStar,
   onRequestDeleteProject,
+  onDeleteTopic,
   showToast,
 }: SpacesPageProps) {
   const { t } = useT();
@@ -175,26 +181,35 @@ export function SpacesPage({
   const [formError, setFormError] = useState("");
   const [openMenuSpaceId, setOpenMenuSpaceId] = useState("");
   const [pendingDeleteSpaceId, setPendingDeleteSpaceId] = useState("");
+  const [localPinnedSpaceIds, setLocalPinnedSpaceIds] = useState<string[]>([]);
+  const [pendingRenameSpaceId, setPendingRenameSpaceId] = useState("");
+  const [renameDraft, setRenameDraft] = useState("");
+  const [renameError, setRenameError] = useState("");
 
   const spaces = useMemo(
-    () => [...deriveProjectSpaces(projects, tasks, t), ...deriveStudySpaces(studyTopics, conceptNotes, t), ...localSpaces],
-    [conceptNotes, localSpaces, projects, studyTopics, tasks, t],
+    () =>
+      [...deriveProjectSpaces(projects, tasks, t), ...deriveStudySpaces(studyTopics, conceptNotes, t), ...localSpaces]
+        .map((space) => ({ ...space, pinned: Boolean(space.pinned || localPinnedSpaceIds.includes(space.id)) })),
+    [conceptNotes, localPinnedSpaceIds, localSpaces, projects, studyTopics, tasks, t],
   );
   const signals = useMemo(() => deriveSignals(spaces, tasks, conceptNotes, t), [conceptNotes, spaces, tasks, t]);
   const selectedSpace = spaces.find((space) => space.id === selectedSpaceId) ?? spaces.find((space) => space.sourceId === selectedProjectId);
   const pendingDeleteSpace = spaces.find((space) => space.id === pendingDeleteSpaceId);
+  const pendingRenameSpace = spaces.find((space) => space.id === pendingRenameSpaceId);
   const isDetailOpen = Boolean(selectedSpace) && (detailOpen || selectedSpaceId);
   const normalizedQuery = query.trim().toLowerCase();
 
-  const visibleSpaces = spaces.filter((space) => {
-    if (filter !== "all" && space.type !== filter) return false;
-    if (!normalizedQuery) return true;
-    const signalText = signals.filter((signal) => signal.spaceId === space.id).map((signal) => signal.title).join(" ");
-    return [space.name, space.type, space.description, space.status, space.mainSignal, space.aiPriority, space.topics.join(" "), signalText]
-      .join(" ")
-      .toLowerCase()
-      .includes(normalizedQuery);
-  });
+  const visibleSpaces = spaces
+    .filter((space) => {
+      if (filter !== "all" && space.type !== filter) return false;
+      if (!normalizedQuery) return true;
+      const signalText = signals.filter((signal) => signal.spaceId === space.id).map((signal) => signal.title).join(" ");
+      return [space.name, space.type, space.description, space.status, space.mainSignal, space.aiPriority, space.topics.join(" "), signalText]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery);
+    })
+    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
 
   useEffect(() => {
     function handleKeyDown(event: globalThis.KeyboardEvent) {
@@ -227,10 +242,61 @@ export function SpacesPage({
       setPendingDeleteSpaceId("");
       return;
     }
+    if (space.sourceRef === "study" && space.sourceId) {
+      onDeleteTopic(space.sourceId);
+      setPendingDeleteSpaceId("");
+      setLocalPinnedSpaceIds((current) => current.filter((id) => id !== space.id));
+      closeSpace();
+      showToast({ message: t("spaces.delete.deleted", { name: space.name }) });
+      return;
+    }
     setLocalSpaces((current) => current.filter((item) => item.id !== space.id));
+    setLocalPinnedSpaceIds((current) => current.filter((id) => id !== space.id));
     setPendingDeleteSpaceId("");
     closeSpace();
-    showToast({ message: `${space.name} deleted.` });
+    showToast({ message: t("spaces.delete.deleted", { name: space.name }) });
+  }
+
+  function togglePinSpace(space: Space) {
+    setOpenMenuSpaceId("");
+    if (space.sourceRef === "project" && space.sourceId) {
+      onToggleStar(space.sourceId);
+    } else {
+      setLocalPinnedSpaceIds((current) =>
+        current.includes(space.id) ? current.filter((id) => id !== space.id) : [space.id, ...current],
+      );
+    }
+    showToast({ message: t(space.pinned ? "spaces.pin.unpinned" : "spaces.pin.pinned", { name: space.name }) });
+  }
+
+  function openRenameSpace(space: Space) {
+    setOpenMenuSpaceId("");
+    setPendingRenameSpaceId(space.id);
+    setRenameDraft(space.name);
+    setRenameError("");
+  }
+
+  function renameSpace(space: Space, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setRenameError(t("spaces.rename.required"));
+      return;
+    }
+    if (spaces.some((item) => item.id !== space.id && item.name.trim().toLowerCase() === trimmed.toLowerCase())) {
+      setRenameError(t("spaces.rename.duplicate"));
+      return;
+    }
+    if (space.sourceRef === "project" && space.sourceId) {
+      onUpdateProject(space.sourceId, { name: trimmed });
+    } else if (space.sourceRef === "study" && space.sourceId) {
+      onUpdateTopic(space.sourceId, { name: trimmed });
+    } else {
+      setLocalSpaces((current) => current.map((item) => (item.id === space.id ? { ...item, name: trimmed } : item)));
+    }
+    setPendingRenameSpaceId("");
+    setRenameDraft("");
+    setRenameError("");
+    showToast({ message: t("spaces.rename.saved", { name: trimmed }) });
   }
 
   function formatAnalyzedAt(date: Date) {
@@ -410,6 +476,8 @@ export function SpacesPage({
             menuOpen={openMenuSpaceId === space.id}
             onOpen={() => openSpace(space)}
             onToggleMenu={() => setOpenMenuSpaceId((current) => (current === space.id ? "" : space.id))}
+            onTogglePin={() => togglePinSpace(space)}
+            onRequestRename={() => openRenameSpace(space)}
             onRequestDelete={() => {
               setOpenMenuSpaceId("");
               setPendingDeleteSpaceId(space.id);
@@ -504,8 +572,27 @@ export function SpacesPage({
         <DeleteSpaceConfirmModal
           spaceName={pendingDeleteSpace.name}
           isProject={pendingDeleteSpace.sourceRef === "project"}
+          isStudy={pendingDeleteSpace.sourceRef === "study"}
           onConfirm={() => deleteSpace(pendingDeleteSpace)}
           onClose={() => setPendingDeleteSpaceId("")}
+        />
+      ) : null}
+
+      {pendingRenameSpace ? (
+        <RenameSpaceModal
+          spaceName={pendingRenameSpace.name}
+          value={renameDraft}
+          error={renameError}
+          onChange={(value) => {
+            setRenameDraft(value);
+            setRenameError("");
+          }}
+          onSubmit={() => renameSpace(pendingRenameSpace, renameDraft)}
+          onClose={() => {
+            setPendingRenameSpaceId("");
+            setRenameDraft("");
+            setRenameError("");
+          }}
         />
       ) : null}
     </div>
@@ -517,12 +604,16 @@ function SpaceCard({
   menuOpen,
   onOpen,
   onToggleMenu,
+  onTogglePin,
+  onRequestRename,
   onRequestDelete,
 }: {
   space: Space;
   menuOpen: boolean;
   onOpen: () => void;
   onToggleMenu: () => void;
+  onTogglePin: () => void;
+  onRequestRename: () => void;
   onRequestDelete: () => void;
 }) {
   const { t } = useT();
@@ -548,6 +639,12 @@ function SpaceCard({
             <div className="spc-card-menu" role="menu" onClick={(event) => event.stopPropagation()}>
               <button type="button" role="menuitem" onClick={onOpen}>
                 {t("spaces.card.menuOpen")}
+              </button>
+              <button type="button" role="menuitem" onClick={onTogglePin}>
+                {t(space.pinned ? "spaces.card.menuUnpin" : "spaces.card.menuPin")}
+              </button>
+              <button type="button" role="menuitem" onClick={onRequestRename}>
+                {t("spaces.card.menuRename")}
               </button>
               <button type="button" role="menuitem" className="danger" onClick={onRequestDelete}>
                 {t("spaces.card.menuDelete")}
@@ -711,6 +808,49 @@ function SimpleModal({ title, children, onClose }: { title: string; children: Re
   );
 }
 
+function RenameSpaceModal({
+  spaceName,
+  value,
+  error,
+  onChange,
+  onSubmit,
+  onClose,
+}: {
+  spaceName: string;
+  value: string;
+  error: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useT();
+  return (
+    <SimpleModal title={t("spaces.rename.title")} onClose={onClose}>
+      <form
+        className="spc-rename-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit();
+        }}
+      >
+        <label>
+          {t("spaces.rename.label", { name: spaceName })}
+          <input value={value} onChange={(event) => onChange(event.target.value)} autoFocus />
+        </label>
+        {error ? <p className="spc-form-error">{error}</p> : null}
+        <div className="spc-modal-actions">
+          <button type="button" className="spc-btn" onClick={onClose}>
+            {t("common.cancel")}
+          </button>
+          <button type="submit" className="spc-btn spc-btn-primary">
+            {t("spaces.rename.save")}
+          </button>
+        </div>
+      </form>
+    </SimpleModal>
+  );
+}
+
 function deriveProjectSpaces(projects: Project[], tasks: Task[], t: TFn): Space[] {
   return projects
     .filter((project) => project.status !== "archived")
@@ -735,6 +875,7 @@ function deriveProjectSpaces(projects: Project[], tasks: Task[], t: TFn): Space[
         objective: project.description,
         sourceRef: "project",
         sourceId: project.id,
+        pinned: Boolean(project.pinned),
       };
     });
 }

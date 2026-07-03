@@ -413,11 +413,13 @@ export function FocusConflictModal({ onGoToFocus, onClose }: { onGoToFocus: () =
 export function DeleteSpaceConfirmModal({
   spaceName,
   isProject,
+  isStudy = false,
   onConfirm,
   onClose,
 }: {
   spaceName: string;
   isProject: boolean;
+  isStudy?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -428,7 +430,9 @@ export function DeleteSpaceConfirmModal({
         {t("spaces.delete.body", { name: spaceName })}{" "}
         {isProject
           ? t("spaces.delete.projectHint")
-          : t("spaces.delete.localHint")}
+          : isStudy
+            ? t("spaces.delete.studyHint")
+            : t("spaces.delete.localHint")}
       </p>
       <div className="sdv-modal-actions">
         <button type="button" className="sdv-btn" onClick={onClose}>

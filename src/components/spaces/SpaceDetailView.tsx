@@ -695,6 +695,7 @@ export function SpaceDetailView({
         <DeleteSpaceConfirmModal
           spaceName={displayName}
           isProject={Boolean(sourceProjectId)}
+          isStudy={space.sourceRef === "study"}
           onConfirm={handleDeleteSpace}
           onClose={() => setModal({ kind: "none" })}
         />

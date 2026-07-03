@@ -238,9 +238,11 @@ export function AppPages({
         onCreateTask={planner.createTask}
         onCreateProject={planner.createProject}
         onUpdateProject={planner.updateProject}
+        onUpdateTopic={planner.updateTopic}
         onToggleStar={planner.toggleProjectPinned}
         onArchiveProject={handleArchiveProject}
         onRequestDeleteProject={requestDeleteProject}
+        onDeleteTopic={planner.deleteTopic}
         onSaveNotes={(id, value) => planner.updateProject(id, { notes: value })}
         showToast={showToast}
       />
