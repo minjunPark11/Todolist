@@ -147,8 +147,8 @@ export function Sidebar({
   const primaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
     { id: "today", label: t("sidebar.today"), icon: "today", count: todayCount },
     { id: "calendar", label: t("sidebar.calendar"), icon: "calendar", count: 0 },
-    { id: "projects", label: "Spaces", icon: "projects", count: activeProjectCount + dueReviewCount },
-    { id: "focus", label: "Focus", icon: "focus", count: tasks.filter((task) => task.activeSessionId).length },
+    { id: "projects", label: t("sidebar.spaces"), icon: "projects", count: activeProjectCount + dueReviewCount },
+    { id: "focus", label: t("sidebar.focus"), icon: "focus", count: tasks.filter((task) => task.activeSessionId).length },
   ];
   const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
     { id: "archive", label: t("sidebar.archive"), icon: "archive", count: 0 },

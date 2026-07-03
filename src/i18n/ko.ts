@@ -67,6 +67,8 @@ export const ko: Dictionary = {
   "sidebar.today": "오늘",
   "sidebar.calendar": "캘린더",
   "sidebar.projects": "프로젝트",
+  "sidebar.spaces": "공간",
+  "sidebar.focus": "집중",
   "sidebar.planning": "계획",
   "sidebar.study": "학습",
   "sidebar.archive": "보관함",
