@@ -4,22 +4,28 @@ import { useT } from "../i18n";
 type AppModalsProps = {
   pendingDeleteTaskId: string;
   pendingDeleteProjectId: string;
+  pendingResetAllData: boolean;
   toast: ToastState | null;
   onCancelDeleteTask: () => void;
   onConfirmDeleteTask: () => void;
   onCancelDeleteProject: () => void;
   onConfirmDeleteProject: () => void;
+  onCancelResetAllData: () => void;
+  onConfirmResetAllData: () => void;
   onDismissToast: () => void;
 };
 
 export function AppModals({
   pendingDeleteTaskId,
   pendingDeleteProjectId,
+  pendingResetAllData,
   toast,
   onCancelDeleteTask,
   onConfirmDeleteTask,
   onCancelDeleteProject,
   onConfirmDeleteProject,
+  onCancelResetAllData,
+  onConfirmResetAllData,
   onDismissToast,
 }: AppModalsProps) {
   const { t } = useT();
@@ -50,6 +56,21 @@ export function AppModals({
               <button onClick={onCancelDeleteProject}>{t("common.cancel")}</button>
               <button className="danger-button-inline" onClick={onConfirmDeleteProject}>
                 {t("app.deleteProjectConfirm")}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {pendingResetAllData ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="reset-all-data-title">
+            <h2 id="reset-all-data-title">{t("app.resetAllDataTitle")}</h2>
+            <p>{t("app.resetAllDataBody")}</p>
+            <div className="confirm-actions">
+              <button onClick={onCancelResetAllData}>{t("common.cancel")}</button>
+              <button className="danger-button-inline" onClick={onConfirmResetAllData}>
+                {t("app.resetAllDataConfirm")}
               </button>
             </div>
           </section>

@@ -1,8 +1,8 @@
 // Pointer-time math for drag-to-create (CALENDAR_V3_DESIGN.md §2, §6).
 // DAY_START/DAY_END/SLOT_HEIGHT are the single source of truth for the
 // Day/Week time grid — WeekView and CalendarView both import from here.
-export const DAY_START = 6;
-export const DAY_END = 23;
+export const DAY_START = 0;
+export const DAY_END = 24;
 export const SLOT_HEIGHT = 44;
 export const TIME_SNAP_MINUTES = 10;
 

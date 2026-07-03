@@ -43,6 +43,7 @@ type AppPagesProps = {
   exportJson: () => void;
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
   importMessage: string;
+  requestResetAllData: () => void;
   accountSlot: ReactNode;
 };
 
@@ -76,6 +77,7 @@ export function AppPages({
   exportJson,
   handleImport,
   importMessage,
+  requestResetAllData,
   accountSlot,
 }: AppPagesProps) {
   function pageGridClass(extra = "") {
@@ -256,7 +258,7 @@ export function AppPages({
       onExport={exportJson}
       onImport={handleImport}
       onLoadSamples={planner.loadSamples}
-      onReset={planner.resetData}
+      onReset={requestResetAllData}
       importMessage={importMessage}
       accountSlot={accountSlot}
     />

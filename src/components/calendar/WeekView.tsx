@@ -259,7 +259,7 @@ export function WeekView({
         <div className="gcal-time-gutter">
           {hours.map((hour) => (
             <div key={hour} className="gcal-time-label" style={{ height: SLOT_HEIGHT }}>
-              {hour}:00
+              {String(hour).padStart(2, "0")}:00
             </div>
           ))}
         </div>

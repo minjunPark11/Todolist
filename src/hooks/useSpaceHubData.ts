@@ -50,6 +50,14 @@ export function useSpaceHubData() {
   const [store, setStore] = useState<SpaceHubStore>(loadStore);
 
   useEffect(() => {
+    function resetSpaceHubStore() {
+      setStore({ notes: [], activities: [], configs: [] });
+    }
+    window.addEventListener("focusflow:space-hub-reset", resetSpaceHubStore);
+    return () => window.removeEventListener("focusflow:space-hub-reset", resetSpaceHubStore);
+  }, []);
+
+  useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
     } catch {

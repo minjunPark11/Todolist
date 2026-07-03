@@ -46,6 +46,7 @@ export default function App() {
   const [studyFocusNoteId, setStudyFocusNoteId] = useState("");
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState("");
+  const [pendingResetAllData, setPendingResetAllData] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
@@ -253,6 +254,26 @@ export default function App() {
     showToast({ message: t("app.toastProjectDeleted") });
   }
 
+  function requestResetAllData() {
+    setPendingResetAllData(true);
+  }
+
+  function confirmResetAllData() {
+    planner.resetData();
+    setPendingResetAllData(false);
+    setSelectedProjectId("");
+    setIsProjectDetailOpen(false);
+    setStudyFocusNoteId("");
+    planner.selectTask("");
+    try {
+      localStorage.removeItem("todo-planner-space-hub-v1");
+    } catch {
+      // Keep reset working even if localStorage is unavailable.
+    }
+    window.dispatchEvent(new Event("focusflow:space-hub-reset"));
+    showToast({ message: t("app.toastAllDataReset") });
+  }
+
   function openTaskInOfficialPage(taskId: string) {
     const task = planner.tasks.find((item) => item.id === taskId);
     if (!task) {
@@ -389,6 +410,7 @@ export default function App() {
         exportJson={exportJson}
         handleImport={handleImport}
         importMessage={importMessage}
+        requestResetAllData={requestResetAllData}
         accountSlot={
           <AccountSection
             auth={planner.auth}
@@ -505,11 +527,14 @@ export default function App() {
       <AppModals
         pendingDeleteTaskId={pendingDeleteTaskId}
         pendingDeleteProjectId={pendingDeleteProjectId}
+        pendingResetAllData={pendingResetAllData}
         toast={toast}
         onCancelDeleteTask={() => setPendingDeleteTaskId("")}
         onConfirmDeleteTask={confirmDeleteTask}
         onCancelDeleteProject={() => setPendingDeleteProjectId("")}
         onConfirmDeleteProject={confirmDeleteProject}
+        onCancelResetAllData={() => setPendingResetAllData(false)}
+        onConfirmResetAllData={confirmResetAllData}
         onDismissToast={() => setToast(null)}
       />
     </div>
