@@ -81,19 +81,21 @@ export function buildCalendarShareSnapshot(input: {
 
   input.projects.forEach((project) => {
     if (!project.name || !isDate(project.dueDate)) return;
+    const dueDate = project.dueDate;
     events.push({
       uid: `project-due-${project.id}`,
       title: `프로젝트 마감: ${project.name}`,
-      date: project.dueDate,
+      date: dueDate,
     });
   });
 
   input.conceptNotes.forEach((note) => {
     if (!note.title || !isDate(note.nextReviewDate)) return;
+    const nextReviewDate = note.nextReviewDate;
     events.push({
       uid: `review-${note.id}`,
       title: `복습: ${note.title}`,
-      date: note.nextReviewDate,
+      date: nextReviewDate,
     });
   });
 
