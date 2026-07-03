@@ -137,6 +137,7 @@ export function SpacesPage({
   const [selectedSpaceId, setSelectedSpaceId] = useState("");
   const [highlightSignalId, setHighlightSignalId] = useState("");
   const [analysisState, setAnalysisState] = useState<"empty" | "loading" | "success" | "insufficient" | "error">("empty");
+  const [lastAnalyzedAt, setLastAnalyzedAt] = useState<Date | null>(null);
   const [reasonOpen, setReasonOpen] = useState(false);
   const [signalsOpen, setSignalsOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -188,13 +189,25 @@ export function SpacesPage({
     onCloseProject();
   }
 
+  function formatAnalyzedAt(date: Date) {
+    const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    if (isToday) return `Last analyzed: Today, ${time}`;
+    const day = date.toLocaleDateString([], { month: "short", day: "numeric" });
+    return `Last analyzed: ${day}, ${time}`;
+  }
+
   function analyzeSpaces() {
     if (spaces.length < 2 || signals.length < 2) {
       setAnalysisState("insufficient");
       return;
     }
     setAnalysisState("loading");
-    window.setTimeout(() => setAnalysisState("success"), 650);
+    window.setTimeout(() => {
+      setAnalysisState("success");
+      setLastAnalyzedAt(new Date());
+    }, 650);
   }
 
   function resetAdd() {
@@ -323,7 +336,7 @@ export function SpacesPage({
           )}
         </div>
         <div className="spc-brief-actions">
-          {analysisState === "success" ? <span>Last analyzed: Today, 10:24 AM</span> : null}
+          {analysisState === "success" && lastAnalyzedAt ? <span>{formatAnalyzedAt(lastAnalyzedAt)}</span> : null}
           <button type="button" className="spc-btn spc-btn-soft" onClick={() => setReasonOpen(true)} disabled={analysisState !== "success"}>
             <InfoIcon /> Why this?
           </button>
