@@ -136,6 +136,20 @@ export function FocusPage({
     setDurationDrafts((current) => ({ ...current, [taskId]: minutes }));
   }
 
+  function toggleTaskFocus(task: Task) {
+    if (!activeSession) {
+      onStartFocus(task.id, "focus_page", durationForTask(task));
+      return;
+    }
+
+    if (activeSession.taskId !== task.id) return;
+    if (activeSession.status === "paused") {
+      onResumeFocus(activeSession.id);
+      return;
+    }
+    onPauseFocus(activeSession.id);
+  }
+
   function stopAndAsk(session: FocusSession) {
     setFinishTaskId(session.taskId);
     onStopFocus(session.id, false);
@@ -184,11 +198,15 @@ export function FocusPage({
                         <button
                           type="button"
                           className="foc-play"
-                          aria-label={`Start focus session for ${task.title}`}
+                          aria-label={
+                            isActive
+                              ? activeSession?.status === "paused"
+                                ? `Resume focus session for ${task.title}`
+                                : `Pause focus session for ${task.title}`
+                              : `Start focus session for ${task.title}`
+                          }
                           disabled={Boolean(activeSession && activeSession.taskId !== task.id)}
-                          onClick={() => {
-                            if (!activeSession) onStartFocus(task.id, "focus_page", durationForTask(task));
-                          }}
+                          onClick={() => toggleTaskFocus(task)}
                         >
                           {isActive && activeSession?.status === "running" ? "||" : "▶"}
                         </button>

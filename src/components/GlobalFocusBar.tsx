@@ -45,11 +45,17 @@ export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, 
       </button>
       <div className="foc-global-actions">
         {session.status === "paused" ? (
-          <button type="button" onClick={() => onResume(session.id)}>재개</button>
+          <button type="button" className="foc-global-icon-action" aria-label="재개" title="재개" onClick={() => onResume(session.id)}>
+            ▶
+          </button>
         ) : (
-          <button type="button" onClick={() => onPause(session.id)}>일시정지</button>
+          <button type="button" className="foc-global-icon-action" aria-label="일시정지" title="일시정지" onClick={() => onPause(session.id)}>
+            ||
+          </button>
         )}
-        <button type="button" className="danger" onClick={() => onStop(session.id)}>끝</button>
+        <button type="button" className="foc-global-icon-action danger" aria-label="끝내기" title="끝내기" onClick={() => onStop(session.id)}>
+          ■
+        </button>
       </div>
     </aside>
   );

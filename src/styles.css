@@ -8397,8 +8397,18 @@ div.spc-signal-row {
 }
 
 .foc-global-actions button {
+  display: inline-grid;
+  place-items: center;
   min-height: 40px;
-  padding: 0 18px;
+  min-width: 44px;
+  padding: 0 12px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.foc-global-actions .foc-global-icon-action {
+  border-radius: 14px;
+  font-weight: 900;
 }
 
 @media (max-width: 1220px) {
