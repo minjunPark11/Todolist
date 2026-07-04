@@ -62,11 +62,18 @@ export function getDraftMatrixPosition(
   );
 }
 
-// Reverse mapping for quadrant drag & drop: moving a card into a quadrant
-// mutates the underlying fields so the derived position matches the drop
-// target. Returns the minimal patch.
+function levelsForQuadrant(quadrant: MatrixQuadrant): Pick<Task, "importance" | "urgency"> {
+  if (quadrant === "I") return { importance: "high", urgency: "high" };
+  if (quadrant === "II") return { importance: "high", urgency: "low" };
+  if (quadrant === "III") return { importance: "low", urgency: "high" };
+  return { importance: "low", urgency: "low" };
+}
+
+// Reverse mapping for quadrant changes: moving a card into a quadrant mutates
+// the fields that drive the derived position, while keeping importance/urgency
+// aligned with the visible Eisenhower state.
 export function patchForQuadrant(task: Task, quadrant: MatrixQuadrant, today: string): Partial<Task> {
-  const patch: Partial<Task> = {};
+  const patch: Partial<Task> = levelsForQuadrant(quadrant);
   const urgent = isMatrixUrgent(task, today);
 
   // Leaving IV's parked groups re-activates the task.

@@ -1,5 +1,6 @@
-import type { Project, RepeatType, Subtask, Task, TaskLevel } from "../types";
+import type { Project, RepeatType, Subtask, Task } from "../types";
 import { todayValue } from "../utils/date";
+import { getMatrixPosition, patchForQuadrant, type MatrixQuadrant } from "../utils/eisenhower";
 import { useT } from "../i18n";
 
 interface TaskDetailProps {
@@ -18,11 +19,11 @@ interface TaskDetailProps {
 }
 
 const repeatTypes: RepeatType[] = ["none", "daily", "weekly", "monthly"];
-const matrixQuadrants: Array<{ key: string; labelKey: string; hintKey: string; importance: TaskLevel; urgency: TaskLevel }> = [
-  { key: "do", labelKey: "planning.doNow", hintKey: "planning.doNowHint", importance: "high", urgency: "high" },
-  { key: "schedule", labelKey: "planning.schedule", hintKey: "planning.scheduleHint", importance: "high", urgency: "low" },
-  { key: "delegate", labelKey: "planning.quickHandle", hintKey: "planning.quickHandleHint", importance: "low", urgency: "high" },
-  { key: "later", labelKey: "planning.later", hintKey: "planning.laterHint", importance: "low", urgency: "low" },
+const matrixQuadrants: Array<{ key: MatrixQuadrant; labelKey: string; hintKey: string }> = [
+  { key: "I", labelKey: "eis.qI", hintKey: "eis.qIHint" },
+  { key: "II", labelKey: "eis.qII", hintKey: "eis.qIIHint" },
+  { key: "III", labelKey: "eis.qIII", hintKey: "eis.qIIIHint" },
+  { key: "IV", labelKey: "eis.qIV", hintKey: "eis.qIVHint" },
 ];
 
 export function TaskDetail({
@@ -50,9 +51,8 @@ export function TaskDetail({
     weekly: t("taskDetail.repeatWeekly"),
     monthly: t("taskDetail.repeatMonthly"),
   };
-  const selectedQuadrant =
-    matrixQuadrants.find((quadrant) => quadrant.importance === task.importance && quadrant.urgency === task.urgency) ??
-    matrixQuadrants[3];
+  const today = todayValue();
+  const selectedQuadrant = getMatrixPosition(task, today).quadrant;
 
   return (
     <aside className="detail-panel">
@@ -162,11 +162,11 @@ export function TaskDetail({
           <label>
             <span>{t("taskDetail.importance")}</span>
             <select
-              value={selectedQuadrant.key}
+              value={selectedQuadrant}
               onChange={(event) => {
                 const quadrant = matrixQuadrants.find((item) => item.key === event.target.value);
                 if (quadrant) {
-                  onUpdateTask(task.id, { importance: quadrant.importance, urgency: quadrant.urgency });
+                  onUpdateTask(task.id, patchForQuadrant(task, quadrant.key, today));
                 }
               }}
             >
