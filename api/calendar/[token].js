@@ -2,8 +2,26 @@ import { createClient } from "@supabase/supabase-js";
 
 // Trim: env values pasted into Vercel often pick up a trailing newline,
 // which Supabase rejects as "Invalid API key".
-const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+const supabaseUrl = resolveSupabaseUrl(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
 const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+
+// Accepts the values people actually paste — the bare project URL, a URL with
+// a stray path like /rest/v1 (→ "Invalid path specified in request URL"), or
+// the dashboard link — and reduces them to https://<ref>.supabase.co.
+function resolveSupabaseUrl(raw) {
+  const value = (raw || "").trim();
+  if (!value) return "";
+  try {
+    const url = new URL(value.includes("://") ? value : `https://${value}`);
+    const dashboard = url.pathname.match(/\/dashboard\/project\/([a-z0-9-]+)/i);
+    if (dashboard && /(^|\.)supabase\.com$/i.test(url.hostname)) {
+      return `https://${dashboard[1]}.supabase.co`;
+    }
+    return url.origin;
+  } catch {
+    return value;
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== "GET" && req.method !== "HEAD") {
