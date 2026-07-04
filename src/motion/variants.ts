@@ -1,3 +1,4 @@
+import type { Variants } from "framer-motion";
 import { motionDistance, motionDurations, motionScale } from "./tokens";
 
 export const cardVariants = {
@@ -81,7 +82,7 @@ export const panelVariants = {
   },
 };
 
-export const backdropVariants = {
+export const backdropVariants: Variants = {
   initial: {
     opacity: 0,
   },
@@ -106,7 +107,7 @@ export const pageVariants = {
   },
 };
 
-export const modalVariants = {
+export const modalVariants: Variants = {
   initial: {
     opacity: 0,
     y: motionDistance.modalY,
