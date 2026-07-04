@@ -4599,6 +4599,23 @@ main {
   grid-template-columns: minmax(0, 1200px);
 }
 
+/* Task-detail panel close: `selectedTask` clears immediately on X, so the grid
+   collapses to the single-column `.no-detail` layout while the panel is still
+   playing its 0.42s exit animation. As the grid's 2nd child it would reflow
+   below the page content (flash at the bottom). Pin the still-mounted panel to
+   the right edge so it slides out in place instead of dropping down. Only ever
+   matches during that exit window (no panel exists otherwise). */
+.page-grid {
+  position: relative;
+}
+
+.page-grid.no-detail > .detail-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 360px;
+}
+
 .page-subtitle,
 .today-list-header p,
 .today-list-header span {
