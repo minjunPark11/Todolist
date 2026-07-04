@@ -1,7 +1,7 @@
 // Small event/agenda popovers (spec §5.7, §6.8): title + date/time + memo
 // hook only — no location / call / reminder rows. Used by month chips and
 // week blocks instead of a fixed right panel.
-import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CalendarCategoryGroup } from "../../lib/calendarCategories";
 import type { CalendarItem } from "../../utils/calendarItems";
 import { formatDate } from "../../utils/date";
@@ -36,23 +36,31 @@ export function CalendarPopover({
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
   // Place beside the anchor (right first, then left, then below), clamped to
-  // the viewport so a chip near the edge never opens off-screen.
+  // the viewport so a chip near the edge never opens off-screen. Re-clamps
+  // when the content grows (e.g. the inline quick-edit form expands).
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const height = el.offsetHeight;
-    let left = anchor.right + MARGIN;
-    if (left + POPOVER_WIDTH > window.innerWidth - MARGIN) {
-      left = anchor.left - POPOVER_WIDTH - MARGIN;
+    function place() {
+      if (!el) return;
+      const height = el.offsetHeight;
+      let left = anchor.right + MARGIN;
+      if (left + POPOVER_WIDTH > window.innerWidth - MARGIN) {
+        left = anchor.left - POPOVER_WIDTH - MARGIN;
+      }
+      let top = anchor.top;
+      if (left < MARGIN) {
+        left = Math.min(Math.max(anchor.left, MARGIN), window.innerWidth - POPOVER_WIDTH - MARGIN);
+        top = anchor.bottom + MARGIN;
+      }
+      left = Math.max(left, MARGIN);
+      top = Math.min(Math.max(top, MARGIN), Math.max(MARGIN, window.innerHeight - height - MARGIN));
+      setPosition({ left, top });
     }
-    let top = anchor.top;
-    if (left < MARGIN) {
-      left = Math.min(Math.max(anchor.left, MARGIN), window.innerWidth - POPOVER_WIDTH - MARGIN);
-      top = anchor.bottom + MARGIN;
-    }
-    left = Math.max(left, MARGIN);
-    top = Math.min(Math.max(top, MARGIN), Math.max(MARGIN, window.innerHeight - height - MARGIN));
-    setPosition({ left, top });
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [anchor]);
 
   useEffect(() => {
@@ -102,6 +110,8 @@ export function EventPopover({
   onClose,
   onOpenDetail,
   onDelete,
+  initialMemo,
+  onSaveQuickEdit,
 }: {
   item: CalendarItem;
   anchor: PopoverAnchor;
@@ -112,9 +122,17 @@ export function EventPopover({
   onClose: () => void;
   onOpenDetail: (item: CalendarItem) => void;
   onDelete?: (item: CalendarItem) => void;
+  // Quick edit (start/end time + memo) inline in the popover, replacing the
+  // jump to the day-view detail panel for task events.
+  initialMemo?: string;
+  onSaveQuickEdit?: (item: CalendarItem, input: { startTime: string; endTime: string; memo: string }) => void;
 }) {
   const { t, lang } = useT();
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [startTime, setStartTime] = useState(item.startTime ?? "");
+  const [endTime, setEndTime] = useState(item.endTime ?? "");
+  const [memo, setMemo] = useState(initialMemo ?? "");
   const timeLabel = item.allDay
     ? t("calendar.allDay")
     : item.startTime
@@ -123,6 +141,12 @@ export function EventPopover({
   const canChangeCategory = Boolean(
     categoryGroups && onChangeCategory && item.sourceType === "task" && !item.readOnly,
   );
+  const canQuickEdit = Boolean(onSaveQuickEdit && item.sourceType === "task" && !item.readOnly);
+
+  function submitQuickEdit(event: FormEvent) {
+    event.preventDefault();
+    onSaveQuickEdit!(item, { startTime, endTime, memo });
+  }
   // Only task-backed events can be deleted; derived markers (project deadline,
   // review) and read-only external events keep the popover action-free.
   const canDelete = Boolean(onDelete && item.sourceType === "task" && !item.readOnly);
@@ -214,6 +238,43 @@ export function EventPopover({
         <p className="gcal-popover-when">
           {t("calendar.externalSourceLine", { name: item.externalCalendarName ?? "" })}
         </p>
+      ) : canQuickEdit ? (
+        editOpen ? (
+          <form className="gcal-popover-edit" onSubmit={submitQuickEdit}>
+            <div className="gcal-popover-edit-row">
+              <label>
+                <span>{t("calendar.startTime")}</span>
+                <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+              </label>
+              <label>
+                <span>{t("calendar.endTime")}</span>
+                <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+              </label>
+            </div>
+            <label className="gcal-popover-edit-memo">
+              <span>{t("calendar.memoLabel")}</span>
+              <textarea
+                rows={3}
+                value={memo}
+                placeholder={t("calendar.popoverAddMemo")}
+                onChange={(event) => setMemo(event.target.value)}
+                autoFocus
+              />
+            </label>
+            <div className="gcal-popover-edit-actions">
+              <button type="button" onClick={() => setEditOpen(false)}>
+                {t("common.cancel")}
+              </button>
+              <button type="submit" className="is-primary">
+                {t("common.save")}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button type="button" className="gcal-popover-memo" onClick={() => setEditOpen(true)}>
+            {t("calendar.popoverAddMemo")}
+          </button>
+        )
       ) : (
         <button type="button" className="gcal-popover-memo" onClick={() => onOpenDetail(item)}>
           {t("calendar.popoverAddMemo")}

@@ -2836,6 +2836,65 @@ textarea {
   cursor: pointer;
 }
 
+.gcal-popover-edit {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.gcal-popover-edit label {
+  display: grid;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: var(--color-ink-muted-80);
+}
+
+.gcal-popover-edit-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.gcal-popover-edit input,
+.gcal-popover-edit textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.3));
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.gcal-popover-edit textarea {
+  resize: vertical;
+  min-height: 56px;
+}
+
+.gcal-popover-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.gcal-popover-edit-actions button {
+  border: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.3));
+  border-radius: 8px;
+  padding: 4px 12px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.gcal-popover-edit-actions button.is-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+
 .gcal-popover-agenda {
   list-style: none;
   margin: 0;

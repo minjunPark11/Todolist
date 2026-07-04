@@ -461,17 +461,25 @@ export function CalendarView({
       setActiveCategory(itemCategory.id);
       ensureCategoryVisible(itemCategory.id);
     }
-    if (item.sourceType === "external") {
-      setPopover({ kind: "event", item, anchor });
+    if (mode === "day" && item.sourceType === "project") {
+      onOpenProject?.(item.sourceId);
       return;
     }
-    if (mode === "day") {
-      if (item.sourceType === "task") onSelectTask(item.sourceId);
-      else if (item.sourceType === "project") onOpenProject?.(item.sourceId);
-      else onOpenStudyReview?.(item.sourceId);
+    if (mode === "day" && item.sourceType === "note") {
+      onOpenStudyReview?.(item.sourceId);
       return;
     }
+    // Task/external events open the same popover in every view; the quick-edit
+    // form inside it replaces the old jump into the day-view detail panel.
     setPopover({ kind: "event", item, anchor });
+  }
+
+  // Quick edit from the popover: start/end time + memo only (§ user request);
+  // anything deeper still goes through the task detail drawer.
+  function handleQuickEditSave(item: CalendarItem, input: { startTime: string; endTime: string; memo: string }) {
+    if (item.sourceType !== "task") return;
+    onUpdateTask(item.sourceId, { startTime: input.startTime, endTime: input.endTime, notes: input.memo });
+    setPopover(null);
   }
 
   // Delete flows through the app-level requestDeleteTask, so the global
@@ -728,6 +736,12 @@ export function CalendarView({
           onClose={() => setPopover(null)}
           onOpenDetail={openDetailFromPopover}
           onDelete={onDeleteTask ? handleDeleteFromPopover : undefined}
+          initialMemo={
+            popover.item.sourceType === "task"
+              ? tasks.find((task) => task.id === popover.item.sourceId)?.notes ?? ""
+              : ""
+          }
+          onSaveQuickEdit={handleQuickEditSave}
         />
       ) : null}
       {popover?.kind === "agenda" ? (
