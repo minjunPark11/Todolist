@@ -6772,23 +6772,7 @@ main {
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
   background: var(--bg-surface);
-  cursor: pointer;
   transition: background var(--motion-fast), border-color var(--motion-fast);
-}
-
-.tdy-row:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-strong);
-}
-
-.tdy-row:focus-visible {
-  outline: 3px solid var(--accent-soft);
-  outline-offset: 1px;
-}
-
-.tdy-row.is-selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .tdy-row.is-done {

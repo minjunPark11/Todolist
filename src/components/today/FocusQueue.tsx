@@ -5,10 +5,8 @@ import { useT } from "../../i18n";
 interface FocusQueueProps {
   entries: TodayEntry[];
   projects: Project[];
-  selectedTaskId: string;
   hasQuery: boolean;
   query: string;
-  onOpenTask: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
   onAddTask: () => void;
   onOpenSpaces: () => void;
@@ -17,10 +15,8 @@ interface FocusQueueProps {
 export function FocusQueue({
   entries,
   projects,
-  selectedTaskId,
   hasQuery,
   query,
-  onOpenTask,
   onToggleDone,
   onAddTask,
   onOpenSpaces,
@@ -69,8 +65,6 @@ export function FocusQueue({
               key={entry.task.id}
               entry={entry}
               projects={projects}
-              selected={entry.task.id === selectedTaskId}
-              onOpenTask={onOpenTask}
               onToggleDone={onToggleDone}
             />
           ))}
@@ -88,18 +82,14 @@ function hexToSoft(color: string | undefined): { bg: string; fg: string } | unde
 function FocusQueueRow({
   entry,
   projects,
-  selected,
-  onOpenTask,
   onToggleDone,
 }: {
   entry: TodayEntry;
   projects: Project[];
-  selected: boolean;
-  onOpenTask: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
 }) {
   const { t, lang } = useT();
-  const { task, reason, completed } = entry;
+  const { task, completed } = entry;
   const project = projects.find((candidate) => candidate.id === task.projectId);
   const pill = hexToSoft(project?.color);
 
@@ -113,27 +103,12 @@ function FocusQueueRow({
       : "";
 
   return (
-    <div
-      className={`tdy-row${completed ? " is-done" : ""}${selected ? " is-selected" : ""}`}
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpenTask(task.id)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpenTask(task.id);
-        }
-      }}
-    >
+    <div className={`tdy-row${completed ? " is-done" : ""}`}>
       <button
         type="button"
         className={`tdy-check${completed ? " checked" : ""}`}
         aria-label={t("todayv.checkAria", { title: task.title })}
-        onClick={(event) => {
-          // Checkbox must never open the task drawer (spec §28).
-          event.stopPropagation();
-          onToggleDone(task.id);
-        }}
+        onClick={() => onToggleDone(task.id)}
       >
         {completed ? "✓" : ""}
       </button>
@@ -147,13 +122,6 @@ function FocusQueueRow({
           {project.name}
         </span>
       ) : null}
-      <span className={`tdy-reason tdy-reason-${reason}`}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <path d="M5 21V4" />
-          <path d="M5 4h13l-2.5 4L18 12H5" />
-        </svg>
-        {t(`todayv.reason.${reason}`)}
-      </span>
     </div>
   );
 }

@@ -125,13 +125,14 @@ export function AppPages({
   }
 
   if (activePage === "today") {
+    // Today has no task-detail side panel — the grid always uses the
+    // full-width (no-detail) layout.
     return (
-      <section className={pageGridClass("tdy-grid")}>
+      <section className="page-grid no-detail tdy-grid">
         <TodayPage
           tasks={planner.tasks}
           projects={activeProjects}
           conceptNotes={planner.conceptNotes}
-          selectedTaskId={planner.selectedTask?.id ?? ""}
           onOpenTask={planner.selectTask}
           onToggleDone={planner.toggleTaskDone}
           onUpdateTask={planner.updateTask}
@@ -144,7 +145,6 @@ export function AppPages({
           onIntentHandled={onTodayIntentHandled}
           showToast={showToast}
         />
-        {renderTaskDetail()}
       </section>
     );
   }

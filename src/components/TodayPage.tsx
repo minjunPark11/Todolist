@@ -31,7 +31,6 @@ interface TodayPageProps {
   tasks: Task[];
   projects: Project[];
   conceptNotes: ConceptNote[];
-  selectedTaskId: string;
   onOpenTask: (id: string) => void;
   onToggleDone: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
@@ -49,7 +48,6 @@ export function TodayPage({
   tasks,
   projects,
   conceptNotes,
-  selectedTaskId,
   onOpenTask,
   onToggleDone,
   onUpdateTask,
@@ -330,10 +328,8 @@ export function TodayPage({
           <FocusQueue
             entries={visibleEntries}
             projects={projects}
-            selectedTaskId={selectedTaskId}
             hasQuery={hasQuery}
             query={searchQuery.trim()}
-            onOpenTask={onOpenTask}
             onToggleDone={onToggleDone}
             onAddTask={() => setQuickAddOpen(true)}
             onOpenSpaces={() => onNavigate("projects")}
