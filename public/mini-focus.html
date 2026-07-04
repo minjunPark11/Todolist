@@ -171,7 +171,12 @@
         dispatch("finish");
       });
       document.getElementById("close").addEventListener("click", function() {
-        window.close();
+        var tauri = getTauri();
+        if (tauri) {
+          tauri.core.invoke("close_focus_mini_timer").catch(function() { window.close(); });
+        } else {
+          window.close();
+        }
       });
 
       boot().catch(function(error) {

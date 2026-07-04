@@ -139,10 +139,14 @@ fn show_mini_timer_window(app: &tauri::AppHandle) -> tauri::Result<()> {
         return Ok(());
     }
 
+    // Fallback only: the mini window is normally pre-declared in
+    // tauri.conf.json and merely shown/hidden. Creating a webview window at
+    // runtime left it stuck on about:blank in release builds, so we avoid that
+    // path. Point at the dedicated standalone page just in case this ever runs.
     WebviewWindowBuilder::new(
         app,
         MINI_TIMER_WINDOW,
-        WebviewUrl::App("index.html?miniFocusTimer=1".into()),
+        WebviewUrl::App("mini-focus.html".into()),
     )
     .title("FocusFlow Mini Timer")
     .inner_size(360.0, 320.0)
@@ -157,8 +161,10 @@ fn show_mini_timer_window(app: &tauri::AppHandle) -> tauri::Result<()> {
 }
 
 fn close_mini_timer_window(app: &tauri::AppHandle) {
+    // Hide rather than destroy: the window is pre-declared in config and reused,
+    // so closing it must keep it alive for the next open.
     if let Some(window) = app.get_webview_window(MINI_TIMER_WINDOW) {
-        let _ = window.close();
+        let _ = window.hide();
     }
 }
 
@@ -309,6 +315,13 @@ fn main() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
+                // The mini timer is a persistent, pre-declared window: hide it on
+                // close (native X included) so it can be reopened, never destroy it.
+                if window.label() == MINI_TIMER_WINDOW {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    return;
+                }
                 if window.label() != "main" {
                     return;
                 }
