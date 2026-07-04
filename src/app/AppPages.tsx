@@ -216,13 +216,11 @@ export function AppPages({
           externalCalendarEvents={externalCalendarEvents}
           onUpdateExternalCalendar={onUpdateExternalCalendar}
           initialProjectId={calendarFocusProjectId}
-          onSelectTask={planner.selectTask}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
           onDeleteTask={requestDeleteTask}
           onOpenProject={openProjectFromCalendar}
           onOpenStudyReview={openStudyReviewFromCalendar}
-          taskDetail={renderTaskDetail()}
           onClearTaskSelection={() => planner.selectTask("")}
           showToast={showToast}
         />

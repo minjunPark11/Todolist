@@ -38,7 +38,6 @@ import { CalendarLeftSidebar } from "./calendar/CalendarLeftSidebar";
 import { WeekView } from "./calendar/WeekView";
 import { MonthView } from "./calendar/MonthView";
 import { YearView } from "./calendar/YearView";
-import { DayDetailPanel } from "./calendar/CalendarRightPanel";
 import { CalendarPopover, DayAgendaPopover, EventPopover, type PopoverAnchor } from "./calendar/EventPopover";
 import { NewTaskForm, type NewTaskFormResult } from "./calendar/NewTaskForm";
 import { QuickCreatePopover, type QuickCreateDefaults, type QuickCreateResult } from "./calendar/QuickCreatePopover";
@@ -79,13 +78,11 @@ interface CalendarViewProps {
   // When set, the calendar mounts with this project's category selected
   // (space detail "Open Calendar" hand-off).
   initialProjectId?: string;
-  onSelectTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
   onDeleteTask?: (taskId: string) => void;
   onOpenProject?: (projectId: string) => void;
   onOpenStudyReview?: (noteId: string) => void;
-  taskDetail?: ReactNode;
   onClearTaskSelection?: () => void;
   showToast?: (toast: ToastState) => void;
 }
@@ -103,13 +100,11 @@ export function CalendarView({
   externalCalendarEvents,
   onUpdateExternalCalendar,
   initialProjectId,
-  onSelectTask,
   onUpdateTask,
   onCreateTask,
   onDeleteTask,
   onOpenProject,
   onOpenStudyReview,
-  taskDetail,
   onClearTaskSelection,
   showToast,
 }: CalendarViewProps) {
@@ -491,16 +486,12 @@ export function CalendarView({
     onDeleteTask?.(item.sourceId);
   }
 
+  // Project/review markers only — task events edit inline in the popover.
   function openDetailFromPopover(item: CalendarItem) {
     setPopover(null);
-    if (item.sourceType === "external") return;
-    if (item.sourceType === "task") {
-      setMode("day");
-      setAnchor(item.date);
-      onSelectTask(item.sourceId);
-    } else if (item.sourceType === "project") {
+    if (item.sourceType === "project") {
       onOpenProject?.(item.sourceId);
-    } else {
+    } else if (item.sourceType === "note") {
       onOpenStudyReview?.(item.sourceId);
     }
   }
@@ -576,7 +567,6 @@ export function CalendarView({
     setActiveCategory(result.categoryId);
     setDraft(null);
     setDraftAnchor(null);
-    if (mode === "day") onSelectTask(taskId);
     showToast?.({ message: t("calendar.createdToast", { title: result.title }) });
   }
 
@@ -646,7 +636,7 @@ export function CalendarView({
           onExpand={() => setSidebarCollapsed(false)}
         />
 
-        <div className={mode === "day" ? "gcal-main-column has-detail" : "gcal-main-column"}>
+        <div className="gcal-main-column">
           <section className={isTimeGrid ? "gcal-main is-timegrid" : "gcal-main"}>
             {aiStatus === "preview" ? (
               <div className="gcal-suggestion-bar">
@@ -713,17 +703,6 @@ export function CalendarView({
               />
             )}
           </section>
-
-          {mode === "day" ? (
-            <DayDetailPanel
-              draft={draft}
-              taskDetail={taskDetail}
-              categoryGroups={categoryGroups}
-              initialCategoryId={activeCategoryId}
-              onCancelDraft={handleCancelDraft}
-              onCreateFromDraft={handleCreateFromDraft}
-            />
-          ) : null}
         </div>
       </div>
 
@@ -753,7 +732,7 @@ export function CalendarView({
           onClickItem={(item, anchor) => setPopover({ kind: "event", item, anchor })}
         />
       ) : null}
-      {mode === "week" && draft && draftAnchor ? (
+      {isTimeGrid && draft && draftAnchor ? (
         <CalendarPopover anchor={draftAnchor} onClose={handleCancelDraft} label={t("calendar.newTask")}>
           <NewTaskForm
             key={`${draft.date}-${draft.startTime}-${draft.endTime}`}

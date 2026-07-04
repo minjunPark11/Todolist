@@ -1820,11 +1820,6 @@ textarea {
   min-height: 0;
 }
 
-/* Spec §7: only the day view keeps a fixed right detail panel (280px). */
-.gcal-main-column.has-detail {
-  grid-template-columns: minmax(0, 1fr) 280px;
-}
-
 .gcal-main {
   position: relative;
   display: grid;
@@ -2422,35 +2417,6 @@ textarea {
   background: var(--calendar-now-color);
 }
 
-/* Right panel (V3 §1: replaces the old backlog aside + global TaskDetail split) */
-
-.gcal-panel {
-  display: grid;
-  gap: 14px;
-  align-content: start;
-  min-width: 0;
-  max-height: calc(100vh - 160px);
-  overflow-y: auto;
-}
-
-.gcal-panel-summary {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-lg);
-  padding: 14px;
-  background: var(--color-canvas);
-  gap: 16px;
-}
-
-.gcal-panel-summary.is-drop {
-  border-color: var(--color-primary);
-  background: var(--color-primary-tint);
-}
-
-.gcal-panel-summary-header h2 {
-  margin: 0 0 6px;
-  font-size: 0.95rem;
-}
-
 .gcal-summary-stats {
   display: flex;
   flex-wrap: wrap;
@@ -2668,15 +2634,6 @@ textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-}
-
-.gcal-panel-kicker {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--color-primary);
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
 }
 
 .gcal-schedule-head h2 {
@@ -2937,28 +2894,6 @@ textarea {
 .gcal-popover .gcal-newtask-form {
   border: 0;
   padding: 0;
-}
-
-/* --- Day view right detail panel (spec §7.7) --- */
-
-.gcal-panel-empty {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-lg);
-  padding: 24px;
-  background: var(--color-canvas);
-  gap: 8px;
-  color: var(--color-ink-muted-80);
-}
-
-.gcal-panel-empty strong {
-  color: var(--color-ink);
-  font-size: 0.95rem;
-}
-
-.gcal-panel-empty p {
-  margin: 0;
-  font-size: 0.84rem;
-  line-height: 1.5;
 }
 
 /* --- Year view (spec §8): 4x3 months, date numbers only --- */
@@ -3323,10 +3258,6 @@ textarea {
 @media (max-width: 1280px) {
   .gcal-main-column {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .gcal-panel {
-    max-height: none;
   }
 }
 
