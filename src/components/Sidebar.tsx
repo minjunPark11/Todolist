@@ -1,9 +1,27 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { PageId, Project, Task } from "../types";
 import { todayValue } from "../utils/date";
 import { getTodayBuckets } from "../utils/planner";
 import { useT } from "../i18n";
 import { MotionCollapse } from "./motion/MotionCollapse";
+import { reducedTransition, transitions } from "../motion/transitions";
+import { useMotionEnabled } from "../motion/reducedMotion";
+
+// The rail collapse only applies on desktop (the mobile overlay menu ignores
+// it), so the JS-driven pieces need the same breakpoint the CSS uses.
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(
+    () => window.matchMedia("(min-width: 861px)").matches,
+  );
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 861px)");
+    const onChange = () => setIsDesktop(query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  return isDesktop;
+}
 
 interface SidebarProps {
   activePage: PageId;
@@ -134,6 +152,9 @@ export function Sidebar({
   search,
 }: SidebarProps) {
   const { t } = useT();
+  const motionEnabled = useMotionEnabled();
+  const isDesktop = useIsDesktop();
+  const railed = collapsed && isDesktop;
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [newProject, setNewProject] = useState("");
   const today = todayValue();
@@ -192,14 +213,36 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand-lockup">
-        <span className="brand-mark">F</span>
-        <strong>{t("sidebar.brand")}</strong>
-        <button
+        {/* layout (FLIP) tweens the row→column rearrangement of the rail
+            header instead of letting the logo and button teleport. */}
+        <motion.span
+          className="brand-mark"
+          layout={motionEnabled ? "position" : false}
+          transition={motionEnabled ? transitions.soft : reducedTransition}
+        >
+          F
+        </motion.span>
+        <AnimatePresence initial={false}>
+          {!railed ? (
+            <motion.strong
+              layout={motionEnabled ? "position" : false}
+              initial={motionEnabled ? { opacity: 0 } : false}
+              animate={motionEnabled ? { opacity: 1 } : undefined}
+              exit={motionEnabled ? { opacity: 0 } : undefined}
+              transition={motionEnabled ? transitions.fast : reducedTransition}
+            >
+              {t("sidebar.brand")}
+            </motion.strong>
+          ) : null}
+        </AnimatePresence>
+        <motion.button
           type="button"
           className="side-icon-btn side-collapse-btn"
           aria-label={collapseLabel}
           title={collapseLabel}
           onClick={onToggleCollapse}
+          layout={motionEnabled ? "position" : false}
+          transition={motionEnabled ? transitions.soft : reducedTransition}
         >
           <svg
             width="16"
@@ -215,7 +258,7 @@ export function Sidebar({
             <path d="M12 5l-6 7 6 7" />
             <path d="M18 5l-6 7 6 7" />
           </svg>
-        </button>
+        </motion.button>
       </div>
 
       <div className="side-profile">
@@ -237,7 +280,7 @@ export function Sidebar({
           </span>
           {t("sidebar.projectShortcuts")}
         </button>
-        <MotionCollapse open={projectsOpen}>
+        <MotionCollapse open={projectsOpen && !railed}>
           <div className="side-list">
             {projects.map((project) => {
               const count = tasks.filter((task) => task.projectId === project.id && isOpen(task)).length;

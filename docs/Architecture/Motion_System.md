@@ -392,6 +392,12 @@ Goal: nothing on screen appears or disappears in a single frame.
 - Popover dismissal: the kit `Popover` owns an internal `AnimatePresence`, so closing any badge/menu popover fades out.
 - Toast and `GlobalFocusBar` animate both in and out (`toastVariants` in `AnimatePresence`).
 - Rail collapse/expand: the app sidebar (`.app-shell` grid columns), calendar left sidebar, and calendar task panel widths transition in CSS (0.28s, mirrors `transitions.soft`); the rail keeps the same DOM node so the width tween just runs on the class swap. The `[data-reduce-motion]` CSS block disables these automatically.
+- Sidebar rail contents move continuously, not just the width (principle: anything that moves tweens from its start position to its end position; nothing display:none-pops):
+  - labels/badges/user name shrink via `max-width` + fade (never `display: none`);
+  - nav icons glide to center because `justify-content: center` is set in both states (inert while the flex:1 label fills the row);
+  - the search box and shortcuts title tween `height`+`margin` to zero so the rows below slide up instead of jumping;
+  - the brand logo and collapse button FLIP (`layout="position"`) through the row→column rearrangement, and the brand text fades via `AnimatePresence`;
+  - the shortcuts list is driven by `MotionCollapse open={projectsOpen && !railed}` with a desktop matchMedia gate so the mobile overlay menu is unaffected.
 - `MotionCollapse` (`src/components/motion/MotionCollapse.tsx`): shared height-auto expand/collapse. Used by the sidebar project-shortcuts section and the calendar task panel quadrant sections (whose row `AnimatePresence` previously unmounted wholesale on collapse, skipping exits).
 - AI chat panel (`OllamaChat`) scales/fades from its bottom-right FAB corner on open and close.
 

@@ -436,6 +436,62 @@ button:focus-visible {
     grid-template-columns: 68px minmax(0, 1fr);
   }
 
+  /* Rail collapse must read as one continuous movement: widths, gaps, and
+     paddings tween while text fades and shrinks — nothing display:none-pops.
+     justify-content: center is set in BOTH states (when expanded the flex:1
+     label fills the row, so centering is inert) so icons glide to the middle
+     as their labels shrink instead of jumping at the class swap. */
+  .sidebar {
+    overflow-x: hidden;
+  }
+
+  .side-item,
+  .side-profile {
+    justify-content: center;
+    transition: gap 0.28s cubic-bezier(0.2, 0, 0, 1), padding 0.28s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .side-item-label,
+  .side-name {
+    max-width: 220px;
+    transition: max-width 0.28s cubic-bezier(0.2, 0, 0, 1), opacity 0.16s ease;
+  }
+
+  .side-item-badge {
+    max-width: 48px;
+    overflow: hidden;
+    transition: max-width 0.28s cubic-bezier(0.2, 0, 0, 1), opacity 0.16s ease;
+  }
+
+  .side-profile .side-icon-btn {
+    overflow: hidden;
+    transition:
+      width 0.28s cubic-bezier(0.2, 0, 0, 1),
+      padding 0.28s cubic-bezier(0.2, 0, 0, 1),
+      opacity 0.16s ease;
+  }
+
+  /* Fixed heights so the vertical space these rows occupy can tween to zero
+     (auto height cannot transition); the negative margin cancels the flex
+     gap so neighbors slide together instead of jumping when they vanish. */
+  .global-search {
+    height: 44px;
+    transition:
+      height 0.28s cubic-bezier(0.2, 0, 0, 1),
+      margin 0.28s cubic-bezier(0.2, 0, 0, 1),
+      opacity 0.16s ease;
+  }
+
+  .side-section-title {
+    height: 24px;
+    overflow: hidden;
+    transition:
+      height 0.28s cubic-bezier(0.2, 0, 0, 1),
+      margin 0.28s cubic-bezier(0.2, 0, 0, 1),
+      padding 0.28s cubic-bezier(0.2, 0, 0, 1),
+      opacity 0.16s ease;
+  }
+
   .sidebar-collapsed .sidebar {
     padding: 20px 10px;
     gap: 16px;
@@ -451,23 +507,46 @@ button:focus-visible {
     margin-left: 0;
   }
 
-  .sidebar-collapsed .brand-lockup strong,
-  .sidebar-collapsed .side-name,
-  .sidebar-collapsed .side-profile .side-icon-btn,
-  .sidebar-collapsed .global-search,
-  .sidebar-collapsed .side-section,
   .sidebar-collapsed .side-item-label,
+  .sidebar-collapsed .side-name,
   .sidebar-collapsed .side-item-badge {
-    display: none;
+    max-width: 0;
+    opacity: 0;
+  }
+
+  .sidebar-collapsed .side-profile .side-icon-btn {
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
   }
 
   .sidebar-collapsed .side-profile {
-    justify-content: center;
+    gap: 0;
   }
 
   .sidebar-collapsed .side-item {
-    justify-content: center;
     padding: 0;
+    gap: 0;
+  }
+
+  .sidebar-collapsed .global-search {
+    height: 0;
+    margin-top: -16px;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .sidebar-collapsed .side-section-title {
+    height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: -16px;
+    opacity: 0;
+    pointer-events: none;
   }
 }
 
