@@ -588,15 +588,21 @@ export default function App() {
     }
   }
 
+  // Deletes immediately, no app-level confirm — for callers that already
+  // showed their own confirmation (e.g. the space delete modal).
+  function deleteProjectNow(projectId: string) {
+    planner.deleteProject(projectId);
+    setIsProjectDetailOpen(false);
+    setSelectedProjectId("");
+    planner.selectTask("");
+    showToast({ message: t("app.toastProjectDeleted") });
+  }
+
   function requestDeleteProject(projectId: string) {
     if (appSettings.confirmBeforeDelete) {
       setPendingDeleteProjectId(projectId);
     } else {
-      planner.deleteProject(projectId);
-      setIsProjectDetailOpen(false);
-      setSelectedProjectId("");
-      planner.selectTask("");
-      showToast({ message: t("app.toastProjectDeleted") });
+      deleteProjectNow(projectId);
     }
   }
 
@@ -792,6 +798,7 @@ export default function App() {
         handleArchiveProject={handleArchiveProject}
         requestDeleteTask={requestDeleteTask}
         requestDeleteProject={requestDeleteProject}
+        deleteProjectNow={deleteProjectNow}
         openProjectFromCalendar={openProjectFromCalendar}
         openStudyReviewFromCalendar={openStudyReviewFromCalendar}
         viewTaskInCalendar={viewTaskInCalendar}

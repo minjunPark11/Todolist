@@ -38,6 +38,8 @@ type AppPagesProps = {
   handleArchiveProject: (projectId: string) => void;
   requestDeleteTask: (taskId: string) => void;
   requestDeleteProject: (projectId: string) => void;
+  // Immediate delete for flows that already confirmed (space delete modal).
+  deleteProjectNow: (projectId: string) => void;
   openProjectFromCalendar: (projectId: string) => void;
   openStudyReviewFromCalendar: (noteId: string) => void;
   viewTaskInCalendar: (taskId: string) => void;
@@ -89,6 +91,7 @@ export function AppPages({
   handleArchiveProject,
   requestDeleteTask,
   requestDeleteProject,
+  deleteProjectNow,
   openProjectFromCalendar,
   openStudyReviewFromCalendar,
   viewTaskInCalendar,
@@ -287,7 +290,7 @@ export function AppPages({
         onUpdateTopic={planner.updateTopic}
         onToggleStar={planner.toggleProjectPinned}
         onArchiveProject={handleArchiveProject}
-        onRequestDeleteProject={requestDeleteProject}
+        onRequestDeleteProject={deleteProjectNow}
         onDeleteTopic={planner.deleteTopic}
         onSaveNotes={(id, value) => planner.updateProject(id, { notes: value })}
         showToast={showToast}
