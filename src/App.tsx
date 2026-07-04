@@ -67,7 +67,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [isProjectDetailOpen, setIsProjectDetailOpen] = useState(false);
-  const [planningTab, setPlanningTab] = useState<"board" | "matrix">("board");
   const [studyTab, setStudyTab] = useState<"topics" | "notes" | "reviews">("topics");
   const [studyFocusNoteId, setStudyFocusNoteId] = useState("");
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
@@ -784,8 +783,6 @@ export default function App() {
         setSelectedProjectId={setSelectedProjectId}
         isProjectDetailOpen={isProjectDetailOpen}
         setIsProjectDetailOpen={setIsProjectDetailOpen}
-        planningTab={planningTab}
-        setPlanningTab={setPlanningTab}
         studyTab={studyTab}
         setStudyTab={setStudyTab}
         studyFocusNoteId={studyFocusNoteId}

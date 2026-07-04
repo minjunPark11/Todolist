@@ -145,6 +145,10 @@ function normalizeTask(task: Partial<Task>): Task {
     importance: oneOf(task.importance, taskLevels, "low"),
     urgency: oneOf(task.urgency, taskLevels, "low"),
     isFocus: Boolean(task.isFocus),
+    estimatedMinutes:
+      Number.isFinite(task.estimatedMinutes) && Number(task.estimatedMinutes) > 0
+        ? Math.round(Number(task.estimatedMinutes))
+        : 0,
     actualSeconds: Number.isFinite(task.actualSeconds) ? Number(task.actualSeconds) : 0,
     activeSessionId: task.activeSessionId ?? "",
     lastFocusedAt: task.lastFocusedAt ?? "",
