@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Trim: env values pasted into Vercel often pick up a trailing newline,
+// which Supabase rejects as "Invalid API key".
+const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
 export default async function handler(req, res) {
   if (req.method !== "GET" && req.method !== "HEAD") {
