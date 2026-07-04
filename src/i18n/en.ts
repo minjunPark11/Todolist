@@ -420,6 +420,7 @@ export const en: Dictionary = {
   "calendar.yearMode": "Year",
   "calendar.yearTitle": "{{year}}",
   "calendar.popoverAddMemo": "Add memo or URL",
+  "calendar.deleteEvent": "Delete event",
   "calendar.detailEmptyTitle": "Select an event",
   "calendar.detailEmptyBody": "Pick an event on the calendar to see its details here.",
   "calendar.noUnscheduled": "No unscheduled tasks to suggest.",

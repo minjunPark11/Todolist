@@ -101,6 +101,7 @@ export function EventPopover({
   onChangeCategory,
   onClose,
   onOpenDetail,
+  onDelete,
 }: {
   item: CalendarItem;
   anchor: PopoverAnchor;
@@ -110,6 +111,7 @@ export function EventPopover({
   onChangeCategory?: (item: CalendarItem, categoryId: string) => void;
   onClose: () => void;
   onOpenDetail: (item: CalendarItem) => void;
+  onDelete?: (item: CalendarItem) => void;
 }) {
   const { t, lang } = useT();
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -121,6 +123,25 @@ export function EventPopover({
   const canChangeCategory = Boolean(
     categoryGroups && onChangeCategory && item.sourceType === "task" && !item.readOnly,
   );
+  // Only task-backed events can be deleted; derived markers (project deadline,
+  // review) and read-only external events keep the popover action-free.
+  const canDelete = Boolean(onDelete && item.sourceType === "task" && !item.readOnly);
+
+  // While the popover is open it acts as the selection, so Delete/Backspace
+  // deletes the event without a separate selected-block state.
+  useEffect(() => {
+    if (!canDelete) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onDelete!(item);
+    }
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [canDelete, item, onDelete]);
 
   return (
     <CalendarPopover anchor={anchor} onClose={onClose} label={item.title}>
@@ -137,6 +158,19 @@ export function EventPopover({
           >
             <span className="gcal-popover-category-swatch" style={{ background: item.color }} />
             <span aria-hidden="true">⌄</span>
+          </button>
+        ) : null}
+        {canDelete ? (
+          <button
+            type="button"
+            className="gcal-popover-delete"
+            aria-label={t("calendar.deleteEvent")}
+            title={t("calendar.deleteEvent")}
+            onClick={() => onDelete!(item)}
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+              <path d="M2.5 4h11M6.5 4V2.8a.8.8 0 0 1 .8-.8h1.4a.8.8 0 0 1 .8.8V4M4 4l.7 9a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4M6.6 7v4M9.4 7v4" />
+            </svg>
           </button>
         ) : null}
         <button type="button" className="gcal-popover-close" aria-label={t("common.close")} onClick={onClose}>

@@ -82,6 +82,7 @@ interface CalendarViewProps {
   onSelectTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
+  onDeleteTask?: (taskId: string) => void;
   onOpenProject?: (projectId: string) => void;
   onOpenStudyReview?: (noteId: string) => void;
   taskDetail?: ReactNode;
@@ -105,6 +106,7 @@ export function CalendarView({
   onSelectTask,
   onUpdateTask,
   onCreateTask,
+  onDeleteTask,
   onOpenProject,
   onOpenStudyReview,
   taskDetail,
@@ -472,6 +474,15 @@ export function CalendarView({
     setPopover({ kind: "event", item, anchor });
   }
 
+  // Delete flows through the app-level requestDeleteTask, so the global
+  // confirm-before-delete setting and toast apply here too.
+  function handleDeleteFromPopover(item: CalendarItem) {
+    if (item.sourceType !== "task") return;
+    setPopover(null);
+    onClearTaskSelection?.();
+    onDeleteTask?.(item.sourceId);
+  }
+
   function openDetailFromPopover(item: CalendarItem) {
     setPopover(null);
     if (item.sourceType === "external") return;
@@ -716,6 +727,7 @@ export function CalendarView({
           onChangeCategory={handleChangeItemCategory}
           onClose={() => setPopover(null)}
           onOpenDetail={openDetailFromPopover}
+          onDelete={onDeleteTask ? handleDeleteFromPopover : undefined}
         />
       ) : null}
       {popover?.kind === "agenda" ? (

@@ -219,6 +219,7 @@ export function AppPages({
           onSelectTask={planner.selectTask}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
+          onDeleteTask={requestDeleteTask}
           onOpenProject={openProjectFromCalendar}
           onOpenStudyReview={openStudyReviewFromCalendar}
           taskDetail={renderTaskDetail()}

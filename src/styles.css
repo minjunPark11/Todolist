@@ -2805,6 +2805,21 @@ textarea {
   cursor: pointer;
 }
 
+.gcal-popover-delete {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-muted-48);
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.gcal-popover-delete:hover {
+  color: #ff453a;
+}
+
 .gcal-popover-when {
   margin: 0;
   color: var(--color-ink-muted-80);
