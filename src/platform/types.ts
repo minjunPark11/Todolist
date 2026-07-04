@@ -13,6 +13,9 @@ export interface PlatformAdapter {
     get(key: string): Promise<string | null>;
     set(key: string, value: string): Promise<void>;
     remove(key: string): Promise<void>;
+    getSync(key: string): string | null;
+    setSync(key: string, value: string): void;
+    removeSync(key: string): void;
   };
   notify(options: { title: string; body?: string }): Promise<boolean>;
   requestNotificationPermission(): Promise<void>;

@@ -11,6 +11,7 @@
 // `hiddenCategoryIds` — and expose visible ids / isVisible helpers computed
 // from it. Categories themselves never store an isVisible flag (§15.2).
 import { useSyncExternalStore } from "react";
+import { platform } from "../platform";
 import type { ExternalCalendar, Project, StudyTopic } from "../types";
 
 export type CalendarGroupType = "personal" | "study" | "project" | "external" | "focus";
@@ -107,7 +108,7 @@ function sanitizeState(raw: Partial<CalendarCategoryState> | null): CalendarCate
 
 function loadState(): CalendarCategoryState {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = platform.storage.getSync(STORAGE_KEY);
     return sanitizeState(raw ? (JSON.parse(raw) as Partial<CalendarCategoryState>) : null);
   } catch {
     return sanitizeState(null);
@@ -120,7 +121,7 @@ const listeners = new Set<() => void>();
 function setState(next: CalendarCategoryState) {
   state = next;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    platform.storage.setSync(STORAGE_KEY, JSON.stringify(next));
   } catch {
     // Keep the in-memory state when storage is unavailable.
   }

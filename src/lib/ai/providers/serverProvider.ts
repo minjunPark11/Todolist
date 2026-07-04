@@ -1,3 +1,4 @@
+import { platform } from "../../../platform";
 import type { AiChatRequest, AiChatResponse, AiProvider } from "../types";
 
 type ServerAiResponse = {
@@ -24,7 +25,7 @@ export const serverProvider: AiProvider = {
       throw new Error("AI server URL is not configured.");
     }
 
-    const response = await fetch(serverUrl, {
+    const response = await platform.aiFetch(serverUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),

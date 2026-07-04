@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { pushUndo } from "../lib/undoStack";
+import { platform } from "../platform";
 import {
   DEFAULT_OVERVIEW_CARDS,
   DEFAULT_SPACE_DEFAULTS,
@@ -10,7 +11,7 @@ import {
 } from "../lib/spaceHubTypes";
 
 // Notes, manual activity records, and per-space customization live in their
-// own localStorage bucket so the core planner data shape stays untouched.
+// own platform storage bucket so the core planner data shape stays untouched.
 const STORAGE_KEY = "todo-planner-space-hub-v1";
 
 interface SpaceHubStore {
@@ -21,7 +22,7 @@ interface SpaceHubStore {
 
 function loadStore(): SpaceHubStore {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = platform.storage.getSync(STORAGE_KEY);
     if (!raw) return { notes: [], activities: [], configs: [] };
     const parsed = JSON.parse(raw) as Partial<SpaceHubStore>;
     return {
@@ -69,9 +70,9 @@ export function useSpaceHubData() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+      platform.storage.setSync(STORAGE_KEY, JSON.stringify(store));
     } catch {
-      // localStorage full/unavailable: keep in-memory state working.
+      // Storage full/unavailable: keep in-memory state working.
     }
   }, [store]);
 

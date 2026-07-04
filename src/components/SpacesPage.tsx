@@ -4,6 +4,7 @@ import type { ToastState } from "./kit";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
 import { DeleteSpaceConfirmModal } from "./spaces/SpaceModals";
 import { useT } from "../i18n";
+import { platform } from "../platform";
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -121,7 +122,7 @@ function priorityLabel(t: TFn, priority: AiPriority) {
 }
 
 // Locally created spaces (study/custom) have no planner-side record, so they
-// persist in their own localStorage bucket alongside local pin state.
+// persist in their own platform storage bucket alongside local pin state.
 const LOCAL_SPACES_KEY = "todo-planner-local-spaces-v1";
 
 interface LocalSpacesStore {
@@ -131,7 +132,7 @@ interface LocalSpacesStore {
 
 function loadLocalSpacesStore(): LocalSpacesStore {
   try {
-    const raw = localStorage.getItem(LOCAL_SPACES_KEY);
+    const raw = platform.storage.getSync(LOCAL_SPACES_KEY);
     if (!raw) return { spaces: [], pinnedIds: [] };
     const parsed = JSON.parse(raw) as Partial<LocalSpacesStore>;
     return {
@@ -233,9 +234,9 @@ export function SpacesPage({
 
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_SPACES_KEY, JSON.stringify({ spaces: localSpaces, pinnedIds: localPinnedSpaceIds }));
+      platform.storage.setSync(LOCAL_SPACES_KEY, JSON.stringify({ spaces: localSpaces, pinnedIds: localPinnedSpaceIds }));
     } catch {
-      // localStorage full/unavailable: keep in-memory state working.
+      // Storage full/unavailable: keep in-memory state working.
     }
   }, [localSpaces, localPinnedSpaceIds]);
 

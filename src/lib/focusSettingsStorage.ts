@@ -1,3 +1,5 @@
+import { platform } from "../platform";
+
 export type FocusUserSettings = {
   showTabTitleTimer: boolean;
   enableCompletionNotification: boolean;
@@ -33,7 +35,7 @@ export function sanitizeFocusUserSettings(value: unknown): FocusUserSettings {
 
 export function loadFocusUserSettings(): FocusUserSettings {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = platform.storage.getSync(STORAGE_KEY);
     return raw ? sanitizeFocusUserSettings(JSON.parse(raw)) : DEFAULT_FOCUS_USER_SETTINGS;
   } catch {
     return DEFAULT_FOCUS_USER_SETTINGS;
@@ -42,7 +44,7 @@ export function loadFocusUserSettings(): FocusUserSettings {
 
 export function saveFocusUserSettings(settings: FocusUserSettings) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    platform.storage.setSync(STORAGE_KEY, JSON.stringify(settings));
   } catch {
     // Storage may be unavailable in private mode; keep the in-memory setting.
   }

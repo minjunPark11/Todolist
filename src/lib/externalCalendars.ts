@@ -1,3 +1,4 @@
+import { platform } from "../platform";
 import type { ExternalCalendar, ExternalCalendarEvent } from "../types";
 
 export const EXTERNAL_CALENDAR_STALE_MINUTES = 30;
@@ -162,7 +163,7 @@ function sanitizeEvent(raw: Partial<ExternalCalendarEvent>): ExternalCalendarEve
 
 export function loadExternalCalendarState(): ExternalCalendarState {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = platform.storage.getSync(STORAGE_KEY);
     if (!raw) return { calendars: [], events: [] };
     const parsed = JSON.parse(raw) as Partial<ExternalCalendarState>;
     return {
@@ -176,7 +177,7 @@ export function loadExternalCalendarState(): ExternalCalendarState {
 
 export function saveExternalCalendarState(state: ExternalCalendarState) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    platform.storage.setSync(STORAGE_KEY, JSON.stringify(state));
   } catch {
     // Keep in-memory state when storage is unavailable.
   }
@@ -234,15 +235,15 @@ export async function fetchExternalCalendarEvents(calendar: ExternalCalendar) {
   const url = normalizeIcsUrl(calendar.icsUrl);
   let text: string;
   if (isSameOrigin(url)) {
-    text = await readIcsResponse(await fetch(url));
+    text = await readIcsResponse(await platform.aiFetch(url));
   } else {
     try {
-      text = await readIcsResponse(await fetch(url));
+      text = await readIcsResponse(await platform.aiFetch(url));
     } catch {
       // Cross-origin ICS hosts (Google, iCloud, ...) don't send CORS headers,
       // so the direct fetch dies with an opaque network error; retry through
       // the same-origin proxy which fetches server-side.
-      text = await readIcsResponse(await fetch(`/api/ics?url=${encodeURIComponent(url)}`));
+      text = await readIcsResponse(await platform.aiFetch(`/api/ics?url=${encodeURIComponent(url)}`));
     }
   }
   return parseIcsEvents(text, calendar.id);

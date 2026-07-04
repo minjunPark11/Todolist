@@ -19,6 +19,15 @@ export const webPlatform: PlatformAdapter = {
     async remove(key) {
       window.localStorage.removeItem(key);
     },
+    getSync(key) {
+      return window.localStorage.getItem(key);
+    },
+    setSync(key, value) {
+      window.localStorage.setItem(key, value);
+    },
+    removeSync(key) {
+      window.localStorage.removeItem(key);
+    },
   },
 
   async notify(options) {

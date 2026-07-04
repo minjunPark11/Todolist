@@ -2,6 +2,7 @@
 // Maps the existing Task/Project/ConceptNote model onto the spec's
 // TodayTask / TimeBlock / SpaceSignal concepts without changing stored data.
 import type { ConceptNote, Project, Task } from "../types";
+import { platform } from "../platform";
 import { todayValue } from "./date";
 import { getDueReviewCount } from "./planner";
 
@@ -30,7 +31,7 @@ const OVERRIDES_STORAGE_KEY = "todayPage.bucketOverrides.v1";
 
 export function loadBucketOverrides(today = todayValue()): BucketOverrides {
   try {
-    const raw = window.localStorage.getItem(OVERRIDES_STORAGE_KEY);
+    const raw = platform.storage.getSync(OVERRIDES_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as { date?: string; overrides?: BucketOverrides };
     // Overrides are a per-day decision; a new day starts from the rule-based default.
@@ -43,7 +44,7 @@ export function loadBucketOverrides(today = todayValue()): BucketOverrides {
 
 export function saveBucketOverrides(overrides: BucketOverrides, today = todayValue()) {
   try {
-    window.localStorage.setItem(
+    platform.storage.setSync(
       OVERRIDES_STORAGE_KEY,
       JSON.stringify({ date: today, overrides }),
     );

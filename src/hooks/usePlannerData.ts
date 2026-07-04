@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { pushUndo } from "../lib/undoStack";
 import { sampleData } from "../data/sampleData";
+import { platform } from "../platform";
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 import type {
   AppSettings,
@@ -461,7 +462,7 @@ function getNextDueDate(task: Task): string {
 }
 
 function readStorage(): PlannerData {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = platform.storage.getSync(STORAGE_KEY);
 
   if (raw) {
     try {
@@ -472,7 +473,7 @@ function readStorage(): PlannerData {
   }
 
   // One-time migration from the legacy storage key (statuses remapped on normalize).
-  const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+  const legacy = platform.storage.getSync(LEGACY_STORAGE_KEY);
   if (legacy) {
     try {
       return normalizeData(JSON.parse(legacy) as Partial<PlannerData>);
@@ -510,7 +511,7 @@ export function usePlannerData() {
   const syncTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    platform.storage.setSync(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
 
   useEffect(() => {
