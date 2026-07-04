@@ -21,7 +21,7 @@ import {
   saveFocusUserSettings,
   type FocusUserSettings,
 } from "./lib/focusSettingsStorage";
-import { updateMiniFocusTimer } from "./lib/miniFocusTimer";
+import { platform } from "./platform";
 import {
   buildCalendarShareSnapshot,
   createShareToken,
@@ -214,8 +214,11 @@ export default function App() {
 
   useEffect(() => {
     const session = planner.activeFocusSession;
-    if (!session || !activeFocusTask) return;
-    updateMiniFocusTimer({
+    if (!session || !activeFocusTask) {
+      void platform.miniFocusTimer.clear();
+      return;
+    }
+    void platform.miniFocusTimer.update({
       sessionId: session.id,
       title: activeFocusTask.title,
       time: formatFocusDuration(activeFocusElapsed),
@@ -240,9 +243,8 @@ export default function App() {
 
   useEffect(() => {
     const session = planner.activeFocusSession;
-    if (!session || !focusSettings.enableCompletionNotification || !("Notification" in window)) return;
-    if (window.Notification.permission !== "default") return;
-    window.Notification.requestPermission().catch(() => undefined);
+    if (!session || !focusSettings.enableCompletionNotification) return;
+    platform.requestNotificationPermission().catch(() => undefined);
   }, [focusSettings.enableCompletionNotification, planner.activeFocusSession?.id]);
 
   useEffect(() => {
@@ -259,6 +261,30 @@ export default function App() {
 
     window.addEventListener("message", handleMiniTimerMessage);
     return () => window.removeEventListener("message", handleMiniTimerMessage);
+  }, [planner.activeFocusSession, planner.pauseFocusSession, planner.resumeFocusSession]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let cancelled = false;
+
+    platform.miniFocusTimer.subscribeAction((payload) => {
+      const session = planner.activeFocusSession;
+      if (!session || session.id !== payload.sessionId) return;
+      if (payload.action === "pause") planner.pauseFocusSession(session.id);
+      if (payload.action === "resume") planner.resumeFocusSession(session.id);
+      if (payload.action === "finish") stopFocusWithNotification(session.id, false);
+    }).then((nextUnlisten) => {
+      if (cancelled) {
+        nextUnlisten();
+        return;
+      }
+      unlisten = nextUnlisten;
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, [planner.activeFocusSession, planner.pauseFocusSession, planner.resumeFocusSession]);
 
   function navigate(path: string, mode: "push" | "replace" = "push") {
@@ -382,15 +408,9 @@ export default function App() {
 
     const title = "Focus 완료";
     const body = `${formatFocusDuration(getDisplayedFocusSeconds(session), true)} 동안 ${task?.title || session.title || "작업"}에 집중했어요.`;
-    if ("Notification" in window && window.Notification.permission === "granted") {
-      try {
-        new window.Notification(title, { body });
-        return;
-      } catch {
-        // Fall back to in-app toast.
-      }
-    }
-    showToast({ message: `${title}: ${body}` });
+    void platform.notify({ title, body }).then((sent) => {
+      if (!sent) showToast({ message: `${title}: ${body}` });
+    });
   }
 
   function stopFocusWithNotification(sessionId: string, completeTask = false) {

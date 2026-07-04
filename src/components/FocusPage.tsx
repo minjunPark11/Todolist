@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FocusSession, PageId, Project, Task } from "../types";
 import { formatDate, isOverdue, todayValue } from "../utils/date";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
-import { openMiniFocusTimer, supportsMiniFocusTimer } from "../lib/miniFocusTimer";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../lib/focusTimer";
+import { platform } from "../platform";
 
 interface FocusPageProps {
   tasks: Task[];
@@ -125,7 +125,7 @@ export function FocusPage({
     .sort((a, b) => b.seconds - a.seconds)
     .slice(0, 4);
 
-  const canOpenMiniTimer = Boolean(activeSession && activeTask && settings.showMiniTimerButton && supportsMiniFocusTimer());
+  const canOpenMiniTimer = Boolean(activeSession && activeTask && settings.showMiniTimerButton && platform.miniFocusTimer.supported());
 
   useEffect(() => {
     if (!optionsOpen) return;
@@ -168,7 +168,7 @@ export function FocusPage({
 
   function openMiniTimer() {
     if (!activeSession || !activeTask) return;
-    openMiniFocusTimer({
+    void platform.miniFocusTimer.open({
       sessionId: activeSession.id,
       title: activeTask.title,
       time: formatFocusDuration(elapsed),

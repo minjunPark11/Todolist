@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FocusFlow Mini Timer</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 280px;
+        overflow: hidden;
+        background: #f5f7fb;
+        color: #111827;
+      }
+
+      main {
+        width: 100vw;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+      }
+
+      section {
+        width: min(100%, 288px);
+        display: grid;
+        gap: 14px;
+        padding: 18px;
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
+        text-align: center;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #6b7280;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      #close {
+        width: 30px;
+        min-height: 30px;
+        border-radius: 8px;
+        color: #6b7280;
+      }
+
+      #time {
+        font-size: 46px;
+        line-height: 1;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+      }
+
+      #title {
+        min-height: 24px;
+        overflow-wrap: anywhere;
+        font-weight: 750;
+      }
+
+      #status {
+        color: #6b7280;
+        font-size: 13px;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      button {
+        min-height: 40px;
+        border: 1px solid #dbe4ff;
+        border-radius: 12px;
+        background: #fff;
+        color: #4f73ff;
+        font-weight: 850;
+        cursor: pointer;
+      }
+
+      button.danger {
+        border-color: #ffd1cc;
+        color: #b42318;
+        background: #fff7f6;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <header>
+          <span>FocusFlow</span>
+          <button type="button" id="close" aria-label="Close">x</button>
+        </header>
+        <div id="time">--:--</div>
+        <div id="title">Loading focus session</div>
+        <div id="status">Connecting</div>
+        <div class="actions">
+          <button type="button" id="toggle" disabled>Pause</button>
+          <button type="button" id="finish" class="danger" disabled>Finish</button>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      let snapshot = null;
+
+      function getTauri() {
+        return window.__TAURI__;
+      }
+
+      function render(next) {
+        snapshot = next && next.sessionId ? next : null;
+        const hasSession = Boolean(snapshot);
+        const paused = snapshot && snapshot.status === "paused";
+
+        document.getElementById("time").textContent = snapshot ? snapshot.time : "--:--";
+        document.getElementById("title").textContent = snapshot ? snapshot.title || "Focus session" : "No active focus session";
+        document.getElementById("status").textContent = hasSession ? (paused ? "Paused" : "Running") : "Idle";
+        document.getElementById("toggle").textContent = paused ? "Resume" : "Pause";
+        document.getElementById("toggle").disabled = !hasSession;
+        document.getElementById("finish").disabled = !hasSession;
+      }
+
+      async function dispatch(action) {
+        if (!snapshot || !getTauri()) return;
+        await getTauri().core.invoke("dispatch_focus_tray_action", {
+          action,
+          sessionId: snapshot.sessionId
+        });
+      }
+
+      async function boot() {
+        const tauri = getTauri();
+        if (!tauri) {
+          document.getElementById("title").textContent = "Tauri API unavailable";
+          document.getElementById("status").textContent = "Error";
+          return;
+        }
+
+        render(await tauri.core.invoke("get_focus_tray_snapshot"));
+        await tauri.event.listen("focus-tray-update", function(event) {
+          render(event.payload);
+        });
+      }
+
+      document.getElementById("toggle").addEventListener("click", function() {
+        dispatch(snapshot && snapshot.status === "paused" ? "resume" : "pause");
+      });
+      document.getElementById("finish").addEventListener("click", function() {
+        dispatch("finish");
+      });
+      document.getElementById("close").addEventListener("click", function() {
+        window.close();
+      });
+
+      boot().catch(function(error) {
+        document.getElementById("title").textContent = error && error.message ? error.message : "Mini timer failed";
+        document.getElementById("status").textContent = "Error";
+      });
+    </script>
+  </body>
+</html>

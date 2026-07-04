@@ -1,4 +1,5 @@
 import type { AiChatRequest, AiChatResponse, AiProvider } from "../types";
+import { platform } from "../../../platform";
 
 const DEFAULT_REMOTE_OLLAMA_MODEL = "gemma3";
 
@@ -44,7 +45,7 @@ export const remoteOllamaProvider: AiProvider = {
 
     const timeout = withTimeout(2500);
     try {
-      const response = await fetch(`${baseUrl}/api/tags`, {
+      const response = await platform.aiFetch(`${baseUrl}/api/tags`, {
         method: "GET",
         signal: timeout.signal,
       });
@@ -67,7 +68,7 @@ export const remoteOllamaProvider: AiProvider = {
     }
 
     const model = getRemoteOllamaModel();
-    const response = await fetch(`${baseUrl}/api/chat`, {
+    const response = await platform.aiFetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

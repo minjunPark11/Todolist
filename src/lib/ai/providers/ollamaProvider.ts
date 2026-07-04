@@ -1,4 +1,5 @@
 import type { AiChatRequest, AiChatResponse, AiProvider } from "../types";
+import { platform } from "../../../platform";
 
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 const DEFAULT_OLLAMA_MODEL = "gemma3";
@@ -50,7 +51,7 @@ export const ollamaProvider: AiProvider = {
     const timeout = withTimeout(1500);
 
     try {
-      const response = await fetch(`${baseUrl}/api/tags`, {
+      const response = await platform.aiFetch(`${baseUrl}/api/tags`, {
         method: "GET",
         signal: timeout.signal,
       });
@@ -66,7 +67,7 @@ export const ollamaProvider: AiProvider = {
     const baseUrl = getOllamaBaseUrl();
     const model = getOllamaModel();
 
-    const response = await fetch(`${baseUrl}/api/chat`, {
+    const response = await platform.aiFetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

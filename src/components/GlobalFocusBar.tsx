@@ -2,10 +2,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { FocusSession, Task } from "../types";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../lib/focusTimer";
-import { openMiniFocusTimer, supportsMiniFocusTimer } from "../lib/miniFocusTimer";
 import { reducedTransition, transitions } from "../motion/transitions";
 import { toastVariants } from "../motion/variants";
 import { useMotionEnabled } from "../motion/reducedMotion";
+import { platform } from "../platform";
 
 interface GlobalFocusBarProps {
   session: FocusSession | null;
@@ -37,10 +37,10 @@ function FocusBarContent({
   const now = useNowTick(session.status === "running");
   const elapsed = getDisplayedFocusSeconds(session, now);
   const motionEnabled = useMotionEnabled();
-  const canOpenMiniTimer = settings.showMiniTimerButton && supportsMiniFocusTimer();
+  const canOpenMiniTimer = settings.showMiniTimerButton && platform.miniFocusTimer.supported();
 
   function openMiniTimer() {
-    openMiniFocusTimer({
+    void platform.miniFocusTimer.open({
       sessionId: session.id,
       title: task.title,
       time: formatFocusDuration(elapsed),
