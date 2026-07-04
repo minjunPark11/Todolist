@@ -22,6 +22,39 @@ import { useT } from "../../i18n";
 export { DAY_END, DAY_START, SLOT_HEIGHT };
 
 const hours = Array.from({ length: DAY_END - DAY_START }, (_, index) => DAY_START + index);
+
+// Overlapping blocks split the column side-by-side (Google Calendar style):
+// greedy column assignment inside each overlap cluster; every block in a
+// cluster shares the cluster's column count so widths line up.
+function computeOverlapLayout(entries: { key: string; start: number; end: number }[]) {
+  const sorted = [...entries].sort((a, b) => a.start - b.start || b.end - a.end);
+  const layout = new Map<string, { col: number; cols: number }>();
+  let cluster: { key: string; col: number }[] = [];
+  let colEnds: number[] = [];
+  let clusterEnd = -1;
+
+  function flush() {
+    for (const entry of cluster) layout.set(entry.key, { col: entry.col, cols: colEnds.length });
+    cluster = [];
+    colEnds = [];
+    clusterEnd = -1;
+  }
+
+  for (const entry of sorted) {
+    if (cluster.length > 0 && entry.start >= clusterEnd) flush();
+    let col = colEnds.findIndex((end) => end <= entry.start);
+    if (col === -1) {
+      col = colEnds.length;
+      colEnds.push(entry.end);
+    } else {
+      colEnds[col] = entry.end;
+    }
+    cluster.push({ key: entry.key, col });
+    clusterEnd = Math.max(clusterEnd, entry.end);
+  }
+  flush();
+  return layout;
+}
 const timeLabelFormatter = new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 // V3 §2.1: only the live drag preview lives here; the confirmed draft is
@@ -722,22 +755,31 @@ export function WeekView({
                     </span>
                   </div>
                 ) : null}
-                {/* §9.1 (D8): overlapping blocks simply stack with a small offset + border, no collision layout. */}
-                {timedItems.map((item, index) => {
-                  // While a pointer move is live the original block disappears;
-                  // only the overlay above represents it.
-                  if (move?.moved && move.key === item.key) return null;
-                  let startMin = timeToMinutesOrNull(item.startTime ?? "");
-                  if (startMin === null) return null;
-                  let endMin = timeToMinutesOrNull(item.endTime ?? "") ?? startMin + 60;
-                  if (endMin <= DAY_START * 60) return null;
-                  if (resize && resize.key === item.key) {
-                    startMin = resize.startMin;
-                    endMin = resize.endMin;
-                  }
-                  const top = topFor(Math.max(startMin, DAY_START * 60));
-                  const height = heightFor(Math.max(startMin, DAY_START * 60), endMin);
-                  const offset = Math.min(index, 4) * 10;
+                {/* Overlapping blocks split the column side-by-side instead of stacking. */}
+                {(() => {
+                  const entries = timedItems.flatMap((item) => {
+                    // While a pointer move is live the original block disappears;
+                    // only the overlay above represents it.
+                    if (move?.moved && move.key === item.key) return [];
+                    let startMin = timeToMinutesOrNull(item.startTime ?? "");
+                    if (startMin === null) return [];
+                    let endMin = timeToMinutesOrNull(item.endTime ?? "") ?? startMin + 60;
+                    if (endMin <= DAY_START * 60) return [];
+                    if (resize && resize.key === item.key) {
+                      startMin = resize.startMin;
+                      endMin = resize.endMin;
+                    }
+                    const clampedStart = Math.max(startMin, DAY_START * 60);
+                    return [{ item, startMin, endMin, clampedStart, clampedEnd: Math.max(endMin, clampedStart + 1) }];
+                  });
+                  const overlapLayout = computeOverlapLayout(
+                    entries.map((entry) => ({ key: entry.item.key, start: entry.clampedStart, end: entry.clampedEnd })),
+                  );
+                  return entries.map(({ item, startMin, endMin, clampedStart }) => {
+                  const top = topFor(clampedStart);
+                  const height = heightFor(clampedStart, endMin);
+                  const { col, cols } = overlapLayout.get(item.key) ?? { col: 0, cols: 1 };
+                  const widthPct = 100 / cols;
                   return (
                     <button
                       key={item.key}
@@ -757,9 +799,9 @@ export function WeekView({
                       style={{
                         top,
                         height,
-                        left: `${offset}%`,
-                        width: `${100 - offset}%`,
-                        zIndex: 10 + index,
+                        left: `${col * widthPct}%`,
+                        width: cols > 1 ? `calc(${widthPct}% - 2px)` : "100%",
+                        zIndex: 10 + col,
                         borderLeft: `3px solid ${item.color}`,
                         background: `${item.color}22`,
                       }}
@@ -799,7 +841,8 @@ export function WeekView({
                       ) : null}
                     </button>
                   );
-                })}
+                  });
+                })()}
               </div>
             );
           })}
