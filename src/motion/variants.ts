@@ -45,6 +45,24 @@ export const dropZoneVariants = {
   },
 };
 
+export const popoverVariants = {
+  initial: {
+    opacity: 0,
+    y: -4,
+    scale: 0.98,
+  },
+  animate: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+  },
+  exit: {
+    opacity: 0,
+    y: -4,
+    scale: 0.98,
+  },
+};
+
 export const panelVariants = {
   initial: {
     opacity: 0,
@@ -60,6 +78,21 @@ export const panelVariants = {
     opacity: 0,
     x: 24,
     scale: motionScale.panel,
+  },
+};
+
+export const calendarBlockVariants = {
+  initial: {
+    opacity: 0,
+    scale: 0.98,
+  },
+  animate: {
+    opacity: 1,
+    scale: 1,
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.96,
   },
 };
 
@@ -93,4 +126,3 @@ export const staggerItem = {
     y: 4,
   },
 };
-

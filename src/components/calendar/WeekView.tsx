@@ -1,4 +1,5 @@
 import { DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { CalendarItem } from "../../utils/calendarItems";
 import {
   clickDefaultRange,
@@ -18,6 +19,10 @@ import {
 import { getDayNumber, todayValue } from "../../utils/date";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { useT } from "../../i18n";
+import { MotionDropZone } from "../motion/MotionDropZone";
+import { reducedTransition, transitions } from "../../motion/transitions";
+import { calendarBlockVariants } from "../../motion/variants";
+import { useMotionEnabled } from "../../motion/reducedMotion";
 
 export { DAY_END, DAY_START, SLOT_HEIGHT };
 
@@ -194,6 +199,7 @@ export function WeekView({
   onDraftCreate,
 }: WeekViewProps) {
   const { t, lang } = useT();
+  const motionEnabled = useMotionEnabled();
   const weekdayFormatter = useMemo(
     () => new Intl.DateTimeFormat(lang === "ko" ? "ko" : "en", { weekday: "short" }),
     [lang],
@@ -557,8 +563,10 @@ export function WeekView({
             const id = `allday:${day}`;
             const isMoveTarget = Boolean(move?.moved && move.allDay && move.day === day);
             return (
-              <div
+              <MotionDropZone
+                as="div"
                 key={day}
+                isOver={dragOverId === id || isMoveTarget}
                 className={
                   dragOverId === id || isMoveTarget ? "gcal-allday-cell is-drop" : "gcal-allday-cell"
                 }
@@ -578,14 +586,22 @@ export function WeekView({
                     {move.title}
                   </span>
                 ) : null}
+                <AnimatePresence initial={false}>
                 {allDayItems.map((item) => (
-                  <button
+                  <motion.button
                     key={item.key}
                     type="button"
                     data-calendar-interactive="true"
+                    variants={motionEnabled ? calendarBlockVariants : undefined}
+                    initial={motionEnabled ? "initial" : false}
+                    animate={motionEnabled ? "animate" : undefined}
+                    exit={motionEnabled ? "exit" : undefined}
+                    transition={motionEnabled ? transitions.soft : reducedTransition}
                     className={`gcal-chip gcal-chip-${item.layer}${item.repeating ? " is-repeating" : ""}`}
                     draggable={item.draggable}
-                    onDragStart={item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined}
+                    onDragStartCapture={
+                      item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined
+                    }
                     onDragEnd={item.draggable ? onDragEnd : undefined}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -599,9 +615,10 @@ export function WeekView({
                     {item.layer === "external" ? "• " : null}
                     {item.repeating ? "↺ " : null}
                     {item.title}
-                  </button>
+                  </motion.button>
                 ))}
-              </div>
+                </AnimatePresence>
+              </MotionDropZone>
             );
           })}
         </div>
@@ -649,8 +666,11 @@ export function WeekView({
             const weekend = asDate(day).getDay() === 0 || asDate(day).getDay() === 6;
 
             return (
-              <div
+              <MotionDropZone
+                as="div"
                 key={day}
+                isOver={dragOverId === id}
+                animateTransform={false}
                 className={[
                   "gcal-time-col",
                   dragOverId === id ? "is-drop" : "",
@@ -660,14 +680,16 @@ export function WeekView({
                   .join(" ")}
                 onDragOver={(event) => {
                   onOverSlot(id)(event);
-                  onDragHover(day, dragStartTimeFromEvent(event));
+                  onDragHover(day, dragStartTimeFromEvent(event as DragEvent<HTMLDivElement>));
                 }}
                 onDragLeave={onLeaveSlot(id)}
-                onDrop={(event) => onDropTime(event, day, dragStartTimeFromEvent(event))}
-                onPointerDown={(event) => handlePointerDown(event, day)}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerCancel}
+                onDrop={(event) =>
+                  onDropTime(event, day, dragStartTimeFromEvent(event as DragEvent<HTMLDivElement>))
+                }
+                onPointerDown={(event) => handlePointerDown(event as ReactPointerEvent<HTMLDivElement>, day)}
+                onPointerMove={(event) => handlePointerMove(event as ReactPointerEvent<HTMLDivElement>)}
+                onPointerUp={(event) => handlePointerUp(event as ReactPointerEvent<HTMLDivElement>)}
+                onPointerCancel={(event) => handlePointerCancel(event as ReactPointerEvent<HTMLDivElement>)}
               >
                 {hours.map((hour) => (
                   <div key={hour} className="gcal-time-slot" style={{ height: SLOT_HEIGHT }}>
@@ -756,6 +778,7 @@ export function WeekView({
                   </div>
                 ) : null}
                 {/* Overlapping blocks split the column side-by-side instead of stacking. */}
+                <AnimatePresence initial={false}>
                 {(() => {
                   const entries = timedItems.flatMap((item) => {
                     // While a pointer move is live the original block disappears;
@@ -781,10 +804,15 @@ export function WeekView({
                   const { col, cols } = overlapLayout.get(item.key) ?? { col: 0, cols: 1 };
                   const widthPct = 100 / cols;
                   return (
-                    <button
+                    <motion.button
                       key={item.key}
                       type="button"
                       data-calendar-interactive="true"
+                      variants={motionEnabled ? calendarBlockVariants : undefined}
+                      initial={motionEnabled ? "initial" : false}
+                      animate={motionEnabled ? "animate" : undefined}
+                      exit={motionEnabled ? "exit" : undefined}
+                      transition={motionEnabled ? transitions.soft : reducedTransition}
                       className={[
                         "gcal-time-block",
                         resize?.key === item.key ? "is-resizing" : "",
@@ -845,11 +873,12 @@ export function WeekView({
                           />
                         </>
                       ) : null}
-                    </button>
+                    </motion.button>
                   );
                   });
                 })()}
-              </div>
+                </AnimatePresence>
+              </MotionDropZone>
             );
           })}
         </div>

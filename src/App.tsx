@@ -1,4 +1,5 @@
 import { FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { Sidebar } from "./components/Sidebar";
 import { OllamaChat } from "./components/OllamaChat";
 import { TaskDetail } from "./components/TaskDetail";
@@ -750,25 +751,26 @@ export default function App() {
   }
 
   function renderTaskDetail() {
-    if (!planner.selectedTask) {
-      return null;
-    }
-
     return (
-      <TaskDetail
-        task={planner.selectedTask}
-        tasks={planner.tasks}
-        projects={activeProjects}
-        subtasks={planner.subtasks}
-        onUpdateTask={planner.updateTask}
-        onRequestDeleteTask={setPendingDeleteTaskId}
-        onArchiveTask={handleArchiveTask}
-        onDuplicateTask={handleDuplicateTask}
-        onAddSubtask={planner.addSubtask}
-        onToggleSubtask={planner.toggleSubtask}
-        onDeleteSubtask={planner.deleteSubtask}
-        onClose={() => planner.selectTask("")}
-      />
+      <AnimatePresence initial={false}>
+        {planner.selectedTask ? (
+          <TaskDetail
+            key={planner.selectedTask.id}
+            task={planner.selectedTask}
+            tasks={planner.tasks}
+            projects={activeProjects}
+            subtasks={planner.subtasks}
+            onUpdateTask={planner.updateTask}
+            onRequestDeleteTask={setPendingDeleteTaskId}
+            onArchiveTask={handleArchiveTask}
+            onDuplicateTask={handleDuplicateTask}
+            onAddSubtask={planner.addSubtask}
+            onToggleSubtask={planner.toggleSubtask}
+            onDeleteSubtask={planner.deleteSubtask}
+            onClose={() => planner.selectTask("")}
+          />
+        ) : null}
+      </AnimatePresence>
     );
   }
 

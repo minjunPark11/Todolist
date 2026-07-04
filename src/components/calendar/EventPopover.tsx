@@ -2,10 +2,14 @@
 // hook only — no location / call / reminder rows. Used by month chips and
 // week blocks instead of a fixed right panel.
 import { FormEvent, ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import type { CalendarCategoryGroup } from "../../lib/calendarCategories";
 import type { CalendarItem } from "../../utils/calendarItems";
 import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
+import { reducedTransition, transitions } from "../../motion/transitions";
+import { popoverVariants } from "../../motion/variants";
+import { useMotionEnabled } from "../../motion/reducedMotion";
 
 export interface PopoverAnchor {
   left: number;
@@ -34,6 +38,7 @@ export function CalendarPopover({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const motionEnabled = useMotionEnabled();
 
   // Place beside the anchor (right first, then left, then below), clamped to
   // the viewport so a chip near the edge never opens off-screen. Re-clamps
@@ -84,12 +89,17 @@ export function CalendarPopover({
   }, [onClose]);
 
   return (
-    <div
+    <motion.div
       ref={ref}
       className="gcal-popover"
       role="dialog"
       aria-label={label}
       data-calendar-interactive="true"
+      variants={motionEnabled ? popoverVariants : undefined}
+      initial={motionEnabled ? "initial" : false}
+      animate={motionEnabled ? "animate" : undefined}
+      exit={motionEnabled ? "exit" : undefined}
+      transition={motionEnabled ? transitions.fast : reducedTransition}
       style={{
         width: POPOVER_WIDTH,
         left: position?.left ?? -9999,
@@ -98,7 +108,7 @@ export function CalendarPopover({
       }}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
 

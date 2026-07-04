@@ -11165,6 +11165,73 @@ div.spc-signal-row {
   position: relative;
 }
 
+.eis-expandable-add {
+  min-width: 148px;
+}
+
+.expandable-add {
+  overflow: hidden;
+  transform-origin: right center;
+}
+
+.expandable-add > button,
+.expandable-add-input-row {
+  min-height: 38px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.expandable-add > button {
+  width: 100%;
+  padding: 9px 16px;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.expandable-add > button:hover {
+  background: var(--bg-hover);
+}
+
+.expandable-add-input-row {
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+}
+
+.expandable-add-input-row input {
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 7px 8px;
+  font: inherit;
+  font-weight: 500;
+  outline: none;
+}
+
+.expandable-add-input-row button {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: calc(var(--radius-md) - 2px);
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 30px;
+}
+
+.expandable-add-input-row button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
 .eis-quickadd {
   position: absolute;
   top: calc(100% + 8px);
@@ -11313,6 +11380,17 @@ div.spc-signal-row {
   z-index: 20;
   cursor: grabbing;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+}
+
+.motion-panel-shell {
+  will-change: transform, opacity;
+}
+
+.motion-panel-shell-content {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
 }
 
 .eis-row:hover {

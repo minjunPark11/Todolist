@@ -2,6 +2,7 @@ import type { Project, RepeatType, Subtask, Task } from "../types";
 import { todayValue } from "../utils/date";
 import { getMatrixPosition, patchForQuadrant, type MatrixQuadrant } from "../utils/eisenhower";
 import { useT } from "../i18n";
+import { MotionPanelShell } from "./motion/MotionPanelShell";
 
 interface TaskDetailProps {
   task: Task | null;
@@ -38,10 +39,10 @@ export function TaskDetail({
 
   if (!task) {
     return (
-      <aside className="detail-panel muted-panel">
+      <MotionPanelShell className="detail-panel muted-panel">
         <h2>{t("taskDetail.title")}</h2>
         <p>{t("taskDetail.selectTaskHint")}</p>
-      </aside>
+      </MotionPanelShell>
     );
   }
 
@@ -55,7 +56,7 @@ export function TaskDetail({
   const selectedQuadrant = getMatrixPosition(task, today).quadrant;
 
   return (
-    <aside className="detail-panel">
+    <MotionPanelShell className="detail-panel">
       <div className="detail-handle" />
       {onClose ? (
         <button type="button" className="detail-close-button" aria-label="Close task detail" onClick={onClose}>
@@ -201,6 +202,6 @@ export function TaskDetail({
           </button>
         </div>
       </section>
-    </aside>
+    </MotionPanelShell>
   );
 }

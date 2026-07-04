@@ -15,7 +15,9 @@ import {
 } from "../utils/eisenhower";
 import { MoreMenu, type MoreMenuItem, type ToastState } from "./kit";
 import { useT } from "../i18n";
+import { ExpandableAdd } from "./motion/ExpandableAdd";
 import { MotionDropZone } from "./motion/MotionDropZone";
+import { MotionPanelShell } from "./motion/MotionPanelShell";
 import { MotionTaskRow } from "./motion/MotionTaskRow";
 
 const QUADRANTS: MatrixQuadrant[] = ["I", "II", "III", "IV"];
@@ -47,7 +49,6 @@ export function EisenhowerPage({
 }: EisenhowerPageProps) {
   const { t } = useT();
   const today = todayValue();
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [draggingTaskId, setDraggingTaskId] = useState("");
 
@@ -79,7 +80,6 @@ export function EisenhowerPage({
       actionLabel: t("eis.toastConfigure"),
       onAction: () => onOpenTask(id),
     });
-    setQuickAddOpen(false);
   }
 
   function handleDetailAdd(draft: TaskDraft) {
@@ -121,14 +121,14 @@ export function EisenhowerPage({
           <p className="ff-page-sub">{t("eis.subtitle")}</p>
         </div>
         <div className="eis-head-actions">
-          <div className="eis-quickadd-wrap">
-            <button type="button" className="ff-btn" onClick={() => setQuickAddOpen((open) => !open)}>
-              ⚡ {t("eis.quickAdd")}
-            </button>
-            {quickAddOpen ? (
-              <QuickAddPopover onAdd={handleQuickAdd} onClose={() => setQuickAddOpen(false)} />
-            ) : null}
-          </div>
+          <ExpandableAdd
+            className="eis-expandable-add"
+            label={`⚡ ${t("eis.quickAdd")}`}
+            placeholder={t("eis.quickAddPlaceholder")}
+            submitLabel={t("common.add")}
+            keepOpenAfterSubmit={false}
+            onSubmit={handleQuickAdd}
+          />
           <button type="button" className="ff-btn ff-btn-primary" onClick={() => setPanelOpen(true)}>
             + {t("eis.addTask")}
           </button>
@@ -195,14 +195,17 @@ export function EisenhowerPage({
         ))}
       </div>
 
-      {panelOpen ? (
-        <AddTaskSidePanel
-          projects={projects}
-          today={today}
-          onAdd={handleDetailAdd}
-          onClose={() => setPanelOpen(false)}
-        />
-      ) : null}
+      <AnimatePresence initial={false}>
+        {panelOpen ? (
+          <AddTaskSidePanel
+            key="eis-add-task-panel"
+            projects={projects}
+            today={today}
+            onAdd={handleDetailAdd}
+            onClose={() => setPanelOpen(false)}
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
@@ -360,54 +363,6 @@ function TaskRow({
   );
 }
 
-function QuickAddPopover({ onAdd, onClose }: { onAdd: (title: string) => void; onClose: () => void }) {
-  const { t } = useT();
-  const [title, setTitle] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-    function handlePointerDown(event: PointerEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) onClose();
-    }
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => window.removeEventListener("pointerdown", handlePointerDown);
-  }, [onClose]);
-
-  function submit() {
-    const trimmed = title.trim();
-    if (!trimmed) return;
-    onAdd(trimmed);
-  }
-
-  return (
-    <div ref={wrapRef} className="eis-quickadd" role="dialog" aria-label={t("eis.quickAdd")}>
-      <strong>⚡ {t("eis.quickAdd")}</strong>
-      <p>{t("eis.quickAddHint")}</p>
-      <input
-        ref={inputRef}
-        value={title}
-        placeholder={t("eis.quickAddPlaceholder")}
-        onChange={(event) => setTitle(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") submit();
-          if (event.key === "Escape") onClose();
-        }}
-      />
-      <small>{t("eis.quickAddDefault")}</small>
-      <div className="eis-quickadd-actions">
-        <button type="button" className="ff-btn" onClick={onClose}>
-          {t("common.cancel")}
-        </button>
-        <button type="button" className="ff-btn ff-btn-primary" disabled={!title.trim()} onClick={submit}>
-          {t("common.add")}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 const PRIORITY_OPTIONS: TaskPriority[] = ["none", "low", "medium", "high"];
 
 function AddTaskSidePanel({
@@ -462,7 +417,7 @@ function AddTaskSidePanel({
 
   return (
     <div className="eis-panel-backdrop" onClick={onClose}>
-      <aside className="eis-panel" onClick={(event) => event.stopPropagation()}>
+      <MotionPanelShell className="eis-panel" onClick={(event) => event.stopPropagation()}>
         <header className="eis-panel-head">
           <div>
             <strong>{t("eis.panelTitle")}</strong>
@@ -580,7 +535,7 @@ function AddTaskSidePanel({
             {t("common.add")}
           </button>
         </footer>
-      </aside>
+      </MotionPanelShell>
     </div>
   );
 }

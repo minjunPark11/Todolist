@@ -1,8 +1,13 @@
 import { DragEvent } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { CalendarItem } from "../../utils/calendarItems";
 import { getDayNumber, getMonthGrid, todayValue, type CalendarCell } from "../../utils/date";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { useT } from "../../i18n";
+import { MotionDropZone } from "../motion/MotionDropZone";
+import { reducedTransition, transitions } from "../../motion/transitions";
+import { calendarBlockVariants } from "../../motion/variants";
+import { useMotionEnabled } from "../../motion/reducedMotion";
 
 // Sunday-first order preserved to match the date grid logic (getMonthGrid).
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -47,6 +52,7 @@ export function MonthView({
   onShowAgenda,
 }: MonthViewProps) {
   const { t, lang } = useT();
+  const motionEnabled = useMotionEnabled();
   const weekdays = lang === "ko" ? WEEKDAYS_KO : WEEKDAYS_EN;
   const today = todayValue();
   const anchorDate = new Date(`${anchor}T00:00:00`);
@@ -62,8 +68,10 @@ export function MonthView({
     const visible = dayItems.slice(0, CHIP_CAP);
 
     return (
-      <div
+      <MotionDropZone
+        as="div"
         key={cell.date}
+        isOver={cell.date === dragOverId}
         className={classes.join(" ")}
         onDragOver={onOverCell(cell.date)}
         onDragLeave={onLeaveCell(cell.date)}
@@ -78,13 +86,21 @@ export function MonthView({
       >
         <span className="gcal-month-date">{getDayNumber(cell.date)}</span>
         <div className="gcal-month-chip-list">
+          <AnimatePresence initial={false}>
           {visible.map((item) => (
-            <button
+            <motion.button
               key={item.key}
               type="button"
+              variants={motionEnabled ? calendarBlockVariants : undefined}
+              initial={motionEnabled ? "initial" : false}
+              animate={motionEnabled ? "animate" : undefined}
+              exit={motionEnabled ? "exit" : undefined}
+              transition={motionEnabled ? transitions.soft : reducedTransition}
               className={`gcal-chip gcal-chip-${item.layer}${item.repeating ? " is-repeating" : ""}`}
               draggable={item.draggable}
-              onDragStart={item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined}
+              onDragStartCapture={
+                item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined
+              }
               onClick={(event) => {
                 event.stopPropagation();
                 onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
@@ -98,8 +114,9 @@ export function MonthView({
               {layerPrefix(item.layer)}
               {item.repeating ? "↺ " : null}
               {item.title}
-            </button>
+            </motion.button>
           ))}
+          </AnimatePresence>
           {dayItems.length > CHIP_CAP ? (
             <button
               type="button"
@@ -113,7 +130,7 @@ export function MonthView({
             </button>
           ) : null}
         </div>
-      </div>
+      </MotionDropZone>
     );
   }
 
