@@ -497,6 +497,33 @@ export function ConfirmModal({
 }) {
   const { t } = useT();
   const ref = useOutsideClose(onCancel);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  // Focus the confirm button so Enter activates it right away; Tab still
+  // moves to Cancel, where Enter cancels instead.
+  useEffect(() => {
+    confirmRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onCancel();
+        return;
+      }
+      if (event.key !== "Enter") return;
+      const target = event.target as HTMLElement | null;
+      // A focused button already activates natively on Enter — don't
+      // double-fire — and typing fields keep their own Enter behavior.
+      if (target && (target.tagName === "BUTTON" || target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      event.preventDefault();
+      onConfirm();
+    }
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onCancel, onConfirm]);
+
   return (
     <div className="ff-modal-backdrop" role="presentation">
       <section ref={ref} className="ff-modal ff-confirm" role="dialog" aria-modal="true">
@@ -507,6 +534,7 @@ export function ConfirmModal({
             {t("common.cancel")}
           </button>
           <button
+            ref={confirmRef}
             type="button"
             className={danger ? "ff-btn ff-btn-danger" : "ff-btn ff-btn-primary"}
             onClick={onConfirm}
