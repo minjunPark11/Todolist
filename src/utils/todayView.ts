@@ -52,7 +52,7 @@ export function saveBucketOverrides(overrides: BucketOverrides, today = todayVal
   }
 }
 
-function parseTimeToMinutes(value: string): number | undefined {
+export function parseTimeToMinutes(value: string): number | undefined {
   if (!/^\d{1,2}:\d{2}/.test(value)) return undefined;
   const [h, m] = value.split(":").map((part) => Number(part));
   if (Number.isNaN(h) || Number.isNaN(m)) return undefined;

@@ -1,13 +1,11 @@
 import { useState } from "react";
 import type { Project, TaskPriority } from "../../types";
-import type { TodayBucketId } from "../../utils/todayView";
 import { Modal, useAutoFocus } from "../kit";
 import { useT } from "../../i18n";
 
 export interface QuickAddInput {
   title: string;
   projectId: string;
-  bucket: TodayBucketId;
   priority: TaskPriority;
   dueDate: string;
   notes: string;
@@ -26,7 +24,6 @@ export function QuickAddTaskModal({ projects, onCreate, onClose }: QuickAddTaskM
   const titleRef = useAutoFocus<HTMLInputElement>();
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState("");
-  const [bucket, setBucket] = useState<TodayBucketId>("next");
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
@@ -43,7 +40,6 @@ export function QuickAddTaskModal({ projects, onCreate, onClose }: QuickAddTaskM
     onCreate({
       title: trimmed,
       projectId,
-      bucket,
       priority,
       dueDate,
       notes: notes.trim(),
@@ -93,24 +89,6 @@ export function QuickAddTaskModal({ projects, onCreate, onClose }: QuickAddTaskM
               </option>
             ))}
           </select>
-        </label>
-
-        <label>
-          {t("todayv.fieldBucket")}
-          <div className="tdy-bucket-picker" role="radiogroup" aria-label={t("todayv.fieldBucket")}>
-            {(["now", "next", "later"] as TodayBucketId[]).map((candidate) => (
-              <button
-                key={candidate}
-                type="button"
-                role="radio"
-                aria-checked={bucket === candidate}
-                className={bucket === candidate ? "active" : ""}
-                onClick={() => setBucket(candidate)}
-              >
-                {t(`todayv.bucket.${candidate}`)}
-              </button>
-            ))}
-          </div>
         </label>
 
         <label>

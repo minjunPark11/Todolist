@@ -1,24 +1,15 @@
-import type { Project, Task } from "../../types";
-import type { TodayBucketId, TodayEntry } from "../../utils/todayView";
-import { MoreMenu, type MoreMenuItem } from "../kit";
+import type { Project } from "../../types";
+import { formatMinuteOfDay, parseTimeToMinutes, type TodayEntry } from "../../utils/todayView";
 import { useT } from "../../i18n";
-
-const BUCKETS: TodayBucketId[] = ["now", "next", "later"];
 
 interface FocusQueueProps {
   entries: TodayEntry[];
   projects: Project[];
   selectedTaskId: string;
-  hideCompleted: boolean;
   hasQuery: boolean;
   query: string;
-  onToggleHideCompleted: () => void;
-  onMoveAllLater: () => void;
-  onClearPlan: () => void;
   onOpenTask: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
-  onMoveBucket: (taskId: string, bucket: TodayBucketId) => void;
-  onArchiveTask: (taskId: string) => void;
   onAddTask: () => void;
   onOpenSpaces: () => void;
 }
@@ -27,34 +18,20 @@ export function FocusQueue({
   entries,
   projects,
   selectedTaskId,
-  hideCompleted,
   hasQuery,
   query,
-  onToggleHideCompleted,
-  onMoveAllLater,
-  onClearPlan,
   onOpenTask,
   onToggleDone,
-  onMoveBucket,
-  onArchiveTask,
   onAddTask,
   onOpenSpaces,
 }: FocusQueueProps) {
   const { t } = useT();
-  const visible = hideCompleted ? entries.filter((entry) => !entry.completed) : entries;
-  // Completed rows stay visible as history (spec §8) — the big empty state only
-  // shows when there is nothing at all for today.
-  const isEmpty = visible.length === 0;
-
-  const cardMenu: MoreMenuItem[] = [
-    {
-      label: hideCompleted ? t("todayv.showCompleted") : t("todayv.hideCompleted"),
-      onClick: onToggleHideCompleted,
-    },
-    { label: t("todayv.moveAllLater"), onClick: onMoveAllLater },
-    { separator: true },
-    { label: t("todayv.clearPlan"), onClick: onClearPlan },
+  // One flat list: open tasks keep their order, completed rows sink to the bottom.
+  const sorted = [
+    ...entries.filter((entry) => !entry.completed),
+    ...entries.filter((entry) => entry.completed),
   ];
+  const isEmpty = sorted.length === 0;
 
   return (
     <section className="tdy-card tdy-queue">
@@ -66,7 +43,6 @@ export function FocusQueue({
           </svg>
         </span>
         <h2>{t("todayv.focusQueue")}</h2>
-        <MoreMenu items={cardMenu} label={t("todayv.queueMenuAria")} />
       </header>
 
       {isEmpty && !hasQuery ? (
@@ -82,49 +58,23 @@ export function FocusQueue({
             </button>
           </div>
         </div>
-      ) : hasQuery && visible.length === 0 ? (
+      ) : hasQuery && isEmpty ? (
         <div className="tdy-queue-empty">
           <p>{t("todayv.searchNoResults", { query })}</p>
         </div>
       ) : (
-        BUCKETS.map((bucket) => {
-          const bucketEntries = visible.filter((entry) => entry.bucket === bucket);
-          // Completed rows sink to the bottom of their bucket (spec §28).
-          const sorted = [
-            ...bucketEntries.filter((entry) => !entry.completed),
-            ...bucketEntries.filter((entry) => entry.completed),
-          ];
-          const openInBucket = bucketEntries.filter((entry) => !entry.completed).length;
-          return (
-            <div key={bucket} className="tdy-bucket">
-              <div className="tdy-bucket-head">
-                <span className={`tdy-bucket-dot tdy-bucket-dot-${bucket}`} aria-hidden="true" />
-                <strong>{t(`todayv.bucket.${bucket}`)}</strong>
-                <span className="tdy-bucket-count">{openInBucket}</span>
-              </div>
-              {sorted.length === 0 ? (
-                hasQuery ? null : (
-                  <p className="tdy-bucket-empty">{t(`todayv.bucketEmpty.${bucket}`)}</p>
-                )
-              ) : (
-                <div className="tdy-rows">
-                  {sorted.map((entry) => (
-                    <FocusQueueRow
-                      key={entry.task.id}
-                      entry={entry}
-                      projects={projects}
-                      selected={entry.task.id === selectedTaskId}
-                      onOpenTask={onOpenTask}
-                      onToggleDone={onToggleDone}
-                      onMoveBucket={onMoveBucket}
-                      onArchiveTask={onArchiveTask}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })
+        <div className="tdy-rows">
+          {sorted.map((entry) => (
+            <FocusQueueRow
+              key={entry.task.id}
+              entry={entry}
+              projects={projects}
+              selected={entry.task.id === selectedTaskId}
+              onOpenTask={onOpenTask}
+              onToggleDone={onToggleDone}
+            />
+          ))}
+        </div>
       )}
     </section>
   );
@@ -141,36 +91,26 @@ function FocusQueueRow({
   selected,
   onOpenTask,
   onToggleDone,
-  onMoveBucket,
-  onArchiveTask,
 }: {
   entry: TodayEntry;
   projects: Project[];
   selected: boolean;
   onOpenTask: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
-  onMoveBucket: (taskId: string, bucket: TodayBucketId) => void;
-  onArchiveTask: (taskId: string) => void;
 }) {
-  const { t } = useT();
-  const { task, reason, completed, bucket } = entry;
+  const { t, lang } = useT();
+  const { task, reason, completed } = entry;
   const project = projects.find((candidate) => candidate.id === task.projectId);
   const pill = hexToSoft(project?.color);
 
-  const rowMenu: MoreMenuItem[] = [
-    { label: t("todayv.openDetails"), onClick: () => onOpenTask(task.id) },
-    { separator: true },
-    ...BUCKETS.filter((candidate) => candidate !== bucket).map((candidate) => ({
-      label: t(`todayv.moveTo.${candidate}`),
-      onClick: () => onMoveBucket(task.id, candidate),
-    })),
-    { separator: true },
-    {
-      label: completed ? t("todayv.markTodo") : t("todayv.markComplete"),
-      onClick: () => onToggleDone(task.id),
-    },
-    { label: t("common.archive"), onClick: () => onArchiveTask(task.id) },
-  ];
+  const startMin = task.startTime ? parseTimeToMinutes(task.startTime) : undefined;
+  const endMin = task.endTime ? parseTimeToMinutes(task.endTime) : undefined;
+  const timeLabel =
+    startMin !== undefined
+      ? endMin !== undefined && endMin > startMin
+        ? `${formatMinuteOfDay(startMin, lang)} – ${formatMinuteOfDay(endMin, lang)}`
+        : formatMinuteOfDay(startMin, lang)
+      : "";
 
   return (
     <div
@@ -198,6 +138,7 @@ function FocusQueueRow({
         {completed ? "✓" : ""}
       </button>
       <span className="tdy-row-title">{task.title}</span>
+      {timeLabel ? <span className="tdy-row-time">{timeLabel}</span> : null}
       {project ? (
         <span
           className="tdy-space-pill"
@@ -213,11 +154,6 @@ function FocusQueueRow({
         </svg>
         {t(`todayv.reason.${reason}`)}
       </span>
-      <span
-        className={`tdy-status-dot${bucket === "now" && !completed ? " is-now" : ""}${completed ? " is-done" : ""}`}
-        aria-hidden="true"
-      />
-      <MoreMenu items={rowMenu} label={t("todayv.rowMenuAria")} />
     </div>
   );
 }

@@ -69,7 +69,6 @@ export function TodayPage({
 
   const [searchQuery, setSearchQuery] = useState("");
   const [overrides, setOverrides] = useState<BucketOverrides>(() => loadBucketOverrides(today));
-  const [hideCompleted, setHideCompleted] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [triageOpen, setTriageOpen] = useState(false);
   const [planStatus, setPlanStatus] = useState<PlanStatus>("idle");
@@ -179,15 +178,11 @@ export function TodayPage({
   const openEntries = entries.filter((entry) => !entry.completed);
   const overdueCount = openEntries.filter((entry) => entry.reason === "overdue").length;
 
-  function setBucket(taskId: string, bucket: TodayBucketId) {
-    setOverrides((current) => ({ ...current, [taskId]: bucket }));
-  }
-
   // Explicit "add to today" decides Today task vs. Inbox item (spec §10).
   // Left unchecked, a title-only capture goes to Inbox instead of silently
   // landing on today's Focus Queue.
   function handleCreateTask(input: QuickAddInput) {
-    const id = onCreateTask({
+    onCreateTask({
       title: input.title,
       status: "todo",
       scheduledDate: today,
@@ -196,26 +191,8 @@ export function TodayPage({
       projectId: input.projectId || undefined,
       notes: input.notes || undefined,
     });
-    setBucket(id, input.bucket);
     showToast({ message: t("todayv.toastTaskAdded") });
     setQuickAddOpen(false);
-  }
-
-  function handleMoveAllLater() {
-    setOverrides((current) => {
-      const next = { ...current };
-      for (const entry of openEntries) {
-        next[entry.task.id] = "later";
-      }
-      return next;
-    });
-  }
-
-  function handleClearPlan() {
-    setPlan(null);
-    setPlanStatus("idle");
-    setOverrides({});
-    showToast({ message: t("todayv.toastPlanCleared") });
   }
 
   // Manual only — never runs on page load (spec §30).
@@ -354,16 +331,10 @@ export function TodayPage({
             entries={visibleEntries}
             projects={projects}
             selectedTaskId={selectedTaskId}
-            hideCompleted={hideCompleted}
             hasQuery={hasQuery}
             query={searchQuery.trim()}
-            onToggleHideCompleted={() => setHideCompleted((value) => !value)}
-            onMoveAllLater={handleMoveAllLater}
-            onClearPlan={handleClearPlan}
             onOpenTask={onOpenTask}
             onToggleDone={onToggleDone}
-            onMoveBucket={setBucket}
-            onArchiveTask={onArchiveTask}
             onAddTask={() => setQuickAddOpen(true)}
             onOpenSpaces={() => onNavigate("projects")}
           />
