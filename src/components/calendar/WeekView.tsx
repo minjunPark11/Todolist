@@ -675,6 +675,7 @@ export function WeekView({
                   "gcal-time-col",
                   dragOverId === id ? "is-drop" : "",
                   weekend && !isDay ? "is-weekend" : "",
+                  day === today && !isDay ? "is-today" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
