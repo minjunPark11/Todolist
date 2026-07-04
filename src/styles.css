@@ -8181,7 +8181,7 @@ div.spc-signal-row {
 
 .foc-task {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 76px auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   min-height: 74px;
@@ -8250,38 +8250,6 @@ div.spc-signal-row {
   font-size: 12.5px;
 }
 
-.foc-duration {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  min-height: 34px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 0 8px;
-  background: var(--bg-surface-muted);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 750;
-}
-
-.foc-duration input {
-  min-width: 0;
-  width: 100%;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.foc-duration input:disabled {
-  color: var(--text-secondary);
-}
-
 .foc-tag,
 .foc-task-pills span {
   display: inline-flex;
@@ -8347,31 +8315,6 @@ div.spc-signal-row {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
-}
-
-.foc-progress-copy {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 15px;
-}
-
-.foc-progress-copy strong {
-  color: var(--accent);
-}
-
-.foc-progress {
-  justify-self: stretch;
-  height: 10px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--bg-hover);
-}
-
-.foc-progress span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
 }
 
 .foc-note {
@@ -8706,7 +8649,6 @@ div.spc-signal-row {
     grid-template-columns: 44px minmax(0, 1fr);
   }
 
-  .foc-duration,
   .foc-tag {
     grid-column: 2;
     justify-self: start;

@@ -1,7 +1,8 @@
 export type MiniFocusTimerSnapshot = {
   sessionId: string;
   title: string;
-  remaining: string;
+  // Elapsed focus time (count-up) — the planned-duration concept was removed.
+  time: string;
   status: "running" | "paused" | "completed" | "cancelled";
 };
 
@@ -53,7 +54,7 @@ function renderMiniTimerDocument(target: Window) {
       }
       window.updateFocusTimer = function(next) {
         snapshot = next;
-        document.getElementById("time").textContent = next.remaining;
+        document.getElementById("time").textContent = next.time;
         document.getElementById("title").textContent = next.title || "Focus session";
         document.getElementById("status").textContent = next.status === "paused" ? "Paused" : next.status === "completed" ? "Completed" : "Running";
         document.getElementById("toggle").textContent = next.status === "paused" ? "Resume" : "Pause";

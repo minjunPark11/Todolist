@@ -1,13 +1,6 @@
-import { useEffect } from "react";
 import type { FocusSession, Task } from "../types";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
-import {
-  formatFocusDuration,
-  getDisplayedFocusSeconds,
-  getFocusRemainingSeconds,
-  getFocusTargetSeconds,
-  useNowTick,
-} from "../lib/focusTimer";
+import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../lib/focusTimer";
 import { openMiniFocusTimer, supportsMiniFocusTimer } from "../lib/miniFocusTimer";
 
 interface GlobalFocusBarProps {
@@ -23,14 +16,6 @@ interface GlobalFocusBarProps {
 export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, onStop, settings }: GlobalFocusBarProps) {
   const now = useNowTick(Boolean(session && session.status === "running"));
   const elapsed = getDisplayedFocusSeconds(session, now);
-  const remaining = getFocusRemainingSeconds(session, now);
-
-  useEffect(() => {
-    if (!session) return;
-    if (session.status !== "running") return;
-    if (elapsed < getFocusTargetSeconds(session)) return;
-    onStop(session.id);
-  }, [elapsed, onStop, session]);
 
   if (!session || !task) return null;
   const canOpenMiniTimer = settings.showMiniTimerButton && supportsMiniFocusTimer();
@@ -40,7 +25,7 @@ export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, 
     openMiniFocusTimer({
       sessionId: session.id,
       title: task.title,
-      remaining: formatFocusDuration(remaining),
+      time: formatFocusDuration(elapsed),
       status: session.status,
     });
   }
@@ -48,14 +33,14 @@ export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, 
   return (
     <aside
       className="foc-global-bar"
-      aria-label={`Current focus session: ${task.title}, ${formatFocusDuration(remaining, true)} remaining`}
+      aria-label={`Current focus session: ${task.title}, ${formatFocusDuration(elapsed, true)} elapsed`}
     >
       <button type="button" className="foc-global-main" onClick={onOpenFocus}>
         <span className={session.status === "paused" ? "is-paused" : ""}>{session.status === "paused" ? "▶" : "||"}</span>
         <strong>{session.status === "paused" ? "일시정지" : "진행 중"} · {task.title}</strong>
       </button>
       <button type="button" className="foc-global-time" onClick={onOpenFocus}>
-        {formatFocusDuration(remaining)}
+        {formatFocusDuration(elapsed)}
       </button>
       <div className="foc-global-actions">
         {session.status === "paused" ? (

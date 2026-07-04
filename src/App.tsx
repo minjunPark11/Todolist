@@ -10,12 +10,7 @@ import type { TodayIntent } from "./components/TodayPage";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { useDataPortability } from "./app/useDataPortability";
 import type { ToastState } from "./components/kit";
-import {
-  formatFocusDuration,
-  getDisplayedFocusSeconds,
-  getFocusRemainingSeconds,
-  useNowTick,
-} from "./lib/focusTimer";
+import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
 import {
   loadFocusUserSettings,
   saveFocusUserSettings,
@@ -106,7 +101,7 @@ export default function App() {
   const activeFocusTask = planner.activeFocusSession
     ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null
     : null;
-  const activeFocusRemaining = getFocusRemainingSeconds(planner.activeFocusSession, focusNow);
+  const activeFocusElapsed = getDisplayedFocusSeconds(planner.activeFocusSession, focusNow);
   const activeProjects = planner.projects.filter((project) => project.status !== "archived");
   const { importMessage, exportJson, handleImport } = useDataPortability({
     today,
@@ -203,8 +198,8 @@ export default function App() {
       return;
     }
 
-    document.title = `${formatFocusDuration(activeFocusRemaining)} · ${activeFocusTask.title}`;
-  }, [activeFocusTask, activeFocusRemaining, focusSettings.showTabTitleTimer, planner.activeFocusSession]);
+    document.title = `${formatFocusDuration(activeFocusElapsed)} · ${activeFocusTask.title}`;
+  }, [activeFocusTask, activeFocusElapsed, focusSettings.showTabTitleTimer, planner.activeFocusSession]);
 
   useEffect(() => {
     const session = planner.activeFocusSession;
@@ -212,10 +207,10 @@ export default function App() {
     updateMiniFocusTimer({
       sessionId: session.id,
       title: activeFocusTask.title,
-      remaining: formatFocusDuration(activeFocusRemaining),
+      time: formatFocusDuration(activeFocusElapsed),
       status: session.status,
     });
-  }, [activeFocusTask, activeFocusRemaining, planner.activeFocusSession]);
+  }, [activeFocusTask, activeFocusElapsed, planner.activeFocusSession]);
 
   useEffect(() => {
     const session = planner.activeFocusSession;

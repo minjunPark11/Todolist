@@ -7,15 +7,6 @@ export function getDisplayedFocusSeconds(session: FocusSession | null, nowMs = D
   return session.accumulatedSeconds + Math.max(0, Math.floor((nowMs - new Date(session.startAt).getTime()) / 1000));
 }
 
-export function getFocusTargetSeconds(session: FocusSession | null) {
-  return Math.max(1, session?.durationMinutes ?? 0) * 60;
-}
-
-export function getFocusRemainingSeconds(session: FocusSession | null, nowMs = Date.now()) {
-  if (!session) return 0;
-  return Math.max(0, getFocusTargetSeconds(session) - getDisplayedFocusSeconds(session, nowMs));
-}
-
 export function formatFocusDuration(seconds: number, compact = false) {
   const safe = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(safe / 3600);

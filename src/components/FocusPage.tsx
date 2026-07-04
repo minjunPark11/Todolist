@@ -3,13 +3,7 @@ import type { FocusSession, PageId, Project, Task } from "../types";
 import { formatDate, isOverdue, todayValue } from "../utils/date";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { openMiniFocusTimer, supportsMiniFocusTimer } from "../lib/miniFocusTimer";
-import {
-  formatFocusDuration,
-  getDisplayedFocusSeconds,
-  getFocusRemainingSeconds,
-  getFocusTargetSeconds,
-  useNowTick,
-} from "../lib/focusTimer";
+import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../lib/focusTimer";
 
 interface FocusPageProps {
   tasks: Task[];
@@ -34,21 +28,6 @@ type FocusGroup = {
   tone: "blue" | "red" | "purple" | "green";
   tasks: Task[];
 };
-
-function minutesBetween(start: string, end: string) {
-  if (!start || !end) return 30;
-  const startDate = new Date(`2000-01-01T${start}`);
-  const endDate = new Date(`2000-01-01T${end}`);
-  const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
-  return minutes > 0 ? minutes : 30;
-}
-
-function plannedMinutes(task: Task) {
-  if (task.startTime && task.endTime) return minutesBetween(task.startTime, task.endTime);
-  if (task.priority === "high") return 50;
-  if (task.priority === "medium") return 30;
-  return 25;
-}
 
 function projectFor(task: Task, projects: Project[]) {
   return projects.find((project) => project.id === task.projectId);
@@ -106,10 +85,8 @@ export function FocusPage({
   const today = todayValue();
   const now = useNowTick(Boolean(activeSession && activeSession.status === "running"));
   const elapsed = getDisplayedFocusSeconds(activeSession, now);
-  const remaining = getFocusRemainingSeconds(activeSession, now);
   const activeTask = activeSession ? tasks.find((task) => task.id === activeSession.taskId) ?? null : null;
   const [finishTaskId, setFinishTaskId] = useState("");
-  const [durationDrafts, setDurationDrafts] = useState<Record<string, number>>({});
   const [optionsOpen, setOptionsOpen] = useState(false);
   const optionsRef = useRef<HTMLDivElement>(null);
 
@@ -148,8 +125,6 @@ export function FocusPage({
     .sort((a, b) => b.seconds - a.seconds)
     .slice(0, 4);
 
-  const targetSeconds = activeSession ? getFocusTargetSeconds(activeSession) : 0;
-  const progress = targetSeconds ? Math.min(100, Math.round((elapsed / targetSeconds) * 100)) : 0;
   const canOpenMiniTimer = Boolean(activeSession && activeTask && settings.showMiniTimerButton && supportsMiniFocusTimer());
 
   useEffect(() => {
@@ -172,25 +147,9 @@ export function FocusPage({
     };
   }, [optionsOpen]);
 
-  useEffect(() => {
-    if (!activeSession || !activeTask || activeSession.status !== "running") return;
-    if (elapsed < getFocusTargetSeconds(activeSession)) return;
-    setFinishTaskId(activeSession.taskId);
-    onStopFocus(activeSession.id, false);
-  }, [activeSession, activeTask, elapsed, onStopFocus]);
-
-  function durationForTask(task: Task) {
-    return durationDrafts[task.id] ?? plannedMinutes(task);
-  }
-
-  function updateDuration(taskId: string, value: number) {
-    const minutes = Math.max(1, Math.min(240, Math.round(value || 1)));
-    setDurationDrafts((current) => ({ ...current, [taskId]: minutes }));
-  }
-
   function toggleTaskFocus(task: Task) {
     if (!activeSession) {
-      onStartFocus(task.id, "focus_page", durationForTask(task));
+      onStartFocus(task.id, "focus_page");
       return;
     }
 
@@ -212,7 +171,7 @@ export function FocusPage({
     openMiniFocusTimer({
       sessionId: activeSession.id,
       title: activeTask.title,
-      remaining: formatFocusDuration(remaining),
+      time: formatFocusDuration(elapsed),
       status: activeSession.status,
     });
   }
@@ -307,23 +266,8 @@ export function FocusPage({
                             {project?.name ?? "Inbox"}
                             {task.scheduledDate === today && task.startTime ? ` · 오늘 ${task.startTime}` : ""}
                           </span>
-                          <small>
-                            예정 {durationForTask(task)}m · 실제 {formatFocusDuration(task.actualSeconds, true)}
-                          </small>
+                          <small>실제 {formatFocusDuration(task.actualSeconds, true)}</small>
                         </button>
-                        <label className="foc-duration" title="Focus minutes">
-                          <input
-                            type="number"
-                            min="1"
-                            max="240"
-                            step="5"
-                            value={durationForTask(task)}
-                            disabled={Boolean(activeSession)}
-                            onChange={(event) => updateDuration(task.id, Number(event.target.value))}
-                            onClick={(event) => event.stopPropagation()}
-                          />
-                          <span>min</span>
-                        </label>
                         <span className="foc-tag">{project?.name ?? (isStudyTask(task, project) ? "Study" : "Task")}</span>
                       </article>
                     );
@@ -346,11 +290,7 @@ export function FocusPage({
                 {isStudyTask(activeTask, projectFor(activeTask, projects)) ? <span>Study</span> : null}
               </div>
               <h2>{activeTask.title}</h2>
-              <div className="foc-clock">{formatFocusDuration(remaining)}</div>
-              <p className="foc-progress-copy">
-                예정 {activeSession.durationMinutes}m 중 <strong>{formatFocusDuration(elapsed, true)}</strong> 진행
-              </p>
-              <div className="foc-progress"><span style={{ width: `${progress}%` }} /></div>
+              <div className="foc-clock">{formatFocusDuration(elapsed)}</div>
               <textarea
                 className="foc-note"
                 value={activeSession.focusNote}
@@ -371,8 +311,7 @@ export function FocusPage({
                 ) : null}
               </div>
               <footer className="foc-meta">
-                <span>남은 시간 <strong>{formatFocusDuration(remaining, true)}</strong></span>
-                <span>예정 시간 <strong>{activeSession.durationMinutes}m</strong></span>
+                <span>이번 세션 <strong>{formatFocusDuration(elapsed, true)}</strong></span>
                 <span>실제 누적 <strong>{formatFocusDuration(activeTask.actualSeconds + elapsed, true)}</strong></span>
               </footer>
             </>
