@@ -150,6 +150,7 @@ export function Sidebar({
 
   const primaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
     { id: "today", label: t("sidebar.today"), icon: "today", count: todayCount },
+    { id: "planning", label: t("sidebar.planning"), icon: "planning", count: 0 },
     { id: "calendar", label: t("sidebar.calendar"), icon: "calendar", count: 0 },
     { id: "projects", label: t("sidebar.spaces"), icon: "projects", count: activeProjectCount + dueReviewCount },
     { id: "focus", label: t("sidebar.focus"), icon: "focus", count: tasks.filter((task) => task.activeSessionId).length },

@@ -38,6 +38,9 @@ export interface Task {
   importance: TaskLevel;
   urgency: TaskLevel;
   isFocus: boolean;
+  // Expected effort in minutes (0 = unset). Drives the default calendar
+  // block length when a task is dragged onto the time grid.
+  estimatedMinutes: number;
   actualSeconds: number;
   activeSessionId: string;
   lastFocusedAt: string;
@@ -369,6 +372,7 @@ export interface TaskDraft {
   importance?: TaskLevel;
   urgency?: TaskLevel;
   isFocus?: boolean;
+  estimatedMinutes?: number;
   actualSeconds?: number;
   activeSessionId?: string;
   lastFocusedAt?: string;

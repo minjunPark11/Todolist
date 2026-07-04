@@ -35,6 +35,7 @@ import {
 import type { ToastState } from "./kit";
 import { CalendarToolbar } from "./calendar/CalendarToolbar";
 import { CalendarLeftSidebar } from "./calendar/CalendarLeftSidebar";
+import { CalendarRightTaskPanel } from "./calendar/CalendarRightTaskPanel";
 import { WeekView } from "./calendar/WeekView";
 import { MonthView } from "./calendar/MonthView";
 import { YearView } from "./calendar/YearView";
@@ -114,6 +115,7 @@ export function CalendarView({
   const [mode, setMode] = useState<CalendarMode>("week");
   const [anchor, setAnchor] = useState(todayValue());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [taskPanelCollapsed, setTaskPanelCollapsed] = useState(false);
   const [dragOverId, setDragOverId] = useState("");
   const [draggingTaskId, setDraggingTaskId] = useState("");
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
@@ -290,7 +292,10 @@ export function CalendarView({
   }
 
   function getTaskDuration(task: Task | undefined) {
-    if (!task) return 30;
+    if (!task) return 60;
+    // Spec §8.3: the estimate drives the block length; fall back to the
+    // existing block's duration, then to a 60-minute default.
+    if (task.estimatedMinutes > 0) return task.estimatedMinutes;
     if (task.startTime && task.endTime) {
       const duration = timeToMinutes(task.endTime) - timeToMinutes(task.startTime);
       if (duration > 0) {
@@ -321,7 +326,9 @@ export function CalendarView({
     const start = timeToMinutes(startTime);
     const end = Math.min(DAY_END * 60, start + duration);
     const endTime = minutesToTime(end);
-    const isValid = end > start && !hasConflict(day, startTime, endTime, draggingTaskId);
+    // Overlap no longer blocks the drop, so the preview only rejects
+    // zero-length targets (e.g. dropping at the grid's very end).
+    const isValid = end > start;
     setDragPreview({ taskId: draggingTaskId, day, startTime, endTime, isValid });
   }
 
@@ -342,17 +349,24 @@ export function CalendarView({
       const start = timeToMinutes(startTime);
       const end = Math.min(DAY_END * 60, start + duration);
       const endTime = minutesToTime(end);
-      if (end <= start || hasConflict(day, startTime, endTime, taskId)) {
-        showToast?.({ message: "This time is not available. Choose another slot." });
+      if (end <= start) {
+        showToast?.({ message: t("calendar.dropInvalid") });
         handleDragEnd();
         return;
       }
+      // Overlaps are allowed (spec §10.5 option A) — the grid renders
+      // overlapping blocks side by side; the toast just calls it out.
+      const overlaps = hasConflict(day, startTime, endTime, taskId);
       onUpdateTask(taskId, {
         scheduledDate: day,
         startTime,
         endTime,
       });
-      showToast?.({ message: `${task?.title ?? "Task"} scheduled at ${startTime}.` });
+      showToast?.({
+        message: overlaps
+          ? t("calendar.dropScheduledOverlap", { title: task?.title ?? "", time: startTime })
+          : t("calendar.dropScheduled", { title: task?.title ?? "", time: startTime }),
+      });
     }
     handleDragEnd();
   }
@@ -375,23 +389,17 @@ export function CalendarView({
     handleDragEnd();
   }
 
-  // Spec §6.9: resize handles commit through here with a conflict check.
+  // Resize commits keep the estimate in sync (spec §8.4): the block length
+  // IS the new expected effort. Overlaps are allowed, same as drops.
   function handleResizeItem(taskId: string, day: string, startTime: string, endTime: string) {
-    if (timeToMinutes(endTime) - timeToMinutes(startTime) < TIME_SNAP_MINUTES) return;
-    if (hasConflict(day, startTime, endTime, taskId)) {
-      showToast?.({ message: "This time is not available. Choose another slot." });
-      return;
-    }
-    onUpdateTask(taskId, { scheduledDate: day, startTime, endTime });
+    const duration = timeToMinutes(endTime) - timeToMinutes(startTime);
+    if (duration < TIME_SNAP_MINUTES) return;
+    onUpdateTask(taskId, { scheduledDate: day, startTime, endTime, estimatedMinutes: duration });
   }
 
-  // Pointer-based block move: same conflict rule as drop, silently committed
-  // (the moving block itself already previews the exact target slot).
+  // Pointer-based block move: silently committed (the moving block itself
+  // already previews the exact target slot). Overlaps are allowed.
   function handleMoveItem(taskId: string, day: string, startTime: string, endTime: string) {
-    if (hasConflict(day, startTime, endTime, taskId)) {
-      showToast?.({ message: "This time is not available. Choose another slot." });
-      return;
-    }
     onUpdateTask(taskId, { scheduledDate: day, startTime, endTime });
   }
 
@@ -714,6 +722,18 @@ export function CalendarView({
             )}
           </section>
         </div>
+
+        {mode !== "year" ? (
+          <CalendarRightTaskPanel
+            tasks={tasks}
+            projects={projects}
+            today={today}
+            collapsed={taskPanelCollapsed}
+            onToggleCollapsed={() => setTaskPanelCollapsed((value) => !value)}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          />
+        ) : null}
       </div>
 
       {popover?.kind === "event" ? (

@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
 import { ArchivePage } from "../components/ArchivePage";
 import { CalendarView } from "../components/CalendarView";
+import { EisenhowerPage } from "../components/EisenhowerPage";
 import { FocusPage } from "../components/FocusPage";
-import { PlanningPage } from "../components/PlanningPage";
 import { SpacesPage } from "../components/SpacesPage";
 import { SettingsPage } from "../components/SettingsPage";
 import { StudyPage } from "../components/StudyPage";
@@ -24,8 +24,6 @@ type AppPagesProps = {
   setSelectedProjectId: (id: string) => void;
   isProjectDetailOpen: boolean;
   setIsProjectDetailOpen: (open: boolean) => void;
-  planningTab: "board" | "matrix";
-  setPlanningTab: (tab: "board" | "matrix") => void;
   studyTab: "topics" | "notes" | "reviews";
   setStudyTab: (tab: "topics" | "notes" | "reviews") => void;
   studyFocusNoteId: string;
@@ -77,8 +75,6 @@ export function AppPages({
   setSelectedProjectId,
   isProjectDetailOpen,
   setIsProjectDetailOpen,
-  planningTab,
-  setPlanningTab,
   studyTab,
   setStudyTab,
   studyFocusNoteId,
@@ -152,16 +148,16 @@ export function AppPages({
   if (activePage === "planning") {
     return (
       <section className={pageGridClass()}>
-        <PlanningPage
+        <EisenhowerPage
           tasks={planner.tasks}
           projects={activeProjects}
           selectedTaskId={planner.selectedTask?.id ?? ""}
-          view={planningTab}
-          onChangeView={(v) => setPlanningTab(v)}
           onOpenTask={planner.selectTask}
-          onUpdateStatus={planner.updateTaskStatus}
+          onToggleDone={planner.toggleTaskDone}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
+          onScheduleInCalendar={viewTaskInCalendar}
+          showToast={showToast}
         />
         {renderTaskDetail()}
       </section>
