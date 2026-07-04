@@ -15,6 +15,7 @@ function layerPrefix(layer: CalendarItem["layer"]) {
   if (layer === "study-review") return "↻ ";
   if (layer === "project-deadline") return "◆ ";
   if (layer === "external") return "• ";
+  if (layer === "focus-actual") return "⏱ ";
   return "";
 }
 
@@ -88,7 +89,11 @@ export function MonthView({
                 event.stopPropagation();
                 onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
               }}
-              style={item.layer === "task" || item.layer === "external" ? { borderLeftColor: item.color } : undefined}
+              style={
+                item.layer === "task" || item.layer === "external" || item.layer === "focus-actual"
+                  ? { borderLeftColor: item.color }
+                  : undefined
+              }
             >
               {layerPrefix(item.layer)}
               {item.repeating ? "↺ " : null}

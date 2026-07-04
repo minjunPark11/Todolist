@@ -6,6 +6,7 @@ import type {
   AppSettings,
   ConceptNote,
   FocusMode,
+  FocusSegment,
   FocusSession,
   Habit,
   HabitFrequency,
@@ -239,6 +240,26 @@ function normalizeFocusSession(session: Partial<FocusSession>): FocusSession {
       : Math.max(0, Math.round((session.durationMinutes ?? 0) * 60));
   const status = session.status ?? (session.completed ? "completed" : "completed");
 
+  // Segment migration: records saved before segments existed get one span
+  // covering the whole session, so past focus time still shows on the
+  // calendar. Sessions that already carry the field keep it as-is (an empty
+  // array on a fresh running session is valid, not legacy).
+  let segments = Array.isArray(session.segments)
+    ? session.segments.filter(
+        (segment): segment is FocusSegment =>
+          Boolean(segment) &&
+          typeof segment.startAt === "string" &&
+          typeof segment.endAt === "string" &&
+          segment.startAt < segment.endAt,
+      )
+    : undefined;
+  if (segments === undefined) {
+    segments =
+      status === "completed" && startedAt && endedAt && startedAt < endedAt
+        ? [{ startAt: startedAt, endAt: endedAt }]
+        : [];
+  }
+
   return {
     id: session.id ?? createId("focus"),
     taskId: session.taskId ?? "",
@@ -253,6 +274,7 @@ function normalizeFocusSession(session: Partial<FocusSession>): FocusSession {
     startedAt,
     endedAt,
     pausedAt: session.pausedAt ?? "",
+    segments,
     source: oneOf(session.source, focusSources, "focus_page"),
     projectId: session.projectId ?? "",
     projectName: session.projectName ?? "",
@@ -1125,6 +1147,14 @@ export function usePlannerData() {
       startedAt,
       endedAt: completed ? now : "",
       pausedAt: "",
+      segments: completed
+        ? [
+            {
+              startAt: startedAt,
+              endAt: new Date(new Date(startedAt).getTime() + durationMinutes * 60000).toISOString(),
+            },
+          ]
+        : [],
       source: "focus_page",
       projectId: task?.projectId ?? "",
       projectName: project?.name ?? "",
@@ -1154,6 +1184,14 @@ export function usePlannerData() {
   function getSessionSeconds(session: FocusSession, nowMs = Date.now()) {
     if (session.status !== "running") return session.accumulatedSeconds;
     return session.accumulatedSeconds + Math.max(0, Math.floor((nowMs - new Date(session.startAt).getTime()) / 1000));
+  }
+
+  // While running, `startAt` marks the open segment's start (resume resets
+  // it). Pausing or stopping closes that segment; a paused session has no
+  // open segment to close.
+  function closeOpenSegment(session: FocusSession, endAt: string): FocusSegment[] {
+    if (session.status !== "running" || session.startAt >= endAt) return session.segments;
+    return [...session.segments, { startAt: session.startAt, endAt }];
   }
 
   function startFocusSession(
@@ -1192,6 +1230,7 @@ export function usePlannerData() {
         startedAt: now,
         endedAt: "",
         pausedAt: "",
+        segments: [],
         source,
         projectId: task.projectId,
         projectName: project?.name ?? "",
@@ -1223,6 +1262,7 @@ export function usePlannerData() {
               status: "paused",
               accumulatedSeconds: getSessionSeconds(session, nowMs),
               pausedAt: now,
+              segments: closeOpenSegment(session, now),
               updatedAt: now,
             }
           : session,
@@ -1263,6 +1303,7 @@ export function usePlannerData() {
                 endAt: now,
                 endedAt: now,
                 pausedAt: "",
+                segments: closeOpenSegment(item, now),
                 updatedAt: now,
               }
             : item,

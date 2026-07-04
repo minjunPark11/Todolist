@@ -1,5 +1,5 @@
 import { DragEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, Project, StudyTopic, Task, TaskDraft } from "../types";
+import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, FocusSession, Project, StudyTopic, Task, TaskDraft } from "../types";
 import {
   addDays,
   addMonths,
@@ -74,6 +74,7 @@ interface CalendarViewProps {
   studyTopics: StudyTopic[];
   externalCalendars: ExternalCalendar[];
   externalCalendarEvents: ExternalCalendarEvent[];
+  focusSessions: FocusSession[];
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
   // When set, the calendar mounts with this project's category selected
   // (space detail "Open Calendar" hand-off).
@@ -98,6 +99,7 @@ export function CalendarView({
   studyTopics,
   externalCalendars,
   externalCalendarEvents,
+  focusSessions,
   onUpdateExternalCalendar,
   initialProjectId,
   onUpdateTask,
@@ -132,8 +134,15 @@ export function CalendarView({
   // categories + study topics + projects + external calendars.
   const categoryState = useCalendarCategoryState();
   const categoryGroups = useMemo(
-    () => buildCalendarCategories({ state: categoryState, projects, studyTopics, externalCalendars }),
-    [categoryState, projects, studyTopics, externalCalendars],
+    () =>
+      buildCalendarCategories({
+        state: categoryState,
+        projects,
+        studyTopics,
+        externalCalendars,
+        focusCategoryName: t("calendar.focusActualCategory"),
+      }),
+    [categoryState, projects, studyTopics, externalCalendars, t],
   );
   const categoriesById = useMemo(() => flattenCategories(categoryGroups), [categoryGroups]);
   const defaultCategoryId = categoryState.defaultCategoryId;
@@ -168,6 +177,7 @@ export function CalendarView({
         tasks,
         projects,
         conceptNotes,
+        focusSessions,
         externalCalendars,
         externalCalendarEvents,
         layers: defaultCalendarLayers,
@@ -176,7 +186,7 @@ export function CalendarView({
         defaultCategoryId,
         visibleCategoryIds,
       }),
-    [tasks, projects, conceptNotes, externalCalendars, externalCalendarEvents, categoriesById, defaultCategoryId, visibleCategoryIds],
+    [tasks, projects, conceptNotes, focusSessions, externalCalendars, externalCalendarEvents, categoriesById, defaultCategoryId, visibleCategoryIds],
   );
 
   const monthPrefix = `${anchorDate.getFullYear()}-${pad(anchorDate.getMonth() + 1)}`;

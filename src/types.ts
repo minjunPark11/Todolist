@@ -202,6 +202,14 @@ export interface HabitLog {
   completed: boolean;
 }
 
+// One uninterrupted running stretch of a focus session. Pauses close a
+// segment; resume opens the next one. This is what the calendar's
+// "actual focus time" blocks are drawn from.
+export interface FocusSegment {
+  startAt: string;
+  endAt: string;
+}
+
 export interface FocusSession {
   id: string;
   taskId: string;
@@ -216,6 +224,7 @@ export interface FocusSession {
   startedAt: string;
   endedAt: string;
   pausedAt: string;
+  segments: FocusSegment[];
   source: "focus_page" | "today_page" | "calendar_event" | "global_bar";
   projectId: string;
   projectName: string;

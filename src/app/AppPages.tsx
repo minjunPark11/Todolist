@@ -217,6 +217,7 @@ export function AppPages({
           studyTopics={planner.studyTopics}
           externalCalendars={externalCalendars}
           externalCalendarEvents={externalCalendarEvents}
+          focusSessions={planner.focusSessions}
           onUpdateExternalCalendar={onUpdateExternalCalendar}
           initialProjectId={calendarFocusProjectId}
           onUpdateTask={planner.updateTask}

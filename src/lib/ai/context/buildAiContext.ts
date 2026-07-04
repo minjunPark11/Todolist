@@ -13,7 +13,8 @@ import type {
   Task,
   TaskTemplate,
 } from "../../../types";
-import { todayValue } from "../../../utils/date";
+import { addDays, todayValue } from "../../../utils/date";
+import { buildPlanVsActual } from "../../../utils/planVsActual";
 import type { AgentIntent } from "../agent/intent";
 import { AI_CONTEXT_LIMITS } from "./limits";
 
@@ -63,6 +64,15 @@ export function buildAiContextText(input: AiContextInput): string {
       taskTemplateCount: input.taskTemplates.length,
       recentItemCount: input.recentItems.length,
     },
+    // Planned blocks vs. focus-measured execution, precomputed for the last
+    // 14 days so the model can compare/analyze without re-deriving it from
+    // raw sessions.
+    planVsActualLast14Days: buildPlanVsActual(
+      input.tasks,
+      input.focusSessions,
+      addDays(today, -13),
+      today,
+    ),
     data: {
       tasks: input.tasks,
       projects: input.projects,

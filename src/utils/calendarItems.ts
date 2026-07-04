@@ -1,16 +1,18 @@
 // Calendar derived-item model (CALENDAR_DESIGN.md §1.3/§1.4).
 // Shared by CalendarView rendering and the Ollama calendar context builder.
-import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, Project, Task, TaskPriority, TaskStatus } from "../types";
+import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, FocusSession, Project, Task, TaskPriority, TaskStatus } from "../types";
 import { externalEventDate, externalEventEndDate, externalEventEndTime, externalEventStartTime } from "../lib/externalCalendars";
 import {
   externalCategoryId,
   projectCategoryId,
   studyCategoryId,
+  FOCUS_ACTUAL_CATEGORY_ID,
+  FOCUS_ACTUAL_COLOR,
   type CalendarCategory,
 } from "../lib/calendarCategories";
 import { addDays } from "./date";
 
-export type CalendarLayer = "task" | "deadline" | "study-review" | "project-deadline" | "external";
+export type CalendarLayer = "task" | "deadline" | "study-review" | "project-deadline" | "external" | "focus-actual";
 
 export interface CalendarLayerToggles {
   task: boolean;
@@ -18,6 +20,7 @@ export interface CalendarLayerToggles {
   studyReview: boolean;
   projectDeadline: boolean;
   completed: boolean;
+  focusActual: boolean;
 }
 
 export const defaultCalendarLayers: CalendarLayerToggles = {
@@ -26,12 +29,13 @@ export const defaultCalendarLayers: CalendarLayerToggles = {
   studyReview: true,
   projectDeadline: true,
   completed: false,
+  focusActual: true,
 };
 
 export interface CalendarItem {
   key: string;
   layer: CalendarLayer;
-  sourceType: "task" | "project" | "note" | "external";
+  sourceType: "task" | "project" | "note" | "external" | "focus";
   sourceId: string;
   externalCalendarId?: string;
   externalCalendarName?: string;
@@ -59,7 +63,49 @@ const LAYER_COLOR: Record<CalendarLayer, string> = {
   "study-review": "#af52de",
   "project-deadline": "#ff2d55",
   external: "#4f73ff",
+  "focus-actual": FOCUS_ACTUAL_COLOR,
 };
+
+// A focus segment is wall-clock time, so it can cross midnight: split it
+// into per-day parts in *local* time (calendar dates/times are local).
+interface FocusSegmentPart {
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+function localDateOf(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function localTimeOf(date: Date): string {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+export function splitFocusSegmentByDay(startAt: string, endAt: string): FocusSegmentPart[] {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return [];
+
+  const parts: FocusSegmentPart[] = [];
+  let cursor = start;
+  // 7-day cap as a runaway guard against corrupted timestamps.
+  for (let i = 0; i < 7 && cursor < end; i += 1) {
+    const dayEnd = new Date(cursor);
+    dayEnd.setHours(24, 0, 0, 0);
+    const partEnd = end < dayEnd ? end : dayEnd;
+    const startTime = localTimeOf(cursor);
+    // Sub-minute stretches still get a visible 1-minute sliver.
+    let endTime = partEnd.getTime() >= dayEnd.getTime() ? "24:00" : localTimeOf(partEnd);
+    if (endTime <= startTime) {
+      const bumped = new Date(cursor.getTime() + 60000);
+      endTime = localDateOf(bumped) === localDateOf(cursor) ? localTimeOf(bumped) : "24:00";
+    }
+    parts.push({ date: localDateOf(cursor), startTime, endTime });
+    cursor = dayEnd;
+  }
+  return parts;
+}
 
 export type ProjectFilter = "all" | Set<string>;
 
@@ -77,6 +123,8 @@ export interface BuildCalendarItemsInput {
   conceptNotes: ConceptNote[];
   externalCalendars?: ExternalCalendar[];
   externalCalendarEvents?: ExternalCalendarEvent[];
+  // Completed sessions become read-only "actual focus time" blocks.
+  focusSessions?: FocusSession[];
   layers: CalendarLayerToggles;
   projectFilter: ProjectFilter;
   // Category resolution (calendar category spec). When supplied, every item
@@ -93,6 +141,7 @@ export function buildCalendarItems({
   conceptNotes,
   externalCalendars = [],
   externalCalendarEvents = [],
+  focusSessions = [],
   layers,
   projectFilter,
   categories,
@@ -263,6 +312,40 @@ export function buildCalendarItems({
         draggable: false,
         readOnly: true,
       });
+    }
+  }
+
+  // Actual focus time: every completed focus session's running segments,
+  // drawn as read-only blocks so planned vs. executed time can be compared
+  // on the same grid.
+  if (layers.focusActual && focusSessions.length > 0) {
+    const focusCategoryId = resolveCategoryId(FOCUS_ACTUAL_CATEGORY_ID);
+    if (categoryAllowed(focusCategoryId)) {
+      const focusColor = categories?.get(focusCategoryId)?.color ?? FOCUS_ACTUAL_COLOR;
+      for (const session of focusSessions) {
+        if (session.status !== "completed") continue;
+        // Breaks are rest, not executed plan time.
+        if (session.mode !== "focus") continue;
+        session.segments.forEach((segment, index) => {
+          for (const part of splitFocusSegmentByDay(segment.startAt, segment.endAt)) {
+            items.push({
+              key: `focus:${session.id}:${index}:${part.date}`,
+              layer: "focus-actual",
+              sourceType: "focus",
+              sourceId: session.id,
+              title: session.title || session.projectName || "Focus",
+              date: part.date,
+              startTime: part.startTime,
+              endTime: part.endTime,
+              allDay: false,
+              color: focusColor,
+              categoryId: focusCategoryId,
+              draggable: false,
+              readOnly: true,
+            });
+          }
+        });
+      }
     }
   }
 

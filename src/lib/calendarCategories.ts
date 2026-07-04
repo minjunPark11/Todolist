@@ -13,7 +13,7 @@
 import { useSyncExternalStore } from "react";
 import type { ExternalCalendar, Project, StudyTopic } from "../types";
 
-export type CalendarGroupType = "personal" | "study" | "project" | "external";
+export type CalendarGroupType = "personal" | "study" | "project" | "external" | "focus";
 
 export interface CalendarCategory {
   id: string;
@@ -51,6 +51,11 @@ interface CalendarCategoryState {
 
 const STORAGE_KEY = "focusflow.calendarCategories.v1";
 export const DEFAULT_PERSONAL_CATEGORY_ID = "cat-personal-default";
+
+// System category for measured focus time (read-only; blocks are derived
+// from completed FocusSession segments, never user-editable events).
+export const FOCUS_ACTUAL_CATEGORY_ID = "cat-focus-actual";
+export const FOCUS_ACTUAL_COLOR = "#0d9488";
 
 export function studyCategoryId(topicId: string) {
   return `cat-study:${topicId}`;
@@ -229,6 +234,8 @@ export function buildCalendarCategories(input: {
   projects: Project[];
   studyTopics: StudyTopic[];
   externalCalendars: ExternalCalendar[];
+  // Display name for the focus-time category (i18n lives with the caller).
+  focusCategoryName: string;
 }): CalendarCategoryGroup[] {
   const personal: CalendarCategory[] = [...input.state.personal]
     .sort((a, b) => a.order - b.order)
@@ -275,11 +282,23 @@ export function buildCalendarCategories(input: {
       sourceId: calendar.id,
     }));
 
+  const focus: CalendarCategory[] = [
+    {
+      id: FOCUS_ACTUAL_CATEGORY_ID,
+      group: "focus",
+      name: input.focusCategoryName,
+      color: FOCUS_ACTUAL_COLOR,
+      order: 0,
+      isReadOnly: true,
+    },
+  ];
+
   return [
     { type: "personal", categories: personal },
     { type: "study", categories: study },
     { type: "project", categories: project },
     { type: "external", categories: external },
+    { type: "focus", categories: focus },
   ];
 }
 

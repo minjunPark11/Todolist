@@ -238,6 +238,8 @@ export function EventPopover({
         <p className="gcal-popover-when">
           {t("calendar.externalSourceLine", { name: item.externalCalendarName ?? "" })}
         </p>
+      ) : item.sourceType === "focus" ? (
+        <p className="gcal-popover-when">{t("calendar.focusSourceLine")}</p>
       ) : canQuickEdit ? (
         editOpen ? (
           <form className="gcal-popover-edit" onSubmit={submitQuickEdit}>

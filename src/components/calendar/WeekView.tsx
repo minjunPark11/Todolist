@@ -789,6 +789,7 @@ export function WeekView({
                         "gcal-time-block",
                         resize?.key === item.key ? "is-resizing" : "",
                         item.layer === "external" ? "is-external" : "",
+                        item.layer === "focus-actual" ? "is-focus-actual" : "",
                       ].filter(Boolean).join(" ")}
                       onPointerDown={item.draggable ? (event) => startMove(event, item, startMin, endMin) : undefined}
                       onClick={(event) => {
@@ -803,7 +804,12 @@ export function WeekView({
                         width: cols > 1 ? `calc(${widthPct}% - 2px)` : "100%",
                         zIndex: 10 + col,
                         borderLeft: `3px solid ${item.color}`,
-                        background: `${item.color}22`,
+                        // Actual-focus blocks read as a "recording" overlay:
+                        // hatched fill instead of the solid planned-event tint.
+                        background:
+                          item.layer === "focus-actual"
+                            ? `repeating-linear-gradient(135deg, ${item.color}30 0 6px, ${item.color}12 6px 12px)`
+                            : `${item.color}22`,
                       }}
                     >
                       <span className="gcal-tb-title">
