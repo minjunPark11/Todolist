@@ -4,7 +4,6 @@ import type { SpaceSectionGroup, SpaceTypePreset } from "../../lib/spaceHubTypes
 import {
   formatSeconds,
   isTaskDone,
-  isTaskUnscheduled,
   relativeTime,
   resolveTaskGroupLabel,
   sessionSeconds,
@@ -13,7 +12,7 @@ import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { useT } from "../../i18n";
 import { presetText, groupText } from "../../lib/spaceHubI18n";
 
-type StatusFilter = "all" | "open" | "scheduled" | "unscheduled" | "done";
+type StatusFilter = "all" | "open" | "done";
 type SortMode = "updated" | "due" | "title";
 
 // === Tasks tab (§21) ===
@@ -24,7 +23,6 @@ export function SpaceTasksTab({
   onOpenTask,
   onToggleDone,
   onStartFocus,
-  onSchedule,
   onAddTask,
 }: {
   preset: SpaceTypePreset;
@@ -33,7 +31,6 @@ export function SpaceTasksTab({
   onOpenTask: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
   onStartFocus: (taskId: string) => void;
-  onSchedule: (taskId: string) => void;
   onAddTask: () => void;
 }) {
   const { t } = useT();
@@ -55,8 +52,6 @@ export function SpaceTasksTab({
       if (normalizedQuery && !`${task.title} ${task.notes}`.toLowerCase().includes(normalizedQuery)) return false;
       if (statusFilter === "open" && isTaskDone(task)) return false;
       if (statusFilter === "done" && !isTaskDone(task)) return false;
-      if (statusFilter === "scheduled" && !task.scheduledDate) return false;
-      if (statusFilter === "unscheduled" && !isTaskUnscheduled(task)) return false;
       if (groupFilter !== "all" && resolveTaskGroupLabel(task, groupLabels) !== groupFilter) return false;
       return true;
     });
@@ -80,8 +75,6 @@ export function SpaceTasksTab({
         <select aria-label={t("spaceHub.aria.statusFilter")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
           <option value="all">{t("spaceHub.filter.allStatuses")}</option>
           <option value="open">{t("spaceHub.filter.open")}</option>
-          <option value="scheduled">{t("spaceHub.filter.scheduled")}</option>
-          <option value="unscheduled">{t("spaceHub.filter.unscheduled")}</option>
           <option value="done">{t("spaceHub.filter.done")}</option>
         </select>
         <select aria-label={t("spaceHub.aria.groupFilter")} value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
@@ -138,9 +131,6 @@ export function SpaceTasksTab({
                       <div className="sdv-row-actions">
                         <button type="button" className="sdv-btn sdv-btn-sm sdv-btn-primary" onClick={() => onStartFocus(task.id)}>
                           {presetText(t, preset.startFocusLabel)}
-                        </button>
-                        <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => onSchedule(task.id)}>
-                          {t("spaceHub.action.schedule")}
                         </button>
                       </div>
                     )}

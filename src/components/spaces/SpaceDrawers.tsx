@@ -37,7 +37,6 @@ export function TaskDetailDrawer({
   notes,
   isPinned,
   onStartFocus,
-  onSchedule,
   onComplete,
   onPin,
   onArchive,
@@ -50,7 +49,6 @@ export function TaskDetailDrawer({
   notes: SpaceNote[];
   isPinned: boolean;
   onStartFocus: () => void;
-  onSchedule: () => void;
   onComplete: () => void;
   onPin: () => void;
   onArchive: () => void;
@@ -75,12 +73,6 @@ export function TaskDetailDrawer({
         <div>
           <dt>{t("spaceHub.field.dueDate")}</dt>
           <dd>{task.dueDate ? formatDate(task.dueDate) : "—"}</dd>
-        </div>
-        <div>
-          <dt>{t("spaceHub.field.scheduled")}</dt>
-          <dd>
-            {task.scheduledDate ? `${formatDate(task.scheduledDate)}${task.startTime ? ` ${task.startTime}` : ""}` : t("spaceHub.value.unscheduled")}
-          </dd>
         </div>
         <div>
           <dt>{t("spaceHub.field.priority")}</dt>
@@ -131,9 +123,6 @@ export function TaskDetailDrawer({
           <>
             <button type="button" className="sdv-btn sdv-btn-primary" onClick={onStartFocus}>
               {t("spaceHub.action.startFocus")}
-            </button>
-            <button type="button" className="sdv-btn" onClick={onSchedule}>
-              {t("spaceHub.action.schedule")}
             </button>
             <button type="button" className="sdv-btn" onClick={onComplete}>
               {t("spaceHub.action.markComplete")}
@@ -284,7 +273,6 @@ export function SpaceAiDrawer({
   nextAction,
   upcoming,
   weekFocusSeconds,
-  onSuggestSchedule,
   onGenerateNextAction,
   onClose,
 }: {
@@ -294,7 +282,6 @@ export function SpaceAiDrawer({
   nextAction: Task | null;
   upcoming: UpcomingItem[];
   weekFocusSeconds: number;
-  onSuggestSchedule: () => void;
   onGenerateNextAction: () => void;
   onClose: () => void;
 }) {
@@ -361,9 +348,6 @@ export function SpaceAiDrawer({
             {command.label}
           </button>
         ))}
-        <button type="button" className="sdv-chip" onClick={onSuggestSchedule}>
-          {t("spaceHub.cmd.placeWeek")}
-        </button>
         <button type="button" className="sdv-chip" onClick={onGenerateNextAction}>
           {t("spaceHub.ai.generateNextAction")}
         </button>

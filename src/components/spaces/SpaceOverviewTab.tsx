@@ -8,6 +8,7 @@ import {
 } from "../../lib/spaceSelectors";
 import { useT } from "../../i18n";
 import { presetText } from "../../lib/spaceHubI18n";
+import { formatDate } from "../../utils/date";
 import { OVERVIEW_NOTES_LIMIT } from "./SpaceNotesPanel";
 
 const activityIcons: Record<SpaceActivity["type"], string> = {
@@ -33,7 +34,6 @@ export function SpaceOverviewTab({
   onOpenTask,
   onToggleDone,
   onStartFocus,
-  onSchedule,
   onAddTask,
   onAddNote,
   onOpenNote,
@@ -41,7 +41,6 @@ export function SpaceOverviewTab({
   onOpenSession,
   onOpenTab,
   onGenerateAiSummary,
-  onAiSuggestSchedule,
   onGenerateNextAction,
 }: {
   preset: SpaceTypePreset;
@@ -53,7 +52,6 @@ export function SpaceOverviewTab({
   onOpenTask: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
   onStartFocus: (taskId: string) => void;
-  onSchedule: (taskId: string) => void;
   onAddTask: () => void;
   onAddNote: () => void;
   onOpenNote: (noteId: string) => void;
@@ -62,7 +60,6 @@ export function SpaceOverviewTab({
   onOpenSession: (sessionId: string) => void;
   onOpenTab: (tab: SpaceTab) => void;
   onGenerateAiSummary: () => void;
-  onAiSuggestSchedule: () => void;
   onGenerateNextAction: () => void;
 }) {
   const { t } = useT();
@@ -109,17 +106,11 @@ export function SpaceOverviewTab({
                     {task.title}
                   </button>
                   <span className="sdv-task-meta">
-                    {task.status === "doing" ? t("spaceHub.taskMeta.inProgress") : task.scheduledDate ? t("spaceHub.taskMeta.scheduled") : t("spaceHub.taskMeta.toSchedule")}
+                    {task.status === "doing" ? t("spaceHub.taskMeta.inProgress") : task.dueDate ? t("spaceHub.meta.due", { date: formatDate(task.dueDate) }) : "—"}
                   </span>
-                  {task.scheduledDate ? (
-                    <button type="button" className="sdv-btn sdv-btn-sm sdv-btn-primary" onClick={() => onStartFocus(task.id)}>
-                      {t("spaceHub.action.startFocus")}
-                    </button>
-                  ) : (
-                    <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => onSchedule(task.id)}>
-                      {t("spaceHub.action.schedule")}
-                    </button>
-                  )}
+                  <button type="button" className="sdv-btn sdv-btn-sm sdv-btn-primary" onClick={() => onStartFocus(task.id)}>
+                    {t("spaceHub.action.startFocus")}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -156,10 +147,7 @@ export function SpaceOverviewTab({
                 ))}
               </ul>
               <div className="sdv-metric-actions">
-                <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onAiSuggestSchedule}>
-                  {t("spaceHub.ai.suggestSchedule")}
-                </button>
-                <button type="button" className="sdv-btn sdv-btn-sm" onClick={onGenerateNextAction}>
+                <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onGenerateNextAction}>
                   {t("spaceHub.ai.generateNextAction")}
                 </button>
               </div>

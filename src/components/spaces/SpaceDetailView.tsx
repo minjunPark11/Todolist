@@ -24,7 +24,6 @@ import {
   getTodaySpaceFocusSeconds,
   getUpcomingSpaceItems,
   getWeekSpaceFocusSeconds,
-  isTaskUnscheduled,
   spaceTaskTag,
 } from "../../lib/spaceSelectors";
 import { useSpaceHubData } from "../../hooks/useSpaceHubData";
@@ -39,10 +38,6 @@ import {
   FocusConflictModal,
   FocusStartPickerModal,
   ManualRecordModal,
-  ScheduleSpaceTaskModal,
-  ScheduleSuggestionModal,
-  type ScheduleInput,
-  type ScheduleSuggestion,
   type SpaceTaskInput,
 } from "./SpaceModals";
 import {
@@ -78,12 +73,10 @@ type ModalState =
   | { kind: "none" }
   | { kind: "add_task" }
   | { kind: "add_note" }
-  | { kind: "schedule"; taskId: string }
   | { kind: "manual_record" }
   | { kind: "focus_picker" }
   | { kind: "focus_conflict" }
-  | { kind: "delete_space" }
-  | { kind: "ai_schedule_preview"; suggestions: ScheduleSuggestion[] };
+  | { kind: "delete_space" };
 
 type DrawerState =
   | { kind: "none" }
@@ -174,8 +167,6 @@ export function SpaceDetailView({
   const weekFocusSeconds = getWeekSpaceFocusSeconds(spaceSessions, weekStart);
   const upcoming = getUpcomingSpaceItems(spaceTasks, reviewNotes, today);
   const recentSessions = getRecentSpaceFocusSessions(spaceSessions, 3);
-  const unscheduledTasks = spaceTasks.filter(isTaskUnscheduled);
-
   // Tab <-> URL query sync (§3.2): pushState on change, restore on popstate.
   function setTab(next: SpaceTab) {
     if (next === tab) return;
@@ -257,25 +248,6 @@ export function SpaceDetailView({
     if (savedNoteId) showToast({ message: t("spaceHub.toast.noteAdded") });
   }
 
-  function handleScheduleTask(taskId: string, input: ScheduleInput) {
-    const task = tasks.find((item) => item.id === taskId);
-    if (!task) return;
-    onUpdateTask(taskId, {
-      scheduledDate: input.date,
-      startTime: input.startTime,
-      endTime: input.endTime,
-      status: task.status === "inbox" ? "todo" : task.status,
-    });
-    hub.addActivity(space.id, {
-      type: "task_scheduled",
-      title: t("spaceHub.activity.taskScheduled", { title: task.title }),
-      description: `${formatDate(input.date)} ${input.startTime}`,
-      relatedTaskId: taskId,
-    });
-    showToast({ message: t("spaceHub.toast.taskScheduled") });
-    setModal({ kind: "none" });
-  }
-
   function handleStartFocus(taskId?: string) {
     // Only one active FocusSession at a time (§33.9).
     if (activeFocusSession) {
@@ -309,7 +281,6 @@ export function SpaceDetailView({
     window.setTimeout(() => {
       const tips: string[] = [];
       if (counts.overdue > 0) tips.push(t("spaceHub.tip.overdue", { n: counts.overdue }));
-      if (unscheduledTasks.length > 0) tips.push(t("spaceHub.tip.place", { n: Math.min(unscheduledTasks.length, 3) }));
       if (upcoming[0]) tips.push(t("spaceHub.tip.prepare", { title: upcoming[0].title, date: formatDate(upcoming[0].when) }));
       if (tips.length === 0) tips.push(t("spaceHub.tip.onTrack"));
       setAiSummary({
@@ -319,53 +290,11 @@ export function SpaceDetailView({
           detail: signal.detail,
           focus: formatSeconds(weekFocusSeconds),
           open: counts.open,
-          unscheduled: counts.unscheduled,
           overdue: counts.overdue,
         }),
         tips,
       });
     }, 500);
-  }
-
-  function buildScheduleSuggestions(): ScheduleSuggestion[] {
-    // Naive placement preview: spread unscheduled tasks from 14:00 today.
-    let hour = 14;
-    return unscheduledTasks.slice(0, 3).map((task) => {
-      const startTime = `${String(hour).padStart(2, "0")}:00`;
-      const endMinutes = hour * 60 + config.defaults.defaultDurationMinutes;
-      const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
-      hour = Math.floor(endMinutes / 60) + 1;
-      return { taskId: task.id, title: task.title, date: today, startTime, endTime };
-    });
-  }
-
-  function handleAiSuggestSchedule() {
-    const suggestions = buildScheduleSuggestions();
-    if (suggestions.length === 0) {
-      showToast({ message: t("spaceHub.toast.noUnscheduled") });
-      return;
-    }
-    setModal({ kind: "ai_schedule_preview", suggestions });
-  }
-
-  function handleApplyAiSchedule(suggestions: ScheduleSuggestion[]) {
-    for (const suggestion of suggestions) {
-      const task = tasks.find((item) => item.id === suggestion.taskId);
-      if (!task) continue;
-      onUpdateTask(suggestion.taskId, {
-        scheduledDate: suggestion.date,
-        startTime: suggestion.startTime,
-        endTime: suggestion.endTime,
-        status: task.status === "inbox" ? "todo" : task.status,
-      });
-    }
-    hub.addActivity(space.id, {
-      type: "ai_suggestion_applied",
-      title: t("spaceHub.activity.aiApplied", { n: suggestions.length }),
-      description: suggestions.map((item) => item.title).join(", "),
-    });
-    showToast({ message: t("spaceHub.toast.tasksScheduled", { n: suggestions.length }) });
-    setModal({ kind: "none" });
   }
 
   function handleGenerateNextAction() {
@@ -413,7 +342,6 @@ export function SpaceDetailView({
   }
 
   const openTaskDrawer = (taskId: string) => setDrawer({ kind: "task", taskId });
-  const openScheduleModal = (taskId: string) => setModal({ kind: "schedule", taskId });
   const drawerTask = drawer.kind === "task" ? spaceTasks.find((task) => task.id === drawer.taskId) ?? null : null;
   const drawerSession = drawer.kind === "session" ? spaceSessions.find((session) => session.id === drawer.sessionId) ?? null : null;
   const drawerNote = drawer.kind === "note" ? spaceNotes.find((note) => note.id === drawer.noteId) ?? null : null;
@@ -450,17 +378,6 @@ export function SpaceDetailView({
           <button type="button" className="sdv-btn" onClick={() => setModal({ kind: "add_note" })}>
             {presetText(t, preset.addNoteLabel)}
           </button>
-          <button
-            type="button"
-            className="sdv-btn"
-            onClick={() => {
-              const target = unscheduledTasks[0];
-              if (target) openScheduleModal(target.id);
-              else showToast({ message: t("spaceHub.toast.noUnscheduledInSpace") });
-            }}
-          >
-            {presetText(t, preset.scheduleLabel)}
-          </button>
           <button type="button" className="sdv-btn sdv-btn-primary" onClick={() => handleStartFocus()}>
             {presetText(t, preset.startFocusLabel)}
           </button>
@@ -488,9 +405,6 @@ export function SpaceDetailView({
                 <div className="sdv-metric-actions">
                   <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={() => handleStartFocus(nextAction.id)}>
                     {presetText(t, preset.startFocusLabel)}
-                  </button>
-                  <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => openScheduleModal(nextAction.id)}>
-                    {t("spaceHub.action.schedule")}
                   </button>
                 </div>
               </>
@@ -590,7 +504,6 @@ export function SpaceDetailView({
           onOpenTask={openTaskDrawer}
           onToggleDone={handleCompleteTask}
           onStartFocus={handleStartFocus}
-          onSchedule={openScheduleModal}
           onAddTask={() => setModal({ kind: "add_task" })}
           onAddNote={() => setModal({ kind: "add_note" })}
           onOpenNote={(noteId) => setDrawer({ kind: "note", noteId })}
@@ -602,7 +515,6 @@ export function SpaceDetailView({
             setTab(next);
           }}
           onGenerateAiSummary={handleGenerateAiSummary}
-          onAiSuggestSchedule={handleAiSuggestSchedule}
           onGenerateNextAction={handleGenerateNextAction}
         />
       ) : null}
@@ -614,7 +526,6 @@ export function SpaceDetailView({
           onOpenTask={openTaskDrawer}
           onToggleDone={handleCompleteTask}
           onStartFocus={handleStartFocus}
-          onSchedule={openScheduleModal}
           onAddTask={() => setModal({ kind: "add_task" })}
         />
       ) : null}
@@ -687,15 +598,6 @@ export function SpaceDetailView({
           }}
         />
       ) : null}
-      {modal.kind === "schedule" ? (
-        <ScheduleSpaceTaskModal
-          taskId={modal.taskId}
-          spaceTasks={spaceTasks}
-          defaultDuration={config.defaults.defaultDurationMinutes}
-          onSubmit={handleScheduleTask}
-          onClose={() => setModal({ kind: "none" })}
-        />
-      ) : null}
       {modal.kind === "manual_record" ? (
         <ManualRecordModal onSubmit={handleManualRecord} onClose={() => setModal({ kind: "none" })} />
       ) : null}
@@ -724,14 +626,6 @@ export function SpaceDetailView({
           onClose={() => setModal({ kind: "none" })}
         />
       ) : null}
-      {modal.kind === "ai_schedule_preview" ? (
-        <ScheduleSuggestionModal
-          suggestions={modal.suggestions}
-          onApply={handleApplyAiSchedule}
-          onClose={() => setModal({ kind: "none" })}
-        />
-      ) : null}
-
       {/* Drawers (§32.4-32.7, §28) */}
       {drawerTask ? (
         <TaskDetailDrawer
@@ -741,7 +635,6 @@ export function SpaceDetailView({
           notes={spaceNotes.filter((note) => note.relatedTaskId === drawerTask.id)}
           isPinned={config.pinnedNextActionTaskId === drawerTask.id}
           onStartFocus={() => handleStartFocus(drawerTask.id)}
-          onSchedule={() => openScheduleModal(drawerTask.id)}
           onComplete={() => {
             handleCompleteTask(drawerTask.id);
             setDrawer({ kind: "none" });
@@ -783,10 +676,6 @@ export function SpaceDetailView({
           nextAction={nextAction}
           upcoming={upcoming}
           weekFocusSeconds={weekFocusSeconds}
-          onSuggestSchedule={() => {
-            setDrawer({ kind: "none" });
-            handleAiSuggestSchedule();
-          }}
           onGenerateNextAction={handleGenerateNextAction}
           onClose={() => setDrawer({ kind: "none" })}
         />
