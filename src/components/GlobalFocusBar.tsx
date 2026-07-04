@@ -1,7 +1,11 @@
+import { AnimatePresence, motion } from "framer-motion";
 import type { FocusSession, Task } from "../types";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../lib/focusTimer";
 import { openMiniFocusTimer, supportsMiniFocusTimer } from "../lib/miniFocusTimer";
+import { reducedTransition, transitions } from "../motion/transitions";
+import { toastVariants } from "../motion/variants";
+import { useMotionEnabled } from "../motion/reducedMotion";
 
 interface GlobalFocusBarProps {
   session: FocusSession | null;
@@ -13,15 +17,29 @@ interface GlobalFocusBarProps {
   settings: FocusUserSettings;
 }
 
-export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, onStop, settings }: GlobalFocusBarProps) {
-  const now = useNowTick(Boolean(session && session.status === "running"));
-  const elapsed = getDisplayedFocusSeconds(session, now);
+export function GlobalFocusBar({ session, task, ...rest }: GlobalFocusBarProps) {
+  return (
+    <AnimatePresence>
+      {session && task ? <FocusBarContent key="focus-bar" session={session} task={task} {...rest} /> : null}
+    </AnimatePresence>
+  );
+}
 
-  if (!session || !task) return null;
+function FocusBarContent({
+  session,
+  task,
+  onOpenFocus,
+  onPause,
+  onResume,
+  onStop,
+  settings,
+}: Omit<GlobalFocusBarProps, "session" | "task"> & { session: FocusSession; task: Task }) {
+  const now = useNowTick(session.status === "running");
+  const elapsed = getDisplayedFocusSeconds(session, now);
+  const motionEnabled = useMotionEnabled();
   const canOpenMiniTimer = settings.showMiniTimerButton && supportsMiniFocusTimer();
 
   function openMiniTimer() {
-    if (!session || !task) return;
     openMiniFocusTimer({
       sessionId: session.id,
       title: task.title,
@@ -31,9 +49,14 @@ export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, 
   }
 
   return (
-    <aside
+    <motion.aside
       className="foc-global-bar"
       aria-label={`Current focus session: ${task.title}, ${formatFocusDuration(elapsed, true)} elapsed`}
+      variants={motionEnabled ? toastVariants : undefined}
+      initial={motionEnabled ? "initial" : false}
+      animate={motionEnabled ? "animate" : undefined}
+      exit={motionEnabled ? "exit" : undefined}
+      transition={motionEnabled ? transitions.soft : reducedTransition}
     >
       <button type="button" className="foc-global-main" onClick={onOpenFocus}>
         <span className={session.status === "paused" ? "is-paused" : ""}>{session.status === "paused" ? "▶" : "||"}</span>
@@ -61,6 +84,6 @@ export function GlobalFocusBar({ session, task, onOpenFocus, onPause, onResume, 
           </button>
         ) : null}
       </div>
-    </aside>
+    </motion.aside>
   );
 }

@@ -1,7 +1,11 @@
 import { RefObject, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { Project, Task } from "../../types";
 import { Modal } from "../kit";
 import { useT } from "../../i18n";
+import { reducedTransition, transitions } from "../../motion/transitions";
+import { cardVariants } from "../../motion/variants";
+import { useMotionEnabled } from "../../motion/reducedMotion";
 
 interface InboxTriageCardProps {
   items: Task[];
@@ -84,9 +88,11 @@ export function InboxTriageDrawer({ items, projects, onTriage, onClose }: InboxT
         <p className="tdy-rail-empty">{t("todayv.triageEmpty")}</p>
       ) : (
         <div className="tdy-triage-list">
-          {items.map((item) => (
-            <TriageRow key={item.id} item={item} projects={projects} lang={lang} onTriage={onTriage} />
-          ))}
+          <AnimatePresence initial={false}>
+            {items.map((item) => (
+              <TriageRow key={item.id} item={item} projects={projects} lang={lang} onTriage={onTriage} />
+            ))}
+          </AnimatePresence>
         </div>
       )}
     </Modal>
@@ -105,6 +111,7 @@ function TriageRow({
   onTriage: (taskId: string, action: TriageAction) => void;
 }) {
   const { t } = useT();
+  const motionEnabled = useMotionEnabled();
   const [projectId, setProjectId] = useState("");
   const created = new Intl.DateTimeFormat(lang === "ko" ? "ko" : "en", {
     month: "short",
@@ -116,7 +123,15 @@ function TriageRow({
   const hasProjects = projects.length > 0;
 
   return (
-    <div className="tdy-triage-row">
+    <motion.div
+      className="tdy-triage-row"
+      layout={motionEnabled ? "position" : false}
+      variants={motionEnabled ? cardVariants : undefined}
+      initial={false}
+      animate={motionEnabled ? "animate" : undefined}
+      exit={motionEnabled ? "exit" : undefined}
+      transition={motionEnabled ? transitions.soft : reducedTransition}
+    >
       <div className="tdy-triage-info">
         <strong>{item.title}</strong>
         <small>
@@ -185,6 +200,6 @@ function TriageRow({
           {t("todayv.keepInbox")}
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }

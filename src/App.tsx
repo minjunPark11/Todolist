@@ -1,5 +1,5 @@
 import { FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Sidebar } from "./components/Sidebar";
 import { OllamaChat } from "./components/OllamaChat";
 import { TaskDetail } from "./components/TaskDetail";
@@ -13,6 +13,9 @@ import { useDataPortability } from "./app/useDataPortability";
 import type { ToastState } from "./components/kit";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
 import { popUndo, pushUndo } from "./lib/undoStack";
+import { reducedTransition, transitions } from "./motion/transitions";
+import { pageVariants } from "./motion/variants";
+import { useMotionEnabled } from "./motion/reducedMotion";
 import {
   loadFocusUserSettings,
   saveFocusUserSettings,
@@ -77,6 +80,13 @@ export default function App() {
   // detail's "Open Calendar" — PROJECT_DETAIL_REMOVE_CALENDAR_TAB spec §8.2).
   const [calendarFocusProjectId, setCalendarFocusProjectId] = useState("");
   const [toast, setToast] = useState<ToastState | null>(null);
+  const motionEnabled = useMotionEnabled();
+  // Page crossfade applies to navigation only; the very first page renders
+  // immediately so app boot never starts at opacity 0.
+  const hasBootedRef = useRef(false);
+  useEffect(() => {
+    hasBootedRef.current = true;
+  }, []);
   const [focusSettings, setFocusSettings] = useState<FocusUserSettings>(() => loadFocusUserSettings());
   const [externalCalendarState, setExternalCalendarState] = useState<ExternalCalendarState>(() => loadExternalCalendarState());
   const [calendarShare, setCalendarShare] = useState<CalendarShareState>(emptyCalendarShareState);
@@ -911,7 +921,17 @@ export default function App() {
           />
         }
       />
-      <main>{renderPage()}</main>
+      {/* key={activePage} remounts <main> on navigation so the new page
+          crossfades in; opacity-only per pageVariants. */}
+      <motion.main
+        key={activePage}
+        variants={motionEnabled ? pageVariants : undefined}
+        initial={motionEnabled && hasBootedRef.current ? "initial" : false}
+        animate={motionEnabled ? "animate" : undefined}
+        transition={motionEnabled ? transitions.soft : reducedTransition}
+      >
+        {renderPage()}
+      </motion.main>
       <GlobalFocusBar
         session={planner.activeFocusSession}
         task={planner.activeFocusSession ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null : null}

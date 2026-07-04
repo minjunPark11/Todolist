@@ -1,6 +1,8 @@
+import { AnimatePresence } from "framer-motion";
 import type { Project } from "../../types";
 import { formatMinuteOfDay, parseTimeToMinutes, type TodayEntry } from "../../utils/todayView";
 import { useT } from "../../i18n";
+import { MotionTaskRow } from "../motion/MotionTaskRow";
 
 interface FocusQueueProps {
   entries: TodayEntry[];
@@ -60,14 +62,16 @@ export function FocusQueue({
         </div>
       ) : (
         <div className="tdy-rows">
-          {sorted.map((entry) => (
-            <FocusQueueRow
-              key={entry.task.id}
-              entry={entry}
-              projects={projects}
-              onToggleDone={onToggleDone}
-            />
-          ))}
+          <AnimatePresence initial={false}>
+            {sorted.map((entry) => (
+              <FocusQueueRow
+                key={entry.task.id}
+                entry={entry}
+                projects={projects}
+                onToggleDone={onToggleDone}
+              />
+            ))}
+          </AnimatePresence>
         </div>
       )}
     </section>
@@ -102,26 +106,30 @@ function FocusQueueRow({
         : formatMinuteOfDay(startMin, lang)
       : "";
 
+  // MotionTaskRow animates inline opacity, so the `.is-done` dim must stay on
+  // the inner row element rather than the motion wrapper.
   return (
-    <div className={`tdy-row${completed ? " is-done" : ""}`}>
-      <button
-        type="button"
-        className={`tdy-check${completed ? " checked" : ""}`}
-        aria-label={t("todayv.checkAria", { title: task.title })}
-        onClick={() => onToggleDone(task.id)}
-      >
-        {completed ? "✓" : ""}
-      </button>
-      <span className="tdy-row-title">{task.title}</span>
-      {timeLabel ? <span className="tdy-row-time">{timeLabel}</span> : null}
-      {project ? (
-        <span
-          className="tdy-space-pill"
-          style={pill ? { background: pill.bg, color: pill.fg } : undefined}
+    <MotionTaskRow taskId={task.id}>
+      <div className={`tdy-row${completed ? " is-done" : ""}`}>
+        <button
+          type="button"
+          className={`tdy-check${completed ? " checked" : ""}`}
+          aria-label={t("todayv.checkAria", { title: task.title })}
+          onClick={() => onToggleDone(task.id)}
         >
-          {project.name}
-        </span>
-      ) : null}
-    </div>
+          {completed ? "✓" : ""}
+        </button>
+        <span className="tdy-row-title">{task.title}</span>
+        {timeLabel ? <span className="tdy-row-time">{timeLabel}</span> : null}
+        {project ? (
+          <span
+            className="tdy-space-pill"
+            style={pill ? { background: pill.bg, color: pill.fg } : undefined}
+          >
+            {project.name}
+          </span>
+        ) : null}
+      </div>
+    </MotionTaskRow>
   );
 }

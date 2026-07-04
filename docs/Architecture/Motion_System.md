@@ -371,12 +371,39 @@ Done when the panel opens smoothly without feeling like an unrelated overlay.
 
 Done when `+ Add task` expands into an input instead of swapping abruptly.
 
+### Phase 7: Global Primitives (finishing pass)
+
+- Animate the shared `Modal`, `ConfirmModal`, and `Popover` in `src/components/kit.tsx` (backdrop fade + `modalVariants` enter). This covers every surface built on them: calendar quick create, Study modals, calendar category settings, Today quick-add / plan preview / inbox triage drawer, and all app confirms.
+- Animate the Spaces `ModalShell` in `src/components/spaces/SpaceModals.tsx` with the same variants.
+- Animate the global toast in `src/app/AppModals.tsx` (`toastVariants` inside `AnimatePresence`, so dismissal also animates).
+- Apply `MotionTaskRow` to the Today `FocusQueue` rows with `AnimatePresence initial={false}`; completing a task animates it sinking below the open tasks via `layout`.
+- Animate `InboxTriageDrawer` rows out on triage (`cardVariants` exit + `layout` close-up).
+
+Modal/popover enter uses motion only; exit is instant because call sites conditionally render them without `AnimatePresence`. The toast is the exception since it auto-dismisses.
+
+Done when opening any modal/popover in the app and completing/triaging Today tasks uses the shared motion language.
+
+### Phase 8: Continuity (no hard cuts)
+
+Goal: nothing on screen appears or disappears in a single frame.
+
+- Page navigation crossfade: `<motion.main key={activePage}>` in `src/App.tsx` with `pageVariants` (opacity only — a transform on `main` would become the containing block for `position: fixed` children like modal backdrops). The very first page skips the fade so app boot never starts at opacity 0.
+- Modal dismissal: `Modal`, `ConfirmModal`, and the Spaces `ModalShell` intercept ✕ / backdrop / Escape with an internal `closing` state, play the exit variant, then call the caller's `onClose` from `onAnimationComplete`. Commit paths (save/confirm buttons owned by the caller) still close instantly by design — committing should feel immediate, dismissing should feel soft.
+- Popover dismissal: the kit `Popover` owns an internal `AnimatePresence`, so closing any badge/menu popover fades out.
+- Toast and `GlobalFocusBar` animate both in and out (`toastVariants` in `AnimatePresence`).
+
+## Status
+
+Phases 1–8 are implemented. Coverage: Eisenhower matrix (cards, drag feedback, panel, expandable add), calendar right task panel, week/month views, event popover, task detail panel, all shared modals/popovers/toast (enter and dismiss), Today focus queue, inbox triage drawer, page navigation crossfade, global focus bar.
+
+`src/components/TaskList.tsx` is currently unreferenced (dead code) and was intentionally left without motion.
+
 ## Deferred
 
 - Framer Motion `drag` replacement.
 - `layoutId` shared transitions between matrix cards and calendar blocks.
-- Global page transition animation.
-- Applying motion to every card/list/popup in the app.
+- Animated exits for caller-driven modal closes (save/submit flows) — would require `AnimatePresence` at every call site.
+- In-page tab content transitions (SegmentedTabs, space tabs).
 - Complex spring tuning per surface.
 
 ## Guardrails

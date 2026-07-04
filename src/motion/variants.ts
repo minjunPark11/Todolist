@@ -1,4 +1,4 @@
-import { motionDistance, motionScale } from "./tokens";
+import { motionDistance, motionDurations, motionScale } from "./tokens";
 
 export const cardVariants = {
   initial: {
@@ -78,6 +78,67 @@ export const panelVariants = {
     opacity: 0,
     x: 24,
     scale: motionScale.panel,
+  },
+};
+
+export const backdropVariants = {
+  initial: {
+    opacity: 0,
+  },
+  animate: {
+    opacity: 1,
+  },
+  exit: {
+    opacity: 0,
+    transition: { duration: motionDurations.fast, ease: [0.2, 0, 0, 1] },
+  },
+};
+
+// Page-level crossfade for main navigation. Opacity only: a transform on
+// <main> would become the containing block for position:fixed children
+// (modal backdrops, popovers) while the transition runs.
+export const pageVariants = {
+  initial: {
+    opacity: 0,
+  },
+  animate: {
+    opacity: 1,
+  },
+};
+
+export const modalVariants = {
+  initial: {
+    opacity: 0,
+    y: motionDistance.modalY,
+    scale: 0.98,
+  },
+  animate: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+  },
+  // Dismissal should feel quicker than entry, so the exit carries its own
+  // fast transition instead of the modal's soft enter transition.
+  exit: {
+    opacity: 0,
+    y: 8,
+    scale: 0.98,
+    transition: { duration: motionDurations.fast, ease: [0.2, 0, 0, 1] },
+  },
+};
+
+export const toastVariants = {
+  initial: {
+    opacity: 0,
+    y: motionDistance.modalY,
+  },
+  animate: {
+    opacity: 1,
+    y: 0,
+  },
+  exit: {
+    opacity: 0,
+    y: 8,
   },
 };
 

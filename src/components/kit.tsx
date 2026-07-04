@@ -5,9 +5,13 @@ import {
   useRef,
   useState,
 } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { Project, Task, TaskPriority, TaskStatus } from "../types";
 import { formatDate, todayValue } from "../utils/date";
 import { useT } from "../i18n";
+import { reducedTransition, transitions } from "../motion/transitions";
+import { backdropVariants, modalVariants, popoverVariants } from "../motion/variants";
+import { useMotionEnabled } from "../motion/reducedMotion";
 
 // ============================================================================
 // Primitives
@@ -46,11 +50,24 @@ export function Popover({
   align?: "start" | "end";
 }) {
   const ref = useOutsideClose(onClose);
-  if (!open) return null;
+  const motionEnabled = useMotionEnabled();
   return (
-    <div ref={ref} className={`ff-popover ff-popover-${align}`} role="menu">
-      {children}
-    </div>
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          ref={ref}
+          className={`ff-popover ff-popover-${align}`}
+          role="menu"
+          variants={motionEnabled ? popoverVariants : undefined}
+          initial={motionEnabled ? "initial" : false}
+          animate={motionEnabled ? "animate" : undefined}
+          exit={motionEnabled ? "exit" : undefined}
+          transition={motionEnabled ? transitions.fast : reducedTransition}
+        >
+          {children}
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }
 
@@ -496,7 +513,15 @@ export function ConfirmModal({
   onConfirm: () => void;
 }) {
   const { t } = useT();
-  const ref = useOutsideClose(onCancel);
+  const motionEnabled = useMotionEnabled();
+  // Dismissals play the exit variant first, then hand control back to the
+  // caller; confirms stay instant so committing never feels delayed.
+  const [closing, setClosing] = useState(false);
+  const requestCancel = () => {
+    if (!motionEnabled) onCancel();
+    else setClosing(true);
+  };
+  const ref = useOutsideClose(requestCancel);
   const confirmRef = useRef<HTMLButtonElement>(null);
 
   // Focus the confirm button so Enter activates it right away; Tab still
@@ -509,7 +534,8 @@ export function ConfirmModal({
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onCancel();
+        if (!motionEnabled) onCancel();
+        else setClosing(true);
         return;
       }
       if (event.key !== "Enter") return;
@@ -522,15 +548,34 @@ export function ConfirmModal({
     }
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onCancel, onConfirm]);
+  }, [onCancel, onConfirm, motionEnabled]);
 
   return (
-    <div className="ff-modal-backdrop" role="presentation">
-      <section ref={ref} className="ff-modal ff-confirm" role="dialog" aria-modal="true">
+    <motion.div
+      className="ff-modal-backdrop"
+      role="presentation"
+      variants={motionEnabled ? backdropVariants : undefined}
+      initial={motionEnabled ? "initial" : false}
+      animate={motionEnabled ? (closing ? "exit" : "animate") : undefined}
+      transition={motionEnabled ? transitions.fast : reducedTransition}
+    >
+      <motion.section
+        ref={ref}
+        className="ff-modal ff-confirm"
+        role="dialog"
+        aria-modal="true"
+        variants={motionEnabled ? modalVariants : undefined}
+        initial={motionEnabled ? "initial" : false}
+        animate={motionEnabled ? (closing ? "exit" : "animate") : undefined}
+        transition={motionEnabled ? transitions.soft : reducedTransition}
+        onAnimationComplete={(definition) => {
+          if (definition === "exit") onCancel();
+        }}
+      >
         <h2>{title}</h2>
         {body ? <div className="ff-confirm-body">{body}</div> : null}
         <div className="ff-modal-actions">
-          <button type="button" className="ff-btn" onClick={onCancel}>
+          <button type="button" className="ff-btn" onClick={requestCancel}>
             {t("common.cancel")}
           </button>
           <button
@@ -542,8 +587,8 @@ export function ConfirmModal({
             {confirmLabel ?? t("common.confirm")}
           </button>
         </div>
-      </section>
-    </div>
+      </motion.section>
+    </motion.div>
   );
 }
 
@@ -586,25 +631,48 @@ export function Modal({
   wide?: boolean;
 }) {
   const { t } = useT();
-  const ref = useOutsideClose(onClose);
+  const motionEnabled = useMotionEnabled();
+  // Same dismissal contract as ConfirmModal: ✕/backdrop/Escape play the exit
+  // variant, then onClose unmounts. Caller-driven closes (save flows) stay
+  // instant.
+  const [closing, setClosing] = useState(false);
+  const requestClose = () => {
+    if (!motionEnabled) onClose();
+    else setClosing(true);
+  };
+  const ref = useOutsideClose(requestClose);
   return (
-    <div className="ff-modal-backdrop" role="presentation">
-      <section
+    <motion.div
+      className="ff-modal-backdrop"
+      role="presentation"
+      variants={motionEnabled ? backdropVariants : undefined}
+      initial={motionEnabled ? "initial" : false}
+      animate={motionEnabled ? (closing ? "exit" : "animate") : undefined}
+      transition={motionEnabled ? transitions.fast : reducedTransition}
+    >
+      <motion.section
         ref={ref}
         className={`ff-modal${wide ? " ff-modal-wide" : ""}`}
         role="dialog"
         aria-modal="true"
+        variants={motionEnabled ? modalVariants : undefined}
+        initial={motionEnabled ? "initial" : false}
+        animate={motionEnabled ? (closing ? "exit" : "animate") : undefined}
+        transition={motionEnabled ? transitions.soft : reducedTransition}
+        onAnimationComplete={(definition) => {
+          if (definition === "exit") onClose();
+        }}
       >
         <header className="ff-modal-head">
           <h2>{title}</h2>
-          <button type="button" className="ff-icon-btn" aria-label={t("kit.close")} onClick={onClose}>
+          <button type="button" className="ff-icon-btn" aria-label={t("kit.close")} onClick={requestClose}>
             ✕
           </button>
         </header>
         <div className="ff-modal-body">{children}</div>
         {footer ? <div className="ff-modal-actions">{footer}</div> : null}
-      </section>
-    </div>
+      </motion.section>
+    </motion.div>
   );
 }
 

@@ -1,31 +1,57 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import type { Task, TaskPriority } from "../../types";
 import type { SpaceTypePreset } from "../../lib/spaceHubTypes";
 import { isTaskDone } from "../../lib/spaceSelectors";
 import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
 import { groupText } from "../../lib/spaceHubI18n";
+import { reducedTransition, transitions } from "../../motion/transitions";
+import { backdropVariants, modalVariants } from "../../motion/variants";
+import { useMotionEnabled } from "../../motion/reducedMotion";
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const { t } = useT();
+  const motionEnabled = useMotionEnabled();
+  // Same dismissal contract as the kit Modal: ✕/backdrop play the exit
+  // variant before onClose unmounts; submit flows close instantly.
+  const [closing, setClosing] = useState(false);
+  const requestClose = () => {
+    if (!motionEnabled) onClose();
+    else setClosing(true);
+  };
   return (
-    <div className="sdv-modal-backdrop" onClick={onClose}>
-      <section
+    <motion.div
+      className="sdv-modal-backdrop"
+      onClick={requestClose}
+      variants={motionEnabled ? backdropVariants : undefined}
+      initial={motionEnabled ? "initial" : false}
+      animate={motionEnabled ? (closing ? "exit" : "animate") : undefined}
+      transition={motionEnabled ? transitions.fast : reducedTransition}
+    >
+      <motion.section
         className="sdv-modal"
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(event) => event.stopPropagation()}
+        variants={motionEnabled ? modalVariants : undefined}
+        initial={motionEnabled ? "initial" : false}
+        animate={motionEnabled ? (closing ? "exit" : "animate") : undefined}
+        transition={motionEnabled ? transitions.soft : reducedTransition}
+        onAnimationComplete={(definition) => {
+          if (definition === "exit") onClose();
+        }}
       >
         <header className="sdv-modal-head">
           <h2>{title}</h2>
-          <button type="button" aria-label={t("spaceHub.aria.close", { title })} onClick={onClose}>
+          <button type="button" aria-label={t("spaceHub.aria.close", { title })} onClick={requestClose}>
             ✕
           </button>
         </header>
         {children}
-      </section>
-    </div>
+      </motion.section>
+    </motion.div>
   );
 }
 
