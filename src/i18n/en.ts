@@ -91,6 +91,7 @@ export const en: Dictionary = {
   "app.toastTaskDuplicated": "Task duplicated.",
   "app.toastProjectArchived": "Project archived.",
   "app.toastTaskDeleted": "Task deleted.",
+  "app.toastUndone": "Undone.",
   "app.toastProjectDeleted": "Project deleted. Tasks moved to Inbox.",
   "app.resetAllDataTitle": "Reset all data?",
   "app.resetAllDataBody": "This permanently deletes all user data on this device, including tasks, projects, study topics, notes, focus sessions, Space notes, and Space settings. This cannot be undone.",

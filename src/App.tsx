@@ -11,6 +11,7 @@ import { executeAgentActions } from "./app/executeAgentActions";
 import { useDataPortability } from "./app/useDataPortability";
 import type { ToastState } from "./components/kit";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
+import { popUndo, pushUndo } from "./lib/undoStack";
 import {
   loadFocusUserSettings,
   saveFocusUserSettings,
@@ -212,6 +213,21 @@ export default function App() {
     });
   }, [activeFocusTask, activeFocusElapsed, planner.activeFocusSession]);
 
+  // Global Ctrl/Cmd+Z: undo the latest user edit across all data stores.
+  // Typing fields keep their native text undo.
+  useEffect(() => {
+    function onUndoKey(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return;
+      if (event.key.toLowerCase() !== "z") return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      event.preventDefault();
+      if (popUndo()) showToast({ message: t("app.toastUndone") });
+    }
+    window.addEventListener("keydown", onUndoKey);
+    return () => window.removeEventListener("keydown", onUndoKey);
+  }, [t]);
+
   useEffect(() => {
     const session = planner.activeFocusSession;
     if (!session || !focusSettings.enableCompletionNotification || !("Notification" in window)) return;
@@ -380,6 +396,22 @@ export default function App() {
     });
   }
 
+  // Same as saveExternalState but records an undo snapshot — used by explicit
+  // user actions (add/update/delete); background sync writes stay off the
+  // undo stack so Ctrl+Z always reverts something the user actually did.
+  function saveExternalStateUndoable(updater: (current: ExternalCalendarState) => ExternalCalendarState) {
+    setExternalCalendarState((current) => {
+      const next = updater(current);
+      if (next === current) return current;
+      saveExternalCalendarState(next);
+      pushUndo(() => {
+        setExternalCalendarState(current);
+        saveExternalCalendarState(current);
+      });
+      return next;
+    });
+  }
+
   async function syncExternalCalendar(calendarId: string, calendarOverride?: ExternalCalendar) {
     if (syncingExternalCalendarsRef.current.has(calendarId)) return;
     const calendar = calendarOverride ?? externalCalendarState.calendars.find((item) => item.id === calendarId);
@@ -441,13 +473,13 @@ export default function App() {
 
   function addExternalCalendar(input: { name: string; icsUrl: string; color: string }) {
     const calendar = createExternalCalendarDraft(input.name, input.icsUrl, input.color);
-    saveExternalState((current) => ({ ...current, calendars: [...current.calendars, calendar] }));
+    saveExternalStateUndoable((current) => ({ ...current, calendars: [...current.calendars, calendar] }));
     void syncExternalCalendar(calendar.id, calendar);
   }
 
   function updateExternalCalendar(calendarId: string, patch: Partial<ExternalCalendar>) {
     const now = new Date().toISOString();
-    saveExternalState((current) => ({
+    saveExternalStateUndoable((current) => ({
       ...current,
       calendars: current.calendars.map((calendar) =>
         calendar.id === calendarId
@@ -464,7 +496,7 @@ export default function App() {
   }
 
   function deleteExternalCalendar(calendarId: string) {
-    saveExternalState((current) => ({
+    saveExternalStateUndoable((current) => ({
       calendars: current.calendars.filter((calendar) => calendar.id !== calendarId),
       events: current.events.filter((event) => event.externalCalendarId !== calendarId),
     }));

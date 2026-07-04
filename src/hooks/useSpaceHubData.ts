@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { pushUndo } from "../lib/undoStack";
 import {
   DEFAULT_OVERVIEW_CARDS,
   DEFAULT_SPACE_DEFAULTS,
@@ -47,11 +48,20 @@ export interface SpaceNoteDraft {
 }
 
 export function useSpaceHubData() {
-  const [store, setStore] = useState<SpaceHubStore>(loadStore);
+  const [store, setStoreState] = useState<SpaceHubStore>(loadStore);
+
+  // User edits record an undo snapshot; the reset event below bypasses it.
+  function setStore(updater: (current: SpaceHubStore) => SpaceHubStore) {
+    setStoreState((current) => {
+      const next = updater(current);
+      if (next !== current) pushUndo(() => setStoreState(current));
+      return next;
+    });
+  }
 
   useEffect(() => {
     function resetSpaceHubStore() {
-      setStore({ notes: [], activities: [], configs: [] });
+      setStoreState({ notes: [], activities: [], configs: [] });
     }
     window.addEventListener("focusflow:space-hub-reset", resetSpaceHubStore);
     return () => window.removeEventListener("focusflow:space-hub-reset", resetSpaceHubStore);

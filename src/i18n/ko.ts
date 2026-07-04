@@ -91,6 +91,7 @@ export const ko: Dictionary = {
   "app.toastTaskDuplicated": "할 일을 복제했습니다.",
   "app.toastProjectArchived": "프로젝트를 보관했습니다.",
   "app.toastTaskDeleted": "할 일을 삭제했습니다.",
+  "app.toastUndone": "실행 취소했습니다.",
   "app.toastProjectDeleted": "프로젝트를 삭제했습니다. 할 일은 받은함으로 이동했습니다.",
   "app.resetAllDataTitle": "전체 데이터를 초기화할까요?",
   "app.resetAllDataBody": "이 기기의 모든 사용자 데이터가 영구적으로 삭제됩니다. 할 일, 프로젝트, 학습 주제, 노트, 집중 기록, Space 노트와 설정이 모두 삭제되며 되돌릴 수 없습니다.",

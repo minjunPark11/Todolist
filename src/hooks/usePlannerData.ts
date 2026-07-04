@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { pushUndo } from "../lib/undoStack";
 import { sampleData } from "../data/sampleData";
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 import type {
@@ -460,7 +461,17 @@ function readStorage(): PlannerData {
 }
 
 export function usePlannerData() {
-  const [data, setData] = useState<PlannerData>(() => readStorage());
+  const [data, setDataState] = useState<PlannerData>(() => readStorage());
+  // Every user-facing mutation goes through this wrapper so Ctrl+Z can walk
+  // edits back; system paths (remote load, migration) use setDataState so
+  // they never land on the undo stack.
+  function setData(updater: PlannerData | ((current: PlannerData) => PlannerData)) {
+    setDataState((current) => {
+      const next = typeof updater === "function" ? updater(current) : updater;
+      if (next !== current) pushUndo(() => setDataState(current));
+      return next;
+    });
+  }
   const [selectedTaskId, setSelectedTaskId] = useState<string>("");
   const [userEmail, setUserEmail] = useState("");
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
@@ -585,7 +596,7 @@ export function usePlannerData() {
 
       partial.settings = normalizeSettings(settingsRows?.data as Partial<PlannerSettings> | undefined);
 
-      setData(normalizeData(partial));
+      setDataState(normalizeData(partial));
       setRemoteLoaded(true);
       setSyncStatus("Synced with Supabase");
     } catch (error) {
@@ -700,7 +711,7 @@ export function usePlannerData() {
     }
 
     await saveSupabaseData(localMigrationData);
-    setData(localMigrationData);
+    setDataState(localMigrationData);
     setLocalMigrationData(null);
     setRemoteLoaded(true);
     return true;

@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import type { Task, TaskPriority } from "../../types";
 import type { SpaceTypePreset } from "../../lib/spaceHubTypes";
 import { isTaskDone } from "../../lib/spaceSelectors";
@@ -231,6 +231,31 @@ export function DeleteSpaceConfirmModal({
   onClose: () => void;
 }) {
   const { t } = useT();
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  // Same keyboard contract as ConfirmModal: the confirm button is focused on
+  // open so Enter deletes right away; Escape cancels.
+  useEffect(() => {
+    confirmRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+      if (event.key !== "Enter") return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "BUTTON" || target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      event.preventDefault();
+      onConfirm();
+    }
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose, onConfirm]);
+
   return (
     <ModalShell title={t("spaces.delete.title")} onClose={onClose}>
       <p className="sdv-modal-copy">
@@ -245,7 +270,7 @@ export function DeleteSpaceConfirmModal({
         <button type="button" className="sdv-btn" onClick={onClose}>
           {t("common.cancel")}
         </button>
-        <button type="button" className="sdv-btn sdv-btn-danger" onClick={onConfirm}>
+        <button ref={confirmRef} type="button" className="sdv-btn sdv-btn-danger" onClick={onConfirm}>
           {t("spaces.delete.confirm")}
         </button>
       </div>
