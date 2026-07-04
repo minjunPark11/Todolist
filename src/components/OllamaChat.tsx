@@ -1,4 +1,5 @@
 import { FormEvent, KeyboardEvent, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { AgentActionPreview } from "./ai/AgentActionPreview";
 import type { AgentAction } from "../lib/ai/agent/actions";
 import { runPersonalAgent } from "../lib/ai/agent/personalAgent";
@@ -13,6 +14,9 @@ import type { AiMessage, AiProviderName } from "../lib/ai/types";
 import { buildCalendarContextText, type CalendarContextInput } from "../lib/calendarContext";
 import type { PageId } from "../types";
 import { useT } from "../i18n";
+import { reducedTransition, transitions } from "../motion/transitions";
+import { modalVariants } from "../motion/variants";
+import { useMotionEnabled } from "../motion/reducedMotion";
 
 type ChatMessage = AiMessage & {
   id: string;
@@ -42,6 +46,7 @@ function getProviderLabel(t: (key: string) => string, provider?: AiProviderName)
 
 export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteActions }: OllamaChatProps = {}) {
   const { t } = useT();
+  const motionEnabled = useMotionEnabled();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     createMessage("assistant", t("ai.greeting")),
@@ -174,8 +179,18 @@ export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteAc
 
   return (
     <div className={open ? "ollama-chat open" : "ollama-chat"}>
+      <AnimatePresence>
       {open ? (
-        <section className="ollama-chat-panel" aria-label={t("ai.panelLabel")}>
+        <motion.section
+          className="ollama-chat-panel"
+          aria-label={t("ai.panelLabel")}
+          style={{ transformOrigin: "bottom right" }}
+          variants={motionEnabled ? modalVariants : undefined}
+          initial={motionEnabled ? "initial" : false}
+          animate={motionEnabled ? "animate" : undefined}
+          exit={motionEnabled ? "exit" : undefined}
+          transition={motionEnabled ? transitions.soft : reducedTransition}
+        >
           <header className="ollama-chat-head">
             <div>
               <span>{getProviderLabel(t, provider)}</span>
@@ -224,8 +239,9 @@ export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteAc
             />
             <button type="submit" disabled={!draft.trim() || loading}>{t("ai.send")}</button>
           </form>
-        </section>
+        </motion.section>
       ) : null}
+      </AnimatePresence>
 
       <button
         type="button"

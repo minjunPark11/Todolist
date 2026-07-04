@@ -391,6 +391,9 @@ Goal: nothing on screen appears or disappears in a single frame.
 - Modal dismissal: `Modal`, `ConfirmModal`, and the Spaces `ModalShell` intercept ✕ / backdrop / Escape with an internal `closing` state, play the exit variant, then call the caller's `onClose` from `onAnimationComplete`. Commit paths (save/confirm buttons owned by the caller) still close instantly by design — committing should feel immediate, dismissing should feel soft.
 - Popover dismissal: the kit `Popover` owns an internal `AnimatePresence`, so closing any badge/menu popover fades out.
 - Toast and `GlobalFocusBar` animate both in and out (`toastVariants` in `AnimatePresence`).
+- Rail collapse/expand: the app sidebar (`.app-shell` grid columns), calendar left sidebar, and calendar task panel widths transition in CSS (0.28s, mirrors `transitions.soft`); the rail keeps the same DOM node so the width tween just runs on the class swap. The `[data-reduce-motion]` CSS block disables these automatically.
+- `MotionCollapse` (`src/components/motion/MotionCollapse.tsx`): shared height-auto expand/collapse. Used by the sidebar project-shortcuts section and the calendar task panel quadrant sections (whose row `AnimatePresence` previously unmounted wholesale on collapse, skipping exits).
+- AI chat panel (`OllamaChat`) scales/fades from its bottom-right FAB corner on open and close.
 
 ## Status
 

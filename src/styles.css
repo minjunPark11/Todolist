@@ -11393,6 +11393,35 @@ div.spc-signal-row {
   gap: inherit;
 }
 
+/* Structural rail collapse/expand: animate the track/width change itself.
+   Values mirror transitions.soft (0.28s, [0.2, 0, 0, 1]); the global
+   [data-reduce-motion] block above disables these along with everything
+   else. */
+.app-shell {
+  transition: grid-template-columns 0.28s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.sidebar {
+  transition: padding 0.28s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.gcal-sidebar,
+.gcal-taskpanel {
+  transition: width 0.28s cubic-bezier(0.2, 0, 0, 1), padding 0.28s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Fixed rail width so the collapse can animate (auto cannot transition). */
+.gcal-taskpanel.is-rail {
+  width: 48px;
+}
+
+/* Rows sit inside the MotionCollapse wrapper, so the section's grid gap
+   no longer reaches them; restore it here. */
+.gcal-taskpanel-section-body {
+  display: grid;
+  gap: 6px;
+}
+
 .eis-row:hover {
   background: var(--bg-hover);
 }

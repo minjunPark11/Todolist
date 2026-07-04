@@ -6,6 +6,7 @@ import { AnimatePresence } from "framer-motion";
 import type { Project, Task } from "../../types";
 import { getMatrixPosition, type MatrixQuadrant } from "../../utils/eisenhower";
 import { useT } from "../../i18n";
+import { MotionCollapse } from "../motion/MotionCollapse";
 import { MotionTaskRow } from "../motion/MotionTaskRow";
 
 const SECTIONS: Array<{ quadrant: MatrixQuadrant; defaultOpen: boolean }> = [
@@ -134,8 +135,8 @@ function PanelSection({
         <span className="gcal-taskpanel-section-name">{t(`caltasks.q${quadrant}`)}</span>
         <span className="ff-board-count">{tasks.length}</span>
       </button>
-      {open ? (
-        tasks.length === 0 ? (
+      <MotionCollapse open={open} className="gcal-taskpanel-section-body">
+        {tasks.length === 0 ? (
           <p className="gcal-taskpanel-empty">{t("caltasks.empty")}</p>
         ) : (
           <AnimatePresence initial={false}>
@@ -177,8 +178,8 @@ function PanelSection({
             );
           })}
           </AnimatePresence>
-        )
-      ) : null}
+        )}
+      </MotionCollapse>
     </section>
   );
 }

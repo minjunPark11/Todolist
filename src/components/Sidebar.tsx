@@ -3,6 +3,7 @@ import type { PageId, Project, Task } from "../types";
 import { todayValue } from "../utils/date";
 import { getTodayBuckets } from "../utils/planner";
 import { useT } from "../i18n";
+import { MotionCollapse } from "./motion/MotionCollapse";
 
 interface SidebarProps {
   activePage: PageId;
@@ -236,7 +237,7 @@ export function Sidebar({
           </span>
           {t("sidebar.projectShortcuts")}
         </button>
-        {projectsOpen ? (
+        <MotionCollapse open={projectsOpen}>
           <div className="side-list">
             {projects.map((project) => {
               const count = tasks.filter((task) => task.projectId === project.id && isOpen(task)).length;
@@ -267,7 +268,7 @@ export function Sidebar({
               />
             </form>
           </div>
-        ) : null}
+        </MotionCollapse>
       </div>
 
       <nav className="side-list side-list-secondary">{secondaryNav.map(renderNavItem)}</nav>
