@@ -18,7 +18,8 @@ export default async function handler(req, res) {
   }
 
   if (!supabaseUrl || !supabaseKey) {
-    res.status(500).end("Calendar sharing is not configured");
+    const missing = [!supabaseUrl && "SUPABASE_URL", !supabaseKey && "SUPABASE_SERVICE_ROLE_KEY"].filter(Boolean).join(", ");
+    res.status(500).end(`Calendar sharing is not configured (missing env: ${missing})`);
     return;
   }
 
@@ -33,7 +34,7 @@ export default async function handler(req, res) {
     .maybeSingle();
 
   if (error) {
-    res.status(500).end("Calendar lookup failed");
+    res.status(500).end(`Calendar lookup failed: ${error.message || error.code || "unknown error"}`);
     return;
   }
   if (!data) {

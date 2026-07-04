@@ -187,7 +187,7 @@ export function createExternalCalendarDraft(name: string, icsUrl: string, color:
   return {
     id: createId("external-calendar"),
     name: name.trim(),
-    icsUrl: icsUrl.trim(),
+    icsUrl: normalizeIcsUrl(icsUrl),
     color,
     visible: true,
     enabled: true,
@@ -204,10 +204,47 @@ export function shouldSyncExternalCalendar(calendar: ExternalCalendar, nowMs = D
   return nowMs - new Date(calendar.lastSyncedAt).getTime() >= EXTERNAL_CALENDAR_STALE_MINUTES * 60_000;
 }
 
-export async function fetchExternalCalendarEvents(calendar: ExternalCalendar) {
-  const response = await fetch(calendar.icsUrl);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+export function normalizeIcsUrl(raw: string) {
+  const trimmed = raw.trim();
+  if (/^webcal:\/\//i.test(trimmed)) return `https://${trimmed.slice("webcal://".length)}`;
+  return trimmed;
+}
+
+function isSameOrigin(url: string) {
+  try {
+    return new URL(url, window.location.origin).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+async function readIcsResponse(response: Response) {
   const text = await response.text();
+  if (!response.ok) {
+    const detail = text.trim().replace(/\s+/g, " ").slice(0, 120);
+    throw new Error(detail ? `HTTP ${response.status} — ${detail}` : `HTTP ${response.status}`);
+  }
+  if (!text.toUpperCase().includes("BEGIN:VCALENDAR")) {
+    throw new Error("Not an ICS calendar");
+  }
+  return text;
+}
+
+export async function fetchExternalCalendarEvents(calendar: ExternalCalendar) {
+  const url = normalizeIcsUrl(calendar.icsUrl);
+  let text: string;
+  if (isSameOrigin(url)) {
+    text = await readIcsResponse(await fetch(url));
+  } else {
+    try {
+      text = await readIcsResponse(await fetch(url));
+    } catch {
+      // Cross-origin ICS hosts (Google, iCloud, ...) don't send CORS headers,
+      // so the direct fetch dies with an opaque network error; retry through
+      // the same-origin proxy which fetches server-side.
+      text = await readIcsResponse(await fetch(`/api/ics?url=${encodeURIComponent(url)}`));
+    }
+  }
   return parseIcsEvents(text, calendar.id);
 }
 
