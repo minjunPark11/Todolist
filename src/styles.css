@@ -11240,6 +11240,10 @@ div.spc-signal-row {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+.motion-drop-zone {
+  transform-origin: center;
+}
+
 .eis-cell-head {
   display: grid;
   gap: 2px;
@@ -11298,6 +11302,17 @@ div.spc-signal-row {
   background: var(--bg-surface);
   cursor: pointer;
   transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.motion-task-row {
+  position: relative;
+  transform-origin: center;
+}
+
+.motion-task-row.is-dragging {
+  z-index: 20;
+  cursor: grabbing;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
 }
 
 .eis-row:hover {
@@ -11567,6 +11582,10 @@ div.spc-signal-row {
 .gcal-taskpanel-row:active {
   cursor: grabbing;
   opacity: 0.7;
+}
+
+.gcal-taskpanel-row.is-dragging {
+  opacity: 1;
 }
 
 .gcal-taskpanel-row-title {

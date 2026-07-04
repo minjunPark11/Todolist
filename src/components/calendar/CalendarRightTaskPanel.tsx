@@ -2,9 +2,11 @@
 // not-yet-time-blocked tasks, ready to drag onto the time grid. Not a 2x2
 // matrix — collapsible priority sections, I/II expanded by default.
 import { DragEvent, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import type { Project, Task } from "../../types";
 import { getMatrixPosition, type MatrixQuadrant } from "../../utils/eisenhower";
 import { useT } from "../../i18n";
+import { MotionTaskRow } from "../motion/MotionTaskRow";
 
 const SECTIONS: Array<{ quadrant: MatrixQuadrant; defaultOpen: boolean }> = [
   { quadrant: "I", defaultOpen: true },
@@ -34,6 +36,7 @@ export function CalendarRightTaskPanel({
   onDragEnd,
 }: CalendarRightTaskPanelProps) {
   const { t } = useT();
+  const [draggingTaskId, setDraggingTaskId] = useState("");
 
   if (collapsed) {
     return (
@@ -86,8 +89,13 @@ export function CalendarRightTaskPanel({
           tasks={candidates.filter((task) => getMatrixPosition(task, today).quadrant === quadrant)}
           projects={projects}
           today={today}
+          draggingTaskId={draggingTaskId}
           onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
+          onDragStartState={setDraggingTaskId}
+          onDragEnd={() => {
+            setDraggingTaskId("");
+            onDragEnd();
+          }}
         />
       ))}
     </aside>
@@ -100,7 +108,9 @@ function PanelSection({
   tasks,
   projects,
   today,
+  draggingTaskId,
   onDragStart,
+  onDragStartState,
   onDragEnd,
 }: {
   quadrant: MatrixQuadrant;
@@ -108,7 +118,9 @@ function PanelSection({
   tasks: Task[];
   projects: Project[];
   today: string;
+  draggingTaskId: string;
   onDragStart: (event: DragEvent, taskId: string) => void;
+  onDragStartState: (taskId: string) => void;
   onDragEnd: () => void;
 }) {
   const { t } = useT();
@@ -126,7 +138,8 @@ function PanelSection({
         tasks.length === 0 ? (
           <p className="gcal-taskpanel-empty">{t("caltasks.empty")}</p>
         ) : (
-          tasks.map((task) => {
+          <AnimatePresence initial={false}>
+          {tasks.map((task) => {
             const project = projects.find((item) => item.id === task.projectId);
             const dateLabel = task.scheduledDate
               ? task.scheduledDate === today
@@ -138,12 +151,17 @@ function PanelSection({
                   : task.dueDate.slice(5).replace("-", ".")
                 : "";
             return (
-              <div
+              <MotionTaskRow
                 key={task.id}
+                taskId={task.id}
+                isDragging={task.id === draggingTaskId}
                 className="gcal-taskpanel-row"
                 draggable
-                onDragStart={(event) => onDragStart(event, task.id)}
-                onDragEnd={onDragEnd}
+                onNativeDragStart={(event) => {
+                  onDragStartState(task.id);
+                  onDragStart(event, task.id);
+                }}
+                onNativeDragEnd={onDragEnd}
                 title={t("caltasks.dragHint")}
               >
                 <span className="gcal-taskpanel-row-title">{task.title}</span>
@@ -155,9 +173,10 @@ function PanelSection({
                   {dateLabel && task.estimatedMinutes > 0 ? " · " : ""}
                   {task.estimatedMinutes > 0 ? t("eis.minutes", { n: task.estimatedMinutes }) : ""}
                 </span>
-              </div>
+              </MotionTaskRow>
             );
-          })
+          })}
+          </AnimatePresence>
         )
       ) : null}
     </section>

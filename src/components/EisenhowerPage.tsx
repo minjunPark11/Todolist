@@ -3,6 +3,7 @@
 // off to the calendar for time-blocking. The quadrant is derived, never
 // stored — dragging a card between quadrants mutates the underlying fields.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import type { Project, Task, TaskDraft, TaskPriority } from "../types";
 import { todayValue, addDays } from "../utils/date";
 import {
@@ -14,6 +15,8 @@ import {
 } from "../utils/eisenhower";
 import { MoreMenu, type MoreMenuItem, type ToastState } from "./kit";
 import { useT } from "../i18n";
+import { MotionDropZone } from "./motion/MotionDropZone";
+import { MotionTaskRow } from "./motion/MotionTaskRow";
 
 const QUADRANTS: MatrixQuadrant[] = ["I", "II", "III", "IV"];
 const IV_GROUPS: MatrixGroup[] = ["unclassified", "onHold", "completed"];
@@ -46,6 +49,7 @@ export function EisenhowerPage({
   const today = todayValue();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [draggingTaskId, setDraggingTaskId] = useState("");
 
   const positioned = useMemo(
     () =>
@@ -153,9 +157,12 @@ export function EisenhowerPage({
                       today={today}
                       projects={projects}
                       selected={task.id === selectedTaskId}
+                      isDragging={task.id === draggingTaskId}
                       menu={rowMenu(task)}
                       onOpen={() => onOpenTask(task.id)}
                       onToggleDone={() => onToggleDone(task.id)}
+                      onDragStart={() => setDraggingTaskId(task.id)}
+                      onDragEnd={() => setDraggingTaskId("")}
                     />
                   )}
                 />
@@ -165,18 +172,23 @@ export function EisenhowerPage({
                 {tasksFor(quadrant).length === 0 ? (
                   <p className="eis-empty">{t("eis.empty")}</p>
                 ) : null}
-                {tasksFor(quadrant).map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    today={today}
-                    projects={projects}
-                    selected={task.id === selectedTaskId}
-                    menu={rowMenu(task)}
-                    onOpen={() => onOpenTask(task.id)}
-                    onToggleDone={() => onToggleDone(task.id)}
-                  />
-                ))}
+                <AnimatePresence initial={false}>
+                  {tasksFor(quadrant).map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      today={today}
+                      projects={projects}
+                      selected={task.id === selectedTaskId}
+                      isDragging={task.id === draggingTaskId}
+                      menu={rowMenu(task)}
+                      onOpen={() => onOpenTask(task.id)}
+                      onToggleDone={() => onToggleDone(task.id)}
+                      onDragStart={() => setDraggingTaskId(task.id)}
+                      onDragEnd={() => setDraggingTaskId("")}
+                    />
+                  ))}
+                </AnimatePresence>
               </>
             )}
           </QuadrantCard>
@@ -207,7 +219,9 @@ function QuadrantCard({
   const { t } = useT();
   const [over, setOver] = useState(false);
   return (
-    <section
+    <MotionDropZone
+      as="section"
+      isOver={over}
       className={`eis-cell eis-cell-${quadrant}${over ? " is-over" : ""}`}
       onDragOver={(event) => {
         event.preventDefault();
@@ -228,7 +242,7 @@ function QuadrantCard({
         <small>{t(`eis.q${quadrant}Hint`)}</small>
       </header>
       <div className="eis-cell-body">{children}</div>
-    </section>
+    </MotionDropZone>
   );
 }
 
@@ -254,7 +268,7 @@ function QuadrantGroup({
         <span>{label}</span>
         <span className="ff-board-count">{tasks.length}</span>
       </button>
-      {open ? visible.map(renderRow) : null}
+      <AnimatePresence initial={false}>{open ? visible.map(renderRow) : null}</AnimatePresence>
     </div>
   );
 }
@@ -264,17 +278,23 @@ function TaskRow({
   today,
   projects,
   selected,
+  isDragging,
   menu,
   onOpen,
   onToggleDone,
+  onDragStart,
+  onDragEnd,
 }: {
   task: Task;
   today: string;
   projects: Project[];
   selected: boolean;
+  isDragging: boolean;
   menu: MoreMenuItem[];
   onOpen: () => void;
   onToggleDone: () => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 }) {
   const { t } = useT();
   const project = projects.find((item) => item.id === task.projectId);
@@ -292,10 +312,16 @@ function TaskRow({
       : "";
 
   return (
-    <div
+    <MotionTaskRow
+      taskId={task.id}
+      isDragging={isDragging}
       className={`eis-row${done ? " is-done" : ""}${selected ? " is-selected" : ""}`}
       draggable={!done}
-      onDragStart={(event) => event.dataTransfer.setData("text/task", task.id)}
+      onNativeDragStart={(event) => {
+        event.dataTransfer.setData("text/task", task.id);
+        onDragStart();
+      }}
+      onNativeDragEnd={onDragEnd}
       role="button"
       tabIndex={0}
       onClick={onOpen}
@@ -330,7 +356,7 @@ function TaskRow({
         </span>
       ) : null}
       <MoreMenu items={menu} />
-    </div>
+    </MotionTaskRow>
   );
 }
 
