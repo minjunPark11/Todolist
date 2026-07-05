@@ -1335,9 +1335,14 @@ div.spc-signal-row {
   }
 
   .foc-header,
-  .foc-header-chips,
   .foc-global-bar {
     display: grid;
+  }
+
+  /* Keep the date / today / settings chips on one horizontal row even when
+     the header stacks below the title. */
+  .foc-header-chips {
+    justify-content: flex-start;
   }
 
   .foc-options-popover {
