@@ -330,16 +330,16 @@ export function FocusPage({
           )}
         </section>
 
+        <section className="foc-card foc-summary">
+          <h2>{t("focus.summaryTitle")}</h2>
+          <div className="foc-stat-grid">
+            <span><small>{t("focus.statTotal")}</small><strong>{formatFocusDuration(todaySeconds, true)}</strong></span>
+            <span><small>{t("focus.statSessions")}</small><strong>{t("focus.sessionCount", { count: todaySessions.length })}</strong></span>
+            <span><small>{t("focus.statAverage")}</small><strong>{formatFocusDuration(avgSeconds, true)}</strong></span>
+            <span><small>{t("focus.statLongest")}</small><strong>{formatFocusDuration(longestSeconds, true)}</strong></span>
+          </div>
+        </section>
         <aside className="foc-insights">
-          <section className="foc-card">
-            <h2>{t("focus.summaryTitle")}</h2>
-            <div className="foc-stat-grid">
-              <span><small>{t("focus.statTotal")}</small><strong>{formatFocusDuration(todaySeconds, true)}</strong></span>
-              <span><small>{t("focus.statSessions")}</small><strong>{t("focus.sessionCount", { count: todaySessions.length })}</strong></span>
-              <span><small>{t("focus.statAverage")}</small><strong>{formatFocusDuration(avgSeconds, true)}</strong></span>
-              <span><small>{t("focus.statLongest")}</small><strong>{formatFocusDuration(longestSeconds, true)}</strong></span>
-            </div>
-          </section>
           <section className="foc-card">
             <h2>{t("focus.byProjectTitle")}</h2>
             <div className="foc-project-bars">

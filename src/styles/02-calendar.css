@@ -2918,7 +2918,7 @@ body {
 }
 
 .app-shell {
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 200px minmax(0, 1fr);
   background: var(--ff-page);
 }
 
@@ -2932,18 +2932,18 @@ body {
 .brand-lockup {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 40px;
+  gap: 8px;
+  min-height: 34px;
   padding: 0 8px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .brand-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 7px;
   color: #fff;
   background: linear-gradient(135deg, #60a5fa, #2563eb);
@@ -3005,7 +3005,9 @@ main {
 }
 
 .page-grid.no-detail {
-  grid-template-columns: minmax(0, 1200px);
+  /* Fill the full content width (like Calendar/Spaces) so every view shares the
+     same left/right margins. Individual pages set their own inner padding. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /* Task-detail panel close: `selectedTask` clears immediately on X, so the grid

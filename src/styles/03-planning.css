@@ -3,9 +3,11 @@
    ============================================================================ */
 .ff-page {
   width: 100%;
-  max-width: 1120px;
+  max-width: none;
   margin: 0 auto;
-  padding: 32px 36px 80px;
+  /* No horizontal inset — left/right margins align with the Calendar view.
+     (Narrow screens re-add side padding via the @media 900 rule below.) */
+  padding: 32px 0 80px;
   display: flex;
   flex-direction: column;
   gap: 28px;

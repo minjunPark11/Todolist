@@ -3,7 +3,9 @@
    ========================================================================== */
 
 .page-grid.no-detail.tdy-grid {
-  grid-template-columns: minmax(0, 1320px);
+  /* Fill the full content width like the Calendar view (no narrow cap) so the
+     left/right empty space matches across views. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .tdy-page {
@@ -14,7 +16,7 @@
   --tdy-amber-soft: #fff4e0;
   --tdy-purple-soft: #f2ecfd;
   display: grid;
-  gap: 24px;
+  gap: 18px;
   min-width: 0;
 }
 
@@ -39,15 +41,15 @@
 
 .tdy-head-title h1 {
   margin: 0;
-  font-size: 40px;
+  font-size: 30px;
   line-height: 1.15;
   font-weight: 750;
-  letter-spacing: -0.8px;
+  letter-spacing: -0.6px;
 }
 
 .tdy-head-title p {
   margin: 4px 0 0;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 
@@ -63,10 +65,10 @@
   align-items: center;
   gap: 10px;
   width: min(400px, 60vw);
-  height: 48px;
+  height: 42px;
   padding: 0 14px;
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--bg-surface);
   color: var(--text-tertiary);
   transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
@@ -117,12 +119,12 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 46px;
-  padding: 0 20px;
-  border-radius: 14px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 12px;
   border: 1px solid transparent;
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast);
@@ -170,14 +172,14 @@
 .tdy-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 24px;
+  gap: 20px;
   align-items: start;
 }
 
 .tdy-main,
 .tdy-side {
   display: grid;
-  gap: 22px;
+  gap: 16px;
   min-width: 0;
 }
 
@@ -186,8 +188,8 @@
 .tdy-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 24px;
-  padding: 22px;
+  border-radius: 18px;
+  padding: 18px;
   box-shadow: var(--shadow-xs);
 }
 
@@ -195,13 +197,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .tdy-card-head h2 {
   margin: 0;
   flex: 1;
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 650;
   letter-spacing: -0.3px;
 }
@@ -230,11 +232,11 @@
 
 .tdy-brief-icon {
   flex-shrink: 0;
-  width: 54px;
-  height: 54px;
+  width: 46px;
+  height: 46px;
   display: grid;
   place-items: center;
-  border-radius: 16px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #4d94ff, #2f6fe0);
   color: #fff;
   box-shadow: 0 6px 16px rgba(47, 111, 224, 0.28);
@@ -245,21 +247,21 @@
 }
 
 .tdy-brief-body h2 {
-  margin: 4px 0 8px;
-  font-size: 21px;
+  margin: 4px 0 6px;
+  font-size: 18px;
   font-weight: 650;
   letter-spacing: -0.3px;
 }
 
 .tdy-brief-summary {
   margin: 0 0 2px;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text-primary);
 }
 
 .tdy-brief-hint {
-  margin: 0 0 16px;
-  font-size: 15px;
+  margin: 0 0 14px;
+  font-size: 13.5px;
   color: var(--text-secondary);
 }
 
@@ -337,10 +339,10 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 54px;
-  padding: 8px 12px;
+  min-height: 46px;
+  padding: 7px 12px;
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--bg-surface);
   transition: background var(--motion-fast), border-color var(--motion-fast);
 }
@@ -391,7 +393,7 @@
 .tdy-row-title {
   flex: 1;
   min-width: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 550;
   color: var(--text-primary);
   white-space: nowrap;

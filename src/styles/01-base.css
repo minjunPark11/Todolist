@@ -162,6 +162,19 @@ body {
   background: var(--bg-app);
 }
 
+/* Hide scrollbars entirely (scrolling still works). No reserved gutter, so
+   centered content fills the full width and stays left/right symmetric on
+   every view, scrolling or not. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 /* Accent themes (spec §4.7 AppSettings.accentColor) */
 [data-accent="blue"] { --accent: #007aff; --accent-soft: rgba(0, 122, 255, 0.1); }
 [data-accent="purple"] { --accent: #af52de; --accent-soft: rgba(175, 82, 222, 0.12); }
@@ -263,6 +276,13 @@ button:focus-visible {
   min-height: 100vh;
 }
 
+/* Global content density: shrink the whole content area (all views) a touch
+   for a tighter, cleaner look. Sidebar stays 100% so proportions read right.
+   Tune this single value (1 = off) to make everything larger/smaller. */
+.app-shell > main {
+  zoom: 0.9;
+}
+
 .mobile-menu-button,
 .mobile-menu-backdrop {
   display: none;
@@ -273,10 +293,10 @@ button:focus-visible {
   top: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   height: 100vh;
   overflow-y: auto;
-  padding: 20px 14px;
+  padding: 14px 10px;
   color: var(--color-on-dark);
   background: var(--color-surface-tile-1);
 }
@@ -314,9 +334,9 @@ button:focus-visible {
 }
 
 .global-search input {
-  height: 44px;
+  height: 36px;
   border-radius: var(--rounded-pill);
-  padding: 0 18px;
+  padding: 0 14px;
   color: var(--color-on-dark);
   border-color: rgba(255, 255, 255, 0.2);
   background: var(--color-ink);
@@ -368,8 +388,8 @@ button:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   flex: 0 0 auto;
   border-radius: var(--rounded-pill);
   color: var(--color-on-dark);
@@ -383,7 +403,7 @@ button:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   font-weight: 600;
 }
 
@@ -391,8 +411,8 @@ button:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex: 0 0 auto;
   border: 0;
   border-radius: var(--rounded-sm);
@@ -408,16 +428,16 @@ button:focus-visible {
 .side-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  min-height: 38px;
+  min-height: 32px;
   border: 0;
   border-radius: var(--rounded-sm);
-  padding: 0 10px;
+  padding: 0 8px;
   color: rgba(255, 255, 255, 0.82);
   background: transparent;
   text-align: left;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .side-item:hover {
@@ -450,7 +470,7 @@ button:focus-visible {
 .side-item-badge {
   flex: 0 0 auto;
   color: rgba(255, 255, 255, 0.55);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -471,10 +491,10 @@ button:focus-visible {
   align-items: center;
   gap: 4px;
   border: 0;
-  padding: 4px 6px;
+  padding: 3px 6px;
   color: rgba(255, 255, 255, 0.5);
   background: transparent;
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;

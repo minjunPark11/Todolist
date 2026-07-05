@@ -693,7 +693,8 @@ div.spc-signal-row {
 .foc-page {
   display: grid;
   gap: 22px;
-  padding: 28px;
+  /* No horizontal inset — align left/right margins with Calendar/Today. */
+  padding: 28px 0;
   min-height: 100vh;
   background: var(--bg-app);
 }
@@ -812,10 +813,33 @@ div.spc-signal-row {
 
 .foc-layout {
   display: grid;
-  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.2fr) minmax(300px, 0.9fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
+  grid-template-areas:
+    "timer summary"
+    "queue rail";
+  gap: 16px;
   align-items: start;
   padding-bottom: 110px;
+}
+
+.foc-timer { grid-area: timer; }
+.foc-queue { grid-area: queue; }
+.foc-summary { grid-area: summary; }
+.foc-insights { grid-area: rail; }
+
+/* Summary card is now a direct grid item (pulled out of .foc-insights so it
+   shares the top row with the timer and the middle divider lines up). */
+.foc-summary {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+/* Match the top-row card heights so the middle divider is a single clean line
+   across both columns (queue/rail already share the row-2 start line). */
+.foc-timer,
+.foc-summary {
+  align-self: stretch;
 }
 
 .foc-card {
@@ -861,7 +885,7 @@ div.spc-signal-row {
 .foc-card h2,
 .foc-card-head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   letter-spacing: 0;
 }
 
@@ -990,7 +1014,7 @@ div.spc-signal-row {
 .foc-green .foc-tag { color: #137a4b; background: #e7f8ee; }
 
 .foc-timer {
-  min-height: 620px;
+  min-height: 280px;
   justify-items: center;
   align-content: center;
   text-align: center;
@@ -1001,7 +1025,7 @@ div.spc-signal-row {
   justify-content: flex-start;
   color: var(--accent);
   font-weight: 750;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .foc-status span {
@@ -1024,15 +1048,15 @@ div.spc-signal-row {
 
 .foc-timer h2 {
   max-width: 100%;
-  margin: 12px 0 0;
-  font-size: 28px;
+  margin: 10px 0 0;
+  font-size: 22px;
   overflow-wrap: anywhere;
 }
 
 .foc-clock {
   margin-top: 10px;
   color: var(--text-primary);
-  font-size: clamp(56px, 7vw, 78px);
+  font-size: clamp(46px, 5.5vw, 62px);
   line-height: 1;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -1041,9 +1065,9 @@ div.spc-signal-row {
 
 .foc-note {
   width: 100%;
-  min-height: 86px;
+  min-height: 70px;
   border-radius: 14px;
-  font-size: 15px;
+  font-size: 13.5px;
 }
 
 .foc-controls {
@@ -1056,7 +1080,7 @@ div.spc-signal-row {
 .foc-empty button,
 .foc-modal button,
 .foc-global-actions button {
-  min-height: 46px;
+  min-height: 40px;
   border: 1px solid var(--accent-soft);
   border-radius: 12px;
   background: var(--bg-surface);
@@ -1081,7 +1105,7 @@ div.spc-signal-row {
   width: 100%;
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
-  padding: 14px;
+  padding: 12px;
   background: var(--bg-surface-muted);
 }
 
@@ -1335,10 +1359,11 @@ div.spc-signal-row {
 @media (max-width: 1240px) {
   .foc-layout {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: none;
   }
 
   .foc-timer {
-    min-height: 520px;
+    min-height: 320px;
   }
 }
 
