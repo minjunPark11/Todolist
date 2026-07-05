@@ -271,6 +271,14 @@ fn close_focus_mini_timer(app: tauri::AppHandle) {
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
+        // Must be registered first: a second launch (e.g. reopening from the
+        // shortcut while an instance lingers in the tray) would otherwise spawn
+        // a duplicate window whose WebView2 fails to init against the locked
+        // user-data dir, showing an empty black window. Instead, focus the
+        // existing window and let the second process exit.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            show_main_window(app);
+        }))
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())

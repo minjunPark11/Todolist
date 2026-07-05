@@ -39,24 +39,9 @@ export function CalendarRightTaskPanel({
   const { t } = useT();
   const [draggingTaskId, setDraggingTaskId] = useState("");
 
-  if (collapsed) {
-    return (
-      <aside className="gcal-taskpanel is-rail">
-        <button
-          type="button"
-          className="gcal-icon-btn"
-          aria-label={t("caltasks.expand")}
-          title={t("caltasks.expand")}
-          onClick={onToggleCollapsed}
-        >
-          «
-        </button>
-      </aside>
-    );
-  }
-
   // Only unblocked work that still needs a time slot: no start time yet,
   // and not finished/parked. Quadrant IV shows just the unsorted group.
+  // Computed before the collapsed branch so the rail can show the count.
   const candidates = tasks.filter(
     (task) =>
       !task.deletedAt &&
@@ -65,6 +50,30 @@ export function CalendarRightTaskPanel({
       task.status !== "waiting" &&
       !task.startTime,
   );
+
+  if (collapsed) {
+    return (
+      <aside className="gcal-taskpanel is-rail">
+        <button
+          type="button"
+          className="gcal-taskpanel-rail-btn"
+          aria-label={t("caltasks.expand")}
+          title={t("caltasks.expand")}
+          onClick={onToggleCollapsed}
+        >
+          <span className="gcal-taskpanel-rail-icon" aria-hidden="true">
+            ▦
+          </span>
+          {candidates.length > 0 ? (
+            <span className="gcal-taskpanel-rail-badge">{candidates.length}</span>
+          ) : null}
+          <span className="gcal-taskpanel-rail-caret" aria-hidden="true">
+            «
+          </span>
+        </button>
+      </aside>
+    );
+  }
 
   return (
     <aside className="gcal-taskpanel">

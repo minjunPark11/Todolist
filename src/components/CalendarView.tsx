@@ -115,7 +115,15 @@ export function CalendarView({
   const [mode, setMode] = useState<CalendarMode>("week");
   const [anchor, setAnchor] = useState(todayValue());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [taskPanelCollapsed, setTaskPanelCollapsed] = useState(false);
+  // Default collapsed; remembered across sessions (origin-scoped localStorage).
+  const [taskPanelCollapsed, setTaskPanelCollapsed] = useState(() => {
+    try {
+      const raw = localStorage.getItem("focusflow-caltasks-collapsed");
+      return raw === null ? true : raw === "1";
+    } catch {
+      return true;
+    }
+  });
   const [dragOverId, setDragOverId] = useState("");
   const [draggingTaskId, setDraggingTaskId] = useState("");
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
@@ -729,7 +737,17 @@ export function CalendarView({
             projects={projects}
             today={today}
             collapsed={taskPanelCollapsed}
-            onToggleCollapsed={() => setTaskPanelCollapsed((value) => !value)}
+            onToggleCollapsed={() =>
+              setTaskPanelCollapsed((value) => {
+                const next = !value;
+                try {
+                  localStorage.setItem("focusflow-caltasks-collapsed", next ? "1" : "0");
+                } catch {
+                  /* ignore storage failures */
+                }
+                return next;
+              })
+            }
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           />
