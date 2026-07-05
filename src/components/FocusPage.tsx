@@ -195,7 +195,6 @@ export function FocusPage({
               onClick={() => setOptionsOpen((open) => !open)}
             >
               <span aria-hidden="true">⚙</span>
-              <b>Focus 옵션</b>
             </button>
             {optionsOpen ? (
               <div className="foc-options-popover" role="dialog" aria-label="Focus options">
