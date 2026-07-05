@@ -507,6 +507,9 @@ export function usePlannerData() {
   const [syncError, setSyncError] = useState("");
   const [remoteLoaded, setRemoteLoaded] = useState(false);
   const [localMigrationData, setLocalMigrationData] = useState<PlannerData | null>(null);
+  // True after the user opens a password-reset link (Supabase PASSWORD_RECOVERY);
+  // the UI then shows a "set a new password" form instead of the normal app.
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const syncTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -530,8 +533,11 @@ export function usePlannerData() {
       setAuthLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       setUserEmail(session?.user.email ?? "");
+      if (event === "PASSWORD_RECOVERY") {
+        setRecoveryMode(true);
+      }
     });
 
     return () => {
@@ -606,7 +612,10 @@ export function usePlannerData() {
       for (const [key, table] of collectionTables) {
         const { data: rows, error } = await supabase.from(table).select("data");
         if (error) {
-          throw error;
+          // Name the table so a missing migration (e.g. study_topics) is
+          // obvious instead of a generic "could not load" message. Fail closed
+          // (don't mark remoteLoaded) so a partial read never overwrites remote.
+          throw new Error(`'${table}' 테이블 로드 실패: ${error.message}`);
         }
         partial[key] = (rows ?? []).map((row: { data: unknown }) => row.data) as never;
       }
@@ -617,7 +626,7 @@ export function usePlannerData() {
         .eq("id", "settings")
         .maybeSingle();
       if (settingsError) {
-        throw settingsError;
+        throw new Error(`'settings' 테이블 로드 실패: ${settingsError.message}`);
       }
 
       partial.settings = normalizeSettings(settingsRows?.data as Partial<PlannerSettings> | undefined);
@@ -626,8 +635,10 @@ export function usePlannerData() {
       setRemoteLoaded(true);
       setSyncStatus("Synced with Supabase");
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not load Supabase data.";
+      console.error("[Supabase] load failed:", error);
       setRemoteLoaded(false);
-      setSyncError(error instanceof Error ? error.message : "Could not load Supabase data.");
+      setSyncError(message);
       setSyncStatus("Supabase load failed. Local data is still available.");
     }
   }
@@ -729,6 +740,39 @@ export function usePlannerData() {
     setUserEmail("");
     setRemoteLoaded(false);
     setSyncStatus("Signed out. LocalStorage mode");
+  }
+
+  // Sends a password-reset email. The link brings the user back to the app with
+  // a recovery session (PASSWORD_RECOVERY event), where updatePassword finishes.
+  async function resetPassword(email: string) {
+    if (!supabase) {
+      setSyncError("Supabase environment variables are not configured.");
+      return false;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+    });
+    if (error) {
+      setSyncError(error.message);
+      return false;
+    }
+    setSyncError("");
+    return true;
+  }
+
+  async function updatePassword(newPassword: string) {
+    if (!supabase) {
+      setSyncError("Supabase environment variables are not configured.");
+      return false;
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setSyncError(error.message);
+      return false;
+    }
+    setSyncError("");
+    setRecoveryMode(false);
+    return true;
   }
 
   async function uploadLocalDataToSupabase() {
@@ -1640,6 +1684,7 @@ export function usePlannerData() {
       mode: userEmail && remoteLoaded ? "supabase" : "localStorage",
       syncStatus,
       syncError,
+      recoveryMode,
       migrationPreviewCount: localMigrationData ? countDataItems(localMigrationData) : 0,
     },
     addTask,
@@ -1695,6 +1740,8 @@ export function usePlannerData() {
     signIn,
     signUp,
     signOut,
+    resetPassword,
+    updatePassword,
     uploadLocalDataToSupabase,
     refreshSupabaseData: loadSupabaseData,
     selectTask: setSelectedTaskId,

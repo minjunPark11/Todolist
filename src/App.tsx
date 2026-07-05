@@ -767,6 +767,19 @@ export default function App() {
     planner.selectTask("");
   }
 
+  // A password-reset link opens the app with a recovery session — before any
+  // normal routing, let the user set a new password.
+  if (planner.auth.recoveryMode) {
+    return (
+      <I18nProvider lang={appSettings.language}>
+        <PasswordRecoveryGate
+          onUpdatePassword={planner.updatePassword}
+          onDone={() => navigate("/login", "replace")}
+        />
+      </I18nProvider>
+    );
+  }
+
   if (currentPath === "/login" && !planner.auth.isSignedIn) {
     return (
       <I18nProvider lang={appSettings.language}>
@@ -774,6 +787,7 @@ export default function App() {
           auth={planner.auth}
           onSignIn={planner.signIn}
           onSignUp={planner.signUp}
+          onResetPassword={planner.resetPassword}
           onAuthenticated={() => navigate("/app", "replace")}
         />
       </I18nProvider>
@@ -1017,11 +1031,13 @@ function AuthGate({
   auth,
   onSignIn,
   onSignUp,
+  onResetPassword,
   onAuthenticated,
 }: {
   auth: ReturnType<typeof usePlannerData>["auth"];
   onSignIn: (email: string, password: string) => Promise<boolean>;
   onSignUp: (email: string, password: string) => Promise<{ ok: boolean; needsEmailConfirmation: boolean }>;
+  onResetPassword: (email: string) => Promise<boolean>;
   onAuthenticated: () => void;
 }) {
   const { t } = useT();
@@ -1064,6 +1080,18 @@ function AuthGate({
       onAuthenticated();
     }
     setPassword("");
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      setMessage(t("auth.resetEnterEmail"));
+      return;
+    }
+    setSubmitting(true);
+    setMessage("");
+    const ok = await onResetPassword(email.trim());
+    setSubmitting(false);
+    setMessage(ok ? t("auth.resetEmailSent") : t("auth.resetFailed"));
   }
 
   return (
@@ -1123,7 +1151,7 @@ function AuthGate({
               />
               {t("auth.keepSignedIn")}
             </label>
-            <button type="button" className="auth-link" onClick={() => setMessage(t("auth.forgotPasswordMessage"))}>
+            <button type="button" className="auth-link" onClick={handleForgotPassword} disabled={submitting}>
               {t("auth.forgotPassword")}
             </button>
           </div>
@@ -1156,6 +1184,91 @@ function AuthGate({
           <p className={authError ? "auth-message error" : "auth-message"}>
             {authError || message}
           </p>
+        ) : null}
+      </section>
+    </main>
+  );
+}
+
+function PasswordRecoveryGate({
+  onUpdatePassword,
+  onDone,
+}: {
+  onUpdatePassword: (newPassword: string) => Promise<boolean>;
+  onDone: () => void;
+}) {
+  const { t } = useT();
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState(false);
+
+  const canSubmit = password.length >= 6 && !submitting;
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit) {
+      setError(true);
+      setMessage(t("auth.passwordTooShort"));
+      return;
+    }
+    setSubmitting(true);
+    setMessage("");
+    const ok = await onUpdatePassword(password);
+    setSubmitting(false);
+    setPassword("");
+    if (ok) {
+      setError(false);
+      setMessage(t("auth.passwordUpdated"));
+      onDone();
+    } else {
+      setError(true);
+      setMessage(t("auth.updatePasswordFailed"));
+    }
+  }
+
+  return (
+    <main className="auth-screen">
+      <section className="auth-card" aria-labelledby="recovery-title">
+        <div className="auth-brand">
+          <div className="auth-logo" aria-hidden="true">
+            <span />
+          </div>
+          <h1 id="recovery-title">{t("auth.newPasswordTitle")}</h1>
+          <p>{t("auth.newPasswordSubtitle")}</p>
+        </div>
+
+        <form className="auth-gate-form" onSubmit={submit}>
+          <label>
+            {t("auth.newPassword")}
+            <div className="auth-input-wrap">
+              <span aria-hidden="true">L</span>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder={t("auth.passwordPlaceholder")}
+                value={password}
+                autoComplete="new-password"
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <button
+                type="button"
+                className="auth-icon-button"
+                aria-label={showPassword ? t("auth.hide") : t("auth.show")}
+                onClick={() => setShowPassword((visible) => !visible)}
+              >
+                {showPassword ? t("auth.hide") : t("auth.show")}
+              </button>
+            </div>
+          </label>
+
+          <button type="submit" className="auth-submit" disabled={!canSubmit}>
+            {submitting ? t("auth.processing") : t("auth.updatePassword")}
+          </button>
+        </form>
+
+        {message ? (
+          <p className={error ? "auth-message error" : "auth-message"}>{message}</p>
         ) : null}
       </section>
     </main>
