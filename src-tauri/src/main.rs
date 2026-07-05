@@ -128,7 +128,19 @@ fn show_main_window(app: &tauri::AppHandle) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        return;
     }
+
+    let Ok(window) = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+        .title("FocusFlow")
+        .inner_size(1280.0, 820.0)
+        .min_inner_size(980.0, 680.0)
+        .build()
+    else {
+        return;
+    };
+    let _ = window.show();
+    let _ = window.set_focus();
 }
 
 fn show_mini_timer_window(app: &tauri::AppHandle) -> tauri::Result<()> {
@@ -338,13 +350,7 @@ fn main() {
                 let app = window.app_handle();
                 let state = app.state::<AppState>();
                 let force_quit = state.force_quit.lock().map(|value| *value).unwrap_or(false);
-                let has_focus = state
-                    .focus_snapshot
-                    .lock()
-                    .map(|snapshot| snapshot.as_ref().map(has_active_focus).unwrap_or(false))
-                    .unwrap_or(false);
-
-                if has_focus && !force_quit {
+                if !force_quit {
                     api.prevent_close();
                     let _ = window.hide();
                 }

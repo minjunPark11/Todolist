@@ -193,6 +193,8 @@ export const ko: Dictionary = {
   "settings.importJson": "JSON 가져오기",
   "settings.resetAllData": "전체 데이터 초기화",
   "settings.resetAllDataHint": "모든 할 일, 프로젝트, 노트를 영구적으로 삭제합니다. 되돌릴 수 없습니다.",
+  "settings.appInfo": "앱 정보",
+  "settings.appVersion": "앱 버전",
 
   // ---- Today page ----
   "today.title": "오늘",

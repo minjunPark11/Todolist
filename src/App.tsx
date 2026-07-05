@@ -90,6 +90,7 @@ export default function App() {
   const [focusSettings, setFocusSettings] = useState<FocusUserSettings>(() => loadFocusUserSettings());
   const [externalCalendarState, setExternalCalendarState] = useState<ExternalCalendarState>(() => loadExternalCalendarState());
   const [calendarShare, setCalendarShare] = useState<CalendarShareState>(emptyCalendarShareState);
+  const [appVersion, setAppVersion] = useState(__APP_VERSION__);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Desktop-only sidebar rail collapse; ignored by the mobile overlay menu.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -119,6 +120,18 @@ export default function App() {
     exportData: planner.exportData,
     importData: planner.importData,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    platform.getAppVersion().then((version) => {
+      if (!cancelled && version) {
+        setAppVersion(version);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -851,6 +864,7 @@ export default function App() {
         exportJson={exportJson}
         handleImport={handleImport}
         importMessage={importMessage}
+        appVersion={appVersion}
         requestResetAllData={requestResetAllData}
         focusSettings={focusSettings}
         onUpdateFocusSettings={updateFocusSettings}

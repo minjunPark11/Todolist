@@ -193,6 +193,8 @@ export const en: Dictionary = {
   "settings.importJson": "Import JSON",
   "settings.resetAllData": "Reset All Data",
   "settings.resetAllDataHint": "Permanently delete all tasks, projects, and notes. This cannot be undone.",
+  "settings.appInfo": "App Info",
+  "settings.appVersion": "App version",
 
   // ---- Today page ----
   "today.title": "Today",

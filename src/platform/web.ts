@@ -49,6 +49,10 @@ export const webPlatform: PlatformAdapter = {
     return window.fetch(input, init);
   },
 
+  async getAppVersion() {
+    return __APP_VERSION__;
+  },
+
   miniFocusTimer: {
     supported() {
       return supportsMiniFocusTimer();

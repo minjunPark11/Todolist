@@ -12,6 +12,7 @@ interface SettingsPageProps {
   onImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onReset: () => void;
   importMessage: string;
+  appVersion: string;
   accountSlot: ReactNode;
   tasks: Task[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
@@ -43,6 +44,7 @@ export function SettingsPage({
   onImport,
   onReset,
   importMessage,
+  appVersion,
   accountSlot,
   tasks,
   onUpdateTask,
@@ -387,6 +389,17 @@ export function SettingsPage({
             {importMessage ? <p className="ff-settings-msg">{importMessage}</p> : null}
           </div>
           {accountSlot}
+          <section className="settings-card account-card">
+            <div className="section-title">
+              <h2>{t("settings.appInfo")}</h2>
+              <span>FocusFlow</span>
+            </div>
+            <div className="account-stack">
+              <p>
+                {t("settings.appVersion")} <strong>{appVersion}</strong>
+              </p>
+            </div>
+          </section>
         </>
       ) : null}
     </div>

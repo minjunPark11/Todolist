@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import {
@@ -53,6 +54,10 @@ export const tauriPlatform: PlatformAdapter = {
 
   async aiFetch(input, init) {
     return tauriFetch(input, init);
+  },
+
+  async getAppVersion() {
+    return getVersion().catch(() => webPlatform.getAppVersion());
   },
 
   miniFocusTimer: {

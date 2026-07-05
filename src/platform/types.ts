@@ -20,6 +20,7 @@ export interface PlatformAdapter {
   notify(options: { title: string; body?: string }): Promise<boolean>;
   requestNotificationPermission(): Promise<void>;
   aiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  getAppVersion(): Promise<string>;
   miniFocusTimer: {
     supported(): boolean;
     open(snapshot: MiniFocusTimerSnapshot): Promise<boolean>;

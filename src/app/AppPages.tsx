@@ -47,6 +47,7 @@ type AppPagesProps = {
   exportJson: () => void;
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
   importMessage: string;
+  appVersion: string;
   requestResetAllData: () => void;
   focusSettings: FocusUserSettings;
   onUpdateFocusSettings: (patch: Partial<FocusUserSettings>) => void;
@@ -97,6 +98,7 @@ export function AppPages({
   exportJson,
   handleImport,
   importMessage,
+  appVersion,
   requestResetAllData,
   focusSettings,
   onUpdateFocusSettings,
@@ -303,20 +305,21 @@ export function AppPages({
       onImport={handleImport}
       onReset={requestResetAllData}
       importMessage={importMessage}
-        accountSlot={accountSlot}
-        tasks={planner.tasks}
-        onUpdateTask={planner.updateTask}
-        externalCalendars={externalCalendars}
-        onAddExternalCalendar={onAddExternalCalendar}
-        onUpdateExternalCalendar={onUpdateExternalCalendar}
-        onDeleteExternalCalendar={onDeleteExternalCalendar}
-        onSyncExternalCalendar={onSyncExternalCalendar}
-        onSyncAllExternalCalendars={onSyncAllExternalCalendars}
-        calendarShare={calendarShare}
-        onEnableCalendarShare={onEnableCalendarShare}
-        onDisableCalendarShare={onDisableCalendarShare}
-        onRegenerateCalendarShare={onRegenerateCalendarShare}
-        onPublishCalendarShare={onPublishCalendarShare}
-      />
+      appVersion={appVersion}
+      accountSlot={accountSlot}
+      tasks={planner.tasks}
+      onUpdateTask={planner.updateTask}
+      externalCalendars={externalCalendars}
+      onAddExternalCalendar={onAddExternalCalendar}
+      onUpdateExternalCalendar={onUpdateExternalCalendar}
+      onDeleteExternalCalendar={onDeleteExternalCalendar}
+      onSyncExternalCalendar={onSyncExternalCalendar}
+      onSyncAllExternalCalendars={onSyncAllExternalCalendars}
+      calendarShare={calendarShare}
+      onEnableCalendarShare={onEnableCalendarShare}
+      onDisableCalendarShare={onDisableCalendarShare}
+      onRegenerateCalendarShare={onRegenerateCalendarShare}
+      onPublishCalendarShare={onPublishCalendarShare}
+    />
   );
 }
