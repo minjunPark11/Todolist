@@ -870,8 +870,7 @@ export default function App() {
         accountSlot={
           <AccountSection
             auth={planner.auth}
-            onSignIn={planner.signIn}
-            onSignUp={planner.signUp}
+            onOpenLogin={() => navigate("/login")}
             onSignOut={planner.signOut}
             onUploadLocal={planner.uploadLocalDataToSupabase}
             onRefresh={planner.refreshSupabaseData}
@@ -1293,41 +1292,19 @@ function formatAuthError(error: string, t: (key: string) => string): string {
 
 function AccountSection({
   auth,
-  onSignIn,
-  onSignUp,
+  onOpenLogin,
   onSignOut,
   onUploadLocal,
   onRefresh,
 }: {
   auth: ReturnType<typeof usePlannerData>["auth"];
-  onSignIn: (email: string, password: string) => Promise<boolean>;
-  onSignUp: (email: string, password: string) => Promise<{ ok: boolean; needsEmailConfirmation: boolean }>;
+  onOpenLogin: () => void;
   onSignOut: () => Promise<void>;
   onUploadLocal: () => Promise<boolean>;
   onRefresh: () => Promise<void>;
 }) {
   const { t } = useT();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-
-  async function submit(action: "signIn" | "signUp") {
-    const result = action === "signIn"
-      ? { ok: await onSignIn(email, password), needsEmailConfirmation: false }
-      : await onSignUp(email, password);
-    setMessage(
-      result.ok
-        ? action === "signIn"
-          ? t("auth.signedIn")
-          : result.needsEmailConfirmation
-            ? t("auth.verificationSent")
-            : t("auth.accountCreated")
-        : t("auth.authFailed"),
-    );
-    if (result.ok) {
-      setPassword("");
-    }
-  }
 
   return (
     <section className="settings-card account-card">
@@ -1349,25 +1326,13 @@ function AccountSection({
           </div>
         </div>
       ) : (
-        <div className="auth-form">
-          <input
-            type="email"
-            placeholder={t("auth.email")}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <input
-            type="password"
-            placeholder={t("auth.password")}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <button onClick={() => submit("signIn")} disabled={!auth.isConfigured || auth.isLoading}>
-            {t("auth.logIn")}
-          </button>
-          <button onClick={() => submit("signUp")} disabled={!auth.isConfigured || auth.isLoading}>
-            {t("auth.signUp")}
-          </button>
+        <div className="account-stack">
+          <p className="empty-state">{t("auth.signInSubtitle")}</p>
+          <div className="settings-actions">
+            <button onClick={onOpenLogin} disabled={!auth.isConfigured || auth.isLoading}>
+              {t("auth.logIn")} / {t("auth.signUp")}
+            </button>
+          </div>
         </div>
       )}
       {auth.migrationPreviewCount > 0 && auth.isSignedIn ? (
