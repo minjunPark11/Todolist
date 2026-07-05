@@ -4673,7 +4673,8 @@ main {
 
 .today-board-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  /* Fluid: columns wrap 4→1 by available width; no breakpoints needed. */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   align-items: start;
 }
@@ -4688,7 +4689,7 @@ main {
 }
 
 .planning-columns {
-  grid-template-columns: repeat(4, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
 .task-row {
@@ -4742,7 +4743,7 @@ main {
 
 .study-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
 }
 
@@ -5053,22 +5054,14 @@ main {
   background: var(--bg-surface);
 }
 
-@media (max-width: 1200px) {
-  .today-board-grid,
-  .planning-columns,
-  .study-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
+/* Dashboard grids (.today-board-grid / .planning-columns / .study-metrics)
+   are fluid via auto-fit — the 1200px and 760px column breakpoints they used
+   to need are now handled intrinsically. */
 @media (max-width: 760px) {
   main {
     padding: 20px;
   }
 
-  .today-board-grid,
-  .planning-columns,
-  .study-metrics,
   .study-layout {
     grid-template-columns: 1fr;
   }
@@ -6336,7 +6329,7 @@ main {
 }
 
 /* ===== Study ===== */
-.ff-study-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.ff-study-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
 .ff-metric {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -6414,9 +6407,7 @@ main {
 .ff-field-value { font-size: 14px; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; }
 .ff-history { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-secondary); }
 
-@media (max-width: 1100px) {
-  .ff-study-metrics { grid-template-columns: repeat(2, 1fr); }
-}
+/* .ff-study-metrics is fluid via auto-fit — no column breakpoint needed. */
 
 /* ===== Archive ===== */
 .ff-archive-table {
@@ -7672,7 +7663,9 @@ main {
 
 .spc-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Fluid: cards wrap 4→1 by available width — replaces the 1220/900/640
+     column breakpoints this grid used to need. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 14px;
 }
 
@@ -8981,10 +8974,6 @@ div.spc-signal-row {
 }
 
 @media (max-width: 1220px) {
-  .spc-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .spc-brief {
     grid-template-columns: 54px minmax(0, 1fr);
   }
@@ -9001,7 +8990,6 @@ div.spc-signal-row {
 }
 
 @media (max-width: 900px) {
-  .spc-grid,
   .spc-detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -9023,7 +9011,6 @@ div.spc-signal-row {
     font-size: 30px;
   }
 
-  .spc-grid,
   .spc-detail-grid,
   .spc-type-grid {
     grid-template-columns: 1fr;
