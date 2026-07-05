@@ -274,6 +274,8 @@ fn main() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let menu = build_tray_menu(app.handle(), None)?;
             TrayIconBuilder::with_id(TRAY_ID)
