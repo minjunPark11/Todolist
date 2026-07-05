@@ -3032,7 +3032,7 @@ textarea {
 
 .gcal-year-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   column-gap: 56px;
   row-gap: 48px;
   padding: 16px 20px 28px;
@@ -3040,14 +3040,7 @@ textarea {
 
 @media (max-width: 1360px) {
   .gcal-year-grid {
-    grid-template-columns: repeat(3, minmax(200px, 1fr));
     column-gap: 40px;
-  }
-}
-
-@media (max-width: 1000px) {
-  .gcal-year-grid {
-    grid-template-columns: repeat(2, minmax(180px, 1fr));
   }
 }
 
@@ -5245,7 +5238,7 @@ main {
 /* Attention cards */
 .ff-attention-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px;
 }
 .ff-attention {
@@ -5866,7 +5859,6 @@ main {
 }
 
 @media (max-width: 900px) {
-  .ff-attention-grid { grid-template-columns: 1fr; }
   .ff-form-grid { grid-template-columns: 1fr; }
   .ff-page { padding: 20px 16px 64px; }
 }
@@ -8067,7 +8059,7 @@ div.spc-signal-row {
 
 .spc-detail-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
 }
 
@@ -8886,7 +8878,7 @@ div.spc-signal-row {
 
 .spc-type-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 
@@ -8990,10 +8982,6 @@ div.spc-signal-row {
 }
 
 @media (max-width: 900px) {
-  .spc-detail-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .spc-signal-row,
   div.spc-signal-row {
     grid-template-columns: 74px minmax(0, 1fr);
@@ -9009,11 +8997,6 @@ div.spc-signal-row {
   .spc-header h1,
   .spc-detail h1 {
     font-size: 30px;
-  }
-
-  .spc-detail-grid,
-  .spc-type-grid {
-    grid-template-columns: 1fr;
   }
 
   .spc-brief {
@@ -9232,7 +9215,7 @@ div.spc-signal-row {
 /* Overview metric cards (§8) */
 .sdv-metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
 }
 
@@ -10229,10 +10212,6 @@ div.spc-signal-row {
 
 /* Responsive (§34) */
 @media (max-width: 1200px) {
-  .sdv-metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .sdv-overview-top {
     grid-template-columns: 1fr;
   }
@@ -10243,7 +10222,6 @@ div.spc-signal-row {
 }
 
 @media (max-width: 720px) {
-  .sdv-metric-grid,
   .sdv-overview-bottom,
   .sdv-focus-grid {
     grid-template-columns: 1fr;
