@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { pushUndo } from "../lib/undoStack";
-import { sampleData } from "../data/sampleData";
 import { platform } from "../platform";
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 import type {
@@ -1613,11 +1612,6 @@ export function usePlannerData() {
     setSelectedTaskId("");
   }
 
-  function loadSamples() {
-    setData(normalizeData(sampleData));
-    setSelectedTaskId("");
-  }
-
   return {
     tasks: data.tasks,
     projects: data.projects,
@@ -1696,7 +1690,6 @@ export function usePlannerData() {
     cancelFocusSession,
     updateFocusSessionNote,
     resetData,
-    loadSamples,
     importData,
     exportData,
     signIn,

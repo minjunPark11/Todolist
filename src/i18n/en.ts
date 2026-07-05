@@ -183,9 +183,6 @@ export const en: Dictionary = {
   "settings.importData": "Import Data",
   "settings.importDataHint": "Restore previously exported data.",
   "settings.importJson": "Import JSON",
-  "settings.sampleData": "Sample Data",
-  "settings.sampleDataHint": "Load a demo dataset to explore the app.",
-  "settings.loadSamples": "Load Samples",
   "settings.resetAllData": "Reset All Data",
   "settings.resetAllDataHint": "Permanently delete all tasks, projects, and notes. This cannot be undone.",
 

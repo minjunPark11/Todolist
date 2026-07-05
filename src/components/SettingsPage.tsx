@@ -10,7 +10,6 @@ interface SettingsPageProps {
   onUpdate: (patch: Partial<AppSettings>) => void;
   onExport: () => void;
   onImport: (event: ChangeEvent<HTMLInputElement>) => void;
-  onLoadSamples: () => void;
   onReset: () => void;
   importMessage: string;
   accountSlot: ReactNode;
@@ -42,7 +41,6 @@ export function SettingsPage({
   onUpdate,
   onExport,
   onImport,
-  onLoadSamples,
   onReset,
   importMessage,
   accountSlot,
@@ -382,9 +380,6 @@ export function SettingsPage({
                 {t("settings.importJson")}
                 <input type="file" accept="application/json" onChange={onImport} hidden />
               </label>
-            </Row>
-            <Row title={t("settings.sampleData")} hint={t("settings.sampleDataHint")}>
-              <button type="button" className="ff-btn" onClick={onLoadSamples}>{t("settings.loadSamples")}</button>
             </Row>
             <Row title={t("settings.resetAllData")} hint={t("settings.resetAllDataHint")}>
               <button type="button" className="ff-btn ff-btn-danger" onClick={onReset}>{t("settings.resetAllData")}</button>

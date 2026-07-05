@@ -183,9 +183,6 @@ export const ko: Dictionary = {
   "settings.importData": "데이터 가져오기",
   "settings.importDataHint": "이전에 내보낸 데이터를 복원합니다.",
   "settings.importJson": "JSON 가져오기",
-  "settings.sampleData": "샘플 데이터",
-  "settings.sampleDataHint": "앱을 둘러볼 수 있는 데모 데이터를 불러옵니다.",
-  "settings.loadSamples": "샘플 불러오기",
   "settings.resetAllData": "전체 데이터 초기화",
   "settings.resetAllDataHint": "모든 할 일, 프로젝트, 노트를 영구적으로 삭제합니다. 되돌릴 수 없습니다.",
 

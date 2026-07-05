@@ -301,7 +301,6 @@ export function AppPages({
       onUpdate={planner.updateAppSettings}
       onExport={exportJson}
       onImport={handleImport}
-      onLoadSamples={planner.loadSamples}
       onReset={requestResetAllData}
       importMessage={importMessage}
         accountSlot={accountSlot}
