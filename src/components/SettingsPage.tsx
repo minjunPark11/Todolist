@@ -162,8 +162,15 @@ export function SettingsPage({
       {tab === "behavior" ? (
         <div className="ff-settings-card">
           <Row title={t("settings.defaultStartPage")} hint={t("settings.defaultStartPageHint")}>
-            <select value={settings.defaultView} onChange={(e) => onUpdate({ defaultView: e.target.value as "/today" | "/inbox" })}>
+            <select
+              value={settings.defaultView}
+              onChange={(e) => onUpdate({ defaultView: e.target.value as AppSettings["defaultView"] })}
+            >
               <option value="/today">{t("sidebar.today")}</option>
+              <option value="/calendar">{t("sidebar.calendar")}</option>
+              <option value="/planning">{t("sidebar.planning")}</option>
+              <option value="/projects">{t("sidebar.spaces")}</option>
+              <option value="/focus">{t("sidebar.focus")}</option>
               <option value="/inbox">{t("settings.defaultStartPageInboxOption")}</option>
             </select>
           </Row>
@@ -172,12 +179,6 @@ export function SettingsPage({
             hint={t("settings.showCompletedTasksHint")}
             value={settings.showCompletedInToday}
             onChange={(v) => onUpdate({ showCompletedInToday: v })}
-          />
-          <Toggle
-            label={t("settings.confirmBeforeDelete")}
-            hint={t("settings.confirmBeforeDeleteHint")}
-            value={settings.confirmBeforeDelete}
-            onChange={(v) => onUpdate({ confirmBeforeDelete: v })}
           />
           <Toggle
             label={t("settings.showSidebarCounts")}

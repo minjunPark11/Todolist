@@ -92,7 +92,22 @@ export default function App() {
   // use the useT() context hook — call the plain translate() helper instead.
   const t = (key: string, vars?: Record<string, string | number>) => translate(appSettings.language, key, vars);
   const dueReviewCount = getDueReviewCount(planner.conceptNotes);
-  const [activePage, setActivePage] = useState<PageId>("today");
+  // Open the user's chosen default start page on boot. /inbox opens Today with
+  // the triage drawer (handled by todayIntent below), so it maps to "today".
+  const [activePage, setActivePage] = useState<PageId>(() => {
+    switch (appSettings.defaultView) {
+      case "/calendar":
+        return "calendar";
+      case "/planning":
+        return "planning";
+      case "/projects":
+        return "projects";
+      case "/focus":
+        return "focus";
+      default:
+        return "today";
+    }
+  });
   // Inbox is folded into Today's triage drawer (no standalone page). This
   // covers the legacy /inbox route, a ?triage=inbox deep link, and the
   // "default start page" setting all landing on the same Today intent.

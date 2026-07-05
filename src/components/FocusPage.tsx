@@ -183,6 +183,23 @@ export function FocusPage({
 
   const deleteSession = focusSessions.find((session) => session.id === deleteSessionId) ?? null;
 
+  // Confirm the delete dialog with Enter, dismiss with Escape.
+  useEffect(() => {
+    if (!deleteSession) return;
+    const sessionId = deleteSession.id;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        onDeleteFocusSession(sessionId);
+        setDeleteSessionId("");
+      } else if (event.key === "Escape") {
+        setDeleteSessionId("");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [deleteSession, onDeleteFocusSession]);
+
   return (
     <div className="foc-page">
       <header className="foc-header">
@@ -227,7 +244,7 @@ export function FocusPage({
         </div>
       </header>
 
-      <main className="foc-layout">
+      <div className="foc-layout">
         <section className="foc-card foc-queue">
           <header className="foc-card-head">
             <h2>{t("focus.queueTitle")}</h2>
@@ -377,7 +394,7 @@ export function FocusPage({
             </div>
           </section>
         </aside>
-      </main>
+      </div>
 
       {finishTaskId ? (
         <div className="foc-modal-backdrop" role="presentation">

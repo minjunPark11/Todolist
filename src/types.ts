@@ -269,7 +269,7 @@ export interface AppSettings {
   accentColor: AccentColor;
   fontSize: FontSize;
   language: Language;
-  defaultView: "/today" | "/inbox";
+  defaultView: "/today" | "/inbox" | "/calendar" | "/planning" | "/projects" | "/focus";
   showCompletedInToday: boolean;
   confirmBeforeDelete: boolean;
   showSidebarCounts: boolean;

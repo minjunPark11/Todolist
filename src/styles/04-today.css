@@ -311,6 +311,12 @@
 .tdy-bucket-dot-next { background: var(--warning); }
 .tdy-bucket-dot-later { background: var(--accent); }
 
+/* Eisenhower quadrants (Plan Today preview), matching the Planning matrix. */
+.tdy-bucket-dot-qI { background: var(--danger); }
+.tdy-bucket-dot-qII { background: var(--accent); }
+.tdy-bucket-dot-qIII { background: var(--warning); }
+.tdy-bucket-dot-qIV { background: var(--text-tertiary); }
+
 .tdy-bucket-count {
   min-width: 22px;
   height: 20px;
@@ -778,6 +784,11 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+/* Eisenhower preview uses four quadrant columns. */
+.tdy-plan-groups-eis {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .tdy-plan-group ul {

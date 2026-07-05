@@ -479,6 +479,7 @@ export const en: Dictionary = {
   "todayv.titleRequired": "Task title is required.",
   "todayv.planPreviewTitle": "Today Plan Preview",
   "todayv.planSummary": "Suggested: {{now}} task(s) now, {{next}} up next, {{later}} for later.",
+  "todayv.planSummaryEis": "Suggested: {{q1}} important & urgent, {{q2}} important, {{q3}} urgent, {{q4}} other.",
   "todayv.planGroupEmpty": "No tasks proposed here.",
   "todayv.planReasoning": "Reasoning",
   "todayv.planReasonOverdue": "Overdue tasks go to Now so they get cleared first.",

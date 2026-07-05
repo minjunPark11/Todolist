@@ -412,7 +412,11 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
     accentColor: oneOf(settings?.accentColor, accentColors, DEFAULT_APP_SETTINGS.accentColor),
     fontSize: oneOf(settings?.fontSize, fontSizes, DEFAULT_APP_SETTINGS.fontSize),
     language: oneOf(settings?.language, languages, DEFAULT_APP_SETTINGS.language),
-    defaultView: settings?.defaultView === "/inbox" ? "/inbox" : "/today",
+    defaultView: oneOf(
+      settings?.defaultView,
+      ["/today", "/inbox", "/calendar", "/planning", "/projects", "/focus"] as const,
+      DEFAULT_APP_SETTINGS.defaultView,
+    ),
     showCompletedInToday: settings?.showCompletedInToday ?? DEFAULT_APP_SETTINGS.showCompletedInToday,
     confirmBeforeDelete: settings?.confirmBeforeDelete ?? DEFAULT_APP_SETTINGS.confirmBeforeDelete,
     showSidebarCounts: settings?.showSidebarCounts ?? DEFAULT_APP_SETTINGS.showSidebarCounts,

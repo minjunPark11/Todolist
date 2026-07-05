@@ -479,6 +479,7 @@ export const ko: Dictionary = {
   "todayv.titleRequired": "할 일 제목을 입력해주세요.",
   "todayv.planPreviewTitle": "오늘 계획 미리보기",
   "todayv.planSummary": "제안: 지금 {{now}}개, 다음 {{next}}개, 나중에 {{later}}개.",
+  "todayv.planSummaryEis": "제안: 중요·긴급 {{q1}}개, 중요 {{q2}}개, 긴급 {{q3}}개, 그 외 {{q4}}개.",
   "todayv.planGroupEmpty": "제안된 할 일이 없습니다.",
   "todayv.planReasoning": "배치 이유",
   "todayv.planReasonOverdue": "기한 초과 할 일은 먼저 처리하도록 '지금'에 배치했습니다.",

@@ -1,6 +1,6 @@
 import { AnimatePresence } from "framer-motion";
 import type { Project } from "../../types";
-import { formatMinuteOfDay, parseTimeToMinutes, type TodayEntry } from "../../utils/todayView";
+import type { TodayEntry } from "../../utils/todayView";
 import { useT } from "../../i18n";
 import { MotionTaskRow } from "../motion/MotionTaskRow";
 
@@ -92,19 +92,10 @@ function FocusQueueRow({
   projects: Project[];
   onToggleDone: (taskId: string) => void;
 }) {
-  const { t, lang } = useT();
+  const { t } = useT();
   const { task, completed } = entry;
   const project = projects.find((candidate) => candidate.id === task.projectId);
   const pill = hexToSoft(project?.color);
-
-  const startMin = task.startTime ? parseTimeToMinutes(task.startTime) : undefined;
-  const endMin = task.endTime ? parseTimeToMinutes(task.endTime) : undefined;
-  const timeLabel =
-    startMin !== undefined
-      ? endMin !== undefined && endMin > startMin
-        ? `${formatMinuteOfDay(startMin, lang)} – ${formatMinuteOfDay(endMin, lang)}`
-        : formatMinuteOfDay(startMin, lang)
-      : "";
 
   // MotionTaskRow animates inline opacity, so the `.is-done` dim must stay on
   // the inner row element rather than the motion wrapper.
@@ -120,7 +111,6 @@ function FocusQueueRow({
           {completed ? "✓" : ""}
         </button>
         <span className="tdy-row-title">{task.title}</span>
-        {timeLabel ? <span className="tdy-row-time">{timeLabel}</span> : null}
         {project ? (
           <span
             className="tdy-space-pill"

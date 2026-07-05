@@ -6,8 +6,10 @@
   max-width: none;
   margin: 0 auto;
   /* No horizontal inset — left/right margins align with the Calendar view.
-     (Narrow screens re-add side padding via the @media 900 rule below.) */
-  padding: 32px 0 80px;
+     (Narrow screens re-add side padding via the @media 900 rule below.)
+     No top inset either, so the page title lines up with Today/Spaces/Calendar
+     (which sit flush against main's top padding) instead of dropping ~30px. */
+  padding: 0 0 80px;
   display: flex;
   flex-direction: column;
   gap: 28px;

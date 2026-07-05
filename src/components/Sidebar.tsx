@@ -218,6 +218,7 @@ export function Sidebar({
         <motion.span
           className="brand-mark"
           layout={motionEnabled ? "position" : false}
+          layoutDependency={railed}
           transition={motionEnabled ? transitions.soft : reducedTransition}
         >
           F
@@ -226,6 +227,7 @@ export function Sidebar({
           {!railed ? (
             <motion.strong
               layout={motionEnabled ? "position" : false}
+              layoutDependency={railed}
               initial={motionEnabled ? { opacity: 0 } : false}
               animate={motionEnabled ? { opacity: 1 } : undefined}
               exit={motionEnabled ? { opacity: 0 } : undefined}
@@ -242,6 +244,7 @@ export function Sidebar({
           title={collapseLabel}
           onClick={onToggleCollapse}
           layout={motionEnabled ? "position" : false}
+          layoutDependency={railed}
           transition={motionEnabled ? transitions.soft : reducedTransition}
         >
           <svg

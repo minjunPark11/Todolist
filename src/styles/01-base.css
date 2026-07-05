@@ -281,11 +281,35 @@ button:focus-visible {
    Tune this single value (1 = off) to make everything larger/smaller. */
 .app-shell > main {
   zoom: 0.9;
+  /* Every view fills at least the viewport so short pages (Archive, Calendar,
+     Settings) don't collapse to their content height — this keeps the content
+     region the same height across pages instead of jumping on navigation.
+     The sidebar is position:fixed, so it can't stretch the grid row; main must
+     force its own height. Divide by the zoom above so the rendered height lands
+     on exactly 100vh (keep this in sync with the zoom value). */
+  min-height: calc(100vh / 0.9);
 }
 
 .mobile-menu-button,
 .mobile-menu-backdrop {
   display: none;
+}
+
+/* App chrome (nav sidebar + calendar) is click/drag UI, not prose — dragging
+   across it shouldn't leave a text-selection highlight. Real inputs stay
+   selectable/editable so typing and editing are unaffected. */
+.sidebar,
+.gcal-shell {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sidebar input,
+.gcal-shell input,
+.gcal-shell textarea,
+.gcal-shell [contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .sidebar {

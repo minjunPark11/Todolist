@@ -692,9 +692,11 @@ div.spc-signal-row {
 
 .foc-page {
   display: grid;
-  gap: 22px;
-  /* No horizontal inset — align left/right margins with Calendar/Today. */
-  padding: 28px 0;
+  gap: 18px;
+  /* No horizontal inset — align left/right margins with Calendar/Today.
+     No top inset so the "Focus" title lines up with the other pages' titles
+     (flush against main's top padding) instead of dropping ~28px. */
+  padding: 0 0 28px;
   min-height: 100vh;
   background: var(--bg-app);
 }
