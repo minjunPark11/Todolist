@@ -182,7 +182,8 @@ export function Sidebar({
     { id: "settings", label: t("sidebar.settings"), icon: "settings", count: 0 },
   ];
 
-  const initial = (userEmail || "Junghoon").charAt(0).toUpperCase();
+  const signedInUserEmail = userEmail.trim();
+  const initial = signedInUserEmail.charAt(0).toUpperCase();
 
   const renderNavItem = (item: { id: PageId; label: string; icon: IconName; count: number }) => (
     <button
@@ -216,12 +217,12 @@ export function Sidebar({
         {/* layout (FLIP) tweens the row→column rearrangement of the rail
             header instead of letting the logo and button teleport. */}
         <motion.span
-          className="brand-mark"
+          className="brand-mark brand-mark-image"
           layout={motionEnabled ? "position" : false}
           layoutDependency={railed}
           transition={motionEnabled ? transitions.soft : reducedTransition}
         >
-          F
+          <img className="brand-mark-img" src="/icon_focustodo.png" alt="" aria-hidden="true" />
         </motion.span>
         <AnimatePresence initial={false}>
           {!railed ? (
@@ -264,13 +265,12 @@ export function Sidebar({
         </motion.button>
       </div>
 
-      <div className="side-profile">
-        <span className="side-avatar">{initial}</span>
-        <span className="side-name">{userEmail || "Junghoon"}</span>
-        <button className="side-icon-btn" aria-label={t("sidebar.settingsAria")} onClick={onOpenSettings}>
-          <Icon name="gear" />
-        </button>
-      </div>
+      {signedInUserEmail ? (
+        <div className="side-profile">
+          <span className="side-avatar">{initial}</span>
+          <span className="side-name">{signedInUserEmail}</span>
+        </div>
+      ) : null}
 
       <div className="global-search">{search}</div>
 

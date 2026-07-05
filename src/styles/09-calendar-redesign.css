@@ -414,6 +414,23 @@
   box-shadow: var(--shadow-accent);
 }
 
+.brand-mark.brand-mark-image {
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+
+.brand-mark-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
 .side-avatar {
   background: linear-gradient(135deg, #a78bfa, #3b82f6);
   color: #fff;
