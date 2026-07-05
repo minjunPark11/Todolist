@@ -2,7 +2,6 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { MiniFocusTimerWindow } from "./components/MiniFocusTimerWindow";
-import { UpdateChecker } from "./components/UpdateChecker";
 import "./styles.css";
 
 // The desktop mini-timer window is flagged by an initialization script
@@ -21,10 +20,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     {isMiniFocusTimerWindow ? (
       <MiniFocusTimerWindow />
     ) : (
-      <>
-        <App />
-        <UpdateChecker />
-      </>
+      <App />
     )}
   </React.StrictMode>,
 );

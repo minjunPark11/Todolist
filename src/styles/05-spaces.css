@@ -1180,19 +1180,37 @@ div.spc-signal-row {
   display: grid;
 }
 
-.foc-recent button {
+.foc-recent-session {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 54px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.foc-recent-main {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   min-height: 54px;
   border: 0;
-  border-top: 1px solid var(--border-subtle);
   background: transparent;
   text-align: left;
 }
 
-.foc-recent span {
+.foc-recent-delete {
+  min-height: 34px;
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  font-weight: 700;
+}
+
+.foc-recent-main span {
   display: grid;
   place-items: center;
   width: 28px;
@@ -1594,4 +1612,3 @@ div.spc-signal-row {
     border-radius: 20px 20px 0 0;
   }
 }
-

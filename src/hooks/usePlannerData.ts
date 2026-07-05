@@ -5,6 +5,7 @@ import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 import type {
   AppSettings,
   ConceptNote,
+  ExternalCalendar,
   FocusMode,
   FocusSegment,
   FocusSession,
@@ -329,8 +330,31 @@ function normalizeSettings(settings?: Partial<PlannerSettings>): PlannerSettings
   return {
     id: "settings",
     theme: settings?.theme === "light" || settings?.theme === "dark" ? settings.theme : "system",
+    externalCalendars: Array.isArray(settings?.externalCalendars)
+      ? settings.externalCalendars.map(normalizeExternalCalendar).filter((calendar): calendar is ExternalCalendar => Boolean(calendar))
+      : [],
     createdAt: settings?.createdAt ?? now,
     updatedAt: settings?.updatedAt ?? now,
+  };
+}
+
+function normalizeExternalCalendar(calendar: Partial<ExternalCalendar>): ExternalCalendar | null {
+  if (!calendar.id || !calendar.name || !calendar.icsUrl) return null;
+  const now = new Date().toISOString();
+  return {
+    id: String(calendar.id),
+    name: String(calendar.name),
+    icsUrl: String(calendar.icsUrl),
+    color: calendar.color || "#4f73ff",
+    visible: calendar.visible !== false,
+    enabled: calendar.enabled !== false,
+    syncStatus: calendar.syncStatus ?? "idle",
+    lastSyncedAt: calendar.lastSyncedAt,
+    lastAttemptedAt: calendar.lastAttemptedAt,
+    lastError: calendar.lastError,
+    eventCount: calendar.eventCount ?? 0,
+    createdAt: calendar.createdAt || now,
+    updatedAt: calendar.updatedAt || now,
   };
 }
 
@@ -638,7 +662,7 @@ export function usePlannerData() {
           }
           // Required tables should still fail loudly with the table name so a
           // broken base Supabase setup is obvious.
-          throw new Error(`'${table}' 테이블 로드 실패: ${error.message}`);
+          throw new Error(`Failed to load '${table}' table: ${error.message}`);
         }
         partial[key] = (rows ?? []).map((row: { data: unknown }) => row.data) as never;
       }
@@ -649,7 +673,7 @@ export function usePlannerData() {
         .eq("id", "settings")
         .maybeSingle();
       if (settingsError) {
-        throw new Error(`'settings' 테이블 로드 실패: ${settingsError.message}`);
+        throw new Error(`Failed to load 'settings' table: ${settingsError.message}`);
       }
 
       partial.settings = normalizeSettings(settingsRows?.data as Partial<PlannerSettings> | undefined);
@@ -1427,6 +1451,30 @@ export function usePlannerData() {
     });
   }
 
+  function deleteFocusSession(sessionId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const session = current.focusSessions.find((item) => item.id === sessionId);
+      if (!session) return current;
+
+      return {
+        ...current,
+        activeSessionId: current.activeSessionId === sessionId ? "" : current.activeSessionId,
+        focusSessions: current.focusSessions.filter((item) => item.id !== sessionId),
+        tasks: current.tasks.map((task) =>
+          task.id === session.taskId
+            ? {
+                ...task,
+                actualSeconds: Math.max(0, task.actualSeconds - session.accumulatedSeconds),
+                activeSessionId: task.activeSessionId === sessionId ? "" : task.activeSessionId,
+                updatedAt: now,
+              }
+            : task,
+        ),
+      };
+    });
+  }
+
   function updateFocusSessionNote(sessionId: string, focusNote: string) {
     const now = new Date().toISOString();
     setData((current) => ({
@@ -1661,6 +1709,18 @@ export function usePlannerData() {
     setData((current) => ({ ...current, appSettings: { ...current.appSettings, ...patch } }));
   }
 
+  function updatePlannerSettings(patch: Partial<PlannerSettings>) {
+    const now = new Date().toISOString();
+    setDataState((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        ...patch,
+        updatedAt: now,
+      },
+    }));
+  }
+
   function pushRecentItem(item: Omit<RecentItem, "id" | "openedAt">) {
     setData((current) => {
       const filtered = current.recentItems.filter(
@@ -1758,6 +1818,7 @@ export function usePlannerData() {
     scheduleReview,
     markNoteReviewed,
     updateAppSettings,
+    updatePlannerSettings,
     pushRecentItem,
     saveTaskAsTemplate,
     addHabit,
@@ -1768,6 +1829,7 @@ export function usePlannerData() {
     resumeFocusSession,
     stopFocusSession,
     cancelFocusSession,
+    deleteFocusSession,
     updateFocusSessionNote,
     resetData,
     importData,

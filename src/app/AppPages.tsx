@@ -248,6 +248,7 @@ export function AppPages({
         onPauseFocus={planner.pauseFocusSession}
         onResumeFocus={planner.resumeFocusSession}
         onStopFocus={onStopFocus}
+        onDeleteFocusSession={planner.deleteFocusSession}
         onUpdateFocusNote={planner.updateFocusSessionNote}
         onCompleteTask={planner.completeTask}
         onOpenTask={planner.selectTask}

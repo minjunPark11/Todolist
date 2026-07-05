@@ -4,6 +4,7 @@ import { Sidebar } from "./components/Sidebar";
 import { OllamaChat } from "./components/OllamaChat";
 import { TaskDetail } from "./components/TaskDetail";
 import { GlobalFocusBar } from "./components/GlobalFocusBar";
+import { UpdateChecker } from "./components/UpdateChecker";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
@@ -50,6 +51,39 @@ import type {
 import { todayValue } from "./utils/date";
 import { getDueReviewCount } from "./utils/planner";
 import { I18nProvider, translate, useT } from "./i18n";
+
+function cloudExternalCalendarSnapshot(calendar: ExternalCalendar): ExternalCalendar {
+  return {
+    id: calendar.id,
+    name: calendar.name,
+    icsUrl: calendar.icsUrl,
+    color: calendar.color,
+    visible: calendar.visible,
+    enabled: calendar.enabled,
+    createdAt: calendar.createdAt,
+    updatedAt: calendar.updatedAt,
+  };
+}
+
+function comparableExternalCalendars(calendars: ExternalCalendar[]) {
+  return calendars
+    .map(cloudExternalCalendarSnapshot)
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function externalCalendarListsEqual(a: ExternalCalendar[], b: ExternalCalendar[]) {
+  return JSON.stringify(comparableExternalCalendars(a)) === JSON.stringify(comparableExternalCalendars(b));
+}
+
+function mergeExternalCalendars(local: ExternalCalendar[], remote: ExternalCalendar[]) {
+  const localById = new Map(local.map((calendar) => [calendar.id, calendar]));
+  const mergedRemote = remote.map((calendar) => {
+    const existing = localById.get(calendar.id);
+    localById.delete(calendar.id);
+    return existing ? { ...existing, ...cloudExternalCalendarSnapshot(calendar) } : calendar;
+  });
+  return [...mergedRemote, ...Array.from(localById.values())];
+}
 
 export default function App() {
   const planner = usePlannerData();
@@ -107,6 +141,7 @@ export default function App() {
   const completedNotificationRef = useRef<Set<string>>(new Set());
   const syncingExternalCalendarsRef = useRef<Set<string>>(new Set());
   const initialExternalCalendarSyncRef = useRef(false);
+  const externalCalendarCloudHydratedRef = useRef(false);
   const sharePublishTimerRef = useRef<number | null>(null);
 
   const today = todayValue();
@@ -358,6 +393,33 @@ export default function App() {
   }, [externalCalendarState.calendars]);
 
   useEffect(() => {
+    const remoteCalendars = planner.settings.externalCalendars ?? [];
+    externalCalendarCloudHydratedRef.current = true;
+    if (!remoteCalendars.length) return;
+
+    setExternalCalendarState((current) => {
+      const calendars = mergeExternalCalendars(current.calendars, remoteCalendars);
+      if (externalCalendarListsEqual(current.calendars, calendars)) return current;
+      const next = {
+        calendars,
+        events: current.events.filter((event) => calendars.some((calendar) => calendar.id === event.externalCalendarId)),
+      };
+      saveExternalCalendarState(next);
+      return next;
+    });
+  }, [planner.settings.externalCalendars]);
+
+  useEffect(() => {
+    if (!planner.auth.isSignedIn || !externalCalendarCloudHydratedRef.current) return;
+    const remoteCalendars = planner.settings.externalCalendars ?? [];
+    if (!externalCalendarState.calendars.length && remoteCalendars.length) return;
+    if (externalCalendarListsEqual(externalCalendarState.calendars, remoteCalendars)) return;
+    planner.updatePlannerSettings({
+      externalCalendars: comparableExternalCalendars(externalCalendarState.calendars),
+    });
+  }, [externalCalendarState.calendars, planner.auth.isSignedIn, planner.settings.externalCalendars]);
+
+  useEffect(() => {
     let cancelled = false;
     setCalendarShare((current) => ({ ...current, status: current.status === "unavailable" ? "unavailable" : "loading", error: "" }));
     loadCalendarShare()
@@ -369,7 +431,7 @@ export default function App() {
           setCalendarShare((current) => ({
             ...current,
             status: "error",
-            error: error instanceof Error ? error.message : "공유 링크를 불러오지 못했습니다.",
+            error: error instanceof Error ? error.message : t("app.calendarShareLoadFailed"),
           }));
         }
       });
@@ -430,8 +492,11 @@ export default function App() {
     completedNotificationRef.current.add(sessionId);
     if (!focusSettings.enableCompletionNotification) return;
 
-    const title = "Focus 완료";
-    const body = `${formatFocusDuration(getDisplayedFocusSeconds(session), true)} 동안 ${task?.title || session.title || "작업"}에 집중했어요.`;
+    const title = t("focus.notificationTitle");
+    const body = t("focus.notificationBody", {
+      time: formatFocusDuration(getDisplayedFocusSeconds(session), true),
+      title: task?.title || session.title || t("focus.notificationTaskFallback"),
+    });
     void platform.notify({ title, body }).then((sent) => {
       if (!sent) showToast({ message: `${title}: ${body}` });
     });
@@ -573,12 +638,12 @@ export default function App() {
         snapshot: buildCurrentShareSnapshot(),
       });
       setCalendarShare(next);
-      if (!options?.silent) showToast({ message: "구독 링크가 업데이트되었습니다." });
+      if (!options?.silent) showToast({ message: t("app.calendarShareUpdated") });
     } catch (error) {
       setCalendarShare((current) => ({
         ...current,
         status: "error",
-        error: error instanceof Error ? error.message : "구독 링크를 업데이트하지 못했습니다.",
+        error: error instanceof Error ? error.message : t("app.calendarShareUpdateFailed"),
       }));
     }
   }
@@ -593,12 +658,12 @@ export default function App() {
     try {
       const next = await disableCalendarShare(calendarShare.token);
       setCalendarShare(next);
-      showToast({ message: "구독 링크가 비활성화되었습니다." });
+      showToast({ message: t("app.calendarShareDisabled") });
     } catch (error) {
       setCalendarShare((current) => ({
         ...current,
         status: "error",
-        error: error instanceof Error ? error.message : "구독 링크를 끄지 못했습니다.",
+        error: error instanceof Error ? error.message : t("app.calendarShareDisableFailed"),
       }));
     }
   }
@@ -910,19 +975,20 @@ export default function App() {
 
   return (
     <I18nProvider lang={appSettings.language}>
-    <div
-      className={[
-        "app-shell",
-        mobileMenuOpen ? "mobile-menu-open" : "",
-        sidebarCollapsed ? "sidebar-collapsed" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
+      <>
+        <div
+          className={[
+            "app-shell",
+            mobileMenuOpen ? "mobile-menu-open" : "",
+            sidebarCollapsed ? "sidebar-collapsed" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
       <button
         type="button"
         className="mobile-menu-button"
-        aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+        aria-label={mobileMenuOpen ? t("app.closeMenu") : t("app.openMenu")}
         aria-expanded={mobileMenuOpen}
         onClick={() => setMobileMenuOpen((open) => !open)}
       >
@@ -934,7 +1000,7 @@ export default function App() {
         <button
           type="button"
           className="mobile-menu-backdrop"
-          aria-label="Close menu"
+          aria-label={t("app.closeMenu")}
           onClick={() => setMobileMenuOpen(false)}
         />
       ) : null}
@@ -1048,7 +1114,9 @@ export default function App() {
         onConfirmResetAllData={confirmResetAllData}
         onDismissToast={() => setToast(null)}
       />
-    </div>
+        </div>
+        <UpdateChecker />
+      </>
     </I18nProvider>
   );
 }

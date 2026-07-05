@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { isTauriRuntime } from "../platform/tauri";
+import { useT } from "../i18n";
 
 type UpdateState =
   | { phase: "idle" }
@@ -14,6 +15,7 @@ type UpdateState =
  * then the app relaunches into the new version. Web builds render nothing.
  */
 export function UpdateChecker() {
+  const { t } = useT();
   const [state, setState] = useState<UpdateState>({ phase: "idle" });
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export function UpdateChecker() {
           } catch (err) {
             setState({
               phase: "error",
-              message: err instanceof Error ? err.message : "업데이트 설치에 실패했어요.",
+              message: err instanceof Error ? err.message : t("update.installFailed"),
             });
           }
         };
@@ -75,14 +77,14 @@ export function UpdateChecker() {
       {state.phase === "available" && (
         <>
           <span style={textStyle}>
-            새 버전 <strong>{state.version}</strong>이 있어요.
+            {t("update.availablePrefix")} <strong>{state.version}</strong>{t("update.availableSuffix")}
           </span>
           <div style={actionsStyle}>
             <button style={primaryBtn} onClick={() => void state.install()}>
-              지금 업데이트
+              {t("update.installNow")}
             </button>
             <button style={ghostBtn} onClick={() => setState({ phase: "idle" })}>
-              나중에
+              {t("update.later")}
             </button>
           </div>
         </>
@@ -90,19 +92,19 @@ export function UpdateChecker() {
 
       {state.phase === "downloading" && (
         <span style={textStyle}>
-          업데이트 다운로드 중… {state.percent}%
+          {t("update.downloading", { percent: state.percent })}
         </span>
       )}
 
       {state.phase === "ready" && (
-        <span style={textStyle}>설치 완료. 앱을 재시작합니다…</span>
+        <span style={textStyle}>{t("update.ready")}</span>
       )}
 
       {state.phase === "error" && (
         <>
-          <span style={textStyle}>업데이트 실패: {state.message}</span>
+          <span style={textStyle}>{t("update.failed", { message: state.message })}</span>
           <button style={ghostBtn} onClick={() => setState({ phase: "idle" })}>
-            닫기
+            {t("common.close")}
           </button>
         </>
       )}

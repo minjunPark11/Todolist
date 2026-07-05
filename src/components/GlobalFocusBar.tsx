@@ -6,6 +6,7 @@ import { reducedTransition, transitions } from "../motion/transitions";
 import { toastVariants } from "../motion/variants";
 import { useMotionEnabled } from "../motion/reducedMotion";
 import { platform } from "../platform";
+import { useT } from "../i18n";
 
 interface GlobalFocusBarProps {
   session: FocusSession | null;
@@ -38,6 +39,7 @@ function FocusBarContent({
   const elapsed = getDisplayedFocusSeconds(session, now);
   const motionEnabled = useMotionEnabled();
   const canOpenMiniTimer = settings.showMiniTimerButton && platform.miniFocusTimer.supported();
+  const { t } = useT();
 
   function openMiniTimer() {
     void platform.miniFocusTimer.open({
@@ -51,7 +53,7 @@ function FocusBarContent({
   return (
     <motion.aside
       className="foc-global-bar"
-      aria-label={`Current focus session: ${task.title}, ${formatFocusDuration(elapsed, true)} elapsed`}
+      aria-label={t("focus.globalAria", { title: task.title, time: formatFocusDuration(elapsed, true) })}
       variants={motionEnabled ? toastVariants : undefined}
       initial={motionEnabled ? "initial" : false}
       animate={motionEnabled ? "animate" : undefined}
@@ -60,26 +62,26 @@ function FocusBarContent({
     >
       <button type="button" className="foc-global-main" onClick={onOpenFocus}>
         <span className={session.status === "paused" ? "is-paused" : ""}>{session.status === "paused" ? "▶" : "||"}</span>
-        <strong>{session.status === "paused" ? "일시정지" : "진행 중"} · {task.title}</strong>
+        <strong>{session.status === "paused" ? t("focus.pause") : t("focus.runningShort")} · {task.title}</strong>
       </button>
       <button type="button" className="foc-global-time" onClick={onOpenFocus}>
         {formatFocusDuration(elapsed)}
       </button>
       <div className="foc-global-actions">
         {session.status === "paused" ? (
-          <button type="button" className="foc-global-icon-action" aria-label="재개" title="재개" onClick={() => onResume(session.id)}>
+          <button type="button" className="foc-global-icon-action" aria-label={t("focus.resume")} title={t("focus.resume")} onClick={() => onResume(session.id)}>
             ▶
           </button>
         ) : (
-          <button type="button" className="foc-global-icon-action" aria-label="일시정지" title="일시정지" onClick={() => onPause(session.id)}>
+          <button type="button" className="foc-global-icon-action" aria-label={t("focus.pause")} title={t("focus.pause")} onClick={() => onPause(session.id)}>
             ||
           </button>
         )}
-        <button type="button" className="foc-global-icon-action danger" aria-label="끝내기" title="끝내기" onClick={() => onStop(session.id)}>
+        <button type="button" className="foc-global-icon-action danger" aria-label={t("focus.stop")} title={t("focus.stop")} onClick={() => onStop(session.id)}>
           ■
         </button>
         {canOpenMiniTimer ? (
-          <button type="button" className="foc-global-icon-action" aria-label="미니 타이머 열기" title="미니 타이머 열기" onClick={openMiniTimer}>
+          <button type="button" className="foc-global-icon-action" aria-label={t("focus.openMiniTimer")} title={t("focus.openMiniTimer")} onClick={openMiniTimer}>
             ↗
           </button>
         ) : null}

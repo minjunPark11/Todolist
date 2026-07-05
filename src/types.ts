@@ -253,6 +253,7 @@ export interface TaskTemplate {
 export interface PlannerSettings {
   id: string;
   theme: "system" | "light" | "dark";
+  externalCalendars?: ExternalCalendar[];
   createdAt: string;
   updatedAt: string;
 }

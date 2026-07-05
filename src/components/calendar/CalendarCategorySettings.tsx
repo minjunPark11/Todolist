@@ -12,6 +12,7 @@ import {
   updatePersonalCategory,
   useCalendarCategoryState,
 } from "../../lib/calendarCategories";
+import { useT } from "../../i18n";
 import { Modal } from "../kit";
 
 interface CalendarCategorySettingsProps {
@@ -30,6 +31,7 @@ type EditorState = {
 };
 
 export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCategorySettingsProps) {
+  const { t } = useT();
   const state = useCalendarCategoryState();
   const categories = [...state.personal].sort((a, b) => a.order - b.order);
 
@@ -73,14 +75,14 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
     if (!editor) return;
     const name = editor.name.trim();
     if (!name) {
-      setEditor({ ...editor, error: "카테고리 이름을 입력하세요." });
+      setEditor({ ...editor, error: t("settings.category.nameRequired") });
       return;
     }
     const duplicated = categories.some(
       (category) => category.id !== editor.categoryId && category.name.trim().toLowerCase() === name.toLowerCase(),
     );
     if (duplicated) {
-      setEditor({ ...editor, error: "같은 이름의 카테고리가 이미 있어요." });
+      setEditor({ ...editor, error: t("settings.category.duplicateName") });
       return;
     }
     if (editor.mode === "add") addPersonalCategory(name, editor.color);
@@ -116,12 +118,12 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
           <FolderIcon />
         </span>
         <div className="ff-cal-card-text">
-          <strong>카테고리 관리</strong>
-          <small>일정 분류와 색상을 관리합니다.</small>
+          <strong>{t("settings.category.title")}</strong>
+          <small>{t("settings.category.hint")}</small>
         </div>
         <div className="ff-cal-card-actions">
           <button type="button" className="ff-btn ff-cal-btn-outline" onClick={openAdd}>
-            + 새 카테고리
+            {t("settings.category.addNew")}
           </button>
         </div>
       </div>
@@ -158,19 +160,19 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
               setDragOverIndex(null);
             }}
           >
-            <span className="ff-cat-drag-handle" aria-label={`${category.name} 순서 이동`} title="드래그해서 순서 변경">
+            <span className="ff-cat-drag-handle" aria-label={t("settings.category.moveAria", { name: category.name })} title={t("settings.category.dragToReorder")}>
               <DragHandleIcon />
             </span>
             <span className="ff-cat-color-chip" style={{ background: category.color }} aria-hidden="true" />
             <span className="ff-cat-name">
               {category.name}
-              {category.id === state.defaultCategoryId ? <em className="ff-cat-default-badge">기본</em> : null}
+              {category.id === state.defaultCategoryId ? <em className="ff-cat-default-badge">{t("settings.category.defaultBadge")}</em> : null}
             </span>
             <div className="ff-cat-menu-wrap">
               <button
                 type="button"
                 className="ff-btn ff-btn-ghost ff-cat-menu-btn"
-                aria-label={`${category.name} 메뉴`}
+                aria-label={t("settings.category.menuAria", { name: category.name })}
                 aria-expanded={openMenuId === category.id}
                 onClick={() => setOpenMenuId(openMenuId === category.id ? "" : category.id)}
               >
@@ -179,7 +181,7 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
               {openMenuId === category.id ? (
                 <div className="ff-cat-menu" role="menu">
                   <button type="button" role="menuitem" onClick={() => openEdit(category.id)}>
-                    이름 · 색상 변경
+                    {t("settings.category.editNameColor")}
                   </button>
                   <button
                     type="button"
@@ -190,21 +192,21 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
                       setOpenMenuId("");
                     }}
                   >
-                    기본 카테고리로 설정
+                    {t("settings.category.setDefault")}
                   </button>
                   <button
                     type="button"
                     role="menuitem"
                     className="danger"
                     disabled={category.id === state.defaultCategoryId}
-                    title={category.id === state.defaultCategoryId ? "기본 카테고리는 삭제할 수 없습니다." : undefined}
+                    title={category.id === state.defaultCategoryId ? t("settings.category.defaultDeleteDisabled") : undefined}
                     onClick={() => {
                       setOpenMenuId("");
                       setPendingDeleteId(category.id);
                       setMoveTargetId(state.defaultCategoryId);
                     }}
                   >
-                    삭제
+                    {t("common.delete")}
                   </button>
                 </div>
               ) : null}
@@ -214,31 +216,31 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
       </div>
 
       <p className="ff-cat-footnote">
-        <InfoIcon /> 학습/프로젝트 카테고리는 각 페이지에서 자동 생성됩니다.
+        <InfoIcon /> {t("settings.category.derivedNote")}
       </p>
 
       {editor ? (
         <Modal
-          title={editor.mode === "add" ? "새 카테고리" : "카테고리 수정"}
+          title={editor.mode === "add" ? t("settings.category.newTitle") : t("settings.category.editTitle")}
           onClose={() => setEditor(null)}
           footer={
             <>
               <button type="button" className="ff-btn" onClick={() => setEditor(null)}>
-                취소
+                {t("common.cancel")}
               </button>
               <button type="button" className="ff-btn ff-btn-primary" onClick={submitEditor}>
-                {editor.mode === "add" ? "추가" : "저장"}
+                {editor.mode === "add" ? t("common.add") : t("common.save")}
               </button>
             </>
           }
         >
           <div className="ff-cat-editor">
             <label className="ff-cat-editor-field">
-              이름
+              {t("common.name")}
               <input
                 value={editor.name}
                 autoFocus
-                placeholder="카테고리 이름"
+                placeholder={t("settings.category.namePlaceholder")}
                 onChange={(event) => setEditor({ ...editor, name: event.target.value, error: "" })}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") submitEditor();
@@ -246,8 +248,8 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
               />
             </label>
             <div className="ff-cat-editor-field">
-              색상
-              <div className="ff-cat-color-palette" role="radiogroup" aria-label="카테고리 색상">
+              {t("common.color")}
+              <div className="ff-cat-color-palette" role="radiogroup" aria-label={t("settings.category.colorAria")}>
                 {CATEGORY_COLORS.map((color) => (
                   <button
                     key={color}
@@ -264,7 +266,7 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
                   type="color"
                   className="ff-cat-color-custom"
                   value={editor.color}
-                  aria-label="직접 색상 선택"
+                  aria-label={t("settings.category.customColorAria")}
                   onChange={(event) => setEditor({ ...editor, color: event.target.value })}
                 />
               </div>
@@ -276,7 +278,7 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
 
       {pendingDelete ? (
         <Modal
-          title={`"${pendingDelete.name}" 카테고리 삭제`}
+          title={t("settings.category.deleteTitle", { name: pendingDelete.name })}
           onClose={() => {
             setPendingDeleteId("");
             setMoveTargetId("");
@@ -291,10 +293,10 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
                   setMoveTargetId("");
                 }}
               >
-                취소
+                {t("common.cancel")}
               </button>
               <button type="button" className="ff-btn ff-btn-danger" onClick={confirmDelete}>
-                삭제
+                {t("common.delete")}
               </button>
             </>
           }
@@ -302,8 +304,7 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
           {pendingDeleteTaskCount > 0 ? (
             <div className="ff-cat-delete-body">
               <p>
-                "{pendingDelete.name}" 카테고리에 일정 {pendingDeleteTaskCount}개가 있습니다. 삭제하면 아래 카테고리로
-                이동합니다.
+                {t("settings.category.deleteMoveBody", { name: pendingDelete.name, count: pendingDeleteTaskCount })}
               </p>
               <select value={moveTargetId} onChange={(event) => setMoveTargetId(event.target.value)}>
                 {categories
@@ -311,13 +312,13 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
                   .map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name}
-                      {category.id === state.defaultCategoryId ? " (기본)" : ""}
+                      {category.id === state.defaultCategoryId ? t("settings.category.defaultSuffix") : ""}
                     </option>
                   ))}
               </select>
             </div>
           ) : (
-            <p>"{pendingDelete.name}" 카테고리를 삭제할까요?</p>
+            <p>{t("settings.category.deleteBody", { name: pendingDelete.name })}</p>
           )}
         </Modal>
       ) : null}

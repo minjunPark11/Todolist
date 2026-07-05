@@ -4,6 +4,7 @@ import { formatDate, isOverdue, todayValue } from "../utils/date";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../lib/focusTimer";
 import { platform } from "../platform";
+import { useT } from "../i18n";
 
 interface FocusPageProps {
   tasks: Task[];
@@ -16,6 +17,7 @@ interface FocusPageProps {
   onPauseFocus: (sessionId: string) => void;
   onResumeFocus: (sessionId: string) => void;
   onStopFocus: (sessionId: string, completeTask?: boolean) => void;
+  onDeleteFocusSession: (sessionId: string) => void;
   onUpdateFocusNote: (sessionId: string, note: string) => void;
   onCompleteTask: (taskId: string) => void;
   onOpenTask: (taskId: string) => void;
@@ -77,16 +79,19 @@ export function FocusPage({
   onPauseFocus,
   onResumeFocus,
   onStopFocus,
+  onDeleteFocusSession,
   onUpdateFocusNote,
   onCompleteTask,
   onOpenTask,
   onNavigate,
 }: FocusPageProps) {
+  const { t } = useT();
   const today = todayValue();
   const now = useNowTick(Boolean(activeSession && activeSession.status === "running"));
   const elapsed = getDisplayedFocusSeconds(activeSession, now);
   const activeTask = activeSession ? tasks.find((task) => task.id === activeSession.taskId) ?? null : null;
   const [finishTaskId, setFinishTaskId] = useState("");
+  const [deleteSessionId, setDeleteSessionId] = useState("");
   const [optionsOpen, setOptionsOpen] = useState(false);
   const optionsRef = useRef<HTMLDivElement>(null);
 
@@ -103,12 +108,12 @@ export function FocusPage({
       .slice(0, 8);
 
     return [
-      { id: "scheduled", title: "오늘 예정", tone: "blue" as const, tasks: scheduled },
-      { id: "deadline", title: "마감 임박", tone: "red" as const, tasks: deadline },
-      { id: "study", title: "학습 복습", tone: "purple" as const, tasks: study },
-      { id: "quick", title: "바로 시작", tone: "green" as const, tasks: quickStart },
+      { id: "scheduled", title: t("focus.groupScheduled"), tone: "blue" as const, tasks: scheduled },
+      { id: "deadline", title: t("focus.groupDeadline"), tone: "red" as const, tasks: deadline },
+      { id: "study", title: t("focus.groupStudy"), tone: "purple" as const, tasks: study },
+      { id: "quick", title: t("focus.groupQuick"), tone: "green" as const, tasks: quickStart },
     ].filter((group) => group.tasks.length > 0);
-  }, [openTasks, projects, today]);
+  }, [openTasks, projects, t, today]);
 
   const todaySessions = focusSessions.filter((session) => todaySessionFilter(session, today));
   const todaySeconds = todaySessions.reduce((sum, session) => sum + session.accumulatedSeconds, 0);
@@ -176,16 +181,18 @@ export function FocusPage({
     });
   }
 
+  const deleteSession = focusSessions.find((session) => session.id === deleteSessionId) ?? null;
+
   return (
     <div className="foc-page">
       <header className="foc-header">
         <div>
           <h1>Focus</h1>
-          <p>실제 집중 시간을 기록하고 확인하는 공간</p>
+          <p>{t("focus.subtitle")}</p>
         </div>
         <div className="foc-header-chips">
           <span>{formatDate(today, "ko")}</span>
-          <strong>오늘 {formatFocusDuration(todaySeconds, true)}</strong>
+          <strong>{t("focus.todayTotal", { time: formatFocusDuration(todaySeconds, true) })}</strong>
           <div className="foc-options-wrap" ref={optionsRef}>
             <button
               type="button"
@@ -198,19 +205,19 @@ export function FocusPage({
             </button>
             {optionsOpen ? (
               <div className="foc-options-popover" role="dialog" aria-label="Focus options">
-                <h2>Focus 옵션</h2>
+                <h2>{t("focus.optionsTitle")}</h2>
                 <FocusOptionToggle
-                  label="탭 제목 타이머"
+                  label={t("focus.optionTabTitleTimer")}
                   checked={settings.showTabTitleTimer}
                   onChange={(checked) => onUpdateSettings({ showTabTitleTimer: checked })}
                 />
                 <FocusOptionToggle
-                  label="완료 알림"
+                  label={t("focus.optionCompletionNotification")}
                   checked={settings.enableCompletionNotification}
                   onChange={(checked) => onUpdateSettings({ enableCompletionNotification: checked })}
                 />
                 <FocusOptionToggle
-                  label="미니 타이머 버튼"
+                  label={t("focus.optionMiniTimerButton")}
                   checked={settings.showMiniTimerButton}
                   onChange={(checked) => onUpdateSettings({ showMiniTimerButton: checked })}
                 />
@@ -223,13 +230,13 @@ export function FocusPage({
       <main className="foc-layout">
         <section className="foc-card foc-queue">
           <header className="foc-card-head">
-            <h2>오늘 시작할 일</h2>
+            <h2>{t("focus.queueTitle")}</h2>
           </header>
           {groups.length === 0 ? (
             <div className="foc-empty">
-              <strong>시작할 일이 없습니다.</strong>
-              <p>오늘 할 일을 추가하거나 Calendar에 배치해보세요.</p>
-              <button type="button" onClick={() => onNavigate("today")}>Today로 이동</button>
+              <strong>{t("focus.emptyTitle")}</strong>
+              <p>{t("focus.emptyBody")}</p>
+              <button type="button" onClick={() => onNavigate("today")}>{t("focus.goToday")}</button>
             </div>
           ) : (
             groups.map((group) => (
@@ -262,10 +269,10 @@ export function FocusPage({
                         <button type="button" className="foc-task-main" onClick={() => onOpenTask(task.id)}>
                           <strong>{task.title}</strong>
                           <span>
-                            {project?.name ?? "Inbox"}
-                            {task.scheduledDate === today && task.startTime ? ` · 오늘 ${task.startTime}` : ""}
+                            {project?.name ?? t("status.inbox")}
+                            {task.scheduledDate === today && task.startTime ? ` · ${t("common.today")} ${task.startTime}` : ""}
                           </span>
-                          <small>실제 {formatFocusDuration(task.actualSeconds, true)}</small>
+                          <small>{t("focus.actualTime", { time: formatFocusDuration(task.actualSeconds, true) })}</small>
                         </button>
                         <span className="foc-tag">{project?.name ?? (isStudyTask(task, project) ? "Study" : "Task")}</span>
                       </article>
@@ -282,7 +289,7 @@ export function FocusPage({
             <>
               <div className="foc-status">
                 <span className={activeSession.status === "paused" ? "is-paused" : ""} />
-                {activeSession.status === "paused" ? "일시정지됨" : "현재 집중 중"}
+                {activeSession.status === "paused" ? t("focus.paused") : t("focus.running")}
               </div>
               <div className="foc-task-pills">
                 {projectFor(activeTask, projects) ? <span>{projectFor(activeTask, projects)?.name}</span> : null}
@@ -294,49 +301,49 @@ export function FocusPage({
                 className="foc-note"
                 value={activeSession.focusNote}
                 onChange={(event) => onUpdateFocusNote(activeSession.id, event.target.value)}
-                placeholder="집중 메모"
+                placeholder={t("focus.notePlaceholder")}
               />
               <div className="foc-controls">
                 {activeSession.status === "paused" ? (
-                  <button type="button" onClick={() => onResumeFocus(activeSession.id)}>재개</button>
+                  <button type="button" onClick={() => onResumeFocus(activeSession.id)}>{t("focus.resume")}</button>
                 ) : (
-                  <button type="button" onClick={() => onPauseFocus(activeSession.id)}>일시정지</button>
+                  <button type="button" onClick={() => onPauseFocus(activeSession.id)}>{t("focus.pause")}</button>
                 )}
-                <button type="button" className="danger" onClick={() => stopAndAsk(activeSession)}>끝내기</button>
+                <button type="button" className="danger" onClick={() => stopAndAsk(activeSession)}>{t("focus.stop")}</button>
                 {canOpenMiniTimer ? (
                   <button type="button" className="foc-mini-open" onClick={openMiniTimer}>
-                    미니 타이머 열기 ↗
+                    {t("focus.openMiniTimer")}
                   </button>
                 ) : null}
               </div>
               <footer className="foc-meta">
-                <span>이번 세션 <strong>{formatFocusDuration(elapsed, true)}</strong></span>
-                <span>실제 누적 <strong>{formatFocusDuration(activeTask.actualSeconds + elapsed, true)}</strong></span>
+                <span>{t("focus.thisSession")} <strong>{formatFocusDuration(elapsed, true)}</strong></span>
+                <span>{t("focus.actualAccumulated")} <strong>{formatFocusDuration(activeTask.actualSeconds + elapsed, true)}</strong></span>
               </footer>
             </>
           ) : (
             <div className="foc-no-session">
               <span>◎</span>
-              <h2>현재 진행 중인 작업이 없습니다.</h2>
-              <p>왼쪽에서 할 일을 골라 집중 시간을 기록하세요.</p>
+              <h2>{t("focus.noActiveTitle")}</h2>
+              <p>{t("focus.noActiveBody")}</p>
             </div>
           )}
         </section>
 
         <aside className="foc-insights">
           <section className="foc-card">
-            <h2>오늘 집중 요약</h2>
+            <h2>{t("focus.summaryTitle")}</h2>
             <div className="foc-stat-grid">
-              <span><small>총 집중</small><strong>{formatFocusDuration(todaySeconds, true)}</strong></span>
-              <span><small>세션</small><strong>{todaySessions.length}개</strong></span>
-              <span><small>평균</small><strong>{formatFocusDuration(avgSeconds, true)}</strong></span>
-              <span><small>가장 긴 세션</small><strong>{formatFocusDuration(longestSeconds, true)}</strong></span>
+              <span><small>{t("focus.statTotal")}</small><strong>{formatFocusDuration(todaySeconds, true)}</strong></span>
+              <span><small>{t("focus.statSessions")}</small><strong>{t("focus.sessionCount", { count: todaySessions.length })}</strong></span>
+              <span><small>{t("focus.statAverage")}</small><strong>{formatFocusDuration(avgSeconds, true)}</strong></span>
+              <span><small>{t("focus.statLongest")}</small><strong>{formatFocusDuration(longestSeconds, true)}</strong></span>
             </div>
           </section>
           <section className="foc-card">
-            <h2>프로젝트별 집중 시간</h2>
+            <h2>{t("focus.byProjectTitle")}</h2>
             <div className="foc-project-bars">
-              {byProject.length === 0 ? <p>아직 오늘의 프로젝트 기록이 없습니다.</p> : null}
+              {byProject.length === 0 ? <p>{t("focus.noProjectRecords")}</p> : null}
               {byProject.map(({ project, seconds }) => (
                 <div key={project.id}>
                   <span>{project.name}</span>
@@ -347,14 +354,25 @@ export function FocusPage({
             </div>
           </section>
           <section className="foc-card">
-            <h2>최근 세션</h2>
+            <h2>{t("focus.recentSessions")}</h2>
             <div className="foc-recent">
-              {focusSessions.filter((session) => session.status === "completed").slice(0, 4).map((session) => (
-                <button key={session.id} type="button" onClick={() => onOpenTask(session.taskId)}>
+              {focusSessions.filter((session) => session.status === "completed").slice(0, 8).map((session) => (
+                <article key={session.id} className="foc-recent-session">
+                <button type="button" className="foc-recent-main" onClick={() => onOpenTask(session.taskId)}>
                   <span>✓</span>
-                  <strong>{session.title || tasks.find((task) => task.id === session.taskId)?.title || "Focus session"}</strong>
+                    <strong>{session.title || tasks.find((task) => task.id === session.taskId)?.title || t("focus.sessionFallback")}</strong>
                   <small>{formatFocusDuration(session.accumulatedSeconds, true)}</small>
                 </button>
+                  <button
+                    type="button"
+                    className="foc-recent-delete"
+                    aria-label={t("focus.deleteSession")}
+                    title={t("focus.deleteSession")}
+                    onClick={() => setDeleteSessionId(session.id)}
+                  >
+                    {t("common.delete")}
+                  </button>
+                </article>
               ))}
             </div>
           </section>
@@ -364,14 +382,32 @@ export function FocusPage({
       {finishTaskId ? (
         <div className="foc-modal-backdrop" role="presentation">
           <div className="foc-modal" role="dialog" aria-modal="true">
-            <h2>집중 기록을 저장했습니다.</h2>
-            <p>{tasks.find((task) => task.id === finishTaskId)?.title ?? "이 작업"}을 완료 처리할까요?</p>
+            <h2>{t("focus.savedTitle")}</h2>
+            <p>{t("focus.completePrompt", { title: tasks.find((task) => task.id === finishTaskId)?.title ?? t("focus.thisTask") })}</p>
             <div>
               <button type="button" onClick={() => {
                 onCompleteTask(finishTaskId);
                 setFinishTaskId("");
-              }}>완료 처리</button>
-              <button type="button" onClick={() => setFinishTaskId("")}>아직 진행 중</button>
+              }}>{t("focus.markComplete")}</button>
+              <button type="button" onClick={() => setFinishTaskId("")}>{t("focus.stillInProgress")}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {deleteSession ? (
+        <div className="foc-modal-backdrop" role="presentation">
+          <div className="foc-modal" role="dialog" aria-modal="true">
+            <h2>{t("focus.deleteTitle")}</h2>
+            <p>
+              {deleteSession.title || tasks.find((task) => task.id === deleteSession.taskId)?.title || t("focus.sessionFallback")} ·{" "}
+              {formatFocusDuration(deleteSession.accumulatedSeconds, true)}
+            </p>
+            <div>
+              <button type="button" className="danger" onClick={() => {
+                onDeleteFocusSession(deleteSession.id);
+                setDeleteSessionId("");
+              }}>{t("common.delete")}</button>
+              <button type="button" onClick={() => setDeleteSessionId("")}>{t("common.cancel")}</button>
             </div>
           </div>
         </div>
