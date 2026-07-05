@@ -1,0 +1,1251 @@
+/* === Space Detail work hub (SPACE_DETAIL_COMPLETE_IMPLEMENTATION_SPEC) === */
+
+.sdv-page {
+  --sdv-accent: #6d4aff;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding-bottom: 90px;
+}
+
+.sdv-back {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.sdv-back:hover {
+  text-decoration: underline;
+}
+
+/* Header card (§7) */
+.sdv-header-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 22px;
+  box-shadow: var(--shadow-card);
+}
+
+.sdv-header-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sdv-space-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.sdv-header-identity h1 {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.sdv-header-subtitle {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.sdv-header-counts {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.sdv-overdue {
+  color: #e5484d;
+  font-weight: 600;
+}
+
+.sdv-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Buttons (§35.5) */
+.sdv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-radius: 11px;
+  padding: 9px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sdv-btn:hover {
+  background: var(--bg-hover);
+}
+
+.sdv-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sdv-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sdv-btn-primary:hover {
+  background: var(--accent);
+  filter: brightness(1.06);
+}
+
+.sdv-btn-danger {
+  color: #e5484d;
+  border-color: rgba(229, 72, 77, 0.35);
+}
+
+.sdv-btn-sm {
+  padding: 6px 11px;
+  font-size: 12.5px;
+  border-radius: 9px;
+}
+
+.sdv-btn-icon {
+  width: 44px;
+  min-height: 38px;
+  padding: 7px 0;
+  font-weight: 900;
+  border-color: var(--border-strong);
+}
+
+.sdv-more-dots {
+  display: inline-block;
+  margin-top: -8px;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.sdv-link {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.sdv-link:hover {
+  text-decoration: underline;
+}
+
+/* Status pill (§7.5) */
+.sdv-status-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.sdv-status-on_track { background: #e5f6ec; color: #15803d; }
+.sdv-status-needs_attention { background: #fff3e0; color: #c2570a; }
+.sdv-status-deadline_risk { background: #fdebec; color: #d32f2f; }
+.sdv-status-blocked { background: #fdebec; color: #b3261e; }
+.sdv-status-inactive { background: var(--bg-hover); color: var(--text-secondary); }
+.sdv-status-review_due { background: #f1edff; color: #6d4aff; }
+.sdv-status-pending_items { background: #fff3e0; color: #c2570a; }
+
+.sdv-signal-on_track { color: #15803d; }
+.sdv-signal-needs_attention,
+.sdv-signal-pending_items { color: #c2570a; }
+.sdv-signal-deadline_risk,
+.sdv-signal-blocked { color: #d32f2f; }
+.sdv-signal-inactive { color: var(--text-secondary); }
+.sdv-signal-review_due { color: #6d4aff; }
+
+/* Overview metric cards (§8) */
+.sdv-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.sdv-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 140px;
+  padding: 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+}
+
+.sdv-metric-card h3 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+}
+
+.sdv-metric-title {
+  font-size: 16px;
+  font-weight: 680;
+  line-height: 1.3;
+}
+
+.sdv-metric-card small {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.sdv-metric-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.sdv-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  overflow: hidden;
+  margin-top: auto;
+}
+
+.sdv-progress span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.sdv-upcoming-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.sdv-upcoming-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.sdv-upcoming-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 550;
+}
+
+.sdv-upcoming-kind {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.sdv-kind-deadline { background: #fdebec; color: #d32f2f; }
+.sdv-kind-scheduled { background: #eaf3ff; color: #1d6fd6; }
+.sdv-kind-review { background: #f1edff; color: #6d4aff; }
+
+/* "Schedules live in the main Calendar" helper under the Upcoming card */
+.sdv-upcoming-hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
+/* Tab navigation (§13) */
+.sdv-tab-nav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+}
+
+.sdv-tab-nav button {
+  border: 0;
+  background: transparent;
+  padding: 13px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+
+.sdv-tab-nav button:hover {
+  color: var(--text-primary);
+}
+
+.sdv-tab-nav button.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Overview content grid (§14): tasks + AI summary on top,
+   activity / focus / notes in a row below. */
+.sdv-overview-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.sdv-overview-top {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 0.95fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.sdv-overview-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.sdv-overview-bottom > .sdv-card {
+  height: 100%;
+}
+
+.sdv-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+
+.sdv-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sdv-card-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 680;
+}
+
+.sdv-card-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sdv-card h3,
+.sdv-tab-panel h3 {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text-secondary);
+}
+
+/* Task rows (§15) */
+.sdv-task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.sdv-task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.sdv-task-row:hover {
+  background: var(--bg-hover);
+}
+
+.sdv-task-row.done .sdv-task-title {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+.sdv-task-row input[type="checkbox"] {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.sdv-task-title {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--text-primary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+}
+
+.sdv-task-title:hover {
+  color: var(--accent);
+}
+
+.sdv-task-meta {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.sdv-task-est {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 34px;
+  text-align: right;
+}
+
+.sdv-task-done-label {
+  font-size: 12px;
+  font-weight: 650;
+  color: #15803d;
+}
+
+.sdv-row-actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.sdv-task-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+
+.sdv-task-group h3 span {
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--text-tertiary);
+  background: var(--bg-hover);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+/* Activity timeline (§16) */
+.sdv-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.sdv-activity-list li button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.sdv-activity-list li button:hover {
+  background: var(--bg-hover);
+}
+
+.sdv-activity-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.sdv-activity-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.sdv-activity-body strong {
+  font-size: 13px;
+  font-weight: 570;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sdv-activity-body em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.sdv-activity-list li small {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  padding-top: 2px;
+}
+
+.sdv-record-type {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.sdv-record-ai_suggestion_applied,
+.sdv-record-manual_record { background: var(--accent-soft); color: var(--accent); }
+.sdv-record-task_completed { background: #e5f6ec; color: #15803d; }
+.sdv-record-focus_completed,
+.sdv-record-focus_started { background: #f1edff; color: #6d4aff; }
+
+/* Record lists */
+.sdv-record-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.sdv-record-list li button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.sdv-record-list li button:hover {
+  background: var(--bg-hover);
+}
+
+.sdv-record-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sdv-record-list li button strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 570;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sdv-record-list li button small,
+.sdv-record-list li button span {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* AI card (§18) */
+.sdv-ai-card {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-subtle));
+  background: linear-gradient(180deg, var(--accent-soft), var(--bg-surface) 55%);
+}
+
+.sdv-ai-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.sdv-ai-tips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Empty states (§33) */
+.sdv-empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 16px 8px;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+}
+
+.sdv-empty p {
+  margin: 0;
+}
+
+.sdv-empty-inline {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+/* Toolbars, chips */
+.sdv-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sdv-toolbar input[type="search"] {
+  flex: 1;
+  min-width: 160px;
+  height: 36px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: var(--bg-surface-muted);
+  color: var(--text-primary);
+}
+
+.sdv-toolbar select {
+  height: 36px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.sdv-chip-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sdv-chip {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sdv-chip:hover {
+  background: var(--bg-hover);
+}
+
+.sdv-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Focus tab (§23) */
+.sdv-focus-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sdv-focus-stats > div {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface-muted);
+}
+
+.sdv-focus-stats small {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+  font-weight: 650;
+}
+
+.sdv-focus-stats strong {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.sdv-active-focus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  font-size: 13.5px;
+}
+
+.sdv-active-focus strong {
+  flex: 1;
+  min-width: 0;
+}
+
+.sdv-pulse {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: sdv-pulse 1.6s ease infinite;
+}
+
+@keyframes sdv-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.sdv-focus-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sdv-actual-row {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  min-width: 0;
+}
+
+.sdv-actual-row strong {
+  font-size: 13px;
+  font-weight: 570;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sdv-actual-row small {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+/* Note type badge (note detail drawer) */
+.sdv-note-type {
+  justify-self: start;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Floating AI button (§26). Sits above the global Ollama chat FAB, which
+   already occupies the bottom-right corner. */
+.sdv-floating-ai {
+  position: fixed;
+  right: 28px;
+  bottom: 96px;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 0;
+  background: linear-gradient(135deg, var(--accent), #6d4aff);
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: var(--shadow-raised);
+  z-index: 40;
+  transition: transform 0.15s ease;
+}
+
+.sdv-floating-ai:hover {
+  transform: scale(1.06);
+}
+
+/* Modals (§32) */
+.sdv-modal-backdrop,
+.sdv-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 20, 0.42);
+  z-index: 60;
+  display: flex;
+}
+
+.sdv-modal-backdrop {
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.sdv-modal {
+  width: min(520px, 100%);
+  max-height: min(84vh, 720px);
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: var(--shadow-raised);
+  display: grid;
+  gap: 14px;
+}
+
+.sdv-modal-head,
+.sdv-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sdv-modal-head h2,
+.sdv-drawer-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.sdv-modal-head button,
+.sdv-drawer-head button {
+  border: 0;
+  background: var(--bg-hover);
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.sdv-modal-copy {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.sdv-form {
+  display: grid;
+  gap: 12px;
+}
+
+.sdv-form label {
+  display: grid;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 620;
+  color: var(--text-secondary);
+}
+
+.sdv-form input,
+.sdv-form select,
+.sdv-form textarea {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.sdv-form input:focus,
+.sdv-form select:focus,
+.sdv-form textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  border-color: transparent;
+}
+
+.sdv-form h4 {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 680;
+  color: var(--text-primary);
+}
+
+.sdv-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.sdv-form-error {
+  margin: 0;
+  color: #d32f2f;
+  font-size: 13px;
+}
+
+.sdv-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sdv-picker-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.sdv-suggestion-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.sdv-suggestion-row:hover {
+  background: var(--bg-hover);
+}
+
+.sdv-suggestion-row strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sdv-suggestion-row small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* Drawers */
+.sdv-drawer-backdrop {
+  justify-content: flex-end;
+}
+
+.sdv-drawer {
+  width: min(420px, 92vw);
+  height: 100%;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-panel);
+  display: flex;
+  flex-direction: column;
+  animation: sdv-drawer-in 0.2s ease;
+}
+
+@keyframes sdv-drawer-in {
+  from { transform: translateX(24px); opacity: 0.4; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.sdv-drawer-head {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sdv-drawer-body {
+  padding: 18px 20px 28px;
+  overflow-y: auto;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.sdv-drawer-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.sdv-drawer-notes {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.sdv-drawer-body h4 {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.sdv-detail-list {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.sdv-detail-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+}
+
+.sdv-detail-list dt {
+  color: var(--text-tertiary);
+}
+
+.sdv-detail-list dd {
+  margin: 0;
+  font-weight: 570;
+  text-align: right;
+}
+
+.sdv-drawer-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.sdv-ai-commands {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.sdv-ai-log {
+  display: grid;
+  gap: 10px;
+}
+
+.sdv-ai-message {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-surface-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.sdv-ai-message small {
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.sdv-ai-message p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* Settings drawer group editor (§28) */
+.sdv-group-editor {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.sdv-group-editor li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sdv-group-editor input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.sdv-group-editor button {
+  flex: none;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  border-radius: 8px;
+  padding: 6px 9px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sdv-group-editor button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sdv-hidden-toggle.hidden {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+}
+
+.sdv-add-group {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.sdv-check-row {
+  display: flex !important;
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px !important;
+  color: var(--text-primary) !important;
+}
+
+.sdv-check-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.sdv-full-timeline li button {
+  align-items: center;
+}
+
+/* Responsive (§34) */
+@media (max-width: 1240px) {
+  .sdv-overview-top {
+    grid-template-columns: 1fr;
+  }
+
+  .sdv-overview-bottom {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .sdv-overview-bottom,
+  .sdv-focus-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sdv-focus-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sdv-header-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sdv-header-actions {
+    justify-content: flex-start;
+  }
+
+  .sdv-task-row {
+    flex-wrap: wrap;
+  }
+
+  .sdv-row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .sdv-drawer {
+    width: 100vw;
+  }
+
+  .sdv-floating-ai {
+    right: 18px;
+    bottom: 86px;
+  }
+}
+
+.sdv-form input[type="color"] {
+  width: 64px;
+  height: 36px;
+  padding: 3px;
+  cursor: pointer;
+}
+

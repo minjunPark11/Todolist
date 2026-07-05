@@ -188,5 +188,11 @@ h1 { font-size: clamp(28px, 4vw, 40px); }
   - ⚠️ 800px 임계값은 추정치(사이드220+그리드+패널260). 실사용 폭에서 눈으로 미세 조정 여지 있음.
   - 참고: `.ff-board`는 죽은 CSS라 CQ 대상 아님(삭제됨). 다른 gcal-* 패널은 필요 시 동일 패턴으로 확산 가능.
 
+- **5단계 파일 분할 — 완료.** `styles.css`(12.5k줄) → `src/styles/01~09-*.css` 9개 모듈로 분할.
+  - 방식: **연속 라인 구간을 순서 보존**하며 슬라이스(토픽별 재배치 X → cascade 불변). `styles.css`는 순서대로 `@import`하는 barrel로 전환.
+  - 파일: 01-base / 02-calendar / 03-planning / 04-today / 05-spaces / 06-space-detail / 07-notes-splitview / 08-calendar-categories / 09-calendar-redesign.
+  - 검증: 9파일 연결 = 원본과 **바이트 동일(diff 0)**. 프리뷰: 규칙 1816개 전부 로드, media 21·container 1·bp 5종, 토큰 해석, 콘솔 에러 0.
+  - 후속(선택): 08 안의 calendar-categories, 09 calendar-redesign을 02-calendar 쪽으로 **토픽 재배치**하려면 cascade 영향 확인 필요 → 별도 작업.
+
 ### 미완 / 후속
-- **5단계 파일 분할 — 별도 진행 권장.** 12.5k줄 단일 파일 → 순수 기계적 이동(동작 무변). diff 폭발로 회귀 리뷰가 어려워지므로 독립 PR이 적합.
+- 없음(핵심 계획 0~5단계 완료). 남은 건 선택적 토픽 재배치·임계값 실측 미세조정뿐.

@@ -1,0 +1,1060 @@
+/* ===== Calendar categories (category management spec) ===== */
+
+/* Sidebar category rows: checkbox = show/hide, row = active category. */
+.gcal-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.gcal-cat-row:hover {
+  background: var(--color-fill-quaternary, rgba(0, 0, 0, 0.04));
+}
+
+.gcal-cat-row input[type="checkbox"] {
+  /* Apple Calendar style: the checkbox itself is tinted with the category
+     color (--cat-color set inline per row). Explicit size also guards against
+     the global `input { width: 100% }` rule squashing the flex:1 name span. */
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--cat-color, #8e8e93) 22%, transparent);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.gcal-cat-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 5' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 5' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  background: color-mix(in srgb, var(--cat-color, #8e8e93) 45%, transparent);
+}
+
+.gcal-cat-row input[type="checkbox"]:checked {
+  background: var(--cat-color, #8e8e93);
+}
+
+.gcal-cat-row input[type="checkbox"]:checked::after {
+  background: #fff;
+}
+
+.gcal-cat-row input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.gcal-cat-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gcal-cat-row.is-active .gcal-cat-name {
+  font-weight: 600;
+}
+
+.gcal-cat-badge {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  padding: 1px 6px;
+  border-radius: var(--rounded-pill, 999px);
+  background: var(--color-fill-tertiary, rgba(0, 0, 0, 0.06));
+  color: var(--color-ink-muted-48, #8e8e93);
+}
+
+/* Event popover: category color button + dropdown (§12–§13). */
+.gcal-popover-category-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--color-divider-soft);
+  border-radius: 6px;
+  background: transparent;
+  padding: 2px 5px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  color: var(--color-ink-muted-80, #6b7280);
+}
+
+.gcal-popover-category-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.gcal-popover-category-list {
+  margin: 6px 0;
+  border: 1px solid var(--color-divider-soft);
+  border-radius: 10px;
+  padding: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  gap: 4px;
+}
+
+.gcal-popover-category-group {
+  display: grid;
+  gap: 2px;
+}
+
+.gcal-popover-category-group-name {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--color-ink-muted-48, #8e8e93);
+  padding: 2px 6px;
+  text-transform: uppercase;
+}
+
+.gcal-popover-category-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.gcal-popover-category-item:hover:not(:disabled) {
+  background: var(--color-fill-quaternary, rgba(0, 0, 0, 0.04));
+}
+
+.gcal-popover-category-item.is-current {
+  background: var(--color-primary-tint, rgba(0, 102, 204, 0.08));
+  font-weight: 600;
+}
+
+.gcal-popover-category-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.gcal-popover-category-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Settings > 캘린더 (card layout) */
+.ff-cal-settings-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.ff-cal-card {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.ff-cal-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ff-cal-card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--accent-soft, #eaf3ff);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ff-cal-card-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ff-cal-card-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ff-cal-card-text strong {
+  font-size: 15px;
+}
+
+.ff-cal-card-text small {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.ff-cal-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.ff-btn.ff-cal-btn-outline {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-surface);
+}
+
+.ff-btn.ff-cal-btn-outline:hover {
+  background: var(--accent-soft, #eaf3ff);
+}
+
+.ff-cal-chip {
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ff-cal-chip.on {
+  color: var(--accent);
+  background: var(--accent-soft, #eaf3ff);
+  border-color: transparent;
+}
+
+.ff-cal-card-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.ff-calendar-share-actions .ff-cal-card-note {
+  margin-right: auto;
+  align-self: center;
+}
+
+/* 카테고리 관리 */
+.ff-cat-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ff-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.ff-cat-row.dragging {
+  opacity: 0.45;
+}
+
+.ff-cat-row.drag-over {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.ff-cat-drag-handle {
+  display: inline-flex;
+  color: var(--text-tertiary);
+  cursor: grab;
+}
+
+.ff-cat-drag-handle svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.ff-cat-color-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.ff-cat-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ff-cat-default-badge {
+  font-style: normal;
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--accent-soft, rgba(0, 102, 204, 0.1));
+  color: var(--accent);
+}
+
+.ff-cat-menu-wrap {
+  position: relative;
+}
+
+.ff-cat-menu-btn {
+  font-size: 16px;
+  padding: 2px 10px;
+  color: var(--text-tertiary);
+}
+
+.ff-cat-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 180px;
+  display: grid;
+  padding: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.ff-cat-menu button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.ff-cat-menu button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.ff-cat-menu button:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+.ff-cat-menu button.danger:not(:disabled) {
+  color: var(--danger);
+}
+
+.ff-cat-footnote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.ff-cat-footnote-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+/* 카테고리 추가/수정 모달 */
+.ff-cat-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.ff-cat-editor-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ff-cat-editor-field input:not([type="color"]) {
+  padding: 9px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 400;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.ff-cat-color-palette {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ff-cat-color-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ff-cat-color-swatch.active {
+  border-color: var(--text-primary);
+}
+
+.ff-cat-color-custom {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ff-cat-delete-body {
+  display: grid;
+  gap: 10px;
+}
+
+/* --- Eisenhower matrix page --- */
+
+.eis-head-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.eis-quickadd-wrap {
+  position: relative;
+}
+
+.eis-expandable-add {
+  min-width: 148px;
+}
+
+.expandable-add {
+  overflow: hidden;
+  transform-origin: right center;
+}
+
+.expandable-add > button,
+.expandable-add-input-row {
+  min-height: 38px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.expandable-add > button {
+  width: 100%;
+  padding: 9px 16px;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.expandable-add > button:hover {
+  background: var(--bg-hover);
+}
+
+.expandable-add-input-row {
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+}
+
+.expandable-add-input-row input {
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 7px 8px;
+  font: inherit;
+  font-weight: 500;
+  outline: none;
+}
+
+.expandable-add-input-row button {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: calc(var(--radius-md) - 2px);
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 30px;
+}
+
+.expandable-add-input-row button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.eis-quickadd {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 16px 40px rgba(10, 16, 28, 0.18);
+  display: grid;
+  gap: 8px;
+  z-index: 60;
+}
+
+.eis-quickadd strong {
+  font-size: 14.5px;
+}
+
+.eis-quickadd p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.eis-quickadd input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-base, transparent);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.eis-quickadd small {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.eis-quickadd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.eis-matrix {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+@media (max-width: 1120px) {
+  .eis-matrix {
+    grid-template-columns: 1fr;
+  }
+}
+
+.eis-cell {
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: var(--bg-surface);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 240px;
+}
+
+.eis-cell.is-over {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.motion-drop-zone {
+  transform-origin: center;
+}
+
+.eis-cell-head {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.eis-cell-head strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.eis-cell-head small {
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+}
+
+.eis-cell-roman {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.eis-cell-I { border-top: 3px solid var(--danger); }
+.eis-cell-II { border-top: 3px solid var(--warning); }
+.eis-cell-III { border-top: 3px solid var(--accent); }
+.eis-cell-IV { border-top: 3px solid var(--success); }
+
+.eis-cell-I .eis-cell-roman, .eis-q-I { color: var(--danger); }
+.eis-cell-II .eis-cell-roman, .eis-q-II { color: var(--warning); }
+.eis-cell-III .eis-cell-roman, .eis-q-III { color: var(--accent); }
+.eis-cell-IV .eis-cell-roman, .eis-q-IV { color: var(--success); }
+
+.eis-cell-body {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  flex: 1;
+}
+
+.eis-empty {
+  margin: 2px 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.eis-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.motion-task-row {
+  position: relative;
+  transform-origin: center;
+}
+
+.motion-task-row.is-dragging {
+  z-index: 20;
+  cursor: grabbing;
+  box-shadow: var(--shadow-lg);
+}
+
+.motion-panel-shell {
+  will-change: transform, opacity;
+}
+
+.motion-panel-shell-content {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+}
+
+/* Structural rail collapse/expand: animate the track/width change itself.
+   Values mirror transitions.soft (0.28s, [0.2, 0, 0, 1]); the global
+   [data-reduce-motion] block above disables these along with everything
+   else. */
+.app-shell {
+  transition: grid-template-columns 0.28s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.sidebar {
+  transition: padding 0.28s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.gcal-sidebar,
+.gcal-taskpanel {
+  transition: width 0.28s cubic-bezier(0.2, 0, 0, 1), padding 0.28s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Fixed rail width so the collapse can animate (auto cannot transition). */
+.gcal-taskpanel.is-rail {
+  width: 48px;
+}
+
+/* Rows sit inside the MotionCollapse wrapper, so the section's grid gap
+   no longer reaches them; restore it here. */
+.gcal-taskpanel-section-body {
+  display: grid;
+  gap: 6px;
+}
+
+.eis-row:hover {
+  background: var(--bg-hover);
+}
+
+.eis-row.is-selected {
+  border-color: var(--accent);
+}
+
+.eis-row.is-done .eis-row-title {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+.eis-row .tdy-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.eis-row-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eis-row-estimate,
+.eis-row-date {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.eis-row-date.is-overdue {
+  color: var(--danger);
+  font-weight: 650;
+}
+
+.eis-group {
+  display: grid;
+  gap: 6px;
+}
+
+.eis-group + .eis-group {
+  margin-top: 6px;
+}
+
+.eis-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.eis-group-caret {
+  width: 12px;
+  color: var(--text-tertiary);
+}
+
+.eis-chiprow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.eis-chiprow button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.eis-chiprow button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.eis-chiprow input[type="date"],
+.eis-chiprow input[type="number"] {
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 140px;
+}
+
+.eis-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 20, 0.35);
+  /* Above the floating AI launcher (z 230), aligned with other modals. */
+  z-index: 1200;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.eis-panel {
+  width: 400px;
+  max-width: 94vw;
+  height: 100%;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.eis-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.eis-panel-head strong {
+  font-size: 17px;
+}
+
+.eis-panel-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.eis-panel-preview {
+  display: grid;
+  gap: 6px;
+}
+
+.eis-panel-preview small {
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+}
+
+.eis-preview-badge {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-hover);
+  font-size: 13.5px;
+  font-weight: 650;
+  width: fit-content;
+}
+
+.eis-panel-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* --- Calendar right task panel (Eisenhower list) --- */
+
+.gcal-taskpanel {
+  width: 264px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: var(--bg-surface);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.gcal-taskpanel.is-rail {
+  width: auto;
+  padding: 10px 8px;
+  align-items: center;
+}
+
+/* Collapsed rail: fixed narrow track (grid auto column sizes to content). */
+.gcal-taskpanel.is-rail {
+  width: 48px;
+}
+
+/* Collapsed rail: vertical icon + waiting-count badge + expand caret. */
+.gcal-taskpanel-rail-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 32px;
+  padding: 6px 2px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+
+.gcal-taskpanel-rail-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.gcal-taskpanel-rail-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.gcal-taskpanel-rail-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gcal-taskpanel-rail-caret {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.gcal-taskpanel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gcal-taskpanel-head strong {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.gcal-taskpanel-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.gcal-taskpanel-section {
+  display: grid;
+  gap: 6px;
+}
+
+.gcal-taskpanel-section-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.gcal-taskpanel-section-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gcal-taskpanel-empty {
+  margin: 0 0 2px 20px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.gcal-taskpanel-row {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  cursor: grab;
+  transition: background var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast);
+}
+
+.gcal-taskpanel-row:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.gcal-taskpanel-row:active {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+
+.gcal-taskpanel-row.is-dragging {
+  opacity: 1;
+}
+
+.gcal-taskpanel-row-title {
+  font-size: 13.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gcal-taskpanel-row-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
