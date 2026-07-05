@@ -601,6 +601,34 @@
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* Narrow: the matrix is stacked to one column, so keep it tidy — shorter
+   cells (no 240px voids), tighter gaps, and full-width header actions that
+   wrap instead of overflowing. Placed after the base .eis-cell so it wins. */
+@media (max-width: 768px) {
+  .eis-matrix {
+    gap: 10px;
+  }
+
+  .eis-cell {
+    min-height: 148px;
+    padding: 12px;
+  }
+
+  .eis-head-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .eis-expandable-add {
+    min-width: 0;
+    flex: 1 1 140px;
+  }
+
+  .eis-head-actions .ff-btn-primary {
+    flex: 1 1 120px;
+  }
+}
+
 .motion-drop-zone {
   transform-origin: center;
 }

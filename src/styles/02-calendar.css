@@ -24,6 +24,41 @@
   flex-wrap: wrap;
   gap: 12px;
   padding: 10px 4px;
+  /* Never let the column-flex shell crush the toolbar below its content when
+     it wraps to multiple rows on narrow widths (otherwise rows spill out). */
+  flex-shrink: 0;
+  /* Query container so the view tabs can go full-width when the calendar is
+     narrow (tracks the app sidebar, matching the body's collapse). */
+  container: gcalbar / inline-size;
+}
+
+/* Narrow: stack the toolbar into clean rows —
+   [menu · title · today · nav] / [range label] / [view tabs] — so nothing
+   clips off the right edge and the tabs split the width evenly. */
+@container gcalbar (max-width: 640px) {
+  .gcal-toolbar-left {
+    flex-wrap: wrap;
+  }
+
+  .gcal-range-label {
+    width: 100%;
+    font-size: 1rem;
+  }
+
+  .gcal-toolbar-right {
+    width: 100%;
+  }
+
+  .gcal-modes {
+    display: flex;
+    width: 100%;
+  }
+
+  .gcal-modes button {
+    flex: 1;
+    padding: 6px 8px;
+    text-align: center;
+  }
 }
 
 .gcal-toolbar-left,

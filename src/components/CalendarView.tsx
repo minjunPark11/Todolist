@@ -1,4 +1,4 @@
-import { DragEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { DragEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, FocusSession, Project, StudyTopic, Task, TaskDraft } from "../types";
 import {
   addDays,
@@ -115,6 +115,25 @@ export function CalendarView({
   const [mode, setMode] = useState<CalendarMode>("week");
   const [anchor, setAnchor] = useState(todayValue());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // When the calendar gets too narrow for a 7-day week grid (columns become
+  // too thin to read event names), fall back to the single-day view. Measured
+  // on the shell itself so it tracks the app sidebar, not just the viewport.
+  const shellRef = useRef<HTMLDivElement>(null);
+  const [isNarrow, setIsNarrow] = useState(false);
+  useEffect(() => {
+    const el = shellRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      setIsNarrow(entries[0].contentRect.width < 640);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    // One-way nudge: collapsing to narrow switches week→day, but growing back
+    // leaves the choice to the user (they can re-pick "week" any time).
+    if (isNarrow) setMode((current) => (current === "week" ? "day" : current));
+  }, [isNarrow]);
   // Default collapsed; remembered across sessions (origin-scoped localStorage).
   const [taskPanelCollapsed, setTaskPanelCollapsed] = useState(() => {
     try {
@@ -627,7 +646,7 @@ export function CalendarView({
   const isTimeGrid = mode === "week" || mode === "day";
 
   return (
-    <div className="gcal-shell">
+    <div className="gcal-shell" ref={shellRef}>
       <CalendarToolbar
         mode={mode}
         rangeLabel={rangeLabel}
