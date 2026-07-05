@@ -1,5 +1,6 @@
 import { ChangeEvent, ReactNode, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
+import type { AppUpdateStatus } from "../platform";
 import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, Task, ThemeMode } from "../types";
 import { CalendarCategorySettings } from "./calendar/CalendarCategorySettings";
 import { SegmentedTabs } from "./kit";
@@ -13,6 +14,8 @@ interface SettingsPageProps {
   onReset: () => void;
   importMessage: string;
   appVersion: string;
+  updateStatus: AppUpdateStatus | { status: "checking" };
+  onCheckUpdate: () => void;
   accountSlot: ReactNode;
   tasks: Task[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
@@ -45,6 +48,8 @@ export function SettingsPage({
   onReset,
   importMessage,
   appVersion,
+  updateStatus,
+  onCheckUpdate,
   accountSlot,
   tasks,
   onUpdateTask,
@@ -398,12 +403,28 @@ export function SettingsPage({
               <p>
                 {t("settings.appVersion")} <strong>{appVersion}</strong>
               </p>
+              <p>{formatUpdateStatus(updateStatus, t)}</p>
+              <div className="settings-actions">
+                <button type="button" onClick={onCheckUpdate} disabled={updateStatus.status === "checking"}>
+                  {t("settings.checkUpdates")}
+                </button>
+              </div>
             </div>
           </section>
         </>
       ) : null}
     </div>
   );
+}
+
+function formatUpdateStatus(
+  status: AppUpdateStatus | { status: "checking" },
+  t: (key: string, vars?: Record<string, string | number>) => string,
+) {
+  if (status.status === "checking") return t("settings.updateChecking");
+  if (status.status === "available") return t("settings.updateAvailable", { version: status.latestVersion });
+  if (status.status === "current") return t("settings.updateCurrent", { version: status.latestVersion ?? "" });
+  return status.message ? `${t("settings.updateUnavailable")} ${status.message}` : t("settings.updateUnavailable");
 }
 
 function ShareIcon() {

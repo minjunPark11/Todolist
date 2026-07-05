@@ -21,7 +21,7 @@ import {
   saveFocusUserSettings,
   type FocusUserSettings,
 } from "./lib/focusSettingsStorage";
-import { platform } from "./platform";
+import { platform, type AppUpdateStatus } from "./platform";
 import {
   buildCalendarShareSnapshot,
   createShareToken,
@@ -91,6 +91,7 @@ export default function App() {
   const [externalCalendarState, setExternalCalendarState] = useState<ExternalCalendarState>(() => loadExternalCalendarState());
   const [calendarShare, setCalendarShare] = useState<CalendarShareState>(emptyCalendarShareState);
   const [appVersion, setAppVersion] = useState(__APP_VERSION__);
+  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | { status: "checking" }>({ status: "checking" });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Desktop-only sidebar rail collapse; ignored by the mobile overlay menu.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -132,6 +133,16 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  async function checkAppUpdate(version = appVersion) {
+    setUpdateStatus({ status: "checking" });
+    const result = await platform.checkForUpdate(version);
+    setUpdateStatus(result);
+  }
+
+  useEffect(() => {
+    void checkAppUpdate(appVersion);
+  }, [appVersion]);
 
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -865,6 +876,8 @@ export default function App() {
         handleImport={handleImport}
         importMessage={importMessage}
         appVersion={appVersion}
+        updateStatus={updateStatus}
+        onCheckUpdate={() => void checkAppUpdate()}
         requestResetAllData={requestResetAllData}
         focusSettings={focusSettings}
         onUpdateFocusSettings={updateFocusSettings}

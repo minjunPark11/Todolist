@@ -195,6 +195,11 @@ export const en: Dictionary = {
   "settings.resetAllDataHint": "Permanently delete all tasks, projects, and notes. This cannot be undone.",
   "settings.appInfo": "App Info",
   "settings.appVersion": "App version",
+  "settings.checkUpdates": "Check for updates",
+  "settings.updateChecking": "Checking for updates...",
+  "settings.updateCurrent": "You're on the latest version.",
+  "settings.updateAvailable": "Update available: {{version}}",
+  "settings.updateUnavailable": "Could not check for updates.",
 
   // ---- Today page ----
   "today.title": "Today",

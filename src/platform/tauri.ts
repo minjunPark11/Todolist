@@ -60,6 +60,16 @@ export const tauriPlatform: PlatformAdapter = {
     return getVersion().catch(() => webPlatform.getAppVersion());
   },
 
+  async checkForUpdate(currentVersion) {
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const update = await check();
+      return update ? { status: "available", latestVersion: update.version } : { status: "current", latestVersion: currentVersion };
+    } catch (error) {
+      return { status: "unavailable", message: error instanceof Error ? error.message : "Update check failed." };
+    }
+  },
+
   miniFocusTimer: {
     supported() {
       return true;

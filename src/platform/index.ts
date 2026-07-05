@@ -4,4 +4,4 @@ import { webPlatform } from "./web";
 
 export const platform: PlatformAdapter = isTauriRuntime() ? tauriPlatform : webPlatform;
 
-export type { PlatformAdapter, PlatformKind } from "./types";
+export type { AppUpdateStatus, PlatformAdapter, PlatformKind } from "./types";

@@ -11,6 +11,7 @@ import type { ToastState } from "../components/kit";
 import type { usePlannerData } from "../hooks/usePlannerData";
 import type { CalendarShareState } from "../lib/calendarShare";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
+import type { AppUpdateStatus } from "../platform";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Project } from "../types";
 
 type Planner = ReturnType<typeof usePlannerData>;
@@ -48,6 +49,8 @@ type AppPagesProps = {
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
   importMessage: string;
   appVersion: string;
+  updateStatus: AppUpdateStatus | { status: "checking" };
+  onCheckUpdate: () => void;
   requestResetAllData: () => void;
   focusSettings: FocusUserSettings;
   onUpdateFocusSettings: (patch: Partial<FocusUserSettings>) => void;
@@ -99,6 +102,8 @@ export function AppPages({
   handleImport,
   importMessage,
   appVersion,
+  updateStatus,
+  onCheckUpdate,
   requestResetAllData,
   focusSettings,
   onUpdateFocusSettings,
@@ -306,6 +311,8 @@ export function AppPages({
       onReset={requestResetAllData}
       importMessage={importMessage}
       appVersion={appVersion}
+      updateStatus={updateStatus}
+      onCheckUpdate={onCheckUpdate}
       accountSlot={accountSlot}
       tasks={planner.tasks}
       onUpdateTask={planner.updateTask}

@@ -6,6 +6,10 @@ export type FocusTrayActionPayload = {
   action: FocusTrayAction;
   sessionId: string;
 };
+export type AppUpdateStatus =
+  | { status: "current"; latestVersion?: string }
+  | { status: "available"; latestVersion: string }
+  | { status: "unavailable"; message?: string };
 
 export interface PlatformAdapter {
   kind: PlatformKind;
@@ -21,6 +25,7 @@ export interface PlatformAdapter {
   requestNotificationPermission(): Promise<void>;
   aiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
   getAppVersion(): Promise<string>;
+  checkForUpdate(currentVersion: string): Promise<AppUpdateStatus>;
   miniFocusTimer: {
     supported(): boolean;
     open(snapshot: MiniFocusTimerSnapshot): Promise<boolean>;

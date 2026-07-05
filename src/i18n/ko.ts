@@ -195,6 +195,11 @@ export const ko: Dictionary = {
   "settings.resetAllDataHint": "모든 할 일, 프로젝트, 노트를 영구적으로 삭제합니다. 되돌릴 수 없습니다.",
   "settings.appInfo": "앱 정보",
   "settings.appVersion": "앱 버전",
+  "settings.checkUpdates": "업데이트 확인",
+  "settings.updateChecking": "업데이트를 확인하는 중...",
+  "settings.updateCurrent": "최신 버전입니다.",
+  "settings.updateAvailable": "업데이트 가능: {{version}}",
+  "settings.updateUnavailable": "업데이트를 확인할 수 없습니다.",
 
   // ---- Today page ----
   "today.title": "오늘",

@@ -6,6 +6,16 @@ import {
 } from "../lib/miniFocusTimer";
 import type { PlatformAdapter } from "./types";
 
+function compareVersions(a: string, b: string) {
+  const left = a.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const right = b.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const diff = (left[index] ?? 0) - (right[index] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 export const webPlatform: PlatformAdapter = {
   kind: "web",
 
@@ -51,6 +61,27 @@ export const webPlatform: PlatformAdapter = {
 
   async getAppVersion() {
     return __APP_VERSION__;
+  },
+
+  async checkForUpdate(currentVersion) {
+    try {
+      const response = await window.fetch("https://github.com/minjunPark11/Todolist/releases/latest/download/latest.json", {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        return { status: "unavailable", message: `Update check failed (${response.status})` };
+      }
+      const latest = (await response.json()) as { version?: unknown };
+      const latestVersion = typeof latest.version === "string" ? latest.version : "";
+      if (!latestVersion) {
+        return { status: "unavailable", message: "Latest version metadata is unavailable." };
+      }
+      return compareVersions(latestVersion, currentVersion) > 0
+        ? { status: "available", latestVersion }
+        : { status: "current", latestVersion };
+    } catch (error) {
+      return { status: "unavailable", message: error instanceof Error ? error.message : "Update check failed." };
+    }
   },
 
   miniFocusTimer: {

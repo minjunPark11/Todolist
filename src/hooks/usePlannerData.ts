@@ -99,6 +99,23 @@ const collectionTables = [
   ["studyTopics", "study_topics"],
   ["conceptNotes", "concept_notes"],
 ] as const;
+const optionalRemoteTables = new Set(["study_topics", "concept_notes"]);
+
+function isMissingRemoteTableError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { code?: unknown; message?: unknown };
+  const message = typeof record.message === "string" ? record.message.toLowerCase() : "";
+  return (
+    record.code === "PGRST205" ||
+    message.includes("could not find the table") ||
+    (message.includes("schema cache") && message.includes("table"))
+  );
+}
+
+function formatMissingRemoteTables(tables: Iterable<string>) {
+  const names = Array.from(tables);
+  return names.length ? ` Some cloud tables are local-only until Supabase migrations are applied: ${names.join(", ")}.` : "";
+}
 
 function createId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -511,6 +528,7 @@ export function usePlannerData() {
   // the UI then shows a "set a new password" form instead of the normal app.
   const [recoveryMode, setRecoveryMode] = useState(false);
   const syncTimerRef = useRef<number | null>(null);
+  const missingRemoteTablesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     platform.storage.setSync(STORAGE_KEY, JSON.stringify(data));
@@ -608,13 +626,18 @@ export function usePlannerData() {
 
     try {
       const partial: Partial<PlannerData> = {};
+      missingRemoteTablesRef.current = new Set();
 
       for (const [key, table] of collectionTables) {
         const { data: rows, error } = await supabase.from(table).select("data");
         if (error) {
-          // Name the table so a missing migration (e.g. study_topics) is
-          // obvious instead of a generic "could not load" message. Fail closed
-          // (don't mark remoteLoaded) so a partial read never overwrites remote.
+          if (optionalRemoteTables.has(table) && isMissingRemoteTableError(error)) {
+            missingRemoteTablesRef.current.add(table);
+            partial[key] = data[key] as never;
+            continue;
+          }
+          // Required tables should still fail loudly with the table name so a
+          // broken base Supabase setup is obvious.
           throw new Error(`'${table}' 테이블 로드 실패: ${error.message}`);
         }
         partial[key] = (rows ?? []).map((row: { data: unknown }) => row.data) as never;
@@ -633,7 +656,7 @@ export function usePlannerData() {
 
       setDataState(normalizeData(partial));
       setRemoteLoaded(true);
-      setSyncStatus("Synced with Supabase");
+      setSyncStatus(`Synced with Supabase.${formatMissingRemoteTables(missingRemoteTablesRef.current)}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not load Supabase data.";
       console.error("[Supabase] load failed:", error);
@@ -655,6 +678,10 @@ export function usePlannerData() {
       }
 
       for (const [key, table] of collectionTables) {
+        if (missingRemoteTablesRef.current.has(table)) {
+          continue;
+        }
+
         const items = nextData[key];
         const rows = items.map((item) => ({
           id: item.id,
@@ -665,6 +692,10 @@ export function usePlannerData() {
         if (rows.length > 0) {
           const { error } = await supabase.from(table).upsert(rows, { onConflict: "id,user_id" });
           if (error) {
+            if (optionalRemoteTables.has(table) && isMissingRemoteTableError(error)) {
+              missingRemoteTablesRef.current.add(table);
+              continue;
+            }
             throw error;
           }
         }
@@ -676,6 +707,10 @@ export function usePlannerData() {
         }
         const { error: deleteError } = await deleteQuery;
         if (deleteError) {
+          if (optionalRemoteTables.has(table) && isMissingRemoteTableError(deleteError)) {
+            missingRemoteTablesRef.current.add(table);
+            continue;
+          }
           throw deleteError;
         }
       }
@@ -693,7 +728,7 @@ export function usePlannerData() {
       }
 
       setSyncError("");
-      setSyncStatus("Synced with Supabase");
+      setSyncStatus(`Synced with Supabase.${formatMissingRemoteTables(missingRemoteTablesRef.current)}`);
     } catch (error) {
       setSyncError(error instanceof Error ? error.message : "Could not save Supabase data.");
       setSyncStatus("Supabase sync failed. Changes remain in localStorage.");
@@ -1681,7 +1716,7 @@ export function usePlannerData() {
       isLoading: authLoading,
       userEmail,
       isSignedIn: Boolean(userEmail),
-      mode: userEmail && remoteLoaded ? "supabase" : "localStorage",
+      mode: userEmail ? "supabase" : "localStorage",
       syncStatus,
       syncError,
       recoveryMode,
