@@ -111,6 +111,17 @@
   --motion-fast: 120ms ease-out;
   --motion-base: 180ms ease-out;
 
+  /* === Responsive breakpoints (Responsive_Audit.md) ===
+     13종 → 5종 표준. CSS 변수는 @media 조건식에 직접 못 쓰므로
+     아래 값을 @media에 그대로 쓰되, 반드시 이 5개만 사용한다.
+       xs 640  | sm 768  | md 900  | lg 1120 | xl 1240
+     (토큰은 JS/문서 참조용) */
+  --bp-xs: 640px;
+  --bp-sm: 768px;
+  --bp-md: 900px;
+  --bp-lg: 1120px;
+  --bp-xl: 1240px;
+
   /* Harmonize legacy aliases onto the spec accent so old screens match. */
   --color-primary: var(--accent);
   --color-primary-focus: var(--accent);
@@ -480,7 +491,7 @@ button:focus-visible {
   margin-left: auto;
 }
 
-@media (min-width: 861px) {
+@media (min-width: 900px) {
   .app-shell.sidebar-collapsed {
     grid-template-columns: 68px minmax(0, 1fr);
   }
@@ -1757,6 +1768,16 @@ textarea {
 .gcal-ai-btn:disabled {
   color: var(--color-ink-muted-48);
   cursor: default;
+}
+
+/* Query container for the calendar body (see @container gcal rule below).
+   inline-size only, so it constrains width-based reflow without affecting the
+   internal vertical scroll design (gcal-shell height + gcal-main overflow). */
+.gcal-body-container {
+  container: gcal / inline-size;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .gcal-body {
@@ -3038,7 +3059,7 @@ textarea {
   padding: 16px 20px 28px;
 }
 
-@media (max-width: 1360px) {
+@media (max-width: 1240px) {
   .gcal-year-grid {
     column-gap: 40px;
   }
@@ -3377,26 +3398,18 @@ textarea {
   color: var(--color-ink);
 }
 
-/* Laptop range: the fixed side panels leave too little room for the week
-   grid, crushing the day headers. Stack the contextual panel below the
-   calendar (sidebar stays) so the grid gets the full width. */
-@media (max-width: 1280px) {
-  .gcal-main-column {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 900px) {
+/* Container query: the calendar collapses based on its OWN available width
+   (which varies with the app-level sidebar), not the raw viewport. When the
+   body is too narrow for sidebar + week grid + task panel, drop to a single
+   column and hide the sidebar. Container declared on `.gcal-body-container`
+   (wraps only the body, so the fixed popovers stay viewport-anchored). */
+@container gcal (max-width: 800px) {
   .gcal-body {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .gcal-sidebar {
     display: none;
-  }
-
-  .gcal-main-column {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -4359,7 +4372,7 @@ textarea {
   font-size: 0.72rem;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1120px) {
   .page-grid {
     grid-template-columns: 1fr;
   }
@@ -4402,7 +4415,7 @@ textarea {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
@@ -4664,27 +4677,6 @@ main {
   grid-template-columns: minmax(220px, 1fr) 150px 150px 136px auto auto;
 }
 
-.today-board-grid {
-  display: grid;
-  /* Fluid: columns wrap 4→1 by available width; no breakpoints needed. */
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  align-items: start;
-}
-
-.today-board-grid .panel-section {
-  min-height: 260px;
-  padding: 18px;
-}
-
-.today-board-grid .panel-section:first-child {
-  min-height: 360px;
-}
-
-.planning-columns {
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-}
-
 .task-row {
   border-color: transparent;
   border-bottom: 1px solid var(--ff-border);
@@ -4732,12 +4724,6 @@ main {
   color: var(--ff-blue);
   background: var(--ff-blue-soft);
   box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18);
-}
-
-.study-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
 }
 
 .study-layout {
@@ -5047,10 +5033,7 @@ main {
   background: var(--bg-surface);
 }
 
-/* Dashboard grids (.today-board-grid / .planning-columns / .study-metrics)
-   are fluid via auto-fit — the 1200px and 760px column breakpoints they used
-   to need are now handled intrinsically. */
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   main {
     padding: 20px;
   }
@@ -5863,7 +5846,7 @@ main {
   .ff-page { padding: 20px 16px 64px; }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   body {
     overflow-x: hidden;
   }
@@ -6014,15 +5997,11 @@ main {
     line-height: 1.08;
   }
 
-  .today-board-grid,
-  .planning-columns,
-  .study-metrics,
   .study-layout,
   .ff-study-metrics,
   .ff-project-grid,
   .ff-topic-grid,
   .ff-note-grid,
-  .ff-board,
   .ff-matrix,
   .ff-overview-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -6237,14 +6216,13 @@ main {
 .ff-color-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; }
 .ff-color-swatch.active { border-color: var(--text-primary); }
 
-@media (max-width: 1100px) {
+@media (max-width: 1120px) {
   .ff-detail-layout { grid-template-columns: 1fr; }
   .ff-detail-panel { border-left: none; border-top: 1px solid var(--border-subtle); }
   .ff-overview-grid { grid-template-columns: 1fr; }
 }
 
 /* ===== Planning: Board ===== */
-.ff-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; align-items: start; }
 .ff-board-col {
   background: var(--bg-surface-muted);
   border: 1px solid var(--border-subtle);
@@ -6315,8 +6293,7 @@ main {
 .ff-matrix-head small { font-size: 12px; color: var(--text-tertiary); }
 .ff-matrix-body { display: flex; flex-direction: column; gap: 8px; flex: 1; }
 
-@media (max-width: 1100px) {
-  .ff-board { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 1120px) {
   .ff-matrix { grid-template-columns: 1fr; grid-template-rows: none; }
 }
 
@@ -7383,7 +7360,7 @@ main {
 
 /* --- Responsive --- */
 
-@media (max-width: 1100px) {
+@media (max-width: 1120px) {
   .tdy-body {
     grid-template-columns: 1fr;
   }
@@ -8735,7 +8712,7 @@ div.spc-signal-row {
   font-weight: 900;
 }
 
-@media (max-width: 1220px) {
+@media (max-width: 1240px) {
   .foc-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -8745,7 +8722,7 @@ div.spc-signal-row {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .foc-page {
     padding: 18px;
   }
@@ -8965,7 +8942,7 @@ div.spc-signal-row {
   font-size: 13px;
 }
 
-@media (max-width: 1220px) {
+@media (max-width: 1240px) {
   .spc-brief {
     grid-template-columns: 54px minmax(0, 1fr);
   }
@@ -10211,7 +10188,7 @@ div.spc-signal-row {
 }
 
 /* Responsive (§34) */
-@media (max-width: 1200px) {
+@media (max-width: 1240px) {
   .sdv-overview-top {
     grid-template-columns: 1fr;
   }
@@ -10221,7 +10198,7 @@ div.spc-signal-row {
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .sdv-overview-bottom,
   .sdv-focus-grid {
     grid-template-columns: 1fr;
@@ -11417,7 +11394,7 @@ div.spc-signal-row {
   align-items: stretch;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1120px) {
   .eis-matrix {
     grid-template-columns: 1fr;
   }

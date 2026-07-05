@@ -170,7 +170,23 @@ h1 { font-size: clamp(28px, 4vw, 40px); }
 - `.ff-study-metrics`(StudyPage) → auto-fit, 1100px media 블록 삭제.
 - 죽은 CSS `.today-board-grid/.planning-columns/.study-metrics`(컴포넌트 미사용) → auto-fit 전환 + 1200px 블록 삭제, 760px 블록 정리. ※ 이들은 **사용처 없음** → 추후 완전 삭제 후보.
 
-## 9. 다음 액션 제안
+## 9. 진행 현황 (2026-07-05 업데이트)
 
-- 가장 효과 큰 **2단계(FLUID 전환)**를 캘린더 or 대시보드 한 곳에 **시범 적용**해 패턴을 확정한 뒤 나머지에 확산하는 것을 추천.
-- 원하면 0~1단계(토큰 선언 + 값 통일)를 한 번에 PR로 만들 수 있음 — 동작은 사실상 그대로라 리스크 낮음.
+- **2단계 FLUID 전환 — 완료.** 대시보드/카드 그리드 auto-fit 확산 (커밋 `0bf17a5`, `2acfaf2`). `auto-fit` 19곳.
+- **0단계 토큰 선언 — 완료.** `:root`에 `--bp-xs/sm/md/lg/xl` (640/768/900/1120/1240) 추가.
+- **1단계 값 통일 — 완료.** 13종 → 5종. 23개 `@media` 전부 표준값만 사용.
+  - 매핑: 720·760→768 / 860·861·900→900 / 980·1100→1120 / 1200·1220·1280·1360→1240.
+  - 브라우저 검증(dev, 5181): 토큰 로드 OK, media 규칙 23개 전부 파싱, 노출된 폭 값 = 정확히 5종, 콘솔/파싱 에러 0.
+  - ⚠️ 861/860→900 인접 정렬됨(이전 1px 갭 제거). 값 이동폭이 큰 곳: 980→1120(`.eis-matrix`), 1360→1240(`.gcal-year-grid`) — 회귀는 안 보였으나 실사용 데이터로 재확인 권장.
+
+- **죽은 CSS 삭제 — 완료.** `.ff-board`, `.today-board-grid`(+자손), `.planning-columns`, `.study-metrics`, `.gcal-main-column` 1240 no-op media 제거. tsx 전수 확인으로 미사용 확정, 자식(`.ff-board-*` 등)은 보존.
+
+- **4단계 Container Query — `.gcal-body` 완료.** 캘린더 본문을 뷰포트가 아닌 **자기 컨테이너 폭**에 반응하도록 전환.
+  - `.gcal-body`만 감싸는 `.gcal-body-container`에 `container: gcal / inline-size` 선언. 팝오버(`.gcal-popover`, `.gcal-schedule-modal-backdrop`는 `position:fixed`)는 래퍼 **밖**(shell 직속)에 유지해 layout 컨테인먼트로 인한 기준 이동 방지.
+  - 규칙: `@container gcal (max-width: 800px)` → 3열→1열 + 사이드바 숨김. (기존 뷰포트 900px + main-column no-op 대체)
+  - probe 검증: 컨테이너 폭 810/799 경계에서 3열↔1열·사이드바 표시↔숨김 정확 전환, 내부 스크롤(shell height bound) 유지, 팝오버 컨테이너 미포함(0), 콘솔 에러 0, tsc 통과.
+  - ⚠️ 800px 임계값은 추정치(사이드220+그리드+패널260). 실사용 폭에서 눈으로 미세 조정 여지 있음.
+  - 참고: `.ff-board`는 죽은 CSS라 CQ 대상 아님(삭제됨). 다른 gcal-* 패널은 필요 시 동일 패턴으로 확산 가능.
+
+### 미완 / 후속
+- **5단계 파일 분할 — 별도 진행 권장.** 12.5k줄 단일 파일 → 순수 기계적 이동(동작 무변). diff 폭발로 회귀 리뷰가 어려워지므로 독립 PR이 적합.

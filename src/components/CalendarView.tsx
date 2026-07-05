@@ -642,6 +642,7 @@ export function CalendarView({
         onNext={() => shift(1)}
       />
 
+      <div className="gcal-body-container">
       <div className={sidebarCollapsed ? "gcal-body is-sidebar-rail" : "gcal-body"}>
         <CalendarLeftSidebar
           anchor={anchor}
@@ -752,6 +753,7 @@ export function CalendarView({
             onDragEnd={handleDragEnd}
           />
         ) : null}
+      </div>
       </div>
 
       {popover?.kind === "event" ? (
