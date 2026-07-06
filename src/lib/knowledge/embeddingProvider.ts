@@ -1,7 +1,42 @@
 // Full-mode embeddings: always the local Ollama instance (KNOWLEDGE_BASE_DESIGN.md
 // principles 9-10 — never a remote provider). See design §4.6.
-import { getOllamaBaseUrl, withTimeout } from "../ai/providers/ollamaProvider";
+//
+// NOTE: chat no longer uses Ollama (the managed llama-server replaced it,
+// LOCAL_AI_SYSTEM_DESIGN.md Phase 4), but Full-mode embeddings still do until
+// the llama-server embedding backend lands (Phase 5). This module is the only
+// remaining Ollama dependency, so the base-URL helper lives here now.
+import { withTimeout } from "../ai/http";
 import { platform } from "../../platform";
+
+const DEFAULT_OLLAMA_URL = "http://localhost:11434";
+
+function getOllamaBaseUrl() {
+  const configured = import.meta.env.VITE_OLLAMA_URL as string | undefined;
+  return (configured?.trim() || DEFAULT_OLLAMA_URL).replace(/\/$/, "");
+}
+
+// Lists models installed on the local Ollama instance so the Settings UI can
+// tell whether the configured embedding model is available. Empty array =
+// Ollama offline or no models.
+export async function listOllamaModels(): Promise<string[]> {
+  const baseUrl = getOllamaBaseUrl();
+  const timeout = withTimeout(2500);
+  try {
+    const response = await platform.aiFetch(`${baseUrl}/api/tags`, {
+      method: "GET",
+      signal: timeout.signal,
+    });
+    if (!response.ok) return [];
+    const data = (await response.json().catch(() => null)) as OllamaTagsResponse | null;
+    return (data?.models ?? [])
+      .map((entry) => entry.name ?? entry.model ?? "")
+      .filter((name): name is string => name.length > 0);
+  } catch {
+    return [];
+  } finally {
+    timeout.clear();
+  }
+}
 
 export interface EmbeddingProvider {
   isAvailable(): Promise<boolean>;
@@ -21,7 +56,7 @@ type OllamaEmbedResponse = {
 
 // Ollama model names come back as e.g. "bge-m3:latest"; a bare configured
 // name ("bge-m3") should still match that installed tag. Exported so Settings
-// UI can check candidate embedding models against listLocalAiModels() output.
+// UI can check candidate embedding models against listOllamaModels() output.
 export function modelNameMatches(installedName: string, configuredName: string): boolean {
   const installedBase = installedName.split(":")[0];
   const configuredBase = configuredName.split(":")[0];

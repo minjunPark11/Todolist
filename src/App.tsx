@@ -1114,8 +1114,6 @@ export default function App() {
       />
       <OllamaChat
         activePage={activePage}
-        aiModel={appSettings.aiModel}
-        onChangeAiModel={(model) => planner.updateAppSettings({ aiModel: model })}
         knowledgeSettings={knowledge.settings}
         aiContext={{
           currentPage: activePage,

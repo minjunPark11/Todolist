@@ -5,7 +5,7 @@
 import { useEffect } from "react";
 import { platform } from "../../platform";
 import { findModelById } from "./modelCatalog";
-import { withTimeout } from "../ai/providers/ollamaProvider";
+import { withTimeout } from "../ai/http";
 import { loadLocalAiSettings } from "./settings";
 import type { InstalledModelFile, LocalAiSettings } from "./types";
 

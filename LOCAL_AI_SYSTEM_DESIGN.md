@@ -28,7 +28,7 @@ Focus Todo 앱
 
 | # | 원칙 |
 |---|------|
-| 1 | **Ollama는 기본값이 아니다.** Ollama / LM Studio / LocalAI는 "외부 서버 연결" 옵션으로만 남는다. 정식 경로는 `llama.cpp`의 `llama-server`를 Tauri sidecar로 자동 실행하는 것이다. |
+| 1 | **Ollama 의존 없음.** 정식 경로는 `llama.cpp`의 `llama-server`를 Tauri sidecar로 자동 실행하는 것이다. Ollama 전용 chat provider는 Phase 4에서 제거했고, 외부 서버 연결은 일반 OpenAI 호환 서버(LM Studio, LocalAI 등)로 통일했다. (예외: Full RAG 임베딩은 Phase 5까지 Ollama 사용 — §8) |
 | 2 | **모델 파일은 앱 설치 파일에 포함하지 않는다.** GGUF는 앱 내 모델 설치 화면에서 다운로드하고, OS별 앱 로컬 데이터 폴더에 저장한다. |
 | 3 | **llama-server 바이너리는 sidecar로 포함할 수 있게 설계만 한다.** 실제 바이너리는 git에 커밋하지 않는다 (§7). |
 | 4 | **AI는 앱 시작 시 무조건 켜지 않는다.** 기본값은 "AI 기능 사용 시 자동 실행(on-demand)"이며, "앱 시작 시 미리 실행", "외부 서버 연결"은 옵션이다. |
@@ -59,8 +59,8 @@ Focus Todo 앱
 │  │   settings.ts       local-only 설정 저장 + useLocalAiSettings 훅        │ │
 │  │   runtime.ts        AiRuntimeManager — ensureAiReady() 오케스트레이션    │ │
 │  │                                                                        │ │
-│  │ src/lib/ai/gateway.ts  provider 체인 (Phase 4에서 llamaServer 추가)      │ │
-│  │   [llamaServer(관리형)] → ollama → remote-ollama → server               │ │
+│  │ src/lib/ai/gateway.ts  provider 체인 (Phase 4 반영)                     │ │
+│  │   llamaServer(관리형 sidecar 또는 외부 OpenAI 호환 서버) → server         │ │
 │  │                                                                        │ │
 │  │ src/lib/knowledge/*    KnowledgeContext (기존 그대로 재사용)             │ │
 │  └───────────────┬────────────────────────────────────────────────────────┘ │
@@ -288,19 +288,24 @@ externalBin/리소스 번들링은 **추가적인** 패키징 단계로 남는�
 | 앱 시작 시 미리 실행 | `on-app-start` | 앱 부팅 후 백그라운드 spawn (모델 로딩 선반영) |
 | 외부 서버에 연결 | `external` | spawn 안 함. externalServerUrl로 연결 (Ollama/LM Studio/LocalAI) |
 
-### 기존 provider 체인과의 통합 (Phase 4)
+### 기존 provider 체인과의 통합 (Phase 4 — 구현됨)
 
-`src/lib/ai/providers/llamaServerProvider.ts`(신규)가 OpenAI 호환
-`/v1/chat/completions`를 호출하고, `gateway.ts` 체인의 **맨 앞**에 선다:
+`src/lib/ai/providers/llamaServerProvider.ts`가 OpenAI 호환
+`/v1/chat/completions`를 호출하고, `gateway.ts` 체인의 **맨 앞**에 선다.
+**Ollama 전용 provider(로컬/원격)는 삭제했다**:
 
 ```
-llamaServer(관리형, 로컬) → ollama(외부 로컬) → remote-ollama → server
+llamaServer(관리형 sidecar, 또는 external 모드의 OpenAI 호환 서버) → server
 ```
 
-- `canHandleFullAppData()` / `canHandleKnowledgeContext()`는 localhost일 때만
-  true — 기존 게이트 로직 그대로.
-- `AiProviderName`에 `"llama-server"` 추가는 Phase 4에서 수행
-  (지금 추가하면 죽은 코드 경고만 남는다).
+- chat 호출 시 provider가 `ensureAiReady()`를 수행 — on-demand 모드에선 이
+  순간 sidecar가 뜨고 모델이 로드된다(의도된 흐름).
+- `canHandleFullAppData()` / `canHandleKnowledgeContext()`는 엔드포인트가
+  localhost일 때만 true — 관리형은 항상, external은 URL이 로컬일 때만.
+- 채팅의 모델 선택 UI(Ollama 태그 목록)는 제거 — 관리형에선 모델이 Local AI
+  설정(selectedModelId)에서 정해진다. `appSettings.aiModel`은 sync 스키마
+  호환을 위해 필드만 남긴 레거시.
+- Full RAG 임베딩(`embeddingProvider.ts`)만 Phase 5까지 Ollama에 남는다.
 
 ---
 
@@ -394,7 +399,7 @@ OS · RAM · CPU(코어) · GPU(감지 시) · 저장공간 · **추천 모델 �
 | **1** | Local AI Setup UI (검사 동의 → 결과 → 추천), i18n, GPU 감지 1차(wgpu 이름) | ✅ UI/i18n (설정 탭 "로컬 AI") · GPU 감지는 미착수 |
 | **2** | ModelInstaller: Rust 다운로드 command (진행률 event, 이어받기, sha256), 다운로드 UI, 카탈로그 URL/해시 확정 | ✅ 다운로드 인프라 완료 · URL/해시는 여전히 TODO(release) — 해시 없는 모델은 다운로드 버튼이 비활성 |
 | **3** | sidecar: spawn/health/종료 정리, 포트 충돌 처리 (런타임 바이너리 해석 방식 — §7) | ✅ 런타임 완료 · 바이너리 자동 설치/패키징은 후속 |
-| **4** | `llamaServerProvider` 추가 + gateway 체인 선두 배치, launchMode(on-app-start/external) 반영, 기존 Ollama 경로는 외부 서버 옵션으로 강등 | |
+| **4** | `llamaServerProvider` 추가 + gateway 체인 선두 배치, Ollama chat provider 제거 (외부 연결은 OpenAI 호환으로 통일) | ✅ |
 | **5** | 임베딩 llama-server 백엔드(Full RAG), 유휴 자동 종료, NVIDIA VRAM 감지 | |
 
 각 Phase는 독립적으로 출시 가능하다 — Phase 2까지만 나가도 "모델 준비"가 되고,

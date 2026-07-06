@@ -90,7 +90,8 @@ export interface LocalAiSettings {
   // probes upward from this value when it is taken and reports the real port
   // via LocalAiRuntimeStatus.
   serverPort: number;
-  // Only used when launchMode === "external" (Ollama / LM Studio / LocalAI).
+  // Only used when launchMode === "external" — any OpenAI-compatible server
+  // (LM Studio, LocalAI, …).
   externalServerUrl: string;
   // Catalog id of the model chosen during setup. "" = setup not done.
   selectedModelId: string;
