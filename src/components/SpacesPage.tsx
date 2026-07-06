@@ -860,19 +860,13 @@ function SpaceFormFields({ draft, error, onUpdate }: { draft: AddSpaceDraft; err
         <>
           <label>{t("spaces.form.objective")}<input value={draft.objective} onChange={(event) => onUpdate({ objective: event.target.value })} /></label>
           <label>{t("spaces.form.deadline")}<input type="date" value={draft.deadline} onChange={(event) => onUpdate({ deadline: event.target.value })} /></label>
-          <label>{t("spaces.form.milestones")}<textarea value={draft.initialMilestonesText} onChange={(event) => onUpdate({ initialMilestonesText: event.target.value })} placeholder={"Dashboard\nCalendar\nSpaces"} /></label>
           <label>{t("spaces.form.tasks")}<textarea value={draft.initialTasksText} onChange={(event) => onUpdate({ initialTasksText: event.target.value })} /></label>
         </>
       ) : null}
       {type === "study" ? (
         <>
           <label>{t("spaces.form.learningGoal")}<input value={draft.learningGoal} onChange={(event) => onUpdate({ learningGoal: event.target.value })} /></label>
-          <label>{t("spaces.form.topics")}<input value={draft.initialTopicsText} onChange={(event) => onUpdate({ initialTopicsText: event.target.value })} placeholder="Array/String, Hash Map, Stack" /></label>
-          <label>{t("spaces.form.trackingStyle")}<select value={draft.trackingStyle} onChange={(event) => onUpdate({ trackingStyle: event.target.value as AddSpaceDraft["trackingStyle"] })}><option value="problems">{t("spaces.form.trackProblems")}</option><option value="concepts">{t("spaces.form.trackConcepts")}</option><option value="notes">{t("spaces.form.trackNotes")}</option><option value="mixed">{t("spaces.form.trackMixed")}</option></select></label>
         </>
-      ) : null}
-      {type === "custom" ? (
-        <label>{t("spaces.form.customSections")}<textarea value={draft.customSectionsText} onChange={(event) => onUpdate({ customSectionsText: event.target.value })} placeholder={"Notes\nTasks\nActivity"} /></label>
       ) : null}
       <label>{t("spaces.form.description")}<textarea value={draft.description} onChange={(event) => onUpdate({ description: event.target.value })} /></label>
     </div>
