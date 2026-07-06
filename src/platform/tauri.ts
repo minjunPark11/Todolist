@@ -309,6 +309,10 @@ export const tauriPlatform: PlatformAdapter = {
       await invoke("stop_local_ai_server");
     },
 
+    async getPlatform() {
+      return invoke<{ os: string; arch: string }>("get_local_ai_platform");
+    },
+
     async isServerInstalled() {
       return invoke<boolean>("is_local_ai_server_installed");
     },

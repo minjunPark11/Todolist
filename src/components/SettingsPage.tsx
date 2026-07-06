@@ -7,11 +7,11 @@ import {
   deleteInstalledModel,
   installServerRuntime,
   isModelDownloadable,
-  isServerRuntimeAvailable,
+  resolveServerRuntimeForPlatform,
   startModelDownload,
 } from "../lib/localAi/installer";
 import { LOCAL_MODEL_CATALOG, findModelById } from "../lib/localAi/modelCatalog";
-import { resolveServerRuntimeAsset } from "../lib/localAi/serverRuntimeCatalog";
+import type { ServerRuntimeAsset } from "../lib/localAi/serverRuntimeCatalog";
 import { recommendLocalModel } from "../lib/localAi/recommender";
 import { useLocalAiSettings } from "../lib/localAi/settings";
 import type {
@@ -858,10 +858,10 @@ function LocalAiSettingsTab() {
   const [downloadError, setDownloadError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<InstalledModelFile | null>(null);
   const [serverInstalled, setServerInstalled] = useState<boolean | null>(null);
+  const [runtimeAsset, setRuntimeAsset] = useState<ServerRuntimeAsset | null>(null);
 
   const recommendation = useMemo(() => (profile ? recommendLocalModel(profile, t) : null), [profile, t]);
   const selectedModel = findModelById(settings.selectedModelId);
-  const runtimeAsset = resolveServerRuntimeAsset();
   const installingRuntime = downloadingId === SERVER_RUNTIME_DOWNLOAD_ID;
 
   async function refreshInstalledModels() {
@@ -876,6 +876,7 @@ function LocalAiSettingsTab() {
     if (!isDesktop) return;
     void platform.localAi.getModelsDir().then(setModelsDir).catch(() => undefined);
     void platform.localAi.isServerInstalled().then(setServerInstalled).catch(() => setServerInstalled(false));
+    void resolveServerRuntimeForPlatform().then(setRuntimeAsset).catch(() => setRuntimeAsset(null));
     void refreshInstalledModels();
 
     let unsubscribe: (() => void) | undefined;
@@ -1202,7 +1203,7 @@ function LocalAiSettingsTab() {
               <button
                 type="button"
                 className="ff-btn ff-btn-primary"
-                disabled={!isServerRuntimeAvailable() || serverInstalled === null}
+                disabled={!runtimeAsset || serverInstalled === null}
                 onClick={() => void handleInstallRuntime()}
               >
                 {downloadError ? t("settings.localAi.downloadRetry") : t("settings.localAi.runtimeInstallButton")}

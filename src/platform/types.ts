@@ -86,6 +86,10 @@ export interface PlatformLocalAi {
   // via GET /health, since model loading can take tens of seconds.
   startServer(modelFileName: string, preferredPort: number, binaryPathOverride: string): Promise<LocalAiRuntimeStatus>;
   stopServer(): Promise<void>;
+  // The running build's target (std::env::consts OS/ARCH), used to pick the
+  // matching runtime asset — e.g. macos-aarch64 vs macos-x86_64 on a universal
+  // app. Reveals nothing beyond the app binary itself, so it needs no consent.
+  getPlatform(): Promise<{ os: string; arch: string }>;
   // True once the managed llama-server binary is present in the app-local bin
   // dir. External launch mode and a path override don't need it.
   isServerInstalled(): Promise<boolean>;

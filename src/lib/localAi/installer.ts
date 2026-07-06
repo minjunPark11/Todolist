@@ -40,16 +40,17 @@ export async function cancelModelDownload(modelId: string): Promise<void> {
   await platform.localAi.cancelDownload(modelId);
 }
 
-// True when a pinned llama-server build exists for this platform (so the UI can
-// offer the install action instead of a "not available" message).
-export function isServerRuntimeAvailable(): boolean {
-  return resolveServerRuntimeAsset() !== null;
+// The pinned llama-server build for the running platform, or null when none is
+// available yet (so the UI can offer install vs. a "not available" message).
+export async function resolveServerRuntimeForPlatform() {
+  const { os, arch } = await platform.localAi.getPlatform();
+  return resolveServerRuntimeAsset(os, arch);
 }
 
 // Downloads + extracts the managed llama-server for this platform. Throws if no
 // asset is pinned for it; the Rust side verifies the sha256 on install.
 export async function installServerRuntime(): Promise<ModelDownloadOutcome> {
-  const asset = resolveServerRuntimeAsset();
+  const asset = await resolveServerRuntimeForPlatform();
   if (!asset) {
     throw new Error("No llama-server runtime is available for this platform yet.");
   }

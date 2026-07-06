@@ -66,6 +66,25 @@ pub struct LocalAiRuntimeStatus {
     pub port: Option<u16>,
 }
 
+// The running build's target, used to pick the right runtime asset (e.g.
+// macos-aarch64 vs macos-x86_64 on a universal app). Unlike HardwareProfile
+// this reveals nothing about the user's machine beyond the app's own binary, so
+// it needs no consent gate.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalAiPlatform {
+    pub os: String,
+    pub arch: String,
+}
+
+#[tauri::command]
+pub fn get_local_ai_platform() -> LocalAiPlatform {
+    LocalAiPlatform {
+        os: std::env::consts::OS.to_string(),
+        arch: std::env::consts::ARCH.to_string(),
+    }
+}
+
 fn bytes_to_gb(bytes: u64) -> f64 {
     // One decimal is plenty for recommendation thresholds and the UI.
     (bytes as f64 / (1024.0 * 1024.0 * 1024.0) * 10.0).round() / 10.0
@@ -466,11 +485,12 @@ pub async fn delete_local_ai_model(app: tauri::AppHandle, file_name: String) -> 
 
 // ===== llama-server runtime installer (Phase 6, LOCAL_AI_SYSTEM_DESIGN.md §7.7) =====
 //
-// Downloads an official llama.cpp release zip (allowlist + sha256, same trust
-// model as model files) and extracts it into <app-local-data>/bin, where
-// resolve_server_binary already looks. The zip is flat and ships llama-server
-// plus its companion DLLs, so we extract every entry to keep the dynamic
-// dependency closure intact.
+// Downloads an official llama.cpp release archive (allowlist + sha256, same
+// trust model as model files) and extracts it into <app-local-data>/bin, where
+// resolve_server_binary already looks. Windows ships a flat .zip; macOS/Linux
+// ship a .tar.gz whose contents are wrapped in a single top-level directory
+// that we flatten away. Either way we keep every entry so llama-server's
+// companion libraries (DLLs / .so / .dylib) stay beside it.
 
 // Extracts a zip into `dest`, rejecting entries that would escape it. Blocking,
 // so callers run it on a blocking task. `dest` must already exist.
@@ -495,6 +515,56 @@ fn extract_zip_to_dir(zip_path: &Path, dest: &Path) -> Result<(), String> {
         std::io::copy(&mut entry, &mut out).map_err(|error| error.to_string())?;
     }
     Ok(())
+}
+
+// Drops the first path component so `llama-<tag>/llama-server` lands at
+// `<dest>/llama-server`. llama.cpp's macOS/Linux tarballs wrap everything in one
+// top-level dir; a component-less entry (the dir itself) yields None and is
+// skipped by the caller.
+fn strip_leading_component(path: &Path) -> Option<PathBuf> {
+    let mut components = path.components();
+    components.next();
+    let rest = components.as_path();
+    if rest.as_os_str().is_empty() {
+        None
+    } else {
+        Some(rest.to_path_buf())
+    }
+}
+
+// Extracts a gzipped tar into `dest`, flattening the single wrapper directory
+// and preserving Unix permissions (so llama-server keeps its exec bit).
+// Blocking; `dest` must already exist.
+fn extract_tar_gz_to_dir(archive_path: &Path, dest: &Path) -> Result<(), String> {
+    let file = std::fs::File::open(archive_path).map_err(|error| error.to_string())?;
+    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(file));
+    archive.set_preserve_permissions(true);
+    let entries = archive.entries().map_err(|error| error.to_string())?;
+    for entry in entries {
+        let mut entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path().map_err(|error| error.to_string())?.into_owned();
+        // Reject absolute paths / ".." traversal, then flatten the wrapper dir.
+        if path.is_absolute() || path.components().any(|c| c == std::path::Component::ParentDir) {
+            continue;
+        }
+        let Some(relative) = strip_leading_component(&path) else {
+            continue;
+        };
+        let out_path = dest.join(&relative);
+        if let Some(parent) = out_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        entry.unpack(&out_path).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn extract_runtime_archive(archive_path: &Path, dest: &Path, is_tar_gz: bool) -> Result<(), String> {
+    if is_tar_gz {
+        extract_tar_gz_to_dir(archive_path, dest)
+    } else {
+        extract_zip_to_dir(archive_path, dest)
+    }
 }
 
 #[tauri::command]
@@ -522,8 +592,16 @@ pub async fn install_local_ai_server(
         return Ok(DownloadOutcome::Completed);
     }
 
-    let archive_path = bin_dir.join(SERVER_RUNTIME_ARCHIVE_NAME);
-    let partial_path = bin_dir.join(format!("{SERVER_RUNTIME_ARCHIVE_NAME}{PARTIAL_SUFFIX}"));
+    let is_tar_gz = {
+        let lower = url.to_ascii_lowercase();
+        lower.ends_with(".tar.gz") || lower.ends_with(".tgz")
+    };
+    let archive_name = format!(
+        "{SERVER_RUNTIME_ARCHIVE_STEM}.{}",
+        if is_tar_gz { "tar.gz" } else { "zip" }
+    );
+    let archive_path = bin_dir.join(&archive_name);
+    let partial_path = bin_dir.join(format!("{archive_name}{PARTIAL_SUFFIX}"));
 
     let cancel = Arc::new(AtomicBool::new(false));
     {
@@ -559,7 +637,7 @@ pub async fn install_local_ai_server(
 
     let extract_dir = bin_dir.clone();
     let extract_archive = archive_path.clone();
-    tokio::task::spawn_blocking(move || extract_zip_to_dir(&extract_archive, &extract_dir))
+    tokio::task::spawn_blocking(move || extract_runtime_archive(&extract_archive, &extract_dir, is_tar_gz))
         .await
         .map_err(|error| error.to_string())??;
     let _ = tokio::fs::remove_file(&archive_path).await;
@@ -581,8 +659,9 @@ const LOCAL_BIN_DIR_NAME: &str = "bin";
 // Progress for the runtime install streams under this synthetic id so the
 // frontend can reuse the same download-progress subscription as model files.
 const SERVER_RUNTIME_DOWNLOAD_ID: &str = "llama-server-runtime";
-// Temporary archive name while the runtime zip downloads into the bin dir.
-const SERVER_RUNTIME_ARCHIVE_NAME: &str = "llama-server-runtime.zip";
+// Base name for the runtime archive while it downloads into the bin dir; the
+// real extension (.zip or .tar.gz) is chosen from the download URL.
+const SERVER_RUNTIME_ARCHIVE_STEM: &str = "llama-server-runtime";
 // How far above the preferred port we probe for a free one.
 const PORT_PROBE_RANGE: u16 = 20;
 

@@ -278,13 +278,18 @@ externalBin/리소스 번들링은 **추가적인** 패키징 단계로 남는�
 6. **유휴 정지(옵션, 후순위)**: N분 미사용 시 자동 종료로 메모리 회수.
 7. **바이너리 자동 설치(Phase 6 — 구현됨)**: 모델 다운로더와 동일한
    allowlist+sha256 구조로 llama.cpp 공식 릴리스( github.com/ggml-org/llama.cpp )
-   에서 zip을 받아 `<app-local-data>/bin`에 해제한다. Rust
-   `install_local_ai_server`가 `run_download`로 스트리밍+sha256 검증 후 `zip`
-   크레이트로 전체 추출(Windows는 llama-server.exe + 동반 DLL). 진행률/취소는
-   모델 다운로드 채널(`llama-server-runtime` id)을 재사용하고,
-   `is_local_ai_server_installed`로 설치 여부를 보고한다. 카탈로그는
-   `src/lib/localAi/serverRuntimeCatalog.ts`(OS/arch 키). 현재 pin: b9885 Windows
-   x64 CPU 빌드. macOS/Linux·GPU(Vulkan/CUDA)+`-ngl` 빌드는 후속.
+   에서 아카이브를 받아 `<app-local-data>/bin`에 해제한다. Rust
+   `install_local_ai_server`가 `run_download`로 스트리밍+sha256 검증 후, URL
+   확장자로 추출기를 고른다: Windows `.zip`(평면, llama-server.exe + 동반 DLL)은
+   `zip` 크레이트, macOS/Linux `.tar.gz`(단일 래퍼 디렉터리)는 `tar`+`flate2`로
+   최상위 디렉터리를 평탄화하며 Unix 권한(exec bit)·심볼릭 링크를 보존한다.
+   진행률/취소는 모델 다운로드 채널(`llama-server-runtime` id)을 재사용하고,
+   `is_local_ai_server_installed`로 설치 여부를 보고한다. 카탈로그
+   `src/lib/localAi/serverRuntimeCatalog.ts`는 `${os}-${arch}` 키이며,
+   `get_local_ai_platform`(std::env::consts, 동의 불필요)으로 universal 앱이
+   실행 슬라이스에 맞는 자산을 고른다. 현재 pin: b9885 CPU 빌드 — windows-x86_64,
+   macos-aarch64, macos-x86_64(릴리스 빌드 타깃과 일치). Linux·GPU(Vulkan/CUDA)+
+   `-ngl` 빌드는 후속. **macOS 실행은 실기기 미검증(Gatekeeper 포함)**.
 
 ### 실행 모드 (LocalAiSettings.launchMode)
 
@@ -415,7 +420,7 @@ OS · RAM · CPU(코어) · GPU(감지 시) · 저장공간 · **추천 모델 �
 | **3** | sidecar: spawn/health/종료 정리, 포트 충돌 처리 (런타임 바이너리 해석 방식 — §7) | ✅ 런타임 완료 · 바이너리 자동 설치/패키징은 후속 |
 | **4** | `llamaServerProvider` 추가 + gateway 체인 선두 배치, Ollama chat provider 제거 (외부 연결은 OpenAI 호환으로 통일) | ✅ |
 | **5** | 아키텍처 전환 완료: 임베딩 llama-server 백엔드(Full RAG), Ollama 의존 제거/격리, 유휴 자동 종료, NVIDIA VRAM 감지 | ✅ 구현 |
-| **6** | 기존 배포 앱 통합 릴리스: llama-server 바이너리 확보/검증/설치, 모델 카탈로그 URL·sha256 확정, feature gate, 업데이트 호환성 | 🟡 런타임 자동 설치(§7.7, Windows x64 CPU pin) + 모델 카탈로그 확정 완료 · macOS/Linux·GPU 빌드, feature gate, 업데이트 호환성은 후속 |
+| **6** | 기존 배포 앱 통합 릴리스: llama-server 바이너리 확보/검증/설치, 모델 카탈로그 URL·sha256 확정, feature gate, 업데이트 호환성 | 🟡 런타임 자동 설치(§7.7, Windows x64 + macOS arm64/x64 CPU pin, zip/tar.gz) + 모델 카탈로그 확정 완료 · macOS 실기기 검증, Linux·GPU 빌드, feature gate, 업데이트 호환성은 후속 |
 | **7** | 실제 기기 QA + staged rollout: Windows 기준 smoke/e2e, 저사양/중간/고사양 프로파일, 성능·메모리·전력 기준선, rollback 기준 | 설계 |
 | **8** | 운영 안정화: 진단 로그(민감정보 제외), 복구/재설치 플로우, 사용자 지원 문서, 기본 공개 전환 | 설계 |
 | **9** | 제품 확장(선택): 모델/프롬프트 품질 튜닝, 고급 RAG 검색, 멀티 모델 프로필, GPU 가속 고도화 | 후보 |

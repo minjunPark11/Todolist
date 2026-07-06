@@ -413,7 +413,8 @@ fn main() {
             local_ai::start_local_ai_server,
             local_ai::stop_local_ai_server,
             local_ai::is_local_ai_server_installed,
-            local_ai::install_local_ai_server
+            local_ai::install_local_ai_server,
+            local_ai::get_local_ai_platform
         ])
         .build(tauri::generate_context!())
         .expect("error while running FocusFlow desktop app")
