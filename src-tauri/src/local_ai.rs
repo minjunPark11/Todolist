@@ -637,10 +637,13 @@ pub async fn install_local_ai_server(
 
     let extract_dir = bin_dir.clone();
     let extract_archive = archive_path.clone();
-    tokio::task::spawn_blocking(move || extract_runtime_archive(&extract_archive, &extract_dir, is_tar_gz))
+    let extract_result = tokio::task::spawn_blocking(move || extract_runtime_archive(&extract_archive, &extract_dir, is_tar_gz))
         .await
-        .map_err(|error| error.to_string())??;
+        .map_err(|error| error.to_string())?;
+    // Drop the downloaded archive either way so a failed extract doesn't leave
+    // a stale zip/tarball behind for the next attempt to trip over.
     let _ = tokio::fs::remove_file(&archive_path).await;
+    extract_result?;
 
     if !bin_dir.join(server_binary_file_name()).is_file() {
         return Err("The runtime archive did not contain llama-server.".to_string());
