@@ -296,5 +296,17 @@ export const tauriPlatform: PlatformAdapter = {
         handler(event.payload);
       });
     },
+
+    async startServer(modelFileName, preferredPort, binaryPathOverride) {
+      return invoke<LocalAiRuntimeStatus>("start_local_ai_server", {
+        modelFileName,
+        preferredPort,
+        binaryPathOverride,
+      });
+    },
+
+    async stopServer() {
+      await invoke("stop_local_ai_server");
+    },
   },
 };

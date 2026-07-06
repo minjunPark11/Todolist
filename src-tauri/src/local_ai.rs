@@ -418,14 +418,215 @@ pub async fn delete_local_ai_model(app: tauri::AppHandle, file_name: String) -> 
     Ok(())
 }
 
-#[tauri::command]
-pub fn get_local_ai_runtime_status() -> LocalAiRuntimeStatus {
-    // TODO(Phase 3): track the spawned llama-server sidecar in managed state
-    // (pid + actual port after port probing) and report it here. Until the
-    // sidecar exists there is nothing to report.
+// ===== llama-server sidecar runtime (Phase 3, LOCAL_AI_SYSTEM_DESIGN.md §7) =====
+//
+// The server binary is resolved at RUNTIME, not bundled via externalBin:
+// builds stay green without binaries in the repo, and the lookup order below
+// keeps a future externalBin/resource-dir integration additive.
+
+const SERVER_BINARY_NAME: &str = "llama-server";
+const LOCAL_BIN_DIR_NAME: &str = "bin";
+// How far above the preferred port we probe for a free one.
+const PORT_PROBE_RANGE: u16 = 20;
+
+struct ManagedServer {
+    child: std::process::Child,
+    port: u16,
+    model_file: String,
+}
+
+#[derive(Default)]
+pub struct LocalAiRuntimeState {
+    server: Mutex<Option<ManagedServer>>,
+}
+
+fn server_binary_file_name() -> String {
+    if cfg!(windows) {
+        format!("{SERVER_BINARY_NAME}.exe")
+    } else {
+        SERVER_BINARY_NAME.to_string()
+    }
+}
+
+fn find_in_path() -> Option<PathBuf> {
+    let file_name = server_binary_file_name();
+    std::env::var_os("PATH").and_then(|paths| {
+        std::env::split_paths(&paths)
+            .map(|dir| dir.join(&file_name))
+            .find(|candidate| candidate.is_file())
+    })
+}
+
+// Lookup order: explicit user override (advanced setting) → the app-managed
+// bin dir (<app-local-data>/bin, where a future binary installer will place
+// it) → PATH. A clear error tells the user what to do when nothing matches.
+fn resolve_server_binary(app: &tauri::AppHandle, override_path: &str) -> Result<PathBuf, String> {
+    let override_path = override_path.trim();
+    if !override_path.is_empty() {
+        let candidate = PathBuf::from(override_path);
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+        return Err(format!("llama-server binary not found at the configured path: {override_path}"));
+    }
+
+    let managed = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|error| error.to_string())?
+        .join(LOCAL_BIN_DIR_NAME)
+        .join(server_binary_file_name());
+    if managed.is_file() {
+        return Ok(managed);
+    }
+
+    if let Some(found) = find_in_path() {
+        return Ok(found);
+    }
+
+    Err(format!(
+        "llama-server binary not found. Place it at {} or set its path in Local AI settings.",
+        managed.to_string_lossy()
+    ))
+}
+
+// Binding briefly is the portable free-port test; the small TOCTOU window
+// until llama-server binds is acceptable for a localhost dev port.
+fn find_free_port(preferred: u16) -> Result<u16, String> {
+    for offset in 0..=PORT_PROBE_RANGE {
+        let Some(port) = preferred.checked_add(offset) else { break };
+        if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+            return Ok(port);
+        }
+    }
+    Err(format!(
+        "No free port found between {preferred} and {}.",
+        preferred.saturating_add(PORT_PROBE_RANGE)
+    ))
+}
+
+fn status_of(server: &mut Option<ManagedServer>) -> LocalAiRuntimeStatus {
+    // try_wait() reaps a crashed/exited child so a stale entry never reports
+    // as running.
+    if let Some(managed) = server.as_mut() {
+        match managed.child.try_wait() {
+            Ok(None) => {
+                return LocalAiRuntimeStatus {
+                    running: true,
+                    pid: Some(managed.child.id()),
+                    port: Some(managed.port),
+                };
+            }
+            _ => {
+                *server = None;
+            }
+        }
+    }
     LocalAiRuntimeStatus {
         running: false,
         pid: None,
         port: None,
     }
+}
+
+fn kill_managed_server(server: &mut Option<ManagedServer>) {
+    if let Some(mut managed) = server.take() {
+        let _ = managed.child.kill();
+        let _ = managed.child.wait();
+    }
+}
+
+// Kills the sidecar when the app exits (wired to RunEvent::Exit in main.rs).
+pub fn shutdown_local_ai_server(app: &tauri::AppHandle) {
+    let state = app.state::<LocalAiRuntimeState>();
+    let mut server = match state.server.lock() {
+        Ok(guard) => guard,
+        Err(_) => return,
+    };
+    kill_managed_server(&mut server);
+}
+
+#[tauri::command]
+pub fn start_local_ai_server(
+    app: tauri::AppHandle,
+    state: State<'_, LocalAiRuntimeState>,
+    model_file_name: String,
+    preferred_port: u16,
+    binary_path_override: String,
+) -> Result<LocalAiRuntimeStatus, String> {
+    validate_model_file_name(&model_file_name)?;
+    let model_path = models_dir_path(&app)?.join(&model_file_name);
+    if !model_path.is_file() {
+        return Err(format!("Model file is not installed: {model_file_name}"));
+    }
+
+    let mut server = state.server.lock().map_err(|_| "runtime state poisoned")?;
+
+    // Already serving this model? Reuse it. A different model means the old
+    // process must go first — llama-server loads one model per process.
+    let current = status_of(&mut server);
+    if current.running {
+        match server.as_ref() {
+            Some(managed) if managed.model_file == model_file_name => return Ok(current),
+            _ => kill_managed_server(&mut server),
+        }
+    }
+
+    let binary = resolve_server_binary(&app, &binary_path_override)?;
+    let port = find_free_port(preferred_port)?;
+
+    let mut command = std::process::Command::new(&binary);
+    command
+        .arg("-m")
+        .arg(&model_path)
+        // Never expose the server beyond this machine (§11.4).
+        .args(["--host", "127.0.0.1", "--port"])
+        .arg(port.to_string())
+        .args(["--ctx-size", "4096"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let child = command
+        .spawn()
+        .map_err(|error| format!("Failed to start llama-server ({}): {error}", binary.to_string_lossy()))?;
+
+    let status = LocalAiRuntimeStatus {
+        running: true,
+        pid: Some(child.id()),
+        port: Some(port),
+    };
+    *server = Some(ManagedServer {
+        child,
+        port,
+        model_file: model_file_name,
+    });
+    // Readiness (model loading can take a while) is the frontend's job: it
+    // polls GET /health until llama-server reports ok.
+    Ok(status)
+}
+
+#[tauri::command]
+pub fn stop_local_ai_server(state: State<'_, LocalAiRuntimeState>) -> Result<(), String> {
+    let mut server = state.server.lock().map_err(|_| "runtime state poisoned")?;
+    kill_managed_server(&mut server);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_local_ai_runtime_status(state: State<'_, LocalAiRuntimeState>) -> LocalAiRuntimeStatus {
+    let Ok(mut server) = state.server.lock() else {
+        return LocalAiRuntimeStatus {
+            running: false,
+            pid: None,
+            port: None,
+        };
+    };
+    status_of(&mut server)
 }

@@ -309,6 +309,8 @@ export const en: Dictionary = {
   "settings.localAi.externalUrlLabel": "Server URL",
   "settings.localAi.portLabel": "Port",
   "settings.localAi.portHint": "Port for the local AI server. If taken, the next free port is used automatically.",
+  "settings.localAi.binaryPathLabel": "llama-server path (advanced)",
+  "settings.localAi.binaryPathHint": "Leave empty to look in the app data bin folder or the system PATH.",
   "settings.localAi.storageTitle": "Model storage location",
   "settings.localAi.storageHint": "Downloaded models are stored only on this device.",
   "settings.localAi.installedModelsTitle": "Installed models",

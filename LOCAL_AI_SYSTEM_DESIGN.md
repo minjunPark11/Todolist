@@ -248,30 +248,37 @@ Rust sidecar 제어 `src-tauri/src/local_ai.rs` (Phase 3).
    └─ 성공 → /v1/chat/completions 사용 가능
 ```
 
-### sidecar 구성 (Phase 3에서 추가할 것)
+### sidecar 구성 (Phase 3 — 구현됨: 런타임 바이너리 해석 방식)
 
-1. `tauri-plugin-shell` 의존성 추가 (Cargo.toml + capabilities에 sidecar 권한).
-2. `tauri.conf.json`에 externalBin 등록:
-   ```json
-   "bundle": { "externalBin": ["binaries/llama-server"] }
-   ```
-   Tauri가 target triple을 자동으로 붙여 플랫폼별 파일을 찾는다.
-3. 바이너리 위치: `src-tauri/binaries/` (git 미포함 — `.gitignore` 처리 완료)
-   - `llama-server-x86_64-pc-windows-msvc.exe`
-   - `llama-server-aarch64-apple-darwin`
-   - `llama-server-x86_64-apple-darwin`
-   - `llama-server-x86_64-unknown-linux-gnu`
-   - CI/릴리스 빌드에서 llama.cpp 공식 릴리스 바이너리를 받아 배치한다.
-   - **주의**: externalBin은 파일이 없으면 빌드가 깨진다. 바이너리 배치 파이프라인이
-     준비되기 전에는 tauri.conf.json에 넣지 않는다 (이번 커밋에서 넣지 않은 이유).
-4. 실행 옵션 초안: `--host 127.0.0.1` (외부 노출 금지), `--port <설정값>`,
-   `--ctx-size 4096`(초기값), `--ngl 999`(GPU 가능 시; CPU 빌드면 무시됨).
-5. **포트**: 고정값을 코드에 박지 않는다. `LocalAiSettings.serverPort`
-   (기본 제안값 `39281`)이며, 점유 시 자동으로 +1 탐색 후 실제 사용 포트를
-   상태로 보고한다.
-6. **정리**: 앱 종료(`RunEvent::Exit`)와 마지막 창 닫힘 정책에 맞춰 child process
-   kill. Windows에서는 Job Object로 좀비 프로세스 방지 검토.
-7. **유휴 정지(옵션, 후순위)**: N분 미사용 시 자동 종료로 메모리 회수.
+**결정**: 빌드 타임 `externalBin` 대신 **런타임에 llama-server 바이너리를
+찾는다**. externalBin은 파일이 없으면 빌드가 깨지므로, 바이너리 배치
+파이프라인 없이도 저장소 빌드가 항상 성공하도록 이 방식을 정식 경로로 삼았다.
+externalBin/리소스 번들링은 **추가적인** 패키징 단계로 남는다(아래 탐색 순서에
+리소스 경로만 끼워 넣으면 됨).
+
+1. **바이너리 탐색 순서** (`resolve_server_binary`):
+   1. `LocalAiSettings.serverBinaryPathOverride` (설정 UI의 고급 항목, 로컬 전용)
+   2. `<app-local-data>/bin/llama-server(.exe)` — 향후 "바이너리 자동 설치"가
+      배치할 위치 (llama.cpp 공식 릴리스 zip을 받아 풀어 넣는 것도 이 폴더)
+   3. 시스템 PATH
+   4. (향후) Tauri 리소스/externalBin 경로 — 패키징 파이프라인 도입 시 2와 3 사이에 추가
+   - 어디에도 없으면 배치 방법을 안내하는 명확한 오류를 돌려준다.
+2. **실행 옵션**: `-m <모델> --host 127.0.0.1 --port <탐색된 포트> --ctx-size 4096`.
+   127.0.0.1 바인딩은 코드에 고정(외부 노출 금지, §11.4). GPU 레이어(-ngl)는
+   GPU 감지 도입 시 추가.
+3. **포트**: `serverPort`(기본 39281)부터 +20 범위에서 빈 포트를 탐색하고,
+   실제 사용 포트를 `LocalAiRuntimeStatus.port`로 보고한다. 프론트는 보고된
+   포트로 baseUrl을 만든다.
+4. **준비 판정**: spawn은 즉시 반환하고, 프론트(`runtime.ts`)가 `GET /health`를
+   1초 간격 최대 60초 폴링한다 (모델 로딩 동안 503 → 준비되면 200).
+5. **정리**: `RunEvent::Exit`에서 child kill (main.rs). 같은 모델이 이미 떠
+   있으면 재사용, 다른 모델이면 기존 프로세스를 내리고 새로 띄운다. crash된
+   child는 `try_wait()`로 회수해 stale "running" 보고를 막는다.
+   Windows Job Object(앱 강제종료 시 좀비 방지)는 후속 검토.
+6. **유휴 정지(옵션, 후순위)**: N분 미사용 시 자동 종료로 메모리 회수.
+7. **바이너리 자동 설치(후속)**: 모델 다운로더와 동일한 allowlist+sha256
+   구조로 llama.cpp 공식 릴리스( github.com/ggml-org/llama.cpp )에서 받아
+   `<app-local-data>/bin`에 설치. zip 해제 필요(Windows는 DLL 동반).
 
 ### 실행 모드 (LocalAiSettings.launchMode)
 
@@ -386,7 +393,7 @@ OS · RAM · CPU(코어) · GPU(감지 시) · 저장공간 · **추천 모델 �
 | **0** | 설계 문서 + 타입/카탈로그/추천기/설정/런타임 스캐폴드 + Rust HW 프로파일러·모델 폴더·목록 command | ✅ 이번 커밋 |
 | **1** | Local AI Setup UI (검사 동의 → 결과 → 추천), i18n, GPU 감지 1차(wgpu 이름) | ✅ UI/i18n (설정 탭 "로컬 AI") · GPU 감지는 미착수 |
 | **2** | ModelInstaller: Rust 다운로드 command (진행률 event, 이어받기, sha256), 다운로드 UI, 카탈로그 URL/해시 확정 | ✅ 다운로드 인프라 완료 · URL/해시는 여전히 TODO(release) — 해시 없는 모델은 다운로드 버튼이 비활성 |
-| **3** | sidecar: tauri-plugin-shell + externalBin + 바이너리 배치 파이프라인, spawn/health/종료 정리, 포트 충돌 처리 | |
+| **3** | sidecar: spawn/health/종료 정리, 포트 충돌 처리 (런타임 바이너리 해석 방식 — §7) | ✅ 런타임 완료 · 바이너리 자동 설치/패키징은 후속 |
 | **4** | `llamaServerProvider` 추가 + gateway 체인 선두 배치, launchMode(on-app-start/external) 반영, 기존 Ollama 경로는 외부 서버 옵션으로 강등 | |
 | **5** | 임베딩 llama-server 백엔드(Full RAG), 유휴 자동 종료, NVIDIA VRAM 감지 | |
 

@@ -1168,21 +1168,33 @@ function LocalAiSettingsTab() {
             />
           </Row>
         ) : (
-          <Row title={t("settings.localAi.portLabel")} hint={t("settings.localAi.portHint")}>
-            <input
-              className="ff-localai-port-input"
-              type="number"
-              min={1024}
-              max={65535}
-              value={settings.serverPort}
-              onChange={(event) => {
-                const port = Number.parseInt(event.target.value, 10);
-                if (Number.isInteger(port) && port >= 1024 && port <= 65535) {
-                  updateSettings({ serverPort: port });
-                }
-              }}
-            />
-          </Row>
+          <>
+            <Row title={t("settings.localAi.portLabel")} hint={t("settings.localAi.portHint")}>
+              <input
+                className="ff-localai-port-input"
+                type="number"
+                min={1024}
+                max={65535}
+                value={settings.serverPort}
+                onChange={(event) => {
+                  const port = Number.parseInt(event.target.value, 10);
+                  if (Number.isInteger(port) && port >= 1024 && port <= 65535) {
+                    updateSettings({ serverPort: port });
+                  }
+                }}
+              />
+            </Row>
+            {isDesktop ? (
+              <Row title={t("settings.localAi.binaryPathLabel")} hint={t("settings.localAi.binaryPathHint")}>
+                <input
+                  className="ff-localai-url-input"
+                  value={settings.serverBinaryPathOverride}
+                  placeholder="llama-server"
+                  onChange={(event) => updateSettings({ serverBinaryPathOverride: event.target.value })}
+                />
+              </Row>
+            ) : null}
+          </>
         )}
       </div>
 

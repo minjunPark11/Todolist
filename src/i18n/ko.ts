@@ -309,6 +309,8 @@ export const ko: Dictionary = {
   "settings.localAi.externalUrlLabel": "서버 주소",
   "settings.localAi.portLabel": "포트",
   "settings.localAi.portHint": "로컬 AI 서버가 사용할 포트입니다. 사용 중이면 자동으로 다음 포트를 찾습니다.",
+  "settings.localAi.binaryPathLabel": "llama-server 경로 (고급)",
+  "settings.localAi.binaryPathHint": "비워두면 앱 데이터 폴더의 bin 또는 시스템 PATH에서 찾습니다.",
   "settings.localAi.storageTitle": "모델 저장 위치",
   "settings.localAi.storageHint": "다운로드한 모델은 이 기기에만 저장됩니다.",
   "settings.localAi.installedModelsTitle": "설치된 모델",

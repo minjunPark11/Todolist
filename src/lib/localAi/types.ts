@@ -96,6 +96,9 @@ export interface LocalAiSettings {
   selectedModelId: string;
   // "" = platform default (<app-local-data>/models). LOCAL ONLY — never sync.
   modelsDirOverride: string;
+  // Advanced: explicit llama-server binary path. "" = auto-resolve
+  // (<app-local-data>/bin, then PATH). LOCAL ONLY — never sync.
+  serverBinaryPathOverride: string;
   // ISO timestamp of the moment the user clicked "내 기기 검사하기".
   // "" = consent never given; the hardware scan must not run.
   hardwareConsentGrantedAt: string;
@@ -109,6 +112,7 @@ export const DEFAULT_LOCAL_AI_SETTINGS: LocalAiSettings = {
   externalServerUrl: "",
   selectedModelId: "",
   modelsDirOverride: "",
+  serverBinaryPathOverride: "",
   hardwareConsentGrantedAt: "",
 };
 
@@ -131,6 +135,10 @@ export function normalizeLocalAiSettings(raw: unknown): LocalAiSettings {
       typeof value.selectedModelId === "string" ? value.selectedModelId : DEFAULT_LOCAL_AI_SETTINGS.selectedModelId,
     modelsDirOverride:
       typeof value.modelsDirOverride === "string" ? value.modelsDirOverride : DEFAULT_LOCAL_AI_SETTINGS.modelsDirOverride,
+    serverBinaryPathOverride:
+      typeof value.serverBinaryPathOverride === "string"
+        ? value.serverBinaryPathOverride
+        : DEFAULT_LOCAL_AI_SETTINGS.serverBinaryPathOverride,
     hardwareConsentGrantedAt:
       typeof value.hardwareConsentGrantedAt === "string"
         ? value.hardwareConsentGrantedAt

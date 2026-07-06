@@ -190,5 +190,11 @@ export const webPlatform: PlatformAdapter = {
     async subscribeDownloadProgress() {
       return () => undefined;
     },
+    async startServer() {
+      localAiUnsupported();
+    },
+    async stopServer() {
+      localAiUnsupported();
+    },
   },
 };

@@ -303,6 +303,7 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
         .manage(local_ai::LocalAiDownloadState::default())
+        .manage(local_ai::LocalAiRuntimeState::default())
         // Must be registered first: a second launch (e.g. reopening from the
         // shortcut while an instance lingers in the tray) would otherwise spawn
         // a duplicate window whose WebView2 fails to init against the locked
@@ -393,8 +394,16 @@ fn main() {
             local_ai::get_local_ai_runtime_status,
             local_ai::download_local_ai_model,
             local_ai::cancel_local_ai_download,
-            local_ai::delete_local_ai_model
+            local_ai::delete_local_ai_model,
+            local_ai::start_local_ai_server,
+            local_ai::stop_local_ai_server
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running FocusFlow desktop app");
+        .build(tauri::generate_context!())
+        .expect("error while running FocusFlow desktop app")
+        .run(|app, event| {
+            // The llama-server sidecar must never outlive the app.
+            if let tauri::RunEvent::Exit = event {
+                local_ai::shutdown_local_ai_server(app);
+            }
+        });
 }

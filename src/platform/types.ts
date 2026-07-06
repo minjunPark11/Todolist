@@ -82,6 +82,11 @@ export interface PlatformLocalAi {
   // Removes an installed model file (and any leftover .partial download).
   deleteModel(fileName: string): Promise<void>;
   subscribeDownloadProgress(handler: (progress: ModelDownloadProgress) => void): Promise<() => void>;
+  // Spawns (or reuses) the managed llama-server for an installed model.
+  // Resolves as soon as the process is up — readiness is polled separately
+  // via GET /health, since model loading can take tens of seconds.
+  startServer(modelFileName: string, preferredPort: number, binaryPathOverride: string): Promise<LocalAiRuntimeStatus>;
+  stopServer(): Promise<void>;
 }
 
 export interface PlatformAdapter {
