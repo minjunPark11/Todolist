@@ -5,11 +5,15 @@ import {
   cancelModelDownload,
   cancelServerRuntimeInstall,
   deleteInstalledModel,
-  installServerRuntime,
   isModelDownloadable,
   resolveServerRuntimeForPlatform,
-  startModelDownload,
 } from "../lib/localAi/installer";
+import {
+  getLocalAiDownloadSessionSnapshot,
+  startTrackedModelDownload,
+  startTrackedServerRuntimeInstall,
+  subscribeLocalAiDownloadSession,
+} from "../lib/localAi/downloadSession";
 import { LOCAL_MODEL_CATALOG, findModelById } from "../lib/localAi/modelCatalog";
 import type { ServerRuntimeAsset } from "../lib/localAi/serverRuntimeCatalog";
 import { recommendLocalModel } from "../lib/localAi/recommender";
@@ -19,7 +23,6 @@ import type {
   InstalledModelFile,
   LocalAiLaunchMode,
   LocalModelOption,
-  ModelDownloadProgress,
 } from "../lib/localAi/types";
 import { listEmbeddingModels, modelNameMatches, resolveEmbeddingStoreModelName } from "../lib/knowledge/embeddingProvider";
 import { EmbeddingModelUnavailableError, runIndexing, type IndexProgress } from "../lib/knowledge/indexer";
@@ -844,6 +847,18 @@ function KnowledgeSettingsTab({
 // Local AI setup tab (LOCAL_AI_SYSTEM_DESIGN.md §9). Self-contained on
 // purpose: local AI settings live in device-local storage (useLocalAiSettings),
 // so nothing here needs to flow through SettingsPage props / appSettings.
+function useLocalAiDownloadSession() {
+  const [downloadSession, setDownloadSession] = useState(getLocalAiDownloadSessionSnapshot);
+
+  useEffect(() => {
+    return subscribeLocalAiDownloadSession(() => {
+      setDownloadSession(getLocalAiDownloadSessionSnapshot());
+    });
+  }, []);
+
+  return downloadSession;
+}
+
 function LocalAiSettingsTab() {
   const { t } = useT();
   const { settings, updateSettings, isDesktop } = useLocalAiSettings();
@@ -852,16 +867,28 @@ function LocalAiSettingsTab() {
   const [scanError, setScanError] = useState("");
   const [installedModels, setInstalledModels] = useState<InstalledModelFile[]>([]);
   const [modelsDir, setModelsDir] = useState("");
-  const [downloadingId, setDownloadingId] = useState("");
-  const [downloadProgress, setDownloadProgress] = useState<ModelDownloadProgress | null>(null);
-  const [downloadMessage, setDownloadMessage] = useState("");
-  const [downloadError, setDownloadError] = useState("");
+  const downloadSession = useLocalAiDownloadSession();
+  const [localActionError, setLocalActionError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<InstalledModelFile | null>(null);
   const [serverInstalled, setServerInstalled] = useState<boolean | null>(null);
   const [runtimeAsset, setRuntimeAsset] = useState<ServerRuntimeAsset | null>(null);
+  const handledDownloadResultRef = useRef(0);
 
   const recommendation = useMemo(() => (profile ? recommendLocalModel(profile, t) : null), [profile, t]);
   const selectedModel = findModelById(settings.selectedModelId);
+  const downloadingId = downloadSession.downloadingId;
+  const downloadProgress = downloadSession.progress;
+  const downloadError = downloadSession.error || localActionError;
+  const downloadResultMessage = downloadSession.result
+    ? downloadSession.result.outcome === "completed"
+      ? downloadSession.result.kind === "runtime"
+        ? t("settings.localAi.runtimeInstalled")
+        : t("settings.localAi.downloadComplete")
+      : t("settings.localAi.downloadCancelled")
+    : "";
+  const modelDownloadMessage =
+    downloadSession.result?.kind === "model" && downloadSession.result.id === selectedModel?.id ? downloadResultMessage : "";
+  const runtimeDownloadMessage = downloadSession.result?.kind === "runtime" ? downloadResultMessage : "";
   const installingRuntime = downloadingId === SERVER_RUNTIME_DOWNLOAD_ID;
 
   async function refreshInstalledModels() {
@@ -879,65 +906,41 @@ function LocalAiSettingsTab() {
     void resolveServerRuntimeForPlatform().then(setRuntimeAsset).catch(() => setRuntimeAsset(null));
     void refreshInstalledModels();
 
-    let unsubscribe: (() => void) | undefined;
-    void platform.localAi.subscribeDownloadProgress(setDownloadProgress).then((fn) => {
-      unsubscribe = fn;
-    });
-    return () => unsubscribe?.();
     // Mount-only setup (plus the desktop gate); refresh is triggered
     // explicitly after downloads/deletes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDesktop]);
 
-  async function handleDownload(model: LocalModelOption) {
-    setDownloadError("");
-    setDownloadMessage("");
-    setDownloadingId(model.id);
-    setDownloadProgress({ modelId: model.id, receivedBytes: 0, totalBytes: null });
-    try {
-      const outcome = await startModelDownload(model);
-      setDownloadMessage(
-        outcome === "completed" ? t("settings.localAi.downloadComplete") : t("settings.localAi.downloadCancelled"),
-      );
-      await refreshInstalledModels();
-    } catch (error) {
-      setDownloadError(error instanceof Error ? error.message : t("settings.localAi.downloadFailed"));
-    } finally {
-      setDownloadingId("");
-      setDownloadProgress(null);
+  useEffect(() => {
+    const result = downloadSession.result;
+    if (!isDesktop || !result || handledDownloadResultRef.current === result.completedAt) return;
+    handledDownloadResultRef.current = result.completedAt;
+    if (result.kind === "runtime" && result.outcome === "completed") {
+      setServerInstalled(true);
     }
+    void refreshInstalledModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [downloadSession.result, isDesktop]);
+
+  function handleDownload(model: LocalModelOption) {
+    setLocalActionError("");
+    startTrackedModelDownload(model);
   }
 
-  async function handleInstallRuntime() {
-    setDownloadError("");
-    setDownloadMessage("");
-    setDownloadingId(SERVER_RUNTIME_DOWNLOAD_ID);
-    setDownloadProgress({ modelId: SERVER_RUNTIME_DOWNLOAD_ID, receivedBytes: 0, totalBytes: null });
-    try {
-      const outcome = await installServerRuntime();
-      if (outcome === "completed") {
-        setServerInstalled(true);
-        setDownloadMessage(t("settings.localAi.runtimeInstalled"));
-      } else {
-        setDownloadMessage(t("settings.localAi.downloadCancelled"));
-      }
-    } catch (error) {
-      setDownloadError(error instanceof Error ? error.message : t("settings.localAi.runtimeInstallFailed"));
-    } finally {
-      setDownloadingId("");
-      setDownloadProgress(null);
-    }
+  function handleInstallRuntime() {
+    setLocalActionError("");
+    startTrackedServerRuntimeInstall();
   }
 
   async function confirmDeleteModel() {
     if (!deleteTarget) return;
+    setLocalActionError("");
     try {
       await deleteInstalledModel(deleteTarget.fileName);
     } catch (error) {
-      setDownloadError(error instanceof Error ? error.message : String(error));
+      setLocalActionError(error instanceof Error ? error.message : String(error));
     }
     setDeleteTarget(null);
-    setDownloadMessage("");
     await refreshInstalledModels();
   }
 
@@ -1070,7 +1073,7 @@ function LocalAiSettingsTab() {
         </div>
       ) : null}
 
-      {selectedModel && (!isModelInstalled(selectedModel.id) || downloadMessage || downloadError) ? (
+      {selectedModel && (!isModelInstalled(selectedModel.id) || modelDownloadMessage || downloadError) ? (
         <div className="ff-settings-card">
           <Row
             title={selectedModel.displayName}
@@ -1098,7 +1101,7 @@ function LocalAiSettingsTab() {
               <button
                 type="button"
                 className="ff-btn ff-btn-primary"
-                disabled={!isDesktop || !isModelDownloadable(selectedModel)}
+                disabled={!isDesktop || Boolean(downloadingId) || !isModelDownloadable(selectedModel)}
                 onClick={() => void handleDownload(selectedModel)}
               >
                 {downloadError ? t("settings.localAi.downloadRetry") : t("settings.localAi.downloadButton")}
@@ -1126,7 +1129,7 @@ function LocalAiSettingsTab() {
               ) : null}
             </div>
           ) : null}
-          {downloadMessage ? <p className="ff-settings-msg">{downloadMessage}</p> : null}
+          {modelDownloadMessage ? <p className="ff-settings-msg">{modelDownloadMessage}</p> : null}
           {downloadError ? <p className="ff-settings-error">{downloadError}</p> : null}
         </div>
       ) : null}
@@ -1203,7 +1206,7 @@ function LocalAiSettingsTab() {
               <button
                 type="button"
                 className="ff-btn ff-btn-primary"
-                disabled={!runtimeAsset || serverInstalled === null}
+                disabled={Boolean(downloadingId) || !runtimeAsset || serverInstalled === null}
                 onClick={() => void handleInstallRuntime()}
               >
                 {downloadError ? t("settings.localAi.downloadRetry") : t("settings.localAi.runtimeInstallButton")}
@@ -1233,6 +1236,8 @@ function LocalAiSettingsTab() {
               )}
             </div>
           ) : null}
+          {runtimeDownloadMessage ? <p className="ff-settings-msg">{runtimeDownloadMessage}</p> : null}
+          {downloadError ? <p className="ff-settings-error">{downloadError}</p> : null}
         </div>
       ) : null}
 
