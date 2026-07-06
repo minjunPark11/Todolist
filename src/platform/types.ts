@@ -44,6 +44,10 @@ export interface PlatformFiles {
   readTextFile(path: string, maxBytes?: number): Promise<string>;
   getFileMetadata(path: string): Promise<PlatformFileEntry | null>;
   getDefaultKnowledgeDbPath(): Promise<string>;
+  // Creates the directory that getDefaultKnowledgeDbPath()'s file lives in,
+  // if it doesn't already exist. Must be called before opening the default
+  // knowledge DB — Tauri does not guarantee the app data dir pre-exists.
+  ensureKnowledgeDbDir(): Promise<void>;
 }
 
 export interface PlatformAdapter {

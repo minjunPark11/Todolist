@@ -315,6 +315,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_sql::Builder::default().build())
         .setup(|app| {
             let menu = build_tray_menu(app.handle(), None)?;
             TrayIconBuilder::with_id(TRAY_ID)

@@ -27,7 +27,9 @@ const HEADING_PATTERN = /^(#{1,6})\s+(.+?)\s*$/;
 const INLINE_TAG_PATTERN = /(?:^|\s)#([\w/-]+)/g;
 const WIKI_LINK_PATTERN = /\[\[([^\]|#]+)/g;
 const TASK_PATTERN = /^\s*-\s\[([ xX])\]\s+(.*)$/;
-const FENCE_PATTERN = /^\s*```/;
+// Exported so the chunker can respect the same fence boundaries when
+// splitting a section into paragraph-sized pieces.
+export const FENCE_PATTERN = /^\s*```/;
 
 function stripQuotes(value: string): string {
   return value.trim().replace(/^["']|["']$/g, "");

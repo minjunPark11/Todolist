@@ -15,7 +15,9 @@ type OllamaTagsResponse = {
   models?: Array<{ name?: string; model?: string }>;
 };
 
-function getOllamaBaseUrl() {
+// Exported for reuse by the knowledge-base embedding provider (Full mode
+// always talks to this same local Ollama instance, never a remote fallback).
+export function getOllamaBaseUrl() {
   const configured = import.meta.env.VITE_OLLAMA_URL as string | undefined;
   return (configured?.trim() || DEFAULT_OLLAMA_URL).replace(/\/$/, "");
 }
@@ -47,7 +49,7 @@ function withKnowledgeContext(messages: AiMessage[], knowledgeContext?: string):
   ];
 }
 
-function withTimeout(milliseconds: number) {
+export function withTimeout(milliseconds: number) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), milliseconds);
   return {

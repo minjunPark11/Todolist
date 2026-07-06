@@ -150,5 +150,8 @@ export const webPlatform: PlatformAdapter = {
     async getDefaultKnowledgeDbPath() {
       filesUnsupported();
     },
+    async ensureKnowledgeDbDir() {
+      filesUnsupported();
+    },
   },
 };

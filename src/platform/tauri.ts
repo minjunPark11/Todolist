@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { appDataDir, join as joinPath } from "@tauri-apps/api/path";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import {
+  mkdir,
   readDir,
   readTextFile as fsReadTextFile,
   stat as fsStat,
@@ -230,6 +231,11 @@ export const tauriPlatform: PlatformAdapter = {
     async getDefaultKnowledgeDbPath() {
       const dir = await appDataDir();
       return joinPath(dir, KNOWLEDGE_DB_FILENAME);
+    },
+
+    async ensureKnowledgeDbDir() {
+      const dir = await appDataDir();
+      await mkdir(dir, { recursive: true });
     },
   },
 };

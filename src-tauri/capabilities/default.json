@@ -17,6 +17,9 @@
     "fs:allow-read-text-file",
     "fs:allow-read-dir",
     "fs:allow-exists",
-    "fs:allow-stat"
+    "fs:allow-stat",
+    "fs:create-app-specific-dirs",
+    "sql:default",
+    "sql:allow-execute"
   ]
 }

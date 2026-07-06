@@ -1522,6 +1522,71 @@
   white-space: nowrap;
 }
 .ff-knowledge-locked { opacity: 0.85; }
+.ff-knowledge-model-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.ff-knowledge-model-control select {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 6px 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ff-knowledge-index-status {
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: right;
+}
+.ff-knowledge-index-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+}
+.ff-knowledge-index-progress {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-knowledge-progress-bar {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+.ff-knowledge-index-message {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ff-knowledge-delete-index-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  cursor: pointer;
+}
+.ff-knowledge-delete-index-toggle input {
+  margin-top: 3px;
+}
+.ff-knowledge-delete-index-toggle span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ff-knowledge-delete-index-toggle small {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
 .ff-import-btn { cursor: pointer; }
 .ff-settings-msg { color: var(--success); font-size: 13px; padding: 8px 0; }
 .ff-settings-error { color: var(--danger); font-size: 13px; margin: 0; }

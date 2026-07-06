@@ -1,5 +1,8 @@
-import { ChangeEvent, ReactNode, useEffect, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useRef, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
+import { modelNameMatches } from "../lib/knowledge/embeddingProvider";
+import { EmbeddingModelUnavailableError, runIndexing, type IndexProgress } from "../lib/knowledge/indexer";
+import { KnowledgeStore, type IndexStats } from "../lib/knowledge/knowledgeStore";
 import type { KnowledgeSettings } from "../lib/knowledge/types";
 import { platform } from "../platform";
 import type { AppUpdateStatus } from "../platform";
@@ -550,6 +553,55 @@ function KnowledgeSettingsTab({
   const [pickError, setPickError] = useState("");
   const [picking, setPicking] = useState(false);
   const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false);
+  const [deleteIndexOnDisconnect, setDeleteIndexOnDisconnect] = useState(true);
+
+  const [installedModels, setInstalledModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [indexStats, setIndexStats] = useState<IndexStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [indexing, setIndexing] = useState(false);
+  const [indexProgress, setIndexProgress] = useState<IndexProgress | null>(null);
+  const [indexMessage, setIndexMessage] = useState("");
+  const [indexError, setIndexError] = useState("");
+  const cancelRequestedRef = useRef(false);
+
+  const vaultReady = isDesktop && settings.enabled && Boolean(settings.vaultPath);
+
+  async function loadInstalledModels() {
+    setModelsLoading(true);
+    try {
+      setInstalledModels(await listLocalAiModels());
+    } finally {
+      setModelsLoading(false);
+    }
+  }
+
+  async function loadStats() {
+    setStatsLoading(true);
+    try {
+      const store = await KnowledgeStore.open(settings.dbPath);
+      try {
+        setIndexStats(await store.getStats());
+      } finally {
+        await store.close();
+      }
+    } catch {
+      setIndexStats(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!vaultReady) return;
+    void loadInstalledModels();
+    void loadStats();
+    // Re-run only when the vault actually becomes ready/connected, not on
+    // every keystroke of unrelated settings fields.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vaultReady]);
+
+  const modelInstalled = installedModels.some((name) => modelNameMatches(name, settings.embeddingModel));
 
   async function handlePickFolder() {
     setPickError("");
@@ -566,12 +618,69 @@ function KnowledgeSettingsTab({
     }
   }
 
-  function confirmDisconnect() {
-    // Phase 0 has no local index yet (Full RAG's KnowledgeStore lands in a
-    // later phase), so there is nothing to offer to keep/delete here beyond
-    // the connection itself.
+  async function handleIndexNow() {
+    if (!vaultReady || indexing) return;
+    setIndexError("");
+    setIndexMessage("");
+    cancelRequestedRef.current = false;
+    setIndexing(true);
+    setIndexProgress({ phase: "scanning", processed: 0, total: 0 });
+
+    let store: KnowledgeStore | null = null;
+    try {
+      store = await KnowledgeStore.open(settings.dbPath);
+      const result = await runIndexing(store, {
+        vaultPath: settings.vaultPath,
+        excludedFolders: settings.excludedFolders,
+        embeddingModel: settings.embeddingModel,
+        onProgress: setIndexProgress,
+        shouldCancel: () => cancelRequestedRef.current,
+      });
+
+      if (result.cancelled) {
+        setIndexMessage(t("settings.knowledge.indexCancelled"));
+      } else {
+        const summary = t("settings.knowledge.indexResult", {
+          indexed: result.filesIndexed,
+          deleted: result.filesDeleted,
+          unchanged: result.filesUnchanged,
+        });
+        setIndexMessage(result.modelChanged ? `${summary} ${t("settings.knowledge.modelChangedNotice")}` : summary);
+      }
+      setIndexStats(await store.getStats());
+    } catch (error) {
+      if (error instanceof EmbeddingModelUnavailableError) {
+        setIndexError(t("settings.knowledge.modelPullHint", { model: error.modelName }));
+      } else {
+        setIndexError(error instanceof Error ? error.message : t("settings.knowledge.indexFailed"));
+      }
+    } finally {
+      if (store) await store.close();
+      setIndexing(false);
+      setIndexProgress(null);
+    }
+  }
+
+  function handleCancelIndexing() {
+    cancelRequestedRef.current = true;
+  }
+
+  async function confirmDisconnect() {
+    if (deleteIndexOnDisconnect) {
+      try {
+        const store = await KnowledgeStore.open(settings.dbPath);
+        try {
+          await store.wipeAll();
+        } finally {
+          await store.close();
+        }
+      } catch {
+        // Nothing to wipe if the store was never created — best-effort.
+      }
+    }
     updateSettings({ vaultPath: "", enabled: false, lastIndexedAt: "" });
     setDisconnectConfirmOpen(false);
+    setIndexStats(null);
   }
 
   if (!isDesktop) {
@@ -585,6 +694,7 @@ function KnowledgeSettingsTab({
   }
 
   return (
+    <>
     <div className="ff-settings-card">
       <Row title={t("settings.knowledge.vaultTitle")} hint={t("settings.knowledge.vaultHint")}>
         <div className="ff-knowledge-vault-control">
@@ -625,13 +735,108 @@ function KnowledgeSettingsTab({
       {disconnectConfirmOpen ? (
         <ConfirmModal
           title={t("settings.knowledge.disconnectTitle")}
-          body={t("settings.knowledge.disconnectBody")}
+          body={
+            <>
+              <p>{t("settings.knowledge.disconnectBody")}</p>
+              <label className="ff-knowledge-delete-index-toggle">
+                <input
+                  type="checkbox"
+                  checked={deleteIndexOnDisconnect}
+                  onChange={(event) => setDeleteIndexOnDisconnect(event.target.checked)}
+                />
+                <span>
+                  <strong>{t("settings.knowledge.deleteIndexOnDisconnect")}</strong>
+                  <small>{t("settings.knowledge.deleteIndexOnDisconnectHint")}</small>
+                </span>
+              </label>
+            </>
+          }
           confirmLabel={t("settings.knowledge.disconnectConfirm")}
           onCancel={() => setDisconnectConfirmOpen(false)}
           onConfirm={confirmDisconnect}
         />
       ) : null}
     </div>
+
+    {vaultReady ? (
+      <div className="ff-settings-card">
+        <Row title={t("settings.knowledge.embeddingModel")} hint={t("settings.knowledge.embeddingModelHint")}>
+          <div className="ff-knowledge-model-control">
+            <select
+              value={settings.embeddingModel}
+              onChange={(event) => updateSettings({ embeddingModel: event.target.value })}
+              disabled={modelsLoading}
+            >
+              <option value="bge-m3">bge-m3</option>
+              <option value="nomic-embed-text">nomic-embed-text</option>
+            </select>
+            <button
+              type="button"
+              className="ff-btn"
+              aria-label={t("ai.model.refresh")}
+              onClick={() => void loadInstalledModels()}
+              disabled={modelsLoading}
+            >
+              {modelsLoading ? "…" : "↻"}
+            </button>
+          </div>
+          {!modelsLoading && !modelInstalled ? (
+            <small className="ff-settings-error">{t("settings.knowledge.modelPullHint", { model: settings.embeddingModel })}</small>
+          ) : null}
+        </Row>
+
+        <Row title={t("settings.knowledge.indexStatus")} hint="">
+          <div className="ff-knowledge-index-status">
+            {statsLoading ? (
+              <span>…</span>
+            ) : (
+              <span>
+                {t("settings.knowledge.indexStatusValue", {
+                  files: indexStats?.fileCount ?? 0,
+                  chunks: indexStats?.chunkCount ?? 0,
+                })}
+                {" · "}
+                {indexStats?.lastIndexedAt
+                  ? t("settings.knowledge.lastIndexed", { date: new Date(indexStats.lastIndexedAt).toLocaleString() })
+                  : t("settings.knowledge.neverIndexed")}
+              </span>
+            )}
+          </div>
+        </Row>
+
+        <div className="ff-knowledge-index-actions">
+          {indexing ? (
+            <>
+              <button type="button" className="ff-btn ff-btn-danger" onClick={handleCancelIndexing}>
+                {t("settings.knowledge.cancelIndexing")}
+              </button>
+              <span className="ff-knowledge-index-progress">
+                {indexProgress?.phase === "scanning"
+                  ? t("settings.knowledge.indexScanning")
+                  : indexProgress
+                    ? t("settings.knowledge.indexProgress", {
+                        processed: indexProgress.processed,
+                        total: indexProgress.total,
+                        file: indexProgress.currentFile ?? "",
+                      })
+                    : ""}
+              </span>
+              {indexProgress && indexProgress.total > 0 ? (
+                <progress className="ff-knowledge-progress-bar" value={indexProgress.processed} max={indexProgress.total} />
+              ) : null}
+            </>
+          ) : (
+            <button type="button" className="ff-btn ff-btn-primary" onClick={() => void handleIndexNow()}>
+              {t("settings.knowledge.indexNow")}
+            </button>
+          )}
+        </div>
+
+        {indexMessage ? <p className="ff-knowledge-index-message">{indexMessage}</p> : null}
+        {indexError ? <p className="ff-settings-error">{indexError}</p> : null}
+      </div>
+    ) : null}
+    </>
   );
 }
 
