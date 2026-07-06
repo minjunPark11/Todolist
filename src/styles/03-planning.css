@@ -1437,6 +1437,30 @@
   background: var(--bg-surface);
   color: var(--text-primary);
 }
+.ff-ai-model-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.ff-ai-model-refresh {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
+  padding: 8px 11px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ff-ai-model-refresh:disabled { opacity: 0.6; cursor: default; }
+.ff-ai-model-offline {
+  display: block;
+  margin-top: 6px;
+  color: var(--accent);
+  font-size: 12px;
+  text-align: right;
+}
 .ff-import-btn { cursor: pointer; }
 .ff-settings-msg { color: var(--success); font-size: 13px; padding: 8px 0; }
 .ff-settings-error { color: var(--danger); font-size: 13px; margin: 0; }

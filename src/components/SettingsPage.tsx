@@ -1,9 +1,10 @@
-import { ChangeEvent, ReactNode, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
 import type { AppUpdateStatus } from "../platform";
 import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, Task, ThemeMode } from "../types";
 import { CalendarCategorySettings } from "./calendar/CalendarCategorySettings";
 import { SegmentedTabs } from "./kit";
+import { listLocalAiModels } from "../lib/ai/gateway";
 import { useT } from "../i18n";
 
 interface SettingsPageProps {
@@ -194,6 +195,7 @@ export function SettingsPage({
             value={settings.reduceMotion}
             onChange={(v) => onUpdate({ reduceMotion: v })}
           />
+          <AiModelRow value={settings.aiModel} onChange={(model) => onUpdate({ aiModel: model })} />
         </div>
       ) : null}
 
@@ -468,6 +470,53 @@ function SyncIcon() {
       <path d="M20 12a8 8 0 11-2.3-5.7" />
       <path d="M20 4v6h-6" />
     </svg>
+  );
+}
+
+function AiModelRow({ value, onChange }: { value: string; onChange: (model: string) => void }) {
+  const { t } = useT();
+  const [models, setModels] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  async function loadModels() {
+    setLoading(true);
+    try {
+      setModels(await listLocalAiModels());
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadModels();
+  }, []);
+
+  const isOffline = !loading && models.length === 0;
+
+  return (
+    <Row title={t("settings.aiModel")} hint={t("settings.aiModelHint")}>
+      <div className="ff-ai-model-control">
+        <select value={value} onChange={(event) => onChange(event.target.value)} disabled={loading}>
+          <option value="">{t("ai.model.auto")}</option>
+          {value && !models.includes(value) ? <option value={value}>{value}</option> : null}
+          {models.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="ff-ai-model-refresh"
+          aria-label={t("ai.model.refresh")}
+          onClick={() => void loadModels()}
+          disabled={loading}
+        >
+          {loading ? "…" : "↻"}
+        </button>
+      </div>
+      {isOffline ? <small className="ff-ai-model-offline">{t("ai.status.offline")}</small> : null}
+    </Row>
   );
 }
 

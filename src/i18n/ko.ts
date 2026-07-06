@@ -203,6 +203,8 @@ export const ko: Dictionary = {
   "settings.showSidebarCountsHint": "사이드바 항목 옆에 할 일 개수를 표시합니다.",
   "settings.reduceMotion": "애니메이션 줄이기",
   "settings.reduceMotionHint": "애니메이션과 전환 효과를 최소화합니다.",
+  "settings.aiModel": "AI 모델",
+  "settings.aiModelHint": "AI 챗에 사용할 로컬 Ollama 모델입니다. 기기 간 동기화됩니다.",
   "settings.exportData": "데이터 내보내기",
   "settings.exportDataHint": "모든 데이터를 JSON 파일로 다운로드합니다.",
   "settings.exportJson": "JSON 내보내기",

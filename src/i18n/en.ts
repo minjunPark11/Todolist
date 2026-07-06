@@ -203,6 +203,8 @@ export const en: Dictionary = {
   "settings.showSidebarCountsHint": "Display task counts next to sidebar items.",
   "settings.reduceMotion": "Reduce Motion",
   "settings.reduceMotionHint": "Minimize animations and transitions.",
+  "settings.aiModel": "AI model",
+  "settings.aiModelHint": "Local Ollama model used for AI chat. Synced across your devices.",
   "settings.exportData": "Export Data",
   "settings.exportDataHint": "Download all your data as a JSON file.",
   "settings.exportJson": "Export JSON",
