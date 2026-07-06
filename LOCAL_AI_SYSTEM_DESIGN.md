@@ -306,6 +306,12 @@ llamaServer(관리형 sidecar, 또는 external 모드의 OpenAI 호환 서버) �
 
 - chat 호출 시 provider가 `ensureAiReady()`를 수행 — on-demand 모드에선 이
   순간 sidecar가 뜨고 모델이 로드된다(의도된 흐름).
+- `ensureAiReady()`는 실패 시 `reason`을 돌려준다: `model-not-installed`,
+  `engine-not-installed`(관리형인데 bin/PATH/override 어디에도 llama-server가
+  없음 → "엔진 설치" 유도), `server-not-running`, `external-unreachable`,
+  `unsupported`. `llamaServerProvider.unavailableMessage()`가 이 메시지를
+  보관하고, `gateway.ts`는 server fallback이 미설정이어도 이 실행가능한 안내를
+  최종 에러 headline으로 노출한다(일반 메시지로 묻히지 않도록).
 - `canHandleFullAppData()` / `canHandleKnowledgeContext()`는 엔드포인트가
   localhost일 때만 true — 관리형은 항상, external은 URL이 로컬일 때만.
 - 채팅의 모델 선택 UI(Ollama 태그 목록)는 제거 — 관리형에선 모델이 Local AI

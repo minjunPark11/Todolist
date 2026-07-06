@@ -49,4 +49,9 @@ export type AiProvider = {
   chat: (request: AiChatRequest) => Promise<AiChatResponse>;
   // Lists the models installed on the provider, when it can be introspected.
   listModels?: () => Promise<string[]>;
+  // A user-actionable reason the last isAvailable() returned false (e.g. "the
+  // engine isn't installed — install it in Settings"), or null when available
+  // or the reason isn't actionable. The gateway surfaces it so a fallthrough to
+  // an unconfigured provider doesn't bury the real fix behind a generic error.
+  unavailableMessage?: () => string | null;
 };

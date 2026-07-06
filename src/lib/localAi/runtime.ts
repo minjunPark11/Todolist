@@ -23,7 +23,12 @@ export type EnsureAiReadyResult =
   | {
       ok: false;
       // Drives which screen the UI routes to: setup, download, or settings.
-      reason: "unsupported" | "external-unreachable" | "model-not-installed" | "server-not-running";
+      reason:
+        | "unsupported"
+        | "external-unreachable"
+        | "model-not-installed"
+        | "engine-not-installed"
+        | "server-not-running";
       message: string;
     };
 
@@ -170,6 +175,20 @@ export async function ensureAiReady(settings: LocalAiSettings): Promise<EnsureAi
     );
     startedPort = started.port ?? settings.serverPort;
   } catch (error) {
+    // The most common start failure on a fresh managed setup is a missing
+    // engine binary. When there's no path override (so we'd rely on the
+    // managed bin dir) and nothing is installed there, guide the user to the
+    // one-click installer instead of surfacing the raw path error. A binary on
+    // PATH would have started fine, so reaching here with none installed means
+    // installing the engine is the actual fix.
+    const engineInstalled = await platform.localAi.isServerInstalled().catch(() => true);
+    if (!engineInstalled && !settings.serverBinaryPathOverride.trim()) {
+      return {
+        ok: false,
+        reason: "engine-not-installed",
+        message: "로컬 AI 엔진이 아직 설치되지 않았어요. 설정 → 로컬 AI에서 \"엔진 설치\"를 눌러주세요.",
+      };
+    }
     return {
       ok: false,
       reason: "server-not-running",

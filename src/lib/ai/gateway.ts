@@ -38,13 +38,13 @@ export async function sendAiChat(request: AiChatRequest): Promise<AiChatResponse
     }
   }
 
-  throw new Error(
-    [
-      "AI provider is not available.",
-      "Set up Local AI in Settings (install a model), connect an external server, or configure the server AI endpoint.",
-      errors.length ? `Details: ${errors.join(" | ")}` : "",
-    ]
-      .filter(Boolean)
-      .join(" "),
-  );
+  // Prefer a provider's actionable setup hint (e.g. "install the engine") over
+  // the generic message, so falling through to an unconfigured server provider
+  // doesn't hide the real fix.
+  const providerHint = providers.map((provider) => provider.unavailableMessage?.() ?? null).find(Boolean);
+  const headline =
+    providerHint ??
+    "AI provider is not available. Set up Local AI in Settings (install a model), connect an external server, or configure the server AI endpoint.";
+
+  throw new Error([headline, errors.length ? `Details: ${errors.join(" | ")}` : ""].filter(Boolean).join(" "));
 }

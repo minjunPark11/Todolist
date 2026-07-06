@@ -49,6 +49,11 @@ function errorMessageOf(data: OpenAiChatResponse | null): string | undefined {
   return typeof data.error === "string" ? data.error : data.error.message;
 }
 
+// The reason the last isAvailable() call failed, so the gateway can surface an
+// actionable message (e.g. "install the engine") instead of a generic error
+// when it falls through to an unconfigured server provider.
+let lastUnavailableMessage: string | null = null;
+
 export const llamaServerProvider: AiProvider = {
   name: "llama-server",
 
@@ -65,7 +70,12 @@ export const llamaServerProvider: AiProvider = {
   // launch flow, not an accident.
   async isAvailable() {
     const result = await ensureAiReady(loadLocalAiSettings());
+    lastUnavailableMessage = result.ok ? null : result.message;
     return result.ok;
+  },
+
+  unavailableMessage() {
+    return lastUnavailableMessage;
   },
 
   async chat(request: AiChatRequest): Promise<AiChatResponse> {
