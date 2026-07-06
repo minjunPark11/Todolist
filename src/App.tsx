@@ -140,7 +140,7 @@ export default function App() {
   const [externalCalendarState, setExternalCalendarState] = useState<ExternalCalendarState>(() => loadExternalCalendarState());
   const [calendarShare, setCalendarShare] = useState<CalendarShareState>(emptyCalendarShareState);
   const [appVersion, setAppVersion] = useState(__APP_VERSION__);
-  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | { status: "checking" }>({ status: "checking" });
+  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | { status: "checking" } | { status: "installing"; latestVersion?: string }>({ status: "checking" });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Desktop-only sidebar rail collapse; ignored by the mobile overlay menu.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -188,6 +188,19 @@ export default function App() {
     setUpdateStatus({ status: "checking" });
     const result = await platform.checkForUpdate(version);
     setUpdateStatus(result);
+  }
+
+  async function installAppUpdate() {
+    const latestVersion = updateStatus.status === "available" ? updateStatus.latestVersion : undefined;
+    setUpdateStatus({ status: "installing", latestVersion });
+    try {
+      await platform.installUpdate();
+    } catch (error) {
+      setUpdateStatus({
+        status: "unavailable",
+        message: error instanceof Error ? error.message : t("update.installFailed"),
+      });
+    }
   }
 
   useEffect(() => {
@@ -958,6 +971,7 @@ export default function App() {
         appVersion={appVersion}
         updateStatus={updateStatus}
         onCheckUpdate={() => void checkAppUpdate()}
+        onInstallUpdate={() => void installAppUpdate()}
         requestResetAllData={requestResetAllData}
         focusSettings={focusSettings}
         onUpdateFocusSettings={updateFocusSettings}

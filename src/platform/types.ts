@@ -26,6 +26,7 @@ export interface PlatformAdapter {
   aiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
   getAppVersion(): Promise<string>;
   checkForUpdate(currentVersion: string): Promise<AppUpdateStatus>;
+  installUpdate(): Promise<void>;
   miniFocusTimer: {
     supported(): boolean;
     open(snapshot: MiniFocusTimerSnapshot): Promise<boolean>;

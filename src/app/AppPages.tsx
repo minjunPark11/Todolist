@@ -49,8 +49,9 @@ type AppPagesProps = {
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
   importMessage: string;
   appVersion: string;
-  updateStatus: AppUpdateStatus | { status: "checking" };
+  updateStatus: AppUpdateStatus | { status: "checking" } | { status: "installing"; latestVersion?: string };
   onCheckUpdate: () => void;
+  onInstallUpdate: () => void;
   requestResetAllData: () => void;
   focusSettings: FocusUserSettings;
   onUpdateFocusSettings: (patch: Partial<FocusUserSettings>) => void;
@@ -104,6 +105,7 @@ export function AppPages({
   appVersion,
   updateStatus,
   onCheckUpdate,
+  onInstallUpdate,
   requestResetAllData,
   focusSettings,
   onUpdateFocusSettings,
@@ -314,6 +316,7 @@ export function AppPages({
       appVersion={appVersion}
       updateStatus={updateStatus}
       onCheckUpdate={onCheckUpdate}
+      onInstallUpdate={onInstallUpdate}
       accountSlot={accountSlot}
       tasks={planner.tasks}
       onUpdateTask={planner.updateTask}

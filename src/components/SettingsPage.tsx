@@ -14,8 +14,9 @@ interface SettingsPageProps {
   onReset: () => void;
   importMessage: string;
   appVersion: string;
-  updateStatus: AppUpdateStatus | { status: "checking" };
+  updateStatus: AppUpdateStatus | { status: "checking" } | { status: "installing"; latestVersion?: string };
   onCheckUpdate: () => void;
+  onInstallUpdate: () => void;
   accountSlot: ReactNode;
   tasks: Task[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
@@ -50,6 +51,7 @@ export function SettingsPage({
   appVersion,
   updateStatus,
   onCheckUpdate,
+  onInstallUpdate,
   accountSlot,
   tasks,
   onUpdateTask,
@@ -412,7 +414,12 @@ export function SettingsPage({
               </p>
               <p>{formatUpdateStatus(updateStatus, t)}</p>
               <div className="settings-actions">
-                <button type="button" onClick={onCheckUpdate} disabled={updateStatus.status === "checking"}>
+                {updateStatus.status === "available" ? (
+                  <button type="button" onClick={onInstallUpdate}>
+                    {t("settings.installUpdate")}
+                  </button>
+                ) : null}
+                <button type="button" onClick={onCheckUpdate} disabled={updateStatus.status === "checking" || updateStatus.status === "installing"}>
                   {t("settings.checkUpdates")}
                 </button>
               </div>
@@ -425,10 +432,11 @@ export function SettingsPage({
 }
 
 function formatUpdateStatus(
-  status: AppUpdateStatus | { status: "checking" },
+  status: AppUpdateStatus | { status: "checking" } | { status: "installing"; latestVersion?: string },
   t: (key: string, vars?: Record<string, string | number>) => string,
 ) {
   if (status.status === "checking") return t("settings.updateChecking");
+  if (status.status === "installing") return t("settings.updateInstalling");
   if (status.status === "available") return t("settings.updateAvailable", { version: status.latestVersion });
   if (status.status === "current") return t("settings.updateCurrent", { version: status.latestVersion ?? "" });
   return status.message ? `${t("settings.updateUnavailable")} ${status.message}` : t("settings.updateUnavailable");

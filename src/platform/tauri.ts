@@ -70,6 +70,17 @@ export const tauriPlatform: PlatformAdapter = {
     }
   },
 
+  async installUpdate() {
+    const { check } = await import("@tauri-apps/plugin-updater");
+    const update = await check();
+    if (!update) {
+      throw new Error("No update is available.");
+    }
+    await update.downloadAndInstall();
+    const { relaunch } = await import("@tauri-apps/plugin-process");
+    await relaunch();
+  },
+
   miniFocusTimer: {
     supported() {
       return true;

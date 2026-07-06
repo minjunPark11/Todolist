@@ -84,6 +84,10 @@ export const webPlatform: PlatformAdapter = {
     }
   },
 
+  async installUpdate() {
+    await webPlatform.openExternal("https://github.com/minjunPark11/Todolist/releases/latest");
+  },
+
   miniFocusTimer: {
     supported() {
       return supportsMiniFocusTimer();
