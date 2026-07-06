@@ -677,6 +677,32 @@ export function usePlannerData() {
 
       partial.settings = normalizeSettings(settingsRows?.data as Partial<PlannerSettings> | undefined);
 
+      const { data: appSettingsRow, error: appSettingsError } = await supabase
+        .from("settings")
+        .select("data")
+        .eq("id", "app_settings")
+        .maybeSingle();
+      if (appSettingsError) {
+        throw new Error(`Failed to load 'app_settings' row: ${appSettingsError.message}`);
+      }
+      const appState = appSettingsRow?.data as
+        | { appSettings?: Partial<AppSettings>; activeSessionId?: unknown; recentItems?: unknown }
+        | undefined;
+      // Fall back to the current local values when no remote row exists yet, so
+      // an existing device's preferences aren't wiped on first sync after this
+      // change; the next save pushes them to the account.
+      partial.appSettings = appState?.appSettings ? normalizeAppSettings(appState.appSettings) : data.appSettings;
+      partial.activeSessionId = appState
+        ? typeof appState.activeSessionId === "string"
+          ? appState.activeSessionId
+          : ""
+        : data.activeSessionId;
+      partial.recentItems = appState
+        ? Array.isArray(appState.recentItems)
+          ? (appState.recentItems as never)
+          : []
+        : data.recentItems;
+
       setDataState(normalizeData(partial));
       setRemoteLoaded(true);
       setSyncStatus("sync.synced");
@@ -748,6 +774,25 @@ export function usePlannerData() {
       );
       if (settingsError) {
         throw settingsError;
+      }
+
+      // Device-level preferences (theme accent, language, font size, view
+      // prefs, active focus session, recent items) are synced too, so a single
+      // account looks and behaves the same on app and web.
+      const { error: appSettingsError } = await supabase.from("settings").upsert(
+        {
+          id: "app_settings",
+          user_id: userId,
+          data: {
+            appSettings: nextData.appSettings,
+            activeSessionId: nextData.activeSessionId,
+            recentItems: nextData.recentItems,
+          },
+        },
+        { onConflict: "id,user_id" },
+      );
+      if (appSettingsError) {
+        throw appSettingsError;
       }
 
       setSyncError("");
