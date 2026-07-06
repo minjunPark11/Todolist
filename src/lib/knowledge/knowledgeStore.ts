@@ -74,6 +74,13 @@ export interface IndexStats {
   lastIndexedAt: string;
 }
 
+export interface StoredChunk {
+  filePath: string;
+  headingPath: string;
+  text: string;
+  embedding: number[];
+}
+
 async function resolveAndOpenDb(dbPath: string): Promise<{ db: Database; resolvedPath: string; usedFallback: boolean }> {
   const customPath = dbPath.trim();
   if (customPath) {
@@ -143,6 +150,26 @@ export class KnowledgeStore {
       relativePath: row.relative_path,
       contentHash: row.content_hash,
       modifiedAt: row.modified_at,
+    }));
+  }
+
+  // For Full retrieval's cosine ranking (Phase 3). `embedding` comes back as
+  // a TEXT column — sqlx/tauri-plugin-sql decodes non-scalar SQLite values as
+  // their raw stored string, not parsed JSON, so it must be JSON.parse()'d
+  // here (same reason indexFile() stores it via JSON-serializing bind, not a
+  // real BLOB — see the schema comment above).
+  async getAllChunks(): Promise<StoredChunk[]> {
+    const rows = await this.db.select<
+      Array<{ relative_path: string; heading_path: string; text: string; embedding: string }>
+    >(
+      `SELECT f.relative_path as relative_path, c.heading_path as heading_path, c.text as text, c.embedding as embedding
+       FROM chunks c JOIN files f ON f.id = c.file_id`,
+    );
+    return rows.map((row) => ({
+      filePath: row.relative_path,
+      headingPath: row.heading_path,
+      text: row.text,
+      embedding: JSON.parse(row.embedding) as number[],
     }));
   }
 

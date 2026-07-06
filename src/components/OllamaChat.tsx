@@ -13,7 +13,7 @@ import {
 } from "../lib/ai/tools/toolExecutor";
 import type { AiMessage, AiProviderName } from "../lib/ai/types";
 import { buildCalendarContextText, type CalendarContextInput } from "../lib/calendarContext";
-import { createLiteFolderContextSource } from "../lib/knowledge/liteContextSource";
+import { createKnowledgeContextSource } from "../lib/knowledge/knowledgeContextSource";
 import { DEFAULT_KNOWLEDGE_SETTINGS, type KnowledgeSettings, type RetrievedChunk } from "../lib/knowledge/types";
 import type { PageId } from "../types";
 import { useT } from "../i18n";
@@ -144,7 +144,7 @@ export function OllamaChat({
       let knowledgeContextText: string | undefined;
       let nextKnowledgeSources: RetrievedChunk[] = [];
       try {
-        const knowledgeSource = createLiteFolderContextSource(() => knowledgeSettings);
+        const knowledgeSource = createKnowledgeContextSource(() => knowledgeSettings);
         if (await knowledgeSource.isReady()) {
           const knowledgeResult = await knowledgeSource.buildContext(content, knowledgeSettings.knowledgeBudgetChars);
           if (knowledgeResult) {

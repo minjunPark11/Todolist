@@ -3,9 +3,10 @@
 // knowledge budget. See KNOWLEDGE_BASE_DESIGN.md §3.1, §4.8.
 import { platform } from "../../platform";
 import type { PlatformFileEntry } from "../../platform/types";
+import { assembleKnowledgeContext } from "./contextFormat";
 import { parseMarkdownNote } from "./markdownParser";
 import { scanVault } from "./obsidianScanner";
-import type { KnowledgeContextResult, KnowledgeContextSource, KnowledgeSettings, RetrievedChunk } from "./types";
+import type { KnowledgeContextResult, KnowledgeContextSource, KnowledgeSettings } from "./types";
 
 // "제한 적용 (기본: 최대 50파일 · 파일당 256KB)" — §3.1. The same cap also
 // bounds how many files stage 2 reads, so "상위 후보 파일만 read" (never the
@@ -17,10 +18,6 @@ const FILENAME_MATCH_WEIGHT = 10;
 const HEADING_MATCH_WEIGHT = 5;
 const TAG_OR_ALIAS_MATCH_WEIGHT = 8;
 const PRIORITY_FOLDER_BONUS = 3;
-
-const KNOWLEDGE_BLOCK_HEADER = "[KNOWLEDGE from Obsidian vault — read-only excerpts]";
-const KNOWLEDGE_BLOCK_INSTRUCTIONS = "Instructions: cite the source path when you use these excerpts.";
-const KNOWLEDGE_BLOCK_TRUNCATED = "[knowledge truncated]";
 
 function extractKeywords(query: string): string[] {
   const matches = query.match(/[\p{L}\p{N}]{2,}/gu) ?? [];
@@ -57,11 +54,6 @@ function scoreParsedNote(note: ReturnType<typeof parseMarkdownNote>, keywords: s
     if (lowerAliases.includes(keyword)) score += TAG_OR_ALIAS_MATCH_WEIGHT;
   }
   return score;
-}
-
-function formatSourceBlock(relativePath: string, headingPath: string, text: string): string {
-  const sourceLabel = headingPath ? `${relativePath} # ${headingPath}` : relativePath;
-  return `── source: ${sourceLabel}\n${text}`;
 }
 
 type ReadCandidate = {
@@ -124,44 +116,15 @@ export function createLiteFolderContextSource(getSettings: () => KnowledgeSettin
 
       candidates.sort((a, b) => b.score - a.score || b.entry.modifiedAt - a.entry.modifiedAt);
 
-      const blocks: string[] = [];
-      const sources: RetrievedChunk[] = [];
-      let used = 0;
-      let truncated = false;
-
-      for (const candidate of candidates) {
-        const remaining = budgetChars - used;
-        if (remaining <= 0) {
-          truncated = true;
-          break;
-        }
-
-        const overhead = formatSourceBlock(candidate.entry.relativePath, candidate.headingPath, "").length;
-        const available = remaining - overhead;
-        if (available <= 0) {
-          truncated = true;
-          break;
-        }
-
-        const fitsFully = candidate.content.length <= available;
-        const text = fitsFully ? candidate.content : candidate.content.slice(0, available);
-        if (!fitsFully) truncated = true;
-
-        blocks.push(formatSourceBlock(candidate.entry.relativePath, candidate.headingPath, text));
-        sources.push({ text, filePath: candidate.entry.relativePath, headingPath: candidate.headingPath, score: candidate.score });
-        used += overhead + text.length;
-
-        if (!fitsFully) break;
-      }
-
-      if (!blocks.length) return null;
-
-      const footer = truncated ? `${KNOWLEDGE_BLOCK_TRUNCATED}\n${KNOWLEDGE_BLOCK_INSTRUCTIONS}` : KNOWLEDGE_BLOCK_INSTRUCTIONS;
-
-      return {
-        text: [KNOWLEDGE_BLOCK_HEADER, ...blocks, footer].join("\n"),
-        sources,
-      };
+      return assembleKnowledgeContext(
+        candidates.map((candidate) => ({
+          filePath: candidate.entry.relativePath,
+          headingPath: candidate.headingPath,
+          text: candidate.content,
+          score: candidate.score,
+        })),
+        budgetChars,
+      );
     },
   };
 }

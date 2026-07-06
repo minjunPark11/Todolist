@@ -558,6 +558,7 @@ function KnowledgeSettingsTab({
   const [installedModels, setInstalledModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [indexStats, setIndexStats] = useState<IndexStats | null>(null);
+  const [storedEmbeddingModel, setStoredEmbeddingModel] = useState<string | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [indexing, setIndexing] = useState(false);
   const [indexProgress, setIndexProgress] = useState<IndexProgress | null>(null);
@@ -582,11 +583,13 @@ function KnowledgeSettingsTab({
       const store = await KnowledgeStore.open(settings.dbPath);
       try {
         setIndexStats(await store.getStats());
+        setStoredEmbeddingModel(await store.getMeta("embedding_model"));
       } finally {
         await store.close();
       }
     } catch {
       setIndexStats(null);
+      setStoredEmbeddingModel(null);
     } finally {
       setStatsLoading(false);
     }
@@ -602,6 +605,11 @@ function KnowledgeSettingsTab({
   }, [vaultReady]);
 
   const modelInstalled = installedModels.some((name) => modelNameMatches(name, settings.embeddingModel));
+  const reindexNeeded =
+    vaultReady &&
+    settings.indexingMode === "full" &&
+    !statsLoading &&
+    ((indexStats?.chunkCount ?? 0) === 0 || (storedEmbeddingModel !== null && storedEmbeddingModel !== settings.embeddingModel));
 
   async function handlePickFolder() {
     setPickError("");
@@ -648,6 +656,7 @@ function KnowledgeSettingsTab({
         setIndexMessage(result.modelChanged ? `${summary} ${t("settings.knowledge.modelChangedNotice")}` : summary);
       }
       setIndexStats(await store.getStats());
+      setStoredEmbeddingModel(await store.getMeta("embedding_model"));
     } catch (error) {
       if (error instanceof EmbeddingModelUnavailableError) {
         setIndexError(t("settings.knowledge.modelPullHint", { model: error.modelName }));
@@ -681,6 +690,7 @@ function KnowledgeSettingsTab({
     updateSettings({ vaultPath: "", enabled: false, lastIndexedAt: "" });
     setDisconnectConfirmOpen(false);
     setIndexStats(null);
+    setStoredEmbeddingModel(null);
   }
 
   if (!isDesktop) {
@@ -728,6 +738,19 @@ function KnowledgeSettingsTab({
             value={settings.enabled}
             onChange={(value) => updateSettings({ enabled: value })}
           />
+          {settings.enabled ? (
+            <Row title={t("settings.knowledge.modeTitle")} hint={t("settings.knowledge.modeHint")}>
+              <SegmentedTabs
+                tabs={[
+                  ["lite", t("settings.knowledge.modeLite")],
+                  ["full", t("settings.knowledge.modeFull")],
+                ]}
+                active={settings.indexingMode}
+                onChange={(mode) => updateSettings({ indexingMode: mode })}
+              />
+            </Row>
+          ) : null}
+          {reindexNeeded ? <p className="ff-settings-error">{t("settings.knowledge.reindexNeeded")}</p> : null}
           <p className="ff-knowledge-privacy-note">{t("settings.knowledge.privacyNote")}</p>
         </>
       ) : null}
