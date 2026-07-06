@@ -1,4 +1,5 @@
 import type { MiniFocusTimerSnapshot } from "../lib/miniFocusTimer";
+import type { HardwareProfile, InstalledModelFile, LocalAiRuntimeStatus } from "../lib/localAi/types";
 
 export type PlatformKind = "web" | "desktop";
 export type FocusTrayAction = "pause" | "resume" | "finish";
@@ -54,6 +55,19 @@ export interface PlatformFiles {
   watchVault(path: string, onChange: () => void): Promise<() => void>;
 }
 
+// Desktop-only bridge to the local AI Rust commands (src-tauri/src/local_ai.rs,
+// LOCAL_AI_SYSTEM_DESIGN.md). Hardware profiling is read-only and local — the
+// caller (Local AI Setup UI) must only invoke it after explicit user consent.
+export interface PlatformLocalAi {
+  supported(): boolean;
+  getHardwareProfile(): Promise<HardwareProfile>;
+  // Returns the app-local models directory, creating it if needed.
+  getModelsDir(): Promise<string>;
+  listInstalledModels(): Promise<InstalledModelFile[]>;
+  // Phase 0 stub: always reports running=false until the sidecar ships.
+  getRuntimeStatus(): Promise<LocalAiRuntimeStatus>;
+}
+
 export interface PlatformAdapter {
   kind: PlatformKind;
   storage: {
@@ -82,4 +96,5 @@ export interface PlatformAdapter {
   };
   openExternal(url: string): Promise<void>;
   files: PlatformFiles;
+  localAi: PlatformLocalAi;
 }

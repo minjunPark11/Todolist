@@ -18,6 +18,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { MiniFocusTimerSnapshot } from "../lib/miniFocusTimer";
+import type { HardwareProfile, InstalledModelFile, LocalAiRuntimeStatus } from "../lib/localAi/types";
 import { webPlatform } from "./web";
 import type {
   FocusTrayActionPayload,
@@ -241,6 +242,30 @@ export const tauriPlatform: PlatformAdapter = {
 
     async watchVault(path, onChange) {
       return watchFs([path], () => onChange(), { recursive: true, delayMs: 2000 });
+    },
+  },
+
+  localAi: {
+    supported() {
+      return true;
+    },
+
+    async getHardwareProfile() {
+      // Consent gate lives in the UI: only the Local AI Setup screen calls
+      // this, after the user clicks "내 기기 검사하기" (design principle 5).
+      return invoke<HardwareProfile>("get_local_ai_hardware_profile");
+    },
+
+    async getModelsDir() {
+      return invoke<string>("get_local_ai_models_dir");
+    },
+
+    async listInstalledModels() {
+      return invoke<InstalledModelFile[]>("list_local_ai_models");
+    },
+
+    async getRuntimeStatus() {
+      return invoke<LocalAiRuntimeStatus>("get_local_ai_runtime_status");
     },
   },
 };

@@ -10,6 +10,10 @@ function filesUnsupported(): never {
   throw new Error("Local file access is only available in the desktop app.");
 }
 
+function localAiUnsupported(): never {
+  throw new Error("Local AI runtime is only available in the desktop app.");
+}
+
 function compareVersions(a: string, b: string) {
   const left = a.split(".").map((part) => Number.parseInt(part, 10) || 0);
   const right = b.split(".").map((part) => Number.parseInt(part, 10) || 0);
@@ -155,6 +159,24 @@ export const webPlatform: PlatformAdapter = {
     },
     async watchVault() {
       filesUnsupported();
+    },
+  },
+
+  localAi: {
+    supported() {
+      return false;
+    },
+    async getHardwareProfile() {
+      localAiUnsupported();
+    },
+    async getModelsDir() {
+      localAiUnsupported();
+    },
+    async listInstalledModels() {
+      localAiUnsupported();
+    },
+    async getRuntimeStatus() {
+      localAiUnsupported();
     },
   },
 };

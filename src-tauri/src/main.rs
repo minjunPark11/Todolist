@@ -2,6 +2,8 @@
 // Debug builds keep the console so logs remain visible.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod local_ai;
+
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
@@ -383,7 +385,11 @@ fn main() {
             open_focus_mini_timer,
             dispatch_focus_tray_action,
             close_focus_mini_timer,
-            grant_vault_read_access
+            grant_vault_read_access,
+            local_ai::get_local_ai_hardware_profile,
+            local_ai::get_local_ai_models_dir,
+            local_ai::list_local_ai_models,
+            local_ai::get_local_ai_runtime_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running FocusFlow desktop app");
