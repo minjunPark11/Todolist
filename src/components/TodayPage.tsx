@@ -331,6 +331,7 @@ export function TodayPage({
             hasQuery={hasQuery}
             query={searchQuery.trim()}
             onToggleDone={onToggleDone}
+            onOpenTask={onOpenTask}
             onAddTask={() => setQuickAddOpen(true)}
             onOpenSpaces={() => onNavigate("projects")}
           />

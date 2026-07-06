@@ -10,6 +10,7 @@ interface FocusQueueProps {
   hasQuery: boolean;
   query: string;
   onToggleDone: (taskId: string) => void;
+  onOpenTask: (taskId: string) => void;
   onAddTask: () => void;
   onOpenSpaces: () => void;
 }
@@ -20,6 +21,7 @@ export function FocusQueue({
   hasQuery,
   query,
   onToggleDone,
+  onOpenTask,
   onAddTask,
   onOpenSpaces,
 }: FocusQueueProps) {
@@ -69,6 +71,7 @@ export function FocusQueue({
                 entry={entry}
                 projects={projects}
                 onToggleDone={onToggleDone}
+                onOpenTask={onOpenTask}
               />
             ))}
           </AnimatePresence>
@@ -87,10 +90,12 @@ function FocusQueueRow({
   entry,
   projects,
   onToggleDone,
+  onOpenTask,
 }: {
   entry: TodayEntry;
   projects: Project[];
   onToggleDone: (taskId: string) => void;
+  onOpenTask: (taskId: string) => void;
 }) {
   const { t } = useT();
   const { task, completed } = entry;
@@ -101,12 +106,26 @@ function FocusQueueRow({
   // the inner row element rather than the motion wrapper.
   return (
     <MotionTaskRow taskId={task.id}>
-      <div className={`tdy-row${completed ? " is-done" : ""}`}>
+      <div
+        className={`tdy-row${completed ? " is-done" : ""}`}
+        role="button"
+        tabIndex={0}
+        onClick={() => onOpenTask(task.id)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpenTask(task.id);
+          }
+        }}
+      >
         <button
           type="button"
           className={`tdy-check${completed ? " checked" : ""}`}
           aria-label={t("todayv.checkAria", { title: task.title })}
-          onClick={() => onToggleDone(task.id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleDone(task.id);
+          }}
         >
           {completed ? "✓" : ""}
         </button>

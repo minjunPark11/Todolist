@@ -350,7 +350,12 @@
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   background: var(--bg-surface);
+  cursor: pointer;
   transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.tdy-row:hover {
+  border-color: var(--accent);
 }
 
 .tdy-row.is-done {
@@ -709,6 +714,33 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 2px;
+}
+
+/* --- Task detail overlay: clicking a row opens TaskDetail as a right-side
+   drawer, since the Today grid has no side-by-side detail column. --- */
+
+.tdy-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 20, 0.35);
+  z-index: 1200;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tdy-detail-drawer {
+  width: 400px;
+  max-width: 94vw;
+  height: 100%;
+  padding: 20px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.tdy-detail-drawer .detail-panel {
+  position: static;
+  max-height: none;
 }
 
 .tdy-badge {

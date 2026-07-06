@@ -137,8 +137,9 @@ export function AppPages({
   }
 
   if (activePage === "today") {
-    // Today has no task-detail side panel — the grid always uses the
-    // full-width (no-detail) layout.
+    // Today has no side-by-side task-detail panel — the grid always uses the
+    // full-width (no-detail) layout. Clicking a task instead opens the
+    // shared TaskDetail as a right-side overlay drawer.
     return (
       <section className="page-grid no-detail tdy-grid">
         <TodayPage
@@ -157,6 +158,13 @@ export function AppPages({
           onIntentHandled={onTodayIntentHandled}
           showToast={showToast}
         />
+        {planner.selectedTask ? (
+          <div className="tdy-detail-overlay" onClick={() => planner.selectTask("")}>
+            <div className="tdy-detail-drawer" onClick={(event) => event.stopPropagation()}>
+              {renderTaskDetail()}
+            </div>
+          </div>
+        ) : null}
       </section>
     );
   }
