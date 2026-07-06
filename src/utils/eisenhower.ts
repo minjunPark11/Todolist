@@ -2,7 +2,10 @@
 // The quadrant is never stored — it is derived from the task's existing
 // fields so it can't drift out of sync:
 //   important = priority === "high"
-//   urgent    = scheduled today, due today, or overdue
+//   urgent    = due today, or overdue
+// scheduledDate ("planned for today") is deliberately excluded from urgency:
+// it drives the Today page's plan, not the deadline pressure that defines
+// quadrants I/III, so moving a task into Q2 no longer wipes today's plan.
 // Quadrant IV carries the unsorted / on-hold / completed sub-groups, mapped
 // onto the existing statuses (inbox / waiting / done).
 import type { Task, TaskDraft } from "../types";
@@ -20,14 +23,10 @@ export function isMatrixImportant(task: Pick<Task, "priority">): boolean {
 }
 
 export function isMatrixUrgent(
-  task: Pick<Task, "scheduledDate" | "dueDate">,
+  task: Pick<Task, "dueDate">,
   today: string,
 ): boolean {
-  return (
-    task.scheduledDate === today ||
-    task.dueDate === today ||
-    Boolean(task.dueDate && task.dueDate < today)
-  );
+  return task.dueDate === today || Boolean(task.dueDate && task.dueDate < today);
 }
 
 export function getMatrixPosition(
@@ -89,11 +88,18 @@ export function patchForQuadrant(task: Task, quadrant: MatrixQuadrant, today: st
   }
 
   if (quadrant === "I" || quadrant === "III") {
-    if (!urgent) patch.scheduledDate = today;
+    if (!urgent) patch.dueDate = today;
   } else if (urgent) {
-    // De-urgentize: only the fields that make it urgent today are touched.
-    if (task.scheduledDate === today) patch.scheduledDate = "";
-    if (task.dueDate && task.dueDate <= today) patch.dueDate = "";
+    // De-urgentize: clearing today's/overdue deadline is what actually moves
+    // the card out of the urgent column. But that deadline may have been the
+    // task's only tie to the Today list — if it has no scheduled day, pin it
+    // to today's plan so classifying it as "important, not urgent" (Q2) or
+    // "neither" (Q4) never makes it vanish from Today. scheduledDate no longer
+    // affects urgency, so the card still lands in Q2/Q4.
+    if (task.dueDate && task.dueDate <= today) {
+      patch.dueDate = "";
+      if (!task.scheduledDate) patch.scheduledDate = today;
+    }
   }
 
   return patch;
