@@ -48,6 +48,10 @@ export interface PlatformFiles {
   // if it doesn't already exist. Must be called before opening the default
   // knowledge DB — Tauri does not guarantee the app data dir pre-exists.
   ensureKnowledgeDbDir(): Promise<void>;
+  // Watches the vault folder (recursively, debounced) and calls onChange
+  // after edits settle. Returns an unsubscribe function. Relies on the fs
+  // scope already granted by grantAccess()/pickFolder() for this same path.
+  watchVault(path: string, onChange: () => void): Promise<() => void>;
 }
 
 export interface PlatformAdapter {

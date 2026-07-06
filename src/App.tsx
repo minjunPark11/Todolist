@@ -13,6 +13,7 @@ import { executeAgentActions } from "./app/executeAgentActions";
 import { useDataPortability } from "./app/useDataPortability";
 import type { ToastState } from "./components/kit";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
+import { useKnowledgeAutoIndex } from "./lib/knowledge/useKnowledgeAutoIndex";
 import { useKnowledgeSettings } from "./lib/knowledge/useKnowledgeSettings";
 import { popUndo, pushUndo } from "./lib/undoStack";
 import { reducedTransition, transitions } from "./motion/transitions";
@@ -93,6 +94,9 @@ export default function App() {
   // vault connection made in Settings is immediately visible to the chat panel
   // (both are mounted for the app's whole lifetime, not remounted on nav).
   const knowledge = useKnowledgeSettings();
+  // Phase 4: auto-syncs the Full-mode index on app start and on vault file
+  // changes; no-ops entirely unless Full mode is enabled and connected.
+  useKnowledgeAutoIndex(knowledge.settings);
   // Renders before the <I18nProvider> below exists in the tree, so this can't
   // use the useT() context hook — call the plain translate() helper instead.
   const t = (key: string, vars?: Record<string, string | number>) => translate(appSettings.language, key, vars);

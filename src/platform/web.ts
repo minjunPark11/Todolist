@@ -153,5 +153,8 @@ export const webPlatform: PlatformAdapter = {
     async ensureKnowledgeDbDir() {
       filesUnsupported();
     },
+    async watchVault() {
+      filesUnsupported();
+    },
   },
 };

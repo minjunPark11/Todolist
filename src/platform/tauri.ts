@@ -8,6 +8,7 @@ import {
   readDir,
   readTextFile as fsReadTextFile,
   stat as fsStat,
+  watch as watchFs,
 } from "@tauri-apps/plugin-fs";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import {
@@ -236,6 +237,10 @@ export const tauriPlatform: PlatformAdapter = {
     async ensureKnowledgeDbDir() {
       const dir = await appDataDir();
       await mkdir(dir, { recursive: true });
+    },
+
+    async watchVault(path, onChange) {
+      return watchFs([path], () => onChange(), { recursive: true, delayMs: 2000 });
     },
   },
 };
