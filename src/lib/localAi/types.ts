@@ -32,8 +32,8 @@ export interface LocalModelOption {
   recommendedRamGb: number;
   // i18n key (localAi.model.*) — render with t(model.description).
   description: string;
-  // TODO(release): finalize official GGUF URLs (allowlisted hosts only) and
-  // sha256 hashes before shipping the installer. Undefined = download blocked.
+  // Set in modelCatalog.ts from allowlisted HF repos. Undefined = download
+  // blocked (isModelDownloadable), so the settings UI disables the button.
   downloadUrl?: string;
   expectedSha256?: string;
 }

@@ -399,7 +399,7 @@ OS · RAM · CPU(코어) · GPU(감지 시) · 저장공간 · **추천 모델 �
 |-------|------|------|
 | **0** | 설계 문서 + 타입/카탈로그/추천기/설정/런타임 스캐폴드 + Rust HW 프로파일러·모델 폴더·목록 command | ✅ 이번 커밋 |
 | **1** | Local AI Setup UI (검사 동의 → 결과 → 추천), i18n, GPU 감지 1차(wgpu 이름) | ✅ UI/i18n (설정 탭 "로컬 AI") · GPU 감지는 미착수 |
-| **2** | ModelInstaller: Rust 다운로드 command (진행률 event, 이어받기, sha256), 다운로드 UI, 카탈로그 URL/해시 확정 | ✅ 다운로드 인프라 완료 · URL/해시는 여전히 TODO(release) — 해시 없는 모델은 다운로드 버튼이 비활성 |
+| **2** | ModelInstaller: Rust 다운로드 command (진행률 event, 이어받기, sha256), 다운로드 UI, 카탈로그 URL/해시 확정 | ✅ 다운로드 인프라 + 카탈로그 URL/sha256 확정 (bartowski 단일 파일 Q4_K_M, HF LFS oid). Phase 7에서 full-download 재검증 |
 | **3** | sidecar: spawn/health/종료 정리, 포트 충돌 처리 (런타임 바이너리 해석 방식 — §7) | ✅ 런타임 완료 · 바이너리 자동 설치/패키징은 후속 |
 | **4** | `llamaServerProvider` 추가 + gateway 체인 선두 배치, Ollama chat provider 제거 (외부 연결은 OpenAI 호환으로 통일) | ✅ |
 | **5** | 아키텍처 전환 완료: 임베딩 llama-server 백엔드(Full RAG), Ollama 의존 제거/격리, 유휴 자동 종료, NVIDIA VRAM 감지 | ✅ 구현 |
