@@ -7,6 +7,10 @@ import { PERSONAL_AGENT_SYSTEM_PROMPT } from "./prompts";
 export type PersonalAgentRequest = {
   messages: AiMessage[];
   contextText?: string;
+  // Obsidian-derived excerpts, passed through untouched to sendAiChat as a
+  // separate field (never baked into `messages`) so the gateway can still
+  // strip it structurally on non-local provider fallback.
+  knowledgeContext?: string;
   intent?: AgentIntent;
   model?: string;
 };
@@ -20,6 +24,7 @@ export type PersonalAgentResponse = AiChatResponse & {
 export async function runPersonalAgent({
   messages,
   contextText,
+  knowledgeContext,
   intent,
   model,
 }: PersonalAgentRequest): Promise<PersonalAgentResponse> {
@@ -29,6 +34,7 @@ export async function runPersonalAgent({
     dataScope: contextText ? "full-app" : "compact",
     temperature: 0.2,
     model,
+    knowledgeContext,
     messages: [
       {
         role: "system",

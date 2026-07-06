@@ -13,6 +13,8 @@ import {
 } from "../lib/ai/tools/toolExecutor";
 import type { AiMessage, AiProviderName } from "../lib/ai/types";
 import { buildCalendarContextText, type CalendarContextInput } from "../lib/calendarContext";
+import { createLiteFolderContextSource } from "../lib/knowledge/liteContextSource";
+import { DEFAULT_KNOWLEDGE_SETTINGS, type KnowledgeSettings, type RetrievedChunk } from "../lib/knowledge/types";
 import type { PageId } from "../types";
 import { useT } from "../i18n";
 import { reducedTransition, transitions } from "../motion/transitions";
@@ -38,6 +40,7 @@ interface OllamaChatProps {
   onExecuteActions?: (actions: AgentAction[]) => ToolExecutionResult[];
   aiModel?: string;
   onChangeAiModel?: (model: string) => void;
+  knowledgeSettings?: KnowledgeSettings;
 }
 
 function getProviderLabel(t: (key: string) => string, provider?: AiProviderName) {
@@ -54,6 +57,7 @@ export function OllamaChat({
   onExecuteActions,
   aiModel = "",
   onChangeAiModel,
+  knowledgeSettings = DEFAULT_KNOWLEDGE_SETTINGS,
 }: OllamaChatProps = {}) {
   const { t } = useT();
   const motionEnabled = useMotionEnabled();
@@ -71,6 +75,8 @@ export function OllamaChat({
   const [suggestedActions, setSuggestedActions] = useState<AgentAction[]>([]);
   const [validationResults, setValidationResults] = useState<ToolValidationResult[]>([]);
   const [actionNotice, setActionNotice] = useState("");
+  const [knowledgeSources, setKnowledgeSources] = useState<RetrievedChunk[]>([]);
+  const [copiedSourcePath, setCopiedSourcePath] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const chatHistory = useMemo<AiMessage[]>(
@@ -123,6 +129,7 @@ export function OllamaChat({
     setSuggestedActions([]);
     setValidationResults([]);
     setActionNotice("");
+    setKnowledgeSources([]);
     setLoading(true);
 
     try {
@@ -131,9 +138,28 @@ export function OllamaChat({
       const requestContextText = aiContext
         ? buildAiContextText({ ...aiContext, intent: nextIntent, calendarContextText })
         : calendarContextText;
+
+      // Best-effort: knowledge context is an enhancement, never blocks the
+      // chat if the vault is unreadable or unset (see KNOWLEDGE_BASE_DESIGN.md).
+      let knowledgeContextText: string | undefined;
+      let nextKnowledgeSources: RetrievedChunk[] = [];
+      try {
+        const knowledgeSource = createLiteFolderContextSource(() => knowledgeSettings);
+        if (await knowledgeSource.isReady()) {
+          const knowledgeResult = await knowledgeSource.buildContext(content, knowledgeSettings.knowledgeBudgetChars);
+          if (knowledgeResult) {
+            knowledgeContextText = knowledgeResult.text;
+            nextKnowledgeSources = knowledgeResult.sources;
+          }
+        }
+      } catch {
+        // Ignore — the chat proceeds without knowledge context.
+      }
+
       const response = await runPersonalAgent({
         messages: [...chatHistory, { role: "user", content }],
         contextText: requestContextText,
+        knowledgeContext: knowledgeContextText,
         intent: nextIntent,
         model: aiModel || undefined,
       });
@@ -149,11 +175,22 @@ export function OllamaChat({
           : [],
       );
       setMessages((current) => [...current, createMessage("assistant", response.content)]);
+      setKnowledgeSources(nextKnowledgeSources);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("ai.error.chatFailed"));
     } finally {
       setLoading(false);
       window.setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }
+
+  async function copySourcePath(path: string) {
+    try {
+      await navigator.clipboard.writeText(path);
+      setCopiedSourcePath(path);
+      window.setTimeout(() => setCopiedSourcePath(""), 1500);
+    } catch {
+      // Clipboard API may be unavailable; the chip still shows the path.
     }
   }
 
@@ -171,6 +208,7 @@ export function OllamaChat({
     setSuggestedActions([]);
     setValidationResults([]);
     setActionNotice("");
+    setKnowledgeSources([]);
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }
 
@@ -226,7 +264,14 @@ export function OllamaChat({
           <header className="ollama-chat-head">
             <div>
               <span>{getProviderLabel(t, provider)}</span>
-              <h2>{t("ai.personalAiTitle")}</h2>
+              <h2>
+                {t("ai.personalAiTitle")}
+                {knowledgeSources.length > 0 ? (
+                  <span className="ollama-chat-knowledge-badge" title={t("ai.knowledge.badgeHint")} aria-label={t("ai.knowledge.badgeHint")}>
+                    📚
+                  </span>
+                ) : null}
+              </h2>
               <small>{getIntentLabel(intent)}</small>
             </div>
             <div className="ollama-chat-actions">
@@ -283,6 +328,21 @@ export function OllamaChat({
           </div>
 
           {error ? <div className="ollama-chat-error">{error}</div> : null}
+          {knowledgeSources.length > 0 ? (
+            <div className="ollama-chat-knowledge-sources" aria-label={t("ai.knowledge.sourcesLabel")}>
+              {knowledgeSources.map((source, index) => (
+                <button
+                  key={`${source.filePath}-${index}`}
+                  type="button"
+                  className="ollama-chat-knowledge-chip"
+                  title={source.filePath}
+                  onClick={() => void copySourcePath(source.filePath)}
+                >
+                  {copiedSourcePath === source.filePath ? t("ai.knowledge.copied") : source.filePath}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {actionNotice ? <div className="ollama-chat-notice">{actionNotice}</div> : null}
           <AgentActionPreview
             actions={suggestedActions}

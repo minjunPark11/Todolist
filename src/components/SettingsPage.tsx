@@ -1,6 +1,6 @@
 import { ChangeEvent, ReactNode, useEffect, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
-import { useKnowledgeSettings } from "../lib/knowledge/useKnowledgeSettings";
+import type { KnowledgeSettings } from "../lib/knowledge/types";
 import { platform } from "../platform";
 import type { AppUpdateStatus } from "../platform";
 import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, Task, ThemeMode } from "../types";
@@ -34,6 +34,9 @@ interface SettingsPageProps {
   onDisableCalendarShare: () => void;
   onRegenerateCalendarShare: () => void;
   onPublishCalendarShare: () => void;
+  knowledgeSettings: KnowledgeSettings;
+  onUpdateKnowledgeSettings: (patch: Partial<KnowledgeSettings>) => void;
+  isKnowledgeDesktop: boolean;
 }
 
 const ACCENTS: { id: AccentColor; color: string }[] = [
@@ -69,6 +72,9 @@ export function SettingsPage({
   onDisableCalendarShare,
   onRegenerateCalendarShare,
   onPublishCalendarShare,
+  knowledgeSettings,
+  onUpdateKnowledgeSettings,
+  isKnowledgeDesktop,
 }: SettingsPageProps) {
   const { t } = useT();
   const [tab, setTab] = useState<"appearance" | "behavior" | "calendar" | "knowledge" | "data">("appearance");
@@ -390,7 +396,13 @@ export function SettingsPage({
         </div>
       ) : null}
 
-      {tab === "knowledge" ? <KnowledgeSettingsTab /> : null}
+      {tab === "knowledge" ? (
+        <KnowledgeSettingsTab
+          settings={knowledgeSettings}
+          updateSettings={onUpdateKnowledgeSettings}
+          isDesktop={isKnowledgeDesktop}
+        />
+      ) : null}
 
       {tab === "data" ? (
         <>
@@ -525,9 +537,16 @@ function AiModelRow({ value, onChange }: { value: string; onChange: (model: stri
   );
 }
 
-function KnowledgeSettingsTab() {
+function KnowledgeSettingsTab({
+  settings,
+  updateSettings,
+  isDesktop,
+}: {
+  settings: KnowledgeSettings;
+  updateSettings: (patch: Partial<KnowledgeSettings>) => void;
+  isDesktop: boolean;
+}) {
   const { t } = useT();
-  const { settings, updateSettings, isDesktop } = useKnowledgeSettings();
   const [pickError, setPickError] = useState("");
   const [picking, setPicking] = useState(false);
   const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false);

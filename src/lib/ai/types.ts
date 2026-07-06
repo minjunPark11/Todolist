@@ -24,6 +24,10 @@ export type AiChatRequest = {
   dataScope?: "compact" | "full-app";
   // Optional model override chosen by the user; falls back to provider default.
   model?: string;
+  // Obsidian-derived excerpts (see KNOWLEDGE_BASE_DESIGN.md). Kept separate
+  // from `messages` so the gateway can structurally strip it before falling
+  // back to a provider that isn't the local Ollama instance (principles 9-10).
+  knowledgeContext?: string;
 };
 
 export type AiChatResponse = {
@@ -37,6 +41,10 @@ export type AiProvider = {
   name: AiProviderName;
   isAvailable: () => Promise<boolean>;
   canHandleFullAppData?: () => boolean;
+  // True only for the local Ollama provider. Gates `AiChatRequest.knowledgeContext`
+  // (see KNOWLEDGE_BASE_DESIGN.md principles 9-10) — undefined/false means the
+  // gateway strips knowledgeContext before this provider ever sees the request.
+  canHandleKnowledgeContext?: () => boolean;
   chat: (request: AiChatRequest) => Promise<AiChatResponse>;
   // Lists the models installed on the provider, when it can be introspected.
   listModels?: () => Promise<string[]>;

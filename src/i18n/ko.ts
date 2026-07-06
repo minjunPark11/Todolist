@@ -698,6 +698,9 @@ export const ko: Dictionary = {
   "ai.model.loading": "모델 불러오는 중…",
   "ai.model.refresh": "모델 목록 새로고침",
   "ai.status.offline": "Ollama가 꺼져 있어요. AI 챗을 쓰려면 Ollama를 켜주세요.",
+  "ai.knowledge.badgeHint": "이 답변은 내 Obsidian 노트를 참고했습니다",
+  "ai.knowledge.sourcesLabel": "참고한 노트",
+  "ai.knowledge.copied": "경로 복사됨",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "이전",

@@ -35,6 +35,28 @@ export const DEFAULT_KNOWLEDGE_SETTINGS: KnowledgeSettings = {
   lastIndexedAt: "",
 };
 
+// One retrieved excerpt shown to the model and, as `sources`, to the user as
+// a citation chip. Lite fills this at file granularity (headingPath = the
+// note's first heading); Full (Phase 2+) will fill it at chunk granularity.
+export interface RetrievedChunk {
+  text: string;
+  filePath: string;
+  headingPath: string;
+  score: number;
+}
+
+export interface KnowledgeContextResult {
+  text: string; // "[KNOWLEDGE] ..." block, ready to send as a system message
+  sources: RetrievedChunk[];
+}
+
+// Lite/Full share this interface so retrieval can be swapped later without
+// touching call sites (see KNOWLEDGE_BASE_DESIGN.md §4.8).
+export interface KnowledgeContextSource {
+  isReady(): Promise<boolean>;
+  buildContext(query: string, budgetChars: number): Promise<KnowledgeContextResult | null>;
+}
+
 export function normalizeKnowledgeSettings(raw: unknown): KnowledgeSettings {
   const value = (raw && typeof raw === "object" ? raw : {}) as Partial<KnowledgeSettings>;
   return {

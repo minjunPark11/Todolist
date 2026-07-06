@@ -1,4 +1,4 @@
-import type { AiChatRequest, AiChatResponse, AiProvider } from "../types";
+import type { AiChatRequest, AiChatResponse, AiMessage, AiProvider } from "../types";
 import { platform } from "../../../platform";
 
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
@@ -34,6 +34,19 @@ function isLocalOllamaUrl() {
   }
 }
 
+// Inserts the knowledge block as a system message after any leading system
+// messages (system prompt, app-data context) and before the chat turns, per
+// KNOWLEDGE_BASE_DESIGN.md §6 priority order (system > app data > knowledge).
+function withKnowledgeContext(messages: AiMessage[], knowledgeContext?: string): AiMessage[] {
+  if (!knowledgeContext) return messages;
+  const lastSystemIndex = messages.reduce((last, message, index) => (message.role === "system" ? index : last), -1);
+  return [
+    ...messages.slice(0, lastSystemIndex + 1),
+    { role: "system" as const, content: knowledgeContext },
+    ...messages.slice(lastSystemIndex + 1),
+  ];
+}
+
 function withTimeout(milliseconds: number) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), milliseconds);
@@ -47,6 +60,10 @@ export const ollamaProvider: AiProvider = {
   name: "ollama",
 
   canHandleFullAppData() {
+    return isLocalOllamaUrl();
+  },
+
+  canHandleKnowledgeContext() {
     return isLocalOllamaUrl();
   },
 
@@ -101,7 +118,7 @@ export const ollamaProvider: AiProvider = {
         options: {
           temperature: request.temperature ?? 0.2,
         },
-        messages: request.messages,
+        messages: withKnowledgeContext(request.messages, request.knowledgeContext),
       }),
     });
 

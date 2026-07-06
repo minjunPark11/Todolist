@@ -13,6 +13,7 @@ import { executeAgentActions } from "./app/executeAgentActions";
 import { useDataPortability } from "./app/useDataPortability";
 import type { ToastState } from "./components/kit";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
+import { useKnowledgeSettings } from "./lib/knowledge/useKnowledgeSettings";
 import { popUndo, pushUndo } from "./lib/undoStack";
 import { reducedTransition, transitions } from "./motion/transitions";
 import { pageVariants } from "./motion/variants";
@@ -88,6 +89,10 @@ function mergeExternalCalendars(local: ExternalCalendar[], remote: ExternalCalen
 export default function App() {
   const planner = usePlannerData();
   const appSettings = planner.appSettings;
+  // Single instance shared by the Settings "지식베이스" tab and OllamaChat so a
+  // vault connection made in Settings is immediately visible to the chat panel
+  // (both are mounted for the app's whole lifetime, not remounted on nav).
+  const knowledge = useKnowledgeSettings();
   // Renders before the <I18nProvider> below exists in the tree, so this can't
   // use the useT() context hook — call the plain translate() helper instead.
   const t = (key: string, vars?: Record<string, string | number>) => translate(appSettings.language, key, vars);
@@ -988,6 +993,9 @@ export default function App() {
         onDisableCalendarShare={() => void disableCurrentCalendarShare()}
         onRegenerateCalendarShare={() => void regenerateCalendarShare()}
         onPublishCalendarShare={() => void publishCurrentCalendarShare()}
+        knowledgeSettings={knowledge.settings}
+        onUpdateKnowledgeSettings={knowledge.updateSettings}
+        isKnowledgeDesktop={knowledge.isDesktop}
         accountSlot={
           <AccountSection
             auth={planner.auth}
@@ -1100,6 +1108,7 @@ export default function App() {
         activePage={activePage}
         aiModel={appSettings.aiModel}
         onChangeAiModel={(model) => planner.updateAppSettings({ aiModel: model })}
+        knowledgeSettings={knowledge.settings}
         aiContext={{
           currentPage: activePage,
           userId: planner.auth.userEmail || "local-user",

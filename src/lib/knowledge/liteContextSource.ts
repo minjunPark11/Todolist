@@ -1,0 +1,167 @@
+// Lite retrieval: no index, no embeddings. Ranks vault files by a cheap
+// two-stage keyword match and appends whole files (in ranked order) into the
+// knowledge budget. See KNOWLEDGE_BASE_DESIGN.md §3.1, §4.8.
+import { platform } from "../../platform";
+import type { PlatformFileEntry } from "../../platform/types";
+import { parseMarkdownNote } from "./markdownParser";
+import { scanVault } from "./obsidianScanner";
+import type { KnowledgeContextResult, KnowledgeContextSource, KnowledgeSettings, RetrievedChunk } from "./types";
+
+// "제한 적용 (기본: 최대 50파일 · 파일당 256KB)" — §3.1. The same cap also
+// bounds how many files stage 2 reads, so "상위 후보 파일만 read" (never the
+// whole vault) falls out of this single constant.
+const MAX_CANDIDATE_FILES = 50;
+const MAX_FILE_BYTES = 256 * 1024;
+
+const FILENAME_MATCH_WEIGHT = 10;
+const HEADING_MATCH_WEIGHT = 5;
+const TAG_OR_ALIAS_MATCH_WEIGHT = 8;
+const PRIORITY_FOLDER_BONUS = 3;
+
+const KNOWLEDGE_BLOCK_HEADER = "[KNOWLEDGE from Obsidian vault — read-only excerpts]";
+const KNOWLEDGE_BLOCK_INSTRUCTIONS = "Instructions: cite the source path when you use these excerpts.";
+const KNOWLEDGE_BLOCK_TRUNCATED = "[knowledge truncated]";
+
+function extractKeywords(query: string): string[] {
+  const matches = query.match(/[\p{L}\p{N}]{2,}/gu) ?? [];
+  return Array.from(new Set(matches.map((word) => word.toLowerCase())));
+}
+
+function normalizeFolder(folder: string): string {
+  return folder.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+}
+
+function isUnderPriorityFolder(relativePath: string, priorityFolders: string[]): boolean {
+  if (!priorityFolders.length) return false;
+  const normalizedPath = relativePath.replace(/\\/g, "/");
+  return priorityFolders.some((folder) => {
+    const prefix = normalizeFolder(folder);
+    return prefix.length > 0 && normalizedPath.startsWith(`${prefix}/`);
+  });
+}
+
+function scoreFilename(relativePath: string, keywords: string[]): number {
+  const lower = relativePath.toLowerCase();
+  return keywords.reduce((score, keyword) => (lower.includes(keyword) ? score + FILENAME_MATCH_WEIGHT : score), 0);
+}
+
+function scoreParsedNote(note: ReturnType<typeof parseMarkdownNote>, keywords: string[]): number {
+  const headingText = note.headings.map((heading) => heading.text.toLowerCase()).join(" ");
+  const lowerTags = note.tags.map((tag) => tag.toLowerCase());
+  const lowerAliases = note.aliases.map((alias) => alias.toLowerCase());
+
+  let score = 0;
+  for (const keyword of keywords) {
+    if (headingText.includes(keyword)) score += HEADING_MATCH_WEIGHT;
+    if (lowerTags.includes(keyword)) score += TAG_OR_ALIAS_MATCH_WEIGHT;
+    if (lowerAliases.includes(keyword)) score += TAG_OR_ALIAS_MATCH_WEIGHT;
+  }
+  return score;
+}
+
+function formatSourceBlock(relativePath: string, headingPath: string, text: string): string {
+  const sourceLabel = headingPath ? `${relativePath} # ${headingPath}` : relativePath;
+  return `── source: ${sourceLabel}\n${text}`;
+}
+
+type ReadCandidate = {
+  entry: PlatformFileEntry;
+  content: string;
+  headingPath: string;
+  score: number;
+};
+
+export function createLiteFolderContextSource(getSettings: () => KnowledgeSettings): KnowledgeContextSource {
+  return {
+    async isReady() {
+      const settings = getSettings();
+      return Boolean(settings.enabled && settings.vaultPath && platform.files.supported());
+    },
+
+    async buildContext(query, budgetChars): Promise<KnowledgeContextResult | null> {
+      const settings = getSettings();
+      if (!settings.enabled || !settings.vaultPath || !platform.files.supported()) return null;
+
+      let entries: PlatformFileEntry[];
+      try {
+        entries = await scanVault(settings.vaultPath, settings.excludedFolders);
+      } catch {
+        return null;
+      }
+      if (!entries.length) return null;
+
+      const keywords = extractKeywords(query);
+
+      // Stage 1: filename-only score from scan metadata (no reads yet).
+      const stage1 = entries
+        .map((entry) => ({
+          entry,
+          score:
+            scoreFilename(entry.relativePath, keywords) +
+            (isUnderPriorityFolder(entry.relativePath, settings.priorityFolders) ? PRIORITY_FOLDER_BONUS : 0),
+        }))
+        .sort((a, b) => b.score - a.score || b.entry.modifiedAt - a.entry.modifiedAt)
+        .slice(0, Math.min(MAX_CANDIDATE_FILES, entries.length));
+
+      // Stage 2: read only the stage-1 candidates, add heading/tag/alias bonus.
+      const candidates: ReadCandidate[] = [];
+      for (const candidate of stage1) {
+        if (candidate.entry.size > MAX_FILE_BYTES) continue;
+        try {
+          const content = await platform.files.readTextFile(candidate.entry.path, MAX_FILE_BYTES);
+          const note = parseMarkdownNote(content);
+          candidates.push({
+            entry: candidate.entry,
+            content,
+            headingPath: note.headings[0]?.text ?? "",
+            score: candidate.score + scoreParsedNote(note, keywords),
+          });
+        } catch {
+          continue;
+        }
+      }
+      if (!candidates.length) return null;
+
+      candidates.sort((a, b) => b.score - a.score || b.entry.modifiedAt - a.entry.modifiedAt);
+
+      const blocks: string[] = [];
+      const sources: RetrievedChunk[] = [];
+      let used = 0;
+      let truncated = false;
+
+      for (const candidate of candidates) {
+        const remaining = budgetChars - used;
+        if (remaining <= 0) {
+          truncated = true;
+          break;
+        }
+
+        const overhead = formatSourceBlock(candidate.entry.relativePath, candidate.headingPath, "").length;
+        const available = remaining - overhead;
+        if (available <= 0) {
+          truncated = true;
+          break;
+        }
+
+        const fitsFully = candidate.content.length <= available;
+        const text = fitsFully ? candidate.content : candidate.content.slice(0, available);
+        if (!fitsFully) truncated = true;
+
+        blocks.push(formatSourceBlock(candidate.entry.relativePath, candidate.headingPath, text));
+        sources.push({ text, filePath: candidate.entry.relativePath, headingPath: candidate.headingPath, score: candidate.score });
+        used += overhead + text.length;
+
+        if (!fitsFully) break;
+      }
+
+      if (!blocks.length) return null;
+
+      const footer = truncated ? `${KNOWLEDGE_BLOCK_TRUNCATED}\n${KNOWLEDGE_BLOCK_INSTRUCTIONS}` : KNOWLEDGE_BLOCK_INSTRUCTIONS;
+
+      return {
+        text: [KNOWLEDGE_BLOCK_HEADER, ...blocks, footer].join("\n"),
+        sources,
+      };
+    },
+  };
+}

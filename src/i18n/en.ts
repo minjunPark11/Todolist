@@ -698,6 +698,9 @@ export const en: Dictionary = {
   "ai.model.loading": "Loading models…",
   "ai.model.refresh": "Refresh model list",
   "ai.status.offline": "Ollama is off. Start Ollama to use AI chat.",
+  "ai.knowledge.badgeHint": "This answer used excerpts from your Obsidian notes",
+  "ai.knowledge.sourcesLabel": "Notes referenced",
+  "ai.knowledge.copied": "Path copied",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "Previous",

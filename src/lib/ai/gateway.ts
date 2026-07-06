@@ -23,7 +23,14 @@ export async function sendAiChat(request: AiChatRequest): Promise<AiChatResponse
         continue;
       }
 
-      return await provider.chat(request);
+      // Structural enforcement of KNOWLEDGE_BASE_DESIGN.md principles 9-10:
+      // Obsidian-derived context never reaches a non-local provider.
+      const outgoingRequest =
+        request.knowledgeContext && !provider.canHandleKnowledgeContext?.()
+          ? { ...request, knowledgeContext: undefined }
+          : request;
+
+      return await provider.chat(outgoingRequest);
     } catch (error) {
       errors.push(`${provider.name}: ${error instanceof Error ? error.message : String(error)}`);
     }

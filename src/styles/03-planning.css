@@ -582,6 +582,13 @@
   margin: 2px 0 0;
   color: var(--text-primary);
   font-size: 17px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ollama-chat-knowledge-badge {
+  font-size: 14px;
+  line-height: 1;
 }
 .ollama-chat-head small {
   display: block;
@@ -710,6 +717,25 @@
   padding: 10px 12px;
   font-size: 13px;
   line-height: 1.45;
+}
+.ollama-chat-knowledge-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 16px;
+}
+.ollama-chat-knowledge-chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
 }
 .ollama-chat-notice {
   margin: 0 16px;
