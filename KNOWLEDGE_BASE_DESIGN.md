@@ -1,6 +1,6 @@
 # Obsidian Vault 로컬 지식베이스 설계 (Lite → Full RAG)
 
-> 상태: 설계 확정 전 초안 · 구현 전 문서
+> 상태: **설계 확정** (2026-07-06, §11 결정 반영) · 구현 전 문서
 > 대상: FocusFlow 데스크톱(Tauri) 앱
 > 관련 코드: `src/platform/*`, `src/lib/ai/*`, `src/hooks/usePlannerData.ts`
 
@@ -102,11 +102,21 @@ Supabase에 동기화되기 때문.) 대신 별도 로컬 키 `focusflow.knowled
 사용자 질문
   → provider가 로컬 Ollama인지 확인 (아니면 knowledge 생략)
   → ObsidianScanner.scan(vaultPath)        // .md/.markdown/.txt, 제외폴더 skip
-  → 최근 수정순 정렬 → 제한 적용 (기본: 최대 50파일 · 파일당 256KB)
-  → 파일 내용 read → knowledge 전용 문자 예산(기본 60,000자)까지 이어붙임
+  → 파일 선정 (2단계, 비용 통제):
+     1) 스캔 메타만으로 질문 키워드 ↔ 파일명 매칭 점수
+     2) 상위 후보 파일만 read하여 heading/tag/aliases 매칭 가산점
+     최종 순위: 키워드 매칭 점수 > 최근 수정순 (tie-breaker)
+     ※ 본문 전문 키워드 검색은 하지 않는다 — 전 파일 read를 유발해 Lite의
+       가벼움을 깨뜨림. 본문 수준 관련도는 Full RAG의 몫.
+  → 제한 적용 (기본: 최대 50파일 · 파일당 256KB)
+  → knowledge 전용 문자 예산(기본 30,000자, 설정 조절 가능)까지 이어붙임
   → [KNOWLEDGE] 블록으로 시스템 컨텍스트에 append (파일 경로 헤더 포함)
   → Ollama /api/chat
 ```
+
+우선 폴더(예: `daily/`, `projects/`)는 지금 UI를 만들지 않되,
+`KnowledgeSettings.priorityFolders: string[]`(기본 `[]`)로 자리만 확보해
+선정 점수에 가산점을 줄 수 있는 확장 지점으로 남긴다.
 
 Lite는 색인·DB가 없다. 매 질문마다 읽되, 스캔 결과를 세션 메모리에 짧게(TTL 30s)
 캐시해 연타 질문의 중복 I/O를 줄인다.
@@ -118,7 +128,7 @@ Vault 연결 or "지금 색인" 클릭
   → scan: 모든 .md 파일 경로+mtime+size 수집
   → 파일별: read → hash(sha256) → MarkdownParser(heading/tags/[[links]]/tasks)
   → Chunker: heading 우선, 문단 보조, target 600~900자, overlap 100~150자
-  → EmbeddingProvider: chunk 배치 임베딩 (Ollama /api/embed, 예: nomic-embed-text)
+  → EmbeddingProvider: chunk 배치 임베딩 (Ollama /api/embed, 기본 bge-m3)
   → KnowledgeStore: files/chunks 행 저장 (embedding BLOB 포함)
   → meta.lastIndexedAt 갱신, 진행률 UI 이벤트 발행
 ```
@@ -194,8 +204,11 @@ export interface KnowledgeSettings {
   vaultPath: string;            // "" = 미연결
   dbPath: string;               // "" = 기본 appDataDir 사용 (fallback 규칙 적용)
   indexingMode: "lite" | "full";
-  embeddingModel: string;       // Full용, 기본 "nomic-embed-text"
+  embeddingModel: string;       // Full용. 기본 "bge-m3" (한국어 품질 우선),
+                                // 가벼운 대안 "nomic-embed-text" 선택 가능
   excludedFolders: string[];    // 기본 [".obsidian", ".trash", "templates"]
+  priorityFolders: string[];    // Lite 선정 가산점용. 기본 [] (UI는 추후)
+  knowledgeBudgetChars: number; // 기본 30_000, 설정에서 조절
   lastIndexedAt: string;        // ISO, Full에서만 갱신
 }
 ```
@@ -215,8 +228,10 @@ export interface KnowledgeSettings {
 
 책임: 노트 1개의 구조 추출 (색인 메타데이터·chunk 경계용).
 - headings(레벨·텍스트·offset), `#tags`, `[[wiki links]]`, `- [ ]`/`- [x]` tasks,
-  frontmatter(YAML) 태그.
-- 출력 타입 `ParsedNote`. Lite에서는 사용 안 해도 되지만 Full 전 단계로 독립 모듈화.
+  frontmatter(YAML)의 **`tags`와 `aliases`만** 구조화 — 그 외 frontmatter 필드는
+  이번 단계에서 파싱하지 않는다(YAML 전체 구조화는 범위 밖).
+- aliases는 Lite 파일 선정(키워드 매칭)과 Full 색인 메타 양쪽에 사용.
+- 출력 타입 `ParsedNote`. Lite에서는 heading/tag/aliases 매칭에만 부분 사용.
 
 ### 4.5 Chunker (Full)
 
@@ -236,10 +251,12 @@ export interface EmbeddingProvider {
 ```
 
 - 구현: `OllamaEmbeddingProvider` (`/api/embed`, 로컬만).
+- **기본 모델: `bge-m3`** (다국어·한국어 검색 품질 우선, ~1.2GB, 1024차원).
+  가벼운 대안으로 `nomic-embed-text`(~270MB, 768차원)를 드롭다운에서 선택 가능.
 - **모델 부재 시**: 색인 시작을 막고 안내 — "임베딩 모델이 없습니다.
-  `ollama pull nomic-embed-text` 후 다시 시도하세요." (AI 챗의 offline 배너와 동일 패턴)
-- 모델 교체 시 전체 재색인 필요 → DB meta에 `embeddingModel`, `dimensions` 기록,
-  불일치 감지 시 재색인 유도.
+  `ollama pull bge-m3` 후 다시 시도하세요." (AI 챗의 offline 배너와 동일 패턴)
+- 두 모델은 **차원이 달라 교체 시 전체 재색인 필수** → DB meta에
+  `embeddingModel`, `dimensions` 기록, 불일치 감지 시 재색인 유도 배너.
 
 ### 4.7 KnowledgeStore (Full)
 
@@ -272,8 +289,10 @@ export interface KnowledgeContextSource {
 
 - 기존 `buildAiContextText()`는 그대로 두고, 호출부(`OllamaChat.submit`)에서
   `KnowledgeContextSource.buildContext()` 결과를 **별도 시스템 메시지**로 추가.
-- 예산: `AI_CONTEXT_LIMITS`에 `knowledgeContextCharacters: 60_000` 추가.
+- 예산: 기본 30,000자 (`KnowledgeSettings.knowledgeBudgetChars`, 설정 조절).
+  작은 로컬 모델(예: gemma3 4B)의 컨텍스트를 고려한 보수적 기본값.
   앱 데이터 예산과 분리해 서로 밀어내지 않게 한다.
+  Full에서는 top-k=6 × chunk ~900자 ≈ 5~6k자라 예산은 사실상 Lite용 안전장치.
 - **provider 게이트**: `AiChatRequest`에 `knowledgeContext?: string` 필드를 별도로
   두고, gateway가 provider 선택 시 `canHandleKnowledgeContext()`(= 로컬 Ollama만
   true)가 아닌 provider로 폴백하는 경우 **해당 필드를 제거**하고 전달한다.
@@ -301,6 +320,7 @@ CREATE TABLE files (
   modified_at   INTEGER NOT NULL,       -- epoch ms
   indexed_at    INTEGER NOT NULL,
   tags          TEXT NOT NULL DEFAULT '[]',   -- JSON array
+  aliases       TEXT NOT NULL DEFAULT '[]',   -- JSON array (frontmatter aliases)
   wiki_links    TEXT NOT NULL DEFAULT '[]'    -- JSON array
 );
 
@@ -356,7 +376,8 @@ CREATE INDEX idx_chunks_file  ON chunks(file_id);
   기능 사용     (토글) AI 챗에 내 노트 참고 허용
   모드         ( Lite: 최근 노트 참고 | Full: 색인 + 의미 검색 )
   ── Full 선택 시 ──
-  임베딩 모델   nomic-embed-text (드롭다운, /api/tags 기반)   [↻]
+  임베딩 모델   bge-m3 (기본) | nomic-embed-text (드롭다운, /api/tags 기반)   [↻]
+  컨텍스트 예산 30,000자 (슬라이더/입력, 10k~100k)
   색인 상태     1,240 파일 · 8,932 chunks · 마지막 색인 7/6 14:02
                [지금 색인] [진행률 바 / 취소]
   ── Advanced ──
@@ -381,8 +402,9 @@ AI 챗 패널: knowledge 사용 중이면 헤더에 📚 배지, 답변 아래 �
 - Tauri capability는 읽기 최소 권한 + DB 폴더에만 쓰기.
 - Vault 쓰기 기능(예: "AI 제안을 노트로 저장")은 **명시적 옵트인 설정 + 별도
   capability**가 생기기 전까지 설계상 금지(원칙 7·8).
-- 사용자 데이터 삭제: "연결 해제" 시 knowledge DB 파일 삭제 여부를 물어본다
-  (기본: 삭제).
+- 사용자 데이터 삭제: "연결 해제" 모달에서 "검색 색인 DB도 삭제할까요?"를 묻는다.
+  **기본 선택은 삭제**(프라이버시 우선), 사용자가 원하면 보존 선택 가능
+  (재연결 시 재색인 생략).
 
 ---
 
@@ -414,7 +436,8 @@ AI 챗 패널: knowledge 사용 중이면 헤더에 📚 배지, 답변 아래 �
 - ObsidianScanner + `LiteFolderContextSource`
 - `AiChatRequest.knowledgeContext` + gateway 게이트(`canHandleKnowledgeContext`)
 - knowledge 예산(`AI_CONTEXT_LIMITS`) + [KNOWLEDGE] 블록 + 챗 배지
-- 제한: 50파일 · 256KB/파일 · 60k자 예산
+- 파일 선정: 키워드(파일명 > heading/tag/aliases) 매칭 우선, 최근 수정순 tie-break
+- 제한: 50파일 · 256KB/파일 · 30k자 예산(설정 조절)
 
 **Phase 2 — Full 색인 파이프라인**
 - plugin-sql + KnowledgeStore(schema v1) + MarkdownParser + Chunker
@@ -433,19 +456,32 @@ AI 챗 패널: knowledge 사용 중이면 헤더에 📚 배지, 답변 아래 �
 
 ---
 
-## 11. 구현 전 확인 질문
+## 11. 확정된 설계 결정 (2026-07-06)
 
-1. **임베딩 모델 기본값**: `nomic-embed-text`(영어 중심, 가벼움) vs
-   `bge-m3`(다국어·한국어 우수, 큼). 노트가 한국어 위주면 bge-m3 계열 추천 — 어느 쪽?
-2. **Lite 파일 선정 기준**: "최근 수정순"이 기본인데, 특정 폴더 우선(예: `daily/`)
-   같은 규칙이 필요한가?
-3. **증분 색인 트리거**: 앱 시작 시 자동 + 수동 버튼이면 충분한가, 주기 폴링(예: 10분)도
-   원하는가?
-4. **frontmatter 처리**: Obsidian frontmatter(YAML)의 tags 외 필드(aliases 등)도
-   색인 메타에 넣을가?
-5. **top-k / 예산 기본값**: k=6, knowledge 60k자로 시작 — 사용 모델(예: gemma3 4B)
-   컨텍스트 크기에 맞춰 조정 필요. 주로 쓰는 모델이 무엇인가?
-6. **연결 해제 시 DB 삭제 기본값**: 삭제(프라이버시 우선) vs 보존(재연결 빠름) —
-   기본을 어느 쪽으로?
-7. **설정 탭 위치**: "지식베이스" 별도 탭 vs 기존 "동작" 탭 내 섹션?
-8. **web 빌드에서 탭 노출**: 비활성으로 보여주기(기능 존재 인지) vs 아예 숨김?
+구현 전 확인 질문 8건에 대한 답변이 확정되어 본문에 반영됨. 기록:
+
+| # | 항목 | 결정 |
+|---|------|------|
+| 1 | 임베딩 모델 | 기본 **`bge-m3`**(한국어 품질 우선). 미설치 시 색인 차단 + `ollama pull bge-m3` 안내. 가벼운 대안 `nomic-embed-text` 선택 가능. 차원 상이 → 교체 시 전체 재색인 |
+| 2 | Lite 파일 선정 | **파일명/heading/tag/aliases 키워드 매칭 > 최근 수정순**. 본문 전문 검색은 금지(비용). 우선 폴더는 `priorityFolders` 설정 자리만 확보, UI는 추후 |
+| 3 | 증분 색인 트리거 | 앱 시작 자동 확인 + 수동 새로고침만. 폴링/watch는 Phase 4 이후 |
+| 4 | frontmatter | `tags` + `aliases`만 구조화. 그 외 필드는 범위 밖 |
+| 5 | top-k / 예산 | k=6 유지. knowledge 예산 기본 **30k자**, 설정에서 조절(10k~100k) |
+| 6 | 연결 해제 시 DB | 모달로 "색인 DB도 삭제?" 질문, **기본 삭제**(프라이버시 우선), 보존 선택 가능 |
+| 7 | 설정 위치 | **"지식베이스" 독립 탭** (핵심 확장 기능으로 취급) |
+| 8 | web 노출 | 탭을 **비활성 상태로 노출** + "Desktop only" 안내 (숨기지 않음) |
+
+추가 지침:
+- Phase 0~1은 플랫폼 토대 + Lite 연결 경험 안정화에 집중. Full RAG는 그 뒤.
+- 읽기 전용 원칙(§1 원칙 7·8)과 원격 provider 게이트(§1 원칙 9·10, §4.9) 유지.
+
+### 구현 시 주의점 (평가에서 도출)
+
+- **bge-m3 비용**: ~1.2GB 모델·1024차원 — 대형 Vault에서 최초 색인 시간과 DB 크기
+  증가. 진행률/취소 UI(§9)가 필수 전제.
+- **Lite 키워드 매칭 비용 통제**: 매칭은 반드시 2단계(파일명은 스캔 메타만 →
+  상위 후보만 read하여 heading/tag/aliases 확인). 전 파일 read 금지.
+- **예산-모델 관계**: 30k자 ≈ 한국어 15k~20k 토큰. 소형 모델(4B)에서는 20k 이하
+  권장 — 설정 UI에 권장치 힌트 표기 고려.
+- **모델 교체 재색인**: meta의 `embeddingModel`/`dimensions` 불일치 감지 배너는
+  Phase 2 필수 범위(선택 아님).
