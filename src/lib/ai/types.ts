@@ -1,6 +1,6 @@
 import type { AgentIntent } from "./agent/intent";
 
-export type AiProviderName = "ollama" | "remote-ollama" | "server";
+export type AiProviderName = "llama-server" | "server";
 
 export type AiRole = "system" | "user" | "assistant";
 
@@ -26,7 +26,7 @@ export type AiChatRequest = {
   model?: string;
   // Obsidian-derived excerpts (see KNOWLEDGE_BASE_DESIGN.md). Kept separate
   // from `messages` so the gateway can structurally strip it before falling
-  // back to a provider that isn't the local Ollama instance (principles 9-10).
+  // back to a provider that isn't a local endpoint (principles 9-10).
   knowledgeContext?: string;
 };
 
@@ -41,11 +41,17 @@ export type AiProvider = {
   name: AiProviderName;
   isAvailable: () => Promise<boolean>;
   canHandleFullAppData?: () => boolean;
-  // True only for the local Ollama provider. Gates `AiChatRequest.knowledgeContext`
-  // (see KNOWLEDGE_BASE_DESIGN.md principles 9-10) — undefined/false means the
-  // gateway strips knowledgeContext before this provider ever sees the request.
+  // True only when the provider's endpoint is on this machine. Gates
+  // `AiChatRequest.knowledgeContext` (KNOWLEDGE_BASE_DESIGN.md principles
+  // 9-10) — undefined/false means the gateway strips knowledgeContext before
+  // this provider ever sees the request.
   canHandleKnowledgeContext?: () => boolean;
   chat: (request: AiChatRequest) => Promise<AiChatResponse>;
   // Lists the models installed on the provider, when it can be introspected.
   listModels?: () => Promise<string[]>;
+  // A user-actionable reason the last isAvailable() returned false (e.g. "the
+  // engine isn't installed — install it in Settings"), or null when available
+  // or the reason isn't actionable. The gateway surfaces it so a fallthrough to
+  // an unconfigured provider doesn't bury the real fix behind a generic error.
+  unavailableMessage?: () => string | null;
 };

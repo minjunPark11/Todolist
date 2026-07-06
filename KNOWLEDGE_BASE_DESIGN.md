@@ -1,6 +1,6 @@
 # Obsidian Vault 로컬 지식베이스 설계 (Lite → Full RAG)
 
-> 상태: **설계 확정** (2026-07-06, §11 결정 반영) · 구현 전 문서
+> 상태: **설계 확정** (2026-07-06, Local AI Phase 4 반영) · 구현 문서
 > 대상: FocusFlow 데스크톱(Tauri) 앱
 > 관련 코드: `src/platform/*`, `src/lib/ai/*`, `src/hooks/usePlannerData.ts`
 
@@ -9,12 +9,13 @@
 ## 1. 설계 요약
 
 사용자가 Obsidian Vault 폴더를 지정하면, 앱이 Vault의 `.md` 노트를 읽어
-AI 챗(로컬 Ollama) 컨텍스트에 관련 내용을 넣어주는 **로컬 지식베이스** 기능.
+AI 챗(로컬 AI endpoint) 컨텍스트에 관련 내용을 넣어주는 **로컬 지식베이스** 기능.
 
 - **Lite(1단계)**: Vault에서 텍스트 파일을 제한적으로 읽어(파일 수·크기·문자 예산)
   AI 컨텍스트에 이어붙인다. 검색 없음.
-- **Full(2단계)**: 노트를 chunk로 쪼개 Ollama 임베딩을 생성, 로컬 DB(knowledge index)에
+- **Full(2단계)**: 노트를 chunk로 쪼개 임베딩을 생성, 로컬 DB(knowledge index)에
   저장하고, 질문 시 top-k 유사 chunk만 검색해 컨텍스트로 전달(로컬 RAG).
+  Phase 5 이후 현재 구현은 `llama-server` `/v1/embeddings`를 사용한다.
 - Lite와 Full은 **동일한 인터페이스(`KnowledgeContextSource`)** 뒤에 있어,
   Full 전환 시 구조를 갈아엎지 않고 구현체만 교체한다.
 
@@ -24,18 +25,18 @@ AI 챗(로컬 Ollama) 컨텍스트에 관련 내용을 넣어주는 **로컬 지
 |---|------|
 | 1 | Obsidian Vault는 **원본 저장소**다. 앱은 소비자일 뿐이다. |
 | 2 | 앱의 Knowledge DB는 **검색용 로컬 색인**이다. 원본이 아니다. |
-| 3 | Ollama가 노트를 "학습"하는 것이 아니다. 앱이 관련 문단을 찾아 **요청 컨텍스트로 전달**할 뿐이다. |
+| 3 | 로컬 LLM이 노트를 "학습"하는 것이 아니다. 앱이 관련 문단을 찾아 **요청 컨텍스트로 전달**할 뿐이다. |
 | 4 | Knowledge DB는 서버/Supabase에 **저장하지 않는다**. |
 | 5 | Knowledge DB는 반드시 **기기 로컬**에 저장한다. |
 | 6 | `vaultPath`, `dbPath`는 **sync 제외** — 기기별 local setting으로만 저장한다. |
 | 7 | Obsidian 파일은 **읽기 전용**으로 접근한다. |
 | 8 | 사용자가 명시적으로 허용하기 전까지 원본 파일을 **수정하지 않는다**. |
 | 9 | **원격 AI provider에는 Obsidian-derived context를 보내지 않는다.** |
-| 10 | Obsidian context는 **로컬 Ollama provider일 때만** 사용한다. |
+| 10 | Obsidian context는 **로컬 AI endpoint일 때만** 사용한다. 관리형 `llama-server`는 허용, external mode는 localhost/127.0.0.1/[::1]일 때만 허용한다. |
 
-원칙 9·10은 기존 `AiProvider.canHandleFullAppData()` 게이트(로컬 provider만 전체 앱
-데이터 수신)와 같은 계열이며, 지식베이스용으로 `canHandleKnowledgeContext()`를
-추가해 동일한 방식으로 강제한다.
+원칙 9·10은 기존 `AiProvider.canHandleFullAppData()` 게이트(로컬 endpoint만 전체 앱
+데이터 수신)와 같은 계열이며, 지식베이스용 `canHandleKnowledgeContext()`로
+동일한 방식으로 강제한다.
 
 ---
 
@@ -51,7 +52,8 @@ AI 챗(로컬 Ollama) 컨텍스트에 관련 내용을 넣어주는 **로컬 지
 │  ObsidianScanner ──▶ MarkdownParser ──▶ Chunker                        │
 │        │                                   │ (Full only)               │
 │        │ Lite: 파일 단위                     ▼                          │
-│        │                     EmbeddingProvider (Ollama /api/embed)     │
+│        │                     EmbeddingProvider                         │
+│        │                     (Phase 5: llama-server /v1/embeddings)    │
 │        │                                   │                           │
 │        │                                   ▼                           │
 │        │                     KnowledgeStore (SQLite: knowledge_index.db)│
@@ -65,8 +67,8 @@ AI 챗(로컬 Ollama) 컨텍스트에 관련 내용을 넣어주는 **로컬 지
 │  AiContextBuilder (기존 buildAiContext 확장)                            │
 │    앱 데이터 컨텍스트 + knowledge 컨텍스트(전용 예산) 조합                  │
 │                                  ▼                                     │
-│  AI Gateway ──[로컬 Ollama만]──▶ Ollama /api/chat                       │
-│              └─[원격/서버 provider]─▶ knowledge context 제거 후 전달      │
+│  AI Gateway ──[로컬 AI endpoint]──▶ /v1/chat/completions                │
+│              └─[원격 provider]──────▶ knowledge context 제거 후 전달      │
 └────────────────────────────────────────────────────────────────────────┘
 
 Web 빌드: platform.files 미지원 → 설정 UI 비활성 + "Desktop only" 안내
@@ -100,7 +102,7 @@ Supabase에 동기화되기 때문.) 대신 별도 로컬 키 `focusflow.knowled
 
 ```
 사용자 질문
-  → provider가 로컬 Ollama인지 확인 (아니면 knowledge 생략)
+  → provider가 로컬 AI endpoint인지 확인 (아니면 knowledge 생략)
   → ObsidianScanner.scan(vaultPath)        // .md/.markdown/.txt, 제외폴더 skip
   → 파일 선정 (2단계, 비용 통제):
      1) 스캔 메타만으로 질문 키워드 ↔ 파일명 매칭 점수
@@ -111,7 +113,7 @@ Supabase에 동기화되기 때문.) 대신 별도 로컬 키 `focusflow.knowled
   → 제한 적용 (기본: 최대 50파일 · 파일당 256KB)
   → knowledge 전용 문자 예산(기본 30,000자, 설정 조절 가능)까지 이어붙임
   → [KNOWLEDGE] 블록으로 시스템 컨텍스트에 append (파일 경로 헤더 포함)
-  → Ollama /api/chat
+  → OpenAI 호환 /v1/chat/completions
 ```
 
 우선 폴더(예: `daily/`, `projects/`)는 지금 UI를 만들지 않되,
@@ -128,7 +130,7 @@ Vault 연결 or "지금 색인" 클릭
   → scan: 모든 .md 파일 경로+mtime+size 수집
   → 파일별: read → hash(sha256) → MarkdownParser(heading/tags/[[links]]/tasks)
   → Chunker: heading 우선, 문단 보조, target 600~900자, overlap 100~150자
-  → EmbeddingProvider: chunk 배치 임베딩 (Ollama /api/embed, 기본 bge-m3)
+  → EmbeddingProvider: chunk 배치 임베딩 (llama-server /v1/embeddings)
   → KnowledgeStore: files/chunks 행 저장 (embedding BLOB 포함)
   → meta.lastIndexedAt 갱신, 진행률 UI 이벤트 발행
 ```
@@ -148,12 +150,12 @@ Vault 연결 or "지금 색인" 클릭
 
 ```
 사용자 질문
-  → 로컬 Ollama 확인 (아니면 knowledge 생략 — 원칙 9·10)
+  → 로컬 AI endpoint 확인 (아니면 knowledge 생략 — 원칙 9·10)
   → 질문 텍스트 임베딩 (동일 embedding 모델)
   → KnowledgeStore에서 코사인 유사도 top-k (기본 k=6, 유사도 하한 적용)
   → chunk들을 예산 내에서 조합, 각 chunk 앞에 `source: path#heading` 표기
   → 시스템 컨텍스트 [KNOWLEDGE] 블록으로 주입 + "답변 시 출처 파일명을 표기하라" 지시
-  → Ollama /api/chat → 답변에 출처 노출
+  → OpenAI 호환 /v1/chat/completions → 답변에 출처 노출
 ```
 
 ---
@@ -243,18 +245,17 @@ export interface KnowledgeSettings {
 
 ```ts
 export interface EmbeddingProvider {
-  isAvailable(): Promise<boolean>;      // 모델 설치 여부까지 확인 (/api/tags)
+  isAvailable(): Promise<boolean>;      // Local AI 모델/endpoint 준비 여부 확인
   embed(texts: string[]): Promise<number[][]>;  // 배치
   modelName(): string;
   dimensions(): number | null;          // 최초 임베딩 후 확정
 }
 ```
 
-- 구현: `OllamaEmbeddingProvider` (`/api/embed`, 로컬만).
-- **기본 모델: `bge-m3`** (다국어·한국어 검색 품질 우선, ~1.2GB, 1024차원).
-  가벼운 대안으로 `nomic-embed-text`(~270MB, 768차원)를 드롭다운에서 선택 가능.
-- **모델 부재 시**: 색인 시작을 막고 안내 — "임베딩 모델이 없습니다.
-  `ollama pull bge-m3` 후 다시 시도하세요." (AI 챗의 offline 배너와 동일 패턴)
+- 현재 구현: `LlamaServerEmbeddingProvider` (`/v1/embeddings`, 로컬 endpoint만).
+- **기본 모델**: Local AI 설정에서 선택된 모델(`local-ai`). external mode는
+  localhost/127.0.0.1/[::1]일 때만 허용한다.
+- **모델 부재 시**: 색인 시작을 막고 Local AI 설정에서 모델을 설치하라고 안내한다.
 - 두 모델은 **차원이 달라 교체 시 전체 재색인 필수** → DB meta에
   `embeddingModel`, `dimensions` 기록, 불일치 감지 시 재색인 유도 배너.
 
@@ -287,15 +288,15 @@ export interface KnowledgeContextSource {
 
 ### 4.9 AiContextBuilder 통합
 
-- 기존 `buildAiContextText()`는 그대로 두고, 호출부(`OllamaChat.submit`)에서
+- 기존 `buildAiContextText()`는 그대로 두고, 호출부(`OllamaChat.submit`, 레거시 컴포넌트명)에서
   `KnowledgeContextSource.buildContext()` 결과를 **별도 시스템 메시지**로 추가.
 - 예산: 기본 30,000자 (`KnowledgeSettings.knowledgeBudgetChars`, 설정 조절).
   작은 로컬 모델(예: gemma3 4B)의 컨텍스트를 고려한 보수적 기본값.
   앱 데이터 예산과 분리해 서로 밀어내지 않게 한다.
   Full에서는 top-k=6 × chunk ~900자 ≈ 5~6k자라 예산은 사실상 Lite용 안전장치.
 - **provider 게이트**: `AiChatRequest`에 `knowledgeContext?: string` 필드를 별도로
-  두고, gateway가 provider 선택 시 `canHandleKnowledgeContext()`(= 로컬 Ollama만
-  true)가 아닌 provider로 폴백하는 경우 **해당 필드를 제거**하고 전달한다.
+  두고, gateway가 provider 선택 시 `canHandleKnowledgeContext()`(= 로컬 AI
+  endpoint만 true)가 아닌 provider로 폴백하는 경우 **해당 필드를 제거**하고 전달한다.
   → 원격 유출이 구조적으로 불가능(원칙 9·10).
 
 ---
@@ -376,7 +377,7 @@ CREATE INDEX idx_chunks_file  ON chunks(file_id);
   기능 사용     (토글) AI 챗에 내 노트 참고 허용
   모드         ( Lite: 최근 노트 참고 | Full: 색인 + 의미 검색 )
   ── Full 선택 시 ──
-  임베딩 모델   bge-m3 (기본) | nomic-embed-text (드롭다운, /api/tags 기반)   [↻]
+  임베딩 모델   Local AI 설정의 선택 모델                              [↻]
   컨텍스트 예산 30,000자 (슬라이더/입력, 10k~100k)
   색인 상태     1,240 파일 · 8,932 chunks · 마지막 색인 7/6 14:02
                [지금 색인] [진행률 바 / 취소]
@@ -384,7 +385,7 @@ CREATE INDEX idx_chunks_file  ON chunks(file_id);
   DB 위치      기본 (앱 데이터 폴더)  [사용자 지정…] [기본값으로]
                ⚠ 접근 불가 시 자동으로 기본 위치로 대체됩니다
   제외 폴더     .obsidian, .trash, templates  [편집]
-  개인정보     "노트 내용은 이 기기의 로컬 Ollama에만 전달되며,
+  개인정보     "노트 내용은 이 기기의 로컬 AI에만 전달되며,
                서버·클라우드로 전송되지 않습니다."
 ```
 
@@ -412,9 +413,9 @@ AI 챗 패널: knowledge 사용 중이면 헤더에 📚 배지, 답변 아래 �
 
 | 리스크 | 대응 |
 |--------|------|
-| 임베딩 모델 미설치 | 색인 진입 차단 + pull 명령 안내. Lite로 자동 강등 옵션 |
+| 임베딩 모델 미설치 | 색인 진입 차단 + Local AI 모델 설치 안내. Lite로 자동 강등 옵션 |
 | 대형 Vault(수만 파일) 최초 색인 지연 | 배치 처리 + 진행률/취소, 백그라운드 실행, 재시작 시 이어하기(파일 단위 트랜잭션) |
-| 작은 Ollama 모델의 컨텍스트 한계 | knowledge 예산 분리 + top-k 제한, k·예산을 설정으로 |
+| 작은 로컬 모델의 컨텍스트 한계 | knowledge 예산 분리 + top-k 제한, k·예산을 설정으로 |
 | Vault 수정 중 색인 경합 | hash 비교로 다음 증분에서 자연 수복. watch는 도입 보류 |
 | 임베딩 모델 교체 | meta 불일치 감지 → 전체 재색인 유도 배너 |
 | dbPath 접근 불가(외장 디스크 분리 등) | 기본 경로 fallback + UI 경고 (설계 요구사항) |
@@ -441,7 +442,7 @@ AI 챗 패널: knowledge 사용 중이면 헤더에 📚 배지, 답변 아래 �
 
 **Phase 2 — Full 색인 파이프라인**
 - plugin-sql + KnowledgeStore(schema v1) + MarkdownParser + Chunker
-- OllamaEmbeddingProvider(모델 확인·안내 포함)
+- EmbeddingProvider(llama-server `/v1/embeddings` 모델 확인·안내 포함)
 - 최초 색인 + 진행률 UI, 증분 색인(hash/mtime diff), 삭제 반영
 
 **Phase 3 — Full retrieval 전환**
@@ -462,7 +463,7 @@ AI 챗 패널: knowledge 사용 중이면 헤더에 📚 배지, 답변 아래 �
 
 | # | 항목 | 결정 |
 |---|------|------|
-| 1 | 임베딩 모델 | 기본 **`bge-m3`**(한국어 품질 우선). 미설치 시 색인 차단 + `ollama pull bge-m3` 안내. 가벼운 대안 `nomic-embed-text` 선택 가능. 차원 상이 → 교체 시 전체 재색인 |
+| 1 | 임베딩 모델 | Phase 5 기본값은 **Local AI 설정의 선택 모델**. 미설치 시 색인 차단 + Local AI 모델 설치 안내. 선택 모델이 바뀌면 전체 재색인 |
 | 2 | Lite 파일 선정 | **파일명/heading/tag/aliases 키워드 매칭 > 최근 수정순**. 본문 전문 검색은 금지(비용). 우선 폴더는 `priorityFolders` 설정 자리만 확보, UI는 추후 |
 | 3 | 증분 색인 트리거 | 앱 시작 자동 확인 + 수동 새로고침만. 폴링/watch는 Phase 4 이후 |
 | 4 | frontmatter | `tags` + `aliases`만 구조화. 그 외 필드는 범위 밖 |

@@ -2,6 +2,8 @@
 // Debug builds keep the console so logs remain visible.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod local_ai;
+
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
@@ -89,7 +91,10 @@ fn tray_icon_image() -> Image<'static> {
     Image::new_owned(rgba, 32, 32)
 }
 
-fn build_tray_menu(app: &tauri::AppHandle, snapshot: Option<&FocusTraySnapshot>) -> tauri::Result<Menu<tauri::Wry>> {
+fn build_tray_menu(
+    app: &tauri::AppHandle,
+    snapshot: Option<&FocusTraySnapshot>,
+) -> tauri::Result<Menu<tauri::Wry>> {
     let summary = current_focus_summary(snapshot);
     let has_focus = snapshot.map(has_active_focus).unwrap_or(false);
     let toggle_label = match snapshot {
@@ -97,7 +102,13 @@ fn build_tray_menu(app: &tauri::AppHandle, snapshot: Option<&FocusTraySnapshot>)
         _ => "Pause",
     };
     let status_item = MenuItem::with_id(app, "focus-status", summary, false, None::<&str>)?;
-    let toggle_item = MenuItem::with_id(app, MENU_TOGGLE_FOCUS, toggle_label, has_focus, None::<&str>)?;
+    let toggle_item = MenuItem::with_id(
+        app,
+        MENU_TOGGLE_FOCUS,
+        toggle_label,
+        has_focus,
+        None::<&str>,
+    )?;
     let finish_item = MenuItem::with_id(app, MENU_FINISH_FOCUS, "Finish", has_focus, None::<&str>)?;
     let show_item = MenuItem::with_id(app, MENU_SHOW, "Open FocusFlow", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, MENU_QUIT, "Quit", true, None::<&str>)?;
@@ -215,7 +226,10 @@ fn update_focus_tray(app: tauri::AppHandle, state: State<AppState>, snapshot: Fo
     };
 
     {
-        let mut current = state.focus_snapshot.lock().expect("focus tray state poisoned");
+        let mut current = state
+            .focus_snapshot
+            .lock()
+            .expect("focus tray state poisoned");
         *current = snapshot.clone();
     }
 
@@ -229,7 +243,10 @@ fn update_focus_tray(app: tauri::AppHandle, state: State<AppState>, snapshot: Fo
 #[tauri::command]
 fn clear_focus_tray(app: tauri::AppHandle, state: State<AppState>) {
     {
-        let mut current = state.focus_snapshot.lock().expect("focus tray state poisoned");
+        let mut current = state
+            .focus_snapshot
+            .lock()
+            .expect("focus tray state poisoned");
         *current = None;
     }
     refresh_tray(&app, None);
@@ -300,6 +317,8 @@ fn grant_vault_read_access(app: tauri::AppHandle, path: String) -> Result<(), St
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
+        .manage(local_ai::LocalAiDownloadState::default())
+        .manage(local_ai::LocalAiRuntimeState::default())
         // Must be registered first: a second launch (e.g. reopening from the
         // shortcut while an instance lingers in the tray) would otherwise spawn
         // a duplicate window whose WebView2 fails to init against the locked
@@ -383,8 +402,26 @@ fn main() {
             open_focus_mini_timer,
             dispatch_focus_tray_action,
             close_focus_mini_timer,
-            grant_vault_read_access
+            grant_vault_read_access,
+            local_ai::get_local_ai_hardware_profile,
+            local_ai::get_local_ai_models_dir,
+            local_ai::list_local_ai_models,
+            local_ai::get_local_ai_runtime_status,
+            local_ai::download_local_ai_model,
+            local_ai::cancel_local_ai_download,
+            local_ai::delete_local_ai_model,
+            local_ai::start_local_ai_server,
+            local_ai::stop_local_ai_server,
+            local_ai::is_local_ai_server_installed,
+            local_ai::install_local_ai_server,
+            local_ai::get_local_ai_platform
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running FocusFlow desktop app");
+        .build(tauri::generate_context!())
+        .expect("error while running FocusFlow desktop app")
+        .run(|app, event| {
+            // The llama-server sidecar must never outlive the app.
+            if let tauri::RunEvent::Exit = event {
+                local_ai::shutdown_local_ai_server(app);
+            }
+        });
 }

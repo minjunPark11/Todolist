@@ -275,7 +275,9 @@ export interface AppSettings {
   showSidebarCounts: boolean;
   sidebarCollapsed: boolean;
   reduceMotion: boolean;
-  // Preferred local Ollama model. Empty string = use the build-time default.
+  // Legacy Ollama model preference. No UI sets it since the managed
+  // llama-server replaced Ollama chat (LOCAL_AI_SYSTEM_DESIGN.md Phase 4);
+  // kept so synced settings from older clients still normalize cleanly.
   aiModel: string;
 }
 

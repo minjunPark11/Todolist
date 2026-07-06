@@ -18,6 +18,13 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { MiniFocusTimerSnapshot } from "../lib/miniFocusTimer";
+import type {
+  HardwareProfile,
+  InstalledModelFile,
+  LocalAiRuntimeStatus,
+  ModelDownloadOutcome,
+  ModelDownloadProgress,
+} from "../lib/localAi/types";
 import { webPlatform } from "./web";
 import type {
   FocusTrayActionPayload,
@@ -241,6 +248,80 @@ export const tauriPlatform: PlatformAdapter = {
 
     async watchVault(path, onChange) {
       return watchFs([path], () => onChange(), { recursive: true, delayMs: 2000 });
+    },
+  },
+
+  localAi: {
+    supported() {
+      return true;
+    },
+
+    async getHardwareProfile() {
+      // Consent gate lives in the UI: only the Local AI Setup screen calls
+      // this, after the user clicks "내 기기 검사하기" (design principle 5).
+      return invoke<HardwareProfile>("get_local_ai_hardware_profile");
+    },
+
+    async getModelsDir() {
+      return invoke<string>("get_local_ai_models_dir");
+    },
+
+    async listInstalledModels() {
+      return invoke<InstalledModelFile[]>("list_local_ai_models");
+    },
+
+    async getRuntimeStatus() {
+      return invoke<LocalAiRuntimeStatus>("get_local_ai_runtime_status");
+    },
+
+    async downloadModel(request) {
+      return invoke<ModelDownloadOutcome>("download_local_ai_model", {
+        modelId: request.modelId,
+        url: request.url,
+        expectedSha256: request.expectedSha256,
+        fileName: request.fileName,
+      });
+    },
+
+    async cancelDownload(modelId) {
+      await invoke("cancel_local_ai_download", { modelId });
+    },
+
+    async deleteModel(fileName) {
+      await invoke("delete_local_ai_model", { fileName });
+    },
+
+    async subscribeDownloadProgress(handler) {
+      return listen<ModelDownloadProgress>("local-ai://download-progress", (event) => {
+        handler(event.payload);
+      });
+    },
+
+    async startServer(modelFileName, preferredPort, binaryPathOverride) {
+      return invoke<LocalAiRuntimeStatus>("start_local_ai_server", {
+        modelFileName,
+        preferredPort,
+        binaryPathOverride,
+      });
+    },
+
+    async stopServer() {
+      await invoke("stop_local_ai_server");
+    },
+
+    async getPlatform() {
+      return invoke<{ os: string; arch: string }>("get_local_ai_platform");
+    },
+
+    async isServerInstalled() {
+      return invoke<boolean>("is_local_ai_server_installed");
+    },
+
+    async installServer(url, expectedSha256) {
+      return invoke<ModelDownloadOutcome>("install_local_ai_server", {
+        url,
+        expectedSha256,
+      });
     },
   },
 };

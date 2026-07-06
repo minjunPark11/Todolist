@@ -15,6 +15,7 @@ import type { ToastState } from "./components/kit";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
 import { useKnowledgeAutoIndex } from "./lib/knowledge/useKnowledgeAutoIndex";
 import { useKnowledgeSettings } from "./lib/knowledge/useKnowledgeSettings";
+import { useLocalAiAutostart } from "./lib/localAi/runtime";
 import { popUndo, pushUndo } from "./lib/undoStack";
 import { reducedTransition, transitions } from "./motion/transitions";
 import { pageVariants } from "./motion/variants";
@@ -97,6 +98,9 @@ export default function App() {
   // Phase 4: auto-syncs the Full-mode index on app start and on vault file
   // changes; no-ops entirely unless Full mode is enabled and connected.
   useKnowledgeAutoIndex(knowledge.settings);
+  // Pre-warms the managed llama-server, but only when the user picked
+  // "앱 시작 시 미리 실행" in Local AI settings (default is on-demand).
+  useLocalAiAutostart();
   // Renders before the <I18nProvider> below exists in the tree, so this can't
   // use the useT() context hook — call the plain translate() helper instead.
   const t = (key: string, vars?: Record<string, string | number>) => translate(appSettings.language, key, vars);
@@ -1110,8 +1114,6 @@ export default function App() {
       />
       <OllamaChat
         activePage={activePage}
-        aiModel={appSettings.aiModel}
-        onChangeAiModel={(model) => planner.updateAppSettings({ aiModel: model })}
         knowledgeSettings={knowledge.settings}
         aiContext={{
           currentPage: activePage,

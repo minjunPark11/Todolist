@@ -13,6 +13,20 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Local AI hardware profiling (RAM/disk) — read-only, local queries only.
+sysinfo = { version = "0.33", default-features = false, features = ["system", "disk"] }
+# Local AI model downloads (streaming + resume). rustls avoids the OpenSSL
+# system dependency across platforms.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+futures-util = "0.3"
+sha2 = "0.10"
+# Extracts the llama.cpp release archives into the app-local bin dir: zip for
+# the Windows build (deflate only, skipping the C-backed bzip2/zstd codecs) and
+# tar.gz for the macOS/Linux builds.
+zip = { version = "4", default-features = false, features = ["deflate"] }
+tar = "0.4"
+flate2 = "1"
+tokio = { version = "1", features = ["fs", "io-util"] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = { version = "2", features = ["watch"] }

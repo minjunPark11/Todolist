@@ -1,4 +1,12 @@
 import type { MiniFocusTimerSnapshot } from "../lib/miniFocusTimer";
+import type {
+  HardwareProfile,
+  InstalledModelFile,
+  LocalAiRuntimeStatus,
+  ModelDownloadOutcome,
+  ModelDownloadProgress,
+  ModelDownloadRequest,
+} from "../lib/localAi/types";
 
 export type PlatformKind = "web" | "desktop";
 export type FocusTrayAction = "pause" | "resume" | "finish";
@@ -54,6 +62,44 @@ export interface PlatformFiles {
   watchVault(path: string, onChange: () => void): Promise<() => void>;
 }
 
+// Desktop-only bridge to the local AI Rust commands (src-tauri/src/local_ai.rs,
+// LOCAL_AI_SYSTEM_DESIGN.md). Hardware profiling is read-only and local — the
+// caller (Local AI Setup UI) must only invoke it after explicit user consent.
+export interface PlatformLocalAi {
+  supported(): boolean;
+  getHardwareProfile(): Promise<HardwareProfile>;
+  // Returns the app-local models directory, creating it if needed.
+  getModelsDir(): Promise<string>;
+  listInstalledModels(): Promise<InstalledModelFile[]>;
+  getRuntimeStatus(): Promise<LocalAiRuntimeStatus>;
+  // Streams a GGUF into the models dir with resume + sha256 verification.
+  // Resolves when the download finishes or was cancelled; rejects on failure
+  // (bad host, network error, checksum mismatch). Progress arrives via
+  // subscribeDownloadProgress.
+  downloadModel(request: ModelDownloadRequest): Promise<ModelDownloadOutcome>;
+  cancelDownload(modelId: string): Promise<void>;
+  // Removes an installed model file (and any leftover .partial download).
+  deleteModel(fileName: string): Promise<void>;
+  subscribeDownloadProgress(handler: (progress: ModelDownloadProgress) => void): Promise<() => void>;
+  // Spawns (or reuses) the managed llama-server for an installed model.
+  // Resolves as soon as the process is up — readiness is polled separately
+  // via GET /health, since model loading can take tens of seconds.
+  startServer(modelFileName: string, preferredPort: number, binaryPathOverride: string): Promise<LocalAiRuntimeStatus>;
+  stopServer(): Promise<void>;
+  // The running build's target (std::env::consts OS/ARCH), used to pick the
+  // matching runtime asset — e.g. macos-aarch64 vs macos-x86_64 on a universal
+  // app. Reveals nothing beyond the app binary itself, so it needs no consent.
+  getPlatform(): Promise<{ os: string; arch: string }>;
+  // True once the managed llama-server binary is present in the app-local bin
+  // dir. External launch mode and a path override don't need it.
+  isServerInstalled(): Promise<boolean>;
+  // Downloads and extracts an official llama.cpp release zip into the bin dir.
+  // Same allowlist + sha256 trust model as downloadModel; progress and
+  // cancellation reuse subscribeDownloadProgress / cancelDownload under the
+  // "llama-server-runtime" id. Resolves "completed" or "cancelled".
+  installServer(url: string, expectedSha256: string): Promise<ModelDownloadOutcome>;
+}
+
 export interface PlatformAdapter {
   kind: PlatformKind;
   storage: {
@@ -82,4 +128,5 @@ export interface PlatformAdapter {
   };
   openExternal(url: string): Promise<void>;
   files: PlatformFiles;
+  localAi: PlatformLocalAi;
 }

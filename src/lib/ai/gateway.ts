@@ -1,11 +1,13 @@
 import type { AiChatRequest, AiChatResponse, AiProvider } from "./types";
-import { ollamaProvider } from "./providers/ollamaProvider";
-import { remoteOllamaProvider } from "./providers/remoteOllamaProvider";
+import { llamaServerProvider } from "./providers/llamaServerProvider";
 import { serverProvider } from "./providers/serverProvider";
 
-// Local-first provider order. Each provider owns its own availability check, so
-// optional fallbacks stay inert unless their env configuration is present.
-const providers: AiProvider[] = [ollamaProvider, remoteOllamaProvider, serverProvider];
+// Local-first provider order: the managed llama-server (or the user's own
+// OpenAI-compatible server in external mode) leads, with the optional
+// server-side endpoint as the only fallback. The Ollama-specific providers
+// were removed in Phase 4 — connecting to a self-hosted server now goes
+// through the external launch mode instead.
+const providers: AiProvider[] = [llamaServerProvider, serverProvider];
 
 export async function sendAiChat(request: AiChatRequest): Promise<AiChatResponse> {
   const errors: string[] = [];
@@ -36,23 +38,13 @@ export async function sendAiChat(request: AiChatRequest): Promise<AiChatResponse
     }
   }
 
-  throw new Error(
-    [
-      "AI provider is not available.",
-      "Run local Ollama, configure remote Ollama fallback, or configure the server AI endpoint.",
-      errors.length ? `Details: ${errors.join(" | ")}` : "",
-    ]
-      .filter(Boolean)
-      .join(" "),
-  );
-}
+  // Prefer a provider's actionable setup hint (e.g. "install the engine") over
+  // the generic message, so falling through to an unconfigured server provider
+  // doesn't hide the real fix.
+  const providerHint = providers.map((provider) => provider.unavailableMessage?.() ?? null).find(Boolean);
+  const headline =
+    providerHint ??
+    "AI provider is not available. Set up Local AI in Settings (install a model), connect an external server, or configure the server AI endpoint.";
 
-// Lists models installed on the local Ollama instance. Returns an empty array
-// when Ollama is offline or exposes no models, which the UI reads as "offline".
-export async function listLocalAiModels(): Promise<string[]> {
-  try {
-    return (await ollamaProvider.listModels?.()) ?? [];
-  } catch {
-    return [];
-  }
+  throw new Error([headline, errors.length ? `Details: ${errors.join(" | ")}` : ""].filter(Boolean).join(" "));
 }
