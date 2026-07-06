@@ -308,5 +308,16 @@ export const tauriPlatform: PlatformAdapter = {
     async stopServer() {
       await invoke("stop_local_ai_server");
     },
+
+    async isServerInstalled() {
+      return invoke<boolean>("is_local_ai_server_installed");
+    },
+
+    async installServer(url, expectedSha256) {
+      return invoke<ModelDownloadOutcome>("install_local_ai_server", {
+        url,
+        expectedSha256,
+      });
+    },
   },
 };

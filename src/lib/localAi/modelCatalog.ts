@@ -6,7 +6,10 @@ import type { LocalModelOption } from "./types";
 // (e.g. *.hf.co), and the HTTP client follows that automatically. The gate's
 // job is to stop a compromised webview from pointing the downloader at an
 // arbitrary host, which holds as long as every catalog URL starts at HF.
-export const MODEL_DOWNLOAD_ALLOWLIST = ["huggingface.co", "cdn-lfs.huggingface.co"] as const;
+// github.com covers the llama.cpp runtime release assets (serverRuntimeCatalog),
+// which 302-redirect to release-assets.githubusercontent.com — followed by the
+// HTTP client, so only the initial github.com host needs allowlisting.
+export const MODEL_DOWNLOAD_ALLOWLIST = ["huggingface.co", "cdn-lfs.huggingface.co", "github.com"] as const;
 
 export function isAllowedDownloadUrl(url: string): boolean {
   try {

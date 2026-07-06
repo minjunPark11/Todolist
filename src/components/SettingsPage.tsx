@@ -1,12 +1,17 @@
 import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
 import {
+  SERVER_RUNTIME_DOWNLOAD_ID,
   cancelModelDownload,
+  cancelServerRuntimeInstall,
   deleteInstalledModel,
+  installServerRuntime,
   isModelDownloadable,
+  isServerRuntimeAvailable,
   startModelDownload,
 } from "../lib/localAi/installer";
 import { LOCAL_MODEL_CATALOG, findModelById } from "../lib/localAi/modelCatalog";
+import { resolveServerRuntimeAsset } from "../lib/localAi/serverRuntimeCatalog";
 import { recommendLocalModel } from "../lib/localAi/recommender";
 import { useLocalAiSettings } from "../lib/localAi/settings";
 import type {
@@ -852,9 +857,12 @@ function LocalAiSettingsTab() {
   const [downloadMessage, setDownloadMessage] = useState("");
   const [downloadError, setDownloadError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<InstalledModelFile | null>(null);
+  const [serverInstalled, setServerInstalled] = useState<boolean | null>(null);
 
   const recommendation = useMemo(() => (profile ? recommendLocalModel(profile, t) : null), [profile, t]);
   const selectedModel = findModelById(settings.selectedModelId);
+  const runtimeAsset = resolveServerRuntimeAsset();
+  const installingRuntime = downloadingId === SERVER_RUNTIME_DOWNLOAD_ID;
 
   async function refreshInstalledModels() {
     try {
@@ -867,6 +875,7 @@ function LocalAiSettingsTab() {
   useEffect(() => {
     if (!isDesktop) return;
     void platform.localAi.getModelsDir().then(setModelsDir).catch(() => undefined);
+    void platform.localAi.isServerInstalled().then(setServerInstalled).catch(() => setServerInstalled(false));
     void refreshInstalledModels();
 
     let unsubscribe: (() => void) | undefined;
@@ -892,6 +901,27 @@ function LocalAiSettingsTab() {
       await refreshInstalledModels();
     } catch (error) {
       setDownloadError(error instanceof Error ? error.message : t("settings.localAi.downloadFailed"));
+    } finally {
+      setDownloadingId("");
+      setDownloadProgress(null);
+    }
+  }
+
+  async function handleInstallRuntime() {
+    setDownloadError("");
+    setDownloadMessage("");
+    setDownloadingId(SERVER_RUNTIME_DOWNLOAD_ID);
+    setDownloadProgress({ modelId: SERVER_RUNTIME_DOWNLOAD_ID, receivedBytes: 0, totalBytes: null });
+    try {
+      const outcome = await installServerRuntime();
+      if (outcome === "completed") {
+        setServerInstalled(true);
+        setDownloadMessage(t("settings.localAi.runtimeInstalled"));
+      } else {
+        setDownloadMessage(t("settings.localAi.downloadCancelled"));
+      }
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : t("settings.localAi.runtimeInstallFailed"));
     } finally {
       setDownloadingId("");
       setDownloadProgress(null);
@@ -1151,6 +1181,59 @@ function LocalAiSettingsTab() {
           </>
         )}
       </div>
+
+      {isDesktop && settings.launchMode !== "external" ? (
+        <div className="ff-settings-card">
+          <Row
+            title={t("settings.localAi.runtimeTitle")}
+            hint={
+              runtimeAsset
+                ? t("settings.localAi.runtimeHint", { version: runtimeAsset.version })
+                : t("settings.localAi.runtimeUnavailable")
+            }
+          >
+            {serverInstalled ? (
+              <span className="ff-localai-chip on">{t("settings.localAi.runtimeInstalledBadge")}</span>
+            ) : installingRuntime ? (
+              <button type="button" className="ff-btn ff-btn-danger" onClick={() => void cancelServerRuntimeInstall()}>
+                {t("settings.localAi.downloadCancel")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="ff-btn ff-btn-primary"
+                disabled={!isServerRuntimeAvailable() || serverInstalled === null}
+                onClick={() => void handleInstallRuntime()}
+              >
+                {downloadError ? t("settings.localAi.downloadRetry") : t("settings.localAi.runtimeInstallButton")}
+              </button>
+            )}
+          </Row>
+          {installingRuntime && downloadProgress?.modelId === SERVER_RUNTIME_DOWNLOAD_ID ? (
+            <div className="ff-knowledge-index-actions">
+              <span className="ff-knowledge-index-progress">
+                {downloadProgress.totalBytes
+                  ? t("settings.localAi.downloadingKnown", {
+                      received: (downloadProgress.receivedBytes / 1024 ** 3).toFixed(2),
+                      total: (downloadProgress.totalBytes / 1024 ** 3).toFixed(2),
+                    })
+                  : t("settings.localAi.downloadingUnknown", {
+                      received: (downloadProgress.receivedBytes / 1024 ** 3).toFixed(2),
+                    })}
+              </span>
+              {downloadProgress.totalBytes ? (
+                <progress
+                  className="ff-knowledge-progress-bar"
+                  value={downloadProgress.receivedBytes}
+                  max={downloadProgress.totalBytes}
+                />
+              ) : (
+                <progress className="ff-knowledge-progress-bar" />
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {isDesktop ? (
         <div className="ff-settings-card">

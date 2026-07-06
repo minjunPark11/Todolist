@@ -4,10 +4,18 @@
 자리다. **바이너리는 절대 git에 커밋하지 않는다** — `.gitignore`가 이 폴더의
 README 외 모든 파일을 차단한다.
 
-> **현재 구현(Phase 3)은 이 폴더를 사용하지 않는다.** 앱은 런타임에
-> 바이너리를 찾는다 (`LOCAL_AI_SYSTEM_DESIGN.md` §7): ① 설정의 경로 오버라이드
-> ② `<app-local-data>/bin/llama-server(.exe)` ③ 시스템 PATH.
-> 개발 중 테스트하려면 llama.cpp 릴리스의 llama-server를 그 중 한 곳에 두면 된다.
+> **현재 구현은 이 폴더(`src-tauri/binaries/`)를 사용하지 않는다.** 앱은
+> 런타임에 바이너리를 찾는다 (`LOCAL_AI_SYSTEM_DESIGN.md` §7): ① 설정의 경로
+> 오버라이드 ② `<app-local-data>/bin/llama-server(.exe)` ③ 시스템 PATH.
+>
+> **정식 설치 경로(Phase 6, §7.7)**: 설정 → 로컬 AI → "엔진 설치"가
+> `install_local_ai_server`로 llama.cpp 공식 릴리스 zip을 받아
+> `<app-local-data>/bin`에 해제한다(sha256 검증). 카탈로그는
+> `src/lib/localAi/serverRuntimeCatalog.ts`. 개발 중 수동 테스트라면 llama.cpp
+> 릴리스의 llama-server를 위 경로 중 하나에 두어도 된다.
+>
+> 이 repo 폴더는 향후 build-time `externalBin` 번들링을 도입할 때만 쓰인다
+> (런타임 자동 설치와는 별개의 선택적 경로).
 
 ## 파일 이름 규칙 (향후 Tauri externalBin 패키징 시)
 

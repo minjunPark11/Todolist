@@ -25,8 +25,9 @@ const DOWNLOAD_PROGRESS_EVENT: &str = "local-ai://download-progress";
 const PROGRESS_EMIT_INTERVAL: Duration = Duration::from_millis(300);
 // Mirrors MODEL_DOWNLOAD_ALLOWLIST in src/lib/localAi/modelCatalog.ts —
 // defense in depth so a compromised webview still can't point the downloader
-// at an arbitrary host.
-const DOWNLOAD_HOST_ALLOWLIST: &[&str] = &["huggingface.co", "cdn-lfs.huggingface.co"];
+// at an arbitrary host. github.com covers the llama.cpp runtime release assets
+// (they 302 to release-assets.githubusercontent.com, which reqwest follows).
+const DOWNLOAD_HOST_ALLOWLIST: &[&str] = &["huggingface.co", "cdn-lfs.huggingface.co", "github.com"];
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -463,6 +464,112 @@ pub async fn delete_local_ai_model(app: tauri::AppHandle, file_name: String) -> 
     Ok(())
 }
 
+// ===== llama-server runtime installer (Phase 6, LOCAL_AI_SYSTEM_DESIGN.md §7.7) =====
+//
+// Downloads an official llama.cpp release zip (allowlist + sha256, same trust
+// model as model files) and extracts it into <app-local-data>/bin, where
+// resolve_server_binary already looks. The zip is flat and ships llama-server
+// plus its companion DLLs, so we extract every entry to keep the dynamic
+// dependency closure intact.
+
+// Extracts a zip into `dest`, rejecting entries that would escape it. Blocking,
+// so callers run it on a blocking task. `dest` must already exist.
+fn extract_zip_to_dir(zip_path: &Path, dest: &Path) -> Result<(), String> {
+    let file = std::fs::File::open(zip_path).map_err(|error| error.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|error| error.to_string())?;
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index).map_err(|error| error.to_string())?;
+        // enclosed_name() returns None for absolute paths or ".." traversal.
+        let Some(relative) = entry.enclosed_name() else {
+            continue;
+        };
+        let out_path = dest.join(relative);
+        if entry.is_dir() {
+            std::fs::create_dir_all(&out_path).map_err(|error| error.to_string())?;
+            continue;
+        }
+        if let Some(parent) = out_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        let mut out = std::fs::File::create(&out_path).map_err(|error| error.to_string())?;
+        std::io::copy(&mut entry, &mut out).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn is_local_ai_server_installed(app: tauri::AppHandle) -> bool {
+    local_bin_dir_path(&app)
+        .map(|dir| dir.join(server_binary_file_name()).is_file())
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+pub async fn install_local_ai_server(
+    app: tauri::AppHandle,
+    state: State<'_, LocalAiDownloadState>,
+    url: String,
+    expected_sha256: String,
+) -> Result<DownloadOutcome, String> {
+    let parsed_url = validate_download_url(&url)?;
+    validate_sha256(&expected_sha256)?;
+
+    let bin_dir = local_bin_dir_path(&app)?;
+    tokio::fs::create_dir_all(&bin_dir)
+        .await
+        .map_err(|error| error.to_string())?;
+    if bin_dir.join(server_binary_file_name()).is_file() {
+        return Ok(DownloadOutcome::Completed);
+    }
+
+    let archive_path = bin_dir.join(SERVER_RUNTIME_ARCHIVE_NAME);
+    let partial_path = bin_dir.join(format!("{SERVER_RUNTIME_ARCHIVE_NAME}{PARTIAL_SUFFIX}"));
+
+    let cancel = Arc::new(AtomicBool::new(false));
+    {
+        let mut flags = state
+            .cancel_flags
+            .lock()
+            .map_err(|_| "download state poisoned")?;
+        if flags.contains_key(SERVER_RUNTIME_DOWNLOAD_ID) {
+            return Err("The runtime is already being installed.".to_string());
+        }
+        flags.insert(SERVER_RUNTIME_DOWNLOAD_ID.to_string(), Arc::clone(&cancel));
+    }
+
+    let outcome = run_download(
+        &app,
+        &cancel,
+        SERVER_RUNTIME_DOWNLOAD_ID,
+        parsed_url,
+        &expected_sha256,
+        &archive_path,
+        &partial_path,
+    )
+    .await;
+
+    if let Ok(mut flags) = state.cancel_flags.lock() {
+        flags.remove(SERVER_RUNTIME_DOWNLOAD_ID);
+    }
+
+    match outcome? {
+        DownloadOutcome::Cancelled => return Ok(DownloadOutcome::Cancelled),
+        DownloadOutcome::Completed => {}
+    }
+
+    let extract_dir = bin_dir.clone();
+    let extract_archive = archive_path.clone();
+    tokio::task::spawn_blocking(move || extract_zip_to_dir(&extract_archive, &extract_dir))
+        .await
+        .map_err(|error| error.to_string())??;
+    let _ = tokio::fs::remove_file(&archive_path).await;
+
+    if !bin_dir.join(server_binary_file_name()).is_file() {
+        return Err("The runtime archive did not contain llama-server.".to_string());
+    }
+    Ok(DownloadOutcome::Completed)
+}
+
 // ===== llama-server sidecar runtime (Phase 3, LOCAL_AI_SYSTEM_DESIGN.md §7) =====
 //
 // The server binary is resolved at RUNTIME, not bundled via externalBin:
@@ -471,6 +578,11 @@ pub async fn delete_local_ai_model(app: tauri::AppHandle, file_name: String) -> 
 
 const SERVER_BINARY_NAME: &str = "llama-server";
 const LOCAL_BIN_DIR_NAME: &str = "bin";
+// Progress for the runtime install streams under this synthetic id so the
+// frontend can reuse the same download-progress subscription as model files.
+const SERVER_RUNTIME_DOWNLOAD_ID: &str = "llama-server-runtime";
+// Temporary archive name while the runtime zip downloads into the bin dir.
+const SERVER_RUNTIME_ARCHIVE_NAME: &str = "llama-server-runtime.zip";
 // How far above the preferred port we probe for a free one.
 const PORT_PROBE_RANGE: u16 = 20;
 
@@ -491,6 +603,16 @@ fn server_binary_file_name() -> String {
     } else {
         SERVER_BINARY_NAME.to_string()
     }
+}
+
+// The app-managed bin dir (<app-local-data>/bin) that the runtime installer
+// populates and resolve_server_binary looks in.
+fn local_bin_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let base = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|error| error.to_string())?;
+    Ok(base.join(LOCAL_BIN_DIR_NAME))
 }
 
 fn find_in_path() -> Option<PathBuf> {
@@ -517,12 +639,7 @@ fn resolve_server_binary(app: &tauri::AppHandle, override_path: &str) -> Result<
         ));
     }
 
-    let managed = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|error| error.to_string())?
-        .join(LOCAL_BIN_DIR_NAME)
-        .join(server_binary_file_name());
+    let managed = local_bin_dir_path(app)?.join(server_binary_file_name());
     if managed.is_file() {
         return Ok(managed);
     }

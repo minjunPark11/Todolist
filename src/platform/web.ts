@@ -196,5 +196,11 @@ export const webPlatform: PlatformAdapter = {
     async stopServer() {
       localAiUnsupported();
     },
+    async isServerInstalled() {
+      return false;
+    },
+    async installServer() {
+      localAiUnsupported();
+    },
   },
 };

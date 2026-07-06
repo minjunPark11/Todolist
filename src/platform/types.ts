@@ -86,6 +86,14 @@ export interface PlatformLocalAi {
   // via GET /health, since model loading can take tens of seconds.
   startServer(modelFileName: string, preferredPort: number, binaryPathOverride: string): Promise<LocalAiRuntimeStatus>;
   stopServer(): Promise<void>;
+  // True once the managed llama-server binary is present in the app-local bin
+  // dir. External launch mode and a path override don't need it.
+  isServerInstalled(): Promise<boolean>;
+  // Downloads and extracts an official llama.cpp release zip into the bin dir.
+  // Same allowlist + sha256 trust model as downloadModel; progress and
+  // cancellation reuse subscribeDownloadProgress / cancelDownload under the
+  // "llama-server-runtime" id. Resolves "completed" or "cancelled".
+  installServer(url: string, expectedSha256: string): Promise<ModelDownloadOutcome>;
 }
 
 export interface PlatformAdapter {

@@ -20,6 +20,10 @@ sysinfo = { version = "0.33", default-features = false, features = ["system", "d
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 futures-util = "0.3"
 sha2 = "0.10"
+# Extracts the llama.cpp release zip (llama-server + companion DLLs) into the
+# app-local bin dir. deflate is the only method GitHub release zips use, so we
+# skip the C-backed codecs (bzip2/zstd) to avoid extra system dependencies.
+zip = { version = "4", default-features = false, features = ["deflate"] }
 tokio = { version = "1", features = ["fs", "io-util"] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
