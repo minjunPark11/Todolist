@@ -542,7 +542,7 @@ export function usePlannerData() {
   const [userEmail, setUserEmail] = useState("");
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [syncStatus, setSyncStatus] = useState(
-    isSupabaseConfigured ? "Supabase ready. Sign in to sync." : "LocalStorage mode",
+    isSupabaseConfigured ? "sync.ready" : "sync.localMode",
   );
   const [syncError, setSyncError] = useState("");
   const [remoteLoaded, setRemoteLoaded] = useState(false);
@@ -644,7 +644,7 @@ export function usePlannerData() {
       return;
     }
 
-    setSyncStatus("Syncing…");
+    setSyncStatus("sync.syncing");
     setSyncError("");
 
     try {
@@ -679,13 +679,13 @@ export function usePlannerData() {
 
       setDataState(normalizeData(partial));
       setRemoteLoaded(true);
-      setSyncStatus("Synced");
+      setSyncStatus("sync.synced");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not load Supabase data.";
       console.error("[Supabase] load failed:", error);
       setRemoteLoaded(false);
       setSyncError(message);
-      setSyncStatus("Supabase load failed. Local data is still available.");
+      setSyncStatus("sync.loadFailed");
     }
   }
 
@@ -751,10 +751,10 @@ export function usePlannerData() {
       }
 
       setSyncError("");
-      setSyncStatus("Synced");
+      setSyncStatus("sync.synced");
     } catch (error) {
       setSyncError(error instanceof Error ? error.message : "Could not save Supabase data.");
-      setSyncStatus("Supabase sync failed. Changes remain in localStorage.");
+      setSyncStatus("sync.syncFailed");
     }
   }
 
@@ -786,7 +786,7 @@ export function usePlannerData() {
     }
     const needsEmailConfirmation = !signUpData.session;
     setSyncError("");
-    setSyncStatus(needsEmailConfirmation ? "Verification email sent. Please check your inbox." : "Account created.");
+    setSyncStatus(needsEmailConfirmation ? "sync.verificationSent" : "sync.accountCreated");
     return { ok: true, needsEmailConfirmation };
   }
 
@@ -797,7 +797,7 @@ export function usePlannerData() {
     await supabase.auth.signOut();
     setUserEmail("");
     setRemoteLoaded(false);
-    setSyncStatus("Signed out. LocalStorage mode");
+    setSyncStatus("sync.signedOut");
   }
 
   // Sends a password-reset email. The link brings the user back to the app with

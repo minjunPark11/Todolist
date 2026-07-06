@@ -159,6 +159,17 @@ export const en: Dictionary = {
   "auth.uploadNoData": "No local data to upload.",
   "auth.authFailed": "Authentication failed.",
 
+  // ---- Sync status ----
+  "sync.ready": "Supabase ready. Sign in to sync.",
+  "sync.localMode": "LocalStorage mode",
+  "sync.syncing": "Syncing…",
+  "sync.synced": "Synced",
+  "sync.loadFailed": "Supabase load failed. Local data is still available.",
+  "sync.syncFailed": "Supabase sync failed. Changes remain in localStorage.",
+  "sync.verificationSent": "Verification email sent. Please check your inbox.",
+  "sync.accountCreated": "Account created.",
+  "sync.signedOut": "Signed out. LocalStorage mode",
+
   // ---- Settings page ----
   "settings.title": "Settings",
   "settings.subtitle": "Personalize FocusFlow and manage your local data.",

@@ -1473,7 +1473,7 @@ function AccountSection({
           </button>
         </div>
       ) : null}
-      <p className="settings-message">{auth.syncStatus}</p>
+      <p className="settings-message">{t(auth.syncStatus)}</p>
       {auth.syncError ? <p className="settings-error">{auth.syncError}</p> : null}
       {message ? <p className="settings-message">{message}</p> : null}
     </section>

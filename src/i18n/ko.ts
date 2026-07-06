@@ -159,6 +159,17 @@ export const ko: Dictionary = {
   "auth.uploadNoData": "업로드할 로컬 데이터가 없습니다.",
   "auth.authFailed": "인증에 실패했습니다.",
 
+  // ---- Sync status ----
+  "sync.ready": "Supabase 준비됨. 로그인하면 동기화됩니다.",
+  "sync.localMode": "로컬 저장소 모드",
+  "sync.syncing": "동기화 중…",
+  "sync.synced": "동기화됨",
+  "sync.loadFailed": "Supabase 불러오기 실패. 로컬 데이터는 그대로 사용할 수 있습니다.",
+  "sync.syncFailed": "Supabase 동기화 실패. 변경사항은 로컬 저장소에 남아 있습니다.",
+  "sync.verificationSent": "인증 이메일을 보냈습니다. 받은 편지함을 확인해 주세요.",
+  "sync.accountCreated": "계정이 생성되었습니다.",
+  "sync.signedOut": "로그아웃됨. 로컬 저장소 모드",
+
   // ---- Settings page ----
   "settings.title": "설정",
   "settings.subtitle": "FocusFlow를 원하는 대로 꾸미고 로컬 데이터를 관리하세요.",
