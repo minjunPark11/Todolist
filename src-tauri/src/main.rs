@@ -132,6 +132,22 @@ fn refresh_tray(app: &tauri::AppHandle, snapshot: Option<&FocusTraySnapshot>) {
             let _ = tray.set_menu(Some(menu));
         }
         let _ = tray.set_tooltip(Some(tray_tooltip(snapshot)));
+        // macOS shows this text next to the menu-bar icon; other platforms
+        // only support tray tooltips/menus, so this is a no-op there.
+        #[cfg(target_os = "macos")]
+        {
+            let title = match snapshot {
+                Some(snapshot) if has_active_focus(snapshot) => {
+                    if snapshot.status == "paused" {
+                        format!("⏸ {}", snapshot.time)
+                    } else {
+                        snapshot.time.clone()
+                    }
+                }
+                _ => String::new(),
+            };
+            let _ = tray.set_title(if title.is_empty() { None } else { Some(title.as_str()) });
+        }
     }
 }
 
