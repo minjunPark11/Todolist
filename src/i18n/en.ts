@@ -723,6 +723,12 @@ export const en: Dictionary = {
   "ai.knowledge.badgeHint": "This answer used excerpts from your Obsidian notes",
   "ai.knowledge.sourcesLabel": "Notes referenced",
   "ai.knowledge.copied": "Path copied",
+  "ai.attach.button": "Attach a vault file",
+  "ai.attach.filterPlaceholder": "Search files…",
+  "ai.attach.loading": "Loading…",
+  "ai.attach.empty": "No matching files",
+  "ai.attach.attachedLabel": "Attached files",
+  "ai.attach.remove": "Remove attachment",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "Previous",

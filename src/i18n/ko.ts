@@ -723,6 +723,12 @@ export const ko: Dictionary = {
   "ai.knowledge.badgeHint": "이 답변은 내 Obsidian 노트를 참고했습니다",
   "ai.knowledge.sourcesLabel": "참고한 노트",
   "ai.knowledge.copied": "경로 복사됨",
+  "ai.attach.button": "Vault 파일 첨부",
+  "ai.attach.filterPlaceholder": "파일 검색…",
+  "ai.attach.loading": "불러오는 중…",
+  "ai.attach.empty": "일치하는 파일이 없습니다",
+  "ai.attach.attachedLabel": "첨부된 파일",
+  "ai.attach.remove": "첨부 제거",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "이전",

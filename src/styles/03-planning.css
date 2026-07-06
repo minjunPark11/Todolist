@@ -839,7 +839,7 @@
 }
 .ollama-chat-form {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
   gap: 10px;
   padding: 14px;
   border-top: 1px solid var(--border-subtle);
@@ -873,6 +873,72 @@
 .ollama-chat-form button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+.ollama-chat-attach-anchor {
+  position: relative;
+  align-self: end;
+}
+.ollama-chat-attach-button {
+  align-self: end;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
+  padding: 0 12px;
+  min-height: 44px;
+  font-size: 16px;
+}
+.ollama-chat-attach-filter {
+  width: 220px;
+  max-width: 60vw;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 6px 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.ollama-chat-attach-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.ollama-chat-attach-empty {
+  padding: 8px 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+.ollama-chat-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 14px;
+}
+.ollama-chat-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 4px 6px 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ollama-chat-attachment-chip button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 @media (max-width: 900px) {

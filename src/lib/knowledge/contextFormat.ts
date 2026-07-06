@@ -5,6 +5,7 @@
 import type { KnowledgeContextResult, RetrievedChunk } from "./types";
 
 export const KNOWLEDGE_BLOCK_HEADER = "[KNOWLEDGE from Obsidian vault — read-only excerpts]";
+export const ATTACHED_FILES_HEADER = "[ATTACHED FILES — user-selected, always included in this message]";
 export const KNOWLEDGE_BLOCK_INSTRUCTIONS = "Instructions: cite the source path when you use these excerpts.";
 export const KNOWLEDGE_BLOCK_TRUNCATED = "[knowledge truncated]";
 
@@ -24,7 +25,11 @@ export interface RankedCandidate {
 // used up. A candidate that doesn't fully fit gets truncated in place and
 // ends the loop — lower-ranked candidates are dropped, matching design §6
 // item 3 ("score 낮은 chunk부터 탈락").
-export function assembleKnowledgeContext(candidates: RankedCandidate[], budgetChars: number): KnowledgeContextResult | null {
+export function assembleKnowledgeContext(
+  candidates: RankedCandidate[],
+  budgetChars: number,
+  header: string = KNOWLEDGE_BLOCK_HEADER,
+): KnowledgeContextResult | null {
   const blocks: string[] = [];
   const sources: RetrievedChunk[] = [];
   let used = 0;
@@ -60,7 +65,7 @@ export function assembleKnowledgeContext(candidates: RankedCandidate[], budgetCh
   const footer = truncated ? `${KNOWLEDGE_BLOCK_TRUNCATED}\n${KNOWLEDGE_BLOCK_INSTRUCTIONS}` : KNOWLEDGE_BLOCK_INSTRUCTIONS;
 
   return {
-    text: [KNOWLEDGE_BLOCK_HEADER, ...blocks, footer].join("\n"),
+    text: [header, ...blocks, footer].join("\n"),
     sources,
   };
 }

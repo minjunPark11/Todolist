@@ -13,8 +13,13 @@ import {
 } from "../lib/ai/tools/toolExecutor";
 import type { AiMessage, AiProviderName } from "../lib/ai/types";
 import { buildCalendarContextText, type CalendarContextInput } from "../lib/calendarContext";
+import { Popover } from "./kit";
+import { buildAttachedFilesContext, type AttachedFileRef } from "../lib/knowledge/attachedFilesContext";
 import { createKnowledgeContextSource } from "../lib/knowledge/knowledgeContextSource";
+import { scanVault } from "../lib/knowledge/obsidianScanner";
 import { DEFAULT_KNOWLEDGE_SETTINGS, type KnowledgeSettings, type RetrievedChunk } from "../lib/knowledge/types";
+import { platform } from "../platform";
+import type { PlatformFileEntry } from "../platform/types";
 import type { PageId } from "../types";
 import { useT } from "../i18n";
 import { reducedTransition, transitions } from "../motion/transitions";
@@ -77,7 +82,43 @@ export function OllamaChat({
   const [actionNotice, setActionNotice] = useState("");
   const [knowledgeSources, setKnowledgeSources] = useState<RetrievedChunk[]>([]);
   const [copiedSourcePath, setCopiedSourcePath] = useState("");
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFileRef[]>([]);
+  const [attachPopoverOpen, setAttachPopoverOpen] = useState(false);
+  const [attachFilter, setAttachFilter] = useState("");
+  const [attachCandidates, setAttachCandidates] = useState<PlatformFileEntry[]>([]);
+  const [attachLoading, setAttachLoading] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const canAttachFiles = Boolean(knowledgeSettings.vaultPath) && platform.files.supported();
+  const attachMatches = attachCandidates
+    .filter((entry) => entry.relativePath.toLowerCase().includes(attachFilter.toLowerCase()))
+    .slice(0, 20);
+
+  async function openAttachPopover() {
+    setAttachPopoverOpen(true);
+    setAttachLoading(true);
+    try {
+      setAttachCandidates(await scanVault(knowledgeSettings.vaultPath, knowledgeSettings.excludedFolders));
+    } catch {
+      setAttachCandidates([]);
+    } finally {
+      setAttachLoading(false);
+    }
+  }
+
+  function addAttachment(entry: PlatformFileEntry) {
+    setAttachedFiles((current) =>
+      current.some((file) => file.path === entry.path)
+        ? current
+        : [...current, { path: entry.path, relativePath: entry.relativePath }],
+    );
+    setAttachPopoverOpen(false);
+    setAttachFilter("");
+  }
+
+  function removeAttachment(path: string) {
+    setAttachedFiles((current) => current.filter((file) => file.path !== path));
+  }
 
   const chatHistory = useMemo<AiMessage[]>(
     () => messages.map(({ role, content }) => ({ role, content })),
@@ -122,9 +163,11 @@ export function OllamaChat({
 
     const userMessage = createMessage("user", content);
     const nextIntent = detectAgentIntent(content);
+    const filesToAttach = attachedFiles;
     setIntent(nextIntent);
     setMessages((current) => [...current, userMessage]);
     setDraft("");
+    setAttachedFiles([]);
     setError("");
     setSuggestedActions([]);
     setValidationResults([]);
@@ -141,20 +184,41 @@ export function OllamaChat({
 
       // Best-effort: knowledge context is an enhancement, never blocks the
       // chat if the vault is unreadable or unset (see KNOWLEDGE_BASE_DESIGN.md).
-      let knowledgeContextText: string | undefined;
-      let nextKnowledgeSources: RetrievedChunk[] = [];
+      // Attached files are always included and consume the budget first;
+      // automatic retrieval (Lite/Full) gets whatever budget remains.
+      let attachedContextText: string | undefined;
+      let attachedSources: RetrievedChunk[] = [];
       try {
-        const knowledgeSource = createKnowledgeContextSource(() => knowledgeSettings);
-        if (await knowledgeSource.isReady()) {
-          const knowledgeResult = await knowledgeSource.buildContext(content, knowledgeSettings.knowledgeBudgetChars);
-          if (knowledgeResult) {
-            knowledgeContextText = knowledgeResult.text;
-            nextKnowledgeSources = knowledgeResult.sources;
-          }
+        const attachedResult = await buildAttachedFilesContext(filesToAttach, knowledgeSettings.knowledgeBudgetChars);
+        if (attachedResult) {
+          attachedContextText = attachedResult.text;
+          attachedSources = attachedResult.sources;
         }
       } catch {
-        // Ignore — the chat proceeds without knowledge context.
+        // Ignore — the chat proceeds without the attachment.
       }
+
+      const remainingBudget = Math.max(0, knowledgeSettings.knowledgeBudgetChars - (attachedContextText?.length ?? 0));
+
+      let autoContextText: string | undefined;
+      let autoSources: RetrievedChunk[] = [];
+      if (remainingBudget > 0) {
+        try {
+          const knowledgeSource = createKnowledgeContextSource(() => knowledgeSettings);
+          if (await knowledgeSource.isReady()) {
+            const knowledgeResult = await knowledgeSource.buildContext(content, remainingBudget);
+            if (knowledgeResult) {
+              autoContextText = knowledgeResult.text;
+              autoSources = knowledgeResult.sources;
+            }
+          }
+        } catch {
+          // Ignore — the chat proceeds without knowledge context.
+        }
+      }
+
+      const knowledgeContextText = [attachedContextText, autoContextText].filter(Boolean).join("\n\n") || undefined;
+      const nextKnowledgeSources = [...attachedSources, ...autoSources];
 
       const response = await runPersonalAgent({
         messages: [...chatHistory, { role: "user", content }],
@@ -209,6 +273,8 @@ export function OllamaChat({
     setValidationResults([]);
     setActionNotice("");
     setKnowledgeSources([]);
+    setAttachedFiles([]);
+    setAttachPopoverOpen(false);
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }
 
@@ -352,7 +418,63 @@ export function OllamaChat({
             onRequestApply={requestApplyActions}
           />
 
+          {attachedFiles.length > 0 ? (
+            <div className="ollama-chat-attachments" aria-label={t("ai.attach.attachedLabel")}>
+              {attachedFiles.map((file) => (
+                <span key={file.path} className="ollama-chat-attachment-chip" title={file.relativePath}>
+                  📎 {file.relativePath}
+                  <button type="button" aria-label={t("ai.attach.remove")} onClick={() => removeAttachment(file.path)}>
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+
           <form className="ollama-chat-form" onSubmit={submit}>
+            {canAttachFiles ? (
+              <div className="ff-anchor ollama-chat-attach-anchor">
+                <button
+                  type="button"
+                  className="ollama-chat-attach-button"
+                  aria-label={t("ai.attach.button")}
+                  onClick={() => (attachPopoverOpen ? setAttachPopoverOpen(false) : void openAttachPopover())}
+                >
+                  📎
+                </button>
+                <Popover open={attachPopoverOpen} onClose={() => setAttachPopoverOpen(false)}>
+                  <input
+                    type="text"
+                    className="ollama-chat-attach-filter"
+                    value={attachFilter}
+                    placeholder={t("ai.attach.filterPlaceholder")}
+                    onChange={(event) => setAttachFilter(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.preventDefault();
+                    }}
+                    autoFocus
+                  />
+                  <div className="ollama-chat-attach-list">
+                    {attachLoading ? (
+                      <div className="ollama-chat-attach-empty">{t("ai.attach.loading")}</div>
+                    ) : attachMatches.length ? (
+                      attachMatches.map((entry) => (
+                        <button
+                          key={entry.path}
+                          type="button"
+                          className="ff-menu-item"
+                          onClick={() => addAttachment(entry)}
+                        >
+                          {entry.relativePath}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="ollama-chat-attach-empty">{t("ai.attach.empty")}</div>
+                    )}
+                  </div>
+                </Popover>
+              </div>
+            ) : null}
             <textarea
               ref={inputRef}
               value={draft}
