@@ -15,6 +15,7 @@ import {
   subscribeLocalAiDownloadSession,
 } from "../lib/localAi/downloadSession";
 import { LOCAL_MODEL_CATALOG, findModelById } from "../lib/localAi/modelCatalog";
+import { installedFileMatchesModel } from "../lib/localAi/runtime";
 import type { ServerRuntimeAsset } from "../lib/localAi/serverRuntimeCatalog";
 import { recommendLocalModel } from "../lib/localAi/recommender";
 import { useLocalAiSettings } from "../lib/localAi/settings";
@@ -960,8 +961,8 @@ function LocalAiSettingsTab() {
   }
 
   function isModelInstalled(modelId: string) {
-    // Phase 2 installer names files "<catalog-id>.gguf" (see runtime.ts).
-    return installedModels.some((file) => file.fileName.toLowerCase().startsWith(modelId.toLowerCase()));
+    const model = findModelById(modelId);
+    return Boolean(model && installedModels.some((file) => installedFileMatchesModel(file.fileName, model)));
   }
 
   const launchHintKey: Record<LocalAiLaunchMode, string> = {

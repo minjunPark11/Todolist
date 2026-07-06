@@ -5,6 +5,10 @@ import { SpaceDetailView } from "./spaces/SpaceDetailView";
 import { DeleteSpaceConfirmModal } from "./spaces/SpaceModals";
 import { useT } from "../i18n";
 import { platform } from "../platform";
+import { sendAiChat } from "../lib/ai/gateway";
+import { SPACES_BRIEFING_PROMPT } from "../lib/ai/agent/prompts";
+import { llamaServerProvider } from "../lib/ai/providers/llamaServerProvider";
+import { buildSpaceBriefing, buildSpaceBriefingContext, type SpaceBriefing } from "../utils/spaceBriefing";
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -42,6 +46,8 @@ type ActivitySignal = {
   severity: AiPriority;
   spaceId: string;
 };
+
+type AnalysisState = "baseline" | "loading" | "success";
 
 type AddSpaceDraft = {
   type: SpaceType | null;
@@ -191,7 +197,9 @@ export function SpacesPage({
   const [localSpaces, setLocalSpaces] = useState<Space[]>(() => loadLocalSpacesStore().spaces);
   const [selectedSpaceId, setSelectedSpaceId] = useState("");
   const [highlightSignalId, setHighlightSignalId] = useState("");
-  const [analysisState, setAnalysisState] = useState<"empty" | "loading" | "success" | "insufficient" | "error">("empty");
+  const [analysisState, setAnalysisState] = useState<AnalysisState>("baseline");
+  const [aiBriefing, setAiBriefing] = useState<SpaceBriefing | null>(null);
+  const [analysisHint, setAnalysisHint] = useState("");
   const [lastAnalyzedAt, setLastAnalyzedAt] = useState<Date | null>(null);
   const [reasonOpen, setReasonOpen] = useState(false);
   const [signalsOpen, setSignalsOpen] = useState(false);
@@ -214,6 +222,10 @@ export function SpacesPage({
     [conceptNotes, localPinnedSpaceIds, localSpaces, projects, studyTopics, tasks, t],
   );
   const signals = useMemo(() => deriveSignals(spaces, tasks, conceptNotes, t), [conceptNotes, spaces, tasks, t]);
+  const baselineBriefing = useMemo(() => buildSpaceBriefing(spaces, signals, t), [signals, spaces, t]);
+  const activeBriefing = analysisState === "success" && aiBriefing ? aiBriefing : baselineBriefing;
+  const effectiveAnalysisState = spaces.length === 0 ? "empty" : analysisState;
+  const reasonLines = activeBriefing.detailLines.length > 0 ? activeBriefing.detailLines : [t("spaces.reason.noSignals")];
   const selectedSpace = spaces.find((space) => space.id === selectedSpaceId) ?? spaces.find((space) => space.sourceId === selectedProjectId);
   const pendingDeleteSpace = spaces.find((space) => space.id === pendingDeleteSpaceId);
   const pendingRenameSpace = spaces.find((space) => space.id === pendingRenameSpaceId);
@@ -379,16 +391,39 @@ export function SpacesPage({
     return t("spaces.brief.lastAnalyzedOn", { date: day, time });
   }
 
-  function analyzeSpaces() {
-    if (spaces.length < 2 || signals.length < 2) {
-      setAnalysisState("insufficient");
-      return;
-    }
+  async function analyzeSpaces() {
+    if (spaces.length === 0) return;
     setAnalysisState("loading");
-    window.setTimeout(() => {
+    setAiBriefing(null);
+    setAnalysisHint("");
+
+    try {
+      const localAvailable = await llamaServerProvider.isAvailable();
+      if (!localAvailable) {
+        setAnalysisState("baseline");
+        setAnalysisHint(t("spaces.brief.localAiUnavailable"));
+        setLastAnalyzedAt(new Date());
+        return;
+      }
+
+      const response = await sendAiChat({
+        dataScope: "full-app",
+        temperature: 0.3,
+        messages: [
+          { role: "system", content: SPACES_BRIEFING_PROMPT },
+          { role: "system", content: buildSpaceBriefingContext(spaces, signals) },
+          { role: "user", content: t("spaces.brief.aiUserPrompt") },
+        ],
+      });
+
+      setAiBriefing(parseAiBriefing(response.content, baselineBriefing));
       setAnalysisState("success");
       setLastAnalyzedAt(new Date());
-    }, 650);
+    } catch (error) {
+      setAnalysisState("baseline");
+      setAnalysisHint(t("spaces.brief.aiFallback", { reason: errorMessage(error) }));
+      setLastAnalyzedAt(new Date());
+    }
   }
 
   function resetAdd() {
@@ -513,42 +548,37 @@ export function SpacesPage({
         </label>
       </header>
 
-      <section className={analysisState === "success" ? "spc-brief analyzed" : "spc-brief"}>
+      <section className={effectiveAnalysisState === "success" ? "spc-brief analyzed" : "spc-brief"}>
         <div className="spc-brief-icon"><SparkIcon /></div>
         <div className="spc-brief-copy">
           <h2>{t("spaces.brief.title")}</h2>
-          {analysisState === "empty" ? (
+          {effectiveAnalysisState === "empty" ? (
             <>
               <strong>{t("spaces.brief.emptyTitle")}</strong>
               <p>{t("spaces.brief.emptyBody")}</p>
             </>
-          ) : analysisState === "loading" ? (
+          ) : effectiveAnalysisState === "loading" ? (
             <>
               <strong>{t("spaces.brief.loadingTitle")}</strong>
               <p>{t("spaces.brief.loadingBody")}</p>
             </>
-          ) : analysisState === "insufficient" ? (
-            <>
-              <strong>{t("spaces.brief.insufficientTitle")}</strong>
-              <p>{t("spaces.brief.insufficientBody")}</p>
-            </>
           ) : (
             <>
-              <strong>{t("spaces.brief.recommendPrefix")} <span>LeetCode</span> {t("spaces.brief.and")} <span>Personal App</span></strong>
-              <p>{t("spaces.brief.recommendBody")}</p>
+              <strong>{activeBriefing.headline}</strong>
+              <p>{[activeBriefing.body, analysisHint].filter(Boolean).join(" ")}</p>
             </>
           )}
         </div>
         <div className="spc-brief-actions">
-          {analysisState === "success" && lastAnalyzedAt ? <span>{formatAnalyzedAt(lastAnalyzedAt)}</span> : null}
-          <button type="button" className="spc-btn spc-btn-soft" onClick={() => setReasonOpen(true)} disabled={analysisState !== "success"}>
+          {effectiveAnalysisState !== "empty" && lastAnalyzedAt ? <span>{formatAnalyzedAt(lastAnalyzedAt)}</span> : null}
+          <button type="button" className="spc-btn spc-btn-soft" onClick={() => setReasonOpen(true)} disabled={effectiveAnalysisState === "empty" || effectiveAnalysisState === "loading"}>
             <InfoIcon /> {t("spaces.brief.whyThis")}
           </button>
-          <button type="button" className="spc-btn spc-btn-primary" onClick={() => setSignalsOpen(true)} disabled={analysisState !== "success"}>
+          <button type="button" className="spc-btn spc-btn-primary" onClick={() => setSignalsOpen(true)} disabled={signals.length === 0}>
             <SignalIcon /> {t("spaces.brief.viewSignals")}
           </button>
-          <button type="button" className="spc-btn" onClick={analyzeSpaces} disabled={analysisState === "loading"}>
-            <RefreshIcon /> {analysisState === "success" ? t("spaces.brief.refresh") : t("spaces.brief.analyze")}
+          <button type="button" className="spc-btn" onClick={analyzeSpaces} disabled={effectiveAnalysisState === "empty" || effectiveAnalysisState === "loading"}>
+            <RefreshIcon /> {effectiveAnalysisState === "success" ? t("spaces.brief.refresh") : t("spaces.brief.analyze")}
           </button>
         </div>
       </section>
@@ -641,9 +671,9 @@ export function SpacesPage({
       {reasonOpen ? (
         <SimpleModal title={t("spaces.reason.title")} onClose={() => setReasonOpen(false)}>
           <ul className="spc-reason-list">
-            <li>{t("spaces.reason.item1")}</li>
-            <li>{t("spaces.reason.item2")}</li>
-            <li>{t("spaces.reason.item3")}</li>
+            {reasonLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
           </ul>
         </SimpleModal>
       ) : null}
@@ -987,29 +1017,77 @@ function deriveStudySpaces(studyTopics: StudyTopic[], notes: ConceptNote[], t: T
 }
 
 function deriveSignals(spaces: Space[], tasks: Task[], notes: ConceptNote[], t: TFn): ActivitySignal[] {
-  const taskSignals = tasks.slice(0, 5).map((task, index): ActivitySignal => {
-    const space = spaces.find((item) => item.sourceId === task.projectId) ?? spaces[index % Math.max(spaces.length, 1)];
-    return {
-      id: `task-signal-${task.id}`,
-      title: task.title,
-      detail: task.status === "waiting" ? t("spaces.signalDetail.waiting") : task.priority === "high" ? t("spaces.signalDetail.highPriorityTask") : t("spaces.signalDetail.taskActivity"),
-      age: index < 2 ? t("spaces.time.minutesAgo", { n: 30 }) : t("spaces.time.hoursAgo", { n: index + 1 }),
-      severity: task.priority === "high" ? "High" : task.priority === "medium" ? "Medium" : "Low",
-      spaceId: space?.id ?? "space-personal-app-demo",
-    };
-  });
-  const noteSignals = notes.slice(0, 3).map((note, index): ActivitySignal => {
-    const space = spaces.find((item) => item.type === "study") ?? spaces[0];
-    return {
-      id: `note-signal-${note.id}`,
-      title: note.title,
-      detail: note.nextReviewDate ? t("spaces.signalDetail.review") : t("spaces.signalDetail.studyNote"),
-      age: t("spaces.time.hoursAgo", { n: index + 2 }),
-      severity: note.difficulty === "hard" ? "High" : note.difficulty === "medium" ? "Medium" : "Low",
-      spaceId: space?.id ?? "space-leetcode-demo",
-    };
-  });
+  const taskSignals = tasks
+    .filter((task) => task.status !== "archived" && task.projectId)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 5)
+    .flatMap((task): ActivitySignal[] => {
+      const space = spaces.find((item) => item.sourceRef === "project" && item.sourceId === task.projectId);
+      if (!space) return [];
+      return [{
+        id: `task-signal-${task.id}`,
+        title: task.title,
+        detail: task.status === "waiting" ? t("spaces.signalDetail.waiting") : task.priority === "high" ? t("spaces.signalDetail.highPriorityTask") : t("spaces.signalDetail.taskActivity"),
+        age: relativeUpdated(t, task.updatedAt),
+        severity: task.priority === "high" ? "High" : task.priority === "medium" ? "Medium" : "Low",
+        spaceId: space.id,
+      }];
+    });
+  const noteSignals = notes
+    .filter((note) => !note.deletedAt && note.topicId)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 3)
+    .flatMap((note): ActivitySignal[] => {
+      const space = spaces.find((item) => item.sourceRef === "study" && item.sourceId === note.topicId);
+      if (!space) return [];
+      return [{
+        id: `note-signal-${note.id}`,
+        title: note.title,
+        detail: note.nextReviewDate ? t("spaces.signalDetail.review") : t("spaces.signalDetail.studyNote"),
+        age: relativeUpdated(t, note.updatedAt),
+        severity: note.difficulty === "hard" ? "High" : note.difficulty === "medium" ? "Medium" : "Low",
+        spaceId: space.id,
+      }];
+    });
   return [...taskSignals, ...noteSignals];
+}
+
+function parseAiBriefing(content: string, fallback: SpaceBriefing): SpaceBriefing {
+  const jsonText = extractJsonObject(content);
+  if (!jsonText) return fallback;
+
+  try {
+    const parsed = JSON.parse(jsonText) as Partial<SpaceBriefing>;
+    const headline = typeof parsed.headline === "string" ? parsed.headline.trim() : "";
+    const body = typeof parsed.body === "string" ? parsed.body.trim() : "";
+    const detailLines = Array.isArray(parsed.detailLines)
+      ? parsed.detailLines.filter((line): line is string => typeof line === "string").map((line) => line.trim()).filter(Boolean).slice(0, 3)
+      : [];
+
+    if (!headline || !body) return fallback;
+    return {
+      headline,
+      body,
+      detailLines: detailLines.length > 0 ? detailLines : fallback.detailLines,
+      attentionSpaceIds: fallback.attentionSpaceIds,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function extractJsonObject(content: string) {
+  const trimmed = content.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced?.[1]?.trim() ?? trimmed;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  if (start < 0 || end <= start) return "";
+  return candidate.slice(start, end + 1);
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function validateDraft(draft: AddSpaceDraft, spaces: Space[], t: TFn) {

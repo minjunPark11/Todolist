@@ -4,10 +4,10 @@
 // anything — it only health-checks the user's own server.
 import { useEffect } from "react";
 import { platform } from "../../platform";
-import { findModelById } from "./modelCatalog";
+import { findModelById, LOCAL_MODEL_CATALOG } from "./modelCatalog";
 import { withTimeout } from "../ai/http";
 import { loadLocalAiSettings } from "./settings";
-import type { InstalledModelFile, LocalAiSettings } from "./types";
+import type { InstalledModelFile, LocalAiSettings, LocalModelOption } from "./types";
 
 // llama-server can take tens of seconds to load a multi-GB GGUF; /health
 // stays 503 until the model is ready.
@@ -77,17 +77,47 @@ async function waitForManagedReady(baseUrl: string, timeoutMs: number): Promise<
   return false;
 }
 
-// The installed file for the selected catalog model. Matching is by catalog
-// id prefix on the file name — the installer names files "<catalog-id>.gguf",
-// and manually placed files keep working as long as they follow the prefix.
+function catalogDownloadFileName(model: LocalModelOption): string {
+  if (!model.downloadUrl) return "";
+  try {
+    const pathname = new URL(model.downloadUrl).pathname;
+    return decodeURIComponent(pathname.split("/").pop() ?? "");
+  } catch {
+    return "";
+  }
+}
+
+export function installedFileMatchesModel(fileName: string, model: LocalModelOption): boolean {
+  const normalized = fileName.toLowerCase();
+  const catalogFileName = `${model.id}.gguf`.toLowerCase();
+  const sourceFileName = catalogDownloadFileName(model).toLowerCase();
+  return normalized === catalogFileName || normalized.startsWith(`${model.id.toLowerCase()}.`) || Boolean(sourceFileName && normalized === sourceFileName);
+}
+
+export function findInstalledFileForModel(model: LocalModelOption, installed: InstalledModelFile[]): InstalledModelFile | null {
+  return installed.find((file) => installedFileMatchesModel(file.fileName, model)) ?? null;
+}
+
+export function findFirstInstalledCatalogModel(
+  installed: InstalledModelFile[],
+): { model: LocalModelOption; file: InstalledModelFile } | null {
+  for (const model of LOCAL_MODEL_CATALOG) {
+    const file = findInstalledFileForModel(model, installed);
+    if (file) return { model, file };
+  }
+  return null;
+}
+
+// The installed file for the selected catalog model. Matching accepts both the
+// managed installer file name ("<catalog-id>.gguf") and the upstream GGUF file
+// name, so manually placed/downloaded models are still recognized.
 export function findInstalledModelFile(
   settings: LocalAiSettings,
   installed: InstalledModelFile[],
 ): InstalledModelFile | null {
   if (!settings.selectedModelId || !findModelById(settings.selectedModelId)) return null;
-  return (
-    installed.find((file) => file.fileName.toLowerCase().startsWith(settings.selectedModelId.toLowerCase())) ?? null
-  );
+  const model = findModelById(settings.selectedModelId);
+  return model ? findInstalledFileForModel(model, installed) : null;
 }
 
 export function isSelectedModelInstalled(settings: LocalAiSettings, installed: InstalledModelFile[]): boolean {
@@ -141,7 +171,9 @@ export async function ensureAiReady(settings: LocalAiSettings): Promise<EnsureAi
   }
 
   const installed = await platform.localAi.listInstalledModels().catch(() => []);
-  const installedFile = findInstalledModelFile(settings, installed);
+  const installedFile =
+    findInstalledModelFile(settings, installed) ??
+    (!settings.selectedModelId ? findFirstInstalledCatalogModel(installed)?.file ?? null : null);
   if (!installedFile) {
     return {
       ok: false,

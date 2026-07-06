@@ -4,7 +4,7 @@
 // leaves the device (KNOWLEDGE_BASE_DESIGN.md principles 9-10).
 import { platform } from "../../platform";
 import { withTimeout } from "../ai/http";
-import { findInstalledModelFile } from "../localAi/runtime";
+import { findFirstInstalledCatalogModel, findInstalledModelFile } from "../localAi/runtime";
 import { loadLocalAiSettings } from "../localAi/settings";
 import { findModelById } from "../localAi/modelCatalog";
 import { ensureAiReady } from "../localAi/runtime";
@@ -50,8 +50,11 @@ function normalizeEmbeddings(data: OpenAiEmbeddingResponse | null): number[][] |
 }
 
 async function resolveManagedEmbeddingModel(settings: LocalAiSettings): Promise<string | null> {
-  if (!settings.selectedModelId || !findModelById(settings.selectedModelId)) return null;
   const installed = await platform.localAi.listInstalledModels().catch(() => []);
+  if (!settings.selectedModelId) {
+    return findFirstInstalledCatalogModel(installed)?.model.id ?? null;
+  }
+  if (!findModelById(settings.selectedModelId)) return null;
   const file = findInstalledModelFile(settings, installed);
   return file ? settings.selectedModelId : null;
 }
