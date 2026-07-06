@@ -275,6 +275,8 @@ export interface AppSettings {
   showSidebarCounts: boolean;
   sidebarCollapsed: boolean;
   reduceMotion: boolean;
+  // Preferred local Ollama model. Empty string = use the build-time default.
+  aiModel: string;
 }
 
 export type RecentItemType = "task" | "project" | "topic" | "note";

@@ -604,6 +604,60 @@
   font-size: 13px;
   font-weight: 700;
 }
+.ollama-chat-modelbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ollama-chat-modelbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.ollama-chat-modelbar label span {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ollama-chat-modelbar select {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 6px 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ollama-chat-model-refresh {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
+  padding: 6px 9px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.ollama-chat-model-refresh:disabled {
+  opacity: 0.6;
+}
+.ollama-chat-status {
+  margin: 12px 16px 0;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
 .ollama-chat-messages {
   flex: 1;
   overflow-y: auto;

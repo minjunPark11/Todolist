@@ -8,6 +8,7 @@ export type PersonalAgentRequest = {
   messages: AiMessage[];
   contextText?: string;
   intent?: AgentIntent;
+  model?: string;
 };
 
 export type PersonalAgentResponse = AiChatResponse & {
@@ -20,12 +21,14 @@ export async function runPersonalAgent({
   messages,
   contextText,
   intent,
+  model,
 }: PersonalAgentRequest): Promise<PersonalAgentResponse> {
   const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
   const resolvedIntent = intent ?? detectAgentIntent(lastUserMessage?.content ?? "");
   const response = await sendAiChat({
     dataScope: contextText ? "full-app" : "compact",
     temperature: 0.2,
+    model,
     messages: [
       {
         role: "system",

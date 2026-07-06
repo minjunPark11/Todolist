@@ -22,6 +22,8 @@ export type AiChatRequest = {
   context?: AiAppContext;
   temperature?: number;
   dataScope?: "compact" | "full-app";
+  // Optional model override chosen by the user; falls back to provider default.
+  model?: string;
 };
 
 export type AiChatResponse = {
@@ -36,4 +38,6 @@ export type AiProvider = {
   isAvailable: () => Promise<boolean>;
   canHandleFullAppData?: () => boolean;
   chat: (request: AiChatRequest) => Promise<AiChatResponse>;
+  // Lists the models installed on the provider, when it can be introspected.
+  listModels?: () => Promise<string[]>;
 };

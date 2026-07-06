@@ -675,6 +675,11 @@ export const en: Dictionary = {
   "ai.provider.localOllama": "Local Ollama",
   "ai.provider.localFirst": "Local-first AI",
   "ai.suggestedActionsLabel": "AI suggested actions",
+  "ai.model.label": "Model",
+  "ai.model.auto": "Auto (default)",
+  "ai.model.loading": "Loading models…",
+  "ai.model.refresh": "Refresh model list",
+  "ai.status.offline": "Ollama is off. Start Ollama to use AI chat.",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "Previous",

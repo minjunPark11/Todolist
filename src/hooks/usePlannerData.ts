@@ -75,6 +75,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   showSidebarCounts: true,
   sidebarCollapsed: false,
   reduceMotion: false,
+  aiModel: "",
 };
 
 // Review interval (days) by difficulty. `mastered` clears the schedule.
@@ -417,6 +418,7 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
     showSidebarCounts: settings?.showSidebarCounts ?? DEFAULT_APP_SETTINGS.showSidebarCounts,
     sidebarCollapsed: settings?.sidebarCollapsed ?? DEFAULT_APP_SETTINGS.sidebarCollapsed,
     reduceMotion: settings?.reduceMotion ?? DEFAULT_APP_SETTINGS.reduceMotion,
+    aiModel: typeof settings?.aiModel === "string" ? settings.aiModel : DEFAULT_APP_SETTINGS.aiModel,
   };
 }
 

@@ -1,8 +1,9 @@
-import { FormEvent, KeyboardEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AgentActionPreview } from "./ai/AgentActionPreview";
 import type { AgentAction } from "../lib/ai/agent/actions";
 import { runPersonalAgent } from "../lib/ai/agent/personalAgent";
+import { listLocalAiModels } from "../lib/ai/gateway";
 import { detectAgentIntent, getIntentLabel, type AgentIntent } from "../lib/ai/agent/intent";
 import { buildAiContextText, type AiContextInput } from "../lib/ai/context/buildAiContext";
 import {
@@ -35,6 +36,8 @@ interface OllamaChatProps {
   calendarContext?: CalendarContextInput;
   aiContext?: Omit<AiContextInput, "calendarContextText">;
   onExecuteActions?: (actions: AgentAction[]) => ToolExecutionResult[];
+  aiModel?: string;
+  onChangeAiModel?: (model: string) => void;
 }
 
 function getProviderLabel(t: (key: string) => string, provider?: AiProviderName) {
@@ -44,10 +47,19 @@ function getProviderLabel(t: (key: string) => string, provider?: AiProviderName)
   return t("ai.provider.localFirst");
 }
 
-export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteActions }: OllamaChatProps = {}) {
+export function OllamaChat({
+  activePage,
+  calendarContext,
+  aiContext,
+  onExecuteActions,
+  aiModel = "",
+  onChangeAiModel,
+}: OllamaChatProps = {}) {
   const { t } = useT();
   const motionEnabled = useMotionEnabled();
   const [open, setOpen] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     createMessage("assistant", t("ai.greeting")),
   ]);
@@ -75,6 +87,25 @@ export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteAc
       return nextOpen;
     });
   }
+
+  async function loadModels() {
+    setModelsLoading(true);
+    try {
+      setModels(await listLocalAiModels());
+    } finally {
+      setModelsLoading(false);
+    }
+  }
+
+  // Refresh the installed-model list whenever the panel opens, so the dropdown
+  // reflects what Ollama currently has (and an empty list flags it as offline).
+  useEffect(() => {
+    if (open) {
+      void loadModels();
+    }
+  }, [open]);
+
+  const isOffline = open && !modelsLoading && models.length === 0;
 
   async function submit(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -104,6 +135,7 @@ export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteAc
         messages: [...chatHistory, { role: "user", content }],
         contextText: requestContextText,
         intent: nextIntent,
+        model: aiModel || undefined,
       });
       setProvider(response.provider);
       setIntent(response.intent);
@@ -202,6 +234,38 @@ export function OllamaChat({ activePage, calendarContext, aiContext, onExecuteAc
               <button type="button" aria-label={t("ai.closeChat")} onClick={() => setOpen(false)}>x</button>
             </div>
           </header>
+
+          <div className="ollama-chat-modelbar">
+            <label>
+              <span>{t("ai.model.label")}</span>
+              <select
+                value={aiModel}
+                onChange={(event) => onChangeAiModel?.(event.target.value)}
+                disabled={!onChangeAiModel || modelsLoading}
+              >
+                <option value="">{t("ai.model.auto")}</option>
+                {aiModel && !models.includes(aiModel) ? (
+                  <option value={aiModel}>{aiModel}</option>
+                ) : null}
+                {models.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="ollama-chat-model-refresh"
+              aria-label={t("ai.model.refresh")}
+              onClick={() => void loadModels()}
+              disabled={modelsLoading}
+            >
+              {modelsLoading ? "…" : "↻"}
+            </button>
+          </div>
+
+          {isOffline ? <div className="ollama-chat-status">{t("ai.status.offline")}</div> : null}
 
           <div className="ollama-chat-messages" role="log" aria-live="polite">
             {messages.map((message) => (

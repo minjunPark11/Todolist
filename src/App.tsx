@@ -1098,6 +1098,8 @@ export default function App() {
       />
       <OllamaChat
         activePage={activePage}
+        aiModel={appSettings.aiModel}
+        onChangeAiModel={(model) => planner.updateAppSettings({ aiModel: model })}
         aiContext={{
           currentPage: activePage,
           userId: planner.auth.userEmail || "local-user",

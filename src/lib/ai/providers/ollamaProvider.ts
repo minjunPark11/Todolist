@@ -11,6 +11,10 @@ type OllamaChatResponse = {
   error?: string;
 };
 
+type OllamaTagsResponse = {
+  models?: Array<{ name?: string; model?: string }>;
+};
+
 function getOllamaBaseUrl() {
   const configured = import.meta.env.VITE_OLLAMA_URL as string | undefined;
   return (configured?.trim() || DEFAULT_OLLAMA_URL).replace(/\/$/, "");
@@ -63,9 +67,30 @@ export const ollamaProvider: AiProvider = {
     }
   },
 
+  async listModels() {
+    const baseUrl = getOllamaBaseUrl();
+    const timeout = withTimeout(2500);
+
+    try {
+      const response = await platform.aiFetch(`${baseUrl}/api/tags`, {
+        method: "GET",
+        signal: timeout.signal,
+      });
+      if (!response.ok) return [];
+      const data = (await response.json().catch(() => null)) as OllamaTagsResponse | null;
+      return (data?.models ?? [])
+        .map((entry) => entry.name ?? entry.model ?? "")
+        .filter((name): name is string => name.length > 0);
+    } catch {
+      return [];
+    } finally {
+      timeout.clear();
+    }
+  },
+
   async chat(request: AiChatRequest): Promise<AiChatResponse> {
     const baseUrl = getOllamaBaseUrl();
-    const model = getOllamaModel();
+    const model = request.model?.trim() || getOllamaModel();
 
     const response = await platform.aiFetch(`${baseUrl}/api/chat`, {
       method: "POST",

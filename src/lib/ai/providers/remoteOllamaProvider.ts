@@ -67,7 +67,7 @@ export const remoteOllamaProvider: AiProvider = {
       throw new Error("Remote Ollama URL is not configured.");
     }
 
-    const model = getRemoteOllamaModel();
+    const model = request.model?.trim() || getRemoteOllamaModel();
     const response = await platform.aiFetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

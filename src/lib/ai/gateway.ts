@@ -39,3 +39,13 @@ export async function sendAiChat(request: AiChatRequest): Promise<AiChatResponse
       .join(" "),
   );
 }
+
+// Lists models installed on the local Ollama instance. Returns an empty array
+// when Ollama is offline or exposes no models, which the UI reads as "offline".
+export async function listLocalAiModels(): Promise<string[]> {
+  try {
+    return (await ollamaProvider.listModels?.()) ?? [];
+  } catch {
+    return [];
+  }
+}

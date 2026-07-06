@@ -675,6 +675,11 @@ export const ko: Dictionary = {
   "ai.provider.localOllama": "로컬 Ollama",
   "ai.provider.localFirst": "로컬 우선 AI",
   "ai.suggestedActionsLabel": "AI 제안 작업",
+  "ai.model.label": "모델",
+  "ai.model.auto": "자동 (기본)",
+  "ai.model.loading": "모델 불러오는 중…",
+  "ai.model.refresh": "모델 목록 새로고침",
+  "ai.status.offline": "Ollama가 꺼져 있어요. AI 챗을 쓰려면 Ollama를 켜주세요.",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "이전",
