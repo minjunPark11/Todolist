@@ -153,7 +153,7 @@ export const en: Dictionary = {
   "auth.refreshCloud": "Refresh cloud data",
   "auth.logOut": "Log out",
   "auth.migrationCount": "{{n}} local items can be uploaded.",
-  "auth.migrationBody": "Upload your existing localStorage data to Supabase. Matching ids are upserted to avoid duplicates.",
+  "auth.migrationBody": "Local data can be uploaded.",
   "auth.uploadLocal": "Upload local data",
   "auth.uploadSuccess": "Local data uploaded to Supabase.",
   "auth.uploadNoData": "No local data to upload.",

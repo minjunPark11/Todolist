@@ -153,7 +153,7 @@ export const ko: Dictionary = {
   "auth.refreshCloud": "클라우드 데이터 새로고침",
   "auth.logOut": "로그아웃",
   "auth.migrationCount": "로컬 항목 {{n}}개를 업로드할 수 있습니다.",
-  "auth.migrationBody": "기존 로컬 저장소 데이터를 Supabase에 업로드합니다. 같은 id는 덮어써서 중복을 방지합니다.",
+  "auth.migrationBody": "로컬 데이터를 업로드할 수 있습니다.",
   "auth.uploadLocal": "로컬 데이터 업로드",
   "auth.uploadSuccess": "로컬 데이터를 Supabase에 업로드했습니다.",
   "auth.uploadNoData": "업로드할 로컬 데이터가 없습니다.",

@@ -113,11 +113,6 @@ function isMissingRemoteTableError(error: unknown): boolean {
   );
 }
 
-function formatMissingRemoteTables(tables: Iterable<string>) {
-  const names = Array.from(tables);
-  return names.length ? ` Some cloud tables are local-only until Supabase migrations are applied: ${names.join(", ")}.` : "";
-}
-
 function createId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
@@ -649,7 +644,7 @@ export function usePlannerData() {
       return;
     }
 
-    setSyncStatus("Loading Supabase data...");
+    setSyncStatus("Syncing…");
     setSyncError("");
 
     try {
@@ -684,7 +679,7 @@ export function usePlannerData() {
 
       setDataState(normalizeData(partial));
       setRemoteLoaded(true);
-      setSyncStatus(`Synced with Supabase.${formatMissingRemoteTables(missingRemoteTablesRef.current)}`);
+      setSyncStatus("Synced");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not load Supabase data.";
       console.error("[Supabase] load failed:", error);
@@ -756,7 +751,7 @@ export function usePlannerData() {
       }
 
       setSyncError("");
-      setSyncStatus(`Synced with Supabase.${formatMissingRemoteTables(missingRemoteTablesRef.current)}`);
+      setSyncStatus("Synced");
     } catch (error) {
       setSyncError(error instanceof Error ? error.message : "Could not save Supabase data.");
       setSyncStatus("Supabase sync failed. Changes remain in localStorage.");
