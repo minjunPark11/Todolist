@@ -71,7 +71,6 @@ export interface PlatformLocalAi {
   // Returns the app-local models directory, creating it if needed.
   getModelsDir(): Promise<string>;
   listInstalledModels(): Promise<InstalledModelFile[]>;
-  // Phase 0 stub: always reports running=false until the sidecar ships.
   getRuntimeStatus(): Promise<LocalAiRuntimeStatus>;
   // Streams a GGUF into the models dir with resume + sha256 verification.
   // Resolves when the download finishes or was cancelled; rejects on failure

@@ -4,7 +4,7 @@
 // the same [KNOWLEDGE] block format via the shared assembler.
 import { platform } from "../../platform";
 import { assembleKnowledgeContext } from "./contextFormat";
-import { OllamaEmbeddingProvider } from "./embeddingProvider";
+import { createEmbeddingProvider, resolveEmbeddingStoreModelName } from "./embeddingProvider";
 import { KnowledgeStore, type StoredChunk } from "./knowledgeStore";
 import type { KnowledgeContextSource, KnowledgeSettings } from "./types";
 
@@ -60,7 +60,8 @@ export function rankChunksBySimilarity(chunks: StoredChunk[], queryEmbedding: nu
 // space than a freshly-embedded query, and cosine scores would be meaningless.
 async function getUsableStoredModel(store: KnowledgeStore, settings: KnowledgeSettings): Promise<string | null> {
   const storedModel = await store.getMeta("embedding_model");
-  if (!storedModel || storedModel !== settings.embeddingModel) return null;
+  const expectedModel = await resolveEmbeddingStoreModelName();
+  if (!storedModel || !expectedModel || storedModel !== expectedModel) return null;
   return storedModel;
 }
 
@@ -95,7 +96,7 @@ export function createRagRetrieverContextSource(getSettings: () => KnowledgeSett
       const storedModel = await getUsableStoredModel(store, settings);
       if (!storedModel) return null;
 
-      const provider = new OllamaEmbeddingProvider(storedModel);
+      const provider = createEmbeddingProvider(storedModel);
       if (!(await provider.isAvailable())) return null;
 
       let queryEmbedding: number[] | undefined;

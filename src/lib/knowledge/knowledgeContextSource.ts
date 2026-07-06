@@ -1,6 +1,6 @@
 // Lite/Full mode switch — the actual "선택 로직" from
 // KNOWLEDGE_BASE_DESIGN.md §4.8: "indexingMode === 'full' && store 준비됨
-// 이면 RAG, 아니면 Lite." This is the single entry point OllamaChat should
+// 이면 RAG, 아니면 Lite." This is the single entry point the AI chat should
 // use instead of reaching for either concrete source directly.
 import { createLiteFolderContextSource } from "./liteContextSource";
 import { createRagRetrieverContextSource } from "./ragContextSource";

@@ -2,14 +2,14 @@
 // and maintains the local sqlite index; does not perform retrieval (Phase 3).
 import { platform } from "../../platform";
 import { chunkMarkdownNote } from "./chunker";
-import { OllamaEmbeddingProvider } from "./embeddingProvider";
+import { createEmbeddingProvider } from "./embeddingProvider";
 import { KnowledgeStore } from "./knowledgeStore";
 import { parseMarkdownNote } from "./markdownParser";
 import { clearVaultScanCache, scanVault } from "./obsidianScanner";
 
 export class EmbeddingModelUnavailableError extends Error {
   constructor(readonly modelName: string) {
-    super(`Embedding model "${modelName}" is not installed. Run "ollama pull ${modelName}" and try again.`);
+    super(`Local AI embedding backend "${modelName}" is not ready. Install a Local AI model and try again.`);
     this.name = "EmbeddingModelUnavailableError";
   }
 }
@@ -53,13 +53,14 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 export async function runIndexing(store: KnowledgeStore, options: RunIndexOptions): Promise<RunIndexResult> {
-  const provider = new OllamaEmbeddingProvider(options.embeddingModel);
+  const provider = createEmbeddingProvider(options.embeddingModel);
   if (!(await provider.isAvailable())) {
     throw new EmbeddingModelUnavailableError(options.embeddingModel);
   }
 
+  const providerModel = provider.modelName();
   const storedModel = await store.getMeta("embedding_model");
-  const modelChanged = Boolean(storedModel) && storedModel !== options.embeddingModel;
+  const modelChanged = Boolean(storedModel) && storedModel !== providerModel;
   const forceFull = Boolean(options.forceFull) || modelChanged;
 
   options.onProgress?.({ phase: "scanning", processed: 0, total: 0 });
@@ -132,7 +133,7 @@ export async function runIndexing(store: KnowledgeStore, options: RunIndexOption
   }
 
   await store.setMeta("vault_path", options.vaultPath);
-  await store.setMeta("embedding_model", options.embeddingModel);
+  await store.setMeta("embedding_model", provider.modelName());
   if (provider.dimensions() !== null) {
     await store.setMeta("embedding_dimensions", String(provider.dimensions()));
   }

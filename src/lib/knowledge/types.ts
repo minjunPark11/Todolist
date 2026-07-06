@@ -9,8 +9,8 @@ export interface KnowledgeSettings {
   // "" = use the platform default (app data dir). See getDefaultKnowledgeDbPath.
   dbPath: string;
   indexingMode: KnowledgeIndexingMode;
-  // Full RAG only. Default favors Korean-language retrieval quality; the
-  // lighter "nomic-embed-text" is offered as an alternative in settings.
+  // Full RAG only. "local-ai" means the managed llama-server/OpenAI-compatible
+  // localhost endpoint selected in Local AI settings.
   embeddingModel: string;
   excludedFolders: string[];
   // Lite selection scoring hook; no UI yet (Phase 0), kept for forward
@@ -21,7 +21,7 @@ export interface KnowledgeSettings {
   lastIndexedAt: string;
 }
 
-export const DEFAULT_EMBEDDING_MODEL = "bge-m3";
+export const DEFAULT_EMBEDDING_MODEL = "local-ai";
 
 export const DEFAULT_KNOWLEDGE_SETTINGS: KnowledgeSettings = {
   enabled: false,
@@ -66,7 +66,7 @@ export function normalizeKnowledgeSettings(raw: unknown): KnowledgeSettings {
     indexingMode: value.indexingMode === "full" ? "full" : "lite",
     embeddingModel:
       typeof value.embeddingModel === "string" && value.embeddingModel.trim()
-        ? value.embeddingModel
+        ? normalizeEmbeddingModel(value.embeddingModel)
         : DEFAULT_KNOWLEDGE_SETTINGS.embeddingModel,
     excludedFolders: Array.isArray(value.excludedFolders)
       ? value.excludedFolders.filter((item): item is string => typeof item === "string")
@@ -80,4 +80,11 @@ export function normalizeKnowledgeSettings(raw: unknown): KnowledgeSettings {
         : DEFAULT_KNOWLEDGE_SETTINGS.knowledgeBudgetChars,
     lastIndexedAt: typeof value.lastIndexedAt === "string" ? value.lastIndexedAt : DEFAULT_KNOWLEDGE_SETTINGS.lastIndexedAt,
   };
+}
+
+function normalizeEmbeddingModel(model: string): string {
+  // Phase 5 migration: previous Full RAG settings pointed at Ollama model tags.
+  // The default path is now llama-server via Local AI settings.
+  if (model === "bge-m3" || model === "nomic-embed-text") return DEFAULT_EMBEDDING_MODEL;
+  return model;
 }

@@ -13,6 +13,10 @@ import type { InstalledModelFile, LocalAiSettings } from "./types";
 // stays 503 until the model is ready.
 const MANAGED_READY_TIMEOUT_MS = 60_000;
 const MANAGED_READY_POLL_INTERVAL_MS = 1_000;
+const MANAGED_IDLE_SHUTDOWN_MS = 10 * 60_000;
+
+let idleShutdownTimer: number | null = null;
+let lastManagedActivityAt = 0;
 
 export type EnsureAiReadyResult =
   | { ok: true; baseUrl: string }
@@ -89,6 +93,27 @@ export function managedBaseUrl(settings: LocalAiSettings): string {
   return `http://127.0.0.1:${settings.serverPort}`;
 }
 
+export function recordManagedLocalAiActivity(settings = loadLocalAiSettings()): void {
+  if (settings.launchMode === "external" || !platform.localAi.supported()) return;
+
+  lastManagedActivityAt = Date.now();
+  if (idleShutdownTimer !== null) {
+    window.clearTimeout(idleShutdownTimer);
+  }
+  idleShutdownTimer = window.setTimeout(() => {
+    const idleForMs = Date.now() - lastManagedActivityAt;
+    if (idleForMs < MANAGED_IDLE_SHUTDOWN_MS) {
+      idleShutdownTimer = window.setTimeout(() => {
+        idleShutdownTimer = null;
+        void platform.localAi.stopServer().catch(() => undefined);
+      }, MANAGED_IDLE_SHUTDOWN_MS - idleForMs);
+      return;
+    }
+    idleShutdownTimer = null;
+    void platform.localAi.stopServer().catch(() => undefined);
+  }, MANAGED_IDLE_SHUTDOWN_MS);
+}
+
 export async function ensureAiReady(settings: LocalAiSettings): Promise<EnsureAiReadyResult> {
   if (settings.launchMode === "external") {
     const baseUrl = settings.externalServerUrl.trim().replace(/\/$/, "");
@@ -124,12 +149,14 @@ export async function ensureAiReady(settings: LocalAiSettings): Promise<EnsureAi
   // port or on the one a previous start probed to (port conflicts, §7.5).
   const preferredUrl = managedBaseUrl(settings);
   if (await checkManagedHealth(preferredUrl)) {
+    recordManagedLocalAiActivity(settings);
     return { ok: true, baseUrl: preferredUrl };
   }
   const status = await platform.localAi.getRuntimeStatus().catch(() => null);
   if (status?.running && status.port) {
     const runningUrl = `http://127.0.0.1:${status.port}`;
     if (await waitForManagedReady(runningUrl, MANAGED_READY_TIMEOUT_MS)) {
+      recordManagedLocalAiActivity(settings);
       return { ok: true, baseUrl: runningUrl };
     }
   }
@@ -152,6 +179,7 @@ export async function ensureAiReady(settings: LocalAiSettings): Promise<EnsureAi
 
   const baseUrl = `http://127.0.0.1:${startedPort}`;
   if (await waitForManagedReady(baseUrl, MANAGED_READY_TIMEOUT_MS)) {
+    recordManagedLocalAiActivity(settings);
     return { ok: true, baseUrl };
   }
   return {

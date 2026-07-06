@@ -1,42 +1,16 @@
-// Full-mode embeddings: always the local Ollama instance (KNOWLEDGE_BASE_DESIGN.md
-// principles 9-10 — never a remote provider). See design §4.6.
-//
-// NOTE: chat no longer uses Ollama (the managed llama-server replaced it,
-// LOCAL_AI_SYSTEM_DESIGN.md Phase 4), but Full-mode embeddings still do until
-// the llama-server embedding backend lands (Phase 5). This module is the only
-// remaining Ollama dependency, so the base-URL helper lives here now.
-import { withTimeout } from "../ai/http";
+// Full-mode embeddings use the same local AI boundary as chat: managed
+// llama-server, or an explicitly configured localhost OpenAI-compatible
+// endpoint. Remote endpoints are rejected so Obsidian-derived text never
+// leaves the device (KNOWLEDGE_BASE_DESIGN.md principles 9-10).
 import { platform } from "../../platform";
+import { withTimeout } from "../ai/http";
+import { findInstalledModelFile } from "../localAi/runtime";
+import { loadLocalAiSettings } from "../localAi/settings";
+import { findModelById } from "../localAi/modelCatalog";
+import { ensureAiReady } from "../localAi/runtime";
+import type { LocalAiSettings } from "../localAi/types";
 
-const DEFAULT_OLLAMA_URL = "http://localhost:11434";
-
-function getOllamaBaseUrl() {
-  const configured = import.meta.env.VITE_OLLAMA_URL as string | undefined;
-  return (configured?.trim() || DEFAULT_OLLAMA_URL).replace(/\/$/, "");
-}
-
-// Lists models installed on the local Ollama instance so the Settings UI can
-// tell whether the configured embedding model is available. Empty array =
-// Ollama offline or no models.
-export async function listOllamaModels(): Promise<string[]> {
-  const baseUrl = getOllamaBaseUrl();
-  const timeout = withTimeout(2500);
-  try {
-    const response = await platform.aiFetch(`${baseUrl}/api/tags`, {
-      method: "GET",
-      signal: timeout.signal,
-    });
-    if (!response.ok) return [];
-    const data = (await response.json().catch(() => null)) as OllamaTagsResponse | null;
-    return (data?.models ?? [])
-      .map((entry) => entry.name ?? entry.model ?? "")
-      .filter((name): name is string => name.length > 0);
-  } catch {
-    return [];
-  } finally {
-    timeout.clear();
-  }
-}
+const EMBEDDING_TIMEOUT_MS = 60_000;
 
 export interface EmbeddingProvider {
   isAvailable(): Promise<boolean>;
@@ -45,81 +19,146 @@ export interface EmbeddingProvider {
   dimensions(): number | null;
 }
 
-type OllamaTagsResponse = {
-  models?: Array<{ name?: string; model?: string }>;
-};
-
-type OllamaEmbedResponse = {
+type OpenAiEmbeddingResponse = {
+  data?: Array<{ embedding?: number[] }>;
   embeddings?: number[][];
-  error?: string;
+  error?: { message?: string } | string;
 };
 
-// Ollama model names come back as e.g. "bge-m3:latest"; a bare configured
-// name ("bge-m3") should still match that installed tag. Exported so Settings
-// UI can check candidate embedding models against listOllamaModels() output.
-export function modelNameMatches(installedName: string, configuredName: string): boolean {
-  const installedBase = installedName.split(":")[0];
-  const configuredBase = configuredName.split(":")[0];
-  return installedBase === configuredBase;
+function isLocalHostname(hostname: string) {
+  return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
 }
 
-export class OllamaEmbeddingProvider implements EmbeddingProvider {
-  private model: string;
+function isLocalEndpoint(settings: LocalAiSettings): boolean {
+  if (settings.launchMode !== "external") return true;
+  try {
+    return isLocalHostname(new URL(settings.externalServerUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function errorMessageOf(data: OpenAiEmbeddingResponse | null): string | undefined {
+  if (!data?.error) return undefined;
+  return typeof data.error === "string" ? data.error : data.error.message;
+}
+
+function normalizeEmbeddings(data: OpenAiEmbeddingResponse | null): number[][] | null {
+  if (data?.embeddings) return data.embeddings;
+  const embeddings = data?.data?.map((item) => item.embedding).filter((item): item is number[] => Array.isArray(item));
+  return embeddings?.length ? embeddings : null;
+}
+
+async function resolveManagedEmbeddingModel(settings: LocalAiSettings): Promise<string | null> {
+  if (!settings.selectedModelId || !findModelById(settings.selectedModelId)) return null;
+  const installed = await platform.localAi.listInstalledModels().catch(() => []);
+  const file = findInstalledModelFile(settings, installed);
+  return file ? settings.selectedModelId : null;
+}
+
+async function resolveEmbeddingModel(settings: LocalAiSettings): Promise<string | null> {
+  if (!isLocalEndpoint(settings)) return null;
+  if (settings.launchMode === "external") {
+    return settings.selectedModelId || "local";
+  }
+  return resolveManagedEmbeddingModel(settings);
+}
+
+export async function resolveEmbeddingStoreModelName(): Promise<string | null> {
+  const settings = loadLocalAiSettings();
+  const model = await resolveEmbeddingModel(settings);
+  return model ? `local-ai:${model}` : null;
+}
+
+// Settings UI helper. A non-empty array means the local endpoint is configured
+// enough for Full RAG to try indexing; the actual /v1/embeddings call still
+// performs the definitive check.
+export async function listEmbeddingModels(): Promise<string[]> {
+  const settings = loadLocalAiSettings();
+  const model = await resolveEmbeddingModel(settings);
+  return model ? [model] : [];
+}
+
+export function modelNameMatches(installedName: string, configuredName: string): boolean {
+  if (configuredName === "local-ai") return installedName.length > 0;
+  return installedName === configuredName;
+}
+
+export class LlamaServerEmbeddingProvider implements EmbeddingProvider {
+  private configuredModel: string;
+  private resolvedModel: string | null = null;
+  private baseUrl: string | null = null;
   private dims: number | null = null;
 
   constructor(model: string) {
-    this.model = model;
+    this.configuredModel = model;
   }
 
   modelName() {
-    return this.model;
+    return this.resolvedModel ? `local-ai:${this.resolvedModel}` : this.configuredModel;
   }
 
   dimensions() {
     return this.dims;
   }
 
+  private async prepare(): Promise<boolean> {
+    const settings = loadLocalAiSettings();
+    if (!isLocalEndpoint(settings)) return false;
+
+    const model = await resolveEmbeddingModel(settings);
+    if (!model) return false;
+
+    const ready = await ensureAiReady(settings);
+    if (!ready.ok) return false;
+
+    this.resolvedModel = model;
+    this.baseUrl = ready.baseUrl.replace(/\/$/, "");
+    return true;
+  }
+
   async isAvailable(): Promise<boolean> {
-    const baseUrl = getOllamaBaseUrl();
-    const timeout = withTimeout(2500);
-    try {
-      const response = await platform.aiFetch(`${baseUrl}/api/tags`, {
-        method: "GET",
-        signal: timeout.signal,
-      });
-      if (!response.ok) return false;
-      const data = (await response.json().catch(() => null)) as OllamaTagsResponse | null;
-      const installedNames = (data?.models ?? []).map((entry) => entry.name ?? entry.model ?? "");
-      return installedNames.some((name) => modelNameMatches(name, this.model));
-    } catch {
-      return false;
-    } finally {
-      timeout.clear();
-    }
+    return this.prepare();
   }
 
   async embed(texts: string[]): Promise<number[][]> {
     if (!texts.length) return [];
-
-    const baseUrl = getOllamaBaseUrl();
-    const response = await platform.aiFetch(`${baseUrl}/api/embed`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: this.model, input: texts }),
-    });
-
-    const data = (await response.json().catch(() => null)) as OllamaEmbedResponse | null;
-    if (!response.ok) {
-      throw new Error(data?.error ?? `Ollama embedding request failed with status ${response.status}.`);
-    }
-    const embeddings = data?.embeddings;
-    if (!embeddings || embeddings.length !== texts.length) {
-      throw new Error("Ollama returned an unexpected embedding response.");
+    if (!(await this.prepare()) || !this.baseUrl || !this.resolvedModel) {
+      throw new Error("Local AI embedding backend is not ready. Install a local AI model and try again.");
     }
 
-    if (this.dims === null && embeddings[0]) {
-      this.dims = embeddings[0].length;
+    const timeout = withTimeout(EMBEDDING_TIMEOUT_MS);
+    try {
+      const response = await platform.aiFetch(`${this.baseUrl}/v1/embeddings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: timeout.signal,
+        body: JSON.stringify({
+          model: this.resolvedModel,
+          input: texts,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as OpenAiEmbeddingResponse | null;
+      if (!response.ok) {
+        throw new Error(errorMessageOf(data) ?? `Local AI embedding request failed with status ${response.status}.`);
+      }
+
+      const embeddings = normalizeEmbeddings(data);
+      if (!embeddings || embeddings.length !== texts.length) {
+        throw new Error("Local AI returned an unexpected embedding response.");
+      }
+
+      if (this.dims === null && embeddings[0]) {
+        this.dims = embeddings[0].length;
+      }
+      return embeddings;
+    } finally {
+      timeout.clear();
     }
-    return embeddings;
   }
+}
+
+export function createEmbeddingProvider(model: string): EmbeddingProvider {
+  return new LlamaServerEmbeddingProvider(model);
 }

@@ -1,11 +1,9 @@
 // Local AI system commands (see LOCAL_AI_SYSTEM_DESIGN.md).
 //
-// Scope so far: hardware profiling for model recommendation (Phase 0), the
-// app-local models directory and installed-model listing (Phase 0), and the
-// model downloader with resume/cancel/sha256 verification (Phase 2). The
-// llama-server sidecar (Phase 3) remains a TODO documented in the design doc
-// — no process spawning happens here yet. The only network access is the
-// model download itself, restricted to the host allowlist below.
+// Scope so far: hardware profiling and model recommendation, model
+// download/install/delete, and managed llama-server runtime for chat plus
+// embeddings. The only external network access here is model download,
+// restricted to the host allowlist below.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -93,6 +91,37 @@ fn available_disk_gb_for(path: &Path) -> Option<f64> {
         .map(|disk| bytes_to_gb(disk.available_space()))
 }
 
+fn detect_nvidia_gpu() -> Option<GpuInfo> {
+    let mut command = std::process::Command::new("nvidia-smi");
+    command.args([
+        "--query-gpu=name,memory.total",
+        "--format=csv,noheader,nounits",
+    ]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = command.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    let first_line = stdout.lines().find(|line| !line.trim().is_empty())?;
+    let mut parts = first_line.splitn(2, ',');
+    let name = parts.next()?.trim().to_string();
+    if name.is_empty() {
+        return None;
+    }
+    let vram_gb = parts
+        .next()
+        .and_then(|value| value.trim().parse::<f64>().ok())
+        .map(|mb| (mb / 1024.0 * 10.0).round() / 10.0);
+    Some(GpuInfo { name, vram_gb })
+}
+
 #[tauri::command]
 pub fn get_local_ai_hardware_profile(app: tauri::AppHandle) -> HardwareProfile {
     let mut system = System::new();
@@ -114,10 +143,10 @@ pub fn get_local_ai_hardware_profile(app: tauri::AppHandle) -> HardwareProfile {
         cpu_core_count,
         total_ram_gb: (total_ram_bytes > 0).then(|| bytes_to_gb(total_ram_bytes)),
         available_disk_gb,
-        // TODO(Phase 1+): GPU detection — wgpu adapter enumeration for the
-        // name, nvml-wrapper for NVIDIA VRAM. On Apple Silicon, unified
-        // memory means RAM already covers it. See LOCAL_AI_SYSTEM_DESIGN.md §3.
-        gpu: None,
+        // Phase 5: NVIDIA VRAM via nvidia-smi when available. Other GPUs fall
+        // back to RAM-based recommendation until a cross-platform detector is
+        // added.
+        gpu: detect_nvidia_gpu(),
     }
 }
 
@@ -248,11 +277,16 @@ fn emit_progress(app: &tauri::AppHandle, model_id: &str, received: u64, total: O
 // Feeds the bytes already present in the .partial file into the hasher so a
 // resumed download still produces the hash of the complete file.
 async fn hash_existing_partial(path: &Path, hasher: &mut Sha256) -> Result<u64, String> {
-    let mut file = tokio::fs::File::open(path).await.map_err(|error| error.to_string())?;
+    let mut file = tokio::fs::File::open(path)
+        .await
+        .map_err(|error| error.to_string())?;
     let mut buffer = vec![0u8; 1024 * 1024];
     let mut total = 0u64;
     loop {
-        let read = file.read(&mut buffer).await.map_err(|error| error.to_string())?;
+        let read = file
+            .read(&mut buffer)
+            .await
+            .map_err(|error| error.to_string())?;
         if read == 0 {
             break;
         }
@@ -320,7 +354,9 @@ async fn run_download(
             return Ok(DownloadOutcome::Cancelled);
         }
         let chunk = chunk.map_err(|error| error.to_string())?;
-        file.write_all(&chunk).await.map_err(|error| error.to_string())?;
+        file.write_all(&chunk)
+            .await
+            .map_err(|error| error.to_string())?;
         hasher.update(&chunk);
         received += chunk.len() as u64;
         if last_emit.elapsed() >= PROGRESS_EMIT_INTERVAL {
@@ -361,7 +397,9 @@ pub async fn download_local_ai_model(
     validate_sha256(&expected_sha256)?;
 
     let dir = models_dir_path(&app)?;
-    tokio::fs::create_dir_all(&dir).await.map_err(|error| error.to_string())?;
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|error| error.to_string())?;
     let final_path = dir.join(&file_name);
     let partial_path = dir.join(format!("{file_name}{PARTIAL_SUFFIX}"));
     if final_path.exists() {
@@ -370,7 +408,10 @@ pub async fn download_local_ai_model(
 
     let cancel = Arc::new(AtomicBool::new(false));
     {
-        let mut flags = state.cancel_flags.lock().map_err(|_| "download state poisoned")?;
+        let mut flags = state
+            .cancel_flags
+            .lock()
+            .map_err(|_| "download state poisoned")?;
         if flags.contains_key(&model_id) {
             return Err("This model is already being downloaded.".to_string());
         }
@@ -410,10 +451,14 @@ pub async fn delete_local_ai_model(app: tauri::AppHandle, file_name: String) -> 
     let final_path = dir.join(&file_name);
     let partial_path = dir.join(format!("{file_name}{PARTIAL_SUFFIX}"));
     if final_path.exists() {
-        tokio::fs::remove_file(&final_path).await.map_err(|error| error.to_string())?;
+        tokio::fs::remove_file(&final_path)
+            .await
+            .map_err(|error| error.to_string())?;
     }
     if partial_path.exists() {
-        tokio::fs::remove_file(&partial_path).await.map_err(|error| error.to_string())?;
+        tokio::fs::remove_file(&partial_path)
+            .await
+            .map_err(|error| error.to_string())?;
     }
     Ok(())
 }
@@ -467,7 +512,9 @@ fn resolve_server_binary(app: &tauri::AppHandle, override_path: &str) -> Result<
         if candidate.is_file() {
             return Ok(candidate);
         }
-        return Err(format!("llama-server binary not found at the configured path: {override_path}"));
+        return Err(format!(
+            "llama-server binary not found at the configured path: {override_path}"
+        ));
     }
 
     let managed = app
@@ -494,7 +541,9 @@ fn resolve_server_binary(app: &tauri::AppHandle, override_path: &str) -> Result<
 // until llama-server binds is acceptable for a localhost dev port.
 fn find_free_port(preferred: u16) -> Result<u16, String> {
     for offset in 0..=PORT_PROBE_RANGE {
-        let Some(port) = preferred.checked_add(offset) else { break };
+        let Some(port) = preferred.checked_add(offset) else {
+            break;
+        };
         if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
             return Ok(port);
         }
@@ -583,6 +632,10 @@ pub fn start_local_ai_server(
         .args(["--host", "127.0.0.1", "--port"])
         .arg(port.to_string())
         .args(["--ctx-size", "4096"])
+        // Phase 5: Full RAG uses OpenAI-compatible /v1/embeddings on this
+        // same local endpoint. llama-server rejects that endpoint unless
+        // embeddings support is enabled at startup.
+        .arg("--embeddings")
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
@@ -593,9 +646,12 @@ pub fn start_local_ai_server(
         command.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let child = command
-        .spawn()
-        .map_err(|error| format!("Failed to start llama-server ({}): {error}", binary.to_string_lossy()))?;
+    let child = command.spawn().map_err(|error| {
+        format!(
+            "Failed to start llama-server ({}): {error}",
+            binary.to_string_lossy()
+        )
+    })?;
 
     let status = LocalAiRuntimeStatus {
         running: true,

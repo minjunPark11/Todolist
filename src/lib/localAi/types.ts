@@ -13,8 +13,8 @@ export interface HardwareProfile {
   cpuCoreCount: number; // logical cores
   totalRamGb: number | null; // null = detection failed → conservative pick
   availableDiskGb: number | null; // free space on the models-dir disk
-  // TODO(Phase 1+): GPU detection (wgpu adapter name, NVML VRAM). Always null
-  // from the current Rust command — see LOCAL_AI_SYSTEM_DESIGN.md §3.
+  // Phase 5: NVIDIA VRAM is detected via nvidia-smi when available. Other
+  // GPUs remain null until a cross-platform detector lands.
   gpu: { name: string; vramGb: number | null } | null;
 }
 
@@ -57,8 +57,6 @@ export interface InstalledModelFile {
   modifiedAt: number; // epoch ms, 0 when unknown
 }
 
-// Stub until Phase 3 wires the actual sidecar (LOCAL_AI_SYSTEM_DESIGN.md §7):
-// the Rust command currently always reports running=false.
 export interface LocalAiRuntimeStatus {
   running: boolean;
   pid: number | null;

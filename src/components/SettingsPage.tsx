@@ -16,7 +16,7 @@ import type {
   LocalModelOption,
   ModelDownloadProgress,
 } from "../lib/localAi/types";
-import { listOllamaModels, modelNameMatches } from "../lib/knowledge/embeddingProvider";
+import { listEmbeddingModels, modelNameMatches, resolveEmbeddingStoreModelName } from "../lib/knowledge/embeddingProvider";
 import { EmbeddingModelUnavailableError, runIndexing, type IndexProgress } from "../lib/knowledge/indexer";
 import { KnowledgeStore, type IndexStats } from "../lib/knowledge/knowledgeStore";
 import type { KnowledgeSettings } from "../lib/knowledge/types";
@@ -541,9 +541,9 @@ function KnowledgeSettingsTab({
   async function loadInstalledModels() {
     setModelsLoading(true);
     try {
-      // Full-mode embeddings still run on Ollama until the llama-server
-      // embedding backend lands (LOCAL_AI_SYSTEM_DESIGN.md Phase 5).
-      setInstalledModels(await listOllamaModels());
+      const [models, expected] = await Promise.all([listEmbeddingModels(), resolveEmbeddingStoreModelName()]);
+      setInstalledModels(models);
+      setExpectedEmbeddingModel(expected);
     } finally {
       setModelsLoading(false);
     }
@@ -577,11 +577,13 @@ function KnowledgeSettingsTab({
   }, [vaultReady]);
 
   const modelInstalled = installedModels.some((name) => modelNameMatches(name, settings.embeddingModel));
+  const [expectedEmbeddingModel, setExpectedEmbeddingModel] = useState<string | null>(null);
   const reindexNeeded =
     vaultReady &&
     settings.indexingMode === "full" &&
     !statsLoading &&
-    ((indexStats?.chunkCount ?? 0) === 0 || (storedEmbeddingModel !== null && storedEmbeddingModel !== settings.embeddingModel));
+    ((indexStats?.chunkCount ?? 0) === 0 ||
+      (storedEmbeddingModel !== null && expectedEmbeddingModel !== null && storedEmbeddingModel !== expectedEmbeddingModel));
 
   async function handlePickFolder() {
     setPickError("");
@@ -762,8 +764,7 @@ function KnowledgeSettingsTab({
               onChange={(event) => updateSettings({ embeddingModel: event.target.value })}
               disabled={modelsLoading}
             >
-              <option value="bge-m3">bge-m3</option>
-              <option value="nomic-embed-text">nomic-embed-text</option>
+              <option value="local-ai">{t("settings.knowledge.localAiEmbedding")}</option>
             </select>
             <button
               type="button"

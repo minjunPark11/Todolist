@@ -28,7 +28,7 @@ Focus Todo 앱
 
 | # | 원칙 |
 |---|------|
-| 1 | **Ollama 의존 없음.** 정식 경로는 `llama.cpp`의 `llama-server`를 Tauri sidecar로 자동 실행하는 것이다. Ollama 전용 chat provider는 Phase 4에서 제거했고, 외부 서버 연결은 일반 OpenAI 호환 서버(LM Studio, LocalAI 등)로 통일했다. (예외: Full RAG 임베딩은 Phase 5까지 Ollama 사용 — §8) |
+| 1 | **Ollama 의존 없음.** 정식 경로는 `llama.cpp`의 `llama-server`를 Tauri sidecar로 자동 실행하는 것이다. Ollama 전용 chat provider는 Phase 4에서 제거했고, Full RAG 임베딩도 Phase 5에서 `llama-server` `/v1/embeddings`로 전환했다. 외부 서버 연결은 일반 OpenAI 호환 서버(LM Studio, LocalAI 등)로 통일한다. |
 | 2 | **모델 파일은 앱 설치 파일에 포함하지 않는다.** GGUF는 앱 내 모델 설치 화면에서 다운로드하고, OS별 앱 로컬 데이터 폴더에 저장한다. |
 | 3 | **llama-server 바이너리는 sidecar로 포함할 수 있게 설계만 한다.** 실제 바이너리는 git에 커밋하지 않는다 (§7). |
 | 4 | **AI는 앱 시작 시 무조건 켜지 않는다.** 기본값은 "AI 기능 사용 시 자동 실행(on-demand)"이며, "앱 시작 시 미리 실행", "외부 서버 연결"은 옵션이다. |
@@ -82,7 +82,7 @@ Focus Todo 앱
 │    → http://127.0.0.1:<port>/v1/chat/completions (OpenAI 호환)               │
 └──────────────────────────────────────────────────────────────────────────────┘
 
-외부 서버 연결 모드(옵션): Ollama(11434) / LM Studio(1234) / LocalAI 등
+외부 서버 연결 모드(옵션): LM Studio(1234) / LocalAI 등 OpenAI 호환 서버
 사용자가 직접 띄운 서버 URL로 같은 인터페이스를 통해 연결.
 ```
 
@@ -286,7 +286,7 @@ externalBin/리소스 번들링은 **추가적인** 패키징 단계로 남는�
 |------|----|------|
 | 필요할 때 자동 실행 (기본) | `on-demand` | AI 기능 첫 사용 시 ensureAiReady()가 spawn |
 | 앱 시작 시 미리 실행 | `on-app-start` | 앱 부팅 후 백그라운드 spawn (모델 로딩 선반영) |
-| 외부 서버에 연결 | `external` | spawn 안 함. externalServerUrl로 연결 (Ollama/LM Studio/LocalAI) |
+| 외부 서버에 연결 | `external` | spawn 안 함. externalServerUrl로 연결 (LM Studio/LocalAI 등 OpenAI 호환 서버) |
 
 ### 기존 provider 체인과의 통합 (Phase 4 — 구현됨)
 
@@ -305,7 +305,8 @@ llamaServer(관리형 sidecar, 또는 external 모드의 OpenAI 호환 서버) �
 - 채팅의 모델 선택 UI(Ollama 태그 목록)는 제거 — 관리형에선 모델이 Local AI
   설정(selectedModelId)에서 정해진다. `appSettings.aiModel`은 sync 스키마
   호환을 위해 필드만 남긴 레거시.
-- Full RAG 임베딩(`embeddingProvider.ts`)만 Phase 5까지 Ollama에 남는다.
+- Full RAG 임베딩(`embeddingProvider.ts`)도 Phase 5에서 로컬 `llama-server`
+  `/v1/embeddings`로 전환했다.
 
 ---
 
@@ -316,15 +317,16 @@ llamaServer(관리형 sidecar, 또는 external 모드의 OpenAI 호환 서버) �
 - Lite: `src/lib/knowledge/liteContextSource.ts` — 파일명/제목/heading/tag
   키워드 매칭 + 최근 수정순. (이미 구현됨)
 - Full RAG: `src/lib/knowledge/ragContextSource.ts` + `embeddingProvider.ts` —
-  현재 Ollama 임베딩(`bge-m3` 기본, `nomic-embed-text` 대안)에 의존.
+  로컬 `llama-server` 또는 localhost OpenAI 호환 endpoint의 `/v1/embeddings`에 의존.
 - 오늘 브리핑/작업 쪼개기 프롬프트는 `src/lib/ai/context/buildAiContext.ts`의
   Todo/Calendar/Focus 컨텍스트 + `knowledgeContext`를 조합한다.
 
-**managed 런타임 전환 시 열린 항목 (Phase 5)**:
-- llama-server는 `--embedding` 플래그로 임베딩 서버가 될 수 있으나 chat 모델과
-  별개 프로세스/모델(GGUF 임베딩 모델)이 필요하다.
-- 방향: `embeddingProvider.ts`에 llama-server 백엔드를 추가하고, 임베딩 모델이
-  설치되지 않았으면 **색인을 막고 설치 안내** (기존 Ollama 경로도 옵션으로 유지).
+**Phase 5 반영**:
+- managed `llama-server`는 `--embeddings` 플래그로 시작해 OpenAI 호환
+  `/v1/embeddings`를 제공한다.
+- `embeddingProvider.ts`는 Local AI 설정의 선택 모델을 사용한다. external mode는
+  localhost/127.0.0.1/[::1]일 때만 허용한다.
+- 기존 `bge-m3`/`nomic-embed-text` Ollama 설정은 `local-ai`로 migration한다.
 - 인덱스는 기존 SQLite(knowledge_index.db) 구조 유지.
 
 ---
@@ -400,14 +402,199 @@ OS · RAM · CPU(코어) · GPU(감지 시) · 저장공간 · **추천 모델 �
 | **2** | ModelInstaller: Rust 다운로드 command (진행률 event, 이어받기, sha256), 다운로드 UI, 카탈로그 URL/해시 확정 | ✅ 다운로드 인프라 완료 · URL/해시는 여전히 TODO(release) — 해시 없는 모델은 다운로드 버튼이 비활성 |
 | **3** | sidecar: spawn/health/종료 정리, 포트 충돌 처리 (런타임 바이너리 해석 방식 — §7) | ✅ 런타임 완료 · 바이너리 자동 설치/패키징은 후속 |
 | **4** | `llamaServerProvider` 추가 + gateway 체인 선두 배치, Ollama chat provider 제거 (외부 연결은 OpenAI 호환으로 통일) | ✅ |
-| **5** | 임베딩 llama-server 백엔드(Full RAG), 유휴 자동 종료, NVIDIA VRAM 감지 | |
+| **5** | 아키텍처 전환 완료: 임베딩 llama-server 백엔드(Full RAG), Ollama 의존 제거/격리, 유휴 자동 종료, NVIDIA VRAM 감지 | ✅ 구현 |
+| **6** | 기존 배포 앱 통합 릴리스: llama-server 바이너리 확보/검증/설치, 모델 카탈로그 URL·sha256 확정, feature gate, 업데이트 호환성 | 설계 |
+| **7** | 실제 기기 QA + staged rollout: Windows 기준 smoke/e2e, 저사양/중간/고사양 프로파일, 성능·메모리·전력 기준선, rollback 기준 | 설계 |
+| **8** | 운영 안정화: 진단 로그(민감정보 제외), 복구/재설치 플로우, 사용자 지원 문서, 기본 공개 전환 | 설계 |
+| **9** | 제품 확장(선택): 모델/프롬프트 품질 튜닝, 고급 RAG 검색, 멀티 모델 프로필, GPU 가속 고도화 | 후보 |
 
-각 Phase는 독립적으로 출시 가능하다 — Phase 2까지만 나가도 "모델 준비"가 되고,
-사용자는 그동안 외부 서버 모드로 기능을 쓸 수 있다.
+Phase 5가 **로컬 AI 아키텍처 전환의 마지막 단계**다. Phase 6 이후는 새 앱을
+처음 배포하는 단계가 아니라, **이미 배포 중인 FocusFlow 0.2.x 계열 앱에 Local AI를
+안전하게 붙이는 통합 릴리스 단계**다. 기능 확장보다 기존 사용자 데이터 보존,
+점진 공개, 업데이트 실패 복구, 롤백 가능성을 우선한다.
 
 ---
 
-## 13. 이번 커밋(Phase 0)에서 의도적으로 하지 않은 것
+## 13. Phase 5 이후 설계
+
+### 13.1 Phase 5 완료 기준 — 아키텍처 전환 종료
+
+Phase 5가 끝나면 "Ollama에서 llama-server로 전환" 프로젝트는 완료로 본다.
+
+완료 조건:
+
+- 채팅: `llamaServerProvider → serverProvider` 체인 유지. Ollama chat provider 없음.
+- Full RAG 임베딩: `llama-server` 임베딩 backend 사용.
+- `src/lib/knowledge/embeddingProvider.ts`의 Ollama 경로는 제거하거나
+  legacy/manual 옵션으로 격리하고 기본 경로에서 제외.
+- Local AI 설정에서 chat 모델과 embedding 모델 설치 상태를 구분해 표시.
+- 유휴 자동 종료: 일정 시간 AI 요청이 없으면 managed `llama-server` 종료.
+- NVIDIA VRAM 감지: 가능하면 VRAM 기반 추천, 실패 시 RAM 기반 추천으로 조용히 fallback.
+- 문서/문구: "Ollama 필요" 안내가 기본 UX에 남지 않음.
+
+비목표:
+
+- 클라우드 LLM provider 직접 연동.
+- 사용자 노트/프롬프트의 원격 전송.
+- 앱 설치 파일에 GGUF 모델 번들링.
+
+### 13.2 Phase 6 — 기존 배포 앱 통합 릴리스
+
+목표: 현재 배포 채널(Tauri updater + GitHub Releases)을 유지하면서, 사용자가
+별도로 llama.cpp를 찾지 않아도 Local AI를 준비할 수 있게 한다. 기존 사용자에게는
+업데이트 후에도 현재 Todo/Calendar/Knowledge 데이터가 그대로 유지되어야 한다.
+
+릴리스 원칙:
+
+- Local AI는 기존 앱 기능을 대체하지 않는 **옵트인 기능**으로 들어간다.
+- 업데이트 직후 AI 런타임이나 모델 다운로드를 자동으로 시작하지 않는다.
+- 기존 사용자의 `appSettings`, Supabase 동기화 데이터, Obsidian 설정은 migration 없이
+  그대로 읽혀야 한다.
+- `focusflow.localAi.v1`은 새 local-only storage 키로 추가하고, 없으면 기본값을 생성한다.
+- 문제가 생겨도 기존 Todo/Calendar/Study 기능은 계속 사용할 수 있어야 한다.
+
+결정할 것:
+
+| 항목 | 방향 |
+|------|------|
+| llama-server 배포 | llama.cpp 공식 릴리스에서 OS/arch별 바이너리 취득. 버전·sha256을 릴리스 manifest에 기록 |
+| 설치 위치 | `<app-local-data>/bin/llama-server(.exe)` 우선. git에는 커밋하지 않음 |
+| 설치 방식 | 앱 내 "로컬 AI 런타임 설치" 버튼 또는 첫 모델 설치 시 함께 설치 |
+| 검증 | 다운로드 allowlist + sha256 검증. 실패 파일 삭제 |
+| Windows DLL | zip에 동반되는 DLL 누락 여부 검사. 누락 시 명확한 복구 안내 |
+| 앱 업데이트 | `package.json`, `src-tauri/Cargo.toml`, `tauri.conf.json` 버전 동기화. updater artifact와 `latest.json` 생성 |
+| 런타임 업데이트 | 새 런타임 버전이 있으면 기존 프로세스 종료 후 교체. 실패 시 이전 버전 유지 |
+| 기능 공개 | 첫 릴리스는 설정 탭에서 opt-in. 기본 자동 실행은 꺼짐 |
+
+모델 카탈로그:
+
+- 공식 GGUF URL과 expectedSha256을 채운다.
+- 카탈로그 항목은 `id`, `fileName`, `sizeGb`, `ramRequiredGb`, `contextLength`,
+  `downloadUrl`, `expectedSha256`, `licenseNote`를 명시한다.
+- 해시가 없는 항목은 다운로드 버튼을 비활성화한다.
+- Hugging Face 접근 실패, 중단, 재시도, 디스크 부족을 각각 다른 메시지로 안내한다.
+
+기존 배포 앱 체크:
+
+- updater가 기존 설치본에서 새 버전으로 정상 업데이트되는지 확인한다.
+- 업데이트 후 기존 localStorage/Supabase 데이터가 유지되는지 확인한다.
+- Local AI 설정 키가 없던 사용자에게 기본값이 생성되는지 확인한다.
+- Local AI를 한 번도 켜지 않은 사용자의 앱 시작 시간과 메모리 사용량이 크게 늘지 않아야 한다.
+- 문제가 있으면 Local AI UI만 숨기거나 비활성화할 수 있는 feature gate를 둔다.
+
+### 13.3 Phase 7 — 실제 기기 QA와 staged rollout
+
+목표: "내 PC에서 켜진다"가 아니라 "예상 가능한 속도와 실패 방식으로 동작한다"를 확인한다.
+
+테스트 매트릭스:
+
+| 프로파일 | 예시 기준 | 기대 |
+|----------|-----------|------|
+| 저사양 | 8GB RAM, 내장 GPU | 가장 작은 모델 추천, 다운로드/실행 실패 시 친절한 안내 |
+| 중간 | 16GB RAM | 기본 추천 모델 설치·채팅 가능 |
+| 고사양 | 32GB+ RAM, NVIDIA GPU | 더 큰 모델 추천, VRAM 감지 표시 |
+| 오프라인 | 네트워크 없음 | 이미 설치된 모델은 사용, 신규 다운로드는 재시도 안내 |
+| 디스크 부족 | 모델 저장 공간 부족 | 다운로드 시작 전 또는 중간에 중단 + 정리 안내 |
+
+측정 항목:
+
+- 첫 응답까지 걸리는 시간(모델 로드 포함/제외).
+- 유휴 자동 종료 후 재시작 시간.
+- 메모리 사용량 상한.
+- Full RAG 색인 시간과 chunk 수.
+- embedding retrieval latency.
+
+검증 명령:
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run build
+cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+릴리스 후보는 최소 1회 Tauri dev 실행과 패키징 빌드 smoke test를 통과해야 한다.
+
+점진 공개:
+
+| 단계 | 대상 | 기준 |
+|------|------|------|
+| 내부 테스트 | 개발자/테스트 기기 | 설치·업데이트·모델 다운로드·채팅 smoke 통과 |
+| 제한 공개 | opt-in 사용자 | 치명적 crash 없음, 기존 기능 회귀 없음 |
+| 기본 노출 | 전체 사용자 | 복구 UX와 지원 문서 준비, 모델/런타임 다운로드 안정화 |
+
+롤백 기준:
+
+- 앱 시작 crash 또는 updater 실패.
+- 기존 데이터 로딩/동기화 회귀.
+- Local AI 비사용자에게도 성능 저하가 명확한 경우.
+- 다운로드 검증 우회, 원격 context 유출 가능성 등 보안 이슈.
+
+롤백 방식:
+
+- 앱 버전 롤백보다 먼저 feature gate로 Local AI 진입점을 비활성화한다.
+- 모델/런타임 파일은 사용자 데이터 폴더에 남겨두되 자동 실행은 중지한다.
+- 데이터 migration은 되돌릴 필요가 없도록 additive-only로 설계한다.
+
+### 13.4 Phase 8 — 운영 안정화와 복구 UX
+
+목표: 기존 배포 앱의 일부 기능으로 운영될 때, 실패했을 때 사용자가 원인을 이해하고
+복구할 수 있게 한다.
+
+진단 정보:
+
+- runtime 상태: running/pid/port/model/backend version.
+- 모델 설치 상태: fileName/size/hash 검증 여부.
+- 최근 오류 코드: download_failed, checksum_mismatch, runtime_missing,
+  runtime_crashed, model_load_timeout, embedding_model_missing.
+- 민감정보 제외: 프롬프트, 노트 원문, 파일 본문, Supabase 데이터는 로그에 남기지 않는다.
+
+복구 플로우:
+
+- "런타임 다시 설치"
+- "모델 파일 검증"
+- "부분 다운로드 삭제"
+- "로컬 AI 설정 초기화"
+- "외부 서버 모드로 임시 전환"
+
+업데이트 호환성:
+
+- `focusflow.localAi.v1` schemaVersion을 도입한다.
+- 구버전 설정은 migration 함수에서 보정한다.
+- 모델 파일은 가능한 한 재다운로드 없이 재사용한다.
+- 바이너리와 모델 호환 문제가 있으면 런타임만 교체하고 모델은 보존한다.
+- 앱 버전과 Local AI runtime/model catalog 버전은 별도로 기록한다.
+- 앱 updater 실패가 Local AI 파일을 훼손하지 않아야 하고, Local AI 파일 손상이 앱
+  updater를 막지 않아야 한다.
+
+지원 문서:
+
+- "로컬 AI를 처음 켜는 법"
+- "모델 다운로드가 실패할 때"
+- "`llama-server` 런타임 다시 설치"
+- "기기 사양이 낮을 때 추천 설정"
+- "외부 서버 모드로 임시 사용"
+- "로컬 AI 파일을 삭제하고 초기화"
+
+### 13.5 Phase 9 — 선택 확장
+
+Phase 9는 필수가 아니라 제품 판단에 따라 고르는 후보군이다.
+
+- 모델별 프롬프트/temperature/context-size 프로필.
+- embedding rerank 또는 hybrid search(BM25 + vector).
+- sqlite-vec 도입.
+- 작업 유형별 모델 선택: 빠른 분류 모델, 긴 글 모델, 임베딩 모델 분리.
+- GPU backend 선택/표시: Vulkan/CUDA/Metal 등 플랫폼별 고도화.
+- 레거시 이름 정리: `OllamaChat` → `AiChat`, `ollama-chat-*` → `ai-chat-*`.
+- Local AI health dashboard.
+
+Phase 9에 들어가기 전 기준:
+
+- Phase 6~8에서 다운로드, 실행, 복구, 업데이트 플로우가 안정화되어 있어야 한다.
+- 새 확장은 기본 프라이버시 원칙(로컬 우선, 원격 유출 금지)을 약화하지 않아야 한다.
+
+---
+
+## 14. 이번 커밋(Phase 0)에서 의도적으로 하지 않은 것
 
 | 항목 | 이유 |
 |------|------|

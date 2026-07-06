@@ -91,7 +91,10 @@ fn tray_icon_image() -> Image<'static> {
     Image::new_owned(rgba, 32, 32)
 }
 
-fn build_tray_menu(app: &tauri::AppHandle, snapshot: Option<&FocusTraySnapshot>) -> tauri::Result<Menu<tauri::Wry>> {
+fn build_tray_menu(
+    app: &tauri::AppHandle,
+    snapshot: Option<&FocusTraySnapshot>,
+) -> tauri::Result<Menu<tauri::Wry>> {
     let summary = current_focus_summary(snapshot);
     let has_focus = snapshot.map(has_active_focus).unwrap_or(false);
     let toggle_label = match snapshot {
@@ -99,7 +102,13 @@ fn build_tray_menu(app: &tauri::AppHandle, snapshot: Option<&FocusTraySnapshot>)
         _ => "Pause",
     };
     let status_item = MenuItem::with_id(app, "focus-status", summary, false, None::<&str>)?;
-    let toggle_item = MenuItem::with_id(app, MENU_TOGGLE_FOCUS, toggle_label, has_focus, None::<&str>)?;
+    let toggle_item = MenuItem::with_id(
+        app,
+        MENU_TOGGLE_FOCUS,
+        toggle_label,
+        has_focus,
+        None::<&str>,
+    )?;
     let finish_item = MenuItem::with_id(app, MENU_FINISH_FOCUS, "Finish", has_focus, None::<&str>)?;
     let show_item = MenuItem::with_id(app, MENU_SHOW, "Open FocusFlow", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, MENU_QUIT, "Quit", true, None::<&str>)?;
@@ -217,7 +226,10 @@ fn update_focus_tray(app: tauri::AppHandle, state: State<AppState>, snapshot: Fo
     };
 
     {
-        let mut current = state.focus_snapshot.lock().expect("focus tray state poisoned");
+        let mut current = state
+            .focus_snapshot
+            .lock()
+            .expect("focus tray state poisoned");
         *current = snapshot.clone();
     }
 
@@ -231,7 +243,10 @@ fn update_focus_tray(app: tauri::AppHandle, state: State<AppState>, snapshot: Fo
 #[tauri::command]
 fn clear_focus_tray(app: tauri::AppHandle, state: State<AppState>) {
     {
-        let mut current = state.focus_snapshot.lock().expect("focus tray state poisoned");
+        let mut current = state
+            .focus_snapshot
+            .lock()
+            .expect("focus tray state poisoned");
         *current = None;
     }
     refresh_tray(&app, None);
