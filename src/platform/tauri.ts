@@ -18,7 +18,13 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { MiniFocusTimerSnapshot } from "../lib/miniFocusTimer";
-import type { HardwareProfile, InstalledModelFile, LocalAiRuntimeStatus } from "../lib/localAi/types";
+import type {
+  HardwareProfile,
+  InstalledModelFile,
+  LocalAiRuntimeStatus,
+  ModelDownloadOutcome,
+  ModelDownloadProgress,
+} from "../lib/localAi/types";
 import { webPlatform } from "./web";
 import type {
   FocusTrayActionPayload,
@@ -266,6 +272,29 @@ export const tauriPlatform: PlatformAdapter = {
 
     async getRuntimeStatus() {
       return invoke<LocalAiRuntimeStatus>("get_local_ai_runtime_status");
+    },
+
+    async downloadModel(request) {
+      return invoke<ModelDownloadOutcome>("download_local_ai_model", {
+        modelId: request.modelId,
+        url: request.url,
+        expectedSha256: request.expectedSha256,
+        fileName: request.fileName,
+      });
+    },
+
+    async cancelDownload(modelId) {
+      await invoke("cancel_local_ai_download", { modelId });
+    },
+
+    async deleteModel(fileName) {
+      await invoke("delete_local_ai_model", { fileName });
+    },
+
+    async subscribeDownloadProgress(handler) {
+      return listen<ModelDownloadProgress>("local-ai://download-progress", (event) => {
+        handler(event.payload);
+      });
     },
   },
 };

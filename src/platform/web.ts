@@ -178,5 +178,17 @@ export const webPlatform: PlatformAdapter = {
     async getRuntimeStatus() {
       localAiUnsupported();
     },
+    async downloadModel() {
+      localAiUnsupported();
+    },
+    async cancelDownload() {
+      localAiUnsupported();
+    },
+    async deleteModel() {
+      localAiUnsupported();
+    },
+    async subscribeDownloadProgress() {
+      return () => undefined;
+    },
   },
 };

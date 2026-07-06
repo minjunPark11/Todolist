@@ -1,19 +1,34 @@
 // Local AI system commands (see LOCAL_AI_SYSTEM_DESIGN.md).
 //
-// Phase 0 scope: hardware profiling for model recommendation, the app-local
-// models directory, and the installed-model listing. Model download (Phase 2)
-// and the llama-server sidecar (Phase 3) are TODOs documented in the design
-// doc — no network access and no process spawning happens here yet.
+// Scope so far: hardware profiling for model recommendation (Phase 0), the
+// app-local models directory and installed-model listing (Phase 0), and the
+// model downloader with resume/cancel/sha256 verification (Phase 2). The
+// llama-server sidecar (Phase 3) remains a TODO documented in the design doc
+// — no process spawning happens here yet. The only network access is the
+// model download itself, restricted to the host allowlist below.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
+use futures_util::StreamExt;
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use sysinfo::{Disks, System};
-use tauri::Manager;
+use tauri::{Emitter, Manager, State};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 const MODELS_DIR_NAME: &str = "models";
 const MODEL_FILE_EXTENSION: &str = "gguf";
+const PARTIAL_SUFFIX: &str = ".partial";
+const DOWNLOAD_PROGRESS_EVENT: &str = "local-ai://download-progress";
+const PROGRESS_EMIT_INTERVAL: Duration = Duration::from_millis(300);
+// Mirrors MODEL_DOWNLOAD_ALLOWLIST in src/lib/localAi/modelCatalog.ts —
+// defense in depth so a compromised webview still can't point the downloader
+// at an arbitrary host.
+const DOWNLOAD_HOST_ALLOWLIST: &[&str] = &["huggingface.co", "cdn-lfs.huggingface.co"];
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -152,6 +167,255 @@ pub fn list_local_ai_models(app: tauri::AppHandle) -> Result<Vec<InstalledModelF
     }
     models.sort_by(|a, b| a.file_name.cmp(&b.file_name));
     Ok(models)
+}
+
+// ===== Model download (Phase 2, LOCAL_AI_SYSTEM_DESIGN.md §6) =====
+
+// One cancel flag per in-flight download, keyed by model id. An entry's
+// presence also serves as the "already downloading" guard.
+#[derive(Default)]
+pub struct LocalAiDownloadState {
+    cancel_flags: Mutex<HashMap<String, Arc<AtomicBool>>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DownloadProgress {
+    model_id: String,
+    received_bytes: u64,
+    total_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DownloadOutcome {
+    Completed,
+    Cancelled,
+}
+
+fn validate_download_url(url: &str) -> Result<reqwest::Url, String> {
+    let parsed = reqwest::Url::parse(url).map_err(|error| error.to_string())?;
+    if parsed.scheme() != "https" {
+        return Err("Model downloads must use https.".to_string());
+    }
+    let host = parsed.host_str().unwrap_or_default();
+    let allowed = DOWNLOAD_HOST_ALLOWLIST
+        .iter()
+        .any(|entry| host == *entry || host.ends_with(&format!(".{entry}")));
+    if !allowed {
+        return Err(format!("Download host is not allowlisted: {host}"));
+    }
+    Ok(parsed)
+}
+
+// The file name comes from the frontend catalog; reject anything that could
+// escape the models directory.
+fn validate_model_file_name(file_name: &str) -> Result<(), String> {
+    let valid = !file_name.is_empty()
+        && !file_name.contains(['/', '\\'])
+        && !file_name.contains("..")
+        && Path::new(file_name)
+            .extension()
+            .map(|ext| ext.eq_ignore_ascii_case(MODEL_FILE_EXTENSION))
+            .unwrap_or(false);
+    if valid {
+        Ok(())
+    } else {
+        Err(format!("Invalid model file name: {file_name}"))
+    }
+}
+
+fn validate_sha256(expected: &str) -> Result<(), String> {
+    if expected.len() == 64 && expected.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        Ok(())
+    } else {
+        // No hash means no download — partial trust is not an option (§11.2).
+        Err("A sha256 hash is required to download a model.".to_string())
+    }
+}
+
+fn emit_progress(app: &tauri::AppHandle, model_id: &str, received: u64, total: Option<u64>) {
+    let _ = app.emit(
+        DOWNLOAD_PROGRESS_EVENT,
+        DownloadProgress {
+            model_id: model_id.to_string(),
+            received_bytes: received,
+            total_bytes: total,
+        },
+    );
+}
+
+// Feeds the bytes already present in the .partial file into the hasher so a
+// resumed download still produces the hash of the complete file.
+async fn hash_existing_partial(path: &Path, hasher: &mut Sha256) -> Result<u64, String> {
+    let mut file = tokio::fs::File::open(path).await.map_err(|error| error.to_string())?;
+    let mut buffer = vec![0u8; 1024 * 1024];
+    let mut total = 0u64;
+    loop {
+        let read = file.read(&mut buffer).await.map_err(|error| error.to_string())?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+        total += read as u64;
+    }
+    Ok(total)
+}
+
+async fn run_download(
+    app: &tauri::AppHandle,
+    cancel: &AtomicBool,
+    model_id: &str,
+    url: reqwest::Url,
+    expected_sha256: &str,
+    final_path: &Path,
+    partial_path: &Path,
+) -> Result<DownloadOutcome, String> {
+    let mut hasher = Sha256::new();
+    let mut received = match tokio::fs::metadata(partial_path).await {
+        Ok(metadata) if metadata.is_file() && metadata.len() > 0 => {
+            hash_existing_partial(partial_path, &mut hasher).await?
+        }
+        _ => 0,
+    };
+
+    let client = reqwest::Client::new();
+    let mut request = client.get(url);
+    if received > 0 {
+        request = request.header(reqwest::header::RANGE, format!("bytes={received}-"));
+    }
+    let response = request.send().await.map_err(|error| error.to_string())?;
+    let status = response.status();
+
+    let resuming = status == reqwest::StatusCode::PARTIAL_CONTENT;
+    if !resuming && !status.is_success() {
+        return Err(format!("Download failed with HTTP status {status}."));
+    }
+    if received > 0 && !resuming {
+        // Server ignored the Range header and is sending the whole file:
+        // start over so the hash and byte count stay consistent.
+        hasher = Sha256::new();
+        received = 0;
+    }
+
+    let total_bytes = response.content_length().map(|length| length + received);
+
+    let mut file = tokio::fs::OpenOptions::new()
+        .create(true)
+        .append(resuming)
+        .truncate(!resuming)
+        .write(true)
+        .open(partial_path)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    emit_progress(app, model_id, received, total_bytes);
+    let mut last_emit = Instant::now();
+
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        if cancel.load(Ordering::SeqCst) {
+            // Keep the .partial file so a retry resumes instead of restarting.
+            file.flush().await.map_err(|error| error.to_string())?;
+            return Ok(DownloadOutcome::Cancelled);
+        }
+        let chunk = chunk.map_err(|error| error.to_string())?;
+        file.write_all(&chunk).await.map_err(|error| error.to_string())?;
+        hasher.update(&chunk);
+        received += chunk.len() as u64;
+        if last_emit.elapsed() >= PROGRESS_EMIT_INTERVAL {
+            emit_progress(app, model_id, received, total_bytes);
+            last_emit = Instant::now();
+        }
+    }
+
+    file.flush().await.map_err(|error| error.to_string())?;
+    file.sync_all().await.map_err(|error| error.to_string())?;
+    drop(file);
+
+    let actual = format!("{:x}", hasher.finalize());
+    if !actual.eq_ignore_ascii_case(expected_sha256) {
+        // A corrupt or tampered file must not survive to be resumed (§11.2).
+        let _ = tokio::fs::remove_file(partial_path).await;
+        return Err("Downloaded file failed sha256 verification and was removed.".to_string());
+    }
+
+    tokio::fs::rename(partial_path, final_path)
+        .await
+        .map_err(|error| error.to_string())?;
+    emit_progress(app, model_id, received, Some(received));
+    Ok(DownloadOutcome::Completed)
+}
+
+#[tauri::command]
+pub async fn download_local_ai_model(
+    app: tauri::AppHandle,
+    state: State<'_, LocalAiDownloadState>,
+    model_id: String,
+    url: String,
+    expected_sha256: String,
+    file_name: String,
+) -> Result<DownloadOutcome, String> {
+    let parsed_url = validate_download_url(&url)?;
+    validate_model_file_name(&file_name)?;
+    validate_sha256(&expected_sha256)?;
+
+    let dir = models_dir_path(&app)?;
+    tokio::fs::create_dir_all(&dir).await.map_err(|error| error.to_string())?;
+    let final_path = dir.join(&file_name);
+    let partial_path = dir.join(format!("{file_name}{PARTIAL_SUFFIX}"));
+    if final_path.exists() {
+        return Ok(DownloadOutcome::Completed);
+    }
+
+    let cancel = Arc::new(AtomicBool::new(false));
+    {
+        let mut flags = state.cancel_flags.lock().map_err(|_| "download state poisoned")?;
+        if flags.contains_key(&model_id) {
+            return Err("This model is already being downloaded.".to_string());
+        }
+        flags.insert(model_id.clone(), Arc::clone(&cancel));
+    }
+
+    let result = run_download(
+        &app,
+        &cancel,
+        &model_id,
+        parsed_url,
+        &expected_sha256,
+        &final_path,
+        &partial_path,
+    )
+    .await;
+
+    if let Ok(mut flags) = state.cancel_flags.lock() {
+        flags.remove(&model_id);
+    }
+    result
+}
+
+#[tauri::command]
+pub fn cancel_local_ai_download(state: State<'_, LocalAiDownloadState>, model_id: String) {
+    if let Ok(flags) = state.cancel_flags.lock() {
+        if let Some(flag) = flags.get(&model_id) {
+            flag.store(true, Ordering::SeqCst);
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn delete_local_ai_model(app: tauri::AppHandle, file_name: String) -> Result<(), String> {
+    validate_model_file_name(&file_name)?;
+    let dir = models_dir_path(&app)?;
+    let final_path = dir.join(&file_name);
+    let partial_path = dir.join(format!("{file_name}{PARTIAL_SUFFIX}"));
+    if final_path.exists() {
+        tokio::fs::remove_file(&final_path).await.map_err(|error| error.to_string())?;
+    }
+    if partial_path.exists() {
+        tokio::fs::remove_file(&partial_path).await.map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]

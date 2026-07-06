@@ -65,6 +65,23 @@ export interface LocalAiRuntimeStatus {
   port: number | null;
 }
 
+// Payload of the "local-ai://download-progress" Tauri event, emitted by the
+// Rust downloader while a model streams in (throttled to ~300ms).
+export interface ModelDownloadProgress {
+  modelId: string;
+  receivedBytes: number;
+  totalBytes: number | null;
+}
+
+export type ModelDownloadOutcome = "completed" | "cancelled";
+
+export interface ModelDownloadRequest {
+  modelId: string;
+  url: string;
+  expectedSha256: string;
+  fileName: string;
+}
+
 export type LocalAiLaunchMode = "on-demand" | "on-app-start" | "external";
 
 export interface LocalAiSettings {

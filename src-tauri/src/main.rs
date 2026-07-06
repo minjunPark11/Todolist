@@ -302,6 +302,7 @@ fn grant_vault_read_access(app: tauri::AppHandle, path: String) -> Result<(), St
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
+        .manage(local_ai::LocalAiDownloadState::default())
         // Must be registered first: a second launch (e.g. reopening from the
         // shortcut while an instance lingers in the tray) would otherwise spawn
         // a duplicate window whose WebView2 fails to init against the locked
@@ -389,7 +390,10 @@ fn main() {
             local_ai::get_local_ai_hardware_profile,
             local_ai::get_local_ai_models_dir,
             local_ai::list_local_ai_models,
-            local_ai::get_local_ai_runtime_status
+            local_ai::get_local_ai_runtime_status,
+            local_ai::download_local_ai_model,
+            local_ai::cancel_local_ai_download,
+            local_ai::delete_local_ai_model
         ])
         .run(tauri::generate_context!())
         .expect("error while running FocusFlow desktop app");

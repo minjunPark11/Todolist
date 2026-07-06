@@ -1,9 +1,21 @@
 import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
+import {
+  cancelModelDownload,
+  deleteInstalledModel,
+  isModelDownloadable,
+  startModelDownload,
+} from "../lib/localAi/installer";
 import { LOCAL_MODEL_CATALOG, findModelById } from "../lib/localAi/modelCatalog";
 import { recommendLocalModel } from "../lib/localAi/recommender";
 import { useLocalAiSettings } from "../lib/localAi/settings";
-import type { HardwareProfile, InstalledModelFile, LocalAiLaunchMode, LocalModelOption } from "../lib/localAi/types";
+import type {
+  HardwareProfile,
+  InstalledModelFile,
+  LocalAiLaunchMode,
+  LocalModelOption,
+  ModelDownloadProgress,
+} from "../lib/localAi/types";
 import { modelNameMatches } from "../lib/knowledge/embeddingProvider";
 import { EmbeddingModelUnavailableError, runIndexing, type IndexProgress } from "../lib/knowledge/indexer";
 import { KnowledgeStore, type IndexStats } from "../lib/knowledge/knowledgeStore";
@@ -881,18 +893,68 @@ function LocalAiSettingsTab() {
   const [scanError, setScanError] = useState("");
   const [installedModels, setInstalledModels] = useState<InstalledModelFile[]>([]);
   const [modelsDir, setModelsDir] = useState("");
+  const [downloadingId, setDownloadingId] = useState("");
+  const [downloadProgress, setDownloadProgress] = useState<ModelDownloadProgress | null>(null);
+  const [downloadMessage, setDownloadMessage] = useState("");
+  const [downloadError, setDownloadError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<InstalledModelFile | null>(null);
 
   const recommendation = useMemo(() => (profile ? recommendLocalModel(profile, t) : null), [profile, t]);
   const selectedModel = findModelById(settings.selectedModelId);
 
+  async function refreshInstalledModels() {
+    try {
+      setInstalledModels(await platform.localAi.listInstalledModels());
+    } catch {
+      // Desktop-only call; leave the last known list on failure.
+    }
+  }
+
   useEffect(() => {
     if (!isDesktop) return;
     void platform.localAi.getModelsDir().then(setModelsDir).catch(() => undefined);
-    void platform.localAi
-      .listInstalledModels()
-      .then(setInstalledModels)
-      .catch(() => undefined);
+    void refreshInstalledModels();
+
+    let unsubscribe: (() => void) | undefined;
+    void platform.localAi.subscribeDownloadProgress(setDownloadProgress).then((fn) => {
+      unsubscribe = fn;
+    });
+    return () => unsubscribe?.();
+    // Mount-only setup (plus the desktop gate); refresh is triggered
+    // explicitly after downloads/deletes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDesktop]);
+
+  async function handleDownload(model: LocalModelOption) {
+    setDownloadError("");
+    setDownloadMessage("");
+    setDownloadingId(model.id);
+    setDownloadProgress({ modelId: model.id, receivedBytes: 0, totalBytes: null });
+    try {
+      const outcome = await startModelDownload(model);
+      setDownloadMessage(
+        outcome === "completed" ? t("settings.localAi.downloadComplete") : t("settings.localAi.downloadCancelled"),
+      );
+      await refreshInstalledModels();
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : t("settings.localAi.downloadFailed"));
+    } finally {
+      setDownloadingId("");
+      setDownloadProgress(null);
+    }
+  }
+
+  async function confirmDeleteModel() {
+    if (!deleteTarget) return;
+    try {
+      await deleteInstalledModel(deleteTarget.fileName);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : String(error));
+    }
+    setDeleteTarget(null);
+    setDownloadMessage("");
+    await refreshInstalledModels();
+  }
 
   async function handleScan() {
     setScanError("");
@@ -1023,13 +1085,64 @@ function LocalAiSettingsTab() {
         </div>
       ) : null}
 
-      {selectedModel && !isModelInstalled(selectedModel.id) ? (
+      {selectedModel && (!isModelInstalled(selectedModel.id) || downloadMessage || downloadError) ? (
         <div className="ff-settings-card">
-          {/* Phase 2 replaces this notice with the actual download flow
-              (progress, cancel, retry, sha256 verification). */}
-          <Row title={selectedModel.displayName} hint={t("settings.localAi.downloadSoon")}>
-            <span className="ff-knowledge-badge">{t("settings.localAi.selectedBadge")}</span>
+          <Row
+            title={selectedModel.displayName}
+            hint={
+              isModelDownloadable(selectedModel)
+                ? t("settings.localAi.modelMeta", {
+                    size: selectedModel.estimatedSizeGb,
+                    minRam: selectedModel.minRamGb,
+                    recommendedRam: selectedModel.recommendedRamGb,
+                  })
+                : t("settings.localAi.downloadSoon")
+            }
+          >
+            {isModelInstalled(selectedModel.id) ? (
+              <span className="ff-localai-chip on">{t("settings.localAi.installedBadge")}</span>
+            ) : downloadingId === selectedModel.id ? (
+              <button
+                type="button"
+                className="ff-btn ff-btn-danger"
+                onClick={() => void cancelModelDownload(selectedModel.id)}
+              >
+                {t("settings.localAi.downloadCancel")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="ff-btn ff-btn-primary"
+                disabled={!isDesktop || !isModelDownloadable(selectedModel)}
+                onClick={() => void handleDownload(selectedModel)}
+              >
+                {downloadError ? t("settings.localAi.downloadRetry") : t("settings.localAi.downloadButton")}
+              </button>
+            )}
           </Row>
+          {downloadingId === selectedModel.id && downloadProgress?.modelId === selectedModel.id ? (
+            <div className="ff-knowledge-index-actions">
+              <span className="ff-knowledge-index-progress">
+                {downloadProgress.totalBytes
+                  ? t("settings.localAi.downloadingKnown", {
+                      received: (downloadProgress.receivedBytes / 1024 ** 3).toFixed(2),
+                      total: (downloadProgress.totalBytes / 1024 ** 3).toFixed(2),
+                    })
+                  : t("settings.localAi.downloadingUnknown", {
+                      received: (downloadProgress.receivedBytes / 1024 ** 3).toFixed(2),
+                    })}
+              </span>
+              {downloadProgress.totalBytes ? (
+                <progress
+                  className="ff-knowledge-progress-bar"
+                  value={downloadProgress.receivedBytes}
+                  max={downloadProgress.totalBytes}
+                />
+              ) : null}
+            </div>
+          ) : null}
+          {downloadMessage ? <p className="ff-settings-msg">{downloadMessage}</p> : null}
+          {downloadError ? <p className="ff-settings-error">{downloadError}</p> : null}
         </div>
       ) : null}
 
@@ -1081,15 +1194,40 @@ function LocalAiSettingsTab() {
             </span>
           </Row>
           <Row title={t("settings.localAi.installedModelsTitle")} hint="">
-            <span className="ff-knowledge-index-status">
-              {installedModels.length === 0
-                ? t("settings.localAi.noInstalledModels")
-                : installedModels
-                    .map((file) => `${file.fileName} (${t("settings.localAi.sizeGb", { size: (file.sizeBytes / 1024 ** 3).toFixed(1) })})`)
-                    .join(", ")}
-            </span>
+            {installedModels.length === 0 ? (
+              <span className="ff-knowledge-index-status">{t("settings.localAi.noInstalledModels")}</span>
+            ) : (
+              <span />
+            )}
           </Row>
+          {installedModels.length > 0 ? (
+            <div className="ff-localai-model-list">
+              {installedModels.map((file) => (
+                <article key={file.path} className="ff-localai-model-item">
+                  <div className="ff-localai-model-text">
+                    <strong>{file.fileName}</strong>
+                    <small>{t("settings.localAi.sizeGb", { size: (file.sizeBytes / 1024 ** 3).toFixed(1) })}</small>
+                  </div>
+                  <div className="ff-external-calendar-actions">
+                    <button type="button" className="ff-btn ff-btn-danger" onClick={() => setDeleteTarget(file)}>
+                      {t("common.delete")}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
         </div>
+      ) : null}
+
+      {deleteTarget ? (
+        <ConfirmModal
+          title={t("settings.localAi.deleteConfirmTitle")}
+          body={<p>{t("settings.localAi.deleteConfirmBody", { file: deleteTarget.fileName })}</p>}
+          confirmLabel={t("common.delete")}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() => void confirmDeleteModel()}
+        />
       ) : null}
     </>
   );

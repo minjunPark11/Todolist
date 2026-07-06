@@ -1,5 +1,12 @@
 import type { MiniFocusTimerSnapshot } from "../lib/miniFocusTimer";
-import type { HardwareProfile, InstalledModelFile, LocalAiRuntimeStatus } from "../lib/localAi/types";
+import type {
+  HardwareProfile,
+  InstalledModelFile,
+  LocalAiRuntimeStatus,
+  ModelDownloadOutcome,
+  ModelDownloadProgress,
+  ModelDownloadRequest,
+} from "../lib/localAi/types";
 
 export type PlatformKind = "web" | "desktop";
 export type FocusTrayAction = "pause" | "resume" | "finish";
@@ -66,6 +73,15 @@ export interface PlatformLocalAi {
   listInstalledModels(): Promise<InstalledModelFile[]>;
   // Phase 0 stub: always reports running=false until the sidecar ships.
   getRuntimeStatus(): Promise<LocalAiRuntimeStatus>;
+  // Streams a GGUF into the models dir with resume + sha256 verification.
+  // Resolves when the download finishes or was cancelled; rejects on failure
+  // (bad host, network error, checksum mismatch). Progress arrives via
+  // subscribeDownloadProgress.
+  downloadModel(request: ModelDownloadRequest): Promise<ModelDownloadOutcome>;
+  cancelDownload(modelId: string): Promise<void>;
+  // Removes an installed model file (and any leftover .partial download).
+  deleteModel(fileName: string): Promise<void>;
+  subscribeDownloadProgress(handler: (progress: ModelDownloadProgress) => void): Promise<() => void>;
 }
 
 export interface PlatformAdapter {
