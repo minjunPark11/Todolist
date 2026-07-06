@@ -429,7 +429,9 @@ Phase 5가 끝나면 "Ollama에서 llama-server로 전환" 프로젝트는 완�
   legacy/manual 옵션으로 격리하고 기본 경로에서 제외.
 - Local AI 설정에서 chat 모델과 embedding 모델 설치 상태를 구분해 표시.
 - 유휴 자동 종료: 일정 시간 AI 요청이 없으면 managed `llama-server` 종료.
-- NVIDIA VRAM 감지: 가능하면 VRAM 기반 추천, 실패 시 RAM 기반 추천으로 조용히 fallback.
+- NVIDIA VRAM 감지: `recommender.ts`가 RAM tier와 VRAM tier(6GB→7B, 12GB→14B)
+  중 높은 쪽으로 추천을 정한다. VRAM은 상향만 하고 낮추지 않으며, GPU 미감지
+  시 RAM 기반으로 조용히 fallback한다.
 - 문서/문구: "Ollama 필요" 안내가 기본 UX에 남지 않음.
 
 비목표:
