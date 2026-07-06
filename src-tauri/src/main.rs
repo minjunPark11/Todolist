@@ -1,3 +1,7 @@
+// Prevents an extra console window from appearing on Windows in release builds.
+// Debug builds keep the console so logs remain visible.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
