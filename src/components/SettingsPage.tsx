@@ -1,5 +1,9 @@
-import { ChangeEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
+import { LOCAL_MODEL_CATALOG, findModelById } from "../lib/localAi/modelCatalog";
+import { recommendLocalModel } from "../lib/localAi/recommender";
+import { useLocalAiSettings } from "../lib/localAi/settings";
+import type { HardwareProfile, InstalledModelFile, LocalAiLaunchMode, LocalModelOption } from "../lib/localAi/types";
 import { modelNameMatches } from "../lib/knowledge/embeddingProvider";
 import { EmbeddingModelUnavailableError, runIndexing, type IndexProgress } from "../lib/knowledge/indexer";
 import { KnowledgeStore, type IndexStats } from "../lib/knowledge/knowledgeStore";
@@ -80,7 +84,7 @@ export function SettingsPage({
   isKnowledgeDesktop,
 }: SettingsPageProps) {
   const { t } = useT();
-  const [tab, setTab] = useState<"appearance" | "behavior" | "calendar" | "knowledge" | "data">("appearance");
+  const [tab, setTab] = useState<"appearance" | "behavior" | "calendar" | "knowledge" | "localAi" | "data">("appearance");
   const [calendarDraft, setCalendarDraft] = useState({ name: "", icsUrl: "", color: "#4f73ff" });
   const [externalFormOpen, setExternalFormOpen] = useState(false);
   const [shareCopyKey, setShareCopyKey] = useState("settings.calendar.copy");
@@ -117,6 +121,7 @@ export function SettingsPage({
           ["behavior", t("settings.tabBehavior")],
           ["calendar", t("settings.tabCalendar")],
           ["knowledge", t("settings.tabKnowledge")],
+          ["localAi", t("settings.tabLocalAi")],
           ["data", t("settings.tabData")],
         ]}
         active={tab}
@@ -406,6 +411,8 @@ export function SettingsPage({
           isDesktop={isKnowledgeDesktop}
         />
       ) : null}
+
+      {tab === "localAi" ? <LocalAiSettingsTab /> : null}
 
       {tab === "data" ? (
         <>
@@ -860,6 +867,276 @@ function KnowledgeSettingsTab({
       </div>
     ) : null}
     </>
+  );
+}
+
+// Local AI setup tab (LOCAL_AI_SYSTEM_DESIGN.md §9). Self-contained on
+// purpose: local AI settings live in device-local storage (useLocalAiSettings),
+// so nothing here needs to flow through SettingsPage props / appSettings.
+function LocalAiSettingsTab() {
+  const { t } = useT();
+  const { settings, updateSettings, isDesktop } = useLocalAiSettings();
+  const [profile, setProfile] = useState<HardwareProfile | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const [installedModels, setInstalledModels] = useState<InstalledModelFile[]>([]);
+  const [modelsDir, setModelsDir] = useState("");
+
+  const recommendation = useMemo(() => (profile ? recommendLocalModel(profile, t) : null), [profile, t]);
+  const selectedModel = findModelById(settings.selectedModelId);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    void platform.localAi.getModelsDir().then(setModelsDir).catch(() => undefined);
+    void platform.localAi
+      .listInstalledModels()
+      .then(setInstalledModels)
+      .catch(() => undefined);
+  }, [isDesktop]);
+
+  async function handleScan() {
+    setScanError("");
+    setScanning(true);
+    // Clicking the scan button IS the consent required by design principle 5;
+    // no hardware query ever runs before this moment.
+    updateSettings({ hardwareConsentGrantedAt: new Date().toISOString() });
+    try {
+      setProfile(await platform.localAi.getHardwareProfile());
+    } catch (error) {
+      setScanError(error instanceof Error ? error.message : t("settings.localAi.scanFailed"));
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  function isModelInstalled(modelId: string) {
+    // Phase 2 installer names files "<catalog-id>.gguf" (see runtime.ts).
+    return installedModels.some((file) => file.fileName.toLowerCase().startsWith(modelId.toLowerCase()));
+  }
+
+  const launchHintKey: Record<LocalAiLaunchMode, string> = {
+    "on-demand": "settings.localAi.launchOnDemandHint",
+    "on-app-start": "settings.localAi.launchOnStartHint",
+    external: "settings.localAi.launchExternalHint",
+  };
+
+  return (
+    <>
+      <div className="ff-settings-card">
+        <div className="ff-localai-intro">
+          <strong>{t("settings.localAi.introTitle")}</strong>
+          <small>{t("settings.localAi.introHint")}</small>
+        </div>
+        <div className="ff-localai-intro-actions">
+          {isDesktop ? (
+            <button type="button" className="ff-btn ff-btn-primary" onClick={() => void handleScan()} disabled={scanning}>
+              {scanning
+                ? t("settings.localAi.scanning")
+                : profile
+                  ? t("settings.localAi.rescanButton")
+                  : t("settings.localAi.scanButton")}
+            </button>
+          ) : (
+            <span className="ff-knowledge-badge">{t("settings.knowledge.desktopOnlyBadge")}</span>
+          )}
+        </div>
+        {!isDesktop ? <p className="ff-knowledge-privacy-note">{t("settings.localAi.desktopOnly")}</p> : null}
+        {scanError ? <p className="ff-settings-error">{scanError}</p> : null}
+        <p className="ff-knowledge-privacy-note">{t("settings.localAi.privacyNote")}</p>
+      </div>
+
+      {profile && recommendation ? (
+        <div className="ff-settings-card">
+          <Row title={t("settings.localAi.resultTitle")} hint="">
+            <span />
+          </Row>
+          <Row title={t("settings.localAi.resultOs")} hint="">
+            <span className="ff-knowledge-index-status">{`${profile.os} (${profile.arch})`}</span>
+          </Row>
+          <Row title={t("settings.localAi.resultCpu")} hint="">
+            <span className="ff-knowledge-index-status">{t("settings.localAi.resultCores", { cores: profile.cpuCoreCount })}</span>
+          </Row>
+          <Row title={t("settings.localAi.resultRam")} hint="">
+            <span className="ff-knowledge-index-status">
+              {profile.totalRamGb !== null
+                ? t("settings.localAi.sizeGb", { size: profile.totalRamGb })
+                : t("settings.localAi.unknown")}
+            </span>
+          </Row>
+          <Row title={t("settings.localAi.resultDisk")} hint="">
+            <span className="ff-knowledge-index-status">
+              {profile.availableDiskGb !== null
+                ? t("settings.localAi.sizeGb", { size: profile.availableDiskGb })
+                : t("settings.localAi.unknown")}
+            </span>
+          </Row>
+          <Row title={t("settings.localAi.resultGpu")} hint="">
+            <span className="ff-knowledge-index-status">{profile.gpu?.name ?? t("settings.localAi.gpuNotDetected")}</span>
+          </Row>
+
+          <p className="ff-localai-reason">{recommendation.reason}</p>
+          {recommendation.warnings.length > 0 ? (
+            <ul className="ff-localai-warnings">
+              {recommendation.warnings.map((warning) => (
+                <li key={warning}>⚠️ {warning}</li>
+              ))}
+            </ul>
+          ) : null}
+
+          <div className="ff-localai-model-list">
+            <LocalAiModelItem
+              model={recommendation.primary}
+              badge={t("settings.localAi.recommendedModel")}
+              selected={settings.selectedModelId === recommendation.primary.id}
+              installed={isModelInstalled(recommendation.primary.id)}
+              onSelect={() => updateSettings({ selectedModelId: recommendation.primary.id })}
+            />
+            {recommendation.alternatives.map((model) => (
+              <LocalAiModelItem
+                key={model.id}
+                model={model}
+                selected={settings.selectedModelId === model.id}
+                installed={isModelInstalled(model.id)}
+                onSelect={() => updateSettings({ selectedModelId: model.id })}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {!profile ? (
+        <div className="ff-settings-card">
+          <Row title={t("settings.localAi.catalogTitle")} hint={t("settings.localAi.catalogHint")}>
+            <span />
+          </Row>
+          <div className="ff-localai-model-list">
+            {LOCAL_MODEL_CATALOG.map((model) => (
+              <LocalAiModelItem
+                key={model.id}
+                model={model}
+                selected={settings.selectedModelId === model.id}
+                installed={isModelInstalled(model.id)}
+                onSelect={() => updateSettings({ selectedModelId: model.id })}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {selectedModel && !isModelInstalled(selectedModel.id) ? (
+        <div className="ff-settings-card">
+          {/* Phase 2 replaces this notice with the actual download flow
+              (progress, cancel, retry, sha256 verification). */}
+          <Row title={selectedModel.displayName} hint={t("settings.localAi.downloadSoon")}>
+            <span className="ff-knowledge-badge">{t("settings.localAi.selectedBadge")}</span>
+          </Row>
+        </div>
+      ) : null}
+
+      <div className="ff-settings-card">
+        <Row title={t("settings.localAi.launchTitle")} hint={t(launchHintKey[settings.launchMode])}>
+          <SegmentedTabs
+            tabs={[
+              ["on-demand", t("settings.localAi.launchOnDemand")],
+              ["on-app-start", t("settings.localAi.launchOnStart")],
+              ["external", t("settings.localAi.launchExternal")],
+            ]}
+            active={settings.launchMode}
+            onChange={(mode) => updateSettings({ launchMode: mode })}
+          />
+        </Row>
+        {settings.launchMode === "external" ? (
+          <Row title={t("settings.localAi.externalUrlLabel")} hint={t("settings.localAi.launchExternalHint")}>
+            <input
+              className="ff-localai-url-input"
+              value={settings.externalServerUrl}
+              placeholder="http://localhost:11434"
+              onChange={(event) => updateSettings({ externalServerUrl: event.target.value })}
+            />
+          </Row>
+        ) : (
+          <Row title={t("settings.localAi.portLabel")} hint={t("settings.localAi.portHint")}>
+            <input
+              className="ff-localai-port-input"
+              type="number"
+              min={1024}
+              max={65535}
+              value={settings.serverPort}
+              onChange={(event) => {
+                const port = Number.parseInt(event.target.value, 10);
+                if (Number.isInteger(port) && port >= 1024 && port <= 65535) {
+                  updateSettings({ serverPort: port });
+                }
+              }}
+            />
+          </Row>
+        )}
+      </div>
+
+      {isDesktop ? (
+        <div className="ff-settings-card">
+          <Row title={t("settings.localAi.storageTitle")} hint={t("settings.localAi.storageHint")}>
+            <span className="ff-knowledge-path" title={modelsDir}>
+              {modelsDir || "…"}
+            </span>
+          </Row>
+          <Row title={t("settings.localAi.installedModelsTitle")} hint="">
+            <span className="ff-knowledge-index-status">
+              {installedModels.length === 0
+                ? t("settings.localAi.noInstalledModels")
+                : installedModels
+                    .map((file) => `${file.fileName} (${t("settings.localAi.sizeGb", { size: (file.sizeBytes / 1024 ** 3).toFixed(1) })})`)
+                    .join(", ")}
+            </span>
+          </Row>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function LocalAiModelItem({
+  model,
+  badge,
+  selected,
+  installed,
+  onSelect,
+}: {
+  model: LocalModelOption;
+  badge?: string;
+  selected: boolean;
+  installed: boolean;
+  onSelect: () => void;
+}) {
+  const { t } = useT();
+  return (
+    <article className={`ff-localai-model-item${selected ? " selected" : ""}`}>
+      <div className="ff-localai-model-text">
+        <div className="ff-localai-model-head">
+          <strong>{model.displayName}</strong>
+          {badge ? <span className="ff-localai-chip on">{badge}</span> : null}
+          <span className="ff-localai-chip">{t(`localAi.tier.${model.recommendedTier}`)}</span>
+          {installed ? <span className="ff-localai-chip on">{t("settings.localAi.installedBadge")}</span> : null}
+        </div>
+        <small>{t(model.description)}</small>
+        <small>
+          {t("settings.localAi.modelMeta", {
+            size: model.estimatedSizeGb,
+            minRam: model.minRamGb,
+            recommendedRam: model.recommendedRamGb,
+          })}
+        </small>
+      </div>
+      <div className="ff-external-calendar-actions">
+        {selected ? (
+          <span className="ff-localai-chip on">{t("settings.localAi.selectedBadge")}</span>
+        ) : (
+          <button type="button" className="ff-btn" onClick={onSelect}>
+            {t("settings.localAi.selectModel")}
+          </button>
+        )}
+      </div>
+    </article>
   );
 }
 

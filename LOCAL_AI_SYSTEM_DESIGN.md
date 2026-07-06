@@ -384,7 +384,7 @@ OS · RAM · CPU(코어) · GPU(감지 시) · 저장공간 · **추천 모델 �
 | Phase | 내용 | 상태 |
 |-------|------|------|
 | **0** | 설계 문서 + 타입/카탈로그/추천기/설정/런타임 스캐폴드 + Rust HW 프로파일러·모델 폴더·목록 command | ✅ 이번 커밋 |
-| **1** | Local AI Setup UI (검사 동의 → 결과 → 추천), i18n, GPU 감지 1차(wgpu 이름) | |
+| **1** | Local AI Setup UI (검사 동의 → 결과 → 추천), i18n, GPU 감지 1차(wgpu 이름) | ✅ UI/i18n (설정 탭 "로컬 AI") · GPU 감지는 미착수 |
 | **2** | ModelInstaller: Rust 다운로드 command (진행률 event, 이어받기, sha256), 다운로드 UI, 카탈로그 URL/해시 확정 | |
 | **3** | sidecar: tauri-plugin-shell + externalBin + 바이너리 배치 파이프라인, spawn/health/종료 정리, 포트 충돌 처리 | |
 | **4** | `llamaServerProvider` 추가 + gateway 체인 선두 배치, launchMode(on-app-start/external) 반영, 기존 Ollama 경로는 외부 서버 옵션으로 강등 | |

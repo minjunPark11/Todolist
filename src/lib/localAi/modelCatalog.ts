@@ -33,7 +33,7 @@ export const LOCAL_MODEL_CATALOG: LocalModelOption[] = [
     estimatedSizeGb: 2.0,
     minRamGb: 6,
     recommendedRamGb: 8,
-    description: "가벼움 — 저사양 노트북에서도 빠르게 동작. 브리핑·요약 같은 짧은 작업에 적합.",
+    description: "localAi.model.qwen3b.description",
   },
   {
     id: "qwen2.5-7b-instruct-q4_k_m",
@@ -45,7 +45,7 @@ export const LOCAL_MODEL_CATALOG: LocalModelOption[] = [
     estimatedSizeGb: 4.7,
     minRamGb: 12,
     recommendedRamGb: 16,
-    description: "추천 — 속도와 품질의 균형. 오늘 브리핑, 작업 쪼개기, 집중 세션 추천에 두루 적합.",
+    description: "localAi.model.qwen7b.description",
   },
   {
     id: "qwen2.5-coder-7b-instruct-q4_k_m",
@@ -57,7 +57,7 @@ export const LOCAL_MODEL_CATALOG: LocalModelOption[] = [
     estimatedSizeGb: 4.7,
     minRamGb: 12,
     recommendedRamGb: 16,
-    description: "코딩 특화 — 개발 노트·코드 스니펫이 많은 vault와 개발 작업 분해에 유리.",
+    description: "localAi.model.qwenCoder7b.description",
   },
   {
     id: "qwen2.5-14b-instruct-q4_k_m",
@@ -69,7 +69,7 @@ export const LOCAL_MODEL_CATALOG: LocalModelOption[] = [
     estimatedSizeGb: 9.0,
     minRamGb: 24,
     recommendedRamGb: 32,
-    description: "고성능 — 32GB RAM 이상에서 최고 품질의 브리핑과 계획 수립.",
+    description: "localAi.model.qwen14b.description",
   },
 ];
 

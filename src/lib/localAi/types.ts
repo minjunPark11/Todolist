@@ -30,12 +30,17 @@ export interface LocalModelOption {
   estimatedSizeGb: number;
   minRamGb: number;
   recommendedRamGb: number;
+  // i18n key (localAi.model.*) — render with t(model.description).
   description: string;
   // TODO(release): finalize official GGUF URLs (allowlisted hosts only) and
   // sha256 hashes before shipping the installer. Undefined = download blocked.
   downloadUrl?: string;
   expectedSha256?: string;
 }
+
+// Matches the i18n translate() signature so the recommender can build
+// localized reason/warning strings while staying a pure function.
+export type TranslateFn = (key: string, vars?: Record<string, string | number>) => string;
 
 export interface ModelRecommendation {
   primary: LocalModelOption;
