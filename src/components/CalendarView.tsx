@@ -314,7 +314,7 @@ export function CalendarView({
   function leave(id: string) {
     return () => {
       setDragOverId((current) => (current === id ? "" : current));
-      setDragPreview((current) => (current && id.startsWith("col:") ? null : current));
+      setDragPreview(null);
     };
   }
 
@@ -725,8 +725,6 @@ export function CalendarView({
                 anchor={anchor}
                 items={items}
                 dragOverId={dragOverId}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
                 onOverSlot={over}
                 onLeaveSlot={leave}
                 onDragHover={handleDragHover}
@@ -737,6 +735,7 @@ export function CalendarView({
                 onResizeItem={handleResizeItem}
                 onMoveItem={handleMoveItem}
                 onMoveItemToAllDay={handleMoveItemToAllDay}
+                durationForSource={(sourceId) => getTaskDuration(tasks.find((task) => task.id === sourceId))}
                 draft={draft}
                 dragPreview={dragPreview}
                 draggingTaskTitle={tasks.find((task) => task.id === draggingTaskId)?.title ?? ""}

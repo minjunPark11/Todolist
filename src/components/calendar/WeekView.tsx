@@ -142,8 +142,6 @@ interface WeekViewProps {
   anchor: string;
   items: CalendarItem[];
   dragOverId: string;
-  onDragStart: (event: DragEvent, itemKey: string) => void;
-  onDragEnd: () => void;
   onOverSlot: (id: string) => (event: DragEvent) => void;
   onLeaveSlot: (id: string) => () => void;
   onDragHover: (day: string, startTime: string) => void;
@@ -154,6 +152,7 @@ interface WeekViewProps {
   onResizeItem: (sourceId: string, day: string, startTime: string, endTime: string) => void;
   onMoveItem: (sourceId: string, day: string, startTime: string, endTime: string) => void;
   onMoveItemToAllDay: (sourceId: string, day: string) => void;
+  durationForSource: (sourceId: string) => number;
   draft: CalendarDraftBlock | null;
   dragPreview: {
     taskId: string;
@@ -179,8 +178,6 @@ export function WeekView({
   anchor,
   items,
   dragOverId,
-  onDragStart,
-  onDragEnd,
   onOverSlot,
   onLeaveSlot,
   onDragHover,
@@ -191,6 +188,7 @@ export function WeekView({
   onResizeItem,
   onMoveItem,
   onMoveItemToAllDay,
+  durationForSource,
   draft,
   dragPreview,
   draggingTaskTitle,
@@ -247,11 +245,13 @@ export function WeekView({
   const showEmptyHint = !hasAnyItemInView && !draft && !selection;
 
   function minutesFromTimeGridPointerY(clientY: number): number {
-    const scroller = scrollRef.current;
-    const body = scroller?.querySelector<HTMLElement>(".gcal-timegrid-body");
-    if (scroller && body) {
-      const scrollRect = scroller.getBoundingClientRect();
-      const offsetY = clientY - scrollRect.top + scroller.scrollTop - body.offsetTop;
+    // Measure against the body's live on-screen rect: getBoundingClientRect
+    // already reflects the current scroll position, so we don't juggle
+    // scrollTop/offsetTop (which broke when the scroller isn't the body's
+    // offsetParent — the sticky header's height then leaked in as an offset).
+    const body = scrollRef.current?.querySelector<HTMLElement>(".gcal-timegrid-body");
+    if (body) {
+      const offsetY = clientY - body.getBoundingClientRect().top;
       return clampMinutes(DAY_START * 60 + (offsetY / SLOT_HEIGHT) * 60, DAY_START * 60, DAY_END * 60);
     }
     return minutesFromPointerY(clientY, 0);
@@ -379,19 +379,28 @@ export function WeekView({
     window.addEventListener("pointerup", onUp, { once: true });
   }
 
-  function startMove(event: ReactPointerEvent<HTMLElement>, item: CalendarItem, startMin: number, endMin: number) {
+  // fromAllDay: the gesture started on an all-day chip, which has no
+  // existing time-slot position — the block's duration (and grab offset)
+  // fall back to the source task's usual estimate instead of the block's
+  // current start/end.
+  function startMove(
+    event: ReactPointerEvent<HTMLElement>,
+    item: CalendarItem,
+    startMin: number,
+    endMin: number,
+    fromAllDay = false,
+  ) {
     if (event.button !== 0) return;
-    const blockEl = event.currentTarget as HTMLElement;
-    const body = blockEl.closest(".gcal-timegrid-body");
-    const column = blockEl.closest(".gcal-time-col");
-    if (!body || !column) return;
+    const scroller = scrollRef.current;
+    if (!scroller) return;
     event.preventDefault();
-    const duration = endMin - startMin;
+    const duration = fromAllDay ? Math.max(TIME_SNAP_MINUTES, durationForSource(item.sourceId)) : endMin - startMin;
     const startClientX = event.clientX;
     const startClientY = event.clientY;
     // Keep the grab point stable: the block moves relative to where it was
-    // grabbed instead of snapping its top edge to the cursor.
-    const grabOffsetMin = minutesFromTimeGridPointerY(event.clientY) - startMin;
+    // grabbed instead of snapping its top edge to the cursor. An all-day
+    // origin has no meaningful grab point yet, so it snaps from the top.
+    const grabOffsetMin = fromAllDay ? 0 : minutesFromTimeGridPointerY(event.clientY) - startMin;
 
     const state: LiveMove = {
       key: item.key,
@@ -403,13 +412,14 @@ export function WeekView({
       startMin,
       endMin,
       moved: false,
-      allDay: false,
+      allDay: fromAllDay,
     };
     moveRef.current = state;
     setMove(state);
 
-    function targetDayFromX(clientX: number): { day: string; columnEl: Element } {
-      const cols = [...body!.querySelectorAll(".gcal-time-col")];
+    function targetDayFromX(clientX: number): { day: string; columnEl: Element | null } {
+      const cols = [...(scroller!.querySelectorAll(".gcal-time-col"))];
+      if (cols.length === 0) return { day: item.date, columnEl: null };
       let index = cols.findIndex((col) => {
         const rect = col.getBoundingClientRect();
         return clientX >= rect.left && clientX < rect.right;
@@ -565,7 +575,9 @@ export function WeekView({
         >
           <div className="gcal-time-corner small">{t("calendar.allDay")}</div>
           {days.map((day) => {
-            const allDayItems = items.filter((item) => item.date === day && item.allDay);
+            const allDayItems = items.filter(
+              (item) => item.date === day && item.allDay && !(move?.moved && move.key === item.key),
+            );
             const id = `allday:${day}`;
             const isMoveTarget = Boolean(move?.moved && move.allDay && move.day === day);
             return (
@@ -609,13 +621,12 @@ export function WeekView({
                       item.repeating ? "is-repeating" : "",
                       item.status === "done" ? "is-done" : "",
                     ].filter(Boolean).join(" ")}
-                    draggable={item.draggable}
-                    onDragStartCapture={
-                      item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined
+                    onPointerDown={
+                      item.draggable ? (event) => startMove(event, item, 0, 0, true) : undefined
                     }
-                    onDragEnd={item.draggable ? onDragEnd : undefined}
                     onClick={(event) => {
                       event.stopPropagation();
+                      if (suppressClickRef.current) return;
                       onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
                     }}
                     style={item.layer === "task" || item.layer === "external" ? { borderLeftColor: item.color } : undefined}
