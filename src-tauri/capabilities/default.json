@@ -9,6 +9,11 @@
     "notification:default",
     "opener:default",
     "updater:default",
-    "process:default"
+    "process:default",
+    "dialog:allow-open",
+    "fs:allow-read-text-file",
+    "fs:allow-read-dir",
+    "fs:allow-exists",
+    "fs:allow-stat"
   ]
 }

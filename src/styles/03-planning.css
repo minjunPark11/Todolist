@@ -1461,6 +1461,41 @@
   font-size: 12px;
   text-align: right;
 }
+.ff-knowledge-vault-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.ff-knowledge-path {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, monospace);
+}
+.ff-knowledge-privacy-note {
+  margin: 0;
+  padding: 12px 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ff-knowledge-badge {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface-muted);
+  color: var(--text-tertiary);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ff-knowledge-locked { opacity: 0.85; }
 .ff-import-btn { cursor: pointer; }
 .ff-settings-msg { color: var(--success); font-size: 13px; padding: 8px 0; }
 .ff-settings-error { color: var(--danger); font-size: 13px; margin: 0; }

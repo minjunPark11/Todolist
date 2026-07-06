@@ -1,6 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
+import { appDataDir, join as joinPath } from "@tauri-apps/api/path";
+import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
+import {
+  readDir,
+  readTextFile as fsReadTextFile,
+  stat as fsStat,
+} from "@tauri-apps/plugin-fs";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import {
   isPermissionGranted,
@@ -10,7 +17,61 @@ import {
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { MiniFocusTimerSnapshot } from "../lib/miniFocusTimer";
 import { webPlatform } from "./web";
-import type { FocusTrayActionPayload, PlatformAdapter } from "./types";
+import type {
+  FocusTrayActionPayload,
+  PlatformAdapter,
+  PlatformFileEntry,
+  ScanMarkdownFilesOptions,
+} from "./types";
+
+const KNOWLEDGE_DB_FILENAME = "knowledge_index.db";
+
+function baseName(path: string) {
+  return path.split(/[\\/]/).pop() ?? path;
+}
+
+function hasAllowedExtension(name: string, extensions: string[]) {
+  const lower = name.toLowerCase();
+  return extensions.some((ext) => lower.endsWith(ext.toLowerCase()));
+}
+
+async function scanDirectory(
+  root: string,
+  currentDir: string,
+  options: ScanMarkdownFilesOptions,
+  results: PlatformFileEntry[],
+): Promise<void> {
+  if (options.maxFiles && results.length >= options.maxFiles) return;
+
+  const entries = await readDir(currentDir);
+  for (const entry of entries) {
+    if (options.maxFiles && results.length >= options.maxFiles) return;
+    // Symlinks are skipped so a vault can never read outside the folder the
+    // user actually picked (read-only, scoped access — design principle 7).
+    if (entry.isSymlink) continue;
+
+    if (entry.isDirectory) {
+      if (options.excludedFolders.includes(entry.name)) continue;
+      const childDir = await joinPath(currentDir, entry.name);
+      await scanDirectory(root, childDir, options, results);
+      continue;
+    }
+
+    if (!entry.isFile || !hasAllowedExtension(entry.name, options.extensions)) continue;
+
+    const fullPath = await joinPath(currentDir, entry.name);
+    const info = await fsStat(fullPath).catch(() => null);
+    const relativePath = fullPath.startsWith(root)
+      ? fullPath.slice(root.length).replace(/^[\\/]+/, "")
+      : fullPath;
+    results.push({
+      path: fullPath,
+      relativePath,
+      size: info?.size ?? 0,
+      modifiedAt: info?.mtime ? info.mtime.getTime() : 0,
+    });
+  }
+}
 
 type TauriGlobal = Window & {
   __TAURI__?: unknown;
@@ -117,5 +178,58 @@ export const tauriPlatform: PlatformAdapter = {
 
   async openExternal(url) {
     await openUrl(url);
+  },
+
+  files: {
+    supported() {
+      return true;
+    },
+
+    async pickFolder() {
+      const selected = await openFolderDialog({ directory: true, multiple: false });
+      if (typeof selected !== "string") return null;
+      await tauriPlatform.files.grantAccess(selected);
+      return selected;
+    },
+
+    async grantAccess(path) {
+      // The fs plugin scope is deny-all by default (see
+      // capabilities/default.json); this extends it to exactly the folder
+      // the user chose. Required on every app start too, since Tauri does
+      // not persist the scope dialog.open() grants across restarts.
+      await invoke("grant_vault_read_access", { path });
+    },
+
+    async scanMarkdownFiles(root, options) {
+      const results: PlatformFileEntry[] = [];
+      await scanDirectory(root, root, options, results);
+      return results;
+    },
+
+    async readTextFile(path, maxBytes) {
+      if (maxBytes) {
+        const info = await fsStat(path).catch(() => null);
+        if (info && info.size > maxBytes) {
+          throw new Error(`File exceeds the ${maxBytes}-byte limit (${info.size} bytes): ${path}`);
+        }
+      }
+      return fsReadTextFile(path);
+    },
+
+    async getFileMetadata(path) {
+      const info = await fsStat(path).catch(() => null);
+      if (!info) return null;
+      return {
+        path,
+        relativePath: baseName(path),
+        size: info.size,
+        modifiedAt: info.mtime ? info.mtime.getTime() : 0,
+      };
+    },
+
+    async getDefaultKnowledgeDbPath() {
+      const dir = await appDataDir();
+      return joinPath(dir, KNOWLEDGE_DB_FILENAME);
+    },
   },
 };

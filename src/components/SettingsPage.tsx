@@ -1,9 +1,11 @@
 import { ChangeEvent, ReactNode, useEffect, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
+import { useKnowledgeSettings } from "../lib/knowledge/useKnowledgeSettings";
+import { platform } from "../platform";
 import type { AppUpdateStatus } from "../platform";
 import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, Task, ThemeMode } from "../types";
 import { CalendarCategorySettings } from "./calendar/CalendarCategorySettings";
-import { SegmentedTabs } from "./kit";
+import { ConfirmModal, SegmentedTabs } from "./kit";
 import { listLocalAiModels } from "../lib/ai/gateway";
 import { useT } from "../i18n";
 
@@ -69,7 +71,7 @@ export function SettingsPage({
   onPublishCalendarShare,
 }: SettingsPageProps) {
   const { t } = useT();
-  const [tab, setTab] = useState<"appearance" | "behavior" | "calendar" | "data">("appearance");
+  const [tab, setTab] = useState<"appearance" | "behavior" | "calendar" | "knowledge" | "data">("appearance");
   const [calendarDraft, setCalendarDraft] = useState({ name: "", icsUrl: "", color: "#4f73ff" });
   const [externalFormOpen, setExternalFormOpen] = useState(false);
   const [shareCopyKey, setShareCopyKey] = useState("settings.calendar.copy");
@@ -105,6 +107,7 @@ export function SettingsPage({
           ["appearance", t("settings.tabAppearance")],
           ["behavior", t("settings.tabBehavior")],
           ["calendar", t("settings.tabCalendar")],
+          ["knowledge", t("settings.tabKnowledge")],
           ["data", t("settings.tabData")],
         ]}
         active={tab}
@@ -387,6 +390,8 @@ export function SettingsPage({
         </div>
       ) : null}
 
+      {tab === "knowledge" ? <KnowledgeSettingsTab /> : null}
+
       {tab === "data" ? (
         <>
           <div className="ff-settings-card">
@@ -517,6 +522,97 @@ function AiModelRow({ value, onChange }: { value: string; onChange: (model: stri
       </div>
       {isOffline ? <small className="ff-ai-model-offline">{t("ai.status.offline")}</small> : null}
     </Row>
+  );
+}
+
+function KnowledgeSettingsTab() {
+  const { t } = useT();
+  const { settings, updateSettings, isDesktop } = useKnowledgeSettings();
+  const [pickError, setPickError] = useState("");
+  const [picking, setPicking] = useState(false);
+  const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false);
+
+  async function handlePickFolder() {
+    setPickError("");
+    setPicking(true);
+    try {
+      const picked = await platform.files.pickFolder();
+      if (picked) {
+        updateSettings({ vaultPath: picked, enabled: true });
+      }
+    } catch (error) {
+      setPickError(error instanceof Error ? error.message : t("settings.knowledge.pickFailed"));
+    } finally {
+      setPicking(false);
+    }
+  }
+
+  function confirmDisconnect() {
+    // Phase 0 has no local index yet (Full RAG's KnowledgeStore lands in a
+    // later phase), so there is nothing to offer to keep/delete here beyond
+    // the connection itself.
+    updateSettings({ vaultPath: "", enabled: false, lastIndexedAt: "" });
+    setDisconnectConfirmOpen(false);
+  }
+
+  if (!isDesktop) {
+    return (
+      <div className="ff-settings-card ff-knowledge-locked">
+        <Row title={t("settings.knowledge.title")} hint={t("settings.knowledge.desktopOnly")}>
+          <span className="ff-knowledge-badge">{t("settings.knowledge.desktopOnlyBadge")}</span>
+        </Row>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ff-settings-card">
+      <Row title={t("settings.knowledge.vaultTitle")} hint={t("settings.knowledge.vaultHint")}>
+        <div className="ff-knowledge-vault-control">
+          {settings.vaultPath ? (
+            <>
+              <span className="ff-knowledge-path" title={settings.vaultPath}>
+                {settings.vaultPath}
+              </span>
+              <button type="button" className="ff-btn" onClick={handlePickFolder} disabled={picking}>
+                {t("settings.knowledge.changeFolder")}
+              </button>
+              <button type="button" className="ff-btn ff-btn-danger" onClick={() => setDisconnectConfirmOpen(true)}>
+                {t("settings.knowledge.disconnect")}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="ff-btn ff-btn-primary" onClick={handlePickFolder} disabled={picking}>
+              {t("settings.knowledge.pickFolder")}
+            </button>
+          )}
+        </div>
+      </Row>
+
+      {pickError ? <p className="ff-settings-error">{pickError}</p> : null}
+
+      {settings.vaultPath ? (
+        <>
+          <Toggle
+            label={t("settings.knowledge.enable")}
+            hint={t("settings.knowledge.enableHint")}
+            value={settings.enabled}
+            onChange={(value) => updateSettings({ enabled: value })}
+          />
+          <p className="ff-knowledge-privacy-note">{t("settings.knowledge.privacyNote")}</p>
+        </>
+      ) : null}
+
+      {disconnectConfirmOpen ? (
+        <ConfirmModal
+          title={t("settings.knowledge.disconnectTitle")}
+          body={t("settings.knowledge.disconnectBody")}
+          confirmLabel={t("settings.knowledge.disconnectConfirm")}
+          onCancel={() => setDisconnectConfirmOpen(false)}
+          onConfirm={confirmDisconnect}
+        />
+      ) : null}
+    </div>
   );
 }
 

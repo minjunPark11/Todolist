@@ -4,7 +4,11 @@ import {
   updateMiniFocusTimer,
   type MiniFocusTimerSnapshot,
 } from "../lib/miniFocusTimer";
-import type { PlatformAdapter } from "./types";
+import type { PlatformAdapter, PlatformFileEntry } from "./types";
+
+function filesUnsupported(): never {
+  throw new Error("Local file access is only available in the desktop app.");
+}
 
 function compareVersions(a: string, b: string) {
   const left = a.split(".").map((part) => Number.parseInt(part, 10) || 0);
@@ -122,5 +126,29 @@ export const webPlatform: PlatformAdapter = {
 
   async openExternal(url) {
     window.open(url, "_blank", "noopener,noreferrer");
+  },
+
+  files: {
+    supported() {
+      return false;
+    },
+    async pickFolder() {
+      return null;
+    },
+    async grantAccess() {
+      filesUnsupported();
+    },
+    async scanMarkdownFiles(): Promise<PlatformFileEntry[]> {
+      filesUnsupported();
+    },
+    async readTextFile() {
+      filesUnsupported();
+    },
+    async getFileMetadata() {
+      filesUnsupported();
+    },
+    async getDefaultKnowledgeDbPath() {
+      filesUnsupported();
+    },
   },
 };

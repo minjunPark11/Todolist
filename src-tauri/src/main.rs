@@ -11,6 +11,7 @@ use tauri::{
     tray::TrayIconBuilder,
     Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
+use tauri_plugin_fs::FsExt;
 
 const TRAY_ID: &str = "focusflow-tray";
 const MINI_TIMER_WINDOW: &str = "focus-mini-timer";
@@ -284,6 +285,18 @@ fn close_focus_mini_timer(app: tauri::AppHandle) {
     close_mini_timer_window(&app);
 }
 
+// The fs plugin denies all paths by default (see capabilities/default.json,
+// which grants the read commands but no static scope). This command extends
+// the runtime scope to exactly the folder the user picked via the dialog
+// plugin, so the knowledge-base feature can only ever read a directory the
+// user explicitly chose — never an arbitrary filesystem path.
+#[tauri::command]
+fn grant_vault_read_access(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    app.fs_scope()
+        .allow_directory(&path, true)
+        .map_err(|error| error.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
@@ -295,6 +308,8 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_main_window(app);
         }))
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
@@ -366,7 +381,8 @@ fn main() {
             get_focus_tray_snapshot,
             open_focus_mini_timer,
             dispatch_focus_tray_action,
-            close_focus_mini_timer
+            close_focus_mini_timer,
+            grant_vault_read_access
         ])
         .run(tauri::generate_context!())
         .expect("error while running FocusFlow desktop app");
