@@ -173,8 +173,12 @@ export function buildCalendarItems({
 
   for (const task of tasks) {
     if (task.status === "archived" || task.deletedAt) continue;
-    // Done items only appear when the Completed layer is explicitly on (§9.8).
-    if (task.status === "done" && !layers.completed) continue;
+    const done = task.status === "done";
+    const hasScheduledBlock = Boolean(task.scheduledDate);
+    // Scheduled work blocks stay on the calendar after completion so the
+    // plan remains visible as a completed schedule. Completed, unscheduled
+    // tasks still obey the optional Completed layer.
+    if (done && !hasScheduledBlock && !layers.completed) continue;
     if (!projectAllowed(task.projectId, projectFilter)) continue;
 
     const project = projectById.get(task.projectId);
@@ -199,13 +203,13 @@ export function buildCalendarItems({
         categoryId: taskCategoryId,
         priority: task.priority,
         status: task.status,
-        draggable: true,
+        draggable: !done,
         repeating,
       });
     }
 
     // D2: dueDate is always an all-day, non-draggable deadline marker.
-    if (layers.deadline && task.dueDate) {
+    if (layers.deadline && task.dueDate && (!done || layers.completed)) {
       items.push({
         key: `deadline:${task.id}`,
         layer: "deadline",

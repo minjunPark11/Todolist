@@ -563,6 +563,13 @@
   font-style: italic;
 }
 
+.gcal-chip.is-done {
+  opacity: 0.68;
+  cursor: pointer;
+  text-decoration: line-through;
+  background: rgba(52, 199, 89, 0.12);
+}
+
 /* Week/Day time grid */
 
 .gcal-timegrid {
@@ -883,6 +890,16 @@
 .gcal-time-block.is-external {
   cursor: default;
   outline: 1px dashed rgba(0, 0, 0, 0.18);
+}
+
+.gcal-time-block.is-done {
+  opacity: 0.72;
+  cursor: pointer;
+  filter: saturate(0.72);
+}
+
+.gcal-time-block.is-done .gcal-tb-title {
+  text-decoration: line-through;
 }
 
 /* Pointer-move overlay: the only visual while a block is being dragged. */
@@ -3463,4 +3480,3 @@ main {
     overflow-x: auto;
   }
 }
-

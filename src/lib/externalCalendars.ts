@@ -37,17 +37,33 @@ function unescapeIcsText(value = "") {
 }
 
 function getIcsValue(lines: string[], name: string) {
-  const prefix = `${name}`;
-  const line = lines.find((item) => item.startsWith(`${prefix}:`) || item.startsWith(`${prefix};`));
-  if (!line) return "";
-  const colon = line.indexOf(":");
-  return colon >= 0 ? line.slice(colon + 1) : "";
+  const property = getIcsProperty(lines, name);
+  return property?.value ?? "";
 }
 
-function parseIcsDate(value: string) {
+function getIcsProperty(lines: string[], name: string) {
+  const prefix = name.toUpperCase();
+  const line = lines.find((item) => {
+    const upper = item.toUpperCase();
+    return upper.startsWith(`${prefix}:`) || upper.startsWith(`${prefix};`);
+  });
+  if (!line) return null;
+  const colon = line.indexOf(":");
+  if (colon < 0) return null;
+  const head = line.slice(0, colon);
+  const params = new Map<string, string>();
+  for (const part of head.split(";").slice(1)) {
+    const equals = part.indexOf("=");
+    if (equals < 0) continue;
+    params.set(part.slice(0, equals).toUpperCase(), part.slice(equals + 1).replace(/^"|"$/g, ""));
+  }
+  return { value: line.slice(colon + 1), params };
+}
+
+function parseIcsDate(value: string, timezone?: string) {
   if (!value) return null;
   if (/^\d{8}$/.test(value)) {
-    return { value: `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`, allDay: true };
+    return { value: `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`, allDay: true, timezone: undefined };
   }
   const match = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/);
   if (!match) return null;
@@ -55,20 +71,45 @@ function parseIcsDate(value: string) {
   const iso = z
     ? new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`).toISOString()
     : `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-  return { value: iso, allDay: false };
+  return { value: iso, allDay: false, timezone };
 }
 
 function pad2(value: number) {
   return String(value).padStart(2, "0");
 }
 
-// UTC ("...Z") stamps are converted to the device's local date/time so events
-// land on the day/slot the user actually experiences them; floating times are
-// taken as-is.
-function localDateTimeParts(value: string): { date: string; time?: string } {
+// UTC ("...Z") stamps are converted to the source calendar's timezone when
+// available, otherwise to the device's local date/time. Floating TZID values
+// are already in the source calendar's wall time, so they are taken as-is.
+function localDateTimeParts(value: string, timezone?: string): { date: string; time?: string } {
   if (!value.includes("T")) return { date: value.slice(0, 10) };
   if (value.endsWith("Z")) {
     const date = new Date(value);
+    if (timezone) {
+      try {
+        const parts = new Intl.DateTimeFormat("en-CA", {
+          timeZone: timezone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+          hourCycle: "h23",
+        })
+          .formatToParts(date)
+          .reduce<Record<string, string>>((acc, part) => {
+            if (part.type !== "literal") acc[part.type] = part.value;
+            return acc;
+          }, {});
+        return {
+          date: `${parts.year}-${parts.month}-${parts.day}`,
+          time: `${parts.hour}:${parts.minute}`,
+        };
+      } catch {
+        // Unknown/non-IANA TZID: fall back to device local handling.
+      }
+    }
     return {
       date: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`,
       time: `${pad2(date.getHours())}:${pad2(date.getMinutes())}`,
@@ -79,6 +120,7 @@ function localDateTimeParts(value: string): { date: string; time?: string } {
 
 export function parseIcsEvents(text: string, calendarId: string): ExternalCalendarEvent[] {
   const lines = unfoldIcsLines(text);
+  const calendarTimezone = getIcsValue(lines, "X-WR-TIMEZONE") || getIcsValue(lines, "TZID") || undefined;
   const now = new Date().toISOString();
   const events: ExternalCalendarEvent[] = [];
   let block: string[] | null = null;
@@ -90,12 +132,16 @@ export function parseIcsEvents(text: string, calendarId: string): ExternalCalend
     }
     if (line === "END:VEVENT" && block) {
       const uid = getIcsValue(block, "UID") || createId("ics-event");
-      const start = parseIcsDate(getIcsValue(block, "DTSTART"));
+      const startProperty = getIcsProperty(block, "DTSTART");
+      const startTimezone = startProperty?.params.get("TZID") || calendarTimezone;
+      const start = parseIcsDate(startProperty?.value ?? "", startTimezone);
       if (!start) {
         block = null;
         continue;
       }
-      const end = parseIcsDate(getIcsValue(block, "DTEND"));
+      const endProperty = getIcsProperty(block, "DTEND");
+      const endTimezone = endProperty?.params.get("TZID") || start.timezone;
+      const end = parseIcsDate(endProperty?.value ?? "", endTimezone);
       events.push({
         id: `${calendarId}:${uid}`,
         externalCalendarId: calendarId,
@@ -106,6 +152,7 @@ export function parseIcsEvents(text: string, calendarId: string): ExternalCalend
         start: start.value,
         end: end?.value,
         allDay: start.allDay,
+        timezone: start.timezone,
         sourceUrl: getIcsValue(block, "URL"),
         readOnly: true,
         createdAt: now,
@@ -250,18 +297,18 @@ export async function fetchExternalCalendarEvents(calendar: ExternalCalendar) {
 }
 
 export function externalEventDate(event: ExternalCalendarEvent) {
-  return localDateTimeParts(event.start).date;
+  return localDateTimeParts(event.start, event.timezone).date;
 }
 
 // End date (exclusive for all-day events per RFC 5545), or undefined.
 export function externalEventEndDate(event: ExternalCalendarEvent) {
-  return event.end ? localDateTimeParts(event.end).date : undefined;
+  return event.end ? localDateTimeParts(event.end, event.timezone).date : undefined;
 }
 
 export function externalEventStartTime(event: ExternalCalendarEvent) {
-  return event.allDay ? undefined : localDateTimeParts(event.start).time;
+  return event.allDay ? undefined : localDateTimeParts(event.start, event.timezone).time;
 }
 
 export function externalEventEndTime(event: ExternalCalendarEvent) {
-  return event.allDay || !event.end ? undefined : localDateTimeParts(event.end).time;
+  return event.allDay || !event.end ? undefined : localDateTimeParts(event.end, event.timezone).time;
 }

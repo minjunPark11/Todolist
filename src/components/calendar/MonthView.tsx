@@ -96,7 +96,12 @@ export function MonthView({
               animate={motionEnabled ? "animate" : undefined}
               exit={motionEnabled ? "exit" : undefined}
               transition={motionEnabled ? transitions.soft : reducedTransition}
-              className={`gcal-chip gcal-chip-${item.layer}${item.repeating ? " is-repeating" : ""}`}
+              className={[
+                "gcal-chip",
+                `gcal-chip-${item.layer}`,
+                item.repeating ? "is-repeating" : "",
+                item.status === "done" ? "is-done" : "",
+              ].filter(Boolean).join(" ")}
               draggable={item.draggable}
               onDragStartCapture={
                 item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined

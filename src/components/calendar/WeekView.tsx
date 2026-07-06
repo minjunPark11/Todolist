@@ -246,6 +246,17 @@ export function WeekView({
   const hasAnyItemInView = items.some((item) => days.includes(item.date));
   const showEmptyHint = !hasAnyItemInView && !draft && !selection;
 
+  function minutesFromTimeGridPointerY(clientY: number): number {
+    const scroller = scrollRef.current;
+    const body = scroller?.querySelector<HTMLElement>(".gcal-timegrid-body");
+    if (scroller && body) {
+      const scrollRect = scroller.getBoundingClientRect();
+      const offsetY = clientY - scrollRect.top + scroller.scrollTop - body.offsetTop;
+      return clampMinutes(DAY_START * 60 + (offsetY / SLOT_HEIGHT) * 60, DAY_START * 60, DAY_END * 60);
+    }
+    return minutesFromPointerY(clientY, 0);
+  }
+
   // Now-indicator geometry: one grid-wide overlay (badge in the time gutter,
   // muted line across all days, solid segment + dot over today's column).
   const todayIndex = days.indexOf(today);
@@ -256,8 +267,7 @@ export function WeekView({
     if (event.button !== 0) return;
     if (resize || move) return;
     if (!shouldStartTimeSelection(event.target)) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const startMinutes = minutesFromPointerY(event.clientY, rect.top);
+    const startMinutes = minutesFromTimeGridPointerY(event.clientY);
     // §9.7: capture so a drag ending outside the grid still reaches pointerup.
     // Defensive — some browsers reject capture for edge-case pointer sessions;
     // the selection still works via direct pointermove/up listeners either way.
@@ -278,8 +288,7 @@ export function WeekView({
 
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     if (!selection || event.pointerId !== selection.pointerId) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const currentMinutes = minutesFromPointerY(event.clientY, rect.top);
+    const currentMinutes = minutesFromTimeGridPointerY(event.clientY);
     setSelection((current) => (current ? { ...current, currentMinutes } : current));
   }
 
@@ -339,8 +348,7 @@ export function WeekView({
     setResize(state);
 
     function onMove(move: PointerEvent) {
-      const rect = column!.getBoundingClientRect();
-      const minutes = clampMinutes(minutesFromPointerY(move.clientY, rect.top), DAY_START * 60, DAY_END * 60);
+      const minutes = minutesFromTimeGridPointerY(move.clientY);
       const current = resizeRef.current;
       if (!current) return;
       let next: LiveResize;
@@ -383,7 +391,7 @@ export function WeekView({
     const startClientY = event.clientY;
     // Keep the grab point stable: the block moves relative to where it was
     // grabbed instead of snapping its top edge to the cursor.
-    const grabOffsetMin = minutesFromPointerY(event.clientY, column.getBoundingClientRect().top) - startMin;
+    const grabOffsetMin = minutesFromTimeGridPointerY(event.clientY) - startMin;
 
     const state: LiveMove = {
       key: item.key,
@@ -437,8 +445,7 @@ export function WeekView({
         if (moveEvent.clientY < scrollRect.top + 110) scroller.scrollTop -= 14;
         else if (moveEvent.clientY > scrollRect.bottom - 48) scroller.scrollTop += 14;
       }
-      const rect = target.columnEl.getBoundingClientRect();
-      const pointerMin = minutesFromPointerY(moveEvent.clientY, rect.top);
+      const pointerMin = minutesFromTimeGridPointerY(moveEvent.clientY);
       const nextStart = clampMinutes(
         snapDownToStep(pointerMin - grabOffsetMin),
         DAY_START * 60,
@@ -516,8 +523,7 @@ export function WeekView({
   }
 
   function dragStartTimeFromEvent(event: DragEvent<HTMLDivElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const minutes = minutesFromPointerY(event.clientY, rect.top);
+    const minutes = minutesFromTimeGridPointerY(event.clientY);
     const snapped = clampMinutes(
       Math.floor(minutes / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES,
       DAY_START * 60,
@@ -597,7 +603,12 @@ export function WeekView({
                     animate={motionEnabled ? "animate" : undefined}
                     exit={motionEnabled ? "exit" : undefined}
                     transition={motionEnabled ? transitions.soft : reducedTransition}
-                    className={`gcal-chip gcal-chip-${item.layer}${item.repeating ? " is-repeating" : ""}`}
+                    className={[
+                      "gcal-chip",
+                      `gcal-chip-${item.layer}`,
+                      item.repeating ? "is-repeating" : "",
+                      item.status === "done" ? "is-done" : "",
+                    ].filter(Boolean).join(" ")}
                     draggable={item.draggable}
                     onDragStartCapture={
                       item.draggable ? (event) => onDragStart(event, item.sourceId) : undefined
@@ -819,6 +830,7 @@ export function WeekView({
                         resize?.key === item.key ? "is-resizing" : "",
                         item.layer === "external" ? "is-external" : "",
                         item.layer === "focus-actual" ? "is-focus-actual" : "",
+                        item.status === "done" ? "is-done" : "",
                       ].filter(Boolean).join(" ")}
                       onPointerDown={item.draggable ? (event) => startMove(event, item, startMin, endMin) : undefined}
                       onClick={(event) => {
