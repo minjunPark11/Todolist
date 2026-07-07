@@ -72,6 +72,17 @@ fn tray_tooltip(snapshot: Option<&FocusTraySnapshot>) -> String {
     }
 }
 
+// macOS menu-bar items expect a *template* image: black + alpha only, ~18pt
+// (36px @2x). The system then tints it for light/dark menu bars and click
+// highlight — a colored bitmap neither scales nor adapts there, which is why
+// the old procedural circle showed fine in the Windows tray but not on macOS.
+#[cfg(target_os = "macos")]
+fn tray_icon_image() -> Image<'static> {
+    Image::from_bytes(include_bytes!("../icons/tray/trayTemplate@2x.png"))
+        .expect("bundled tray template icon must decode")
+}
+
+#[cfg(not(target_os = "macos"))]
 fn tray_icon_image() -> Image<'static> {
     let mut rgba = Vec::with_capacity(32 * 32 * 4);
     for y in 0..32 {
@@ -353,12 +364,20 @@ fn main() {
         .plugin(tauri_plugin_sql::Builder::default().build())
         .setup(|app| {
             let menu = build_tray_menu(app.handle(), None)?;
-            TrayIconBuilder::with_id(TRAY_ID)
+            #[allow(unused_mut)]
+            let mut tray = TrayIconBuilder::with_id(TRAY_ID)
                 .icon(tray_icon_image())
                 .tooltip("FocusFlow")
                 .menu(&menu)
-                .show_menu_on_left_click(true)
-                .build(app)?;
+                .show_menu_on_left_click(true);
+            // Template mode lets macOS tint the glyph for light/dark menu
+            // bars; without it the icon renders as a raw bitmap (or not at
+            // all). Other platforms don't have the concept.
+            #[cfg(target_os = "macos")]
+            {
+                tray = tray.icon_as_template(true);
+            }
+            tray.build(app)?;
             Ok(())
         })
         .on_menu_event(|app, event| match event.id().as_ref() {
