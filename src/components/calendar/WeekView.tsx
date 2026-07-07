@@ -244,15 +244,31 @@ export function WeekView({
   const hasAnyItemInView = items.some((item) => days.includes(item.date));
   const showEmptyHint = !hasAnyItemInView && !draft && !selection;
 
+  // The grid renders inside the app shell's `zoom: 0.9` density scaling, so
+  // one layout pixel is NOT one screen pixel — and engines disagree on how
+  // zoomed coordinates are reported (WebView2/WKWebView vs. browser versions).
+  // Deriving the effective scale from the measured height is correct under
+  // any zoom/transform, so pointer math never assumes a fixed ratio.
+  function timeGridScaleFromRect(rect: DOMRect): number {
+    const layoutHeight = (DAY_END - DAY_START) * SLOT_HEIGHT;
+    return rect.height > 0 ? rect.height / layoutHeight : 1;
+  }
+
+  function timeGridBodyRect(): DOMRect | null {
+    const body = scrollRef.current?.querySelector<HTMLElement>(".gcal-timegrid-body");
+    return body ? body.getBoundingClientRect() : null;
+  }
+
   function minutesFromTimeGridPointerY(clientY: number): number {
     // Measure against the body's live on-screen rect: getBoundingClientRect
     // already reflects the current scroll position, so we don't juggle
     // scrollTop/offsetTop (which broke when the scroller isn't the body's
     // offsetParent — the sticky header's height then leaked in as an offset).
-    const body = scrollRef.current?.querySelector<HTMLElement>(".gcal-timegrid-body");
-    if (body) {
-      const offsetY = clientY - body.getBoundingClientRect().top;
-      return clampMinutes(DAY_START * 60 + (offsetY / SLOT_HEIGHT) * 60, DAY_START * 60, DAY_END * 60);
+    const rect = timeGridBodyRect();
+    if (rect) {
+      const offsetY = clientY - rect.top;
+      const scale = timeGridScaleFromRect(rect);
+      return clampMinutes(DAY_START * 60 + (offsetY / (SLOT_HEIGHT * scale)) * 60, DAY_START * 60, DAY_END * 60);
     }
     return minutesFromPointerY(clientY, 0);
   }
@@ -301,12 +317,16 @@ export function WeekView({
       ({ startMin, endMin } = snappedDragRange(sel.startMinutes, sel.currentMinutes));
     }
     if (endMin - startMin < TIME_SNAP_MINUTES) return;
-    const top = columnRect.top + topFor(startMin);
+    // columnRect is in screen px while topFor/heightFor are layout px —
+    // convert with the measured scale so the popover anchors to the block.
+    const bodyRect = timeGridBodyRect();
+    const scale = bodyRect ? timeGridScaleFromRect(bodyRect) : 1;
+    const top = columnRect.top + topFor(startMin) * scale;
     onDraftCreate(sel.day, minutesToTime(startMin), minutesToTime(endMin), {
       left: columnRect.left,
       right: columnRect.right,
       top,
-      bottom: top + heightFor(startMin, endMin),
+      bottom: top + heightFor(startMin, endMin) * scale,
     });
   }
 
