@@ -133,4 +133,6 @@ export interface SpaceTypePreset {
   noteTypes: string[];
   focusCategories: string[];
   aiSummaryLabel: string;
+  // Example first tasks shown under the tasks-tab empty state ("e.g. …").
+  emptyTaskExamples: string;
 }

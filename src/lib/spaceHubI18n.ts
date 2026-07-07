@@ -41,6 +41,10 @@ const PRESET_KEY: Record<string, string> = {
   "AI Space Summary": "spaceHub.preset.aiSpaceSummary",
   "AI Study Summary": "spaceHub.preset.aiStudySummary",
   "AI Personal Summary": "spaceHub.preset.aiPersonalSummary",
+  "Outline the paper · Read prior research": "spaceHub.preset.taskExamplesProject",
+  "Review wrong answers · Revisit key concepts": "spaceHub.preset.taskExamplesStudy",
+  "Make a grocery list · 30-minute workout": "spaceHub.preset.taskExamplesPersonal",
+  "Write down today's tasks · Gather references": "spaceHub.preset.taskExamplesCustom",
 };
 
 const GROUP_KEY: Record<string, string> = {

@@ -18,6 +18,7 @@ export const spaceTypePresets: Record<SpaceHubType, SpaceTypePreset> = {
     noteTypes: ["Meeting Note", "Feedback", "Decision", "Design Link", "Reference"],
     focusCategories: ["Development", "Design", "Planning", "Review"],
     aiSummaryLabel: "AI Space Summary",
+    emptyTaskExamples: "Outline the paper · Read prior research",
   },
   study: {
     headerSubtitle: "Space for study and problem solving",
@@ -34,6 +35,7 @@ export const spaceTypePresets: Record<SpaceHubType, SpaceTypePreset> = {
     noteTypes: ["Concept Note", "Wrong Answer Note", "Pattern Summary", "Reference"],
     focusCategories: ["Problem Solving", "Review", "Concept", "Mock Test"],
     aiSummaryLabel: "AI Study Summary",
+    emptyTaskExamples: "Review wrong answers · Revisit key concepts",
   },
   personal: {
     headerSubtitle: "Space for routines and life admin",
@@ -50,6 +52,7 @@ export const spaceTypePresets: Record<SpaceHubType, SpaceTypePreset> = {
     noteTypes: ["Quick Note", "Checklist", "Reminder", "Reference", "Link"],
     focusCategories: ["Routine", "Life Admin", "Reading", "Health", "Errand"],
     aiSummaryLabel: "AI Personal Summary",
+    emptyTaskExamples: "Make a grocery list · 30-minute workout",
   },
   custom: {
     headerSubtitle: "Flexible space for your own work",
@@ -66,6 +69,7 @@ export const spaceTypePresets: Record<SpaceHubType, SpaceTypePreset> = {
     noteTypes: ["Quick Note", "Reference", "Link", "Decision"],
     focusCategories: ["Work", "Review", "Planning"],
     aiSummaryLabel: "AI Space Summary",
+    emptyTaskExamples: "Write down today's tasks · Gather references",
   },
 };
 

@@ -11,6 +11,7 @@ import {
 import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { useT } from "../../i18n";
 import { presetText, groupText } from "../../lib/spaceHubI18n";
+import { MoreMenu } from "../kit";
 
 type StatusFilter = "all" | "open" | "done";
 type SortMode = "updated" | "due" | "title";
@@ -41,6 +42,7 @@ export function SpaceTasksTab({
 
   const groupLabels = groups.map((group) => group.label);
   const normalizedQuery = query.trim().toLowerCase();
+  const hasTasks = spaceTasks.length > 0;
 
   const filtered = useMemo(() => {
     const sorted = [...spaceTasks].sort((a, b) => {
@@ -57,89 +59,125 @@ export function SpaceTasksTab({
     });
   }, [spaceTasks, sortMode, normalizedQuery, statusFilter, groupFilter, groupLabels]);
 
-  const grouped = groupLabels.map((label) => ({
-    label,
-    tasks: filtered.filter((task) => resolveTaskGroupLabel(task, groupLabels) === label),
-  }));
+  function resetFilters() {
+    setQuery("");
+    setStatusFilter("all");
+    setGroupFilter("all");
+  }
 
   return (
-    <section className="sdv-card sdv-tab-panel">
-      <header className="sdv-toolbar">
-        <input
-          type="search"
-          placeholder={t("spaceHub.search.tasks")}
-          aria-label={t("spaceHub.aria.searchTasks")}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <select aria-label={t("spaceHub.aria.statusFilter")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
-          <option value="all">{t("spaceHub.filter.allStatuses")}</option>
-          <option value="open">{t("spaceHub.filter.open")}</option>
-          <option value="done">{t("spaceHub.filter.done")}</option>
-        </select>
-        <select aria-label={t("spaceHub.aria.groupFilter")} value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
-          <option value="all">{t("spaceHub.filter.allGroups")}</option>
-          {groupLabels.map((label) => (
-            <option key={label} value={label}>
-              {groupText(t, label)}
-            </option>
-          ))}
-        </select>
-        <select aria-label={t("spaceHub.aria.sortTasks")} value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
-          <option value="updated">{t("spaceHub.sort.updated")}</option>
-          <option value="due">{t("spaceHub.sort.due")}</option>
-          <option value="title">{t("spaceHub.sort.title")}</option>
-        </select>
-        <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onAddTask}>
-          {presetText(t, preset.addTaskLabel)}
-        </button>
-      </header>
-
-      {spaceTasks.length === 0 ? (
-        <div className="sdv-empty">
-          <p>{t("spaceHub.empty.noTasks")}</p>
+    <section className="sdv-card sdv-tab-panel sdv-tasks-tab">
+      {/* Count header. With zero tasks the empty-state CTA is the single add
+          entry point, so the header button only renders once tasks exist. */}
+      <header className="sdv-tasks-head">
+        <h2>{t("spaceHub.tasks.count", { n: spaceTasks.length })}</h2>
+        {hasTasks ? (
           <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onAddTask}>
             {presetText(t, preset.addTaskLabel)}
           </button>
+        ) : null}
+      </header>
+
+      {!hasTasks ? (
+        <div className="sdv-tasks-empty">
+          <div className="sdv-tasks-empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
+              <path d="M8.2 12.2l2.6 2.6 5-5.4" />
+            </svg>
+          </div>
+          <strong>{t("spaceHub.tasksEmpty.title")}</strong>
+          <p>{t("spaceHub.tasksEmpty.desc")}</p>
+          <button type="button" className="sdv-btn sdv-btn-primary" onClick={onAddTask}>
+            {t("spaceHub.tasksEmpty.cta")}
+          </button>
+          <small>{t("spaceHub.tasksEmpty.hint", { examples: presetText(t, preset.emptyTaskExamples) })}</small>
         </div>
       ) : (
-        grouped.map((section) =>
-          section.tasks.length === 0 ? null : (
-            <div key={section.label} className="sdv-task-group">
-              <h3>
-                {groupText(t, section.label)} <span>{section.tasks.length}</span>
-              </h3>
-              <ul className="sdv-task-list">
-                {section.tasks.map((task) => (
-                  <li key={task.id} className={isTaskDone(task) ? "sdv-task-row done" : "sdv-task-row"}>
+        <>
+          <div className="sdv-toolbar sdv-toolbar-compact">
+            <input
+              type="search"
+              placeholder={t("spaceHub.search.tasks")}
+              aria-label={t("spaceHub.aria.searchTasks")}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <select aria-label={t("spaceHub.aria.statusFilter")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+              <option value="all">{t("spaceHub.filter.allStatuses")}</option>
+              <option value="open">{t("spaceHub.filter.open")}</option>
+              <option value="done">{t("spaceHub.filter.done")}</option>
+            </select>
+            <select aria-label={t("spaceHub.aria.groupFilter")} value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
+              <option value="all">{t("spaceHub.filter.allGroups")}</option>
+              {groupLabels.map((label) => (
+                <option key={label} value={label}>
+                  {groupText(t, label)}
+                </option>
+              ))}
+            </select>
+            <select aria-label={t("spaceHub.aria.sortTasks")} value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
+              <option value="updated">{t("spaceHub.sort.updated")}</option>
+              <option value="due">{t("spaceHub.sort.due")}</option>
+              <option value="title">{t("spaceHub.sort.title")}</option>
+            </select>
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="sdv-tasks-nomatch">
+              <p>{t("spaceHub.tasksEmpty.noMatch")}</p>
+              <button type="button" className="sdv-btn sdv-btn-sm" onClick={resetFilters}>
+                {t("spaceHub.tasksEmpty.resetFilters")}
+              </button>
+            </div>
+          ) : (
+            // Flat list: sorting stays global instead of per-section, and each
+            // row carries its group as a chip (the group filter still scopes).
+            <ul className="sdv-task-list sdv-task-list-flat">
+              {filtered.map((task) => {
+                const done = isTaskDone(task);
+                const group = resolveTaskGroupLabel(task, groupLabels);
+                return (
+                  <li key={task.id} className={done ? "sdv-task-row done" : "sdv-task-row"}>
                     <input
                       type="checkbox"
-                      checked={isTaskDone(task)}
+                      checked={done}
                       aria-label={t("spaceHub.aria.complete", { title: task.title })}
                       onChange={() => onToggleDone(task.id)}
-                      disabled={isTaskDone(task)}
+                      disabled={done}
                     />
                     <button type="button" className="sdv-task-title" onClick={() => onOpenTask(task.id)}>
                       {task.title}
                     </button>
-                    <span className="sdv-task-meta">
-                      {task.dueDate ? t("spaceHub.meta.due", { date: formatDate(task.dueDate) }) : task.scheduledDate ? formatDate(task.scheduledDate) : "—"}
-                    </span>
-                    {isTaskDone(task) ? (
+                    {group ? <span className="sdv-task-group-chip">{groupText(t, group)}</span> : null}
+                    {task.dueDate || task.scheduledDate ? (
+                      <span className={task.dueDate ? "sdv-task-date-chip due" : "sdv-task-date-chip"}>
+                        {task.dueDate ? t("spaceHub.meta.due", { date: formatDate(task.dueDate) }) : formatDate(task.scheduledDate)}
+                      </span>
+                    ) : (
+                      <span className="sdv-task-meta">—</span>
+                    )}
+                    {done ? (
                       <span className="sdv-task-done-label">{t("spaceHub.taskDone")}</span>
                     ) : (
                       <div className="sdv-row-actions">
                         <button type="button" className="sdv-btn sdv-btn-sm sdv-btn-primary" onClick={() => onStartFocus(task.id)}>
                           {presetText(t, preset.startFocusLabel)}
                         </button>
+                        <MoreMenu
+                          items={[
+                            { label: t("spaceHub.rowMenu.open"), onClick: () => onOpenTask(task.id) },
+                            { label: t("spaceHub.rowMenu.markDone"), onClick: () => onToggleDone(task.id) },
+                          ]}
+                        />
                       </div>
                     )}
                   </li>
-                ))}
-              </ul>
-            </div>
-          ),
-        )
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
     </section>
   );
