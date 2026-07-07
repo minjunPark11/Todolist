@@ -242,6 +242,23 @@ pub enum DownloadOutcome {
     Cancelled,
 }
 
+// reqwest's Display hides the actual failure (DNS, TLS, proxy, refused
+// connection) behind "error sending request for url (…)". Walk the source
+// chain so the message that reaches the UI says what actually went wrong.
+fn describe_error(error: &(dyn std::error::Error + 'static)) -> String {
+    let mut message = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        let text = cause.to_string();
+        if !message.contains(&text) {
+            message.push_str(": ");
+            message.push_str(&text);
+        }
+        source = cause.source();
+    }
+    message
+}
+
 fn validate_download_url(url: &str) -> Result<reqwest::Url, String> {
     let parsed = reqwest::Url::parse(url).map_err(|error| error.to_string())?;
     if parsed.scheme() != "https" {
@@ -333,12 +350,17 @@ async fn run_download(
         _ => 0,
     };
 
-    let client = reqwest::Client::new();
+    // No overall timeout — a 9GB model on slow links takes hours — but a
+    // connect timeout keeps a dead network from hanging the download forever.
+    let client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(20))
+        .build()
+        .map_err(|error| describe_error(&error))?;
     let mut request = client.get(url);
     if received > 0 {
         request = request.header(reqwest::header::RANGE, format!("bytes={received}-"));
     }
-    let response = request.send().await.map_err(|error| error.to_string())?;
+    let response = request.send().await.map_err(|error| describe_error(&error))?;
     let status = response.status();
 
     let resuming = status == reqwest::StatusCode::PARTIAL_CONTENT;
@@ -373,7 +395,7 @@ async fn run_download(
             file.flush().await.map_err(|error| error.to_string())?;
             return Ok(DownloadOutcome::Cancelled);
         }
-        let chunk = chunk.map_err(|error| error.to_string())?;
+        let chunk = chunk.map_err(|error| describe_error(&error))?;
         file.write_all(&chunk)
             .await
             .map_err(|error| error.to_string())?;
