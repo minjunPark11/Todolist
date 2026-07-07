@@ -341,6 +341,16 @@ fn grant_vault_read_access(app: tauri::AppHandle, path: String) -> Result<(), St
         .map_err(|error| error.to_string())
 }
 
+// Creates the app data directory that holds the knowledge-base sqlite index.
+// The fs plugin denies mkdir outside its static scope (the frontend can't
+// create $APPDATA), so directory creation for our own data dir happens here in
+// Rust — same trust model as models_dir/grant_vault_read_access.
+#[tauri::command]
+fn ensure_knowledge_db_dir(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|error| error.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|error| error.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
@@ -438,6 +448,7 @@ fn main() {
             dispatch_focus_tray_action,
             close_focus_mini_timer,
             grant_vault_read_access,
+            ensure_knowledge_db_dir,
             local_ai::get_local_ai_hardware_profile,
             local_ai::get_local_ai_models_dir,
             local_ai::list_local_ai_models,
