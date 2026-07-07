@@ -2,12 +2,19 @@
 // llama-server, or an explicitly configured localhost OpenAI-compatible
 // endpoint. Remote endpoints are rejected so Obsidian-derived text never
 // leaves the device (KNOWLEDGE_BASE_DESIGN.md principles 9-10).
+//
+// The knowledge settings' embeddingModel picks the route:
+// - "local-ai": auto — reuse the chat endpoint (managed chat server or the
+//   external server) for /v1/embeddings.
+// - an installed GGUF file name: run that file in the dedicated managed
+//   embedding sidecar (see ensureEmbeddingAiReady) so e.g. a small bge-m3
+//   GGUF can embed while the chat model stays loaded.
 import { platform } from "../../platform";
 import { withTimeout } from "../ai/http";
 import { findFirstInstalledCatalogModel, findInstalledModelFile } from "../localAi/runtime";
 import { loadLocalAiSettings } from "../localAi/settings";
 import { findModelById } from "../localAi/modelCatalog";
-import { ensureAiReady } from "../localAi/runtime";
+import { ensureEmbeddingAiReady } from "../localAi/runtime";
 import type { LocalAiSettings } from "../localAi/types";
 
 const EMBEDDING_TIMEOUT_MS = 60_000;
@@ -49,7 +56,7 @@ function normalizeEmbeddings(data: OpenAiEmbeddingResponse | null): number[][] |
   return embeddings?.length ? embeddings : null;
 }
 
-async function resolveManagedEmbeddingModel(settings: LocalAiSettings): Promise<string | null> {
+async function resolveManagedAutoModel(settings: LocalAiSettings): Promise<string | null> {
   const installed = await platform.localAi.listInstalledModels().catch(() => []);
   if (!settings.selectedModelId) {
     return findFirstInstalledCatalogModel(installed)?.model.id ?? null;
@@ -59,32 +66,37 @@ async function resolveManagedEmbeddingModel(settings: LocalAiSettings): Promise<
   return file ? settings.selectedModelId : null;
 }
 
-async function resolveEmbeddingModel(settings: LocalAiSettings): Promise<string | null> {
+// The model identifier the /v1/embeddings requests (and the store's
+// embedding_model meta, prefixed "local-ai:") will use for the given
+// embeddingModel setting, or null when that route isn't usable right now.
+async function resolveEmbeddingModel(settings: LocalAiSettings, embeddingModel: string): Promise<string | null> {
   if (!isLocalEndpoint(settings)) return null;
   if (settings.launchMode === "external") {
     return settings.selectedModelId || "local";
   }
-  return resolveManagedEmbeddingModel(settings);
+  if (embeddingModel === "local-ai") {
+    return resolveManagedAutoModel(settings);
+  }
+  const installed = await platform.localAi.listInstalledModels().catch(() => []);
+  return installed.some((file) => file.fileName === embeddingModel) ? embeddingModel : null;
 }
 
-export async function resolveEmbeddingStoreModelName(): Promise<string | null> {
+// The embedding_model meta value a (re)index run would record for this
+// configuration. Null = the configured route isn't usable (nothing installed,
+// remote endpoint, …), which the UI turns into an install/select hint.
+export async function resolveEmbeddingStoreModelName(embeddingModel: string): Promise<string | null> {
   const settings = loadLocalAiSettings();
-  const model = await resolveEmbeddingModel(settings);
+  const model = await resolveEmbeddingModel(settings, embeddingModel);
   return model ? `local-ai:${model}` : null;
 }
 
-// Settings UI helper. A non-empty array means the local endpoint is configured
-// enough for Full RAG to try indexing; the actual /v1/embeddings call still
-// performs the definitive check.
-export async function listEmbeddingModels(): Promise<string[]> {
-  const settings = loadLocalAiSettings();
-  const model = await resolveEmbeddingModel(settings);
-  return model ? [model] : [];
-}
-
-export function modelNameMatches(installedName: string, configuredName: string): boolean {
-  if (configuredName === "local-ai") return installedName.length > 0;
-  return installedName === configuredName;
+// Installed GGUF file names the settings dropdown offers as dedicated
+// embedding models (besides the "local-ai" auto option). Empty on web/external
+// setups — the auto option is the only route there.
+export async function listEmbeddingModelChoices(): Promise<string[]> {
+  if (!platform.localAi.supported()) return [];
+  const installed = await platform.localAi.listInstalledModels().catch(() => []);
+  return installed.map((file) => file.fileName).sort((a, b) => a.localeCompare(b));
 }
 
 export class LlamaServerEmbeddingProvider implements EmbeddingProvider {
@@ -109,10 +121,10 @@ export class LlamaServerEmbeddingProvider implements EmbeddingProvider {
     const settings = loadLocalAiSettings();
     if (!isLocalEndpoint(settings)) return false;
 
-    const model = await resolveEmbeddingModel(settings);
+    const model = await resolveEmbeddingModel(settings, this.configuredModel);
     if (!model) return false;
 
-    const ready = await ensureAiReady(settings);
+    const ready = await ensureEmbeddingAiReady(settings, this.configuredModel);
     if (!ready.ok) return false;
 
     this.resolvedModel = model;

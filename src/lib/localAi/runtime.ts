@@ -140,13 +140,21 @@ export function recordManagedLocalAiActivity(settings = loadLocalAiSettings()): 
     if (idleForMs < MANAGED_IDLE_SHUTDOWN_MS) {
       idleShutdownTimer = window.setTimeout(() => {
         idleShutdownTimer = null;
-        void platform.localAi.stopServer().catch(() => undefined);
+        stopManagedServers();
       }, MANAGED_IDLE_SHUTDOWN_MS - idleForMs);
       return;
     }
     idleShutdownTimer = null;
-    void platform.localAi.stopServer().catch(() => undefined);
+    stopManagedServers();
   }, MANAGED_IDLE_SHUTDOWN_MS);
+}
+
+// Both managed sidecars share the idle-shutdown policy: the embedding server
+// is only ever needed together with AI features, so it goes down with the
+// chat server.
+function stopManagedServers(): void {
+  void platform.localAi.stopServer().catch(() => undefined);
+  void platform.localAi.stopEmbeddingServer().catch(() => undefined);
 }
 
 export async function ensureAiReady(settings: LocalAiSettings): Promise<EnsureAiReadyResult> {
@@ -238,6 +246,82 @@ export async function ensureAiReady(settings: LocalAiSettings): Promise<EnsureAi
     reason: "server-not-running",
     message: "로컬 AI 서버가 제한 시간 안에 준비되지 않았어요. 모델 크기에 따라 잠시 후 다시 시도해주세요.",
   };
+}
+
+// Readies the endpoint that will answer /v1/embeddings for the given
+// knowledge-base embedding model choice:
+// - "local-ai" (auto) and external mode → the regular chat endpoint
+//   (ensureAiReady); the managed chat server is started with --embeddings
+//   --pooling mean, so its /v1/embeddings works.
+// - an installed GGUF file name → the dedicated managed embedding sidecar on
+//   its own port, so the chat model stays loaded beside it.
+export async function ensureEmbeddingAiReady(
+  settings: LocalAiSettings,
+  embeddingModel: string,
+): Promise<EnsureAiReadyResult> {
+  if (settings.launchMode === "external" || embeddingModel === "local-ai") {
+    return ensureAiReady(settings);
+  }
+
+  if (!platform.localAi.supported()) {
+    return {
+      ok: false,
+      reason: "unsupported",
+      message: "로컬 AI 실행은 데스크톱 앱에서만 지원돼요. 웹에서는 외부 서버 연결을 사용해주세요.",
+    };
+  }
+
+  const installed = await platform.localAi.listInstalledModels().catch(() => []);
+  const file = installed.find((candidate) => candidate.fileName === embeddingModel) ?? null;
+  if (!file) {
+    return {
+      ok: false,
+      reason: "model-not-installed",
+      message: "선택한 임베딩 모델 파일이 설치되어 있지 않아요. 지식 베이스 설정에서 다시 선택해주세요.",
+    };
+  }
+
+  // Same file as the chat route? The chat server already answers
+  // /v1/embeddings — don't load the same multi-GB model twice.
+  const chatFile =
+    findInstalledModelFile(settings, installed) ??
+    (!settings.selectedModelId ? findFirstInstalledCatalogModel(installed)?.file ?? null : null);
+  if (chatFile && chatFile.fileName === file.fileName) {
+    return ensureAiReady(settings);
+  }
+
+  const preferredPort = Math.min(settings.serverPort + 1, 65535);
+  try {
+    const started = await platform.localAi.startEmbeddingServer(
+      file.fileName,
+      preferredPort,
+      settings.serverBinaryPathOverride,
+    );
+    const baseUrl = `http://127.0.0.1:${started.port ?? preferredPort}`;
+    if (await waitForManagedReady(baseUrl, MANAGED_READY_TIMEOUT_MS)) {
+      recordManagedLocalAiActivity(settings);
+      return { ok: true, baseUrl };
+    }
+    return {
+      ok: false,
+      reason: "server-not-running",
+      message: "임베딩 서버가 제한 시간 안에 준비되지 않았어요. 잠시 후 다시 시도해주세요.",
+    };
+  } catch (error) {
+    const engineInstalled = await platform.localAi.isServerInstalled().catch(() => true);
+    if (!engineInstalled && !settings.serverBinaryPathOverride.trim()) {
+      return {
+        ok: false,
+        reason: "engine-not-installed",
+        message: "로컬 AI 엔진이 아직 설치되지 않았어요. 설정 → 로컬 AI에서 \"엔진 설치\"를 눌러주세요.",
+      };
+    }
+    return {
+      ok: false,
+      reason: "server-not-running",
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 // Pre-warms the managed server when the user opted into "앱 시작 시 미리

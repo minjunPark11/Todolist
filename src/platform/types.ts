@@ -86,6 +86,17 @@ export interface PlatformLocalAi {
   // via GET /health, since model loading can take tens of seconds.
   startServer(modelFileName: string, preferredPort: number, binaryPathOverride: string): Promise<LocalAiRuntimeStatus>;
   stopServer(): Promise<void>;
+  // Second managed llama-server slot dedicated to Full-RAG embeddings, so a
+  // dedicated embedding GGUF can run beside the chat model instead of
+  // swapping it in and out per request. Same readiness contract as
+  // startServer (poll GET /health on the returned port).
+  startEmbeddingServer(
+    modelFileName: string,
+    preferredPort: number,
+    binaryPathOverride: string,
+  ): Promise<LocalAiRuntimeStatus>;
+  stopEmbeddingServer(): Promise<void>;
+  getEmbeddingRuntimeStatus(): Promise<LocalAiRuntimeStatus>;
   // The running build's target (std::env::consts OS/ARCH), used to pick the
   // matching runtime asset — e.g. macos-aarch64 vs macos-x86_64 on a universal
   // app. Reveals nothing beyond the app binary itself, so it needs no consent.

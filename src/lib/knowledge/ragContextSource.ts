@@ -60,7 +60,7 @@ export function rankChunksBySimilarity(chunks: StoredChunk[], queryEmbedding: nu
 // space than a freshly-embedded query, and cosine scores would be meaningless.
 async function getUsableStoredModel(store: KnowledgeStore, settings: KnowledgeSettings): Promise<string | null> {
   const storedModel = await store.getMeta("embedding_model");
-  const expectedModel = await resolveEmbeddingStoreModelName();
+  const expectedModel = await resolveEmbeddingStoreModelName(settings.embeddingModel);
   if (!storedModel || !expectedModel || storedModel !== expectedModel) return null;
   return storedModel;
 }
@@ -96,7 +96,9 @@ export function createRagRetrieverContextSource(getSettings: () => KnowledgeSett
       const storedModel = await getUsableStoredModel(store, settings);
       if (!storedModel) return null;
 
-      const provider = createEmbeddingProvider(storedModel);
+      // The query must be embedded by the same configured route that produced
+      // the stored vectors (getUsableStoredModel just verified they match).
+      const provider = createEmbeddingProvider(settings.embeddingModel);
       if (!(await provider.isAvailable())) return null;
 
       let queryEmbedding: number[] | undefined;

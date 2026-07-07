@@ -447,6 +447,9 @@ fn main() {
             local_ai::delete_local_ai_model,
             local_ai::start_local_ai_server,
             local_ai::stop_local_ai_server,
+            local_ai::start_local_ai_embedding_server,
+            local_ai::stop_local_ai_embedding_server,
+            local_ai::get_local_ai_embedding_runtime_status,
             local_ai::is_local_ai_server_installed,
             local_ai::install_local_ai_server,
             local_ai::get_local_ai_platform

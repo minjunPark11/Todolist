@@ -196,6 +196,15 @@ export const webPlatform: PlatformAdapter = {
     async stopServer() {
       localAiUnsupported();
     },
+    async startEmbeddingServer() {
+      localAiUnsupported();
+    },
+    async stopEmbeddingServer() {
+      localAiUnsupported();
+    },
+    async getEmbeddingRuntimeStatus() {
+      localAiUnsupported();
+    },
     async getPlatform() {
       localAiUnsupported();
     },

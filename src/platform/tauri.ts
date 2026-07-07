@@ -309,6 +309,22 @@ export const tauriPlatform: PlatformAdapter = {
       await invoke("stop_local_ai_server");
     },
 
+    async startEmbeddingServer(modelFileName, preferredPort, binaryPathOverride) {
+      return invoke<LocalAiRuntimeStatus>("start_local_ai_embedding_server", {
+        modelFileName,
+        preferredPort,
+        binaryPathOverride,
+      });
+    },
+
+    async stopEmbeddingServer() {
+      await invoke("stop_local_ai_embedding_server");
+    },
+
+    async getEmbeddingRuntimeStatus() {
+      return invoke<LocalAiRuntimeStatus>("get_local_ai_embedding_runtime_status");
+    },
+
     async getPlatform() {
       return invoke<{ os: string; arch: string }>("get_local_ai_platform");
     },

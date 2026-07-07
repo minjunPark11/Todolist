@@ -253,8 +253,17 @@ export interface EmbeddingProvider {
 ```
 
 - 현재 구현: `LlamaServerEmbeddingProvider` (`/v1/embeddings`, 로컬 endpoint만).
-- **기본 모델**: Local AI 설정에서 선택된 모델(`local-ai`). external mode는
-  localhost/127.0.0.1/[::1]일 때만 허용한다.
+- **기본 모델**: Local AI 설정에서 선택된 모델(`local-ai` 자동 라우트). external
+  mode는 localhost/127.0.0.1/[::1]일 때만 허용한다.
+- **전용 임베딩 모델**: `embeddingModel`에 설치된 GGUF 파일명을 지정하면 관리형
+  임베딩 사이드카(`start_local_ai_embedding_server`, 채팅 포트+1)가 그 파일을
+  별도 프로세스로 서빙한다(bge-m3 등 전용 임베딩 GGUF를 수동 설치해 선택 가능).
+  채팅 모델과 같은 파일이면 이중 로드를 피하려고 채팅 서버를 재사용한다.
+- **llama-server 주의**: OpenAI 호환 `/v1/embeddings`는 `--embeddings` 플래그와
+  `none`이 아닌 pooling을 요구한다(causal 채팅 모델의 기본 pooling은 `none`).
+  관리형 서버는 두 슬롯 모두 `--embeddings --pooling mean`으로 spawn하고, pooled
+  임베딩이 단일 ubatch에 들어가야 하므로 `--ubatch-size`를 청크 크기에 맞게
+  올려서 실행한다.
 - **모델 부재 시**: 색인 시작을 막고 Local AI 설정에서 모델을 설치하라고 안내한다.
 - 두 모델은 **차원이 달라 교체 시 전체 재색인 필수** → DB meta에
   `embeddingModel`, `dimensions` 기록, 불일치 감지 시 재색인 유도 배너.
@@ -463,7 +472,7 @@ AI 챗 패널: knowledge 사용 중이면 헤더에 📚 배지, 답변 아래 �
 
 | # | 항목 | 결정 |
 |---|------|------|
-| 1 | 임베딩 모델 | Phase 5 기본값은 **Local AI 설정의 선택 모델**. 미설치 시 색인 차단 + Local AI 모델 설치 안내. 선택 모델이 바뀌면 전체 재색인 |
+| 1 | 임베딩 모델 | Phase 5 기본값은 **Local AI 설정의 선택 모델**(`local-ai` 자동). 설치된 GGUF 파일명을 지정하면 전용 임베딩 사이드카로 서빙(§4.6). 미설치 시 색인 차단 + Local AI 모델 설치 안내. 선택 모델이 바뀌면 전체 재색인 |
 | 2 | Lite 파일 선정 | **파일명/heading/tag/aliases 키워드 매칭 > 최근 수정순**. 본문 전문 검색은 금지(비용). 우선 폴더는 `priorityFolders` 설정 자리만 확보, UI는 추후 |
 | 3 | 증분 색인 트리거 | 앱 시작 자동 확인 + 수동 새로고침만. 폴링/watch는 Phase 4 이후 |
 | 4 | frontmatter | `tags` + `aliases`만 구조화. 그 외 필드는 범위 밖 |

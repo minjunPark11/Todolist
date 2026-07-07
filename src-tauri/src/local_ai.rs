@@ -699,6 +699,11 @@ struct ManagedServer {
 #[derive(Default)]
 pub struct LocalAiRuntimeState {
     server: Mutex<Option<ManagedServer>>,
+    // Second, independent slot for the Full-RAG embedding model. llama-server
+    // loads one model per process, so a dedicated embedding GGUF (e.g. bge-m3)
+    // must run beside the chat model instead of replacing it — otherwise every
+    // RAG question would reload models twice (query embed → chat completion).
+    embedding_server: Mutex<Option<ManagedServer>>,
 }
 
 fn server_binary_file_name() -> String {
@@ -806,31 +811,34 @@ fn kill_managed_server(server: &mut Option<ManagedServer>) {
     }
 }
 
-// Kills the sidecar when the app exits (wired to RunEvent::Exit in main.rs).
-pub fn shutdown_local_ai_server(app: &tauri::AppHandle) {
-    let state = app.state::<LocalAiRuntimeState>();
-    let mut server = match state.server.lock() {
-        Ok(guard) => guard,
-        Err(_) => return,
-    };
-    kill_managed_server(&mut server);
+fn kill_managed_slot(slot: &Mutex<Option<ManagedServer>>) {
+    if let Ok(mut server) = slot.lock() {
+        kill_managed_server(&mut server);
+    }
 }
 
-#[tauri::command]
-pub fn start_local_ai_server(
-    app: tauri::AppHandle,
-    state: State<'_, LocalAiRuntimeState>,
+// Kills both sidecars when the app exits (wired to RunEvent::Exit in main.rs).
+pub fn shutdown_local_ai_server(app: &tauri::AppHandle) {
+    let state = app.state::<LocalAiRuntimeState>();
+    kill_managed_slot(&state.server);
+    kill_managed_slot(&state.embedding_server);
+}
+
+fn start_managed_server_in_slot(
+    app: &tauri::AppHandle,
+    slot: &Mutex<Option<ManagedServer>>,
     model_file_name: String,
     preferred_port: u16,
-    binary_path_override: String,
+    binary_path_override: &str,
+    extra_args: &[&str],
 ) -> Result<LocalAiRuntimeStatus, String> {
     validate_model_file_name(&model_file_name)?;
-    let model_path = models_dir_path(&app)?.join(&model_file_name);
+    let model_path = models_dir_path(app)?.join(&model_file_name);
     if !model_path.is_file() {
         return Err(format!("Model file is not installed: {model_file_name}"));
     }
 
-    let mut server = state.server.lock().map_err(|_| "runtime state poisoned")?;
+    let mut server = slot.lock().map_err(|_| "runtime state poisoned")?;
 
     // Already serving this model? Reuse it. A different model means the old
     // process must go first — llama-server loads one model per process.
@@ -842,7 +850,7 @@ pub fn start_local_ai_server(
         }
     }
 
-    let binary = resolve_server_binary(&app, &binary_path_override)?;
+    let binary = resolve_server_binary(app, binary_path_override)?;
     let port = find_free_port(preferred_port)?;
 
     let mut command = std::process::Command::new(&binary);
@@ -852,11 +860,7 @@ pub fn start_local_ai_server(
         // Never expose the server beyond this machine (§11.4).
         .args(["--host", "127.0.0.1", "--port"])
         .arg(port.to_string())
-        .args(["--ctx-size", "4096"])
-        // Phase 5: Full RAG uses OpenAI-compatible /v1/embeddings on this
-        // same local endpoint. llama-server rejects that endpoint unless
-        // embeddings support is enabled at startup.
-        .arg("--embeddings")
+        .args(extra_args)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
@@ -890,6 +894,71 @@ pub fn start_local_ai_server(
 }
 
 #[tauri::command]
+pub fn start_local_ai_server(
+    app: tauri::AppHandle,
+    state: State<'_, LocalAiRuntimeState>,
+    model_file_name: String,
+    preferred_port: u16,
+    binary_path_override: String,
+) -> Result<LocalAiRuntimeStatus, String> {
+    start_managed_server_in_slot(
+        &app,
+        &state.server,
+        model_file_name,
+        preferred_port,
+        &binary_path_override,
+        // Phase 5: Full RAG's "auto" route reuses this chat endpoint for
+        // OpenAI-compatible /v1/embeddings. That endpoint requires
+        // --embeddings AND a pooling type other than "none" — causal chat
+        // models default to "none", which llama-server rejects with
+        // "Pooling type 'none' is not OAI compatible" (the bug that broke
+        // indexing). With --embeddings on, llama-server clamps n_batch to
+        // n_ubatch and pooled inputs must fit one ubatch, so raise it to
+        // cover ~900-char note chunks.
+        &[
+            "--ctx-size",
+            "4096",
+            "--embeddings",
+            "--pooling",
+            "mean",
+            "--ubatch-size",
+            "1024",
+        ],
+    )
+}
+
+// Sidecar for a dedicated embedding GGUF (Full RAG). Smaller context than the
+// chat server — note chunks are ≤ ~900 chars — and a ubatch that fits a whole
+// chunk, since pooled embeddings must be computed within a single ubatch.
+// --pooling mean also covers embedding GGUFs whose metadata lacks a pooling
+// type and chat models used as embedders.
+#[tauri::command]
+pub fn start_local_ai_embedding_server(
+    app: tauri::AppHandle,
+    state: State<'_, LocalAiRuntimeState>,
+    model_file_name: String,
+    preferred_port: u16,
+    binary_path_override: String,
+) -> Result<LocalAiRuntimeStatus, String> {
+    start_managed_server_in_slot(
+        &app,
+        &state.embedding_server,
+        model_file_name,
+        preferred_port,
+        &binary_path_override,
+        &[
+            "--ctx-size",
+            "2048",
+            "--embeddings",
+            "--pooling",
+            "mean",
+            "--ubatch-size",
+            "2048",
+        ],
+    )
+}
+
+#[tauri::command]
 pub fn stop_local_ai_server(state: State<'_, LocalAiRuntimeState>) -> Result<(), String> {
     let mut server = state.server.lock().map_err(|_| "runtime state poisoned")?;
     kill_managed_server(&mut server);
@@ -897,8 +966,17 @@ pub fn stop_local_ai_server(state: State<'_, LocalAiRuntimeState>) -> Result<(),
 }
 
 #[tauri::command]
-pub fn get_local_ai_runtime_status(state: State<'_, LocalAiRuntimeState>) -> LocalAiRuntimeStatus {
-    let Ok(mut server) = state.server.lock() else {
+pub fn stop_local_ai_embedding_server(state: State<'_, LocalAiRuntimeState>) -> Result<(), String> {
+    let mut server = state
+        .embedding_server
+        .lock()
+        .map_err(|_| "runtime state poisoned")?;
+    kill_managed_server(&mut server);
+    Ok(())
+}
+
+fn status_of_slot(slot: &Mutex<Option<ManagedServer>>) -> LocalAiRuntimeStatus {
+    let Ok(mut server) = slot.lock() else {
         return LocalAiRuntimeStatus {
             running: false,
             pid: None,
@@ -906,4 +984,16 @@ pub fn get_local_ai_runtime_status(state: State<'_, LocalAiRuntimeState>) -> Loc
         };
     };
     status_of(&mut server)
+}
+
+#[tauri::command]
+pub fn get_local_ai_runtime_status(state: State<'_, LocalAiRuntimeState>) -> LocalAiRuntimeStatus {
+    status_of_slot(&state.server)
+}
+
+#[tauri::command]
+pub fn get_local_ai_embedding_runtime_status(
+    state: State<'_, LocalAiRuntimeState>,
+) -> LocalAiRuntimeStatus {
+    status_of_slot(&state.embedding_server)
 }

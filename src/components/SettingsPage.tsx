@@ -25,7 +25,7 @@ import type {
   LocalAiLaunchMode,
   LocalModelOption,
 } from "../lib/localAi/types";
-import { listEmbeddingModels, modelNameMatches, resolveEmbeddingStoreModelName } from "../lib/knowledge/embeddingProvider";
+import { listEmbeddingModelChoices, resolveEmbeddingStoreModelName } from "../lib/knowledge/embeddingProvider";
 import { EmbeddingModelUnavailableError, runIndexing, type IndexProgress } from "../lib/knowledge/indexer";
 import { KnowledgeStore, type IndexStats } from "../lib/knowledge/knowledgeStore";
 import type { KnowledgeSettings } from "../lib/knowledge/types";
@@ -534,7 +534,8 @@ function KnowledgeSettingsTab({
   const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false);
   const [deleteIndexOnDisconnect, setDeleteIndexOnDisconnect] = useState(true);
 
-  const [installedModels, setInstalledModels] = useState<string[]>([]);
+  const [embeddingChoices, setEmbeddingChoices] = useState<string[]>([]);
+  const [expectedEmbeddingModel, setExpectedEmbeddingModel] = useState<string | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [indexStats, setIndexStats] = useState<IndexStats | null>(null);
   const [storedEmbeddingModel, setStoredEmbeddingModel] = useState<string | null>(null);
@@ -550,8 +551,11 @@ function KnowledgeSettingsTab({
   async function loadInstalledModels() {
     setModelsLoading(true);
     try {
-      const [models, expected] = await Promise.all([listEmbeddingModels(), resolveEmbeddingStoreModelName()]);
-      setInstalledModels(models);
+      const [choices, expected] = await Promise.all([
+        listEmbeddingModelChoices(),
+        resolveEmbeddingStoreModelName(settings.embeddingModel),
+      ]);
+      setEmbeddingChoices(choices);
       setExpectedEmbeddingModel(expected);
     } finally {
       setModelsLoading(false);
@@ -580,13 +584,16 @@ function KnowledgeSettingsTab({
     if (!vaultReady) return;
     void loadInstalledModels();
     void loadStats();
-    // Re-run only when the vault actually becomes ready/connected, not on
+    // Re-run when the vault becomes ready/connected or the embedding model
+    // choice changes (the resolved store-model name depends on it), not on
     // every keystroke of unrelated settings fields.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vaultReady]);
+  }, [vaultReady, settings.embeddingModel]);
 
-  const modelInstalled = installedModels.some((name) => modelNameMatches(name, settings.embeddingModel));
-  const [expectedEmbeddingModel, setExpectedEmbeddingModel] = useState<string | null>(null);
+  // Null after loading means the configured route can't embed right now —
+  // e.g. no Local AI model installed for "auto", or the selected GGUF file
+  // was deleted from the models directory.
+  const modelInstalled = expectedEmbeddingModel !== null;
   const reindexNeeded =
     vaultReady &&
     settings.indexingMode === "full" &&
@@ -774,6 +781,18 @@ function KnowledgeSettingsTab({
               disabled={modelsLoading}
             >
               <option value="local-ai">{t("settings.knowledge.localAiEmbedding")}</option>
+              {embeddingChoices.map((fileName) => (
+                <option key={fileName} value={fileName}>
+                  {fileName}
+                </option>
+              ))}
+              {settings.embeddingModel !== "local-ai" && !embeddingChoices.includes(settings.embeddingModel) ? (
+                // Keep a stale saved choice visible (and re-selectable away
+                // from) instead of letting the select silently show nothing.
+                <option value={settings.embeddingModel}>
+                  {t("settings.knowledge.embeddingModelMissingOption", { model: settings.embeddingModel })}
+                </option>
+              ) : null}
             </select>
             <button
               type="button"
@@ -786,7 +805,11 @@ function KnowledgeSettingsTab({
             </button>
           </div>
           {!modelsLoading && !modelInstalled ? (
-            <small className="ff-settings-error">{t("settings.knowledge.modelPullHint", { model: settings.embeddingModel })}</small>
+            <small className="ff-settings-error">
+              {settings.embeddingModel === "local-ai"
+                ? t("settings.knowledge.modelPullHint", { model: settings.embeddingModel })
+                : t("settings.knowledge.embeddingFileMissingHint")}
+            </small>
           ) : null}
         </Row>
 
