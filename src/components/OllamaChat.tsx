@@ -14,7 +14,7 @@ import type { AiMessage, AiProviderName } from "../lib/ai/types";
 import { buildCalendarContextText, type CalendarContextInput } from "../lib/calendarContext";
 import { Popover } from "./kit";
 import { buildAttachedFilesContext, type AttachedFileRef } from "../lib/knowledge/attachedFilesContext";
-import { createKnowledgeContextSource } from "../lib/knowledge/knowledgeContextSource";
+import { searchKnowledge } from "../lib/knowledge/retrieval/searchKnowledge";
 import { scanVault } from "../lib/knowledge/obsidianScanner";
 import { DEFAULT_KNOWLEDGE_SETTINGS, type KnowledgeSettings, type RetrievedChunk } from "../lib/knowledge/types";
 import { platform } from "../platform";
@@ -178,19 +178,14 @@ export function OllamaChat({
 
       let autoContextText: string | undefined;
       let autoSources: RetrievedChunk[] = [];
-      if (remainingBudget > 0) {
-        try {
-          const knowledgeSource = createKnowledgeContextSource(() => knowledgeSettings);
-          if (await knowledgeSource.isReady()) {
-            const knowledgeResult = await knowledgeSource.buildContext(content, remainingBudget);
-            if (knowledgeResult) {
-              autoContextText = knowledgeResult.text;
-              autoSources = knowledgeResult.sources;
-            }
-          }
-        } catch {
-          // Ignore — the chat proceeds without knowledge context.
+      try {
+        const knowledgeResult = await searchKnowledge(content, knowledgeSettings, remainingBudget);
+        if (knowledgeResult) {
+          autoContextText = knowledgeResult.text;
+          autoSources = knowledgeResult.sources;
         }
+      } catch {
+        // Ignore — the chat proceeds without knowledge context.
       }
 
       const knowledgeContextText = [attachedContextText, autoContextText].filter(Boolean).join("\n\n") || undefined;
