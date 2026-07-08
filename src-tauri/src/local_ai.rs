@@ -915,9 +915,14 @@ pub fn start_local_ai_server(
         // indexing). With --embeddings on, llama-server clamps n_batch to
         // n_ubatch and pooled inputs must fit one ubatch, so raise it to
         // cover ~900-char note chunks.
+        //
+        // 8192 ctx: the personal-AI prompt carries the system prompt, a
+        // trimmed app-data JSON block (AI_CONTEXT_LIMITS), knowledge context,
+        // and chat history — 4096 rejected real-world prompts with
+        // "request exceeds the available context size".
         &[
             "--ctx-size",
-            "4096",
+            "8192",
             "--embeddings",
             "--pooling",
             "mean",

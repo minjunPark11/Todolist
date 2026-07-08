@@ -112,8 +112,11 @@ export function OllamaChat({
     setAttachedFiles((current) => current.filter((file) => file.path !== path));
   }
 
+  // Only the recent turns go to the model: the app-data context is rebuilt on
+  // every request anyway, and an unbounded history would eventually overflow
+  // the local llama-server's context window (--ctx-size in local_ai.rs).
   const chatHistory = useMemo<AiMessage[]>(
-    () => messages.map(({ role, content }) => ({ role, content })),
+    () => messages.slice(-19).map(({ role, content }) => ({ role, content })),
     [messages],
   );
 
