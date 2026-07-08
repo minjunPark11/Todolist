@@ -1,51 +1,47 @@
-// Type draft for the AI Assistant MVP surface. Nothing implements these yet —
-// they document how the pieces refactored ahead of the MVP are meant to snap
-// together:
-//   context: selectRelevantAppContext/summarizeContextForPrompt (lib/ai/context)
-//   data:    domain selectors + buildAiContextInput (src/domain)
-//   search:  createKnowledgeRetriever (lib/knowledge/retrieval)
-//   actions: AiSafeAction proposals (lib/ai/actions/types.ts)
-//   memory:  AiMemoryStore (lib/ai/memory/types.ts)
-//   cards:   ContextCard (lib/ai/contextCards/types.ts)
-import type { AiSafeAction } from "../actions/types";
-import type { AiMessage } from "../types";
-import type { AgentIntent } from "../agent/intent";
+// Shared types for the AI Assistant brain-dump flow (MVP 2). The pipeline:
+//   buildAssistantContextPack — limited app/knowledge/card context (no dumps)
+//   runAssistantTurn          — gateway call + safe parse into AssistantTurn
+//   AssistantPanel (UI)       — user confirms card save / task save; every
+//                               proposal outcome lands in memory/outcomeLog.
+import type { RetrievedChunk } from "../../knowledge/types";
+import type { ContextCard, ContextCardDraft, RecommendedNextAction } from "../contextCards/types";
+import type { AiProviderName } from "../types";
 
-// One user→assistant exchange. The assistant loop should stay provider-
-// agnostic: it builds context, calls the gateway, and returns proposals —
-// never mutates app data itself (that's the safe-action executor's job).
-export type AssistantTurnRequest = {
-  messages: AiMessage[];
-  intent?: AgentIntent;
-  // Prompt-ready app context (buildAiContextText output or a future
-  // per-intent context pack summary).
-  contextText?: string;
-  // Retrieved knowledge excerpts; stripped for non-local providers by the
-  // gateway, same as today.
-  knowledgeContext?: string;
+export type AssistantMode = "needs_more_context" | "ready_for_next_action";
+
+// Parsed safe_action_proposals entries. MVP 2 only understands create_task;
+// unknown types are dropped at parse time.
+export type AssistantSafeActionProposal = {
+  type: "create_task";
+  title: string;
+  description: string;
+  linkedContextCardId: string;
 };
 
-export type AssistantTurnResult = {
-  content: string;
-  intent: AgentIntent;
-  // Proposals only — nothing here has been applied.
-  suggestedActions: AiSafeAction[];
+// Normalized (camelCase) form of the model's JSON reply. null draft/action
+// means the model omitted or malformed that part — callers fall back rather
+// than fail.
+export type AssistantAnalysis = {
+  mode: AssistantMode;
+  contextCardDraft: ContextCardDraft | null;
+  followUpQuestions: string[];
+  recommendedNextAction: RecommendedNextAction | null;
+  safeActionProposals: AssistantSafeActionProposal[];
+  userFacingResponse: string;
 };
 
-// Brain Dump flow draft: free-form text in, structured triage out. The
-// parse step is an AI call; accepting items funnels through safe actions
-// (create_task / save_context_card), never direct writes.
-export type BrainDumpItemKind = "task" | "note" | "context_card" | "unknown";
-
-export type BrainDumpItem = {
+// One completed assistant exchange, ready for the UI. contextCardDraft is
+// always present: when the model returned free text only, it's a heuristic
+// fallback draft (usedFallbackDraft = true) so saving still works.
+export type AssistantTurn = {
   id: string;
-  kind: BrainDumpItemKind;
-  // Original fragment of the dump this item was extracted from.
-  sourceText: string;
-  proposedAction?: AiSafeAction;
-};
-
-export type BrainDumpResult = {
-  rawText: string;
-  items: BrainDumpItem[];
+  provider: AiProviderName;
+  mode: AssistantMode;
+  userFacingText: string;
+  contextCardDraft: ContextCardDraft;
+  usedFallbackDraft: boolean;
+  followUpQuestions: string[];
+  recommendedNextAction: RecommendedNextAction | null;
+  relatedCards: ContextCard[];
+  knowledgeSources: RetrievedChunk[];
 };
