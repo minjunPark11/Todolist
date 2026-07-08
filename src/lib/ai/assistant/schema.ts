@@ -101,18 +101,36 @@ function parseSafeActionProposals(value: unknown): AssistantSafeActionProposal[]
     .slice(0, 3);
 }
 
+// Small local models frequently drop or garble a single enum field while
+// still following the rest of the schema (e.g. they emit follow_up_questions
+// but omit "mode"). Trusting a blind default here would silently hide real
+// questions/actions from the user, so an invalid/missing mode is inferred
+// from whichever payload is actually present instead of always assuming
+// "ready_for_next_action".
+function resolveMode(
+  rawMode: unknown,
+  followUpQuestions: string[],
+  recommendedNextAction: RecommendedNextAction | null,
+): AssistantMode {
+  if (rawMode === "needs_more_context" || rawMode === "ready_for_next_action") return rawMode;
+  if (recommendedNextAction) return "ready_for_next_action";
+  if (followUpQuestions.length > 0) return "needs_more_context";
+  return "ready_for_next_action";
+}
+
 // null analysis = the reply contained no usable JSON; show the text as-is and
 // fall back to a heuristic card draft.
 export function parseAssistantResponse(content: string, rawInput: string): AssistantAnalysis | null {
   const json = extractJsonObject(content);
   if (!json) return null;
 
-  const mode: AssistantMode = json.mode === "needs_more_context" ? "needs_more_context" : "ready_for_next_action";
+  const followUpQuestions = cleanStringArray(json.follow_up_questions, MAX_FOLLOW_UP_QUESTIONS);
+  const recommendedNextAction = parseNextAction(json.recommended_next_action);
   return {
-    mode,
+    mode: resolveMode(json.mode, followUpQuestions, recommendedNextAction),
     contextCardDraft: parseCardDraft(json.context_card_draft, rawInput),
-    followUpQuestions: cleanStringArray(json.follow_up_questions, MAX_FOLLOW_UP_QUESTIONS),
-    recommendedNextAction: parseNextAction(json.recommended_next_action),
+    followUpQuestions,
+    recommendedNextAction,
     safeActionProposals: parseSafeActionProposals(json.safe_action_proposals),
     userFacingResponse: cleanString(json.user_facing_response, 2000),
   };
