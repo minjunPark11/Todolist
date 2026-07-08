@@ -1,6 +1,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AgentActionPreview } from "./ai/AgentActionPreview";
+import { AssistantPanel } from "./ai/AssistantPanel";
 import type { AgentAction } from "../lib/ai/agent/actions";
 import { runPersonalAgent } from "../lib/ai/agent/personalAgent";
 import { detectAgentIntent, getIntentLabel, type AgentIntent } from "../lib/ai/agent/intent";
@@ -61,6 +62,9 @@ export function OllamaChat({
   const { t } = useT();
   const motionEnabled = useMotionEnabled();
   const [open, setOpen] = useState(false);
+  // "chat" = existing read-only chat; "assistant" = brain-dump flow. Both
+  // stay mounted (hidden toggle) so switching tabs never loses state.
+  const [tab, setTab] = useState<"chat" | "assistant">("chat");
   const [messages, setMessages] = useState<ChatMessage[]>([
     createMessage("assistant", t("ai.greeting")),
   ]);
@@ -316,6 +320,36 @@ export function OllamaChat({
             </div>
           </header>
 
+          <div className="ollama-chat-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "chat"}
+              className={tab === "chat" ? "active" : ""}
+              onClick={() => setTab("chat")}
+            >
+              {t("ai.tab.chat")}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "assistant"}
+              className={tab === "assistant" ? "active" : ""}
+              onClick={() => setTab("assistant")}
+            >
+              {t("ai.tab.assistant")}
+            </button>
+          </div>
+
+          <div className="ollama-chat-mode" hidden={tab !== "assistant"}>
+            <AssistantPanel
+              aiContext={aiContext}
+              knowledgeSettings={knowledgeSettings}
+              onExecuteActions={onExecuteActions}
+            />
+          </div>
+
+          <div className="ollama-chat-mode" hidden={tab !== "chat"}>
           <div className="ollama-chat-messages" role="log" aria-live="polite">
             {messages.map((message) => (
               <div key={message.id} className={`ollama-chat-message ${message.role}`}>
@@ -423,6 +457,7 @@ export function OllamaChat({
             />
             <button type="submit" disabled={!draft.trim() || loading}>{t("ai.send")}</button>
           </form>
+          </div>
         </motion.section>
       ) : null}
       </AnimatePresence>

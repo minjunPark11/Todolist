@@ -1854,3 +1854,192 @@
 }
 .ff-toggle.on .ff-toggle-knob { transform: translateX(18px); }
 
+
+/* === AI Assistant (brain dump) tab === */
+.ollama-chat-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ollama-chat-tabs button {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  padding: 6px 10px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.ollama-chat-tabs button.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+/* Full-height flex wrapper so tab switching preserves each mode's state. */
+.ollama-chat-mode {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.ollama-chat-mode[hidden] {
+  display: none;
+}
+.assistant-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.assistant-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-surface-muted);
+}
+.assistant-greeting {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.assistant-exchange {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.assistant-section {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.assistant-section h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+.assistant-next-action {
+  border-color: var(--accent);
+}
+.assistant-hint {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.assistant-questions {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.assistant-card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.assistant-detail {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.assistant-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.assistant-field-label {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.assistant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.assistant-chip {
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.assistant-status {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.assistant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.assistant-actions button {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.assistant-actions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.assistant-actions button.assistant-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.assistant-toggle {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+.assistant-related-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.assistant-related-card {
+  margin: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
+  padding: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+}
