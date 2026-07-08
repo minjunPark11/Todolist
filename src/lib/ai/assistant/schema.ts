@@ -1,15 +1,19 @@
 // Safe parsing of the assistant's JSON reply (see prompts.ts for the schema
 // the model is asked to follow). Everything here is defensive: the local
 // model regularly wraps JSON in prose or markdown fences, truncates fields,
-// or returns free text — none of that may break the app. When no usable JSON
-// arrives, callers still get the raw text plus a heuristic fallback card
-// draft so the save flow keeps working.
-import type { ContextCardDraft, NextActionDifficulty, RecommendedNextAction } from "../contextCards/types";
-import type { AssistantAnalysis, AssistantMode, AssistantSafeActionProposal } from "./types";
+// omits new fields, or returns free text — none of that may break the app.
+// When no usable JSON arrives, callers still get the raw text plus a
+// heuristic fallback card draft so the save flow keeps working.
+import type { ContextCardDraft, DetectedItem, NextActionDifficulty, RecommendedNextAction } from "../contextCards/types";
+import { dedupeDetectedItems, resolveResponseMode } from "./overwhelmHeuristics";
+import type { AssistantAnalysis, AssistantMode, AssistantSafeActionProposal, InputSignals, SignalStrength } from "./types";
 
 const MAX_LIST_ITEMS = 10;
 const MAX_ITEM_CHARS = 300;
 const MAX_FOLLOW_UP_QUESTIONS = 3;
+// Overwhelm/clarification responses hand the user one decision at most, not
+// up to three — see prompts.ts §Responding in overwhelm mode.
+const MAX_FOLLOW_UP_QUESTIONS_TIGHT = 1;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -29,6 +33,22 @@ function cleanStringArray(value: unknown, maxItems = MAX_LIST_ITEMS): string[] {
 
 function cleanDifficulty(value: unknown): NextActionDifficulty | undefined {
   return value === "low" || value === "medium" || value === "high" ? value : undefined;
+}
+
+function cleanSignalStrength(value: unknown): SignalStrength {
+  return value === "weak" || value === "strong" ? value : "none";
+}
+
+function parseInputSignals(value: unknown): InputSignals {
+  const record = isRecord(value) ? value : {};
+  return {
+    decisionSignal: cleanSignalStrength(record.decision_signal),
+    frictionSignal: cleanSignalStrength(record.friction_signal),
+    lowActionabilitySignal: cleanSignalStrength(record.low_actionability_signal),
+    blockerSignal: cleanSignalStrength(record.blocker_signal),
+    externalPressureSignal: cleanSignalStrength(record.external_pressure_signal),
+    unscopedProjectSignal: cleanSignalStrength(record.unscoped_project_signal),
+  };
 }
 
 // Pulls the first plausible JSON object out of a model reply: the whole
@@ -65,21 +85,56 @@ function parseNextAction(value: unknown): RecommendedNextAction | null {
   };
 }
 
+// One detected_items entry may arrive as a plain string (legacy shape, or a
+// smaller model that ignores the structured form) or as the structured
+// object prompts.ts asks for. Either way we normalize to a full DetectedItem
+// so downstream heuristics never have to branch on shape.
+function parseDetectedItem(value: unknown): DetectedItem | null {
+  if (typeof value === "string") {
+    const label = cleanString(value, 120);
+    if (!label) return null;
+    return { label, domain: "", workType: "", status: "", possibleOutput: "", dependency: false, externalPressure: false };
+  }
+  if (!isRecord(value)) return null;
+  const label = cleanString(value.label, 120);
+  if (!label) return null;
+  return {
+    label,
+    domain: cleanString(value.domain, 80),
+    workType: cleanString(value.work_type, 80),
+    status: cleanString(value.status, 120),
+    possibleOutput: cleanString(value.possible_output, 160),
+    dependency: value.dependency === true,
+    externalPressure: value.external_pressure === true,
+  };
+}
+
+function parseDetectedItems(value: unknown): DetectedItem[] {
+  if (!Array.isArray(value)) return [];
+  const items = value
+    .map(parseDetectedItem)
+    .filter((item): item is DetectedItem => item !== null)
+    .slice(0, MAX_LIST_ITEMS);
+  return dedupeDetectedItems(items);
+}
+
 function parseCardDraft(value: unknown, rawInput: string): ContextCardDraft | null {
   if (!isRecord(value)) return null;
   const title = cleanString(value.title, 120);
   if (!title) return null;
+  const items = parseDetectedItems(value.detected_items);
   return {
     title,
     // Always keep the user's actual input, not the model's echo of it.
     rawInput,
-    detectedItems: cleanStringArray(value.detected_items),
-    inferredDomains: cleanStringArray(value.inferred_domains),
-    workTypes: cleanStringArray(value.work_types),
-    currentStatus: cleanStringArray(value.current_status),
+    detectedItems: items.map((item) => item.label),
+    inferredDomains: [...new Set(items.map((item) => item.domain).filter(Boolean))],
+    workTypes: [...new Set(items.map((item) => item.workType).filter(Boolean))],
+    currentStatus: items.map((item) => item.status).filter(Boolean),
     likelyBlockers: cleanStringArray(value.likely_blockers),
     missingInfo: cleanStringArray(value.missing_info),
-    possibleOutputs: cleanStringArray(value.possible_outputs),
+    possibleOutputs: items.map((item) => item.possibleOutput).filter(Boolean),
+    detectedItemDetails: items,
     relatedTaskIds: cleanStringArray(value.related_task_ids),
     relatedProjectIds: cleanStringArray(value.related_project_ids),
     relatedNotePaths: cleanStringArray(value.related_note_paths, 5),
@@ -124,11 +179,21 @@ export function parseAssistantResponse(content: string, rawInput: string): Assis
   const json = extractJsonObject(content);
   if (!json) return null;
 
-  const followUpQuestions = cleanStringArray(json.follow_up_questions, MAX_FOLLOW_UP_QUESTIONS);
+  const inputSignals = parseInputSignals(json.input_signals);
+  const contextCardDraft = parseCardDraft(json.context_card_draft, rawInput);
+  const itemCount = contextCardDraft?.detectedItemDetails?.length ?? 0;
+  const responseMode = resolveResponseMode(json.response_mode, inputSignals, itemCount);
+
+  const followUpCap =
+    responseMode === "overwhelm" || responseMode === "clarification_needed" ? MAX_FOLLOW_UP_QUESTIONS_TIGHT : MAX_FOLLOW_UP_QUESTIONS;
+  const followUpQuestions = cleanStringArray(json.follow_up_questions, followUpCap);
   const recommendedNextAction = parseNextAction(json.recommended_next_action);
+
   return {
     mode: resolveMode(json.mode, followUpQuestions, recommendedNextAction),
-    contextCardDraft: parseCardDraft(json.context_card_draft, rawInput),
+    responseMode,
+    inputSignals,
+    contextCardDraft,
     followUpQuestions,
     recommendedNextAction,
     safeActionProposals: parseSafeActionProposals(json.safe_action_proposals),
@@ -146,6 +211,15 @@ export function buildFallbackContextCardDraft(rawInput: string): ContextCardDraf
     .filter((part) => part.length >= 2)
     .slice(0, 8);
   const title = rawInput.trim().replace(/\s+/g, " ").slice(0, 60) || "Brain dump";
+  const items: DetectedItem[] = fragments.map((label) => ({
+    label,
+    domain: "",
+    workType: "",
+    status: "",
+    possibleOutput: "",
+    dependency: false,
+    externalPressure: false,
+  }));
   return {
     title,
     rawInput,
@@ -156,6 +230,7 @@ export function buildFallbackContextCardDraft(rawInput: string): ContextCardDraf
     likelyBlockers: [],
     missingInfo: [],
     possibleOutputs: [],
+    detectedItemDetails: items,
     relatedTaskIds: [],
     relatedProjectIds: [],
     relatedNotePaths: [],

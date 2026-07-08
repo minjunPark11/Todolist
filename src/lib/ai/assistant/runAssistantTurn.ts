@@ -8,10 +8,22 @@ import type { AiMessage } from "../types";
 import type { KnowledgeSettings } from "../../knowledge/types";
 import { loadContextCards } from "../contextCards/store";
 import type { AiContextInput } from "../context/buildAiContext";
+import type { DetectedItem } from "../contextCards/types";
 import { buildAssistantContextPack } from "./buildAssistantContext";
+import { resolveResponseMode } from "./overwhelmHeuristics";
 import { ASSISTANT_SYSTEM_PROMPT } from "./prompts";
 import { buildFallbackContextCardDraft, parseAssistantResponse } from "./schema";
-import type { AssistantTurn } from "./types";
+import type { AssistantTurn, InputSignals } from "./types";
+import { buildFallbackOverwhelmResponse, validateAssistantResponse } from "./validateAssistantResponse";
+
+const NONE_SIGNALS: InputSignals = {
+  decisionSignal: "none",
+  frictionSignal: "none",
+  lowActionabilitySignal: "none",
+  blockerSignal: "none",
+  externalPressureSignal: "none",
+  unscopedProjectSignal: "none",
+};
 
 export type AssistantTurnInput = {
   brainDump: string;
@@ -63,17 +75,43 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
     draft.recommendedNextAction = analysis.recommendedNextAction;
   }
 
-  const userFacingText = analysis?.userFacingResponse || response.content.trim();
+  const items: DetectedItem[] = draft.detectedItemDetails ?? [];
+  const responseMode = analysis?.responseMode ?? resolveResponseMode(undefined, NONE_SIGNALS, items.length);
+  const inputSignals = analysis?.inputSignals ?? NONE_SIGNALS;
+
+  // Generic Failure Guard (validateAssistantResponse.ts): only overwhelm/
+  // planning replies are held to it. When the model's own reply falls back
+  // to a re-offered menu, a missing next action, vague completion criteria,
+  // or an unrequested schedule, replace it with the deterministic fallback
+  // built from the same parsed items rather than showing the broken reply.
+  const validation = analysis ? validateAssistantResponse(analysis, items) : { ok: true, failures: [] };
+  const usedGenericFailureFallback = analysis !== null && !validation.ok;
+
+  let userFacingText = analysis?.userFacingResponse || response.content.trim();
+  let followUpQuestions = analysis?.followUpQuestions ?? [];
+  let recommendedNextAction = analysis?.recommendedNextAction ?? null;
+
+  if (usedGenericFailureFallback) {
+    const fallback = buildFallbackOverwhelmResponse(input.brainDump, items);
+    userFacingText = fallback.userFacingResponse;
+    recommendedNextAction = fallback.recommendedNextAction;
+    followUpQuestions = fallback.followUpQuestions;
+    draft.recommendedNextAction = fallback.recommendedNextAction;
+  }
 
   return {
     id: `aturn-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     provider: response.provider,
     mode: analysis?.mode ?? "needs_more_context",
+    responseMode,
+    inputSignals,
     userFacingText,
     contextCardDraft: draft,
     usedFallbackDraft,
-    followUpQuestions: analysis?.followUpQuestions ?? [],
-    recommendedNextAction: analysis?.recommendedNextAction ?? null,
+    usedGenericFailureFallback,
+    validation,
+    followUpQuestions,
+    recommendedNextAction,
     relatedCards: pack.relatedCards,
     knowledgeSources: pack.knowledgeSources,
   };

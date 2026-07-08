@@ -14,6 +14,29 @@ export type RecommendedNextAction = {
   estimatedDifficulty?: NextActionDifficulty;
 };
 
+// One independently actionable work candidate detected in a dump. Boundary
+// rule (enforced by the assistant prompt, not this type): items are split
+// when they lead to different outputs, actions, external deadlines, domains,
+// or blockers — not merely because different nouns were mentioned. Two
+// mentions that resolve to the same possibleOutput should be one item.
+export type DetectedItem = {
+  label: string;
+  // Broad area this item belongs to ("language learning", "thesis").
+  domain: string;
+  // Kind of work it actually is ("memorization", "writing", "coding practice").
+  workType: string;
+  // Where it stands right now: not-started / in-progress / stuck / under-documented.
+  status: string;
+  // A small, observable deliverable this item could produce next — never a
+  // vague state like "study done" or "thesis progressed".
+  possibleOutput: string;
+  // True when this item is a precondition blocking another item's progress.
+  dependency: boolean;
+  // True when this item is tied to an external deadline/submission/audience
+  // (due date, submission, certification, professor/team/institution/client).
+  externalPressure: boolean;
+};
+
 export type ContextCard = {
   id: string;
   title: string;
@@ -33,6 +56,11 @@ export type ContextCard = {
   missingInfo: string[];
   // Concrete deliverables this work could produce.
   possibleOutputs: string[];
+  // Structured per-item view of the fields above, one entry per detected
+  // item (rather than index-paired parallel arrays). Optional so drafts
+  // built before this field existed (or by the plain-text fallback splitter)
+  // stay valid.
+  detectedItemDetails?: DetectedItem[];
   recommendedNextAction?: RecommendedNextAction;
   relatedTaskIds: string[];
   relatedProjectIds: string[];

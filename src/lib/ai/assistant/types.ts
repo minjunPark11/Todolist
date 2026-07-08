@@ -4,10 +4,47 @@
 //   AssistantPanel (UI)       — user confirms card save / task save; every
 //                               proposal outcome lands in memory/outcomeLog.
 import type { RetrievedChunk } from "../../knowledge/types";
-import type { ContextCard, ContextCardDraft, RecommendedNextAction } from "../contextCards/types";
+import type { ContextCard, ContextCardDraft, DetectedItem, RecommendedNextAction } from "../contextCards/types";
 import type { AiProviderName } from "../types";
 
 export type AssistantMode = "needs_more_context" | "ready_for_next_action";
+
+// Coarse-grained signal strength, used instead of booleans so a single weak
+// mention can't by itself trigger overwhelm handling (see InputSignals).
+export type SignalStrength = "none" | "weak" | "strong";
+
+// Judgment signals the model reports about the raw input, independent of how
+// many items were detected. None of these alone decides the response mode —
+// selectResponseMode combines them (see overwhelmHeuristics.ts).
+export type InputSignals = {
+  decisionSignal: SignalStrength; // user asks for order/start point/choice/priority
+  frictionSignal: SignalStrength; // overwhelm, dread, avoidance, fatigue, "it's all a mess"
+  lowActionabilitySignal: SignalStrength; // named work with no visible next step/output
+  blockerSignal: SignalStrength; // one item is stuck or is blocking another
+  externalPressureSignal: SignalStrength; // deadline/submission/external audience involved
+  unscopedProjectSignal: SignalStrength; // item is large/fuzzy, no executable unit visible yet
+};
+
+// Which handling strategy applies to this turn. Scope-gated domain requests
+// (code/debugging, LeetCode/algorithms, translation/rewriting/summarizing, a
+// single direct question, an explicit file/task edit, a concept explanation)
+// all collapse into "domain_specific": the assistant answers in that mode
+// instead of running overwhelm handling. See prompts.ts §Scope Gate.
+export type ResponseMode =
+  | "domain_specific"
+  | "normal_task_request"
+  | "single_task_blocker"
+  | "planning_request"
+  | "learning_request"
+  | "overwhelm"
+  | "clarification_needed";
+
+export type ResponseValidationResult = {
+  ok: boolean;
+  failures: string[];
+};
+
+export type { DetectedItem };
 
 // Parsed safe_action_proposals entries. MVP 2 only understands create_task;
 // unknown types are dropped at parse time.
@@ -23,6 +60,8 @@ export type AssistantSafeActionProposal = {
 // than fail.
 export type AssistantAnalysis = {
   mode: AssistantMode;
+  responseMode: ResponseMode;
+  inputSignals: InputSignals;
   contextCardDraft: ContextCardDraft | null;
   followUpQuestions: string[];
   recommendedNextAction: RecommendedNextAction | null;
@@ -37,9 +76,16 @@ export type AssistantTurn = {
   id: string;
   provider: AiProviderName;
   mode: AssistantMode;
+  responseMode: ResponseMode;
+  inputSignals: InputSignals;
   userFacingText: string;
   contextCardDraft: ContextCardDraft;
   usedFallbackDraft: boolean;
+  // True when the model's own reply failed the generic-failure guard (see
+  // validateAssistantResponse.ts) and userFacingText/recommendedNextAction
+  // were replaced by the deterministic fallback built from parsed items.
+  usedGenericFailureFallback: boolean;
+  validation: ResponseValidationResult;
   followUpQuestions: string[];
   recommendedNextAction: RecommendedNextAction | null;
   relatedCards: ContextCard[];
