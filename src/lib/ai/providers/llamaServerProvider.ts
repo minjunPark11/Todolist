@@ -6,6 +6,7 @@
 import { ensureAiReady } from "../../localAi/runtime";
 import { loadLocalAiSettings } from "../../localAi/settings";
 import { platform } from "../../../platform";
+import { fitToContextWindow } from "../promptBudget";
 import type { AiChatRequest, AiChatResponse, AiMessage, AiProvider } from "../types";
 
 type OpenAiChatResponse = {
@@ -89,6 +90,12 @@ export const llamaServerProvider: AiProvider = {
     // but external OpenAI-compatible servers may route on it.
     const model = request.model?.trim() || settings.selectedModelId || "local";
 
+    // llama-server hard-rejects prompts larger than its context window, so
+    // trim the request to the managed window before sending. Applied in
+    // external mode too — the user's server is at least protected from the
+    // pathological oversizes the char-based budgets allow.
+    const fitted = fitToContextWindow(request.messages, request.knowledgeContext);
+
     const response = await platform.aiFetch(`${ready.baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -96,7 +103,7 @@ export const llamaServerProvider: AiProvider = {
         model,
         stream: false,
         temperature: request.temperature ?? 0.2,
-        messages: withKnowledgeContext(request.messages, request.knowledgeContext),
+        messages: withKnowledgeContext(fitted.messages, fitted.knowledgeContext),
       }),
     });
 

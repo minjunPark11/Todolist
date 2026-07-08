@@ -916,13 +916,17 @@ pub fn start_local_ai_server(
         // n_ubatch and pooled inputs must fit one ubatch, so raise it to
         // cover ~900-char note chunks.
         //
-        // 8192 ctx: the personal-AI prompt carries the system prompt, a
+        // 16384 ctx: the personal-AI prompt carries the system prompt, a
         // trimmed app-data JSON block (AI_CONTEXT_LIMITS), knowledge context,
-        // and chat history — 4096 rejected real-world prompts with
-        // "request exceeds the available context size".
+        // and chat history. The char-based budgets assume ~4 chars/token,
+        // which Korean text badly undershoots (Hangul ≈ 1 token/char), so
+        // 8192 still rejected real-world prompts with "request exceeds the
+        // available context size". All catalog models (Qwen2.5) train at 32k,
+        // and the frontend clamps prompts to this window too — keep
+        // LOCAL_AI_CONTEXT_TOKENS in src/lib/ai/promptBudget.ts in sync.
         &[
             "--ctx-size",
-            "8192",
+            "16384",
             "--embeddings",
             "--pooling",
             "mean",

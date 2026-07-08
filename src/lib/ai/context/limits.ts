@@ -1,7 +1,9 @@
 // Caps applied by buildAiContextText so the personal-AI prompt fits the
-// managed llama-server's context window (--ctx-size 8192 in local_ai.rs)
+// managed llama-server's context window (--ctx-size 16384 in local_ai.rs)
 // alongside the system prompt, knowledge context, and chat history.
-// maxContextCharacters ≈ 16k chars of compact JSON ≈ 4-5k tokens.
+// maxContextCharacters ≈ 16k chars of compact JSON ≈ 4-5k tokens for mostly
+// ASCII content — Korean-heavy data runs denser, which is why the final
+// token-level clamp lives in promptBudget.ts rather than here.
 export const AI_CONTEXT_LIMITS = {
   todayTasks: 20,
   overdueTasks: 10,
