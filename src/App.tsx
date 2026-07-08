@@ -10,6 +10,7 @@ import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
 import type { TodayIntent } from "./components/TodayPage";
 import { executeAgentActions } from "./app/executeAgentActions";
+import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
 import { useDataPortability } from "./app/useDataPortability";
 import type { ToastState } from "./components/kit";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
@@ -1115,23 +1116,7 @@ export default function App() {
       <OllamaChat
         activePage={activePage}
         knowledgeSettings={knowledge.settings}
-        aiContext={{
-          currentPage: activePage,
-          userId: planner.auth.userEmail || "local-user",
-          tasks: planner.tasks,
-          projects: planner.projects,
-          subtasks: planner.subtasks,
-          studyTopics: planner.studyTopics,
-          conceptNotes: planner.conceptNotes,
-          habits: planner.habits,
-          habitLogs: planner.habitLogs,
-          focusSessions: planner.focusSessions,
-          activeSessionId: planner.activeSessionId,
-          taskTemplates: planner.taskTemplates,
-          recentItems: planner.recentItems,
-          settings: planner.settings,
-          appSettings,
-        }}
+        aiContext={buildAiContextInput({ planner, appSettings, currentPage: activePage })}
         calendarContext={{
           tasks: planner.tasks,
           projects: planner.projects,

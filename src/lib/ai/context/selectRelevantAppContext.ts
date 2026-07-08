@@ -19,6 +19,9 @@ import type {
   Task,
   TaskTemplate,
 } from "../../../types";
+import { selectRecentFocusSessions } from "../../../domain/focus/selectors";
+import { selectActiveProjects } from "../../../domain/projects/selectors";
+import { selectRelevantTasks } from "../../../domain/tasks/selectors";
 import { addDays, todayValue } from "../../../utils/date";
 import { buildPlanVsActual } from "../../../utils/planVsActual";
 import type { AgentIntent } from "../agent/intent";
@@ -115,57 +118,12 @@ function slimTask(task: Task) {
   });
 }
 
-// Nearest future date the task is actionable on (scheduled or due), "" if none.
-function nextDateOf(task: Task, today: string): string {
-  return [task.scheduledDate, task.dueDate].filter((date) => date && date > today).sort()[0] ?? "";
-}
-
-// Bucketed relevance selection per the limits: overdue, today, upcoming,
-// recently completed, then recently touched active tasks — deduped in that
-// priority order. Dumping every task blew past the local model's context
-// window as soon as real data accumulated.
-function selectTasks(tasks: Task[], today: string): Task[] {
-  const live = tasks.filter((task) => !task.deletedAt && task.status !== "archived");
-  const active = live.filter((task) => task.status !== "done");
-
-  const overdue = active
-    .filter((task) => task.dueDate && task.dueDate < today)
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-    .slice(0, AI_CONTEXT_LIMITS.overdueTasks);
-  const todays = active
-    .filter((task) => task.scheduledDate === today || task.dueDate === today)
-    .slice(0, AI_CONTEXT_LIMITS.todayTasks);
-  const upcoming = active
-    .filter((task) => nextDateOf(task, today) !== "")
-    .sort((a, b) => nextDateOf(a, today).localeCompare(nextDateOf(b, today)))
-    .slice(0, AI_CONTEXT_LIMITS.upcomingTasks);
-  const recentDone = live
-    .filter((task) => task.status === "done" && task.completedAt.slice(0, 10) >= addDays(today, -6))
-    .sort((a, b) => b.completedAt.localeCompare(a.completedAt))
-    .slice(0, AI_CONTEXT_LIMITS.recentDoneTasks);
-
-  const picked = new Map<string, Task>();
-  for (const task of [...overdue, ...todays, ...upcoming, ...recentDone]) {
-    picked.set(task.id, task);
-  }
-
-  const otherActive = active
-    .filter((task) => !picked.has(task.id))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, AI_CONTEXT_LIMITS.otherActiveTasks);
-  for (const task of otherActive) {
-    picked.set(task.id, task);
-  }
-
-  return [...picked.values()];
-}
-
 export function selectRelevantAppContext(input: AiContextInput): RelevantAppContext {
   const today = todayValue();
   const intent = input.intent ?? "general_chat";
   const activityCutoff = addDays(today, -(AI_CONTEXT_LIMITS.activityWindowDays - 1));
 
-  const tasks = selectTasks(input.tasks, today);
+  const tasks = selectRelevantTasks(input.tasks, today, AI_CONTEXT_LIMITS);
   const taskIds = new Set(tasks.map((task) => task.id));
 
   return {
@@ -197,8 +155,7 @@ export function selectRelevantAppContext(input: AiContextInput): RelevantAppCont
     ),
     data: {
       tasks: tasks.map(slimTask),
-      projects: input.projects
-        .filter((project) => project.status !== "archived")
+      projects: selectActiveProjects(input.projects)
         .slice(0, AI_CONTEXT_LIMITS.projects)
         .map((project) =>
           omitEmpty({
@@ -264,9 +221,7 @@ export function selectRelevantAppContext(input: AiContextInput): RelevantAppCont
       habitLogs: input.habitLogs
         .filter((log) => log.date >= activityCutoff)
         .map((log) => omitEmpty({ habitId: log.habitId, date: log.date, completed: log.completed })),
-      focusSessions: [...input.focusSessions]
-        .filter((session) => (session.startedAt || session.startAt).slice(0, 10) >= activityCutoff)
-        .sort((a, b) => (b.startedAt || b.startAt).localeCompare(a.startedAt || a.startAt))
+      focusSessions: selectRecentFocusSessions(input.focusSessions, activityCutoff)
         .slice(0, AI_CONTEXT_LIMITS.focusSessions)
         .map((session) =>
           omitEmpty({
