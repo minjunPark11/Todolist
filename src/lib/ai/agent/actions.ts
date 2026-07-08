@@ -13,6 +13,10 @@ export type AgentAction =
         dueDate?: string;
         projectId?: string;
         priority?: Exclude<TaskPriority, "none">;
+        // Free-text details (e.g. the AI assistant's completion criteria and
+        // context-card reference) stored on the task without a schema change.
+        notes?: string;
+        tags?: string[];
       };
     }
   | {

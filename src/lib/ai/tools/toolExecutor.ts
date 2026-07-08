@@ -13,6 +13,9 @@ export type ToolExecutionResult = {
   actionId: string;
   ok: boolean;
   message: string;
+  // Set for create_task executions so callers (e.g. the assistant's outcome
+  // log) can reference the created task.
+  taskId?: string;
 };
 
 export type ToolValidationContext = {

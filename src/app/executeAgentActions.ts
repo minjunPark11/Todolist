@@ -34,12 +34,15 @@ export function executeAgentActions(
           dueDate: action.payload.dueDate,
           projectId: action.payload.projectId,
           priority: action.payload.priority,
+          notes: action.payload.notes,
+          tags: action.payload.tags,
           status: "todo",
         });
         return {
           actionId: action.id,
           ok: Boolean(taskId),
           message: taskId ? "Task created." : "Task creation failed.",
+          taskId: taskId || undefined,
         };
       }
 
