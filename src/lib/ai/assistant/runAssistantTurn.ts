@@ -79,13 +79,17 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
   const responseMode = analysis?.responseMode ?? resolveResponseMode(undefined, NONE_SIGNALS, items.length);
   const inputSignals = analysis?.inputSignals ?? NONE_SIGNALS;
 
-  // Generic Failure Guard (validateAssistantResponse.ts): only overwhelm/
-  // planning replies are held to it. When the model's own reply falls back
-  // to a re-offered menu, a missing next action, vague completion criteria,
-  // or an unrequested schedule, replace it with the deterministic fallback
-  // built from the same parsed items rather than showing the broken reply.
-  const validation = analysis ? validateAssistantResponse(analysis, items) : { ok: true, failures: [] };
-  const usedGenericFailureFallback = analysis !== null && !validation.ok;
+  // Generic Failure Guard (validateAssistantResponse.ts): overwhelm/planning
+  // replies that re-offer a menu, miss the next action, use vague completion
+  // criteria, or invent a schedule are replaced with the deterministic
+  // fallback built from the same parsed items rather than shown broken.
+  // A reply with no parseable JSON at all is itself a guard failure: free
+  // text cannot carry the structured next action the contract requires, and
+  // showing it raw is exactly how generic advice used to bypass the guard.
+  const validation = analysis
+    ? validateAssistantResponse(analysis, items)
+    : { ok: false, failures: ["model reply contained no parseable JSON"] };
+  const usedGenericFailureFallback = !validation.ok;
 
   let userFacingText = analysis?.userFacingResponse || response.content.trim();
   let followUpQuestions = analysis?.followUpQuestions ?? [];
@@ -98,6 +102,14 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
     followUpQuestions = fallback.followUpQuestions;
     draft.recommendedNextAction = fallback.recommendedNextAction;
   }
+
+  console.debug("[runAssistantTurn]", {
+    rawContent: response.content,
+    parsedAnalysis: analysis,
+    responseMode,
+    validation,
+    usedGenericFailureFallback,
+  });
 
   return {
     id: `aturn-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,

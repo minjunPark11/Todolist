@@ -5,6 +5,8 @@ import { AssistantPanel } from "./ai/AssistantPanel";
 import type { AgentAction } from "../lib/ai/agent/actions";
 import { runPersonalAgent } from "../lib/ai/agent/personalAgent";
 import { detectAgentIntent, getIntentLabel, type AgentIntent } from "../lib/ai/agent/intent";
+import { shouldRouteToAssistantFlow } from "../lib/ai/assistant/overwhelmHeuristics";
+import { runAssistantTurn } from "../lib/ai/assistant/runAssistantTurn";
 import { buildAiContextText, type AiContextInput } from "../lib/ai/context/buildAiContext";
 import {
   validateAgentActions,
@@ -156,6 +158,30 @@ export function OllamaChat({
     setLoading(true);
 
     try {
+      // Overwhelm-shaped messages ("too much, can't start, what first?") must
+      // not be answered by the free-text personal-agent prompt — it has no
+      // Generic Failure Guard, so it happily produces "우선 가장 시급한 일부터"
+      // advice. Route them through the assistant flow (runAssistantTurn),
+      // whose replies are validated and deterministically repaired.
+      if (aiContext && shouldRouteToAssistantFlow(content)) {
+        const turn = await runAssistantTurn({
+          brainDump: content,
+          history: chatHistory,
+          appData: aiContext,
+          knowledgeSettings,
+        });
+        setProvider(turn.provider);
+        const replyParts = [turn.userFacingText];
+        if (turn.recommendedNextAction) {
+          replyParts.push(`${t("ai.assistant.nextAction")}: ${turn.recommendedNextAction.title}`);
+          if (turn.recommendedNextAction.completionCriteria) {
+            replyParts.push(`${t("ai.assistant.completionCriteria")}: ${turn.recommendedNextAction.completionCriteria}`);
+          }
+        }
+        setMessages((current) => [...current, createMessage("assistant", replyParts.join("\n"))]);
+        return;
+      }
+
       const calendarContextText =
         activePage === "calendar" && calendarContext ? buildCalendarContextText(calendarContext) : undefined;
       const requestContextText = aiContext

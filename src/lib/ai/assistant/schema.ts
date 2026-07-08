@@ -2,10 +2,11 @@
 // the model is asked to follow). Everything here is defensive: the local
 // model regularly wraps JSON in prose or markdown fences, truncates fields,
 // omits new fields, or returns free text — none of that may break the app.
-// When no usable JSON arrives, callers still get the raw text plus a
-// heuristic fallback card draft so the save flow keeps working.
+// When no usable JSON arrives, callers get null and must treat it as a
+// Generic Failure Guard failure (deterministic fallback text + heuristic
+// fallback card draft) — never surface the raw reply.
 import type { ContextCardDraft, DetectedItem, NextActionDifficulty, RecommendedNextAction } from "../contextCards/types";
-import { dedupeDetectedItems, resolveResponseMode } from "./overwhelmHeuristics";
+import { dedupeDetectedItems, extractLikelyItemLabels, resolveResponseMode } from "./overwhelmHeuristics";
 import type { AssistantAnalysis, AssistantMode, AssistantSafeActionProposal, InputSignals, SignalStrength } from "./types";
 
 const MAX_LIST_ITEMS = 10;
@@ -173,8 +174,9 @@ function resolveMode(
   return "ready_for_next_action";
 }
 
-// null analysis = the reply contained no usable JSON; show the text as-is and
-// fall back to a heuristic card draft.
+// null analysis = the reply contained no usable JSON. Callers must NOT show
+// the raw text: runAssistantTurn treats null as a validation failure and
+// routes it through buildFallbackOverwhelmResponse + the fallback card draft.
 export function parseAssistantResponse(content: string, rawInput: string): AssistantAnalysis | null {
   const json = extractJsonObject(content);
   if (!json) return null;
@@ -205,11 +207,7 @@ export function parseAssistantResponse(content: string, rawInput: string): Assis
 // without a card): split the dump into fragments so the user still gets a
 // saveable, editable starting point instead of a dead end.
 export function buildFallbackContextCardDraft(rawInput: string): ContextCardDraft {
-  const fragments = rawInput
-    .split(/[\n.;,!?]|(?:하고|해야\s*하고|그리고)/)
-    .map((part) => part.trim())
-    .filter((part) => part.length >= 2)
-    .slice(0, 8);
+  const fragments = extractLikelyItemLabels(rawInput).slice(0, 8);
   const title = rawInput.trim().replace(/\s+/g, " ").slice(0, 60) || "Brain dump";
   const items: DetectedItem[] = fragments.map((label) => ({
     label,

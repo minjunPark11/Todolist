@@ -9,8 +9,11 @@ import {
   isObservableOutput,
   isVagueCompletionCriteria,
   itemsHaveWorkTypeOrOutput,
+  extractLikelyItemLabels,
   looksLikeTimetable,
   resolveResponseMode,
+  shouldRouteToAssistantFlow,
+  splitDumpFragments,
 } from "./overwhelmHeuristics";
 
 const NONE: InputSignals = {
@@ -180,6 +183,54 @@ describe("containsGenericFailurePhrases", () => {
 
   it("does not flag a specific, item-grounded sentence", () => {
     expect(containsGenericFailurePhrases("졸업논문의 초안 3장을 먼저 작성해보세요")).toBe(false);
+  });
+});
+
+describe("splitDumpFragments", () => {
+  it("splits a Korean multi-obligation dump into fragments", () => {
+    const fragments = splitDumpFragments("논문 피드백 반영, 앱 버그 수정, LeetCode 공부, 중국어 복습이 다 밀렸어");
+    expect(fragments.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("extractLikelyItemLabels", () => {
+  it("keeps only real work items, dropping the complaint and the question", () => {
+    const labels = extractLikelyItemLabels(
+      "해야 할 게 너무 많아서 시작을 못 하겠어. 논문 피드백 반영, 앱 버그 수정, LeetCode 공부, 중국어 복습이 다 밀렸어. 뭐부터 해야 해?",
+    );
+    expect(labels).toEqual(["논문 피드백 반영", "앱 버그 수정", "LeetCode 공부", "중국어 복습"]);
+  });
+
+  it("falls back to raw fragments when every fragment looks like noise", () => {
+    const labels = extractLikelyItemLabels("너무 많아서 막막해");
+    expect(labels.length).toBeGreaterThan(0);
+  });
+});
+
+describe("shouldRouteToAssistantFlow", () => {
+  it("routes the reported overwhelm input (friction + decision handoff)", () => {
+    expect(
+      shouldRouteToAssistantFlow(
+        "해야 할 게 너무 많아서 시작을 못 하겠어. 논문 피드백 반영, 앱 버그 수정, LeetCode 공부, 중국어 복습이 다 밀렸어. 뭐부터 해야 해?",
+      ),
+    ).toBe(true);
+  });
+
+  it("routes an English overwhelm message", () => {
+    expect(shouldRouteToAssistantFlow("I'm so overwhelmed — thesis feedback, app bugs, LeetCode. Where should I start?")).toBe(true);
+  });
+
+  it("does not route a plain multi-item status report with no friction or decision handoff", () => {
+    expect(shouldRouteToAssistantFlow("오늘은 논문 피드백 반영하고, 앱 버그도 고치고, 중국어 복습도 했어")).toBe(false);
+  });
+
+  it("does not route a single scoped request even when a signal word appears", () => {
+    expect(shouldRouteToAssistantFlow("막막해")).toBe(false);
+    expect(shouldRouteToAssistantFlow("what should i do first")).toBe(false);
+  });
+
+  it("does not route an ordinary question", () => {
+    expect(shouldRouteToAssistantFlow("이번 주 금요일에 일정 있어?")).toBe(false);
   });
 });
 

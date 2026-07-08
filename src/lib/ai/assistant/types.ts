@@ -81,9 +81,10 @@ export type AssistantTurn = {
   userFacingText: string;
   contextCardDraft: ContextCardDraft;
   usedFallbackDraft: boolean;
-  // True when the model's own reply failed the generic-failure guard (see
-  // validateAssistantResponse.ts) and userFacingText/recommendedNextAction
-  // were replaced by the deterministic fallback built from parsed items.
+  // True when the model's reply failed the generic-failure guard (see
+  // validateAssistantResponse.ts) — including replies with no parseable
+  // JSON at all — and userFacingText/recommendedNextAction were replaced
+  // by the deterministic fallback built from the parsed/fallback items.
   usedGenericFailureFallback: boolean;
   validation: ResponseValidationResult;
   followUpQuestions: string[];

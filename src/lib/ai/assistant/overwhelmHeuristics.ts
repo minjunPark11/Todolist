@@ -56,6 +56,49 @@ export function resolveResponseMode(rawResponseMode: unknown, signals: InputSign
   return "normal_task_request";
 }
 
+// --- Brain-dump fragment splitting -----------------------------------------
+
+// Lexical splitter for "how many separate obligations does this text likely
+// mention". Real item boundaries come from the model (see prompts.ts); this
+// only backs the fallback card draft (schema.ts) and the chat-tab routing
+// detector below, so it just has to be a usable approximation.
+export function splitDumpFragments(text: string): string[] {
+  return text
+    .split(/[\n.;,!?]|(?:하고|해야\s*하고|그리고)/)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 2);
+}
+
+// Fragments that are the overwhelm complaint itself or the "what first?"
+// question rather than a piece of work. They must not become fallback items:
+// otherwise the deterministic fallback can end up recommending "해야 할 게
+// 너무 많아서 시작을 못 하겠어" as the first work item.
+const NOISE_FRAGMENT_PATTERNS: RegExp[] = [
+  /뭐부터|무엇부터|어디서부터|어떤\s*것부터|뭐\s*먼저/,
+  /너무\s*많/,
+  /시작(을|이)?\s*못|손에\s*안\s*잡|엄두가?\s*안|감당이?\s*안|막막|모르겠/,
+  /what\s+(should\s+i\s+)?(do|start|tackle)\s+first/i,
+  /where\s+(do|should)\s+i\s+(start|begin)/i,
+  /\boverwhelm|\btoo (much|many)\b|can'?t\s+(get\s+)?start/i,
+];
+
+// Trailing backlog/friction predicates carried by an otherwise real item,
+// e.g. "중국어 복습이 다 밀렸어" → "중국어 복습".
+const TRAILING_PREDICATE = /(이|가)?\s*(다|전부|잔뜩|많이)?\s*(밀렸|밀려|쌓였|쌓여)[^]*$|\s+(is|are)\s+(all\s+)?(overdue|piling up|piled up)[^]*$/i;
+
+// Work-item labels for the fallback card draft: split the dump, strip
+// friction predicates, and drop complaint/question fragments — but never
+// return an empty list when the raw split found something, so the fallback
+// card always has at least one label to anchor on.
+export function extractLikelyItemLabels(text: string): string[] {
+  const fragments = splitDumpFragments(text);
+  const cleaned = fragments
+    .filter((fragment) => !NOISE_FRAGMENT_PATTERNS.some((pattern) => pattern.test(fragment)))
+    .map((fragment) => fragment.replace(TRAILING_PREDICATE, "").trim())
+    .filter((fragment) => fragment.length >= 2);
+  return cleaned.length > 0 ? cleaned : fragments;
+}
+
 // --- Detected item boundary enforcement -----------------------------------
 
 function normalize(value: string): string {
@@ -180,6 +223,56 @@ const GENERIC_FAILURE_PHRASES: RegExp[] = [
 // generic-failure verdict (see validateAssistantResponse.ts).
 export function containsGenericFailurePhrases(text: string): boolean {
   return GENERIC_FAILURE_PHRASES.some((pattern) => pattern.test(text));
+}
+
+// --- Chat-tab routing detector ---------------------------------------------
+
+// Overwhelm/dread/avoidance phrases and "you decide the order for me"
+// phrases, judged on the raw text before any model call. Deliberately
+// narrower than the model-side signal judgment in prompts.ts: this only has
+// to catch inputs that must not be answered by the free-text personal-agent
+// prompt (which has no Generic Failure Guard).
+const ROUTE_FRICTION_PATTERNS: RegExp[] = [
+  /너무\s*많/,
+  /막막/,
+  /(다|잔뜩)\s*밀렸/,
+  /밀려\s*있/,
+  /시작(을|이)?\s*못/,
+  /손에\s*안\s*잡/,
+  /엄두가?\s*안/,
+  /감당이?\s*안/,
+  /정신이?\s*없/,
+  /\boverwhelm/i,
+  /\btoo (much|many)\b/i,
+  /can'?t\s+(get\s+)?start/i,
+  /\bbehind on\b/i,
+  /\bswamped\b/i,
+];
+
+const ROUTE_DECISION_PATTERNS: RegExp[] = [
+  /뭐부터/,
+  /무엇부터/,
+  /어디서부터/,
+  /어떤\s*것부터/,
+  /뭐\s*먼저/,
+  /우선\s*?순위\s*(를|좀)?\s*(정해|골라|매겨|알려)/,
+  /what\s+(should\s+i\s+)?(do|start|tackle)\s+first/i,
+  /where\s+(do|should)\s+i\s+(start|begin)/i,
+  /prioriti[sz]e\s+(these|them|this|my|for me)/i,
+];
+
+// Whether a chat-tab message must be handled by the assistant flow
+// (runAssistantTurn + Generic Failure Guard) instead of the free-text
+// personal agent. Mirrors the combination rule of resolveResponseMode:
+// mentioning several items alone never routes — an explicit friction or
+// decision handoff must be present, and a single signal additionally needs
+// 2+ likely items so scoped one-item requests stay in normal chat.
+export function shouldRouteToAssistantFlow(text: string): boolean {
+  const friction = ROUTE_FRICTION_PATTERNS.some((pattern) => pattern.test(text));
+  const decision = ROUTE_DECISION_PATTERNS.some((pattern) => pattern.test(text));
+  if (!friction && !decision) return false;
+  if (friction && decision) return true;
+  return splitDumpFragments(text).length >= 2;
 }
 
 // --- Fallback next action builder ------------------------------------------
