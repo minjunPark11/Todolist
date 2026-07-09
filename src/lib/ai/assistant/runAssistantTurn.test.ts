@@ -148,6 +148,8 @@ describe("runAssistantTurn — Generic Failure Guard on unparseable replies", ()
     expect(slots.map((slot) => slot.kind)).toContain("done_criteria");
     // Label-only fallback items leave done_criteria unresolved → scoping.
     expect(turn.contextCardDraft.stage).toBe("scoping");
+    // A plan exists only on planned cards — never before info gathering ends.
+    expect(turn.contextCardDraft.plan).toBeUndefined();
   });
 
   it("computes stage=planned when the model answers the required slots and gives a next action", async () => {
@@ -198,6 +200,87 @@ describe("runAssistantTurn — Generic Failure Guard on unparseable replies", ()
     const deadline = turn.contextCardDraft.infoSlots?.find((slot) => slot.kind === "deadline");
     expect(deadline?.answer).toBe("금요일 미팅 전까지");
     expect(deadline?.source).toBe("user_answer");
+
+    // Planned card, no model plan_steps → the deterministic fallback plan:
+    // step 0 is the recommended next action, and the plan closes by deferring
+    // the next decision instead of scheduling everything up front.
+    const plan = turn.contextCardDraft.plan ?? [];
+    expect(plan.length).toBeGreaterThanOrEqual(2);
+    expect(plan[0].title).toBe("논문 피드백 반영: 첫 번째 코멘트 1개 반영");
+    expect(plan[0].startCue.trim()).not.toBe("");
+    expect(plan[plan.length - 1].title).toContain("다음 실행 단위");
+  });
+
+  it("keeps the model's valid plan steps after the anchored first step and drops unusable ones", async () => {
+    mockReply(
+      JSON.stringify({
+        response_mode: "overwhelm",
+        input_signals: { decision_signal: "strong", friction_signal: "strong" },
+        mode: "ready_for_next_action",
+        context_card_draft: {
+          title: "밀린 일 정리",
+          detected_items: [
+            {
+              label: "논문 피드백 반영",
+              domain: "연구",
+              work_type: "수정",
+              status: "in-progress",
+              possible_output: "피드백 반영된 절 1개",
+              dependency: false,
+              external_pressure: true,
+            },
+          ],
+          info_slots: [
+            { kind: "done_criteria", question: "", answer: "피드백 반영된 절 1개", source: "derived" },
+            { kind: "deadline", question: "", answer: "금요일 미팅 전까지", source: "user_answer" },
+            { kind: "blocked_point", question: "", answer: "코멘트 목록 정리까지 함", source: "user_answer" },
+          ],
+          plan_steps: [
+            {
+              title: "첫 번째 코멘트 1개 반영",
+              why: "이미 추천한 행동과 같음",
+              start_cue: "원고 열기",
+              completion_criteria: "수정본 저장",
+            },
+            {
+              title: "나머지 코멘트를 훑고 다음 반영 대상 1개 고르기",
+              why: "다음 반영 범위가 정해져요",
+              start_cue: "코멘트 목록 열기",
+              completion_criteria: "다음 대상 1개가 메모에 남아 있으면 끝",
+            },
+            {
+              title: "열심히 나머지도 진행하기",
+              why: "",
+              start_cue: "오전 9시에 시작",
+              completion_criteria: "이해하면 완료",
+            },
+          ],
+          likely_blockers: [],
+          missing_info: [],
+          related_task_ids: [],
+          related_project_ids: [],
+          related_note_paths: [],
+        },
+        follow_up_questions: [],
+        recommended_next_action: {
+          title: "논문 피드백 반영: 첫 번째 코멘트 1개 반영",
+          reason: "외부 마감과 연결되어 있습니다.",
+          completion_criteria: "해당 절의 수정본이 저장되어 있으면 완료",
+          estimated_difficulty: "low",
+        },
+        user_facing_response: "논문 피드백 반영부터 시작하는 게 안전합니다.",
+      }),
+    );
+
+    const turn = await runAssistantTurn(turnInput());
+
+    expect(turn.contextCardDraft.stage).toBe("planned");
+    const plan = turn.contextCardDraft.plan ?? [];
+    // Step 0 anchored on the next action; the model's duplicate of it and its
+    // vague/clock-time step are gone; the valid follow-through survives.
+    expect(plan).toHaveLength(2);
+    expect(plan[0].title).toBe("논문 피드백 반영: 첫 번째 코멘트 1개 반영");
+    expect(plan[1].title).toBe("나머지 코멘트를 훑고 다음 반영 대상 1개 고르기");
   });
 
   it("replaces a parsed overwhelm reply whose text is still generic advice", async () => {

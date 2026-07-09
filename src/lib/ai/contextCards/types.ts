@@ -68,6 +68,24 @@ export type InfoSlot = {
   source?: InfoSlotSource;
 };
 
+// One ordered execution unit of a planned card. The user-facing plan answers
+// "what, why this order, how do I physically start, when is it done" — the
+// SMART quality bar behind these fields lives in assistant/planSteps.ts as an
+// internal validator and is never surfaced as terminology.
+export type PlanStep = {
+  // Small and concrete — startable within minutes, never a duration or a
+  // stock phrase.
+  title: string;
+  // Why this step sits at this position, in natural language tied to the
+  // priority reasoning (deadline, unblocking, ambiguity reduction).
+  why: string;
+  // Physical start trigger: what to open / where to be. Never a clock time —
+  // the assistant must not invent schedules (see looksLikeTimetable guard).
+  startCue: string;
+  // Observable artifact that makes "done" a yes/no question.
+  completionCriteria: string;
+};
+
 export type ContextCard = {
   id: string;
   title: string;
@@ -99,6 +117,11 @@ export type ContextCard = {
   // Deterministically computed pipeline stage (see CardStage). Optional for
   // the same backward-compatibility reason.
   stage?: CardStage;
+  // Ordered execution units, present only on planned cards (slice 3). Index
+  // is the order; step 0 always corresponds to recommendedNextAction, so the
+  // panel renders it once (on the action card) and lists steps 1+ as "what
+  // comes after". Optional: cards saved before this field existed stay valid.
+  plan?: PlanStep[];
   recommendedNextAction?: RecommendedNextAction;
   relatedTaskIds: string[];
   relatedProjectIds: string[];

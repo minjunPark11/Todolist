@@ -296,6 +296,11 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
               <section className="assistant-section assistant-next-action" aria-label={t("ai.assistant.nextAction")}>
                 <h3>{t("ai.assistant.nextAction")}</h3>
                 <p className="assistant-card-title">{nextAction.title}</p>
+                {cardDraft?.plan?.[0]?.startCue ? (
+                  <p className="assistant-detail">
+                    <strong>{t("ai.assistant.planStartCue")}:</strong> {cardDraft.plan[0].startCue}
+                  </p>
+                ) : null}
                 {nextAction.completionCriteria ? (
                   <p className="assistant-detail">
                     <strong>{t("ai.assistant.completionCriteria")}:</strong> {nextAction.completionCriteria}
@@ -335,6 +340,25 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
                     {t("ai.assistant.startFocus")} · {t("ai.assistant.comingSoon")}
                   </button>
                 </div>
+              </section>
+            ) : null}
+
+            {cardDraft?.plan && cardDraft.plan.length > 1 ? (
+              <section className="assistant-section" aria-label={t("ai.assistant.planUpcoming")}>
+                <h3>{t("ai.assistant.planUpcoming")}</h3>
+                <p className="assistant-hint">{t("ai.assistant.planHint")}</p>
+                <ol className="assistant-plan-steps">
+                  {cardDraft.plan.slice(1).map((step, index) => (
+                    <li key={index} className="assistant-plan-step">
+                      <p className="assistant-plan-step-title">{step.title}</p>
+                      {step.why ? <p className="assistant-plan-step-why">{step.why}</p> : null}
+                      <p className="assistant-plan-step-meta">
+                        {t("ai.assistant.planStartCue")}: {step.startCue}
+                        {step.completionCriteria ? ` · ${t("ai.assistant.planDoneCue")}: ${step.completionCriteria}` : ""}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
               </section>
             ) : null}
 

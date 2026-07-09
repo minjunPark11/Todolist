@@ -858,6 +858,10 @@ export const en: Dictionary = {
   "ai.assistant.slot.prerequisite": "Prerequisite",
   "ai.assistant.slot.time_budget": "Time budget",
   "ai.assistant.slot.scope_boundary": "Scope boundary",
+  "ai.assistant.planUpcoming": "What comes after",
+  "ai.assistant.planHint": "Once the action above is done, continue in this order.",
+  "ai.assistant.planStartCue": "Start",
+  "ai.assistant.planDoneCue": "Done when",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "Previous",

@@ -858,6 +858,10 @@ export const ko: Dictionary = {
   "ai.assistant.slot.prerequisite": "선행 조건",
   "ai.assistant.slot.time_budget": "시간 예산",
   "ai.assistant.slot.scope_boundary": "범위 경계",
+  "ai.assistant.planUpcoming": "이 다음 순서",
+  "ai.assistant.planHint": "지금 행동이 끝나면 이 순서로 이어가요.",
+  "ai.assistant.planStartCue": "시작",
+  "ai.assistant.planDoneCue": "끝",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "이전",

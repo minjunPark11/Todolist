@@ -2004,6 +2004,29 @@
 .assistant-info-slot.resolved {
   color: var(--text-primary);
 }
+.assistant-plan-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.assistant-plan-step p {
+  margin: 0;
+}
+.assistant-plan-step-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.assistant-plan-step-why {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.assistant-plan-step-meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
 .assistant-status {
   margin: 0;
   font-size: 12px;

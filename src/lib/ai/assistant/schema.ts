@@ -5,7 +5,16 @@
 // When no usable JSON arrives, callers get null and must treat it as a
 // Generic Failure Guard failure (deterministic fallback text + heuristic
 // fallback card draft) — never surface the raw reply.
-import type { ContextCardDraft, DetectedItem, InfoSlot, InfoSlotKind, InfoSlotSource, NextActionDifficulty, RecommendedNextAction } from "../contextCards/types";
+import type {
+  ContextCardDraft,
+  DetectedItem,
+  InfoSlot,
+  InfoSlotKind,
+  InfoSlotSource,
+  NextActionDifficulty,
+  PlanStep,
+  RecommendedNextAction,
+} from "../contextCards/types";
 import { dedupeDetectedItems, extractLikelyItemLabels, resolveResponseMode } from "./overwhelmHeuristics";
 import type { AssistantAnalysis, AssistantMode, AssistantSafeActionProposal, InputSignals, SignalStrength } from "./types";
 
@@ -140,6 +149,27 @@ function parseInfoSlots(value: unknown): InfoSlot[] {
   return slots;
 }
 
+// plan_steps entries the model emits. Only shape-level cleaning happens here;
+// the SMART quality bar (validate/repair/fallback) is applied later by
+// planSteps.ts, and only for cards that actually reach the planned stage.
+const MAX_RAW_PLAN_STEPS = 6;
+
+function parsePlanSteps(value: unknown): PlanStep[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(isRecord)
+    .map(
+      (entry): PlanStep => ({
+        title: cleanString(entry.title, 160),
+        why: cleanString(entry.why, 200),
+        startCue: cleanString(entry.start_cue, 120),
+        completionCriteria: cleanString(entry.completion_criteria, 200),
+      }),
+    )
+    .filter((step) => step.title)
+    .slice(0, MAX_RAW_PLAN_STEPS);
+}
+
 function parseDetectedItems(value: unknown): DetectedItem[] {
   if (!Array.isArray(value)) return [];
   const items = value
@@ -167,6 +197,7 @@ function parseCardDraft(value: unknown, rawInput: string): ContextCardDraft | nu
     possibleOutputs: items.map((item) => item.possibleOutput).filter(Boolean),
     detectedItemDetails: items,
     infoSlots: parseInfoSlots(value.info_slots),
+    plan: parsePlanSteps(value.plan_steps),
     relatedTaskIds: cleanStringArray(value.related_task_ids),
     relatedProjectIds: cleanStringArray(value.related_project_ids),
     relatedNotePaths: cleanStringArray(value.related_note_paths, 5),

@@ -98,6 +98,7 @@ export function summarizeContextCardForPrompt(card: ContextCard): string {
       : "",
     openSlots.length ? `open info slots: ${joinCapped(openSlots.map((slot) => slot.kind), 6)}` : "",
     card.recommendedNextAction ? `last recommended next action: ${card.recommendedNextAction.title}` : "",
+    card.plan?.length ? `existing plan (refine, do not restart): ${joinCapped(card.plan.map((step) => step.title), 4)}` : "",
   ].filter(Boolean);
   return lines.join("\n");
 }

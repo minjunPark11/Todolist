@@ -5,7 +5,7 @@
 // migration. Swap this file for a DB-backed store later without touching
 // callers.
 import { platform } from "../../../platform";
-import type { CardStage, ContextCard, ContextCardDraft, InfoSlot, RecommendedNextAction } from "./types";
+import type { CardStage, ContextCard, ContextCardDraft, InfoSlot, PlanStep, RecommendedNextAction } from "./types";
 
 const STORAGE_KEY = "focusflow.aiContextCards.v1";
 // Oldest-updated cards are pruned past this cap so the blob stays small.
@@ -54,6 +54,23 @@ function asOptionalInfoSlots(value: unknown): InfoSlot[] | undefined {
   return slots.length > 0 ? slots : undefined;
 }
 
+function asOptionalPlanSteps(value: unknown): PlanStep[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const steps = value
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
+    .filter((entry) => typeof entry.title === "string" && entry.title.trim() !== "")
+    .map(
+      (entry): PlanStep => ({
+        title: (entry.title as string).trim(),
+        why: typeof entry.why === "string" ? entry.why : "",
+        startCue: typeof entry.startCue === "string" ? entry.startCue : "",
+        completionCriteria: typeof entry.completionCriteria === "string" ? entry.completionCriteria : "",
+      }),
+    )
+    .slice(0, 4);
+  return steps.length > 0 ? steps : undefined;
+}
+
 function asOptionalStage(value: unknown): CardStage | undefined {
   return typeof value === "string" && CARD_STAGES.has(value) ? (value as CardStage) : undefined;
 }
@@ -76,6 +93,7 @@ function sanitizeCard(value: unknown): ContextCard | null {
     possibleOutputs: asStringArray(record.possibleOutputs),
     infoSlots: asOptionalInfoSlots(record.infoSlots),
     stage: asOptionalStage(record.stage),
+    plan: asOptionalPlanSteps(record.plan),
     recommendedNextAction: asOptionalNextAction(record.recommendedNextAction),
     relatedTaskIds: asStringArray(record.relatedTaskIds),
     relatedProjectIds: asStringArray(record.relatedProjectIds),

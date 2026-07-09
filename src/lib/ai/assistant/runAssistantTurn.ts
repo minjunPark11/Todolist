@@ -11,6 +11,7 @@ import type { AiContextInput } from "../context/buildAiContext";
 import type { DetectedItem } from "../contextCards/types";
 import { buildAssistantContextPack } from "./buildAssistantContext";
 import { deriveInfoSlots, mergeInfoSlots, resolveCardStage } from "./infoSlots";
+import { resolvePlanSteps } from "./planSteps";
 import { resolveResponseMode } from "./overwhelmHeuristics";
 import { ASSISTANT_SYSTEM_PROMPT } from "./prompts";
 import { buildFallbackContextCardDraft, parseAssistantResponse } from "./schema";
@@ -115,6 +116,14 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
   // Computed last so the stage reflects the final draft, including a next
   // action supplied by the fallback path above.
   draft.stage = resolveCardStage(draft);
+
+  // Plan (planSteps.ts): only a planned card carries one — a plan before the
+  // required info is resolved would be built on unchecked assumptions. The
+  // model's steps are SMART-validated and repaired deterministically; step 0
+  // is always the recommended next action, so the plan and the action card
+  // can never disagree about where to start.
+  const plan = draft.stage === "planned" ? resolvePlanSteps(draft.plan ?? [], items, draft.recommendedNextAction ?? null) : [];
+  draft.plan = plan.length > 0 ? plan : undefined;
 
   console.debug("[runAssistantTurn]", {
     rawContent: response.content,
