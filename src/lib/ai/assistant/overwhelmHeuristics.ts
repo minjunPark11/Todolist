@@ -351,25 +351,25 @@ export function shouldRouteToAssistantFlow(text: string): boolean {
 function buildSemanticFallbackAction(item: DetectedItem, semanticText: string): RecommendedNextAction | null {
   if (looksLikeDebuggingItem(semanticText)) {
     return {
-      title: `${item.label}: 재현 조건 1개와 에러 메시지 1개를 메모로 남기기`,
-      reason: "버그를 바로 고치는 대신, 재현 조건과 에러 메시지부터 기록해 실행 단위를 줄입니다.",
-      completionCriteria: "재현 조건 1개와 에러 메시지 1개가 메모로 남아 있으면 완료입니다.",
+      title: `${item.label}: 재현 조건 1개랑 에러 메시지 1개만 메모로 남기기`,
+      reason: "바로 고치려 들기보다, 막힌 자리부터 기록해 두면 부담 없이 다시 움직일 수 있어요.",
+      completionCriteria: "재현 조건 1개와 에러 메시지 1개가 메모로 남아 있으면 끝이에요.",
       estimatedDifficulty: "low",
     };
   }
   if (looksLikeDeadlineOrExternalProject(semanticText)) {
     return {
-      title: `${item.label}: 오늘 반영할 피드백(또는 수정 포인트) 1개를 고르고 수정 메모 3줄 작성하기`,
-      reason: "외부 제출/평가로 이어질 가능성이 높은 항목이라, 반영할 포인트 1개로 범위를 좁혀 시작합니다.",
-      completionCriteria: "선택한 포인트 1개와 수정 메모 3줄이 남아 있으면 완료입니다.",
+      title: `${item.label}: 오늘 볼 수정 포인트 1개 고르고, 메모 3줄만 남기기`,
+      reason: "포인트 1개로 좁히면 지금 바로 시작할 수 있어요.",
+      completionCriteria: "고른 포인트 1개와 메모 3줄이 남아 있으면 끝이에요.",
       estimatedDifficulty: "low",
     };
   }
   if (looksLikeRoutineLearningItem(semanticText)) {
     return {
-      title: `${item.label}: 문제/단어/복습 항목 1개만 골라서 기록하기`,
-      reason: "밀린 루틴 학습은 항목 1개 기록으로 가볍게 재시작하는 게 안전합니다.",
-      completionCriteria: "그 항목 1개가 기록으로 남아 있으면 완료입니다.",
+      title: `${item.label}: 오늘 할 항목 1개만 골라서 기록하기`,
+      reason: "밀린 학습은 항목 1개 기록으로 가볍게 다시 시작하는 게 안전해요.",
+      completionCriteria: "그 항목 1개가 기록으로 남아 있으면 끝이에요.",
       estimatedDifficulty: "low",
     };
   }
@@ -391,21 +391,21 @@ export function buildFallbackNextActionForItem(item: DetectedItem): RecommendedN
   if (semanticAction) return semanticAction;
   if (isObservableOutput(item.possibleOutput)) {
     const reason = item.dependency
-      ? "다른 항목의 진행을 막고 있어 먼저 처리합니다."
+      ? "다른 일이 여기에 걸려 있어서 먼저 처리해요."
       : item.externalPressure
-        ? "외부 마감/제출과 연결되어 있어 먼저 처리합니다."
-        : "지금 가장 작게 시작할 수 있는 항목입니다.";
+        ? "마감·제출과 이어져 있어서 먼저 처리해요."
+        : "지금 가장 작게 시작할 수 있는 일이에요.";
     return {
       title: `${item.label}: ${item.possibleOutput}`,
       reason,
-      completionCriteria: `${item.possibleOutput}이(가) 실제로 남아 있으면 완료입니다.`,
+      completionCriteria: `${item.possibleOutput} — 이게 실제로 남아 있으면 끝이에요.`,
       estimatedDifficulty: "low",
     };
   }
   return {
-    title: `${item.label}: 다음 실행 단위를 정하는 데 필요한 조건 1~2가지 적어보기`,
-    reason: "산출물이나 다음 행동이 아직 불명확해서, 큰 결과물 대신 범위부터 좁힙니다.",
-    completionCriteria: "그 조건들이 메모나 목록으로 남아 있으면 완료입니다.",
+    title: `${item.label}: 다음에 뭘 할지 정하는 데 필요한 조건 1~2가지만 적어보기`,
+    reason: "아직 산출물이 흐릿해서, 큰 결과물 대신 범위부터 좁혀요.",
+    completionCriteria: "그 조건들이 메모나 목록으로 남아 있으면 끝이에요.",
     estimatedDifficulty: "low",
   };
 }

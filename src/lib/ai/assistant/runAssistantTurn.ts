@@ -105,7 +105,7 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
   let recommendedNextAction = analysis?.recommendedNextAction ?? null;
 
   if (usedGenericFailureFallback) {
-    const fallback = buildFallbackOverwhelmResponse(input.brainDump, items);
+    const fallback = buildFallbackOverwhelmResponse(input.brainDump, items, draft.infoSlots ?? []);
     userFacingText = fallback.userFacingResponse;
     recommendedNextAction = fallback.recommendedNextAction;
     followUpQuestions = fallback.followUpQuestions;

@@ -242,7 +242,7 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
               <p>{turn.userFacingText}</p>
             </div>
 
-            {turn.mode === "needs_more_context" && turn.followUpQuestions.length > 0 ? (
+            {turn.followUpQuestions.length > 0 ? (
               <section className="assistant-section" aria-label={t("ai.assistant.followUps")}>
                 <h3>
                   {t("ai.assistant.needsMoreContext")}
@@ -296,11 +296,6 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
               <section className="assistant-section assistant-next-action" aria-label={t("ai.assistant.nextAction")}>
                 <h3>{t("ai.assistant.nextAction")}</h3>
                 <p className="assistant-card-title">{nextAction.title}</p>
-                {nextAction.reason ? (
-                  <p className="assistant-detail">
-                    <strong>{t("ai.assistant.reason")}:</strong> {nextAction.reason}
-                  </p>
-                ) : null}
                 {nextAction.completionCriteria ? (
                   <p className="assistant-detail">
                     <strong>{t("ai.assistant.completionCriteria")}:</strong> {nextAction.completionCriteria}

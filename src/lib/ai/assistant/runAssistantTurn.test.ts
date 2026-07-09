@@ -62,9 +62,14 @@ describe("runAssistantTurn — Generic Failure Guard on unparseable replies", ()
     // observable completion criteria.
     expect(turn.userFacingText).toContain("논문 피드백 반영");
     expect(turn.userFacingText).not.toContain("뭐부터 해야 해(");
-    expect(turn.userFacingText).toContain("다음 행동");
     expect(turn.recommendedNextAction).not.toBeNull();
     expect(turn.recommendedNextAction!.completionCriteria.trim()).not.toBe("");
+    // Role split: the next action and its completion criteria live on the
+    // card only — the body must not restate them.
+    expect(turn.userFacingText).not.toContain(turn.recommendedNextAction!.title);
+    expect(turn.userFacingText).not.toContain("다음 행동:");
+    // The optional info-gathering question obeys the "at most 1" guard rule.
+    expect(turn.followUpQuestions.length).toBeLessThanOrEqual(1);
   });
 
   it("picks the external-deliverable item in the fallback even when routine items are mentioned first", async () => {
@@ -75,7 +80,7 @@ describe("runAssistantTurn — Generic Failure Guard on unparseable replies", ()
     expect(turn.usedGenericFailureFallback).toBe(true);
     expect(turn.recommendedNextAction).not.toBeNull();
     expect(turn.recommendedNextAction!.title).toContain("논문 피드백 반영");
-    expect(turn.userFacingText).not.toContain("다음 행동: 중국어 복습");
+    expect(turn.recommendedNextAction!.title).not.toContain("중국어 복습");
     expect(turn.recommendedNextAction!.completionCriteria.trim()).not.toBe("");
   });
 

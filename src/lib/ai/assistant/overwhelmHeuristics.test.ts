@@ -301,7 +301,9 @@ describe("buildFallbackNextActionForItem", () => {
     const target = item({ label: "새 프로젝트" });
     const action = buildFallbackNextActionForItem(target);
     expect(action.title).toContain("새 프로젝트");
-    expect(action.title).toContain("조건 1~2가지");
+    // Scope-reducing, not a deliverable: it asks to write down conditions,
+    // however the sentence is worded.
+    expect(action.title).toContain("조건");
     expect(isObservableOutput(action.completionCriteria)).toBe(true);
   });
 

@@ -3,7 +3,8 @@
 // "overwhelm" and "planning_request" responses are held to these rules —
 // domain_specific/learning_request/direct answers keep their own mode's
 // quality bar and are never touched here.
-import type { DetectedItem, RecommendedNextAction } from "../contextCards/types";
+import type { DetectedItem, InfoSlot, RecommendedNextAction } from "../contextCards/types";
+import { chooseNextSlotToAsk, resolveCardStage } from "./infoSlots";
 import {
   buildFallbackNextActionForItem,
   chooseFirstItem,
@@ -82,7 +83,12 @@ export type FallbackOverwhelmResponse = {
 
 // Built entirely from the actual parsed items — never a canned sentence
 // unrelated to the input. Used only when validateAssistantResponse fails.
-export function buildFallbackOverwhelmResponse(rawInput: string, items: DetectedItem[]): FallbackOverwhelmResponse {
+//
+// Body ↔ card contract: the body reassures, names the chosen item exactly
+// once with a short reason, states the gathering state in plain words, and
+// parks the rest. The next action title and completion criteria live only on
+// the recommendation card (AssistantPanel) — never restated in the body.
+export function buildFallbackOverwhelmResponse(rawInput: string, items: DetectedItem[], infoSlots: InfoSlot[] = []): FallbackOverwhelmResponse {
   const deduped = dedupeDetectedItems(items);
   const chosen =
     chooseFirstItem(deduped) ??
@@ -96,46 +102,41 @@ export function buildFallbackOverwhelmResponse(rawInput: string, items: Detected
       externalPressure: false,
     } satisfies DetectedItem);
 
-  const summaryLine = deduped.map((item) => `${item.label}(${item.workType || item.possibleOutput || "정리 필요"})`).join(", ");
+  const focusLine = deduped.length >= 2 ? "지금은 하나만 잡을게요." : "지금은 작게 하나만 잡을게요.";
 
-  const diagnosis =
-    deduped.length >= 2
-      ? `${deduped.length}개의 일이 섞여 있어서 지금 어디부터 시작할지 실행 단위가 흐려진 상태로 보입니다.`
-      : `"${chosen.label}"이 아직 작은 실행 단위로 쪼개지지 않아 시작점이 보이지 않는 상태로 보입니다.`;
-
-  // One- or two-sentence reason (never a lecture): explicit flags first, then
-  // the same category signals the priority heuristic used, so the stated
-  // reason matches why the item actually won.
+  // Short natural reason, not a restated rule: explicit flags first, then the
+  // same category signals the priority heuristic used, so the stated reason
+  // matches why the item actually won. The chosen label appears here and only
+  // here in the body.
   const chosenText = itemSemanticText(chosen);
   const reasonLine = chosen.dependency
-    ? `그 중 "${chosen.label}"이 다른 일의 진행을 막고 있어 먼저 잡는 게 안전합니다.`
+    ? `우선 "${chosen.label}"부터 — 다른 일이 여기에 걸려 있어서, 이걸 풀어야 나머지가 움직여요.`
     : chosen.externalPressure
-      ? `그 중 "${chosen.label}"이 외부 마감/제출과 연결되어 있어 먼저 잡는 게 안전합니다.`
+      ? `우선 "${chosen.label}"부터 — 마감이 걸려 있는 일이라 먼저 잡는 게 안전해요.`
       : looksLikeDeadlineOrExternalProject(chosenText)
-        ? `그 중 "${chosen.label}"은 결과물이 남고 외부 피드백/제출로 이어지기 쉬워 먼저 잡는 게 좋습니다.`
+        ? `우선 "${chosen.label}"부터 — 손대면 결과가 바로 남는 일이라 먼저 잡을게요.`
         : looksLikeDebuggingItem(chosenText)
-          ? `그 중 "${chosen.label}"은 막힌 지점을 기록만 해도 다시 움직이기 쉬워서 먼저 잡습니다.`
-          : `그 중 "${chosen.label}"을 첫 실행 단위로 잡습니다.`;
+          ? `우선 "${chosen.label}"부터 — 막힌 자리만 적어 둬도 다시 움직이기 쉬운 일이에요.`
+          : `우선 "${chosen.label}"부터 시작할게요.`;
 
   const recommendedNextAction = buildFallbackNextActionForItem(chosen);
 
+  // Info-gathering state in plain words only — internal stage/slot names never
+  // reach the user. At most one optional follow-up question (guard rule);
+  // the recommended action is startable whether or not it gets answered.
+  const stage = resolveCardStage({ detectedItemDetails: deduped, infoSlots, recommendedNextAction });
+  const nextSlot = stage === "planned" ? null : chooseNextSlotToAsk(infoSlots);
+  const stageLine = nextSlot
+    ? "확인해 두면 좋은 게 하나 있긴 한데, 답하지 않고 그냥 시작해도 괜찮아요."
+    : "바로 시작할 수 있는 단계예요.";
+
   // The rest is parked, not dropped: name the remaining items and defer the
-  // decision to the next execution unit instead of asking the user anything.
+  // decision to the next execution unit.
   const remainingLabels = deduped.filter((item) => item.label !== chosen.label).map((item) => item.label);
   const holdLine =
-    remainingLabels.length > 0
-      ? `나머지(${remainingLabels.join(", ")})는 버리는 게 아니라 보류입니다 — 이 행동이 끝난 뒤 다음 실행 단위를 정할 때 다시 봅니다.`
-      : "";
+    remainingLabels.length > 0 ? `나머지(${remainingLabels.join(", ")})는 버리는 게 아니라 보류예요 — 이 작업이 끝난 뒤에 다시 볼게요.` : "";
 
-  const userFacingResponse = [
-    diagnosis,
-    deduped.length >= 2 ? `정리하면: ${summaryLine}.` : "",
-    reasonLine,
-    `다음 행동: ${recommendedNextAction.title}.`,
-    holdLine,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const userFacingResponse = [focusLine, reasonLine, stageLine, holdLine].filter(Boolean).join(" ");
 
-  return { userFacingResponse, recommendedNextAction, followUpQuestions: [] };
+  return { userFacingResponse, recommendedNextAction, followUpQuestions: nextSlot ? [nextSlot.question] : [] };
 }

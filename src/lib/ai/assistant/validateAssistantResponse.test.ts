@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DetectedItem } from "../contextCards/types";
+import type { DetectedItem, InfoSlot } from "../contextCards/types";
 import { isObservableOutput } from "./overwhelmHeuristics";
 import type { AssistantAnalysis, InputSignals } from "./types";
 import { buildFallbackOverwhelmResponse, validateAssistantResponse } from "./validateAssistantResponse";
@@ -157,6 +157,46 @@ describe("buildFallbackOverwhelmResponse", () => {
     expect(fallback.userFacingResponse).toContain("앱 버그 수정");
     expect(fallback.followUpQuestions).toEqual([]);
     expect(fallback.userFacingResponse).not.toMatch(/\?\s*$/);
+  });
+
+  it("keeps the next action title and completion criteria out of the body — the card owns them", () => {
+    const items = [
+      item({ label: "논문 피드백 반영", workType: "", possibleOutput: "" }),
+      item({ label: "중국어 복습", domain: "", workType: "", possibleOutput: "" }),
+    ];
+    const fallback = buildFallbackOverwhelmResponse("논문 피드백 반영이랑 중국어 복습이 다 밀렸어", items);
+
+    expect(fallback.userFacingResponse).not.toContain(fallback.recommendedNextAction.title);
+    expect(fallback.userFacingResponse).not.toContain(fallback.recommendedNextAction.completionCriteria);
+    expect(fallback.userFacingResponse).not.toContain("다음 행동:");
+    // The chosen label appears exactly once in the body (in the reason line).
+    expect(fallback.userFacingResponse.match(/논문 피드백 반영/g)).toHaveLength(1);
+  });
+
+  it("asks the single highest-priority unresolved slot question when info is still missing", () => {
+    const slots: InfoSlot[] = [
+      { kind: "done_criteria", question: "끝나면 어떤 산출물이 남아 있나요?", answer: "" },
+      { kind: "deadline", question: "마감이 있나요?", answer: "" },
+    ];
+    const fallback = buildFallbackOverwhelmResponse("논문 피드백 반영이 밀렸어", [item({ label: "논문 피드백 반영" })], slots);
+
+    expect(fallback.followUpQuestions).toEqual(["끝나면 어떤 산출물이 남아 있나요?"]);
+  });
+
+  it("asks nothing once the required slots are resolved, even when optional slots are still open", () => {
+    // The unresolved time_budget slot exercises the planned-stage gate: without
+    // it, chooseNextSlotToAsk would return null anyway and the gate could be
+    // deleted without this test noticing.
+    const slots: InfoSlot[] = [
+      { kind: "done_criteria", question: "", answer: "수정 메모 3줄", source: "derived" },
+      { kind: "deadline", question: "", answer: "금요일까지", source: "user_answer" },
+      { kind: "blocked_point", question: "", answer: "아직 시작 전", source: "user_answer" },
+      { kind: "time_budget", question: "이번 주에 쓸 수 있는 시간이 얼마나 되나요?", answer: "" },
+    ];
+    const fallback = buildFallbackOverwhelmResponse("논문 피드백 반영이 밀렸어", [item({ label: "논문 피드백 반영" })], slots);
+
+    expect(fallback.followUpQuestions).toEqual([]);
+    expect(fallback.userFacingResponse).toContain("바로 시작");
   });
 
   it("does not hand the user the final deliverable as the fallback next action", () => {
