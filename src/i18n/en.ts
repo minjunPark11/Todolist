@@ -317,6 +317,7 @@ export const en: Dictionary = {
   "settings.localAi.runtimeUnavailable": "No engine is available for this platform yet. Use an external server connection.",
   "settings.localAi.runtimeInstalledBadge": "Installed",
   "settings.localAi.runtimeInstallButton": "Install engine",
+  "settings.localAi.runtimeUpdateButton": "Update engine",
   "settings.localAi.runtimeInstalled": "Local AI engine installed.",
   "settings.localAi.runtimeInstallFailed": "Engine install failed.",
   "settings.localAi.storageTitle": "Model storage location",

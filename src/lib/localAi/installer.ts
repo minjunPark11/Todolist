@@ -57,7 +57,18 @@ export async function installServerRuntime(): Promise<ModelDownloadOutcome> {
   if (!isAllowedDownloadUrl(asset.downloadUrl)) {
     throw new Error("The runtime download URL is not allowlisted.");
   }
-  return platform.localAi.installServer(asset.downloadUrl, asset.expectedSha256);
+  return platform.localAi.installServer(asset.downloadUrl, asset.expectedSha256, asset.version);
+}
+
+// True when a runtime is installed but its recorded version differs from the
+// pinned catalog asset (including pre-version-tracking installs, which have
+// no recorded version). Drives the "엔진 업데이트" affordance in settings.
+export async function isServerRuntimeOutdated(): Promise<boolean> {
+  const asset = await resolveServerRuntimeForPlatform();
+  if (!asset) return false;
+  if (!(await platform.localAi.isServerInstalled())) return false;
+  const installedVersion = await platform.localAi.getServerRuntimeVersion();
+  return installedVersion !== asset.version;
 }
 
 export async function cancelServerRuntimeInstall(): Promise<void> {

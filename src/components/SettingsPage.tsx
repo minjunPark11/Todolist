@@ -6,6 +6,7 @@ import {
   cancelServerRuntimeInstall,
   deleteInstalledModel,
   isModelDownloadable,
+  isServerRuntimeOutdated,
   resolveServerRuntimeForPlatform,
 } from "../lib/localAi/installer";
 import {
@@ -895,6 +896,7 @@ function LocalAiSettingsTab() {
   const [localActionError, setLocalActionError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<InstalledModelFile | null>(null);
   const [serverInstalled, setServerInstalled] = useState<boolean | null>(null);
+  const [runtimeOutdated, setRuntimeOutdated] = useState(false);
   const [runtimeAsset, setRuntimeAsset] = useState<ServerRuntimeAsset | null>(null);
   const handledDownloadResultRef = useRef(0);
 
@@ -927,6 +929,7 @@ function LocalAiSettingsTab() {
     if (!isDesktop) return;
     void platform.localAi.getModelsDir().then(setModelsDir).catch(() => undefined);
     void platform.localAi.isServerInstalled().then(setServerInstalled).catch(() => setServerInstalled(false));
+    void isServerRuntimeOutdated().then(setRuntimeOutdated).catch(() => setRuntimeOutdated(false));
     void resolveServerRuntimeForPlatform().then(setRuntimeAsset).catch(() => setRuntimeAsset(null));
     void refreshInstalledModels();
 
@@ -941,6 +944,7 @@ function LocalAiSettingsTab() {
     handledDownloadResultRef.current = result.completedAt;
     if (result.kind === "runtime" && result.outcome === "completed") {
       setServerInstalled(true);
+      setRuntimeOutdated(false);
     }
     void refreshInstalledModels();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1220,7 +1224,7 @@ function LocalAiSettingsTab() {
                 : t("settings.localAi.runtimeUnavailable")
             }
           >
-            {serverInstalled ? (
+            {serverInstalled && !runtimeOutdated ? (
               <span className="ff-localai-chip on">{t("settings.localAi.runtimeInstalledBadge")}</span>
             ) : installingRuntime ? (
               <button type="button" className="ff-btn ff-btn-danger" onClick={() => void cancelServerRuntimeInstall()}>
@@ -1233,7 +1237,11 @@ function LocalAiSettingsTab() {
                 disabled={Boolean(downloadingId) || !runtimeAsset || serverInstalled === null}
                 onClick={() => void handleInstallRuntime()}
               >
-                {downloadError ? t("settings.localAi.downloadRetry") : t("settings.localAi.runtimeInstallButton")}
+                {downloadError
+                  ? t("settings.localAi.downloadRetry")
+                  : serverInstalled && runtimeOutdated
+                    ? t("settings.localAi.runtimeUpdateButton")
+                    : t("settings.localAi.runtimeInstallButton")}
               </button>
             )}
           </Row>

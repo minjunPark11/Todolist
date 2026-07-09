@@ -104,11 +104,16 @@ export interface PlatformLocalAi {
   // True once the managed llama-server binary is present in the app-local bin
   // dir. External launch mode and a path override don't need it.
   isServerInstalled(): Promise<boolean>;
-  // Downloads and extracts an official llama.cpp release zip into the bin dir.
-  // Same allowlist + sha256 trust model as downloadModel; progress and
-  // cancellation reuse subscribeDownloadProgress / cancelDownload under the
-  // "llama-server-runtime" id. Resolves "completed" or "cancelled".
-  installServer(url: string, expectedSha256: string): Promise<ModelDownloadOutcome>;
+  // The catalog version of the installed runtime (written on install), or
+  // null for none/pre-version-tracking installs — the settings UI treats a
+  // mismatch with the pinned catalog version as "update available".
+  getServerRuntimeVersion(): Promise<string | null>;
+  // Downloads and extracts an official llama.cpp release zip into the bin dir,
+  // replacing any previous build. Same allowlist + sha256 trust model as
+  // downloadModel; progress and cancellation reuse subscribeDownloadProgress /
+  // cancelDownload under the "llama-server-runtime" id. Resolves "completed"
+  // or "cancelled".
+  installServer(url: string, expectedSha256: string, version: string): Promise<ModelDownloadOutcome>;
 }
 
 export interface PlatformAdapter {

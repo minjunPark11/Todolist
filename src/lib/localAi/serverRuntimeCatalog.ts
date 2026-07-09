@@ -5,10 +5,14 @@
 // (windows/macos/linux, x86_64/aarch64), resolved from get_local_ai_platform so
 // a universal macOS app picks the slice it actually runs as.
 //
-// Pinned to llama.cpp release b9885 CPU builds — they run without GPU drivers
-// and match the current sidecar spawn args (no -ngl). Only the release
-// workflow's shipped targets (Windows, macOS universal) are listed; Linux and
-// GPU builds (Vulkan/CUDA) + -ngl offload are follow-ups.
+// Pinned to llama.cpp release b9885. Windows ships the Vulkan build: the
+// sidecar passes -ngl 999 (local_ai.rs), and on-device measurement (Core
+// Ultra 7 155H + Arc iGPU) showed 4x faster prompt processing vs the CPU
+// build (29 → 115 tok/s). Machines without a usable Vulkan device are safe:
+// llama.cpp's dynamic backend loading skips ggml-vulkan when it can't
+// initialize and falls back to the bundled CPU backend. macOS builds carry
+// Metal already. Only the release workflow's shipped targets are listed;
+// Linux is a follow-up.
 export interface ServerRuntimeAsset {
   // llama.cpp release tag, surfaced in the UI and for support/debugging.
   version: string;
@@ -23,9 +27,9 @@ const RELEASE_BASE = `https://github.com/ggml-org/llama.cpp/releases/download/${
 
 export const SERVER_RUNTIME_CATALOG: Record<string, ServerRuntimeAsset> = {
   "windows-x86_64": {
-    version: RELEASE,
-    downloadUrl: `${RELEASE_BASE}/llama-${RELEASE}-bin-win-cpu-x64.zip`,
-    expectedSha256: "0f88b475892930f201a2f4ae185a01afef6eb355fc302508d57f5f3cf7471d0b",
+    version: `${RELEASE}-vulkan`,
+    downloadUrl: `${RELEASE_BASE}/llama-${RELEASE}-bin-win-vulkan-x64.zip`,
+    expectedSha256: "ec7cc287cb88e6af9829660b5c91de5f4927d38e424a5c1929a5ec711b277bb7",
     sizeGb: 0.1,
   },
   "macos-aarch64": {

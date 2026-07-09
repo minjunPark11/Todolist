@@ -317,6 +317,7 @@ export const ko: Dictionary = {
   "settings.localAi.runtimeUnavailable": "이 플랫폼용 엔진은 아직 준비되지 않았습니다. 외부 서버 연결을 사용하세요.",
   "settings.localAi.runtimeInstalledBadge": "설치됨",
   "settings.localAi.runtimeInstallButton": "엔진 설치",
+  "settings.localAi.runtimeUpdateButton": "엔진 업데이트",
   "settings.localAi.runtimeInstalled": "로컬 AI 엔진 설치 완료.",
   "settings.localAi.runtimeInstallFailed": "엔진 설치에 실패했습니다.",
   "settings.localAi.storageTitle": "모델 저장 위치",

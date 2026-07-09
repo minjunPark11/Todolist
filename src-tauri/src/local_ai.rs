@@ -596,21 +596,75 @@ pub fn is_local_ai_server_installed(app: tauri::AppHandle) -> bool {
         .unwrap_or(false)
 }
 
+// Which catalog build is installed (written on install). None for installs
+// that predate version tracking — the frontend treats those as outdated so
+// the CPU-build → Vulkan-build upgrade path reaches existing users.
+#[tauri::command]
+pub fn get_local_ai_server_runtime_version(app: tauri::AppHandle) -> Option<String> {
+    let path = local_bin_dir_path(&app).ok()?.join(RUNTIME_VERSION_FILE);
+    let version = std::fs::read_to_string(path).ok()?;
+    let version = version.trim();
+    (!version.is_empty()).then(|| version.to_string())
+}
+
+// The version string is written to a file inside the bin dir; keep it to a
+// tag-shaped token so it can't smuggle path separators or control characters.
+fn validate_runtime_version(version: &str) -> Result<(), String> {
+    let valid = !version.is_empty()
+        && version.len() <= 64
+        && version
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'.' || byte == b'-' || byte == b'_');
+    if valid {
+        Ok(())
+    } else {
+        Err(format!("Invalid runtime version: {version}"))
+    }
+}
+
+// Removes everything in the bin dir except the freshly downloaded archive.
+// llama.cpp loads every ggml-*.dll/.so it finds beside the binary, so DLLs
+// left over from a previous build (e.g. the CPU build when upgrading to
+// Vulkan) must not survive an upgrade.
+fn clear_bin_dir_except(bin_dir: &Path, keep: &Path) -> Result<(), String> {
+    let entries = std::fs::read_dir(bin_dir).map_err(|error| error.to_string())?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path == keep {
+            continue;
+        }
+        let result = if path.is_dir() {
+            std::fs::remove_dir_all(&path)
+        } else {
+            std::fs::remove_file(&path)
+        };
+        result.map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn install_local_ai_server(
     app: tauri::AppHandle,
     state: State<'_, LocalAiDownloadState>,
     url: String,
     expected_sha256: String,
+    version: String,
 ) -> Result<DownloadOutcome, String> {
     let parsed_url = validate_download_url(&url)?;
     validate_sha256(&expected_sha256)?;
+    validate_runtime_version(&version)?;
 
     let bin_dir = local_bin_dir_path(&app)?;
     tokio::fs::create_dir_all(&bin_dir)
         .await
         .map_err(|error| error.to_string())?;
-    if bin_dir.join(server_binary_file_name()).is_file() {
+    // Already on this exact build? Done. A missing/different version marker
+    // means an upgrade: fall through and reinstall over the old build.
+    let installed_version = std::fs::read_to_string(bin_dir.join(RUNTIME_VERSION_FILE))
+        .ok()
+        .map(|value| value.trim().to_string());
+    if bin_dir.join(server_binary_file_name()).is_file() && installed_version.as_deref() == Some(version.as_str()) {
         return Ok(DownloadOutcome::Completed);
     }
 
@@ -657,11 +711,18 @@ pub async fn install_local_ai_server(
         DownloadOutcome::Completed => {}
     }
 
+    // A running sidecar holds locks on the exe/DLLs about to be replaced
+    // (Windows would fail the delete); stop both before touching the bin dir.
+    shutdown_local_ai_server(&app);
+
     let extract_dir = bin_dir.clone();
     let extract_archive = archive_path.clone();
-    let extract_result = tokio::task::spawn_blocking(move || extract_runtime_archive(&extract_archive, &extract_dir, is_tar_gz))
-        .await
-        .map_err(|error| error.to_string())?;
+    let extract_result = tokio::task::spawn_blocking(move || {
+        clear_bin_dir_except(&extract_dir, &extract_archive)?;
+        extract_runtime_archive(&extract_archive, &extract_dir, is_tar_gz)
+    })
+    .await
+    .map_err(|error| error.to_string())?;
     // Drop the downloaded archive either way so a failed extract doesn't leave
     // a stale zip/tarball behind for the next attempt to trip over.
     let _ = tokio::fs::remove_file(&archive_path).await;
@@ -670,6 +731,9 @@ pub async fn install_local_ai_server(
     if !bin_dir.join(server_binary_file_name()).is_file() {
         return Err("The runtime archive did not contain llama-server.".to_string());
     }
+    // Written only after the binary is verified present, so a failed install
+    // never claims the new version.
+    std::fs::write(bin_dir.join(RUNTIME_VERSION_FILE), &version).map_err(|error| error.to_string())?;
     Ok(DownloadOutcome::Completed)
 }
 
@@ -687,6 +751,9 @@ const SERVER_RUNTIME_DOWNLOAD_ID: &str = "llama-server-runtime";
 // Base name for the runtime archive while it downloads into the bin dir; the
 // real extension (.zip or .tar.gz) is chosen from the download URL.
 const SERVER_RUNTIME_ARCHIVE_STEM: &str = "llama-server-runtime";
+// Marker written beside llama-server recording which catalog build is
+// installed, so a catalog bump (e.g. CPU → Vulkan) can trigger a reinstall.
+const RUNTIME_VERSION_FILE: &str = "runtime-version.txt";
 // How far above the preferred port we probe for a free one.
 const PORT_PROBE_RANGE: u16 = 20;
 
@@ -920,6 +987,11 @@ pub fn start_local_ai_server(
         // trimmed app-data JSON block (AI_CONTEXT_LIMITS), knowledge context,
         // and chat history — 4096 rejected real-world prompts with
         // "request exceeds the available context size".
+        //
+        // -ngl 999: offload every layer to the GPU backend when one is
+        // usable (the Windows runtime is the Vulkan build, macOS has Metal;
+        // see serverRuntimeCatalog.ts). Harmless on CPU-only builds/devices —
+        // llama.cpp just keeps the layers on CPU.
         &[
             "--ctx-size",
             "8192",
@@ -928,6 +1000,8 @@ pub fn start_local_ai_server(
             "mean",
             "--ubatch-size",
             "1024",
+            "-ngl",
+            "999",
         ],
     )
 }
@@ -959,6 +1033,8 @@ pub fn start_local_ai_embedding_server(
             "mean",
             "--ubatch-size",
             "2048",
+            "-ngl",
+            "999",
         ],
     )
 }
