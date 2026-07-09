@@ -4,9 +4,12 @@ import type { AgentAction } from "../../lib/ai/agent/actions";
 import { runAssistantTurn } from "../../lib/ai/assistant/runAssistantTurn";
 import type { AssistantTurn } from "../../lib/ai/assistant/types";
 import type { AiContextInput } from "../../lib/ai/context/buildAiContext";
-import { saveContextCard } from "../../lib/ai/contextCards/store";
+import { loadContextCards, saveContextCard } from "../../lib/ai/contextCards/store";
 import { summarizeContextCardForPrompt } from "../../lib/ai/contextCards/searchContextCards";
 import type { ContextCard, RecommendedNextAction } from "../../lib/ai/contextCards/types";
+import { formatBreadcrumb, type PathBreadcrumb } from "../../lib/ai/learningPaths/progress";
+import { loadLearningPaths, saveLearningPath } from "../../lib/ai/learningPaths/store";
+import type { LearningPath, LearningPathDraft } from "../../lib/ai/learningPaths/types";
 import { logProposedOutcome, updateOutcome } from "../../lib/ai/memory/outcomeLog";
 import type { ToolExecutionResult } from "../../lib/ai/tools/toolExecutor";
 import type { AiMessage } from "../../lib/ai/types";
@@ -56,6 +59,13 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
   const [rejected, setRejected] = useState(false);
   const [notice, setNotice] = useState("");
   const [showRelatedCards, setShowRelatedCards] = useState(false);
+  const [savedPath, setSavedPath] = useState<LearningPath | null>(null);
+  // Position line for the most recently updated path (learningPaths/progress
+  // is the single source — the panel never derives position itself).
+  const [breadcrumb, setBreadcrumb] = useState<PathBreadcrumb | null>(() => {
+    const latest = loadLearningPaths()[0];
+    return latest ? formatBreadcrumb(latest, loadContextCards()) : null;
+  });
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Prior exchanges as chat history so follow-up answers refine the draft.
@@ -105,6 +115,7 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
       setSavedTaskTitle("");
       setRejected(false);
       setShowRelatedCards(false);
+      setSavedPath(null);
 
       // Every surfaced proposal starts as "proposed" in the outcome log; the
       // buttons below move it to saved_as_task / rejected / failed.
@@ -196,6 +207,13 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
     }
   }
 
+  function handleSavePath(pathDraft: LearningPathDraft) {
+    if (!turn || savedPath) return;
+    const path = saveLearningPath(pathDraft, "assistant");
+    setSavedPath(path);
+    setBreadcrumb(formatBreadcrumb(path, loadContextCards()));
+  }
+
   function handleReject() {
     if (!turn || savedTaskTitle || rejected) return;
     setRejected(true);
@@ -207,6 +225,11 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
 
   return (
     <div className="assistant-panel">
+      {breadcrumb ? (
+        <div className="assistant-breadcrumb" title={t("ai.assistant.path.breadcrumbLabel")}>
+          🧭 {breadcrumb.goal} · {breadcrumb.position} {breadcrumb.milestoneTitle}
+        </div>
+      ) : null}
       <div className="assistant-scroll" role="log" aria-live="polite">
         {exchanges.length === 0 && !loading ? (
           <p className="assistant-greeting">{t("ai.assistant.greeting")}</p>
@@ -362,6 +385,34 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
                     </li>
                   ))}
                 </ol>
+              </section>
+            ) : null}
+
+            {turn.learningPathDraft ? (
+              <section className="assistant-section assistant-path" aria-label={t("ai.assistant.path.draftTitle")}>
+                <h3>{t("ai.assistant.path.draftTitle")}</h3>
+                <p className="assistant-hint">{t("ai.assistant.path.hint")}</p>
+                <p className="assistant-card-title">{turn.learningPathDraft.goal}</p>
+                <ol className="assistant-plan-steps">
+                  {turn.learningPathDraft.milestones.map((milestone) => (
+                    <li key={milestone.id} className="assistant-plan-step">
+                      <p className="assistant-plan-step-title">{milestone.title}</p>
+                      <p className="assistant-plan-step-meta">
+                        {t("ai.assistant.path.milestoneDone")}: {milestone.doneCriteria}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+                <div className="assistant-actions">
+                  <button
+                    type="button"
+                    className="assistant-primary"
+                    onClick={() => turn.learningPathDraft && handleSavePath(turn.learningPathDraft)}
+                    disabled={Boolean(savedPath)}
+                  >
+                    {savedPath ? t("ai.assistant.path.saved") : t("ai.assistant.path.save")}
+                  </button>
+                </div>
               </section>
             ) : null}
 

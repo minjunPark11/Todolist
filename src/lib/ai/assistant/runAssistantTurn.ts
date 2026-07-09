@@ -11,6 +11,7 @@ import type { AiContextInput } from "../context/buildAiContext";
 import type { DetectedItem } from "../contextCards/types";
 import { buildAssistantContextPack } from "./buildAssistantContext";
 import { deriveInfoSlots, mergeInfoSlots, resolveCardStage } from "./infoSlots";
+import { looksLikeLearningPathRequest, resolveLearningPathDraft } from "./pathDraft";
 import { resolvePlanSteps } from "./planSteps";
 import { resolveResponseMode } from "./overwhelmHeuristics";
 import { ASSISTANT_SYSTEM_PROMPT } from "./prompts";
@@ -129,6 +130,16 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
   const plan = draft.stage === "planned" ? resolvePlanSteps(draft.plan ?? [], items, draft.recommendedNextAction ?? null) : [];
   draft.plan = plan.length > 0 ? plan : undefined;
 
+  // Learning path (pathDraft.ts): double gate — the user must have
+  // explicitly asked for a path THIS turn (deterministic trigger on the raw
+  // dump) AND the model's proposal must survive validation/repair. The model
+  // alone can never surface a path, and this leaves every existing
+  // draft/guard/fallback branch above untouched.
+  const learningPathDraft =
+    looksLikeLearningPathRequest(input.brainDump) && analysis?.learningPathProposal
+      ? resolveLearningPathDraft(analysis.learningPathProposal.goal, analysis.learningPathProposal.milestones)
+      : null;
+
   console.debug("[runAssistantTurn]", {
     rawContent: response.content,
     parsedAnalysis: analysis,
@@ -150,6 +161,7 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
     validation,
     followUpQuestions,
     recommendedNextAction,
+    learningPathDraft,
     relatedCards: pack.relatedCards,
     knowledgeSources: pack.knowledgeSources,
   };

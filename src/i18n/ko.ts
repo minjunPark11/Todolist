@@ -863,6 +863,12 @@ export const ko: Dictionary = {
   "ai.assistant.planHint": "지금 행동이 끝나면 이 순서로 이어가요.",
   "ai.assistant.planStartCue": "시작",
   "ai.assistant.planDoneCue": "끝",
+  "ai.assistant.path.draftTitle": "학습 경로 초안",
+  "ai.assistant.path.hint": "큰 방향을 중간 목표로 나눈 초안이에요. 저장하면 위쪽에 현재 위치가 계속 표시돼요.",
+  "ai.assistant.path.save": "경로로 저장",
+  "ai.assistant.path.saved": "경로 저장됨",
+  "ai.assistant.path.milestoneDone": "완료 기준",
+  "ai.assistant.path.breadcrumbLabel": "현재 학습 경로 위치",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "이전",

@@ -863,6 +863,12 @@ export const en: Dictionary = {
   "ai.assistant.planHint": "Once the action above is done, continue in this order.",
   "ai.assistant.planStartCue": "Start",
   "ai.assistant.planDoneCue": "Done when",
+  "ai.assistant.path.draftTitle": "Learning path draft",
+  "ai.assistant.path.hint": "Your big goal split into intermediate milestones. Save it and your current position stays visible above.",
+  "ai.assistant.path.save": "Save as path",
+  "ai.assistant.path.saved": "Path saved",
+  "ai.assistant.path.milestoneDone": "Done when",
+  "ai.assistant.path.breadcrumbLabel": "Current learning path position",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "Previous",

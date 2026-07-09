@@ -5,6 +5,7 @@
 //                               proposal outcome lands in memory/outcomeLog.
 import type { RetrievedChunk } from "../../knowledge/types";
 import type { ContextCard, ContextCardDraft, DetectedItem, RecommendedNextAction } from "../contextCards/types";
+import type { LearningPathDraft } from "../learningPaths/types";
 import type { AiProviderName } from "../types";
 
 export type AssistantMode = "needs_more_context" | "ready_for_next_action";
@@ -55,6 +56,14 @@ export type AssistantSafeActionProposal = {
   linkedContextCardId: string;
 };
 
+// The model's raw learning_path block, shape-cleaned only. Whether it may
+// surface at all is decided deterministically in runAssistantTurn
+// (looksLikeLearningPathRequest gate + resolveLearningPathDraft repair).
+export type LearningPathProposal = {
+  goal: string;
+  milestones: { title: string; doneCriteria: string }[];
+};
+
 // Normalized (camelCase) form of the model's JSON reply. null draft/action
 // means the model omitted or malformed that part — callers fall back rather
 // than fail.
@@ -66,6 +75,7 @@ export type AssistantAnalysis = {
   followUpQuestions: string[];
   recommendedNextAction: RecommendedNextAction | null;
   safeActionProposals: AssistantSafeActionProposal[];
+  learningPathProposal: LearningPathProposal | null;
   userFacingResponse: string;
 };
 
@@ -89,6 +99,10 @@ export type AssistantTurn = {
   validation: ResponseValidationResult;
   followUpQuestions: string[];
   recommendedNextAction: RecommendedNextAction | null;
+  // Present only when the user explicitly asked for a path this turn AND the
+  // model's proposal survived deterministic validation (pathDraft.ts).
+  // Saving it is a separate user-confirmed action in the panel.
+  learningPathDraft: LearningPathDraft | null;
   relatedCards: ContextCard[];
   knowledgeSources: RetrievedChunk[];
 };
