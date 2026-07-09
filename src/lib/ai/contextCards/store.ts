@@ -5,7 +5,7 @@
 // migration. Swap this file for a DB-backed store later without touching
 // callers.
 import { platform } from "../../../platform";
-import type { ContextCard, ContextCardDraft, RecommendedNextAction } from "./types";
+import type { CardStage, ContextCard, ContextCardDraft, InfoSlot, RecommendedNextAction } from "./types";
 
 const STORAGE_KEY = "focusflow.aiContextCards.v1";
 // Oldest-updated cards are pruned past this cap so the blob stays small.
@@ -33,6 +33,31 @@ function asOptionalNextAction(value: unknown): RecommendedNextAction | undefined
   };
 }
 
+const INFO_SLOT_KINDS = new Set(["done_criteria", "deadline", "blocked_point", "prerequisite", "time_budget", "scope_boundary"]);
+const CARD_STAGES = new Set(["goal_captured", "scoping", "info_gathering", "planned", "executing"]);
+
+function asOptionalInfoSlots(value: unknown): InfoSlot[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const slots = value
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
+    .filter((entry) => typeof entry.kind === "string" && INFO_SLOT_KINDS.has(entry.kind))
+    .map((entry): InfoSlot => {
+      const source = entry.source;
+      return {
+        kind: entry.kind as InfoSlot["kind"],
+        question: typeof entry.question === "string" ? entry.question : "",
+        answer: typeof entry.answer === "string" ? entry.answer : "",
+        source: source === "user_answer" || source === "derived" || source === "assumed_default" ? source : undefined,
+      };
+    })
+    .slice(0, 6);
+  return slots.length > 0 ? slots : undefined;
+}
+
+function asOptionalStage(value: unknown): CardStage | undefined {
+  return typeof value === "string" && CARD_STAGES.has(value) ? (value as CardStage) : undefined;
+}
+
 function sanitizeCard(value: unknown): ContextCard | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
@@ -49,6 +74,8 @@ function sanitizeCard(value: unknown): ContextCard | null {
     likelyBlockers: asStringArray(record.likelyBlockers),
     missingInfo: asStringArray(record.missingInfo),
     possibleOutputs: asStringArray(record.possibleOutputs),
+    infoSlots: asOptionalInfoSlots(record.infoSlots),
+    stage: asOptionalStage(record.stage),
     recommendedNextAction: asOptionalNextAction(record.recommendedNextAction),
     relatedTaskIds: asStringArray(record.relatedTaskIds),
     relatedProjectIds: asStringArray(record.relatedProjectIds),

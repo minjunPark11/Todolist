@@ -133,6 +133,68 @@ describe("runAssistantTurn — Generic Failure Guard on unparseable replies", ()
     expect(turn.userFacingText).toContain("논문 피드백");
   });
 
+  it("attaches info slots and a deterministic stage even on the fallback path", async () => {
+    mockReply(GENERIC_ADVICE);
+
+    const turn = await runAssistantTurn(turnInput());
+
+    const slots = turn.contextCardDraft.infoSlots ?? [];
+    expect(slots.length).toBeGreaterThan(0);
+    expect(slots.map((slot) => slot.kind)).toContain("done_criteria");
+    // Label-only fallback items leave done_criteria unresolved → scoping.
+    expect(turn.contextCardDraft.stage).toBe("scoping");
+  });
+
+  it("computes stage=planned when the model answers the required slots and gives a next action", async () => {
+    mockReply(
+      JSON.stringify({
+        response_mode: "overwhelm",
+        input_signals: { decision_signal: "strong", friction_signal: "strong" },
+        mode: "ready_for_next_action",
+        context_card_draft: {
+          title: "밀린 일 정리",
+          detected_items: [
+            {
+              label: "논문 피드백 반영",
+              domain: "연구",
+              work_type: "수정",
+              status: "in-progress",
+              possible_output: "피드백 반영된 절 1개",
+              dependency: false,
+              external_pressure: true,
+            },
+          ],
+          info_slots: [
+            { kind: "done_criteria", question: "", answer: "피드백 반영된 절 1개", source: "derived" },
+            { kind: "deadline", question: "", answer: "금요일 미팅 전까지", source: "user_answer" },
+            { kind: "blocked_point", question: "", answer: "코멘트 목록 정리까지 함", source: "user_answer" },
+          ],
+          likely_blockers: [],
+          missing_info: [],
+          related_task_ids: [],
+          related_project_ids: [],
+          related_note_paths: [],
+        },
+        follow_up_questions: [],
+        recommended_next_action: {
+          title: "논문 피드백 반영: 첫 번째 코멘트 1개 반영",
+          reason: "외부 마감과 연결되어 있습니다.",
+          completion_criteria: "해당 절의 수정본이 저장되어 있으면 완료",
+          estimated_difficulty: "low",
+        },
+        user_facing_response: "논문 피드백 반영부터 시작하는 게 안전합니다. 첫 번째 코멘트 1개만 반영해보세요.",
+      }),
+    );
+
+    const turn = await runAssistantTurn(turnInput());
+
+    expect(turn.validation.ok).toBe(true);
+    expect(turn.contextCardDraft.stage).toBe("planned");
+    const deadline = turn.contextCardDraft.infoSlots?.find((slot) => slot.kind === "deadline");
+    expect(deadline?.answer).toBe("금요일 미팅 전까지");
+    expect(deadline?.source).toBe("user_answer");
+  });
+
   it("replaces a parsed overwhelm reply whose text is still generic advice", async () => {
     mockReply(
       JSON.stringify({

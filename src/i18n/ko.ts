@@ -846,6 +846,18 @@ export const ko: Dictionary = {
   "ai.assistant.comingSoon": "곧 제공",
   "ai.assistant.statusProposed": "결정을 기다리는 중",
   "ai.assistant.needsMoreContext": "맥락이 조금 더 필요해요",
+  "ai.assistant.infoSlots": "정보 체크",
+  "ai.assistant.stage.goal_captured": "목표 수집",
+  "ai.assistant.stage.scoping": "범위 정의 중",
+  "ai.assistant.stage.info_gathering": "정보 수집 중",
+  "ai.assistant.stage.planned": "계획 준비됨",
+  "ai.assistant.stage.executing": "실행 중",
+  "ai.assistant.slot.done_criteria": "완료 정의",
+  "ai.assistant.slot.deadline": "마감/제출일",
+  "ai.assistant.slot.blocked_point": "막힌 지점",
+  "ai.assistant.slot.prerequisite": "선행 조건",
+  "ai.assistant.slot.time_budget": "시간 예산",
+  "ai.assistant.slot.scope_boundary": "범위 경계",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "이전",

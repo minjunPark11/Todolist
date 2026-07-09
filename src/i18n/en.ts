@@ -846,6 +846,18 @@ export const en: Dictionary = {
   "ai.assistant.comingSoon": "Coming soon",
   "ai.assistant.statusProposed": "Waiting for your decision",
   "ai.assistant.needsMoreContext": "Needs a bit more context",
+  "ai.assistant.infoSlots": "Info checklist",
+  "ai.assistant.stage.goal_captured": "Goal captured",
+  "ai.assistant.stage.scoping": "Scoping",
+  "ai.assistant.stage.info_gathering": "Gathering info",
+  "ai.assistant.stage.planned": "Planned",
+  "ai.assistant.stage.executing": "Executing",
+  "ai.assistant.slot.done_criteria": "Done criteria",
+  "ai.assistant.slot.deadline": "Deadline",
+  "ai.assistant.slot.blocked_point": "Blocked point",
+  "ai.assistant.slot.prerequisite": "Prerequisite",
+  "ai.assistant.slot.time_budget": "Time budget",
+  "ai.assistant.slot.scope_boundary": "Scope boundary",
 
   // ---- Calendar (additions) ----
   "calendar.previous": "Previous",

@@ -83,12 +83,20 @@ function joinCapped(values: string[], max = 4): string {
 // Compact single-card summary for the AI prompt — related cards go in
 // summarized (never the full card set, never full raw inputs).
 export function summarizeContextCardForPrompt(card: ContextCard): string {
+  const slots = card.infoSlots ?? [];
+  const answeredSlots = slots.filter((slot) => slot.answer.trim() !== "");
+  const openSlots = slots.filter((slot) => slot.answer.trim() === "");
   const lines = [
     `[Context card ${card.id}] ${card.title} (updated ${card.updatedAt.slice(0, 10)})`,
+    card.stage ? `stage: ${card.stage}` : "",
     card.detectedItems.length ? `items: ${joinCapped(card.detectedItems)}` : "",
     card.currentStatus.length ? `status: ${joinCapped(card.currentStatus)}` : "",
     card.likelyBlockers.length ? `blockers: ${joinCapped(card.likelyBlockers)}` : "",
     card.missingInfo.length ? `still unknown: ${joinCapped(card.missingInfo)}` : "",
+    answeredSlots.length
+      ? `answered info slots (do not re-ask): ${joinCapped(answeredSlots.map((slot) => `${slot.kind}=${slot.answer}`), 6)}`
+      : "",
+    openSlots.length ? `open info slots: ${joinCapped(openSlots.map((slot) => slot.kind), 6)}` : "",
     card.recommendedNextAction ? `last recommended next action: ${card.recommendedNextAction.title}` : "",
   ].filter(Boolean);
   return lines.join("\n");

@@ -5,7 +5,7 @@
 // When no usable JSON arrives, callers get null and must treat it as a
 // Generic Failure Guard failure (deterministic fallback text + heuristic
 // fallback card draft) — never surface the raw reply.
-import type { ContextCardDraft, DetectedItem, NextActionDifficulty, RecommendedNextAction } from "../contextCards/types";
+import type { ContextCardDraft, DetectedItem, InfoSlot, InfoSlotKind, InfoSlotSource, NextActionDifficulty, RecommendedNextAction } from "../contextCards/types";
 import { dedupeDetectedItems, extractLikelyItemLabels, resolveResponseMode } from "./overwhelmHeuristics";
 import type { AssistantAnalysis, AssistantMode, AssistantSafeActionProposal, InputSignals, SignalStrength } from "./types";
 
@@ -110,6 +110,36 @@ function parseDetectedItem(value: unknown): DetectedItem | null {
   };
 }
 
+const INFO_SLOT_KINDS: readonly InfoSlotKind[] = ["done_criteria", "deadline", "blocked_point", "prerequisite", "time_budget", "scope_boundary"];
+
+function cleanInfoSlotSource(value: unknown): InfoSlotSource | undefined {
+  return value === "user_answer" || value === "derived" || value === "assumed_default" ? value : undefined;
+}
+
+// info_slots entries the model emits: unknown kinds are dropped, one slot per
+// kind (first wins), and a filled answer without a source defaults to
+// "derived" so the merge layer can rank it.
+function parseInfoSlots(value: unknown): InfoSlot[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<InfoSlotKind>();
+  const slots: InfoSlot[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    const kind = entry.kind;
+    if (typeof kind !== "string" || !(INFO_SLOT_KINDS as readonly string[]).includes(kind)) continue;
+    if (seen.has(kind as InfoSlotKind)) continue;
+    seen.add(kind as InfoSlotKind);
+    const answer = cleanString(entry.answer, 200);
+    slots.push({
+      kind: kind as InfoSlotKind,
+      question: cleanString(entry.question, 200),
+      answer,
+      source: answer ? (cleanInfoSlotSource(entry.source) ?? "derived") : undefined,
+    });
+  }
+  return slots;
+}
+
 function parseDetectedItems(value: unknown): DetectedItem[] {
   if (!Array.isArray(value)) return [];
   const items = value
@@ -136,6 +166,7 @@ function parseCardDraft(value: unknown, rawInput: string): ContextCardDraft | nu
     missingInfo: cleanStringArray(value.missing_info),
     possibleOutputs: items.map((item) => item.possibleOutput).filter(Boolean),
     detectedItemDetails: items,
+    infoSlots: parseInfoSlots(value.info_slots),
     relatedTaskIds: cleanStringArray(value.related_task_ids),
     relatedProjectIds: cleanStringArray(value.related_project_ids),
     relatedNotePaths: cleanStringArray(value.related_note_paths, 5),

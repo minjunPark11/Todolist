@@ -10,6 +10,7 @@ import { loadContextCards } from "../contextCards/store";
 import type { AiContextInput } from "../context/buildAiContext";
 import type { DetectedItem } from "../contextCards/types";
 import { buildAssistantContextPack } from "./buildAssistantContext";
+import { deriveInfoSlots, mergeInfoSlots, resolveCardStage } from "./infoSlots";
 import { resolveResponseMode } from "./overwhelmHeuristics";
 import { ASSISTANT_SYSTEM_PROMPT } from "./prompts";
 import { buildFallbackContextCardDraft, parseAssistantResponse } from "./schema";
@@ -79,6 +80,14 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
   const responseMode = analysis?.responseMode ?? resolveResponseMode(undefined, NONE_SIGNALS, items.length);
   const inputSignals = analysis?.inputSignals ?? NONE_SIGNALS;
 
+  // Info-gathering state (see infoSlots.ts): the deterministic derivation
+  // from the items is the base; slots resolved by prior saved cards on the
+  // same work stay resolved; the model's slots (which carry any follow-up
+  // answers from this session's history) are merged on top. The stage is
+  // always computed here — never taken from the model.
+  const priorSlots = pack.relatedCards.flatMap((card) => card.infoSlots ?? []);
+  draft.infoSlots = mergeInfoSlots(mergeInfoSlots(deriveInfoSlots(items), priorSlots), draft.infoSlots ?? []);
+
   // Generic Failure Guard (validateAssistantResponse.ts): overwhelm/planning
   // replies that re-offer a menu, miss the next action, use vague completion
   // criteria, or invent a schedule are replaced with the deterministic
@@ -102,6 +111,10 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
     followUpQuestions = fallback.followUpQuestions;
     draft.recommendedNextAction = fallback.recommendedNextAction;
   }
+
+  // Computed last so the stage reflects the final draft, including a next
+  // action supplied by the fallback path above.
+  draft.stage = resolveCardStage(draft);
 
   console.debug("[runAssistantTurn]", {
     rawContent: response.content,

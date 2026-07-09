@@ -82,13 +82,20 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
       });
 
       // Keep a compact draft echo in the assistant history message so the
-      // next turn's model sees what it already structured.
+      // next turn's model sees what it already structured — including which
+      // info slots are already answered, so it never re-asks them.
       const assistantText = [
         nextTurn.userFacingText,
         `[draft] ${JSON.stringify({
           title: nextTurn.contextCardDraft.title,
           detected_items: nextTurn.contextCardDraft.detectedItems,
           missing_info: nextTurn.contextCardDraft.missingInfo,
+          stage: nextTurn.contextCardDraft.stage,
+          info_slots: (nextTurn.contextCardDraft.infoSlots ?? []).map((slot) => ({
+            kind: slot.kind,
+            answer: slot.answer,
+            source: slot.source,
+          })),
         })}`,
       ].join("\n");
       setExchanges((current) => [...current, { id: nextTurn.id, userText: content, assistantText }]);
@@ -253,13 +260,28 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions 
               <section className="assistant-section" aria-label={t("ai.assistant.cardDraft")}>
                 <h3>{t("ai.assistant.cardDraft")}</h3>
                 {turn.usedFallbackDraft ? <p className="assistant-hint">{t("ai.assistant.fallbackDraftNote")}</p> : null}
-                <p className="assistant-card-title">{cardDraft.title}</p>
+                <p className="assistant-card-title">
+                  {cardDraft.title}
+                  {cardDraft.stage ? <span className="assistant-chip">{t(`ai.assistant.stage.${cardDraft.stage}`)}</span> : null}
+                </p>
                 <Chips label={t("ai.assistant.detectedItems")} values={cardDraft.detectedItems} />
                 <Chips label={t("ai.assistant.inferredDomains")} values={cardDraft.inferredDomains} />
                 <Chips label={t("ai.assistant.workTypes")} values={cardDraft.workTypes} />
                 <Chips label={t("ai.assistant.currentStatus")} values={cardDraft.currentStatus} />
                 <Chips label={t("ai.assistant.likelyBlockers")} values={cardDraft.likelyBlockers} />
                 <Chips label={t("ai.assistant.missingInfo")} values={cardDraft.missingInfo} />
+                {cardDraft.infoSlots && cardDraft.infoSlots.length > 0 ? (
+                  <div className="assistant-field">
+                    <span className="assistant-field-label">{t("ai.assistant.infoSlots")}</span>
+                    <ul className="assistant-info-slots">
+                      {cardDraft.infoSlots.map((slot) => (
+                        <li key={slot.kind} className={slot.answer.trim() ? "assistant-info-slot resolved" : "assistant-info-slot"}>
+                          {slot.answer.trim() ? `✓ ${t(`ai.assistant.slot.${slot.kind}`)}: ${slot.answer}` : `○ ${slot.question}`}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 <Chips label={t("ai.assistant.possibleOutputs")} values={cardDraft.possibleOutputs} />
                 <Chips label={t("ai.assistant.relatedNotes")} values={cardDraft.relatedNotePaths} />
                 <div className="assistant-actions">

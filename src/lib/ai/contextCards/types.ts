@@ -37,6 +37,37 @@ export type DetectedItem = {
   externalPressure: boolean;
 };
 
+// Where a card sits in the goal→execution pipeline. Computed by the
+// deterministic resolver in assistant/infoSlots.ts — never trusted from the
+// model. "planned"/"executing" become reachable as later slices land.
+export type CardStage = "goal_captured" | "scoping" | "info_gathering" | "planned" | "executing";
+
+// The kinds of information the assistant gathers before planning. Ordered by
+// how much the answer changes the plan (see SLOT_PRIORITY in infoSlots.ts).
+// Only information that changes the next action qualifies — preferences,
+// feelings, and motivations are deliberately not slot kinds.
+export type InfoSlotKind =
+  | "done_criteria" // what artifact existing means "done"
+  | "deadline" // submission/feedback date, external audience
+  | "blocked_point" // last attempt and where it stopped
+  | "prerequisite" // what must exist before this can proceed
+  | "time_budget" // rough time available this week
+  | "scope_boundary"; // the explicit "only up to here" line
+
+export type InfoSlotSource =
+  | "user_answer" // the user answered the question (strongest; never overwritten by weaker sources)
+  | "derived" // filled from the dump, card fields, or app data
+  | "assumed_default"; // safe default applied so info gathering never blocks execution
+
+// One trackable question the assistant needs answered (or safely assumed)
+// before the card can advance to planning. answer === "" means unresolved.
+export type InfoSlot = {
+  kind: InfoSlotKind;
+  question: string;
+  answer: string;
+  source?: InfoSlotSource;
+};
+
 export type ContextCard = {
   id: string;
   title: string;
@@ -61,6 +92,13 @@ export type ContextCard = {
   // built before this field existed (or by the plain-text fallback splitter)
   // stay valid.
   detectedItemDetails?: DetectedItem[];
+  // Structured info-gathering state, persisted across turns/sessions so
+  // resolved questions are never re-asked. Optional: cards saved before this
+  // field existed stay valid.
+  infoSlots?: InfoSlot[];
+  // Deterministically computed pipeline stage (see CardStage). Optional for
+  // the same backward-compatibility reason.
+  stage?: CardStage;
   recommendedNextAction?: RecommendedNextAction;
   relatedTaskIds: string[];
   relatedProjectIds: string[];
