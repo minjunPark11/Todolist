@@ -12,6 +12,7 @@ import {
   extractLikelyItemLabels,
   looksLikeTimetable,
   resolveResponseMode,
+  scoreItemForPriority,
   shouldRouteToAssistantFlow,
   splitDumpFragments,
 } from "./overwhelmHeuristics";
@@ -146,6 +147,59 @@ describe("chooseFirstItem", () => {
   });
 });
 
+describe("chooseFirstItem — semantic priority for label-only fallback items", () => {
+  // The fallback draft produces items with only a label; without semantic
+  // scoring every item ties and the first-mentioned one wins by input order.
+  const labelOnlyDump = () => [
+    item({ label: "중국어 복습" }),
+    item({ label: "LeetCode 공부" }),
+    item({ label: "앱 버그 수정" }),
+    item({ label: "논문 피드백 반영" }),
+  ];
+
+  it("picks the external-deliverable project regardless of input order", () => {
+    expect(chooseFirstItem(labelOnlyDump())?.label).toBe("논문 피드백 반영");
+  });
+
+  it("ranks a debugging item above routine learning when no external project is present", () => {
+    const items = [item({ label: "중국어 복습" }), item({ label: "LeetCode 공부" }), item({ label: "앱 버그 수정" })];
+    expect(chooseFirstItem(items)?.label).toBe("앱 버그 수정");
+  });
+
+  it("still lets an explicit dependency flag beat every semantic signal", () => {
+    const items = [item({ label: "논문 피드백 반영" }), item({ label: "중국어 복습", dependency: true })];
+    expect(chooseFirstItem(items)?.label).toBe("중국어 복습");
+  });
+
+  it("still lets explicit externalPressure beat a semantic external-project match", () => {
+    const items = [item({ label: "논문 피드백 반영" }), item({ label: "팀 자료 준비", externalPressure: true })];
+    expect(chooseFirstItem(items)?.label).toBe("팀 자료 준비");
+  });
+
+  it("scores routine learning below thesis/paper/external-project signals", () => {
+    expect(scoreItemForPriority(item({ label: "중국어 복습" }))).toBeLessThan(scoreItemForPriority(item({ label: "논문 피드백 반영" })));
+    expect(scoreItemForPriority(item({ label: "LeetCode 공부" }))).toBeLessThan(scoreItemForPriority(item({ label: "지원서 서류 제출" })));
+  });
+
+  it("does not penalize a routine item the user marked as stuck", () => {
+    const stuckRoutine = item({ label: "중국어 복습", status: "stuck" });
+    const plain = item({ label: "방 정리" });
+    expect(scoreItemForPriority(stuckRoutine)).toBeGreaterThan(scoreItemForPriority(plain));
+  });
+
+  it("keeps input order on ties and never mutates the items", () => {
+    const first = item({ label: "방 정리" });
+    const second = item({ label: "책상 정리" });
+    expect(chooseFirstItem([first, second])?.label).toBe("방 정리");
+
+    const items = labelOnlyDump();
+    const snapshot = items.map((entry) => ({ ...entry }));
+    chooseFirstItem(items);
+    expect(items).toEqual(snapshot);
+    expect(items.every((entry) => !entry.externalPressure && !entry.dependency)).toBe(true);
+  });
+});
+
 describe("isObservableOutput / isVagueCompletionCriteria", () => {
   it("rejects vague completion language", () => {
     expect(isObservableOutput("이해하면 완료")).toBe(false);
@@ -247,6 +301,41 @@ describe("buildFallbackNextActionForItem", () => {
     const target = item({ label: "새 프로젝트" });
     const action = buildFallbackNextActionForItem(target);
     expect(action.title).toContain("새 프로젝트");
+    expect(action.title).toContain("조건 1~2가지");
     expect(isObservableOutput(action.completionCriteria)).toBe(true);
+  });
+
+  it("shrinks a label-only debugging item to a reproduction/log note, not a fix", () => {
+    const action = buildFallbackNextActionForItem(item({ label: "앱 버그 수정" }));
+    expect(action.title).toContain("재현 조건");
+    expect(action.completionCriteria).toMatch(/재현 조건|에러 메시지/);
+    expect(action.completionCriteria).not.toContain("수정 완료");
+    expect(isObservableOutput(action.completionCriteria)).toBe(true);
+  });
+
+  it("shrinks a debugging item even when the model proposed the whole fix as output", () => {
+    const action = buildFallbackNextActionForItem(item({ label: "로그인 오류", possibleOutput: "버그 수정 완료" }));
+    expect(action.title).toContain("재현 조건");
+    expect(action.completionCriteria).not.toContain("수정 완료");
+  });
+
+  it("builds a feedback-scoped action for a label-only thesis/paper item", () => {
+    const action = buildFallbackNextActionForItem(item({ label: "논문 피드백 반영" }));
+    expect(action.title).toContain("논문 피드백 반영");
+    expect(action.title).toMatch(/피드백|포인트/);
+    expect(action.title).toContain("1개");
+    expect(isObservableOutput(action.completionCriteria)).toBe(true);
+  });
+
+  it("builds a single-record action for a label-only routine learning item", () => {
+    const action = buildFallbackNextActionForItem(item({ label: "중국어 복습" }));
+    expect(action.title).toContain("중국어 복습");
+    expect(action.title).toContain("1개");
+    expect(isObservableOutput(action.completionCriteria)).toBe(true);
+  });
+
+  it("still prefers the item's own small observable output over the semantic template", () => {
+    const action = buildFallbackNextActionForItem(item({ label: "졸업논문", possibleOutput: "초안 3장" }));
+    expect(action.title).toContain("초안 3장");
   });
 });

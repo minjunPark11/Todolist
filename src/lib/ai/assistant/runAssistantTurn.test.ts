@@ -23,6 +23,11 @@ import { runAssistantTurn } from "./runAssistantTurn";
 const OVERWHELM_DUMP =
   "해야 할 게 너무 많아서 시작을 못 하겠어. 논문 피드백 반영, 앱 버그 수정, LeetCode 공부, 중국어 복습이 다 밀렸어. 뭐부터 해야 해?";
 
+// Same obligations, mentioned routine-first: the fallback pick must not
+// depend on input order.
+const REORDERED_OVERWHELM_DUMP =
+  "해야 할 게 너무 많아서 시작을 못 하겠어. 중국어 복습, LeetCode 공부, 앱 버그 수정, 논문 피드백 반영이 다 밀렸어. 뭐부터 해야 해?";
+
 const GENERIC_ADVICE =
   "우선 가장 시급하고 중요한 일을 찾아보세요. 현재 상황에서 가장 시급한 일은 무엇인지 판단해보세요. 모든 일을 균형 있게 배분하는 것도 좋습니다.";
 
@@ -59,6 +64,18 @@ describe("runAssistantTurn — Generic Failure Guard on unparseable replies", ()
     expect(turn.userFacingText).not.toContain("뭐부터 해야 해(");
     expect(turn.userFacingText).toContain("다음 행동");
     expect(turn.recommendedNextAction).not.toBeNull();
+    expect(turn.recommendedNextAction!.completionCriteria.trim()).not.toBe("");
+  });
+
+  it("picks the external-deliverable item in the fallback even when routine items are mentioned first", async () => {
+    mockReply(GENERIC_ADVICE);
+
+    const turn = await runAssistantTurn({ ...turnInput(), brainDump: REORDERED_OVERWHELM_DUMP });
+
+    expect(turn.usedGenericFailureFallback).toBe(true);
+    expect(turn.recommendedNextAction).not.toBeNull();
+    expect(turn.recommendedNextAction!.title).toContain("논문 피드백 반영");
+    expect(turn.userFacingText).not.toContain("다음 행동: 중국어 복습");
     expect(turn.recommendedNextAction!.completionCriteria.trim()).not.toBe("");
   });
 

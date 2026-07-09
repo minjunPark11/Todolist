@@ -141,16 +141,84 @@ function looksUnscoped(item: DetectedItem): boolean {
   return !item.workType.trim() || !item.possibleOutput.trim() || /(불명확|흐릿|fuzzy|unscoped|vague)/i.test(item.domain + item.status);
 }
 
+// --- Semantic priority signals ---------------------------------------------
+
+// Fallback-draft items often carry a label and nothing else, so the flag/
+// status-based score above ties across the board and the first-mentioned item
+// wins by default. These lexical detectors read the item's own text fields to
+// break such ties: external-deliverable projects and stuck debugging work are
+// safer first execution units than routine learning. They are advisory only —
+// they never write back to the item and never outrank explicit metadata.
+
+// External deliverable / evaluation / submission signals: thesis-and-paper
+// work, application paperwork, anything reviewed by an outside audience.
+const EXTERNAL_PROJECT_PATTERNS: RegExp[] = [
+  /논문|학위|초록|투고|심사|피드백|교수|지도교수|서류|제출|지원서|원서|마감/,
+  /\bthesis\b|\bdissertation\b|\bpapers?\b|\bmanuscripts?\b|\bsubmissions?\b|\bsubmit\b/i,
+  /\bfeedback\b|\bprofessors?\b|\badvisors?\b|\bapplications?\b|\bdeadlines?\b/i,
+];
+
+// Debugging/investigation signals: the safe first unit is recording a
+// reproduction or an error message, not "fix it".
+const DEBUGGING_PATTERNS: RegExp[] = [
+  /버그|디버깅|디버그|오류|에러|크래시|재현/,
+  /\bbugs?\b|\bdebug(ging)?\b|\berrors?\b|\bcrash(es|ing)?\b|\bstack\s*trace\b|\bfailing\s+tests?\b|\brepro(duce|duction)?\b|\bexceptions?\b/i,
+];
+
+// Routine, self-paced learning: postponable without external consequence, so
+// it yields the first slot unless the user flagged friction on it.
+const ROUTINE_LEARNING_PATTERNS: RegExp[] = [
+  /리트코드|중국어|영어|일본어|단어\s*암기|단어장|복습|암기|문제\s*풀(이|기)/,
+  /\bleetcode\b|\bflashcards?\b|\banki\b|\bduolingo\b|\bvocab(ulary)?\b/i,
+];
+
+export function looksLikeDeadlineOrExternalProject(text: string): boolean {
+  return EXTERNAL_PROJECT_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+export function looksLikeDebuggingItem(text: string): boolean {
+  return DEBUGGING_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+export function looksLikeRoutineLearningItem(text: string): boolean {
+  return ROUTINE_LEARNING_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function itemSemanticText(item: DetectedItem): string {
+  return [item.label, item.domain, item.workType, item.possibleOutput].join(" ");
+}
+
+// Bonus magnitudes are capped so semantic hints can never outrank explicit
+// metadata: the largest reachable non-flag score is stuck(10) + unscoped(5) +
+// external-project(25) = 40, below a bare externalPressure item's worst case
+// of 50 − routine(4) = 46, which in turn stays below dependency(100).
+const EXTERNAL_PROJECT_BONUS = 25;
+const DEBUGGING_BONUS = 12;
+const ROUTINE_LEARNING_PENALTY = 4;
+
+// Pure read of the item's text fields — never mutates the item and never
+// infers dependency/externalPressure. External-project wins over debugging
+// wins over routine when one item matches several categories.
+export function semanticPriorityBonus(item: DetectedItem): number {
+  const text = itemSemanticText(item);
+  if (looksLikeDeadlineOrExternalProject(text)) return EXTERNAL_PROJECT_BONUS;
+  if (looksLikeDebuggingItem(text)) return DEBUGGING_BONUS;
+  if (looksLikeRoutineLearningItem(text) && !looksStuck(item.status)) return -ROUTINE_LEARNING_PENALTY;
+  return 0;
+}
+
 // Order from prompts.ts §Priority heuristic: a blocker that unblocks other
 // work wins, then external deadlines, then a stuck point, then — only in the
-// absence of those — an unscoped item worth de-fuzzing first. Routine items
-// carry no bonus so they sort last among equals.
+// absence of those — an unscoped item worth de-fuzzing first. The semantic
+// bonus breaks ties among label-only items; ties that remain keep input order
+// (chooseFirstItem only replaces on a strictly higher score).
 export function scoreItemForPriority(item: DetectedItem): number {
   let score = 0;
   if (item.dependency) score += 100;
   if (item.externalPressure) score += 50;
   if (looksStuck(item.status)) score += 10;
   if (!item.dependency && !item.externalPressure && looksUnscoped(item)) score += 5;
+  score += semanticPriorityBonus(item);
   return score;
 }
 
@@ -277,11 +345,50 @@ export function shouldRouteToAssistantFlow(text: string): boolean {
 
 // --- Fallback next action builder ------------------------------------------
 
+// A possible_output that is the whole fix ("버그 수정 완료") rather than a
+// small artifact. Observable in principle, but too big a first unit for a
+// debugging item — the fallback shrinks it to a reproduction/log note.
+const WHOLE_FIX_OUTPUT_PATTERN = /(수정|해결|고침)\s*(완료)?\s*$|\bfix(ed|es)?\b|\bresolved?\b/i;
+
+// Category-level next-action templates keyed on what kind of work the item's
+// own text says it is. Still derived from the item (label goes in the title),
+// never a canned answer for one specific user input.
+function buildSemanticFallbackAction(item: DetectedItem, semanticText: string): RecommendedNextAction | null {
+  if (looksLikeDebuggingItem(semanticText)) {
+    return {
+      title: `${item.label}: 재현 조건 1개와 에러 메시지 1개를 메모로 남기기`,
+      reason: "버그를 바로 고치는 대신, 재현 조건과 에러 메시지부터 기록해 실행 단위를 줄입니다.",
+      completionCriteria: "재현 조건 1개와 에러 메시지 1개가 메모로 남아 있으면 완료입니다.",
+      estimatedDifficulty: "low",
+    };
+  }
+  if (looksLikeDeadlineOrExternalProject(semanticText)) {
+    return {
+      title: `${item.label}: 오늘 반영할 피드백(또는 수정 포인트) 1개를 고르고 수정 메모 3줄 작성하기`,
+      reason: "외부 제출/평가로 이어질 가능성이 높은 항목이라, 반영할 포인트 1개로 범위를 좁혀 시작합니다.",
+      completionCriteria: "선택한 포인트 1개와 수정 메모 3줄이 남아 있으면 완료입니다.",
+      estimatedDifficulty: "low",
+    };
+  }
+  if (looksLikeRoutineLearningItem(semanticText)) {
+    return {
+      title: `${item.label}: 문제/단어/복습 항목 1개만 골라서 기록하기`,
+      reason: "밀린 루틴 학습은 항목 1개 기록으로 가볍게 재시작하는 게 안전합니다.",
+      completionCriteria: "그 항목 1개가 기록으로 남아 있으면 완료입니다.",
+      estimatedDifficulty: "low",
+    };
+  }
+  return null;
+}
+
 // Last-resort, fully deterministic next action for when the model's own
 // reply fails validation. Always derived from the chosen item's own fields —
 // never a fixed sentence unrelated to the parsed input.
 export function buildFallbackNextActionForItem(item: DetectedItem): RecommendedNextAction {
-  if (isObservableOutput(item.possibleOutput)) {
+  const semanticText = itemSemanticText(item);
+  const isDebugging = looksLikeDebuggingItem(semanticText);
+  const outputUsable = isObservableOutput(item.possibleOutput) && !(isDebugging && WHOLE_FIX_OUTPUT_PATTERN.test(item.possibleOutput));
+  if (outputUsable) {
     const reason = item.dependency
       ? "다른 항목의 진행을 막고 있어 먼저 처리합니다."
       : item.externalPressure
@@ -294,6 +401,8 @@ export function buildFallbackNextActionForItem(item: DetectedItem): RecommendedN
       estimatedDifficulty: "low",
     };
   }
+  const semanticAction = buildSemanticFallbackAction(item, semanticText);
+  if (semanticAction) return semanticAction;
   return {
     title: `${item.label}: 다음 실행 단위를 정하는 데 필요한 조건 1~2가지 적어보기`,
     reason: "산출물이나 다음 행동이 아직 불명확해서, 큰 결과물 대신 범위부터 좁힙니다.",
