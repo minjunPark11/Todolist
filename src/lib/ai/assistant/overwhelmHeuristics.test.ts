@@ -289,11 +289,11 @@ describe("shouldRouteToAssistantFlow", () => {
 });
 
 describe("buildFallbackNextActionForItem", () => {
-  it("builds a next action from the item's own possible_output when it is observable", () => {
-    const target = item({ label: "졸업논문", possibleOutput: "초안 3장" });
+  it("builds a next action from the item's own possible_output when no category matches", () => {
+    const target = item({ label: "방 정리", possibleOutput: "버릴 물건 목록" });
     const action = buildFallbackNextActionForItem(target);
-    expect(action.title).toContain("졸업논문");
-    expect(action.title).toContain("초안 3장");
+    expect(action.title).toContain("방 정리");
+    expect(action.title).toContain("버릴 물건 목록");
     expect(isObservableOutput(action.completionCriteria)).toBe(true);
   });
 
@@ -334,8 +334,14 @@ describe("buildFallbackNextActionForItem", () => {
     expect(isObservableOutput(action.completionCriteria)).toBe(true);
   });
 
-  it("still prefers the item's own small observable output over the semantic template", () => {
-    const action = buildFallbackNextActionForItem(item({ label: "졸업논문", possibleOutput: "초안 3장" }));
-    expect(action.title).toContain("초안 3장");
+  it("does not promote a final-deliverable possible_output to the next action for a known category", () => {
+    // Reported regression: the model's possible_output "피드백 반영된 논문
+    // 초안" is the item's end deliverable, not a first action startable in
+    // minutes — the thesis/paper template must win over it.
+    const action = buildFallbackNextActionForItem(item({ label: "논문 피드백 반영", workType: "작업 반영", possibleOutput: "피드백 반영된 논문 초안" }));
+    expect(action.title).toContain("1개");
+    expect(action.title).not.toContain("피드백 반영된 논문 초안");
+    expect(action.completionCriteria).not.toContain("논문 초안");
+    expect(isObservableOutput(action.completionCriteria)).toBe(true);
   });
 });

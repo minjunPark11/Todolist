@@ -184,7 +184,7 @@ export function looksLikeRoutineLearningItem(text: string): boolean {
   return ROUTINE_LEARNING_PATTERNS.some((pattern) => pattern.test(text));
 }
 
-function itemSemanticText(item: DetectedItem): string {
+export function itemSemanticText(item: DetectedItem): string {
   return [item.label, item.domain, item.workType, item.possibleOutput].join(" ");
 }
 
@@ -345,11 +345,6 @@ export function shouldRouteToAssistantFlow(text: string): boolean {
 
 // --- Fallback next action builder ------------------------------------------
 
-// A possible_output that is the whole fix ("버그 수정 완료") rather than a
-// small artifact. Observable in principle, but too big a first unit for a
-// debugging item — the fallback shrinks it to a reproduction/log note.
-const WHOLE_FIX_OUTPUT_PATTERN = /(수정|해결|고침)\s*(완료)?\s*$|\bfix(ed|es)?\b|\bresolved?\b/i;
-
 // Category-level next-action templates keyed on what kind of work the item's
 // own text says it is. Still derived from the item (label goes in the title),
 // never a canned answer for one specific user input.
@@ -384,11 +379,17 @@ function buildSemanticFallbackAction(item: DetectedItem, semanticText: string): 
 // Last-resort, fully deterministic next action for when the model's own
 // reply fails validation. Always derived from the chosen item's own fields —
 // never a fixed sentence unrelated to the parsed input.
+//
+// Category templates take precedence over the item's possible_output: a
+// possible_output is usually the item's final deliverable ("피드백 반영된
+// 논문 초안", "버그 수정 완료"), which is too big to be a first action —
+// the next action must be physically startable within minutes and leave a
+// small artifact, not demand the whole output up front.
 export function buildFallbackNextActionForItem(item: DetectedItem): RecommendedNextAction {
   const semanticText = itemSemanticText(item);
-  const isDebugging = looksLikeDebuggingItem(semanticText);
-  const outputUsable = isObservableOutput(item.possibleOutput) && !(isDebugging && WHOLE_FIX_OUTPUT_PATTERN.test(item.possibleOutput));
-  if (outputUsable) {
+  const semanticAction = buildSemanticFallbackAction(item, semanticText);
+  if (semanticAction) return semanticAction;
+  if (isObservableOutput(item.possibleOutput)) {
     const reason = item.dependency
       ? "다른 항목의 진행을 막고 있어 먼저 처리합니다."
       : item.externalPressure
@@ -401,8 +402,6 @@ export function buildFallbackNextActionForItem(item: DetectedItem): RecommendedN
       estimatedDifficulty: "low",
     };
   }
-  const semanticAction = buildSemanticFallbackAction(item, semanticText);
-  if (semanticAction) return semanticAction;
   return {
     title: `${item.label}: 다음 실행 단위를 정하는 데 필요한 조건 1~2가지 적어보기`,
     reason: "산출물이나 다음 행동이 아직 불명확해서, 큰 결과물 대신 범위부터 좁힙니다.",

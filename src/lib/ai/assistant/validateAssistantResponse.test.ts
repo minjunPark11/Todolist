@@ -142,4 +142,31 @@ describe("buildFallbackOverwhelmResponse", () => {
     const fallback = buildFallbackOverwhelmResponse("중국어 공부도 하고 논문도 써야 하는데 막막해", items);
     expect(/\d{1,2}\s?시/.test(fallback.userFacingResponse)).toBe(false);
   });
+
+  it("parks the remaining items as on-hold instead of dropping them or asking back", () => {
+    const items = [
+      item({ label: "중국어 복습", domain: "", workType: "", possibleOutput: "" }),
+      item({ label: "앱 버그 수정", domain: "", workType: "", possibleOutput: "" }),
+      item({ label: "논문 피드백 반영", domain: "", workType: "", possibleOutput: "" }),
+    ];
+    const fallback = buildFallbackOverwhelmResponse("다 밀렸어. 뭐부터 해야 해?", items);
+
+    expect(fallback.recommendedNextAction.title).toContain("논문 피드백 반영");
+    expect(fallback.userFacingResponse).toContain("보류");
+    expect(fallback.userFacingResponse).toContain("중국어 복습");
+    expect(fallback.userFacingResponse).toContain("앱 버그 수정");
+    expect(fallback.followUpQuestions).toEqual([]);
+    expect(fallback.userFacingResponse).not.toMatch(/\?\s*$/);
+  });
+
+  it("does not hand the user the final deliverable as the fallback next action", () => {
+    // The reported runtime failure: possible_output was the end deliverable
+    // ("피드백 반영된 논문 초안") and the fallback promoted it verbatim.
+    const items = [item({ label: "논문 피드백 반영", workType: "작업 반영", possibleOutput: "피드백 반영된 논문 초안" })];
+    const fallback = buildFallbackOverwhelmResponse("논문 피드백 반영이 밀렸어. 시작을 못 하겠어.", items);
+
+    expect(fallback.recommendedNextAction.title).not.toContain("피드백 반영된 논문 초안");
+    expect(fallback.recommendedNextAction.title).toContain("1개");
+    expect(isObservableOutput(fallback.recommendedNextAction.completionCriteria)).toBe(true);
+  });
 });

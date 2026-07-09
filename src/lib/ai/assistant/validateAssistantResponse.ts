@@ -11,7 +11,10 @@ import {
   dedupeDetectedItems,
   isObservableOutput,
   isVagueCompletionCriteria,
+  itemSemanticText,
   itemsHaveWorkTypeOrOutput,
+  looksLikeDeadlineOrExternalProject,
+  looksLikeDebuggingItem,
   looksLikeTimetable,
 } from "./overwhelmHeuristics";
 import type { AssistantAnalysis, ResponseValidationResult } from "./types";
@@ -100,19 +103,36 @@ export function buildFallbackOverwhelmResponse(rawInput: string, items: Detected
       ? `${deduped.length}개의 일이 섞여 있어서 지금 어디부터 시작할지 실행 단위가 흐려진 상태로 보입니다.`
       : `"${chosen.label}"이 아직 작은 실행 단위로 쪼개지지 않아 시작점이 보이지 않는 상태로 보입니다.`;
 
+  // One- or two-sentence reason (never a lecture): explicit flags first, then
+  // the same category signals the priority heuristic used, so the stated
+  // reason matches why the item actually won.
+  const chosenText = itemSemanticText(chosen);
   const reasonLine = chosen.dependency
     ? `그 중 "${chosen.label}"이 다른 일의 진행을 막고 있어 먼저 잡는 게 안전합니다.`
     : chosen.externalPressure
       ? `그 중 "${chosen.label}"이 외부 마감/제출과 연결되어 있어 먼저 잡는 게 안전합니다.`
-      : `그 중 "${chosen.label}"을 첫 실행 단위로 잡습니다.`;
+      : looksLikeDeadlineOrExternalProject(chosenText)
+        ? `그 중 "${chosen.label}"은 결과물이 남고 외부 피드백/제출로 이어지기 쉬워 먼저 잡는 게 좋습니다.`
+        : looksLikeDebuggingItem(chosenText)
+          ? `그 중 "${chosen.label}"은 막힌 지점을 기록만 해도 다시 움직이기 쉬워서 먼저 잡습니다.`
+          : `그 중 "${chosen.label}"을 첫 실행 단위로 잡습니다.`;
 
   const recommendedNextAction = buildFallbackNextActionForItem(chosen);
+
+  // The rest is parked, not dropped: name the remaining items and defer the
+  // decision to the next execution unit instead of asking the user anything.
+  const remainingLabels = deduped.filter((item) => item.label !== chosen.label).map((item) => item.label);
+  const holdLine =
+    remainingLabels.length > 0
+      ? `나머지(${remainingLabels.join(", ")})는 버리는 게 아니라 보류입니다 — 이 행동이 끝난 뒤 다음 실행 단위를 정할 때 다시 봅니다.`
+      : "";
 
   const userFacingResponse = [
     diagnosis,
     deduped.length >= 2 ? `정리하면: ${summaryLine}.` : "",
     reasonLine,
     `다음 행동: ${recommendedNextAction.title}.`,
+    holdLine,
   ]
     .filter(Boolean)
     .join(" ");
