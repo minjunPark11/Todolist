@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CardStage, ContextCard } from "../contextCards/types";
-import { currentMilestoneIndex, formatBreadcrumb, resolveMilestoneStatus } from "./progress";
+import { currentMilestoneIndex, formatBreadcrumb, milestoneIndexForCard, resolveMilestoneStatus } from "./progress";
 import type { LearningPath, Milestone } from "./types";
 
 function card(id: string, stage?: CardStage): ContextCard {
@@ -72,6 +72,16 @@ describe("currentMilestoneIndex", () => {
   it("falls back to the last milestone when everything is done", () => {
     const cards = [card("c1", "executing"), card("c2", "executing")];
     expect(currentMilestoneIndex(path([milestone("m1", ["c1"]), milestone("m2", ["c2"])]), cards)).toBe(1);
+  });
+});
+
+describe("milestoneIndexForCard", () => {
+  it("returns the index of the milestone holding the card", () => {
+    expect(milestoneIndexForCard(path([milestone("m1"), milestone("m2", ["c1"])]), "c1")).toBe(1);
+  });
+
+  it("returns null for an unlinked card", () => {
+    expect(milestoneIndexForCard(path([milestone("m1")]), "c9")).toBeNull();
   });
 });
 

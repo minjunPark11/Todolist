@@ -1,12 +1,18 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, Fragment, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AgentActionPreview } from "./ai/AgentActionPreview";
 import { AssistantPanel } from "./ai/AssistantPanel";
+import { AssistantTurnCards } from "./ai/AssistantTurnCards";
+import { AI_SAFE_ACTION_DEFAULT_RISK } from "../lib/ai/actions/types";
 import type { AgentAction } from "../lib/ai/agent/actions";
 import { runPersonalAgent } from "../lib/ai/agent/personalAgent";
 import { detectAgentIntent, getIntentLabel, type AgentIntent } from "../lib/ai/agent/intent";
+import { buildAssistantHistoryText } from "../lib/ai/assistant/historyEcho";
 import { shouldRouteToAssistantFlow } from "../lib/ai/assistant/overwhelmHeuristics";
 import { runAssistantTurn } from "../lib/ai/assistant/runAssistantTurn";
+import type { AssistantTurn } from "../lib/ai/assistant/types";
+import { logProposedOutcome } from "../lib/ai/memory/outcomeLog";
+import { logAssistantTurn, logFreeChatTurn } from "../lib/ai/memory/turnLog";
 import { buildAiContextText, type AiContextInput } from "../lib/ai/context/buildAiContext";
 import {
   validateAgentActions,
@@ -30,6 +36,15 @@ import { useMotionEnabled } from "../motion/reducedMotion";
 
 type ChatMessage = AiMessage & {
   id: string;
+  // Assistant-flow turn behind this message (Unified Chat slice 1): when
+  // present, the structured cards render inline below the bubble instead of
+  // being flattened into the text.
+  turn?: AssistantTurn;
+  // Outcome-log entry for the turn's proposal; the cards' buttons update it.
+  outcomeId?: string;
+  // What the model sees as this message in later turns (draft echo included)
+  // — falls back to `content` when absent.
+  historyContent?: string;
 };
 
 function createMessage(role: ChatMessage["role"], content: string): ChatMessage {
@@ -122,7 +137,7 @@ export function OllamaChat({
   // every request anyway, and an unbounded history would eventually overflow
   // the local llama-server's context window (--ctx-size in local_ai.rs).
   const chatHistory = useMemo<AiMessage[]>(
-    () => messages.slice(-19).map(({ role, content }) => ({ role, content })),
+    () => messages.slice(-19).map(({ role, content, historyContent }) => ({ role, content: historyContent ?? content })),
     [messages],
   );
 
@@ -142,14 +157,24 @@ export function OllamaChat({
     if (!content || loading) {
       return;
     }
+    const filesToAttach = attachedFiles;
+    setDraft("");
+    setAttachedFiles([]);
+    await send(content, filesToAttach);
+  }
+
+  // One chat turn. forceAssistant bypasses the regex router for follow-up
+  // requests fired from an inline card ("더 작게 쪼개줘") — those must stay in
+  // the assistant flow even though their text alone wouldn't route there.
+  async function send(content: string, filesToAttach: AttachedFileRef[], options?: { forceAssistant?: boolean }) {
+    if (!content || loading) {
+      return;
+    }
 
     const userMessage = createMessage("user", content);
     const nextIntent = detectAgentIntent(content);
-    const filesToAttach = attachedFiles;
     setIntent(nextIntent);
     setMessages((current) => [...current, userMessage]);
-    setDraft("");
-    setAttachedFiles([]);
     setError("");
     setSuggestedActions([]);
     setValidationResults([]);
@@ -163,7 +188,7 @@ export function OllamaChat({
       // Generic Failure Guard, so it happily produces "우선 가장 시급한 일부터"
       // advice. Route them through the assistant flow (runAssistantTurn),
       // whose replies are validated and deterministically repaired.
-      if (aiContext && shouldRouteToAssistantFlow(content)) {
+      if (aiContext && (options?.forceAssistant || shouldRouteToAssistantFlow(content))) {
         const turn = await runAssistantTurn({
           brainDump: content,
           history: chatHistory,
@@ -171,14 +196,39 @@ export function OllamaChat({
           knowledgeSettings,
         });
         setProvider(turn.provider);
-        const replyParts = [turn.userFacingText];
+
+        // Same outcome-log contract as AssistantPanel: every surfaced
+        // proposal starts as "proposed"; the inline cards' buttons move it.
+        let outcomeId: string | undefined;
         if (turn.recommendedNextAction) {
-          replyParts.push(`${t("ai.assistant.nextAction")}: ${turn.recommendedNextAction.title}`);
-          if (turn.recommendedNextAction.completionCriteria) {
-            replyParts.push(`${t("ai.assistant.completionCriteria")}: ${turn.recommendedNextAction.completionCriteria}`);
-          }
+          outcomeId = logProposedOutcome({
+            assistantTurnId: turn.id,
+            proposedAction: {
+              id: `safe-${turn.id}`,
+              type: "create_task",
+              label: turn.recommendedNextAction.title,
+              risk: AI_SAFE_ACTION_DEFAULT_RISK.create_task,
+              payload: { title: turn.recommendedNextAction.title },
+            },
+          }).id;
         }
-        setMessages((current) => [...current, createMessage("assistant", replyParts.join("\n"))]);
+
+        // Turn log (User Patterns slice A): persist the exchange + its
+        // signals for later pattern analysis. Honors the settings toggle.
+        logAssistantTurn({ source: "chat_assistant", userText: content, turn, outcomeId });
+
+        // Bubble shows only the user-facing text (the cards carry the
+        // structure); the model's history keeps the draft echo so follow-up
+        // turns refine instead of restarting.
+        setMessages((current) => [
+          ...current,
+          {
+            ...createMessage("assistant", turn.userFacingText),
+            turn,
+            outcomeId,
+            historyContent: buildAssistantHistoryText(turn),
+          },
+        ]);
         return;
       }
 
@@ -229,6 +279,11 @@ export function OllamaChat({
       });
       setProvider(response.provider);
       setIntent(response.intent);
+
+      // Turn log (User Patterns slice A): free-chat exchanges carry no
+      // signals — text and provider only.
+      logFreeChatTurn({ userText: content, assistantText: response.content, provider: response.provider });
+
       setSuggestedActions(response.suggestedActions);
       setValidationResults(
         response.suggestedActions.length && aiContext
@@ -378,10 +433,26 @@ export function OllamaChat({
           <div className="ollama-chat-mode" hidden={tab !== "chat"}>
           <div className="ollama-chat-messages" role="log" aria-live="polite">
             {messages.map((message) => (
-              <div key={message.id} className={`ollama-chat-message ${message.role}`}>
-                <span>{message.role === "user" ? t("ai.youLabel") : t("ai.aiLabel")}</span>
-                <p>{message.content}</p>
-              </div>
+              <Fragment key={message.id}>
+                <div className={`ollama-chat-message ${message.role}`}>
+                  <span>{message.role === "user" ? t("ai.youLabel") : t("ai.aiLabel")}</span>
+                  <p>{message.content}</p>
+                </div>
+                {/* Assistant-flow turns render their structured cards inline
+                    (Unified Chat slice 1) — same save/link buttons as the
+                    Assistant tab, keyed by message so state stays per-turn. */}
+                {message.turn ? (
+                  <AssistantTurnCards
+                    key={`cards-${message.id}`}
+                    turn={message.turn}
+                    outcomeId={message.outcomeId}
+                    loading={loading}
+                    showPositionLine
+                    onExecuteActions={onExecuteActions}
+                    onFollowUpRequest={(text) => void send(text, [], { forceAssistant: true })}
+                  />
+                ) : null}
+              </Fragment>
             ))}
             {loading ? (
               <div className="ollama-chat-message assistant">

@@ -28,6 +28,7 @@ import type {
 } from "../lib/localAi/types";
 import { listEmbeddingModelChoices, resolveEmbeddingStoreModelName } from "../lib/knowledge/embeddingProvider";
 import { EmbeddingModelUnavailableError, runIndexing, type IndexProgress } from "../lib/knowledge/indexer";
+import { clearTurnLog, isTurnLogEnabled, setTurnLogEnabled, turnLogCount } from "../lib/ai/memory/turnLog";
 import { KnowledgeStore, type IndexStats } from "../lib/knowledge/knowledgeStore";
 import type { KnowledgeSettings } from "../lib/knowledge/types";
 import { platform } from "../platform";
@@ -1307,6 +1308,8 @@ function LocalAiSettingsTab() {
         </div>
       ) : null}
 
+      <TurnLogSettingsCard />
+
       {deleteTarget ? (
         <ConfirmModal
           title={t("settings.localAi.deleteConfirmTitle")}
@@ -1317,6 +1320,57 @@ function LocalAiSettingsTab() {
         />
       ) : null}
     </>
+  );
+}
+
+// Turn log (User Patterns slice A): device-local record of AI exchanges for
+// later pattern analysis. Not desktop-gated — the log works wherever the AI
+// panel does.
+function TurnLogSettingsCard() {
+  const { t } = useT();
+  const [enabled, setEnabled] = useState(() => isTurnLogEnabled());
+  const [count, setCount] = useState(() => turnLogCount());
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  function handleToggle(next: boolean) {
+    setTurnLogEnabled(next);
+    setEnabled(next);
+  }
+
+  function handleClear() {
+    clearTurnLog();
+    setCount(0);
+    setConfirmClear(false);
+  }
+
+  return (
+    <div className="ff-settings-card">
+      <Toggle
+        label={t("settings.localAi.turnLog.enable")}
+        hint={t("settings.localAi.turnLog.enableHint")}
+        value={enabled}
+        onChange={handleToggle}
+      />
+      <Row title={t("settings.localAi.turnLog.storedTitle")} hint={t("settings.localAi.turnLog.storedHint")}>
+        <div className="ff-external-calendar-actions">
+          <span className="ff-knowledge-index-status">{t("settings.localAi.turnLog.count", { n: count })}</span>
+          <button type="button" className="ff-btn ff-btn-danger" onClick={() => setConfirmClear(true)} disabled={count === 0}>
+            {t("settings.localAi.turnLog.clear")}
+          </button>
+        </div>
+      </Row>
+      <p className="ff-knowledge-privacy-note">{t("settings.localAi.turnLog.privacyNote")}</p>
+
+      {confirmClear ? (
+        <ConfirmModal
+          title={t("settings.localAi.turnLog.clearConfirmTitle")}
+          body={<p>{t("settings.localAi.turnLog.clearConfirmBody", { n: count })}</p>}
+          confirmLabel={t("common.delete")}
+          onCancel={() => setConfirmClear(false)}
+          onConfirm={handleClear}
+        />
+      ) : null}
+    </div>
   );
 }
 

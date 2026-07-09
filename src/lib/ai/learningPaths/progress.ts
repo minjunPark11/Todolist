@@ -30,6 +30,14 @@ export function currentMilestoneIndex(path: LearningPath, cards: ContextCard[]):
   return index === -1 ? Math.max(path.milestones.length - 1, 0) : index;
 }
 
+// Which milestone (by index) a card is linked to, or null when unlinked.
+// Drives the panel's rolling-wave render: only cards on the current
+// milestone expand to full detail, later-milestone cards stay title-only.
+export function milestoneIndexForCard(path: LearningPath, cardId: string): number | null {
+  const index = path.milestones.findIndex((milestone) => milestone.cardIds.includes(cardId));
+  return index === -1 ? null : index;
+}
+
 export type PathBreadcrumb = {
   goal: string;
   // 1-based "N/M" position string, ready to render.

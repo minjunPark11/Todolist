@@ -127,6 +127,23 @@ export function updateLearningPath(id: string, patch: Partial<LearningPathDraft>
   return updated;
 }
 
+// Slice B: attach a saved Context Card to one milestone. Idempotent — the
+// card id is added at most once; updatedAt bumps so the linked path sorts
+// first and becomes the one the breadcrumb shows.
+export function linkCardToMilestone(pathId: string, milestoneId: string, cardId: string): LearningPath | null {
+  const paths = loadLearningPaths();
+  const existing = paths.find((path) => path.id === pathId);
+  if (!existing) return null;
+  const milestones = existing.milestones.map((milestone) =>
+    milestone.id === milestoneId && !milestone.cardIds.includes(cardId)
+      ? { ...milestone, cardIds: [...milestone.cardIds, cardId] }
+      : milestone,
+  );
+  const updated: LearningPath = { ...existing, milestones, updatedAt: new Date().toISOString() };
+  persist(paths.map((path) => (path.id === pathId ? updated : path)));
+  return updated;
+}
+
 export function removeLearningPath(id: string) {
   persist(loadLearningPaths().filter((path) => path.id !== id));
 }
