@@ -228,7 +228,7 @@ export interface FocusSession {
   endedAt: string;
   pausedAt: string;
   segments: FocusSegment[];
-  source: "focus_page" | "today_page" | "calendar_event" | "global_bar";
+  source: "focus_page" | "today_page" | "calendar_event" | "global_bar" | "ai_assistant";
   projectId: string;
   projectName: string;
   focusNote: string;

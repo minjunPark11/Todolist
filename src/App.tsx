@@ -1131,6 +1131,15 @@ export default function App() {
             updateTask: planner.updateTask,
           })
         }
+        onStartFocus={(taskId, durationMinutes) => {
+          // startFocusSession silently no-ops while a session is running or
+          // paused; report that back so the panel can tell the user instead
+          // of claiming a focus session started.
+          const active = planner.activeFocusSession;
+          if (active && (active.status === "running" || active.status === "paused")) return false;
+          planner.startFocusSession(taskId, "ai_assistant", durationMinutes);
+          return true;
+        }}
       />
       <AppModals
         pendingDeleteTaskId={pendingDeleteTaskId}
