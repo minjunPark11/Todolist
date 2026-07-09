@@ -6,10 +6,7 @@
 import { platform } from "../../../platform";
 import type { AiSafeAction } from "../actions/types";
 
-// "executed" = the proposal was saved as a task AND a focus session was
-// started on it from the assistant panel — the strongest acceptance signal
-// the future memory builder can get.
-export type OutcomeStatus = "proposed" | "accepted" | "rejected" | "saved_as_task" | "executed" | "failed";
+export type OutcomeStatus = "proposed" | "accepted" | "rejected" | "saved_as_task" | "failed";
 
 export type AiOutcomeLogEntry = {
   id: string;
@@ -27,7 +24,7 @@ const STORAGE_KEY = "focusflow.aiOutcomeLog.v1";
 // Newest entries win; older ones are pruned so the blob stays small.
 const MAX_ENTRIES = 300;
 
-const STATUSES: OutcomeStatus[] = ["proposed", "accepted", "rejected", "saved_as_task", "executed", "failed"];
+const STATUSES: OutcomeStatus[] = ["proposed", "accepted", "rejected", "saved_as_task", "failed"];
 
 function sanitizeEntry(value: unknown): AiOutcomeLogEntry | null {
   if (!value || typeof value !== "object") return null;

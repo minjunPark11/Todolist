@@ -4,7 +4,7 @@ import type { AgentAction } from "../../lib/ai/agent/actions";
 import { runAssistantTurn } from "../../lib/ai/assistant/runAssistantTurn";
 import type { AssistantTurn } from "../../lib/ai/assistant/types";
 import type { AiContextInput } from "../../lib/ai/context/buildAiContext";
-import { saveContextCard, updateContextCard } from "../../lib/ai/contextCards/store";
+import { saveContextCard } from "../../lib/ai/contextCards/store";
 import { summarizeContextCardForPrompt } from "../../lib/ai/contextCards/searchContextCards";
 import type { ContextCard, RecommendedNextAction } from "../../lib/ai/contextCards/types";
 import { logProposedOutcome, updateOutcome } from "../../lib/ai/memory/outcomeLog";
@@ -24,15 +24,6 @@ interface AssistantPanelProps {
   aiContext?: Omit<AiContextInput, "calendarContextText">;
   knowledgeSettings?: KnowledgeSettings;
   onExecuteActions?: (actions: AgentAction[]) => ToolExecutionResult[];
-  // Starts a focus session on a task; returns false when another session is
-  // already running/paused so the panel reports it instead of pretending.
-  onStartFocus?: (taskId: string, durationMinutes?: number) => boolean;
-}
-
-// Session length for "start now": sized to the recommended action, not the
-// whole item — these actions are minutes-small by contract.
-function focusMinutesForDifficulty(difficulty: RecommendedNextAction["estimatedDifficulty"]): number {
-  return difficulty === "high" ? 50 : difficulty === "medium" ? 30 : 15;
 }
 
 function Chips({ label, values }: { label: string; values: string[] }) {
@@ -51,7 +42,7 @@ function Chips({ label, values }: { label: string; values: string[] }) {
   );
 }
 
-export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions, onStartFocus }: AssistantPanelProps) {
+export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions }: AssistantPanelProps) {
   const { t } = useT();
   const [draft, setDraft] = useState("");
   const [exchanges, setExchanges] = useState<PanelExchange[]>([]);
@@ -62,8 +53,6 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions,
   const [savedCard, setSavedCard] = useState<ContextCard | null>(null);
   const [outcomeId, setOutcomeId] = useState("");
   const [savedTaskTitle, setSavedTaskTitle] = useState("");
-  const [savedTaskId, setSavedTaskId] = useState("");
-  const [focusStartedTitle, setFocusStartedTitle] = useState("");
   const [rejected, setRejected] = useState(false);
   const [notice, setNotice] = useState("");
   const [showRelatedCards, setShowRelatedCards] = useState(false);
@@ -114,8 +103,6 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions,
       setDraft("");
       setSavedCard(null);
       setSavedTaskTitle("");
-      setSavedTaskId("");
-      setFocusStartedTitle("");
       setRejected(false);
       setShowRelatedCards(false);
 
@@ -163,20 +150,21 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions,
     if (outcomeId) updateOutcome(outcomeId, { contextCardId: card.id });
   }
 
-  // Shared by "save as task" and "save & start focus": creates the task,
-  // records the outcome, and returns the created task id (null on failure).
-  function createTaskFromNextAction(nextAction: RecommendedNextAction, card: ContextCard | null): string | null {
-    if (!turn) return null;
+  // The next action is only ever added to the task list — the assistant
+  // never starts a focus session itself. Execution timing stays the user's
+  // call, made from the task list/focus page like any other task.
+  function handleSaveTask(nextAction: RecommendedNextAction) {
+    if (!turn || savedTaskTitle || rejected) return;
     if (!onExecuteActions) {
       setNotice(t("ai.notice.executorNotConnected"));
-      return null;
+      return;
     }
 
     const noteLines = [
       nextAction.completionCriteria ? `${t("ai.assistant.completionCriteria")}: ${nextAction.completionCriteria}` : "",
       nextAction.reason ? `${t("ai.assistant.reason")}: ${nextAction.reason}` : "",
       "source: ai_assistant",
-      card ? `contextCard: ${card.id}` : "",
+      savedCard ? `contextCard: ${savedCard.id}` : "",
     ].filter(Boolean);
 
     const action: AgentAction = {
@@ -193,60 +181,19 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions,
     };
 
     const [result] = onExecuteActions([action]);
-    if (result?.ok && result.taskId) {
+    if (result?.ok) {
       setSavedTaskTitle(nextAction.title);
-      setSavedTaskId(result.taskId);
       if (outcomeId) {
         updateOutcome(outcomeId, {
           status: "saved_as_task",
           savedTaskId: result.taskId,
-          contextCardId: card?.id,
+          contextCardId: savedCard?.id,
         });
       }
-      return result.taskId;
+    } else {
+      setNotice(t("ai.assistant.taskSaveFailed", { message: result?.message ?? "" }));
+      if (outcomeId) updateOutcome(outcomeId, { status: "failed" });
     }
-    setNotice(t("ai.assistant.taskSaveFailed", { message: result?.message ?? "" }));
-    if (outcomeId) updateOutcome(outcomeId, { status: "failed" });
-    return null;
-  }
-
-  function handleSaveTask(nextAction: RecommendedNextAction) {
-    if (!turn || savedTaskTitle || rejected) return;
-    createTaskFromNextAction(nextAction, savedCard);
-  }
-
-  // The whole point of the pipeline: one click from proposal to running
-  // focus session. The click is the explicit confirmation, so it may persist
-  // the card (execution needs a durable home for the "executing" stage),
-  // create the task, and start the timer in one motion.
-  function handleSaveAndFocus(nextAction: RecommendedNextAction) {
-    if (!turn || focusStartedTitle || rejected) return;
-    if (!onStartFocus) {
-      setNotice(t("ai.notice.executorNotConnected"));
-      return;
-    }
-
-    let card = savedCard;
-    if (!card) {
-      card = saveContextCard(turn.contextCardDraft, "brain_dump");
-      setSavedCard(card);
-      if (outcomeId) updateOutcome(outcomeId, { contextCardId: card.id });
-    }
-
-    const taskId = savedTaskId || createTaskFromNextAction(nextAction, card);
-    if (!taskId) return;
-
-    const started = onStartFocus(taskId, focusMinutesForDifficulty(nextAction.estimatedDifficulty));
-    if (!started) {
-      // Task is saved either way; only the timer refused (another session is
-      // running/paused). Say so instead of claiming a session started.
-      setNotice(t("ai.assistant.focusBusy"));
-      return;
-    }
-
-    setFocusStartedTitle(nextAction.title);
-    updateContextCard(card.id, { stage: "executing" });
-    if (outcomeId) updateOutcome(outcomeId, { status: "executed", savedTaskId: taskId, contextCardId: card.id });
   }
 
   function handleReject() {
@@ -367,25 +314,20 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions,
                 ) : null}
 
                 <p className="assistant-status">
-                  {focusStartedTitle
-                    ? `▶ ${t("ai.assistant.focusStarted", { title: focusStartedTitle })}`
-                    : savedTaskTitle
-                      ? `✓ ${t("ai.assistant.taskSaved", { title: savedTaskTitle })}`
-                      : rejected
-                        ? t("ai.assistant.rejected")
-                        : t("ai.assistant.statusProposed")}
+                  {savedTaskTitle
+                    ? `✓ ${t("ai.assistant.taskSaved", { title: savedTaskTitle })}`
+                    : rejected
+                      ? t("ai.assistant.rejected")
+                      : t("ai.assistant.statusProposed")}
                 </p>
 
                 <div className="assistant-actions">
                   <button
                     type="button"
                     className="assistant-primary"
-                    onClick={() => handleSaveAndFocus(nextAction)}
-                    disabled={Boolean(focusStartedTitle) || rejected}
+                    onClick={() => handleSaveTask(nextAction)}
+                    disabled={Boolean(savedTaskTitle) || rejected}
                   >
-                    {t("ai.assistant.saveAndFocus")}
-                  </button>
-                  <button type="button" onClick={() => handleSaveTask(nextAction)} disabled={Boolean(savedTaskTitle) || rejected}>
                     {t("ai.assistant.saveTask")}
                   </button>
                   <button type="button" onClick={handleReject} disabled={Boolean(savedTaskTitle) || rejected}>
@@ -396,6 +338,9 @@ export function AssistantPanel({ aiContext, knowledgeSettings, onExecuteActions,
                   </button>
                   <button type="button" onClick={() => void analyze(t("ai.assistant.anotherActionRequest"))} disabled={loading}>
                     {t("ai.assistant.anotherAction")}
+                  </button>
+                  <button type="button" disabled title={t("ai.assistant.comingSoon")}>
+                    {t("ai.assistant.startFocus")} · {t("ai.assistant.comingSoon")}
                   </button>
                 </div>
               </section>

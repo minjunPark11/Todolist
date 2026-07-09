@@ -89,7 +89,7 @@ const repeatTypes = ["none", "daily", "weekly", "monthly"] as const;
 const habitFrequencies = ["daily", "weekly"] as const;
 const focusModes = ["focus", "short_break", "long_break"] as const;
 const focusStatuses = ["running", "paused", "completed", "cancelled"] as const;
-const focusSources = ["focus_page", "today_page", "calendar_event", "global_bar", "ai_assistant"] as const;
+const focusSources = ["focus_page", "today_page", "calendar_event", "global_bar"] as const;
 const collectionTables = [
   ["tasks", "tasks"],
   ["projects", "projects"],

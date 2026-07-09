@@ -45,9 +45,6 @@ interface OllamaChatProps {
   calendarContext?: CalendarContextInput;
   aiContext?: Omit<AiContextInput, "calendarContextText">;
   onExecuteActions?: (actions: AgentAction[]) => ToolExecutionResult[];
-  // Starts a focus session on a task; returns false when another session is
-  // already running/paused (the caller shows a notice instead of lying).
-  onStartFocus?: (taskId: string, durationMinutes?: number) => boolean;
   knowledgeSettings?: KnowledgeSettings;
 }
 
@@ -62,7 +59,6 @@ export function OllamaChat({
   calendarContext,
   aiContext,
   onExecuteActions,
-  onStartFocus,
   knowledgeSettings = DEFAULT_KNOWLEDGE_SETTINGS,
 }: OllamaChatProps = {}) {
   const { t } = useT();
@@ -376,7 +372,6 @@ export function OllamaChat({
               aiContext={aiContext}
               knowledgeSettings={knowledgeSettings}
               onExecuteActions={onExecuteActions}
-              onStartFocus={onStartFocus}
             />
           </div>
 
