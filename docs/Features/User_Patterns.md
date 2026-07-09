@@ -44,17 +44,32 @@ AI와의 대화를 기기 로컬에 저장하고, 거기서 사용자의 작업 
   후 전체 삭제. 데스크톱 게이트 밖(웹에서도 동작).
 - assistantText는 user-facing 텍스트만 저장 — `[draft]` history 에코는 저장 안 함.
 
-## 4. 슬라이스 B — 결정적 집계 (설계)
+## 4. 슬라이스 B — 결정적 집계 (구현됨, 2026-07-09)
 
-`memory/patternAggregates.ts` 순수 함수, 입력은 `AiTurnLogEntry[]` + `AiOutcomeLogEntry[]`:
+`memory/patternAggregates.ts` — `computePatternAggregates(turns, outcomes)` 순수 함수.
+입력은 `AiTurnLogEntry[]` + `AiOutcomeLogEntry[]`, 출력은 `PatternAggregates`. 모델 없음,
+결정적 정렬(카운트 desc → 이름 asc)로 tie까지 안정적. 전부 `patternAggregates.test.ts`
+로 커버.
 
-- 시간대(아침/오후/밤)·요일별 overwhelm/friction 턴 비율
-- 도메인 top-N (턴 로그 domains 집계) — "반복해서 막히는 영역"
-- 제안 수락율: outcomeId 조인 → saved_as_task / rejected 비율, 난이도별 분해
-- "더 작게 쪼개줘" 패턴: 같은 세션 내 후속 요청 빈도
-- 미해결 인포슬롯 종류 분포 (사용자가 답 안 하는 질문 유형)
+**구현된 집계 (로그가 원천 신호를 갖는 것):**
 
-선택: 설정 또는 대시보드에 "AI가 본 내 패턴" 읽기 전용 뷰.
+- 시간대(아침 5–11 / 오후 12–17 / 밤 나머지)·요일별 stuck 비율. stuck =
+  `responseMode === "overwhelm"` 또는 `frictionSignal !== "none"`. 판정 가능한 턴
+  (responseMode 있는 assistant 턴)만 분모에 — free-chat 턴은 제외. 버킷은 고정
+  길이(시간 3·요일 7)로 항상 반환.
+- 도메인 top-N (턴 로그 `domains` 집계) — "반복해서 막히는 영역".
+- 제안 수락율: outcome 로그 집계 + `assistantTurnId` 조인. overall / 액션 **type별** /
+  턴의 **responseMode별**. `saved_as_task`+`accepted`를 수락으로, `rejected`를 거부로,
+  `proposed`(대기)·`failed`는 분모에서 제외. (난이도 필드는 액션에 없어 type/mode로 분해.)
+- 보너스: responseMode·stage 분포(`stageCounts`) — 아래 defer한 두 집계의 가장 가까운 대체.
+
+**Defer (turn log에 원천 신호가 없어 스키마 추가 필요 — slice A.1):**
+
+- "더 작게 쪼개줘" 후속 빈도 — refinement 버튼(`forceAssistant`)이 자기 턴을 태깅해야 함.
+- 미해결 인포슬롯 **종류** 분포 — turn log가 info slot을 저장하지 않음(stage만 저장). 현재는
+  `stageCounts`가 "어느 단계에서 자주 멈추나"의 근사치.
+
+선택(미구현): 설정 또는 대시보드에 "AI가 본 내 패턴" 읽기 전용 뷰.
 
 ## 5. 슬라이스 C — 메모리 승격 + 프로필 주입 (설계)
 
