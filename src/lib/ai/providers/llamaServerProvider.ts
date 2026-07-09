@@ -31,16 +31,20 @@ function isLocalEndpoint(): boolean {
   }
 }
 
-// Inserts the knowledge block as a system message after any leading system
-// messages (system prompt, app-data context) and before the chat turns, per
-// KNOWLEDGE_BASE_DESIGN.md §6 priority order (system > app data > knowledge).
+// Inserts the knowledge block as a system message just before the final
+// (current-question) message, keeping KNOWLEDGE_BASE_DESIGN.md §6 priority
+// order (system > app data > knowledge) by text position. Retrieval output
+// changes with every question, so placing it before the chat turns would
+// invalidate llama-server's prompt-prefix cache for the entire history each
+// turn — measured on-device as 153s vs 4.6s per request for a ~4.4k-token
+// prompt on the CPU build.
 function withKnowledgeContext(messages: AiMessage[], knowledgeContext?: string): AiMessage[] {
   if (!knowledgeContext) return messages;
-  const lastSystemIndex = messages.reduce((last, message, index) => (message.role === "system" ? index : last), -1);
+  const insertAt = Math.max(messages.length - 1, 0);
   return [
-    ...messages.slice(0, lastSystemIndex + 1),
+    ...messages.slice(0, insertAt),
     { role: "system" as const, content: knowledgeContext },
-    ...messages.slice(lastSystemIndex + 1),
+    ...messages.slice(insertAt),
   ];
 }
 
@@ -96,6 +100,10 @@ export const llamaServerProvider: AiProvider = {
         model,
         stream: false,
         temperature: request.temperature ?? 0.2,
+        // llama-server defaults this to true, but external OpenAI-compatible
+        // servers may not; prompt-prefix reuse is what keeps repeat turns at
+        // seconds instead of minutes on CPU, so ask for it explicitly.
+        cache_prompt: true,
         messages: withKnowledgeContext(request.messages, request.knowledgeContext),
       }),
     });

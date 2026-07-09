@@ -50,10 +50,13 @@ export type AiContextInput = {
 // Compact, JSON-serializable slice of app data selected for one AI request.
 // Slim records are Record<string, unknown> because omitEmpty drops unset
 // fields; the prompt header explains that omission to the model.
+// Field order matters: JSON.stringify preserves insertion order, and this
+// text becomes the head of every local-AI prompt. Keys that change between
+// messages of one session (currentPage, intent) are serialized LAST so a
+// change invalidates only the tail of llama-server's prompt-prefix cache,
+// not the multi-thousand-token data block behind it.
 export type RelevantAppContext = {
-  currentPage: PageId;
   currentUserId: string;
-  intent: AgentIntent;
   date: string;
   limits: typeof AI_CONTEXT_LIMITS;
   summary: Record<string, number>;
@@ -73,6 +76,8 @@ export type RelevantAppContext = {
     settings: PlannerSettings;
     appSettings: AppSettings;
   };
+  currentPage: PageId;
+  intent: AgentIntent;
 };
 
 function trimField(text: string) {
@@ -127,9 +132,7 @@ export function selectRelevantAppContext(input: AiContextInput): RelevantAppCont
   const taskIds = new Set(tasks.map((task) => task.id));
 
   return {
-    currentPage: input.currentPage,
     currentUserId: input.userId || "local-user",
-    intent,
     date: today,
     limits: AI_CONTEXT_LIMITS,
     summary: {
@@ -252,5 +255,8 @@ export function selectRelevantAppContext(input: AiContextInput): RelevantAppCont
       settings: input.settings,
       appSettings: input.appSettings,
     },
+    // Per-message fields last — see the RelevantAppContext comment.
+    currentPage: input.currentPage,
+    intent,
   };
 }

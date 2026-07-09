@@ -95,13 +95,21 @@ function slimRecord(record: Record<string, unknown>): Record<string, unknown> {
 
 export async function buildAssistantContextPack(args: {
   brainDump: string;
+  // Text that drives task/project/card selection. Defaults to brainDump.
+  // Follow-up turns pass the session's FIRST dump here so the pack stays
+  // byte-identical across the session (given unchanged app data) and the
+  // llama-server prompt-prefix cache survives — follow-up answers ("내일까지",
+  // "2시간쯤") carry no useful keywords anyway. Knowledge retrieval still uses
+  // the current brainDump; it is placed at the prompt tail by the provider.
+  selectionAnchor?: string;
   appData: Omit<AiContextInput, "calendarContextText">;
   contextCards: ContextCard[];
   knowledgeSettings?: KnowledgeSettings;
 }): Promise<AssistantContextPack> {
   const { brainDump, appData, contextCards, knowledgeSettings } = args;
+  const anchor = args.selectionAnchor?.trim() || brainDump;
   const today = todayValue();
-  const keywords = extractKeywords(brainDump);
+  const keywords = extractKeywords(anchor);
 
   const tasks = pickTasks(appData.tasks, keywords, today);
   const projects = pickProjects(appData.projects, keywords);
@@ -109,7 +117,7 @@ export async function buildAssistantContextPack(args: {
     0,
     ASSISTANT_CONTEXT_LIMITS.focusSessions,
   );
-  const relatedCards = findRelatedContextCards(brainDump, contextCards, ASSISTANT_CONTEXT_LIMITS.relatedCards);
+  const relatedCards = findRelatedContextCards(anchor, contextCards, ASSISTANT_CONTEXT_LIMITS.relatedCards);
 
   // Best-effort knowledge retrieval: unset/unreadable vault or a failed
   // search must never block the turn.

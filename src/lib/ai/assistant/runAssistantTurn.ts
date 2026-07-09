@@ -38,8 +38,12 @@ export type AssistantTurnInput = {
 };
 
 export async function runAssistantTurn(input: AssistantTurnInput): Promise<AssistantTurn> {
+  // Anchor selection to the session's first dump so follow-up turns reuse a
+  // byte-identical context pack (prompt-prefix cache; see buildAssistantContext).
+  const sessionAnchor = input.history?.find((message) => message.role === "user")?.content;
   const pack = await buildAssistantContextPack({
     brainDump: input.brainDump,
+    selectionAnchor: sessionAnchor,
     appData: input.appData,
     contextCards: loadContextCards(),
     knowledgeSettings: input.knowledgeSettings,
