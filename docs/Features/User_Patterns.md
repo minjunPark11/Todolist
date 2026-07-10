@@ -71,15 +71,35 @@ AI와의 대화를 기기 로컬에 저장하고, 거기서 사용자의 작업 
 
 선택(미구현): 설정 또는 대시보드에 "AI가 본 내 패턴" 읽기 전용 뷰.
 
-## 5. 슬라이스 C — 메모리 승격 + 프로필 주입 (설계)
+## 5. 슬라이스 C — 메모리 승격 + 프로필 주입
 
-- `AiMemoryStore` 구현 (types.ts seam). confidence는 낮게 시작, 재확인 시 상승.
-- 모델이 집계+최근 대화를 읽고 `preference`/`routine` 후보 제안 → **사용자 승인 UI**
-  통과해야 저장 (자동 저장 금지).
-- 승인된 메모리를 `buildAssistantContextPack`에 ~500자 캡 프로필 블록으로 주입.
-  **선행 조건 promptBudget 해결됨 (2026-07-09)** — `lib/ai/promptBudget.ts` +
-  게이트웨이(`sendAiChat`) 중앙 예산제로 8192 ctx 초과를 막는다(아래 참고). 이제 프로필
-  블록을 얹어도 히스토리가 예산에 맞춰 자동 트리밍되므로 안전.
+C는 4개 파트라 둘로 나눔: **C.1(스토어+주입, 결정적) ✅ / C.2(모델 제안+승인 UI).**
+
+### C.1 — 메모리 스토어 + 프로필 주입 (구현됨, 2026-07-09)
+
+결정적 토대. 모델·UI 없음. 모든 게 꽂힐 자리를 먼저 만든다.
+
+- `memory/aiMemory.ts` — `AiMemoryStore` seam(types.ts) 구현. store 패턴 복제
+  (`aiMemory.v1`, cap 60). CRUD + sanitize + confidence 0..1 클램프 + `expiresAt`
+  만료 필터. **스토어엔 승인된 메모리만** 존재 (C.2 제안은 승인 전까지 비영속).
+- `memory/memoryProfile.ts` — `buildMemoryProfileBlock(memories, maxChars=500)`
+  순수 함수. confidence ≥ 0.4만, 신뢰도 desc→최신 순, ~500자 greedy 캡.
+  "관찰된 행동만, 진단 금지" 헤더로 중립 유지.
+- `buildAssistantContextPack` 주입: 프로필 블록을 `contextText` 최상단 섹션으로.
+  local-only 채널(dataScope full-app)이라 비로컬 공급자에 안 나감. 세션 내 메모리는
+  불변이라 캐시 접두사도 안정.
+- 전부 `aiMemory.test.ts` / `memoryProfile.test.ts`로 커버.
+
+### C.2 — 모델 제안 + 승인 UI (다음)
+
+- 모델이 집계(slice B)+최근 대화를 읽고 `preference`/`routine` 후보 제안 → 결정적
+  검증기(pathDraft.ts 패턴)로 수리/클램프 → **사용자 승인 UI** 통과해야 `saveMemory`
+  (자동 저장 금지). confidence 낮게 시작, 재확인 시 `updateMemory`로 상승.
+- **열린 결정: 트리거 방식** — 수동 버튼("내 패턴 분석") vs N턴마다 자동. 이 앱의
+  consent-first 관례(하드웨어 스캔=명시 클릭)상 수동 버튼이 유력.
+- 메모리 열람/개별 삭제 설정 UI도 C.2에서 (승인 UI와 함께).
+- **선행 조건 promptBudget 해결됨 (2026-07-09)** — 아래 §6. 프로필 블록을 얹어도
+  히스토리가 예산에 맞춰 자동 트리밍되므로 안전.
 
 ## 6. promptBudget — 8192 ctx 초과 수정 (2026-07-09)
 
