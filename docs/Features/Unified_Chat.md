@@ -118,16 +118,33 @@ Assistant 탭은 사실상 중복이 된다. (`AssistantPanel`의 카드 렌더 
 - 챗은 지난 턴 카드도 스트림에 남긴다(패널은 마지막 턴만) — §6 "인라인 카드 히스토리"는
   일단 '남김'으로 감.
 
-### 슬라이스 2 — 라우터 교체 + 가벼운 경로 흡수
+### 슬라이스 2 — 라우터 교체 + 가벼운 경로 흡수  ← 구현됨 (2026-07-09)
 
 - `shouldRouteToAssistantFlow`(정규식) 폐기. **모든 턴을 `runAssistantTurn`으로.**
-- `runAssistantTurn`에 가벼운 경로 분기 추가: `domain_specific`/`normal_task_request`/
-  `learning_request`면 카드 draft·Generic 가드 스킵, personal agent의 액션제안·지식
-  첨부·source chip을 그 경로에 흡수.
-- `dataScope`·캐시 앵커·local-only 불변식 회귀 테스트.
+- `runAssistantTurn`에 가벼운 경로 분기 추가: `domain_specific`/`learning_request`면
+  `isDirectAnswer=true` → 카드·다음행동·plan 렌더 안 함(말풍선만), history 에코도
+  answer만. Generic 가드는 이미 overwhelm/planning에만 적용되므로 자동 통과.
+- personal agent의 지식 첨부·캘린더 컨텍스트·source chip을 assistant 경로에 흡수.
 
-**DoD:** 코드/번역/일반 질문이 Chat에서 personal agent 없이 assistant flow로 동일 품질
-응답. 브레인덤프는 여전히 가드 통과.
+**구현 노트 (2026-07-09) — 2a(엔진) + 2b(라우터):**
+
+- **2a**: `AssistantTurn.isDirectAnswer`(types.ts) + `runAssistantTurn`가 light 모드 판정.
+  `historyEcho`는 direct-answer면 `[draft]` 없이 답변만. `AssistantTurnCards`는
+  `isDirectAnswer`면 `null` 렌더. 테스트 3개.
+- **2b**: `OllamaChat.send`가 라우터 없이 전부 `runAssistantTurn`으로. `runPersonalAgent`
+  호출 제거(모듈은 슬라이스 3에서 삭제).
+- **패리티 스레딩(설계 문서에 없던 격차 3개 발견 → 보존):** `runAssistantTurn`에
+  `attachedKnowledge`(📎 첨부 파일 → knowledgeContext 채널) + `calendarContextText`
+  (캘린더 페이지 일정 → contextText) 옵션 파라미터 추가. source chip은
+  `turn.knowledgeSources`(첨부+자동 병합)에서.
+- **알려진 동작 변화:** 이제 모든 채팅이 앱 데이터 팩을 실어 `dataScope: "full-app"` →
+  **로컬 전용**. 일반 질문도 로컬 AI 필요(웹/로컬 AI 없음이면 서버 폴백 불가). 데스크톱
+  로컬 우선 앱이라 수용 가능하나 웹 일반 채팅은 로컬 AI 없으면 안내 에러.
+- **미검증(데스크톱 몫):** 일반 질문에 assistant 프롬프트(domain_specific)가 personal
+  agent만큼 답하는지 + 2000자 캡. 로컬 llama-server로 확인 필요.
+
+**DoD:** 코드/번역/일반 질문이 Chat에서 assistant flow로 응답(데스크톱 확인 대기).
+브레인덤프는 여전히 가드 통과 + 인라인 카드. ✅ 라우터·엔진 통일, ⏳ 품질 데스크톱 확인.
 
 ### 슬라이스 3 — 탭 제거 (Chat 하나만)
 

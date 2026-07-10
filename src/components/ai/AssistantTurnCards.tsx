@@ -175,6 +175,10 @@ export function AssistantTurnCards({
   const cardDraft = turn.contextCardDraft;
   const nextAction = turn.recommendedNextAction;
 
+  // Direct-answer turns (domain_specific/learning_request) are a plain reply —
+  // the host already rendered the text bubble, so there are no cards to show.
+  if (turn.isDirectAnswer) return null;
+
   return (
     <div className="assistant-turn-cards">
       {showPositionLine && pathView?.breadcrumb ? (

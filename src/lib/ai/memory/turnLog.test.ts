@@ -43,6 +43,7 @@ function fakeTurn(id: string): AssistantTurn {
       unscopedProjectSignal: "none",
     },
     userFacingText: "정리해봤어요. 이 작업부터 시작하는 게 좋겠어요.",
+    isDirectAnswer: false,
     contextCardDraft: {
       title: "중국어/논문 정리",
       rawInput: "",

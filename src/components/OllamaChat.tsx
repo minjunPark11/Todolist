@@ -5,25 +5,18 @@ import { AssistantPanel } from "./ai/AssistantPanel";
 import { AssistantTurnCards } from "./ai/AssistantTurnCards";
 import { AI_SAFE_ACTION_DEFAULT_RISK } from "../lib/ai/actions/types";
 import type { AgentAction } from "../lib/ai/agent/actions";
-import { runPersonalAgent } from "../lib/ai/agent/personalAgent";
 import { detectAgentIntent, getIntentLabel, type AgentIntent } from "../lib/ai/agent/intent";
 import { buildAssistantHistoryText } from "../lib/ai/assistant/historyEcho";
-import { shouldRouteToAssistantFlow } from "../lib/ai/assistant/overwhelmHeuristics";
 import { runAssistantTurn } from "../lib/ai/assistant/runAssistantTurn";
 import type { AssistantTurn } from "../lib/ai/assistant/types";
 import { logProposedOutcome } from "../lib/ai/memory/outcomeLog";
-import { logAssistantTurn, logFreeChatTurn } from "../lib/ai/memory/turnLog";
-import { buildAiContextText, type AiContextInput } from "../lib/ai/context/buildAiContext";
-import {
-  validateAgentActions,
-  type ToolExecutionResult,
-  type ToolValidationResult,
-} from "../lib/ai/tools/toolExecutor";
+import { logAssistantTurn } from "../lib/ai/memory/turnLog";
+import type { AiContextInput } from "../lib/ai/context/buildAiContext";
+import type { ToolExecutionResult, ToolValidationResult } from "../lib/ai/tools/toolExecutor";
 import type { AiMessage, AiProviderName } from "../lib/ai/types";
 import { buildCalendarContextText, type CalendarContextInput } from "../lib/calendarContext";
 import { Popover } from "./kit";
 import { buildAttachedFilesContext, type AttachedFileRef } from "../lib/knowledge/attachedFilesContext";
-import { searchKnowledge } from "../lib/knowledge/retrieval/searchKnowledge";
 import { scanVault } from "../lib/knowledge/obsidianScanner";
 import { DEFAULT_KNOWLEDGE_SETTINGS, type KnowledgeSettings, type RetrievedChunk } from "../lib/knowledge/types";
 import { platform } from "../platform";
@@ -163,138 +156,89 @@ export function OllamaChat({
     await send(content, filesToAttach);
   }
 
-  // One chat turn. forceAssistant bypasses the regex router for follow-up
-  // requests fired from an inline card ("더 작게 쪼개줘") — those must stay in
-  // the assistant flow even though their text alone wouldn't route there.
-  async function send(content: string, filesToAttach: AttachedFileRef[], options?: { forceAssistant?: boolean }) {
+  // One chat turn. Unified Chat slice 2: every message goes through the single
+  // engine (runAssistantTurn). Its model-side Scope Gate decides whether to
+  // answer directly (domain_specific/learning_request → plain bubble) or
+  // structure an overwhelm/planning dump (inline cards). The old regex router
+  // + free-text personal agent are gone; the Generic Failure Guard now covers
+  // every structured turn.
+  async function send(content: string, filesToAttach: AttachedFileRef[]) {
     if (!content || loading) {
       return;
     }
 
     const userMessage = createMessage("user", content);
-    const nextIntent = detectAgentIntent(content);
-    setIntent(nextIntent);
+    setIntent(detectAgentIntent(content));
     setMessages((current) => [...current, userMessage]);
     setError("");
-    setSuggestedActions([]);
-    setValidationResults([]);
     setActionNotice("");
     setKnowledgeSources([]);
     setLoading(true);
 
     try {
-      // Overwhelm-shaped messages ("too much, can't start, what first?") must
-      // not be answered by the free-text personal-agent prompt — it has no
-      // Generic Failure Guard, so it happily produces "우선 가장 시급한 일부터"
-      // advice. Route them through the assistant flow (runAssistantTurn),
-      // whose replies are validated and deterministically repaired.
-      if (aiContext && (options?.forceAssistant || shouldRouteToAssistantFlow(content))) {
-        const turn = await runAssistantTurn({
-          brainDump: content,
-          history: chatHistory,
-          appData: aiContext,
-          knowledgeSettings,
-        });
-        setProvider(turn.provider);
-
-        // Same outcome-log contract as AssistantPanel: every surfaced
-        // proposal starts as "proposed"; the inline cards' buttons move it.
-        let outcomeId: string | undefined;
-        if (turn.recommendedNextAction) {
-          outcomeId = logProposedOutcome({
-            assistantTurnId: turn.id,
-            proposedAction: {
-              id: `safe-${turn.id}`,
-              type: "create_task",
-              label: turn.recommendedNextAction.title,
-              risk: AI_SAFE_ACTION_DEFAULT_RISK.create_task,
-              payload: { title: turn.recommendedNextAction.title },
-            },
-          }).id;
-        }
-
-        // Turn log (User Patterns slice A): persist the exchange + its
-        // signals for later pattern analysis. Honors the settings toggle.
-        logAssistantTurn({ source: "chat_assistant", userText: content, turn, outcomeId });
-
-        // Bubble shows only the user-facing text (the cards carry the
-        // structure); the model's history keeps the draft echo so follow-up
-        // turns refine instead of restarting.
-        setMessages((current) => [
-          ...current,
-          {
-            ...createMessage("assistant", turn.userFacingText),
-            turn,
-            outcomeId,
-            historyContent: buildAssistantHistoryText(turn),
-          },
-        ]);
+      if (!aiContext) {
+        setError(t("ai.error.chatFailed"));
         return;
       }
 
-      const calendarContextText =
-        activePage === "calendar" && calendarContext ? buildCalendarContextText(calendarContext) : undefined;
-      const requestContextText = aiContext
-        ? buildAiContextText({ ...aiContext, intent: nextIntent, calendarContextText })
-        : calendarContextText;
-
-      // Best-effort: knowledge context is an enhancement, never blocks the
-      // chat if the vault is unreadable or unset (see KNOWLEDGE_BASE_DESIGN.md).
-      // Attached files are always included and consume the budget first;
-      // automatic retrieval (Lite/Full) gets whatever budget remains.
-      let attachedContextText: string | undefined;
-      let attachedSources: RetrievedChunk[] = [];
+      // Attached vault files (📎): user-picked and Obsidian-derived, so they
+      // ride the knowledge channel the gateway strips for non-local providers.
+      // Best-effort — a failure never blocks the turn.
+      let attachedKnowledge: { text: string; sources: RetrievedChunk[] } | undefined;
       try {
         const attachedResult = await buildAttachedFilesContext(filesToAttach, knowledgeSettings.knowledgeBudgetChars);
-        if (attachedResult) {
-          attachedContextText = attachedResult.text;
-          attachedSources = attachedResult.sources;
-        }
+        if (attachedResult) attachedKnowledge = { text: attachedResult.text, sources: attachedResult.sources };
       } catch {
-        // Ignore — the chat proceeds without the attachment.
+        // Proceed without the attachment.
       }
 
-      const remainingBudget = Math.max(0, knowledgeSettings.knowledgeBudgetChars - (attachedContextText?.length ?? 0));
+      // Calendar page: thread the schedule the assistant pack doesn't carry.
+      const calendarContextText =
+        activePage === "calendar" && calendarContext ? buildCalendarContextText(calendarContext) : undefined;
 
-      let autoContextText: string | undefined;
-      let autoSources: RetrievedChunk[] = [];
-      try {
-        const knowledgeResult = await searchKnowledge(content, knowledgeSettings, remainingBudget);
-        if (knowledgeResult) {
-          autoContextText = knowledgeResult.text;
-          autoSources = knowledgeResult.sources;
-        }
-      } catch {
-        // Ignore — the chat proceeds without knowledge context.
-      }
-
-      const knowledgeContextText = [attachedContextText, autoContextText].filter(Boolean).join("\n\n") || undefined;
-      const nextKnowledgeSources = [...attachedSources, ...autoSources];
-
-      const response = await runPersonalAgent({
-        messages: [...chatHistory, { role: "user", content }],
-        contextText: requestContextText,
-        knowledgeContext: knowledgeContextText,
-        intent: nextIntent,
+      const turn = await runAssistantTurn({
+        brainDump: content,
+        history: chatHistory,
+        appData: aiContext,
+        knowledgeSettings,
+        attachedKnowledge,
+        calendarContextText,
       });
-      setProvider(response.provider);
-      setIntent(response.intent);
+      setProvider(turn.provider);
 
-      // Turn log (User Patterns slice A): free-chat exchanges carry no
-      // signals — text and provider only.
-      logFreeChatTurn({ userText: content, assistantText: response.content, provider: response.provider });
+      // Same outcome-log contract as AssistantPanel: every surfaced proposal
+      // starts as "proposed"; the inline cards' buttons move it. Direct-answer
+      // turns have no next action, so nothing is logged for them.
+      let outcomeId: string | undefined;
+      if (turn.recommendedNextAction) {
+        outcomeId = logProposedOutcome({
+          assistantTurnId: turn.id,
+          proposedAction: {
+            id: `safe-${turn.id}`,
+            type: "create_task",
+            label: turn.recommendedNextAction.title,
+            risk: AI_SAFE_ACTION_DEFAULT_RISK.create_task,
+            payload: { title: turn.recommendedNextAction.title },
+          },
+        }).id;
+      }
 
-      setSuggestedActions(response.suggestedActions);
-      setValidationResults(
-        response.suggestedActions.length && aiContext
-          ? validateAgentActions(response.suggestedActions, {
-              tasks: aiContext.tasks,
-              projects: aiContext.projects,
-            })
-          : [],
-      );
-      setMessages((current) => [...current, createMessage("assistant", response.content)]);
-      setKnowledgeSources(nextKnowledgeSources);
+      // Turn log (User Patterns slice A): persist the exchange + its signals.
+      logAssistantTurn({ source: "chat_assistant", userText: content, turn, outcomeId });
+
+      // Bubble shows only the user-facing text; AssistantTurnCards renders the
+      // structure (nothing for direct answers). The model's history keeps the
+      // draft echo so follow-up turns refine instead of restarting.
+      setMessages((current) => [
+        ...current,
+        {
+          ...createMessage("assistant", turn.userFacingText),
+          turn,
+          outcomeId,
+          historyContent: buildAssistantHistoryText(turn),
+        },
+      ]);
+      setKnowledgeSources(turn.knowledgeSources);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("ai.error.chatFailed"));
     } finally {
@@ -449,7 +393,7 @@ export function OllamaChat({
                     loading={loading}
                     showPositionLine
                     onExecuteActions={onExecuteActions}
-                    onFollowUpRequest={(text) => void send(text, [], { forceAssistant: true })}
+                    onFollowUpRequest={(text) => void send(text, [])}
                   />
                 ) : null}
               </Fragment>

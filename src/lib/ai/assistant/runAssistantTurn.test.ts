@@ -18,6 +18,7 @@ vi.mock("./buildAssistantContext", () => ({
 }));
 
 import { sendAiChat } from "../gateway";
+import { buildAssistantHistoryText } from "./historyEcho";
 import { runAssistantTurn } from "./runAssistantTurn";
 
 const OVERWHELM_DUMP =
@@ -330,6 +331,56 @@ describe("runAssistantTurn — Generic Failure Guard on unparseable replies", ()
     expect(containsGenericFailurePhrases(turn.userFacingText)).toBe(false);
     expect(turn.userFacingText).toContain("논문 피드백 반영");
     expect(turn.recommendedNextAction).not.toBeNull();
+  });
+});
+
+// Unified Chat slice 2: the light "just answer it" modes (domain_specific /
+// learning_request) mark the turn isDirectAnswer so the UI shows only the
+// reply — no card, next action, or plan — and the history echo carries no
+// [draft]. This is what lets the single engine also serve plain chat.
+describe("runAssistantTurn — direct-answer (light) modes", () => {
+  function directReply(mode: "domain_specific" | "learning_request", text: string) {
+    return JSON.stringify({
+      response_mode: mode,
+      input_signals: {},
+      mode: "ready_for_next_action",
+      context_card_draft: null,
+      follow_up_questions: [],
+      recommended_next_action: null,
+      user_facing_response: text,
+    });
+  }
+
+  it("marks a domain_specific answer as direct and skips the guard", async () => {
+    mockReply(directReply("domain_specific", "재귀는 함수가 자기 자신을 호출하는 기법이에요. 종료 조건이 핵심입니다."));
+
+    const turn = await runAssistantTurn({ ...turnInput(), brainDump: "재귀가 뭐야?" });
+
+    expect(turn.isDirectAnswer).toBe(true);
+    expect(turn.responseMode).toBe("domain_specific");
+    expect(turn.validation.ok).toBe(true);
+    expect(turn.usedGenericFailureFallback).toBe(false);
+    expect(turn.userFacingText).toContain("재귀는");
+    // History echo is just the reply — no [draft] block to bloat the budget.
+    expect(buildAssistantHistoryText(turn)).toBe(turn.userFacingText);
+    expect(buildAssistantHistoryText(turn)).not.toContain("[draft]");
+  });
+
+  it("treats learning_request as a direct answer too", async () => {
+    mockReply(directReply("learning_request", "이분 탐색은 정렬된 배열에서 반씩 줄여가며 찾는 방법이에요."));
+
+    const turn = await runAssistantTurn({ ...turnInput(), brainDump: "이분 탐색 설명해줘" });
+
+    expect(turn.isDirectAnswer).toBe(true);
+    expect(turn.responseMode).toBe("learning_request");
+  });
+
+  it("does NOT mark an overwhelm turn as direct", async () => {
+    mockReply(GENERIC_ADVICE);
+
+    const turn = await runAssistantTurn(turnInput());
+
+    expect(turn.isDirectAnswer).toBe(false);
   });
 });
 

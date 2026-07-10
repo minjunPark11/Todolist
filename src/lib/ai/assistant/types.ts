@@ -89,6 +89,12 @@ export type AssistantTurn = {
   responseMode: ResponseMode;
   inputSignals: InputSignals;
   userFacingText: string;
+  // True for the light "just answer it" modes (domain_specific /
+  // learning_request): the model's Scope Gate handled it directly, so the UI
+  // shows only the reply bubble — no context card, next action, or plan.
+  // Unified Chat slice 2: this is what lets one engine serve both a code/
+  // translation/Q&A answer and a structured overwhelm breakdown.
+  isDirectAnswer: boolean;
   contextCardDraft: ContextCardDraft;
   usedFallbackDraft: boolean;
   // True when the model's reply failed the generic-failure guard (see

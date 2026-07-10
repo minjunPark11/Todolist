@@ -5,7 +5,7 @@
 // the panel.
 import { sendAiChat } from "../gateway";
 import type { AiMessage } from "../types";
-import type { KnowledgeSettings } from "../../knowledge/types";
+import type { KnowledgeSettings, RetrievedChunk } from "../../knowledge/types";
 import { loadContextCards } from "../contextCards/store";
 import type { AiContextInput } from "../context/buildAiContext";
 import type { DetectedItem } from "../contextCards/types";
@@ -36,7 +36,21 @@ export type AssistantTurnInput = {
   appData: Omit<AiContextInput, "calendarContextText">;
   knowledgeSettings?: KnowledgeSettings;
   model?: string;
+  // Unified Chat slice 2 — feature parity when the single engine also serves
+  // the plain chat that used to go to the personal agent:
+  // User-attached vault files (📎). Obsidian-derived, so it rides the
+  // knowledgeContext channel the gateway strips for non-local providers.
+  attachedKnowledge?: { text: string; sources: RetrievedChunk[] };
+  // Calendar-page schedule text; app data, so it joins contextText (local-only
+  // via dataScope "full-app") — the assistant pack itself has no calendar.
+  calendarContextText?: string;
 };
+
+// Join two optional context blocks with a blank line, dropping empties.
+function joinContext(...parts: (string | undefined)[]): string | undefined {
+  const kept = parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part));
+  return kept.length > 0 ? kept.join("\n\n") : undefined;
+}
 
 export async function runAssistantTurn(input: AssistantTurnInput): Promise<AssistantTurn> {
   // Anchor selection to the session's first dump so follow-up turns reuse a
@@ -50,15 +64,22 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
     knowledgeSettings: input.knowledgeSettings,
   });
 
+  // Merge the parity extras (slice 2): attached-file text into the knowledge
+  // channel, calendar text into the app-data context. Attached sources are
+  // prepended so they show first in the chip row.
+  const knowledgeContext = joinContext(input.attachedKnowledge?.text, pack.knowledgeContext);
+  const contextText = joinContext(pack.contextText, input.calendarContextText) ?? pack.contextText;
+  const knowledgeSources: RetrievedChunk[] = [...(input.attachedKnowledge?.sources ?? []), ...pack.knowledgeSources];
+
   const response = await sendAiChat({
     // App data in the pack ⇒ local-only providers, same rule as the chat tab.
     dataScope: "full-app",
     temperature: 0.2,
     model: input.model,
-    knowledgeContext: pack.knowledgeContext,
+    knowledgeContext,
     messages: [
       { role: "system", content: ASSISTANT_SYSTEM_PROMPT },
-      { role: "system", content: pack.contextText },
+      { role: "system", content: contextText },
       ...(input.history ?? []),
       { role: "user", content: input.brainDump },
     ],
@@ -85,6 +106,12 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
   const items: DetectedItem[] = draft.detectedItemDetails ?? [];
   const responseMode = analysis?.responseMode ?? resolveResponseMode(undefined, NONE_SIGNALS, items.length);
   const inputSignals = analysis?.inputSignals ?? NONE_SIGNALS;
+
+  // Light "just answer it" modes: the Scope Gate (prompts.ts) already answered
+  // in user_facing_response, so no context card / next action / plan is built
+  // or shown. This is the branch that lets one engine also serve the plain
+  // chat that used to go to the personal agent (Unified Chat slice 2).
+  const isDirectAnswer = responseMode === "domain_specific" || responseMode === "learning_request";
 
   // Info-gathering state (see infoSlots.ts): the deterministic derivation
   // from the items is the base; slots resolved by prior saved cards on the
@@ -155,6 +182,7 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
     responseMode,
     inputSignals,
     userFacingText,
+    isDirectAnswer,
     contextCardDraft: draft,
     usedFallbackDraft,
     usedGenericFailureFallback,
@@ -163,6 +191,6 @@ export async function runAssistantTurn(input: AssistantTurnInput): Promise<Assis
     recommendedNextAction,
     learningPathDraft,
     relatedCards: pack.relatedCards,
-    knowledgeSources: pack.knowledgeSources,
+    knowledgeSources,
   };
 }
