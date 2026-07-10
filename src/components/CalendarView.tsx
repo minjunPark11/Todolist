@@ -21,7 +21,9 @@ import {
   isCategoryVisible,
   projectCategoryId,
   setActiveCategory,
+  setFocusColor,
   toggleCategoryVisibility,
+  updatePersonalCategory,
   useCalendarCategoryState,
   type CalendarCategory,
 } from "../lib/calendarCategories";
@@ -77,6 +79,9 @@ interface CalendarViewProps {
   externalCalendarEvents: ExternalCalendarEvent[];
   focusSessions: FocusSession[];
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
+  // Sidebar recoloring writes back to the category's source entity.
+  onUpdateProject: (projectId: string, patch: Partial<Project>) => void;
+  onUpdateTopic: (topicId: string, patch: Partial<StudyTopic>) => void;
   // When set, the calendar mounts with this project's category selected
   // (space detail "Open Calendar" hand-off).
   initialProjectId?: string;
@@ -102,6 +107,8 @@ export function CalendarView({
   externalCalendarEvents,
   focusSessions,
   onUpdateExternalCalendar,
+  onUpdateProject,
+  onUpdateTopic,
   initialProjectId,
   onUpdateTask,
   onCreateTask,
@@ -288,6 +295,16 @@ export function CalendarView({
       return;
     }
     toggleCategoryVisibility(category.id);
+  }
+
+  // Sidebar inline recolor: same write-back targets as the settings modal —
+  // derived categories mutate their source entity so nothing drifts.
+  function handleRecolorCategory(category: CalendarCategory, color: string) {
+    if (category.group === "personal") updatePersonalCategory(category.id, { color });
+    else if (category.group === "project" && category.sourceId) onUpdateProject(category.sourceId, { color });
+    else if (category.group === "study" && category.sourceId) onUpdateTopic(category.sourceId, { color });
+    else if (category.group === "external" && category.sourceId) onUpdateExternalCalendar(category.sourceId, { color });
+    else if (category.group === "focus") setFocusColor(color);
   }
 
   // Category → task field mapping: picking a project category also links the
@@ -675,6 +692,7 @@ export function CalendarView({
           isCategoryVisible={(categoryId) => visibleCategoryIds.has(categoryId)}
           onToggleCategory={handleToggleCategory}
           onSelectCategory={handleSelectCategory}
+          onRecolorCategory={handleRecolorCategory}
           onCreateClick={() =>
             setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
           }

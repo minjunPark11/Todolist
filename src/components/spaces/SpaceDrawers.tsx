@@ -32,6 +32,8 @@ function DrawerShell({ title, onClose, children }: { title: string; onClose: () 
 // § 32.4 Task Detail Drawer
 export function TaskDetailDrawer({
   task,
+  parentTask,
+  childTasks,
   projects,
   sessions,
   notes,
@@ -41,9 +43,17 @@ export function TaskDetailDrawer({
   onPin,
   onArchive,
   onOpenNote,
+  onAddChildTask,
+  onToggleChildDone,
+  onOpenTask,
   onClose,
 }: {
   task: Task;
+  // Sub-task wiring: one level deep only — a task that has a parent never
+  // offers its own "add sub-task" input (children are full Tasks so they
+  // flow through Eisenhower / Today / focus like any other task).
+  parentTask: Task | null;
+  childTasks: Task[];
   projects: Project[];
   sessions: FocusSession[];
   notes: SpaceNote[];
@@ -53,13 +63,32 @@ export function TaskDetailDrawer({
   onPin: () => void;
   onArchive: () => void;
   onOpenNote: (noteId: string) => void;
+  onAddChildTask: (title: string) => void;
+  onToggleChildDone: (taskId: string) => void;
+  onOpenTask: (taskId: string) => void;
   onClose: () => void;
 }) {
   const { t } = useT();
+  const [childTitle, setChildTitle] = useState("");
   const project = projects.find((item) => item.id === task.projectId);
   const done = task.status === "done";
+  const canAddChildren = !task.parentTaskId;
+  const childDone = childTasks.filter((child) => child.status === "done").length;
+
+  function submitChild() {
+    const title = childTitle.trim();
+    if (!title) return;
+    onAddChildTask(title);
+    setChildTitle("");
+  }
+
   return (
     <DrawerShell title={t("spaceHub.drawer.task")} onClose={onClose}>
+      {parentTask ? (
+        <button type="button" className="sdv-parent-link" onClick={() => onOpenTask(parentTask.id)}>
+          ↖ {parentTask.title}
+        </button>
+      ) : null}
       <h3 className="sdv-drawer-title">{task.title}</h3>
       <dl className="sdv-detail-list">
         <div>
@@ -86,6 +115,58 @@ export function TaskDetailDrawer({
         ) : null}
       </dl>
       {task.notes ? <p className="sdv-drawer-notes">{task.notes}</p> : null}
+
+      {canAddChildren ? (
+        <>
+          <h4>
+            {t("spaceHub.section.subtasks")}
+            {childTasks.length > 0 ? (
+              <span className="sdv-subtask-progress">
+                {childDone}/{childTasks.length}
+              </span>
+            ) : null}
+          </h4>
+          {childTasks.length > 0 ? (
+            <ul className="sdv-subtask-list">
+              {childTasks.map((child) => {
+                const isChildDone = child.status === "done";
+                return (
+                  <li key={child.id} className={isChildDone ? "done" : undefined}>
+                    <input
+                      type="checkbox"
+                      checked={isChildDone}
+                      aria-label={t("spaceHub.aria.complete", { title: child.title })}
+                      onChange={() => onToggleChildDone(child.id)}
+                      disabled={isChildDone}
+                    />
+                    <button type="button" onClick={() => onOpenTask(child.id)}>
+                      {child.title}
+                    </button>
+                    {child.dueDate ? <small>{formatDate(child.dueDate)}</small> : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          <div className="sdv-form-row sdv-subtask-add">
+            <input
+              value={childTitle}
+              placeholder={t("spaceHub.subtasks.placeholder")}
+              aria-label={t("spaceHub.subtasks.placeholder")}
+              onChange={(event) => setChildTitle(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  submitChild();
+                }
+              }}
+            />
+            <button type="button" className="sdv-btn sdv-btn-sm" disabled={!childTitle.trim()} onClick={submitChild}>
+              {t("spaceHub.subtasks.add")}
+            </button>
+          </div>
+        </>
+      ) : null}
 
       {sessions.length > 0 ? (
         <>

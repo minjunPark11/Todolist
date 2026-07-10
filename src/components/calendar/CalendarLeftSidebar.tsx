@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
-import type { CalendarCategory, CalendarCategoryGroup } from "../../lib/calendarCategories";
+import { useEffect, useState, type CSSProperties } from "react";
+import { CATEGORY_COLOR_PALETTE, type CalendarCategory, type CalendarCategoryGroup } from "../../lib/calendarCategories";
 import { getDayNumber, getMonthGrid, getMonthLabel, todayValue } from "../../utils/date";
 import { useT } from "../../i18n";
 
@@ -9,12 +9,15 @@ interface CalendarLeftSidebarProps {
   onSelectDate: (date: string) => void;
   // Category spec §3.1: the sidebar only *uses* categories — checkbox =
   // show/hide, row click = pick the default category for new events.
-  // Add / rename / delete live in Settings.
+  // Add / rename / delete live in Settings. Recoloring is the one exception:
+  // the ⋯ button opens an inline palette and the color writes back to the
+  // category's source entity (same paths as the settings modal).
   groups: CalendarCategoryGroup[];
   activeCategoryId: string;
   isCategoryVisible: (categoryId: string) => boolean;
   onToggleCategory: (category: CalendarCategory) => void;
   onSelectCategory: (category: CalendarCategory) => void;
+  onRecolorCategory: (category: CalendarCategory, color: string) => void;
   onCreateClick: () => void;
   collapsed: boolean;
   onExpand: () => void;
@@ -29,12 +32,33 @@ export function CalendarLeftSidebar({
   isCategoryVisible,
   onToggleCategory,
   onSelectCategory,
+  onRecolorCategory,
   onCreateClick,
   collapsed,
   onExpand,
 }: CalendarLeftSidebarProps) {
   const { t, lang } = useT();
   const today = todayValue();
+  // Category id whose inline recolor palette is open ("" = none).
+  const [paletteFor, setPaletteFor] = useState("");
+
+  useEffect(() => {
+    if (!paletteFor) return;
+    function handlePointerDown(event: globalThis.PointerEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".gcal-cat-palette-wrap")) return;
+      setPaletteFor("");
+    }
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") setPaletteFor("");
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [paletteFor]);
   const anchorDate = new Date(`${anchor}T00:00:00`);
   const year = anchorDate.getFullYear();
   const month = anchorDate.getMonth();
@@ -142,6 +166,46 @@ export function CalendarLeftSidebar({
                 <span className="gcal-cat-name">{category.name}</span>
                 {category.isDefault ? <span className="gcal-cat-badge">{t("calendar.defaultBadge")}</span> : null}
                 {category.isReadOnly ? <span className="gcal-cat-badge">{t("calendar.readOnlyBadge")}</span> : null}
+                <span className="gcal-cat-palette-wrap">
+                  <button
+                    type="button"
+                    className="gcal-cat-menu-btn"
+                    aria-label={t("calendar.recolorAria", { name: category.name })}
+                    aria-expanded={paletteFor === category.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPaletteFor(paletteFor === category.id ? "" : category.id);
+                    }}
+                  >
+                    ⋯
+                  </button>
+                  {paletteFor === category.id ? (
+                    <div className="gcal-cat-palette" role="radiogroup" aria-label={t("calendar.recolorAria", { name: category.name })} onClick={(event) => event.stopPropagation()}>
+                      {CATEGORY_COLOR_PALETTE.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          role="radio"
+                          aria-checked={category.color.toLowerCase() === color}
+                          className={category.color.toLowerCase() === color ? "gcal-cat-swatch active" : "gcal-cat-swatch"}
+                          style={{ background: color }}
+                          aria-label={color}
+                          onClick={() => {
+                            onRecolorCategory(category, color);
+                            setPaletteFor("");
+                          }}
+                        />
+                      ))}
+                      <input
+                        type="color"
+                        className="gcal-cat-swatch-custom"
+                        value={/^#[0-9a-fA-F]{6}$/.test(category.color) ? category.color : "#0066cc"}
+                        aria-label={t("calendar.recolorCustomAria")}
+                        onChange={(event) => onRecolorCategory(category, event.target.value)}
+                      />
+                    </div>
+                  ) : null}
+                </span>
               </div>
             );
           })}

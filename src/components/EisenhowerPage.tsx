@@ -60,6 +60,9 @@ export function EisenhowerPage({
     [tasks, today],
   );
 
+  // Sub-tasks are classified independently; the card just labels its parent.
+  const titleById = useMemo(() => new Map(tasks.map((task) => [task.id, task.title])), [tasks]);
+
   function tasksFor(quadrant: MatrixQuadrant, group?: MatrixGroup) {
     return positioned
       .filter((entry) => entry.position.quadrant === quadrant && (quadrant !== "IV" || entry.position.group === group))
@@ -154,6 +157,7 @@ export function EisenhowerPage({
                     <TaskRow
                       key={task.id}
                       task={task}
+                      parentTitle={task.parentTaskId ? titleById.get(task.parentTaskId) : undefined}
                       today={today}
                       projects={projects}
                       selected={task.id === selectedTaskId}
@@ -177,6 +181,7 @@ export function EisenhowerPage({
                     <TaskRow
                       key={task.id}
                       task={task}
+                      parentTitle={task.parentTaskId ? titleById.get(task.parentTaskId) : undefined}
                       today={today}
                       projects={projects}
                       selected={task.id === selectedTaskId}
@@ -278,6 +283,7 @@ function QuadrantGroup({
 
 function TaskRow({
   task,
+  parentTitle,
   today,
   projects,
   selected,
@@ -289,6 +295,7 @@ function TaskRow({
   onDragEnd,
 }: {
   task: Task;
+  parentTitle?: string;
   today: string;
   projects: Project[];
   selected: boolean;
@@ -343,7 +350,10 @@ function TaskRow({
       >
         {done ? "✓" : ""}
       </button>
-      <span className="eis-row-title">{task.title}</span>
+      <span className="eis-row-title">
+        {task.title}
+        {parentTitle ? <span className="eis-row-parent">↳ {parentTitle}</span> : null}
+      </span>
       {task.estimatedMinutes > 0 ? (
         <span className="eis-row-estimate">{t("eis.minutes", { n: task.estimatedMinutes })}</span>
       ) : null}

@@ -269,6 +269,21 @@ export function SpaceDetailView({
     showToast({ message: t("spaceHub.toast.taskCompleted") });
   }
 
+  // Sub-tasks are full Tasks (one level deep): they inherit the parent's
+  // space/project linkage and group tag so they stay inside this space, and
+  // they carry their own priority/dueDate so Eisenhower can classify them.
+  function handleCreateSubtask(parent: Task, title: string) {
+    const inheritedTags = parent.tags.filter((tag) => tag.startsWith("space:") || tag.startsWith("group:"));
+    onCreateTask({
+      title,
+      status: "todo",
+      projectId: parent.projectId,
+      parentTaskId: parent.id,
+      tags: inheritedTags,
+    });
+    showToast({ message: t("spaceHub.toast.subtaskAdded", { title: parent.title }) });
+  }
+
   function handlePinNextAction(taskId: string) {
     hub.updateConfig(space.id, { pinnedNextActionTaskId: taskId });
     showToast({ message: t("spaceHub.toast.pinned") });
@@ -630,6 +645,8 @@ export function SpaceDetailView({
       {drawerTask ? (
         <TaskDetailDrawer
           task={drawerTask}
+          parentTask={drawerTask.parentTaskId ? spaceTasks.find((task) => task.id === drawerTask.parentTaskId) ?? null : null}
+          childTasks={spaceTasks.filter((task) => task.parentTaskId === drawerTask.id)}
           projects={projects}
           sessions={spaceSessions.filter((session) => session.taskId === drawerTask.id)}
           notes={spaceNotes.filter((note) => note.relatedTaskId === drawerTask.id)}
@@ -645,6 +662,9 @@ export function SpaceDetailView({
             setDrawer({ kind: "none" });
           }}
           onOpenNote={(noteId) => setDrawer({ kind: "note", noteId })}
+          onAddChildTask={(title) => handleCreateSubtask(drawerTask, title)}
+          onToggleChildDone={handleCompleteTask}
+          onOpenTask={(taskId) => setDrawer({ kind: "task", taskId })}
           onClose={() => setDrawer({ kind: "none" })}
         />
       ) : null}

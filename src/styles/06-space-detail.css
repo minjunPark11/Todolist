@@ -546,6 +546,81 @@
   white-space: nowrap;
 }
 
+/* Sub-task rows: indented under their parent with a subtle left guide. */
+.sdv-task-row-child {
+  margin-left: 22px;
+  border-left: 2px solid var(--border-subtle);
+  padding-left: 10px;
+}
+
+.sdv-subtask-progress {
+  flex: none;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--text-secondary);
+  background: var(--bg-surface-muted);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+/* Sub-task section inside the task detail drawer. */
+.sdv-subtask-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.sdv-subtask-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sdv-subtask-list li button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sdv-subtask-list li.done button {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.sdv-subtask-list li small {
+  color: var(--text-secondary);
+}
+
+.sdv-subtask-add {
+  align-items: center;
+}
+
+.sdv-subtask-add input {
+  flex: 1;
+}
+
+.sdv-parent-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-bottom: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.sdv-parent-link:hover {
+  color: var(--accent);
+}
+
 .sdv-task-date-chip {
   flex: none;
   font-size: 11px;

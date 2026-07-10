@@ -239,6 +239,8 @@ export function AppPages({
           externalCalendarEvents={externalCalendarEvents}
           focusSessions={planner.focusSessions}
           onUpdateExternalCalendar={onUpdateExternalCalendar}
+          onUpdateProject={planner.updateProject}
+          onUpdateTopic={planner.updateTopic}
           initialProjectId={calendarFocusProjectId}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
@@ -335,6 +337,10 @@ export function AppPages({
       accountSlot={accountSlot}
       tasks={planner.tasks}
       onUpdateTask={planner.updateTask}
+      projects={planner.projects}
+      studyTopics={planner.studyTopics}
+      onUpdateProject={planner.updateProject}
+      onUpdateTopic={planner.updateTopic}
       externalCalendars={externalCalendars}
       onAddExternalCalendar={onAddExternalCalendar}
       onUpdateExternalCalendar={onUpdateExternalCalendar}

@@ -44,19 +44,40 @@ export function SpaceTasksTab({
   const normalizedQuery = query.trim().toLowerCase();
   const hasTasks = spaceTasks.length > 0;
 
+  // Sub-tasks nest under their parent: sorting/filtering drives parent rows
+  // (search also matches child titles), and children of a visible parent are
+  // always listed beneath it, sorted by the same mode.
   const filtered = useMemo(() => {
-    const sorted = [...spaceTasks].sort((a, b) => {
+    const compare = (a: Task, b: Task) => {
       if (sortMode === "due") return (a.dueDate || "9999").localeCompare(b.dueDate || "9999");
       if (sortMode === "title") return a.title.localeCompare(b.title);
       return (b.updatedAt || "").localeCompare(a.updatedAt || "");
-    });
-    return sorted.filter((task) => {
-      if (normalizedQuery && !`${task.title} ${task.notes}`.toLowerCase().includes(normalizedQuery)) return false;
-      if (statusFilter === "open" && isTaskDone(task)) return false;
-      if (statusFilter === "done" && !isTaskDone(task)) return false;
-      if (groupFilter !== "all" && resolveTaskGroupLabel(task, groupLabels) !== groupFilter) return false;
-      return true;
-    });
+    };
+    const spaceIds = new Set(spaceTasks.map((task) => task.id));
+    const childrenByParent = new Map<string, Task[]>();
+    for (const task of spaceTasks) {
+      if (!task.parentTaskId || !spaceIds.has(task.parentTaskId)) continue;
+      const siblings = childrenByParent.get(task.parentTaskId) ?? [];
+      siblings.push(task);
+      childrenByParent.set(task.parentTaskId, siblings);
+    }
+    for (const siblings of childrenByParent.values()) siblings.sort(compare);
+
+    const topLevel = spaceTasks
+      .filter((task) => !task.parentTaskId || !spaceIds.has(task.parentTaskId))
+      .sort(compare)
+      .filter((task) => {
+        const children = childrenByParent.get(task.id) ?? [];
+        if (normalizedQuery) {
+          const haystack = [task.title, task.notes, ...children.map((child) => child.title)].join(" ").toLowerCase();
+          if (!haystack.includes(normalizedQuery)) return false;
+        }
+        if (statusFilter === "open" && isTaskDone(task)) return false;
+        if (statusFilter === "done" && !isTaskDone(task)) return false;
+        if (groupFilter !== "all" && resolveTaskGroupLabel(task, groupLabels) !== groupFilter) return false;
+        return true;
+      });
+    return topLevel.map((task) => ({ task, children: childrenByParent.get(task.id) ?? [] }));
   }, [spaceTasks, sortMode, normalizedQuery, statusFilter, groupFilter, groupLabels]);
 
   function resetFilters() {
@@ -131,49 +152,60 @@ export function SpaceTasksTab({
               </button>
             </div>
           ) : (
-            // Flat list: sorting stays global instead of per-section, and each
-            // row carries its group as a chip (the group filter still scopes).
+            // Flat list: sorting stays global instead of per-section. Tags are
+            // intentionally not surfaced here (the group filter still scopes).
+            // Sub-tasks render indented under their parent row.
             <ul className="sdv-task-list sdv-task-list-flat">
-              {filtered.map((task) => {
-                const done = isTaskDone(task);
-                const group = resolveTaskGroupLabel(task, groupLabels);
-                return (
-                  <li key={task.id} className={done ? "sdv-task-row done" : "sdv-task-row"}>
-                    <input
-                      type="checkbox"
-                      checked={done}
-                      aria-label={t("spaceHub.aria.complete", { title: task.title })}
-                      onChange={() => onToggleDone(task.id)}
-                      disabled={done}
-                    />
-                    <button type="button" className="sdv-task-title" onClick={() => onOpenTask(task.id)}>
-                      {task.title}
-                    </button>
-                    {group ? <span className="sdv-task-group-chip">{groupText(t, group)}</span> : null}
-                    {task.dueDate || task.scheduledDate ? (
-                      <span className={task.dueDate ? "sdv-task-date-chip due" : "sdv-task-date-chip"}>
-                        {task.dueDate ? t("spaceHub.meta.due", { date: formatDate(task.dueDate) }) : formatDate(task.scheduledDate)}
-                      </span>
-                    ) : (
-                      <span className="sdv-task-meta">—</span>
-                    )}
-                    {done ? (
-                      <span className="sdv-task-done-label">{t("spaceHub.taskDone")}</span>
-                    ) : (
-                      <div className="sdv-row-actions">
-                        <button type="button" className="sdv-btn sdv-btn-sm sdv-btn-primary" onClick={() => onStartFocus(task.id)}>
-                          {presetText(t, preset.startFocusLabel)}
-                        </button>
-                        <MoreMenu
-                          items={[
-                            { label: t("spaceHub.rowMenu.open"), onClick: () => onOpenTask(task.id) },
-                            { label: t("spaceHub.rowMenu.markDone"), onClick: () => onToggleDone(task.id) },
-                          ]}
-                        />
-                      </div>
-                    )}
-                  </li>
-                );
+              {filtered.flatMap(({ task, children }) => {
+                const renderRow = (row: Task, isChild: boolean) => {
+                  const done = isTaskDone(row);
+                  const childDone = isChild ? 0 : children.filter(isTaskDone).length;
+                  return (
+                    <li
+                      key={row.id}
+                      className={`sdv-task-row${done ? " done" : ""}${isChild ? " sdv-task-row-child" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={done}
+                        aria-label={t("spaceHub.aria.complete", { title: row.title })}
+                        onChange={() => onToggleDone(row.id)}
+                        disabled={done}
+                      />
+                      <button type="button" className="sdv-task-title" onClick={() => onOpenTask(row.id)}>
+                        {row.title}
+                      </button>
+                      {!isChild && children.length > 0 ? (
+                        <span className="sdv-subtask-progress">
+                          {childDone}/{children.length}
+                        </span>
+                      ) : null}
+                      {row.dueDate || row.scheduledDate ? (
+                        <span className={row.dueDate ? "sdv-task-date-chip due" : "sdv-task-date-chip"}>
+                          {row.dueDate ? t("spaceHub.meta.due", { date: formatDate(row.dueDate) }) : formatDate(row.scheduledDate)}
+                        </span>
+                      ) : (
+                        <span className="sdv-task-meta">—</span>
+                      )}
+                      {done ? (
+                        <span className="sdv-task-done-label">{t("spaceHub.taskDone")}</span>
+                      ) : (
+                        <div className="sdv-row-actions">
+                          <button type="button" className="sdv-btn sdv-btn-sm sdv-btn-primary" onClick={() => onStartFocus(row.id)}>
+                            {presetText(t, preset.startFocusLabel)}
+                          </button>
+                          <MoreMenu
+                            items={[
+                              { label: t("spaceHub.rowMenu.open"), onClick: () => onOpenTask(row.id) },
+                              { label: t("spaceHub.rowMenu.markDone"), onClick: () => onToggleDone(row.id) },
+                            ]}
+                          />
+                        </div>
+                      )}
+                    </li>
+                  );
+                };
+                return [renderRow(task, false), ...children.map((child) => renderRow(child, true))];
               })}
             </ul>
           )}

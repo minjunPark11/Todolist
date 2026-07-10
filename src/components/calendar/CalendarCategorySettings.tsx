@@ -1,16 +1,20 @@
 // Settings > 캘린더 > 카테고리 관리 (category spec §4–§9).
-// Personal categories are fully managed here; study / project / external
-// categories are derived from topics, projects, and calendar subscriptions,
-// so they are only mentioned in the footnote below the list.
+// Personal categories are fully managed here. Study / project / external /
+// focus categories are derived from their source entities, so recoloring one
+// writes the color back to the source (topic / project / calendar) — the
+// calendar and the entity's own screens never disagree.
 import { useEffect, useState, type DragEvent } from "react";
-import type { Task } from "../../types";
+import type { ExternalCalendar, Project, StudyTopic, Task } from "../../types";
 import {
   addPersonalCategory,
   deletePersonalCategory,
   movePersonalCategoryTo,
   setDefaultCategory,
+  setFocusColor,
   updatePersonalCategory,
   useCalendarCategoryState,
+  CATEGORY_COLOR_PALETTE,
+  FOCUS_ACTUAL_COLOR,
 } from "../../lib/calendarCategories";
 import { useT } from "../../i18n";
 import { Modal } from "../kit";
@@ -18,19 +22,40 @@ import { Modal } from "../kit";
 interface CalendarCategorySettingsProps {
   tasks: Task[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
+  projects: Project[];
+  studyTopics: StudyTopic[];
+  externalCalendars: ExternalCalendar[];
+  onUpdateProject: (projectId: string, patch: Partial<Project>) => void;
+  onUpdateTopic: (topicId: string, patch: Partial<StudyTopic>) => void;
+  onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
 }
 
-const CATEGORY_COLORS = ["#0066cc", "#34c759", "#ff2d55", "#ff9500", "#af52de", "#5856d6", "#00b8a9", "#8e8e93"];
+const CATEGORY_COLORS = CATEGORY_COLOR_PALETTE;
+
+// Personal categories rename+recolor here; derived ones recolor only (their
+// name belongs to the source entity).
+type EditorTarget = "personal" | "project" | "study" | "external" | "focus";
 
 type EditorState = {
   mode: "add" | "edit";
+  target: EditorTarget;
+  // Personal category id, or the source entity id for derived targets.
   categoryId: string;
   name: string;
   color: string;
   error: string;
 };
 
-export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCategorySettingsProps) {
+export function CalendarCategorySettings({
+  tasks,
+  onUpdateTask,
+  projects,
+  studyTopics,
+  externalCalendars,
+  onUpdateProject,
+  onUpdateTopic,
+  onUpdateExternalCalendar,
+}: CalendarCategorySettingsProps) {
   const { t } = useT();
   const state = useCalendarCategoryState();
   const categories = [...state.personal].sort((a, b) => a.order - b.order);
@@ -61,18 +86,31 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
   }, [openMenuId]);
 
   function openAdd() {
-    setEditor({ mode: "add", categoryId: "", name: "", color: CATEGORY_COLORS[1], error: "" });
+    setEditor({ mode: "add", target: "personal", categoryId: "", name: "", color: CATEGORY_COLORS[1], error: "" });
   }
 
   function openEdit(categoryId: string) {
     const category = categories.find((item) => item.id === categoryId);
     if (!category) return;
     setOpenMenuId("");
-    setEditor({ mode: "edit", categoryId, name: category.name, color: category.color, error: "" });
+    setEditor({ mode: "edit", target: "personal", categoryId, name: category.name, color: category.color, error: "" });
+  }
+
+  // Derived categories: color-only editor, id = source entity id.
+  function openDerivedEdit(target: Exclude<EditorTarget, "personal">, sourceId: string, name: string, color: string) {
+    setEditor({ mode: "edit", target, categoryId: sourceId, name, color, error: "" });
   }
 
   function submitEditor() {
     if (!editor) return;
+    if (editor.target !== "personal") {
+      if (editor.target === "project") onUpdateProject(editor.categoryId, { color: editor.color });
+      else if (editor.target === "study") onUpdateTopic(editor.categoryId, { color: editor.color });
+      else if (editor.target === "external") onUpdateExternalCalendar(editor.categoryId, { color: editor.color });
+      else setFocusColor(editor.color);
+      setEditor(null);
+      return;
+    }
     const name = editor.name.trim();
     if (!name) {
       setEditor({ ...editor, error: t("settings.category.nameRequired") });
@@ -215,13 +253,73 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
         ))}
       </div>
 
+      {/* Derived categories: color is editable here and written back to the
+          source entity; names / lifecycle stay with the entity's own screen. */}
+      {(
+        [
+          {
+            target: "project" as const,
+            label: t("calendar.group.project"),
+            rows: projects
+              .filter((project) => project.status !== "archived")
+              .map((project) => ({ id: project.id, name: project.name, color: project.color })),
+          },
+          {
+            target: "study" as const,
+            label: t("calendar.group.study"),
+            rows: studyTopics
+              .filter((topic) => topic.status !== "archived")
+              .map((topic) => ({ id: topic.id, name: topic.name, color: topic.color || "#af52de" })),
+          },
+          {
+            target: "external" as const,
+            label: t("calendar.group.external"),
+            rows: externalCalendars
+              .filter((calendar) => calendar.enabled)
+              .map((calendar) => ({ id: calendar.id, name: calendar.name, color: calendar.color })),
+          },
+          {
+            target: "focus" as const,
+            label: t("calendar.group.focus"),
+            rows: [{ id: "focus", name: t("calendar.focusActualCategory"), color: state.focusColor || FOCUS_ACTUAL_COLOR }],
+          },
+        ] as const
+      )
+        .filter((section) => section.rows.length > 0)
+        .map((section) => (
+          <div key={section.target} className="ff-cat-derived-section">
+            <h4 className="ff-cat-derived-head">{section.label}</h4>
+            <div className="ff-cat-list" role="list">
+              {section.rows.map((row) => (
+                <div key={row.id} role="listitem" className="ff-cat-row ff-cat-row-derived">
+                  <span className="ff-cat-color-chip" style={{ background: row.color }} aria-hidden="true" />
+                  <span className="ff-cat-name">{row.name}</span>
+                  <button
+                    type="button"
+                    className="ff-btn ff-btn-ghost ff-cat-recolor-btn"
+                    onClick={() => openDerivedEdit(section.target, row.id, row.name, row.color)}
+                  >
+                    {t("settings.category.changeColor")}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
       <p className="ff-cat-footnote">
         <InfoIcon /> {t("settings.category.derivedNote")}
       </p>
 
       {editor ? (
         <Modal
-          title={editor.mode === "add" ? t("settings.category.newTitle") : t("settings.category.editTitle")}
+          title={
+            editor.mode === "add"
+              ? t("settings.category.newTitle")
+              : editor.target === "personal"
+                ? t("settings.category.editTitle")
+                : t("settings.category.recolorTitle", { name: editor.name })
+          }
           onClose={() => setEditor(null)}
           footer={
             <>
@@ -235,18 +333,20 @@ export function CalendarCategorySettings({ tasks, onUpdateTask }: CalendarCatego
           }
         >
           <div className="ff-cat-editor">
-            <label className="ff-cat-editor-field">
-              {t("common.name")}
-              <input
-                value={editor.name}
-                autoFocus
-                placeholder={t("settings.category.namePlaceholder")}
-                onChange={(event) => setEditor({ ...editor, name: event.target.value, error: "" })}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") submitEditor();
-                }}
-              />
-            </label>
+            {editor.target === "personal" ? (
+              <label className="ff-cat-editor-field">
+                {t("common.name")}
+                <input
+                  value={editor.name}
+                  autoFocus
+                  placeholder={t("settings.category.namePlaceholder")}
+                  onChange={(event) => setEditor({ ...editor, name: event.target.value, error: "" })}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") submitEditor();
+                  }}
+                />
+              </label>
+            ) : null}
             <div className="ff-cat-editor-field">
               {t("common.color")}
               <div className="ff-cat-color-palette" role="radiogroup" aria-label={t("settings.category.colorAria")}>

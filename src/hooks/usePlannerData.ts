@@ -996,7 +996,11 @@ export function usePlannerData() {
   function deleteTask(taskId: string) {
     setData((current) => ({
       ...current,
-      tasks: current.tasks.filter((task) => task.id !== taskId),
+      // Children of a deleted parent are promoted to top-level instead of
+      // being orphaned or cascade-deleted (their work is still real).
+      tasks: current.tasks
+        .filter((task) => task.id !== taskId)
+        .map((task) => (task.parentTaskId === taskId ? { ...task, parentTaskId: "" } : task)),
       subtasks: current.subtasks.filter((subtask) => subtask.taskId !== taskId),
     }));
     setSelectedTaskId("");

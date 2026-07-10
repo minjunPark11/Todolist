@@ -48,7 +48,12 @@ interface CalendarCategoryState {
   defaultCategoryId: string;
   activeCategoryId: string;
   hiddenCategoryIds: string[];
+  // User override for the focus-time category color ("" = FOCUS_ACTUAL_COLOR).
+  focusColor: string;
 }
+
+// Shared swatch palette for category recoloring (settings modal + sidebar).
+export const CATEGORY_COLOR_PALETTE = ["#0066cc", "#34c759", "#ff2d55", "#ff9500", "#af52de", "#5856d6", "#00b8a9", "#8e8e93"];
 
 const STORAGE_KEY = "focusflow.calendarCategories.v1";
 export const DEFAULT_PERSONAL_CATEGORY_ID = "cat-personal-default";
@@ -103,6 +108,7 @@ function sanitizeState(raw: Partial<CalendarCategoryState> | null): CalendarCate
     defaultCategoryId,
     activeCategoryId: typeof raw?.activeCategoryId === "string" ? raw.activeCategoryId : defaultCategoryId,
     hiddenCategoryIds: Array.isArray(raw?.hiddenCategoryIds) ? raw.hiddenCategoryIds.filter((id): id is string => typeof id === "string") : [],
+    focusColor: typeof raw?.focusColor === "string" ? raw.focusColor : "",
   };
 }
 
@@ -199,6 +205,10 @@ export function movePersonalCategoryTo(categoryId: string, targetIndex: number) 
   setState({ ...state, personal: sorted.map((category, order) => ({ ...category, order })) });
 }
 
+export function setFocusColor(color: string) {
+  setState({ ...state, focusColor: color });
+}
+
 export function setDefaultCategory(categoryId: string) {
   if (!state.personal.some((category) => category.id === categoryId)) return;
   setState({
@@ -288,7 +298,7 @@ export function buildCalendarCategories(input: {
       id: FOCUS_ACTUAL_CATEGORY_ID,
       group: "focus",
       name: input.focusCategoryName,
-      color: FOCUS_ACTUAL_COLOR,
+      color: input.state.focusColor || FOCUS_ACTUAL_COLOR,
       order: 0,
       isReadOnly: true,
     },
