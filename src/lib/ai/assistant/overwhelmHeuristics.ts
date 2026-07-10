@@ -293,55 +293,9 @@ export function containsGenericFailurePhrases(text: string): boolean {
   return GENERIC_FAILURE_PHRASES.some((pattern) => pattern.test(text));
 }
 
-// --- Chat-tab routing detector ---------------------------------------------
-
-// Overwhelm/dread/avoidance phrases and "you decide the order for me"
-// phrases, judged on the raw text before any model call. Deliberately
-// narrower than the model-side signal judgment in prompts.ts: this only has
-// to catch inputs that must not be answered by the free-text personal-agent
-// prompt (which has no Generic Failure Guard).
-const ROUTE_FRICTION_PATTERNS: RegExp[] = [
-  /너무\s*많/,
-  /막막/,
-  /(다|잔뜩)\s*밀렸/,
-  /밀려\s*있/,
-  /시작(을|이)?\s*못/,
-  /손에\s*안\s*잡/,
-  /엄두가?\s*안/,
-  /감당이?\s*안/,
-  /정신이?\s*없/,
-  /\boverwhelm/i,
-  /\btoo (much|many)\b/i,
-  /can'?t\s+(get\s+)?start/i,
-  /\bbehind on\b/i,
-  /\bswamped\b/i,
-];
-
-const ROUTE_DECISION_PATTERNS: RegExp[] = [
-  /뭐부터/,
-  /무엇부터/,
-  /어디서부터/,
-  /어떤\s*것부터/,
-  /뭐\s*먼저/,
-  /우선\s*?순위\s*(를|좀)?\s*(정해|골라|매겨|알려)/,
-  /what\s+(should\s+i\s+)?(do|start|tackle)\s+first/i,
-  /where\s+(do|should)\s+i\s+(start|begin)/i,
-  /prioriti[sz]e\s+(these|them|this|my|for me)/i,
-];
-
-// Whether a chat-tab message must be handled by the assistant flow
-// (runAssistantTurn + Generic Failure Guard) instead of the free-text
-// personal agent. Mirrors the combination rule of resolveResponseMode:
-// mentioning several items alone never routes — an explicit friction or
-// decision handoff must be present, and a single signal additionally needs
-// 2+ likely items so scoped one-item requests stay in normal chat.
-export function shouldRouteToAssistantFlow(text: string): boolean {
-  const friction = ROUTE_FRICTION_PATTERNS.some((pattern) => pattern.test(text));
-  const decision = ROUTE_DECISION_PATTERNS.some((pattern) => pattern.test(text));
-  if (!friction && !decision) return false;
-  if (friction && decision) return true;
-  return splitDumpFragments(text).length >= 2;
-}
+// (The chat-tab routing detector shouldRouteToAssistantFlow was removed in
+// Unified Chat slice 3: every message now goes through runAssistantTurn, whose
+// model-side Scope Gate replaces this regex prefilter.)
 
 // --- Fallback next action builder ------------------------------------------
 

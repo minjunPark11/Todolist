@@ -1,7 +1,6 @@
 import { FormEvent, Fragment, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AgentActionPreview } from "./ai/AgentActionPreview";
-import { AssistantPanel } from "./ai/AssistantPanel";
 import { AssistantTurnCards } from "./ai/AssistantTurnCards";
 import { AI_SAFE_ACTION_DEFAULT_RISK } from "../lib/ai/actions/types";
 import type { AgentAction } from "../lib/ai/agent/actions";
@@ -9,6 +8,10 @@ import { detectAgentIntent, getIntentLabel, type AgentIntent } from "../lib/ai/a
 import { buildAssistantHistoryText } from "../lib/ai/assistant/historyEcho";
 import { runAssistantTurn } from "../lib/ai/assistant/runAssistantTurn";
 import type { AssistantTurn } from "../lib/ai/assistant/types";
+import { loadContextCards } from "../lib/ai/contextCards/store";
+import { formatBreadcrumb } from "../lib/ai/learningPaths/progress";
+import { loadLearningPaths } from "../lib/ai/learningPaths/store";
+import type { LearningPath } from "../lib/ai/learningPaths/types";
 import { logProposedOutcome } from "../lib/ai/memory/outcomeLog";
 import { logAssistantTurn } from "../lib/ai/memory/turnLog";
 import type { AiContextInput } from "../lib/ai/context/buildAiContext";
@@ -72,9 +75,6 @@ export function OllamaChat({
   const { t } = useT();
   const motionEnabled = useMotionEnabled();
   const [open, setOpen] = useState(false);
-  // "chat" = existing read-only chat; "assistant" = brain-dump flow. Both
-  // stay mounted (hidden toggle) so switching tabs never loses state.
-  const [tab, setTab] = useState<"chat" | "assistant">("chat");
   const [messages, setMessages] = useState<ChatMessage[]>([
     createMessage("assistant", t("ai.greeting")),
   ]);
@@ -93,6 +93,12 @@ export function OllamaChat({
   const [attachFilter, setAttachFilter] = useState("");
   const [attachCandidates, setAttachCandidates] = useState<PlatformFileEntry[]>([]);
   const [attachLoading, setAttachLoading] = useState(false);
+  // Learning-path breadcrumb (moved from the removed Assistant tab in slice 3):
+  // the persistent "where am I on the path" header. Refreshed via
+  // onPathsChanged when a card save/link changes the active path. All position
+  // math lives in learningPaths/progress — never derived here.
+  const [activePath, setActivePath] = useState<LearningPath | null>(() => loadLearningPaths()[0] ?? null);
+  const breadcrumb = useMemo(() => (activePath ? formatBreadcrumb(activePath, loadContextCards()) : null), [activePath]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const canAttachFiles = Boolean(knowledgeSettings.vaultPath) && platform.files.supported();
@@ -345,36 +351,13 @@ export function OllamaChat({
             </div>
           </header>
 
-          <div className="ollama-chat-tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === "chat"}
-              className={tab === "chat" ? "active" : ""}
-              onClick={() => setTab("chat")}
-            >
-              {t("ai.tab.chat")}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === "assistant"}
-              className={tab === "assistant" ? "active" : ""}
-              onClick={() => setTab("assistant")}
-            >
-              {t("ai.tab.assistant")}
-            </button>
-          </div>
+          {breadcrumb ? (
+            <div className="assistant-breadcrumb" title={t("ai.assistant.path.breadcrumbLabel")}>
+              🧭 {breadcrumb.goal} · {breadcrumb.position} {breadcrumb.milestoneTitle}
+            </div>
+          ) : null}
 
-          <div className="ollama-chat-mode" hidden={tab !== "assistant"}>
-            <AssistantPanel
-              aiContext={aiContext}
-              knowledgeSettings={knowledgeSettings}
-              onExecuteActions={onExecuteActions}
-            />
-          </div>
-
-          <div className="ollama-chat-mode" hidden={tab !== "chat"}>
+          <div className="ollama-chat-mode">
           <div className="ollama-chat-messages" role="log" aria-live="polite">
             {messages.map((message) => (
               <Fragment key={message.id}>
@@ -394,6 +377,7 @@ export function OllamaChat({
                     showPositionLine
                     onExecuteActions={onExecuteActions}
                     onFollowUpRequest={(text) => void send(text, [])}
+                    onPathsChanged={() => setActivePath(loadLearningPaths()[0] ?? null)}
                   />
                 ) : null}
               </Fragment>

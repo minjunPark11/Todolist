@@ -146,14 +146,29 @@ Assistant 탭은 사실상 중복이 된다. (`AssistantPanel`의 카드 렌더 
 **DoD:** 코드/번역/일반 질문이 Chat에서 assistant flow로 응답(데스크톱 확인 대기).
 브레인덤프는 여전히 가드 통과 + 인라인 카드. ✅ 라우터·엔진 통일, ⏳ 품질 데스크톱 확인.
 
-### 슬라이스 3 — 탭 제거 (Chat 하나만)
+### 슬라이스 3 — 탭 제거 (Chat 하나만)  ← 구현됨 (2026-07-09)
 
-- Assistant 탭 + `AssistantPanel` 삭제. `runPersonalAgent` 은퇴(또는 domain_specific
-  경로의 내부 헬퍼로 축소).
+- Assistant 탭 + `AssistantPanel` 삭제. `runPersonalAgent` 은퇴.
 - breadcrumb 등 Assistant 전용 헤더 UI를 Chat 헤더로 이전.
 
-**DoD:** 탭 없음. 단일 Chat이 즉답·구조화·learning path·저장을 전부 처리. `runPersonalAgent`
-참조 0.
+**구현 노트 (2026-07-09):**
+
+- `components/ai/AssistantPanel.tsx` **삭제**. 구조 카드 렌더는 이미 슬라이스 1에서
+  `AssistantTurnCards`로 추출돼 챗이 재사용 중 — 패널은 껍데기만 남아 삭제.
+- `lib/ai/agent/personalAgent.ts` **삭제**, `PERSONAL_AGENT_SYSTEM_PROMPT`(agent/prompts.ts)
+  제거. `SPACES_BRIEFING_PROMPT`는 SpacesPage가 써서 유지.
+- `shouldRouteToAssistantFlow` + ROUTE_FRICTION/DECISION 패턴(overwhelmHeuristics.ts) +
+  해당 테스트 제거. 정규식 라우터는 슬라이스 2에서 이미 미사용.
+- `OllamaChat`: 탭 스위처·`tab` 상태·assistant 모드 div 제거, 채팅 뷰가 유일 뷰.
+  breadcrumb를 `activePath`/`formatBreadcrumb`로 챗 헤더에 이전(카드 저장/링크 시
+  `onPathsChanged`로 갱신). 위치 문장(per-turn)은 이미 `AssistantTurnCards`가 렌더.
+
+**DoD:** 탭 없음 ✅. 단일 Chat이 즉답·구조화·learning path·저장을 전부 처리 ✅.
+`runPersonalAgent` 참조 0 ✅ (모듈 삭제). **Unified Chat 3슬라이스 전부 완료.**
+
+**남은 정리(비필수):** `AgentActionPreview`/`suggestedActions`/`validationResults`는
+personal-agent가 채우던 것이라 이제 상시 빈 값 → 죽은 UI. 무해(빈 값이면 렌더 안 함)해
+이번엔 남겨둠. `ai.tab.*` i18n 키도 미사용으로 남음.
 
 ## 6. 열린 질문 (구현 시 결정)
 

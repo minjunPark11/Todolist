@@ -1,6 +1,8 @@
-// System prompt for the brain-dump assistant. Sits beside (not replacing)
-// PERSONAL_AGENT_SYSTEM_PROMPT — the chat tab stays read-only chat; this
-// flow returns structured JSON that the UI turns into user-confirmed saves.
+// System prompt for the unified chat assistant. As of Unified Chat slice 3
+// this is the ONLY chat prompt: its Scope Gate answers plain questions
+// directly (domain_specific/learning_request) and structures overwhelm/
+// planning dumps as JSON the UI turns into user-confirmed saves. The old
+// free-text PERSONAL_AGENT_SYSTEM_PROMPT was retired with the second engine.
 //
 // This prompt asks the model to reason through a fixed pipeline instead of
 // jumping straight to an answer:
