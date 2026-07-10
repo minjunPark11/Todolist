@@ -6,18 +6,19 @@
 import type { AssistantTurn } from "./types";
 
 export function buildAssistantHistoryText(turn: AssistantTurn): string {
+  // Keep the echo minimal (prompt-budget: this rides in history every turn):
+  // only what stops the next turn from re-asking — the stage and which info
+  // slots are already answered. detected_items/missing_info are re-derived
+  // from the fresh app-data pack each turn, so they don't need to persist
+  // here and would just inflate the growing history.
   return [
     turn.userFacingText,
     `[draft] ${JSON.stringify({
       title: turn.contextCardDraft.title,
-      detected_items: turn.contextCardDraft.detectedItems,
-      missing_info: turn.contextCardDraft.missingInfo,
       stage: turn.contextCardDraft.stage,
-      info_slots: (turn.contextCardDraft.infoSlots ?? []).map((slot) => ({
-        kind: slot.kind,
-        answer: slot.answer,
-        source: slot.source,
-      })),
+      info_slots: (turn.contextCardDraft.infoSlots ?? [])
+        .filter((slot) => slot.answer.trim())
+        .map((slot) => ({ kind: slot.kind, answer: slot.answer, source: slot.source })),
     })}`,
   ].join("\n");
 }

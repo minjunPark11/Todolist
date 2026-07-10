@@ -77,8 +77,30 @@ AI와의 대화를 기기 로컬에 저장하고, 거기서 사용자의 작업 
 - 모델이 집계+최근 대화를 읽고 `preference`/`routine` 후보 제안 → **사용자 승인 UI**
   통과해야 저장 (자동 저장 금지).
 - 승인된 메모리를 `buildAssistantContextPack`에 ~500자 캡 프로필 블록으로 주입.
-  **선행 조건: 프롬프트 예산 관리(promptBudget) 먼저** — 8192 ctx 초과 문제(2026-07-09
-  진단: 히스토리 무제한 성장 + slice(-19))가 해결돼야 블록을 안전하게 얹을 수 있다.
+  **선행 조건 promptBudget 해결됨 (2026-07-09)** — `lib/ai/promptBudget.ts` +
+  게이트웨이(`sendAiChat`) 중앙 예산제로 8192 ctx 초과를 막는다(아래 참고). 이제 프로필
+  블록을 얹어도 히스토리가 예산에 맞춰 자동 트리밍되므로 안전.
+
+## 6. promptBudget — 8192 ctx 초과 수정 (2026-07-09)
+
+증상: 대화를 몇 턴 주고받으면 llama-server가 "request (N tokens) exceeds the available
+context size (8192)"로 하드 실패, **앱 강제 종료해야만 복구**(React state에 남은 과대
+히스토리가 다음 요청도 똑같이 터뜨림). 원인은 고정비(시스템 프롬프트 + 앱 컨텍스트
+최대 16k자 + 지식 6k자)에 더해 **히스토리가 매 턴 무제한 성장**하는데 합계를 아무도
+캡하지 않음. 슬라이스 1이 챗 히스토리에 draft 에코를 추가하며 악화.
+
+- `lib/ai/promptBudget.ts` (순수 함수 + 테스트):
+  - `estimateTokens` — 스크립트 인지 보수적 추정(한글/CJK ~1 tok/자, 라틴 ~0.28). 과소추정
+    → 재초과를 피하려 일부러 과대 추정.
+  - `fitMessagesToBudget` — 선두 system 블록(=캐시 접두사)과 마지막 user 메시지는 보존,
+    오래된 중간 턴부터 예산 맞을 때까지 제거. 중간에 구멍 안 남김.
+- 게이트웨이 `sendAiChat`가 유일한 공동 병목이라 여기서 중앙 집행: `8192 − 응답예약(1024)
+  − knowledgeContext 토큰`을 히스토리 예산으로 프로액티브 트리밍(챗/어시스턴트 flow 둘 다
+  자동 보호). 추가로 오버플로 에러 감지 시 히스토리 절반 더 버리고 1회 재시도 → 강제종료
+  증상 제거.
+- `historyEcho.ts` draft 에코 슬림화: detected_items/missing_info 제거, title+stage+
+  **답이 있는** info_slots만 유지(매 턴 팩에서 재파생되므로 히스토리에 실을 필요 없음).
+- 캐시 불변식 유지: `[system][앱컨텍스트]` 접두사는 트리밍 대상이 아니라 그대로.
 
 관련 문서: [[Features/Unified_Chat]], [[Features/AI_Assistant]]
 관련 메모리: `ai-stuck-to-execution-vision.md`
