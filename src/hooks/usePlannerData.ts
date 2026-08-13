@@ -32,6 +32,7 @@ import type {
   TaskTemplate,
 } from "../types";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
+import { diffChangedRecords, diffRemovedIds } from "../domain/sync/diffRecords";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
 
@@ -541,6 +542,9 @@ export function usePlannerData() {
   const [recoveryMode, setRecoveryMode] = useState(false);
   const syncTimerRef = useRef<number | null>(null);
   const missingRemoteTablesRef = useRef<Set<string>>(new Set());
+  // Last state we know the account holds; the save diffs against it so an edit
+  // uploads the records it touched instead of every row in every table.
+  const syncedSnapshotRef = useRef<PlannerData | null>(null);
 
   useEffect(() => {
     platform.storage.setSync(STORAGE_KEY, JSON.stringify(data));
@@ -579,6 +583,9 @@ export function usePlannerData() {
   useEffect(() => {
     if (!supabase || !userEmail) {
       setRemoteLoaded(false);
+      // Signed out, or switching accounts: the old baseline describes someone
+      // else's rows, so the next sign-in must start from a fresh load.
+      syncedSnapshotRef.current = null;
       return;
     }
 
@@ -692,7 +699,11 @@ export function usePlannerData() {
           : []
         : data.recentItems;
 
-      setDataState(adoptLoadedData(normalizeData(partial)));
+      const loaded = adoptLoadedData(normalizeData(partial));
+      setDataState(loaded);
+      // What we just read IS what the account holds, so the next save has
+      // nothing to push until the user actually changes something.
+      syncedSnapshotRef.current = loaded;
       setRemoteLoaded(true);
       setSyncStatus("sync.synced");
     } catch (error) {
@@ -715,19 +726,25 @@ export function usePlannerData() {
         return;
       }
 
+      // Baseline for the diff below: the last state we know the account
+      // already holds (set on load and after each successful save). Null means
+      // we have never synced this session, so everything is sent.
+      const baseline = syncedSnapshotRef.current;
+
       for (const [key, table] of collectionTables) {
         if (missingRemoteTablesRef.current.has(table)) {
           continue;
         }
 
-        const items = nextData[key];
-        const rows = items.map((item) => ({
-          id: item.id,
-          user_id: userId,
-          data: item,
-        }));
+        // The diff only needs identity and an id, so the per-collection types
+        // collapse to one shape here rather than switching on `key`.
+        const items = nextData[key] as Array<{ id: string }>;
+        const previous = baseline?.[key] as Array<{ id: string }> | undefined;
+        const changed = diffChangedRecords(items, previous);
+        const removedIds = diffRemovedIds(items, previous);
 
-        if (rows.length > 0) {
+        if (changed.length > 0) {
+          const rows = changed.map((item) => ({ id: item.id, user_id: userId, data: item }));
           const { error } = await supabase.from(table).upsert(rows, { onConflict: "id,user_id" });
           if (error) {
             if (optionalRemoteTables.has(table) && isMissingRemoteTableError(error)) {
@@ -738,18 +755,24 @@ export function usePlannerData() {
           }
         }
 
-        const keepIds = items.map((item) => item.id);
-        let deleteQuery = supabase.from(table).delete().eq("user_id", userId);
-        if (keepIds.length > 0) {
-          deleteQuery = deleteQuery.not("id", "in", `(${keepIds.map((id) => `"${id}"`).join(",")})`);
-        }
-        const { error: deleteError } = await deleteQuery;
-        if (deleteError) {
-          if (optionalRemoteTables.has(table) && isMissingRemoteTableError(deleteError)) {
-            missingRemoteTablesRef.current.add(table);
-            continue;
+        if (removedIds.length > 0) {
+          // Delete exactly what went away. This used to be "delete everything
+          // NOT in the full id list", with the ids hand-quoted into a filter
+          // string — which broke on any id containing a quote or comma (import
+          // preserves ids verbatim), and which let a device holding stale data
+          // wipe rows another device had just added.
+          const { error: deleteError } = await supabase
+            .from(table)
+            .delete()
+            .eq("user_id", userId)
+            .in("id", removedIds);
+          if (deleteError) {
+            if (optionalRemoteTables.has(table) && isMissingRemoteTableError(deleteError)) {
+              missingRemoteTablesRef.current.add(table);
+              continue;
+            }
+            throw deleteError;
           }
-          throw deleteError;
         }
       }
 
@@ -784,6 +807,9 @@ export function usePlannerData() {
         throw appSettingsError;
       }
 
+      // Only advance the baseline once everything above succeeded; a failed
+      // save must stay "not yet uploaded" so the next attempt resends it.
+      syncedSnapshotRef.current = nextData;
       setSyncError("");
       setSyncStatus("sync.synced");
     } catch (error) {
