@@ -209,6 +209,8 @@ export function parseQuickCapture(input: string, options: QuickParseOptions): Qu
   }
 
   // --- !priority ---
+  // Order matters: "!!" first, then "!high"/"!낮음", and only then a bare "!".
+  // Checking the bare form earlier would eat the "!" off "!high".
   if (take(/!!/)) {
     result.priority = "high";
   } else {
@@ -218,6 +220,12 @@ export function parseQuickCapture(input: string, options: QuickParseOptions): Qu
         result.priority = priority.value;
         break;
       }
+    }
+    // A standalone "!" sits one step below "!!". It must be surrounded by
+    // whitespace so ordinary emphasis ("call mum!") keeps its punctuation and
+    // stays in the title instead of silently becoming a priority.
+    if (!result.priority && take(/(?:^|\s)!(?=\s|$)/)) {
+      result.priority = "medium";
     }
   }
 

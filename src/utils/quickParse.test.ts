@@ -119,6 +119,21 @@ describe("parseQuickCapture", () => {
     expect(parse("배포 !!").title).toBe("배포");
   });
 
+  it("reads a standalone ! as one step below !!", () => {
+    expect(parse("메일 회신 !").priority).toBe("medium");
+    expect(parse("메일 회신 !").title).toBe("메일 회신");
+    // The bare form must not cannibalise the word forms.
+    expect(parse("deploy !high").priority).toBe("high");
+    expect(parse("deploy !high").title).toBe("deploy");
+  });
+
+  it("leaves emphasis attached to a word alone", () => {
+    // "call mum!" is a title, not a priority — only a whitespace-delimited
+    // "!" is a marker, so the punctuation survives.
+    expect(parse("call mum!").priority).toBe("");
+    expect(parse("call mum!").title).toBe("call mum!");
+  });
+
   it("combines everything and cleans up whitespace", () => {
     const result = parse("내일 오후 3시 #업무 팀 회의 준비 !!");
     expect(result.title).toBe("팀 회의 준비");

@@ -31,7 +31,10 @@ export function QuickAddTaskModal({
   const titleRef = useAutoFocus<HTMLInputElement>();
   const [title, setTitle] = useState(initialTitle);
   const [projectId, setProjectId] = useState("");
-  const [priority, setPriority] = useState<TaskPriority>("medium");
+  // "none", matching the capture bar. Defaulting to "medium" meant every task
+  // saved through this form claimed a priority the user never picked, and the
+  // two entry points disagreed about the same field.
+  const [priority, setPriority] = useState<TaskPriority>("none");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");

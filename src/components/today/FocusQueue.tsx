@@ -228,7 +228,9 @@ function FocusQueueRow({
         >
           {task.title}
         </button>
-        <span className={`tdy-reason tdy-reason-${reason}`}>{t(`todayv.reason.${reason}`)}</span>
+        {reason !== "none" ? (
+          <span className={`tdy-reason tdy-reason-${reason}`}>{t(`todayv.reason.${reason}`)}</span>
+        ) : null}
         {task.estimatedMinutes > 0 ? (
           <span className="tdy-estimate">{t("todayv.estimate", { n: task.estimatedMinutes })}</span>
         ) : null}

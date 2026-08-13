@@ -15,7 +15,10 @@ export type TodayReason =
   | "waiting"
   | "high"
   | "medium"
-  | "low";
+  | "low"
+  // No badge earned: the task carries no priority and nothing else about it
+  // is noteworthy. Distinct from "low", which is a choice the user made.
+  | "none";
 
 export interface TodayEntry {
   task: Task;
@@ -90,7 +93,8 @@ function reasonFor(task: Task, today: string): TodayReason {
   if (task.status === "waiting") return "waiting";
   if (task.priority === "high") return "high";
   if (task.priority === "medium") return "medium";
-  return "low";
+  if (task.priority === "low") return "low";
+  return "none";
 }
 
 export function collectTodayEntries(
