@@ -1,5 +1,7 @@
 import {
+  InputHTMLAttributes,
   ReactNode,
+  TextareaHTMLAttributes,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -8,6 +10,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import type { Project, Task, TaskPriority, TaskStatus } from "../types";
 import { formatDate, todayValue } from "../utils/date";
+import { useDeferredTextField } from "../hooks/useDeferredTextField";
 import { useT } from "../i18n";
 import { reducedTransition, transitions } from "../motion/transitions";
 import { backdropVariants, modalVariants, popoverVariants } from "../motion/variants";
@@ -16,6 +19,54 @@ import { useMotionEnabled } from "../motion/reducedMotion";
 // ============================================================================
 // Primitives
 // ============================================================================
+
+// Free-text inputs that commit on pause/blur instead of on every keystroke.
+// They exist as components rather than a bare hook because their callers
+// (TaskDetail) return early when nothing is selected, which rules out calling
+// the hook at the top level. `resetKey` must identify the record being edited
+// so switching records doesn't carry the previous one's text over.
+type DeferredFieldProps = {
+  value: string;
+  onCommit: (next: string) => void;
+  resetKey?: string;
+  delayMs?: number;
+};
+
+export function DeferredInput({
+  value,
+  onCommit,
+  resetKey,
+  delayMs,
+  ...rest
+}: DeferredFieldProps & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
+  const field = useDeferredTextField(value, onCommit, { resetKey, delayMs });
+  return (
+    <input
+      {...rest}
+      value={field.value}
+      onChange={(event) => field.onChange(event.target.value)}
+      onBlur={field.onBlur}
+    />
+  );
+}
+
+export function DeferredTextarea({
+  value,
+  onCommit,
+  resetKey,
+  delayMs,
+  ...rest
+}: DeferredFieldProps & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange">) {
+  const field = useDeferredTextField(value, onCommit, { resetKey, delayMs });
+  return (
+    <textarea
+      {...rest}
+      value={field.value}
+      onChange={(event) => field.onChange(event.target.value)}
+      onBlur={field.onBlur}
+    />
+  );
+}
 
 export function useOutsideClose(onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null);

@@ -2,6 +2,7 @@ import type { Project, RepeatType, Subtask, Task } from "../types";
 import { todayValue } from "../utils/date";
 import { getMatrixPosition, patchForQuadrant, type MatrixQuadrant } from "../utils/eisenhower";
 import { useT } from "../i18n";
+import { DeferredInput, DeferredTextarea } from "./kit";
 import { MotionPanelShell } from "./motion/MotionPanelShell";
 
 interface TaskDetailProps {
@@ -64,18 +65,20 @@ export function TaskDetail({
         </button>
       ) : null}
       <header className="detail-header">
-        <input
+        <DeferredInput
           className="detail-title-input"
           value={task.title}
+          resetKey={task.id}
           aria-label={t("taskDetail.taskTitleAria")}
-          onChange={(event) => onUpdateTask(task.id, { title: event.target.value })}
+          onCommit={(title) => onUpdateTask(task.id, { title })}
         />
-        <textarea
+        <DeferredTextarea
           className="detail-description-input"
           placeholder={t("taskDetail.addDescription")}
           value={task.description}
+          resetKey={task.id}
           aria-label={t("taskDetail.taskDescriptionAria")}
-          onChange={(event) => onUpdateTask(task.id, { description: event.target.value })}
+          onCommit={(description) => onUpdateTask(task.id, { description })}
         />
       </header>
 
@@ -182,11 +185,12 @@ export function TaskDetail({
       </section>
       <section className="detail-section">
         <h3>{t("taskDetail.notes")}</h3>
-        <textarea
+        <DeferredTextarea
           className="detail-notes"
           placeholder={t("taskDetail.addNotes")}
           value={task.notes}
-          onChange={(event) => onUpdateTask(task.id, { notes: event.target.value })}
+          resetKey={task.id}
+          onCommit={(notes) => onUpdateTask(task.id, { notes })}
         />
       </section>
       <section className="detail-section task-actions-section">

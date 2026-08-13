@@ -5,6 +5,7 @@ import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../lib/focusTimer";
 import { platform } from "../platform";
 import { useT } from "../i18n";
+import { DeferredTextarea } from "./kit";
 
 interface FocusPageProps {
   tasks: Task[];
@@ -314,10 +315,11 @@ export function FocusPage({
               </div>
               <h2>{activeTask.title}</h2>
               <div className="foc-clock">{formatFocusDuration(elapsed)}</div>
-              <textarea
+              <DeferredTextarea
                 className="foc-note"
                 value={activeSession.focusNote}
-                onChange={(event) => onUpdateFocusNote(activeSession.id, event.target.value)}
+                resetKey={activeSession.id}
+                onCommit={(note) => onUpdateFocusNote(activeSession.id, note)}
                 placeholder={t("focus.notePlaceholder")}
               />
               <div className="foc-controls">
