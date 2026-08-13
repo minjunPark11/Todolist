@@ -310,6 +310,7 @@
 .tdy-bucket-dot-now { background: var(--success); }
 .tdy-bucket-dot-next { background: var(--warning); }
 .tdy-bucket-dot-later { background: var(--accent); }
+.tdy-bucket-dot-done { background: var(--text-tertiary); }
 
 /* Eisenhower quadrants (Plan Today preview), matching the Planning matrix. */
 .tdy-bucket-dot-qI { background: var(--danger); }
@@ -410,6 +411,18 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The title doubles as the row's "open" control so the row itself stays a
+   plain element — nested interactive controls break screen-reader output.
+   Font size/weight keep coming from .tdy-row-title above. */
+button.tdy-row-title {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .tdy-space-pill {

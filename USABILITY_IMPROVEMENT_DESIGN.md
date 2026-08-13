@@ -1,6 +1,8 @@
 # FocusFlow 사용성 개선 설계
 
-작성 기준: `claude/usability-improvement-design-1yhq46` 브랜치, `c61a9fa` (v0.2.8) 시점의 `src/` 실제 구현.
+작성 기준: `fd083f2` (v0.3.10, 배포 브랜치) 시점의 `src/` 실제 구현.
+
+> **구현 현황** — P0-1(버킷 렌더링)은 구현 완료. 함께 처리한 항목은 §15에 정리했다. 나머지 항목은 미착수.
 
 이 문서는 새 기능을 늘리자는 제안이 아니다. **이미 만들어진 기능이 화면에서 제 값을 못 하고 있는 지점**을 코드 근거와 함께 짚고, 각각을 어떻게 고칠지 UI·상태·구현 단위로 설계한다. `design.md`의 원칙("빠른 입력, 빠른 파악 / 쓰지 않는 기능은 추가하지 않는다")을 그대로 판단 기준으로 삼았다.
 
@@ -557,3 +559,28 @@ src/utils/quickParse.ts                자연어 파싱 (P0-3)
 - 반복 일정 UI 개편 — `repeatType` 등 필드는 있으나 별도 과제다(`docs/Architecture/Responsive_Audit.md`의 CSS 정리와 함께 다룰 사안).
 - 협업·공유 기능 — `design.md`의 scope out을 유지한다.
 - 새 색/타이포 토큰 — 기존 `ff-*` 디자인 시스템 안에서만 조합한다.
+
+---
+
+## 15. 구현 기록 — 1단계
+
+P0-1을 구현하면서 확인한 사실 하나: **이 기능은 설계·번역·CSS가 모두 이미 존재했고 JSX만 없었다.**
+
+- `todayv.bucket.*`, `todayv.bucketEmpty.*`, `todayv.moveTo.*`, `todayv.reason.*`, `todayv.estimate`, `todayv.hideCompleted/showCompleted`, `todayv.moveAllLater`, `todayv.clearPlan`, `todayv.rowMenuAria` — ko/en 양쪽에 이미 있었다
+- `.tdy-bucket`, `.tdy-bucket-head`, `.tdy-bucket-dot-now/next/later`, `.tdy-bucket-count`, `.tdy-bucket-empty`, `.tdy-reason-*` 7종, `.tdy-estimate`, `.tdy-row-time` — 이미 있었다
+
+그래서 실제 추가는 렌더 코드와 CSS 3줄, i18n 키 1쌍(`todayv.toastMovedAllLater`)이 전부다.
+
+**함께 처리한 것**
+
+- 행 메타 노출(P0-2 일부): 사유 칩·예상 시간·시작 시각을 행에 표시
+- 행 시맨틱 교정: 중첩 인터랙티브 요소를 없애고 제목을 열기 버튼으로 분리
+- `showCompletedInToday`: 큐 메뉴 토글과 Settings 토글이 같은 값을 쓰도록 연결 (기존에는 설정이 아무 동작도 하지 않았음)
+- `confirmBeforeDelete`: Settings 동작 탭에 토글 노출 (기존에는 끌 방법이 없었음)
+- 버킷을 바꾸는 모든 경로에 되돌리기 토스트
+
+**발견한 기존 버그**
+
+토스트가 AI 런처와 같은 코너에 겹쳐 있었고 런처의 `z-index`가 더 높아서, **토스트의 되돌리기 버튼을 누를 수 없었다.** `elementFromPoint`로 확인한 결과 모든 화면 폭에서 `.ollama-chat-fab`이 클릭을 가로챘다. 보관 취소 등 기존 되돌리기 토스트도 전부 같은 상태였다. 토스트를 런처 왼쪽으로 옮기고, 포커스 바가 떠 있을 때는 런처와 같은 높이로 올리도록 고쳤다.
+
+---

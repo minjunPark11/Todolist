@@ -154,6 +154,10 @@ export function AppPages({
           onNavigate={onNavigate}
           onOpenProject={openProjectFromCalendar}
           onScheduleInCalendar={viewTaskInCalendar}
+          showCompleted={appSettings.showCompletedInToday}
+          onToggleShowCompleted={() =>
+            planner.updateAppSettings({ showCompletedInToday: !appSettings.showCompletedInToday })
+          }
           intent={todayIntent}
           onIntentHandled={onTodayIntentHandled}
           showToast={showToast}

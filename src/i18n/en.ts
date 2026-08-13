@@ -628,6 +628,7 @@ export const en: Dictionary = {
   "todayv.toastTaskAdded": "Task added to Today.",
   "todayv.toastPlanApplied": "Plan applied to the Focus Queue.",
   "todayv.toastPlanCleared": "Today plan cleared.",
+  "todayv.toastMovedAllLater": "Moved {{n}} tasks to Later.",
   "todayv.toastAssigned": "Assigned to space.",
   "todayv.toastKept": "Kept in Inbox.",
 

@@ -39,6 +39,10 @@ interface TodayPageProps {
   onNavigate: (page: PageId) => void;
   onOpenProject: (projectId: string) => void;
   onScheduleInCalendar: (taskId: string) => void;
+  // Persisted app setting — the Focus Queue menu toggles the same value the
+  // Settings page shows, so the two never disagree.
+  showCompleted: boolean;
+  onToggleShowCompleted: () => void;
   intent?: TodayIntent;
   onIntentHandled?: () => void;
   showToast: (toast: ToastState) => void;
@@ -56,6 +60,8 @@ export function TodayPage({
   onNavigate,
   onOpenProject,
   onScheduleInCalendar,
+  showCompleted,
+  onToggleShowCompleted,
   intent = "",
   onIntentHandled,
   showToast,
@@ -208,10 +214,50 @@ export function TodayPage({
     }, 450);
   }
 
+  // Every bucket change goes through here so the undo toast always restores a
+  // complete snapshot rather than replaying individual moves.
+  function applyOverrides(
+    updater: (current: BucketOverrides) => BucketOverrides,
+    message: string,
+  ) {
+    const previous = overrides;
+    setOverrides(updater);
+    showToast({
+      message,
+      actionLabel: t("app.undo"),
+      onAction: () => setOverrides(previous),
+    });
+  }
+
+  function handleMoveBucket(taskId: string, bucket: TodayBucketId) {
+    setOverrides((current) => ({ ...current, [taskId]: bucket }));
+  }
+
+  function handleMoveAllLater() {
+    const openIds = entries.filter((entry) => !entry.completed).map((entry) => entry.task.id);
+    if (openIds.length === 0) return;
+    applyOverrides(
+      (current) => {
+        const next = { ...current };
+        for (const id of openIds) next[id] = "later";
+        return next;
+      },
+      t("todayv.toastMovedAllLater", { n: openIds.length }),
+    );
+  }
+
+  // Drops every manual/planned override so the queue falls back to the
+  // rule-based default bucket for each task.
+  function handleClearPlan() {
+    applyOverrides(() => ({}), t("todayv.toastPlanCleared"));
+    setPlan(null);
+    setPlanStatus("idle");
+  }
+
   function handleApplyPlan() {
     if (!plan) return;
     const known = new Set(entries.filter((entry) => !entry.completed).map((entry) => entry.task.id));
-    setOverrides((current) => {
+    applyOverrides((current) => {
       const next = { ...current };
       const assign = (ids: string[], bucket: TodayBucketId) => {
         for (const id of ids) {
@@ -223,10 +269,9 @@ export function TodayPage({
       assign(plan.nextTaskIds, "next");
       assign(plan.laterTaskIds, "later");
       return next;
-    });
+    }, t("todayv.toastPlanApplied"));
     setPlan({ ...plan, appliedAt: new Date().toISOString() });
     setPlanStatus("applied");
-    showToast({ message: t("todayv.toastPlanApplied") });
   }
 
   function handleDismissPlan() {
@@ -330,8 +375,13 @@ export function TodayPage({
             projects={projects}
             hasQuery={hasQuery}
             query={searchQuery.trim()}
+            showCompleted={showCompleted}
+            onToggleShowCompleted={onToggleShowCompleted}
             onToggleDone={onToggleDone}
             onOpenTask={onOpenTask}
+            onMoveBucket={handleMoveBucket}
+            onMoveAllLater={handleMoveAllLater}
+            onClearPlan={handleClearPlan}
             onAddTask={() => setQuickAddOpen(true)}
             onOpenSpaces={() => onNavigate("projects")}
           />

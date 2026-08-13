@@ -628,6 +628,7 @@ export const ko: Dictionary = {
   "todayv.toastTaskAdded": "오늘에 할 일을 추가했습니다.",
   "todayv.toastPlanApplied": "포커스 큐에 계획을 적용했습니다.",
   "todayv.toastPlanCleared": "오늘 계획을 초기화했습니다.",
+  "todayv.toastMovedAllLater": "할 일 {{n}}개를 나중에로 옮겼습니다.",
   "todayv.toastAssigned": "스페이스에 배정했습니다.",
   "todayv.toastKept": "받은함에 유지했습니다.",
 
