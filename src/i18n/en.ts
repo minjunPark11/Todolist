@@ -63,7 +63,10 @@ export const en: Dictionary = {
   "sidebar.expand": "Expand sidebar",
 
   // ---- App.tsx chrome ----
-  "app.searchPlaceholder": "Search /",
+  // The sidebar box searches everything; the Today header box only filters
+  // the lists on that page. The two placeholders have to say which is which.
+  "app.searchPlaceholder": "Search everything  /",
+  "app.searchAria": "Search everything",
   "app.searchNoResults": "No results.",
   "app.deleteTaskTitle": "Delete task?",
   "app.deleteTaskBody": "This removes the task and its subtasks. This action cannot be undone.",
@@ -447,7 +450,7 @@ export const en: Dictionary = {
   "today.moveToToday": "Move to Today",
 
   // ---- Today page (redesigned execution view) ----
-  "todayv.searchPlaceholder": "Search tasks, spaces, or notes",
+  "todayv.searchPlaceholder": "Filter today's lists",
   "todayv.add": "Add",
   "todayv.addTask": "Add Task",
   "todayv.addTaskAria": "Add task",
@@ -606,7 +609,10 @@ export const en: Dictionary = {
   "ai.readOnly": "Read only",
   "ai.greeting": "Hi, I'm your personal local-first AI assistant. Ask me anything.",
   "ai.chatCleared": "Chat cleared. What should we think through next?",
-  "ai.error.chatFailed": "AI chat failed.",
+  // Both errors name where to go next: "it failed" alone leaves the user with
+  // no move, and the local runtime is set up in Settings → Local AI.
+  "ai.error.chatFailed": "AI chat failed. Check Settings → Local AI, then try again.",
+  "ai.error.notReady": "Local AI isn't ready yet. Set it up in Settings → Local AI.",
   "ai.notice.dismissed": "Suggestion dismissed. No app data changed.",
   "ai.notice.executorNotConnected": "Action executor is not connected yet. No app data changed.",
   "ai.notice.someActionsInvalid": "Some suggested actions are invalid. No app data changed.",
@@ -775,8 +781,12 @@ export const en: Dictionary = {
   "eis.qIIHint": "Important work to plan ahead",
   "eis.qIII": "Urgent, Not Important",
   "eis.qIIIHint": "Light work to knock out quickly",
-  "eis.qIV": "Neither Important nor Urgent",
-  "eis.qIVHint": "Unsorted · on hold · completed",
+  // Not a real quadrant: I–III are judged positions, IV is where everything
+  // unjudged, paused or finished parks. Calling it "Neither Important nor
+  // Urgent" attributed a judgement the user never made to their new tasks.
+  // Named to match caltasks.qIV, which already said "Unsorted".
+  "eis.qIV": "Unsorted & parked",
+  "eis.qIVHint": "Not judged yet · on hold · completed",
   "eis.group.unclassified": "Unsorted",
   "eis.group.onHold": "On hold",
   "eis.group.completed": "Completed",

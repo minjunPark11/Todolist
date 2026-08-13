@@ -1570,7 +1570,7 @@ function SearchBox({
     <div className="global-search">
       <input
         ref={inputRef}
-        aria-label="Global search"
+        aria-label={t("app.searchAria")}
         placeholder={t("app.searchPlaceholder")}
         value={query}
         onChange={(event) => onChange(event.target.value)}

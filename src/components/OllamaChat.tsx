@@ -183,7 +183,8 @@ export function OllamaChat({
 
     try {
       if (!aiContext) {
-        setError(t("ai.error.chatFailed"));
+        // No runtime yet — that is a setup gap, not a failed turn.
+        setError(t("ai.error.notReady"));
         return;
       }
 

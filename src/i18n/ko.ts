@@ -63,7 +63,9 @@ export const ko: Dictionary = {
   "sidebar.expand": "사이드바 펼치기",
 
   // ---- App.tsx chrome ----
-  "app.searchPlaceholder": "검색 /",
+  // 사이드바는 전체 검색, Today 헤더는 그 페이지 목록 필터. en.ts 주석 참고.
+  "app.searchPlaceholder": "전체 검색  /",
+  "app.searchAria": "전체 검색",
   "app.searchNoResults": "결과가 없습니다.",
   "app.deleteTaskTitle": "할 일을 삭제할까요?",
   "app.deleteTaskBody": "할 일과 하위 작업이 함께 삭제됩니다. 되돌릴 수 없습니다.",
@@ -447,7 +449,7 @@ export const ko: Dictionary = {
   "today.moveToToday": "오늘로 이동",
 
   // ---- Today page (redesigned execution view) ----
-  "todayv.searchPlaceholder": "할 일, 스페이스, 노트 검색",
+  "todayv.searchPlaceholder": "오늘 목록에서 찾기",
   "todayv.add": "추가",
   "todayv.addTask": "할 일 추가",
   "todayv.addTaskAria": "할 일 추가",
@@ -606,7 +608,9 @@ export const ko: Dictionary = {
   "ai.readOnly": "읽기 전용",
   "ai.greeting": "안녕하세요, 저는 당신의 로컬 우선 개인 AI 비서입니다. 무엇이든 물어보세요.",
   "ai.chatCleared": "대화를 지웠습니다. 다음에 무엇을 생각해볼까요?",
-  "ai.error.chatFailed": "AI 대화에 실패했습니다.",
+  // 실패 사실만 알리면 다음 행동이 없다. 로컬 런타임은 설정 → 로컬 AI에서 준비한다.
+  "ai.error.chatFailed": "AI 대화에 실패했습니다. 설정 → 로컬 AI를 확인한 뒤 다시 시도하세요.",
+  "ai.error.notReady": "로컬 AI가 아직 준비되지 않았습니다. 설정 → 로컬 AI에서 설정하세요.",
   "ai.notice.dismissed": "제안을 닫았습니다. 앱 데이터는 변경되지 않았습니다.",
   "ai.notice.executorNotConnected": "아직 작업 실행기가 연결되지 않았습니다. 앱 데이터는 변경되지 않았습니다.",
   "ai.notice.someActionsInvalid": "일부 제안된 작업이 유효하지 않습니다. 앱 데이터는 변경되지 않았습니다.",
@@ -775,8 +779,9 @@ export const ko: Dictionary = {
   "eis.qIIHint": "계획해서 진행할 중요한 작업",
   "eis.qIII": "중요하지 않지만 급한 일",
   "eis.qIIIHint": "빠르게 처리할 가벼운 작업",
-  "eis.qIV": "중요하지도 급하지도 않은 일",
-  "eis.qIVHint": "미분류 · 보류 · 완료 작업",
+  // 실제 사분면이 아니라 보관함이다. en.ts의 eis.qIV 주석 참고.
+  "eis.qIV": "미분류 · 보류함",
+  "eis.qIVHint": "아직 판단하지 않았거나, 보류·완료된 작업",
   "eis.group.unclassified": "미분류",
   "eis.group.onHold": "보류",
   "eis.group.completed": "완료",
