@@ -32,7 +32,12 @@ import type {
   TaskTemplate,
 } from "../types";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
-import { diffChangedRecords, diffRemovedIds } from "../domain/sync/diffRecords";
+import {
+  buildSyncPlan,
+  collectionTables,
+  isEmptySyncPlan,
+  optionalRemoteTables,
+} from "../domain/sync/buildSyncPlan";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
 
@@ -92,19 +97,6 @@ const habitFrequencies = ["daily", "weekly"] as const;
 const focusModes = ["focus", "short_break", "long_break"] as const;
 const focusStatuses = ["running", "paused", "completed", "cancelled"] as const;
 const focusSources = ["focus_page", "today_page", "calendar_event", "global_bar"] as const;
-const collectionTables = [
-  ["tasks", "tasks"],
-  ["projects", "projects"],
-  ["subtasks", "subtasks"],
-  ["habits", "habits"],
-  ["habitLogs", "habit_logs"],
-  ["focusSessions", "focus_sessions"],
-  ["taskTemplates", "task_templates"],
-  ["studyTopics", "study_topics"],
-  ["conceptNotes", "concept_notes"],
-] as const;
-const optionalRemoteTables = new Set(["study_topics", "concept_notes"]);
-
 function isMissingRemoteTableError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const record = error as { code?: unknown; message?: unknown };
@@ -720,55 +712,46 @@ export function usePlannerData() {
       return;
     }
 
+    // What to write is decided by a pure function (see buildSyncPlan) against
+    // the last state known to be on the account — set from the load, advanced
+    // only after a fully successful save.
+    const plan = buildSyncPlan(nextData, syncedSnapshotRef.current, missingRemoteTablesRef.current);
+    if (isEmptySyncPlan(plan)) {
+      // The edit touched nothing that syncs; don't spend a round trip.
+      syncedSnapshotRef.current = nextData;
+      return;
+    }
+
     try {
       const userId = await getUserId();
       if (!userId) {
         return;
       }
 
-      // Baseline for the diff below: the last state we know the account
-      // already holds (set on load and after each successful save). Null means
-      // we have never synced this session, so everything is sent.
-      const baseline = syncedSnapshotRef.current;
-
-      for (const [key, table] of collectionTables) {
-        if (missingRemoteTablesRef.current.has(table)) {
-          continue;
-        }
-
-        // The diff only needs identity and an id, so the per-collection types
-        // collapse to one shape here rather than switching on `key`.
-        const items = nextData[key] as Array<{ id: string }>;
-        const previous = baseline?.[key] as Array<{ id: string }> | undefined;
-        const changed = diffChangedRecords(items, previous);
-        const removedIds = diffRemovedIds(items, previous);
-
-        if (changed.length > 0) {
-          const rows = changed.map((item) => ({ id: item.id, user_id: userId, data: item }));
-          const { error } = await supabase.from(table).upsert(rows, { onConflict: "id,user_id" });
+      for (const operation of plan.tables) {
+        if (operation.upsert.length > 0) {
+          const rows = operation.upsert.map((item) => ({ id: item.id, user_id: userId, data: item }));
+          const { error } = await supabase
+            .from(operation.table)
+            .upsert(rows, { onConflict: "id,user_id" });
           if (error) {
-            if (optionalRemoteTables.has(table) && isMissingRemoteTableError(error)) {
-              missingRemoteTablesRef.current.add(table);
+            if (optionalRemoteTables.has(operation.table) && isMissingRemoteTableError(error)) {
+              missingRemoteTablesRef.current.add(operation.table);
               continue;
             }
             throw error;
           }
         }
 
-        if (removedIds.length > 0) {
-          // Delete exactly what went away. This used to be "delete everything
-          // NOT in the full id list", with the ids hand-quoted into a filter
-          // string — which broke on any id containing a quote or comma (import
-          // preserves ids verbatim), and which let a device holding stale data
-          // wipe rows another device had just added.
+        if (operation.removeIds.length > 0) {
           const { error: deleteError } = await supabase
-            .from(table)
+            .from(operation.table)
             .delete()
             .eq("user_id", userId)
-            .in("id", removedIds);
+            .in("id", operation.removeIds);
           if (deleteError) {
-            if (optionalRemoteTables.has(table) && isMissingRemoteTableError(deleteError)) {
-              missingRemoteTablesRef.current.add(table);
+            if (optionalRemoteTables.has(operation.table) && isMissingRemoteTableError(deleteError)) {
+              missingRemoteTablesRef.current.add(operation.table);
               continue;
             }
             throw deleteError;
@@ -776,35 +759,27 @@ export function usePlannerData() {
         }
       }
 
-      const { error: settingsError } = await supabase.from("settings").upsert(
-        {
-          id: "settings",
-          user_id: userId,
-          data: nextData.settings,
-        },
-        { onConflict: "id,user_id" },
-      );
-      if (settingsError) {
-        throw settingsError;
+      if (plan.settings) {
+        const { error: settingsError } = await supabase.from("settings").upsert(
+          { id: "settings", user_id: userId, data: plan.settings },
+          { onConflict: "id,user_id" },
+        );
+        if (settingsError) {
+          throw settingsError;
+        }
       }
 
       // Device-level preferences (theme accent, language, font size, view
       // prefs, active focus session, recent items) are synced too, so a single
       // account looks and behaves the same on app and web.
-      const { error: appSettingsError } = await supabase.from("settings").upsert(
-        {
-          id: "app_settings",
-          user_id: userId,
-          data: {
-            appSettings: nextData.appSettings,
-            activeSessionId: nextData.activeSessionId,
-            recentItems: nextData.recentItems,
-          },
-        },
-        { onConflict: "id,user_id" },
-      );
-      if (appSettingsError) {
-        throw appSettingsError;
+      if (plan.appState) {
+        const { error: appSettingsError } = await supabase.from("settings").upsert(
+          { id: "app_settings", user_id: userId, data: plan.appState },
+          { onConflict: "id,user_id" },
+        );
+        if (appSettingsError) {
+          throw appSettingsError;
+        }
       }
 
       // Only advance the baseline once everything above succeeded; a failed
