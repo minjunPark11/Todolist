@@ -732,13 +732,23 @@ export default function App() {
     await publishCurrentCalendarShare(createShareToken(), true);
   }
 
-  function handleArchiveTask(taskId: string) {
-    planner.archiveTask(taskId);
+  // Batch-aware: archiving a selection must produce one toast with one undo,
+  // not N toasts that evict each other out of the queue.
+  function handleArchiveTasks(taskIds: string[]) {
+    if (taskIds.length === 0) return;
+    taskIds.forEach((taskId) => planner.archiveTask(taskId));
     showToast({
-      message: t("app.toastTaskArchived"),
+      message:
+        taskIds.length === 1
+          ? t("app.toastTaskArchived")
+          : t("app.toastTasksArchived", { n: taskIds.length }),
       actionLabel: t("app.undo"),
-      onAction: () => planner.restoreTask(taskId),
+      onAction: () => taskIds.forEach((taskId) => planner.restoreTask(taskId)),
     });
+  }
+
+  function handleArchiveTask(taskId: string) {
+    handleArchiveTasks([taskId]);
   }
 
   function handleDuplicateTask(taskId: string) {
@@ -1016,6 +1026,7 @@ export default function App() {
         renderTaskDetail={renderTaskDetail}
         showToast={showToast}
         handleArchiveTask={handleArchiveTask}
+        handleArchiveTasks={handleArchiveTasks}
         handleArchiveProject={handleArchiveProject}
         requestDeleteTask={requestDeleteTask}
         requestDeleteProject={requestDeleteProject}

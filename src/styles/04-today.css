@@ -797,12 +797,92 @@ button.tdy-row-title {
   gap: 14px;
 }
 
+/* Focused programmatically to host the shortcuts; the active row already
+   shows where the keys will land, so no extra ring is needed here. */
+.tdy-triage-list:focus {
+  outline: none;
+}
+
+.tdy-triage-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tdy-triage-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
 .tdy-triage-row {
   display: grid;
-  gap: 10px;
+  grid-template-columns: auto 1fr;
+  gap: 10px 12px;
   padding: 14px;
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
+  transition: border-color var(--motion-fast), background var(--motion-fast);
+}
+
+/* The keyboard cursor: which row j/k/1/3/e will act on. */
+.tdy-triage-row.is-active {
+  border-color: var(--accent);
+}
+
+.tdy-triage-row.is-selected {
+  background: var(--accent-soft);
+}
+
+.tdy-triage-check {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Actions span both columns so they stay left-aligned under the title. */
+.tdy-triage-row .tdy-triage-actions {
+  grid-column: 2;
+}
+
+/* Sticky bar sits over the end of the list, so the list reserves room for it
+   — otherwise the last row's buttons are unreachable while a selection is up. */
+.tdy-triage-list:has(~ .tdy-bulk-bar) {
+  padding-bottom: 76px;
+}
+
+.tdy-bulk-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.tdy-bulk-bar strong {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.tdy-bulk-clear {
+  margin-left: auto;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
 }
 
 .tdy-triage-info {

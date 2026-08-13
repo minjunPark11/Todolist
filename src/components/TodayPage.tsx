@@ -18,7 +18,12 @@ import { TodayBriefCard, type PlanStatus } from "./today/TodayBriefCard";
 import { FocusQueue } from "./today/FocusQueue";
 import { TimeRail } from "./today/TimeRail";
 import { AttentionFromSpaces } from "./today/AttentionFromSpaces";
-import { InboxTriageCard, InboxTriageDrawer, type TriageAction } from "./today/InboxTriage";
+import {
+  InboxTriageCard,
+  InboxTriageDrawer,
+  type BulkTriageAction,
+  type TriageAction,
+} from "./today/InboxTriage";
 import { InlineCapture } from "./today/InlineCapture";
 import { QuickAddTaskModal, type QuickAddInput } from "./today/QuickAddTaskModal";
 import { loadCaptureTarget, saveCaptureTarget, type QuickParseResult } from "../utils/quickParse";
@@ -37,7 +42,7 @@ interface TodayPageProps {
   onToggleDone: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
-  onArchiveTask: (id: string) => void;
+  onArchiveTasks: (ids: string[]) => void;
   onNavigate: (page: PageId) => void;
   onOpenProject: (projectId: string) => void;
   onScheduleInCalendar: (taskId: string) => void;
@@ -58,7 +63,7 @@ export function TodayPage({
   onToggleDone,
   onUpdateTask,
   onCreateTask,
-  onArchiveTask,
+  onArchiveTasks,
   onNavigate,
   onOpenProject,
   onScheduleInCalendar,
@@ -335,10 +340,56 @@ export function TodayPage({
       closeTriage();
       onScheduleInCalendar(taskId);
     } else if (action.type === "archive") {
-      onArchiveTask(taskId);
+      onArchiveTasks([taskId]);
     } else {
       showToast({ message: t("todayv.toastKept") });
     }
+  }
+
+  // One toast and one undo for the whole batch — N toasts for N rows would
+  // just evict each other, and undoing them one at a time is not a real offer.
+  function handleBulkTriage(taskIds: string[], action: BulkTriageAction) {
+    if (taskIds.length === 0) return;
+    if (action.type === "archive") {
+      onArchiveTasks(taskIds);
+      return;
+    }
+
+    const previous = taskIds
+      .map((id) => tasks.find((task) => task.id === id))
+      .filter((task): task is Task => Boolean(task))
+      .map((task) => ({
+        id: task.id,
+        status: task.status,
+        scheduledDate: task.scheduledDate,
+        projectId: task.projectId,
+      }));
+
+    for (const entry of previous) {
+      onUpdateTask(
+        entry.id,
+        action.type === "assign"
+          ? { projectId: action.projectId, status: "todo", scheduledDate: today }
+          : { status: "todo", scheduledDate: today },
+      );
+    }
+
+    showToast({
+      message:
+        action.type === "assign"
+          ? t("todayv.toastBulkAssigned", { n: previous.length })
+          : t("todayv.toastBulkAddedToToday", { n: previous.length }),
+      actionLabel: t("app.undo"),
+      onAction: () => {
+        for (const entry of previous) {
+          onUpdateTask(entry.id, {
+            status: entry.status,
+            scheduledDate: entry.scheduledDate,
+            projectId: entry.projectId,
+          });
+        }
+      },
+    });
   }
 
   function handleOpenSignal(signal: TodaySpaceSignal) {
@@ -470,6 +521,7 @@ export function TodayPage({
           items={triageItems}
           projects={projects}
           onTriage={handleTriage}
+          onBulkTriage={handleBulkTriage}
           onClose={closeTriage}
         />
       ) : null}
