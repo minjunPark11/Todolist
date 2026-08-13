@@ -271,12 +271,6 @@
   flex-wrap: wrap;
 }
 
-.tdy-brief-error {
-  margin: 12px 0 0;
-  font-size: 14px;
-  color: var(--danger);
-}
-
 /* --- Focus Queue --- */
 
 /* One-line capture bar, above the queue. Always present so a stray thought
@@ -404,12 +398,6 @@
 .tdy-bucket-dot-next { background: var(--warning); }
 .tdy-bucket-dot-later { background: var(--accent); }
 .tdy-bucket-dot-done { background: var(--text-tertiary); }
-
-/* Eisenhower quadrants (Plan Today preview), matching the Planning matrix. */
-.tdy-bucket-dot-qI { background: var(--danger); }
-.tdy-bucket-dot-qII { background: var(--accent); }
-.tdy-bucket-dot-qIII { background: var(--warning); }
-.tdy-bucket-dot-qIV { background: var(--text-tertiary); }
 
 .tdy-bucket-count {
   min-width: 22px;
@@ -993,53 +981,10 @@ button.tdy-row-title {
   color: var(--danger);
 }
 
-.tdy-plan-summary {
-  margin: 0 0 16px;
-  font-size: 15.5px;
-}
-
-.tdy-plan-groups {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-/* Eisenhower preview uses four quadrant columns. */
-.tdy-plan-groups-eis {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.tdy-plan-group ul {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-  font-size: 14px;
-}
-
-.tdy-plan-reasons {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-subtle);
-  font-size: 14px;
-}
-
-.tdy-plan-reasons ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-  color: var(--text-secondary);
-}
-
 /* --- Responsive --- */
 
 @media (max-width: 1120px) {
   .tdy-body {
-    grid-template-columns: 1fr;
-  }
-
-  .tdy-plan-groups {
     grid-template-columns: 1fr;
   }
 }

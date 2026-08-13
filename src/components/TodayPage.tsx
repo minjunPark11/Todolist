@@ -10,11 +10,10 @@ import {
   saveBucketOverrides,
   type BucketOverrides,
   type TodayBucketId,
-  type TodayPlanResult,
   type TodaySpaceSignal,
 } from "../utils/todayView";
 import type { ToastState } from "./kit";
-import { TodayBriefCard, type PlanStatus } from "./today/TodayBriefCard";
+import { TodayBriefCard } from "./today/TodayBriefCard";
 import { FocusQueue } from "./today/FocusQueue";
 import { TimeRail } from "./today/TimeRail";
 import { AttentionFromSpaces } from "./today/AttentionFromSpaces";
@@ -27,7 +26,6 @@ import {
 import { InlineCapture } from "./today/InlineCapture";
 import { QuickAddTaskModal, type QuickAddInput } from "./today/QuickAddTaskModal";
 import { loadCaptureTarget, saveCaptureTarget, type QuickParseResult } from "../utils/quickParse";
-import { PlanTodayPreviewModal } from "./today/PlanTodayPreviewModal";
 import { useT } from "../i18n";
 
 // Cross-page requests into Today: opened once, then cleared by the caller
@@ -76,14 +74,11 @@ export function TodayPage({
   const { t, lang } = useT();
   const today = todayValue();
   const searchRef = useRef<HTMLInputElement>(null);
-  const planTimerRef = useRef<number>();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [overrides, setOverrides] = useState<BucketOverrides>(() => loadBucketOverrides(today));
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [triageOpen, setTriageOpen] = useState(false);
-  const [planStatus, setPlanStatus] = useState<PlanStatus>("idle");
-  const [plan, setPlan] = useState<TodayPlanResult | null>(null);
   const [hiddenSignalIds, setHiddenSignalIds] = useState<string[]>([]);
   const [addToToday, setAddToToday] = useState(() => loadCaptureTarget());
   const [quickAddTitle, setQuickAddTitle] = useState("");
@@ -94,8 +89,6 @@ export function TodayPage({
   useEffect(() => {
     saveBucketOverrides(overrides, today);
   }, [overrides, today]);
-
-  useEffect(() => () => window.clearTimeout(planTimerRef.current), []);
 
   // Cross-page open requests (keyboard shortcuts, search, /inbox deep link,
   // §14 URL state) — handled once, then cleared by the caller.
@@ -245,21 +238,6 @@ export function TodayPage({
     });
   }
 
-  // Manual only — never runs on page load (spec §30).
-  function handlePlanToday() {
-    setPlanStatus("planning");
-    window.clearTimeout(planTimerRef.current);
-    planTimerRef.current = window.setTimeout(() => {
-      try {
-        const result = buildTodayPlan(collectTodayEntries(tasks, overrides, today), today);
-        setPlan(result);
-        setPlanStatus("preview");
-      } catch {
-        setPlanStatus("error");
-      }
-    }, 450);
-  }
-
   // Every bucket change goes through here so the undo toast always restores a
   // complete snapshot rather than replaying individual moves.
   function applyOverrides(
@@ -296,33 +274,37 @@ export function TodayPage({
   // rule-based default bucket for each task.
   function handleClearPlan() {
     applyOverrides(() => ({}), t("todayv.toastPlanCleared"));
-    setPlan(null);
-    setPlanStatus("idle");
   }
 
-  function handleApplyPlan() {
-    if (!plan) return;
+  // Manual only — never runs on page load (spec §30). Applies straight to the
+  // queue: the regrouping is visible, each row already shows why it landed
+  // where it did, and the toast undoes the whole plan. A preview step in front
+  // of that was only a second place for the two to disagree.
+  function handlePlanToday() {
+    const result = buildTodayPlan(collectTodayEntries(tasks, overrides, today), today);
+    // Unknown / completed ids are ignored (spec §30 Apply rules). Resolved up
+    // front so the toast can report real counts and the updater stays pure.
     const known = new Set(entries.filter((entry) => !entry.completed).map((entry) => entry.task.id));
-    applyOverrides((current) => {
-      const next = { ...current };
-      const assign = (ids: string[], bucket: TodayBucketId) => {
-        for (const id of ids) {
-          // Unknown / completed ids are ignored (spec §30 Apply rules).
-          if (known.has(id)) next[id] = bucket;
-        }
-      };
-      assign(plan.nowTaskIds, "now");
-      assign(plan.nextTaskIds, "next");
-      assign(plan.laterTaskIds, "later");
-      return next;
-    }, t("todayv.toastPlanApplied"));
-    setPlan({ ...plan, appliedAt: new Date().toISOString() });
-    setPlanStatus("applied");
-  }
+    const planned: Array<[TodayBucketId, string[]]> = [
+      ["now", result.nowTaskIds.filter((id) => known.has(id))],
+      ["next", result.nextTaskIds.filter((id) => known.has(id))],
+      ["later", result.laterTaskIds.filter((id) => known.has(id))],
+    ];
 
-  function handleDismissPlan() {
-    setPlanStatus(plan?.appliedAt ? "applied" : "idle");
-    if (!plan?.appliedAt) setPlan(null);
+    applyOverrides(
+      (current) => {
+        const next = { ...current };
+        for (const [bucket, ids] of planned) {
+          for (const id of ids) next[id] = bucket;
+        }
+        return next;
+      },
+      t("todayv.toastPlanApplied", {
+        now: planned[0][1].length,
+        next: planned[1][1].length,
+        later: planned[2][1].length,
+      }),
+    );
   }
 
   // Shared by the single-row and bulk paths so the two can't drift. Assigning a
@@ -463,7 +445,6 @@ export function TodayPage({
             blockCount={rail.scheduledCount}
             overdueCount={overdueCount}
             inboxCount={triageItems.length}
-            planStatus={planStatus}
             onPlanToday={handlePlanToday}
             onViewCalendar={() => onNavigate("calendar")}
           />
@@ -532,15 +513,6 @@ export function TodayPage({
         />
       ) : null}
 
-      {planStatus === "preview" && plan ? (
-        <PlanTodayPreviewModal
-          plan={plan}
-          tasks={tasks}
-          onApply={handleApplyPlan}
-          onDismiss={handleDismissPlan}
-          onRefresh={handlePlanToday}
-        />
-      ) : null}
     </div>
   );
 }

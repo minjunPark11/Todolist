@@ -1,13 +1,10 @@
 import { useT } from "../../i18n";
 
-export type PlanStatus = "idle" | "planning" | "preview" | "applied" | "error";
-
 interface TodayBriefCardProps {
   focusCount: number;
   blockCount: number;
   overdueCount: number;
   inboxCount: number;
-  planStatus: PlanStatus;
   onPlanToday: () => void;
   onViewCalendar: () => void;
 }
@@ -17,7 +14,6 @@ export function TodayBriefCard({
   blockCount,
   overdueCount,
   inboxCount,
-  planStatus,
   onPlanToday,
   onViewCalendar,
 }: TodayBriefCardProps) {
@@ -36,15 +32,6 @@ export function TodayBriefCard({
   } else {
     hint = t("todayv.briefHigh");
   }
-
-  const planLabel =
-    planStatus === "planning"
-      ? t("todayv.planning")
-      : planStatus === "applied"
-        ? t("todayv.replan")
-        : planStatus === "error"
-          ? t("todayv.planTryAgain")
-          : t("todayv.planToday");
 
   return (
     <section className="tdy-card tdy-brief">
@@ -65,10 +52,9 @@ export function TodayBriefCard({
             type="button"
             className="tdy-btn tdy-btn-navy"
             aria-label={t("todayv.planTodayAria")}
-            disabled={planStatus === "planning"}
             onClick={onPlanToday}
           >
-            {planLabel}
+            {t("todayv.planToday")}
           </button>
           <button
             type="button"
@@ -79,9 +65,6 @@ export function TodayBriefCard({
             {t("todayv.viewCalendar")}
           </button>
         </div>
-        {planStatus === "error" ? (
-          <p className="tdy-brief-error">{t("todayv.planError")}</p>
-        ) : null}
       </div>
     </section>
   );
