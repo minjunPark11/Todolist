@@ -155,7 +155,10 @@ export function Sidebar({
   const motionEnabled = useMotionEnabled();
   const isDesktop = useIsDesktop();
   const railed = collapsed && isDesktop;
-  const [projectsOpen, setProjectsOpen] = useState(false);
+  // Open when there is something to show. Collapsed-by-default hid the one
+  // place tasks are grouped by category, so the grouping looked missing to
+  // anyone who had projects; with none, the empty section stays folded.
+  const [projectsOpen, setProjectsOpen] = useState(() => projects.length > 0);
   const [newProject, setNewProject] = useState("");
   const today = todayValue();
   const isOpen = (task: Task) => task.status !== "done" && task.status !== "archived";
@@ -169,14 +172,17 @@ export function Sidebar({
     buckets.scheduledToday.length;
   const activeProjectCount = projects.filter((project) => project.status !== "archived").length;
 
+  // The two screens the day actually runs on stay at the top. Everything else
+  // is reached occasionally, so it moves below the project list rather than
+  // competing for the same glance — nothing is removed, only reordered.
   const primaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
     { id: "today", label: t("sidebar.today"), icon: "today", count: todayCount },
-    { id: "planning", label: t("sidebar.planning"), icon: "planning", count: 0 },
     { id: "calendar", label: t("sidebar.calendar"), icon: "calendar", count: 0 },
-    { id: "projects", label: t("sidebar.spaces"), icon: "projects", count: activeProjectCount + dueReviewCount },
-    { id: "focus", label: t("sidebar.focus"), icon: "focus", count: tasks.filter((task) => task.activeSessionId).length },
   ];
   const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
+    { id: "planning", label: t("sidebar.planning"), icon: "planning", count: 0 },
+    { id: "projects", label: t("sidebar.spaces"), icon: "projects", count: activeProjectCount + dueReviewCount },
+    { id: "focus", label: t("sidebar.focus"), icon: "focus", count: tasks.filter((task) => task.activeSessionId).length },
     { id: "archive", label: t("sidebar.archive"), icon: "archive", count: 0 },
     { id: "settings", label: t("sidebar.settings"), icon: "settings", count: 0 },
   ];
