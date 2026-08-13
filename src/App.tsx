@@ -265,15 +265,26 @@ export default function App() {
         return;
       }
 
+      // Modifier combos belong to the browser/OS, not to single-letter shortcuts.
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      // Every branch below moves focus into a field, so the keystroke must be
+      // swallowed — otherwise the shortcut letter types itself into the input
+      // it just focused.
       if (event.key === "/") {
         event.preventDefault();
         searchInputRef.current?.focus();
       } else if (event.key.toLowerCase() === "t") {
+        event.preventDefault();
         setActivePage("today");
       } else if (event.key.toLowerCase() === "i") {
+        event.preventDefault();
         setActivePage("today");
         setTodayIntent("triage");
       } else if (event.key.toLowerCase() === "n") {
+        event.preventDefault();
         setActivePage("today");
         setTodayIntent("quickAdd");
       }

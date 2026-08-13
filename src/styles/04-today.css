@@ -279,6 +279,99 @@
 
 /* --- Focus Queue --- */
 
+/* One-line capture bar, above the queue. Always present so a stray thought
+   costs one keystroke rather than a modal. */
+.tdy-capture {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.tdy-capture-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tdy-capture-icon {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.tdy-capture-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--text-primary);
+}
+
+.tdy-capture-input:focus {
+  outline: none;
+}
+
+.tdy-capture-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Reads as the destination, not as an on/off switch — the label always names
+   where the next capture lands. */
+.tdy-capture-toggle {
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.tdy-capture-toggle.is-on {
+  border-color: transparent;
+  background: var(--tdy-blue-soft);
+  color: var(--accent);
+}
+
+.tdy-capture-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-left: 36px;
+}
+
+.tdy-capture-chip {
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tdy-capture-hint {
+  margin: 0;
+  padding-left: 36px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
 .tdy-bucket {
   margin-top: 6px;
 }

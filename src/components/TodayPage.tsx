@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ConceptNote, PageId, Project, Task, TaskDraft } from "../types";
-import { getDayLabel, todayValue } from "../utils/date";
+import { formatDate, getDayLabel, todayValue } from "../utils/date";
 import {
   buildSpaceSignals,
   buildTimeRail,
@@ -19,7 +19,9 @@ import { FocusQueue } from "./today/FocusQueue";
 import { TimeRail } from "./today/TimeRail";
 import { AttentionFromSpaces } from "./today/AttentionFromSpaces";
 import { InboxTriageCard, InboxTriageDrawer, type TriageAction } from "./today/InboxTriage";
+import { InlineCapture } from "./today/InlineCapture";
 import { QuickAddTaskModal, type QuickAddInput } from "./today/QuickAddTaskModal";
+import { loadCaptureTarget, saveCaptureTarget, type QuickParseResult } from "../utils/quickParse";
 import { PlanTodayPreviewModal } from "./today/PlanTodayPreviewModal";
 import { useT } from "../i18n";
 
@@ -78,7 +80,10 @@ export function TodayPage({
   const [planStatus, setPlanStatus] = useState<PlanStatus>("idle");
   const [plan, setPlan] = useState<TodayPlanResult | null>(null);
   const [hiddenSignalIds, setHiddenSignalIds] = useState<string[]>([]);
+  const [addToToday, setAddToToday] = useState(() => loadCaptureTarget());
+  const [quickAddTitle, setQuickAddTitle] = useState("");
   const sortNowButtonRef = useRef<HTMLButtonElement>(null);
+  const captureRef = useRef<HTMLInputElement>(null);
   const triageReturnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -94,7 +99,9 @@ export function TodayPage({
       openTriage();
       onIntentHandled?.();
     } else if (intent === "quickAdd") {
-      setQuickAddOpen(true);
+      // The "n" shortcut lands in the capture bar; the full form stays behind
+      // Alt+Enter / "details" for when the extra fields are actually wanted.
+      captureRef.current?.focus();
       onIntentHandled?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -182,9 +189,8 @@ export function TodayPage({
   const openEntries = entries.filter((entry) => !entry.completed);
   const overdueCount = openEntries.filter((entry) => entry.reason === "overdue").length;
 
-  // Explicit "add to today" decides Today task vs. Inbox item (spec §10).
-  // Left unchecked, a title-only capture goes to Inbox instead of silently
-  // landing on today's Focus Queue.
+  // The full form is the "I already know the details" path, so it always
+  // files a Today task. Bare capture goes through handleCapture below.
   function handleCreateTask(input: QuickAddInput) {
     onCreateTask({
       title: input.title,
@@ -197,6 +203,41 @@ export function TodayPage({
     });
     showToast({ message: t("todayv.toastTaskAdded") });
     setQuickAddOpen(false);
+    setQuickAddTitle("");
+  }
+
+  // One-line capture. The toggle decides Today task vs. Inbox item (spec §10);
+  // anything the parser recognised in the text wins over the toggle's default
+  // date, so "내일 회의" still lands tomorrow with the toggle on Today.
+  function handleCapture(parsed: QuickParseResult) {
+    const title = parsed.title.trim();
+    if (!title) return;
+    onCreateTask({
+      title,
+      status: addToToday ? "todo" : "inbox",
+      scheduledDate: parsed.scheduledDate || (addToToday ? today : ""),
+      dueDate: parsed.dueDate,
+      startTime: parsed.startTime,
+      priority: parsed.priority || undefined,
+      projectId: parsed.projectId || undefined,
+    });
+    // A parsed date can send a "Today" capture to another day, so the toast
+    // names the day it actually landed on rather than always saying "Today".
+    const landedOn = parsed.scheduledDate || (addToToday ? today : "");
+    showToast({
+      message: !addToToday
+        ? t("todayv.toastAddedToInbox")
+        : landedOn && landedOn !== today
+          ? t("todayv.toastTaskScheduled", { date: formatDate(landedOn, lang) })
+          : t("todayv.toastTaskAdded"),
+    });
+  }
+
+  function handleToggleCaptureTarget() {
+    setAddToToday((current) => {
+      saveCaptureTarget(!current);
+      return !current;
+    });
   }
 
   // Manual only — never runs on page load (spec §30).
@@ -370,6 +411,19 @@ export function TodayPage({
             onViewCalendar={() => onNavigate("calendar")}
           />
 
+          <InlineCapture
+            projects={projects}
+            today={today}
+            addToToday={addToToday}
+            onToggleAddToToday={handleToggleCaptureTarget}
+            onCapture={handleCapture}
+            onOpenDetails={(title) => {
+              setQuickAddTitle(title);
+              setQuickAddOpen(true);
+            }}
+            inputRef={captureRef}
+          />
+
           <FocusQueue
             entries={visibleEntries}
             projects={projects}
@@ -402,8 +456,12 @@ export function TodayPage({
       {quickAddOpen ? (
         <QuickAddTaskModal
           projects={projects}
+          initialTitle={quickAddTitle}
           onCreate={handleCreateTask}
-          onClose={() => setQuickAddOpen(false)}
+          onClose={() => {
+            setQuickAddOpen(false);
+            setQuickAddTitle("");
+          }}
         />
       ) : null}
 
