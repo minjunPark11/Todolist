@@ -25,7 +25,6 @@ interface FocusQueueProps {
   onMoveAllLater: () => void;
   onClearPlan: () => void;
   onAddTask: () => void;
-  onOpenSpaces: () => void;
 }
 
 export function FocusQueue({
@@ -41,7 +40,6 @@ export function FocusQueue({
   onMoveAllLater,
   onClearPlan,
   onAddTask,
-  onOpenSpaces,
 }: FocusQueueProps) {
   const { t } = useT();
   const open = entries.filter((entry) => !entry.completed);
@@ -79,12 +77,12 @@ export function FocusQueue({
         <div className="tdy-queue-empty">
           <strong>{t("todayv.queueEmptyTitle")}</strong>
           <p>{t("todayv.queueEmptyText")}</p>
+          {/* The capture bar sits directly above this card, so the empty state
+              points at the one action that starts the day rather than routing
+              the user off to another page. */}
           <div className="tdy-brief-actions">
             <button type="button" className="tdy-btn tdy-btn-navy" onClick={onAddTask}>
               + {t("todayv.addTask")}
-            </button>
-            <button type="button" className="tdy-btn tdy-btn-light" onClick={onOpenSpaces}>
-              {t("todayv.openSpaces")}
             </button>
           </div>
         </div>
@@ -96,33 +94,31 @@ export function FocusQueue({
         <>
           {BUCKETS.map((bucket) => {
             const bucketEntries = byBucket(bucket);
+            // An empty bucket has nothing to say. Captured tasks never land in
+            // "now" on their own, so rendering its placeholder every day made
+            // the list look half-broken; a bucket appears once it holds work.
+            if (bucketEntries.length === 0) return null;
             return (
               <section className="tdy-bucket" key={bucket}>
                 <header className="tdy-bucket-head">
                   <span className={`tdy-bucket-dot tdy-bucket-dot-${bucket}`} aria-hidden="true" />
                   <strong>{t(`todayv.bucket.${bucket}`)}</strong>
-                  {bucketEntries.length > 0 ? (
-                    <span className="tdy-bucket-count">{bucketEntries.length}</span>
-                  ) : null}
+                  <span className="tdy-bucket-count">{bucketEntries.length}</span>
                 </header>
-                {bucketEntries.length === 0 ? (
-                  <p className="tdy-bucket-empty">{t(`todayv.bucketEmpty.${bucket}`)}</p>
-                ) : (
-                  <div className="tdy-rows">
-                    <AnimatePresence initial={false}>
-                      {bucketEntries.map((entry) => (
-                        <FocusQueueRow
-                          key={entry.task.id}
-                          entry={entry}
-                          projects={projects}
-                          onToggleDone={onToggleDone}
-                          onOpenTask={onOpenTask}
-                          onMoveBucket={onMoveBucket}
-                        />
-                      ))}
-                    </AnimatePresence>
-                  </div>
-                )}
+                <div className="tdy-rows">
+                  <AnimatePresence initial={false}>
+                    {bucketEntries.map((entry) => (
+                      <FocusQueueRow
+                        key={entry.task.id}
+                        entry={entry}
+                        projects={projects}
+                        onToggleDone={onToggleDone}
+                        onOpenTask={onOpenTask}
+                        onMoveBucket={onMoveBucket}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
               </section>
             );
           })}

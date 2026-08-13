@@ -147,14 +147,12 @@ export function AppPages({
         <TodayPage
           tasks={planner.tasks}
           projects={activeProjects}
-          conceptNotes={planner.conceptNotes}
           onOpenTask={planner.selectTask}
           onToggleDone={planner.toggleTaskDone}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
           onArchiveTasks={handleArchiveTasks}
           onNavigate={onNavigate}
-          onOpenProject={openProjectFromCalendar}
           onScheduleInCalendar={viewTaskInCalendar}
           showCompleted={appSettings.showCompletedInToday}
           onToggleShowCompleted={() =>

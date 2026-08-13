@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ConceptNote, PageId, Project, Task, TaskDraft } from "../types";
+import type { PageId, Project, Task, TaskDraft } from "../types";
 import { formatDate, getDayLabel, todayValue } from "../utils/date";
 import {
-  buildSpaceSignals,
   buildTimeRail,
   buildTodayPlan,
   collectTodayEntries,
@@ -10,13 +9,11 @@ import {
   saveBucketOverrides,
   type BucketOverrides,
   type TodayBucketId,
-  type TodaySpaceSignal,
 } from "../utils/todayView";
 import type { ToastState } from "./kit";
 import { TodayBriefCard } from "./today/TodayBriefCard";
 import { FocusQueue } from "./today/FocusQueue";
 import { TimeRail } from "./today/TimeRail";
-import { AttentionFromSpaces } from "./today/AttentionFromSpaces";
 import {
   InboxTriageCard,
   InboxTriageDrawer,
@@ -35,14 +32,12 @@ export type TodayIntent = "" | "triage" | "quickAdd";
 interface TodayPageProps {
   tasks: Task[];
   projects: Project[];
-  conceptNotes: ConceptNote[];
   onOpenTask: (id: string) => void;
   onToggleDone: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
   onArchiveTasks: (ids: string[]) => void;
   onNavigate: (page: PageId) => void;
-  onOpenProject: (projectId: string) => void;
   onScheduleInCalendar: (taskId: string) => void;
   // Persisted app setting — the Focus Queue menu toggles the same value the
   // Settings page shows, so the two never disagree.
@@ -56,14 +51,12 @@ interface TodayPageProps {
 export function TodayPage({
   tasks,
   projects,
-  conceptNotes,
   onOpenTask,
   onToggleDone,
   onUpdateTask,
   onCreateTask,
   onArchiveTasks,
   onNavigate,
-  onOpenProject,
   onScheduleInCalendar,
   showCompleted,
   onToggleShowCompleted,
@@ -79,7 +72,6 @@ export function TodayPage({
   const [overrides, setOverrides] = useState<BucketOverrides>(() => loadBucketOverrides(today));
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [triageOpen, setTriageOpen] = useState(false);
-  const [hiddenSignalIds, setHiddenSignalIds] = useState<string[]>([]);
   const [addToToday, setAddToToday] = useState(() => loadCaptureTarget());
   const [quickAddTitle, setQuickAddTitle] = useState("");
   const sortNowButtonRef = useRef<HTMLButtonElement>(null);
@@ -132,10 +124,6 @@ export function TodayPage({
     [tasks, overrides, today],
   );
   const rail = useMemo(() => buildTimeRail(tasks, projects, today), [tasks, projects, today]);
-  const signals = useMemo(
-    () => buildSpaceSignals(tasks, projects, conceptNotes, today),
-    [tasks, projects, conceptNotes, today],
-  );
 
   // Inbox Triage shows only unsorted (status === "inbox") items. Scheduled
   // "todo" tasks already appear in the Focus Queue above, so including them
@@ -171,11 +159,6 @@ export function TodayPage({
   const visibleTriageItems = hasQuery
     ? triageItems.filter((item) => item.title.toLowerCase().includes(query))
     : triageItems;
-  const visibleSignals = useMemo(() => {
-    const active = signals.filter((signal) => !hiddenSignalIds.includes(signal.id));
-    if (!hasQuery) return active;
-    return active.filter((signal) => signal.name.toLowerCase().includes(query));
-  }, [signals, hiddenSignalIds, hasQuery, query]);
   const visibleRail = useMemo(() => {
     if (!hasQuery) return rail;
     const blocks = rail.blocks.filter(
@@ -380,14 +363,6 @@ export function TodayPage({
     });
   }
 
-  function handleOpenSignal(signal: TodaySpaceSignal) {
-    if (signal.kind === "study") {
-      onNavigate("study");
-    } else {
-      onOpenProject(signal.refId);
-    }
-  }
-
   return (
     <div className="tdy-page">
       <header className="tdy-head">
@@ -473,20 +448,21 @@ export function TodayPage({
             onMoveAllLater={handleMoveAllLater}
             onClearPlan={handleClearPlan}
             onAddTask={() => setQuickAddOpen(true)}
-            onOpenSpaces={() => onNavigate("projects")}
           />
 
-          <InboxTriageCard items={visibleTriageItems} onSortNow={openTriage} sortNowRef={sortNowButtonRef} />
+          {/* Cards that would only say "nothing here" stay out of the daily
+              view. Capture and the to-do list are the two things always worth
+              screen space; the rest earn their place by having content. */}
+          {visibleTriageItems.length > 0 ? (
+            <InboxTriageCard items={visibleTriageItems} onSortNow={openTriage} sortNowRef={sortNowButtonRef} />
+          ) : null}
         </div>
 
-        <aside className="tdy-side">
-          <TimeRail rail={visibleRail} onOpenTask={onOpenTask} />
-          <AttentionFromSpaces
-            signals={visibleSignals}
-            onOpenSignal={handleOpenSignal}
-            onHideSignal={(id) => setHiddenSignalIds((current) => [...current, id])}
-          />
-        </aside>
+        {visibleRail.scheduledCount > 0 ? (
+          <aside className="tdy-side">
+            <TimeRail rail={visibleRail} onOpenTask={onOpenTask} />
+          </aside>
+        ) : null}
       </div>
 
       {quickAddOpen ? (

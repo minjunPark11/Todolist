@@ -176,6 +176,12 @@
   align-items: start;
 }
 
+/* The rail only renders on days that have time blocks, so reclaim its column
+   on the days it does not — otherwise the list sits beside 340px of nothing. */
+.tdy-body:not(:has(.tdy-side)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .tdy-main,
 .tdy-side {
   display: grid;
