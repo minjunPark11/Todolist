@@ -255,7 +255,6 @@ function BulkTriageBar({
   onClear: () => void;
 }) {
   const { t } = useT();
-  const [spaceOpen, setSpaceOpen] = useState(false);
 
   return (
     <div className="tdy-bulk-bar" role="group" aria-label={t("todayv.bulkSelected", { n: count })}>
@@ -267,33 +266,10 @@ function BulkTriageBar({
       >
         {t("todayv.addToToday")}
       </button>
-      <div className="ff-anchor">
-        <button
-          type="button"
-          className="tdy-btn tdy-btn-light tdy-btn-sm"
-          disabled={projects.length === 0}
-          title={projects.length === 0 ? t("todayv.needsSpaceFirst") : undefined}
-          onClick={() => setSpaceOpen((open) => !open)}
-        >
-          {t("todayv.assignSpace")}
-        </button>
-        <Popover open={spaceOpen} onClose={() => setSpaceOpen(false)}>
-          {projects.map((project) => (
-            <button
-              key={project.id}
-              type="button"
-              className="ff-menu-item"
-              onClick={() => {
-                setSpaceOpen(false);
-                onAction({ type: "assign", projectId: project.id });
-              }}
-            >
-              <span className="ff-dot" style={{ backgroundColor: project.color }} />
-              {project.name}
-            </button>
-          ))}
-        </Popover>
-      </div>
+      <SpacePickerButton
+        projects={projects}
+        onPick={(projectId) => onAction({ type: "assign", projectId })}
+      />
       <button
         type="button"
         className="tdy-btn tdy-btn-light tdy-btn-sm"
@@ -304,6 +280,58 @@ function BulkTriageBar({
       <button type="button" className="tdy-bulk-clear" onClick={onClear}>
         {t("todayv.selectNone")}
       </button>
+    </div>
+  );
+}
+
+/** "Assign to space" button plus its project list — used by a row and by the
+ *  bulk bar, which had drifted into two near-identical copies. */
+function SpacePickerButton({
+  projects,
+  align,
+  ariaLabel,
+  onFocus,
+  onPick,
+}: {
+  projects: Project[];
+  align?: "start" | "end";
+  ariaLabel?: string;
+  onFocus?: () => void;
+  onPick: (projectId: string) => void;
+}) {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  const hasProjects = projects.length > 0;
+
+  return (
+    <div className="ff-anchor">
+      <button
+        type="button"
+        className="tdy-btn tdy-btn-light tdy-btn-sm"
+        aria-label={ariaLabel}
+        title={hasProjects ? undefined : t("todayv.needsSpaceFirst")}
+        disabled={!hasProjects}
+        onFocus={onFocus}
+        onClick={() => setOpen((current) => !current)}
+      >
+        {t("todayv.assignSpace")}
+      </button>
+      <Popover open={open} onClose={() => setOpen(false)} align={align}>
+        {projects.map((project) => (
+          <button
+            key={project.id}
+            type="button"
+            className="ff-menu-item"
+            onClick={() => {
+              setOpen(false);
+              onPick(project.id);
+            }}
+          >
+            <span className="ff-dot" style={{ backgroundColor: project.color }} />
+            {project.name}
+          </button>
+        ))}
+      </Popover>
     </div>
   );
 }
@@ -329,7 +357,6 @@ function TriageRow({
 }) {
   const { t } = useT();
   const motionEnabled = useMotionEnabled();
-  const [spaceOpen, setSpaceOpen] = useState(false);
   const created = new Intl.DateTimeFormat(lang === "ko" ? "ko" : "en", {
     month: "short",
     day: "numeric",
@@ -337,7 +364,6 @@ function TriageRow({
   const hasNoDate = !item.dueDate && !item.scheduledDate;
   const hasNoSpace = !item.projectId;
   const hasNoPriority = item.priority === "none";
-  const hasProjects = projects.length > 0;
 
   // Only the two decisions people actually make on most items stay on the row.
   // The rarer ones moved into the overflow menu — six buttons per row turned a
@@ -393,35 +419,13 @@ function TriageRow({
         >
           {t("todayv.addToToday")}
         </button>
-        <div className="ff-anchor">
-          <button
-            type="button"
-            className="tdy-btn tdy-btn-light tdy-btn-sm"
-            aria-label={t("todayv.assignSpaceAria", { title: item.title })}
-            title={hasProjects ? undefined : t("todayv.needsSpaceFirst")}
-            disabled={!hasProjects}
-            onFocus={onFocusRow}
-            onClick={() => setSpaceOpen((open) => !open)}
-          >
-            {t("todayv.assignSpace")}
-          </button>
-          <Popover open={spaceOpen} onClose={() => setSpaceOpen(false)} align="end">
-            {projects.map((project) => (
-              <button
-                key={project.id}
-                type="button"
-                className="ff-menu-item"
-                onClick={() => {
-                  setSpaceOpen(false);
-                  onTriage(item.id, { type: "assign", projectId: project.id });
-                }}
-              >
-                <span className="ff-dot" style={{ backgroundColor: project.color }} />
-                {project.name}
-              </button>
-            ))}
-          </Popover>
-        </div>
+        <SpacePickerButton
+          projects={projects}
+          align="end"
+          ariaLabel={t("todayv.assignSpaceAria", { title: item.title })}
+          onFocus={onFocusRow}
+          onPick={(projectId) => onTriage(item.id, { type: "assign", projectId })}
+        />
         <MoreMenu items={menuItems} label={t("todayv.rowMenuAria")} />
       </div>
     </motion.div>

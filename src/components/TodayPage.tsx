@@ -325,17 +325,28 @@ export function TodayPage({
     if (!plan?.appliedAt) setPlan(null);
   }
 
+  // Shared by the single-row and bulk paths so the two can't drift. Assigning a
+  // space only promotes an item that is still unsorted; "add to today" always
+  // schedules, since that is the whole point of the action.
+  function triagePatch(
+    task: Task | undefined,
+    action: Exclude<BulkTriageAction, { type: "archive" }>,
+  ): Partial<Task> {
+    if (action.type === "addToToday") {
+      return { status: "todo", scheduledDate: today };
+    }
+    return {
+      projectId: action.projectId,
+      ...(task?.status === "inbox" ? { status: "todo" as const, scheduledDate: today } : {}),
+    };
+  }
+
   function handleTriage(taskId: string, action: TriageAction) {
-    if (action.type === "assign") {
-      const item = tasks.find((task) => task.id === taskId);
-      onUpdateTask(taskId, {
-        projectId: action.projectId,
-        ...(item?.status === "inbox" ? { status: "todo", scheduledDate: today } : {}),
+    if (action.type === "assign" || action.type === "addToToday") {
+      onUpdateTask(taskId, triagePatch(tasks.find((task) => task.id === taskId), action));
+      showToast({
+        message: action.type === "assign" ? t("todayv.toastAssigned") : t("todayv.toastTaskAdded"),
       });
-      showToast({ message: t("todayv.toastAssigned") });
-    } else if (action.type === "addToToday") {
-      onUpdateTask(taskId, { status: "todo", scheduledDate: today });
-      showToast({ message: t("todayv.toastTaskAdded") });
     } else if (action.type === "scheduleCalendar") {
       closeTriage();
       onScheduleInCalendar(taskId);
@@ -366,12 +377,7 @@ export function TodayPage({
       }));
 
     for (const entry of previous) {
-      onUpdateTask(
-        entry.id,
-        action.type === "assign"
-          ? { projectId: action.projectId, status: "todo", scheduledDate: today }
-          : { status: "todo", scheduledDate: today },
-      );
+      onUpdateTask(entry.id, triagePatch(tasks.find((task) => task.id === entry.id), action));
     }
 
     showToast({
