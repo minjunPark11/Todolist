@@ -37,7 +37,6 @@ const STORAGE_KEY = "focusflow.appData.v1";
 const LEGACY_STORAGE_KEY = "todo-planner-data";
 const taskStatuses = ["inbox", "todo", "doing", "waiting", "done", "archived"] as const;
 const taskPriorities = ["none", "low", "medium", "high"] as const;
-const taskLevels = ["low", "high"] as const;
 const projectTypes = ["project", "area"] as const;
 const projectStatuses = ["active", "paused", "completed", "archived"] as const;
 const topicCategories = [
@@ -156,9 +155,6 @@ function normalizeTask(task: Partial<Task>): Task {
     parentTaskId: task.parentTaskId ?? "",
     tags: Array.isArray(task.tags) ? task.tags : [],
     notes: task.notes ?? "",
-    importance: oneOf(task.importance, taskLevels, "low"),
-    urgency: oneOf(task.urgency, taskLevels, "low"),
-    isFocus: Boolean(task.isFocus),
     estimatedMinutes:
       Number.isFinite(task.estimatedMinutes) && Number(task.estimatedMinutes) > 0
         ? Math.round(Number(task.estimatedMinutes))
@@ -920,42 +916,6 @@ export function usePlannerData() {
     return addTask({ status: "inbox", ...context, ...draft });
   }
 
-  function createTaskFromTemplate(templateId: string) {
-    const template = data.taskTemplates.find((item) => item.id === templateId);
-    if (!template) {
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const taskId = createId("task");
-    const task: Task = normalizeTask({
-      id: taskId,
-      title: template.title,
-      description: template.description,
-      status: "todo",
-      priority: template.priority,
-      projectId: template.projectId,
-      tags: template.tags,
-      notes: template.notes,
-      createdAt: now,
-      updatedAt: now,
-    });
-    const subtasks = template.subtasks.map((title) => ({
-      id: createId("subtask"),
-      taskId,
-      title,
-      completed: false,
-      createdAt: now,
-      updatedAt: now,
-    }));
-
-    setData((current) => ({
-      ...current,
-      tasks: [task, ...current.tasks],
-      subtasks: [...current.subtasks, ...subtasks],
-    }));
-    setSelectedTaskId(taskId);
-  }
 
   function updateTask(taskId: string, patch: Partial<Task>) {
     const now = new Date().toISOString();
@@ -1024,6 +984,39 @@ export function usePlannerData() {
       ),
     }));
     setSelectedTaskId("");
+  }
+
+  // Deletion is a hard removal, so undo re-inserts the rows the caller
+  // captured beforehand. Targeted on purpose: restoring a whole-store snapshot
+  // would also throw away anything the user changed while the toast was up.
+  function restoreDeletedTask(task: Task, subtasks: Subtask[], childTaskIds: string[] = []) {
+    setData((current) => ({
+      ...current,
+      tasks: (current.tasks.some((item) => item.id === task.id)
+        ? current.tasks
+        : [...current.tasks, task]
+      ).map((item) =>
+        // deleteTask promotes children to top level; put them back under the parent.
+        childTaskIds.includes(item.id) ? { ...item, parentTaskId: task.id } : item,
+      ),
+      subtasks: [
+        ...current.subtasks.filter((item) => item.taskId !== task.id),
+        ...subtasks,
+      ],
+    }));
+  }
+
+  function restoreDeletedProject(project: Project, taskIds: string[] = []) {
+    setData((current) => ({
+      ...current,
+      projects: current.projects.some((item) => item.id === project.id)
+        ? current.projects
+        : [...current.projects, project],
+      // deleteProject unassigns its tasks rather than deleting them.
+      tasks: current.tasks.map((item) =>
+        taskIds.includes(item.id) ? { ...item, projectId: project.id } : item,
+      ),
+    }));
   }
 
   function restoreTask(taskId: string) {
@@ -1201,142 +1194,9 @@ export function usePlannerData() {
     }));
   }
 
-  function saveTaskAsTemplate(taskId: string, name: string) {
-    const task = data.tasks.find((item) => item.id === taskId);
-    if (!task) {
-      return;
-    }
 
-    const now = new Date().toISOString();
-    const template: TaskTemplate = {
-      id: createId("template"),
-      name: name.trim() || task.title,
-      title: task.title,
-      description: task.description,
-      priority: task.priority,
-      projectId: task.projectId,
-      tags: task.tags,
-      notes: task.notes,
-      subtasks: data.subtasks.filter((subtask) => subtask.taskId === task.id).map((subtask) => subtask.title),
-      createdAt: now,
-      updatedAt: now,
-    };
 
-    setData((current) => ({
-      ...current,
-      taskTemplates: [template, ...current.taskTemplates],
-    }));
-  }
 
-  function addHabit(name: string, frequency: HabitFrequency) {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const habit: Habit = {
-      id: createId("habit"),
-      name: trimmed,
-      description: "",
-      frequency,
-      targetCount: 1,
-      color: "#0066cc",
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    setData((current) => ({
-      ...current,
-      habits: [...current.habits, habit],
-    }));
-  }
-
-  function toggleHabitLog(habitId: string, date: string) {
-    setData((current) => {
-      const existing = current.habitLogs.find((log) => log.habitId === habitId && log.date === date);
-
-      if (existing) {
-        return {
-          ...current,
-          habitLogs: current.habitLogs.map((log) =>
-            log.id === existing.id ? { ...log, completed: !log.completed } : log,
-          ),
-        };
-      }
-
-      return {
-        ...current,
-        habitLogs: [
-          ...current.habitLogs,
-          {
-            id: createId("habit-log"),
-            habitId,
-            date,
-            completed: true,
-          },
-        ],
-      };
-    });
-  }
-
-  function addFocusSession(
-    taskId: string,
-    mode: FocusMode,
-    durationMinutes: number,
-    startedAt: string,
-    completed: boolean,
-  ) {
-    const now = new Date().toISOString();
-    const task = data.tasks.find((item) => item.id === taskId);
-    const project = data.projects.find((item) => item.id === task?.projectId);
-    const session: FocusSession = {
-      id: createId("focus"),
-      taskId,
-      title: task?.title ?? "",
-      mode,
-      status: completed ? "completed" : "running",
-      durationMinutes,
-      accumulatedSeconds: completed ? durationMinutes * 60 : 0,
-      completed,
-      startAt: startedAt,
-      endAt: completed ? now : "",
-      startedAt,
-      endedAt: completed ? now : "",
-      pausedAt: "",
-      segments: completed
-        ? [
-            {
-              startAt: startedAt,
-              endAt: new Date(new Date(startedAt).getTime() + durationMinutes * 60000).toISOString(),
-            },
-          ]
-        : [],
-      source: "focus_page",
-      projectId: task?.projectId ?? "",
-      projectName: project?.name ?? "",
-      focusNote: "",
-      createdAt: startedAt,
-      updatedAt: now,
-    };
-
-    setData((current) => ({
-      ...current,
-      focusSessions: [session, ...current.focusSessions],
-      activeSessionId: completed ? current.activeSessionId : session.id,
-      tasks: current.tasks.map((item) =>
-        item.id === taskId
-          ? {
-              ...item,
-              actualSeconds: item.actualSeconds + session.accumulatedSeconds,
-              activeSessionId: completed ? "" : session.id,
-              lastFocusedAt: now,
-              updatedAt: now,
-            }
-          : item,
-      ),
-    }));
-  }
 
   function getSessionSeconds(session: FocusSession, nowMs = Date.now()) {
     if (session.status !== "running") return session.accumulatedSeconds;
@@ -1482,24 +1342,6 @@ export function usePlannerData() {
     });
   }
 
-  function cancelFocusSession(sessionId: string) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const session = current.focusSessions.find((item) => item.id === sessionId);
-      return {
-        ...current,
-        activeSessionId: current.activeSessionId === sessionId ? "" : current.activeSessionId,
-        focusSessions: current.focusSessions.map((item) =>
-          item.id === sessionId ? { ...item, status: "cancelled", endAt: now, endedAt: now, updatedAt: now } : item,
-        ),
-        tasks: session
-          ? current.tasks.map((task) =>
-              task.id === session.taskId ? { ...task, activeSessionId: "", updatedAt: now } : task,
-            )
-          : current.tasks,
-      };
-    });
-  }
 
   function deleteFocusSession(sessionId: string) {
     const now = new Date().toISOString();
@@ -1556,34 +1398,14 @@ export function usePlannerData() {
   }
 
   // === Shared task lifecycle (spec §0.1.1) ===
-  function updateTaskStatus(taskId: string, nextStatus: Task["status"], options?: Partial<Task>) {
-    updateTask(taskId, { status: nextStatus, ...options });
-  }
 
   function completeTask(taskId: string) {
     updateTask(taskId, { status: "done" });
   }
 
-  function setTaskFocus(taskId: string, isFocus: boolean) {
-    updateTask(taskId, { isFocus });
-  }
-
   // Snooze moves the planned work date only — never the deadline (spec §0.5.9).
-  function snoozeTask(taskId: string, date?: string) {
-    updateTask(taskId, { scheduledDate: date ?? addDays(todayValue(), 1) });
-  }
 
-  function rescheduleTask(taskId: string, date: string) {
-    updateTask(taskId, { scheduledDate: date });
-  }
 
-  function moveToWaiting(taskId: string, reason?: string, followUpDate?: string) {
-    updateTask(taskId, {
-      status: "waiting",
-      waitingReason: reason ?? "",
-      waitingFollowUpDate: followUpDate ?? "",
-    });
-  }
 
   // === Projects ===
   function createProject(input: {
@@ -1662,9 +1484,6 @@ export function usePlannerData() {
     }));
   }
 
-  function archiveTopic(topicId: string) {
-    updateTopic(topicId, { status: "archived", archivedAt: new Date().toISOString() });
-  }
 
   function deleteTopic(topicId: string) {
     setData((current) => ({
@@ -1702,9 +1521,6 @@ export function usePlannerData() {
     }));
   }
 
-  function moveNote(noteId: string, topicId: string) {
-    updateNote(noteId, { topicId });
-  }
 
   function deleteNote(noteId: string) {
     setData((current) => ({
@@ -1771,15 +1587,6 @@ export function usePlannerData() {
     }));
   }
 
-  function pushRecentItem(item: Omit<RecentItem, "id" | "openedAt">) {
-    setData((current) => {
-      const filtered = current.recentItems.filter(
-        (existing) => !(existing.type === item.type && existing.refId === item.refId),
-      );
-      const next: RecentItem = { ...item, id: createId("recent"), openedAt: new Date().toISOString() };
-      return { ...current, recentItems: [next, ...filtered].slice(0, 12) };
-    });
-  }
 
   function importData(raw: unknown): boolean {
     if (!raw || typeof raw !== "object") {
@@ -1834,15 +1641,11 @@ export function usePlannerData() {
     },
     addTask,
     createTask,
-    createTaskFromTemplate,
     updateTask,
-    updateTaskStatus,
     completeTask,
-    setTaskFocus,
-    snoozeTask,
-    rescheduleTask,
-    moveToWaiting,
     deleteTask,
+    restoreDeletedTask,
+    restoreDeletedProject,
     archiveTask,
     restoreTask,
     duplicateTask,
@@ -1859,26 +1662,18 @@ export function usePlannerData() {
     deleteSubtask,
     createTopic,
     updateTopic,
-    archiveTopic,
     deleteTopic,
     createNote,
     updateNote,
-    moveNote,
     deleteNote,
     scheduleReview,
     markNoteReviewed,
     updateAppSettings,
     updatePlannerSettings,
-    pushRecentItem,
-    saveTaskAsTemplate,
-    addHabit,
-    toggleHabitLog,
-    addFocusSession,
     startFocusSession,
     pauseFocusSession,
     resumeFocusSession,
     stopFocusSession,
-    cancelFocusSession,
     deleteFocusSession,
     updateFocusSessionNote,
     resetData,

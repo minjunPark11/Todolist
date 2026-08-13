@@ -1,4 +1,4 @@
-import { FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sidebar } from "./components/Sidebar";
 import { OllamaChat } from "./components/OllamaChat";
@@ -12,7 +12,7 @@ import type { TodayIntent } from "./components/TodayPage";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
 import { useDataPortability } from "./app/useDataPortability";
-import type { ToastState } from "./components/kit";
+import { dismissToast, enqueueToast, type QueuedToast } from "./lib/toastQueue";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
 import { useKnowledgeAutoIndex } from "./lib/knowledge/useKnowledgeAutoIndex";
 import { useKnowledgeSettings } from "./lib/knowledge/useKnowledgeSettings";
@@ -142,7 +142,8 @@ export default function App() {
   // When set, the Calendar page opens pre-filtered to this project (space
   // detail's "Open Calendar" — PROJECT_DETAIL_REMOVE_CALENDAR_TAB spec §8.2).
   const [calendarFocusProjectId, setCalendarFocusProjectId] = useState("");
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const [toasts, setToasts] = useState<QueuedToast[]>([]);
+  const toastIdRef = useRef(0);
   const motionEnabled = useMotionEnabled();
   // Page crossfade applies to navigation only; the very first page renders
   // immediately so app boot never starts at opacity 0.
@@ -265,15 +266,26 @@ export default function App() {
         return;
       }
 
+      // Modifier combos belong to the browser/OS, not to single-letter shortcuts.
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      // Every branch below moves focus into a field, so the keystroke must be
+      // swallowed — otherwise the shortcut letter types itself into the input
+      // it just focused.
       if (event.key === "/") {
         event.preventDefault();
         searchInputRef.current?.focus();
       } else if (event.key.toLowerCase() === "t") {
+        event.preventDefault();
         setActivePage("today");
       } else if (event.key.toLowerCase() === "i") {
+        event.preventDefault();
         setActivePage("today");
         setTodayIntent("triage");
       } else if (event.key.toLowerCase() === "n") {
+        event.preventDefault();
         setActivePage("today");
         setTodayIntent("quickAdd");
       }
@@ -512,12 +524,18 @@ export default function App() {
     }
   }, []);
 
+  // Queued rather than replaced: back-to-back actions used to drop the first
+  // toast (and its undo button) before it could be pressed. Each toast owns
+  // its own lifetime in AppModals.
   function showToast(nextToast: { message: string; actionLabel?: string; onAction?: () => void }) {
-    setToast(nextToast);
-    window.setTimeout(() => {
-      setToast((current) => (current === nextToast ? null : current));
-    }, 4500);
+    toastIdRef.current += 1;
+    setToasts((current) => enqueueToast(current, { id: toastIdRef.current, ...nextToast }));
   }
+
+  // Stable so a toast's dismissal timer isn't restarted by unrelated renders.
+  const handleDismissToast = useCallback((id: number) => {
+    setToasts((current) => dismissToast(current, id));
+  }, []);
 
   function updateFocusSettings(patch: Partial<FocusUserSettings>) {
     setFocusSettings((current) => {
@@ -714,18 +732,33 @@ export default function App() {
     await publishCurrentCalendarShare(createShareToken(), true);
   }
 
-  function handleArchiveTask(taskId: string) {
-    planner.archiveTask(taskId);
+  // Batch-aware: archiving a selection must produce one toast with one undo,
+  // not N toasts that evict each other out of the queue.
+  function handleArchiveTasks(taskIds: string[]) {
+    if (taskIds.length === 0) return;
+    taskIds.forEach((taskId) => planner.archiveTask(taskId));
     showToast({
-      message: t("app.toastTaskArchived"),
+      message:
+        taskIds.length === 1
+          ? t("app.toastTaskArchived")
+          : t("app.toastTasksArchived", { n: taskIds.length }),
       actionLabel: t("app.undo"),
-      onAction: () => planner.restoreTask(taskId),
+      onAction: () => taskIds.forEach((taskId) => planner.restoreTask(taskId)),
     });
   }
 
+  function handleArchiveTask(taskId: string) {
+    handleArchiveTasks([taskId]);
+  }
+
   function handleDuplicateTask(taskId: string) {
-    planner.duplicateTask(taskId);
-    showToast({ message: t("app.toastTaskDuplicated") });
+    const copyId = planner.duplicateTask(taskId);
+    showToast({
+      message: t("app.toastTaskDuplicated"),
+      ...(copyId
+        ? { actionLabel: t("app.undo"), onAction: () => planner.deleteTask(copyId) }
+        : {}),
+    });
   }
 
   function handleArchiveProject(projectId: string) {
@@ -740,23 +773,52 @@ export default function App() {
     });
   }
 
+  // Deletion is permanent in the store, so the rows are captured first and the
+  // toast hands back a targeted restore — undoing one delete never rolls back
+  // whatever else the user did while the toast was up.
+  function deleteTaskWithUndo(taskId: string) {
+    const task = planner.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const subtasks = planner.subtasks.filter((item) => item.taskId === taskId);
+    const childTaskIds = planner.tasks
+      .filter((item) => item.parentTaskId === taskId)
+      .map((item) => item.id);
+    planner.deleteTask(taskId);
+    showToast({
+      message: t("app.toastTaskDeleted"),
+      actionLabel: t("app.undo"),
+      onAction: () => planner.restoreDeletedTask(task, subtasks, childTaskIds),
+    });
+  }
+
   function requestDeleteTask(taskId: string) {
     if (appSettings.confirmBeforeDelete) {
       setPendingDeleteTaskId(taskId);
     } else {
-      planner.deleteTask(taskId);
-      showToast({ message: t("app.toastTaskDeleted") });
+      deleteTaskWithUndo(taskId);
     }
   }
 
   // Deletes immediately, no app-level confirm — for callers that already
   // showed their own confirmation (e.g. the space delete modal).
   function deleteProjectNow(projectId: string) {
+    const project = planner.projects.find((item) => item.id === projectId);
+    const taskIds = planner.tasks
+      .filter((item) => item.projectId === projectId)
+      .map((item) => item.id);
     planner.deleteProject(projectId);
     setIsProjectDetailOpen(false);
     setSelectedProjectId("");
     planner.selectTask("");
-    showToast({ message: t("app.toastProjectDeleted") });
+    showToast({
+      message: t("app.toastProjectDeleted"),
+      ...(project
+        ? {
+            actionLabel: t("app.undo"),
+            onAction: () => planner.restoreDeletedProject(project, taskIds),
+          }
+        : {}),
+    });
   }
 
   function requestDeleteProject(projectId: string) {
@@ -771,21 +833,16 @@ export default function App() {
     if (!pendingDeleteTaskId) {
       return;
     }
-    planner.deleteTask(pendingDeleteTaskId);
+    deleteTaskWithUndo(pendingDeleteTaskId);
     setPendingDeleteTaskId("");
-    showToast({ message: t("app.toastTaskDeleted") });
   }
 
   function confirmDeleteProject() {
     if (!pendingDeleteProjectId) {
       return;
     }
-    planner.deleteProject(pendingDeleteProjectId);
+    deleteProjectNow(pendingDeleteProjectId);
     setPendingDeleteProjectId("");
-    setIsProjectDetailOpen(false);
-    setSelectedProjectId("");
-    planner.selectTask("");
-    showToast({ message: t("app.toastProjectDeleted") });
   }
 
   function requestResetAllData() {
@@ -969,6 +1026,7 @@ export default function App() {
         renderTaskDetail={renderTaskDetail}
         showToast={showToast}
         handleArchiveTask={handleArchiveTask}
+        handleArchiveTasks={handleArchiveTasks}
         handleArchiveProject={handleArchiveProject}
         requestDeleteTask={requestDeleteTask}
         requestDeleteProject={requestDeleteProject}
@@ -1136,14 +1194,14 @@ export default function App() {
         pendingDeleteTaskId={pendingDeleteTaskId}
         pendingDeleteProjectId={pendingDeleteProjectId}
         pendingResetAllData={pendingResetAllData}
-        toast={toast}
+        toasts={toasts}
         onCancelDeleteTask={() => setPendingDeleteTaskId("")}
         onConfirmDeleteTask={confirmDeleteTask}
         onCancelDeleteProject={() => setPendingDeleteProjectId("")}
         onConfirmDeleteProject={confirmDeleteProject}
         onCancelResetAllData={() => setPendingResetAllData(false)}
         onConfirmResetAllData={confirmResetAllData}
-        onDismissToast={() => setToast(null)}
+        onDismissToast={handleDismissToast}
       />
         </div>
         <UpdateChecker />

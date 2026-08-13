@@ -12,7 +12,6 @@ export type TaskStatus =
   | "in_progress"
   | "blocked";
 export type TaskPriority = "none" | "low" | "medium" | "high";
-export type TaskLevel = "high" | "low";
 export type RepeatType = "none" | "daily" | "weekly" | "monthly";
 export type HabitFrequency = "daily" | "weekly";
 export type FocusMode = "focus" | "short_break" | "long_break";
@@ -35,9 +34,6 @@ export interface Task {
   parentTaskId: string;
   tags: string[];
   notes: string;
-  importance: TaskLevel;
-  urgency: TaskLevel;
-  isFocus: boolean;
   // Expected effort in minutes (0 = unset). Drives the default calendar
   // block length when a task is dragged onto the time grid.
   estimatedMinutes: number;
@@ -374,9 +370,6 @@ export interface TaskDraft {
   status?: TaskStatus;
   tags?: string[];
   notes?: string;
-  importance?: TaskLevel;
-  urgency?: TaskLevel;
-  isFocus?: boolean;
   estimatedMinutes?: number;
   actualSeconds?: number;
   activeSessionId?: string;

@@ -3434,11 +3434,31 @@ main {
   gap: 8px;
 }
 
-.toast {
+/* Sits left of the AI launcher (56px wide at right: 24px) — stacked in the
+   same corner, the launcher's higher z-index swallowed clicks on the toast's
+   action button, so "Undo" could never be pressed. */
+.toast-stack {
   position: fixed;
-  z-index: 90;
-  right: 24px;
+  /* Transient feedback outranks everything, modals included — a toast that
+     appears behind an open drawer takes its undo button with it. */
+  z-index: 1500;
+  right: 96px;
   bottom: 24px;
+  display: flex;
+  /* Oldest on top, newest nearest the corner where the eye already is. */
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: calc(100vw - 120px);
+  pointer-events: none;
+}
+
+.toast-stack > * {
+  pointer-events: auto;
+}
+
+.toast {
+  max-width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -3449,6 +3469,12 @@ main {
   color: #fff;
   background: rgba(29, 29, 31, 0.94);
   box-shadow: var(--shadow-lg);
+}
+
+/* Same lift the AI launcher gets, so an active focus session doesn't park the
+   toast on top of the global focus bar. */
+.foc-global-bar ~ .toast-stack {
+  bottom: 112px;
 }
 
 .toast button {

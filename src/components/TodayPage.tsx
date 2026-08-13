@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ConceptNote, PageId, Project, Task, TaskDraft } from "../types";
-import { getDayLabel, todayValue } from "../utils/date";
+import { formatDate, getDayLabel, todayValue } from "../utils/date";
 import {
   buildSpaceSignals,
   buildTimeRail,
@@ -10,17 +10,22 @@ import {
   saveBucketOverrides,
   type BucketOverrides,
   type TodayBucketId,
-  type TodayPlanResult,
   type TodaySpaceSignal,
 } from "../utils/todayView";
 import type { ToastState } from "./kit";
-import { TodayBriefCard, type PlanStatus } from "./today/TodayBriefCard";
+import { TodayBriefCard } from "./today/TodayBriefCard";
 import { FocusQueue } from "./today/FocusQueue";
 import { TimeRail } from "./today/TimeRail";
 import { AttentionFromSpaces } from "./today/AttentionFromSpaces";
-import { InboxTriageCard, InboxTriageDrawer, type TriageAction } from "./today/InboxTriage";
+import {
+  InboxTriageCard,
+  InboxTriageDrawer,
+  type BulkTriageAction,
+  type TriageAction,
+} from "./today/InboxTriage";
+import { InlineCapture } from "./today/InlineCapture";
 import { QuickAddTaskModal, type QuickAddInput } from "./today/QuickAddTaskModal";
-import { PlanTodayPreviewModal } from "./today/PlanTodayPreviewModal";
+import { loadCaptureTarget, saveCaptureTarget, type QuickParseResult } from "../utils/quickParse";
 import { useT } from "../i18n";
 
 // Cross-page requests into Today: opened once, then cleared by the caller
@@ -35,10 +40,14 @@ interface TodayPageProps {
   onToggleDone: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
-  onArchiveTask: (id: string) => void;
+  onArchiveTasks: (ids: string[]) => void;
   onNavigate: (page: PageId) => void;
   onOpenProject: (projectId: string) => void;
   onScheduleInCalendar: (taskId: string) => void;
+  // Persisted app setting — the Focus Queue menu toggles the same value the
+  // Settings page shows, so the two never disagree.
+  showCompleted: boolean;
+  onToggleShowCompleted: () => void;
   intent?: TodayIntent;
   onIntentHandled?: () => void;
   showToast: (toast: ToastState) => void;
@@ -52,10 +61,12 @@ export function TodayPage({
   onToggleDone,
   onUpdateTask,
   onCreateTask,
-  onArchiveTask,
+  onArchiveTasks,
   onNavigate,
   onOpenProject,
   onScheduleInCalendar,
+  showCompleted,
+  onToggleShowCompleted,
   intent = "",
   onIntentHandled,
   showToast,
@@ -63,23 +74,21 @@ export function TodayPage({
   const { t, lang } = useT();
   const today = todayValue();
   const searchRef = useRef<HTMLInputElement>(null);
-  const planTimerRef = useRef<number>();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [overrides, setOverrides] = useState<BucketOverrides>(() => loadBucketOverrides(today));
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [triageOpen, setTriageOpen] = useState(false);
-  const [planStatus, setPlanStatus] = useState<PlanStatus>("idle");
-  const [plan, setPlan] = useState<TodayPlanResult | null>(null);
   const [hiddenSignalIds, setHiddenSignalIds] = useState<string[]>([]);
+  const [addToToday, setAddToToday] = useState(() => loadCaptureTarget());
+  const [quickAddTitle, setQuickAddTitle] = useState("");
   const sortNowButtonRef = useRef<HTMLButtonElement>(null);
+  const captureRef = useRef<HTMLInputElement>(null);
   const triageReturnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     saveBucketOverrides(overrides, today);
   }, [overrides, today]);
-
-  useEffect(() => () => window.clearTimeout(planTimerRef.current), []);
 
   // Cross-page open requests (keyboard shortcuts, search, /inbox deep link,
   // §14 URL state) — handled once, then cleared by the caller.
@@ -88,7 +97,9 @@ export function TodayPage({
       openTriage();
       onIntentHandled?.();
     } else if (intent === "quickAdd") {
-      setQuickAddOpen(true);
+      // The "n" shortcut lands in the capture bar; the full form stays behind
+      // Alt+Enter / "details" for when the extra fields are actually wanted.
+      captureRef.current?.focus();
       onIntentHandled?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -176,9 +187,8 @@ export function TodayPage({
   const openEntries = entries.filter((entry) => !entry.completed);
   const overdueCount = openEntries.filter((entry) => entry.reason === "overdue").length;
 
-  // Explicit "add to today" decides Today task vs. Inbox item (spec §10).
-  // Left unchecked, a title-only capture goes to Inbox instead of silently
-  // landing on today's Focus Queue.
+  // The full form is the "I already know the details" path, so it always
+  // files a Today task. Bare capture goes through handleCapture below.
   function handleCreateTask(input: QuickAddInput) {
     onCreateTask({
       title: input.title,
@@ -191,68 +201,183 @@ export function TodayPage({
     });
     showToast({ message: t("todayv.toastTaskAdded") });
     setQuickAddOpen(false);
+    setQuickAddTitle("");
   }
 
-  // Manual only — never runs on page load (spec §30).
-  function handlePlanToday() {
-    setPlanStatus("planning");
-    window.clearTimeout(planTimerRef.current);
-    planTimerRef.current = window.setTimeout(() => {
-      try {
-        const result = buildTodayPlan(collectTodayEntries(tasks, overrides, today), today);
-        setPlan(result);
-        setPlanStatus("preview");
-      } catch {
-        setPlanStatus("error");
-      }
-    }, 450);
-  }
-
-  function handleApplyPlan() {
-    if (!plan) return;
-    const known = new Set(entries.filter((entry) => !entry.completed).map((entry) => entry.task.id));
-    setOverrides((current) => {
-      const next = { ...current };
-      const assign = (ids: string[], bucket: TodayBucketId) => {
-        for (const id of ids) {
-          // Unknown / completed ids are ignored (spec §30 Apply rules).
-          if (known.has(id)) next[id] = bucket;
-        }
-      };
-      assign(plan.nowTaskIds, "now");
-      assign(plan.nextTaskIds, "next");
-      assign(plan.laterTaskIds, "later");
-      return next;
+  // One-line capture. The toggle decides Today task vs. Inbox item (spec §10);
+  // anything the parser recognised in the text wins over the toggle's default
+  // date, so "내일 회의" still lands tomorrow with the toggle on Today.
+  function handleCapture(parsed: QuickParseResult) {
+    const title = parsed.title.trim();
+    if (!title) return;
+    onCreateTask({
+      title,
+      status: addToToday ? "todo" : "inbox",
+      scheduledDate: parsed.scheduledDate || (addToToday ? today : ""),
+      dueDate: parsed.dueDate,
+      startTime: parsed.startTime,
+      priority: parsed.priority || undefined,
+      projectId: parsed.projectId || undefined,
     });
-    setPlan({ ...plan, appliedAt: new Date().toISOString() });
-    setPlanStatus("applied");
-    showToast({ message: t("todayv.toastPlanApplied") });
+    // A parsed date can send a "Today" capture to another day, so the toast
+    // names the day it actually landed on rather than always saying "Today".
+    const landedOn = parsed.scheduledDate || (addToToday ? today : "");
+    showToast({
+      message: !addToToday
+        ? t("todayv.toastAddedToInbox")
+        : landedOn && landedOn !== today
+          ? t("todayv.toastTaskScheduled", { date: formatDate(landedOn, lang) })
+          : t("todayv.toastTaskAdded"),
+    });
   }
 
-  function handleDismissPlan() {
-    setPlanStatus(plan?.appliedAt ? "applied" : "idle");
-    if (!plan?.appliedAt) setPlan(null);
+  function handleToggleCaptureTarget() {
+    setAddToToday((current) => {
+      saveCaptureTarget(!current);
+      return !current;
+    });
+  }
+
+  // Every bucket change goes through here so the undo toast always restores a
+  // complete snapshot rather than replaying individual moves.
+  function applyOverrides(
+    updater: (current: BucketOverrides) => BucketOverrides,
+    message: string,
+  ) {
+    const previous = overrides;
+    setOverrides(updater);
+    showToast({
+      message,
+      actionLabel: t("app.undo"),
+      onAction: () => setOverrides(previous),
+    });
+  }
+
+  function handleMoveBucket(taskId: string, bucket: TodayBucketId) {
+    setOverrides((current) => ({ ...current, [taskId]: bucket }));
+  }
+
+  function handleMoveAllLater() {
+    const openIds = entries.filter((entry) => !entry.completed).map((entry) => entry.task.id);
+    if (openIds.length === 0) return;
+    applyOverrides(
+      (current) => {
+        const next = { ...current };
+        for (const id of openIds) next[id] = "later";
+        return next;
+      },
+      t("todayv.toastMovedAllLater", { n: openIds.length }),
+    );
+  }
+
+  // Drops every manual/planned override so the queue falls back to the
+  // rule-based default bucket for each task.
+  function handleClearPlan() {
+    applyOverrides(() => ({}), t("todayv.toastPlanCleared"));
+  }
+
+  // Manual only — never runs on page load (spec §30). Applies straight to the
+  // queue: the regrouping is visible, each row already shows why it landed
+  // where it did, and the toast undoes the whole plan. A preview step in front
+  // of that was only a second place for the two to disagree.
+  function handlePlanToday() {
+    const result = buildTodayPlan(collectTodayEntries(tasks, overrides, today), today);
+    // Unknown / completed ids are ignored (spec §30 Apply rules). Resolved up
+    // front so the toast can report real counts and the updater stays pure.
+    const known = new Set(entries.filter((entry) => !entry.completed).map((entry) => entry.task.id));
+    const planned: Array<[TodayBucketId, string[]]> = [
+      ["now", result.nowTaskIds.filter((id) => known.has(id))],
+      ["next", result.nextTaskIds.filter((id) => known.has(id))],
+      ["later", result.laterTaskIds.filter((id) => known.has(id))],
+    ];
+
+    applyOverrides(
+      (current) => {
+        const next = { ...current };
+        for (const [bucket, ids] of planned) {
+          for (const id of ids) next[id] = bucket;
+        }
+        return next;
+      },
+      t("todayv.toastPlanApplied", {
+        now: planned[0][1].length,
+        next: planned[1][1].length,
+        later: planned[2][1].length,
+      }),
+    );
+  }
+
+  // Shared by the single-row and bulk paths so the two can't drift. Assigning a
+  // space only promotes an item that is still unsorted; "add to today" always
+  // schedules, since that is the whole point of the action.
+  function triagePatch(
+    task: Task | undefined,
+    action: Exclude<BulkTriageAction, { type: "archive" }>,
+  ): Partial<Task> {
+    if (action.type === "addToToday") {
+      return { status: "todo", scheduledDate: today };
+    }
+    return {
+      projectId: action.projectId,
+      ...(task?.status === "inbox" ? { status: "todo" as const, scheduledDate: today } : {}),
+    };
   }
 
   function handleTriage(taskId: string, action: TriageAction) {
-    if (action.type === "assign") {
-      const item = tasks.find((task) => task.id === taskId);
-      onUpdateTask(taskId, {
-        projectId: action.projectId,
-        ...(item?.status === "inbox" ? { status: "todo", scheduledDate: today } : {}),
+    if (action.type === "assign" || action.type === "addToToday") {
+      onUpdateTask(taskId, triagePatch(tasks.find((task) => task.id === taskId), action));
+      showToast({
+        message: action.type === "assign" ? t("todayv.toastAssigned") : t("todayv.toastTaskAdded"),
       });
-      showToast({ message: t("todayv.toastAssigned") });
-    } else if (action.type === "addToToday") {
-      onUpdateTask(taskId, { status: "todo", scheduledDate: today });
-      showToast({ message: t("todayv.toastTaskAdded") });
     } else if (action.type === "scheduleCalendar") {
       closeTriage();
       onScheduleInCalendar(taskId);
     } else if (action.type === "archive") {
-      onArchiveTask(taskId);
+      onArchiveTasks([taskId]);
     } else {
       showToast({ message: t("todayv.toastKept") });
     }
+  }
+
+  // One toast and one undo for the whole batch — N toasts for N rows would
+  // just evict each other, and undoing them one at a time is not a real offer.
+  function handleBulkTriage(taskIds: string[], action: BulkTriageAction) {
+    if (taskIds.length === 0) return;
+    if (action.type === "archive") {
+      onArchiveTasks(taskIds);
+      return;
+    }
+
+    const previous = taskIds
+      .map((id) => tasks.find((task) => task.id === id))
+      .filter((task): task is Task => Boolean(task))
+      .map((task) => ({
+        id: task.id,
+        status: task.status,
+        scheduledDate: task.scheduledDate,
+        projectId: task.projectId,
+      }));
+
+    for (const entry of previous) {
+      onUpdateTask(entry.id, triagePatch(tasks.find((task) => task.id === entry.id), action));
+    }
+
+    showToast({
+      message:
+        action.type === "assign"
+          ? t("todayv.toastBulkAssigned", { n: previous.length })
+          : t("todayv.toastBulkAddedToToday", { n: previous.length }),
+      actionLabel: t("app.undo"),
+      onAction: () => {
+        for (const entry of previous) {
+          onUpdateTask(entry.id, {
+            status: entry.status,
+            scheduledDate: entry.scheduledDate,
+            projectId: entry.projectId,
+          });
+        }
+      },
+    });
   }
 
   function handleOpenSignal(signal: TodaySpaceSignal) {
@@ -320,9 +445,21 @@ export function TodayPage({
             blockCount={rail.scheduledCount}
             overdueCount={overdueCount}
             inboxCount={triageItems.length}
-            planStatus={planStatus}
             onPlanToday={handlePlanToday}
             onViewCalendar={() => onNavigate("calendar")}
+          />
+
+          <InlineCapture
+            projects={projects}
+            today={today}
+            addToToday={addToToday}
+            onToggleAddToToday={handleToggleCaptureTarget}
+            onCapture={handleCapture}
+            onOpenDetails={(title) => {
+              setQuickAddTitle(title);
+              setQuickAddOpen(true);
+            }}
+            inputRef={captureRef}
           />
 
           <FocusQueue
@@ -330,8 +467,13 @@ export function TodayPage({
             projects={projects}
             hasQuery={hasQuery}
             query={searchQuery.trim()}
+            showCompleted={showCompleted}
+            onToggleShowCompleted={onToggleShowCompleted}
             onToggleDone={onToggleDone}
             onOpenTask={onOpenTask}
+            onMoveBucket={handleMoveBucket}
+            onMoveAllLater={handleMoveAllLater}
+            onClearPlan={handleClearPlan}
             onAddTask={() => setQuickAddOpen(true)}
             onOpenSpaces={() => onNavigate("projects")}
           />
@@ -352,8 +494,12 @@ export function TodayPage({
       {quickAddOpen ? (
         <QuickAddTaskModal
           projects={projects}
+          initialTitle={quickAddTitle}
           onCreate={handleCreateTask}
-          onClose={() => setQuickAddOpen(false)}
+          onClose={() => {
+            setQuickAddOpen(false);
+            setQuickAddTitle("");
+          }}
         />
       ) : null}
 
@@ -362,19 +508,11 @@ export function TodayPage({
           items={triageItems}
           projects={projects}
           onTriage={handleTriage}
+          onBulkTriage={handleBulkTriage}
           onClose={closeTriage}
         />
       ) : null}
 
-      {planStatus === "preview" && plan ? (
-        <PlanTodayPreviewModal
-          plan={plan}
-          tasks={tasks}
-          onApply={handleApplyPlan}
-          onDismiss={handleDismissPlan}
-          onRefresh={handlePlanToday}
-        />
-      ) : null}
     </div>
   );
 }

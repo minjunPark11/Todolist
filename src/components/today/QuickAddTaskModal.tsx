@@ -15,14 +15,21 @@ export interface QuickAddInput {
 
 interface QuickAddTaskModalProps {
   projects: Project[];
+  /** Prefilled when the capture bar hands its text over (Alt+Enter). */
+  initialTitle?: string;
   onCreate: (input: QuickAddInput) => void;
   onClose: () => void;
 }
 
-export function QuickAddTaskModal({ projects, onCreate, onClose }: QuickAddTaskModalProps) {
+export function QuickAddTaskModal({
+  projects,
+  initialTitle = "",
+  onCreate,
+  onClose,
+}: QuickAddTaskModalProps) {
   const { t } = useT();
   const titleRef = useAutoFocus<HTMLInputElement>();
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialTitle);
   const [projectId, setProjectId] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [dueDate, setDueDate] = useState("");

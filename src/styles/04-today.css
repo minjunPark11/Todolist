@@ -271,13 +271,100 @@
   flex-wrap: wrap;
 }
 
-.tdy-brief-error {
-  margin: 12px 0 0;
-  font-size: 14px;
-  color: var(--danger);
+/* --- Focus Queue --- */
+
+/* One-line capture bar, above the queue. Always present so a stray thought
+   costs one keystroke rather than a modal. */
+.tdy-capture {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-card);
 }
 
-/* --- Focus Queue --- */
+.tdy-capture-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tdy-capture-icon {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.tdy-capture-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--text-primary);
+}
+
+.tdy-capture-input:focus {
+  outline: none;
+}
+
+.tdy-capture-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Reads as the destination, not as an on/off switch — the label always names
+   where the next capture lands. */
+.tdy-capture-toggle {
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.tdy-capture-toggle.is-on {
+  border-color: transparent;
+  background: var(--tdy-blue-soft);
+  color: var(--accent);
+}
+
+.tdy-capture-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-left: 36px;
+}
+
+.tdy-capture-chip {
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tdy-capture-hint {
+  margin: 0;
+  padding-left: 36px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
 
 .tdy-bucket {
   margin-top: 6px;
@@ -310,12 +397,7 @@
 .tdy-bucket-dot-now { background: var(--success); }
 .tdy-bucket-dot-next { background: var(--warning); }
 .tdy-bucket-dot-later { background: var(--accent); }
-
-/* Eisenhower quadrants (Plan Today preview), matching the Planning matrix. */
-.tdy-bucket-dot-qI { background: var(--danger); }
-.tdy-bucket-dot-qII { background: var(--accent); }
-.tdy-bucket-dot-qIII { background: var(--warning); }
-.tdy-bucket-dot-qIV { background: var(--text-tertiary); }
+.tdy-bucket-dot-done { background: var(--text-tertiary); }
 
 .tdy-bucket-count {
   min-width: 22px;
@@ -410,6 +492,18 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The title doubles as the row's "open" control so the row itself stays a
+   plain element — nested interactive controls break screen-reader output.
+   Font size/weight keep coming from .tdy-row-title above. */
+button.tdy-row-title {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .tdy-space-pill {
@@ -691,12 +785,92 @@
   gap: 14px;
 }
 
+/* Focused programmatically to host the shortcuts; the active row already
+   shows where the keys will land, so no extra ring is needed here. */
+.tdy-triage-list:focus {
+  outline: none;
+}
+
+.tdy-triage-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tdy-triage-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
 .tdy-triage-row {
   display: grid;
-  gap: 10px;
+  grid-template-columns: auto 1fr;
+  gap: 10px 12px;
   padding: 14px;
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
+  transition: border-color var(--motion-fast), background var(--motion-fast);
+}
+
+/* The keyboard cursor: which row j/k/1/3/e will act on. */
+.tdy-triage-row.is-active {
+  border-color: var(--accent);
+}
+
+.tdy-triage-row.is-selected {
+  background: var(--accent-soft);
+}
+
+.tdy-triage-check {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Actions span both columns so they stay left-aligned under the title. */
+.tdy-triage-row .tdy-triage-actions {
+  grid-column: 2;
+}
+
+/* Sticky bar sits over the end of the list, so the list reserves room for it
+   — otherwise the last row's buttons are unreachable while a selection is up. */
+.tdy-triage-list:has(~ .tdy-bulk-bar) {
+  padding-bottom: 76px;
+}
+
+.tdy-bulk-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.tdy-bulk-bar strong {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.tdy-bulk-clear {
+  margin-left: auto;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
 }
 
 .tdy-triage-info {
@@ -807,53 +981,10 @@
   color: var(--danger);
 }
 
-.tdy-plan-summary {
-  margin: 0 0 16px;
-  font-size: 15.5px;
-}
-
-.tdy-plan-groups {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-/* Eisenhower preview uses four quadrant columns. */
-.tdy-plan-groups-eis {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.tdy-plan-group ul {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-  font-size: 14px;
-}
-
-.tdy-plan-reasons {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-subtle);
-  font-size: 14px;
-}
-
-.tdy-plan-reasons ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-  color: var(--text-secondary);
-}
-
 /* --- Responsive --- */
 
 @media (max-width: 1120px) {
   .tdy-body {
-    grid-template-columns: 1fr;
-  }
-
-  .tdy-plan-groups {
     grid-template-columns: 1fr;
   }
 }

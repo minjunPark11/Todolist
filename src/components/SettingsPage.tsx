@@ -237,6 +237,12 @@ export function SettingsPage({
             onChange={(v) => onUpdate({ showSidebarCounts: v })}
           />
           <Toggle
+            label={t("settings.confirmBeforeDelete")}
+            hint={t("settings.confirmBeforeDeleteHint")}
+            value={settings.confirmBeforeDelete}
+            onChange={(v) => onUpdate({ confirmBeforeDelete: v })}
+          />
+          <Toggle
             label={t("settings.reduceMotion")}
             hint={t("settings.reduceMotionHint")}
             value={settings.reduceMotion}

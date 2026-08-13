@@ -35,6 +35,7 @@ type AppPagesProps = {
   renderTaskDetail: () => ReactNode;
   showToast: (toast: ToastState) => void;
   handleArchiveTask: (taskId: string) => void;
+  handleArchiveTasks: (taskIds: string[]) => void;
   handleArchiveProject: (projectId: string) => void;
   requestDeleteTask: (taskId: string) => void;
   requestDeleteProject: (projectId: string) => void;
@@ -93,6 +94,7 @@ export function AppPages({
   renderTaskDetail,
   showToast,
   handleArchiveTask,
+  handleArchiveTasks,
   handleArchiveProject,
   requestDeleteTask,
   requestDeleteProject,
@@ -150,10 +152,14 @@ export function AppPages({
           onToggleDone={planner.toggleTaskDone}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
-          onArchiveTask={handleArchiveTask}
+          onArchiveTasks={handleArchiveTasks}
           onNavigate={onNavigate}
           onOpenProject={openProjectFromCalendar}
           onScheduleInCalendar={viewTaskInCalendar}
+          showCompleted={appSettings.showCompletedInToday}
+          onToggleShowCompleted={() =>
+            planner.updateAppSettings({ showCompletedInToday: !appSettings.showCompletedInToday })
+          }
           intent={todayIntent}
           onIntentHandled={onTodayIntentHandled}
           showToast={showToast}
