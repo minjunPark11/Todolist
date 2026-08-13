@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ConfirmModal, type ToastState } from "../components/kit";
+import { ConfirmModal } from "../components/kit";
+import { toastLifetime, type QueuedToast } from "../lib/toastQueue";
 import { useT } from "../i18n";
 import { reducedTransition, transitions } from "../motion/transitions";
 import { toastVariants } from "../motion/variants";
@@ -9,21 +11,21 @@ type AppModalsProps = {
   pendingDeleteTaskId: string;
   pendingDeleteProjectId: string;
   pendingResetAllData: boolean;
-  toast: ToastState | null;
+  toasts: QueuedToast[];
   onCancelDeleteTask: () => void;
   onConfirmDeleteTask: () => void;
   onCancelDeleteProject: () => void;
   onConfirmDeleteProject: () => void;
   onCancelResetAllData: () => void;
   onConfirmResetAllData: () => void;
-  onDismissToast: () => void;
+  onDismissToast: (id: number) => void;
 };
 
 export function AppModals({
   pendingDeleteTaskId,
   pendingDeleteProjectId,
   pendingResetAllData,
-  toast,
+  toasts,
   onCancelDeleteTask,
   onConfirmDeleteTask,
   onCancelDeleteProject,
@@ -67,32 +69,61 @@ export function AppModals({
         />
       ) : null}
 
-      <AnimatePresence initial={false}>
-        {toast ? (
-          <motion.div
-            key="app-toast"
-            className="toast"
-            role="status"
-            variants={motionEnabled ? toastVariants : undefined}
-            initial={motionEnabled ? "initial" : false}
-            animate={motionEnabled ? "animate" : undefined}
-            exit={motionEnabled ? "exit" : undefined}
-            transition={motionEnabled ? transitions.soft : reducedTransition}
-          >
-            <span>{toast.message}</span>
-            {toast.actionLabel && toast.onAction ? (
-              <button
-                onClick={() => {
-                  toast.onAction?.();
-                  onDismissToast();
-                }}
-              >
-                {toast.actionLabel}
-              </button>
-            ) : null}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      <div className="toast-stack">
+        <AnimatePresence initial={false}>
+          {toasts.map((toast) => (
+            <ToastItem key={toast.id} toast={toast} onDismiss={onDismissToast} />
+          ))}
+        </AnimatePresence>
+      </div>
     </>
+  );
+}
+
+function ToastItem({
+  toast,
+  onDismiss,
+}: {
+  toast: QueuedToast;
+  onDismiss: (id: number) => void;
+}) {
+  const motionEnabled = useMotionEnabled();
+  // Hovering holds the toast open — an undo button that expires while being
+  // read is the whole problem this queue exists to fix.
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused) return undefined;
+    const timer = window.setTimeout(() => onDismiss(toast.id), toastLifetime(toast));
+    return () => window.clearTimeout(timer);
+  }, [paused, toast, onDismiss]);
+
+  return (
+    <motion.div
+      className="toast"
+      role="status"
+      variants={motionEnabled ? toastVariants : undefined}
+      initial={motionEnabled ? "initial" : false}
+      animate={motionEnabled ? "animate" : undefined}
+      exit={motionEnabled ? "exit" : undefined}
+      transition={motionEnabled ? transitions.soft : reducedTransition}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
+    >
+      <span>{toast.message}</span>
+      {toast.actionLabel && toast.onAction ? (
+        <button
+          type="button"
+          onClick={() => {
+            toast.onAction?.();
+            onDismiss(toast.id);
+          }}
+        >
+          {toast.actionLabel}
+        </button>
+      ) : null}
+    </motion.div>
   );
 }

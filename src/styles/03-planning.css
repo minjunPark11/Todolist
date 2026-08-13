@@ -435,6 +435,10 @@
 }
 
 /* Modals */
+/* Above the 1200–1300 drawer/overlay tier (Today's task drawer, the notes
+   split view, the calendar overlay). At the old z-index of 100 a modal opened
+   from inside one of those rendered underneath it — the delete confirmation
+   raised from Today's task drawer was visible but could not be clicked. */
 .ff-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -442,7 +446,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1400;
   padding: 24px;
 }
 .ff-modal {

@@ -1026,6 +1026,39 @@ export function usePlannerData() {
     setSelectedTaskId("");
   }
 
+  // Deletion is a hard removal, so undo re-inserts the rows the caller
+  // captured beforehand. Targeted on purpose: restoring a whole-store snapshot
+  // would also throw away anything the user changed while the toast was up.
+  function restoreDeletedTask(task: Task, subtasks: Subtask[], childTaskIds: string[] = []) {
+    setData((current) => ({
+      ...current,
+      tasks: (current.tasks.some((item) => item.id === task.id)
+        ? current.tasks
+        : [...current.tasks, task]
+      ).map((item) =>
+        // deleteTask promotes children to top level; put them back under the parent.
+        childTaskIds.includes(item.id) ? { ...item, parentTaskId: task.id } : item,
+      ),
+      subtasks: [
+        ...current.subtasks.filter((item) => item.taskId !== task.id),
+        ...subtasks,
+      ],
+    }));
+  }
+
+  function restoreDeletedProject(project: Project, taskIds: string[] = []) {
+    setData((current) => ({
+      ...current,
+      projects: current.projects.some((item) => item.id === project.id)
+        ? current.projects
+        : [...current.projects, project],
+      // deleteProject unassigns its tasks rather than deleting them.
+      tasks: current.tasks.map((item) =>
+        taskIds.includes(item.id) ? { ...item, projectId: project.id } : item,
+      ),
+    }));
+  }
+
   function restoreTask(taskId: string) {
     const now = new Date().toISOString();
 
@@ -1843,6 +1876,8 @@ export function usePlannerData() {
     rescheduleTask,
     moveToWaiting,
     deleteTask,
+    restoreDeletedTask,
+    restoreDeletedProject,
     archiveTask,
     restoreTask,
     duplicateTask,
