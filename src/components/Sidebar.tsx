@@ -165,7 +165,6 @@ export function Sidebar({
     buckets.waiting.length +
     buckets.inProgress.length +
     buckets.overdue.length +
-    buckets.focus.length +
     buckets.dueToday.length +
     buckets.scheduledToday.length;
   const activeProjectCount = projects.filter((project) => project.status !== "archived").length;

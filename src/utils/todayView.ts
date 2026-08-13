@@ -66,7 +66,6 @@ function isTodayTask(task: Task, today: string): boolean {
   if (task.status === "done") return false;
   return (
     Boolean(task.dueDate && task.dueDate < today) ||
-    task.isFocus ||
     task.status === "doing" ||
     task.status === "waiting" ||
     task.dueDate === today ||
@@ -77,8 +76,6 @@ function isTodayTask(task: Task, today: string): boolean {
 export function defaultBucketFor(task: Task, today: string): TodayBucketId {
   if (task.dueDate && task.dueDate < today) return "now";
   if (task.status === "doing") return "now";
-  if (task.isFocus) return "now";
-  if (task.importance === "high" && task.urgency === "high") return "now";
   if (task.priority === "high" && task.dueDate === today) return "now";
   if (task.status === "waiting") return "later";
   if ((task.priority === "low" || task.priority === "none") && task.dueDate !== today) {
@@ -91,7 +88,6 @@ function reasonFor(task: Task, today: string): TodayReason {
   if (task.dueDate && task.dueDate < today && task.status !== "done") return "overdue";
   if (task.status === "doing") return "progress";
   if (task.status === "waiting") return "waiting";
-  if (task.isFocus) return "focus";
   if (task.priority === "high") return "high";
   if (task.priority === "medium") return "medium";
   return "low";
@@ -288,53 +284,33 @@ export function buildSpaceSignals(
 
 // === Plan Today (spec §30, rule-based mock planner) ===
 
+/** The three id lists "Plan today" writes into the bucket overrides. */
 export interface TodayPlanResult {
-  id: string;
   nowTaskIds: string[];
   nextTaskIds: string[];
   laterTaskIds: string[];
-  reasonKeys: string[];
-  createdAt: string;
-  appliedAt?: string;
 }
 
 export function buildTodayPlan(entries: TodayEntry[], today = todayValue()): TodayPlanResult {
-  const open = entries.filter((entry) => !entry.completed);
   const now: string[] = [];
   const next: string[] = [];
   const later: string[] = [];
-  const reasons = new Set<string>();
 
-  for (const entry of open) {
+  for (const entry of entries) {
+    if (entry.completed) continue;
     const { task } = entry;
-    if (entry.reason === "overdue") {
+    if (entry.reason === "overdue" || task.status === "doing" || task.priority === "high") {
       now.push(task.id);
-      reasons.add("todayv.planReasonOverdue");
-    } else if (task.status === "doing" || task.isFocus) {
-      now.push(task.id);
-      reasons.add("todayv.planReasonFocus");
-    } else if (task.priority === "high" || (task.importance === "high" && task.urgency === "high")) {
-      now.push(task.id);
-      reasons.add("todayv.planReasonHigh");
     } else if (task.dueDate === today) {
       next.push(task.id);
-      reasons.add("todayv.planReasonDue");
     } else if (task.status === "waiting" || task.priority === "low" || task.priority === "none") {
       later.push(task.id);
-      reasons.add("todayv.planReasonLow");
     } else {
       next.push(task.id);
     }
   }
 
-  return {
-    id: `plan-${Date.now()}`,
-    nowTaskIds: now,
-    nextTaskIds: next,
-    laterTaskIds: later,
-    reasonKeys: [...reasons],
-    createdAt: new Date().toISOString(),
-  };
+  return { nowTaskIds: now, nextTaskIds: next, laterTaskIds: later };
 }
 
 // === Formatting helpers ===

@@ -37,7 +37,6 @@ const STORAGE_KEY = "focusflow.appData.v1";
 const LEGACY_STORAGE_KEY = "todo-planner-data";
 const taskStatuses = ["inbox", "todo", "doing", "waiting", "done", "archived"] as const;
 const taskPriorities = ["none", "low", "medium", "high"] as const;
-const taskLevels = ["low", "high"] as const;
 const projectTypes = ["project", "area"] as const;
 const projectStatuses = ["active", "paused", "completed", "archived"] as const;
 const topicCategories = [
@@ -156,9 +155,6 @@ function normalizeTask(task: Partial<Task>): Task {
     parentTaskId: task.parentTaskId ?? "",
     tags: Array.isArray(task.tags) ? task.tags : [],
     notes: task.notes ?? "",
-    importance: oneOf(task.importance, taskLevels, "low"),
-    urgency: oneOf(task.urgency, taskLevels, "low"),
-    isFocus: Boolean(task.isFocus),
     estimatedMinutes:
       Number.isFinite(task.estimatedMinutes) && Number(task.estimatedMinutes) > 0
         ? Math.round(Number(task.estimatedMinutes))
@@ -1597,10 +1593,6 @@ export function usePlannerData() {
     updateTask(taskId, { status: "done" });
   }
 
-  function setTaskFocus(taskId: string, isFocus: boolean) {
-    updateTask(taskId, { isFocus });
-  }
-
   // Snooze moves the planned work date only — never the deadline (spec §0.5.9).
   function snoozeTask(taskId: string, date?: string) {
     updateTask(taskId, { scheduledDate: date ?? addDays(todayValue(), 1) });
@@ -1871,7 +1863,6 @@ export function usePlannerData() {
     updateTask,
     updateTaskStatus,
     completeTask,
-    setTaskFocus,
     snoozeTask,
     rescheduleTask,
     moveToWaiting,

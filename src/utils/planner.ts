@@ -29,7 +29,6 @@ export type TodayBuckets = {
   waiting: Task[];
   inProgress: Task[];
   overdue: Task[];
-  focus: Task[];
   dueToday: Task[];
   scheduledToday: Task[];
 };
@@ -41,7 +40,6 @@ export function getTodayBuckets(tasks: Task[], today = todayValue()): TodayBucke
     waiting: [],
     inProgress: [],
     overdue: [],
-    focus: [],
     dueToday: [],
     scheduledToday: [],
   };
@@ -67,10 +65,6 @@ export function getTodayBuckets(tasks: Task[], today = todayValue()): TodayBucke
     }
     if (task.dueDate && task.dueDate < today) {
       buckets.overdue.push(task);
-      continue;
-    }
-    if (task.isFocus) {
-      buckets.focus.push(task);
       continue;
     }
     if (task.dueDate === today) {

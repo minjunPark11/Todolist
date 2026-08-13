@@ -61,18 +61,11 @@ export function getDraftMatrixPosition(
   );
 }
 
-function levelsForQuadrant(quadrant: MatrixQuadrant): Pick<Task, "importance" | "urgency"> {
-  if (quadrant === "I") return { importance: "high", urgency: "high" };
-  if (quadrant === "II") return { importance: "high", urgency: "low" };
-  if (quadrant === "III") return { importance: "low", urgency: "high" };
-  return { importance: "low", urgency: "low" };
-}
-
 // Reverse mapping for quadrant changes: moving a card into a quadrant mutates
-// the fields that drive the derived position, while keeping importance/urgency
-// aligned with the visible Eisenhower state.
+// the priority/dueDate fields the position is derived from. Nothing stores the
+// quadrant itself, so the two can never disagree.
 export function patchForQuadrant(task: Task, quadrant: MatrixQuadrant, today: string): Partial<Task> {
-  const patch: Partial<Task> = levelsForQuadrant(quadrant);
+  const patch: Partial<Task> = {};
   const urgent = isMatrixUrgent(task, today);
 
   // Leaving IV's parked groups re-activates the task.

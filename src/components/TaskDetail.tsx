@@ -161,7 +161,7 @@ export function TaskDetail({
         <h3>{t("taskDetail.planning")}</h3>
         <div className="detail-field-list">
           <label>
-            <span>{t("taskDetail.importance")}</span>
+            <span>{t("taskDetail.quadrant")}</span>
             <select
               value={selectedQuadrant}
               onChange={(event) => {
