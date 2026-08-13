@@ -1,0 +1,1014 @@
+/* ============================================================================
+   Today page (redesigned execution view — TODAY_PAGE_IMPLEMENTATION_SPEC §15)
+   ========================================================================== */
+
+.page-grid.no-detail.tdy-grid {
+  /* Fill the full content width like the Calendar view (no narrow cap) so the
+     left/right empty space matches across views. */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tdy-page {
+  --tdy-navy: #171c30;
+  --tdy-navy-hover: #232a45;
+  --tdy-blue-soft: #eaf2ff;
+  --tdy-green-soft: #e8f6ee;
+  --tdy-amber-soft: #fff4e0;
+  --tdy-purple-soft: #f2ecfd;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+[data-theme="dark"] .tdy-page {
+  --tdy-navy: var(--accent);
+  --tdy-navy-hover: var(--accent);
+  --tdy-blue-soft: rgba(64, 128, 255, 0.16);
+  --tdy-green-soft: rgba(52, 199, 89, 0.14);
+  --tdy-amber-soft: rgba(255, 149, 0, 0.14);
+  --tdy-purple-soft: rgba(175, 82, 222, 0.14);
+}
+
+/* --- Header --- */
+
+.tdy-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.tdy-head-title h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 750;
+  letter-spacing: -0.6px;
+}
+
+.tdy-head-title p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.tdy-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tdy-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(400px, 60vw);
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.tdy-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.tdy-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.tdy-search input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.tdy-kbd {
+  font-size: 12px;
+  padding: 3px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  background: var(--bg-surface-muted);
+  color: var(--text-tertiary);
+}
+
+.tdy-search-clear {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* --- Buttons --- */
+
+.tdy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast);
+}
+
+.tdy-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.tdy-btn:focus-visible {
+  outline: 3px solid var(--accent-soft);
+  outline-offset: 1px;
+}
+
+.tdy-btn-navy {
+  background: var(--tdy-navy);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(23, 28, 48, 0.18);
+}
+
+.tdy-btn-navy:not(:disabled):hover {
+  background: var(--tdy-navy-hover);
+}
+
+.tdy-btn-light {
+  background: var(--bg-surface);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.tdy-btn-light:not(:disabled):hover {
+  background: var(--bg-hover);
+}
+
+.tdy-btn-sm {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 13.5px;
+}
+
+/* --- Layout --- */
+
+.tdy-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+.tdy-main,
+.tdy-side {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* --- Card base --- */
+
+.tdy-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: var(--shadow-xs);
+}
+
+.tdy-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tdy-card-head h2 {
+  margin: 0;
+  flex: 1;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.3px;
+}
+
+.tdy-card-head-icon {
+  display: inline-flex;
+  color: var(--text-secondary);
+}
+
+.tdy-card-head-note {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* --- Today Brief --- */
+
+.tdy-brief {
+  display: flex;
+  gap: 18px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 150% at 100% 100%, rgba(255, 205, 160, 0.18) 0%, rgba(173, 208, 255, 0.16) 38%, transparent 70%),
+    var(--bg-surface);
+}
+
+.tdy-brief-icon {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #4d94ff, #2f6fe0);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(47, 111, 224, 0.28);
+}
+
+.tdy-brief-body {
+  min-width: 0;
+}
+
+.tdy-brief-body h2 {
+  margin: 4px 0 6px;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.3px;
+}
+
+.tdy-brief-summary {
+  margin: 0 0 2px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.tdy-brief-hint {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.tdy-brief-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* --- Focus Queue --- */
+
+/* One-line capture bar, above the queue. Always present so a stray thought
+   costs one keystroke rather than a modal. */
+.tdy-capture {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.tdy-capture-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tdy-capture-icon {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.tdy-capture-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--text-primary);
+}
+
+.tdy-capture-input:focus {
+  outline: none;
+}
+
+.tdy-capture-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Reads as the destination, not as an on/off switch — the label always names
+   where the next capture lands. */
+.tdy-capture-toggle {
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.tdy-capture-toggle.is-on {
+  border-color: transparent;
+  background: var(--tdy-blue-soft);
+  color: var(--accent);
+}
+
+.tdy-capture-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-left: 36px;
+}
+
+.tdy-capture-chip {
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tdy-capture-hint {
+  margin: 0;
+  padding-left: 36px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.tdy-bucket {
+  margin-top: 6px;
+}
+
+.tdy-bucket + .tdy-bucket {
+  margin-top: 18px;
+}
+
+.tdy-bucket-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 10px;
+}
+
+.tdy-bucket-head strong {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.tdy-bucket-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tdy-bucket-dot-now { background: var(--success); }
+.tdy-bucket-dot-next { background: var(--warning); }
+.tdy-bucket-dot-later { background: var(--accent); }
+.tdy-bucket-dot-done { background: var(--text-tertiary); }
+
+.tdy-bucket-count {
+  min-width: 22px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tdy-bucket-empty {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: var(--text-tertiary);
+}
+
+.tdy-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.tdy-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 7px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.tdy-row:hover {
+  border-color: var(--accent);
+}
+
+.tdy-row.is-done {
+  opacity: 0.72;
+}
+
+.tdy-row.is-done .tdy-row-title {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+}
+
+.tdy-row-time {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tdy-check {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 1.6px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--bg-surface);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.tdy-check:hover {
+  border-color: var(--accent);
+}
+
+.tdy-check.checked {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.tdy-row-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The title doubles as the row's "open" control so the row itself stays a
+   plain element — nested interactive controls break screen-reader output.
+   Font size/weight keep coming from .tdy-row-title above. */
+button.tdy-row-title {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tdy-space-pill {
+  flex-shrink: 0;
+  max-width: 140px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--tdy-blue-soft);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tdy-reason {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 74px;
+}
+
+.tdy-reason-overdue { color: var(--danger); }
+.tdy-reason-high { color: #e8590c; }
+.tdy-reason-progress { color: var(--accent); }
+.tdy-reason-focus { color: var(--purple); }
+.tdy-reason-waiting { color: var(--text-tertiary); }
+.tdy-reason-medium { color: var(--warning); }
+.tdy-reason-low { color: var(--success); }
+
+.tdy-estimate {
+  flex-shrink: 0;
+  min-width: 38px;
+  text-align: right;
+  font-size: 13.5px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.tdy-status-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.tdy-status-dot.is-now { background: var(--success); }
+.tdy-status-dot.is-done { background: transparent; }
+
+.tdy-queue-empty {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 18px 4px;
+}
+
+.tdy-queue-empty strong {
+  font-size: 16px;
+}
+
+.tdy-queue-empty p {
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+  font-size: 14.5px;
+}
+
+/* --- Time Rail --- */
+
+.tdy-rail-list {
+  display: grid;
+  gap: 6px;
+}
+
+.tdy-rail-item {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.tdy-rail-time {
+  padding-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tdy-rail-block {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 13px;
+  background: var(--tdy-blue-soft);
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  transition: filter var(--motion-fast), transform var(--motion-fast);
+}
+
+.tdy-rail-block:hover {
+  filter: brightness(0.97);
+}
+
+.tdy-rail-block strong {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.tdy-rail-block span {
+  font-size: 12.5px;
+  opacity: 0.85;
+}
+
+.tdy-rail-item.is-free {
+  min-height: 30px;
+  align-items: center;
+}
+
+.tdy-rail-item.is-free .tdy-rail-time {
+  padding-top: 0;
+}
+
+.tdy-rail-free {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  border-bottom: 1px dashed var(--border-subtle);
+  padding-bottom: 4px;
+}
+
+.tdy-rail-empty {
+  margin: 4px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.tdy-rail-overflow {
+  margin: 6px 0;
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+}
+
+/* --- Attention from Spaces --- */
+
+.tdy-signal-list {
+  display: grid;
+  gap: 4px;
+}
+
+.tdy-signal-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tdy-signal-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-fast);
+}
+
+.tdy-signal-main:hover {
+  background: var(--bg-hover);
+}
+
+.tdy-signal-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--tdy-purple-soft);
+  color: var(--purple);
+}
+
+.tdy-signal-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.tdy-signal-text strong {
+  font-size: 14.5px;
+  font-weight: 620;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tdy-signal-text small {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tdy-severity-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tdy-severity-high { background: var(--danger); }
+.tdy-severity-medium { background: var(--warning); }
+.tdy-severity-low { background: var(--success); }
+
+/* --- Inbox Triage --- */
+
+.tdy-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.tdy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 260px;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 13px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color var(--motion-fast), background var(--motion-fast);
+}
+
+.tdy-chip svg {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.tdy-chip span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tdy-chip:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+.tdy-chip-more {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.tdy-triage-list {
+  display: grid;
+  gap: 14px;
+}
+
+/* Focused programmatically to host the shortcuts; the active row already
+   shows where the keys will land, so no extra ring is needed here. */
+.tdy-triage-list:focus {
+  outline: none;
+}
+
+.tdy-triage-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tdy-triage-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.tdy-triage-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 12px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  transition: border-color var(--motion-fast), background var(--motion-fast);
+}
+
+/* The keyboard cursor: which row j/k/1/3/e will act on. */
+.tdy-triage-row.is-active {
+  border-color: var(--accent);
+}
+
+.tdy-triage-row.is-selected {
+  background: var(--accent-soft);
+}
+
+.tdy-triage-check {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Actions span both columns so they stay left-aligned under the title. */
+.tdy-triage-row .tdy-triage-actions {
+  grid-column: 2;
+}
+
+/* Sticky bar sits over the end of the list, so the list reserves room for it
+   — otherwise the last row's buttons are unreachable while a selection is up. */
+.tdy-triage-list:has(~ .tdy-bulk-bar) {
+  padding-bottom: 76px;
+}
+
+.tdy-bulk-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.tdy-bulk-bar strong {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.tdy-bulk-clear {
+  margin-left: auto;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tdy-triage-info {
+  display: grid;
+  gap: 2px;
+}
+
+.tdy-triage-info small {
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+}
+
+.tdy-triage-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* --- Task detail overlay: clicking a row opens TaskDetail as a right-side
+   drawer, since the Today grid has no side-by-side detail column. --- */
+
+.tdy-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 20, 0.35);
+  z-index: 1200;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tdy-detail-drawer {
+  width: 400px;
+  max-width: 94vw;
+  height: 100%;
+  padding: 20px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.tdy-detail-drawer .detail-panel {
+  position: static;
+  max-height: none;
+}
+
+.tdy-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.tdy-triage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tdy-triage-actions select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13.5px;
+}
+
+/* --- Quick Add / Plan modal bits --- */
+
+.tdy-bucket-picker {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface-muted);
+  margin-top: 4px;
+}
+
+.tdy-bucket-picker button {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tdy-bucket-picker button.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-card);
+}
+
+.tdy-form-error {
+  margin: -6px 0 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 1120px) {
+  .tdy-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .tdy-head-title h1 {
+    font-size: 32px;
+  }
+
+  .tdy-search {
+    width: 100%;
+  }
+
+  .tdy-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .tdy-row-title {
+    flex-basis: calc(100% - 80px);
+  }
+}
+
+[data-reduce-motion="true"] .tdy-page * {
+  transition: none !important;
+}
+

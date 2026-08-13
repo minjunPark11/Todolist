@@ -1,0 +1,47 @@
+[package]
+name = "focusflow"
+version = "0.4.0"
+description = "FocusFlow desktop app"
+authors = ["FocusFlow"]
+license = ""
+repository = ""
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Local AI hardware profiling (RAM/disk) — read-only, local queries only.
+sysinfo = { version = "0.33", default-features = false, features = ["system", "disk"] }
+# Local AI model downloads (streaming + resume). rustls avoids the OpenSSL
+# system dependency across platforms.
+# - system-proxy: WebView traffic honors the OS proxy but reqwest only reads
+#   env vars without it, so downloads died on Windows machines behind a
+#   system-configured proxy while the rest of the app worked.
+# - rustls-tls-native-roots: adds the OS trust store on top of webpki roots,
+#   covering networks/security software that re-sign TLS with a local CA.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots", "stream", "system-proxy"] }
+futures-util = "0.3"
+sha2 = "0.10"
+# Extracts the llama.cpp release archives into the app-local bin dir: zip for
+# the Windows build (deflate only, skipping the C-backed bzip2/zstd codecs) and
+# tar.gz for the macOS/Linux builds.
+zip = { version = "4", default-features = false, features = ["deflate"] }
+tar = "0.4"
+flate2 = "1"
+tokio = { version = "1", features = ["fs", "io-util"] }
+# image-png: decodes the bundled macOS menu-bar template icon at startup.
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = { version = "2", features = ["watch"] }
+tauri-plugin-http = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-process = "2"
+tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
+
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "FocusFlow",
+  "version": "0.4.0",
+  "identifier": "com.focusflow.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "FocusFlow",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 980,
+        "minHeight": 680,
+        "dragDropEnabled": false
+      },
+      {
+        "label": "focus-mini-timer",
+        "url": "mini-focus.html",
+        "title": "FocusFlow Mini Timer",
+        "width": 360,
+        "height": 320,
+        "minWidth": 320,
+        "minHeight": 280,
+        "resizable": true,
+        "maximizable": false,
+        "alwaysOnTop": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/minjunPark11/Todolist/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERBOUY2RUNGQThBNDhCNjMKUldSamk2U296MjZmMnNkUVJua3ZpUU1QaS9qR0ZuVXJtaFFYREhCemxBQWpxNkNGcTNOVGpYQy8K"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "todo-planner",
+  "private": true,
+  "version": "0.4.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --configLoader runner",
+    "build": "tsc -b && vite build --configLoader runner",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-fs": "^2.5.1",
+    "@tauri-apps/plugin-http": "^2.0.0",
+    "@tauri-apps/plugin-notification": "^2.0.0",
+    "@tauri-apps/plugin-opener": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-sql": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.10.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "framer-motion": "^12.42.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.5"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/react": "^18.3.17",
+    "@types/react-dom": "^18.3.5",
+    "vitest": "^4.1.10"
+  }
+}

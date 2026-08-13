@@ -1,0 +1,15 @@
+/* ============================================================================
+   styles.css — barrel
+   원본 단일 파일(12.5k줄)을 모듈로 분할. 아래 @import 순서 = 기존 cascade 순서
+   이므로 동작은 동일하다. 순서를 바꾸면 오버라이드가 깨지니 주의.
+   (분할 근거: docs/Architecture/Responsive_Audit.md §6)
+   ============================================================================ */
+@import "./styles/01-base.css";
+@import "./styles/02-calendar.css";
+@import "./styles/03-planning.css";
+@import "./styles/04-today.css";
+@import "./styles/05-spaces.css";
+@import "./styles/06-space-detail.css";
+@import "./styles/07-notes-splitview.css";
+@import "./styles/08-calendar-categories.css";
+@import "./styles/09-calendar-redesign.css";
