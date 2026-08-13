@@ -2,10 +2,21 @@ name: Release
 
 # Push a version tag (e.g. v0.1.2) to build, sign, and publish a release
 # with auto-update artifacts (latest.json + signed installers) for Windows + macOS.
+#
+# Can also be started by hand from the Actions tab — pick the branch to release
+# from and pass the tag to cut. tauri-action creates the tag on that commit, so
+# no local tag push is needed. (For the manual trigger to appear at all, this
+# file must also exist on the repository's default branch.)
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create and release (e.g. v0.4.0)"
+        required: true
+        type: string
 
 jobs:
   release:
@@ -56,8 +67,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "FocusFlow ${{ github.ref_name }}"
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: "FocusFlow ${{ inputs.tag || github.ref_name }}"
           releaseBody: "자동 업데이트로 배포됩니다. 앱을 실행하면 새 버전을 안내해요."
           releaseDraft: false
           prerelease: false
