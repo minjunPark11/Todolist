@@ -310,6 +310,14 @@ export function Sidebar({
                 placeholder={t("sidebar.addProjectPlaceholder")}
                 value={newProject}
                 onChange={(event) => setNewProject(event.target.value)}
+                onKeyDown={(event) => {
+                  // Sole text field in the form, so Enter submits implicitly —
+                  // including the Enter an IME sends to commit a composition.
+                  // Swallow that one so a half-typed name is not created.
+                  if (event.key === "Enter" && event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                  }
+                }}
               />
             </form>
           </div>

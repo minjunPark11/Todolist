@@ -342,7 +342,8 @@ export function CalendarCategorySettings({
                   placeholder={t("settings.category.namePlaceholder")}
                   onChange={(event) => setEditor({ ...editor, name: event.target.value, error: "" })}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter") submitEditor();
+                    // isComposing: an IME's composition-commit Enter must not save.
+                    if (event.key === "Enter" && !event.nativeEvent.isComposing) submitEditor();
                   }}
                 />
               </label>

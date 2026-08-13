@@ -264,10 +264,13 @@ export function OllamaChat({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      submit();
-    }
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    // isComposing: an IME's composition-commit Enter must not send the message.
+    // Without this a Korean sentence sends on the Enter that only meant to
+    // finish the last syllable, cutting the message short.
+    if (event.nativeEvent.isComposing) return;
+    submit();
   }
 
   function clearChat() {

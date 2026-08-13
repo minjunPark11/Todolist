@@ -80,7 +80,8 @@ export function QuickAddTaskModal({
               if (error) setError("");
             }}
             onKeyDown={(event) => {
-              if (event.key === "Enter") submit();
+              // isComposing: an IME's composition-commit Enter must not save.
+              if (event.key === "Enter" && !event.nativeEvent.isComposing) submit();
             }}
           />
         </label>

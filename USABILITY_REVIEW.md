@@ -74,40 +74,40 @@
 
 `npx tsc -b` 통과, `vitest run` 211개 전부 통과, 콘솔 에러 없음.
 
+### 2.6 IME 조합 Enter 가드 — 7곳 적용 완료
+
+한글/일본어 IME는 조합을 확정할 때도 Enter를 쏜다. 이걸 걸러내지 않으면 **조합이 끝나기 전에 저장**되어 마지막 글자가 잘린다. 리포의 `NewTaskForm`·`QuickCreatePopover`는 이미 `isComposing` 가드를 갖고 있었으나 나머지는 없었다.
+
+| 위치 | 원래 방식 | 조치 |
+|---|---|---|
+| `today/InlineCapture.tsx` | **폼 암시적 제출** (가드 삽입 자체가 불가능한 구조) | 명시적 `onKeyDown` + 가드로 전환 |
+| `today/QuickAddTaskModal.tsx` | `if (key === "Enter") submit()` | 가드 추가 |
+| `EisenhowerPage.tsx` | 동일 | 가드 추가 |
+| `calendar/CalendarCategorySettings.tsx` | 동일 | 가드 추가 |
+| `spaces/SpaceDrawers.tsx` | 동일 | 가드 추가 |
+| `OllamaChat.tsx` | Enter 전송 | 가드 추가 — 한글 채팅이 중간에 잘려 전송되던 자리 |
+| `Sidebar.tsx` (프로젝트 추가) | 텍스트 필드 1개짜리 폼 → 암시적 제출 | 조합 중 Enter만 `preventDefault` |
+
+`role="button"` 활성화용 Enter 핸들러(`kit.tsx`, `SpacesPage`, `StudyPage`, `CalendarLeftSidebar`, `EisenhowerPage:339`)와 삭제 확인 다이얼로그(`FocusPage`)는 텍스트 입력이 아니라 제외했다.
+
+**검증**
+
+1. 합성 `KeyboardEvent`로 `isComposing` 분기를 직접 확인 — 조합 Enter는 저장되지 않고, 이어진 실제 Enter는 저장됐다.
+2. 회귀 확인: 캡처 바에 `내일 오후 3시 팀 미팅 !!` → Enter → `{title:"팀 미팅", priority:"high", scheduledDate:"2026-08-14", startTime:"15:00"}`. 파싱 토큰이 제목에서 정확히 제거됐다.
+
+> **부수 효과**: `InlineCapture`가 암시적 제출을 벗어나면서 Enter 저장이 이제 프로그램적으로도 동작한다.
+> 이전에는 암시적 제출에 의존해 **자동화로는 캡처 저장을 테스트할 수 없었다.**
+>
+> **남은 한계**: 위 검증은 합성 이벤트다. **실제 IME로 조합 중 Enter를 눌러보는 확인은 여전히 남아 있다.**
+> 로직이 옳다는 것과 실기기에서 재현되지 않는다는 것은 다른 문제다.
+
 ---
 
 ## 3. 아직 유효한 문제 (여기서부터 작업)
 
 `v0.4.0` 코드에서 재확인한 것만 적는다.
 
-### 3.1 [P2] IME 조합 중 Enter 가드 없음 — 한국어 사용자 직격
-
-`InlineCapture`의 저장은 **폼 암시적 제출**에 의존한다. `onKeyDown`은 `Escape`와 `Alt+Enter`만 다룬다 (`InlineCapture.tsx:76-87`).
-
-```tsx
-<form className="tdy-capture" onSubmit={submit}>   // :61
-  <input onKeyDown={...} />                        // Enter 케이스 없음
-  <button type="submit">                           // :98 → 암시적 제출
-```
-
-문제: **`event.nativeEvent.isComposing` 검사가 없다.** 한글 IME에서 조합을 확정하는 Enter가 그대로 제출로 이어지면 마지막 글자가 잘리거나 의도치 않게 저장된다. 게다가 암시적 제출 방식은 `isComposing`을 검사할 자리 자체가 없는 구조다.
-
-**코드베이스 내 일관성도 깨진다** — 다른 입력들은 가드를 갖고 있다:
-
-| 위치 | 가드 |
-|---|---|
-| `src/components/calendar/NewTaskForm.tsx:47` | `event.key === "Enter" && !event.nativeEvent.isComposing` |
-| `src/components/calendar/QuickCreatePopover.tsx:76` | 동일 |
-| `src/components/today/InlineCapture.tsx` | **없음** |
-| `src/components/today/QuickAddTaskModal.tsx:83` | **없음** (`if (event.key === "Enter") submit();`) |
-
-**조치**: `InlineCapture`를 명시적 `onKeyDown` + `isComposing` 가드로 바꾸고, `QuickAddTaskModal:83`도 같이 고칠 것.
-
-> **검증 주의**: 브라우저 자동화로 보낸 Enter는 폼 암시적 제출을 트리거하지 못한다.
-> 평가 중 자동화 Enter로는 저장이 되지 않았으나, 이는 도구 한계일 가능성이 높다.
-> **실제 키보드 + 한글 IME로 반드시 손으로 확인할 것.** 자동화 결과만으로 판단 금지.
-
-### 3.2 [P2] 검색창이 2개, 역할이 구분되지 않음
+### 3.1 [P2] 검색창이 2개, 역할이 구분되지 않음
 
 - 사이드바 검색: **전역**. 태스크/프로젝트/토픽/노트를 드롭다운으로. `/`로 포커스 (`App.tsx:279`, `:1137`)
 - Today 헤더 검색: **그 페이지 목록만 거르는 로컬 필터** (`TodayPage.tsx:149` 이하)
@@ -116,7 +116,7 @@
 
 **조치**: 문구를 역할대로 분리 — "전역 검색" vs "이 목록에서 찾기".
 
-### 3.3 [P3] 아이젠하워 사분면 IV의 라벨과 내용이 모순
+### 3.2 [P3] 아이젠하워 사분면 IV의 라벨과 내용이 모순
 
 ```
 "eis.qIV":     "Neither Important nor Urgent"   // src/i18n/en.ts:778
@@ -129,13 +129,13 @@
 
 **조치**: 미분류 그룹을 사분면 밖 별도 레인으로 분리하거나, 최소한 Q4 제목을 내용에 맞게 고칠 것.
 
-### 3.4 [P3] 자유 텍스트 칸이 여전히 2개
+### 3.3 [P3] 자유 텍스트 칸이 여전히 2개
 
 §2.3에서 유실은 해결됐으나 `description`과 `notes`가 상세 패널에 **나란히** 남아 있다. 사용자는 "무엇을 어디에 적어야 하는지" 판단해야 한다. `description`은 전역 검색 인덱스(`App.tsx`) 외에 뚜렷한 소비처가 없다.
 
 **조치**: 한쪽으로 통합 + 마이그레이션. 급하진 않다.
 
-### 3.5 [P3] 죽은 설정 `aiModel`
+### 3.4 [P3] 죽은 설정 `aiModel`
 
 `appSettings.aiModel`은 저장·정규화만 되고 **읽는 코드가 한 곳도 없다.**
 
@@ -157,13 +157,14 @@ src/hooks/usePlannerData.ts:417  aiModel: typeof settings?.aiModel === "string" 
 
 | # | 작업 | 근거 | 규모 |
 |---|---|---|---|
-| 1 | IME `isComposing` 가드 (§3.1) | 한국어 사용자 직격, 실입력 유실 위험. **손으로 재현 확인이 선행돼야 함** | 소 |
-| 2 | 사분면 IV 라벨 (§3.3) | 표시 계층만 남은 잔여 문제 | 소 |
-| 3 | 검색창 문구 분리 (§3.2) | 문구 결정 필요 | 소 |
-| 4 | `aiModel` 제거 + AI 오류 안내 (§3.5) | | 소 |
-| 5 | `description`/`notes` 통합 (§3.4) | 마이그레이션 필요 | 중 |
+| 1 | 사분면 IV 라벨 (§3.2) | 표시 계층만 남은 잔여 문제 | 소 |
+| 2 | 검색창 문구 분리 (§3.1) | 문구 결정 필요 | 소 |
+| 3 | `aiModel` 제거 + AI 오류 안내 (§3.4) | | 소 |
+| 4 | `description`/`notes` 통합 (§3.3) | 마이그레이션 필요 | 중 |
 
-**1번이 유일하게 데이터가 잘못 저장될 수 있는 항목**이다. 나머지는 표시·문구 문제라 틀려도 손해가 없다. 2~4는 독립적이라 순서를 바꿔도 된다.
+**남은 4건은 전부 표시·문구 문제라 틀려도 데이터 손해가 없다.** 1~3은 서로 독립적이라 순서를 바꿔도 된다. 4번만 마이그레이션이 필요하다.
+
+데이터에 영향을 줄 수 있던 항목(§2.6 IME)은 처리됐으나, **실기기 IME 확인은 남아 있다** — 부록 참조.
 
 ---
 
@@ -186,7 +187,10 @@ npm run dev   # .claude/launch.json 의 "dev" → 127.0.0.1:5180
 
 | 확인할 것 | 절차 |
 |---|---|
-| §3.1 IME | **실제 키보드 + 한글 IME로** Today 캡처 바에 한글 입력, 마지막 글자 조합 중 Enter. **자동화 불가** |
-| §3.2 검색 | 사이드바 검색과 Today 헤더 검색에 같은 단어를 넣고 결과 비교 |
+| **§2.6 IME (미완)** | **실제 키보드 + 한글 IME로** Today 캡처 바에 `팀 미팅` 입력, 마지막 글자 조합 중 Enter. 온전히 저장되면 OK, 잘리면 회귀. **자동화 불가 — 반드시 손으로** |
+| §2.6 IME 회귀 | 같은 자리에 영문 입력 후 Enter → 정상 저장돼야 한다 (가드가 일반 Enter까지 막지 않았는지) |
 | §2.2 파싱 | 캡처 바에 `내일 오후 3시 팀 미팅 !!` 입력 → 칩 3개(`Aug 14`·`3:00 PM`·`High`) 확인 |
 | §2.5 로케일 | Settings에서 언어를 English ↔ 한국어로 토글 → Focus 페이지 헤더 날짜가 따라오는지 |
+| §3.1 검색 | 사이드바 검색과 Today 헤더 검색에 같은 단어를 넣고 결과 비교 |
+
+IME 가드가 들어간 자리는 캡처 바 외에도 6곳이다 (§2.6 표). 한글로 저장을 시도해볼 만한 곳: **AI 채팅**, **사이드바 프로젝트 추가**, **Planning 빠른 추가**, **Space 서브태스크 추가**.

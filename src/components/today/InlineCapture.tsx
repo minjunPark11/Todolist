@@ -78,12 +78,24 @@ export function InlineCapture({
               setValue("");
               return;
             }
+            if (event.key !== "Enter") return;
+
+            // Enter is handled here rather than left to the form's implicit
+            // submission, because a Korean/Japanese IME also fires Enter to
+            // commit the in-flight composition. Implicit submission cannot
+            // tell the two apart and would store a half-composed title, so
+            // every Enter is intercepted and only the non-composing one saves.
+            // The commit itself rides on compositionend and is unaffected.
+            event.preventDefault();
+            if (event.nativeEvent.isComposing) return;
+
             // Alt/Option+Enter hands the current text to the full form.
-            if (event.key === "Enter" && event.altKey) {
-              event.preventDefault();
+            if (event.altKey) {
               onOpenDetails(parsed.title.trim() || value.trim());
               setValue("");
+              return;
             }
+            submit();
           }}
         />
         <button

@@ -155,10 +155,11 @@ export function TaskDetailDrawer({
               aria-label={t("spaceHub.subtasks.placeholder")}
               onChange={(event) => setChildTitle(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  submitChild();
-                }
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                // isComposing: an IME's composition-commit Enter must not save.
+                if (event.nativeEvent.isComposing) return;
+                submitChild();
               }}
             />
             <button type="button" className="sdv-btn sdv-btn-sm" disabled={!childTitle.trim()} onClick={submitChild}>
