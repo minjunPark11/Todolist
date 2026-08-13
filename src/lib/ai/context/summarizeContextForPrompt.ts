@@ -5,14 +5,11 @@
 // (or send it structurally) without re-running selection.
 import type { RelevantAppContext } from "./selectRelevantAppContext";
 import { AI_CONTEXT_LIMITS } from "./limits";
+import { truncateToTokenBudget } from "../promptBudget";
 
 export type SummarizeContextOptions = {
   calendarContextText?: string;
 };
-
-function truncateText(text: string, maxCharacters: number) {
-  return text.length > maxCharacters ? `${text.slice(0, maxCharacters)}\n[context truncated]` : text;
-}
 
 export function summarizeContextForPrompt(
   context: RelevantAppContext,
@@ -25,5 +22,5 @@ export function summarizeContextForPrompt(
     "Read-only mode: never claim you changed app data, never emit tool/action JSON, and never ask to apply app changes.",
   ].filter(Boolean);
 
-  return truncateText(sections.join("\n\n"), AI_CONTEXT_LIMITS.maxContextCharacters);
+  return truncateToTokenBudget(sections.join("\n\n"), AI_CONTEXT_LIMITS.maxContextTokens);
 }

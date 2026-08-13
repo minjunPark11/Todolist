@@ -30,6 +30,16 @@ export function addMonths(dateValue: string, months: number): string {
   return toDateInputValue(date);
 }
 
+// Whole days from `from` to `to`, negative when `to` is the earlier date.
+// Both are YYYY-MM-DD; parsing at local midnight keeps DST transitions from
+// turning a whole number of days into 23.958.
+export function daysBetween(from: string, to: string): number {
+  const fromMs = new Date(`${from}T00:00:00`).getTime();
+  const toMs = new Date(`${to}T00:00:00`).getTime();
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return 0;
+  return Math.round((toMs - fromMs) / 86400000);
+}
+
 export function isOverdue(dateValue: string): boolean {
   return Boolean(dateValue) && dateValue < todayValue();
 }

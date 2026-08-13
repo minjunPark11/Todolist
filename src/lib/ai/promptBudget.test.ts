@@ -91,10 +91,10 @@ describe("fitMessagesToBudget", () => {
 
   it("handles an all-system message array without trimming", () => {
     const result = fitMessagesToBudget(head, 1);
-    expect(result).toEqual({ messages: head, dropped: 0 });
+    expect(result).toEqual({ messages: head, dropped: 0, systemTruncated: false });
   });
 
   it("handles an empty array", () => {
-    expect(fitMessagesToBudget([], 100)).toEqual({ messages: [], dropped: 0 });
+    expect(fitMessagesToBudget([], 100)).toEqual({ messages: [], dropped: 0, systemTruncated: false });
   });
 });

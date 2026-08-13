@@ -15,15 +15,27 @@ import type { ContextCard } from "../contextCards/types";
 import type { AiContextInput } from "../context/buildAiContext";
 import { loadMemories } from "../memory/aiMemory";
 import { buildMemoryProfileBlock } from "../memory/memoryProfile";
+import { truncateToTokenBudget } from "../promptBudget";
 
+// The two budgets below are in TOKENS, the unit the llama-server window is
+// measured in. They replace character caps (10,000 for the pack, 6,000 for
+// knowledge) that assumed ~4 chars per token: true for latin text, but Hangul
+// and CJK cost ~1 token per character, so a Korean brain dump could produce a
+// 10k-token pack on its own. Together with the ~2.9k-token system prompt and
+// the 1k reply reserve, that overshot the 8192 window by more than 2x — and
+// even in English the old caps left nothing for history (2832 + 2801 + 1680 +
+// 1024 = 8337). See ASSISTANT_SYSTEM_PROMPT_TOKENS in promptBudget.ts.
 export const ASSISTANT_CONTEXT_LIMITS = {
   matchedTasks: 8,
   fallbackTasks: 5,
   projects: 5,
   focusSessions: 5,
   relatedCards: 3,
+  // Retrieval still selects chunks by character budget (that is the
+  // retriever's API); the result is token-capped below.
   knowledgeBudgetChars: 6000,
-  maxPackCharacters: 10000,
+  knowledgeBudgetTokens: 1400,
+  maxPackTokens: 1800,
 };
 
 export type AssistantContextPack = {
@@ -133,7 +145,10 @@ export async function buildAssistantContextPack(args: {
         budgetChars: Math.min(knowledgeSettings.knowledgeBudgetChars, ASSISTANT_CONTEXT_LIMITS.knowledgeBudgetChars),
       });
       if (result) {
-        knowledgeContext = result.text;
+        knowledgeContext = truncateToTokenBudget(
+          result.text,
+          ASSISTANT_CONTEXT_LIMITS.knowledgeBudgetTokens,
+        );
         knowledgeSources = result.sources.slice(0, 5);
       }
     } catch {
@@ -192,11 +207,10 @@ export async function buildAssistantContextPack(args: {
       : "",
   ].filter(Boolean);
 
-  const joined = sections.join("\n\n");
-  const contextText =
-    joined.length > ASSISTANT_CONTEXT_LIMITS.maxPackCharacters
-      ? `${joined.slice(0, ASSISTANT_CONTEXT_LIMITS.maxPackCharacters)}\n[context truncated]`
-      : joined;
+  const contextText = truncateToTokenBudget(
+    sections.join("\n\n"),
+    ASSISTANT_CONTEXT_LIMITS.maxPackTokens,
+  );
 
   return {
     contextText,

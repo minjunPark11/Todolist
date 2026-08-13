@@ -54,10 +54,73 @@ export function estimateMessagesTokens(messages: AiMessage[]): number {
   return messages.reduce((total, message) => total + estimateMessageTokens(message), 0);
 }
 
+// Fixed cost of the assistant's behavior contract, measured with the
+// estimator above (~2.8k tokens). It is sent verbatim every turn and is the
+// one block that can never be trimmed, so the variable blocks have to be
+// budgeted around it:
+//
+//   8192 window - 2900 system prompt - 1024 reply reserve = ~4268 tokens
+//   left to split between app context, knowledge, and chat history.
+//
+// The per-producer shares live with their own limits (AI_CONTEXT_LIMITS,
+// ASSISTANT_CONTEXT_LIMITS); budgetsFitWindow() below is the assertion that
+// they still add up.
+export const ASSISTANT_SYSTEM_PROMPT_TOKENS = 2900;
+
+const TRUNCATION_MARKER = "\n[context truncated]";
+
+// Cut `text` to fit a TOKEN budget. Upstream caps used to be expressed in
+// characters against a token-sized window, which silently assumed ~4 chars per
+// token — true for latin text, but Hangul and CJK cost ~1 token per character,
+// so a 10k-character cap could mean 10k tokens and blow the window on its own.
+export function truncateToTokenBudget(text: string, budgetTokens: number): string {
+  if (budgetTokens <= 0) return "";
+  if (estimateTokens(text) <= budgetTokens) return text;
+
+  const contentBudget = budgetTokens - estimateTokens(TRUNCATION_MARKER);
+  if (contentBudget <= 0) return "";
+
+  // estimateTokens is monotonic in prefix length, so binary-search the longest
+  // prefix that fits instead of estimating every candidate cut point.
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (estimateTokens(text.slice(0, mid)) <= contentBudget) low = mid;
+    else high = mid - 1;
+  }
+
+  return `${text.slice(0, low)}${TRUNCATION_MARKER}`;
+}
+
+// Last-resort shrink of the leading system block. The FIRST system message is
+// the behavior contract and is never touched; the later ones carry app data
+// and knowledge, so those are what give way when even an empty history would
+// overflow. Without this the request went out oversized anyway and
+// llama-server rejected the whole turn.
+function shrinkSystemHead(head: AiMessage[], budgetTokens: number): AiMessage[] {
+  if (head.length < 2) return head;
+
+  const shrinkable = head.length - 1;
+  const fixedTokens = estimateMessagesTokens(head.slice(0, shrinkable));
+  // 4 tokens of per-message overhead, matching estimateMessageTokens.
+  const room = budgetTokens - fixedTokens - 4;
+
+  const next = [...head];
+  next[shrinkable] = {
+    ...head[shrinkable],
+    content: truncateToTokenBudget(head[shrinkable].content, Math.max(0, room)),
+  };
+  return next;
+}
+
 export type FitResult = {
   messages: AiMessage[];
   // How many messages were dropped from the middle (for logging/telemetry).
   dropped: number;
+  // True when the system block itself had to be cut, i.e. an upstream producer
+  // handed over more context than the window can hold.
+  systemTruncated: boolean;
 };
 
 // Trims chat history to fit a token budget while preserving the two things
@@ -69,15 +132,16 @@ export type FitResult = {
 // budgetTokens is what remains for the whole `messages` array after the
 // caller subtracts the response reserve and any separate knowledge context.
 export function fitMessagesToBudget(messages: AiMessage[], budgetTokens: number): FitResult {
-  if (messages.length === 0) return { messages, dropped: 0 };
+  if (messages.length === 0) return { messages, dropped: 0, systemTruncated: false };
 
-  // Leading system block: kept whole. The prompt prefix cache and the
-  // app-data privacy/priority ordering both depend on it staying intact.
+  // Leading system block: kept whole whenever it fits. The prompt prefix cache
+  // and the app-data privacy/priority ordering both depend on it staying
+  // intact, so it only gives way once nothing else can.
   let headEnd = 0;
   while (headEnd < messages.length && messages[headEnd].role === "system") headEnd += 1;
-  const head = messages.slice(0, headEnd);
+  let head = messages.slice(0, headEnd);
   const rest = messages.slice(headEnd);
-  if (rest.length === 0) return { messages, dropped: 0 };
+  if (rest.length === 0) return { messages, dropped: 0, systemTruncated: false };
 
   // Final message (current turn) is always kept, even if it alone blows the
   // budget — there is nothing to answer without it, and the overflow-retry
@@ -85,7 +149,23 @@ export function fitMessagesToBudget(messages: AiMessage[], budgetTokens: number)
   const last = rest[rest.length - 1];
   const middle = rest.slice(0, -1);
 
-  const fixed = estimateMessagesTokens(head) + estimateMessageTokens(last);
+  // Dropping every history turn still isn't enough when the system block alone
+  // exceeds the window, so trim it before deciding what history survives.
+  //
+  // Only when trimming can actually save the request, though: if the current
+  // user turn is on its own bigger than the budget, no amount of shrinking
+  // makes it fit, and destroying the app context would cost the user their
+  // answer quality for nothing. That pathological case stays with the
+  // gateway's overflow retry, as before.
+  const lastTokens = estimateMessageTokens(last);
+  let systemTruncated = false;
+  if (lastTokens < budgetTokens && estimateMessagesTokens(head) + lastTokens > budgetTokens) {
+    const shrunk = shrinkSystemHead(head, budgetTokens - lastTokens);
+    systemTruncated = shrunk !== head;
+    head = shrunk;
+  }
+
+  const fixed = estimateMessagesTokens(head) + lastTokens;
   let available = budgetTokens - fixed;
 
   // Walk the middle newest-first, keeping messages while they fit.
@@ -105,5 +185,5 @@ export function fitMessagesToBudget(messages: AiMessage[], budgetTokens: number)
   }
 
   const keptMiddle = keptReversed.reverse();
-  return { messages: [...head, ...keptMiddle, last], dropped };
+  return { messages: [...head, ...keptMiddle, last], dropped, systemTruncated };
 }

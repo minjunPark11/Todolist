@@ -97,6 +97,31 @@ function reasonFor(task: Task, today: string): TodayReason {
   return "none";
 }
 
+const NO_DUE_DATE = "9999-12-31";
+
+// Every row in the Focus Queue renders its start time, so the list has to
+// agree with what it shows: timed tasks in clock order first, then untimed
+// ones by deadline and age.
+//
+// This comparison used to lead with `task.order`, but nothing in the app ever
+// assigned that field — every task carried 0, so the sort silently fell
+// through to createdAt and a task labelled 17:00 could sit above one labelled
+// 09:00. (`order` is still normalized and persisted; it just isn't a sort key
+// until something can actually set it.)
+function compareTodayEntries(a: TodayEntry, b: TodayEntry): number {
+  const aStart = parseTimeToMinutes(a.task.startTime);
+  const bStart = parseTimeToMinutes(b.task.startTime);
+  if (aStart !== undefined && bStart !== undefined && aStart !== bStart) return aStart - bStart;
+  if (aStart !== undefined && bStart === undefined) return -1;
+  if (aStart === undefined && bStart !== undefined) return 1;
+
+  const aDue = a.task.dueDate || NO_DUE_DATE;
+  const bDue = b.task.dueDate || NO_DUE_DATE;
+  if (aDue !== bDue) return aDue < bDue ? -1 : 1;
+
+  return a.task.createdAt.localeCompare(b.task.createdAt);
+}
+
 export function collectTodayEntries(
   tasks: Task[],
   overrides: BucketOverrides,
@@ -114,7 +139,7 @@ export function collectTodayEntries(
       completed: task.status === "done",
     });
   }
-  entries.sort((a, b) => a.task.order - b.task.order || a.task.createdAt.localeCompare(b.task.createdAt));
+  entries.sort(compareTodayEntries);
   return entries;
 }
 

@@ -26,8 +26,6 @@ import { useMotionEnabled } from "../../motion/reducedMotion";
 
 export { DAY_END, DAY_START, SLOT_HEIGHT };
 
-const hours = Array.from({ length: DAY_END - DAY_START }, (_, index) => DAY_START + index);
-
 // Overlapping blocks split the column side-by-side (Google Calendar style):
 // greedy column assignment inside each overlap cluster; every block in a
 // cluster shares the cluster's column count so widths line up.
@@ -129,10 +127,6 @@ function timeToMinutesOrNull(value: string): number | null {
   return hour * 60 + minute;
 }
 
-function topFor(minutes: number) {
-  return ((minutes - DAY_START * 60) / 60) * SLOT_HEIGHT;
-}
-
 function heightFor(startMin: number, endMin: number) {
   return Math.max(((endMin - startMin) / 60) * SLOT_HEIGHT, 24);
 }
@@ -224,10 +218,37 @@ export function WeekView({
   const [alldayHeight, setAlldayHeight] = useState<number | null>(loadAlldayHeight);
   const isDay = days.length === 1;
 
+  // The grid normally starts at DAY_START, but an item that ends before that
+  // has nowhere to render — it used to be dropped from the view with no trace,
+  // so an early-morning block simply looked deleted. Growing the window down
+  // to the earliest item on screen keeps the compact 06:00 start for ordinary
+  // weeks while making sure nothing is ever silently unrenderable.
+  const dayKey = days.join(",");
+  const gridStartHour = useMemo(() => {
+    let earliestMin = DAY_START * 60;
+    for (const item of items) {
+      if (!days.includes(item.date)) continue;
+      const startMin = timeToMinutesOrNull(item.startTime ?? "");
+      if (startMin === null) continue;
+      if (startMin < earliestMin) earliestMin = startMin;
+    }
+    return Math.max(0, Math.floor(earliestMin / 60));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, dayKey]);
+  const gridStartMin = gridStartHour * 60;
+  const hours = useMemo(
+    () => Array.from({ length: DAY_END - gridStartHour }, (_, index) => gridStartHour + index),
+    [gridStartHour],
+  );
+
+  function topFor(minutes: number) {
+    return ((minutes - gridStartMin) / 60) * SLOT_HEIGHT;
+  }
+
   const today = todayValue();
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const showNowLine = days.includes(today) && nowMinutes >= DAY_START * 60 && nowMinutes <= DAY_END * 60;
+  const showNowLine = days.includes(today) && nowMinutes >= gridStartMin && nowMinutes <= DAY_END * 60;
   const nowTop = topFor(nowMinutes);
   const nowLabel = timeLabelFormatter.format(now);
 
@@ -236,10 +257,10 @@ export function WeekView({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const target = days.includes(today) ? Math.max(DAY_START * 60, nowMinutes - 60) : 8 * 60;
+    const target = days.includes(today) ? Math.max(gridStartMin, nowMinutes - 60) : 8 * 60;
     el.scrollTop = Math.max(0, topFor(target));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days.join(",")]);
+  }, [dayKey, gridStartMin]);
 
   const hasAnyItemInView = items.some((item) => days.includes(item.date));
   const showEmptyHint = !hasAnyItemInView && !draft && !selection;
@@ -250,7 +271,7 @@ export function WeekView({
   // Deriving the effective scale from the measured height is correct under
   // any zoom/transform, so pointer math never assumes a fixed ratio.
   function timeGridScaleFromRect(rect: DOMRect): number {
-    const layoutHeight = (DAY_END - DAY_START) * SLOT_HEIGHT;
+    const layoutHeight = (DAY_END - gridStartHour) * SLOT_HEIGHT;
     return rect.height > 0 ? rect.height / layoutHeight : 1;
   }
 
@@ -268,7 +289,7 @@ export function WeekView({
     if (rect) {
       const offsetY = clientY - rect.top;
       const scale = timeGridScaleFromRect(rect);
-      return clampMinutes(DAY_START * 60 + (offsetY / (SLOT_HEIGHT * scale)) * 60, DAY_START * 60, DAY_END * 60);
+      return clampMinutes(gridStartMin + (offsetY / (SLOT_HEIGHT * scale)) * 60, gridStartMin, DAY_END * 60);
     }
     return minutesFromPointerY(clientY, 0);
   }
@@ -374,7 +395,7 @@ export function WeekView({
       let next: LiveResize;
       if (current.edge === "start") {
         const value = Math.min(snapDownToStep(minutes), current.endMin - TIME_SNAP_MINUTES);
-        next = { ...current, startMin: Math.max(DAY_START * 60, value) };
+        next = { ...current, startMin: Math.max(gridStartMin, value) };
       } else {
         const value = Math.max(snapUpToStep(minutes), current.startMin + TIME_SNAP_MINUTES);
         next = { ...current, endMin: Math.min(DAY_END * 60, value) };
@@ -478,7 +499,7 @@ export function WeekView({
       const pointerMin = minutesFromTimeGridPointerY(moveEvent.clientY);
       const nextStart = clampMinutes(
         snapDownToStep(pointerMin - grabOffsetMin),
-        DAY_START * 60,
+        gridStartMin,
         DAY_END * 60 - duration,
       );
       const next: LiveMove = { ...current, moved: true, allDay: false, day: target.day, startMin: nextStart, endMin: nextStart + duration };
@@ -556,7 +577,7 @@ export function WeekView({
     const minutes = minutesFromTimeGridPointerY(event.clientY);
     const snapped = clampMinutes(
       Math.floor(minutes / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES,
-      DAY_START * 60,
+      gridStartMin,
       DAY_END * 60 - TIME_SNAP_MINUTES,
     );
     return minutesToTime(snapped);
@@ -769,10 +790,10 @@ export function WeekView({
                   <div
                     className={dragPreview.isValid ? "gcal-drop-preview" : "gcal-drop-preview is-invalid"}
                     style={{
-                      top: topFor(timeToMinutesOrNull(dragPreview.startTime) ?? DAY_START * 60),
+                      top: topFor(timeToMinutesOrNull(dragPreview.startTime) ?? gridStartMin),
                       height: heightFor(
-                        timeToMinutesOrNull(dragPreview.startTime) ?? DAY_START * 60,
-                        timeToMinutesOrNull(dragPreview.endTime) ?? (DAY_START * 60 + 30),
+                        timeToMinutesOrNull(dragPreview.startTime) ?? gridStartMin,
+                        timeToMinutesOrNull(dragPreview.endTime) ?? (gridStartMin + 30),
                       ),
                     }}
                   >
@@ -789,10 +810,10 @@ export function WeekView({
                       key={placement.taskId}
                       className="gcal-ai-preview-block"
                       style={{
-                        top: topFor(timeToMinutesOrNull(placement.startTime) ?? DAY_START * 60),
+                        top: topFor(timeToMinutesOrNull(placement.startTime) ?? gridStartMin),
                         height: heightFor(
-                          timeToMinutesOrNull(placement.startTime) ?? DAY_START * 60,
-                          timeToMinutesOrNull(placement.endTime) ?? (DAY_START * 60 + 30),
+                          timeToMinutesOrNull(placement.startTime) ?? gridStartMin,
+                          timeToMinutesOrNull(placement.endTime) ?? (gridStartMin + 30),
                         ),
                       }}
                     >
@@ -830,12 +851,14 @@ export function WeekView({
                     let startMin = timeToMinutesOrNull(item.startTime ?? "");
                     if (startMin === null) return [];
                     let endMin = timeToMinutesOrNull(item.endTime ?? "") ?? startMin + 60;
-                    if (endMin <= DAY_START * 60) return [];
+                    // gridStartHour already grew to cover the earliest item, so
+                    // this only catches genuinely inverted data (end before start).
+                    if (endMin <= gridStartMin) return [];
                     if (resize && resize.key === item.key) {
                       startMin = resize.startMin;
                       endMin = resize.endMin;
                     }
-                    const clampedStart = Math.max(startMin, DAY_START * 60);
+                    const clampedStart = Math.max(startMin, gridStartMin);
                     return [{ item, startMin, endMin, clampedStart, clampedEnd: Math.max(endMin, clampedStart + 1) }];
                   });
                   const overlapLayout = computeOverlapLayout(

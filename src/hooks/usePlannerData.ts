@@ -31,7 +31,9 @@ import type {
   TaskDraft,
   TaskTemplate,
 } from "../types";
+import { recoverStaleFocusSessions } from "../domain/focus/selectors";
 import { addDays, addMonths, todayValue } from "../utils/date";
+import { planRecurringCompletion } from "../utils/planner";
 
 const STORAGE_KEY = "focusflow.appData.v1";
 const LEGACY_STORAGE_KEY = "todo-planner-data";
@@ -479,23 +481,12 @@ function countDataItems(data: PlannerData): number {
   );
 }
 
-function getNextDueDate(task: Task): string {
-  const interval = Math.max(task.repeatInterval || 1, 1);
-  const baseDate = task.dueDate || new Date().toISOString().slice(0, 10);
-
-  if (task.repeatType === "daily") {
-    return addDays(baseDate, interval);
-  }
-
-  if (task.repeatType === "weekly") {
-    return addDays(baseDate, interval * 7);
-  }
-
-  if (task.repeatType === "monthly") {
-    return addMonths(baseDate, interval);
-  }
-
-  return baseDate;
+// Any data crossing into the app from outside this running instance goes
+// through here, so a timer left running when the app closed can't keep
+// accruing wall-clock time (see recoverStaleFocusSessions).
+function adoptLoadedData(data: PlannerData): PlannerData {
+  const focusSessions = recoverStaleFocusSessions(data.focusSessions);
+  return focusSessions === data.focusSessions ? data : { ...data, focusSessions };
 }
 
 function readStorage(): PlannerData {
@@ -503,7 +494,7 @@ function readStorage(): PlannerData {
 
   if (raw) {
     try {
-      return normalizeData(JSON.parse(raw) as Partial<PlannerData>);
+      return adoptLoadedData(normalizeData(JSON.parse(raw) as Partial<PlannerData>));
     } catch {
       return emptyData();
     }
@@ -513,7 +504,7 @@ function readStorage(): PlannerData {
   const legacy = platform.storage.getSync(LEGACY_STORAGE_KEY);
   if (legacy) {
     try {
-      return normalizeData(JSON.parse(legacy) as Partial<PlannerData>);
+      return adoptLoadedData(normalizeData(JSON.parse(legacy) as Partial<PlannerData>));
     } catch {
       return emptyData();
     }
@@ -701,7 +692,7 @@ export function usePlannerData() {
           : []
         : data.recentItems;
 
-      setDataState(normalizeData(partial));
+      setDataState(adoptLoadedData(normalizeData(partial)));
       setRemoteLoaded(true);
       setSyncStatus("sync.synced");
     } catch (error) {
@@ -1078,38 +1069,44 @@ export function usePlannerData() {
 
   function toggleTaskDone(taskId: string) {
     const now = new Date().toISOString();
+    const today = todayValue();
 
-    setData((current) => ({
-      ...current,
-      tasks: current.tasks.map((task) => {
-        if (task.id !== taskId) {
-          return task;
-        }
+    setData((current) => {
+      const target = current.tasks.find((task) => task.id === taskId);
+      if (!target) return current;
 
-        const isDone = task.status === "done";
-        const isRecurring = !isDone && task.repeatType !== "none";
+      const isDone = target.status === "done";
+      const isRecurring = !isDone && target.repeatType !== "none";
 
-        if (isRecurring) {
-          const nextDueDate = getNextDueDate(task);
-          const shouldStop = task.repeatEndDate && nextDueDate > task.repeatEndDate;
+      const setOnTarget = (patch: Partial<Task>) => ({
+        ...current,
+        tasks: current.tasks.map((task) =>
+          task.id === taskId ? { ...task, ...patch, updatedAt: now } : task,
+        ),
+      });
 
-          return {
-            ...task,
-            status: shouldStop ? "done" : "todo",
-            dueDate: shouldStop ? task.dueDate : nextDueDate,
-            completedAt: shouldStop ? now : "",
-            updatedAt: now,
-          };
-        }
-
-        return {
-          ...task,
+      if (!isRecurring) {
+        return setOnTarget({
           status: isDone ? "todo" : "done",
           completedAt: isDone ? "" : now,
-          updatedAt: now,
-        };
-      }),
-    }));
+        });
+      }
+
+      const rolled = planRecurringCompletion(target, createId("task"), now, today);
+      if (rolled.kind === "final") {
+        return setOnTarget({ status: "done", completedAt: now });
+      }
+
+      return {
+        ...current,
+        tasks: [
+          rolled.occurrence,
+          ...current.tasks.map((task) =>
+            task.id === taskId ? { ...task, ...rolled.patch, updatedAt: now } : task,
+          ),
+        ],
+      };
+    });
   }
 
   function addProject(name: string, color: string) {
@@ -1593,7 +1590,7 @@ export function usePlannerData() {
       return false;
     }
 
-    const normalized = normalizeData(raw as Partial<PlannerData>);
+    const normalized = adoptLoadedData(normalizeData(raw as Partial<PlannerData>));
     setData(normalized);
     setSelectedTaskId("");
     return true;

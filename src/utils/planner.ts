@@ -5,7 +5,7 @@ import type {
   Task,
   TaskPriority,
 } from "../types";
-import { todayValue } from "./date";
+import { addDays, addMonths, daysBetween, todayValue } from "./date";
 
 // === Task filters (spec §4.1.1) ===
 export function isActiveTask(task: Task): boolean {
@@ -152,11 +152,86 @@ export function getDueReviewCount(notes: ConceptNote[], today = todayValue()): n
   return notes.filter((note) => getComputedReviewStatus(note, today) === "due").length;
 }
 
+// === Recurring tasks ===
+
+export function getNextDueDate(task: Task, today = todayValue()): string {
+  const interval = Math.max(task.repeatInterval || 1, 1);
+  // Advance from whichever is later: the task's own due date or today.
+  // Basing this purely on `dueDate` meant a repeat neglected for a week
+  // produced yet another date in the past, so the user had to complete it
+  // once per missed cycle to catch up. Anchoring to today instead costs a
+  // monthly repeat its day-of-month when it is completed late, which is the
+  // cheaper of the two surprises.
+  const baseDate = task.dueDate && task.dueDate > today ? task.dueDate : today;
+
+  if (task.repeatType === "daily") return addDays(baseDate, interval);
+  if (task.repeatType === "weekly") return addDays(baseDate, interval * 7);
+  if (task.repeatType === "monthly") return addMonths(baseDate, interval);
+  return baseDate;
+}
+
+export type RecurringCompletion =
+  // Past the repeat's end date: no next occurrence, so the task itself closes out.
+  | { kind: "final" }
+  // `occurrence` is a standalone done record for the instance just finished;
+  // `patch` rolls the original task forward, still open.
+  | { kind: "rolled"; occurrence: Task; patch: Partial<Task> };
+
+// Decides what completing one occurrence of a repeating task should produce.
+//
+// The completion cannot be recorded on the task itself: every "done today"
+// check keys on completedAt (getTodayBuckets here, isTodayTask in todayView),
+// so a rolled-forward task carrying completedAt would read as finished today
+// and drop out of the open list until tomorrow. Splitting the finished
+// instance onto its own row keeps both facts true at once.
+export function planRecurringCompletion(
+  task: Task,
+  occurrenceId: string,
+  now: string,
+  today = todayValue(),
+): RecurringCompletion {
+  const nextDueDate = getNextDueDate(task, today);
+  if (task.repeatEndDate && nextDueDate > task.repeatEndDate) return { kind: "final" };
+
+  const occurrence: Task = {
+    ...task,
+    id: occurrenceId,
+    status: "done",
+    previousStatus: task.status,
+    completedAt: now,
+    archivedAt: "",
+    // A snapshot of one finished occurrence: it must never repeat again on its
+    // own, and it does not own the parent's running focus session.
+    repeatType: "none",
+    repeatInterval: 1,
+    repeatDays: [],
+    repeatEndDate: "",
+    activeSessionId: "",
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  // Keep the planned work day the same distance from the deadline it had
+  // before, rather than stranding it in the past.
+  const shiftDays = daysBetween(task.dueDate || today, nextDueDate);
+
+  return {
+    kind: "rolled",
+    occurrence,
+    patch: {
+      status: "todo",
+      dueDate: nextDueDate,
+      scheduledDate: task.scheduledDate ? addDays(task.scheduledDate, shiftDays) : task.scheduledDate,
+      completedAt: "",
+    },
+  };
+}
+
 // === Misc helpers ===
 export function getProjectName(projects: Project[], projectId: string): string {
   return projects.find((project) => project.id === projectId)?.name ?? "";
 }
 
-export function sortByOrderThenCreated<T extends { order?: number; createdAt: string }>(items: T[]): T[] {
-  return [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.createdAt.localeCompare(b.createdAt));
-}
+// sortByOrderThenCreated used to live here. It had no callers, and it sorted
+// on an `order` field nothing ever assigned — see compareTodayEntries in
+// todayView.ts for what replaced its one real use.

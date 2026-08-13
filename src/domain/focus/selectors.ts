@@ -12,3 +12,48 @@ export function selectRecentFocusSessions(sessions: FocusSession[], sinceDate: s
     .filter((session) => focusSessionStartOf(session).slice(0, 10) >= sinceDate)
     .sort((a, b) => focusSessionStartOf(b).localeCompare(focusSessionStartOf(a)));
 }
+
+// A session can only legitimately be "running" while the app instance that
+// started it is open: `startAt` marks the open segment's start, and the
+// displayed time is accumulatedSeconds + (now - startAt). So a running session
+// arriving from storage, the account, or an import is stale by definition —
+// the app was closed (or the row came from another device) with the timer
+// going — and leaving it running bills an overnight quit as an 8-hour block.
+//
+// Recovery pauses it and credits only what the user had planned for
+// (durationMinutes), so real work before the quit survives while the
+// wall-clock runaway is capped.
+export function recoverStaleFocusSessions(
+  sessions: FocusSession[],
+  nowMs = Date.now(),
+): FocusSession[] {
+  if (!sessions.some((session) => session.status === "running")) return sessions;
+  const nowIso = new Date(nowMs).toISOString();
+
+  return sessions.map((session): FocusSession => {
+    if (session.status !== "running") return session;
+
+    const startedMs = new Date(session.startAt).getTime();
+    const elapsedSeconds = Number.isFinite(startedMs)
+      ? Math.max(0, Math.floor((nowMs - startedMs) / 1000))
+      : 0;
+    const remainingPlannedSeconds = Math.max(
+      0,
+      session.durationMinutes * 60 - session.accumulatedSeconds,
+    );
+    const creditedSeconds = Math.min(elapsedSeconds, remainingPlannedSeconds);
+    const closedAt =
+      creditedSeconds > 0 ? new Date(startedMs + creditedSeconds * 1000).toISOString() : "";
+
+    return {
+      ...session,
+      status: "paused",
+      accumulatedSeconds: session.accumulatedSeconds + creditedSeconds,
+      pausedAt: closedAt || session.startAt,
+      segments: closedAt
+        ? [...session.segments, { startAt: session.startAt, endAt: closedAt }]
+        : session.segments,
+      updatedAt: nowIso,
+    };
+  });
+}

@@ -256,7 +256,7 @@ LLM 호출 없이 순수 키워드 매칭으로 7종 분류: `daily_planning`, `
 
 - intent별로 tasks/projects/study/habits/calendar 포함 여부가 다름(예: `general_chat`은 tasks도 생략, `study_coaching`일 때만 study 포함)
 - 각 필드는 요약된 형태로만 포함(`compactTask`는 id/title/status/priority/dueDate/scheduledDate/projectId/tags(최대5)/isFocus만)
-- 하드 제한: 전체 컨텍스트 문자열은 최대 **12,000자**(`AI_CONTEXT_LIMITS.maxContextCharacters`), 초과 시 잘라내고 "[context truncated]" 표시
+- 하드 제한: 전체 컨텍스트는 최대 **2,400토큰**(`AI_CONTEXT_LIMITS.maxContextTokens`), 초과 시 잘라내고 "[context truncated]" 표시. 문자 수가 아니라 토큰 수로 재는 이유는 한글·CJK가 1자당 약 1토큰이라 같은 글자 수라도 라틴 문자의 3.5배까지 비싸지기 때문 — 문자 기준 상한은 8192 컨텍스트 창을 지켜주지 못한다
 - 캘린더 페이지에서는 별도로 `buildCalendarContextText()`가 "이번 주"(일~토) 범위의 예정된 작업/마감/복습/프로젝트 마감/미배정 태스크/요일별 업무시간 합계를 JSON으로 만들어 추가 주입(`calendarContext.ts`, `calendar_conflict_check`/`free_time_detection`/`daily_planning`/`weekly_planning` intent일 때만 실제로 포함됨)
 
 ### 9.4 시스템 프롬프트 — `lib/ai/agent/prompts.ts`
