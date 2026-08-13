@@ -85,7 +85,7 @@ export function FocusPage({
   onOpenTask,
   onNavigate,
 }: FocusPageProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const today = todayValue();
   const now = useNowTick(Boolean(activeSession && activeSession.status === "running"));
   const elapsed = getDisplayedFocusSeconds(activeSession, now);
@@ -208,7 +208,7 @@ export function FocusPage({
           <p>{t("focus.subtitle")}</p>
         </div>
         <div className="foc-header-chips">
-          <span>{formatDate(today, "ko")}</span>
+          <span>{formatDate(today, lang)}</span>
           <strong>{t("focus.todayTotal", { time: formatFocusDuration(todaySeconds, true) })}</strong>
           <div className="foc-options-wrap" ref={optionsRef}>
             <button

@@ -420,9 +420,7 @@ export function TodayPage({
               >
                 ✕
               </button>
-            ) : (
-              <span className="tdy-kbd" aria-hidden="true">⌘K</span>
-            )}
+            ) : null}
           </div>
           <button
             type="button"

@@ -452,7 +452,7 @@ export const en: Dictionary = {
   "todayv.addTask": "Add Task",
   "todayv.addTaskAria": "Add task",
   "todayv.briefTitle": "Today Brief",
-  "todayv.briefCounts": "You have {{tasks}} focus tasks and {{blocks}} time blocks today.",
+  "todayv.briefCounts": "You have {{tasks}} focus task(s) and {{blocks}} time block(s) today.",
   "todayv.briefHigh": "Start with your highest priority work.",
   "todayv.briefOverdue": "You have {{n}} overdue task(s) that need attention today.",
   "todayv.briefOpenDay": "Your day is open. Use this time for deep work or schedule a task.",
