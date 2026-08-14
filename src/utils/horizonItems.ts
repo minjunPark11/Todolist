@@ -13,7 +13,8 @@
 import type { Task } from "../types";
 import type { GoalSchedule, LearningPath } from "../lib/ai/learningPaths/types";
 import { horizonForGoalSchedule, normalizeGoalSchedule } from "../domain/horizons/goalSchedule";
-import { deriveHorizon, type Horizon } from "./horizons";
+import { anchorForTaskDate } from "../domain/horizons/horizonAnchors";
+import type { Horizon } from "./horizons";
 
 export type HorizonSourceType = "path" | "milestone" | "task";
 
@@ -31,6 +32,8 @@ export interface HorizonItem {
   doneCriteria?: string;
   targetDate?: string;
   schedule?: GoalSchedule;
+  /** Calendar-period anchor. Life has no anchor. */
+  anchor?: string;
   done: boolean;
   /** Board colour — owned by the Board/Project, shared with the calendar (SPACES_BOARD_DESIGN D1). */
   color: string;
@@ -87,6 +90,7 @@ export function buildHorizonItems({
         title: path.goal,
         targetDate: path.deadlineDate ?? path.targetDate,
         schedule: pathSchedule,
+        anchor: "startDate" in pathSchedule ? pathSchedule.startDate : undefined,
         done: Boolean(path.completedAt),
         color,
         boardId: path.projectId,
@@ -111,6 +115,7 @@ export function buildHorizonItems({
         doneCriteria: milestone.doneCriteria || undefined,
         targetDate: milestone.deadlineDate ?? milestone.targetDate ?? path.deadlineDate ?? path.targetDate,
         schedule: milestoneSchedule,
+        anchor: "startDate" in milestoneSchedule ? milestoneSchedule.startDate : undefined,
         done: Boolean(milestone.completedAt),
         color,
         boardId: path.projectId,
@@ -139,11 +144,12 @@ export function buildHorizonItems({
     // the Inbox, and Today's triage is where it gets one.
     const target = task.scheduledDate || task.dueDate;
     if (!target) continue;
+    const placement = anchorForTaskDate(target, today);
 
     const link = milestoneByTaskId.get(task.id);
     items.push({
       key: `task:${task.id}`,
-      horizon: deriveHorizon(target, today),
+      horizon: placement.horizon,
       sourceType: "task",
       sourceId: task.id,
       parentId: "",
@@ -153,6 +159,7 @@ export function buildHorizonItems({
       // is there to add context; when it has none to add, it is noise.
       parentTitle: link && link.title !== task.title ? link.title : undefined,
       targetDate: target,
+      anchor: placement.anchor,
       done: task.status === "done",
       // A linked task takes its goal's colour so a cascade reads as one
       // colour down the columns; an unlinked one falls back to its project.
@@ -183,13 +190,44 @@ export function itemsForBoard(items: HorizonItem[], boardId: string): HorizonIte
 
 /** Items on one column, unfinished first so a full day does not bury the work. */
 export function itemsForHorizon(items: HorizonItem[], horizon: Horizon): HorizonItem[] {
-  return items
-    .filter((item) => item.horizon === horizon)
-    .sort((a, b) => {
-      if (a.done !== b.done) return a.done ? 1 : -1;
-      // Undated items last within a column: a dated one is a commitment.
-      if (!a.targetDate) return b.targetDate ? 1 : 0;
-      if (!b.targetDate) return -1;
-      return a.targetDate.localeCompare(b.targetDate);
-    });
+  return sortHorizonItems(items.filter((item) => item.horizon === horizon));
+}
+
+export function itemsForHorizonAnchor(
+  items: HorizonItem[],
+  horizon: Horizon,
+  anchor?: string,
+): HorizonItem[] {
+  return sortHorizonItems(
+    items.filter((item) => item.horizon === horizon && (horizon === "life" || item.anchor === anchor)),
+  );
+}
+
+export function carryoverItemsForHorizonAnchor(
+  items: HorizonItem[],
+  horizon: Horizon,
+  anchor: string | undefined,
+  isCurrentPeriod: boolean,
+): HorizonItem[] {
+  if (!isCurrentPeriod || horizon === "life" || !anchor) return [];
+  return sortHorizonItems(
+    items.filter(
+      (item) =>
+        item.sourceType !== "task" &&
+        item.horizon === horizon &&
+        !item.done &&
+        Boolean(item.anchor) &&
+        item.anchor! < anchor,
+    ),
+  );
+}
+
+function sortHorizonItems(items: HorizonItem[]): HorizonItem[] {
+  return [...items].sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    // Deadlines are secondary to period placement and only order peers.
+    if (!a.targetDate) return b.targetDate ? 1 : 0;
+    if (!b.targetDate) return -1;
+    return a.targetDate.localeCompare(b.targetDate);
+  });
 }

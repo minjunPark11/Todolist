@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { Task } from "../types";
 import type { LearningPath } from "../lib/ai/learningPaths/types";
 import { addDays } from "./date";
-import { buildHorizonItems, itemsForBoard, itemsForHorizon, DEFAULT_HORIZON_COLOR } from "./horizonItems";
+import {
+  buildHorizonItems,
+  carryoverItemsForHorizonAnchor,
+  itemsForBoard,
+  itemsForHorizon,
+  itemsForHorizonAnchor,
+  DEFAULT_HORIZON_COLOR,
+} from "./horizonItems";
 
 const TODAY = "2026-08-14";
 
@@ -213,5 +220,42 @@ describe("itemsForHorizon", () => {
       today: TODAY,
     });
     expect(itemsForHorizon(items, "week").map((item) => item.sourceId)).toEqual(["soon", "late", "done"]);
+  });
+});
+
+describe("period anchored horizon items", () => {
+  it("shows only goals belonging to the selected calendar period", () => {
+    const items = buildHorizonItems({
+      paths: [
+        path({ id: "aug", schedule: { unit: "month", startDate: "2026-08-01" } }),
+        path({ id: "sep", schedule: { unit: "month", startDate: "2026-09-01" } }),
+      ],
+      tasks: [],
+      today: TODAY,
+    });
+    expect(itemsForHorizonAnchor(items, "month", "2026-09-01").map((item) => item.sourceId)).toEqual(["sep"]);
+  });
+
+  it("derives unfinished goals from earlier periods as carryover only on the current period", () => {
+    const items = buildHorizonItems({
+      paths: [
+        path({ id: "july", schedule: { unit: "month", startDate: "2026-07-01" } }),
+        path({ id: "done", schedule: { unit: "month", startDate: "2026-06-01" }, completedAt: TODAY }),
+      ],
+      tasks: [],
+      today: TODAY,
+    });
+    expect(carryoverItemsForHorizonAnchor(items, "month", "2026-08-01", true).map((item) => item.sourceId)).toEqual(["july"]);
+    expect(carryoverItemsForHorizonAnchor(items, "month", "2026-09-01", false)).toEqual([]);
+  });
+
+  it("anchors compatibility Tasks to the selected period", () => {
+    const items = buildHorizonItems({
+      paths: [],
+      tasks: [task({ id: "aug-week", scheduledDate: "2026-08-17" }), task({ id: "sep", scheduledDate: "2026-09-20" })],
+      today: TODAY,
+    });
+    expect(itemsForHorizonAnchor(items, "week", "2026-08-16").map((item) => item.sourceId)).toEqual(["aug-week"]);
+    expect(itemsForHorizonAnchor(items, "month", "2026-09-01").map((item) => item.sourceId)).toEqual(["sep"]);
   });
 });

@@ -6,14 +6,27 @@
 // stores that already own their records — it creates no record type of its
 // own (D1).
 //
-// Phase 1 is deliberately drag-free. The derivation and the layout have to be
-// right before a drag can know what to write.
+// Horizons 2 gives each bounded column its own calendar-period anchor. Goals
+// move by GoalSchedule; Tasks retain their date-based compatibility path.
 import { useMemo, useState } from "react";
-import type { LearningPath, Milestone, Project, Task } from "../types";
-import { buildHorizonItems, itemsForHorizon, type HorizonItem } from "../utils/horizonItems";
-import { canDropOnHorizon, dateForHorizonDrop, HORIZONS, type Horizon } from "../utils/horizons";
+import type { GoalSchedule, LearningPath, Milestone, Project, Task } from "../types";
+import {
+  buildHorizonItems,
+  carryoverItemsForHorizonAnchor,
+  itemsForHorizonAnchor,
+  type HorizonItem,
+} from "../utils/horizonItems";
+import { canDropOnHorizon, HORIZONS, type Horizon } from "../utils/horizons";
+import {
+  createHorizonAnchors,
+  dateForTaskAnchorDrop,
+  isCurrentHorizonAnchor,
+  scheduleForHorizon,
+  shiftHorizonAnchor,
+  type HorizonAnchors,
+} from "../domain/horizons/horizonAnchors";
 import { HorizonCard } from "./horizons/HorizonCard";
-import { todayValue } from "../utils/date";
+import { addDays, formatDate, getDayLabel, getMonthLabel, getWeekLabel, todayValue } from "../utils/date";
 import type { ToastState } from "./kit";
 import { useT } from "../i18n";
 
@@ -24,7 +37,7 @@ interface HorizonsPageProps {
   // projectId is the board (SPACES_BOARD_DESIGN D1). Without it a goal made
   // here carried no board at all and so appeared in no Space — the two axes
   // stopped being one model. See TIMESTRIPE_REFERENCE.md §5.
-  onCreatePath: (input: { goal: string; targetDate?: string; projectId?: string }) => void;
+  onCreatePath: (input: { goal: string; schedule?: GoalSchedule; projectId?: string }) => void;
   onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
   onDeletePath: (pathId: string) => void;
   onAddMilestone: (pathId: string, input: { title: string }) => void;
@@ -54,6 +67,12 @@ export function HorizonsPage({
 }: HorizonsPageProps) {
   const { t, lang } = useT();
   const today = todayValue();
+  const currentAnchors = useMemo(() => createHorizonAnchors(today), [today]);
+  const [anchors, setAnchors] = useState<HorizonAnchors>(() => createHorizonAnchors(today));
+  const [focusedHorizon, setFocusedHorizon] = useState<Horizon | null>(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches ? "day" : null,
+  );
+  const [hideCompleted, setHideCompleted] = useState(false);
 
   // Drag state: the item being carried and the column under the cursor. The
   // item is held in React rather than read back out of dataTransfer, which is
@@ -98,14 +117,14 @@ export function HorizonsPage({
     const goal = draftTitle.trim();
     if (!goal) return;
     // Same helper the drop path uses, so creating a goal in a column and
-    // dragging one into it land on the same date.
+    // dragging one into it land in the exact same calendar period.
     // An empty board is allowed and stays visible as "no board" on the card,
     // rather than being refused: you often know the goal before you know
     // where it belongs, and a goal you cannot write down is worse than one
     // that is briefly unfiled.
     onCreatePath({
       goal,
-      targetDate: dateForHorizonDrop(horizon, today),
+      schedule: scheduleForHorizon(horizon, anchors),
       projectId: draftBoardId || undefined,
     });
     setDraftTitle("");
@@ -137,8 +156,8 @@ export function HorizonsPage({
     }
   }
 
-  // Every drag writes a date and nothing else; the column the card ends up in
-  // is re-derived from that date (D2), so the two can never disagree.
+  // Goals and milestones write exact schedules. Tasks remain execution records
+  // and keep their scheduled-day compatibility behavior.
   //
   // A drag deliberately does *not* materialise a milestone into a task — that
   // is the explicit "+ 오늘 할 일로" action below. Moving an item and spawning
@@ -149,19 +168,39 @@ export function HorizonsPage({
     setDragging(null);
     setDragOver(null);
     if (!item || !canDropOnHorizon(item.sourceType, horizon)) return;
-    if (item.horizon === horizon) return;
+    const anchor = horizon === "life" ? undefined : anchors[horizon];
+    if (item.horizon === horizon && item.anchor === anchor) return;
 
-    const date = dateForHorizonDrop(horizon, today);
     if (item.sourceType === "path") {
-      onUpdatePath(item.sourceId, { targetDate: date });
+      onUpdatePath(item.sourceId, { schedule: scheduleForHorizon(horizon, anchors) });
     } else if (item.sourceType === "milestone") {
-      onUpdateMilestone(item.parentId, item.sourceId, { targetDate: date });
-    } else if (date) {
+      onUpdateMilestone(item.parentId, item.sourceId, { schedule: scheduleForHorizon(horizon, anchors) });
+    } else {
+      const date = dateForTaskAnchorDrop(horizon, anchors);
+      if (!date) return;
       // Tasks move by their scheduled day — the due date is a commitment to
       // someone else and is never rewritten by a drag (the calendar holds the
       // same rule for its deadline markers).
       onUpdateTask(item.sourceId, { scheduledDate: date });
     }
+  }
+
+  function shiftAnchor(horizon: Exclude<Horizon, "life">, amount: number) {
+    setAnchors((current) => ({
+      ...current,
+      [horizon]: shiftHorizonAnchor(horizon, current[horizon], amount),
+    }));
+  }
+
+  function periodLabel(horizon: Horizon, full = true): string {
+    if (horizon === "life") return t("horizons.life");
+    const anchor = anchors[horizon];
+    if (horizon === "year") return t("horizons.periodYear", { year: anchor.slice(0, 4) });
+    if (horizon === "month") return getMonthLabel(Number(anchor.slice(0, 4)), Number(anchor.slice(5, 7)) - 1, lang);
+    if (horizon === "week") {
+      return full ? getWeekLabel(anchor, lang) : `${formatDate(anchor, lang)}–${formatDate(addDays(anchor, 6), lang)}`;
+    }
+    return full ? getDayLabel(anchor, lang) : formatDate(anchor, lang);
   }
 
   function materialiseMilestone(item: HorizonItem) {
@@ -180,6 +219,200 @@ export function HorizonsPage({
     showToast({ message: t("horizons.toastRemoved") });
   }
 
+  function renderCard(item: HorizonItem) {
+    return (
+      <HorizonCard
+        key={item.key}
+        item={item}
+        lang={lang}
+        isDragging={dragging?.key === item.key}
+        onDragStart={() => setDragging(item)}
+        onDragEnd={() => {
+          setDragging(null);
+          setDragOver(null);
+        }}
+        onToggleDone={() => toggleDone(item)}
+        onMaterialise={item.sourceType === "milestone" ? () => materialiseMilestone(item) : undefined}
+        onOpen={item.sourceType === "task" ? () => onOpenTask(item.sourceId) : undefined}
+        onAddMilestone={
+          item.sourceType === "path"
+            ? () => {
+                setMilestoneFor(item.sourceId);
+                setMilestoneTitle("");
+              }
+            : undefined
+        }
+        onDelete={item.sourceType === "task" ? undefined : () => deleteItem(item)}
+        milestoneCount={item.sourceType === "path" ? pathById.get(item.sourceId)?.milestones.length ?? 0 : undefined}
+        boards={item.sourceType === "path" ? boards : undefined}
+        onChangeBoard={item.sourceType === "path" ? (boardId) => changeBoard(item.sourceId, boardId) : undefined}
+      />
+    );
+  }
+
+  function renderColumn(horizon: Horizon) {
+    const anchor = horizon === "life" ? undefined : anchors[horizon];
+    const currentPeriod = isCurrentHorizonAnchor(horizon, anchors, currentAnchors);
+    const periodItems = itemsForHorizonAnchor(items, horizon, anchor).filter((item) => !hideCompleted || !item.done);
+    const carryoverItems = carryoverItemsForHorizonAnchor(items, horizon, anchor, currentPeriod);
+    const allVisibleItems = [...carryoverItems, ...periodItems];
+    const accepts = dragging ? canDropOnHorizon(dragging.sourceType, horizon) : false;
+    const columnClass = [
+      "hz-column",
+      focusedHorizon === horizon ? "is-focused" : "",
+      dragOver === horizon && accepts ? "is-drop" : "",
+      dragging && !accepts ? "is-refused" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return (
+      <section
+        key={horizon}
+        className={columnClass}
+        aria-label={periodLabel(horizon)}
+        onDragOver={(event) => {
+          if (!accepts) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+          if (dragOver !== horizon) setDragOver(horizon);
+        }}
+        onDragLeave={(event) => {
+          if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+          if (dragOver === horizon) setDragOver(null);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          handleDrop(horizon);
+        }}
+      >
+        <header className="hz-column-head">
+          <button type="button" className="hz-column-title" onClick={() => setFocusedHorizon(horizon)}>
+            <small>{t(`horizons.${horizon}`)}</small>
+            <strong>{periodLabel(horizon, focusedHorizon === horizon)}</strong>
+          </button>
+          <span className="hz-column-count">{allVisibleItems.length}</span>
+          {horizon !== "life" ? (
+            <div className="hz-period-nav">
+              <button
+                type="button"
+                aria-label={t("horizons.previousPeriod")}
+                onClick={() => shiftAnchor(horizon, -1)}
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                aria-label={t("horizons.nextPeriod")}
+                onClick={() => shiftAnchor(horizon, 1)}
+              >
+                ›
+              </button>
+            </div>
+          ) : null}
+        </header>
+
+        <div className="hz-cards">
+          {carryoverItems.length > 0 ? (
+            <section className="hz-carryover" aria-label={t("horizons.carryover") }>
+              <h3>{t("horizons.carryoverCount", { n: carryoverItems.length })}</h3>
+              <div className="hz-carryover-cards">{carryoverItems.map(renderCard)}</div>
+            </section>
+          ) : null}
+
+          {periodItems.map(renderCard)}
+
+          {milestoneFor && allVisibleItems.some((item) => item.sourceId === milestoneFor) ? (
+            <form
+              className="hz-compose"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitMilestone(milestoneFor);
+              }}
+            >
+              <input
+                autoFocus
+                value={milestoneTitle}
+                placeholder={t("horizons.milestonePlaceholder")}
+                aria-label={t("horizons.milestonePlaceholder")}
+                onChange={(event) => setMilestoneTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setMilestoneFor("");
+                    return;
+                  }
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  if (event.nativeEvent.isComposing) return;
+                  submitMilestone(milestoneFor);
+                }}
+              />
+            </form>
+          ) : null}
+
+          {composing === horizon ? (
+            <form
+              className="hz-compose"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitGoal(horizon);
+              }}
+            >
+              <input
+                autoFocus
+                value={draftTitle}
+                placeholder={t("horizons.goalPlaceholder")}
+                aria-label={t("horizons.goalPlaceholder")}
+                onChange={(event) => setDraftTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setComposing(null);
+                    setDraftTitle("");
+                    return;
+                  }
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  if (event.nativeEvent.isComposing) return;
+                  submitGoal(horizon);
+                }}
+              />
+              {boards.length > 0 ? (
+                <select
+                  className="hz-compose-board"
+                  aria-label={t("horizons.board")}
+                  value={draftBoardId}
+                  onChange={(event) => setDraftBoardId(event.target.value)}
+                >
+                  <option value="">{t("horizons.noBoard")}</option>
+                  {boards.map((board) => (
+                    <option key={board.id} value={board.id}>
+                      {board.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </form>
+          ) : (
+            <button
+              type="button"
+              className="hz-add"
+              onClick={() => {
+                setComposing(horizon);
+                setDraftTitle("");
+              }}
+            >
+              + {t("horizons.addGoal")}
+            </button>
+          )}
+
+          {allVisibleItems.length === 0 && composing !== horizon ? (
+            <p className="hz-empty">{t("horizons.columnEmpty")}</p>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <div className="hz-page">
       <header className="hz-head">
@@ -187,176 +420,28 @@ export function HorizonsPage({
           <h1>{t("horizons.title")}</h1>
           <p>{t("horizons.subtitle")}</p>
         </div>
+        <div className="hz-toolbar">
+          <label>
+            <input type="checkbox" checked={hideCompleted} onChange={(event) => setHideCompleted(event.target.checked)} />
+            {t("horizons.hideCompleted")}
+          </label>
+          <button type="button" onClick={() => setAnchors(currentAnchors)}>
+            {t("horizons.backToToday")}
+          </button>
+        </div>
       </header>
 
-      <div className="hz-columns">
-        {HORIZONS.map((horizon) => {
-          const columnItems = itemsForHorizon(items, horizon);
-          const accepts = dragging ? canDropOnHorizon(dragging.sourceType, horizon) : false;
-          const columnClass = [
-            "hz-column",
-            dragOver === horizon && accepts ? "is-drop" : "",
-            dragging && !accepts ? "is-refused" : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
-          return (
-            <section
-              key={horizon}
-              className={columnClass}
-              aria-label={t(`horizons.${horizon}`)}
-              onDragOver={(event) => {
-                if (!accepts) return;
-                // Only a prevented dragover marks the column as a valid drop
-                // target; without this the browser shows a "no entry" cursor
-                // and never fires onDrop.
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-                if (dragOver !== horizon) setDragOver(horizon);
-              }}
-              onDragLeave={(event) => {
-                // Ignore the leave events fired when the pointer crosses a
-                // child card inside the same column.
-                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-                if (dragOver === horizon) setDragOver(null);
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                handleDrop(horizon);
-              }}
-            >
-              <header className="hz-column-head">
-                <h2>{t(`horizons.${horizon}`)}</h2>
-                <span className="hz-column-count">{columnItems.length}</span>
-              </header>
-              <p className="hz-column-hint">{t(`horizons.${horizon}Hint`)}</p>
+      {focusedHorizon ? (
+        <div className="hz-focus-bar">
+          <button type="button" onClick={() => setFocusedHorizon(null)}>
+            ← {t("horizons.allHorizons")}
+          </button>
+          <strong>{periodLabel(focusedHorizon)}</strong>
+        </div>
+      ) : null}
 
-              <div className="hz-cards">
-                {columnItems.map((item) => (
-                  <HorizonCard
-                    key={item.key}
-                    item={item}
-                    lang={lang}
-                    isDragging={dragging?.key === item.key}
-                    onDragStart={() => setDragging(item)}
-                    onDragEnd={() => {
-                      setDragging(null);
-                      setDragOver(null);
-                    }}
-                    onToggleDone={() => toggleDone(item)}
-                    onMaterialise={item.sourceType === "milestone" ? () => materialiseMilestone(item) : undefined}
-                    onOpen={item.sourceType === "task" ? () => onOpenTask(item.sourceId) : undefined}
-                    onAddMilestone={
-                      item.sourceType === "path"
-                        ? () => {
-                            setMilestoneFor(item.sourceId);
-                            setMilestoneTitle("");
-                          }
-                        : undefined
-                    }
-                    onDelete={item.sourceType === "task" ? undefined : () => deleteItem(item)}
-                    milestoneCount={
-                      item.sourceType === "path" ? pathById.get(item.sourceId)?.milestones.length ?? 0 : undefined
-                    }
-                    boards={item.sourceType === "path" ? boards : undefined}
-                    onChangeBoard={
-                      item.sourceType === "path" ? (boardId) => changeBoard(item.sourceId, boardId) : undefined
-                    }
-                  />
-                ))}
-
-                {milestoneFor && columnItems.some((item) => item.sourceId === milestoneFor) ? (
-                  <form
-                    className="hz-compose"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      submitMilestone(milestoneFor);
-                    }}
-                  >
-                    <input
-                      autoFocus
-                      value={milestoneTitle}
-                      placeholder={t("horizons.milestonePlaceholder")}
-                      aria-label={t("horizons.milestonePlaceholder")}
-                      onChange={(event) => setMilestoneTitle(event.target.value)}
-                      onKeyDown={(event) => {
-                        // An IME fires Enter to commit its composition too;
-                        // saving on that one stores a half-typed title.
-                        if (event.key === "Escape") {
-                          setMilestoneFor("");
-                          return;
-                        }
-                        if (event.key !== "Enter") return;
-                        event.preventDefault();
-                        if (event.nativeEvent.isComposing) return;
-                        submitMilestone(milestoneFor);
-                      }}
-                    />
-                  </form>
-                ) : null}
-
-                {composing === horizon ? (
-                  <form
-                    className="hz-compose"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      submitGoal(horizon);
-                    }}
-                  >
-                    <input
-                      autoFocus
-                      value={draftTitle}
-                      placeholder={t("horizons.goalPlaceholder")}
-                      aria-label={t("horizons.goalPlaceholder")}
-                      onChange={(event) => setDraftTitle(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Escape") {
-                          setComposing(null);
-                          setDraftTitle("");
-                          return;
-                        }
-                        if (event.key !== "Enter") return;
-                        event.preventDefault();
-                        if (event.nativeEvent.isComposing) return;
-                        submitGoal(horizon);
-                      }}
-                    />
-                    {boards.length > 0 ? (
-                      <select
-                        className="hz-compose-board"
-                        aria-label={t("horizons.board")}
-                        value={draftBoardId}
-                        onChange={(event) => setDraftBoardId(event.target.value)}
-                      >
-                        <option value="">{t("horizons.noBoard")}</option>
-                        {boards.map((board) => (
-                          <option key={board.id} value={board.id}>
-                            {board.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : null}
-                  </form>
-                ) : (
-                  <button
-                    type="button"
-                    className="hz-add"
-                    onClick={() => {
-                      setComposing(horizon);
-                      setDraftTitle("");
-                    }}
-                  >
-                    + {t("horizons.addGoal")}
-                  </button>
-                )}
-
-                {columnItems.length === 0 && composing !== horizon ? (
-                  <p className="hz-empty">{t("horizons.columnEmpty")}</p>
-                ) : null}
-              </div>
-            </section>
-          );
-        })}
+      <div className={`hz-columns${focusedHorizon ? " is-focus" : ""}`}>
+        {(focusedHorizon ? [focusedHorizon] : HORIZONS).map(renderColumn)}
       </div>
     </div>
   );
