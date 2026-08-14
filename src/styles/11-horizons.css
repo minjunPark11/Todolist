@@ -331,3 +331,50 @@
 .sdv-horizon-cards .hz-card {
   cursor: default;
 }
+
+/* ── Board picker (TIMESTRIPE_REFERENCE.md §5) ────────────────────────────
+   The badge and the control are the same element: the card has to name its
+   board anyway, and a label plus a separate picker would double the chrome
+   on a card that is already only a few lines tall. */
+
+.hz-card-board {
+  appearance: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 1px 4px;
+  max-width: 100%;
+  font: inherit;
+  font-size: 11px;
+  /* Reads as the card's own colour, because it is what that colour means. */
+  color: color-mix(in srgb, var(--ev-color, var(--accent)) 74%, var(--text-primary));
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 16%, transparent);
+  cursor: pointer;
+}
+
+/* The card's own tint jumps to 30% in dark (see .hz-card above). At a fixed
+   16% the badge ended up fainter than the card it sits on and disappeared
+   into it, so it has to clear the card's level in both themes, not just one. */
+[data-theme="dark"] .hz-card-board {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 38%, transparent);
+}
+
+/* An unfiled goal says so plainly rather than borrowing a board's colour —
+   the whole point of showing the badge is that "no board" stays visible. */
+.hz-card-board.is-unassigned,
+[data-theme="dark"] .hz-card-board.is-unassigned {
+  color: var(--text-tertiary);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+
+.hz-compose-board {
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+}

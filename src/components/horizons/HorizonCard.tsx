@@ -26,6 +26,8 @@ export function HorizonCard({
   onMaterialise,
   onDelete,
   milestoneCount,
+  boards,
+  onChangeBoard,
 }: {
   item: HorizonItem;
   lang: "en" | "ko";
@@ -38,6 +40,17 @@ export function HorizonCard({
   onMaterialise?: () => void;
   onDelete?: () => void;
   milestoneCount?: number;
+  /**
+   * Board picker, shown only where the board actually lives — on the goal.
+   * Milestones and tasks inherit their goal's board (horizonItems D3) and
+   * already carry the goal's title as a breadcrumb, so repeating the board on
+   * them would be noise rather than information.
+   *
+   * Absent inside a board's own detail view: naming the board you are
+   * standing in tells the reader nothing.
+   */
+  boards?: Array<{ id: string; name: string }>;
+  onChangeBoard?: (boardId: string) => void;
 }) {
   const { t } = useT();
   const canDrag = Boolean(onDragStart) && item.draggable;
@@ -86,6 +99,23 @@ export function HorizonCard({
       {item.doneCriteria ? <p className="hz-card-criteria">{item.doneCriteria}</p> : null}
 
       <div className="hz-card-meta">
+        {boards && onChangeBoard ? (
+          // The badge is the control: it has to name the board anyway, and a
+          // separate label plus picker would double the card's chrome.
+          <select
+            className={`hz-card-board${item.boardId ? "" : " is-unassigned"}`}
+            aria-label={t("horizons.board")}
+            value={item.boardId ?? ""}
+            onChange={(event) => onChangeBoard(event.target.value)}
+          >
+            <option value="">{t("horizons.noBoard")}</option>
+            {boards.map((board) => (
+              <option key={board.id} value={board.id}>
+                {board.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
         {item.targetDate ? <span className="hz-card-date">{formatDate(item.targetDate, lang)}</span> : null}
         {milestoneCount !== undefined && milestoneCount > 0 ? (
           <span className="hz-card-count">{t("horizons.milestoneCount", { n: milestoneCount })}</span>

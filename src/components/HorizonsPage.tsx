@@ -21,7 +21,10 @@ interface HorizonsPageProps {
   paths: LearningPath[];
   tasks: Task[];
   projects: Project[];
-  onCreatePath: (input: { goal: string; targetDate?: string }) => void;
+  // projectId is the board (SPACES_BOARD_DESIGN D1). Without it a goal made
+  // here carried no board at all and so appeared in no Space — the two axes
+  // stopped being one model. See TIMESTRIPE_REFERENCE.md §5.
+  onCreatePath: (input: { goal: string; targetDate?: string; projectId?: string }) => void;
   onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
   onDeletePath: (pathId: string) => void;
   onAddMilestone: (pathId: string, input: { title: string }) => void;
@@ -61,6 +64,9 @@ export function HorizonsPage({
 
   const [composing, setComposing] = useState<Horizon | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
+  // Sticky across goals: someone adding three goals is usually adding them to
+  // the same board, and re-picking each time would be the annoying part.
+  const [draftBoardId, setDraftBoardId] = useState("");
   const [milestoneFor, setMilestoneFor] = useState<string>("");
   const [milestoneTitle, setMilestoneTitle] = useState("");
 
@@ -76,12 +82,32 @@ export function HorizonsPage({
 
   const pathById = useMemo(() => new Map(paths.map((path) => [path.id, path])), [paths]);
 
+  const boards = useMemo(
+    () => projects.map((project) => ({ id: project.id, name: project.name })),
+    [projects],
+  );
+
+  // The board axis was write-once: set at creation and never again, while the
+  // time axis moved freely by drag. One axis of a two-axis model being frozen
+  // is the model half-working (TIMESTRIPE_REFERENCE.md §5).
+  function changeBoard(pathId: string, boardId: string) {
+    onUpdatePath(pathId, { projectId: boardId || undefined });
+  }
+
   function submitGoal(horizon: Horizon) {
     const goal = draftTitle.trim();
     if (!goal) return;
     // Same helper the drop path uses, so creating a goal in a column and
     // dragging one into it land on the same date.
-    onCreatePath({ goal, targetDate: dateForHorizonDrop(horizon, today) });
+    // An empty board is allowed and stays visible as "no board" on the card,
+    // rather than being refused: you often know the goal before you know
+    // where it belongs, and a goal you cannot write down is worse than one
+    // that is briefly unfiled.
+    onCreatePath({
+      goal,
+      targetDate: dateForHorizonDrop(horizon, today),
+      projectId: draftBoardId || undefined,
+    });
     setDraftTitle("");
     setComposing(null);
     showToast({ message: t("horizons.toastGoalAdded") });
@@ -232,6 +258,10 @@ export function HorizonsPage({
                     milestoneCount={
                       item.sourceType === "path" ? pathById.get(item.sourceId)?.milestones.length ?? 0 : undefined
                     }
+                    boards={item.sourceType === "path" ? boards : undefined}
+                    onChangeBoard={
+                      item.sourceType === "path" ? (boardId) => changeBoard(item.sourceId, boardId) : undefined
+                    }
                   />
                 ))}
 
@@ -291,6 +321,21 @@ export function HorizonsPage({
                         submitGoal(horizon);
                       }}
                     />
+                    {boards.length > 0 ? (
+                      <select
+                        className="hz-compose-board"
+                        aria-label={t("horizons.board")}
+                        value={draftBoardId}
+                        onChange={(event) => setDraftBoardId(event.target.value)}
+                      >
+                        <option value="">{t("horizons.noBoard")}</option>
+                        {boards.map((board) => (
+                          <option key={board.id} value={board.id}>
+                            {board.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
                   </form>
                 ) : (
                   <button

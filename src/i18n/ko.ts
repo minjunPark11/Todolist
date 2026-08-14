@@ -78,6 +78,8 @@ export const ko: Dictionary = {
   "horizons.columnEmpty": "이 지평에는 아직 없습니다.",
   "horizons.markDone": "완료로 표시",
   "horizons.markNotDone": "완료 해제",
+  "horizons.board": "보드",
+  "horizons.noBoard": "보드 없음",
   "horizons.toastGoalAdded": "목표를 추가했습니다.",
   "horizons.toastRemoved": "삭제했습니다.",
   "spaces.horizons.title": "지평",

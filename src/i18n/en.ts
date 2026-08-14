@@ -78,6 +78,8 @@ export const en: Dictionary = {
   "horizons.columnEmpty": "Nothing on this horizon yet.",
   "horizons.markDone": "Mark as done",
   "horizons.markNotDone": "Mark as not done",
+  "horizons.board": "Board",
+  "horizons.noBoard": "No board",
   "horizons.toastGoalAdded": "Goal added.",
   "horizons.toastRemoved": "Removed.",
   "spaces.horizons.title": "Horizons",
