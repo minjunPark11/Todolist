@@ -96,6 +96,8 @@ export function sanitizeLearningPath(value: unknown, today = todayValue()): Lear
     deadlineDate: timing.deadlineDate,
     targetDate: timing.targetDate,
     projectId: typeof record.projectId === "string" && record.projectId ? record.projectId : undefined,
+    boardListId: typeof record.boardListId === "string" && record.boardListId ? record.boardListId : undefined,
+    boardOrder: typeof record.boardOrder === "number" && Number.isFinite(record.boardOrder) ? record.boardOrder : undefined,
     completedAt: typeof record.completedAt === "string" && record.completedAt ? record.completedAt : undefined,
     infoSlots: asOptionalInfoSlots(record.infoSlots),
     source: record.source === "user" ? "user" : "assistant",

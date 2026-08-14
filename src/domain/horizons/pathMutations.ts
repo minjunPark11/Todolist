@@ -41,6 +41,7 @@ export function patchPath(
 ): LearningPath[] {
   const hasTiming = "schedule" in patch || "targetDate" in patch || "deadlineDate" in patch;
   const hasDetails = "description" in patch || "successCriteria" in patch || "tags" in patch || "links" in patch;
+  const changesBoard = Object.prototype.hasOwnProperty.call(patch, "projectId") && patch.projectId !== paths.find((path) => path.id === id)?.projectId;
   return paths.map((path) =>
     path.id === id
       ? stamp({
@@ -48,6 +49,7 @@ export function patchPath(
           ...patch,
           ...(hasDetails ? sanitizeGoalDetailFields({ ...path, ...patch }) : {}),
           ...(hasTiming ? applyGoalTimingPatch(path, patch, today) : {}),
+          ...(changesBoard ? { boardListId: undefined, boardOrder: undefined } : {}),
           id,
         }, now)
       : path,

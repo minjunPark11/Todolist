@@ -1273,6 +1273,37 @@
 
 }
 
+.sdv-goals { display: grid; gap: 18px; }
+.sdv-goals-head h2 { margin: 0; font-size: 20px; }
+.sdv-goals-head p { margin: 5px 0 0; color: var(--text-tertiary); font-size: 13px; }
+.sdv-goals-create { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+.sdv-goals-create form { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px; }
+.sdv-goals-create form:last-child { grid-template-columns: minmax(0, 1fr) auto; }
+.sdv-goals input, .sdv-goals select { min-width: 0; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg-surface); color: var(--text-primary); padding: 8px 9px; font: inherit; }
+.sdv-goals button { border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg-surface); color: var(--text-primary); padding: 7px 9px; cursor: pointer; }
+.sdv-goals button:hover { background: var(--bg-hover); }
+.sdv-goal-lists { display: grid; gap: 14px; }
+.sdv-goal-list { border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--bg-surface); overflow: hidden; }
+.sdv-goal-list > header { min-height: 45px; display: flex; align-items: center; gap: 8px; padding: 8px 11px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface-muted); }
+.sdv-goal-list > header > input { max-width: 250px; font-weight: 700; }
+.sdv-goal-list > header > span { color: var(--text-tertiary); font-size: 12px; }
+.sdv-goal-list > header > div { display: flex; gap: 4px; margin-left: auto; }
+.sdv-goal-list > header button { padding: 4px 7px; font-size: 11px; }
+.sdv-goal-list-items { display: grid; }
+.sdv-goal-item { display: grid; grid-template-columns: auto minmax(150px, 1fr) minmax(110px, .4fr) minmax(150px, .7fr); align-items: center; gap: 9px; padding: 10px 11px; border-bottom: 1px solid var(--border-subtle); }
+.sdv-goal-item:last-child { border-bottom: 0; }
+.sdv-goal-item[draggable="true"] { cursor: grab; }
+.sdv-goal-title { border: 0 !important; padding: 3px !important; text-align: left; font-weight: 650; }
+.sdv-goal-item.is-done .sdv-goal-title { color: var(--text-tertiary); text-decoration: line-through; }
+.sdv-goal-plan { display: flex; gap: 5px; }
+.sdv-goal-plan input { width: 132px; }
+.sdv-goal-list-empty { margin: 0; padding: 15px 11px; color: var(--text-tertiary); font-size: 12px; }
+@media (max-width: 800px) {
+  .sdv-goals-create { grid-template-columns: 1fr; }
+  .sdv-goal-item { grid-template-columns: auto minmax(0, 1fr); }
+  .sdv-goal-item > select, .sdv-goal-plan { grid-column: 2; }
+}
+
 .sdv-form input[type="color"] {
   width: 64px;
   height: 36px;

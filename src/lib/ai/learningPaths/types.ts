@@ -73,6 +73,8 @@ export type LearningPath = {
   /** @deprecated compatibility with pre-Horizons-2 clients. */
   targetDate?: string;
   projectId?: string; // Board: reuses the existing Space, and its colour (D9)
+  boardListId?: string;
+  boardOrder?: number;
   completedAt?: string; // user-asserted completion (D10)
   // Path-level info gathering, reusing the card slot kinds. Persisted for
   // slice B; slice A neither asks nor renders these.

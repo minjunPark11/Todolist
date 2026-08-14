@@ -7,9 +7,9 @@ export type SpaceHubType = "project" | "personal" | "custom";
 // The per-space "calendar" tab was removed (PROJECT_DETAIL_REMOVE_CALENDAR_TAB
 // spec) — scheduling lives in the main Calendar page. Legacy ?tab=calendar
 // URLs fall back to "overview" because the value is no longer in SPACE_TABS.
-export type SpaceTab = "overview" | "tasks" | "notes";
+export type SpaceTab = "overview" | "goals" | "tasks" | "notes";
 
-export const SPACE_TABS: SpaceTab[] = ["overview", "tasks", "notes"];
+export const SPACE_TABS: SpaceTab[] = ["overview", "goals", "tasks", "notes"];
 
 export type SpaceSignalStatus =
   | "on_track"

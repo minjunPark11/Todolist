@@ -86,6 +86,11 @@ describe("path mutations", () => {
     expect(next[0].id).toBe("p1");
   });
 
+  it("clears a board list when the goal changes board", () => {
+    const next = patchPath([path({ projectId: "p1", boardListId: "l1", boardOrder: 2 })], "p1", { projectId: "p2" }, NOW);
+    expect(next[0]).toMatchObject({ projectId: "p2", boardListId: undefined, boardOrder: undefined });
+  });
+
   it("adds, patches and drops milestones", () => {
     let paths = addMilestone([path()], "p1", milestone(), NOW);
     expect(paths[0].milestones).toHaveLength(1);

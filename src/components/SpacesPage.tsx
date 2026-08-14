@@ -1,5 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import type { FocusSession, LearningPath, Milestone, PageId, Project, ProjectType, Subtask, Task, TaskDraft } from "../types";
+import type { FocusSession, GoalSchedule, LearningPath, Milestone, PageId, Project, ProjectType, Subtask, Task, TaskDraft } from "../types";
 import type { ToastState } from "./kit";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
 import { DeleteSpaceConfirmModal } from "./spaces/SpaceModals";
@@ -71,8 +71,12 @@ type SpacesPageProps = {
   paths: LearningPath[];
   onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
   onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
-  onCreateGoal: (input: { goal: string; projectId: string }) => void;
+  onCreateGoal: (input: { goal: string; projectId: string; boardListId?: string; schedule?: GoalSchedule }) => void;
   onOpenGoal: (pathId: string, milestoneId?: string) => void;
+  onCreateBoardList: (projectId: string, name: string) => void;
+  onUpdateBoardList: (projectId: string, listId: string, patch: { name?: string; order?: number }) => void;
+  onArchiveBoardList: (projectId: string, listId: string) => void;
+  onMoveGoalToBoardList: (pathId: string, listId?: string) => void;
   subtasks: Subtask[];
   focusSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
@@ -149,6 +153,10 @@ export function SpacesPage({
   onUpdateMilestone,
   onCreateGoal,
   onOpenGoal,
+  onCreateBoardList,
+  onUpdateBoardList,
+  onArchiveBoardList,
+  onMoveGoalToBoardList,
   onToggleDone,
   tasks,
   focusSessions,
@@ -444,6 +452,10 @@ export function SpacesPage({
         onUpdateMilestone={onUpdateMilestone}
         onCreateGoal={onCreateGoal}
         onOpenGoal={onOpenGoal}
+        onCreateBoardList={onCreateBoardList}
+        onUpdateBoardList={onUpdateBoardList}
+        onArchiveBoardList={onArchiveBoardList}
+        onMoveGoalToBoardList={onMoveGoalToBoardList}
         onToggleTaskDone={onToggleDone}
         focusSessions={focusSessions}
         activeFocusSession={activeFocusSession}

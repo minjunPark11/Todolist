@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FocusSession, LearningPath, Milestone, Project, Task, TaskDraft } from "../../types";
+import type { FocusSession, GoalSchedule, LearningPath, Milestone, Project, Task, TaskDraft } from "../../types";
 import type { ToastState } from "../kit";
 import type { PageId } from "../../types";
 import {
@@ -30,6 +30,7 @@ import { useSpaceHubData } from "../../hooks/useSpaceHubData";
 import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { SpaceOverviewTab } from "./SpaceOverviewTab";
 import { SpaceHorizons } from "./SpaceHorizons";
+import { SpaceGoalsTab } from "./SpaceGoalsTab";
 import { SpaceTasksTab } from "./SpaceWorkTabs";
 import { NoteQuickCreateModal, SpaceNotesView, type NotesPanelMode } from "./SpaceNotesPanel";
 import {
@@ -54,8 +55,12 @@ export type SpaceDetailViewProps = {
   paths: LearningPath[];
   onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
   onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
-  onCreateGoal: (input: { goal: string; projectId: string }) => void;
+  onCreateGoal: (input: { goal: string; projectId: string; boardListId?: string; schedule?: GoalSchedule }) => void;
   onOpenGoal: (pathId: string, milestoneId?: string) => void;
+  onCreateBoardList: (projectId: string, name: string) => void;
+  onUpdateBoardList: (projectId: string, listId: string, patch: { name?: string; order?: number }) => void;
+  onArchiveBoardList: (projectId: string, listId: string) => void;
+  onMoveGoalToBoardList: (pathId: string, listId?: string) => void;
   onToggleTaskDone: (taskId: string) => void;
   focusSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
@@ -102,6 +107,10 @@ export function SpaceDetailView({
   onUpdateMilestone,
   onCreateGoal,
   onOpenGoal,
+  onCreateBoardList,
+  onUpdateBoardList,
+  onArchiveBoardList,
+  onMoveGoalToBoardList,
   onToggleTaskDone,
   focusSessions,
   activeFocusSession,
@@ -513,6 +522,20 @@ export function SpaceDetailView({
           }}
         />
         </>
+      ) : null}
+      {tab === "goals" ? (
+        <SpaceGoalsTab
+          boardId={space.sourceRef === "project" ? space.sourceId ?? "" : ""}
+          paths={paths}
+          lists={projects.find((project) => project.id === space.sourceId)?.boardLists ?? []}
+          onCreateGoal={onCreateGoal}
+          onCreateList={(name) => space.sourceId && onCreateBoardList(space.sourceId, name)}
+          onUpdateList={(listId, patch) => space.sourceId && onUpdateBoardList(space.sourceId, listId, patch)}
+          onArchiveList={(listId) => space.sourceId && onArchiveBoardList(space.sourceId, listId)}
+          onMoveGoal={onMoveGoalToBoardList}
+          onUpdatePath={onUpdatePath}
+          onOpenGoal={onOpenGoal}
+        />
       ) : null}
       {tab === "tasks" ? (
         <SpaceTasksTab

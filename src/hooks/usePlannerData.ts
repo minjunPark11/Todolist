@@ -31,6 +31,7 @@ import * as pathOps from "../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
+import { addBoardList as addBoardListRecord, archiveBoardList as archiveBoardListRecord, moveGoalToBoardList as moveGoalToBoardListRecord, patchBoardList as patchBoardListRecord, reconcileBoardAssignments, sanitizeBoardLists } from "../domain/horizons/boardLists";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
 import {
   buildSyncPlan,
@@ -178,6 +179,7 @@ function normalizeProject(project: Partial<Project>): Project {
     archivedAt: project.archivedAt ?? "",
     createdAt: project.createdAt ?? now,
     updatedAt: project.updatedAt ?? now,
+    boardLists: sanitizeBoardLists(project.boardLists),
   };
 }
 
@@ -304,7 +306,7 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
 }
 
 function normalizeData(data: RawPlannerData): PlannerData {
-  return {
+  const normalized = {
     tasks: Array.isArray(data.tasks) ? data.tasks.map(normalizeTask) : [],
     projects: Array.isArray(data.projects) ? data.projects.map(normalizeProject) : [],
     subtasks: Array.isArray(data.subtasks)
@@ -325,6 +327,7 @@ function normalizeData(data: RawPlannerData): PlannerData {
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
   };
+  return { ...normalized, learningPaths: reconcileBoardAssignments(normalized.projects, normalized.learningPaths) };
 }
 
 function emptyData(): PlannerData {
@@ -1053,12 +1056,16 @@ export function usePlannerData() {
   }
 
   function deleteProject(projectId: string) {
+    const now = new Date().toISOString();
     setData((current) => ({
       ...current,
       projects: current.projects.filter((project) => project.id !== projectId),
       tasks: current.tasks.map((task) =>
-        task.projectId === projectId ? { ...task, projectId: "", updatedAt: new Date().toISOString() } : task,
+        task.projectId === projectId ? { ...task, projectId: "", updatedAt: now } : task,
       ),
+      learningPaths: current.learningPaths.map((path) => path.projectId === projectId
+        ? { ...path, projectId: undefined, boardListId: undefined, boardOrder: undefined, updatedAt: now }
+        : path),
     }));
   }
 
@@ -1333,6 +1340,31 @@ export function usePlannerData() {
     }));
   }
 
+  function createBoardList(projectId: string, name: string) {
+    const title = name.trim();
+    if (!title) return;
+    const now = new Date().toISOString();
+    setData((current) => ({ ...current, projects: addBoardListRecord(current.projects, projectId, { id: createId("blist"), name: title, order: current.projects.find((project) => project.id === projectId)?.boardLists?.length ?? 0 }, now) }));
+  }
+
+  function updateBoardList(projectId: string, listId: string, patch: { name?: string; order?: number }) {
+    const now = new Date().toISOString();
+    setData((current) => ({ ...current, projects: patchBoardListRecord(current.projects, projectId, listId, patch, now) }));
+  }
+
+  function archiveBoardList(projectId: string, listId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const next = archiveBoardListRecord(current.projects, current.learningPaths, projectId, listId, now);
+      return { ...current, projects: next.projects, learningPaths: next.paths };
+    });
+  }
+
+  function moveGoalToBoardList(pathId: string, listId?: string) {
+    const now = new Date().toISOString();
+    setData((current) => ({ ...current, learningPaths: moveGoalToBoardListRecord(current.learningPaths, current.projects, pathId, listId, now) }));
+  }
+
   function toggleProjectPinned(projectId: string) {
     setData((current) => ({
       ...current,
@@ -1352,6 +1384,7 @@ export function usePlannerData() {
     deadlineDate?: string;
     targetDate?: string;
     projectId?: string;
+    boardListId?: string;
     milestones?: Milestone[];
     source?: LearningPath["source"];
   }): LearningPath | null {
@@ -1364,6 +1397,12 @@ export function usePlannerData() {
       milestones: input.milestones ?? [],
       ...normalizeGoalTiming(input, todayValue()),
       projectId: input.projectId,
+      boardListId: input.boardListId,
+      boardOrder: input.projectId
+        ? data.learningPaths
+            .filter((path) => path.projectId === input.projectId && path.boardListId === input.boardListId)
+            .reduce((max, path) => Math.max(max, path.boardOrder ?? -1), -1) + 1
+        : undefined,
       source: input.source ?? "user",
       createdAt: now,
       updatedAt: now,
@@ -1542,6 +1581,10 @@ export function usePlannerData() {
     addProject,
     createProject,
     updateProject,
+    createBoardList,
+    updateBoardList,
+    archiveBoardList,
+    moveGoalToBoardList,
     toggleProjectPinned,
     archiveProject,
     restoreProject,

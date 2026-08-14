@@ -11,6 +11,7 @@ type GoalDraft = {
   tags: string;
   links: GoalLink[];
   projectId: string;
+  boardListId: string;
   scheduleUnit: GoalSchedule["unit"];
   scheduleDate: string;
   deadlineDate: string;
@@ -25,6 +26,7 @@ function toDraft(path: LearningPath): GoalDraft {
     tags: (path.tags ?? []).join(", "),
     links: path.links ?? [],
     projectId: path.projectId ?? "",
+    boardListId: path.boardListId ?? "",
     scheduleUnit: schedule.unit,
     scheduleDate: "startDate" in schedule ? schedule.startDate : "",
     deadlineDate: path.deadlineDate ?? "",
@@ -116,6 +118,7 @@ export function GoalDetailDrawer({
       tags: draft.tags.split(/[\n,]/).map((tag) => tag.trim()).filter(Boolean),
       links: draft.links,
       projectId: draft.projectId || undefined,
+      boardListId: draft.boardListId || undefined,
       schedule: scheduleFromDraft(draft),
       deadlineDate: draft.deadlineDate || undefined,
     });
@@ -197,7 +200,8 @@ export function GoalDetailDrawer({
           {editing ? (
             <section className="goal-detail-form">
               <label>{t("goalDetail.title")}<input value={draft.goal} maxLength={300} onChange={(e) => setDraft({ ...draft, goal: e.target.value })} /></label>
-              <label>{t("horizons.board")}<select value={draft.projectId} onChange={(e) => setDraft({ ...draft, projectId: e.target.value })}><option value="">{t("horizons.noBoard")}</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+              <label>{t("horizons.board")}<select value={draft.projectId} onChange={(e) => setDraft({ ...draft, projectId: e.target.value, boardListId: "" })}><option value="">{t("horizons.noBoard")}</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+              {draft.projectId ? <label>{t("spaceGoals.list")}<select value={draft.boardListId} onChange={(e) => setDraft({ ...draft, boardListId: e.target.value })}><option value="">{t("spaceGoals.unsorted")}</option>{(projects.find((project) => project.id === draft.projectId)?.boardLists ?? []).filter((list) => !list.archivedAt).map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select></label> : null}
               <div className="goal-detail-grid">
                 <label>{t("goalDetail.period")}<select value={draft.scheduleUnit} onChange={(e) => setDraft({ ...draft, scheduleUnit: e.target.value as GoalSchedule["unit"] })}>{["unscheduled", "life", "year", "month", "week", "day"].map((unit) => <option key={unit} value={unit}>{t(`goalDetail.schedule.${unit}`)}</option>)}</select></label>
                 {!['unscheduled', 'life'].includes(draft.scheduleUnit) ? <label>{t("goalDetail.startDate")}<input type="date" value={draft.scheduleDate} onChange={(e) => setDraft({ ...draft, scheduleDate: e.target.value })} /></label> : null}

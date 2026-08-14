@@ -78,6 +78,13 @@ export interface Subtask {
 export type ProjectStatus = "active" | "paused" | "completed" | "archived";
 export type ProjectType = "project" | "area";
 
+export interface BoardList {
+  id: string;
+  name: string;
+  order: number;
+  archivedAt?: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -93,6 +100,7 @@ export interface Project {
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;
+  boardLists?: BoardList[];
 }
 
 // One uninterrupted running stretch of a focus session. Pauses close a
