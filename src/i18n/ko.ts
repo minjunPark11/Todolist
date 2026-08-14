@@ -786,7 +786,8 @@ export const ko: Dictionary = {
   "eis.qIIIHint": "빠르게 처리할 가벼운 작업",
   // 실제 사분면이 아니라 보관함이다. en.ts의 eis.qIV 주석 참고.
   "eis.qIV": "미분류 · 보류함",
-  "eis.qIVHint": "아직 판단하지 않았거나, 보류·완료된 작업",
+  "eis.qIVHint": "아직 판단하지 않았거나, 안 중요하거나, 보류·완료된 작업",
+  "eis.group.neither": "안 중요하고 안 급함",
   "eis.group.unclassified": "미분류",
   "eis.group.onHold": "보류",
   "eis.group.completed": "완료",

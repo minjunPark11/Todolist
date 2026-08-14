@@ -791,8 +791,9 @@ export const en: Dictionary = {
   // Urgent" attributed a judgement the user never made to their new tasks.
   // Named to match caltasks.qIV, which already said "Unsorted".
   "eis.qIV": "Unsorted & parked",
-  "eis.qIVHint": "Not judged yet · on hold · completed",
+  "eis.qIVHint": "Not judged yet · not important · on hold · completed",
   "eis.group.unclassified": "Unsorted",
+  "eis.group.neither": "Not important, not urgent",
   "eis.group.onHold": "On hold",
   "eis.group.completed": "Completed",
   "eis.empty": "No tasks.",

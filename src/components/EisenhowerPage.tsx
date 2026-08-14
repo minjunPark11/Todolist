@@ -21,7 +21,10 @@ import { MotionPanelShell } from "./motion/MotionPanelShell";
 import { MotionTaskRow } from "./motion/MotionTaskRow";
 
 const QUADRANTS: MatrixQuadrant[] = ["I", "II", "III", "IV"];
-const IV_GROUPS: MatrixGroup[] = ["unclassified", "onHold", "completed"];
+// Triage first: "unclassified" is the only one of these asking to be acted on
+// — the rest are resting states. This list is what Q4 renders, so a group
+// missing from it does not just lose its heading, its tasks vanish.
+const IV_GROUPS: MatrixGroup[] = ["unclassified", "neither", "onHold", "completed"];
 const COMPLETED_CAP = 10;
 
 interface EisenhowerPageProps {
