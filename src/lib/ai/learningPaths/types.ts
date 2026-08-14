@@ -50,10 +50,20 @@ export type Milestone = {
 
 export type LearningPathSource = "assistant" | "user";
 
+export type GoalLink = {
+  id: string;
+  title: string;
+  url: string;
+};
+
 export type LearningPath = {
   id: string;
   // The big direction, one sentence ("HSK4 수준 중국어").
   goal: string;
+  description?: string;
+  successCriteria?: string;
+  tags?: string[];
+  links?: GoalLink[];
   // Order is the path: milestones progress by index.
   milestones: Milestone[];
   // --- Horizons page. schedule is normalized at every read/write boundary;

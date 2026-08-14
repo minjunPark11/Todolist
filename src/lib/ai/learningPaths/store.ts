@@ -16,6 +16,7 @@ import type { LearningPath, Milestone } from "./types";
 import { MAX_MILESTONES } from "../../../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../../../domain/horizons/goalSchedule";
 import { todayValue } from "../../../utils/date";
+import { sanitizeGoalDetailFields } from "../../../domain/horizons/goalDetails";
 
 export const LEGACY_LEARNING_PATHS_KEY = "focusflow.learningPaths.v1";
 // Set once the blob has been folded into planner data. Kept as a separate
@@ -89,6 +90,7 @@ export function sanitizeLearningPath(value: unknown, today = todayValue()): Lear
   return {
     id: record.id,
     goal: record.goal.trim(),
+    ...sanitizeGoalDetailFields(record),
     milestones,
     schedule: timing.schedule,
     deadlineDate: timing.deadlineDate,

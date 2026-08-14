@@ -97,6 +97,14 @@ describe("path mutations", () => {
     expect(paths[0].milestones).toHaveLength(0);
   });
 
+  it("clears a milestone schedule so it inherits the parent goal", () => {
+    const paths = [path({ milestones: [milestone({ schedule: { unit: "month", startDate: "2026-09-01" } })] })];
+    const next = patchMilestone(paths, "p1", "m1", { schedule: undefined, deadlineDate: "2026-10-10" }, NOW);
+    expect(next[0].milestones[0].schedule).toBeUndefined();
+    expect(next[0].milestones[0].targetDate).toBeUndefined();
+    expect(next[0].milestones[0].deadlineDate).toBe("2026-10-10");
+  });
+
   it("caps milestones per path", () => {
     let paths = [path()];
     for (let i = 0; i <= MAX_MILESTONES; i += 1) {

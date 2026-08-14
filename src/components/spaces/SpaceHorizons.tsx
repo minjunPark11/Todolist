@@ -22,6 +22,8 @@ export function SpaceHorizons({
   onUpdateMilestone,
   onCreateGoal,
   onOpenTask,
+  onOpenGoal,
+  onToggleTaskDone,
   onOpenHorizons,
 }: {
   /** The Project behind this Space. Empty for study/local spaces, which have no board yet (Phase S4). */
@@ -38,6 +40,8 @@ export function SpaceHorizons({
    */
   onCreateGoal: (input: { goal: string; projectId: string }) => void;
   onOpenTask: (taskId: string) => void;
+  onOpenGoal: (pathId: string, milestoneId?: string) => void;
+  onToggleTaskDone: (taskId: string) => void;
   onOpenHorizons: () => void;
 }) {
   const { t, lang } = useT();
@@ -78,7 +82,7 @@ export function SpaceHorizons({
       // Same reasoning as the Horizons page: tasks belong to Today and the
       // calendar, which carry the undo, repeat and focus-session handling a
       // checkbox here would have to duplicate.
-      onOpenTask(item.sourceId);
+      onToggleTaskDone(item.sourceId);
       return;
     }
     const stamp = item.done ? undefined : new Date().toISOString();
@@ -153,7 +157,13 @@ export function SpaceHorizons({
                     item={item}
                     lang={lang}
                     onToggleDone={() => toggleDone(item)}
-                    onOpen={item.sourceType === "task" ? () => onOpenTask(item.sourceId) : undefined}
+                    onOpen={
+                      item.sourceType === "task"
+                        ? () => onOpenTask(item.sourceId)
+                        : item.sourceType === "path"
+                          ? () => onOpenGoal(item.sourceId)
+                          : () => onOpenGoal(item.parentId, item.sourceId)
+                    }
                     milestoneCount={
                       item.sourceType === "path" ? pathById.get(item.sourceId)?.milestones.length ?? 0 : undefined
                     }

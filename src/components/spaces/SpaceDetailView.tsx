@@ -55,6 +55,8 @@ export type SpaceDetailViewProps = {
   onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
   onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
   onCreateGoal: (input: { goal: string; projectId: string }) => void;
+  onOpenGoal: (pathId: string, milestoneId?: string) => void;
+  onToggleTaskDone: (taskId: string) => void;
   focusSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
   onBack: () => void;
@@ -99,6 +101,8 @@ export function SpaceDetailView({
   onUpdatePath,
   onUpdateMilestone,
   onCreateGoal,
+  onOpenGoal,
+  onToggleTaskDone,
   focusSessions,
   activeFocusSession,
   onBack,
@@ -482,6 +486,8 @@ export function SpaceDetailView({
           onUpdatePath={onUpdatePath}
           onUpdateMilestone={onUpdateMilestone}
           onCreateGoal={onCreateGoal}
+          onOpenGoal={onOpenGoal}
+          onToggleTaskDone={onToggleTaskDone}
           onOpenTask={openTaskDrawer}
           onOpenHorizons={() => onNavigate("horizons")}
         />

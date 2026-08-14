@@ -72,6 +72,7 @@ type SpacesPageProps = {
   onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
   onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
   onCreateGoal: (input: { goal: string; projectId: string }) => void;
+  onOpenGoal: (pathId: string, milestoneId?: string) => void;
   subtasks: Subtask[];
   focusSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
@@ -147,6 +148,8 @@ export function SpacesPage({
   onUpdatePath,
   onUpdateMilestone,
   onCreateGoal,
+  onOpenGoal,
+  onToggleDone,
   tasks,
   focusSessions,
   activeFocusSession,
@@ -440,6 +443,8 @@ export function SpacesPage({
         onUpdatePath={onUpdatePath}
         onUpdateMilestone={onUpdateMilestone}
         onCreateGoal={onCreateGoal}
+        onOpenGoal={onOpenGoal}
+        onToggleTaskDone={onToggleDone}
         focusSessions={focusSessions}
         activeFocusSession={activeFocusSession}
         onBack={closeSpace}

@@ -1,9 +1,10 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { ArchivePage } from "../components/ArchivePage";
 import { CalendarView } from "../components/CalendarView";
 import { EisenhowerPage } from "../components/EisenhowerPage";
 import { FocusPage } from "../components/FocusPage";
 import { HorizonsPage } from "../components/HorizonsPage";
+import { GoalDetailDrawer } from "../components/horizons/GoalDetailDrawer";
 import { SpacesPage } from "../components/SpacesPage";
 import { SettingsPage } from "../components/SettingsPage";
 import { TodayPage, type TodayIntent } from "../components/TodayPage";
@@ -123,6 +124,38 @@ export function AppPages({
   isKnowledgeDesktop,
   accountSlot,
 }: AppPagesProps) {
+  const [selectedGoal, setSelectedGoal] = useState<{ pathId: string; milestoneId?: string } | null>(null);
+  const selectedGoalPath = selectedGoal
+    ? planner.learningPaths.find((path) => path.id === selectedGoal.pathId) ?? null
+    : null;
+
+  function openGoal(pathId: string, milestoneId?: string) {
+    planner.selectTask("");
+    setSelectedGoal({ pathId, milestoneId });
+  }
+
+  function openTaskFromGoal(taskId: string) {
+    setSelectedGoal(null);
+    planner.selectTask(taskId);
+  }
+
+  const goalDrawer = selectedGoalPath ? (
+    <GoalDetailDrawer
+      path={selectedGoalPath}
+      initialMilestoneId={selectedGoal?.milestoneId}
+      projects={activeProjects}
+      tasks={planner.tasks}
+      onClose={() => setSelectedGoal(null)}
+      onUpdatePath={planner.updateLearningPath}
+      onDeletePath={planner.deleteLearningPath}
+      onAddMilestone={planner.addMilestone}
+      onUpdateMilestone={planner.updateMilestone}
+      onDeleteMilestone={planner.deleteMilestone}
+      onCreateTaskFromMilestone={planner.createTaskFromMilestone}
+      onOpenTask={openTaskFromGoal}
+    />
+  ) : null;
+
   function pageGridClass(extra = "") {
     const base = planner.selectedTask ? "page-grid" : "page-grid no-detail";
     return extra ? `${base} ${extra}` : base;
@@ -196,11 +229,14 @@ export function AppPages({
           onUpdateMilestone={planner.updateMilestone}
           onDeleteMilestone={planner.deleteMilestone}
           onUpdateTask={planner.updateTask}
+          onToggleTaskDone={planner.toggleTaskDone}
           onCreateTaskFromMilestone={planner.createTaskFromMilestone}
           onOpenTask={planner.selectTask}
+          onOpenGoal={openGoal}
           showToast={showToast}
         />
         {renderTaskDetail()}
+        {goalDrawer}
       </section>
     );
   }
@@ -269,6 +305,7 @@ export function AppPages({
 
   if (activePage === "projects") {
     return (
+      <>
       <SpacesPage
         projects={planner.projects}
         tasks={planner.tasks}
@@ -276,6 +313,7 @@ export function AppPages({
         onUpdatePath={planner.updateLearningPath}
         onUpdateMilestone={planner.updateMilestone}
         onCreateGoal={planner.createLearningPath}
+        onOpenGoal={openGoal}
         subtasks={planner.subtasks}
         focusSessions={planner.focusSessions}
         activeFocusSession={planner.activeFocusSession}
@@ -309,6 +347,13 @@ export function AppPages({
         onSaveNotes={(id, value) => planner.updateProject(id, { notes: value })}
         showToast={showToast}
       />
+      {goalDrawer}
+      {planner.selectedTask ? (
+        <div className="tdy-detail-overlay" onClick={() => planner.selectTask("")}>
+          <div className="tdy-detail-drawer" onClick={(event) => event.stopPropagation()}>{renderTaskDetail()}</div>
+        </div>
+      ) : null}
+      </>
     );
   }
 

@@ -88,8 +88,8 @@ export function HorizonCard({
         <button
           type="button"
           className="hz-card-title"
-          onClick={onOpen ?? onToggleDone}
-          disabled={!onOpen && !onToggleDone}
+          onClick={onOpen}
+          disabled={!onOpen}
         >
           {item.title}
         </button>

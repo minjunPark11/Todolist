@@ -8,6 +8,7 @@
 import type { LearningPath, Milestone } from "../../lib/ai/learningPaths/types";
 import { applyGoalTimingPatch, normalizeGoalTiming } from "./goalSchedule";
 import { todayValue } from "../../utils/date";
+import { sanitizeGoalDetailFields } from "./goalDetails";
 
 // A path per long-running goal, so the list stays short by nature. The caps
 // are the same ones the blob enforced.
@@ -28,7 +29,7 @@ export function addPath(paths: LearningPath[], path: LearningPath, today = today
     const hasTiming = "schedule" in milestone || "targetDate" in milestone || "deadlineDate" in milestone;
     return hasTiming ? { ...milestone, ...normalizeGoalTiming(milestone, today) } : milestone;
   });
-  return sortPaths([{ ...path, ...normalizeGoalTiming(path, today), milestones }, ...paths]).slice(0, MAX_PATHS);
+  return sortPaths([{ ...path, ...sanitizeGoalDetailFields(path), ...normalizeGoalTiming(path, today), milestones }, ...paths]).slice(0, MAX_PATHS);
 }
 
 export function patchPath(
@@ -39,9 +40,16 @@ export function patchPath(
   today = todayValue(),
 ): LearningPath[] {
   const hasTiming = "schedule" in patch || "targetDate" in patch || "deadlineDate" in patch;
+  const hasDetails = "description" in patch || "successCriteria" in patch || "tags" in patch || "links" in patch;
   return paths.map((path) =>
     path.id === id
-      ? stamp({ ...path, ...patch, ...(hasTiming ? applyGoalTimingPatch(path, patch, today) : {}), id }, now)
+      ? stamp({
+          ...path,
+          ...patch,
+          ...(hasDetails ? sanitizeGoalDetailFields({ ...path, ...patch }) : {}),
+          ...(hasTiming ? applyGoalTimingPatch(path, patch, today) : {}),
+          id,
+        }, now)
       : path,
   );
 }
@@ -82,13 +90,20 @@ export function patchMilestone(
   today = todayValue(),
 ): LearningPath[] {
   const hasTiming = "schedule" in patch || "targetDate" in patch || "deadlineDate" in patch;
+  const clearsSchedule = Object.prototype.hasOwnProperty.call(patch, "schedule") && patch.schedule === undefined;
   return withMilestones(
     paths,
     pathId,
     (milestones) =>
       milestones.map((milestone) =>
         milestone.id === milestoneId
-          ? { ...milestone, ...patch, ...(hasTiming ? applyGoalTimingPatch(milestone, patch, today) : {}), id: milestone.id }
+          ? {
+              ...milestone,
+              ...patch,
+              ...(hasTiming ? applyGoalTimingPatch(milestone, patch, today) : {}),
+              ...(clearsSchedule ? { schedule: undefined, targetDate: undefined } : {}),
+              id: milestone.id,
+            }
           : milestone,
       ),
     now,

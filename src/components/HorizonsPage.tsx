@@ -44,9 +44,11 @@ interface HorizonsPageProps {
   onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
   onDeleteMilestone: (pathId: string, milestoneId: string) => void;
   onUpdateTask: (taskId: string, patch: { scheduledDate?: string; dueDate?: string }) => void;
+  onToggleTaskDone: (taskId: string) => void;
   /** Month → Day bridge: makes a task for today and links it to the milestone. */
   onCreateTaskFromMilestone: (pathId: string, milestoneId: string, title: string) => void;
   onOpenTask: (taskId: string) => void;
+  onOpenGoal: (pathId: string, milestoneId?: string) => void;
   showToast: (toast: ToastState) => void;
 }
 
@@ -61,8 +63,10 @@ export function HorizonsPage({
   onUpdateMilestone,
   onDeleteMilestone,
   onUpdateTask,
+  onToggleTaskDone,
   onCreateTaskFromMilestone,
   onOpenTask,
+  onOpenGoal,
   showToast,
 }: HorizonsPageProps) {
   const { t, lang } = useT();
@@ -145,7 +149,7 @@ export function HorizonsPage({
       // Tasks are not this page's to own — Today and the calendar already
       // have that job, and a checkbox here would need the same undo, repeat
       // and focus-session handling they carry.
-      onOpenTask(item.sourceId);
+      onToggleTaskDone(item.sourceId);
       return;
     }
     const stamp = item.done ? undefined : new Date().toISOString();
@@ -233,7 +237,13 @@ export function HorizonsPage({
         }}
         onToggleDone={() => toggleDone(item)}
         onMaterialise={item.sourceType === "milestone" ? () => materialiseMilestone(item) : undefined}
-        onOpen={item.sourceType === "task" ? () => onOpenTask(item.sourceId) : undefined}
+        onOpen={
+          item.sourceType === "task"
+            ? () => onOpenTask(item.sourceId)
+            : item.sourceType === "path"
+              ? () => onOpenGoal(item.sourceId)
+              : () => onOpenGoal(item.parentId, item.sourceId)
+        }
         onAddMilestone={
           item.sourceType === "path"
             ? () => {
