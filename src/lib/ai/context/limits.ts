@@ -16,13 +16,9 @@ export const AI_CONTEXT_LIMITS = {
   subtasks: 60,
   projects: 20,
   calendarEvents: 30,
-  studyTopics: 10,
   recentNotes: 5,
-  habits: 20,
   focusSessions: 30,
   activityWindowDays: 14,
-  taskTemplates: 10,
-  recentItems: 10,
   textFieldCharacters: 240,
   maxContextTokens: 2400,
 };

@@ -1,4 +1,4 @@
-import { DragEvent } from "react";
+import { CSSProperties, DragEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { CalendarItem } from "../../utils/calendarItems";
 import { getDayNumber, getMonthGrid, todayValue, type CalendarCell } from "../../utils/date";
@@ -17,7 +17,6 @@ const CHIP_CAP = 5;
 
 function layerPrefix(layer: CalendarItem["layer"]) {
   if (layer === "deadline") return "⚠ ";
-  if (layer === "study-review") return "↻ ";
   if (layer === "project-deadline") return "◆ ";
   if (layer === "external") return "• ";
   if (layer === "focus-actual") return "⏱ ";
@@ -27,6 +26,8 @@ function layerPrefix(layer: CalendarItem["layer"]) {
 interface MonthViewProps {
   anchor: string;
   items: CalendarItem[];
+  /** Key of the item carrying the selection ring; "" when nothing is picked. */
+  selectedKey: string;
   dragOverId: string;
   onDragStart: (event: DragEvent, itemKey: string) => void;
   onOverCell: (id: string) => (event: DragEvent) => void;
@@ -41,6 +42,7 @@ interface MonthViewProps {
 export function MonthView({
   anchor,
   items,
+  selectedKey,
   dragOverId,
   onDragStart,
   onOverCell,
@@ -99,6 +101,13 @@ export function MonthView({
               className={[
                 "gcal-chip",
                 `gcal-chip-${item.layer}`,
+                // A timed item is not an occupation of the whole day, so it is
+                // not drawn as a filled pill: `is-timed` turns it into a dot +
+                // title + start time. Filled pills stay for all-day items, and
+                // a month cell with three of each stops being a block of
+                // colour (CALENDAR_APPLE_DESIGN.md D4).
+                item.allDay ? "" : "is-timed",
+                item.key === selectedKey ? "is-picked" : "",
                 item.repeating ? "is-repeating" : "",
                 item.status === "done" ? "is-done" : "",
               ].filter(Boolean).join(" ")}
@@ -110,15 +119,18 @@ export function MonthView({
                 event.stopPropagation();
                 onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
               }}
-              style={
-                item.layer === "task" || item.layer === "external" || item.layer === "focus-actual"
-                  ? { borderLeftColor: item.color }
-                  : undefined
-              }
+              // Hue now comes from the category for every layer, so the colour
+              // is handed to CSS the same way for all of them.
+              style={{ ["--ev-color"]: item.color } as CSSProperties}
             >
-              {layerPrefix(item.layer)}
-              {item.repeating ? "↺ " : null}
-              {item.title}
+              <span className="gcal-chip-label">
+                {layerPrefix(item.layer)}
+                {item.repeating ? "↺ " : null}
+                {item.title}
+              </span>
+              {!item.allDay && item.startTime ? (
+                <span className="gcal-chip-time">{item.startTime}</span>
+              ) : null}
             </motion.button>
           ))}
           </AnimatePresence>

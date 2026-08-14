@@ -1,10 +1,9 @@
 // Derivations for the redesigned Today page (TODAY_PAGE_IMPLEMENTATION_SPEC).
-// Maps the existing Task/Project/ConceptNote model onto the spec's
+// Maps the existing Task/Project model onto the spec's
 // TodayTask / TimeBlock / SpaceSignal concepts without changing stored data.
-import type { ConceptNote, Project, Task } from "../types";
+import type { Project, Task } from "../types";
 import { platform } from "../platform";
 import { todayValue } from "./date";
-import { getDueReviewCount } from "./planner";
 
 export type TodayBucketId = "now" | "next" | "later";
 
@@ -232,7 +231,7 @@ export type SignalSeverity = "low" | "medium" | "high";
 
 export interface TodaySpaceSignal {
   id: string;
-  kind: "project" | "study";
+  kind: "project";
   refId: string;
   name: string;
   color?: string;
@@ -244,7 +243,6 @@ export interface TodaySpaceSignal {
 export function buildSpaceSignals(
   tasks: Task[],
   projects: Project[],
-  conceptNotes: ConceptNote[],
   today = todayValue(),
 ): TodaySpaceSignal[] {
   const signals: TodaySpaceSignal[] = [];
@@ -291,19 +289,6 @@ export function buildSpaceSignals(
         });
       }
     }
-  }
-
-  const dueReviews = getDueReviewCount(conceptNotes, today);
-  if (dueReviews > 0) {
-    signals.push({
-      id: "study:reviews",
-      kind: "study",
-      refId: "study",
-      name: "Study",
-      severity: dueReviews >= 5 ? "high" : "medium",
-      messageKey: "todayv.signalReviews",
-      messageVars: { n: dueReviews },
-    });
   }
 
   const severityRank: Record<SignalSeverity, number> = { high: 0, medium: 1, low: 2 };

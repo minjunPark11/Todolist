@@ -1,14 +1,13 @@
 // CALENDAR_DESIGN.md §6 (D7): builds a "today's week" snapshot for the Ollama
 // chat when the user is on the Calendar page. MVP scope only — no live anchor
 // from the calendar's own view state (avoids lifting CalendarView state to App).
-import type { ConceptNote, Project, Task } from "../types";
+import type { Project, Task } from "../types";
 import { getWeekDays, todayValue } from "../utils/date";
 import { buildCalendarItems, defaultCalendarLayers } from "../utils/calendarItems";
 
 export interface CalendarContextInput {
   tasks: Task[];
   projects: Project[];
-  conceptNotes: ConceptNote[];
 }
 
 function minutesBetween(start: string, end: string): number {
@@ -17,7 +16,7 @@ function minutesBetween(start: string, end: string): number {
   return Math.max(0, endHour * 60 + endMinute - (startHour * 60 + startMinute));
 }
 
-export function buildCalendarContextText({ tasks, projects, conceptNotes }: CalendarContextInput): string {
+export function buildCalendarContextText({ tasks, projects }: CalendarContextInput): string {
   const days = getWeekDays(todayValue());
   const rangeStart = days[0];
   const rangeEnd = days[days.length - 1];
@@ -25,7 +24,6 @@ export function buildCalendarContextText({ tasks, projects, conceptNotes }: Cale
   const items = buildCalendarItems({
     tasks,
     projects,
-    conceptNotes,
     layers: { ...defaultCalendarLayers, completed: false },
     projectFilter: "all",
   }).filter((item) => item.date >= rangeStart && item.date <= rangeEnd);
@@ -40,9 +38,6 @@ export function buildCalendarContextText({ tasks, projects, conceptNotes }: Cale
     }));
   const deadlines = items
     .filter((item) => item.layer === "deadline")
-    .map((item) => ({ title: item.title, date: item.date }));
-  const studyReviews = items
-    .filter((item) => item.layer === "study-review")
     .map((item) => ({ title: item.title, date: item.date }));
   const projectDeadlines = items
     .filter((item) => item.layer === "project-deadline")
@@ -65,7 +60,6 @@ export function buildCalendarContextText({ tasks, projects, conceptNotes }: Cale
     range: { start: rangeStart, end: rangeEnd },
     scheduledTasks,
     deadlines,
-    studyReviews,
     projectDeadlines,
     unscheduledTasks,
     workloadSummary,

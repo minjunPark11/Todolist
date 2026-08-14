@@ -1101,8 +1101,6 @@
     line-height: 1.08;
   }
 
-  .study-layout,
-  .ff-study-metrics,
   .ff-project-grid,
   .ff-topic-grid,
   .ff-note-grid,
@@ -1401,8 +1399,6 @@
   .ff-matrix { grid-template-columns: 1fr; grid-template-rows: none; }
 }
 
-/* ===== Study ===== */
-.ff-study-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
 .ff-metric {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -1480,7 +1476,6 @@
 .ff-field-value { font-size: 14px; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; }
 .ff-history { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-secondary); }
 
-/* .ff-study-metrics is fluid via auto-fit — no column breakpoint needed. */
 
 /* ===== Archive ===== */
 .ff-archive-table {

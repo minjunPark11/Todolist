@@ -1,8 +1,8 @@
 // Calendar category model (FOCUSFLOW_CALENDAR_CATEGORY_MANAGEMENT_SPEC).
 //
 // Three-level structure: Group > Category > Event. Personal categories are
-// user-managed and stored here; study / project / external categories are
-// derived live from study topics, projects, and external calendars so their
+// user-managed and stored here; project / external categories are
+// derived live from projects and external calendars so their
 // names and colors never drift from the source entities.
 //
 // Visibility: the spec models visibility as `visibleCategoryIds` on calendar
@@ -12,9 +12,9 @@
 // from it. Categories themselves never store an isVisible flag (§15.2).
 import { useSyncExternalStore } from "react";
 import { platform } from "../platform";
-import type { ExternalCalendar, Project, StudyTopic } from "../types";
+import type { ExternalCalendar, Project } from "../types";
 
-export type CalendarGroupType = "personal" | "study" | "project" | "external" | "focus";
+export type CalendarGroupType = "personal" | "project" | "external" | "focus";
 
 export interface CalendarCategory {
   id: string;
@@ -62,10 +62,6 @@ export const DEFAULT_PERSONAL_CATEGORY_ID = "cat-personal-default";
 // from completed FocusSession segments, never user-editable events).
 export const FOCUS_ACTUAL_CATEGORY_ID = "cat-focus-actual";
 export const FOCUS_ACTUAL_COLOR = "#0d9488";
-
-export function studyCategoryId(topicId: string) {
-  return `cat-study:${topicId}`;
-}
 
 export function projectCategoryId(projectId: string) {
   return `cat-project:${projectId}`;
@@ -238,12 +234,9 @@ export function deletePersonalCategory(categoryId: string): boolean {
 
 // ---- derived category list ----
 
-const STUDY_FALLBACK_COLOR = "#af52de";
-
 export function buildCalendarCategories(input: {
   state: CalendarCategoryState;
   projects: Project[];
-  studyTopics: StudyTopic[];
   externalCalendars: ExternalCalendar[];
   // Display name for the focus-time category (i18n lives with the caller).
   focusCategoryName: string;
@@ -257,17 +250,6 @@ export function buildCalendarCategories(input: {
       color: category.color,
       order,
       isDefault: category.id === input.state.defaultCategoryId,
-    }));
-
-  const study: CalendarCategory[] = input.studyTopics
-    .filter((topic) => topic.status !== "archived")
-    .map((topic, order) => ({
-      id: studyCategoryId(topic.id),
-      group: "study" as const,
-      name: topic.name,
-      color: topic.color || STUDY_FALLBACK_COLOR,
-      order,
-      sourceId: topic.id,
     }));
 
   const project: CalendarCategory[] = input.projects
@@ -306,7 +288,6 @@ export function buildCalendarCategories(input: {
 
   return [
     { type: "personal", categories: personal },
-    { type: "study", categories: study },
     { type: "project", categories: project },
     { type: "external", categories: external },
     { type: "focus", categories: focus },

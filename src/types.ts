@@ -1,3 +1,13 @@
+// Learning Paths started as an AI-side concept and still live next to their
+// drafting siblings, but since the Horizons page they are ordinary user data
+// that has to sync. This file is otherwise import-free on purpose; the one
+// type-only reference below is the exception, and it introduces no cycle
+// (learningPaths/types.ts reaches only contextCards/types.ts, which imports
+// nothing).
+import type { LearningPath, Milestone } from "./lib/ai/learningPaths/types";
+
+export type { LearningPath, Milestone };
+
 // === Task lifecycle (spec §4.1) ===
 // Canonical MVP statuses: inbox -> todo -> doing -> waiting -> done -> archived.
 // `in_progress` and `blocked` are LEGACY values kept in the union so non-MVP
@@ -13,7 +23,6 @@ export type TaskStatus =
   | "blocked";
 export type TaskPriority = "none" | "low" | "medium" | "high";
 export type RepeatType = "none" | "daily" | "weekly" | "monthly";
-export type HabitFrequency = "daily" | "weekly";
 export type FocusMode = "focus" | "short_break" | "long_break";
 
 export interface Task {
@@ -86,121 +95,6 @@ export interface Project {
   updatedAt: string;
 }
 
-// === Study (spec §4.4 / §4.5) ===
-export type StudyTopicCategory =
-  | "Python"
-  | "LeetCode"
-  | "Research"
-  | "fNIRS"
-  | "English"
-  | "Presentation"
-  | "Other";
-
-export interface StudyTopic {
-  id: string;
-  name: string;
-  category: StudyTopicCategory;
-  description: string;
-  status: "active" | "paused" | "mastered" | "archived";
-  color: string;
-  icon?: string;
-  order: number;
-  createdAt: string;
-  updatedAt: string;
-  archivedAt?: string;
-}
-
-export type NoteType = "concept" | "leetcode" | "research" | "english" | "presentation" | "other";
-export type NoteDifficulty = "unknown" | "hard" | "medium" | "easy";
-export type StoredReviewStatus = "not_scheduled" | "reviewed" | "mastered";
-export type ComputedReviewStatus = "not_scheduled" | "due" | "upcoming" | "reviewed" | "mastered";
-export type ReviewDifficulty = "hard" | "medium" | "easy" | "mastered";
-
-export interface ReviewHistoryItem {
-  id: string;
-  reviewedAt: string;
-  difficulty: ReviewDifficulty;
-  previousNextReviewDate?: string;
-  nextReviewDate?: string;
-}
-
-export interface LeetCodeNoteFields {
-  problemNumber?: string;
-  problemTitle?: string;
-  pattern?: string;
-  dataStructure?: string;
-  coreIdea?: string;
-  wrongApproach?: string;
-  correctApproach?: string;
-  pythonSyntax?: string;
-  timeComplexity?: string;
-  spaceComplexity?: string;
-  relatedProblems?: string[];
-}
-
-export interface ResearchNoteFields {
-  concept?: string;
-  definition?: string;
-  whyItMatters?: string;
-  methodOrFormula?: string;
-  paperSource?: string;
-  relatedConcepts?: string[];
-  openQuestion?: string;
-}
-
-export interface EnglishPresentationNoteFields {
-  expression?: string;
-  meaning?: string;
-  useCase?: string;
-  mySentence?: string;
-  presentationContext?: string;
-  similarExpressions?: string[];
-}
-
-export interface ConceptNote {
-  id: string;
-  topicId: string;
-  title: string;
-  noteType: NoteType;
-  summary: string;
-  content: string;
-  examples: string;
-  personalExplanation: string;
-  confusionPoint: string;
-  difficulty: NoteDifficulty;
-  reviewStatus: StoredReviewStatus;
-  nextReviewDate: string;
-  lastReviewedAt: string;
-  reviewHistory: ReviewHistoryItem[];
-  leetcode?: LeetCodeNoteFields;
-  research?: ResearchNoteFields;
-  english?: EnglishPresentationNoteFields;
-  source: string;
-  tags: string[];
-  order: number;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string;
-}
-
-export interface Habit {
-  id: string;
-  name: string;
-  description: string;
-  frequency: HabitFrequency;
-  targetCount: number;
-  color: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface HabitLog {
-  id: string;
-  habitId: string;
-  date: string;
-  completed: boolean;
-}
-
 // One uninterrupted running stretch of a focus session. Pauses close a
 // segment; resume opens the next one. This is what the calendar's
 // "actual focus time" blocks are drawn from.
@@ -228,20 +122,6 @@ export interface FocusSession {
   projectId: string;
   projectName: string;
   focusNote: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface TaskTemplate {
-  id: string;
-  name: string;
-  title: string;
-  description: string;
-  priority: TaskPriority;
-  projectId: string;
-  tags: string[];
-  notes: string;
-  subtasks: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -275,16 +155,6 @@ export interface AppSettings {
   // llama-server replaced Ollama chat (LOCAL_AI_SYSTEM_DESIGN.md Phase 4);
   // kept so synced settings from older clients still normalize cleanly.
   aiModel: string;
-}
-
-export type RecentItemType = "task" | "project" | "topic" | "note";
-
-export interface RecentItem {
-  id: string;
-  type: RecentItemType;
-  refId: string;
-  title: string;
-  openedAt: string;
 }
 
 export type ExternalCalendarSyncStatus = "idle" | "syncing" | "success" | "failed" | "hidden" | "disabled";
@@ -334,14 +204,9 @@ export interface PlannerData {
   tasks: Task[];
   projects: Project[];
   subtasks: Subtask[];
-  studyTopics: StudyTopic[];
-  conceptNotes: ConceptNote[];
-  habits: Habit[];
-  habitLogs: HabitLog[];
   focusSessions: FocusSession[];
   activeSessionId: string;
-  taskTemplates: TaskTemplate[];
-  recentItems: RecentItem[];
+  learningPaths: LearningPath[];
   settings: PlannerSettings;
   appSettings: AppSettings;
 }
@@ -351,7 +216,7 @@ export type PageId =
   | "projects"
   | "focus"
   | "planning"
-  | "study"
+  | "horizons"
   | "archive"
   | "settings"
   | "calendar";

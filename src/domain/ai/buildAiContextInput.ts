@@ -5,18 +5,12 @@
 import type { AiContextInput } from "../../lib/ai/context/buildAiContext";
 import type {
   AppSettings,
-  ConceptNote,
   FocusSession,
-  Habit,
-  HabitLog,
   PageId,
   PlannerSettings,
   Project,
-  RecentItem,
-  StudyTopic,
   Subtask,
   Task,
-  TaskTemplate,
 } from "../../types";
 
 // Structural subset of usePlannerData's return value — only the data the AI
@@ -25,14 +19,8 @@ export type AiReadablePlannerData = {
   tasks: Task[];
   projects: Project[];
   subtasks: Subtask[];
-  studyTopics: StudyTopic[];
-  conceptNotes: ConceptNote[];
-  habits: Habit[];
-  habitLogs: HabitLog[];
   focusSessions: FocusSession[];
   activeSessionId: string;
-  taskTemplates: TaskTemplate[];
-  recentItems: RecentItem[];
   settings: PlannerSettings;
   auth: { userEmail: string };
 };
@@ -49,14 +37,8 @@ export function buildAiContextInput(args: {
     tasks: planner.tasks,
     projects: planner.projects,
     subtasks: planner.subtasks,
-    studyTopics: planner.studyTopics,
-    conceptNotes: planner.conceptNotes,
-    habits: planner.habits,
-    habitLogs: planner.habitLogs,
     focusSessions: planner.focusSessions,
     activeSessionId: planner.activeSessionId,
-    taskTemplates: planner.taskTemplates,
-    recentItems: planner.recentItems,
     settings: planner.settings,
     appSettings,
   };

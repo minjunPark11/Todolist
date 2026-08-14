@@ -30,7 +30,6 @@ interface SidebarProps {
   projects: Project[];
   selectedProjectId: string;
   userEmail: string;
-  dueReviewCount?: number;
   showCounts?: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -46,6 +45,7 @@ type IconName =
   | "projects"
   | "focus"
   | "planning"
+  | "horizons"
   | "study"
   | "archive"
   | "settings"
@@ -104,6 +104,15 @@ function Icon({ name }: { name: IconName }) {
         <rect x="14" y="5" width="6" height="9" rx="1" />
       </>
     ),
+    // Receding horizon lines: widest at the bottom, nearest at the top.
+    horizons: (
+      <>
+        <path d="M3 18h18" />
+        <path d="M5 13h14" />
+        <path d="M7 8h10" />
+        <path d="M9 4h6" />
+      </>
+    ),
     study: (
       <>
         <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
@@ -142,7 +151,6 @@ export function Sidebar({
   projects,
   selectedProjectId,
   userEmail,
-  dueReviewCount = 0,
   showCounts = true,
   collapsed,
   onToggleCollapse,
@@ -180,8 +188,9 @@ export function Sidebar({
     { id: "calendar", label: t("sidebar.calendar"), icon: "calendar", count: 0 },
   ];
   const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
+    { id: "horizons", label: t("sidebar.horizons"), icon: "horizons", count: 0 },
     { id: "planning", label: t("sidebar.planning"), icon: "planning", count: 0 },
-    { id: "projects", label: t("sidebar.spaces"), icon: "projects", count: activeProjectCount + dueReviewCount },
+    { id: "projects", label: t("sidebar.spaces"), icon: "projects", count: activeProjectCount },
     { id: "focus", label: t("sidebar.focus"), icon: "focus", count: tasks.filter((task) => task.activeSessionId).length },
     { id: "archive", label: t("sidebar.archive"), icon: "archive", count: 0 },
     { id: "settings", label: t("sidebar.settings"), icon: "settings", count: 0 },

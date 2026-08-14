@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ConceptNote, FocusSession, Project, Task, TaskDraft } from "../../types";
+import type { FocusSession, LearningPath, Milestone, Project, Task, TaskDraft } from "../../types";
 import type { ToastState } from "../kit";
 import type { PageId } from "../../types";
 import {
@@ -29,6 +29,7 @@ import {
 import { useSpaceHubData } from "../../hooks/useSpaceHubData";
 import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { SpaceOverviewTab } from "./SpaceOverviewTab";
+import { SpaceHorizons } from "./SpaceHorizons";
 import { SpaceFocusTab, SpaceTasksTab } from "./SpaceWorkTabs";
 import { SpaceRecordsTab } from "./SpaceNotesRecordsTabs";
 import { NoteQuickCreateModal, SpaceNotesView, type NotesPanelMode } from "./SpaceNotesPanel";
@@ -52,7 +53,11 @@ export type SpaceDetailViewProps = {
   space: SpaceLike;
   tasks: Task[];
   projects: Project[];
-  conceptNotes: ConceptNote[];
+  // Board time axis (SPACES_BOARD_DESIGN.md D2).
+  paths: LearningPath[];
+  onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
+  onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
+  onCreateGoal: (input: { goal: string; projectId: string }) => void;
   focusSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
   onBack: () => void;
@@ -95,7 +100,10 @@ export function SpaceDetailView({
   space,
   tasks,
   projects,
-  conceptNotes,
+  paths,
+  onUpdatePath,
+  onUpdateMilestone,
+  onCreateGoal,
   focusSessions,
   activeFocusSession,
   onBack,
@@ -129,7 +137,7 @@ export function SpaceDetailView({
   const today = todayValue();
   const weekStart = getWeekStart(today);
   const config = hub.getConfig(space.id);
-  const hubType = (["project", "study", "personal", "custom"].includes(space.type) ? space.type : "custom") as SpaceHubType;
+  const hubType = (["project", "personal", "custom"].includes(space.type) ? space.type : "custom") as SpaceHubType;
   const preset = getSpacePreset(hubType);
   const groups = resolveTaskGroups(preset, config);
   const visibleGroups = groups.filter((group) => !group.hidden);
@@ -143,10 +151,6 @@ export function SpaceDetailView({
   const spaceSessions = useMemo(
     () => getSpaceSessions(focusSessions, spaceTasks, sourceProjectId),
     [focusSessions, spaceTasks, sourceProjectId],
-  );
-  const reviewNotes = useMemo(
-    () => (space.sourceRef === "study" ? conceptNotes.filter((note) => note.topicId === space.sourceId && !note.deletedAt) : []),
-    [conceptNotes, space.sourceRef, space.sourceId],
   );
   const spaceNotes = useMemo(
     () =>
@@ -162,10 +166,10 @@ export function SpaceDetailView({
 
   const counts = getSpaceTaskCounts(spaceTasks, today);
   const nextAction = getNextActionTask(spaceTasks, config, today);
-  const signal = getSpaceSignal(hubType, spaceTasks, spaceSessions, reviewNotes, t, today);
+  const signal = getSpaceSignal(hubType, spaceTasks, spaceSessions, t, today);
   const todayFocusSeconds = getTodaySpaceFocusSeconds(spaceSessions, today);
   const weekFocusSeconds = getWeekSpaceFocusSeconds(spaceSessions, weekStart);
-  const upcoming = getUpcomingSpaceItems(spaceTasks, reviewNotes, today);
+  const upcoming = getUpcomingSpaceItems(spaceTasks, today);
   const recentSessions = getRecentSpaceFocusSessions(spaceSessions, 3);
   // Tab <-> URL query sync (§3.2): pushState on change, restore on popstate.
   function setTab(next: SpaceTab) {
@@ -357,7 +361,14 @@ export function SpaceDetailView({
   }
 
   const openTaskDrawer = (taskId: string) => setDrawer({ kind: "task", taskId });
-  const drawerTask = drawer.kind === "task" ? spaceTasks.find((task) => task.id === drawer.taskId) ?? null : null;
+  // Falls back to the full task list because a task can reach this drawer from
+  // the board's horizon rows while carrying a different projectId — it belongs
+  // to a goal on this board, not to the board directly (SPACES_BOARD_DESIGN D3).
+  // Without the fallback that card would open an empty drawer.
+  const drawerTask =
+    drawer.kind === "task"
+      ? spaceTasks.find((task) => task.id === drawer.taskId) ?? tasks.find((task) => task.id === drawer.taskId) ?? null
+      : null;
   const drawerSession = drawer.kind === "session" ? spaceSessions.find((session) => session.id === drawer.sessionId) ?? null : null;
   const drawerNote = drawer.kind === "note" ? spaceNotes.find((note) => note.id === drawer.noteId) ?? null : null;
 
@@ -509,6 +520,20 @@ export function SpaceDetailView({
       </nav>
 
       {tab === "overview" ? (
+        <>
+        {/* Where this board stands across time, before the task/activity
+            cards answer "what is moving" (SPACES_BOARD_DESIGN.md D2). */}
+        <SpaceHorizons
+          boardId={space.sourceRef === "project" ? space.sourceId ?? "" : ""}
+          paths={paths}
+          tasks={tasks}
+          projects={projects}
+          onUpdatePath={onUpdatePath}
+          onUpdateMilestone={onUpdateMilestone}
+          onCreateGoal={onCreateGoal}
+          onOpenTask={openTaskDrawer}
+          onOpenHorizons={() => onNavigate("horizons")}
+        />
         <SpaceOverviewTab
           preset={preset}
           spaceTasks={spaceTasks}
@@ -532,6 +557,7 @@ export function SpaceDetailView({
           onGenerateAiSummary={handleGenerateAiSummary}
           onGenerateNextAction={handleGenerateNextAction}
         />
+        </>
       ) : null}
       {tab === "tasks" ? (
         <SpaceTasksTab
@@ -636,7 +662,6 @@ export function SpaceDetailView({
         <DeleteSpaceConfirmModal
           spaceName={displayName}
           isProject={Boolean(sourceProjectId)}
-          isStudy={space.sourceRef === "study"}
           onConfirm={handleDeleteSpace}
           onClose={() => setModal({ kind: "none" })}
         />

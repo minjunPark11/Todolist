@@ -1,6 +1,4 @@
 import type {
-  ComputedReviewStatus,
-  ConceptNote,
   Project,
   Task,
   TaskPriority,
@@ -117,40 +115,6 @@ export function getProjectStatusSummary(tasks: Task[], projectId: string) {
   return summary;
 }
 
-// === Study review computed status (spec §4.5) ===
-export function getComputedReviewStatus(note: ConceptNote, today = todayValue()): ComputedReviewStatus {
-  if (note.reviewStatus === "mastered") return "mastered";
-  if (!note.nextReviewDate) return "not_scheduled";
-  if (note.nextReviewDate <= today) return "due";
-  return "upcoming";
-}
-
-export type StudyReviewQueue = {
-  due: ConceptNote[];
-  upcoming: ConceptNote[];
-  mastered: ConceptNote[];
-  notScheduled: ConceptNote[];
-};
-
-export function getStudyReviewQueue(notes: ConceptNote[], today = todayValue()): StudyReviewQueue {
-  const queue: StudyReviewQueue = { due: [], upcoming: [], mastered: [], notScheduled: [] };
-  for (const note of notes) {
-    if (note.deletedAt) continue;
-    const status = getComputedReviewStatus(note, today);
-    if (status === "due") queue.due.push(note);
-    else if (status === "upcoming") queue.upcoming.push(note);
-    else if (status === "mastered") queue.mastered.push(note);
-    else queue.notScheduled.push(note);
-  }
-  // Earliest review date first within due/upcoming.
-  queue.due.sort((a, b) => a.nextReviewDate.localeCompare(b.nextReviewDate));
-  queue.upcoming.sort((a, b) => a.nextReviewDate.localeCompare(b.nextReviewDate));
-  return queue;
-}
-
-export function getDueReviewCount(notes: ConceptNote[], today = todayValue()): number {
-  return notes.filter((note) => getComputedReviewStatus(note, today) === "due").length;
-}
 
 // === Recurring tasks ===
 

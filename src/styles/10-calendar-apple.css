@@ -1,0 +1,281 @@
+/* ============================================================================
+   Calendar — Apple Calendar reference layer (CALENDAR_APPLE_DESIGN.md Phase A).
+   Loads after 09-calendar-redesign.css so it wins; 09 stays untouched.
+   Scope: the time grid's event blocks, the now indicator, the toolbar.
+   ========================================================================== */
+
+/* --- A2/A3: every event colour is derived from --ev-color ------------------
+   WeekView hands the category colour in as a custom property and nothing else.
+   Fill, left bar and text are mixed here so they can differ per theme — the
+   old inline `${color}22` was a fixed 13%, which is invisible on the dark
+   canvas (#101012). Apple tints the *text* with the calendar colour too, not
+   just the fill; that is what `--ev-ink` does.                              */
+
+.gcal-time-block,
+.gcal-move-block {
+  --ev-tint: 14%;
+  --ev-tint-hover: 22%;
+  --ev-ink: 74%;
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) var(--ev-tint), transparent);
+  border-left: 3px solid var(--ev-color, var(--accent));
+  color: color-mix(in srgb, var(--ev-color, var(--accent)) var(--ev-ink), var(--text-primary));
+}
+
+[data-theme="dark"] .gcal-time-block,
+[data-theme="dark"] .gcal-move-block {
+  --ev-tint: 30%;
+  --ev-tint-hover: 38%;
+  /* Mixing toward the light --text-primary, so less of the hue, not more. */
+  --ev-ink: 55%;
+}
+
+/* Title and time both inherit the mixed event colour. The time is the same
+   hue one step quieter, rather than a neutral grey that ignores the event. */
+.gcal-time-block .gcal-tb-title,
+.gcal-move-block .gcal-tb-title,
+.gcal-time-block .gcal-tb-time,
+.gcal-move-block .gcal-tb-time {
+  color: inherit;
+}
+
+/* 0.85, not lower: this is 10px text, and the old neutral grey on the tint
+   only reached ~2.8:1. At this value the mixed colour clears 4.5:1 while
+   still reading as secondary to the title. */
+.gcal-time-block .gcal-tb-time,
+.gcal-move-block .gcal-tb-time {
+  opacity: 0.85;
+}
+
+/* Focus-actual keeps its "recording" hatch, now theme-aware like the rest. */
+.gcal-time-block.is-focus-actual {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ev-color, var(--accent)) 30%, transparent) 0 6px,
+    color-mix(in srgb, var(--ev-color, var(--accent)) 12%, transparent) 6px 12px
+  );
+}
+
+[data-theme="dark"] .gcal-time-block.is-focus-actual {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ev-color, var(--accent)) 46%, transparent) 0 6px,
+    color-mix(in srgb, var(--ev-color, var(--accent)) 22%, transparent) 6px 12px
+  );
+}
+
+/* --- A1: the grid is flat -------------------------------------------------
+   Shadow marks a floating layer — popovers, sheets, the block being dragged.
+   Events resting in a dense 7-column timetable are not floating, and a shadow
+   on each one reads as noise once the day fills up.                         */
+
+.gcal-time-block {
+  box-shadow: none;
+}
+
+/* Hover deepens the tint instead of dimming the whole block with a filter,
+   which used to wash out the text along with the fill. */
+.gcal-time-block:not(.is-focus-actual):hover {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) var(--ev-tint-hover), transparent);
+  box-shadow: none;
+  filter: none;
+}
+
+.gcal-time-block.is-focus-actual:hover {
+  box-shadow: none;
+  filter: none;
+  opacity: 0.88;
+}
+
+/* The hover rules above reset `filter`, which would otherwise take the
+   completed block's desaturation with it. */
+.gcal-time-block.is-done:hover {
+  filter: saturate(0.72);
+}
+
+/* The drag overlay *is* a floating layer, so it keeps its lift. */
+
+/* --- B1: layer is read from shape, hue only says "which calendar" ---------
+   Hue used to encode two things at once: task blocks took the category colour
+   while deadline / project-deadline were hard-wired to orange / red.
+   Recolouring a category to red therefore made it indistinguishable from a
+   project deadline. Every item now carries its category
+   colour and the layer is told apart by form instead:
+
+     filled            = something to do that day (a task)
+     outline           = a deadline marker, not an occupation
+     dashed outline    = read-only, owned elsewhere (external)
+     hatched           = a recording of time already spent (focus-actual)
+
+   The outline/dashed set lines up with `draggable: false`, so "you cannot drag
+   this" and "this is not a work block" end up looking the same on purpose. */
+
+.gcal-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-left: 3px solid var(--ev-color, var(--accent));
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 16%, transparent);
+  color: color-mix(in srgb, var(--ev-color, var(--accent)) 74%, var(--text-primary));
+}
+
+[data-theme="dark"] .gcal-chip {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 32%, transparent);
+  color: color-mix(in srgb, var(--ev-color, var(--accent)) 55%, var(--text-primary));
+}
+
+.gcal-chip-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Deadline markers: outline, no fill. A due date does not occupy the day. */
+.gcal-chip.gcal-chip-deadline,
+.gcal-chip.gcal-chip-project-deadline {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--ev-color, var(--accent)) 55%, transparent);
+  border-left: 3px solid var(--ev-color, var(--accent));
+  color: color-mix(in srgb, var(--ev-color, var(--accent)) 78%, var(--text-primary));
+}
+
+/* External calendars are not yours to move; dashed says so without a colour. */
+.gcal-chip.gcal-chip-external {
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--ev-color, var(--accent)) 55%, transparent);
+  border-left: 3px dashed var(--ev-color, var(--accent));
+  color: color-mix(in srgb, var(--ev-color, var(--accent)) 78%, var(--text-primary));
+  font-style: normal;
+}
+
+/* Study reviews are work for that day, so they stay filled — the ↻ glyph and
+   the category colour carry the rest. */
+/* Re-stated after the layer rules so a repeating item stays italic whatever
+   layer it belongs to (the external rule above resets font-style). */
+.gcal-chip.is-repeating {
+  font-style: italic;
+}
+
+/* Completed keeps the item's own hue and says "done" with strike + dimming,
+   rather than repainting every finished item green. */
+.gcal-chip.is-done {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 10%, transparent);
+  opacity: 0.6;
+}
+
+[data-theme="dark"] .gcal-chip.is-done {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 20%, transparent);
+}
+
+/* --- B2: month cells — timed items are a dot, not a pill ------------------
+   A day with three chips used to be three bars of colour. Only all-day items
+   are an occupation of the day and keep the pill; a timed item becomes a dot,
+   its title and its start time on the cell's own background.               */
+
+.gcal-month-cell .gcal-chip.is-timed {
+  background: transparent;
+  border: 0;
+  padding-left: 2px;
+  color: var(--text-primary);
+}
+
+.gcal-month-cell .gcal-chip.is-timed::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ev-color, var(--accent));
+}
+
+/* Focus-actual is a recording, not a plan: a ring instead of a filled dot. */
+.gcal-month-cell .gcal-chip.is-timed.gcal-chip-focus-actual::before {
+  background: transparent;
+  border: 1.5px solid var(--ev-color, var(--accent));
+}
+
+.gcal-chip-time {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.gcal-month-cell .gcal-chip.is-timed.is-done {
+  opacity: 0.55;
+}
+
+/* --- A4: the now indicator is red -----------------------------------------
+   Apple's red is not a taste call: the line must not be mistakable for any
+   calendar colour. 09 had set it to --accent, which is exactly the hue of the
+   default category (#0066cc), so the two collided.                          */
+
+.gcal-timegrid {
+  --calendar-now-color: var(--danger);
+  --calendar-now-line-muted: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+[data-theme="dark"] .gcal-timegrid {
+  --calendar-now-line-muted: color-mix(in srgb, var(--danger) 38%, transparent);
+}
+
+/* --- C3: the selection ring -----------------------------------------------
+   Delete removes whatever carries this ring, so the ring is what makes the
+   keyboard delete safe: there is never an invisible target. Drawn as an
+   outline rather than a border so it costs no layout and cannot reflow a
+   block that is mid-drag.                                                   */
+
+.gcal-time-block.is-picked,
+.gcal-chip.is-picked {
+  outline: 2px solid var(--ev-color, var(--accent));
+  outline-offset: 1px;
+  /* The ring alone is faint on an outline chip, so lift the fill a little. */
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 26%, transparent);
+}
+
+[data-theme="dark"] .gcal-time-block.is-picked,
+[data-theme="dark"] .gcal-chip.is-picked {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 42%, transparent);
+}
+
+.gcal-month-cell .gcal-chip.is-timed.is-picked {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 16%, transparent);
+}
+
+/* --- C2: year view density ------------------------------------------------
+   `--density` is set per date by YearView; dates with nothing stay flat.    */
+
+.gcal-year-date {
+  background: color-mix(in srgb, var(--accent) var(--density, 0%), transparent);
+}
+
+/* --- A5: toolbar ----------------------------------------------------------
+   Create moved out of the sidebar into the toolbar, and ‹ Today › is one
+   group so the date controls read as a single control rather than three.   */
+
+.gcal-create-icon-btn {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 400;
+  color: var(--accent);
+}
+
+.gcal-create-icon-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.gcal-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.gcal-nav .gcal-today-btn {
+  margin: 0 2px;
+}
+
+/* The rail no longer carries a create button, so it is just the expand tab. */
+.gcal-sidebar.is-rail {
+  justify-content: flex-start;
+}

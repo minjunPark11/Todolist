@@ -3,7 +3,7 @@
 // tested directly instead of only in front of a live account.
 //
 // usePlannerData executes the returned plan; it does not decide its contents.
-import type { AppSettings, PlannerData, PlannerSettings, RecentItem } from "../../types";
+import type { AppSettings, PlannerData, PlannerSettings } from "../../types";
 import { diffChangedRecords, diffRemovedIds } from "./diffRecords";
 
 // PlannerData key -> Supabase table.
@@ -11,17 +11,15 @@ export const collectionTables = [
   ["tasks", "tasks"],
   ["projects", "projects"],
   ["subtasks", "subtasks"],
-  ["habits", "habits"],
-  ["habitLogs", "habit_logs"],
   ["focusSessions", "focus_sessions"],
-  ["taskTemplates", "task_templates"],
-  ["studyTopics", "study_topics"],
-  ["conceptNotes", "concept_notes"],
+  ["learningPaths", "learning_paths"],
 ] as const;
 
 // Tables added after the original schema: a client whose project predates them
 // keeps working without them instead of failing every sync.
-export const optionalRemoteTables: ReadonlySet<string> = new Set(["study_topics", "concept_notes"]);
+export const optionalRemoteTables: ReadonlySet<string> = new Set([
+  "learning_paths",
+]);
 
 export type SyncCollectionKey = (typeof collectionTables)[number][0];
 
@@ -37,7 +35,6 @@ export type SyncTableOperation = {
 export type AppStateRow = {
   appSettings: AppSettings;
   activeSessionId: string;
-  recentItems: RecentItem[];
 };
 
 export type SyncPlan = {
@@ -86,8 +83,7 @@ export function buildSyncPlan(
   const appStateChanged =
     !baseline ||
     next.appSettings !== baseline.appSettings ||
-    next.activeSessionId !== baseline.activeSessionId ||
-    next.recentItems !== baseline.recentItems;
+    next.activeSessionId !== baseline.activeSessionId;
 
   return {
     tables,
@@ -96,7 +92,6 @@ export function buildSyncPlan(
       ? {
           appSettings: next.appSettings,
           activeSessionId: next.activeSessionId,
-          recentItems: next.recentItems,
         }
       : null,
   };

@@ -6,18 +6,12 @@
 // stringified) context, or swap the selection strategy per intent.
 import type {
   AppSettings,
-  ConceptNote,
   FocusSession,
-  Habit,
-  HabitLog,
   PageId,
   PlannerSettings,
   Project,
-  RecentItem,
-  StudyTopic,
   Subtask,
   Task,
-  TaskTemplate,
 } from "../../../types";
 import { selectRecentFocusSessions } from "../../../domain/focus/selectors";
 import { selectActiveProjects } from "../../../domain/projects/selectors";
@@ -34,14 +28,8 @@ export type AiContextInput = {
   tasks: Task[];
   projects: Project[];
   subtasks: Subtask[];
-  studyTopics: StudyTopic[];
-  conceptNotes: ConceptNote[];
-  habits: Habit[];
-  habitLogs: HabitLog[];
   focusSessions: FocusSession[];
   activeSessionId: string;
-  taskTemplates: TaskTemplate[];
-  recentItems: RecentItem[];
   settings: PlannerSettings;
   appSettings: AppSettings;
   calendarContextText?: string;
@@ -65,14 +53,8 @@ export type RelevantAppContext = {
     tasks: Record<string, unknown>[];
     projects: Record<string, unknown>[];
     subtasks: Record<string, unknown>[];
-    studyTopics: Record<string, unknown>[];
-    conceptNotes: Record<string, unknown>[];
-    habits: Record<string, unknown>[];
-    habitLogs: Record<string, unknown>[];
     focusSessions: Record<string, unknown>[];
     activeSessionId: string;
-    taskTemplates: Record<string, unknown>[];
-    recentItems: RecentItem[];
     settings: PlannerSettings;
     appSettings: AppSettings;
   };
@@ -136,13 +118,7 @@ export function selectRelevantAppContext(input: AiContextInput): RelevantAppCont
       taskCount: input.tasks.length,
       projectCount: input.projects.length,
       subtaskCount: input.subtasks.length,
-      studyTopicCount: input.studyTopics.length,
-      conceptNoteCount: input.conceptNotes.length,
-      habitCount: input.habits.length,
-      habitLogCount: input.habitLogs.length,
       focusSessionCount: input.focusSessions.length,
-      taskTemplateCount: input.taskTemplates.length,
-      recentItemCount: input.recentItems.length,
     },
     // Planned blocks vs. focus-measured execution, precomputed for the last
     // 14 days so the model can compare/analyze without re-deriving it from
@@ -179,48 +155,6 @@ export function selectRelevantAppContext(input: AiContextInput): RelevantAppCont
             completed: subtask.completed,
           }),
         ),
-      studyTopics: input.studyTopics
-        .filter((topic) => topic.status !== "archived")
-        .slice(0, AI_CONTEXT_LIMITS.studyTopics)
-        .map((topic) =>
-          omitEmpty({
-            id: topic.id,
-            name: topic.name,
-            category: topic.category,
-            description: trimField(topic.description),
-            status: topic.status,
-          }),
-        ),
-      conceptNotes: [...input.conceptNotes]
-        .filter((note) => !note.deletedAt)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-        .slice(0, AI_CONTEXT_LIMITS.recentNotes)
-        .map((note) =>
-          omitEmpty({
-            id: note.id,
-            topicId: note.topicId,
-            title: note.title,
-            noteType: note.noteType,
-            summary: trimField(note.summary),
-            difficulty: note.difficulty,
-            reviewStatus: note.reviewStatus,
-            nextReviewDate: note.nextReviewDate,
-            tags: note.tags,
-            updatedAt: note.updatedAt,
-          }),
-        ),
-      habits: input.habits.slice(0, AI_CONTEXT_LIMITS.habits).map((habit) =>
-        omitEmpty({
-          id: habit.id,
-          name: habit.name,
-          description: trimField(habit.description),
-          frequency: habit.frequency,
-          targetCount: habit.targetCount,
-        }),
-      ),
-      habitLogs: input.habitLogs
-        .filter((log) => log.date >= activityCutoff)
-        .map((log) => omitEmpty({ habitId: log.habitId, date: log.date, completed: log.completed })),
       focusSessions: selectRecentFocusSessions(input.focusSessions, activityCutoff)
         .slice(0, AI_CONTEXT_LIMITS.focusSessions)
         .map((session) =>
@@ -239,16 +173,6 @@ export function selectRelevantAppContext(input: AiContextInput): RelevantAppCont
           }),
         ),
       activeSessionId: input.activeSessionId,
-      taskTemplates: input.taskTemplates.slice(0, AI_CONTEXT_LIMITS.taskTemplates).map((template) =>
-        omitEmpty({
-          id: template.id,
-          name: template.name,
-          title: template.title,
-          priority: template.priority,
-          tags: template.tags,
-        }),
-      ),
-      recentItems: input.recentItems.slice(0, AI_CONTEXT_LIMITS.recentItems),
       settings: input.settings,
       appSettings: input.appSettings,
     },

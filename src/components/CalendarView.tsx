@@ -1,5 +1,5 @@
 import { DragEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import type { ConceptNote, ExternalCalendar, ExternalCalendarEvent, FocusSession, Project, StudyTopic, Task, TaskDraft } from "../types";
+import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, Project, Task, TaskDraft } from "../types";
 import {
   addDays,
   addMonths,
@@ -73,15 +73,12 @@ type PopoverState =
 interface CalendarViewProps {
   tasks: Task[];
   projects: Project[];
-  conceptNotes: ConceptNote[];
-  studyTopics: StudyTopic[];
   externalCalendars: ExternalCalendar[];
   externalCalendarEvents: ExternalCalendarEvent[];
   focusSessions: FocusSession[];
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
   // Sidebar recoloring writes back to the category's source entity.
   onUpdateProject: (projectId: string, patch: Partial<Project>) => void;
-  onUpdateTopic: (topicId: string, patch: Partial<StudyTopic>) => void;
   // When set, the calendar mounts with this project's category selected
   // (space detail "Open Calendar" hand-off).
   initialProjectId?: string;
@@ -89,7 +86,6 @@ interface CalendarViewProps {
   onCreateTask: (draft: TaskDraft) => string;
   onDeleteTask?: (taskId: string) => void;
   onOpenProject?: (projectId: string) => void;
-  onOpenStudyReview?: (noteId: string) => void;
   onClearTaskSelection?: () => void;
   showToast?: (toast: ToastState) => void;
 }
@@ -101,20 +97,16 @@ function pad(value: number) {
 export function CalendarView({
   tasks,
   projects,
-  conceptNotes,
-  studyTopics,
   externalCalendars,
   externalCalendarEvents,
   focusSessions,
   onUpdateExternalCalendar,
   onUpdateProject,
-  onUpdateTopic,
   initialProjectId,
   onUpdateTask,
   onCreateTask,
   onDeleteTask,
   onOpenProject,
-  onOpenStudyReview,
   onClearTaskSelection,
   showToast,
 }: CalendarViewProps) {
@@ -155,6 +147,10 @@ export function CalendarView({
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [quickCreate, setQuickCreate] = useState<QuickCreateDefaults | null>(null);
   const [popover, setPopover] = useState<PopoverState>(null);
+  // The keyboard Delete has to have a visible target: nothing may be deleted
+  // by a keystroke unless the user can see what is about to go. The ring on
+  // the selected block is that target (CALENDAR_APPLE_DESIGN.md C3).
+  const [selected, setSelected] = useState<CalendarItem | null>(null);
   const [aiStatus, setAiStatus] = useState<"idle" | "loading" | "preview" | "error">("idle");
   const [aiPlacements, setAiPlacements] = useState<AiPlacement[]>([]);
   // V3 §7/§8: the confirmed draft block. Never written to localStorage/task
@@ -174,11 +170,10 @@ export function CalendarView({
       buildCalendarCategories({
         state: categoryState,
         projects,
-        studyTopics,
         externalCalendars,
         focusCategoryName: t("calendar.focusActualCategory"),
       }),
-    [categoryState, projects, studyTopics, externalCalendars, t],
+    [categoryState, projects, externalCalendars, t],
   );
   const categoriesById = useMemo(() => flattenCategories(categoryGroups), [categoryGroups]);
   const defaultCategoryId = categoryState.defaultCategoryId;
@@ -212,7 +207,6 @@ export function CalendarView({
       buildCalendarItems({
         tasks,
         projects,
-        conceptNotes,
         focusSessions,
         externalCalendars,
         externalCalendarEvents,
@@ -222,7 +216,7 @@ export function CalendarView({
         defaultCategoryId,
         visibleCategoryIds,
       }),
-    [tasks, projects, conceptNotes, focusSessions, externalCalendars, externalCalendarEvents, categoriesById, defaultCategoryId, visibleCategoryIds],
+    [tasks, projects, focusSessions, externalCalendars, externalCalendarEvents, categoriesById, defaultCategoryId, visibleCategoryIds],
   );
 
   const monthPrefix = `${anchorDate.getFullYear()}-${pad(anchorDate.getMonth() + 1)}`;
@@ -230,6 +224,22 @@ export function CalendarView({
     () => new Set(items.filter((item) => item.date.startsWith(monthPrefix)).map((item) => item.date)),
     [items, monthPrefix],
   );
+
+  // A selected item that no longer exists (deleted, filtered out by a hidden
+  // category, or moved off the visible range) must not keep a ring alive that
+  // Delete would then aim at nothing.
+  useEffect(() => {
+    if (selected && !items.some((item) => item.key === selected.key)) setSelected(null);
+  }, [items, selected]);
+
+  // Year view shades each date by how much sits on it, so a year's worth of
+  // load is readable at a glance (C2). Counted across the whole item set, not
+  // just the anchored month, because the year view shows all twelve.
+  const countsByDate = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of items) counts.set(item.date, (counts.get(item.date) ?? 0) + 1);
+    return counts;
+  }, [items]);
 
   const unscheduled = useMemo(
     () => tasks.filter((task) => !(task.scheduledDate || task.status === "done" || task.status === "archived")),
@@ -251,6 +261,7 @@ export function CalendarView({
     setDraft(null);
     setDraftAnchor(null);
     setPopover(null);
+    setSelected(null);
     onClearTaskSelection?.();
   }
 
@@ -271,6 +282,78 @@ export function CalendarView({
     clearTransient();
     setMode(next);
   }
+
+  // Calendar shortcuts (CALENDAR_APPLE_DESIGN.md C1).
+  //
+  // Apple's own ⌘1–⌘4 / ⌘T could not be reused: Ctrl+digit and Ctrl+T are
+  // claimed by the browser in the web build, and plain `t` is already the
+  // app-wide "go to the Today page" (App.tsx). So the view keys are the
+  // letters they stand for and Home means today, which collides with nothing.
+  //
+  // Modifier combos are skipped for the same reason App.tsx skips them: they
+  // belong to the browser and the OS, not to single-key shortcuts.
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+      // A dialog owns the keyboard while it is open.
+      if (quickCreate) return;
+
+      if (event.key === "Escape") {
+        clearTransient();
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      if (event.key === "Delete" || event.key === "Backspace") {
+        // Only tasks can be deleted; deadlines of projects and study reviews
+        // are markers derived from another record.
+        if (!selected || selected.sourceType !== "task" || !onDeleteTask) return;
+        event.preventDefault();
+        handleDeleteFromPopover(selected);
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        shift(-1);
+        return;
+      }
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        shift(1);
+        return;
+      }
+      if (event.key === "Home") {
+        event.preventDefault();
+        clearTransient();
+        setAnchor(today);
+        return;
+      }
+
+      const viewKey: Record<string, CalendarMode> = { d: "day", w: "week", m: "month", y: "year" };
+      const next = viewKey[event.key.toLowerCase()];
+      if (next) {
+        event.preventDefault();
+        switchMode(next);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+    // Deliberately no dependency array: the handler closes over `selected`,
+    // `mode`, `anchor` and `quickCreate`, and re-binding one window listener
+    // per render is far cheaper than the stale-closure bugs a partial dep list
+    // would hide.
+  });
 
   // §16.1: row click picks the category new events go into. readOnly
   // (external) categories cannot become the active category; hidden ones are
@@ -302,7 +385,6 @@ export function CalendarView({
   function handleRecolorCategory(category: CalendarCategory, color: string) {
     if (category.group === "personal") updatePersonalCategory(category.id, { color });
     else if (category.group === "project" && category.sourceId) onUpdateProject(category.sourceId, { color });
-    else if (category.group === "study" && category.sourceId) onUpdateTopic(category.sourceId, { color });
     else if (category.group === "external" && category.sourceId) onUpdateExternalCalendar(category.sourceId, { color });
     else if (category.group === "focus") setFocusColor(color);
   }
@@ -522,12 +604,9 @@ export function CalendarView({
       onOpenProject?.(item.sourceId);
       return;
     }
-    if (mode === "day" && item.sourceType === "note") {
-      onOpenStudyReview?.(item.sourceId);
-      return;
-    }
     // Task/external events open the same popover in every view; the quick-edit
     // form inside it replaces the old jump into the day-view detail panel.
+    setSelected(item);
     setPopover({ kind: "event", item, anchor });
   }
 
@@ -545,16 +624,18 @@ export function CalendarView({
     if (item.sourceType !== "task") return;
     setPopover(null);
     onClearTaskSelection?.();
+    // The ring deliberately stays put: onDeleteTask opens the app's confirm
+    // dialog, and dropping the ring first would leave the user confirming a
+    // deletion with nothing on screen to say which event it is. The effect
+    // below clears it once the item is actually gone.
     onDeleteTask?.(item.sourceId);
   }
 
-  // Project/review markers only — task events edit inline in the popover.
+  // Project markers only — task events edit inline in the popover.
   function openDetailFromPopover(item: CalendarItem) {
     setPopover(null);
     if (item.sourceType === "project") {
       onOpenProject?.(item.sourceId);
-    } else if (item.sourceType === "note") {
-      onOpenStudyReview?.(item.sourceId);
     }
   }
 
@@ -676,6 +757,9 @@ export function CalendarView({
         }}
         onPrev={() => shift(-1)}
         onNext={() => shift(1)}
+        onCreate={() =>
+          setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
+        }
       />
 
       <div className="gcal-body-container">
@@ -693,9 +777,6 @@ export function CalendarView({
           onToggleCategory={handleToggleCategory}
           onSelectCategory={handleSelectCategory}
           onRecolorCategory={handleRecolorCategory}
-          onCreateClick={() =>
-            setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
-          }
           collapsed={sidebarCollapsed}
           onExpand={() => setSidebarCollapsed(false)}
         />
@@ -722,6 +803,7 @@ export function CalendarView({
               <MonthView
                 anchor={anchor}
                 items={items}
+                selectedKey={selected?.key ?? ""}
                 dragOverId={dragOverId}
                 onDragStart={handleDragStart}
                 onOverCell={over}
@@ -736,12 +818,18 @@ export function CalendarView({
                 onShowAgenda={(date, anchor) => setPopover({ kind: "agenda", date, anchor })}
               />
             ) : mode === "year" ? (
-              <YearView anchor={anchor} onOpenMonth={openMonth} onOpenDay={openDay} />
+              <YearView
+                anchor={anchor}
+                countsByDate={countsByDate}
+                onOpenMonth={openMonth}
+                onOpenDay={openDay}
+              />
             ) : (
               <WeekView
                 days={days}
                 anchor={anchor}
                 items={items}
+                selectedKey={selected?.key ?? ""}
                 dragOverId={dragOverId}
                 onOverSlot={over}
                 onLeaveSlot={leave}

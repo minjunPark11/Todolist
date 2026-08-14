@@ -456,7 +456,7 @@
   color: var(--danger);
 }
 
-/* Derived category sections (project / study / external / focus): color-only
+/* Derived category sections (project / external / focus): color-only
    rows, no drag handle or menu. */
 .ff-cat-derived-section {
   margin-top: 4px;

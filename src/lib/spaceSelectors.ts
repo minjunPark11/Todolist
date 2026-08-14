@@ -1,4 +1,4 @@
-import type { ConceptNote, FocusSession, Task } from "../types";
+import type { FocusSession, Task } from "../types";
 import type {
   SpaceActivity,
   SpaceCustomConfig,
@@ -11,7 +11,7 @@ import { addDays, todayValue } from "../utils/date";
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
 // A space collects tasks either through its source project or through an
-// explicit `space:<id>` tag (used by study/local spaces that have no project).
+// explicit `space:<id>` tag (used by spaces that have no project).
 export function spaceTaskTag(spaceId: string): string {
   return `space:${spaceId}`;
 }
@@ -106,7 +106,6 @@ export function getSpaceSignal(
   type: SpaceHubType,
   spaceTasks: Task[],
   spaceSessions: FocusSession[],
-  reviewNotes: ConceptNote[],
   t: TFn,
   today = todayValue(),
 ): SpaceSignal {
@@ -118,17 +117,6 @@ export function getSpaceSignal(
   const dueSoon = spaceTasks.filter(
     (task) => !isTaskDone(task) && task.dueDate && task.dueDate <= addDays(today, 2) && !task.scheduledDate,
   ).length;
-
-  if (type === "study") {
-    const dueReviews = reviewNotes.filter((note) => note.nextReviewDate && note.nextReviewDate <= today).length;
-    const behindReviews = reviewNotes.filter((note) => note.nextReviewDate && note.nextReviewDate <= addDays(today, -2)).length;
-    const studiedToday = spaceSessions.some((session) => session.status === "completed" && session.startAt.slice(0, 10) === today);
-    if (behindReviews > 0) return { status: "needs_attention", label: t("spaceHub.signal.fallingBehind"), detail: t("spaceHub.signal.fallingBehindDetail", { n: behindReviews }) };
-    if (dueReviews > 0) return { status: "review_due", label: t("spaceHub.signal.reviewDue"), detail: t("spaceHub.signal.reviewDueDetail", { n: dueReviews }) };
-    if (!recentActivity) return { status: "inactive", label: t("spaceHub.signal.inactive"), detail: t("spaceHub.signal.inactiveStudyDetail") };
-    if (studiedToday) return { status: "on_track", label: t("spaceHub.signal.onTrack"), detail: t("spaceHub.signal.onTrackStudiedDetail") };
-    return { status: "on_track", label: t("spaceHub.signal.onTrack"), detail: t("spaceHub.signal.onTrackReviewsDetail") };
-  }
 
   if (type === "personal") {
     if (counts.overdue > 0) return { status: "deadline_risk", label: t("spaceHub.signal.overdue"), detail: t("spaceHub.signal.overdueDetail", { n: counts.overdue }) };
@@ -174,14 +162,12 @@ export interface UpcomingItem {
   id: string;
   title: string;
   when: string;
-  kind: "deadline" | "scheduled" | "review";
+  kind: "deadline" | "scheduled";
   taskId?: string;
-  noteId?: string;
 }
 
 export function getUpcomingSpaceItems(
   spaceTasks: Task[],
-  reviewNotes: ConceptNote[],
   today = todayValue(),
   limit = 4,
 ): UpcomingItem[] {
@@ -194,11 +180,6 @@ export function getUpcomingSpaceItems(
       items.push({ id: `due-${task.id}`, title: task.title, when: task.dueDate, kind: "deadline", taskId: task.id });
     } else if (task.scheduledDate && task.scheduledDate >= today && task.scheduledDate <= horizon) {
       items.push({ id: `sch-${task.id}`, title: task.title, when: task.scheduledDate, kind: "scheduled", taskId: task.id });
-    }
-  }
-  for (const note of reviewNotes) {
-    if (note.nextReviewDate && note.nextReviewDate <= horizon) {
-      items.push({ id: `rev-${note.id}`, title: note.title, when: note.nextReviewDate, kind: "review", noteId: note.id });
     }
   }
 

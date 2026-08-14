@@ -1,4 +1,4 @@
-import { DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { CalendarItem } from "../../utils/calendarItems";
 import {
@@ -135,6 +135,8 @@ interface WeekViewProps {
   days: string[];
   anchor: string;
   items: CalendarItem[];
+  /** Key of the item carrying the selection ring; "" when nothing is picked. */
+  selectedKey: string;
   dragOverId: string;
   onOverSlot: (id: string) => (event: DragEvent) => void;
   onLeaveSlot: (id: string) => () => void;
@@ -171,6 +173,7 @@ export function WeekView({
   days,
   anchor,
   items,
+  selectedKey,
   dragOverId,
   onOverSlot,
   onLeaveSlot,
@@ -639,10 +642,12 @@ export function WeekView({
                 {isMoveTarget && move ? (
                   <span
                     className="gcal-chip gcal-chip-task is-move-preview"
-                    style={{ borderLeftColor: move.color }}
+                    style={{ ["--ev-color"]: move.color } as CSSProperties}
                   >
-                    {move.repeating ? "↺ " : null}
-                    {move.title}
+                    <span className="gcal-chip-label">
+                      {move.repeating ? "↺ " : null}
+                      {move.title}
+                    </span>
                   </span>
                 ) : null}
                 <AnimatePresence initial={false}>
@@ -659,6 +664,7 @@ export function WeekView({
                     className={[
                       "gcal-chip",
                       `gcal-chip-${item.layer}`,
+                      item.key === selectedKey ? "is-picked" : "",
                       item.repeating ? "is-repeating" : "",
                       item.status === "done" ? "is-done" : "",
                     ].filter(Boolean).join(" ")}
@@ -670,14 +676,15 @@ export function WeekView({
                       if (suppressClickRef.current) return;
                       onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
                     }}
-                    style={item.layer === "task" || item.layer === "external" ? { borderLeftColor: item.color } : undefined}
+                    style={{ ["--ev-color"]: item.color } as CSSProperties}
                   >
-                    {item.layer === "deadline" ? "⚠ " : null}
-                    {item.layer === "study-review" ? "↻ " : null}
-                    {item.layer === "project-deadline" ? "◆ " : null}
-                    {item.layer === "external" ? "• " : null}
-                    {item.repeating ? "↺ " : null}
-                    {item.title}
+                    <span className="gcal-chip-label">
+                      {item.layer === "deadline" ? "⚠ " : null}
+                      {item.layer === "project-deadline" ? "◆ " : null}
+                      {item.layer === "external" ? "• " : null}
+                      {item.repeating ? "↺ " : null}
+                      {item.title}
+                    </span>
                   </motion.button>
                 ))}
                 </AnimatePresence>
@@ -828,9 +835,8 @@ export function WeekView({
                     style={{
                       top: topFor(move.startMin),
                       height: heightFor(move.startMin, move.endMin),
-                      borderLeft: `3px solid ${move.color}`,
-                      background: `${move.color}22`,
-                    }}
+                      ["--ev-color"]: move.color,
+                    } as CSSProperties}
                   >
                     <span className="gcal-tb-title">
                       {move.repeating ? "↺ " : null}
@@ -881,6 +887,7 @@ export function WeekView({
                       transition={motionEnabled ? transitions.soft : reducedTransition}
                       className={[
                         "gcal-time-block",
+                        item.key === selectedKey ? "is-picked" : "",
                         resize?.key === item.key ? "is-resizing" : "",
                         item.layer === "external" ? "is-external" : "",
                         item.layer === "focus-actual" ? "is-focus-actual" : "",
@@ -892,20 +899,20 @@ export function WeekView({
                         if (suppressClickRef.current) return;
                         onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
                       }}
+                      // The category colour is handed to CSS as a variable and
+                      // every derived colour — tint, left bar, title and time —
+                      // is mixed there. A hard-coded `${color}22` could not vary
+                      // by theme, and 13% over the dark canvas is invisible.
+                      // The focus-actual hatching moved to CSS for the same
+                      // reason (`.is-focus-actual`).
                       style={{
                         top,
                         height,
                         left: `${col * widthPct}%`,
                         width: cols > 1 ? `calc(${widthPct}% - 2px)` : "100%",
                         zIndex: 10 + col,
-                        borderLeft: `3px solid ${item.color}`,
-                        // Actual-focus blocks read as a "recording" overlay:
-                        // hatched fill instead of the solid planned-event tint.
-                        background:
-                          item.layer === "focus-actual"
-                            ? `repeating-linear-gradient(135deg, ${item.color}30 0 6px, ${item.color}12 6px 12px)`
-                            : `${item.color}22`,
-                      }}
+                        ["--ev-color"]: item.color,
+                      } as CSSProperties}
                     >
                       <span className="gcal-tb-title">
                         {item.repeating ? "↺ " : null}

@@ -18,7 +18,6 @@ interface CalendarLeftSidebarProps {
   onToggleCategory: (category: CalendarCategory) => void;
   onSelectCategory: (category: CalendarCategory) => void;
   onRecolorCategory: (category: CalendarCategory, color: string) => void;
-  onCreateClick: () => void;
   collapsed: boolean;
   onExpand: () => void;
 }
@@ -33,7 +32,6 @@ export function CalendarLeftSidebar({
   onToggleCategory,
   onSelectCategory,
   onRecolorCategory,
-  onCreateClick,
   collapsed,
   onExpand,
 }: CalendarLeftSidebarProps) {
@@ -64,9 +62,10 @@ export function CalendarLeftSidebar({
   const month = anchorDate.getMonth();
   const cells = getMonthGrid(year, month);
 
-  // Collapsed: a slim icon rail (expand + create) instead of hiding the
-  // sidebar entirely, so the calendar keeps its left anchor and stays quick
-  // to reopen.
+  // Collapsed: a slim icon rail (expand only) instead of hiding the sidebar
+  // entirely, so the calendar keeps its left anchor and stays quick to reopen.
+  // Create is not repeated here — it lives in the toolbar, which is visible in
+  // both states.
   if (collapsed) {
     return (
       <aside className="gcal-sidebar is-rail">
@@ -79,53 +78,12 @@ export function CalendarLeftSidebar({
         >
           »
         </button>
-        <button
-          type="button"
-          className="gcal-create-btn is-rail"
-          aria-label={t("calendar.createAria")}
-          title={t("calendar.createAria")}
-          onClick={onCreateClick}
-        >
-          +
-        </button>
       </aside>
     );
   }
 
   return (
     <aside className="gcal-sidebar">
-      <button type="button" className="gcal-create-btn" onClick={onCreateClick}>
-        {t("calendar.create")}
-      </button>
-
-      <div className="gcal-mini-month">
-        <div className="gcal-mini-month-head">{getMonthLabel(year, month, lang)}</div>
-        <div className="gcal-mini-month-grid">
-          {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => (
-            <span key={`${label}-${index}`} className="gcal-mini-weekday">
-              {label}
-            </span>
-          ))}
-          {cells.map((cell) => {
-            const classes = ["gcal-mini-day"];
-            if (!cell.inMonth) classes.push("is-outside");
-            if (cell.date === today) classes.push("is-today");
-            if (cell.date === anchor) classes.push("is-selected");
-            return (
-              <button
-                key={cell.date}
-                type="button"
-                className={classes.join(" ")}
-                onClick={() => onSelectDate(cell.date)}
-              >
-                {getDayNumber(cell.date)}
-                {datesWithItems.has(cell.date) ? <span className="gcal-mini-dot" /> : null}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {groups.map((group) => (
         <div key={group.type} className="gcal-sidebar-section">
           <h3>{t(`calendar.group.${group.type}`)}</h3>
@@ -212,6 +170,37 @@ export function CalendarLeftSidebar({
         </div>
       ))}
 
+      {/* The calendar list is what this sidebar is for, so it comes first.
+          The mini month is a date jumper — Calendar.app has no such thing in
+          its sidebar, but removing it would leave no quick way to jump, so it
+          stays and only gives up the top slot (D5). */}
+      <div className="gcal-mini-month">
+        <div className="gcal-mini-month-head">{getMonthLabel(year, month, lang)}</div>
+        <div className="gcal-mini-month-grid">
+          {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => (
+            <span key={`${label}-${index}`} className="gcal-mini-weekday">
+              {label}
+            </span>
+          ))}
+          {cells.map((cell) => {
+            const classes = ["gcal-mini-day"];
+            if (!cell.inMonth) classes.push("is-outside");
+            if (cell.date === today) classes.push("is-today");
+            if (cell.date === anchor) classes.push("is-selected");
+            return (
+              <button
+                key={cell.date}
+                type="button"
+                className={classes.join(" ")}
+                onClick={() => onSelectDate(cell.date)}
+              >
+                {getDayNumber(cell.date)}
+                {datesWithItems.has(cell.date) ? <span className="gcal-mini-dot" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </aside>
   );
 }

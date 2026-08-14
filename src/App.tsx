@@ -45,15 +45,12 @@ import {
   type ExternalCalendarState,
 } from "./lib/externalCalendars";
 import type {
-  ConceptNote,
   ExternalCalendar,
   PageId,
   Project,
-  StudyTopic,
   Task,
 } from "./types";
 import { todayValue } from "./utils/date";
-import { getDueReviewCount } from "./utils/planner";
 import { I18nProvider, translate, useT } from "./i18n";
 
 function cloudExternalCalendarSnapshot(calendar: ExternalCalendar): ExternalCalendar {
@@ -105,7 +102,6 @@ export default function App() {
   // Renders before the <I18nProvider> below exists in the tree, so this can't
   // use the useT() context hook — call the plain translate() helper instead.
   const t = (key: string, vars?: Record<string, string | number>) => translate(appSettings.language, key, vars);
-  const dueReviewCount = getDueReviewCount(planner.conceptNotes);
   // Open the user's chosen default start page on boot. /inbox opens Today with
   // the triage drawer (handled by todayIntent below), so it maps to "today".
   const [activePage, setActivePage] = useState<PageId>(() => {
@@ -134,8 +130,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [isProjectDetailOpen, setIsProjectDetailOpen] = useState(false);
-  const [studyTab, setStudyTab] = useState<"topics" | "notes" | "reviews">("topics");
-  const [studyFocusNoteId, setStudyFocusNoteId] = useState("");
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState("");
   const [pendingResetAllData, setPendingResetAllData] = useState(false);
@@ -238,17 +232,8 @@ export default function App() {
       projects: activeProjects.filter((project) =>
         [project.name, project.description].join(" ").toLowerCase().includes(query),
       ),
-      topics: planner.studyTopics.filter((topic) =>
-        [topic.name, topic.description, topic.category].join(" ").toLowerCase().includes(query),
-      ),
-      notes: planner.conceptNotes.filter((note) =>
-        [note.title, note.summary, note.content, note.tags.join(" ")]
-          .join(" ")
-          .toLowerCase()
-          .includes(query),
-      ),
     };
-  }, [activeProjects, planner.conceptNotes, planner.studyTopics, planner.tasks, searchQuery]);
+  }, [activeProjects, planner.tasks, searchQuery]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -507,7 +492,7 @@ export default function App() {
         window.clearTimeout(sharePublishTimerRef.current);
       }
     };
-  }, [calendarShare.enabled, calendarShare.token, planner.tasks, planner.projects, planner.conceptNotes]);
+  }, [calendarShare.enabled, calendarShare.token, planner.tasks, planner.projects]);
 
   // One-time cleanup for the legacy /inbox route and ?triage=inbox deep
   // links — the intent was already captured into todayIntent above.
@@ -685,7 +670,6 @@ export default function App() {
     return buildCalendarShareSnapshot({
       tasks: planner.tasks,
       projects: activeProjects,
-      conceptNotes: planner.conceptNotes,
     });
   }
 
@@ -854,7 +838,6 @@ export default function App() {
     setPendingResetAllData(false);
     setSelectedProjectId("");
     setIsProjectDetailOpen(false);
-    setStudyFocusNoteId("");
     planner.selectTask("");
     try {
       localStorage.removeItem("todo-planner-space-hub-v1");
@@ -894,27 +877,6 @@ export default function App() {
     }
 
     setActivePage("planning");
-  }
-
-  function openStudyResult(note?: ConceptNote) {
-    planner.selectTask("");
-    if (note) {
-      setStudyTab(note.nextReviewDate ? "reviews" : "notes");
-    } else {
-      setStudyTab("topics");
-    }
-    setActivePage("study");
-    setSearchQuery("");
-  }
-
-  // Phase 4 (CALENDAR_DESIGN.md §9.11): Calendar's study-review blocks route
-  // here to open a specific ConceptNote inside StudyPage.
-  function openStudyReviewFromCalendar(noteId: string) {
-    const note = planner.conceptNotes.find((candidate) => candidate.id === noteId);
-    planner.selectTask("");
-    setStudyTab(note?.nextReviewDate ? "reviews" : "notes");
-    setStudyFocusNoteId(noteId);
-    setActivePage("study");
   }
 
   function openProjectFromCalendar(projectId: string) {
@@ -1017,10 +979,6 @@ export default function App() {
         setSelectedProjectId={setSelectedProjectId}
         isProjectDetailOpen={isProjectDetailOpen}
         setIsProjectDetailOpen={setIsProjectDetailOpen}
-        studyTab={studyTab}
-        setStudyTab={setStudyTab}
-        studyFocusNoteId={studyFocusNoteId}
-        setStudyFocusNoteId={setStudyFocusNoteId}
         todayIntent={todayIntent}
         onTodayIntentHandled={() => setTodayIntent("")}
         renderTaskDetail={renderTaskDetail}
@@ -1032,7 +990,6 @@ export default function App() {
         requestDeleteProject={requestDeleteProject}
         deleteProjectNow={deleteProjectNow}
         openProjectFromCalendar={openProjectFromCalendar}
-        openStudyReviewFromCalendar={openStudyReviewFromCalendar}
         viewTaskInCalendar={viewTaskInCalendar}
         openCalendarForProject={openCalendarForProject}
         calendarFocusProjectId={calendarFocusProjectId}
@@ -1118,7 +1075,6 @@ export default function App() {
         projects={activeProjects}
         selectedProjectId={selectedProjectId}
         userEmail={planner.auth.userEmail}
-        dueReviewCount={dueReviewCount}
         showCounts={appSettings.showSidebarCounts}
         collapsed={sidebarCollapsed}
         onToggleCollapse={toggleSidebarCollapsed}
@@ -1146,8 +1102,6 @@ export default function App() {
               navigateSection("projects");
               setSearchQuery("");
             }}
-            onSelectTopic={() => openStudyResult()}
-            onSelectNote={openStudyResult}
           />
         }
       />
@@ -1174,12 +1128,23 @@ export default function App() {
       <OllamaChat
         activePage={activePage}
         knowledgeSettings={knowledge.settings}
+        pathStore={{
+          paths: planner.learningPaths,
+          savePath: (draft, source) =>
+            planner.createLearningPath({
+              goal: draft.goal,
+              milestones: draft.milestones,
+              targetDate: draft.targetDate,
+              projectId: draft.projectId,
+              source: source ?? "assistant",
+            }),
+          linkCard: planner.linkCardToMilestone,
+        }}
         aiContext={buildAiContextInput({ planner, appSettings, currentPage: activePage })}
         calendarContext={{
           tasks: planner.tasks,
           projects: planner.projects,
-          conceptNotes: planner.conceptNotes,
-        }}
+            }}
         onExecuteActions={(actions) =>
           executeAgentActions(actions, {
             tasks: planner.tasks,
@@ -1547,24 +1512,18 @@ function SearchBox({
   onChange,
   onSelectTask,
   onSelectProject,
-  onSelectTopic,
-  onSelectNote,
 }: {
   query: string;
   inputRef: RefObject<HTMLInputElement>;
-  results: { tasks: Task[]; projects: Project[]; topics: StudyTopic[]; notes: ConceptNote[] };
+  results: { tasks: Task[]; projects: Project[] };
   onChange: (value: string) => void;
   onSelectTask: (taskId: string) => void;
   onSelectProject: (projectId: string) => void;
-  onSelectTopic: (topicId: string) => void;
-  onSelectNote: (note: ConceptNote) => void;
 }) {
   const { t } = useT();
   const hasResults =
     results.tasks.length > 0 ||
-    results.projects.length > 0 ||
-    results.topics.length > 0 ||
-    results.notes.length > 0;
+    results.projects.length > 0;
 
   return (
     <div className="global-search">
@@ -1588,18 +1547,6 @@ function SearchBox({
             <button key={project.id} onClick={() => onSelectProject(project.id)}>
               <strong>{project.name}</strong>
               <small>{t("app.projectLabel")}</small>
-            </button>
-          ))}
-          {results.topics.slice(0, 4).map((topic) => (
-            <button key={topic.id} onClick={() => onSelectTopic(topic.id)}>
-              <strong>{topic.name}</strong>
-              <small>{t("app.studyTopicLabel")} - {topic.category}</small>
-            </button>
-          ))}
-          {results.notes.slice(0, 4).map((note) => (
-            <button key={note.id} onClick={() => onSelectNote(note)}>
-              <strong>{note.title}</strong>
-              <small>{t("app.studyNoteLabel")} - {note.noteType}</small>
             </button>
           ))}
         </div>

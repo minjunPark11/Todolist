@@ -11,6 +11,8 @@ interface CalendarToolbarProps {
   onToday: () => void;
   onPrev: () => void;
   onNext: () => void;
+  /** Create lives in the toolbar, not as a block button atop the sidebar. */
+  onCreate: () => void;
 }
 
 const MODES: Array<{ id: CalendarMode; labelKey: string }> = [
@@ -29,6 +31,7 @@ export function CalendarToolbar({
   onToday,
   onPrev,
   onNext,
+  onCreate,
 }: CalendarToolbarProps) {
   const { t } = useT();
   return (
@@ -42,13 +45,23 @@ export function CalendarToolbar({
         >
           ☰
         </button>
-        <span className="gcal-title">{t("calendar.title")}</span>
-        <button type="button" className="gcal-today-btn" onClick={onToday}>
-          {t("calendar.today")}
+        {/* The page title said "Calendar" while the app sidebar already had
+            Calendar selected. Dropped; the range label carries the heading. */}
+        <button
+          type="button"
+          className="gcal-icon-btn gcal-create-icon-btn"
+          aria-label={t("calendar.createAria")}
+          title={t("calendar.createAria")}
+          onClick={onCreate}
+        >
+          +
         </button>
         <div className="gcal-nav">
           <button type="button" aria-label={t("calendar.previous")} onClick={onPrev}>
             ‹
+          </button>
+          <button type="button" className="gcal-today-btn" onClick={onToday}>
+            {t("calendar.today")}
           </button>
           <button type="button" aria-label={t("calendar.next")} onClick={onNext}>
             ›

@@ -95,3 +95,39 @@ describe("formatBreadcrumb", () => {
     expect(formatBreadcrumb(path([]), [])).toBeNull();
   });
 });
+
+describe("resolveMilestoneStatus — user completion and tasks", () => {
+  it("lets an explicit completion outrank every derived signal", () => {
+    // The Horizons page reads completedAt; before this, the breadcrumb read
+    // only card stages, so a milestone ticked on one screen stayed "current"
+    // on the other.
+    const ticked: Milestone = { ...milestone("m1", ["c1"]), completedAt: "2026-08-14T00:00:00.000Z" };
+    expect(resolveMilestoneStatus(ticked, [card("c1", "goal_captured")])).toBe("done");
+  });
+
+  it("counts linked tasks as done only when all of them are", () => {
+    const withTasks: Milestone = { ...milestone("m1"), taskIds: ["t1", "t2"] };
+    const partly = resolveMilestoneStatus(withTasks, [], [
+      { id: "t1", status: "done" },
+      { id: "t2", status: "todo" },
+    ]);
+    const all = resolveMilestoneStatus(withTasks, [], [
+      { id: "t1", status: "done" },
+      { id: "t2", status: "done" },
+    ]);
+    expect(partly).toBe("current");
+    expect(all).toBe("done");
+  });
+
+  it("falls back to card stages when the linked tasks are gone", () => {
+    // Deleted tasks must not strand a milestone as permanently "current".
+    const withTasks: Milestone = { ...milestone("m1", ["c1"]), taskIds: ["deleted"] };
+    expect(resolveMilestoneStatus(withTasks, [card("c1", "executing")], [])).toBe("done");
+  });
+
+  it("keeps the old card-only behaviour when nothing new applies", () => {
+    expect(resolveMilestoneStatus(milestone("m1", ["c1"]), [card("c1", "executing")])).toBe("done");
+    expect(resolveMilestoneStatus(milestone("m1", ["c1"]), [card("c1", "scoping")])).toBe("current");
+    expect(resolveMilestoneStatus(milestone("m1"), [])).toBe("upcoming");
+  });
+});

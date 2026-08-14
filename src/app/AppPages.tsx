@@ -3,9 +3,9 @@ import { ArchivePage } from "../components/ArchivePage";
 import { CalendarView } from "../components/CalendarView";
 import { EisenhowerPage } from "../components/EisenhowerPage";
 import { FocusPage } from "../components/FocusPage";
+import { HorizonsPage } from "../components/HorizonsPage";
 import { SpacesPage } from "../components/SpacesPage";
 import { SettingsPage } from "../components/SettingsPage";
-import { StudyPage } from "../components/StudyPage";
 import { TodayPage, type TodayIntent } from "../components/TodayPage";
 import type { ToastState } from "../components/kit";
 import type { usePlannerData } from "../hooks/usePlannerData";
@@ -26,10 +26,6 @@ type AppPagesProps = {
   setSelectedProjectId: (id: string) => void;
   isProjectDetailOpen: boolean;
   setIsProjectDetailOpen: (open: boolean) => void;
-  studyTab: "topics" | "notes" | "reviews";
-  setStudyTab: (tab: "topics" | "notes" | "reviews") => void;
-  studyFocusNoteId: string;
-  setStudyFocusNoteId: (id: string) => void;
   todayIntent: TodayIntent;
   onTodayIntentHandled: () => void;
   renderTaskDetail: () => ReactNode;
@@ -42,7 +38,6 @@ type AppPagesProps = {
   // Immediate delete for flows that already confirmed (space delete modal).
   deleteProjectNow: (projectId: string) => void;
   openProjectFromCalendar: (projectId: string) => void;
-  openStudyReviewFromCalendar: (noteId: string) => void;
   viewTaskInCalendar: (taskId: string) => void;
   openCalendarForProject: (projectId?: string) => void;
   calendarFocusProjectId: string;
@@ -85,10 +80,6 @@ export function AppPages({
   setSelectedProjectId,
   isProjectDetailOpen,
   setIsProjectDetailOpen,
-  studyTab,
-  setStudyTab,
-  studyFocusNoteId,
-  setStudyFocusNoteId,
   todayIntent,
   onTodayIntentHandled,
   renderTaskDetail,
@@ -100,7 +91,6 @@ export function AppPages({
   requestDeleteProject,
   deleteProjectNow,
   openProjectFromCalendar,
-  openStudyReviewFromCalendar,
   viewTaskInCalendar,
   openCalendarForProject,
   calendarFocusProjectId,
@@ -192,24 +182,25 @@ export function AppPages({
     );
   }
 
-  if (activePage === "study") {
+  if (activePage === "horizons") {
     return (
       <section className={pageGridClass()}>
-        <StudyPage
-          topics={planner.studyTopics}
-          notes={planner.conceptNotes}
-          tab={studyTab}
-          onChangeTab={setStudyTab}
-          onCreateTopic={planner.createTopic}
-          onDeleteTopic={planner.deleteTopic}
-          onCreateNote={planner.createNote}
-          onUpdateNote={planner.updateNote}
-          onDeleteNote={planner.deleteNote}
-          onMarkReviewed={planner.markNoteReviewed}
+        <HorizonsPage
+          paths={planner.learningPaths}
+          tasks={planner.tasks}
+          projects={activeProjects}
+          onCreatePath={planner.createLearningPath}
+          onUpdatePath={planner.updateLearningPath}
+          onDeletePath={planner.deleteLearningPath}
+          onAddMilestone={planner.addMilestone}
+          onUpdateMilestone={planner.updateMilestone}
+          onDeleteMilestone={planner.deleteMilestone}
+          onUpdateTask={planner.updateTask}
+          onCreateTaskFromMilestone={planner.createTaskFromMilestone}
+          onOpenTask={planner.selectTask}
           showToast={showToast}
-          focusNoteId={studyFocusNoteId}
-          onFocusNoteHandled={() => setStudyFocusNoteId("")}
         />
+        {renderTaskDetail()}
       </section>
     );
   }
@@ -237,20 +228,16 @@ export function AppPages({
         <CalendarView
           tasks={planner.tasks}
           projects={activeProjects}
-          conceptNotes={planner.conceptNotes}
-          studyTopics={planner.studyTopics}
-          externalCalendars={externalCalendars}
+              externalCalendars={externalCalendars}
           externalCalendarEvents={externalCalendarEvents}
           focusSessions={planner.focusSessions}
           onUpdateExternalCalendar={onUpdateExternalCalendar}
           onUpdateProject={planner.updateProject}
-          onUpdateTopic={planner.updateTopic}
-          initialProjectId={calendarFocusProjectId}
+            initialProjectId={calendarFocusProjectId}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
           onDeleteTask={requestDeleteTask}
           onOpenProject={openProjectFromCalendar}
-          onOpenStudyReview={openStudyReviewFromCalendar}
           onClearTaskSelection={() => planner.selectTask("")}
           showToast={showToast}
         />
@@ -285,9 +272,11 @@ export function AppPages({
       <SpacesPage
         projects={planner.projects}
         tasks={planner.tasks}
+        paths={planner.learningPaths}
+        onUpdatePath={planner.updateLearningPath}
+        onUpdateMilestone={planner.updateMilestone}
+        onCreateGoal={planner.createLearningPath}
         subtasks={planner.subtasks}
-        studyTopics={planner.studyTopics}
-        conceptNotes={planner.conceptNotes}
         focusSessions={planner.focusSessions}
         activeFocusSession={planner.activeFocusSession}
         onCompleteTask={planner.completeTask}
@@ -313,13 +302,10 @@ export function AppPages({
         onUpdateTask={planner.updateTask}
         onCreateTask={planner.createTask}
         onCreateProject={planner.createProject}
-        onCreateTopic={planner.createTopic}
         onUpdateProject={planner.updateProject}
-        onUpdateTopic={planner.updateTopic}
         onToggleStar={planner.toggleProjectPinned}
         onArchiveProject={handleArchiveProject}
         onRequestDeleteProject={deleteProjectNow}
-        onDeleteTopic={planner.deleteTopic}
         onSaveNotes={(id, value) => planner.updateProject(id, { notes: value })}
         showToast={showToast}
       />
@@ -342,9 +328,7 @@ export function AppPages({
       tasks={planner.tasks}
       onUpdateTask={planner.updateTask}
       projects={planner.projects}
-      studyTopics={planner.studyTopics}
       onUpdateProject={planner.updateProject}
-      onUpdateTopic={planner.updateTopic}
       externalCalendars={externalCalendars}
       onAddExternalCalendar={onAddExternalCalendar}
       onUpdateExternalCalendar={onUpdateExternalCalendar}

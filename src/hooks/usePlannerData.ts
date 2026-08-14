@@ -4,33 +4,32 @@ import { platform } from "../platform";
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 import type {
   AppSettings,
-  ConceptNote,
   ExternalCalendar,
   FocusMode,
   FocusSegment,
   FocusSession,
-  Habit,
-  HabitFrequency,
-  HabitLog,
   Language,
-  NoteDifficulty,
-  NoteType,
   PlannerData,
   PlannerSettings,
   Project,
   ProjectType,
   RawPlannerData,
-  RecentItem,
   RepeatType,
-  ReviewDifficulty,
-  StoredReviewStatus,
-  StudyTopic,
-  StudyTopicCategory,
   Subtask,
   Task,
   TaskDraft,
-  TaskTemplate,
 } from "../types";
+import type { LearningPath, Milestone } from "../lib/ai/learningPaths/types";
+import {
+  markLegacyLearningPathsMigrated,
+  readLegacyLearningPaths,
+  sanitizeLearningPath,
+} from "../lib/ai/learningPaths/store";
+import {
+  markLegacyLocalSpacesMigrated,
+  readLegacyLocalSpaces,
+} from "../lib/spaces/legacyLocalSpaces";
+import * as pathOps from "../domain/horizons/pathMutations";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
 import {
   buildSyncPlan,
@@ -47,19 +46,6 @@ const taskStatuses = ["inbox", "todo", "doing", "waiting", "done", "archived"] a
 const taskPriorities = ["none", "low", "medium", "high"] as const;
 const projectTypes = ["project", "area"] as const;
 const projectStatuses = ["active", "paused", "completed", "archived"] as const;
-const topicCategories = [
-  "Python",
-  "LeetCode",
-  "Research",
-  "fNIRS",
-  "English",
-  "Presentation",
-  "Other",
-] as const;
-const topicStatuses = ["active", "paused", "mastered", "archived"] as const;
-const noteTypes = ["concept", "leetcode", "research", "english", "presentation", "other"] as const;
-const noteDifficulties = ["unknown", "hard", "medium", "easy"] as const;
-const storedReviewStatuses = ["not_scheduled", "reviewed", "mastered"] as const;
 const accentColors = ["blue", "purple", "green", "pink", "orange"] as const;
 const themeModes = ["light", "dark", "system"] as const;
 const fontSizes = ["small", "medium", "large"] as const;
@@ -85,15 +71,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   aiModel: "",
 };
 
-// Review interval (days) by difficulty. `mastered` clears the schedule.
-const REVIEW_INTERVALS: Record<ReviewDifficulty, number | null> = {
-  hard: 1,
-  medium: 3,
-  easy: 7,
-  mastered: null,
-};
 const repeatTypes = ["none", "daily", "weekly", "monthly"] as const;
-const habitFrequencies = ["daily", "weekly"] as const;
 const focusModes = ["focus", "short_break", "long_break"] as const;
 const focusStatuses = ["running", "paused", "completed", "cancelled"] as const;
 const focusSources = ["focus_page", "today_page", "calendar_event", "global_bar"] as const;
@@ -215,30 +193,6 @@ function normalizeSubtask(subtask: Partial<Subtask>): Subtask {
   };
 }
 
-function normalizeHabit(habit: Partial<Habit>): Habit {
-  const now = new Date().toISOString();
-
-  return {
-    id: habit.id ?? createId("habit"),
-    name: habit.name ?? "Untitled habit",
-    description: habit.description ?? "",
-    frequency: oneOf(habit.frequency, habitFrequencies, "daily"),
-    targetCount: habit.targetCount ?? 1,
-    color: habit.color ?? "#0066cc",
-    createdAt: habit.createdAt ?? now,
-    updatedAt: habit.updatedAt ?? now,
-  };
-}
-
-function normalizeHabitLog(log: Partial<HabitLog>): HabitLog {
-  return {
-    id: log.id ?? createId("habit-log"),
-    habitId: log.habitId ?? "",
-    date: log.date ?? "",
-    completed: Boolean(log.completed),
-  };
-}
-
 function normalizeFocusSession(session: Partial<FocusSession>): FocusSession {
   const now = new Date().toISOString();
   const startedAt = session.startedAt ?? session.startAt ?? now;
@@ -293,23 +247,6 @@ function normalizeFocusSession(session: Partial<FocusSession>): FocusSession {
   };
 }
 
-function normalizeTaskTemplate(template: Partial<TaskTemplate>): TaskTemplate {
-  const now = new Date().toISOString();
-
-  return {
-    id: template.id ?? createId("template"),
-    name: template.name ?? template.title ?? "Untitled template",
-    title: template.title ?? "Untitled task",
-    description: template.description ?? "",
-    priority: oneOf(template.priority, taskPriorities, "none"),
-    projectId: template.projectId ?? "",
-    tags: Array.isArray(template.tags) ? template.tags : [],
-    notes: template.notes ?? "",
-    subtasks: Array.isArray(template.subtasks) ? template.subtasks : [],
-    createdAt: template.createdAt ?? now,
-    updatedAt: template.updatedAt ?? now,
-  };
-}
 
 function normalizeSettings(settings?: Partial<PlannerSettings>): PlannerSettings {
   const now = new Date().toISOString();
@@ -345,54 +282,6 @@ function normalizeExternalCalendar(calendar: Partial<ExternalCalendar>): Externa
   };
 }
 
-function normalizeStudyTopic(topic: Partial<StudyTopic>): StudyTopic {
-  const now = new Date().toISOString();
-
-  return {
-    id: topic.id ?? createId("topic"),
-    name: topic.name ?? "Untitled topic",
-    category: oneOf(topic.category, topicCategories, "Other") as StudyTopicCategory,
-    description: topic.description ?? "",
-    status: oneOf(topic.status, topicStatuses, "active"),
-    color: topic.color ?? "#007AFF",
-    icon: topic.icon,
-    order: typeof topic.order === "number" ? topic.order : 0,
-    createdAt: topic.createdAt ?? now,
-    updatedAt: topic.updatedAt ?? now,
-    archivedAt: topic.archivedAt,
-  };
-}
-
-function normalizeConceptNote(note: Partial<ConceptNote>): ConceptNote {
-  const now = new Date().toISOString();
-
-  return {
-    id: note.id ?? createId("note"),
-    topicId: note.topicId ?? "",
-    title: note.title ?? "Untitled note",
-    noteType: oneOf(note.noteType, noteTypes, "concept") as NoteType,
-    summary: note.summary ?? "",
-    content: note.content ?? "",
-    examples: note.examples ?? "",
-    personalExplanation: note.personalExplanation ?? "",
-    confusionPoint: note.confusionPoint ?? "",
-    difficulty: oneOf(note.difficulty, noteDifficulties, "unknown") as NoteDifficulty,
-    reviewStatus: oneOf(note.reviewStatus, storedReviewStatuses, "not_scheduled") as StoredReviewStatus,
-    nextReviewDate: note.nextReviewDate ?? "",
-    lastReviewedAt: note.lastReviewedAt ?? "",
-    reviewHistory: Array.isArray(note.reviewHistory) ? note.reviewHistory : [],
-    leetcode: note.leetcode,
-    research: note.research,
-    english: note.english,
-    source: note.source ?? "",
-    tags: Array.isArray(note.tags) ? note.tags : [],
-    order: typeof note.order === "number" ? note.order : 0,
-    createdAt: note.createdAt ?? now,
-    updatedAt: note.updatedAt ?? now,
-    deletedAt: note.deletedAt,
-  };
-}
-
 function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
   return {
     theme: oneOf(settings?.theme, themeModes, DEFAULT_APP_SETTINGS.theme),
@@ -413,51 +302,32 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
   };
 }
 
-function normalizeRecentItem(item: Partial<RecentItem>): RecentItem {
-  return {
-    id: item.id ?? createId("recent"),
-    type: (item.type ?? "task") as RecentItem["type"],
-    refId: item.refId ?? "",
-    title: item.title ?? "",
-    openedAt: item.openedAt ?? new Date().toISOString(),
-  };
-}
-
 function normalizeData(data: RawPlannerData): PlannerData {
-  const hasStudy =
-    Array.isArray(data.studyTopics) || Array.isArray(data.conceptNotes);
-
   return {
     tasks: Array.isArray(data.tasks) ? data.tasks.map(normalizeTask) : [],
     projects: Array.isArray(data.projects) ? data.projects.map(normalizeProject) : [],
     subtasks: Array.isArray(data.subtasks)
       ? data.subtasks.map(normalizeSubtask).filter((subtask) => subtask.taskId)
       : [],
-    studyTopics: hasStudy
-      ? (data.studyTopics ?? []).map(normalizeStudyTopic)
-      : [],
-    conceptNotes: hasStudy
-      ? (data.conceptNotes ?? []).map(normalizeConceptNote).filter((note) => !note.deletedAt)
-      : [],
-    habits: Array.isArray(data.habits) ? data.habits.map(normalizeHabit) : [],
-    habitLogs: Array.isArray(data.habitLogs)
-      ? data.habitLogs.map(normalizeHabitLog).filter((log) => log.habitId && log.date)
-      : [],
     focusSessions: Array.isArray(data.focusSessions)
       ? data.focusSessions.map(normalizeFocusSession)
       : [],
     activeSessionId: typeof data.activeSessionId === "string" ? data.activeSessionId : "",
-    taskTemplates: Array.isArray(data.taskTemplates)
-      ? data.taskTemplates.map(normalizeTaskTemplate)
+    // One validator for both sources: the same sanitizer that read the old
+    // local blob now vets the synced rows.
+    learningPaths: Array.isArray(data.learningPaths)
+      ? data.learningPaths
+          .map(sanitizeLearningPath)
+          .filter((path): path is LearningPath => path !== null)
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       : [],
-    recentItems: Array.isArray(data.recentItems) ? data.recentItems.map(normalizeRecentItem) : [],
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
   };
 }
 
 function emptyData(): PlannerData {
-  return normalizeData({ studyTopics: [], conceptNotes: [] });
+  return normalizeData({});
 }
 
 function countDataItems(data: PlannerData): number {
@@ -465,12 +335,7 @@ function countDataItems(data: PlannerData): number {
     data.tasks.length +
     data.projects.length +
     data.subtasks.length +
-    data.habits.length +
-    data.habitLogs.length +
-    data.focusSessions.length +
-    data.taskTemplates.length +
-    data.studyTopics.length +
-    data.conceptNotes.length
+    data.focusSessions.length
   );
 }
 
@@ -479,7 +344,42 @@ function countDataItems(data: PlannerData): number {
 // accruing wall-clock time (see recoverStaleFocusSessions).
 function adoptLoadedData(data: PlannerData): PlannerData {
   const focusSessions = recoverStaleFocusSessions(data.focusSessions);
-  return focusSessions === data.focusSessions ? data : { ...data, focusSessions };
+  const learningPaths = adoptLegacyLearningPaths(data.learningPaths);
+  const projects = adoptLegacyLocalSpaces(data.projects);
+  if (
+    focusSessions === data.focusSessions &&
+    learningPaths === data.learningPaths &&
+    projects === data.projects
+  ) {
+    return data;
+  }
+  return { ...data, focusSessions, learningPaths, projects };
+}
+
+// Phase S4 migration, and the same shape as the one below it: custom spaces
+// written before Spaces read Projects sat in a device-local blob. Merged by
+// id so a repeated read (StrictMode, or a failed marker write) adds nothing
+// twice, and an already-synced copy is never overwritten by the stale one.
+function adoptLegacyLocalSpaces(current: Project[]): Project[] {
+  const legacy = readLegacyLocalSpaces();
+  if (legacy.length === 0) return current;
+  const seen = new Set(current.map((project) => project.id));
+  const added = legacy.filter((project) => !seen.has(project.id));
+  if (added.length === 0) return current;
+  return [...current, ...added];
+}
+
+// Phase 2 migration: goals written before they were synced sat in a local
+// blob. The read is pure and repeats until the marker is set after mount, and
+// what it yields is merged by id rather than replacing — if a synced copy has
+// already arrived, both survive and neither wins by accident.
+function adoptLegacyLearningPaths(current: LearningPath[]): LearningPath[] {
+  const legacy = readLegacyLearningPaths();
+  if (legacy.length === 0) return current;
+  const seen = new Set(current.map((path) => path.id));
+  const added = legacy.filter((path) => !seen.has(path.id));
+  if (added.length === 0) return current;
+  return pathOps.sortPaths([...current, ...added]).slice(0, pathOps.MAX_PATHS);
 }
 
 function readStorage(): PlannerData {
@@ -505,7 +405,12 @@ function readStorage(): PlannerData {
 
   // First run, no saved data anywhere: start completely blank. Demo content
   // is opt-in only, via the "Load Samples" button in Settings.
-  return emptyData();
+  //
+  // Still goes through adoptLoadedData: the legacy blobs are separate keys, so
+  // "no planner data" does not mean "nothing to migrate". Returning emptyData()
+  // raw skipped the drain while the marker was set anyway, which lost the
+  // records rather than merely postponing them.
+  return adoptLoadedData(emptyData());
 }
 
 export function usePlannerData() {
@@ -520,6 +425,15 @@ export function usePlannerData() {
       return next;
     });
   }
+  // The legacy path blob is only marked migrated once the adopted state is
+  // actually committed. Marking inside the read would lose the data on any
+  // second invocation whose result is discarded — StrictMode's double-call
+  // being the one that caught it.
+  useEffect(() => {
+    markLegacyLearningPathsMigrated();
+    markLegacyLocalSpacesMigrated();
+  }, []);
+
   const [selectedTaskId, setSelectedTaskId] = useState<string>("");
   const [userEmail, setUserEmail] = useState("");
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
@@ -674,7 +588,7 @@ export function usePlannerData() {
         throw new Error(`Failed to load 'app_settings' row: ${appSettingsError.message}`);
       }
       const appState = appSettingsRow?.data as
-        | { appSettings?: Partial<AppSettings>; activeSessionId?: unknown; recentItems?: unknown }
+        | { appSettings?: Partial<AppSettings>; activeSessionId?: unknown }
         | undefined;
       // Fall back to the current local values when no remote row exists yet, so
       // an existing device's preferences aren't wiped on first sync after this
@@ -685,11 +599,6 @@ export function usePlannerData() {
           ? appState.activeSessionId
           : ""
         : data.activeSessionId;
-      partial.recentItems = appState
-        ? Array.isArray(appState.recentItems)
-          ? (appState.recentItems as never)
-          : []
-        : data.recentItems;
 
       const loaded = adoptLoadedData(normalizeData(partial));
       setDataState(loaded);
@@ -1450,122 +1359,116 @@ export function usePlannerData() {
     }));
   }
 
-  // === Study topics ===
-  function createTopic(input: {
-    name: string;
-    category?: StudyTopicCategory;
-    description?: string;
-    color?: string;
-  }): string {
-    const name = input.name.trim();
-    if (!name) {
-      return "";
-    }
-    const topic = normalizeStudyTopic({
-      id: createId("topic"),
-      name,
-      category: input.category ?? "Other",
-      description: input.description ?? "",
-      color: input.color ?? "#007AFF",
-    });
-    setData((current) => ({ ...current, studyTopics: [...current.studyTopics, topic] }));
-    return topic.id;
+  // --- Learning Paths (Horizons) --------------------------------------------
+  // Thin wrappers over the pure operations in domain/horizons/pathMutations so
+  // the rules stay testable and this hook only owns the state transition.
+
+  function createLearningPath(input: {
+    goal: string;
+    targetDate?: string;
+    projectId?: string;
+    milestones?: Milestone[];
+    source?: LearningPath["source"];
+  }): LearningPath | null {
+    const goal = input.goal.trim();
+    if (!goal) return null;
+    const now = new Date().toISOString();
+    const path: LearningPath = {
+      id: createId("lpath"),
+      goal,
+      milestones: input.milestones ?? [],
+      targetDate: input.targetDate,
+      projectId: input.projectId,
+      source: input.source ?? "user",
+      createdAt: now,
+      updatedAt: now,
+    };
+    setData((current) => ({ ...current, learningPaths: pathOps.addPath(current.learningPaths, path) }));
+    // The whole record, not just its id: the assistant panel needs the saved
+    // path in hand to show the position line without waiting for a re-render.
+    return path;
   }
 
-  function updateTopic(topicId: string, patch: Partial<StudyTopic>) {
+  function updateLearningPath(pathId: string, patch: Partial<Omit<LearningPath, "id">>) {
     const now = new Date().toISOString();
     setData((current) => ({
       ...current,
-      studyTopics: current.studyTopics.map((topic) =>
-        topic.id === topicId ? { ...topic, ...patch, updatedAt: now } : topic,
-      ),
+      learningPaths: pathOps.patchPath(current.learningPaths, pathId, patch, now),
     }));
   }
 
-
-  function deleteTopic(topicId: string) {
-    setData((current) => ({
-      ...current,
-      studyTopics: current.studyTopics.filter((topic) => topic.id !== topicId),
-      conceptNotes: current.conceptNotes.map((note) =>
-        note.topicId === topicId ? { ...note, topicId: "" } : note,
-      ),
-    }));
+  function deleteLearningPath(pathId: string) {
+    setData((current) => ({ ...current, learningPaths: pathOps.dropPath(current.learningPaths, pathId) }));
   }
 
-  // === Concept notes ===
-  function createNote(input: Partial<ConceptNote> & { title: string; topicId: string }): string {
+  function addMilestone(pathId: string, input: { title: string; doneCriteria?: string; targetDate?: string }) {
     const title = input.title.trim();
-    if (!title) {
-      return "";
-    }
-    const note = normalizeConceptNote({
-      ...input,
-      id: createId("note"),
+    if (!title) return;
+    const now = new Date().toISOString();
+    const milestone: Milestone = {
+      id: createId("mstone"),
       title,
-      reviewStatus: input.nextReviewDate ? "reviewed" : input.reviewStatus ?? "not_scheduled",
-    });
-    setData((current) => ({ ...current, conceptNotes: [note, ...current.conceptNotes] }));
-    return note.id;
+      doneCriteria: input.doneCriteria?.trim() ?? "",
+      cardIds: [],
+      targetDate: input.targetDate,
+    };
+    setData((current) => ({
+      ...current,
+      learningPaths: pathOps.addMilestone(current.learningPaths, pathId, milestone, now),
+    }));
   }
 
-  function updateNote(noteId: string, patch: Partial<ConceptNote>) {
+  function updateMilestone(pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) {
     const now = new Date().toISOString();
     setData((current) => ({
       ...current,
-      conceptNotes: current.conceptNotes.map((note) =>
-        note.id === noteId ? { ...note, ...patch, updatedAt: now } : note,
+      learningPaths: pathOps.patchMilestone(current.learningPaths, pathId, milestoneId, patch, now),
+    }));
+  }
+
+  function deleteMilestone(pathId: string, milestoneId: string) {
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      learningPaths: pathOps.dropMilestone(current.learningPaths, pathId, milestoneId, now),
+    }));
+  }
+
+  // The Month → Day bridge (HORIZONS_DESIGN.md D6): one action, because a task
+  // created from a milestone but not linked back to it would leave the
+  // milestone unable to tell whether its own work is moving.
+  function createTaskFromMilestone(pathId: string, milestoneId: string, title: string): string {
+    const taskId = createTask({ title, status: "todo", scheduledDate: todayValue() });
+    if (!taskId) return "";
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      learningPaths: pathOps.patchMilestone(
+        current.learningPaths,
+        pathId,
+        milestoneId,
+        {
+          taskIds: [
+            ...(current.learningPaths
+              .find((path) => path.id === pathId)
+              ?.milestones.find((milestone) => milestone.id === milestoneId)?.taskIds ?? []),
+            taskId,
+          ],
+        },
+        now,
       ),
     }));
+    return taskId;
   }
 
-
-  function deleteNote(noteId: string) {
-    setData((current) => ({
-      ...current,
-      conceptNotes: current.conceptNotes.filter((note) => note.id !== noteId),
-    }));
-  }
-
-  function scheduleReview(noteId: string, nextReviewDate: string) {
-    updateNote(noteId, { nextReviewDate, reviewStatus: nextReviewDate ? "reviewed" : "not_scheduled" });
-  }
-
-  // Mark a note reviewed: append history and schedule next review by difficulty (spec §9.6A.11).
-  function markNoteReviewed(noteId: string, difficulty: ReviewDifficulty) {
+  function linkCardToMilestone(pathId: string, milestoneId: string, cardId: string): LearningPath | null {
     const now = new Date().toISOString();
-    const today = todayValue();
-    const interval = REVIEW_INTERVALS[difficulty];
-    const nextReviewDate = interval === null ? "" : addDays(today, interval);
-    const storedStatus: StoredReviewStatus = difficulty === "mastered" ? "mastered" : "reviewed";
-
+    const next = pathOps.linkCardToMilestone(data.learningPaths, pathId, milestoneId, cardId, now);
     setData((current) => ({
       ...current,
-      conceptNotes: current.conceptNotes.map((note) => {
-        if (note.id !== noteId) {
-          return note;
-        }
-        const mappedDifficulty: NoteDifficulty = difficulty === "mastered" ? note.difficulty : difficulty;
-        return {
-          ...note,
-          difficulty: mappedDifficulty,
-          reviewStatus: storedStatus,
-          nextReviewDate,
-          lastReviewedAt: now,
-          reviewHistory: [
-            ...note.reviewHistory,
-            {
-              id: createId("review"),
-              reviewedAt: now,
-              difficulty,
-              previousNextReviewDate: note.nextReviewDate || undefined,
-              nextReviewDate: nextReviewDate || undefined,
-            },
-          ],
-          updatedAt: now,
-        };
-      }),
+      learningPaths: pathOps.linkCardToMilestone(current.learningPaths, pathId, milestoneId, cardId, now),
     }));
+    return next.find((path) => path.id === pathId) ?? null;
   }
 
   // === App settings + recent items ===
@@ -1610,10 +1513,7 @@ export function usePlannerData() {
     tasks: data.tasks,
     projects: data.projects,
     subtasks: data.subtasks,
-    studyTopics: data.studyTopics,
-    conceptNotes: data.conceptNotes,
-    habits: data.habits,
-    habitLogs: data.habitLogs,
+    learningPaths: data.learningPaths,
     focusSessions: data.focusSessions,
     activeSessionId: data.activeSessionId,
     activeFocusSession:
@@ -1621,8 +1521,6 @@ export function usePlannerData() {
         (session) =>
           session.id === data.activeSessionId && (session.status === "running" || session.status === "paused"),
       ) ?? null,
-    taskTemplates: data.taskTemplates,
-    recentItems: data.recentItems,
     settings: data.settings,
     appSettings: data.appSettings,
     selectedTask,
@@ -1658,14 +1556,14 @@ export function usePlannerData() {
     addSubtask,
     toggleSubtask,
     deleteSubtask,
-    createTopic,
-    updateTopic,
-    deleteTopic,
-    createNote,
-    updateNote,
-    deleteNote,
-    scheduleReview,
-    markNoteReviewed,
+    createLearningPath,
+    updateLearningPath,
+    deleteLearningPath,
+    addMilestone,
+    updateMilestone,
+    deleteMilestone,
+    linkCardToMilestone,
+    createTaskFromMilestone,
     updateAppSettings,
     updatePlannerSettings,
     startFocusSession,

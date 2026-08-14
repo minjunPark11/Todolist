@@ -10,7 +10,7 @@ import { runAssistantTurn } from "../lib/ai/assistant/runAssistantTurn";
 import type { AssistantTurn } from "../lib/ai/assistant/types";
 import { loadContextCards } from "../lib/ai/contextCards/store";
 import { formatBreadcrumb } from "../lib/ai/learningPaths/progress";
-import { loadLearningPaths } from "../lib/ai/learningPaths/store";
+import type { LearningPathStore } from "./ai/pathStore";
 import type { LearningPath } from "../lib/ai/learningPaths/types";
 import { logProposedOutcome } from "../lib/ai/memory/outcomeLog";
 import { logAssistantTurn } from "../lib/ai/memory/turnLog";
@@ -57,6 +57,7 @@ interface OllamaChatProps {
   aiContext?: Omit<AiContextInput, "calendarContextText">;
   onExecuteActions?: (actions: AgentAction[]) => ToolExecutionResult[];
   knowledgeSettings?: KnowledgeSettings;
+  pathStore?: LearningPathStore;
 }
 
 function getProviderLabel(t: (key: string) => string, provider?: AiProviderName) {
@@ -71,6 +72,7 @@ export function OllamaChat({
   aiContext,
   onExecuteActions,
   knowledgeSettings = DEFAULT_KNOWLEDGE_SETTINGS,
+  pathStore,
 }: OllamaChatProps = {}) {
   const { t } = useT();
   const motionEnabled = useMotionEnabled();
@@ -97,7 +99,7 @@ export function OllamaChat({
   // the persistent "where am I on the path" header. Refreshed via
   // onPathsChanged when a card save/link changes the active path. All position
   // math lives in learningPaths/progress — never derived here.
-  const [activePath, setActivePath] = useState<LearningPath | null>(() => loadLearningPaths()[0] ?? null);
+  const [activePath, setActivePath] = useState<LearningPath | null>(() => pathStore?.paths[0] ?? null);
   const breadcrumb = useMemo(() => (activePath ? formatBreadcrumb(activePath, loadContextCards()) : null), [activePath]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -381,7 +383,8 @@ export function OllamaChat({
                     showPositionLine
                     onExecuteActions={onExecuteActions}
                     onFollowUpRequest={(text) => void send(text, [])}
-                    onPathsChanged={() => setActivePath(loadLearningPaths()[0] ?? null)}
+                    pathStore={pathStore}
+                    onPathsChanged={() => setActivePath(pathStore?.paths[0] ?? null)}
                   />
                 ) : null}
               </Fragment>

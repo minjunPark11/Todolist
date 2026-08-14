@@ -14,7 +14,7 @@ import { summarizeContextCardForPrompt } from "../../lib/ai/contextCards/searchC
 import type { ContextCard, RecommendedNextAction } from "../../lib/ai/contextCards/types";
 import { suggestMilestoneForCard } from "../../lib/ai/learningPaths/matchMilestone";
 import { currentMilestoneIndex, formatBreadcrumb, milestoneIndexForCard } from "../../lib/ai/learningPaths/progress";
-import { linkCardToMilestone, loadLearningPaths, saveLearningPath } from "../../lib/ai/learningPaths/store";
+import type { LearningPathStore } from "./pathStore";
 import type { LearningPath, LearningPathDraft } from "../../lib/ai/learningPaths/types";
 import { updateOutcome } from "../../lib/ai/memory/outcomeLog";
 import type { ToolExecutionResult } from "../../lib/ai/tools/toolExecutor";
@@ -33,6 +33,9 @@ interface AssistantTurnCardsProps {
   onFollowUpRequest?: (text: string) => void;
   // Fired after a path save/link so hosts with a breadcrumb can refresh it.
   onPathsChanged?: () => void;
+  // Paths now come from planner state; absent means the host does not offer
+  // the path layer, and the panel simply renders no position line.
+  pathStore?: LearningPathStore;
   // Render the deterministic position line ("지금 …의 N/M …") above the
   // cards. The assistant panel keeps its own copy inside the reply bubble,
   // so it passes false; the chat tab passes true.
@@ -63,6 +66,7 @@ export function AssistantTurnCards({
   onFollowUpRequest,
   onPathsChanged,
   showPositionLine,
+  pathStore,
 }: AssistantTurnCardsProps) {
   const { t } = useT();
   // Per-proposal state — reset by the host remounting with key={turn.id}.
@@ -77,7 +81,7 @@ export function AssistantTurnCards({
   // Most recently updated path — drives the link suggestion, rolling-wave
   // render, and (in the chat tab) the position line. All position math lives
   // in learningPaths/progress.
-  const [activePath, setActivePath] = useState<LearningPath | null>(() => loadLearningPaths()[0] ?? null);
+  const [activePath, setActivePath] = useState<LearningPath | null>(() => pathStore?.paths[0] ?? null);
   const pathView = useMemo(() => {
     if (!activePath) return null;
     const cards = loadContextCards();
@@ -141,8 +145,9 @@ export function AssistantTurnCards({
   }
 
   function handleSavePath(pathDraft: LearningPathDraft) {
-    if (savedPath) return;
-    const path = saveLearningPath(pathDraft, "assistant");
+    if (savedPath || !pathStore) return;
+    const path = pathStore.savePath(pathDraft, "assistant");
+    if (!path) return;
     setSavedPath(path);
     setActivePath(path);
     onPathsChanged?.();
@@ -157,8 +162,8 @@ export function AssistantTurnCards({
   );
 
   function handleLinkCard() {
-    if (!savedCard || !activePath || !linkSuggestion) return;
-    const updated = linkCardToMilestone(activePath.id, linkSuggestion.milestone.id, savedCard.id);
+    if (!savedCard || !activePath || !linkSuggestion || !pathStore) return;
+    const updated = pathStore.linkCard(activePath.id, linkSuggestion.milestone.id, savedCard.id);
     if (updated) {
       setActivePath(updated);
       setLinkedMilestoneTitle(linkSuggestion.milestone.title);

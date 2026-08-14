@@ -64,14 +64,9 @@ function data(overrides: Partial<PlannerData> = {}): PlannerData {
     tasks: [],
     projects: [],
     subtasks: [],
-    studyTopics: [],
-    conceptNotes: [],
-    habits: [],
-    habitLogs: [],
     focusSessions: [],
     activeSessionId: "",
-    taskTemplates: [],
-    recentItems: [],
+    learningPaths: [],
     settings,
     appSettings,
     ...overrides,
@@ -180,13 +175,12 @@ describe("buildSyncPlan — incremental saves", () => {
 describe("buildSyncPlan — tables the account does not have", () => {
   it("omits skipped tables from the plan", () => {
     const plan = buildSyncPlan(
-      data({ conceptNotes: [], studyTopics: [], tasks: [task("a")] }),
+      data({ tasks: [task("a")] }),
       null,
-      new Set(["study_topics", "concept_notes"]),
+      new Set(["learning_paths"]),
     );
 
-    expect(tableNamed(plan, "study_topics")).toBeUndefined();
-    expect(tableNamed(plan, "concept_notes")).toBeUndefined();
+    expect(tableNamed(plan, "learning_paths")).toBeUndefined();
     expect(tableNamed(plan, "tasks")).toBeDefined();
   });
 
@@ -210,24 +204,16 @@ describe("buildSyncPlan — every collection is covered", () => {
         tasks: [task("t")],
         projects: [{ id: "p" } as never],
         subtasks: [{ id: "s" } as never],
-        habits: [{ id: "h" } as never],
-        habitLogs: [{ id: "hl" } as never],
         focusSessions: [{ id: "f" } as never],
-        taskTemplates: [{ id: "tt" } as never],
-        studyTopics: [{ id: "st" } as never],
-        conceptNotes: [{ id: "cn" } as never],
+        learningPaths: [{ id: "lp" } as never],
       }),
       null,
     );
     expect(withRows.tables.map((operation) => operation.table).sort()).toEqual([
-      "concept_notes",
       "focus_sessions",
-      "habit_logs",
-      "habits",
+      "learning_paths",
       "projects",
-      "study_topics",
       "subtasks",
-      "task_templates",
       "tasks",
     ]);
   });

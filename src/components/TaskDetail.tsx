@@ -1,4 +1,4 @@
-import type { Project, RepeatType, Subtask, Task } from "../types";
+import type { Project, RepeatType, Subtask, Task, TaskPriority } from "../types";
 import { todayValue } from "../utils/date";
 import { getMatrixPosition, patchForQuadrant, type MatrixQuadrant } from "../utils/eisenhower";
 import { useT } from "../i18n";
@@ -21,6 +21,8 @@ interface TaskDetailProps {
 }
 
 const repeatTypes: RepeatType[] = ["none", "daily", "weekly", "monthly"];
+// Highest first: the value most worth picking should not be last in the list.
+const taskPriorities: TaskPriority[] = ["high", "medium", "low", "none"];
 const matrixQuadrants: Array<{ key: MatrixQuadrant; labelKey: string; hintKey: string }> = [
   { key: "I", labelKey: "eis.qI", hintKey: "eis.qIHint" },
   { key: "II", labelKey: "eis.qII", hintKey: "eis.qIIHint" },
@@ -163,6 +165,26 @@ export function TaskDetail({
       <section className="detail-section">
         <h3>{t("taskDetail.planning")}</h3>
         <div className="detail-field-list">
+          {/* Priority was settable in four creation forms and nowhere after —
+              the only way to change it was the quadrant below, which can only
+              produce "high" or "medium" (patchForQuadrant), so a task saved as
+              Low or None could never be seen or corrected again. The quadrant
+              is derived from this field plus the due date, so the two controls
+              cannot disagree: setting Low here immediately reads as Unsorted
+              below. */}
+          <label>
+            <span>{t("taskDetail.priority")}</span>
+            <select
+              value={task.priority}
+              onChange={(event) => onUpdateTask(task.id, { priority: event.target.value as TaskPriority })}
+            >
+              {taskPriorities.map((priority) => (
+                <option key={priority} value={priority}>
+                  {t(`priority.${priority}`)}
+                </option>
+              ))}
+            </select>
+          </label>
           <label>
             <span>{t("taskDetail.quadrant")}</span>
             <select

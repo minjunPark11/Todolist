@@ -1,10 +1,10 @@
 // Settings > 캘린더 > 카테고리 관리 (category spec §4–§9).
-// Personal categories are fully managed here. Study / project / external /
+// Personal categories are fully managed here. Project / external /
 // focus categories are derived from their source entities, so recoloring one
 // writes the color back to the source (topic / project / calendar) — the
 // calendar and the entity's own screens never disagree.
 import { useEffect, useState, type DragEvent } from "react";
-import type { ExternalCalendar, Project, StudyTopic, Task } from "../../types";
+import type { ExternalCalendar, Project, Task } from "../../types";
 import {
   addPersonalCategory,
   deletePersonalCategory,
@@ -23,10 +23,8 @@ interface CalendarCategorySettingsProps {
   tasks: Task[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   projects: Project[];
-  studyTopics: StudyTopic[];
   externalCalendars: ExternalCalendar[];
   onUpdateProject: (projectId: string, patch: Partial<Project>) => void;
-  onUpdateTopic: (topicId: string, patch: Partial<StudyTopic>) => void;
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
 }
 
@@ -34,7 +32,7 @@ const CATEGORY_COLORS = CATEGORY_COLOR_PALETTE;
 
 // Personal categories rename+recolor here; derived ones recolor only (their
 // name belongs to the source entity).
-type EditorTarget = "personal" | "project" | "study" | "external" | "focus";
+type EditorTarget = "personal" | "project" | "external" | "focus";
 
 type EditorState = {
   mode: "add" | "edit";
@@ -50,10 +48,8 @@ export function CalendarCategorySettings({
   tasks,
   onUpdateTask,
   projects,
-  studyTopics,
   externalCalendars,
   onUpdateProject,
-  onUpdateTopic,
   onUpdateExternalCalendar,
 }: CalendarCategorySettingsProps) {
   const { t } = useT();
@@ -105,7 +101,6 @@ export function CalendarCategorySettings({
     if (!editor) return;
     if (editor.target !== "personal") {
       if (editor.target === "project") onUpdateProject(editor.categoryId, { color: editor.color });
-      else if (editor.target === "study") onUpdateTopic(editor.categoryId, { color: editor.color });
       else if (editor.target === "external") onUpdateExternalCalendar(editor.categoryId, { color: editor.color });
       else setFocusColor(editor.color);
       setEditor(null);
@@ -263,13 +258,6 @@ export function CalendarCategorySettings({
             rows: projects
               .filter((project) => project.status !== "archived")
               .map((project) => ({ id: project.id, name: project.name, color: project.color })),
-          },
-          {
-            target: "study" as const,
-            label: t("calendar.group.study"),
-            rows: studyTopics
-              .filter((topic) => topic.status !== "archived")
-              .map((topic) => ({ id: topic.id, name: topic.name, color: topic.color || "#af52de" })),
           },
           {
             target: "external" as const,

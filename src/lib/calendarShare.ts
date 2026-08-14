@@ -1,5 +1,5 @@
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
-import type { ConceptNote, Project, Task } from "../types";
+import type { Project, Task } from "../types";
 
 export type CalendarShareStatus = "unavailable" | "idle" | "loading" | "saving" | "ready" | "error";
 
@@ -55,7 +55,6 @@ export function getCalendarShareUrl(token: string) {
 export function buildCalendarShareSnapshot(input: {
   tasks: Task[];
   projects: Project[];
-  conceptNotes: ConceptNote[];
 }): CalendarShareSnapshot {
   const events: SharedCalendarEvent[] = [];
 
@@ -86,16 +85,6 @@ export function buildCalendarShareSnapshot(input: {
       uid: `project-due-${project.id}`,
       title: `프로젝트 마감: ${project.name}`,
       date: dueDate,
-    });
-  });
-
-  input.conceptNotes.forEach((note) => {
-    if (!note.title || !isDate(note.nextReviewDate)) return;
-    const nextReviewDate = note.nextReviewDate;
-    events.push({
-      uid: `review-${note.id}`,
-      title: `복습: ${note.title}`,
-      date: nextReviewDate,
     });
   });
 

@@ -1,0 +1,333 @@
+/* ============================================================================
+   Horizons — goals across time scales (HORIZONS_DESIGN.md).
+   Shares the calendar's colour mechanism (--ev-color + color-mix) so the same
+   Space is the same colour on both screens.
+   ========================================================================== */
+
+.hz-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  height: 100%;
+}
+
+.hz-head h1 {
+  margin: 0;
+  font: var(--font-page-title);
+}
+
+.hz-head p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* D8: every horizon visible at once.
+   Not auto-fit: measured at 1104px of usable width in the default window, and
+   auto-fit at any sensible minimum wraps the fifth column onto a second row —
+   which loses the side-by-side perspective exactly as badly as a sideways
+   scroll would. Five explicit tracks with a floor of 0 keep the row intact and
+   let the columns compress instead (~211px each at the default size, still
+   comfortably readable).
+   Dropping columns on a genuinely narrow window is deferred: this is a desktop
+   app, and hiding "life" is worse than a narrower card. */
+.hz-columns {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.hz-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+
+.hz-column-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hz-column-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.hz-column-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.hz-column-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+.hz-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* D7: one card shape for goals, milestones and tasks alike. The uniformity is
+   the point — a card that changes shape between columns makes moving it read
+   as a conversion rather than a move. */
+.hz-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--ev-color, var(--accent));
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 14%, transparent);
+  color: color-mix(in srgb, var(--ev-color, var(--accent)) 74%, var(--text-primary));
+  /* Flat, like the calendar grid: shadow is for floating layers only. */
+  box-shadow: none;
+}
+
+[data-theme="dark"] .hz-card {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 30%, transparent);
+  color: color-mix(in srgb, var(--ev-color, var(--accent)) 55%, var(--text-primary));
+}
+
+/* Milestones and tasks sit under a goal, so they read one step quieter. */
+.hz-card-milestone,
+.hz-card-task {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 8%, transparent);
+}
+
+[data-theme="dark"] .hz-card-milestone,
+[data-theme="dark"] .hz-card-task {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 18%, transparent);
+}
+
+.hz-card.is-done {
+  opacity: 0.55;
+}
+
+.hz-card.is-done .hz-card-title {
+  text-decoration: line-through;
+}
+
+.hz-card-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hz-check {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  padding: 0;
+  border: 1.5px solid color-mix(in srgb, var(--ev-color, var(--accent)) 55%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hz-check.checked {
+  background: var(--ev-color, var(--accent));
+  border-color: var(--ev-color, var(--accent));
+}
+
+.hz-card-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hz-card-title:disabled {
+  cursor: default;
+}
+
+/* D11: the cascade has to be visible, or the columns are just five lists. */
+.hz-card-parent,
+.hz-card-criteria {
+  margin: 0 0 0 24px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+.hz-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: 24px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.hz-card-date {
+  font-variant-numeric: tabular-nums;
+}
+
+.hz-card-action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.hz-card-action:hover {
+  color: var(--accent);
+}
+
+.hz-card-action.is-danger:hover {
+  color: var(--danger);
+}
+
+.hz-add {
+  padding: 6px 8px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hz-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hz-compose input {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.hz-empty {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+/* --- Drag between horizons (Phase 3) ---------------------------------------
+   Every drag writes a date; the column is re-derived from it. The feedback
+   below only has to answer one question before the release: will this column
+   take the card? */
+
+.hz-card[draggable="true"] {
+  cursor: grab;
+}
+
+.hz-card.is-dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.hz-column.is-drop {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg-surface));
+}
+
+/* A column that cannot take the carried card recedes instead of showing a
+   drop cue — a task has no place on the undated horizons, and saying so
+   quietly beats letting the drop fail after the release. */
+.hz-column.is-refused {
+  opacity: 0.45;
+}
+
+.hz-drag-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* ── The same axis inside one board (SPACES_BOARD_DESIGN.md D2) ───────────
+   Rows, not columns: the Space detail already scrolls vertically, and a
+   board's goals are few enough that five columns would be mostly empty.
+   The cards themselves are unchanged — that uniformity is the point (D7). */
+
+.sdv-horizon-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sdv-horizon-row {
+  display: grid;
+  /* Fixed label gutter so the horizon names line up down the card, the way
+     the page's column headers line up across it. */
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.sdv-horizon-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.sdv-horizon-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.sdv-horizon-count {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sdv-horizon-cards {
+  display: grid;
+  /* Cards fill the row and wrap; a board rarely has enough on one horizon to
+     need more than two across. */
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+/* Nothing here is draggable (D6), so the cards must not advertise a grab. */
+.sdv-horizon-cards .hz-card {
+  cursor: default;
+}

@@ -23,6 +23,17 @@ export type Milestone = {
   // Context Cards executing this milestone. Always [] in slice A; slice B
   // links cards here and derives status from their stages.
   cardIds: string[];
+  // --- Horizons page (HORIZONS_DESIGN.md). All optional, so paths written
+  // before it existed still load unchanged.
+  // The only input the horizon column is derived from; never store a horizon
+  // (D2). Empty means "inherit the path's date".
+  targetDate?: string;
+  // Tasks materialised from this milestone — the Month → Day bridge (D6).
+  taskIds?: string[];
+  // An explicit completion by the *user*, which outranks the derived status
+  // below (D10). The "never trust the status" contract in progress.ts is
+  // about the model asserting progress, not about the person.
+  completedAt?: string;
   status?: MilestoneStatus;
 };
 
@@ -34,6 +45,10 @@ export type LearningPath = {
   goal: string;
   // Order is the path: milestones progress by index.
   milestones: Milestone[];
+  // --- Horizons page (HORIZONS_DESIGN.md), all optional — see Milestone.
+  targetDate?: string; // no date = the "life" horizon (D2)
+  projectId?: string; // Board: reuses the existing Space, and its colour (D9)
+  completedAt?: string; // user-asserted completion (D10)
   // Path-level info gathering, reusing the card slot kinds. Persisted for
   // slice B; slice A neither asks nor renders these.
   infoSlots?: InfoSlot[];

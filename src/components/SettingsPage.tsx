@@ -33,7 +33,7 @@ import { KnowledgeStore, type IndexStats } from "../lib/knowledge/knowledgeStore
 import type { KnowledgeSettings } from "../lib/knowledge/types";
 import { platform } from "../platform";
 import type { AppUpdateStatus } from "../platform";
-import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, Project, StudyTopic, Task, ThemeMode } from "../types";
+import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, Project, Task, ThemeMode } from "../types";
 import { CalendarCategorySettings } from "./calendar/CalendarCategorySettings";
 import { ConfirmModal, SegmentedTabs } from "./kit";
 import { useT } from "../i18n";
@@ -53,9 +53,7 @@ interface SettingsPageProps {
   tasks: Task[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   projects: Project[];
-  studyTopics: StudyTopic[];
   onUpdateProject: (projectId: string, patch: Partial<Project>) => void;
-  onUpdateTopic: (topicId: string, patch: Partial<StudyTopic>) => void;
   externalCalendars: ExternalCalendar[];
   onAddExternalCalendar: (input: { name: string; icsUrl: string; color: string }) => void;
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
@@ -95,9 +93,7 @@ export function SettingsPage({
   tasks,
   onUpdateTask,
   projects,
-  studyTopics,
   onUpdateProject,
-  onUpdateTopic,
   externalCalendars,
   onAddExternalCalendar,
   onUpdateExternalCalendar,
@@ -258,10 +254,8 @@ export function SettingsPage({
               tasks={tasks}
               onUpdateTask={onUpdateTask}
               projects={projects}
-              studyTopics={studyTopics}
               externalCalendars={externalCalendars}
               onUpdateProject={onUpdateProject}
-              onUpdateTopic={onUpdateTopic}
               onUpdateExternalCalendar={onUpdateExternalCalendar}
             />
           </section>

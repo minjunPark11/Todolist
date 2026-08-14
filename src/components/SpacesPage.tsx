@@ -1,10 +1,9 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import type { ConceptNote, FocusSession, PageId, Project, ProjectType, StudyTopic, Subtask, Task, TaskDraft } from "../types";
+import type { FocusSession, LearningPath, Milestone, PageId, Project, ProjectType, Subtask, Task, TaskDraft } from "../types";
 import type { ToastState } from "./kit";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
 import { DeleteSpaceConfirmModal } from "./spaces/SpaceModals";
 import { useT } from "../i18n";
-import { platform } from "../platform";
 import { sendAiChat } from "../lib/ai/gateway";
 import { SPACES_BRIEFING_PROMPT } from "../lib/ai/agent/prompts";
 import { llamaServerProvider } from "../lib/ai/providers/llamaServerProvider";
@@ -12,7 +11,7 @@ import { buildSpaceBriefing, buildSpaceBriefingContext, type SpaceBriefing } fro
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
-type SpaceType = "project" | "study" | "custom";
+type SpaceType = "project" | "custom";
 type SpaceStatus = "Blocked" | "Needs Focus" | "Review Needed" | "In Progress" | "On Track" | "New";
 type AiPriority = "High" | "Medium" | "Low";
 type FilterType = "all" | SpaceType;
@@ -32,7 +31,8 @@ type Space = {
   updatedLabel: string;
   topics: string[];
   sourceId?: string;
-  sourceRef?: "project" | "study" | "local";
+  // No "local": every space is backed by a planner record now (Phase S4).
+  sourceRef?: "project";
   pinned?: boolean;
   objective?: string;
   learningGoal?: string;
@@ -66,9 +66,13 @@ type AddSpaceDraft = {
 type SpacesPageProps = {
   projects: Project[];
   tasks: Task[];
+  // The board's time axis (SPACES_BOARD_DESIGN.md D2). Passed straight
+  // through to the detail hub; the card list itself has no horizon axis.
+  paths: LearningPath[];
+  onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
+  onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
+  onCreateGoal: (input: { goal: string; projectId: string }) => void;
   subtasks: Subtask[];
-  studyTopics: StudyTopic[];
-  conceptNotes: ConceptNote[];
   focusSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
   selectedTaskId: string;
@@ -88,20 +92,16 @@ type SpacesPageProps = {
   // Opens the main Calendar, optionally pre-filtered to one project.
   onOpenCalendar: (projectId?: string) => void;
   onCreateProject: (input: { name: string; color?: string; type?: ProjectType; description?: string; dueDate?: string }) => string;
-  onCreateTopic: (input: { name: string; description?: string; color?: string }) => string;
   onUpdateProject: (id: string, patch: Partial<Project>) => void;
-  onUpdateTopic: (id: string, patch: Partial<StudyTopic>) => void;
   onToggleStar: (id: string) => void;
   onArchiveProject: (id: string) => void;
   onRequestDeleteProject: (id: string) => void;
-  onDeleteTopic: (id: string) => void;
   onSaveNotes: (id: string, value: string) => void;
   showToast: (toast: ToastState) => void;
 };
 
 const typeColor: Record<SpaceType, string> = {
   project: "#7c3aed",
-  study: "#2563eb",
   custom: "#f97316",
 };
 
@@ -127,29 +127,6 @@ function priorityLabel(t: TFn, priority: AiPriority) {
   return t(`spaces.priority.${priority.toLowerCase()}`);
 }
 
-// Locally created spaces (study/custom) have no planner-side record, so they
-// persist in their own platform storage bucket alongside local pin state.
-const LOCAL_SPACES_KEY = "todo-planner-local-spaces-v1";
-
-interface LocalSpacesStore {
-  spaces: Space[];
-  pinnedIds: string[];
-}
-
-function loadLocalSpacesStore(): LocalSpacesStore {
-  try {
-    const raw = platform.storage.getSync(LOCAL_SPACES_KEY);
-    if (!raw) return { spaces: [], pinnedIds: [] };
-    const parsed = JSON.parse(raw) as Partial<LocalSpacesStore>;
-    return {
-      spaces: Array.isArray(parsed.spaces) ? parsed.spaces : [],
-      pinnedIds: Array.isArray(parsed.pinnedIds) ? parsed.pinnedIds : [],
-    };
-  } catch {
-    return { spaces: [], pinnedIds: [] };
-  }
-}
-
 const emptyDraft: AddSpaceDraft = {
   type: null,
   name: "",
@@ -166,9 +143,11 @@ const emptyDraft: AddSpaceDraft = {
 
 export function SpacesPage({
   projects,
+  paths,
+  onUpdatePath,
+  onUpdateMilestone,
+  onCreateGoal,
   tasks,
-  studyTopics,
-  conceptNotes,
   focusSessions,
   activeFocusSession,
   selectedProjectId,
@@ -176,7 +155,6 @@ export function SpacesPage({
   onOpenProject,
   onCloseProject,
   onCreateProject,
-  onCreateTopic,
   onCreateTask,
   onUpdateTask,
   onCompleteTask,
@@ -185,16 +163,13 @@ export function SpacesPage({
   onNavigate,
   onOpenCalendar,
   onUpdateProject,
-  onUpdateTopic,
   onToggleStar,
   onRequestDeleteProject,
-  onDeleteTopic,
   showToast,
 }: SpacesPageProps) {
   const { t } = useT();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
-  const [localSpaces, setLocalSpaces] = useState<Space[]>(() => loadLocalSpacesStore().spaces);
   const [selectedSpaceId, setSelectedSpaceId] = useState("");
   const [highlightSignalId, setHighlightSignalId] = useState("");
   const [analysisState, setAnalysisState] = useState<AnalysisState>("baseline");
@@ -210,18 +185,18 @@ export function SpacesPage({
   const [formError, setFormError] = useState("");
   const [openMenuSpaceId, setOpenMenuSpaceId] = useState("");
   const [pendingDeleteSpaceId, setPendingDeleteSpaceId] = useState("");
-  const [localPinnedSpaceIds, setLocalPinnedSpaceIds] = useState<string[]>(() => loadLocalSpacesStore().pinnedIds);
   const [pendingRenameSpaceId, setPendingRenameSpaceId] = useState("");
   const [renameDraft, setRenameDraft] = useState("");
   const [renameError, setRenameError] = useState("");
 
+  // Two sources, both planner records (SPACES_BOARD_DESIGN.md Phase S4). The
+  // third — a device-local blob of custom spaces — was drained into Projects
+  // on load; see lib/spaces/legacyLocalSpaces.ts.
   const spaces = useMemo(
-    () =>
-      [...deriveProjectSpaces(projects, tasks, t), ...deriveStudySpaces(studyTopics, conceptNotes, t), ...localSpaces]
-        .map((space) => ({ ...space, pinned: Boolean(space.pinned || localPinnedSpaceIds.includes(space.id)) })),
-    [conceptNotes, localPinnedSpaceIds, localSpaces, projects, studyTopics, tasks, t],
+    () => deriveProjectSpaces(projects, tasks, t),
+    [projects, tasks, t],
   );
-  const signals = useMemo(() => deriveSignals(spaces, tasks, conceptNotes, t), [conceptNotes, spaces, tasks, t]);
+  const signals = useMemo(() => deriveSignals(spaces, tasks, t), [spaces, tasks, t]);
   const baselineBriefing = useMemo(() => buildSpaceBriefing(spaces, signals, t), [signals, spaces, t]);
   const activeBriefing = analysisState === "success" && aiBriefing ? aiBriefing : baselineBriefing;
   const effectiveAnalysisState = spaces.length === 0 ? "empty" : analysisState;
@@ -243,23 +218,6 @@ export function SpacesPage({
         .includes(normalizedQuery);
     })
     .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
-
-  useEffect(() => {
-    try {
-      platform.storage.setSync(LOCAL_SPACES_KEY, JSON.stringify({ spaces: localSpaces, pinnedIds: localPinnedSpaceIds }));
-    } catch {
-      // Storage full/unavailable: keep in-memory state working.
-    }
-  }, [localSpaces, localPinnedSpaceIds]);
-
-  useEffect(() => {
-    function resetLocalSpaces() {
-      setLocalSpaces([]);
-      setLocalPinnedSpaceIds([]);
-    }
-    window.addEventListener("focusflow:space-hub-reset", resetLocalSpaces);
-    return () => window.removeEventListener("focusflow:space-hub-reset", resetLocalSpaces);
-  }, []);
 
   useEffect(() => {
     function handleKeyDown(event: globalThis.KeyboardEvent) {
@@ -319,36 +277,18 @@ export function SpacesPage({
     onCloseProject();
   }
 
+  // One source now: every space is a Project (SPACES_BOARD_DESIGN.md Phase S4).
   function deleteSpace(space: Space) {
-    if (space.sourceRef === "project" && space.sourceId) {
-      onRequestDeleteProject(space.sourceId);
-      setPendingDeleteSpaceId("");
-      return;
-    }
-    if (space.sourceRef === "study" && space.sourceId) {
-      onDeleteTopic(space.sourceId);
-      setPendingDeleteSpaceId("");
-      setLocalPinnedSpaceIds((current) => current.filter((id) => id !== space.id));
-      closeSpace();
-      showToast({ message: t("spaces.delete.deleted", { name: space.name }) });
-      return;
-    }
-    setLocalSpaces((current) => current.filter((item) => item.id !== space.id));
-    setLocalPinnedSpaceIds((current) => current.filter((id) => id !== space.id));
+    if (space.sourceId) onRequestDeleteProject(space.sourceId);
     setPendingDeleteSpaceId("");
-    closeSpace();
-    showToast({ message: t("spaces.delete.deleted", { name: space.name }) });
   }
 
   function togglePinSpace(space: Space) {
     setOpenMenuSpaceId("");
-    if (space.sourceRef === "project" && space.sourceId) {
-      onToggleStar(space.sourceId);
-    } else {
-      setLocalPinnedSpaceIds((current) =>
-        current.includes(space.id) ? current.filter((id) => id !== space.id) : [space.id, ...current],
-      );
-    }
+    // Pins used to live in a device-local blob for anything that was not a
+    // project, so a pin did not survive to another device. Project.pinned is
+    // synced, and every space has a Project behind it now.
+    if (space.sourceId) onToggleStar(space.sourceId);
     showToast({ message: t(space.pinned ? "spaces.pin.unpinned" : "spaces.pin.pinned", { name: space.name }) });
   }
 
@@ -369,13 +309,7 @@ export function SpacesPage({
       setRenameError(t("spaces.rename.duplicate"));
       return;
     }
-    if (space.sourceRef === "project" && space.sourceId) {
-      onUpdateProject(space.sourceId, { name: trimmed });
-    } else if (space.sourceRef === "study" && space.sourceId) {
-      onUpdateTopic(space.sourceId, { name: trimmed });
-    } else {
-      setLocalSpaces((current) => current.map((item) => (item.id === space.id ? { ...item, name: trimmed } : item)));
-    }
+    if (space.sourceId) onUpdateProject(space.sourceId, { name: trimmed });
     setPendingRenameSpaceId("");
     setRenameDraft("");
     setRenameError("");
@@ -478,23 +412,15 @@ export function SpacesPage({
             return;
           }
         }
-        if (space.type === "study") {
-          // Study spaces are backed by a planner study topic so the calendar's
-          // 학습 category list and the Study page stay in sync.
-          const topicId = onCreateTopic({
-            name: space.name,
-            description: draft.learningGoal.trim() || space.description,
-            color: space.color,
-          });
-          if (topicId) {
-            setSelectedSpaceId(`study-space-${topicId}`);
-            showToast({ message: t("spaces.add.created", { name: space.name }) });
-            resetAdd();
-            return;
-          }
-        }
-        setLocalSpaces((current) => [space, ...current]);
-        setSelectedSpaceId(space.id);
+        // Custom spaces used to stop here, in a device-local blob. They are
+        // "area" Projects now — synced, and able to be a Board (Phase S4).
+        const areaId = onCreateProject({
+          name: space.name,
+          color: space.color,
+          type: "area",
+          description: space.description,
+        });
+        setSelectedSpaceId(areaId ? `project-space-${areaId}` : "");
         showToast({ message: t("spaces.add.created", { name: space.name }) });
         resetAdd();
       } catch {
@@ -510,7 +436,10 @@ export function SpacesPage({
         space={selectedSpace}
         tasks={tasks}
         projects={projects}
-        conceptNotes={conceptNotes}
+        paths={paths}
+        onUpdatePath={onUpdatePath}
+        onUpdateMilestone={onUpdateMilestone}
+        onCreateGoal={onCreateGoal}
         focusSessions={focusSessions}
         activeFocusSession={activeFocusSession}
         onBack={closeSpace}
@@ -584,7 +513,7 @@ export function SpacesPage({
       </section>
 
       <section className="spc-filter-bar" aria-label={t("spaces.filterLabel")}>
-        {(["all", "project", "study", "custom"] as FilterType[]).map((item) => (
+        {(["all", "project", "custom"] as FilterType[]).map((item) => (
           <button key={item} type="button" className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>
             {item === "all" ? t("spaces.filter.all") : typeLabel(t, item)}
           </button>
@@ -695,7 +624,6 @@ export function SpacesPage({
         <DeleteSpaceConfirmModal
           spaceName={pendingDeleteSpace.name}
           isProject={pendingDeleteSpace.sourceRef === "project"}
-          isStudy={pendingDeleteSpace.sourceRef === "study"}
           onConfirm={() => deleteSpace(pendingDeleteSpace)}
           onClose={() => setPendingDeleteSpaceId("")}
         />
@@ -849,7 +777,7 @@ function AddSpaceModal({
           <>
             <p className="spc-field-title">{t("spaces.add.selectType")}</p>
             <div className="spc-type-grid">
-              {(["project", "study", "custom"] as SpaceType[]).map((type) => (
+              {(["project", "custom"] as SpaceType[]).map((type) => (
                 <button key={type} type="button" className={draft.type === type ? "selected" : ""} aria-pressed={draft.type === type} onClick={() => onChooseType(type)}>
                   <span style={{ color: typeColor[type] }}><SpaceIcon type={type} /></span>
                   <strong>{typeLabel(t, type)}</strong>
@@ -891,11 +819,6 @@ function SpaceFormFields({ draft, error, onUpdate }: { draft: AddSpaceDraft; err
           <label>{t("spaces.form.objective")}<input value={draft.objective} onChange={(event) => onUpdate({ objective: event.target.value })} /></label>
           <label>{t("spaces.form.deadline")}<input type="date" value={draft.deadline} onChange={(event) => onUpdate({ deadline: event.target.value })} /></label>
           <label>{t("spaces.form.tasks")}<textarea value={draft.initialTasksText} onChange={(event) => onUpdate({ initialTasksText: event.target.value })} /></label>
-        </>
-      ) : null}
-      {type === "study" ? (
-        <>
-          <label>{t("spaces.form.learningGoal")}<input value={draft.learningGoal} onChange={(event) => onUpdate({ learningGoal: event.target.value })} /></label>
         </>
       ) : null}
       <label>{t("spaces.form.description")}<textarea value={draft.description} onChange={(event) => onUpdate({ description: event.target.value })} /></label>
@@ -990,33 +913,7 @@ function deriveProjectSpaces(projects: Project[], tasks: Task[], t: TFn): Space[
     });
 }
 
-function deriveStudySpaces(studyTopics: StudyTopic[], notes: ConceptNote[], t: TFn): Space[] {
-  return studyTopics
-    .filter((topic) => topic.status !== "archived")
-    .map((topic) => {
-      const topicNotes = notes.filter((note) => note.topicId === topic.id);
-      const due = topicNotes.filter((note) => note.nextReviewDate).length;
-      const type: SpaceType = "study";
-      return {
-        id: `study-space-${topic.id}`,
-        name: topic.name,
-        type,
-        status: due ? "Review Needed" : "On Track",
-        mainSignal: due ? t("spaces.mainSignal.reviewQueue") : t("spaces.mainSignal.organized"),
-        aiPriority: due > 3 ? "High" : due ? "Medium" : "Low",
-        recentActivityCount: Math.max(1, topicNotes.length),
-        description: topic.description || t("spaces.desc.learningSpace", { category: topic.category }),
-        color: topic.color || typeColor[type],
-        updatedLabel: relativeUpdated(t, topic.updatedAt),
-        topics: topicNotes.flatMap((note) => note.tags).filter(Boolean).slice(0, 6),
-        learningGoal: topic.description,
-        sourceRef: "study",
-        sourceId: topic.id,
-      };
-    });
-}
-
-function deriveSignals(spaces: Space[], tasks: Task[], notes: ConceptNote[], t: TFn): ActivitySignal[] {
+function deriveSignals(spaces: Space[], tasks: Task[], t: TFn): ActivitySignal[] {
   const taskSignals = tasks
     .filter((task) => task.status !== "archived" && task.projectId)
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -1033,23 +930,7 @@ function deriveSignals(spaces: Space[], tasks: Task[], notes: ConceptNote[], t: 
         spaceId: space.id,
       }];
     });
-  const noteSignals = notes
-    .filter((note) => !note.deletedAt && note.topicId)
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .slice(0, 3)
-    .flatMap((note): ActivitySignal[] => {
-      const space = spaces.find((item) => item.sourceRef === "study" && item.sourceId === note.topicId);
-      if (!space) return [];
-      return [{
-        id: `note-signal-${note.id}`,
-        title: note.title,
-        detail: note.nextReviewDate ? t("spaces.signalDetail.review") : t("spaces.signalDetail.studyNote"),
-        age: relativeUpdated(t, note.updatedAt),
-        severity: note.difficulty === "hard" ? "High" : note.difficulty === "medium" ? "Medium" : "Low",
-        spaceId: space.id,
-      }];
-    });
-  return [...taskSignals, ...noteSignals];
+  return taskSignals;
 }
 
 function parseAiBriefing(content: string, fallback: SpaceBriefing): SpaceBriefing {
@@ -1096,15 +977,13 @@ function validateDraft(draft: AddSpaceDraft, spaces: Space[], t: TFn) {
   if (draft.name.trim().length < 2) return t("spaces.validate.nameShort");
   if (spaces.some((space) => space.name.trim().toLowerCase() === draft.name.trim().toLowerCase())) return t("spaces.validate.nameDup");
   if (draft.type === "project" && !draft.objective.trim()) return t("spaces.validate.objectiveRequired");
-  if (draft.type === "study" && !draft.learningGoal.trim()) return t("spaces.validate.learningRequired");
   return "";
 }
 
 function createSpaceFromDraft(draft: AddSpaceDraft, t: TFn): Space {
   const type = draft.type ?? "custom";
   const topics =
-    type === "study" ? parseTags(draft.initialTopicsText)
-    : type === "project" ? parseLines(draft.initialMilestonesText)
+    type === "project" ? parseLines(draft.initialMilestonesText)
     : parseLines(draft.customSectionsText || "Notes\nTasks\nActivity");
   return {
     id: `space-${Date.now()}`,
@@ -1120,7 +999,6 @@ function createSpaceFromDraft(draft: AddSpaceDraft, t: TFn): Space {
     topics,
     objective: draft.objective,
     learningGoal: draft.learningGoal,
-    sourceRef: "local",
   };
 }
 
@@ -1137,8 +1015,10 @@ function parseTags(value: string) {
 }
 
 function inferProjectType(project: Project): SpaceType {
+  // An explicit type is an answer, not a hint: "area" is what a custom space
+  // becomes, and guessing from its name would relabel it (Phase S4).
+  if (project.type === "area") return "custom";
   const text = `${project.name} ${project.description}`.toLowerCase();
-  if (text.includes("study") || text.includes("leetcode") || text.includes("python")) return "study";
   return "project";
 }
 
@@ -1167,7 +1047,6 @@ function statusClass(status: SpaceStatus) {
 }
 
 function SpaceIcon({ type }: { type: SpaceType }) {
-  if (type === "study") return <CodeIcon />;
   if (type === "custom") return <SlidersIcon />;
   return <ScreenIcon />;
 }

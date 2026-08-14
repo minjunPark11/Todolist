@@ -1,16 +1,25 @@
-// Learning Path persistence. Same deliberate choice as contextCards/store.ts:
-// a plain local key-value blob (platform.storage), device-local, outside the
-// Supabase-synced dataset — no schema change, no migration, swappable for a
-// DB-backed store later without touching callers.
+// Learning Path validation + the legacy local blob.
+//
+// Paths used to live here entirely: a device-local key-value blob, outside the
+// synced dataset. That was right while they were a by-product of the chat, and
+// the original comment said so — "swappable for a DB-backed store later
+// without touching callers". The Horizons page made them ordinary user data,
+// and a goal you cannot see on your other device is not a goal, so ownership
+// moved to PlannerData (HORIZONS_DESIGN.md D3).
+//
+// What is left here: the sanitizer (one validator for both the blob and the
+// synced rows) and a one-way drain of the old blob. Array operations live in
+// domain/horizons/pathMutations.ts; writes go through usePlannerData.
 import { platform } from "../../../platform";
 import type { InfoSlot } from "../contextCards/types";
-import type { LearningPath, LearningPathDraft, Milestone } from "./types";
+import type { LearningPath, Milestone } from "./types";
+import { MAX_MILESTONES } from "../../../domain/horizons/pathMutations";
 
 const STORAGE_KEY = "focusflow.learningPaths.v1";
-// Paths are few by nature (one per long-running goal); oldest-updated are
-// pruned past this cap so the blob stays small.
-const MAX_PATHS = 50;
-const MAX_MILESTONES = 8;
+// Set once the blob has been folded into planner data. Kept as a separate
+// marker rather than relying on an emptied blob so that deleting every goal
+// afterwards cannot resurrect the old copy.
+const MIGRATED_KEY = "focusflow.learningPaths.migrated.v1";
 
 const INFO_SLOT_KINDS = new Set(["done_criteria", "deadline", "blocked_point", "prerequisite", "time_budget", "scope_boundary"]);
 
@@ -40,6 +49,12 @@ function asOptionalInfoSlots(value: unknown): InfoSlot[] | undefined {
   return slots.length > 0 ? slots : undefined;
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function asOptionalDate(value: unknown): string | undefined {
+  return typeof value === "string" && ISO_DATE.test(value) ? value : undefined;
+}
+
 function sanitizeMilestone(value: unknown): Milestone | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
@@ -50,11 +65,14 @@ function sanitizeMilestone(value: unknown): Milestone | null {
     title: record.title.trim(),
     doneCriteria: typeof record.doneCriteria === "string" ? record.doneCriteria : "",
     cardIds: asStringArray(record.cardIds),
+    targetDate: asOptionalDate(record.targetDate),
+    taskIds: asStringArray(record.taskIds).length > 0 ? asStringArray(record.taskIds) : undefined,
+    completedAt: typeof record.completedAt === "string" && record.completedAt ? record.completedAt : undefined,
     // status is derived at read time (progress.ts), never restored from disk.
   };
 }
 
-function sanitizePath(value: unknown): LearningPath | null {
+export function sanitizeLearningPath(value: unknown): LearningPath | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   if (typeof record.id !== "string" || !record.id) return null;
@@ -65,11 +83,17 @@ function sanitizePath(value: unknown): LearningPath | null {
         .filter((milestone): milestone is Milestone => milestone !== null)
         .slice(0, MAX_MILESTONES)
     : [];
-  if (milestones.length === 0) return null;
+  // A path with no milestones used to be dropped, because the only author was
+  // the assistant and an empty proposal meant a malformed one. The Horizons
+  // page lets a person write the goal down first and break it up later, so an
+  // empty milestone list is now a legitimate state rather than corruption.
   return {
     id: record.id,
     goal: record.goal.trim(),
     milestones,
+    targetDate: asOptionalDate(record.targetDate),
+    projectId: typeof record.projectId === "string" && record.projectId ? record.projectId : undefined,
+    completedAt: typeof record.completedAt === "string" && record.completedAt ? record.completedAt : undefined,
     infoSlots: asOptionalInfoSlots(record.infoSlots),
     source: record.source === "user" ? "user" : "assistant",
     createdAt: typeof record.createdAt === "string" ? record.createdAt : new Date().toISOString(),
@@ -77,73 +101,53 @@ function sanitizePath(value: unknown): LearningPath | null {
   };
 }
 
-// Newest-updated first, so [0] is the path the breadcrumb shows.
-export function loadLearningPaths(): LearningPath[] {
+
+// --- Legacy blob migration --------------------------------------------------
+// Reading and marking are deliberately separate calls.
+//
+// They were one function at first, and it lost data: React StrictMode invokes
+// a useState initialiser twice, so the first call drained the blob and set the
+// marker while the *second* — whose result React actually keeps — saw the
+// marker and returned nothing. The same hole opens without StrictMode whenever
+// a remote load lands before the local read has been persisted.
+//
+// So the read below is pure and repeatable, and the marker is only set once
+// the adopted data is committed (usePlannerData does it in a mount effect).
+// The blob itself is left in place for one release as a safety net — a few
+// kilobytes against the chance that a migration went wrong somewhere.
+
+export function hasMigratedLegacyLearningPaths(): boolean {
+  try {
+    return platform.storage.getSync(MIGRATED_KEY) === "1";
+  } catch {
+    // No storage means no blob to migrate either; treat it as already done so
+    // the caller never blocks on it.
+    return true;
+  }
+}
+
+/** Pure read — safe to call any number of times, no side effects. */
+export function readLegacyLearningPaths(): LearningPath[] {
+  if (hasMigratedLegacyLearningPaths()) return [];
   try {
     const raw = platform.storage.getSync(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .map(sanitizePath)
+      .map(sanitizeLearningPath)
       .filter((path): path is LearningPath => path !== null)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   } catch {
+    // A corrupt blob is not worth failing a load over.
     return [];
   }
 }
 
-function persist(paths: LearningPath[]) {
-  const bounded = [...paths]
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, MAX_PATHS);
+export function markLegacyLearningPathsMigrated() {
   try {
-    platform.storage.setSync(STORAGE_KEY, JSON.stringify(bounded));
+    platform.storage.setSync(MIGRATED_KEY, "1");
   } catch {
-    // Storage may be unavailable (private mode / quota); the path stays
-    // usable in memory for this session and the app keeps working.
+    // Marker unavailable: the read repeats next start. Adoption merges by id,
+    // so a repeat is a no-op rather than a duplicate.
   }
-}
-
-export function saveLearningPath(draft: LearningPathDraft, source: LearningPath["source"] = "assistant"): LearningPath {
-  const now = new Date().toISOString();
-  const path: LearningPath = {
-    ...draft,
-    id: `lpath-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-    source,
-    createdAt: now,
-    updatedAt: now,
-  };
-  persist([path, ...loadLearningPaths()]);
-  return path;
-}
-
-export function updateLearningPath(id: string, patch: Partial<LearningPathDraft>): LearningPath | null {
-  const paths = loadLearningPaths();
-  const existing = paths.find((path) => path.id === id);
-  if (!existing) return null;
-  const updated: LearningPath = { ...existing, ...patch, id, updatedAt: new Date().toISOString() };
-  persist(paths.map((path) => (path.id === id ? updated : path)));
-  return updated;
-}
-
-// Slice B: attach a saved Context Card to one milestone. Idempotent — the
-// card id is added at most once; updatedAt bumps so the linked path sorts
-// first and becomes the one the breadcrumb shows.
-export function linkCardToMilestone(pathId: string, milestoneId: string, cardId: string): LearningPath | null {
-  const paths = loadLearningPaths();
-  const existing = paths.find((path) => path.id === pathId);
-  if (!existing) return null;
-  const milestones = existing.milestones.map((milestone) =>
-    milestone.id === milestoneId && !milestone.cardIds.includes(cardId)
-      ? { ...milestone, cardIds: [...milestone.cardIds, cardId] }
-      : milestone,
-  );
-  const updated: LearningPath = { ...existing, milestones, updatedAt: new Date().toISOString() };
-  persist(paths.map((path) => (path.id === pathId ? updated : path)));
-  return updated;
-}
-
-export function removeLearningPath(id: string) {
-  persist(loadLearningPaths().filter((path) => path.id !== id));
 }

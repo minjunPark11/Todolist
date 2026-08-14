@@ -2,7 +2,7 @@
 // Spaces themselves are derived from projects/study topics on SpacesPage; the
 // hub adds notes, activity records, and per-space customization on top.
 
-export type SpaceHubType = "project" | "study" | "personal" | "custom";
+export type SpaceHubType = "project" | "personal" | "custom";
 
 // The per-space "calendar" tab was removed (PROJECT_DETAIL_REMOVE_CALENDAR_TAB
 // spec) — scheduling lives in the main Calendar page. Legacy ?tab=calendar
@@ -114,7 +114,7 @@ export interface SpaceLike {
   description: string;
   color: string;
   sourceId?: string;
-  sourceRef?: "project" | "study" | "local";
+  sourceRef?: "project" | "study";
 }
 
 // Preset per space type (§27): same layout, different labels/groups/rules.
