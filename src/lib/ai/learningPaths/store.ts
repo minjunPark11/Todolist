@@ -15,11 +15,11 @@ import type { InfoSlot } from "../contextCards/types";
 import type { LearningPath, Milestone } from "./types";
 import { MAX_MILESTONES } from "../../../domain/horizons/pathMutations";
 
-const STORAGE_KEY = "focusflow.learningPaths.v1";
+export const LEGACY_LEARNING_PATHS_KEY = "focusflow.learningPaths.v1";
 // Set once the blob has been folded into planner data. Kept as a separate
 // marker rather than relying on an emptied blob so that deleting every goal
 // afterwards cannot resurrect the old copy.
-const MIGRATED_KEY = "focusflow.learningPaths.migrated.v1";
+export const LEGACY_LEARNING_PATHS_MIGRATED_KEY = "focusflow.learningPaths.migrated.v1";
 
 const INFO_SLOT_KINDS = new Set(["done_criteria", "deadline", "blocked_point", "prerequisite", "time_budget", "scope_boundary"]);
 
@@ -112,13 +112,13 @@ export function sanitizeLearningPath(value: unknown): LearningPath | null {
 // a remote load lands before the local read has been persisted.
 //
 // So the read below is pure and repeatable, and the marker is only set once
-// the adopted data is committed (usePlannerData does it in a mount effect).
+// the adopted data is committed to the PlannerData storage key.
 // The blob itself is left in place for one release as a safety net — a few
 // kilobytes against the chance that a migration went wrong somewhere.
 
 export function hasMigratedLegacyLearningPaths(): boolean {
   try {
-    return platform.storage.getSync(MIGRATED_KEY) === "1";
+    return platform.storage.getSync(LEGACY_LEARNING_PATHS_MIGRATED_KEY) === "1";
   } catch {
     // No storage means no blob to migrate either; treat it as already done so
     // the caller never blocks on it.
@@ -126,26 +126,49 @@ export function hasMigratedLegacyLearningPaths(): boolean {
   }
 }
 
-/** Pure read — safe to call any number of times, no side effects. */
-export function readLegacyLearningPaths(): LearningPath[] {
-  if (hasMigratedLegacyLearningPaths()) return [];
+export type LegacyLearningPathsSnapshot =
+  | { status: "migrated" | "absent" | "invalid"; paths: [] }
+  | { status: "valid"; paths: LearningPath[] };
+
+/** Pure inspection — safe to call any number of times, with no side effects. */
+export function inspectLegacyLearningPaths(): LegacyLearningPathsSnapshot {
+  if (hasMigratedLegacyLearningPaths()) return { status: "migrated", paths: [] };
   try {
-    const raw = platform.storage.getSync(STORAGE_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(sanitizeLearningPath)
-      .filter((path): path is LearningPath => path !== null)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    const raw = platform.storage.getSync(LEGACY_LEARNING_PATHS_KEY);
+    if (!raw) return { status: "absent", paths: [] };
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return { status: "invalid", paths: [] };
+    const sanitized = parsed.map(sanitizeLearningPath);
+    if (sanitized.some((path) => path === null)) return { status: "invalid", paths: [] };
+    const paths = (sanitized as LearningPath[]).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return { status: "valid", paths };
   } catch {
-    // A corrupt blob is not worth failing a load over.
-    return [];
+    return { status: "invalid", paths: [] };
   }
+}
+
+/** Compatibility helper used by the adoption path. */
+export function readLegacyLearningPaths(): LearningPath[] {
+  return inspectLegacyLearningPaths().paths;
+}
+
+// Called only after the new planner snapshot has been persisted. A corrupt
+// source or a partial adoption stays retryable and never consumes the marker.
+export function markLegacyLearningPathsMigratedIfAdopted(current: LearningPath[]): boolean {
+  const snapshot = inspectLegacyLearningPaths();
+  if (snapshot.status === "migrated") return true;
+  if (snapshot.status === "invalid") return false;
+  if (snapshot.status === "valid") {
+    const adoptedIds = new Set(current.map((path) => path.id));
+    if (!snapshot.paths.every((path) => adoptedIds.has(path.id))) return false;
+  }
+  markLegacyLearningPathsMigrated();
+  return hasMigratedLegacyLearningPaths();
 }
 
 export function markLegacyLearningPathsMigrated() {
   try {
-    platform.storage.setSync(MIGRATED_KEY, "1");
+    platform.storage.setSync(LEGACY_LEARNING_PATHS_MIGRATED_KEY, "1");
   } catch {
     // Marker unavailable: the read repeats next start. Adoption merges by id,
     // so a repeat is a no-op rather than a duplicate.

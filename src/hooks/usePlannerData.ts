@@ -21,15 +21,15 @@ import type {
 } from "../types";
 import type { LearningPath, Milestone } from "../lib/ai/learningPaths/types";
 import {
-  markLegacyLearningPathsMigrated,
   readLegacyLearningPaths,
   sanitizeLearningPath,
 } from "../lib/ai/learningPaths/store";
 import {
-  markLegacyLocalSpacesMigrated,
   readLegacyLocalSpaces,
 } from "../lib/spaces/legacyLocalSpaces";
 import * as pathOps from "../domain/horizons/pathMutations";
+import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
+import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
 import {
   buildSyncPlan,
@@ -40,7 +40,7 @@ import {
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
 
-const STORAGE_KEY = "focusflow.appData.v1";
+const STORAGE_KEY = PLANNER_STORAGE_KEY;
 const LEGACY_STORAGE_KEY = "todo-planner-data";
 const taskStatuses = ["inbox", "todo", "doing", "waiting", "done", "archived"] as const;
 const taskPriorities = ["none", "low", "medium", "high"] as const;
@@ -330,15 +330,6 @@ function emptyData(): PlannerData {
   return normalizeData({});
 }
 
-function countDataItems(data: PlannerData): number {
-  return (
-    data.tasks.length +
-    data.projects.length +
-    data.subtasks.length +
-    data.focusSessions.length
-  );
-}
-
 // Any data crossing into the app from outside this running instance goes
 // through here, so a timer left running when the app closed can't keep
 // accruing wall-clock time (see recoverStaleFocusSessions).
@@ -425,15 +416,6 @@ export function usePlannerData() {
       return next;
     });
   }
-  // The legacy path blob is only marked migrated once the adopted state is
-  // actually committed. Marking inside the read would lose the data on any
-  // second invocation whose result is discarded — StrictMode's double-call
-  // being the one that caught it.
-  useEffect(() => {
-    markLegacyLearningPathsMigrated();
-    markLegacyLocalSpacesMigrated();
-  }, []);
-
   const [selectedTaskId, setSelectedTaskId] = useState<string>("");
   const [userEmail, setUserEmail] = useState("");
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
@@ -453,7 +435,7 @@ export function usePlannerData() {
   const syncedSnapshotRef = useRef<PlannerData | null>(null);
 
   useEffect(() => {
-    platform.storage.setSync(STORAGE_KEY, JSON.stringify(data));
+    persistPlannerData(data);
   }, [data]);
 
   useEffect(() => {
@@ -496,7 +478,7 @@ export function usePlannerData() {
     }
 
     const localSnapshot = readStorage();
-    if (countDataItems(localSnapshot) > 0) {
+    if (countPlannerDataItems(localSnapshot) > 0) {
       setLocalMigrationData(localSnapshot);
     }
 
@@ -1533,7 +1515,7 @@ export function usePlannerData() {
       syncStatus,
       syncError,
       recoveryMode,
-      migrationPreviewCount: localMigrationData ? countDataItems(localMigrationData) : 0,
+      migrationPreviewCount: localMigrationData ? countPlannerDataItems(localMigrationData) : 0,
     },
     addTask,
     createTask,
