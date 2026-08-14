@@ -285,6 +285,45 @@ Activity { id; spaceId; type; ...; createdAt }             // D9
 
 `plannerDataMigration.ts` · `legacyLocalSpaces.ts`에 선례가 있고 테스트도 있다. 같은 자리에 붙인다.
 
+### M0. 전방 호환 릴리스 — **M2보다 먼저 나가야 한다** (2026-08-15 추가)
+
+> M1을 끝내고 다음 순서를 짜다 발견했다. 초판에는 없던 항목이고, **없으면 M3가 조용히 데이터를 지운다.**
+
+정규화 함수가 전부 **화이트리스트**다. 아는 필드만 골라 새 객체를 만들고, 나머지는 버린다:
+
+```
+usePlannerData.ts  normalizeTask()        → return { id, title, …, projectId, … }
+learningPaths/store.ts  sanitizeLearningPath() → return { id, goal, …, projectId, … }
+```
+
+그리고 `normalizeData`는 **바깥에서 들어오는 모든 데이터**가 지나는 관문이다 — Supabase 로드, localStorage 읽기, 가져오기 전부.
+
+**따라서 새 필드는 구 버전 클라이언트를 만나면 사라진다:**
+
+```
+새 기기(신버전)   task.listId = "list-3"  저장
+구 기기(v0.5.3)   그 태스크를 읽음 → normalizeTask가 listId를 버림 → 저장
+계정              listId 소멸. 태스크가 어느 List에도 속하지 않게 된다
+```
+
+기기 두 대의 버전이 어긋난 동안 새 기기가 쓴 소속을 구 기기가 되돌린다. 자동 업데이터가 있어 창은 좁지만 **실패가 무음**이라 알아차릴 방법이 없다.
+
+> **M1이 안전했던 것은 우연이 아니다.** 새 *컬렉션*(`space_notes`)을 추가했기 때문이다 — 구 클라이언트는 모르는 테이블을 건드리지 않는다. M3은 `Task`에 *필드*를 더하므로 이 보호가 없다.
+
+**해야 할 것 — 두 가지를 함께**
+
+1. **정규화기를 통과형으로 바꾼다.** 원본을 먼저 펼치고 아는 필드로 덮어쓴다:
+   ```ts
+   return { ...task, id: …, status: oneOf(…), … };
+   ```
+   상태 마이그레이션 같은 기존 보정은 나중에 덮어쓰므로 그대로 살아 있고, 모르는 필드만 보존된다. `Task` · `Project` · `Subtask` · `FocusSession` · `LearningPath` 전부.
+
+2. **가능하면 필드가 아니라 컬렉션을 고른다.** M1이 안전했던 이유이고, 앞으로도 기본 선택지여야 한다.
+
+**그리고 이건 릴리스 하나를 혼자 나가야 한다.** 통과형 정규화기는 *그 코드를 가진 클라이언트*만 보호한다. 이미 나가 있는 v0.5.3은 계속 필드를 버리므로, **M0이 배포되고 사용 중인 기기에 퍼진 뒤에야** M2~M5를 시작할 수 있다.
+
+이 제약은 `CLICKUP_IMPORT_DESIGN.md`에도 그대로 적용된다 — W1.4 커스텀 필드(`Task.customFields`)와 §9-3의 `Task.todayBucket`이 같은 함정 위에 있다.
+
 ### M1. 노트 구조 — **먼저, 단독으로** — ✅ 완료 (2026-08-15)
 
 §1.3 때문에 다른 무엇보다 먼저 했다. 구현하며 계획에서 두 곳이 바뀌었다.
@@ -345,15 +384,27 @@ Space의 `statuses`에 boardList 이름을 `group: "active"`로 추가. 목표�
 
 ## 6. Phase
 
+세 문서(`CLICKUP_IMPORT_DESIGN` · 이 문서 · `SPACES_CLICKUP_UI_DESIGN`)가 각자 Phase를 갖고 있고 서로 얽힌다. 통합 순서는 아래가 정본이다.
+
 ```
 P0  선행       node 복구 ✅(20.20.2) · main 정리 · 전체 내보내기 안내
 P1  M1  ✅완료  노트 동기화 승격  ← 단독 릴리스. 재설계와 분리해도 가치가 있다
-P2  모델        Space/Folder/List 타입 + 005~008 마이그레이션 + collectionTables
-P3  M2~M5      데이터 이관 (테스트 우선)
-P4  UI          Spaces 페이지 재작성 — 진단 카드 버리고 계층 탐색으로
-P5  Status      D7 커스텀 상태 UI
-P6  통합        ViewSpec 연결 → SpaceHorizons.tsx 삭제
+P1.5 M0        전방 호환 릴리스 (§5 M0)  ← 신규. 단독으로 나가고 퍼져야 한다
+P2  독립 기능   의존성 + blocked 파생 강등 + 죽은 필드 정리
+                (CLICKUP_IMPORT W2.2·W2.3·W2.7 — 모델과 무관하고, 뷰 필터의 재료가 된다)
+P3  모델        Space/Folder/List 타입 + 006~008 + collectionTables
+P4  M2~M5      데이터 이관 (테스트 우선)
+P5  스파인      Item 투영 → ViewSpec (CLICKUP_IMPORT W1)
+P6  UI          U-1 라우팅 → U-2 트리 → U-3 뷰 셸 → U-4 탭 이관
+P7  Status      D7 + U-5
+P8  정리        SpaceHorizons.tsx 삭제 · 진단 카드 삭제 (U-7)
 ```
+
+**순서의 근거 세 가지**
+
+- **P1.5가 P4 앞에 있어야 하는 이유**는 §5 M0. 통과형 정규화기가 퍼지기 전에 `Task.listId`를 쓰면 구 클라이언트가 지운다
+- **P5(스파인)가 P4 뒤인 이유**: Item 투영은 지금 `task.projectId`를 읽는다. 모델 이관 전에 만들면 이관 때 다시 고쳐야 한다. **최종 모델 위에 한 번만 짓는다**
+- **태그 편집기(W2.1)는 P2에 넣지 않는다.** D6이 `space:`/`group:` 태그를 없애면 예약 접두사 보호 장치 자체가 불필요해진다 — 지금 만들면 버릴 코드를 만드는 것이다. **P4 이후로 미룬다**
 
 **P1은 나머지와 독립이다.** 재설계를 안 하기로 해도 §1.3은 고쳐야 한다.
 
