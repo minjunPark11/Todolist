@@ -60,6 +60,7 @@ function sanitizeMilestone(value: unknown, today: string): Milestone | null {
   const hasTiming = "schedule" in record || "targetDate" in record || "deadlineDate" in record;
   const timing = hasTiming ? normalizeGoalTiming(record, today) : undefined;
   return {
+    ...(record as Partial<Milestone>), // M0 — see sanitizeLearningPath
     id: record.id,
     title: record.title.trim(),
     doneCriteria: typeof record.doneCriteria === "string" ? record.doneCriteria : "",
@@ -68,6 +69,10 @@ function sanitizeMilestone(value: unknown, today: string): Milestone | null {
     taskIds: asStringArray(record.taskIds).length > 0 ? asStringArray(record.taskIds) : undefined,
     completedAt: typeof record.completedAt === "string" && record.completedAt ? record.completedAt : undefined,
     // status is derived at read time (progress.ts), never restored from disk.
+    // Explicit since M0: the passthrough spread above would otherwise hand back
+    // a stale status that a model once asserted, defeating the whole "never
+    // trust a persisted status" contract. Dropped again on serialize.
+    status: undefined,
   };
 }
 
@@ -88,6 +93,10 @@ export function sanitizeLearningPath(value: unknown, today = todayValue()): Lear
   // empty milestone list is now a legitimate state rather than corruption.
   const timing = normalizeGoalTiming(record, today);
   return {
+    // Forward compatibility (SPACES_CLICKUP_REDESIGN.md M0): carry fields this
+    // build does not know so a client one version behind cannot erase what a
+    // newer one wrote. Everything below overwrites, so validation still wins.
+    ...(record as Partial<LearningPath>),
     id: record.id,
     goal: record.goal.trim(),
     ...sanitizeGoalDetailFields(record),

@@ -125,6 +125,13 @@ function normalizeTask(task: Partial<Task>): Task {
   }
 
   return {
+    // Forward compatibility (SPACES_CLICKUP_REDESIGN.md M0). Everything below
+    // overwrites what it knows, so legacy repairs like the status migration
+    // above still win; the spread exists only to carry fields this build has
+    // never heard of. Without it a client one version behind silently erases
+    // any field a newer one wrote — it normalizes on load, drops what it does
+    // not recognise, and saves the result back over the account.
+    ...task,
     id: task.id ?? createId("task"),
     title: task.title ?? "Untitled task",
     description: task.description ?? "",
@@ -174,6 +181,7 @@ function normalizeProject(project: Partial<Project>): Project {
   const now = new Date().toISOString();
 
   return {
+    ...project, // M0 — see normalizeTask
     id: project.id ?? createId("project"),
     name: project.name ?? "Untitled project",
     description: project.description ?? "",
@@ -196,6 +204,7 @@ function normalizeSubtask(subtask: Partial<Subtask>): Subtask {
   const now = new Date().toISOString();
 
   return {
+    ...subtask, // M0 — see normalizeTask
     id: subtask.id ?? createId("subtask"),
     taskId: subtask.taskId ?? "",
     title: subtask.title ?? "Untitled subtask",
@@ -236,6 +245,7 @@ function normalizeFocusSession(session: Partial<FocusSession>): FocusSession {
   }
 
   return {
+    ...session, // M0 — see normalizeTask
     id: session.id ?? createId("focus"),
     taskId: session.taskId ?? "",
     title: session.title ?? "",
@@ -264,6 +274,7 @@ function normalizeSettings(settings?: Partial<PlannerSettings>): PlannerSettings
   const now = new Date().toISOString();
 
   return {
+    ...settings, // M0 — see normalizeTask
     id: "settings",
     theme: settings?.theme === "light" || settings?.theme === "dark" ? settings.theme : "system",
     externalCalendars: Array.isArray(settings?.externalCalendars)
@@ -278,6 +289,7 @@ function normalizeExternalCalendar(calendar: Partial<ExternalCalendar>): Externa
   if (!calendar.id || !calendar.name || !calendar.icsUrl) return null;
   const now = new Date().toISOString();
   return {
+    ...calendar, // M0 — see normalizeTask
     id: String(calendar.id),
     name: String(calendar.name),
     icsUrl: String(calendar.icsUrl),
@@ -296,6 +308,10 @@ function normalizeExternalCalendar(calendar: Partial<ExternalCalendar>): Externa
 
 function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
   return {
+    // M0 — see normalizeTask. Matters here as much as on the records: the
+    // ClickApps-style feature toggles (CLICKUP_IMPORT_DESIGN.md P2) land in
+    // this object, and an older client must not switch them all back off.
+    ...settings,
     theme: oneOf(settings?.theme, themeModes, DEFAULT_APP_SETTINGS.theme),
     accentColor: oneOf(settings?.accentColor, accentColors, DEFAULT_APP_SETTINGS.accentColor),
     fontSize: oneOf(settings?.fontSize, fontSizes, DEFAULT_APP_SETTINGS.fontSize),
@@ -314,7 +330,14 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
   };
 }
 
-function normalizeData(data: RawPlannerData): PlannerData {
+/**
+ * The gate every record from outside this running instance passes through —
+ * Supabase loads, localStorage reads, and imports alike.
+ *
+ * Exported for the forward-compatibility test only (M0). Nothing else should
+ * call it from outside this module.
+ */
+export function normalizeData(data: RawPlannerData): PlannerData {
   const normalized = {
     tasks: Array.isArray(data.tasks) ? data.tasks.map(normalizeTask) : [],
     projects: Array.isArray(data.projects) ? data.projects.map(normalizeProject) : [],

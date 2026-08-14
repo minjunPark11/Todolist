@@ -41,6 +41,10 @@ export function sanitizeSpaceNote(value: unknown): SpaceNote | null {
   const createdAt = asString(record.createdAt);
   const updatedAt = asString(record.updatedAt);
   return {
+    // Forward compatibility (SPACES_CLICKUP_REDESIGN.md M0): carry fields this
+    // build does not know — the redesign gives a note a `listId` — so a client
+    // one version behind cannot erase them. Validation below still wins.
+    ...(record as Partial<SpaceNote>),
     id,
     spaceId,
     title: asString(record.title),
