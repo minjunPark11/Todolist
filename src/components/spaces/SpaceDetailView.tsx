@@ -30,21 +30,18 @@ import { useSpaceHubData } from "../../hooks/useSpaceHubData";
 import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { SpaceOverviewTab } from "./SpaceOverviewTab";
 import { SpaceHorizons } from "./SpaceHorizons";
-import { SpaceFocusTab, SpaceTasksTab } from "./SpaceWorkTabs";
-import { SpaceRecordsTab } from "./SpaceNotesRecordsTabs";
+import { SpaceTasksTab } from "./SpaceWorkTabs";
 import { NoteQuickCreateModal, SpaceNotesView, type NotesPanelMode } from "./SpaceNotesPanel";
 import {
   AddSpaceTaskModal,
   DeleteSpaceConfirmModal,
   FocusConflictModal,
   FocusStartPickerModal,
-  ManualRecordModal,
   type SpaceTaskInput,
 } from "./SpaceModals";
 import {
   NoteDetailDrawer,
   SessionDetailDrawer,
-  SpaceAiDrawer,
   SpaceSettingsDrawer,
   TaskDetailDrawer,
 } from "./SpaceDrawers";
@@ -78,7 +75,6 @@ type ModalState =
   | { kind: "none" }
   | { kind: "add_task" }
   | { kind: "add_note" }
-  | { kind: "manual_record" }
   | { kind: "focus_picker" }
   | { kind: "focus_conflict" }
   | { kind: "delete_space" };
@@ -88,7 +84,6 @@ type DrawerState =
   | { kind: "task"; taskId: string }
   | { kind: "session"; sessionId: string }
   | { kind: "note"; noteId: string }
-  | { kind: "ai" }
   | { kind: "settings" };
 
 function readTabFromUrl(): SpaceTab {
@@ -128,23 +123,16 @@ export function SpaceDetailView({
   const [notesPanelMode, setNotesPanelMode] = useState<NotesPanelMode>("split");
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [isNotesSplitFullscreen, setIsNotesSplitFullscreen] = useState(false);
-  const [aiSummary, setAiSummary] = useState<{ state: "idle" | "loading" | "ready" | "error"; text: string; tips: string[] }>({
-    state: "idle",
-    text: "",
-    tips: [],
-  });
-
   const today = todayValue();
   const weekStart = getWeekStart(today);
   const config = hub.getConfig(space.id);
   const hubType = (["project", "personal", "custom"].includes(space.type) ? space.type : "custom") as SpaceHubType;
   const preset = getSpacePreset(hubType);
-  const groups = resolveTaskGroups(preset, config);
-  const visibleGroups = groups.filter((group) => !group.hidden);
+  const groups = resolveTaskGroups(preset);
 
-  const displayName = config.nameOverride || space.name;
-  const displayDescription = config.descriptionOverride || space.description || preset.headerSubtitle;
-  const displayColor = config.colorOverride || space.color;
+  const displayName = space.name;
+  const displayDescription = space.description || preset.headerSubtitle;
+  const displayColor = space.color;
 
   const sourceProjectId = space.sourceRef === "project" ? space.sourceId : undefined;
   const spaceTasks = useMemo(() => getSpaceTasks(tasks, space.id, sourceProjectId), [tasks, space.id, sourceProjectId]);
@@ -293,62 +281,27 @@ export function SpaceDetailView({
     showToast({ message: t("spaceHub.toast.pinned") });
   }
 
-  // AI summary is generated only on explicit user action (§2.3) and is
-  // computed locally from current space data.
-  function handleGenerateAiSummary() {
-    setAiSummary({ state: "loading", text: "", tips: [] });
-    window.setTimeout(() => {
-      const tips: string[] = [];
-      if (counts.overdue > 0) tips.push(t("spaceHub.tip.overdue", { n: counts.overdue }));
-      if (upcoming[0]) tips.push(t("spaceHub.tip.prepare", { title: upcoming[0].title, date: formatDate(upcoming[0].when) }));
-      if (tips.length === 0) tips.push(t("spaceHub.tip.onTrack"));
-      setAiSummary({
-        state: "ready",
-        text: t("spaceHub.aiSummary.text", {
-          label: signal.label,
-          detail: signal.detail,
-          focus: formatSeconds(weekFocusSeconds),
-          open: counts.open,
-          overdue: counts.overdue,
-        }),
-        tips,
-      });
-    }, 500);
-  }
-
-  function handleGenerateNextAction() {
-    const candidate = getNextActionTask(spaceTasks, { ...config, pinnedNextActionTaskId: undefined }, today);
-    if (!candidate) {
-      showToast({ message: t("spaceHub.toast.noRecommend") });
-      return;
-    }
-    handlePinNextAction(candidate.id);
-  }
-
-  function handleManualRecord(input: { title: string; description: string }) {
-    hub.addActivity(space.id, { type: "manual_record", title: input.title, description: input.description });
-    showToast({ message: t("spaceHub.toast.recordAdded") });
-    setModal({ kind: "none" });
+  function handleOpenGlobalAi() {
+    window.dispatchEvent(
+      new CustomEvent("focusflow:open-ai-chat", {
+        detail: { draft: t("spaceHub.ai.boardPrompt", { name: displayName }) },
+      }),
+    );
   }
 
   function handleSaveSettings(input: {
     name: string;
     description: string;
     color: string;
-    groups: typeof groups;
     overviewCards: typeof config.overviewCards;
     defaults: typeof config.defaults;
   }) {
     hub.updateConfig(space.id, {
-      nameOverride: input.name !== space.name ? input.name : undefined,
-      descriptionOverride: input.description !== space.description ? input.description : undefined,
-      colorOverride: input.color !== space.color ? input.color : undefined,
-      sectionGroups: input.groups,
       overviewCards: input.overviewCards,
       defaults: input.defaults,
     });
     if (sourceProjectId) {
-      onUpdateProject(sourceProjectId, { name: input.name, description: input.description });
+      onUpdateProject(sourceProjectId, { name: input.name, description: input.description, color: input.color });
     }
     showToast({ message: t("spaceHub.toast.settingsSaved") });
     setDrawer({ kind: "none" });
@@ -408,6 +361,9 @@ export function SpaceDetailView({
             {presetText(t, preset.startFocusLabel)}
           </button>
           <span className={`sdv-status-pill sdv-status-${signal.status}`}>{signal.label}</span>
+          <button type="button" className="sdv-btn" onClick={handleOpenGlobalAi}>
+            ✦ {t("spaceHub.action.askAi")}
+          </button>
           <button
             type="button"
             className="sdv-btn sdv-btn-icon"
@@ -444,11 +400,6 @@ export function SpaceDetailView({
             <h3>{presetText(t, preset.signalLabel)}</h3>
             <strong className={`sdv-metric-title sdv-signal-${signal.status}`}>{signal.label}</strong>
             <small>{signal.detail}</small>
-            <div className="sdv-metric-actions">
-              <button type="button" className="sdv-btn sdv-btn-sm" onClick={() => setTab("records")}>
-                {t("spaceHub.action.viewDetails")}
-              </button>
-            </div>
           </article>
         ) : null}
         {config.overviewCards.focusTime ? (
@@ -540,7 +491,6 @@ export function SpaceDetailView({
           activities={activities}
           recentSessions={recentSessions}
           spaceNotes={spaceNotes}
-          aiSummary={aiSummary}
           onOpenTask={openTaskDrawer}
           onToggleDone={handleCompleteTask}
           onStartFocus={handleStartFocus}
@@ -549,37 +499,24 @@ export function SpaceDetailView({
           onOpenNote={(noteId) => setDrawer({ kind: "note", noteId })}
           onOpenNoteInSplit={openNoteInSplit}
           onOpenSession={(sessionId) => setDrawer({ kind: "session", sessionId })}
+          onOpenFocusPage={() => onNavigate("focus")}
           onOpenTab={(next) => {
             // "View all" from the overview notes card lands on the notes Home list (§24.5).
             if (next === "notes") closeNotesSplit();
             setTab(next);
           }}
-          onGenerateAiSummary={handleGenerateAiSummary}
-          onGenerateNextAction={handleGenerateNextAction}
         />
         </>
       ) : null}
       {tab === "tasks" ? (
         <SpaceTasksTab
           preset={preset}
-          groups={visibleGroups}
+          groups={groups}
           spaceTasks={spaceTasks}
           onOpenTask={openTaskDrawer}
           onToggleDone={handleCompleteTask}
           onStartFocus={handleStartFocus}
           onAddTask={() => setModal({ kind: "add_task" })}
-        />
-      ) : null}
-      {tab === "focus" ? (
-        <SpaceFocusTab
-          preset={preset}
-          spaceTasks={spaceTasks}
-          spaceSessions={spaceSessions}
-          activeFocusSession={activeFocusSession}
-          weeklyGoalSeconds={config.defaults.weeklyFocusGoalSeconds}
-          onStartFocus={handleStartFocus}
-          onOpenSession={(sessionId) => setDrawer({ kind: "session", sessionId })}
-          onOpenFocusPage={() => onNavigate("focus")}
         />
       ) : null}
       {tab === "notes" ? (
@@ -603,26 +540,11 @@ export function SpaceDetailView({
           }}
         />
       ) : null}
-      {tab === "records" ? (
-        <SpaceRecordsTab
-          activities={activities}
-          onAddManualRecord={() => setModal({ kind: "manual_record" })}
-          onOpenTask={(taskId) => (spaceTasks.some((task) => task.id === taskId) ? openTaskDrawer(taskId) : undefined)}
-          onOpenSession={(sessionId) => setDrawer({ kind: "session", sessionId })}
-          onOpenNote={(noteId) => setDrawer({ kind: "note", noteId })}
-        />
-      ) : null}
-
-      {/* Floating AI button (§26) */}
-      <button type="button" className="sdv-floating-ai" aria-label={t("spaceHub.aria.aiAssistant")} onClick={() => setDrawer({ kind: "ai" })}>
-        ✦
-      </button>
-
       {/* Modals (§32) */}
       {modal.kind === "add_task" ? (
         <AddSpaceTaskModal
           preset={preset}
-          groups={visibleGroups.map((group) => group.label)}
+          groups={groups.map((group) => group.label)}
           onSubmit={handleCreateSpaceTask}
           onClose={() => setModal({ kind: "none" })}
         />
@@ -638,9 +560,6 @@ export function SpaceDetailView({
             openNoteInSplit(noteId);
           }}
         />
-      ) : null}
-      {modal.kind === "manual_record" ? (
-        <ManualRecordModal onSubmit={handleManualRecord} onClose={() => setModal({ kind: "none" })} />
       ) : null}
       {modal.kind === "focus_picker" ? (
         <FocusStartPickerModal
@@ -713,24 +632,11 @@ export function SpaceDetailView({
           onClose={() => setDrawer({ kind: "none" })}
         />
       ) : null}
-      {drawer.kind === "ai" ? (
-        <SpaceAiDrawer
-          spaceName={displayName}
-          signal={signal}
-          counts={counts}
-          nextAction={nextAction}
-          upcoming={upcoming}
-          weekFocusSeconds={weekFocusSeconds}
-          onGenerateNextAction={handleGenerateNextAction}
-          onClose={() => setDrawer({ kind: "none" })}
-        />
-      ) : null}
       {drawer.kind === "settings" ? (
         <SpaceSettingsDrawer
           name={displayName}
           description={displayDescription}
           color={displayColor}
-          groups={groups}
           overviewCards={config.overviewCards}
           defaults={config.defaults}
           onSave={handleSaveSettings}

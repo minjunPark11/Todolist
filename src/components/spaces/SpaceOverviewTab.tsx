@@ -30,7 +30,6 @@ export function SpaceOverviewTab({
   activities,
   recentSessions,
   spaceNotes,
-  aiSummary,
   onOpenTask,
   onToggleDone,
   onStartFocus,
@@ -39,16 +38,14 @@ export function SpaceOverviewTab({
   onOpenNote,
   onOpenNoteInSplit,
   onOpenSession,
+  onOpenFocusPage,
   onOpenTab,
-  onGenerateAiSummary,
-  onGenerateNextAction,
 }: {
   preset: SpaceTypePreset;
   spaceTasks: Task[];
   activities: SpaceActivity[];
   recentSessions: FocusSession[];
   spaceNotes: SpaceNote[];
-  aiSummary: { state: "idle" | "loading" | "ready" | "error"; text: string; tips: string[] };
   onOpenTask: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
   onStartFocus: (taskId: string) => void;
@@ -58,9 +55,8 @@ export function SpaceOverviewTab({
   // Notes card titles open the note in the notes tab Split View (§24.5).
   onOpenNoteInSplit: (noteId: string) => void;
   onOpenSession: (sessionId: string) => void;
+  onOpenFocusPage: () => void;
   onOpenTab: (tab: SpaceTab) => void;
-  onGenerateAiSummary: () => void;
-  onGenerateNextAction: () => void;
 }) {
   const { t } = useT();
   const openTasks = spaceTasks.filter((task) => !isTaskDone(task));
@@ -70,7 +66,8 @@ export function SpaceOverviewTab({
 
   return (
     <div className="sdv-overview-layout">
-      {/* Row 1: tasks + AI summary */}
+      {/* Primary task preview. Space AI uses the global assistant instead of
+          maintaining a second summary state in this page. */}
       <div className="sdv-overview-top">
         {/* Tasks card (§15) */}
         <section className="sdv-card">
@@ -117,44 +114,6 @@ export function SpaceOverviewTab({
           )}
         </section>
 
-        {/* AI Space Summary (§18) — never auto-runs */}
-        <section className="sdv-card sdv-ai-card">
-          <header className="sdv-card-head">
-            <h2>{presetText(t, preset.aiSummaryLabel)}</h2>
-          </header>
-          {aiSummary.state === "idle" ? (
-            <div className="sdv-empty">
-              <p>{t("spaceHub.ai.generatePrompt")}</p>
-              <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onGenerateAiSummary}>
-                {t("spaceHub.ai.generate")}
-              </button>
-            </div>
-          ) : aiSummary.state === "loading" ? (
-            <p className="sdv-empty-inline">{t("spaceHub.ai.building")}</p>
-          ) : aiSummary.state === "error" ? (
-            <div className="sdv-empty">
-              <p>{t("spaceHub.ai.error")}</p>
-              <button type="button" className="sdv-btn sdv-btn-sm" onClick={onGenerateAiSummary}>
-                {t("spaceHub.action.retry")}
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className="sdv-ai-text">{aiSummary.text}</p>
-              <ul className="sdv-ai-tips">
-                {aiSummary.tips.map((tip) => (
-                  <li key={tip}>✓ {tip}</li>
-                ))}
-              </ul>
-              <div className="sdv-metric-actions">
-                <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={onGenerateNextAction}>
-                  {t("spaceHub.ai.generateNextAction")}
-                </button>
-              </div>
-            </>
-          )}
-        </section>
-
       </div>
 
       {/* Row 2: activity timeline, focus records, notes */}
@@ -163,9 +122,6 @@ export function SpaceOverviewTab({
         <section className="sdv-card">
           <header className="sdv-card-head">
             <h2>{t("spaceHub.section.activityTimeline")}</h2>
-            <button type="button" className="sdv-link" onClick={() => onOpenTab("records")}>
-              {t("spaceHub.action.viewAll")}
-            </button>
           </header>
           {activities.length === 0 ? (
             <div className="sdv-empty">
@@ -173,7 +129,7 @@ export function SpaceOverviewTab({
             </div>
           ) : (
             <ul className="sdv-activity-list">
-              {activities.slice(0, 6).map((activity) => (
+              {activities.slice(0, 5).map((activity) => (
                 <li key={activity.id}>
                   <button
                     type="button"
@@ -202,7 +158,7 @@ export function SpaceOverviewTab({
         <section className="sdv-card">
           <header className="sdv-card-head">
             <h2>{t("spaceHub.section.focusRecords")}</h2>
-            <button type="button" className="sdv-link" onClick={() => onOpenTab("focus")}>
+            <button type="button" className="sdv-link" onClick={onOpenFocusPage}>
               {t("spaceHub.action.viewAll")}
             </button>
           </header>

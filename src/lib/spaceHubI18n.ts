@@ -119,7 +119,3 @@ export function hubTypeText(t: TFn, type: string): string {
 export function upcomingKindText(t: TFn, kind: string): string {
   return t(`spaceHub.kind.${kind}`);
 }
-
-export function recordTypeText(t: TFn, type: string): string {
-  return t(`spaceHub.record.${type}`);
-}

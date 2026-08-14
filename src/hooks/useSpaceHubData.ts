@@ -10,8 +10,8 @@ import {
   type SpaceNote,
 } from "../lib/spaceHubTypes";
 
-// Notes, manual activity records, and per-space customization live in their
-// own platform storage bucket so the core planner data shape stays untouched.
+// Notes, legacy activity records, and lightweight per-space preferences live
+// in their own platform storage bucket so the core planner data stays small.
 const STORAGE_KEY = "todo-planner-space-hub-v1";
 
 interface SpaceHubStore {
@@ -106,31 +106,15 @@ export function useSpaceHubData() {
     setStore((current) => ({ ...current, notes: current.notes.filter((note) => note.id !== noteId) }));
   }
 
-  function addActivity(
-    spaceId: string,
-    input: Pick<SpaceActivity, "type" | "title"> & Partial<Pick<SpaceActivity, "description" | "relatedTaskId" | "relatedSessionId" | "relatedNoteId">>,
-  ) {
-    const activity: SpaceActivity = {
-      id: createId("sact"),
-      spaceId,
-      type: input.type,
-      title: input.title,
-      description: input.description ?? "",
-      relatedTaskId: input.relatedTaskId ?? "",
-      relatedSessionId: input.relatedSessionId ?? "",
-      relatedNoteId: input.relatedNoteId ?? "",
-      createdAt: new Date().toISOString(),
-    };
-    setStore((current) => ({ ...current, activities: [activity, ...current.activities].slice(0, 500) }));
-  }
-
   function getConfig(spaceId: string): SpaceCustomConfig {
     const stored = store.configs.find((config) => config.spaceId === spaceId);
     if (!stored) return emptySpaceConfig(spaceId);
     return {
-      ...stored,
+      spaceId,
       overviewCards: { ...DEFAULT_OVERVIEW_CARDS, ...stored.overviewCards },
       defaults: { ...DEFAULT_SPACE_DEFAULTS, ...stored.defaults },
+      pinnedNextActionTaskId: stored.pinnedNextActionTaskId,
+      updatedAt: stored.updatedAt,
     };
   }
 
@@ -158,7 +142,6 @@ export function useSpaceHubData() {
     addNote,
     updateNote,
     deleteNote,
-    addActivity,
     getConfig,
     updateConfig,
   };

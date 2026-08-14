@@ -146,53 +146,6 @@ export function AddSpaceTaskModal({
 
 // § 32.2 note modal was replaced by NoteQuickCreateModal (SpaceNotesPanel.tsx).
 
-// § 25.3 Manual record
-export function ManualRecordModal({
-  onSubmit,
-  onClose,
-}: {
-  onSubmit: (input: { title: string; description: string }) => void;
-  onClose: () => void;
-}) {
-  const { t } = useT();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [error, setError] = useState("");
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!title.trim()) {
-      setError(t("spaceHub.error.titleRequired"));
-      return;
-    }
-    onSubmit({ title: title.trim(), description: description.trim() });
-  }
-
-  return (
-    <ModalShell title={t("spaceHub.modal.manualTitle")} onClose={onClose}>
-      <form className="sdv-form" onSubmit={submit}>
-        <label>
-          {t("spaceHub.field.whatHappened")}
-          <input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus />
-        </label>
-        <label>
-          {t("spaceHub.field.details")}
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} />
-        </label>
-        {error ? <p className="sdv-form-error">{error}</p> : null}
-        <div className="sdv-modal-actions">
-          <button type="button" className="sdv-btn" onClick={onClose}>
-            {t("spaceHub.action.cancel")}
-          </button>
-          <button type="submit" className="sdv-btn sdv-btn-primary">
-            {t("spaceHub.action.addRecord")}
-          </button>
-        </div>
-      </form>
-    </ModalShell>
-  );
-}
-
 // § 7.5 Start Focus without a next action -> task picker
 export function FocusStartPickerModal({
   spaceTasks,

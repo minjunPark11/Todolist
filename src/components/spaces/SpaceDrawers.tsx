@@ -1,12 +1,9 @@
 import { ReactNode, useState } from "react";
 import type { FocusSession, Project, Task } from "../../types";
-import type { SpaceCustomConfig, SpaceNote, SpaceSectionGroup } from "../../lib/spaceHubTypes";
+import type { SpaceCustomConfig, SpaceNote } from "../../lib/spaceHubTypes";
 import {
   formatSeconds,
   sessionSeconds,
-  type SpaceSignal,
-  type SpaceTaskCounts,
-  type UpcomingItem,
 } from "../../lib/spaceSelectors";
 import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
@@ -347,115 +344,11 @@ export function NoteDetailDrawer({
   );
 }
 
-// § 32.7 Space AI Drawer — command-driven, never mutates without confirmation.
-export function SpaceAiDrawer({
-  spaceName,
-  signal,
-  counts,
-  nextAction,
-  upcoming,
-  weekFocusSeconds,
-  onGenerateNextAction,
-  onClose,
-}: {
-  spaceName: string;
-  signal: SpaceSignal;
-  counts: SpaceTaskCounts;
-  nextAction: Task | null;
-  upcoming: UpcomingItem[];
-  weekFocusSeconds: number;
-  onGenerateNextAction: () => void;
-  onClose: () => void;
-}) {
-  const { t } = useT();
-  const [messages, setMessages] = useState<{ id: number; command: string; reply: string }[]>([]);
-
-  function respond(command: string, reply: string) {
-    setMessages((current) => [...current, { id: Date.now(), command, reply }]);
-  }
-
-  const commands: { label: string; run: () => void }[] = [
-    {
-      label: t("spaceHub.cmd.summarize"),
-      run: () =>
-        respond(
-          t("spaceHub.cmd.summarize"),
-          t("spaceHub.cmd.summarizeReply", {
-            name: spaceName,
-            label: signal.label,
-            detail: signal.detail,
-            open: counts.open,
-            unscheduled: counts.unscheduled,
-            overdue: counts.overdue,
-            focus: formatSeconds(weekFocusSeconds),
-          }),
-        ),
-    },
-    {
-      label: t("spaceHub.cmd.recommend"),
-      run: () =>
-        respond(
-          t("spaceHub.cmd.recommend"),
-          nextAction ? t("spaceHub.cmd.recommendReply", { title: nextAction.title }) : t("spaceHub.cmd.recommendEmpty"),
-        ),
-    },
-    {
-      label: t("spaceHub.cmd.deadline"),
-      run: () =>
-        respond(
-          t("spaceHub.cmd.deadline"),
-          counts.overdue > 0
-            ? t("spaceHub.cmd.deadlineOverdue", { n: counts.overdue })
-            : upcoming.length > 0
-              ? t("spaceHub.cmd.deadlineNearest", { title: upcoming[0].title, date: formatDate(upcoming[0].when) })
-              : t("spaceHub.cmd.deadlineNone"),
-        ),
-    },
-    {
-      label: t("spaceHub.cmd.review"),
-      run: () =>
-        respond(
-          t("spaceHub.cmd.review"),
-          t("spaceHub.cmd.reviewReply", { focus: formatSeconds(weekFocusSeconds), done: counts.done }),
-        ),
-    },
-  ];
-
-  return (
-    <DrawerShell title={t("spaceHub.drawer.aiTitle", { name: spaceName })} onClose={onClose}>
-      <p className="sdv-modal-copy">{t("spaceHub.ai.drawerIntro")}</p>
-      <div className="sdv-ai-commands">
-        {commands.map((command) => (
-          <button key={command.label} type="button" className="sdv-chip" onClick={command.run}>
-            {command.label}
-          </button>
-        ))}
-        <button type="button" className="sdv-chip" onClick={onGenerateNextAction}>
-          {t("spaceHub.ai.generateNextAction")}
-        </button>
-      </div>
-      <div className="sdv-ai-log" aria-live="polite">
-        {messages.length === 0 ? (
-          <p className="sdv-empty-inline">{t("spaceHub.ai.pickCommand")}</p>
-        ) : (
-          messages.map((message) => (
-            <div key={message.id} className="sdv-ai-message">
-              <small>{message.command}</small>
-              <p>{message.reply}</p>
-            </div>
-          ))
-        )}
-      </div>
-    </DrawerShell>
-  );
-}
-
 // § 28 Space Settings Drawer
 export function SpaceSettingsDrawer({
   name,
   description,
   color,
-  groups,
   overviewCards,
   defaults,
   onSave,
@@ -465,14 +358,12 @@ export function SpaceSettingsDrawer({
   name: string;
   description: string;
   color: string;
-  groups: SpaceSectionGroup[];
   overviewCards: SpaceCustomConfig["overviewCards"];
   defaults: SpaceCustomConfig["defaults"];
   onSave: (input: {
     name: string;
     description: string;
     color: string;
-    groups: SpaceSectionGroup[];
     overviewCards: SpaceCustomConfig["overviewCards"];
     defaults: SpaceCustomConfig["defaults"];
   }) => void;
@@ -483,20 +374,8 @@ export function SpaceSettingsDrawer({
   const [draftName, setDraftName] = useState(name);
   const [draftDescription, setDraftDescription] = useState(description);
   const [draftColor, setDraftColor] = useState(color);
-  const [draftGroups, setDraftGroups] = useState<SpaceSectionGroup[]>(groups.map((group) => ({ ...group })));
   const [draftCards, setDraftCards] = useState({ ...overviewCards });
   const [draftDefaults, setDraftDefaults] = useState({ ...defaults });
-  const [newGroupLabel, setNewGroupLabel] = useState("");
-
-  function moveGroup(index: number, direction: -1 | 1) {
-    setDraftGroups((current) => {
-      const next = [...current];
-      const target = index + direction;
-      if (target < 0 || target >= next.length) return current;
-      [next[index], next[target]] = [next[target], next[index]];
-      return next.map((group, order) => ({ ...group, order }));
-    });
-  }
 
   return (
     <DrawerShell title={t("spaceHub.drawer.settings")} onClose={onClose}>
@@ -514,58 +393,6 @@ export function SpaceSettingsDrawer({
           {t("spaceHub.field.color")}
           <input type="color" value={normalizeColor(draftColor)} onChange={(event) => setDraftColor(event.target.value)} />
         </label>
-
-        <h4>{t("spaceHub.settings.taskGroups")}</h4>
-        <ul className="sdv-group-editor">
-          {draftGroups.map((group, index) => (
-            <li key={group.id}>
-              <input
-                value={group.label}
-                aria-label={t("spaceHub.aria.groupName", { n: index + 1 })}
-                onChange={(event) =>
-                  setDraftGroups((current) => current.map((item) => (item.id === group.id ? { ...item, label: event.target.value } : item)))
-                }
-              />
-              <button type="button" aria-label={t("spaceHub.aria.moveUp")} onClick={() => moveGroup(index, -1)} disabled={index === 0}>
-                ↑
-              </button>
-              <button type="button" aria-label={t("spaceHub.aria.moveDown")} onClick={() => moveGroup(index, 1)} disabled={index === draftGroups.length - 1}>
-                ↓
-              </button>
-              <button
-                type="button"
-                className={group.hidden ? "sdv-hidden-toggle hidden" : "sdv-hidden-toggle"}
-                onClick={() =>
-                  setDraftGroups((current) => current.map((item) => (item.id === group.id ? { ...item, hidden: !item.hidden } : item)))
-                }
-              >
-                {group.hidden ? t("spaceHub.settings.hidden") : t("spaceHub.settings.visible")}
-              </button>
-            </li>
-          ))}
-        </ul>
-        <div className="sdv-form-row sdv-add-group">
-          <input
-            value={newGroupLabel}
-            placeholder={t("spaceHub.settings.newGroupName")}
-            aria-label={t("spaceHub.settings.newGroupName")}
-            onChange={(event) => setNewGroupLabel(event.target.value)}
-          />
-          <button
-            type="button"
-            className="sdv-btn sdv-btn-sm"
-            disabled={!newGroupLabel.trim()}
-            onClick={() => {
-              setDraftGroups((current) => [
-                ...current,
-                { id: `custom-${Date.now()}`, label: newGroupLabel.trim(), order: current.length },
-              ]);
-              setNewGroupLabel("");
-            }}
-          >
-            {t("spaceHub.action.addGroup")}
-          </button>
-        </div>
 
         <h4>{t("spaceHub.settings.overviewCards")}</h4>
         {(
@@ -614,7 +441,6 @@ export function SpaceSettingsDrawer({
                 name: draftName.trim() || name,
                 description: draftDescription,
                 color: draftColor,
-                groups: draftGroups.map((group, order) => ({ ...group, order })),
                 overviewCards: draftCards,
                 defaults: draftDefaults,
               })

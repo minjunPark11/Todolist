@@ -343,7 +343,7 @@
 
 .sdv-overview-top {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(300px, 0.95fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -863,27 +863,6 @@
 }
 
 /* AI card (§18) */
-.sdv-ai-card {
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-subtle));
-  background: linear-gradient(180deg, var(--accent-soft), var(--bg-surface) 55%);
-}
-
-.sdv-ai-text {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-}
-
-.sdv-ai-tips {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
 /* Empty states (§33) */
 .sdv-empty {
   display: grid;
@@ -961,69 +940,6 @@
 }
 
 /* Focus tab (§23) */
-.sdv-focus-stats {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.sdv-focus-stats > div {
-  display: grid;
-  gap: 3px;
-  padding: 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background: var(--bg-surface-muted);
-}
-
-.sdv-focus-stats small {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--text-tertiary);
-  font-weight: 650;
-}
-
-.sdv-focus-stats strong {
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.sdv-active-focus {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--accent-soft);
-  font-size: 13.5px;
-}
-
-.sdv-active-focus strong {
-  flex: 1;
-  min-width: 0;
-}
-
-.sdv-pulse {
-  flex: none;
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: var(--accent);
-  animation: sdv-pulse 1.6s ease infinite;
-}
-
-@keyframes sdv-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-
-.sdv-focus-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
 .sdv-actual-row {
   display: grid;
   gap: 2px;
@@ -1059,27 +975,6 @@
 
 /* Floating AI button (§26). Sits above the global Ollama chat FAB, which
    already occupies the bottom-right corner. */
-.sdv-floating-ai {
-  position: fixed;
-  right: 28px;
-  bottom: 96px;
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
-  border: 0;
-  background: linear-gradient(135deg, var(--accent), #6d4aff);
-  color: #fff;
-  font-size: 22px;
-  cursor: pointer;
-  box-shadow: var(--shadow-raised);
-  z-index: 40;
-  transition: transform 0.15s ease;
-}
-
-.sdv-floating-ai:hover {
-  transform: scale(1.06);
-}
-
 /* Modals (§32) */
 .sdv-modal-backdrop,
 .sdv-drawer-backdrop {
@@ -1318,90 +1213,7 @@
   margin-top: 6px;
 }
 
-.sdv-ai-commands {
-  display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
-}
-
-.sdv-ai-log {
-  display: grid;
-  gap: 10px;
-}
-
-.sdv-ai-message {
-  display: grid;
-  gap: 4px;
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--bg-surface-muted);
-  border: 1px solid var(--border-subtle);
-}
-
-.sdv-ai-message small {
-  font-size: 11.5px;
-  font-weight: 650;
-  color: var(--accent);
-}
-
-.sdv-ai-message p {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-}
-
 /* Settings drawer group editor (§28) */
-.sdv-group-editor {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.sdv-group-editor li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sdv-group-editor input {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: 9px;
-  padding: 7px 10px;
-  font-size: 13px;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-}
-
-.sdv-group-editor button {
-  flex: none;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-  border-radius: 8px;
-  padding: 6px 9px;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.sdv-group-editor button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.sdv-hidden-toggle.hidden {
-  color: var(--text-tertiary);
-  text-decoration: line-through;
-}
-
-.sdv-add-group {
-  grid-template-columns: 1fr auto;
-  align-items: center;
-}
-
 .sdv-check-row {
   display: flex !important;
   flex-direction: row;
@@ -1433,13 +1245,8 @@
 }
 
 @media (max-width: 768px) {
-  .sdv-overview-bottom,
-  .sdv-focus-grid {
+  .sdv-overview-bottom {
     grid-template-columns: 1fr;
-  }
-
-  .sdv-focus-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .sdv-header-card {
@@ -1464,10 +1271,6 @@
     width: 100vw;
   }
 
-  .sdv-floating-ai {
-    right: 18px;
-    bottom: 86px;
-  }
 }
 
 .sdv-form input[type="color"] {

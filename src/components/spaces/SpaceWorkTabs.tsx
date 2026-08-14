@@ -1,14 +1,11 @@
 import { useMemo, useState } from "react";
-import type { FocusSession, Task } from "../../types";
+import type { Task } from "../../types";
 import type { SpaceSectionGroup, SpaceTypePreset } from "../../lib/spaceHubTypes";
 import {
-  formatSeconds,
   isTaskDone,
-  relativeTime,
   resolveTaskGroupLabel,
-  sessionSeconds,
 } from "../../lib/spaceSelectors";
-import { formatDate, getWeekStart, todayValue } from "../../utils/date";
+import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
 import { presetText, groupText } from "../../lib/spaceHubI18n";
 import { MoreMenu } from "../kit";
@@ -210,147 +207,6 @@ export function SpaceTasksTab({
             </ul>
           )}
         </>
-      )}
-    </section>
-  );
-}
-
-// === Focus tab (§23) ===
-export function SpaceFocusTab({
-  preset,
-  spaceTasks,
-  spaceSessions,
-  activeFocusSession,
-  weeklyGoalSeconds,
-  onStartFocus,
-  onOpenSession,
-  onOpenFocusPage,
-}: {
-  preset: SpaceTypePreset;
-  spaceTasks: Task[];
-  spaceSessions: FocusSession[];
-  activeFocusSession: FocusSession | null;
-  weeklyGoalSeconds: number;
-  onStartFocus: (taskId: string) => void;
-  onOpenSession: (sessionId: string) => void;
-  onOpenFocusPage: () => void;
-}) {
-  const { t } = useT();
-  const today = todayValue();
-  const weekStart = getWeekStart(today);
-  const completed = spaceSessions.filter((session) => session.status === "completed");
-  const todaySeconds = completed
-    .filter((session) => session.startAt.slice(0, 10) === today)
-    .reduce((sum, session) => sum + sessionSeconds(session), 0);
-  const weekSeconds = completed
-    .filter((session) => session.startAt.slice(0, 10) >= weekStart)
-    .reduce((sum, session) => sum + sessionSeconds(session), 0);
-  const average = completed.length ? Math.round(completed.reduce((sum, session) => sum + sessionSeconds(session), 0) / completed.length) : 0;
-  const goalPct = Math.min(100, Math.round((weekSeconds / Math.max(weeklyGoalSeconds, 1)) * 100));
-
-  const openTasks = spaceTasks.filter((task) => !isTaskDone(task) && task.status !== "waiting");
-  const byTask = new Map<string, number>();
-  for (const session of completed) {
-    byTask.set(session.taskId, (byTask.get(session.taskId) ?? 0) + sessionSeconds(session));
-  }
-  const actualRows = [...byTask.entries()]
-    .map(([taskId, seconds]) => ({ task: spaceTasks.find((task) => task.id === taskId), seconds }))
-    .filter((row): row is { task: Task; seconds: number } => Boolean(row.task))
-    .sort((a, b) => b.seconds - a.seconds)
-    .slice(0, 5);
-
-  return (
-    <section className="sdv-card sdv-tab-panel">
-      <div className="sdv-focus-stats">
-        <div>
-          <small>{t("spaceHub.focusStat.today")}</small>
-          <strong>{formatSeconds(todaySeconds)}</strong>
-        </div>
-        <div>
-          <small>{t("spaceHub.focusStat.thisWeek")}</small>
-          <strong>{formatSeconds(weekSeconds)}</strong>
-        </div>
-        <div>
-          <small>{t("spaceHub.focusStat.sessions")}</small>
-          <strong>{completed.length}</strong>
-        </div>
-        <div>
-          <small>{t("spaceHub.focusStat.average")}</small>
-          <strong>{formatSeconds(average)}</strong>
-        </div>
-        <div>
-          <small>{t("spaceHub.focusStat.goal")}</small>
-          <strong>{goalPct}%</strong>
-        </div>
-      </div>
-
-      {activeFocusSession ? (
-        <div className="sdv-active-focus">
-          <span className="sdv-pulse" aria-hidden="true" />
-          <strong>{t("spaceHub.focus.inProgress", { title: activeFocusSession.title || t("spaceHub.untitled") })}</strong>
-          <button type="button" className="sdv-btn sdv-btn-sm" onClick={onOpenFocusPage}>
-            {t("spaceHub.action.openFocusPage")}
-          </button>
-        </div>
-      ) : null}
-
-      <div className="sdv-focus-grid">
-        <div>
-          <h3>{t("spaceHub.section.startQueue")}</h3>
-          {openTasks.length === 0 ? (
-            <p className="sdv-empty-inline">{t("spaceHub.empty.noOpenTasksAddOne")}</p>
-          ) : (
-            <ul className="sdv-record-list">
-              {openTasks.slice(0, 6).map((task) => (
-                <li key={task.id}>
-                  <button type="button" onClick={() => onStartFocus(task.id)}>
-                    <strong>{task.title}</strong>
-                    <span className="sdv-btn sdv-btn-sm sdv-btn-primary">{presetText(t, preset.startFocusLabel)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <h3>{t("spaceHub.field.actual")}</h3>
-          {actualRows.length === 0 ? (
-            <p className="sdv-empty-inline">{t("spaceHub.empty.noFocusPick")}</p>
-          ) : (
-            <ul className="sdv-record-list">
-              {actualRows.map((row) => (
-                <li key={row.task.id}>
-                  <div className="sdv-actual-row">
-                    <strong>{row.task.title}</strong>
-                    <small>{formatSeconds(row.seconds)}</small>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      <h3>{t("spaceHub.section.recentSessions")}</h3>
-      {completed.length === 0 ? (
-        <div className="sdv-empty">
-          <p>{t("spaceHub.empty.noFocusPick")}</p>
-        </div>
-      ) : (
-        <ul className="sdv-record-list">
-          {completed
-            .sort((a, b) => (b.endAt || b.createdAt).localeCompare(a.endAt || a.createdAt))
-            .slice(0, 8)
-            .map((session) => (
-              <li key={session.id}>
-                <button type="button" onClick={() => onOpenSession(session.id)}>
-                  <strong>{session.title || t("spaceHub.untitledFocus")}</strong>
-                  <small>{relativeTime(session.endAt || session.createdAt, t)}</small>
-                  <span>{formatSeconds(sessionSeconds(session))}</span>
-                </button>
-              </li>
-            ))}
-        </ul>
       )}
     </section>
   );

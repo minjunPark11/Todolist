@@ -7,9 +7,9 @@ export type SpaceHubType = "project" | "personal" | "custom";
 // The per-space "calendar" tab was removed (PROJECT_DETAIL_REMOVE_CALENDAR_TAB
 // spec) — scheduling lives in the main Calendar page. Legacy ?tab=calendar
 // URLs fall back to "overview" because the value is no longer in SPACE_TABS.
-export type SpaceTab = "overview" | "tasks" | "focus" | "notes" | "records";
+export type SpaceTab = "overview" | "tasks" | "notes";
 
-export const SPACE_TABS: SpaceTab[] = ["overview", "tasks", "focus", "notes", "records"];
+export const SPACE_TABS: SpaceTab[] = ["overview", "tasks", "notes"];
 
 export type SpaceSignalStatus =
   | "on_track"
@@ -66,10 +66,6 @@ export interface SpaceSectionGroup {
 
 export interface SpaceCustomConfig {
   spaceId: string;
-  nameOverride?: string;
-  descriptionOverride?: string;
-  colorOverride?: string;
-  sectionGroups?: SpaceSectionGroup[];
   overviewCards: {
     nextAction: boolean;
     signal: boolean;
@@ -122,7 +118,6 @@ export interface SpaceTypePreset {
   headerSubtitle: string;
   addTaskLabel: string;
   addNoteLabel: string;
-  scheduleLabel: string;
   startFocusLabel: string;
   primaryTaskSectionLabel: string;
   nextActionLabel: string;
@@ -131,8 +126,6 @@ export interface SpaceTypePreset {
   upcomingLabel: string;
   taskGroups: string[];
   noteTypes: string[];
-  focusCategories: string[];
-  aiSummaryLabel: string;
   // Example first tasks shown under the tasks-tab empty state ("e.g. …").
   emptyTaskExamples: string;
 }

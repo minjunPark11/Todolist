@@ -103,6 +103,18 @@ export function OllamaChat({
   const breadcrumb = useMemo(() => (activePath ? formatBreadcrumb(activePath, loadContextCards()) : null), [activePath]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => {
+    function openChat(event: Event) {
+      const detail = (event as CustomEvent<{ draft?: string }>).detail;
+      setOpen(true);
+      if (detail?.draft) setDraft(detail.draft);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    }
+
+    window.addEventListener("focusflow:open-ai-chat", openChat);
+    return () => window.removeEventListener("focusflow:open-ai-chat", openChat);
+  }, []);
+
   const canAttachFiles = Boolean(knowledgeSettings.vaultPath) && platform.files.supported();
   const attachMatches = attachCandidates
     .filter((entry) => entry.relativePath.toLowerCase().includes(attachFilter.toLowerCase()))
