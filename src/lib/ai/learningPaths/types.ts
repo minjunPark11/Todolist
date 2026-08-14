@@ -13,6 +13,14 @@ import type { InfoSlot } from "../contextCards/types";
 // stages — never trusted from the model or persisted as authoritative.
 export type MilestoneStatus = "upcoming" | "current" | "done";
 
+export type GoalSchedule =
+  | { unit: "unscheduled" }
+  | { unit: "life" }
+  | { unit: "year"; startDate: string }
+  | { unit: "month"; startDate: string }
+  | { unit: "week"; startDate: string }
+  | { unit: "day"; startDate: string };
+
 // One intermediate goal on the path. Like possibleOutput/completionCriteria
 // on cards, doneCriteria must name something observable so "done" stays a
 // yes/no question.
@@ -25,8 +33,11 @@ export type Milestone = {
   cardIds: string[];
   // --- Horizons page (HORIZONS_DESIGN.md). All optional, so paths written
   // before it existed still load unchanged.
-  // The only input the horizon column is derived from; never store a horizon
-  // (D2). Empty means "inherit the path's date".
+  // Period placement is explicit in Horizons 2. An omitted milestone schedule
+  // inherits its parent goal's schedule.
+  schedule?: GoalSchedule;
+  deadlineDate?: string;
+  /** @deprecated compatibility with pre-Horizons-2 clients. */
   targetDate?: string;
   // Tasks materialised from this milestone — the Month → Day bridge (D6).
   taskIds?: string[];
@@ -45,8 +56,12 @@ export type LearningPath = {
   goal: string;
   // Order is the path: milestones progress by index.
   milestones: Milestone[];
-  // --- Horizons page (HORIZONS_DESIGN.md), all optional — see Milestone.
-  targetDate?: string; // no date = the "life" horizon (D2)
+  // --- Horizons page. schedule is normalized at every read/write boundary;
+  // it stays optional in the type for one compatibility release.
+  schedule?: GoalSchedule;
+  deadlineDate?: string;
+  /** @deprecated compatibility with pre-Horizons-2 clients. */
+  targetDate?: string;
   projectId?: string; // Board: reuses the existing Space, and its colour (D9)
   completedAt?: string; // user-asserted completion (D10)
   // Path-level info gathering, reusing the card slot kinds. Persisted for

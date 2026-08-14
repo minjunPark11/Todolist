@@ -14,6 +14,8 @@ import { platform } from "../../../platform";
 import type { InfoSlot } from "../contextCards/types";
 import type { LearningPath, Milestone } from "./types";
 import { MAX_MILESTONES } from "../../../domain/horizons/pathMutations";
+import { normalizeGoalTiming } from "../../../domain/horizons/goalSchedule";
+import { todayValue } from "../../../utils/date";
 
 export const LEGACY_LEARNING_PATHS_KEY = "focusflow.learningPaths.v1";
 // Set once the blob has been folded into planner data. Kept as a separate
@@ -49,37 +51,33 @@ function asOptionalInfoSlots(value: unknown): InfoSlot[] | undefined {
   return slots.length > 0 ? slots : undefined;
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-function asOptionalDate(value: unknown): string | undefined {
-  return typeof value === "string" && ISO_DATE.test(value) ? value : undefined;
-}
-
-function sanitizeMilestone(value: unknown): Milestone | null {
+function sanitizeMilestone(value: unknown, today: string): Milestone | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   if (typeof record.id !== "string" || !record.id) return null;
   if (typeof record.title !== "string" || !record.title.trim()) return null;
+  const hasTiming = "schedule" in record || "targetDate" in record || "deadlineDate" in record;
+  const timing = hasTiming ? normalizeGoalTiming(record, today) : undefined;
   return {
     id: record.id,
     title: record.title.trim(),
     doneCriteria: typeof record.doneCriteria === "string" ? record.doneCriteria : "",
     cardIds: asStringArray(record.cardIds),
-    targetDate: asOptionalDate(record.targetDate),
+    ...(timing ?? {}),
     taskIds: asStringArray(record.taskIds).length > 0 ? asStringArray(record.taskIds) : undefined,
     completedAt: typeof record.completedAt === "string" && record.completedAt ? record.completedAt : undefined,
     // status is derived at read time (progress.ts), never restored from disk.
   };
 }
 
-export function sanitizeLearningPath(value: unknown): LearningPath | null {
+export function sanitizeLearningPath(value: unknown, today = todayValue()): LearningPath | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   if (typeof record.id !== "string" || !record.id) return null;
   if (typeof record.goal !== "string" || !record.goal.trim()) return null;
   const milestones = Array.isArray(record.milestones)
     ? record.milestones
-        .map(sanitizeMilestone)
+        .map((milestone) => sanitizeMilestone(milestone, today))
         .filter((milestone): milestone is Milestone => milestone !== null)
         .slice(0, MAX_MILESTONES)
     : [];
@@ -87,11 +85,14 @@ export function sanitizeLearningPath(value: unknown): LearningPath | null {
   // the assistant and an empty proposal meant a malformed one. The Horizons
   // page lets a person write the goal down first and break it up later, so an
   // empty milestone list is now a legitimate state rather than corruption.
+  const timing = normalizeGoalTiming(record, today);
   return {
     id: record.id,
     goal: record.goal.trim(),
     milestones,
-    targetDate: asOptionalDate(record.targetDate),
+    schedule: timing.schedule,
+    deadlineDate: timing.deadlineDate,
+    targetDate: timing.targetDate,
     projectId: typeof record.projectId === "string" && record.projectId ? record.projectId : undefined,
     completedAt: typeof record.completedAt === "string" && record.completedAt ? record.completedAt : undefined,
     infoSlots: asOptionalInfoSlots(record.infoSlots),
@@ -138,7 +139,7 @@ export function inspectLegacyLearningPaths(): LegacyLearningPathsSnapshot {
     if (!raw) return { status: "absent", paths: [] };
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return { status: "invalid", paths: [] };
-    const sanitized = parsed.map(sanitizeLearningPath);
+    const sanitized = parsed.map((path) => sanitizeLearningPath(path));
     if (sanitized.some((path) => path === null)) return { status: "invalid", paths: [] };
     const paths = (sanitized as LearningPath[]).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return { status: "valid", paths };

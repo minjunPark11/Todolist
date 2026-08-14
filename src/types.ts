@@ -4,9 +4,9 @@
 // type-only reference below is the exception, and it introduces no cycle
 // (learningPaths/types.ts reaches only contextCards/types.ts, which imports
 // nothing).
-import type { LearningPath, Milestone } from "./lib/ai/learningPaths/types";
+import type { GoalSchedule, LearningPath, Milestone } from "./lib/ai/learningPaths/types";
 
-export type { LearningPath, Milestone };
+export type { GoalSchedule, LearningPath, Milestone };
 
 // === Task lifecycle (spec §4.1) ===
 // Canonical MVP statuses: inbox -> todo -> doing -> waiting -> done -> archived.

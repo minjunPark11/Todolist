@@ -51,6 +51,36 @@ describe("path mutations", () => {
     expect(next.find((p) => p.id === "b")?.updatedAt).toBe("2026-08-01T00:00:00.000Z");
   });
 
+  it("dual-writes a schedule patch to the legacy representative date", () => {
+    const next = patchPath(
+      [path({ deadlineDate: "2026-09-25" })],
+      "p1",
+      { schedule: { unit: "year", startDate: "2027-08-20" } },
+      NOW,
+      "2026-08-14",
+    );
+    expect(next[0]).toMatchObject({
+      schedule: { unit: "year", startDate: "2027-01-01" },
+      deadlineDate: "2026-09-25",
+      targetDate: "2027-01-01",
+    });
+  });
+
+  it("converts a legacy target patch without changing the saved deadline", () => {
+    const next = patchPath(
+      [path({ schedule: { unit: "month", startDate: "2026-09-01" }, deadlineDate: "2026-09-25" })],
+      "p1",
+      { targetDate: "2027-03-01" },
+      NOW,
+      "2026-08-14",
+    );
+    expect(next[0]).toMatchObject({
+      schedule: { unit: "year", startDate: "2027-01-01" },
+      deadlineDate: "2026-09-25",
+      targetDate: "2027-01-01",
+    });
+  });
+
   it("refuses to let a patch rewrite the id", () => {
     const next = patchPath([path()], "p1", { goal: "x", id: "hacked" } as never, NOW);
     expect(next[0].id).toBe("p1");

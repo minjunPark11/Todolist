@@ -6,6 +6,8 @@
 // the *rules* moved here and the store kept only the legacy blob it now just
 // migrates away from.
 import type { LearningPath, Milestone } from "../../lib/ai/learningPaths/types";
+import { applyGoalTimingPatch, normalizeGoalTiming } from "./goalSchedule";
+import { todayValue } from "../../utils/date";
 
 // A path per long-running goal, so the list stays short by nature. The caps
 // are the same ones the blob enforced.
@@ -21,8 +23,12 @@ export function sortPaths(paths: LearningPath[]): LearningPath[] {
   return [...paths].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-export function addPath(paths: LearningPath[], path: LearningPath): LearningPath[] {
-  return sortPaths([path, ...paths]).slice(0, MAX_PATHS);
+export function addPath(paths: LearningPath[], path: LearningPath, today = todayValue()): LearningPath[] {
+  const milestones = path.milestones.map((milestone) => {
+    const hasTiming = "schedule" in milestone || "targetDate" in milestone || "deadlineDate" in milestone;
+    return hasTiming ? { ...milestone, ...normalizeGoalTiming(milestone, today) } : milestone;
+  });
+  return sortPaths([{ ...path, ...normalizeGoalTiming(path, today), milestones }, ...paths]).slice(0, MAX_PATHS);
 }
 
 export function patchPath(
@@ -30,8 +36,14 @@ export function patchPath(
   id: string,
   patch: Partial<Omit<LearningPath, "id">>,
   now: string,
+  today = todayValue(),
 ): LearningPath[] {
-  return paths.map((path) => (path.id === id ? stamp({ ...path, ...patch, id }, now) : path));
+  const hasTiming = "schedule" in patch || "targetDate" in patch || "deadlineDate" in patch;
+  return paths.map((path) =>
+    path.id === id
+      ? stamp({ ...path, ...patch, ...(hasTiming ? applyGoalTimingPatch(path, patch, today) : {}), id }, now)
+      : path,
+  );
 }
 
 export function dropPath(paths: LearningPath[], id: string): LearningPath[] {
@@ -54,8 +66,11 @@ export function addMilestone(
   pathId: string,
   milestone: Milestone,
   now: string,
+  today = todayValue(),
 ): LearningPath[] {
-  return withMilestones(paths, pathId, (milestones) => [...milestones, milestone], now);
+  const hasTiming = "schedule" in milestone || "targetDate" in milestone || "deadlineDate" in milestone;
+  const normalized = hasTiming ? { ...milestone, ...normalizeGoalTiming(milestone, today) } : milestone;
+  return withMilestones(paths, pathId, (milestones) => [...milestones, normalized], now);
 }
 
 export function patchMilestone(
@@ -64,13 +79,17 @@ export function patchMilestone(
   milestoneId: string,
   patch: Partial<Omit<Milestone, "id">>,
   now: string,
+  today = todayValue(),
 ): LearningPath[] {
+  const hasTiming = "schedule" in patch || "targetDate" in patch || "deadlineDate" in patch;
   return withMilestones(
     paths,
     pathId,
     (milestones) =>
       milestones.map((milestone) =>
-        milestone.id === milestoneId ? { ...milestone, ...patch, id: milestone.id } : milestone,
+        milestone.id === milestoneId
+          ? { ...milestone, ...patch, ...(hasTiming ? applyGoalTimingPatch(milestone, patch, today) : {}), id: milestone.id }
+          : milestone,
       ),
     now,
   );

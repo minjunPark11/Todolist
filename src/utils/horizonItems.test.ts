@@ -42,6 +42,23 @@ describe("buildHorizonItems", () => {
     expect(items.find((item) => item.sourceId === "p2")?.horizon).toBe("year");
   });
 
+  it("uses explicit schedule before the compatibility target and hides unscheduled goals", () => {
+    const items = buildHorizonItems({
+      paths: [
+        path({
+          id: "scheduled",
+          schedule: { unit: "year", startDate: "2027-01-01" },
+          targetDate: addDays(TODAY, 2),
+        }),
+        path({ id: "hidden", schedule: { unit: "unscheduled" } }),
+      ],
+      tasks: [],
+      today: TODAY,
+    });
+    expect(items.find((item) => item.sourceId === "scheduled")?.horizon).toBe("year");
+    expect(items.some((item) => item.sourceId === "hidden")).toBe(false);
+  });
+
   it("lets a milestone inherit its path's date", () => {
     // Otherwise a freshly proposed path scatters: the goal lands on "year"
     // while all of its milestones fall to "life".

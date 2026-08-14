@@ -16,6 +16,7 @@ import {
   LEGACY_LEARNING_PATHS_MIGRATED_KEY,
   markLegacyLearningPathsMigratedIfAdopted,
   readLegacyLearningPaths,
+  sanitizeLearningPath,
 } from "./store";
 import type { LearningPath } from "./types";
 
@@ -39,10 +40,12 @@ describe("legacy learning-path migration", () => {
     expect(inspectLegacyLearningPaths().status).toBe("invalid");
   });
 
-  it("returns a valid legacy goal without changing its identity", () => {
+  it("returns a valid legacy goal with its identity and a migrated life schedule", () => {
     const path = goal();
     storage.set(LEGACY_LEARNING_PATHS_KEY, JSON.stringify([path]));
-    expect(inspectLegacyLearningPaths()).toEqual({ status: "valid", paths: [path] });
+    const snapshot = inspectLegacyLearningPaths();
+    expect(snapshot.status).toBe("valid");
+    expect(snapshot.paths[0]).toMatchObject({ id: path.id, goal: path.goal, schedule: { unit: "life" } });
     expect(storage.has(LEGACY_LEARNING_PATHS_MIGRATED_KEY)).toBe(false);
   });
 
@@ -71,5 +74,35 @@ describe("legacy learning-path migration", () => {
     expect(markLegacyLearningPathsMigratedIfAdopted([path])).toBe(true);
     expect(storage.get(LEGACY_LEARNING_PATHS_MIGRATED_KEY)).toBe("1");
     expect(inspectLegacyLearningPaths().status).toBe("migrated");
+  });
+});
+
+describe("sanitizeLearningPath schedule compatibility", () => {
+  it("migrates a legacy target into schedule, deadline, and representative target", () => {
+    expect(sanitizeLearningPath({ ...goal(), targetDate: "2026-09-25" }, "2026-08-14")).toMatchObject({
+      schedule: { unit: "month", startDate: "2026-09-01" },
+      deadlineDate: "2026-09-25",
+      targetDate: "2026-09-01",
+    });
+  });
+
+  it("keeps an undated milestone inheritable while normalizing an explicitly dated one", () => {
+    const path = sanitizeLearningPath(
+      {
+        ...goal(),
+        targetDate: "2027-03-01",
+        milestones: [
+          { id: "inherit", title: "Inherited", doneCriteria: "", cardIds: [] },
+          { id: "dated", title: "Dated", doneCriteria: "", cardIds: [], targetDate: "2026-09-25" },
+        ],
+      },
+      "2026-08-14",
+    );
+    expect(path?.milestones[0]).not.toHaveProperty("schedule");
+    expect(path?.milestones[1]).toMatchObject({
+      schedule: { unit: "month", startDate: "2026-09-01" },
+      deadlineDate: "2026-09-25",
+      targetDate: "2026-09-01",
+    });
   });
 });

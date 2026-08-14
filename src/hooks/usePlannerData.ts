@@ -28,6 +28,7 @@ import {
   readLegacyLocalSpaces,
 } from "../lib/spaces/legacyLocalSpaces";
 import * as pathOps from "../domain/horizons/pathMutations";
+import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
@@ -317,7 +318,7 @@ function normalizeData(data: RawPlannerData): PlannerData {
     // local blob now vets the synced rows.
     learningPaths: Array.isArray(data.learningPaths)
       ? data.learningPaths
-          .map(sanitizeLearningPath)
+          .map((path) => sanitizeLearningPath(path))
           .filter((path): path is LearningPath => path !== null)
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       : [],
@@ -1347,6 +1348,8 @@ export function usePlannerData() {
 
   function createLearningPath(input: {
     goal: string;
+    schedule?: LearningPath["schedule"];
+    deadlineDate?: string;
     targetDate?: string;
     projectId?: string;
     milestones?: Milestone[];
@@ -1359,7 +1362,7 @@ export function usePlannerData() {
       id: createId("lpath"),
       goal,
       milestones: input.milestones ?? [],
-      targetDate: input.targetDate,
+      ...normalizeGoalTiming(input, todayValue()),
       projectId: input.projectId,
       source: input.source ?? "user",
       createdAt: now,
@@ -1383,7 +1386,13 @@ export function usePlannerData() {
     setData((current) => ({ ...current, learningPaths: pathOps.dropPath(current.learningPaths, pathId) }));
   }
 
-  function addMilestone(pathId: string, input: { title: string; doneCriteria?: string; targetDate?: string }) {
+  function addMilestone(pathId: string, input: {
+    title: string;
+    doneCriteria?: string;
+    schedule?: Milestone["schedule"];
+    deadlineDate?: string;
+    targetDate?: string;
+  }) {
     const title = input.title.trim();
     if (!title) return;
     const now = new Date().toISOString();
@@ -1392,7 +1401,9 @@ export function usePlannerData() {
       title,
       doneCriteria: input.doneCriteria?.trim() ?? "",
       cardIds: [],
-      targetDate: input.targetDate,
+      ...("schedule" in input || "deadlineDate" in input || "targetDate" in input
+        ? normalizeGoalTiming(input, todayValue())
+        : {}),
     };
     setData((current) => ({
       ...current,

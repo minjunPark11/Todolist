@@ -11,7 +11,8 @@
 // Nothing here owns a record: every HorizonItem points back at the store that
 // does (D1, "the view is owned, the storage never is").
 import type { Task } from "../types";
-import type { LearningPath } from "../lib/ai/learningPaths/types";
+import type { GoalSchedule, LearningPath } from "../lib/ai/learningPaths/types";
+import { horizonForGoalSchedule, normalizeGoalSchedule } from "../domain/horizons/goalSchedule";
 import { deriveHorizon, type Horizon } from "./horizons";
 
 export type HorizonSourceType = "path" | "milestone" | "task";
@@ -29,6 +30,7 @@ export interface HorizonItem {
   /** The observable "how do I know this is done" line, when the source has one. */
   doneCriteria?: string;
   targetDate?: string;
+  schedule?: GoalSchedule;
   done: boolean;
   /** Board colour — owned by the Board/Project, shared with the calendar (SPACES_BOARD_DESIGN D1). */
   color: string;
@@ -52,12 +54,12 @@ export interface BuildHorizonItemsArgs {
 }
 
 /**
- * A milestone inherits its path's target date when it has none of its own, so
+ * A milestone inherits its path's schedule when it has none of its own, so
  * a freshly proposed path does not scatter its milestones onto "life" while
  * the goal itself sits on "year".
  */
-function milestoneTargetDate(path: LearningPath, milestoneTargetDate?: string): string | undefined {
-  return milestoneTargetDate || path.targetDate;
+function hasOwnTiming(value: { schedule?: GoalSchedule; targetDate?: string; deadlineDate?: string }): boolean {
+  return "schedule" in value || "targetDate" in value || "deadlineDate" in value;
 }
 
 export function buildHorizonItems({
@@ -72,33 +74,43 @@ export function buildHorizonItems({
 
   for (const path of paths) {
     const color = colorFor(path.projectId);
+    const pathSchedule = normalizeGoalSchedule(path.schedule, path.targetDate, today);
+    const pathHorizon = horizonForGoalSchedule(pathSchedule);
 
-    items.push({
-      key: `path:${path.id}`,
-      horizon: deriveHorizon(path.targetDate, today),
-      sourceType: "path",
-      sourceId: path.id,
-      parentId: "",
-      title: path.goal,
-      targetDate: path.targetDate,
-      done: Boolean(path.completedAt),
-      color,
-      boardId: path.projectId,
-      draggable: true,
-    });
+    if (pathHorizon) {
+      items.push({
+        key: `path:${path.id}`,
+        horizon: pathHorizon,
+        sourceType: "path",
+        sourceId: path.id,
+        parentId: "",
+        title: path.goal,
+        targetDate: path.deadlineDate ?? path.targetDate,
+        schedule: pathSchedule,
+        done: Boolean(path.completedAt),
+        color,
+        boardId: path.projectId,
+        draggable: true,
+      });
+    }
 
     for (const milestone of path.milestones) {
-      const target = milestoneTargetDate(path, milestone.targetDate);
+      const milestoneSchedule = hasOwnTiming(milestone)
+        ? normalizeGoalSchedule(milestone.schedule, milestone.targetDate, today)
+        : pathSchedule;
+      const milestoneHorizon = horizonForGoalSchedule(milestoneSchedule);
+      if (!milestoneHorizon) continue;
       items.push({
         key: `milestone:${milestone.id}`,
-        horizon: deriveHorizon(target, today),
+        horizon: milestoneHorizon,
         sourceType: "milestone",
         sourceId: milestone.id,
         parentId: path.id,
         title: milestone.title,
         parentTitle: path.goal,
         doneCriteria: milestone.doneCriteria || undefined,
-        targetDate: target,
+        targetDate: milestone.deadlineDate ?? milestone.targetDate ?? path.deadlineDate ?? path.targetDate,
+        schedule: milestoneSchedule,
         done: Boolean(milestone.completedAt),
         color,
         boardId: path.projectId,
