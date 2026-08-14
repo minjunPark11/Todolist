@@ -1303,6 +1303,37 @@ textarea {
   color: var(--color-ink-muted-48);
 }
 
+/* Dependency rows (W2.2). Both sit inside .detail-field-list, whose children
+   are two-column label grids, so these align to the value column rather than
+   starting at the panel edge and reading as a new section. */
+.detail-hint {
+  margin-left: 114px; /* 104px label column + its 10px gap */
+  padding-bottom: 6px;
+  color: var(--color-ink-muted-48);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.detail-blocking {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 10px;
+  padding: 6px 0;
+  color: var(--color-ink-muted-80);
+  font-size: 0.86rem;
+}
+
+.detail-blocking > span {
+  color: var(--color-ink-muted-48);
+}
+
+.detail-blocking ul {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 2px;
+}
+
 .detail-field-list input,
 .detail-field-list select {
   min-height: 34px;

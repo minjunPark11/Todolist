@@ -541,6 +541,10 @@ button.tdy-row-title {
 .tdy-reason-progress { color: var(--accent); }
 .tdy-reason-focus { color: var(--purple); }
 .tdy-reason-waiting { color: var(--text-tertiary); }
+/* Blocked reads as parked, not as a problem: the queue has already moved the
+   row down, so the badge only has to say why. Kept distinct from `waiting`,
+   which is a status the user chose rather than one derived from a blocker. */
+.tdy-reason-blocked { color: var(--text-tertiary); }
 .tdy-reason-medium { color: var(--warning); }
 .tdy-reason-low { color: var(--success); }
 

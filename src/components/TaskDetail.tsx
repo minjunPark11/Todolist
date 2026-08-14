@@ -1,6 +1,7 @@
 import type { Project, RepeatType, Subtask, Task, TaskPriority } from "../types";
 import { todayValue } from "../utils/date";
 import { getMatrixPosition, patchForQuadrant, type MatrixQuadrant } from "../utils/eisenhower";
+import { dependentsOf, eligibleBlockers } from "../domain/tasks/dependencies";
 import { useT } from "../i18n";
 import { DeferredInput, DeferredTextarea } from "./kit";
 import { MotionPanelShell } from "./motion/MotionPanelShell";
@@ -32,6 +33,7 @@ const matrixQuadrants: Array<{ key: MatrixQuadrant; labelKey: string; hintKey: s
 
 export function TaskDetail({
   task,
+  tasks,
   onUpdateTask,
   onRequestDeleteTask,
   onArchiveTask,
@@ -57,6 +59,11 @@ export function TaskDetail({
   };
   const today = todayValue();
   const selectedQuadrant = getMatrixPosition(task, today).quadrant;
+  // The picker refuses anything that would close a loop, so the cycle rule is
+  // enforced where the value is written rather than guarded at every read.
+  const blockerOptions = eligibleBlockers(tasks, task.id);
+  // Derived, never stored — one fact, one place (domain/tasks/dependencies).
+  const blocking = dependentsOf(tasks, task.id);
 
   return (
     <MotionPanelShell className="detail-panel">
@@ -203,6 +210,40 @@ export function TaskDetail({
               ))}
             </select>
           </label>
+          <label>
+            <span>{t("taskDetail.blockedBy")}</span>
+            <select
+              value={task.blockedByTaskId}
+              onChange={(event) => onUpdateTask(task.id, { blockedByTaskId: event.target.value })}
+            >
+              <option value="">{t("taskDetail.blockedByNone")}</option>
+              {/* A blocker set earlier can fall out of the eligible list once
+                  it is completed. Keeping it as an option means the select
+                  still shows what it is waiting on instead of silently
+                  reading "Nothing" while the field holds an id. */}
+              {task.blockedByTaskId && !blockerOptions.some((item) => item.id === task.blockedByTaskId) ? (
+                <option value={task.blockedByTaskId}>
+                  {tasks.find((item) => item.id === task.blockedByTaskId)?.title ?? task.blockedByTaskId}
+                </option>
+              ) : null}
+              {blockerOptions.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          {task.blockedByTaskId ? <small className="detail-hint">{t("taskDetail.blockedByHint")}</small> : null}
+          {blocking.length > 0 ? (
+            <div className="detail-blocking">
+              <span>{t("taskDetail.blocks")}</span>
+              <ul>
+                {blocking.map((dependent) => (
+                  <li key={dependent.id}>{dependent.title}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </section>
       <section className="detail-section">

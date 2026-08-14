@@ -3,6 +3,7 @@
 // TodayTask / TimeBlock / SpaceSignal concepts without changing stored data.
 import type { Project, Task } from "../types";
 import { platform } from "../platform";
+import { blockedTaskIds } from "../domain/tasks/dependencies";
 import { todayValue } from "./date";
 
 export type TodayBucketId = "now" | "next" | "later";
@@ -11,6 +12,9 @@ export type TodayReason =
   | "overdue"
   | "progress"
   | "focus"
+  // Waiting on another task that is still open (domain/tasks/dependencies).
+  // Distinct from "waiting", which is a status the user set by hand.
+  | "blocked"
   | "waiting"
   | "high"
   | "medium"
@@ -75,8 +79,20 @@ function isTodayTask(task: Task, today: string): boolean {
   );
 }
 
-export function defaultBucketFor(task: Task, today: string): TodayBucketId {
+/**
+ * `blocked` is passed in rather than read off the task, because whether a
+ * dependency still holds depends on the *other* task's status — see
+ * domain/tasks/dependencies. It is derived on every read and never stored,
+ * the same rule the Eisenhower quadrant follows (PLANNING_PRIORITY_DESIGN).
+ *
+ * It is checked before everything except an overdue deadline. A task you
+ * cannot start is not the next thing to do, however it is prioritised — but a
+ * deadline that has already passed still needs to be seen, and burying it
+ * would be the queue hiding the one thing that is going wrong.
+ */
+export function defaultBucketFor(task: Task, today: string, blocked = false): TodayBucketId {
   if (task.dueDate && task.dueDate < today) return "now";
+  if (blocked) return "later";
   if (task.status === "doing") return "now";
   if (task.priority === "high" && task.dueDate === today) return "now";
   if (task.status === "waiting") return "later";
@@ -86,8 +102,9 @@ export function defaultBucketFor(task: Task, today: string): TodayBucketId {
   return "next";
 }
 
-function reasonFor(task: Task, today: string): TodayReason {
+function reasonFor(task: Task, today: string, blocked = false): TodayReason {
   if (task.dueDate && task.dueDate < today && task.status !== "done") return "overdue";
+  if (blocked) return "blocked";
   if (task.status === "doing") return "progress";
   if (task.status === "waiting") return "waiting";
   if (task.priority === "high") return "high";
@@ -127,14 +144,20 @@ export function collectTodayEntries(
   today = todayValue(),
 ): TodayEntry[] {
   const entries: TodayEntry[] = [];
+  // Computed once over the whole list: a task's blocked-ness is a fact about
+  // its blocker, so it cannot be read from the task alone. The user's own
+  // override still wins below — this only moves the *default*, exactly as it
+  // does for every other rule here.
+  const blockedIds = blockedTaskIds(tasks);
   for (const task of tasks) {
     if (!isTodayTask(task, today)) continue;
-    const defaultBucket = defaultBucketFor(task, today);
+    const blocked = blockedIds.has(task.id);
+    const defaultBucket = defaultBucketFor(task, today, blocked);
     entries.push({
       task,
       defaultBucket,
       bucket: overrides[task.id] ?? defaultBucket,
-      reason: reasonFor(task, today),
+      reason: reasonFor(task, today, blocked),
       completed: task.status === "done",
     });
   }

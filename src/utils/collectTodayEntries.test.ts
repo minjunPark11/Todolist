@@ -104,3 +104,69 @@ describe("collectTodayEntries ordering", () => {
     expect(idsOf(tasks)).toEqual(["morning", "evening"]);
   });
 });
+
+// W2.3 — a task you cannot start is not the next thing to do. The demotion is
+// derived on every read from the blocker's status, never stored, so finishing
+// the blocker releases it with no cleanup pass.
+describe("collectTodayEntries blocked demotion", () => {
+  const entryFor = (tasks: Task[], id: string) =>
+    collectTodayEntries(tasks, {}, TODAY).find((entry) => entry.task.id === id);
+
+  it("sends a blocked task to later and says why", () => {
+    const tasks = [task({ id: "blocked", blockedByTaskId: "blocker" }), task({ id: "blocker" })];
+    const entry = entryFor(tasks, "blocked");
+    expect(entry?.defaultBucket).toBe("later");
+    expect(entry?.reason).toBe("blocked");
+  });
+
+  it("releases it as soon as the blocker is done", () => {
+    const tasks = [
+      task({ id: "blocked", blockedByTaskId: "blocker", priority: "high", dueDate: TODAY }),
+      task({ id: "blocker", status: "done", completedAt: `${TODAY}T09:00:00.000Z` }),
+    ];
+    const entry = entryFor(tasks, "blocked");
+    expect(entry?.defaultBucket).toBe("now");
+    expect(entry?.reason).toBe("high");
+  });
+
+  it("demotes a high-priority task due today, which would otherwise be now", () => {
+    const tasks = [
+      task({ id: "blocked", blockedByTaskId: "blocker", priority: "high", dueDate: TODAY }),
+      task({ id: "blocker" }),
+    ];
+    expect(entryFor(tasks, "blocked")?.defaultBucket).toBe("later");
+  });
+
+  it("still shows an overdue task, because a missed deadline outranks being stuck", () => {
+    const tasks = [
+      task({ id: "blocked", blockedByTaskId: "blocker", dueDate: "2026-08-01" }),
+      task({ id: "blocker" }),
+    ];
+    const entry = entryFor(tasks, "blocked");
+    expect(entry?.defaultBucket).toBe("now");
+    expect(entry?.reason).toBe("overdue");
+  });
+
+  it("lets the user's own override win, exactly as it does for every other rule", () => {
+    const tasks = [task({ id: "blocked", blockedByTaskId: "blocker" }), task({ id: "blocker" })];
+    const [entry] = collectTodayEntries(tasks, { blocked: "now" }, TODAY).filter(
+      (item) => item.task.id === "blocked",
+    );
+    expect(entry.bucket).toBe("now");
+    // The default it was moved away from is still reported, so the row can
+    // explain itself.
+    expect(entry.defaultBucket).toBe("later");
+  });
+
+  it("does not treat a dangling blocker id as blocked", () => {
+    // Asserted on the reason, not the bucket: a priority-none task with no
+    // deadline already lands in `later` on its own, so the bucket cannot tell
+    // the two causes apart.
+    const tasks = [
+      task({ id: "dangling", blockedByTaskId: "deleted-long-ago", priority: "high", dueDate: TODAY }),
+    ];
+    const entry = entryFor(tasks, "dangling");
+    expect(entry?.reason).toBe("high");
+    expect(entry?.defaultBucket).toBe("now");
+  });
+});

@@ -94,8 +94,13 @@ function slimTask(task: Task) {
     tags: task.tags,
     notes: trimField(task.notes),
     estimatedMinutes: task.estimatedMinutes,
-    isSomeday: task.isSomeday,
+    // isSomeday was here and is not any more: no UI has ever set it, so it was
+    // `false` on every task ever sent — a field that spent prompt budget to
+    // say nothing. The field itself stays on Task rather than being migrated
+    // away, since removing it buys nothing (CLICKUP_IMPORT_DESIGN D5).
     waitingReason: trimField(task.waitingReason),
+    // Kept, and now worth keeping: dependencies became settable in W2.2, so
+    // this finally carries a value the model can use.
     blockedByTaskId: task.blockedByTaskId,
     repeatType: task.repeatType === "none" ? "" : task.repeatType,
     completedAt: task.completedAt,
