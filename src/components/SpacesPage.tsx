@@ -1,5 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import type { FocusSession, GoalSchedule, LearningPath, Milestone, PageId, Project, ProjectType, Subtask, Task, TaskDraft } from "../types";
+import type { FocusSession, GoalSchedule, LearningPath, Milestone, PageId, Project, ProjectType, SpaceNote, Subtask, Task, TaskDraft } from "../types";
 import type { ToastState } from "./kit";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
 import { DeleteSpaceConfirmModal } from "./spaces/SpaceModals";
@@ -88,6 +88,12 @@ type SpacesPageProps = {
   onCloseProject: () => void;
   onOpenTask: (id: string) => void;
   onToggleDone: (id: string) => void;
+  // Space notes became synced planner records in M1; this page only passes
+  // them through to the detail view.
+  notes: SpaceNote[];
+  onCreateNote: (spaceId: string, draft: { title: string; body?: string; type?: string }) => string;
+  onUpdateNote: (noteId: string, patch: Partial<SpaceNote>) => void;
+  onDeleteNote: (noteId: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
   onCompleteTask: (id: string) => void;
@@ -158,6 +164,10 @@ export function SpacesPage({
   onArchiveBoardList,
   onMoveGoalToBoardList,
   onToggleDone,
+  notes,
+  onCreateNote,
+  onUpdateNote,
+  onDeleteNote,
   tasks,
   focusSessions,
   activeFocusSession,
@@ -457,6 +467,10 @@ export function SpacesPage({
         onArchiveBoardList={onArchiveBoardList}
         onMoveGoalToBoardList={onMoveGoalToBoardList}
         onToggleTaskDone={onToggleDone}
+        notes={notes}
+        onCreateNote={onCreateNote}
+        onUpdateNote={onUpdateNote}
+        onDeleteNote={onDeleteNote}
         focusSessions={focusSessions}
         activeFocusSession={activeFocusSession}
         onBack={closeSpace}

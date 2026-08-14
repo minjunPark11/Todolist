@@ -314,6 +314,10 @@ export function AppPages({
         onUpdateMilestone={planner.updateMilestone}
         onCreateGoal={planner.createLearningPath}
         onOpenGoal={openGoal}
+        notes={planner.spaceNotes}
+        onCreateNote={planner.createSpaceNote}
+        onUpdateNote={planner.updateSpaceNote}
+        onDeleteNote={planner.deleteSpaceNote}
         onCreateBoardList={planner.createBoardList}
         onUpdateBoardList={planner.updateBoardList}
         onArchiveBoardList={planner.archiveBoardList}

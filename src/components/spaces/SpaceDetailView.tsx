@@ -62,6 +62,12 @@ export type SpaceDetailViewProps = {
   onArchiveBoardList: (projectId: string, listId: string) => void;
   onMoveGoalToBoardList: (pathId: string, listId?: string) => void;
   onToggleTaskDone: (taskId: string) => void;
+  // Notes are synced planner records now, not hub-local state (M1), so they
+  // arrive as props like every other record this view edits.
+  notes: SpaceNote[];
+  onCreateNote: (spaceId: string, draft: { title: string; body?: string; type?: string }) => string;
+  onUpdateNote: (noteId: string, patch: Partial<SpaceNote>) => void;
+  onDeleteNote: (noteId: string) => void;
   focusSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
   onBack: () => void;
@@ -112,6 +118,10 @@ export function SpaceDetailView({
   onArchiveBoardList,
   onMoveGoalToBoardList,
   onToggleTaskDone,
+  notes,
+  onCreateNote,
+  onUpdateNote,
+  onDeleteNote,
   focusSessions,
   activeFocusSession,
   onBack,
@@ -155,10 +165,10 @@ export function SpaceDetailView({
   );
   const spaceNotes = useMemo(
     () =>
-      hub.notes
+      notes
         .filter((note) => note.spaceId === space.id)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [hub.notes, space.id],
+    [notes, space.id],
   );
   const activities = useMemo(
     () => deriveSpaceActivities(space.id, spaceTasks, spaceSessions, spaceNotes, hub.activities, t),
@@ -245,7 +255,7 @@ export function SpaceDetailView({
   }
 
   function handleQuickNoteCreate(draft: { title: string; body: string }): string {
-    return hub.addNote(space.id, { title: draft.title, body: draft.body, type: "Quick Note" });
+    return onCreateNote(space.id, { title: draft.title, body: draft.body, type: "Quick Note" });
   }
 
   function handleQuickNoteClose(savedNoteId: string | null) {
@@ -562,9 +572,9 @@ export function SpaceDetailView({
           onCloseSplit={closeNotesSplit}
           onToggleFullscreen={() => setIsNotesSplitFullscreen((current) => !current)}
           onAddNote={() => setModal({ kind: "add_note" })}
-          onUpdateNote={(noteId, patch) => hub.updateNote(noteId, patch)}
+          onUpdateNote={(noteId, patch) => onUpdateNote(noteId, patch)}
           onDeleteNote={(noteId) => {
-            hub.deleteNote(noteId);
+            onDeleteNote(noteId);
             showToast({ message: t("spaceHub.toast.noteDeleted") });
           }}
         />
@@ -581,8 +591,8 @@ export function SpaceDetailView({
       {modal.kind === "add_note" ? (
         <NoteQuickCreateModal
           onCreate={handleQuickNoteCreate}
-          onUpdate={(noteId, patch) => hub.updateNote(noteId, patch)}
-          onDelete={(noteId) => hub.deleteNote(noteId)}
+          onUpdate={(noteId, patch) => onUpdateNote(noteId, patch)}
+          onDelete={(noteId) => onDeleteNote(noteId)}
           onClose={handleQuickNoteClose}
           onOpenInSplit={(noteId) => {
             setModal({ kind: "none" });
@@ -652,9 +662,9 @@ export function SpaceDetailView({
         <NoteDetailDrawer
           note={drawerNote}
           relatedTask={spaceTasks.find((task) => task.id === drawerNote.relatedTaskId) ?? null}
-          onUpdate={(patch: Partial<SpaceNote>) => hub.updateNote(drawerNote.id, patch)}
+          onUpdate={(patch: Partial<SpaceNote>) => onUpdateNote(drawerNote.id, patch)}
           onDelete={() => {
-            hub.deleteNote(drawerNote.id);
+            onDeleteNote(drawerNote.id);
             setDrawer({ kind: "none" });
             showToast({ message: t("spaceHub.toast.noteDeleted") });
           }}

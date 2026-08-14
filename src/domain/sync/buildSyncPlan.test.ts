@@ -67,6 +67,7 @@ function data(overrides: Partial<PlannerData> = {}): PlannerData {
     focusSessions: [],
     activeSessionId: "",
     learningPaths: [],
+    spaceNotes: [],
     settings,
     appSettings,
     ...overrides,

@@ -1,12 +1,16 @@
 // Learning Paths started as an AI-side concept and still live next to their
 // drafting siblings, but since the Horizons page they are ordinary user data
-// that has to sync. This file is otherwise import-free on purpose; the one
-// type-only reference below is the exception, and it introduces no cycle
-// (learningPaths/types.ts reaches only contextCards/types.ts, which imports
-// nothing).
+// that has to sync. This file is otherwise import-free on purpose; the two
+// type-only references below are the exceptions, and neither introduces a
+// cycle (learningPaths/types.ts reaches only contextCards/types.ts, which
+// imports nothing; spaceHubTypes.ts imports nothing at all).
 import type { GoalLink, GoalSchedule, LearningPath, Milestone } from "./lib/ai/learningPaths/types";
+// Space notes joined the synced dataset for the same reason Learning Paths did
+// (SPACES_CLICKUP_REDESIGN.md D9): they are user writing, and writing that
+// lives on one device is writing the user loses.
+import type { SpaceNote } from "./lib/spaceHubTypes";
 
-export type { GoalLink, GoalSchedule, LearningPath, Milestone };
+export type { GoalLink, GoalSchedule, LearningPath, Milestone, SpaceNote };
 
 // === Task lifecycle (spec §4.1) ===
 // Canonical MVP statuses: inbox -> todo -> doing -> waiting -> done -> archived.
@@ -215,6 +219,7 @@ export interface PlannerData {
   focusSessions: FocusSession[];
   activeSessionId: string;
   learningPaths: LearningPath[];
+  spaceNotes: SpaceNote[];
   settings: PlannerSettings;
   appSettings: AppSettings;
 }

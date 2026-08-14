@@ -7,45 +7,50 @@ import {
   emptySpaceConfig,
   type SpaceActivity,
   type SpaceCustomConfig,
-  type SpaceNote,
 } from "../lib/spaceHubTypes";
 
-// Notes, legacy activity records, and lightweight per-space preferences live
-// in their own platform storage bucket so the core planner data stays small.
+// Legacy activity records and lightweight per-space preferences live in their
+// own platform storage bucket so the core planner data stays small.
+//
+// Notes used to live here too. They are user *writing*, so they moved into the
+// synced dataset (usePlannerData, SPACES_CLICKUP_REDESIGN.md M1) — this hook no
+// longer reads or edits them.
 const STORAGE_KEY = "todo-planner-space-hub-v1";
 
 interface SpaceHubStore {
-  notes: SpaceNote[];
+  // Carried verbatim, never parsed or edited. The migration drains this key
+  // (legacySpaceNotes.ts) and only marks itself done once the planner data has
+  // been persisted, so dropping it here would destroy the notes of anyone whose
+  // first launch after the update failed to write. It costs one untouched key
+  // to keep the old copy recoverable by hand for a release.
+  legacyNotes: unknown;
   activities: SpaceActivity[];
   configs: SpaceCustomConfig[];
+}
+
+function emptyStore(): SpaceHubStore {
+  return { legacyNotes: undefined, activities: [], configs: [] };
 }
 
 function loadStore(): SpaceHubStore {
   try {
     const raw = platform.storage.getSync(STORAGE_KEY);
-    if (!raw) return { notes: [], activities: [], configs: [] };
-    const parsed = JSON.parse(raw) as Partial<SpaceHubStore>;
+    if (!raw) return emptyStore();
+    const parsed = JSON.parse(raw) as Partial<SpaceHubStore> & { notes?: unknown };
     return {
-      notes: Array.isArray(parsed.notes) ? parsed.notes : [],
+      legacyNotes: parsed.notes,
       activities: Array.isArray(parsed.activities) ? parsed.activities : [],
       configs: Array.isArray(parsed.configs) ? parsed.configs : [],
     };
   } catch {
-    return { notes: [], activities: [], configs: [] };
+    return emptyStore();
   }
 }
 
-function createId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-export interface SpaceNoteDraft {
-  title: string;
-  body?: string;
-  type?: string;
-  url?: string;
-  relatedTaskId?: string;
-  tags?: string[];
+/** Written back under the original `notes` key so the blob keeps its shape. */
+function serializeStore(store: SpaceHubStore): string {
+  const { legacyNotes, ...rest } = store;
+  return JSON.stringify(legacyNotes === undefined ? rest : { ...rest, notes: legacyNotes });
 }
 
 export function useSpaceHubData() {
@@ -62,7 +67,9 @@ export function useSpaceHubData() {
 
   useEffect(() => {
     function resetSpaceHubStore() {
-      setStoreState({ notes: [], activities: [], configs: [] });
+      // A full reset drops the legacy copy too — the user asked for their data
+      // to be gone, and by then the notes live in the planner dataset.
+      setStoreState(emptyStore());
     }
     window.addEventListener("focusflow:space-hub-reset", resetSpaceHubStore);
     return () => window.removeEventListener("focusflow:space-hub-reset", resetSpaceHubStore);
@@ -70,41 +77,11 @@ export function useSpaceHubData() {
 
   useEffect(() => {
     try {
-      platform.storage.setSync(STORAGE_KEY, JSON.stringify(store));
+      platform.storage.setSync(STORAGE_KEY, serializeStore(store));
     } catch {
       // Storage full/unavailable: keep in-memory state working.
     }
   }, [store]);
-
-  function addNote(spaceId: string, draft: SpaceNoteDraft): string {
-    const now = new Date().toISOString();
-    const note: SpaceNote = {
-      id: createId("snote"),
-      spaceId,
-      title: draft.title.trim(),
-      body: draft.body?.trim() ?? "",
-      type: draft.type ?? "Quick Note",
-      url: draft.url?.trim() ?? "",
-      relatedTaskId: draft.relatedTaskId ?? "",
-      tags: draft.tags ?? [],
-      createdAt: now,
-      updatedAt: now,
-    };
-    setStore((current) => ({ ...current, notes: [note, ...current.notes] }));
-    return note.id;
-  }
-
-  function updateNote(noteId: string, patch: Partial<SpaceNote>) {
-    const now = new Date().toISOString();
-    setStore((current) => ({
-      ...current,
-      notes: current.notes.map((note) => (note.id === noteId ? { ...note, ...patch, updatedAt: now } : note)),
-    }));
-  }
-
-  function deleteNote(noteId: string) {
-    setStore((current) => ({ ...current, notes: current.notes.filter((note) => note.id !== noteId) }));
-  }
 
   function getConfig(spaceId: string): SpaceCustomConfig {
     const stored = store.configs.find((config) => config.spaceId === spaceId);
@@ -137,11 +114,7 @@ export function useSpaceHubData() {
   }
 
   return {
-    notes: store.notes,
     activities: store.activities,
-    addNote,
-    updateNote,
-    deleteNote,
     getConfig,
     updateConfig,
   };
