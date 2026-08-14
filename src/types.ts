@@ -79,6 +79,73 @@ export interface Subtask {
   updatedAt: string;
 }
 
+// === Space hierarchy (SPACES_CLICKUP_REDESIGN.md §4) ===
+//
+// Space -> Folder? -> List -> Item. Folder is optional, so a List may hang
+// straight off a Space (D4); that is the shape ClickUp calls a Folderless
+// List, and it is what keeps simple use from paying for the hierarchy.
+//
+// Only the two NEW collections live here so far. The Space itself is still the
+// existing `Project` record and gains its fields in P4: adding a field to a
+// record an older client already syncs would have that client erase it, which
+// is the whole point of M0 (§5). A brand-new table has no such problem — a
+// client that has never heard of it simply leaves it alone.
+
+/**
+ * A workflow stage. The label is the user's, but `group` is the app's: it is
+ * how "does this count as finished" stays answerable no matter what someone
+ * names their columns (D7).
+ *
+ * Four groups, always on. ClickUp ships three and puts Not Started behind a
+ * toggle; a per-user toggle for a status group would just be one more decision
+ * to make in an app with one user, and `inbox` already occupies that slot.
+ */
+export type StatusGroup = "notStarted" | "active" | "done" | "closed";
+
+export interface Status {
+  id: string;
+  label: string;
+  color: string;
+  order: number;
+  group: StatusGroup;
+}
+
+/** Optional grouping inside a Space. Absent until someone makes one (D4). */
+export interface Folder {
+  id: string;
+  spaceId: string;
+  name: string;
+  order: number;
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface List {
+  id: string;
+  /**
+   * Always set, even when the List sits inside a Folder. Reaching the Space
+   * through the Folder would make every lookup a two-hop join, and a
+   * Folderless List could not be resolved that way at all.
+   */
+  spaceId: string;
+  /** Absent for a Folderless List (D4). */
+  folderId?: string;
+  name: string;
+  order: number;
+  /**
+   * Created with the Space and not deletable, so an Item always has somewhere
+   * to be (D5). It is also what lets the UI hide the List level entirely until
+   * a second List exists (SPACES_CLICKUP_UI_DESIGN U2).
+   */
+  isDefault: boolean;
+  /** Overrides the Space's set when present; inherits when absent (D7). */
+  statuses?: Status[];
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ProjectStatus = "active" | "paused" | "completed" | "archived";
 export type ProjectType = "project" | "area";
 
@@ -220,6 +287,8 @@ export interface PlannerData {
   activeSessionId: string;
   learningPaths: LearningPath[];
   spaceNotes: SpaceNote[];
+  folders: Folder[];
+  lists: List[];
   settings: PlannerSettings;
   appSettings: AppSettings;
 }

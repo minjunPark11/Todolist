@@ -91,6 +91,15 @@ describe("normalizeData carries fields it does not know", () => {
     expect(note).toMatchObject(FUTURE);
   });
 
+  it("keeps them on a folder and a list", () => {
+    const data = normalizeData({
+      folders: [withFuture({ id: "folder-1", spaceId: "space-1", name: "H1" })],
+      lists: [withFuture({ id: "list-1", spaceId: "space-1", name: "Tasks" })],
+    });
+    expect(data.folders[0]).toMatchObject(FUTURE);
+    expect(data.lists[0]).toMatchObject(FUTURE);
+  });
+
   it("keeps them on app settings — feature toggles will live here", () => {
     const appSettings = normalizeData({
       appSettings: { ...FUTURE, theme: "dark" } as never,

@@ -8,7 +8,9 @@ import type {
   FocusMode,
   FocusSegment,
   FocusSession,
+  Folder,
   Language,
+  List,
   PlannerData,
   PlannerSettings,
   Project,
@@ -36,6 +38,8 @@ import {
   sortSpaceNotes,
 } from "../lib/spaces/spaceNotes";
 import type { SpaceNote } from "../lib/spaceHubTypes";
+import * as hierarchy from "../domain/spaces/hierarchy";
+import { sanitizeFolder, sanitizeList } from "../domain/spaces/hierarchy";
 import * as pathOps from "../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
@@ -365,6 +369,14 @@ export function normalizeData(data: RawPlannerData): PlannerData {
             .map((note) => sanitizeSpaceNote(note))
             .filter((note): note is SpaceNote => note !== null),
         )
+      : [],
+    // Space hierarchy (P3). Both collections stay empty until the Spaces UI
+    // creates anything; attaching Items to Lists is P4.
+    folders: Array.isArray(data.folders)
+      ? data.folders.map(sanitizeFolder).filter((folder): folder is Folder => folder !== null)
+      : [],
+    lists: Array.isArray(data.lists)
+      ? data.lists.map(sanitizeList).filter((list): list is List => list !== null)
       : [],
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
@@ -1600,6 +1612,100 @@ export function usePlannerData() {
     });
   }
 
+  // === Space hierarchy (P3) ===
+  // Nothing calls these yet — the Spaces UI arrives in P6. They exist now so
+  // the collections have a single owner from the start, the way every other
+  // record type does, rather than being written from a component later.
+  function createList(spaceId: string, name: string, folderId?: string): string {
+    const now = new Date().toISOString();
+    const list: List = {
+      id: createId("list"),
+      spaceId,
+      folderId,
+      name: name.trim(),
+      order: 0,
+      isDefault: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    setData((current) => ({ ...current, lists: hierarchy.addList(current.lists, list) }));
+    // TODO(P4): set `listsRevealed` on the Space here, so the tree keeps
+    // showing the List level after the count drops back to one (U2). It is a
+    // new field on the existing Project record, which a client older than
+    // v0.6.0 would strip on its next save (M0) — so it waits until that
+    // release has reached the user's devices. Until then shouldRevealLists()
+    // falls back to the live count, which is correct while nothing has been
+    // deleted yet.
+    return list.id;
+  }
+
+  /** Created with a Space and never deletable, so an Item always has a home (D5). */
+  function createDefaultList(spaceId: string): string {
+    const now = new Date().toISOString();
+    const list = hierarchy.makeDefaultList(createId("list"), spaceId, now);
+    setData((current) =>
+      hierarchy.defaultListFor(current.lists, spaceId)
+        ? current
+        : { ...current, lists: hierarchy.addList(current.lists, list) },
+    );
+    return list.id;
+  }
+
+  function updateList(listId: string, patch: Partial<List>) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const lists = hierarchy.patchList(current.lists, listId, patch, now);
+      return lists === current.lists ? current : { ...current, lists };
+    });
+  }
+
+  function archiveList(listId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const lists = hierarchy.archiveList(current.lists, listId, now);
+      return lists === current.lists ? current : { ...current, lists };
+    });
+  }
+
+  function moveListToFolder(listId: string, folderId?: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const lists = hierarchy.moveListToFolder(current.lists, listId, folderId, current.folders, now);
+      return lists === current.lists ? current : { ...current, lists };
+    });
+  }
+
+  function createFolder(spaceId: string, name: string): string {
+    const now = new Date().toISOString();
+    const folder: Folder = {
+      id: createId("folder"),
+      spaceId,
+      name: name.trim(),
+      order: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    setData((current) => ({ ...current, folders: hierarchy.addFolder(current.folders, folder) }));
+    return folder.id;
+  }
+
+  function updateFolder(folderId: string, patch: Partial<Folder>) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const folders = hierarchy.patchFolder(current.folders, folderId, patch, now);
+      return folders === current.folders ? current : { ...current, folders };
+    });
+  }
+
+  function archiveFolder(folderId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const next = hierarchy.archiveFolder(current.folders, current.lists, folderId, now);
+      if (next.folders === current.folders && next.lists === current.lists) return current;
+      return { ...current, folders: next.folders, lists: next.lists };
+    });
+  }
+
   // === App settings + recent items ===
   function updateAppSettings(patch: Partial<AppSettings>) {
     setData((current) => ({ ...current, appSettings: { ...current.appSettings, ...patch } }));
@@ -1644,6 +1750,8 @@ export function usePlannerData() {
     subtasks: data.subtasks,
     learningPaths: data.learningPaths,
     spaceNotes: data.spaceNotes,
+    folders: data.folders,
+    lists: data.lists,
     focusSessions: data.focusSessions,
     activeSessionId: data.activeSessionId,
     activeFocusSession:
@@ -1701,6 +1809,14 @@ export function usePlannerData() {
     createSpaceNote,
     updateSpaceNote,
     deleteSpaceNote,
+    createList,
+    createDefaultList,
+    updateList,
+    archiveList,
+    moveListToFolder,
+    createFolder,
+    updateFolder,
+    archiveFolder,
     updateAppSettings,
     updatePlannerSettings,
     startFocusSession,

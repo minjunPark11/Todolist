@@ -43,6 +43,8 @@ function plannerData(path: LearningPath): PlannerData {
     activeSessionId: "",
     learningPaths: [path],
     spaceNotes: [],
+    folders: [],
+    lists: [],
     settings: {} as PlannerData["settings"],
     appSettings: {} as PlannerData["appSettings"],
   };

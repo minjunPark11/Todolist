@@ -14,6 +14,8 @@ export const collectionTables = [
   ["focusSessions", "focus_sessions"],
   ["learningPaths", "learning_paths"],
   ["spaceNotes", "space_notes"],
+  ["folders", "folders"],
+  ["lists", "lists"],
 ] as const;
 
 // Tables added after the original schema: a client whose project predates them
@@ -21,6 +23,8 @@ export const collectionTables = [
 export const optionalRemoteTables: ReadonlySet<string> = new Set([
   "learning_paths",
   "space_notes",
+  "folders",
+  "lists",
 ]);
 
 export type SyncCollectionKey = (typeof collectionTables)[number][0];
