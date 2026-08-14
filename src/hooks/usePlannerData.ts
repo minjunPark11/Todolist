@@ -40,6 +40,7 @@ import {
 import type { SpaceNote } from "../lib/spaceHubTypes";
 import * as hierarchy from "../domain/spaces/hierarchy";
 import { sanitizeFolder, sanitizeList } from "../domain/spaces/hierarchy";
+import { defaultListIdFor } from "../domain/spaces/membership";
 import * as pathOps from "../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
@@ -396,15 +397,26 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   const learningPaths = adoptLegacyLearningPaths(data.learningPaths);
   const projects = adoptLegacyLocalSpaces(data.projects);
   const spaceNotes = adoptLegacySpaceNotes(data.spaceNotes);
+  // P4 (M3): every Space gets a default List so an Item always has somewhere
+  // to be. This is the ONLY thing the Spaces migration writes — tasks and
+  // goals are not rewritten, because while a Space has one List their
+  // membership is already answered by projectId (domain/spaces/membership).
+  const lists = hierarchy.ensureDefaultLists(
+    projects.filter((project) => !project.archivedAt).map((project) => project.id),
+    data.lists,
+    new Date().toISOString(),
+    defaultListIdFor,
+  );
   if (
     focusSessions === data.focusSessions &&
     learningPaths === data.learningPaths &&
     projects === data.projects &&
-    spaceNotes === data.spaceNotes
+    spaceNotes === data.spaceNotes &&
+    lists === data.lists
   ) {
     return data;
   }
-  return { ...data, focusSessions, learningPaths, projects, spaceNotes };
+  return { ...data, focusSessions, learningPaths, projects, spaceNotes, lists };
 }
 
 // M1 migration, and the same shape as the two below it: notes written before
@@ -1642,7 +1654,9 @@ export function usePlannerData() {
   /** Created with a Space and never deletable, so an Item always has a home (D5). */
   function createDefaultList(spaceId: string): string {
     const now = new Date().toISOString();
-    const list = hierarchy.makeDefaultList(createId("list"), spaceId, now);
+    // Same derived id the backfill uses, so creating a Space and loading one
+    // that predates Lists cannot end up with two different default Lists.
+    const list = hierarchy.makeDefaultList(defaultListIdFor(spaceId), spaceId, now);
     setData((current) =>
       hierarchy.defaultListFor(current.lists, spaceId)
         ? current

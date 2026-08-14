@@ -13,16 +13,22 @@ import type { Folder, List, Status, StatusGroup } from "../../types";
 export const STATUS_GROUPS: StatusGroup[] = ["notStarted", "active", "done", "closed"];
 
 /**
- * The set a Space starts with, and what the current fixed `TaskStatus` values
- * map onto when P4 migrates them (§5 M2). Keeping the mapping here means the
- * migration and the defaults cannot describe different things.
+ * The set a Space starts with (§5 M2).
+ *
+ * Every id is exactly a `TaskStatus` value, and that is load-bearing rather
+ * than tidy: while a Space still uses these defaults, a task's status id IS
+ * its status, so nothing has to be written to every task to migrate it. Only
+ * a task moved onto a status the user invented needs a stored `statusId`.
+ * `statusIdFor` in ./membership depends on this holding, and a test asserts
+ * the two lists stay in step.
  */
 export const DEFAULT_STATUSES: Status[] = [
   { id: "inbox", label: "Inbox", color: "#8e8e93", order: 0, group: "notStarted" },
   { id: "todo", label: "To Do", color: "#0066cc", order: 1, group: "active" },
-  { id: "waiting", label: "Waiting", color: "#ff9500", order: 2, group: "active" },
-  { id: "done", label: "Done", color: "#34c759", order: 3, group: "done" },
-  { id: "archived", label: "Archived", color: "#8e8e93", order: 4, group: "closed" },
+  { id: "doing", label: "Doing", color: "#5856d6", order: 2, group: "active" },
+  { id: "waiting", label: "Waiting", color: "#ff9500", order: 3, group: "active" },
+  { id: "done", label: "Done", color: "#34c759", order: 4, group: "done" },
+  { id: "archived", label: "Archived", color: "#8e8e93", order: 5, group: "closed" },
 ];
 
 export const DEFAULT_LIST_NAME = "Tasks";
@@ -175,6 +181,31 @@ function nextOrder(items: Array<{ order: number }>): number {
 
 export function makeDefaultList(id: string, spaceId: string, now: string, name = DEFAULT_LIST_NAME): List {
   return { id, spaceId, name, order: 0, isDefault: true, createdAt: now, updatedAt: now };
+}
+
+/**
+ * Give every Space a default List (D5). Returns the SAME array when there is
+ * nothing to add, so a load that changes nothing marks nothing dirty.
+ *
+ * Ids are derived from the Space id rather than generated, so a second run —
+ * a device whose first save failed, or another device migrating on its own —
+ * produces the same record instead of a duplicate.
+ */
+export function ensureDefaultLists(
+  spaceIds: string[],
+  lists: List[],
+  now: string,
+  idFor: (spaceId: string) => string,
+): List[] {
+  const added: List[] = [];
+  for (const spaceId of spaceIds) {
+    if (!spaceId) continue;
+    if (defaultListFor(lists, spaceId)) continue;
+    const id = idFor(spaceId);
+    if (lists.some((list) => list.id === id) || added.some((list) => list.id === id)) continue;
+    added.push(makeDefaultList(id, spaceId, now));
+  }
+  return added.length > 0 ? [...lists, ...added] : lists;
 }
 
 export function addList(current: List[], list: List): List[] {

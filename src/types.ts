@@ -64,6 +64,14 @@ export interface Task {
   deletedAt?: string; // optional soft-delete marker
   previousStatus?: TaskStatus; // used for undo/restore
   blockedByTaskId: string;
+  // === Space hierarchy (P4) ===
+  // Written only when the answer stops being derivable — when the task is
+  // moved into a List other than its Space's default, or onto a status the
+  // user invented. Resolve through membership.listIdFor / statusIdFor rather
+  // than reading these directly; `projectId` and `status` still answer when
+  // they are absent, which is the normal case.
+  listId?: string;
+  statusId?: string;
   repeatType: RepeatType;
   repeatInterval: number;
   repeatDays: number[];
@@ -172,6 +180,20 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
   boardLists?: BoardList[];
+  // === Space fields (P4, SPACES_CLICKUP_REDESIGN D1/D7) ===
+  // A Project IS the Space; the record keeps its id so Task.projectId,
+  // LearningPath.projectId, calendar categories and space:<id> tags all keep
+  // pointing at the same thing.
+  //
+  // All optional, and none is backfilled. A Space that has never been edited
+  // stores nothing new, so this migration rewrites no records at all — see
+  // domain/spaces/membership.ts for why that matters.
+  /** Absent means the default set (membership.statusesForSpace). */
+  statuses?: Status[];
+  /** Feature toggles, inherited from AppSettings when absent. */
+  features?: Record<string, boolean>;
+  /** One-way once a second List has existed (SPACES_CLICKUP_UI_DESIGN U2). */
+  listsRevealed?: boolean;
 }
 
 // One uninterrupted running stretch of a focus session. Pauses close a

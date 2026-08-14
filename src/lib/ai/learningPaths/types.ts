@@ -73,6 +73,9 @@ export type LearningPath = {
   /** @deprecated compatibility with pre-Horizons-2 clients. */
   targetDate?: string;
   projectId?: string; // Board: reuses the existing Space, and its colour (D9)
+  // Set only when the goal is moved off its Space's default List (P4).
+  // membership.goalListIdFor resolves it; projectId answers when absent.
+  listId?: string;
   boardListId?: string;
   boardOrder?: number;
   completedAt?: string; // user-asserted completion (D10)
