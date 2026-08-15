@@ -108,8 +108,10 @@ export default function App() {
     switch (appSettings.defaultView) {
       case "/calendar":
         return "calendar";
+      case "/board":
+      // Legacy: Planning is now the Board grouped by quadrant.
       case "/planning":
-        return "planning";
+        return "board";
       case "/projects":
         return "projects";
       case "/focus":
@@ -876,7 +878,7 @@ export default function App() {
       return;
     }
 
-    setActivePage("planning");
+    setActivePage("board");
   }
 
   function openProjectFromCalendar(projectId: string) {

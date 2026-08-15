@@ -73,26 +73,6 @@ const GROUP_KEY: Record<string, string> = {
   Work: "spaceHub.group.work",
 };
 
-const NOTE_TYPE_KEY: Record<string, string> = {
-  "Meeting Note": "spaceHub.noteType.meetingNote",
-  Feedback: "spaceHub.noteType.feedback",
-  Decision: "spaceHub.noteType.decision",
-  "Design Link": "spaceHub.noteType.designLink",
-  Reference: "spaceHub.noteType.reference",
-  "Concept Note": "spaceHub.noteType.conceptNote",
-  "Wrong Answer Note": "spaceHub.noteType.wrongAnswerNote",
-  "Pattern Summary": "spaceHub.noteType.patternSummary",
-  "Paper Note": "spaceHub.noteType.paperNote",
-  "Literature Summary": "spaceHub.noteType.literatureSummary",
-  "Supervisor Feedback": "spaceHub.noteType.supervisorFeedback",
-  "Experiment Note": "spaceHub.noteType.experimentNote",
-  Citation: "spaceHub.noteType.citation",
-  "Quick Note": "spaceHub.noteType.quickNote",
-  Checklist: "spaceHub.noteType.checklist",
-  Reminder: "spaceHub.noteType.reminder",
-  Link: "spaceHub.noteType.link",
-};
-
 export function presetText(t: TFn, value: string): string {
   const key = PRESET_KEY[value];
   return key ? t(key) : value;
@@ -100,11 +80,6 @@ export function presetText(t: TFn, value: string): string {
 
 export function groupText(t: TFn, value: string): string {
   const key = GROUP_KEY[value];
-  return key ? t(key) : value;
-}
-
-export function noteTypeText(t: TFn, value: string): string {
-  const key = NOTE_TYPE_KEY[value];
   return key ? t(key) : value;
 }
 

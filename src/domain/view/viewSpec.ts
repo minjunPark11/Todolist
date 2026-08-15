@@ -11,7 +11,7 @@
 // still driving the live screens. The equivalence tests assert that a view
 // and its screen answer identically, so this cannot quietly drift while the
 // two exist side by side.
-import type { Task, TaskPriority } from "../../types";
+import type { List, Project, Task, TaskPriority } from "../../types";
 import { getMatrixPosition } from "../../utils/eisenhower";
 import { defaultBucketFor } from "../../utils/todayView";
 import { HORIZONS } from "../../utils/horizons";
@@ -105,6 +105,43 @@ export function matchesFilter(item: Item, filter: ViewFilter): boolean {
 export interface GroupContext {
   today: string;
   taskById: Map<string, Task>;
+  /**
+   * Group id -> rank, for axes whose order the user owns rather than the
+   * product (D10). Built by `groupRank` so the board and the timeline cannot
+   * disagree: the same records in a different order on two screens is two
+   * truths, not two views. Absent means fall back to name order.
+   */
+  groupRank?: ReadonlyMap<string, number>;
+}
+
+/**
+ * Ranks the Spaces or Lists an axis groups by, honouring the order the user
+ * arranged them in and falling back to name only where they never said.
+ *
+ * `order` is optional on a Project and absent on anything the user has not
+ * reordered, so records without one sort after those with one — otherwise a
+ * single reordered Space would jump ahead of every untouched one for no
+ * reason the user could see.
+ */
+export function groupRank(
+  axis: GroupAxis,
+  records: { projects?: Project[]; lists?: List[] },
+): ReadonlyMap<string, number> | undefined {
+  const source =
+    axis === "space"
+      ? records.projects?.map((p) => ({ id: p.id, order: p.order, name: p.name }))
+      : axis === "list"
+        ? records.lists?.map((l) => ({ id: l.id, order: l.order, name: l.name }))
+        : undefined;
+  if (!source || source.length === 0) return undefined;
+
+  const ordered = [...source].sort((a, b) => {
+    const ao = typeof a.order === "number" ? a.order : Number.POSITIVE_INFINITY;
+    const bo = typeof b.order === "number" ? b.order : Number.POSITIVE_INFINITY;
+    if (ao !== bo) return ao - bo;
+    return a.name.localeCompare(b.name);
+  });
+  return new Map(ordered.map((record, index) => [record.id, index]));
 }
 
 export function groupKeyFor(item: Item, axis: GroupAxis, context: GroupContext): string {
@@ -144,7 +181,12 @@ const AXIS_ORDER: Partial<Record<GroupAxis, readonly string[]>> = {
   priority: ["high", "medium", "low", "none"],
 };
 
-function compareGroupIds(a: string, b: string, axis: GroupAxis): number {
+function compareGroupIds(
+  a: string,
+  b: string,
+  axis: GroupAxis,
+  rank?: ReadonlyMap<string, number>,
+): number {
   const order = AXIS_ORDER[axis];
   if (order) {
     const ai = order.indexOf(a);
@@ -156,6 +198,16 @@ function compareGroupIds(a: string, b: string, axis: GroupAxis): number {
   if (a === b) return 0;
   if (!a) return 1;
   if (!b) return -1;
+  // The user's arrangement outranks the alphabet (D10). A group with no rank —
+  // a record deleted while its items survive — sorts after every ranked one
+  // rather than at the top.
+  if (rank) {
+    const ar = rank.get(a);
+    const br = rank.get(b);
+    if (ar !== undefined || br !== undefined) {
+      return (ar ?? Number.MAX_SAFE_INTEGER) - (br ?? Number.MAX_SAFE_INTEGER);
+    }
+  }
   return a < b ? -1 : 1;
 }
 
@@ -200,7 +252,7 @@ export function applyView(items: Item[], spec: ViewSpec, context: GroupContext):
     else byGroup.set(key, [item]);
   }
   return [...byGroup.entries()]
-    .sort(([a], [b]) => compareGroupIds(a, b, spec.groupBy))
+    .sort(([a], [b]) => compareGroupIds(a, b, spec.groupBy, context.groupRank))
     .map(([id, groupItems]) => ({ id, items: [...groupItems].sort((a, b) => compareItems(a, b, spec.sort)) }));
 }
 

@@ -1,7 +1,8 @@
 import { ReactNode, useState } from "react";
 import { ArchivePage } from "../components/ArchivePage";
+import { BoardPage } from "../components/BoardPage";
+import { TimelinePage } from "../components/TimelinePage";
 import { CalendarView } from "../components/CalendarView";
-import { EisenhowerPage } from "../components/EisenhowerPage";
 import { FocusPage } from "../components/FocusPage";
 import { HorizonsPage } from "../components/HorizonsPage";
 import { GoalDetailDrawer } from "../components/horizons/GoalDetailDrawer";
@@ -196,18 +197,35 @@ export function AppPages({
     );
   }
 
-  if (activePage === "planning") {
+  if (activePage === "timeline") {
     return (
       <section className={pageGridClass()}>
-        <EisenhowerPage
+        <TimelinePage
           tasks={planner.tasks}
-          projects={activeProjects}
+          projects={planner.projects}
+          lists={planner.lists}
+          learningPaths={planner.learningPaths}
           selectedTaskId={planner.selectedTask?.id ?? ""}
           onOpenTask={planner.selectTask}
-          onToggleDone={planner.toggleTaskDone}
+          onUpdateTask={planner.updateTask}
+        />
+        {renderTaskDetail()}
+      </section>
+    );
+  }
+
+  if (activePage === "board") {
+    return (
+      <section className={pageGridClass()}>
+        <BoardPage
+          tasks={planner.tasks}
+          projects={planner.projects}
+          lists={planner.lists}
+          learningPaths={planner.learningPaths}
+          selectedTaskId={planner.selectedTask?.id ?? ""}
+          onOpenTask={planner.selectTask}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
-          onScheduleInCalendar={viewTaskInCalendar}
           showToast={showToast}
         />
         {renderTaskDetail()}
@@ -247,6 +265,8 @@ export function AppPages({
         <ArchivePage
           tasks={planner.tasks}
           projects={planner.projects}
+          lists={planner.lists}
+          learningPaths={planner.learningPaths}
           onOpenTask={planner.selectTask}
           onRestoreTask={planner.restoreTask}
           onRestoreProject={planner.restoreProject}
@@ -309,15 +329,12 @@ export function AppPages({
       <SpacesPage
         projects={planner.projects}
         tasks={planner.tasks}
+        lists={planner.lists}
         paths={planner.learningPaths}
         onUpdatePath={planner.updateLearningPath}
         onUpdateMilestone={planner.updateMilestone}
         onCreateGoal={planner.createLearningPath}
         onOpenGoal={openGoal}
-        notes={planner.spaceNotes}
-        onCreateNote={planner.createSpaceNote}
-        onUpdateNote={planner.updateSpaceNote}
-        onDeleteNote={planner.deleteSpaceNote}
         onCreateBoardList={planner.createBoardList}
         onUpdateBoardList={planner.updateBoardList}
         onArchiveBoardList={planner.archiveBoardList}

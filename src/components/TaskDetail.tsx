@@ -95,6 +95,14 @@ export function TaskDetail({
         <h3>{t("taskDetail.schedule")}</h3>
         <div className="detail-field-list">
           <label>
+            <span>{t("taskDetail.startDate")}</span>
+            <input
+              type="date"
+              value={task.startDate}
+              onChange={(event) => onUpdateTask(task.id, { startDate: event.target.value })}
+            />
+          </label>
+          <label>
             <span>{t("taskDetail.scheduledDate")}</span>
             <input
               type="date"

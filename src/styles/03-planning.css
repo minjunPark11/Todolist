@@ -1325,6 +1325,37 @@
 }
 
 /* ===== Planning: Board ===== */
+/* Columns keep a workable width and scroll sideways rather than being squeezed
+   — a Space with eight statuses is a scrolling board, not eight slivers. */
+.ff-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(260px, 1fr);
+  gap: 14px;
+  overflow-x: auto;
+  align-items: start;
+  padding-bottom: 8px;
+}
+.ff-board-controls { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.ff-board-quick-add { min-width: 148px; }
+@media (max-width: 768px) {
+  .ff-board-controls { width: 100%; }
+  .ff-board-quick-add { min-width: 0; flex: 1 1 140px; }
+}
+.ff-board-control { display: flex; flex-direction: column; gap: 4px; }
+.ff-board-control > span { font-size: 12px; font-weight: 600; color: var(--text-tertiary); }
+.ff-board-control select { min-width: 160px; padding: 6px 10px; font-size: 13px; }
+.ff-board-col-head strong { display: flex; align-items: center; gap: 6px; }
+.ff-board-chip {
+  background: var(--bg-hover);
+  border-radius: 99px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.ff-board-chip.is-warn { background: var(--accent-soft); color: var(--accent); }
+.ff-board-card.is-done .ff-board-card-title { text-decoration: line-through; color: var(--text-tertiary); }
+
 .ff-board-col {
   background: var(--bg-surface-muted);
   border: 1px solid var(--border-subtle);

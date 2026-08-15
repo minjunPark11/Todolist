@@ -1,5 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import type { FocusSession, GoalSchedule, LearningPath, Milestone, PageId, Project, ProjectType, SpaceNote, Subtask, Task, TaskDraft } from "../types";
+import type { FocusSession, GoalSchedule, LearningPath, List, Milestone, PageId, Project, ProjectType, Subtask, Task, TaskDraft } from "../types";
 import type { ToastState } from "./kit";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
 import { DeleteSpaceConfirmModal } from "./spaces/SpaceModals";
@@ -69,6 +69,8 @@ type SpacesPageProps = {
   // The board's time axis (SPACES_BOARD_DESIGN.md D2). Passed straight
   // through to the detail hub; the card list itself has no horizon axis.
   paths: LearningPath[];
+  // Only the detail hub's board reads these — the card list has no columns.
+  lists: List[];
   onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
   onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
   onCreateGoal: (input: { goal: string; projectId: string; boardListId?: string; schedule?: GoalSchedule }) => void;
@@ -88,12 +90,6 @@ type SpacesPageProps = {
   onCloseProject: () => void;
   onOpenTask: (id: string) => void;
   onToggleDone: (id: string) => void;
-  // Space notes became synced planner records in M1; this page only passes
-  // them through to the detail view.
-  notes: SpaceNote[];
-  onCreateNote: (spaceId: string, draft: { title: string; body?: string; type?: string }) => string;
-  onUpdateNote: (noteId: string, patch: Partial<SpaceNote>) => void;
-  onDeleteNote: (noteId: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
   onCompleteTask: (id: string) => void;
@@ -154,6 +150,7 @@ const emptyDraft: AddSpaceDraft = {
 
 export function SpacesPage({
   projects,
+  lists,
   paths,
   onUpdatePath,
   onUpdateMilestone,
@@ -164,10 +161,6 @@ export function SpacesPage({
   onArchiveBoardList,
   onMoveGoalToBoardList,
   onToggleDone,
-  notes,
-  onCreateNote,
-  onUpdateNote,
-  onDeleteNote,
   tasks,
   focusSessions,
   activeFocusSession,
@@ -456,6 +449,7 @@ export function SpacesPage({
       <SpaceDetailView
         space={selectedSpace}
         tasks={tasks}
+        lists={lists}
         projects={projects}
         paths={paths}
         onUpdatePath={onUpdatePath}
@@ -467,10 +461,6 @@ export function SpacesPage({
         onArchiveBoardList={onArchiveBoardList}
         onMoveGoalToBoardList={onMoveGoalToBoardList}
         onToggleTaskDone={onToggleDone}
-        notes={notes}
-        onCreateNote={onCreateNote}
-        onUpdateNote={onUpdateNote}
-        onDeleteNote={onDeleteNote}
         focusSessions={focusSessions}
         activeFocusSession={activeFocusSession}
         onBack={closeSpace}

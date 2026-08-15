@@ -29,15 +29,6 @@ import {
 import {
   readLegacyLocalSpaces,
 } from "../lib/spaces/legacyLocalSpaces";
-import { readLegacySpaceNotes } from "../lib/spaces/legacySpaceNotes";
-import {
-  addSpaceNote,
-  dropSpaceNote,
-  patchSpaceNote,
-  sanitizeSpaceNote,
-  sortSpaceNotes,
-} from "../lib/spaces/spaceNotes";
-import type { SpaceNote } from "../lib/spaceHubTypes";
 import * as hierarchy from "../domain/spaces/hierarchy";
 import { sanitizeFolder, sanitizeList } from "../domain/spaces/hierarchy";
 import { defaultListIdFor } from "../domain/spaces/membership";
@@ -144,6 +135,7 @@ function normalizeTask(task: Partial<Task>): Task {
     priority: oneOf(task.priority, taskPriorities, "none"),
     dueDate,
     scheduledDate,
+    startDate: task.startDate ?? "",
     startTime,
     endTime: task.endTime ?? "",
     projectId: task.projectId ?? "",
@@ -323,7 +315,9 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
     language: oneOf(settings?.language, languages, DEFAULT_APP_SETTINGS.language),
     defaultView: oneOf(
       settings?.defaultView,
-      ["/today", "/inbox", "/calendar", "/planning", "/projects", "/focus"] as const,
+      // "/planning" stays accepted: it is stored in existing accounts and
+      // resolves to the Board, so dropping it here would reset those users.
+      ["/today", "/inbox", "/calendar", "/board", "/planning", "/projects", "/focus"] as const,
       DEFAULT_APP_SETTINGS.defaultView,
     ),
     showCompletedInToday: settings?.showCompletedInToday ?? DEFAULT_APP_SETTINGS.showCompletedInToday,
@@ -361,16 +355,6 @@ export function normalizeData(data: RawPlannerData): PlannerData {
           .filter((path): path is LearningPath => path !== null)
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       : [],
-    // Same rule as learningPaths above: one sanitizer for the legacy blob and
-    // the synced rows alike, so a note cannot mean different things depending
-    // on where it was read from.
-    spaceNotes: Array.isArray(data.spaceNotes)
-      ? sortSpaceNotes(
-          data.spaceNotes
-            .map((note) => sanitizeSpaceNote(note))
-            .filter((note): note is SpaceNote => note !== null),
-        )
-      : [],
     // Space hierarchy (P3). Both collections stay empty until the Spaces UI
     // creates anything; attaching Items to Lists is P4.
     folders: Array.isArray(data.folders)
@@ -396,7 +380,6 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   const focusSessions = recoverStaleFocusSessions(data.focusSessions);
   const learningPaths = adoptLegacyLearningPaths(data.learningPaths);
   const projects = adoptLegacyLocalSpaces(data.projects);
-  const spaceNotes = adoptLegacySpaceNotes(data.spaceNotes);
   // P4 (M3): every Space gets a default List so an Item always has somewhere
   // to be. This is the ONLY thing the Spaces migration writes — tasks and
   // goals are not rewritten, because while a Space has one List their
@@ -411,25 +394,11 @@ function adoptLoadedData(data: PlannerData): PlannerData {
     focusSessions === data.focusSessions &&
     learningPaths === data.learningPaths &&
     projects === data.projects &&
-    spaceNotes === data.spaceNotes &&
     lists === data.lists
   ) {
     return data;
   }
-  return { ...data, focusSessions, learningPaths, projects, spaceNotes, lists };
-}
-
-// M1 migration, and the same shape as the two below it: notes written before
-// they were synced sit in the space-hub blob. Merged by id so a repeated read
-// (StrictMode, or a failed marker write) adds nothing twice, and a copy that
-// already reached the account is never overwritten by the stale local one.
-function adoptLegacySpaceNotes(current: SpaceNote[]): SpaceNote[] {
-  const legacy = readLegacySpaceNotes();
-  if (legacy.length === 0) return current;
-  const seen = new Set(current.map((note) => note.id));
-  const added = legacy.filter((note) => !seen.has(note.id));
-  if (added.length === 0) return current;
-  return sortSpaceNotes([...current, ...added]);
+  return { ...data, focusSessions, learningPaths, projects, lists };
 }
 
 // Phase S4 migration, and the same shape as the one below it: custom spaces
@@ -1584,46 +1553,6 @@ export function usePlannerData() {
     return next.find((path) => path.id === pathId) ?? null;
   }
 
-  // === Space notes (M1) ===
-  // The hub hook owned these until they had to sync. The reducers stay here so
-  // notes ride the same save path as every other record — and so the identity
-  // rule that keeps a save to one note from rewriting all of them holds.
-  function createSpaceNote(
-    spaceId: string,
-    draft: { title: string; body?: string; type?: string; url?: string; relatedTaskId?: string; tags?: string[] },
-  ): string {
-    const now = new Date().toISOString();
-    const note: SpaceNote = {
-      id: `snote-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      spaceId,
-      title: draft.title.trim(),
-      body: draft.body?.trim() ?? "",
-      type: draft.type ?? "Quick Note",
-      url: draft.url?.trim() ?? "",
-      relatedTaskId: draft.relatedTaskId ?? "",
-      tags: draft.tags ?? [],
-      createdAt: now,
-      updatedAt: now,
-    };
-    setData((current) => ({ ...current, spaceNotes: addSpaceNote(current.spaceNotes, note) }));
-    return note.id;
-  }
-
-  function updateSpaceNote(noteId: string, patch: Partial<SpaceNote>) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const spaceNotes = patchSpaceNote(current.spaceNotes, noteId, patch, now);
-      return spaceNotes === current.spaceNotes ? current : { ...current, spaceNotes };
-    });
-  }
-
-  function deleteSpaceNote(noteId: string) {
-    setData((current) => {
-      const spaceNotes = dropSpaceNote(current.spaceNotes, noteId);
-      return spaceNotes === current.spaceNotes ? current : { ...current, spaceNotes };
-    });
-  }
-
   // === Space hierarchy (P3) ===
   // Nothing calls these yet — the Spaces UI arrives in P6. They exist now so
   // the collections have a single owner from the start, the way every other
@@ -1763,7 +1692,6 @@ export function usePlannerData() {
     projects: data.projects,
     subtasks: data.subtasks,
     learningPaths: data.learningPaths,
-    spaceNotes: data.spaceNotes,
     folders: data.folders,
     lists: data.lists,
     focusSessions: data.focusSessions,
@@ -1820,9 +1748,6 @@ export function usePlannerData() {
     deleteMilestone,
     linkCardToMilestone,
     createTaskFromMilestone,
-    createSpaceNote,
-    updateSpaceNote,
-    deleteSpaceNote,
     createList,
     createDefaultList,
     updateList,

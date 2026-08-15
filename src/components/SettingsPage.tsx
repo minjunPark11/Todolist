@@ -209,12 +209,14 @@ export function SettingsPage({
         <div className="ff-settings-card">
           <Row title={t("settings.defaultStartPage")} hint={t("settings.defaultStartPageHint")}>
             <select
-              value={settings.defaultView}
+              // A stored "/planning" has no option of its own any more; showing
+              // it as the Board keeps the picker from reading as unset.
+              value={settings.defaultView === "/planning" ? "/board" : settings.defaultView}
               onChange={(e) => onUpdate({ defaultView: e.target.value as AppSettings["defaultView"] })}
             >
               <option value="/today">{t("sidebar.today")}</option>
               <option value="/calendar">{t("sidebar.calendar")}</option>
-              <option value="/planning">{t("sidebar.planning")}</option>
+              <option value="/board">{t("sidebar.board")}</option>
               <option value="/projects">{t("sidebar.spaces")}</option>
               <option value="/focus">{t("sidebar.focus")}</option>
               <option value="/inbox">{t("settings.defaultStartPageInboxOption")}</option>

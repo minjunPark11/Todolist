@@ -42,7 +42,6 @@ function plannerData(path: LearningPath): PlannerData {
     focusSessions: [],
     activeSessionId: "",
     learningPaths: [path],
-    spaceNotes: [],
     folders: [],
     lists: [],
     settings: {} as PlannerData["settings"],

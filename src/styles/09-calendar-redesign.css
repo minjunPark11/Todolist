@@ -443,59 +443,14 @@
   --tdy-navy-hover: color-mix(in srgb, var(--accent) 88%, #000);
   --tdy-blue-soft: var(--accent-soft);
 }
-
-/* --- Eisenhower matrix: tinted quadrants (reference EisSection) --- */
-.eis-cell {
-  border: none;
-  border-radius: var(--radius-lg);
-  padding: 12px;
-}
-
-.eis-cell-I,
-.eis-cell-II,
-.eis-cell-III,
-.eis-cell-IV {
-  border-top: none;
-}
-
-.eis-cell-I { background: color-mix(in srgb, var(--danger) 5%, var(--bg-surface)); }
-.eis-cell-II { background: color-mix(in srgb, var(--accent) 5%, var(--bg-surface)); }
-.eis-cell-III { background: color-mix(in srgb, var(--warning) 5%, var(--bg-surface)); }
-.eis-cell-IV { background: color-mix(in srgb, var(--text-tertiary) 5%, var(--bg-surface)); }
-
-.eis-cell-I .eis-cell-roman, .eis-q-I { color: var(--danger); }
-.eis-cell-II .eis-cell-roman, .eis-q-II { color: var(--accent); }
-.eis-cell-III .eis-cell-roman, .eis-q-III { color: var(--warning); }
-.eis-cell-IV .eis-cell-roman, .eis-q-IV { color: var(--text-tertiary); }
-
-.eis-cell-head {
-  border-bottom: none;
-  padding-bottom: 4px;
-}
-
-.eis-cell-head strong {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.eis-cell-head small {
-  font-size: 10px;
-}
+.eis-q-I { color: var(--danger); }
+.eis-q-II { color: var(--accent); }
+.eis-q-III { color: var(--warning); }
+.eis-q-IV { color: var(--text-tertiary); }
 
 .eis-cell-roman {
   font-size: 11px;
   font-weight: 700;
-}
-
-.eis-row {
-  box-shadow: var(--shadow-xs);
-  transition: border-color var(--motion-fast), box-shadow var(--motion-fast),
-    background var(--motion-fast);
-}
-
-.eis-row:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
 }
 body:has(.mini-focus-window) {
   margin: 0;

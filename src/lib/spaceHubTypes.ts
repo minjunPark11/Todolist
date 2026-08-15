@@ -7,9 +7,9 @@ export type SpaceHubType = "project" | "personal" | "custom";
 // The per-space "calendar" tab was removed (PROJECT_DETAIL_REMOVE_CALENDAR_TAB
 // spec) — scheduling lives in the main Calendar page. Legacy ?tab=calendar
 // URLs fall back to "overview" because the value is no longer in SPACE_TABS.
-export type SpaceTab = "overview" | "goals" | "tasks" | "notes";
+export type SpaceTab = "overview" | "goals" | "tasks";
 
-export const SPACE_TABS: SpaceTab[] = ["overview", "goals", "tasks", "notes"];
+export const SPACE_TABS: SpaceTab[] = ["overview", "goals", "tasks"];
 
 export type SpaceSignalStatus =
   | "on_track"
@@ -20,19 +20,6 @@ export type SpaceSignalStatus =
   | "review_due"
   | "pending_items";
 
-export interface SpaceNote {
-  id: string;
-  spaceId: string;
-  title: string;
-  body: string;
-  type: string;
-  url: string;
-  relatedTaskId: string;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 export type SpaceActivityType =
   | "task_created"
   | "task_updated"
@@ -40,8 +27,6 @@ export type SpaceActivityType =
   | "task_scheduled"
   | "focus_started"
   | "focus_completed"
-  | "note_created"
-  | "note_updated"
   | "manual_record"
   | "ai_suggestion_applied";
 
@@ -53,7 +38,6 @@ export interface SpaceActivity {
   description: string;
   relatedTaskId: string;
   relatedSessionId: string;
-  relatedNoteId: string;
   createdAt: string;
 }
 
@@ -117,15 +101,12 @@ export interface SpaceLike {
 export interface SpaceTypePreset {
   headerSubtitle: string;
   addTaskLabel: string;
-  addNoteLabel: string;
   startFocusLabel: string;
   primaryTaskSectionLabel: string;
   nextActionLabel: string;
   signalLabel: string;
   focusTimeLabel: string;
   upcomingLabel: string;
-  taskGroups: string[];
-  noteTypes: string[];
-  // Example first tasks shown under the tasks-tab empty state ("e.g. …").
+  taskGroups: string[];  // Example first tasks shown under the tasks-tab empty state ("e.g. …").
   emptyTaskExamples: string;
 }
