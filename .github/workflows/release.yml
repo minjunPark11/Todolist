@@ -19,7 +19,15 @@ on:
         type: string
 
 jobs:
+  # A tag can be cut from any commit, including one that never went through a
+  # PR, so the release re-runs the gate rather than trusting that it already
+  # passed. It is one ubuntu job against two platform builds — cheap insurance
+  # against publishing a broken auto-update to every installed client.
+  verify:
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: verify
     permissions:
       contents: write
     strategy:

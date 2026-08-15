@@ -1,0 +1,45 @@
+name: CI
+
+# The gate that was missing: 530 tests existed but nothing ran them, so a
+# broken commit could reach main and be tagged for release unchallenged.
+#
+# Frontend only — this never touches Rust or Tauri, so it stays fast enough
+# to block a merge on. The platform builds live in release.yml.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  # Lets the release workflow depend on this exact job (see release.yml).
+  workflow_call:
+
+# A new push supersedes the run in flight for the same branch. The release
+# path is deliberately NOT cancellable, so it names its own group.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Matches release.yml — a version that passes here and fails there
+          # would defeat the point of gating.
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Kept as separate steps so a red run says which one failed without
+      # anyone opening the log.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
