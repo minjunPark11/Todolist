@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSyncPlan, isEmptySyncPlan } from "./buildSyncPlan";
+import { buildSyncPlan, collectionTables, isEmptySyncPlan } from "./buildSyncPlan";
 import type { AppSettings, PlannerData, PlannerSettings, Task } from "../../types";
 
 function task(id: string, title = id): Task {
@@ -10,6 +10,7 @@ function task(id: string, title = id): Task {
     status: "todo",
     priority: "none",
     dueDate: "",
+    startDate: "",
     scheduledDate: "",
     startTime: "",
     endTime: "",
@@ -67,7 +68,6 @@ function data(overrides: Partial<PlannerData> = {}): PlannerData {
     focusSessions: [],
     activeSessionId: "",
     learningPaths: [],
-    spaceNotes: [],
     folders: [],
     lists: [],
     settings,
@@ -97,6 +97,21 @@ describe("buildSyncPlan — first sync", () => {
     expect(plan.settings).not.toBeNull();
     expect(plan.appState).not.toBeNull();
     expect(isEmptySyncPlan(plan)).toBe(false);
+  });
+});
+
+describe("a collection the product dropped", () => {
+  // Space notes were removed. The danger is not that the table is missing —
+  // it is that re-adding it with nothing local means "delete every note the
+  // account holds", which is exactly what a diff against an empty collection
+  // produces. This asserts the table is never in a plan at all.
+  it("never appears in a plan, so a release cannot erase the rows", () => {
+    const withBaseline = buildSyncPlan(data(), data({ tasks: [task("a")] }));
+    const firstSync = buildSyncPlan(data(), null);
+    for (const plan of [withBaseline, firstSync]) {
+      expect(tableNamed(plan, "space_notes")).toBeUndefined();
+    }
+    expect(collectionTables.some(([, table]) => (table as string) === "space_notes")).toBe(false);
   });
 });
 

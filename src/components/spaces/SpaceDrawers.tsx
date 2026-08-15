@@ -1,13 +1,12 @@
 import { ReactNode, useState } from "react";
 import type { FocusSession, Project, Task } from "../../types";
-import type { SpaceCustomConfig, SpaceNote } from "../../lib/spaceHubTypes";
+import type { SpaceCustomConfig } from "../../lib/spaceHubTypes";
 import {
   formatSeconds,
   sessionSeconds,
 } from "../../lib/spaceSelectors";
 import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
-import { noteTypeText } from "../../lib/spaceHubI18n";
 
 function DrawerShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const { t } = useT();
@@ -33,13 +32,11 @@ export function TaskDetailDrawer({
   childTasks,
   projects,
   sessions,
-  notes,
   isPinned,
   onStartFocus,
   onComplete,
   onPin,
   onArchive,
-  onOpenNote,
   onAddChildTask,
   onToggleChildDone,
   onOpenTask,
@@ -53,13 +50,11 @@ export function TaskDetailDrawer({
   childTasks: Task[];
   projects: Project[];
   sessions: FocusSession[];
-  notes: SpaceNote[];
   isPinned: boolean;
   onStartFocus: () => void;
   onComplete: () => void;
   onPin: () => void;
   onArchive: () => void;
-  onOpenNote: (noteId: string) => void;
   onAddChildTask: (title: string) => void;
   onToggleChildDone: (taskId: string) => void;
   onOpenTask: (taskId: string) => void;
@@ -181,21 +176,6 @@ export function TaskDetailDrawer({
           </ul>
         </>
       ) : null}
-      {notes.length > 0 ? (
-        <>
-          <h4>{t("spaceHub.section.linkedNotes")}</h4>
-          <ul className="sdv-record-list">
-            {notes.map((note) => (
-              <li key={note.id}>
-                <button type="button" onClick={() => onOpenNote(note.id)}>
-                  <strong>{note.title}</strong>
-                  <small>{noteTypeText(t, note.type)}</small>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
 
       <div className="sdv-drawer-actions">
         {!done ? (
@@ -252,94 +232,6 @@ export function SessionDetailDrawer({
         </div>
       </dl>
       {session.focusNote ? <p className="sdv-drawer-notes">{session.focusNote}</p> : null}
-    </DrawerShell>
-  );
-}
-
-// § 32.6 Note Detail Drawer
-export function NoteDetailDrawer({
-  note,
-  relatedTask,
-  onUpdate,
-  onDelete,
-  onClose,
-}: {
-  note: SpaceNote;
-  relatedTask: Task | null;
-  onUpdate: (patch: Partial<SpaceNote>) => void;
-  onDelete: () => void;
-  onClose: () => void;
-}) {
-  const { t } = useT();
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(note.title);
-  const [body, setBody] = useState(note.body);
-
-  return (
-    <DrawerShell title={t("spaceHub.drawer.note")} onClose={onClose}>
-      {editing ? (
-        <div className="sdv-form">
-          <label>
-            {t("spaceHub.field.title")}
-            <input value={title} onChange={(event) => setTitle(event.target.value)} />
-          </label>
-          <label>
-            {t("spaceHub.field.body")}
-            <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={6} />
-          </label>
-          <div className="sdv-drawer-actions">
-            <button
-              type="button"
-              className="sdv-btn sdv-btn-primary"
-              onClick={() => {
-                onUpdate({ title: title.trim() || note.title, body });
-                setEditing(false);
-              }}
-            >
-              {t("spaceHub.action.save")}
-            </button>
-            <button type="button" className="sdv-btn" onClick={() => setEditing(false)}>
-              {t("spaceHub.action.cancel")}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <h3 className="sdv-drawer-title">{note.title}</h3>
-          <span className="sdv-note-type">{noteTypeText(t, note.type)}</span>
-          {note.body ? <p className="sdv-drawer-notes">{note.body}</p> : null}
-          {note.url ? (
-            <a className="sdv-btn sdv-btn-sm" href={note.url} target="_blank" rel="noreferrer">
-              {t("spaceHub.action.openLink")}
-            </a>
-          ) : null}
-          {relatedTask ? (
-            <dl className="sdv-detail-list">
-              <div>
-                <dt>{t("spaceHub.field.relatedTask")}</dt>
-                <dd>{relatedTask.title}</dd>
-              </div>
-            </dl>
-          ) : null}
-          {note.tags.length > 0 ? (
-            <div className="sdv-chip-row">
-              {note.tags.map((tag) => (
-                <span key={tag} className="sdv-chip">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          <div className="sdv-drawer-actions">
-            <button type="button" className="sdv-btn" onClick={() => setEditing(true)}>
-              {t("spaceHub.action.edit")}
-            </button>
-            <button type="button" className="sdv-btn sdv-btn-danger" onClick={onDelete}>
-              {t("spaceHub.action.delete")}
-            </button>
-          </div>
-        </>
-      )}
     </DrawerShell>
   );
 }

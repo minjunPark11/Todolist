@@ -1,0 +1,210 @@
+// The Space's work board (SPACES_CLICKUP_REDESIGN D7, CLICKUP_IMPORT_DESIGN
+// §4.2): `filter:{spaceId}, groupBy:"status", layout:"board"` — a saved view,
+// not a screen with rules of its own.
+//
+// Statuses are owned by the Space and inherited downwards (D7), so the columns
+// change with the scope selector rather than being a fixed set. "All spaces"
+// falls back to the defaults, which is honest because a task with no Space
+// status of its own resolves to exactly those (membership.statusIdFor).
+//
+// The axis selector is here to prove the engine, not as a feature for its own
+// sake: switching to Quadrant renders the Planning matrix as four columns
+// through this same component, which is the step that lets EisenhowerPage go.
+import { useMemo, useState } from "react";
+import type { LearningPath, List, Project, Task, TaskDraft } from "../types";
+import { projectItems, type Item } from "../domain/view/item";
+import { patchForColumn } from "../domain/view/board";
+import { type GroupAxis, type GroupContext, type ViewSpec } from "../domain/view/viewSpec";
+import { statusesWithBoardLists } from "../domain/spaces/membership";
+import { DEFAULT_STATUSES } from "../domain/spaces/hierarchy";
+import { todayValue } from "../utils/date";
+import { BoardView, type BoardColumn } from "./BoardView";
+import { EmptyState, type ToastState } from "./kit";
+import { ExpandableAdd } from "./motion/ExpandableAdd";
+import { useT } from "../i18n";
+
+const ALL_SPACES = "";
+
+const DEFAULT_STATUS_IDS = new Set(DEFAULT_STATUSES.map((status) => status.id));
+
+// The axes this board offers. Both are droppable, which is the point: an axis
+// you can only look at is a report, not a board.
+const AXES: GroupAxis[] = ["status", "quadrant"];
+
+interface BoardPageProps {
+  tasks: Task[];
+  projects: Project[];
+  lists: List[];
+  learningPaths: LearningPath[];
+  selectedTaskId: string;
+  onOpenTask: (id: string) => void;
+  onUpdateTask: (id: string, patch: Partial<Task>) => void;
+  onCreateTask: (draft: TaskDraft) => string;
+  showToast: (toast: ToastState) => void;
+}
+
+export function BoardPage({
+  tasks,
+  projects,
+  lists,
+  learningPaths,
+  selectedTaskId,
+  onOpenTask,
+  onUpdateTask,
+  onCreateTask,
+  showToast,
+}: BoardPageProps) {
+  const { t } = useT();
+  const today = todayValue();
+  const [spaceId, setSpaceId] = useState<string>(ALL_SPACES);
+  const [axis, setAxis] = useState<GroupAxis>("status");
+
+  const activeSpaces = useMemo(
+    () => projects.filter((project) => project.status !== "archived" && !project.archivedAt),
+    [projects],
+  );
+
+  // A Space that was archived while selected would otherwise leave the board
+  // scoped to something the picker no longer offers.
+  const scope = activeSpaces.some((space) => space.id === spaceId) ? spaceId : ALL_SPACES;
+  const space = activeSpaces.find((candidate) => candidate.id === scope);
+  const statuses = useMemo(
+    () => (space ? statusesWithBoardLists(space) : DEFAULT_STATUSES),
+    [space],
+  );
+
+  const items = useMemo(
+    () => projectItems({ tasks, paths: learningPaths, projects, lists, today }),
+    [tasks, learningPaths, projects, lists, today],
+  );
+
+  const context: GroupContext = useMemo(
+    () => ({ today, taskById: new Map(tasks.map((task) => [task.id, task])) }),
+    [today, tasks],
+  );
+
+  const spec: ViewSpec = useMemo(
+    () => ({
+      id: `board-${axis}-${scope || "all"}`,
+      name: t("board.title"),
+      // An archived task is closed work; it belongs in the Archive, not as a
+      // column on the working board.
+      filter: {
+        ...(scope ? { spaceId: scope } : {}),
+        ...(axis === "quadrant" ? { sources: ["task" as const] } : {}),
+      },
+      groupBy: axis,
+      sort: { key: "dueDate" },
+      layout: "board",
+    }),
+    [axis, scope, t],
+  );
+
+  const visibleItems = useMemo(
+    () => items.filter((item) => item.statusId !== "archived"),
+    [items],
+  );
+
+  const columns: BoardColumn[] = useMemo(() => {
+    if (axis === "quadrant") {
+      return (["I", "II", "III", "IV"] as const).map((quadrant) => ({
+        id: quadrant,
+        // Shared with TaskDetail's quadrant picker — the `eis.` prefix now
+        // names the Eisenhower vocabulary, not the page that used to own it.
+        label: `${quadrant}. ${t(`eis.q${quadrant}`)}`,
+      }));
+    }
+    return statuses
+      .filter((status) => status.id !== "archived")
+      .map((status) => ({
+        // A default status has a translation; a column the user named is
+        // already in their own words and must not be overwritten by one.
+        id: status.id,
+        label: DEFAULT_STATUS_IDS.has(status.id) ? t(`status.${status.id}`) : status.label,
+        color: status.color,
+      }));
+  }, [axis, statuses, t]);
+
+  function handleQuickAdd(title: string) {
+    // Captured into the Space currently in scope, otherwise a task typed while
+    // looking at one board would be filtered straight back out of it.
+    const id = onCreateTask({ title, status: "inbox", ...(scope ? { projectId: scope } : {}) });
+    showToast({
+      message: t("board.toastAdded"),
+      actionLabel: t("board.toastConfigure"),
+      onAction: () => onOpenTask(id),
+    });
+  }
+
+  function handleDrop(item: Item, columnId: string) {
+    // Only tasks carry the fields every axis is derived from. A goal has no
+    // priority and no workflow status, so dropping one is a no-op rather than
+    // a write that would mean something different from what it looks like.
+    if (item.source !== "task") return;
+    const task = context.taskById.get(item.sourceId);
+    if (!task) return;
+    const patch = patchForColumn(axis, task, columnId, { today, statuses });
+    if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
+  }
+
+  return (
+    <div className="ff-page">
+      <header className="ff-page-head">
+        <div>
+          <h1 className="ff-page-title">{t("board.title")}</h1>
+          <p className="ff-page-sub">{t("board.subtitle")}</p>
+        </div>
+        <div className="ff-board-controls">
+          <ExpandableAdd
+            className="ff-board-quick-add"
+            label={`⚡ ${t("board.quickAdd")}`}
+            placeholder={t("board.quickAddPlaceholder")}
+            submitLabel={t("common.add")}
+            keepOpenAfterSubmit={false}
+            onSubmit={handleQuickAdd}
+          />
+          <label className="ff-board-control">
+            <span>{t("board.scope")}</span>
+            <select value={scope} onChange={(event) => setSpaceId(event.target.value)}>
+              <option value={ALL_SPACES}>{t("board.allSpaces")}</option>
+              {activeSpaces.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ff-board-control">
+            <span>{t("board.groupBy")}</span>
+            <select value={axis} onChange={(event) => setAxis(event.target.value as GroupAxis)}>
+              {AXES.map((option) => (
+                <option key={option} value={option}>
+                  {t(`board.axis.${option}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </header>
+
+      {visibleItems.length === 0 ? (
+        <EmptyState icon="🗂" title={t("board.empty")} text={t("board.emptyHint")} />
+      ) : (
+        <BoardView
+          items={visibleItems}
+          spec={spec}
+          context={context}
+          columns={columns}
+          projects={projects}
+          today={today}
+          selectedTaskId={selectedTaskId}
+          otherLabel={t("board.other")}
+          onOpenItem={(item) => {
+            if (item.source === "task") onOpenTask(item.sourceId);
+          }}
+          onDropItem={handleDrop}
+        />
+      )}
+    </div>
+  );
+}

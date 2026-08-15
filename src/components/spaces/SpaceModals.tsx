@@ -144,8 +144,6 @@ export function AddSpaceTaskModal({
   );
 }
 
-// § 32.2 note modal was replaced by NoteQuickCreateModal (SpaceNotesPanel.tsx).
-
 // § 7.5 Start Focus without a next action -> task picker
 export function FocusStartPickerModal({
   spaceTasks,

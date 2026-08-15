@@ -40,8 +40,10 @@ export interface Item {
   listId: string;
   color: string;
 
-  // --- time axis. Three fields answering three different questions; folding
+  // --- time axis. Four fields answering four different questions; folding
   // them together would lose information the app already relies on.
+  /** When the work begins. "" for anything with no span of its own. */
+  startDate: string;
   /** When it is meant to be worked on. */
   scheduledDate: string;
   /** When it is due. */
@@ -102,6 +104,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         spaceId: task.projectId,
         listId: listIdFor(task, lists),
         color: colors.get(task.projectId) ?? DEFAULT_COLOR,
+        startDate: task.startDate,
         scheduledDate: task.scheduledDate,
         dueDate: task.dueDate,
         // A task's period comes from the date it is meant to be worked on, or
@@ -138,6 +141,9 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         spaceId,
         listId,
         color,
+        // "unscheduled" and "life" carry no start; both are periods without
+        // a first day, so the span resolver falls back to the deadline.
+        startDate: schedule && "startDate" in schedule ? schedule.startDate : "",
         scheduledDate: "",
         dueDate: path.deadlineDate ?? "",
         horizon: horizon ?? undefined,
@@ -173,6 +179,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         spaceId,
         listId,
         color,
+        startDate: "",
         scheduledDate: "",
         dueDate: milestone.deadlineDate ?? "",
         horizon: milestoneHorizon,

@@ -1,0 +1,241 @@
+/* ===== Timeline (GANTT_TIMELINE_DESIGN P1) =====
+   Fixed window, no horizontal scrolling: every track is one CSS Grid of
+   --timeline-columns equal columns, and a bar is placed by grid-column. That
+   is why nothing here needs virtualisation or scroll synchronisation. */
+
+.ff-timeline {
+  --timeline-label-width: 220px;
+  --timeline-row-height: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* The connector overlay is absolutely positioned against this box. */
+  position: relative;
+}
+
+.ff-timeline-head,
+.ff-timeline-row {
+  display: grid;
+  grid-template-columns: var(--timeline-label-width) 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.ff-timeline-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-surface);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ff-timeline-columns,
+.ff-timeline-track {
+  display: grid;
+  grid-template-columns: repeat(var(--timeline-columns), minmax(0, 1fr));
+}
+
+.ff-timeline-col {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: 2px 0;
+  /* Labels shorten on narrow screens; the window never does (D11). */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ff-timeline-col.is-today { color: var(--accent); font-weight: 800; }
+
+.ff-timeline-group { display: flex; flex-direction: column; gap: 2px; }
+.ff-timeline-group-head {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin: 10px 0 2px;
+}
+
+.ff-timeline-row { min-height: var(--timeline-row-height); }
+.ff-timeline-row.is-selected .ff-timeline-label-text { color: var(--accent); font-weight: 700; }
+
+.ff-timeline-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0 4px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  overflow: hidden;
+}
+/* A child is indented only when its parent is on screen (D9) — the mark is
+   the whole of the hierarchy shown here; nothing is rolled up or moved. */
+.ff-timeline-label.is-child { padding-left: 16px; }
+.ff-timeline-child-mark { color: var(--text-tertiary); font-size: 11px; }
+.ff-timeline-label-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ff-timeline-label:hover .ff-timeline-label-text { color: var(--accent); }
+
+.ff-timeline-track { position: relative; align-items: center; min-height: var(--timeline-row-height); }
+
+.ff-timeline-cell {
+  grid-row: 1;
+  height: 100%;
+  border-left: 1px solid var(--border-subtle);
+}
+.ff-timeline-cell.is-today { background: var(--accent-soft); }
+
+.ff-timeline-bar,
+.ff-timeline-marker {
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 20px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 999px;
+  background: var(--bar-color, var(--accent));
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+}
+.ff-timeline-bar-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Edge handles (P2). Wide enough to grab, narrow enough not to eat the bar;
+   hidden on a clipped edge because that end is off-window. */
+.ff-timeline-bar.is-draggable { cursor: grab; }
+.ff-timeline-bar.is-draggable:active { cursor: grabbing; }
+.ff-timeline-bar.is-dragging { opacity: 0.6; }
+.ff-timeline-handle {
+  flex: none;
+  width: 6px;
+  align-self: stretch;
+  border-radius: 999px;
+  cursor: ew-resize;
+  background: rgba(255, 255, 255, 0.55);
+}
+.ff-timeline-bar.is-inferred .ff-timeline-handle { background: var(--bar-color, var(--accent)); opacity: 0.5; }
+.ff-timeline-bar:hover .ff-timeline-handle { background: rgba(255, 255, 255, 0.9); }
+.ff-timeline-marker .ff-timeline-handle { display: none; }
+
+/* The start was derived rather than declared, so the bar says so (D5). */
+.ff-timeline-bar.is-inferred {
+  background: transparent;
+  border: 1px dashed var(--bar-color, var(--accent));
+  color: var(--text-secondary);
+}
+
+.ff-timeline-bar.is-done,
+.ff-timeline-marker.is-done { opacity: 0.45; }
+.ff-timeline-bar.is-blocked { outline: 2px solid var(--warning); outline-offset: -2px; }
+
+/* Cut ends carry an arrow: a clipped bar that looked whole would read as a
+   three-day task (D4). */
+.ff-timeline-bar.is-clipped-start { border-top-left-radius: 2px; border-bottom-left-radius: 2px; }
+.ff-timeline-bar.is-clipped-end { border-top-right-radius: 2px; border-bottom-right-radius: 2px; }
+.ff-timeline-clip { font-size: 9px; opacity: 0.85; flex: none; }
+
+/* A milestone has one date and no width to describe (D8). */
+.ff-timeline-marker {
+  justify-self: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 3px;
+  transform: rotate(45deg);
+}
+.ff-timeline-marker .ff-timeline-bar-text,
+.ff-timeline-marker .ff-timeline-clip { display: none; }
+
+/* Dependency arrows (P3). Purely decorative — every line restates a relation
+   the bars and badges already carry — so it must never intercept a click. */
+.ff-timeline-links {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+.ff-timeline-links path {
+  stroke: var(--text-tertiary);
+  stroke-width: 1.5;
+  opacity: 0.7;
+}
+.ff-timeline-links polygon { fill: var(--text-tertiary); opacity: 0.7; }
+/* The dependent starts before its blocker finishes — the contradiction is
+   the one thing this view can show that no other screen can. */
+.ff-timeline-links .is-conflict path { stroke: var(--danger); stroke-width: 2; opacity: 1; }
+.ff-timeline-links .is-conflict polygon { fill: var(--danger); opacity: 1; }
+
+.ff-timeline-badge {
+  flex: none;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.9;
+  cursor: help;
+}
+.ff-timeline-bar.is-inferred .ff-timeline-badge { color: var(--text-secondary); }
+
+.ff-timeline-bar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.ff-timeline-nav { display: flex; align-items: center; gap: 8px; }
+.ff-timeline-range { font-size: 12px; color: var(--text-tertiary); }
+.ff-timeline-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.ff-timeline-toggle input { width: auto; }
+
+.ff-timeline-empty { color: var(--text-tertiary); font-size: 13px; padding: 16px 4px; }
+
+.ff-timeline-tray {
+  margin-top: 20px;
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+.ff-timeline-tray h3 { font-size: 13px; font-weight: 700; }
+.ff-timeline-tray-hint { font-size: 12px; color: var(--text-tertiary); margin: 2px 0 8px; }
+.ff-timeline-tray ul { display: flex; flex-wrap: wrap; gap: 6px; }
+.ff-timeline-tray li { list-style: none; }
+.ff-timeline-tray button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ff-timeline-tray button:hover { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 900px) {
+  .ff-timeline { --timeline-label-width: 130px; }
+  .ff-timeline-col { font-size: 10px; }
+}

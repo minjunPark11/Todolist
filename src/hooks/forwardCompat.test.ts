@@ -84,13 +84,6 @@ describe("normalizeData carries fields it does not know", () => {
     expect(path.milestones[0]).toMatchObject(FUTURE);
   });
 
-  it("keeps them on a space note", () => {
-    const [note] = normalizeData({
-      spaceNotes: [withFuture({ id: "snote-1", spaceId: "space-1", title: "Kickoff" })],
-    }).spaceNotes;
-    expect(note).toMatchObject(FUTURE);
-  });
-
   it("keeps them on a folder and a list", () => {
     const data = normalizeData({
       folders: [withFuture({ id: "folder-1", spaceId: "space-1", name: "H1" })],

@@ -2,7 +2,6 @@ import type { PlannerData } from "../../types";
 import { platform } from "../../platform";
 import { markLegacyLearningPathsMigratedIfAdopted } from "../../lib/ai/learningPaths/store";
 import { markLegacyLocalSpacesMigrated } from "../../lib/spaces/legacyLocalSpaces";
-import { markLegacySpaceNotesMigrated } from "../../lib/spaces/legacySpaceNotes";
 
 export const PLANNER_STORAGE_KEY = "focusflow.appData.v1";
 
@@ -12,5 +11,4 @@ export function persistPlannerData(data: PlannerData): void {
   // legacy sources stay unmarked and remain available for the next launch.
   markLegacyLearningPathsMigratedIfAdopted(data.learningPaths);
   markLegacyLocalSpacesMigrated();
-  markLegacySpaceNotesMigrated();
 }

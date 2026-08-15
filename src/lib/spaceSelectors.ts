@@ -3,7 +3,6 @@ import type {
   SpaceActivity,
   SpaceCustomConfig,
   SpaceHubType,
-  SpaceNote,
   SpaceSignalStatus,
 } from "./spaceHubTypes";
 import { addDays, todayValue } from "../utils/date";
@@ -186,29 +185,12 @@ export function getUpcomingSpaceItems(
   return items.sort((a, b) => a.when.localeCompare(b.when)).slice(0, limit);
 }
 
-// Task -> configured group. Falls back on status heuristics so preset groups
-// fill up without the user assigning every task manually.
-export function resolveTaskGroupLabel(task: Task, groupLabels: string[]): string {
-  const explicit = task.tags.find((tag) => tag.startsWith("group:"))?.slice("group:".length);
-  if (explicit && groupLabels.includes(explicit)) return explicit;
-
-  const has = (label: string) => groupLabels.includes(label);
-  if (isTaskDone(task)) return has("Done") ? "Done" : has("Completed") ? "Completed" : groupLabels[groupLabels.length - 1];
-  if (task.status === "waiting") {
-    if (has("Blocked")) return "Blocked";
-    if (has("Waiting")) return "Waiting";
-  }
-  if (task.status === "doing" && has("In Progress")) return "In Progress";
-  if (isTaskUnscheduled(task) && has("To Schedule")) return "To Schedule";
-  return groupLabels[0];
-}
 
 // Activity timeline (§16): derived from real records + stored manual entries.
 export function deriveSpaceActivities(
   spaceId: string,
   spaceTasks: Task[],
   spaceSessions: FocusSession[],
-  spaceNotes: SpaceNote[],
   storedActivities: SpaceActivity[],
   t: TFn,
   limit = 30,
@@ -224,9 +206,7 @@ export function deriveSpaceActivities(
       title: t("spaceHub.activity.taskCreated", { title: task.title }),
       description: "",
       relatedTaskId: task.id,
-      relatedSessionId: "",
-      relatedNoteId: "",
-      createdAt: task.createdAt,
+      relatedSessionId: "",      createdAt: task.createdAt,
     });
     if (task.completedAt) {
       derived.push({
@@ -236,9 +216,7 @@ export function deriveSpaceActivities(
         title: t("spaceHub.activity.taskCompleted", { title: task.title }),
         description: "",
         relatedTaskId: task.id,
-        relatedSessionId: "",
-        relatedNoteId: "",
-        createdAt: task.completedAt,
+        relatedSessionId: "",        createdAt: task.completedAt,
       });
     }
   }
@@ -251,9 +229,7 @@ export function deriveSpaceActivities(
         title: t("spaceHub.activity.focusCompleted", { title: session.title || untitled }),
         description: `${Math.max(1, Math.round(sessionSeconds(session) / 60))}m`,
         relatedTaskId: session.taskId,
-        relatedSessionId: session.id,
-        relatedNoteId: "",
-        createdAt: session.endAt || session.createdAt,
+        relatedSessionId: session.id,        createdAt: session.endAt || session.createdAt,
       });
     } else if (session.status === "running" || session.status === "paused") {
       derived.push({
@@ -263,26 +239,10 @@ export function deriveSpaceActivities(
         title: t("spaceHub.activity.focusStarted", { title: session.title || untitled }),
         description: "",
         relatedTaskId: session.taskId,
-        relatedSessionId: session.id,
-        relatedNoteId: "",
-        createdAt: session.startedAt || session.createdAt,
+        relatedSessionId: session.id,        createdAt: session.startedAt || session.createdAt,
       });
     }
   }
-  for (const note of spaceNotes) {
-    derived.push({
-      id: `act-note-${note.id}`,
-      spaceId,
-      type: "note_created",
-      title: t("spaceHub.activity.noteAdded", { title: note.title }),
-      description: note.type,
-      relatedTaskId: "",
-      relatedSessionId: "",
-      relatedNoteId: note.id,
-      createdAt: note.createdAt,
-    });
-  }
-
   const manual = storedActivities.filter((activity) => activity.spaceId === spaceId);
   return [...derived, ...manual]
     .filter((activity) => Boolean(activity.createdAt))

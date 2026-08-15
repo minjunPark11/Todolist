@@ -14,6 +14,7 @@ function task(overrides: Partial<Task> = {}): Task {
     status: "todo",
     priority: "none",
     dueDate: "",
+    startDate: "",
     scheduledDate: "",
     startTime: "",
     endTime: "",

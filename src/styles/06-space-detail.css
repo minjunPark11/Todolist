@@ -961,18 +961,6 @@
 }
 
 /* Note type badge (note detail drawer) */
-.sdv-note-type {
-  justify-self: start;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
 /* Floating AI button (§26). Sits above the global Ollama chat FAB, which
    already occupies the bottom-right corner. */
 /* Modals (§32) */

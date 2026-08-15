@@ -1,5 +1,5 @@
 import type { FocusSession, Task } from "../../types";
-import type { SpaceActivity, SpaceNote, SpaceTab, SpaceTypePreset } from "../../lib/spaceHubTypes";
+import type { SpaceActivity, SpaceTab, SpaceTypePreset } from "../../lib/spaceHubTypes";
 import {
   formatSeconds,
   isTaskDone,
@@ -9,7 +9,6 @@ import {
 import { useT } from "../../i18n";
 import { presetText } from "../../lib/spaceHubI18n";
 import { formatDate } from "../../utils/date";
-import { OVERVIEW_NOTES_LIMIT } from "./SpaceNotesPanel";
 
 const activityIcons: Record<SpaceActivity["type"], string> = {
   task_created: "＋",
@@ -18,8 +17,6 @@ const activityIcons: Record<SpaceActivity["type"], string> = {
   task_scheduled: "📅",
   focus_started: "⏱",
   focus_completed: "⏱",
-  note_created: "📝",
-  note_updated: "📝",
   manual_record: "•",
   ai_suggestion_applied: "✦",
 };
@@ -29,14 +26,10 @@ export function SpaceOverviewTab({
   spaceTasks,
   activities,
   recentSessions,
-  spaceNotes,
   onOpenTask,
   onToggleDone,
   onStartFocus,
   onAddTask,
-  onAddNote,
-  onOpenNote,
-  onOpenNoteInSplit,
   onOpenSession,
   onOpenFocusPage,
   onOpenTab,
@@ -45,15 +38,10 @@ export function SpaceOverviewTab({
   spaceTasks: Task[];
   activities: SpaceActivity[];
   recentSessions: FocusSession[];
-  spaceNotes: SpaceNote[];
   onOpenTask: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
   onStartFocus: (taskId: string) => void;
   onAddTask: () => void;
-  onAddNote: () => void;
-  onOpenNote: (noteId: string) => void;
-  // Notes card titles open the note in the notes tab Split View (§24.5).
-  onOpenNoteInSplit: (noteId: string) => void;
   onOpenSession: (sessionId: string) => void;
   onOpenFocusPage: () => void;
   onOpenTab: (tab: SpaceTab) => void;
@@ -136,7 +124,6 @@ export function SpaceOverviewTab({
                     onClick={() => {
                       if (activity.relatedTaskId) onOpenTask(activity.relatedTaskId);
                       else if (activity.relatedSessionId) onOpenSession(activity.relatedSessionId);
-                      else if (activity.relatedNoteId) onOpenNote(activity.relatedNoteId);
                     }}
                   >
                     <span className="sdv-activity-icon" aria-hidden="true">
@@ -181,38 +168,6 @@ export function SpaceOverviewTab({
           )}
         </section>
 
-        {/* Notes / resources — title-only preview list (notes spec §24) */}
-        <section className="sdv-card">
-          <header className="sdv-card-head">
-            <h2>{t("spaceHub.section.notesResources")}</h2>
-            <button type="button" className="sdv-link" onClick={() => onOpenTab("notes")}>
-              {t("spaceHub.action.viewAll")}
-            </button>
-          </header>
-          {spaceNotes.length === 0 ? (
-            <div className="sdv-empty">
-              <p>{t("spaceHub.empty.noNotes")}</p>
-              <button type="button" className="sdv-btn sdv-btn-sm" onClick={onAddNote}>
-                {presetText(t, preset.addNoteLabel)}
-              </button>
-            </div>
-          ) : (
-            <>
-              <ul className="sdv-overview-note-list">
-                {spaceNotes.slice(0, OVERVIEW_NOTES_LIMIT).map((note) => (
-                  <li key={note.id}>
-                    <button type="button" onClick={() => onOpenNoteInSplit(note.id)}>
-                      <span className="sdv-overview-note-title">{note.title.trim() || t("notes.untitled")}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <button type="button" className="sdv-btn sdv-btn-sm sdv-overview-note-add" onClick={onAddNote}>
-                {presetText(t, preset.addNoteLabel)}
-              </button>
-            </>
-          )}
-        </section>
       </div>
     </div>
   );

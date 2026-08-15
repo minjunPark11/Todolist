@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FocusSession, GoalSchedule, LearningPath, Milestone, Project, Task, TaskDraft } from "../../types";
+import type { FocusSession, GoalSchedule, LearningPath, List, Milestone, Project, Task, TaskDraft } from "../../types";
 import type { ToastState } from "../kit";
 import type { PageId } from "../../types";
 import {
   SPACE_TABS,
   type SpaceHubType,
   type SpaceLike,
-  type SpaceNote,
   type SpaceTab,
 } from "../../lib/spaceHubTypes";
 import { getSpacePreset, resolveTaskGroups } from "../../lib/spaceTypeConfig";
@@ -31,8 +30,12 @@ import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { SpaceOverviewTab } from "./SpaceOverviewTab";
 import { SpaceHorizons } from "./SpaceHorizons";
 import { SpaceGoalsTab } from "./SpaceGoalsTab";
-import { SpaceTasksTab } from "./SpaceWorkTabs";
-import { NoteQuickCreateModal, SpaceNotesView, type NotesPanelMode } from "./SpaceNotesPanel";
+import { BoardView, type BoardColumn } from "../BoardView";
+import { projectItems, type Item } from "../../domain/view/item";
+import { patchForColumn } from "../../domain/view/board";
+import type { GroupContext, ViewSpec } from "../../domain/view/viewSpec";
+import { statusesWithBoardLists } from "../../domain/spaces/membership";
+import { DEFAULT_STATUSES } from "../../domain/spaces/hierarchy";
 import {
   AddSpaceTaskModal,
   DeleteSpaceConfirmModal,
@@ -41,7 +44,6 @@ import {
   type SpaceTaskInput,
 } from "./SpaceModals";
 import {
-  NoteDetailDrawer,
   SessionDetailDrawer,
   SpaceSettingsDrawer,
   TaskDetailDrawer,
@@ -62,12 +64,9 @@ export type SpaceDetailViewProps = {
   onArchiveBoardList: (projectId: string, listId: string) => void;
   onMoveGoalToBoardList: (pathId: string, listId?: string) => void;
   onToggleTaskDone: (taskId: string) => void;
-  // Notes are synced planner records now, not hub-local state (M1), so they
-  // arrive as props like every other record this view edits.
-  notes: SpaceNote[];
-  onCreateNote: (spaceId: string, draft: { title: string; body?: string; type?: string }) => string;
-  onUpdateNote: (noteId: string, patch: Partial<SpaceNote>) => void;
-  onDeleteNote: (noteId: string) => void;
+  // Read only by the Tasks board, to resolve an Item's List. Passed rather
+  // than defaulted to [] so a future grouping on that axis is not silently wrong.
+  lists: List[];
   focusSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
   onBack: () => void;
@@ -87,7 +86,6 @@ export type SpaceDetailViewProps = {
 type ModalState =
   | { kind: "none" }
   | { kind: "add_task" }
-  | { kind: "add_note" }
   | { kind: "focus_picker" }
   | { kind: "focus_conflict" }
   | { kind: "delete_space" };
@@ -96,8 +94,9 @@ type DrawerState =
   | { kind: "none" }
   | { kind: "task"; taskId: string }
   | { kind: "session"; sessionId: string }
-  | { kind: "note"; noteId: string }
   | { kind: "settings" };
+
+const DEFAULT_STATUS_IDS = new Set(DEFAULT_STATUSES.map((status) => status.id));
 
 function readTabFromUrl(): SpaceTab {
   const value = new URLSearchParams(window.location.search).get("tab");
@@ -118,10 +117,7 @@ export function SpaceDetailView({
   onArchiveBoardList,
   onMoveGoalToBoardList,
   onToggleTaskDone,
-  notes,
-  onCreateNote,
-  onUpdateNote,
-  onDeleteNote,
+  lists,
   focusSessions,
   activeFocusSession,
   onBack,
@@ -141,11 +137,6 @@ export function SpaceDetailView({
   const [tab, setTabState] = useState<SpaceTab>(readTabFromUrl);
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [drawer, setDrawer] = useState<DrawerState>({ kind: "none" });
-  // Notes popup/split-view spec (§4): panel mode + selection + fullscreen are
-  // separate so fullscreen only changes presentation, never edit state.
-  const [notesPanelMode, setNotesPanelMode] = useState<NotesPanelMode>("split");
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [isNotesSplitFullscreen, setIsNotesSplitFullscreen] = useState(false);
   const today = todayValue();
   const weekStart = getWeekStart(today);
   const config = hub.getConfig(space.id);
@@ -163,17 +154,63 @@ export function SpaceDetailView({
     () => getSpaceSessions(focusSessions, spaceTasks, sourceProjectId),
     [focusSessions, spaceTasks, sourceProjectId],
   );
-  const spaceNotes = useMemo(
-    () =>
-      notes
-        .filter((note) => note.spaceId === space.id)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [notes, space.id],
-  );
   const activities = useMemo(
-    () => deriveSpaceActivities(space.id, spaceTasks, spaceSessions, spaceNotes, hub.activities, t),
-    [space.id, spaceTasks, spaceSessions, spaceNotes, hub.activities, t],
+    () => deriveSpaceActivities(space.id, spaceTasks, spaceSessions, hub.activities, t),
+    [space.id, spaceTasks, spaceSessions, hub.activities, t],
   );
+
+  // === Tasks board (CLICKUP_IMPORT_DESIGN §4.2: filter{space} + groupBy status) ===
+  //
+  // Built from `spaceTasks` rather than filtered by `spaceId` in the spec,
+  // because membership here is not always projectId — a Space with no source
+  // project claims its tasks by tag (getSpaceTasks). Resolving membership
+  // first and handing the engine the answer keeps that one rule in one place.
+  const sourceProject = sourceProjectId ? projects.find((p) => p.id === sourceProjectId) : undefined;
+  const boardStatuses = useMemo(
+    () => (sourceProject ? statusesWithBoardLists(sourceProject) : DEFAULT_STATUSES),
+    [sourceProject],
+  );
+  const boardItems = useMemo(
+    () =>
+      projectItems({ tasks: spaceTasks, paths: [], projects, lists, today, sources: ["task"] })
+        // Archived work belongs in the Archive, not as a column here.
+        .filter((item) => item.statusId !== "archived"),
+    [spaceTasks, projects, lists, today],
+  );
+  const boardContext: GroupContext = useMemo(
+    () => ({ today, taskById: new Map(spaceTasks.map((task) => [task.id, task])) }),
+    [today, spaceTasks],
+  );
+  const boardSpec: ViewSpec = useMemo(
+    () => ({
+      id: `space-board-${space.id}`,
+      name: tabText(t, "tasks"),
+      filter: {},
+      groupBy: "status",
+      sort: { key: "dueDate" },
+      layout: "board",
+    }),
+    [space.id, t],
+  );
+  const boardColumns: BoardColumn[] = useMemo(
+    () =>
+      boardStatuses
+        .filter((status) => status.id !== "archived")
+        .map((status) => ({
+          id: status.id,
+          // A default status has a translation; a column the Space named does not.
+          label: DEFAULT_STATUS_IDS.has(status.id) ? t(`status.${status.id}`) : status.label,
+          color: status.color,
+        })),
+    [boardStatuses, t],
+  );
+
+  function handleBoardDrop(item: Item, columnId: string) {
+    const task = boardContext.taskById.get(item.sourceId);
+    if (!task) return;
+    const patch = patchForColumn("status", task, columnId, { today, statuses: boardStatuses });
+    if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
+  }
 
   const counts = getSpaceTaskCounts(spaceTasks, today);
   const nextAction = getNextActionTask(spaceTasks, config, today);
@@ -210,16 +247,12 @@ export function SpaceDetailView({
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
-      // The quick note popup owns ESC (save/discard rules) via a capture listener.
-      if (modal.kind === "add_note") return;
       if (modal.kind !== "none") setModal({ kind: "none" });
       else if (drawer.kind !== "none") setDrawer({ kind: "none" });
-      // Notes spec §20.4: fullscreen exits first, then split falls back to home.
-      else if (isNotesSplitFullscreen) setIsNotesSplitFullscreen(false);
     }
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [modal.kind, drawer.kind, isNotesSplitFullscreen, tab, notesPanelMode]);
+  }, [modal.kind, drawer.kind, tab]);
 
   // === Handlers (§31) ===
 
@@ -240,28 +273,6 @@ export function SpaceDetailView({
     setModal({ kind: "none" });
   }
 
-  // === Notes popup + split view handlers (NOTES_POPUP_SPLIT spec) ===
-
-  function openNoteInSplit(noteId: string) {
-    if (tab !== "notes") setTab("notes");
-    setSelectedNoteId(noteId);
-    setNotesPanelMode("split");
-  }
-
-  function closeNotesSplit() {
-    setNotesPanelMode("split");
-    setSelectedNoteId(null);
-    setIsNotesSplitFullscreen(false);
-  }
-
-  function handleQuickNoteCreate(draft: { title: string; body: string }): string {
-    return onCreateNote(space.id, { title: draft.title, body: draft.body, type: "Quick Note" });
-  }
-
-  function handleQuickNoteClose(savedNoteId: string | null) {
-    setModal({ kind: "none" });
-    if (savedNoteId) showToast({ message: t("spaceHub.toast.noteAdded") });
-  }
 
   function handleStartFocus(taskId?: string) {
     // Only one active FocusSession at a time (§33.9).
@@ -346,7 +357,6 @@ export function SpaceDetailView({
       ? spaceTasks.find((task) => task.id === drawer.taskId) ?? tasks.find((task) => task.id === drawer.taskId) ?? null
       : null;
   const drawerSession = drawer.kind === "session" ? spaceSessions.find((session) => session.id === drawer.sessionId) ?? null : null;
-  const drawerNote = drawer.kind === "note" ? spaceNotes.find((note) => note.id === drawer.noteId) ?? null : null;
 
   return (
     <div className="sdv-page" style={{ ["--sdv-accent" as string]: displayColor }}>
@@ -376,9 +386,6 @@ export function SpaceDetailView({
         <div className="sdv-header-actions">
           <button type="button" className="sdv-btn" onClick={() => setModal({ kind: "add_task" })}>
             {presetText(t, preset.addTaskLabel)}
-          </button>
-          <button type="button" className="sdv-btn" onClick={() => setModal({ kind: "add_note" })}>
-            {presetText(t, preset.addNoteLabel)}
           </button>
           <button type="button" className="sdv-btn sdv-btn-primary" onClick={() => handleStartFocus()}>
             {presetText(t, preset.startFocusLabel)}
@@ -515,21 +522,13 @@ export function SpaceDetailView({
           spaceTasks={spaceTasks}
           activities={activities}
           recentSessions={recentSessions}
-          spaceNotes={spaceNotes}
           onOpenTask={openTaskDrawer}
           onToggleDone={handleCompleteTask}
           onStartFocus={handleStartFocus}
           onAddTask={() => setModal({ kind: "add_task" })}
-          onAddNote={() => setModal({ kind: "add_note" })}
-          onOpenNote={(noteId) => setDrawer({ kind: "note", noteId })}
-          onOpenNoteInSplit={openNoteInSplit}
           onOpenSession={(sessionId) => setDrawer({ kind: "session", sessionId })}
           onOpenFocusPage={() => onNavigate("focus")}
-          onOpenTab={(next) => {
-            // "View all" from the overview notes card lands on the notes Home list (§24.5).
-            if (next === "notes") closeNotesSplit();
-            setTab(next);
-          }}
+          onOpenTab={setTab}
         />
         </>
       ) : null}
@@ -548,35 +547,16 @@ export function SpaceDetailView({
         />
       ) : null}
       {tab === "tasks" ? (
-        <SpaceTasksTab
-          preset={preset}
-          groups={groups}
-          spaceTasks={spaceTasks}
-          onOpenTask={openTaskDrawer}
-          onToggleDone={handleCompleteTask}
-          onStartFocus={handleStartFocus}
-          onAddTask={() => setModal({ kind: "add_task" })}
-        />
-      ) : null}
-      {tab === "notes" ? (
-        <SpaceNotesView
-          preset={preset}
-          notes={spaceNotes}
-          mode={notesPanelMode}
-          selectedNoteId={selectedNoteId}
-          isFullscreen={isNotesSplitFullscreen}
-          onSelectNote={(noteId) => {
-            setSelectedNoteId(noteId);
-            setNotesPanelMode("split");
-          }}
-          onCloseSplit={closeNotesSplit}
-          onToggleFullscreen={() => setIsNotesSplitFullscreen((current) => !current)}
-          onAddNote={() => setModal({ kind: "add_note" })}
-          onUpdateNote={(noteId, patch) => onUpdateNote(noteId, patch)}
-          onDeleteNote={(noteId) => {
-            onDeleteNote(noteId);
-            showToast({ message: t("spaceHub.toast.noteDeleted") });
-          }}
+        <BoardView
+          items={boardItems}
+          spec={boardSpec}
+          context={boardContext}
+          columns={boardColumns}
+          projects={projects}
+          today={today}
+          otherLabel={t("board.other")}
+          onOpenItem={(item: Item) => openTaskDrawer(item.sourceId)}
+          onDropItem={handleBoardDrop}
         />
       ) : null}
       {/* Modals (§32) */}
@@ -586,18 +566,6 @@ export function SpaceDetailView({
           groups={groups.map((group) => group.label)}
           onSubmit={handleCreateSpaceTask}
           onClose={() => setModal({ kind: "none" })}
-        />
-      ) : null}
-      {modal.kind === "add_note" ? (
-        <NoteQuickCreateModal
-          onCreate={handleQuickNoteCreate}
-          onUpdate={(noteId, patch) => onUpdateNote(noteId, patch)}
-          onDelete={(noteId) => onDeleteNote(noteId)}
-          onClose={handleQuickNoteClose}
-          onOpenInSplit={(noteId) => {
-            setModal({ kind: "none" });
-            openNoteInSplit(noteId);
-          }}
         />
       ) : null}
       {modal.kind === "focus_picker" ? (
@@ -632,7 +600,6 @@ export function SpaceDetailView({
           childTasks={spaceTasks.filter((task) => task.parentTaskId === drawerTask.id)}
           projects={projects}
           sessions={spaceSessions.filter((session) => session.taskId === drawerTask.id)}
-          notes={spaceNotes.filter((note) => note.relatedTaskId === drawerTask.id)}
           isPinned={config.pinnedNextActionTaskId === drawerTask.id}
           onStartFocus={() => handleStartFocus(drawerTask.id)}
           onComplete={() => {
@@ -644,7 +611,6 @@ export function SpaceDetailView({
             onArchiveTask(drawerTask.id);
             setDrawer({ kind: "none" });
           }}
-          onOpenNote={(noteId) => setDrawer({ kind: "note", noteId })}
           onAddChildTask={(title) => handleCreateSubtask(drawerTask, title)}
           onToggleChildDone={handleCompleteTask}
           onOpenTask={(taskId) => setDrawer({ kind: "task", taskId })}
@@ -655,19 +621,6 @@ export function SpaceDetailView({
         <SessionDetailDrawer
           session={drawerSession}
           task={spaceTasks.find((task) => task.id === drawerSession.taskId) ?? null}
-          onClose={() => setDrawer({ kind: "none" })}
-        />
-      ) : null}
-      {drawerNote ? (
-        <NoteDetailDrawer
-          note={drawerNote}
-          relatedTask={spaceTasks.find((task) => task.id === drawerNote.relatedTaskId) ?? null}
-          onUpdate={(patch: Partial<SpaceNote>) => onUpdateNote(drawerNote.id, patch)}
-          onDelete={() => {
-            onDeleteNote(drawerNote.id);
-            setDrawer({ kind: "none" });
-            showToast({ message: t("spaceHub.toast.noteDeleted") });
-          }}
           onClose={() => setDrawer({ kind: "none" })}
         />
       ) : null}

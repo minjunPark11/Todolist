@@ -9,7 +9,9 @@ import {
   applyView,
   axisGroupIds,
   compareItems,
+  groupRank,
   matchesFilter,
+  PRESET_ARCHIVE,
   PRESET_PLANNING,
   presetSpaceHorizons,
   presetTodayQueue,
@@ -28,6 +30,7 @@ function task(overrides: Partial<Task> = {}): Task {
     status: "todo",
     priority: "none",
     dueDate: "",
+    startDate: "",
     scheduledDate: TODAY,
     startTime: "",
     endTime: "",
@@ -193,6 +196,33 @@ describe("applyView grouping", () => {
     expect(axisGroupIds("space")).toBeUndefined();
   });
 
+  it("orders Space groups by the user's arrangement, not the alphabet (D10)", () => {
+    // "Career" sorts before "Health" by name; the user put Health first.
+    const arranged = [
+      { ...projects[0], order: 1 },
+      { ...projects[1], order: 0 },
+    ];
+    const { items, context } = build([task({ id: "a" }), task({ id: "b", projectId: "space-2" })]);
+    const spec: ViewSpec = {
+      id: "v", name: "v", filter: {}, groupBy: "space", sort: { key: "title" }, layout: "list",
+    };
+    const ranked = { ...context, groupRank: groupRank("space", { projects: arranged }) };
+    expect(applyView(items, spec, ranked).map((group) => group.id)).toEqual(["space-2", "space-1"]);
+    // Without a rank it falls back to name order, which is id order here.
+    expect(applyView(items, spec, context).map((group) => group.id)).toEqual(["space-1", "space-2"]);
+  });
+
+  it("sorts a Space the user never arranged after the ones they did", () => {
+    const partly = [{ ...projects[1], order: 5 }, projects[0]];
+    const rank = groupRank("space", { projects: partly })!;
+    expect(rank.get("space-2")).toBeLessThan(rank.get("space-1")!);
+  });
+
+  it("has no rank to give for an axis the user does not own", () => {
+    expect(groupRank("status", { projects })).toBeUndefined();
+    expect(groupRank("space", { projects: [] })).toBeUndefined();
+  });
+
   it("breaks sort ties by key, so two runs cannot disagree", () => {
     const { items } = build([task({ id: "b" }), task({ id: "a" })]);
     const sorted = [...items].sort((x, y) => compareItems(x, y, { key: "manual" }));
@@ -244,6 +274,31 @@ describe("equivalence with the screens it replaces", () => {
     // Without this the loop could skip everything and still pass, proving
     // nothing about the two agreeing.
     expect(compared).toBeGreaterThan(3);
+  });
+
+  it("filters the archive exactly as the Archive page did", () => {
+    const archive = [
+      task({ id: "archived", status: "archived", archivedAt: NOW }),
+      task({ id: "done", status: "done", completedAt: NOW }),
+      task({ id: "open" }),
+    ];
+    const { items, context } = build(archive);
+    const fromView = applyView(items, PRESET_ARCHIVE, context).flatMap((group) =>
+      group.items.map((item) => item.sourceId),
+    );
+    // The screen's own filter, verbatim.
+    const fromScreen = archive.filter((t) => t.status === "archived" || t.archivedAt).map((t) => t.id);
+    expect(fromView).toEqual(fromScreen);
+  });
+
+  it("drops a tombstoned task the Archive page used to show", () => {
+    // The one place the two deliberately disagree. `planner.tasks` carries
+    // soft-deleted rows that arrived from another device, and the screen's
+    // filter never looked at deletedAt; projectItems does.
+    const { items, context } = build([
+      task({ id: "gone", status: "archived", archivedAt: NOW, deletedAt: NOW }),
+    ]);
+    expect(applyView(items, PRESET_ARCHIVE, context)).toEqual([]);
   });
 
   it("narrows Horizons to one board, which is what SpaceHorizons.tsx does by hand", () => {

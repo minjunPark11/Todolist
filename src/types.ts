@@ -5,12 +5,8 @@
 // cycle (learningPaths/types.ts reaches only contextCards/types.ts, which
 // imports nothing; spaceHubTypes.ts imports nothing at all).
 import type { GoalLink, GoalSchedule, LearningPath, Milestone } from "./lib/ai/learningPaths/types";
-// Space notes joined the synced dataset for the same reason Learning Paths did
-// (SPACES_CLICKUP_REDESIGN.md D9): they are user writing, and writing that
-// lives on one device is writing the user loses.
-import type { SpaceNote } from "./lib/spaceHubTypes";
 
-export type { GoalLink, GoalSchedule, LearningPath, Milestone, SpaceNote };
+export type { GoalLink, GoalSchedule, LearningPath, Milestone };
 
 // === Task lifecycle (spec §4.1) ===
 // Canonical MVP statuses: inbox -> todo -> doing -> waiting -> done -> archived.
@@ -38,6 +34,21 @@ export interface Task {
   // Dates use "" as the "not set" sentinel (kept as string for legacy callers).
   dueDate: string; // deadline (YYYY-MM-DD)
   scheduledDate: string; // planned work date (YYYY-MM-DD)
+  /**
+   * When the work BEGINS (YYYY-MM-DD, "" = unset). Added for the timeline,
+   * which needs a span and not a point.
+   *
+   * Deliberately not the same thing as `scheduledDate`: a task can start on
+   * Monday and be due Friday while the day actually blocked out on the
+   * calendar is Wednesday. Folding the two together would make every
+   * multi-day task either lose its span or lie about its calendar block.
+   *
+   * Additive only (M0). It rides inside the `data` jsonb, so no table change
+   * is needed, and `normalizeTask` spreads unknown fields first — which is
+   * what lets a client that predates this field carry it instead of erasing
+   * it (a29a8f7).
+   */
+  startDate: string;
   startTime: string;
   endTime: string;
   projectId: string;
@@ -246,7 +257,10 @@ export interface AppSettings {
   accentColor: AccentColor;
   fontSize: FontSize;
   language: Language;
-  defaultView: "/today" | "/inbox" | "/calendar" | "/planning" | "/projects" | "/focus";
+  // "/planning" is LEGACY: the Planning page became the Board's quadrant
+  // grouping, but the value is already stored in accounts, so it stays in the
+  // union and resolves to the Board rather than dropping those users on Today.
+  defaultView: "/today" | "/inbox" | "/calendar" | "/board" | "/planning" | "/projects" | "/focus";
   showCompletedInToday: boolean;
   confirmBeforeDelete: boolean;
   showSidebarCounts: boolean;
@@ -308,7 +322,6 @@ export interface PlannerData {
   focusSessions: FocusSession[];
   activeSessionId: string;
   learningPaths: LearningPath[];
-  spaceNotes: SpaceNote[];
   folders: Folder[];
   lists: List[];
   settings: PlannerSettings;
@@ -319,7 +332,8 @@ export type PageId =
   | "today"
   | "projects"
   | "focus"
-  | "planning"
+  | "board"
+  | "timeline"
   | "horizons"
   | "archive"
   | "settings"

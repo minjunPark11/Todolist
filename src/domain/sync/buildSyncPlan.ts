@@ -7,13 +7,20 @@ import type { AppSettings, PlannerData, PlannerSettings } from "../../types";
 import { diffChangedRecords, diffRemovedIds } from "./diffRecords";
 
 // PlannerData key -> Supabase table.
+//
+// `space_notes` is deliberately ABSENT rather than mapped to an empty local
+// collection. Space notes were removed from the product, and the difference
+// matters: a table listed here with nothing local diffs to "delete every id
+// the account holds", so the first sync after this release would erase every
+// note the user ever wrote. Absent from the list, the table is simply never
+// touched — the rows stay in the account, orphaned but intact, and dropping
+// them is a separate decision someone has to make on purpose.
 export const collectionTables = [
   ["tasks", "tasks"],
   ["projects", "projects"],
   ["subtasks", "subtasks"],
   ["focusSessions", "focus_sessions"],
   ["learningPaths", "learning_paths"],
-  ["spaceNotes", "space_notes"],
   ["folders", "folders"],
   ["lists", "lists"],
 ] as const;
@@ -22,7 +29,6 @@ export const collectionTables = [
 // keeps working without them instead of failing every sync.
 export const optionalRemoteTables: ReadonlySet<string> = new Set([
   "learning_paths",
-  "space_notes",
   "folders",
   "lists",
 ]);

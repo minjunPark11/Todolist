@@ -188,8 +188,9 @@ export function Sidebar({
     { id: "calendar", label: t("sidebar.calendar"), icon: "calendar", count: 0 },
   ];
   const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
+    { id: "board", label: t("sidebar.board"), icon: "planning", count: 0 },
+    { id: "timeline", label: t("sidebar.timeline"), icon: "calendar", count: 0 },
     { id: "horizons", label: t("sidebar.horizons"), icon: "horizons", count: 0 },
-    { id: "planning", label: t("sidebar.planning"), icon: "planning", count: 0 },
     { id: "projects", label: t("sidebar.spaces"), icon: "projects", count: activeProjectCount },
     { id: "focus", label: t("sidebar.focus"), icon: "focus", count: tasks.filter((task) => task.activeSessionId).length },
     { id: "archive", label: t("sidebar.archive"), icon: "archive", count: 0 },
