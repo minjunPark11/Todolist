@@ -10483,9 +10483,67 @@ typecheck 통과, 테스트 **640개** 통과 (spaces 도메인 22, sync 2, forw
 
 ---
 
-## STEP 6 — Routing / Selection
+## STEP 6 — Routing / Selection — 완료 (2026-08-17)
 
 Hierarchy Location의 의미를 맞춘다.
+
+### Selection 모델
+
+§35의 `HierarchySelection`을 기존 `Selection`을 확장해 구현했다. 새 병렬 시스템을 만들지 않았다(§18).
+
+```ts
+| { kind: "none" }
+| { kind: "space";   spaceId }
+| { kind: "project"; spaceId, projectId }
+| { kind: "folder";  spaceId, projectId, folderId }
+| { kind: "list";    spaceId, projectId, listId }
+```
+
+조상을 함께 들고 다니는 이유는 트리가 아무것도 조회하지 않고 올바른 가지를 열 수 있어야 하기 때문이다.
+
+### Route
+
+```text
+/s/:spaceId
+/s/:spaceId/p/:projectId
+/s/:spaceId/p/:projectId/f/:folderId
+/s/:spaceId/p/:projectId/l/:listId
+```
+
+### 레거시 해소 (§33) — 파싱과 조회를 분리한다
+
+옛 스킴은 첫 칸에 **Project id**를 담았다. 세 가지 모양 중 둘은 경로만으로 구분된다 — 옛 route는 첫 id 뒤에 바로 `f`/`l`이 오고, 새 route는 `p`가 먼저다. 남는 `/s/:id` 하나만 진짜 모호하다.
+
+```text
+/s/X/f/Y  /s/X/l/Y   →  구문만으로 레거시로 판정. spaceId를 비워 파싱
+/s/X                 →  모호. 컬렉션만이 X가 Space인지 Project인지 안다
+```
+
+그래서 `parseSelection`은 순수·구문 전용으로 남기고, `resolveSelection(selection, {spaces, projects})`이 조회를 맡는다. **해소는 항상 승격이며 절대 버리지 않는다** — 첫 렌더에는 컬렉션이 비어 있고, 여기서 "없음"을 답하면 사용자가 방금 따라온 딥링크를 잃는다. 데이터가 도착하면 memo가 다시 돌아 채운다.
+
+주소창은 해소 직후 새 스킴으로 `replace`한다. `push`가 아닌 이유는 Back이 사용자가 온 곳으로 가야지 방금 따라온 링크로 가면 안 되기 때문이다.
+
+### `filterForSelection`의 경계
+
+`ViewFilter.spaceId`는 **아직 Project id를 담는다.** 필터 언어를 옮기는 것은 STEP 7이므로, Project 선택이 그 칸을 채우고 **Space 선택은 아무것도 좁히지 않는다.** 지금 여기서 Space 스코프를 만들어내면 같은 결정이 두 곳에 생긴다.
+
+### 검증
+
+typecheck 통과, 테스트 **650개** 통과 (selection 19개로 확장). 실제 앱에서:
+
+```text
+/s/p1              → /s/space-default/p/p1                  (레거시 최상위)
+/s/p1/l/list-x     → /s/space-default/p/p1/l/list-x         (레거시 List)
+트리 클릭          → 새 스킴으로 기록, 정확히 한 행만 선택
+새로고침           → 딥링크·선택·분기 펼침 유지
+Back               → /app (레거시 승격이 히스토리에 남지 않음)
+```
+
+도중에 회귀 하나를 만들고 고쳤다: 트리의 초기 펼침 집합이 `selection.spaceId`로 키잉돼 있었는데, 그 값이 이제 Space를 가리켜 Project id 키와 영원히 어긋났다. `selectedProjectId(selection)`으로 교정.
+
+### 이 단계가 하지 않은 것
+
+Space 수준 화면은 없다. `/s/:spaceId`는 유효한 경로이고 선택도 되지만, 그 스코프를 그리는 것은 STEP 7(Scope)과 STEP 10(Domain Sections)이다. 트리 행도 여전히 Project다 — 위에 Space 레벨을 얹는 것은 STEP 11이다.
 
 ---
 

@@ -1,4 +1,4 @@
-import { FormEvent, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { FormEvent, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sidebar } from "./components/Sidebar";
 import { OllamaChat } from "./components/OllamaChat";
@@ -8,7 +8,15 @@ import { UpdateChecker } from "./components/UpdateChecker";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
-import { filterForSelection, parseSelection, pathForSelection, selectedSpaceId } from "./app/spaceSelection";
+import {
+  filterForSelection,
+  parseSelection,
+  pathForSelection,
+  resolveSelection,
+  selectedProjectId as readSelectedProjectId,
+  selectedSpaceId,
+} from "./app/spaceSelection";
+import { spaceIdForProject } from "./domain/spaces/spaces";
 import type { TodayIntent } from "./components/TodayPage";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
@@ -137,7 +145,7 @@ export default function App() {
   // Where in the Space tree the user is standing. Derived from the path, never
   // mirrored into state: the two flat fields this replaces could not say which
   // List was open and did not survive a reload (SPACES_CLICKUP_UI_DESIGN §1).
-  // `selectSpace` / `selectList` / `clearSelection` below are the only writers.
+  // `selectProject` / `selectList` / `clearSelection` below are the only writers.
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState("");
   const [pendingResetAllData, setPendingResetAllData] = useState(false);
@@ -168,8 +176,14 @@ export default function App() {
     }
   });
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
-  const selection = useMemo(() => parseSelection(currentPath), [currentPath]);
-  const selectedProjectId = selectedSpaceId(selection);
+  // Parsing is syntactic; resolving is what turns an old `/s/:projectId` link
+  // into a Project scope under its Space (§33). It re-runs when the records
+  // arrive, so a deep link followed before the first load still lands.
+  const selection = useMemo(
+    () => resolveSelection(parseSelection(currentPath), { spaces: planner.spaces, projects: planner.projects }),
+    [currentPath, planner.spaces, planner.projects],
+  );
+  const selectedProjectId = readSelectedProjectId(selection);
   const isProjectDetailOpen = selection.kind !== "none";
   const searchInputRef = useRef<HTMLInputElement>(null);
   const originalTitleRef = useRef(document.title || "FocusFlow");
@@ -404,27 +418,53 @@ export default function App() {
     setCurrentPath(path);
   }
 
-  function selectSpace(spaceId: string) {
+  /** The Space a Project hangs in, for building a full path to it. */
+  function spaceIdOf(projectId: string): string {
+    const project = planner.projects.find((item) => item.id === projectId);
+    return project ? spaceIdForProject(project) : "";
+  }
+
+  function selectProject(projectId: string) {
     planner.selectTask("");
-    navigate(pathForSelection({ kind: "space", spaceId }));
+    navigate(pathForSelection({ kind: "project", spaceId: spaceIdOf(projectId), projectId }));
     setActivePage("projects");
   }
 
-  function selectList(spaceId: string, listId: string) {
+  function selectList(projectId: string, listId: string) {
     planner.selectTask("");
-    navigate(pathForSelection({ kind: "list", spaceId, listId }));
+    navigate(pathForSelection({ kind: "list", spaceId: spaceIdOf(projectId), projectId, listId }));
     setActivePage("projects");
   }
 
-  function selectFolder(spaceId: string, folderId: string) {
+  function selectFolder(projectId: string, folderId: string) {
     planner.selectTask("");
-    navigate(pathForSelection({ kind: "folder", spaceId, folderId }));
+    navigate(pathForSelection({ kind: "folder", spaceId: spaceIdOf(projectId), projectId, folderId }));
     setActivePage("projects");
   }
 
   function clearSelection() {
     if (selection.kind !== "none") navigate("/app");
   }
+
+  /**
+   * Widens a Folder or List scope back to its whole Project. A Space selection
+   * has no narrower scope to clear, so this does nothing there.
+   */
+  function clearScope() {
+    if (selectedProjectId) selectProject(selectedProjectId);
+  }
+
+  // §33: once the records that can resolve an old `/s/:projectId` link have
+  // loaded, the address bar is rewritten to the new scheme — replace, not
+  // push, so Back still goes where the user came from rather than to the link
+  // they just followed. Skipped while `spaceId` is empty: that is the marker
+  // for a selection still waiting to resolve, and writing it would produce a
+  // path with a hole in it.
+  useEffect(() => {
+    if (selection.kind === "none" || !selectedSpaceId(selection)) return;
+    const canonical = pathForSelection(selection);
+    if (canonical !== currentPath) navigate(canonical, "replace");
+  }, [selection, currentPath]);
 
   useEffect(() => {
     function handlePopState() {
@@ -900,7 +940,7 @@ export default function App() {
     }
 
     if (task.projectId) {
-      selectSpace(task.projectId);
+      selectProject(task.projectId);
       return;
     }
 
@@ -908,7 +948,7 @@ export default function App() {
   }
 
   function openProjectFromCalendar(projectId: string) {
-    selectSpace(projectId);
+    selectProject(projectId);
   }
 
   function viewTaskInCalendar(taskId: string) {
@@ -1008,9 +1048,9 @@ export default function App() {
         activeProjects={activeProjects}
         selectedProjectId={selectedProjectId}
         viewScope={filterForSelection(selection)}
-        onClearScope={() => { if (selection.kind !== "none") selectSpace(selection.spaceId); }}
+        onClearScope={clearScope}
         isProjectDetailOpen={isProjectDetailOpen}
-        onSelectSpace={selectSpace}
+        onSelectSpace={selectProject}
         onCloseSpace={clearSelection}
         todayIntent={todayIntent}
         onTodayIntentHandled={() => setTodayIntent("")}
@@ -1115,7 +1155,7 @@ export default function App() {
         folders={planner.folders}
         lists={planner.lists}
         onSelectProject={(projectId) => {
-          selectSpace(projectId);
+          selectProject(projectId);
           setMobileMenuOpen(false);
         }}
         onSelectList={(spaceId, listId) => {
@@ -1153,7 +1193,7 @@ export default function App() {
             onChange={setSearchQuery}
             onSelectTask={openTaskInOfficialPage}
             onSelectProject={(projectId) => {
-              selectSpace(projectId);
+              selectProject(projectId);
               setSearchQuery("");
             }}
           />

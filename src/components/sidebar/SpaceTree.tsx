@@ -11,7 +11,8 @@
 import { useState } from "react";
 import type { Folder, List, Project } from "../../types";
 import { activeFolders, folderlessLists, listsInFolder, shouldRevealLists } from "../../domain/spaces/hierarchy";
-import { isSelected, type Selection } from "../../app/spaceSelection";
+import { spaceIdForProject } from "../../domain/spaces/spaces";
+import { isSelected, selectedProjectId, type Selection } from "../../app/spaceSelection";
 import { useT } from "../../i18n";
 
 interface SpaceTreeProps {
@@ -78,9 +79,10 @@ function InlineAdd({ label, placeholder, onSubmit }: { label: string; placeholde
   );
 }
 
-function ListRow({ list, spaceId, selection, onSelect, onRename, onArchive, onDropItem }: {
+function ListRow({ list, spaceId, projectId, selection, onSelect, onRename, onArchive, onDropItem }: {
   list: List;
   spaceId: string;
+  projectId: string;
   selection: Selection;
   onSelect: () => void;
   onRename: (name: string) => void;
@@ -90,7 +92,7 @@ function ListRow({ list, spaceId, selection, onSelect, onRename, onArchive, onDr
   const { t } = useT();
   const [renaming, setRenaming] = useState(false);
   const [over, setOver] = useState(false);
-  const selected = isSelected(selection, { kind: "list", spaceId, listId: list.id });
+  const selected = isSelected(selection, { kind: "list", spaceId, projectId, listId: list.id });
 
   if (renaming) {
     return (
@@ -147,10 +149,14 @@ export function SpaceTree({
 }: SpaceTreeProps) {
   const { t } = useT();
   // A selected branch starts open, so a deep link or a reload lands with the
-  // list it names already in view rather than behind a closed Space.
-  const [openSpaces, setOpenSpaces] = useState<Set<string>>(
-    () => new Set(selection.kind === "none" ? [] : [selection.spaceId]),
-  );
+  // list it names already in view rather than behind a closed row.
+  //
+  // Keyed by PROJECT id, which is what these rows are. `selection.spaceId`
+  // names the Space above them since STEP 6 and would never match.
+  const [openSpaces, setOpenSpaces] = useState<Set<string>>(() => {
+    const projectId = selectedProjectId(selection);
+    return new Set(projectId ? [projectId] : []);
+  });
   const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
 
   function toggle(set: Set<string>, id: string, apply: (next: Set<string>) => void) {
@@ -163,12 +169,16 @@ export function SpaceTree({
   return (
     <div className="spt-tree">
       {spaces.map((space) => {
+        // Rows are Projects. The Space level above them arrives in STEP 11;
+        // until then each row carries the Space its Project hangs in so the
+        // paths this tree builds are complete.
+        const spaceId = spaceIdForProject(space);
         const open = openSpaces.has(space.id);
         const spaceFolders = activeFolders(folders, space.id);
         const loose = folderlessLists(lists, space.id);
         const revealed = shouldRevealLists(lists, space.id, space.listsRevealed);
         const count = counts?.get(space.id) ?? 0;
-        const selected = isSelected(selection, { kind: "space", spaceId: space.id });
+        const selected = isSelected(selection, { kind: "project", spaceId, projectId: space.id });
 
         return (
           <div key={space.id} className="spt-space">
@@ -193,7 +203,7 @@ export function SpaceTree({
               <div className="spt-children">
                 {spaceFolders.map((folder) => {
                   const folderOpen = openFolders.has(folder.id);
-                  const folderRow: Selection = { kind: "folder", spaceId: space.id, folderId: folder.id };
+                  const folderRow: Selection = { kind: "folder", spaceId, projectId: space.id, folderId: folder.id };
                   return (
                     <div key={folder.id} className="spt-folder">
                       <div className={`spt-row spt-folder-row${isSelected(selection, folderRow) ? " is-selected" : ""}`}>
@@ -228,7 +238,8 @@ export function SpaceTree({
                             <ListRow
                               key={list.id}
                               list={list}
-                              spaceId={space.id}
+                              spaceId={spaceId}
+                              projectId={space.id}
                               selection={selection}
                               onSelect={() => onSelectList(space.id, list.id)}
                               onRename={(name) => onRenameList(list.id, name)}
@@ -255,7 +266,8 @@ export function SpaceTree({
                       <ListRow
                         key={list.id}
                         list={list}
-                        spaceId={space.id}
+                        spaceId={spaceId}
+                        projectId={space.id}
                         selection={selection}
                         onSelect={() => onSelectList(space.id, list.id)}
                         onRename={(name) => onRenameList(list.id, name)}
