@@ -47,7 +47,6 @@ export const SPACE_NAV: readonly SpaceNavItem[] = [
  * there. This set shrinks as STEP 9 connects each one, and goes with the last.
  */
 export const PENDING_TASK_VIEWS: ReadonlySet<BuiltInTaskViewId> = new Set([
-  "list",
   "gantt",
   "calendar",
 ]);

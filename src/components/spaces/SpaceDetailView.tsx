@@ -28,6 +28,8 @@ import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { SpaceOverviewTab } from "./SpaceOverviewTab";
 import { GoalQuickAdd, StatusManager } from "./SpaceViewTools";
 import { BoardView, type BoardColumn } from "../BoardView";
+import { TaskListView } from "../TaskListView";
+import { statusPatch } from "../../domain/view/board";
 import { projectItems, type Item } from "../../domain/view/item";
 import { goalDropFor, patchForColumn } from "../../domain/view/board";
 import { axisGroupIds, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
@@ -360,6 +362,13 @@ export function SpaceDetailView({
 
   // === Handlers (§31) ===
 
+  /** One route into the shared detail surface, whatever view opened it (§49A.4). */
+  function openItem(item: Item) {
+    if (item.source === "task") openTaskDrawer(item.sourceId);
+    else if (item.source === "goal") onOpenGoal(item.sourceId);
+    else if (item.source === "milestone") onOpenGoal(item.parentId, item.sourceId);
+  }
+
   function handleCreateSpaceTask(input: SpaceTaskInput) {
     const tags: string[] = [];
     if (input.group) tags.push(`group:${input.group}`);
@@ -657,21 +666,39 @@ export function SpaceDetailView({
               </>
             ) : null}
           </div>
-          <BoardView
-            items={boardItems}
-            spec={boardSpec}
-            context={boardContext}
-            columns={boardColumns}
-            projects={projects}
-            today={today}
-            otherLabel={t("board.other")}
-            onOpenItem={(item: Item) => {
-              if (item.source === "task") openTaskDrawer(item.sourceId);
-              else if (item.source === "goal") onOpenGoal(item.sourceId);
-              else if (item.source === "milestone") onOpenGoal(item.parentId, item.sourceId);
-            }}
-            onDropItem={handleBoardDrop}
-          />
+          {tab === "list" ? (
+            <TaskListView
+              items={boardItems}
+              spec={boardSpec}
+              context={boardContext}
+              statuses={boardStatuses}
+              lists={lists}
+              today={today}
+              onOpenItem={openItem}
+              onPatchTask={onUpdateTask}
+              onSetStatus={(item, statusId) => {
+                const task = boardContext.taskById.get(item.sourceId);
+                if (!task) return;
+                const patch = statusPatch(task, statusId, boardStatuses);
+                if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
+              }}
+              onCreateTask={(title) =>
+                onCreateTask({ title, status: "todo", projectId, listId: viewScope.listId ?? "" })
+              }
+            />
+          ) : (
+            <BoardView
+              items={boardItems}
+              spec={boardSpec}
+              context={boardContext}
+              columns={boardColumns}
+              projects={projects}
+              today={today}
+              otherLabel={t("board.other")}
+              onOpenItem={openItem}
+              onDropItem={handleBoardDrop}
+            />
+          )}
         </>
       ) : null}
       {/* Modals (§32) */}

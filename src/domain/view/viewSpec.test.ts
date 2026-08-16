@@ -381,6 +381,29 @@ describe("columns the user named", () => {
 // §16-§18: the same view opened at four depths.
 // Space -> Project -> Folder -> List, and the filter language says which by
 // naming one field.
+describe("query — search as a filter predicate (§50A.15)", () => {
+  const [item] = build([task({ title: "Contingency Theory 정리" })]).items;
+
+  it("matches part of a title, ignoring case", () => {
+    expect(matchesFilter(item, { query: "contingency" })).toBe(true);
+    expect(matchesFilter(item, { query: "THEORY" })).toBe(true);
+    expect(matchesFilter(item, { query: "정리" })).toBe(true);
+    expect(matchesFilter(item, { query: "drone" })).toBe(false);
+  });
+
+  it("narrows nothing when it is empty or blank", () => {
+    expect(matchesFilter(item, { query: "" })).toBe(true);
+    expect(matchesFilter(item, { query: "   " })).toBe(true);
+  });
+
+  it("composes with the scope rather than replacing it", () => {
+    // Search must not reach outside the place the user is standing: the scope
+    // narrows first and this narrows what is left.
+    expect(matchesFilter(item, { projectId: "space-2", query: "contingency" })).toBe(false);
+    expect(matchesFilter(item, { projectId: "space-1", query: "contingency" })).toBe(true);
+  });
+});
+
 describe("the Space scope (STEP 7)", () => {
   // Two Projects filed under one Space, and a third somewhere else. This is
   // the case a single id could not express before the level existed.

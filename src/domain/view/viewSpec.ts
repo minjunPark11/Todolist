@@ -51,6 +51,15 @@ export interface ViewFilter {
    * rather than one inside the other.
    */
   parentId?: string;
+  /**
+   * Free text over the title, case-insensitive (§50A.15).
+   *
+   * A predicate in the shared filter language rather than a step a screen does
+   * on its own, so search composes with the scope instead of racing it: the
+   * scope narrows first and this narrows what is left, which is what keeps a
+   * search from pulling in Items from outside the place the user is standing.
+   */
+  query?: string;
   /** An item matches when it carries every tag named. */
   tags?: string[];
   statusIds?: string[];
@@ -109,6 +118,10 @@ export function matchesFilter(item: Item, filter: ViewFilter): boolean {
   if (filter.priorities && !filter.priorities.includes(item.priority)) return false;
   if (filter.blocked !== undefined && item.blocked !== filter.blocked) return false;
   if (filter.done !== undefined && item.done !== filter.done) return false;
+  if (filter.query) {
+    const needle = filter.query.trim().toLowerCase();
+    if (needle && !item.title.toLowerCase().includes(needle)) return false;
+  }
   if (filter.tags && filter.tags.length > 0) {
     if (!filter.tags.every((tag) => item.tags.includes(tag))) return false;
   }

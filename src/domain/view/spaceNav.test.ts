@@ -74,6 +74,7 @@ describe("navItemsForScope (§14)", () => {
     }
     expect(navItemsForScope("project").map((item) => item.id)).toEqual([
       "overview",
+      "list",
       "board",
       "goals",
       "horizons",

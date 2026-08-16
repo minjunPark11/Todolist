@@ -10683,6 +10683,45 @@ typecheck 통과, 테스트 **664개** 통과 (spaceNav 10개 신규). 실제 �
 
 ---
 
+## STEP 9 — Built-in Task Views — List 완료 (2026-08-17)
+
+### List (§50A)
+
+`components/TaskListView.tsx` 신설. §0.3.2에서 확인했듯 재사용할 table renderer가 없어 신규 구축이다.
+
+**툴바가 곧 spec이다.** group / sort / search 컨트롤이 각각 `groupBy` · `sort` · `filter.query`를 바꾸고 같은 엔진이 다시 답한다. 손으로 거르거나 정렬하는 코드가 없다.
+
+검색은 `ViewFilter.query`로 **필터 언어에 넣었다**(§50A.13이 "Filter는 ViewSpec.filter 규칙을 사용한다"고 못박는다). 화면이 따로 하는 단계가 아니라 술어이므로, 스코프가 먼저 좁히고 검색이 그 나머지를 좁힌다 — 검색 결과에 스코프 밖 Task가 섞이지 않는 이유다(§50A.15).
+
+**Assignee 컬럼은 없다.** Task에 담당자 필드가 없고, §50A.25가 목업을 맞추려고 없는 필드를 만들지 말라고 한다. T-LV04의 "지원되는 Domain Field 기준" 조항을 따른다.
+
+상태 쓰기만 별도 콜백(`onSetStatus`)이다. 상태는 평범한 필드가 아니라 — 기본 상태는 `status`를 쓰고 `statusId`를 비우며 사용자가 만든 상태는 그 반대 — 그 규칙은 `statusPatch`가 소유한다. 목표·마일스톤 행은 읽기 전용이다. 목표의 컬럼은 `boardListId`라는 다른 쓰기이고, **아무 일도 안 하는 편집기를 절반만 붙이는 것은 라벨보다 나쁘다.**
+
+### 검증 — §50A.27
+
+```text
+T-LV01  Shell 유지, Content만 교체            ✓
+T-LV02  View Bar에서 List만 active            ✓
+T-LV03  Group | Sort | Search 한 행           ✓ (Filter/Display는 후속)
+T-LV04  작업 → 리스트 → 상태 → 마감일 → 우선순위  ✓ (Assignee 제외, 위 참조)
+T-LV05  compact row, card 아님                 ✓ 행 높이 38px
+T-LV06  현재 Project의 Task만                 ✓
+T-LV07  List 수정이 Board에 반영               ✓ 문헌 검토 할 일 → 진행 중
+T-LV08  공통 TaskDetail로 연결                ✓
+T-LV09  Search가 Scope 안에서만               ✓ 4개 중 1개 표시
+T-LV10  생성이 Project/List Context 상속       ✓ List 스코프에서 listId 상속
+T-LV11  좁은 화면에서 압축하지 않음            ✓ 보조 컬럼만 접힘, 본문 가로 스크롤 없음
+T-LV12  Header + Bar + Toolbar + Table + Count ✓
+```
+
+typecheck 통과, 테스트 **667개** 통과. `PENDING_TASK_VIEWS`에서 `list` 제거.
+
+### 아직 안 한 것
+
+Filter 컨트롤(§50A.13)과 Display/column settings(§50A.6)는 붙이지 않았다. Bulk action(§50A.12)은 선택 상태만 있고 동작은 없다 — §50A.12가 "지원하지 않는 Bulk Action을 UI를 맞추려고 추가하지 않는다"고 한다. Gantt·Calendar는 `PENDING_TASK_VIEWS`에 남아 있다.
+
+---
+
 ## STEP 9 — Built-in Task Views
 
 기존 Renderer를 검증하면서 다음 Task View를 하나씩 연결한다.
