@@ -17,6 +17,7 @@ import type {
   ProjectType,
   RawPlannerData,
   RepeatType,
+  Space,
   Subtask,
   Task,
   TaskDraft,
@@ -30,6 +31,7 @@ import {
   readLegacyLocalSpaces,
 } from "../lib/spaces/legacyLocalSpaces";
 import * as hierarchy from "../domain/spaces/hierarchy";
+import * as spaceTree from "../domain/spaces/spaces";
 import { sanitizeFolder, sanitizeList } from "../domain/spaces/hierarchy";
 import { defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
 import * as pathOps from "../domain/horizons/pathMutations";
@@ -356,6 +358,11 @@ export function normalizeData(data: RawPlannerData): PlannerData {
           .filter((path): path is LearningPath => path !== null)
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       : [],
+    // The work area above Project (SPACES_REDESIGN_II §4). Stays empty until
+    // there is a Project to file, so a fresh account creates nothing.
+    spaces: Array.isArray(data.spaces)
+      ? data.spaces.map(spaceTree.sanitizeSpace).filter((space): space is Space => space !== null)
+      : [],
     // Space hierarchy (P3). Both collections stay empty until the Spaces UI
     // creates anything; attaching Items to Lists is P4.
     folders: Array.isArray(data.folders)
@@ -378,28 +385,36 @@ function emptyData(): PlannerData {
 // through here, so a timer left running when the app closed can't keep
 // accruing wall-clock time (see recoverStaleFocusSessions).
 function adoptLoadedData(data: PlannerData): PlannerData {
+  const now = new Date().toISOString();
   const focusSessions = recoverStaleFocusSessions(data.focusSessions);
   const learningPaths = adoptLegacyLearningPaths(data.learningPaths);
-  const projects = adoptLegacyLocalSpaces(data.projects);
-  // P4 (M3): every Space gets a default List so an Item always has somewhere
-  // to be. This is the ONLY thing the Spaces migration writes — tasks and
-  // goals are not rewritten, because while a Space has one List their
-  // membership is already answered by projectId (domain/spaces/membership).
+  const legacyAdopted = adoptLegacyLocalSpaces(data.projects);
+  // STEP 5 (§40 M2/M4): one Space, and every Project filed under it. This is
+  // the whole Space migration's write budget — Projects number in the tens,
+  // and nothing beneath them is touched, which is the property that made this
+  // model cheaper than demoting Project to a Folder (§8, H-INV-05).
+  const spaces = spaceTree.ensureDefaultSpace(data.spaces, legacyAdopted, now);
+  const projects = spaceTree.backfillProjectSpace(legacyAdopted);
+  // P4 (M3): every Project gets a default List so an Item always has somewhere
+  // to be. Tasks and goals are not rewritten, because while a Project has one
+  // List their membership is already answered by projectId
+  // (domain/spaces/membership).
   const lists = hierarchy.ensureDefaultLists(
     projects.filter((project) => !project.archivedAt).map((project) => project.id),
     data.lists,
-    new Date().toISOString(),
+    now,
     defaultListIdFor,
   );
   if (
     focusSessions === data.focusSessions &&
     learningPaths === data.learningPaths &&
     projects === data.projects &&
+    spaces === data.spaces &&
     lists === data.lists
   ) {
     return data;
   }
-  return { ...data, focusSessions, learningPaths, projects, lists };
+  return { ...data, focusSessions, learningPaths, projects, spaces, lists };
 }
 
 // Phase S4 migration, and the same shape as the one below it: custom spaces
@@ -1563,6 +1578,47 @@ export function usePlannerData() {
     return next.find((path) => path.id === pathId) ?? null;
   }
 
+  // === Spaces (SPACES_REDESIGN_II STEP 5) ===
+  // The tree and routing arrive in STEP 6/11; these exist now so the
+  // collection has one owner from the start, like every other record type.
+  function createSpace(name: string): string {
+    const now = new Date().toISOString();
+    const space = spaceTree.makeSpace(createId("space"), name.trim(), now);
+    setData((current) => ({ ...current, spaces: spaceTree.addSpace(current.spaces, space) }));
+    return space.id;
+  }
+
+  function updateSpace(spaceId: string, patch: Partial<Space>) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const spaces = spaceTree.patchSpace(current.spaces, spaceId, patch, now);
+      return spaces === current.spaces ? current : { ...current, spaces };
+    });
+  }
+
+  /**
+   * H-INV-06: a Space holding Projects is archived, never deleted — deleting
+   * it would strand every Project, Folder, List and Task under it. The caller
+   * checks `canDeleteSpace` to decide which it is offering; this refuses
+   * rather than cascading if it is asked to do the wrong one.
+   */
+  function archiveSpace(spaceId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const spaces = spaceTree.archiveSpace(current.spaces, spaceId, now);
+      return spaces === current.spaces ? current : { ...current, spaces };
+    });
+  }
+
+  /** H-INV-05: one row. Nothing under the Project is rewritten. */
+  function moveProjectToSpace(projectId: string, spaceId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const projects = spaceTree.moveProjectToSpace(current.projects, projectId, spaceId, current.spaces, now);
+      return projects === current.projects ? current : { ...current, projects };
+    });
+  }
+
   // === Space hierarchy (P3) ===
   // Nothing calls these yet — the Spaces UI arrives in P6. They exist now so
   // the collections have a single owner from the start, the way every other
@@ -1745,6 +1801,7 @@ export function usePlannerData() {
     projects: data.projects,
     subtasks: data.subtasks,
     learningPaths: data.learningPaths,
+    spaces: data.spaces,
     folders: data.folders,
     lists: data.lists,
     focusSessions: data.focusSessions,
@@ -1801,6 +1858,10 @@ export function usePlannerData() {
     deleteMilestone,
     linkCardToMilestone,
     createTaskFromMilestone,
+    createSpace,
+    updateSpace,
+    archiveSpace,
+    moveProjectToSpace,
     createList,
     createDefaultList,
     updateList,

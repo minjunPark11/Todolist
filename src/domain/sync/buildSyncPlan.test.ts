@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSyncPlan, collectionTables, isEmptySyncPlan } from "./buildSyncPlan";
+import { buildSyncPlan, collectionTables, isEmptySyncPlan, optionalRemoteTables } from "./buildSyncPlan";
 import type { AppSettings, PlannerData, PlannerSettings, Task } from "../../types";
 
 function task(id: string, title = id): Task {
@@ -64,6 +64,7 @@ function data(overrides: Partial<PlannerData> = {}): PlannerData {
   return {
     tasks: [],
     projects: [],
+    spaces: [],
     subtasks: [],
     focusSessions: [],
     activeSessionId: "",
@@ -112,6 +113,36 @@ describe("a collection the product dropped", () => {
       expect(tableNamed(plan, "space_notes")).toBeUndefined();
     }
     expect(collectionTables.some(([, table]) => (table as string) === "space_notes")).toBe(false);
+  });
+});
+
+describe("the spaces collection (SPACES_REDESIGN_II STEP 5)", () => {
+  const space = (id: string) => ({
+    id,
+    name: id,
+    description: "",
+    color: "#8e8e93",
+    order: 0,
+    createdAt: "2026-08-17T00:00:00.000Z",
+    updatedAt: "2026-08-17T00:00:00.000Z",
+  });
+
+  it("syncs like every other collection", () => {
+    const plan = buildSyncPlan(data({ spaces: [space("s1")] }), null);
+    expect(tableNamed(plan, "spaces")?.upsert.map((row) => row.id)).toEqual(["s1"]);
+  });
+
+  it("is optional, so an account whose project lacks the table keeps syncing", () => {
+    // The table is skipped, and everything else still ships — the point of
+    // optionalRemoteTables. A required table would fail the whole save.
+    const plan = buildSyncPlan(
+      data({ spaces: [space("s1")], tasks: [task("a")] }),
+      null,
+      new Set(["spaces"]),
+    );
+    expect(tableNamed(plan, "spaces")).toBeUndefined();
+    expect(tableNamed(plan, "tasks")?.upsert.map((row) => row.id)).toEqual(["a"]);
+    expect(optionalRemoteTables.has("spaces")).toBe(true);
   });
 });
 

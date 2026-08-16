@@ -21,6 +21,7 @@ export const collectionTables = [
   ["subtasks", "subtasks"],
   ["focusSessions", "focus_sessions"],
   ["learningPaths", "learning_paths"],
+  ["spaces", "spaces"],
   ["folders", "folders"],
   ["lists", "lists"],
 ] as const;
@@ -29,6 +30,7 @@ export const collectionTables = [
 // keeps working without them instead of failing every sync.
 export const optionalRemoteTables: ReadonlySet<string> = new Set([
   "learning_paths",
+  "spaces",
   "folders",
   "lists",
 ]);

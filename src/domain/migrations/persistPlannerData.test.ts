@@ -38,6 +38,7 @@ function plannerData(path: LearningPath): PlannerData {
   return {
     tasks: [],
     projects: [],
+    spaces: [],
     subtasks: [],
     focusSessions: [],
     activeSessionId: "",

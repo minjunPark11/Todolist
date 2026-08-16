@@ -129,7 +129,27 @@ export interface Status {
   group: StatusGroup;
 }
 
-/** Optional grouping inside a Space. Absent until someone makes one (D4). */
+/**
+ * A work area holding several Projects — the top of the tree
+ * (SPACES_REDESIGN_II §4).
+ *
+ * A brand-new collection, which is what makes it safe to add: a client that
+ * has never heard of this table simply leaves it alone, where a new field on
+ * an existing synced record needs M0 to survive (§5).
+ */
+export interface Space {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  icon?: string;
+  order: number;
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Optional grouping inside a Project. Absent until someone makes one (D4). */
 export interface Folder {
   id: string;
   spaceId: string;
@@ -219,6 +239,16 @@ export interface Project {
   features?: Record<string, boolean>;
   /** One-way once a second List has existed (SPACES_CLICKUP_UI_DESIGN U2). */
   listsRevealed?: boolean;
+  /**
+   * The Space this Project belongs to (H-INV-01).
+   *
+   * Optional because it is a new field on a record that already syncs: a
+   * client written before Spaces will not send it, and M0 passthrough is what
+   * stops such a client from erasing it. Absent reads as the default Space
+   * (`spaceIdForProject`), so a Project is never missing from the tree while
+   * waiting for the backfill to reach this device.
+   */
+  spaceId?: string;
 }
 
 // One uninterrupted running stretch of a focus session. Pauses close a
@@ -336,6 +366,7 @@ export interface PlannerData {
   focusSessions: FocusSession[];
   activeSessionId: string;
   learningPaths: LearningPath[];
+  spaces: Space[];
   folders: Folder[];
   lists: List[];
   settings: PlannerSettings;

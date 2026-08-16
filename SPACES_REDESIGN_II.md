@@ -10430,9 +10430,56 @@ id 네임스페이스   project-space-${id} 제거         공간 id = Project i
 
 ---
 
-## STEP 5 — Hierarchy Migration
+## STEP 5 — Hierarchy Migration — 완료 (2026-08-17)
 
 Space → Project 관계부터 완성한다.
+
+### 무엇이 생겼는가
+
+```text
+types.ts               Space 레코드 + Project.spaceId (optional)
+domain/spaces/spaces.ts  Space 레코드와 Project→Space 관계의 소유자
+                       sanitizeSpace / activeSpaces / projectsInSpace
+                       spaceIdForProject / canDeleteSpace
+                       ensureDefaultSpace / backfillProjectSpace
+                       addSpace / patchSpace / archiveSpace / moveProjectToSpace
+008_spaces.sql         id/user_id/data jsonb — 다른 컬렉션과 같은 형태
+buildSyncPlan          collectionTables + optionalRemoteTables 등록
+usePlannerData         로드 시 M2/M4 마이그레이션, createSpace 등 액션 4개
+```
+
+`domain/spaces/hierarchy.ts`에 넣지 않은 이유: 그 모듈은 *"Nothing here reads Task or Project"* 를 명시한다. Project를 쓰는 backfill이 그 경계를 깬다.
+
+### 재작성 예산 — 실측
+
+STEP 5 이전 저장소(= `spaces` 키 없음, `Project.spaceId` 없음)로 앱을 띄워 확인했다.
+
+```text
+생성   Space 1개 (space-default, "My Space")
+수정   Project N개 — spaceId 부여. updatedAt은 건드리지 않음
+불변   Task · List · Folder · Subtask — 0행
+
+재실행 멱등: 두 번째 로드에서 Space가 1개 그대로
+빈 계정: 아무것도 만들지 않음 (Project가 생길 때 함께 생긴다)
+```
+
+`updatedAt`을 올리지 않는 것은 의도다. 사용자가 편집한 것이 아니므로, 올리면 첫 실행에 모든 Project가 "최근 업데이트" 맨 위로 올라가 마이그레이션이 스스로를 광고하게 된다.
+
+### FK를 만들지 않은 이유
+
+`projects.space_id` 컬럼 + FK 대신 `spaceId`를 기존 `projects.data` jsonb 안에 둔다. 모든 컬렉션이 jsonb 레코드로 저장되므로 관계도 레코드가 사는 곳에 둔다. 컬럼+FK는 스키마 유일의 교차 테이블 제약이 되고, **두 테이블이 계정에 도달하는 순서가 어긋나면 평범한 저장이 실패한다.** H-INV-06(Project를 가진 Space는 삭제 불가)은 이유를 설명할 수 있는 클라이언트에서 강제한다.
+
+### `Project.spaceId`가 유일한 M0 의존 지점
+
+이 마이그레이션이 만드는 다른 컬렉션은 전부 신규라 구버전 클라이언트가 건드리지 않는다. `spaceId`만 **이미 동기화되는 레코드에 얹히는 필드**이고, 구버전이 Project를 되쓸 때 이 필드를 지우지 않게 막는 것은 M0 passthrough뿐이다. `forwardCompat.test.ts`가 이 한 지점을 지킨다.
+
+### 검증
+
+typecheck 통과, 테스트 **640개** 통과 (spaces 도메인 22, sync 2, forwardCompat 2 신규).
+
+### 이 단계가 하지 않은 것
+
+라우팅·트리·Scope는 STEP 6/7/11이다. `createSpace`/`moveProjectToSpace`는 아직 호출자가 없다 — Folder/List 액션이 P3에서 그랬듯, 컬렉션에 처음부터 주인을 하나 두기 위해 먼저 존재한다.
 
 ---
 

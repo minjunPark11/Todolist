@@ -93,6 +93,24 @@ describe("normalizeData carries fields it does not know", () => {
     expect(data.lists[0]).toMatchObject(FUTURE);
   });
 
+  it("keeps them on a space", () => {
+    const data = normalizeData({
+      spaces: [withFuture({ id: "space-1", name: "Research" })],
+    });
+    expect(data.spaces[0]).toMatchObject(FUTURE);
+  });
+
+  it("keeps a project's spaceId — the one field STEP 5 adds to a synced record", () => {
+    // Every other collection this migration touches is brand new, so an older
+    // client leaves it alone. `Project.spaceId` is the exception: it rides in
+    // a record that already syncs, and M0 is the only thing standing between
+    // it and a client one version behind writing the Project back without it.
+    const data = normalizeData({
+      projects: [{ id: "p1", name: "Drone research", spaceId: "space-1" }],
+    });
+    expect(data.projects[0].spaceId).toBe("space-1");
+  });
+
   it("keeps them on app settings — feature toggles will live here", () => {
     const appSettings = normalizeData({
       appSettings: { ...FUTURE, theme: "dark" } as never,
