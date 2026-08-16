@@ -2,33 +2,39 @@ import type { FocusSession, Task } from "../types";
 import type {
   SpaceActivity,
   SpaceCustomConfig,
-  SpaceHubType,
   SpaceSignalStatus,
 } from "./spaceHubTypes";
 import { addDays, todayValue } from "../utils/date";
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
-// A space collects tasks either through its source project or through an
-// explicit `space:<id>` tag (used by spaces that have no project).
-export function spaceTaskTag(spaceId: string): string {
-  return `space:${spaceId}`;
-}
-
-export function getSpaceTasks(tasks: Task[], spaceId: string, sourceProjectId?: string): Task[] {
-  const tag = spaceTaskTag(spaceId);
+/**
+ * A space's tasks are the tasks of the Project behind it — one rule, not two
+ * (SPACES_CLICKUP_REDESIGN D6, SPACES_REDESIGN_II §0.3.7).
+ *
+ * There used to be a second rule: a task could also claim membership by
+ * carrying a `space:<id>` tag, for spaces that had no Project. Nothing can
+ * reach that state any more — every space is derived from a Project record and
+ * both creation paths make one (`deriveProjectSpaces`, `submitAdd`) — so the
+ * tag branch could only ever match a legacy string. It is gone rather than
+ * kept as a second answer to "where does this task live", which is what the
+ * incoming Space entity would have turned into a third.
+ *
+ * Legacy `space:...` strings left in `Task.tags` are not stripped: rewriting
+ * every task to remove an inert string is exactly the write amplification the
+ * store spent a release removing. They reference nothing.
+ */
+export function getSpaceTasks(tasks: Task[], projectId: string): Task[] {
+  if (!projectId) return [];
   return tasks.filter(
-    (task) =>
-      task.status !== "archived" &&
-      !task.deletedAt &&
-      ((sourceProjectId && task.projectId === sourceProjectId) || task.tags.includes(tag)),
+    (task) => task.status !== "archived" && !task.deletedAt && task.projectId === projectId,
   );
 }
 
-export function getSpaceSessions(sessions: FocusSession[], spaceTasks: Task[], sourceProjectId?: string): FocusSession[] {
+export function getSpaceSessions(sessions: FocusSession[], spaceTasks: Task[], projectId: string): FocusSession[] {
   const taskIds = new Set(spaceTasks.map((task) => task.id));
   return sessions.filter(
-    (session) => taskIds.has(session.taskId) || (sourceProjectId ? session.projectId === sourceProjectId : false),
+    (session) => taskIds.has(session.taskId) || (projectId ? session.projectId === projectId : false),
   );
 }
 
@@ -100,9 +106,15 @@ export interface SpaceSignal {
   detail: string;
 }
 
-// Signal rules per space type (§10.6), computed from real space data.
+/**
+ * Signal rules (§10.6), computed from real space data.
+ *
+ * There used to be a `type` parameter selecting between a "personal" rule set
+ * and a shared one. Nothing could produce that type (SPACES_REDESIGN_II
+ * §0.3.8), so every space in the product took the shared branch and the
+ * parameter only made the two look like a choice. Both are gone.
+ */
 export function getSpaceSignal(
-  type: SpaceHubType,
   spaceTasks: Task[],
   spaceSessions: FocusSession[],
   t: TFn,
@@ -117,14 +129,6 @@ export function getSpaceSignal(
     (task) => !isTaskDone(task) && task.dueDate && task.dueDate <= addDays(today, 2) && !task.scheduledDate,
   ).length;
 
-  if (type === "personal") {
-    if (counts.overdue > 0) return { status: "deadline_risk", label: t("spaceHub.signal.overdue"), detail: t("spaceHub.signal.overdueDetail", { n: counts.overdue }) };
-    if (counts.unscheduled > 0) return { status: "pending_items", label: t("spaceHub.signal.pendingItems"), detail: t("spaceHub.signal.pendingItemsDetail", { n: counts.unscheduled }) };
-    if (!recentActivity) return { status: "inactive", label: t("spaceHub.signal.inactive"), detail: t("spaceHub.signal.inactiveDetail") };
-    return { status: "on_track", label: t("spaceHub.signal.onTrack"), detail: t("spaceHub.signal.onTrackPersonalDetail") };
-  }
-
-  // project / custom share the base rules.
   if (blocked > 0) return { status: "blocked", label: t("spaceHub.signal.blocked"), detail: t("spaceHub.signal.blockedDetail", { n: blocked }) };
   if (dueSoon > 0) return { status: "deadline_risk", label: t("spaceHub.signal.deadlineRisk"), detail: t("spaceHub.signal.deadlineRiskDetail", { n: dueSoon }) };
   if (!recentActivity && counts.open > 0) return { status: "inactive", label: t("spaceHub.signal.inactive"), detail: t("spaceHub.signal.inactiveDetail") };

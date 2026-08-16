@@ -194,16 +194,18 @@ export function FocusConflictModal({ onGoToFocus, onClose }: { onGoToFocus: () =
   );
 }
 
+/**
+ * `isProject` and `isStudy` used to pick between three hints. Every space is a
+ * Project (SPACES_REDESIGN_II §0.3.8) — `isStudy` had no caller at all and
+ * `isProject` was always true — so the branch and both props are gone rather
+ * than left as a choice with one reachable arm.
+ */
 export function DeleteSpaceConfirmModal({
   spaceName,
-  isProject,
-  isStudy = false,
   onConfirm,
   onClose,
 }: {
   spaceName: string;
-  isProject: boolean;
-  isStudy?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -237,11 +239,7 @@ export function DeleteSpaceConfirmModal({
     <ModalShell title={t("spaces.delete.title")} onClose={onClose}>
       <p className="sdv-modal-copy">
         {t("spaces.delete.body", { name: spaceName })}{" "}
-        {isProject
-          ? t("spaces.delete.projectHint")
-          : isStudy
-            ? t("spaces.delete.studyHint")
-            : t("spaces.delete.localHint")}
+        {t("spaces.delete.projectHint")}
       </p>
       <div className="sdv-modal-actions">
         <button type="button" className="sdv-btn" onClick={onClose}>

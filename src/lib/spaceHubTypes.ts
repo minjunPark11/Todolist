@@ -3,8 +3,17 @@
 // hub adds notes, activity records, and per-space customization on top.
 
 import { SPACE_VIEWS, type SpaceViewId } from "../domain/view/spaceViews";
+import type { ProjectType } from "../types";
 
-export type SpaceHubType = "project" | "personal" | "custom";
+// `SpaceHubType` ("project" | "personal" | "custom") used to live here, beside
+// a page-local `SpaceType` ("project" | "custom") and the stored `ProjectType`
+// ("project" | "area") — three vocabularies for one question, none of which
+// knew about the other two (SPACES_REDESIGN_II §0.3.8).
+//
+// `ProjectType` is the survivor because it is the only one that is stored and
+// synced; the other two were derived on the way to the screen and had to be
+// translated back at every boundary. "personal" had no path that could produce
+// it at all.
 
 // The per-space "calendar" tab was removed (PROJECT_DETAIL_REMOVE_CALENDAR_TAB
 // spec) — scheduling lives in the main Calendar page. Legacy ?tab=calendar
@@ -102,11 +111,13 @@ export function emptySpaceConfig(spaceId: string): SpaceCustomConfig {
 export interface SpaceLike {
   id: string;
   name: string;
-  type: string;
+  type: ProjectType;
   description: string;
   color: string;
-  sourceId?: string;
-  sourceRef?: "project" | "study";
+  // `id` IS the Project id (SPACES_REDESIGN_II §0.3.8). A `sourceId` beside it
+  // and a `sourceRef` discriminator whose only arm was "project" — "study" had
+  // no producer at all — are gone; they described a time when a space could be
+  // something other than a Project.
 }
 
 // Preset per space type (§27): same layout, different labels/groups/rules.

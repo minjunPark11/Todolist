@@ -32,15 +32,45 @@ function emptyStore(): SpaceHubStore {
   return { legacyNotes: undefined, activities: [], configs: [] };
 }
 
+/**
+ * Records here were keyed by the Spaces screen's derived card id, which used
+ * to carry a `project-space-` prefix the rest of the app never used
+ * (SPACES_REDESIGN_II §0.3.8). Now that a space IS its Project, the stored keys
+ * are normalised on load rather than looked up through a permanent fallback —
+ * a fallback would have to answer for every read forever, and this blob is
+ * device-local, so rewriting it costs one localStorage write and no sync.
+ */
+const LEGACY_SPACE_ID_PREFIX = "project-space-";
+
+function normalizeSpaceId(spaceId: string): string {
+  return spaceId.startsWith(LEGACY_SPACE_ID_PREFIX)
+    ? spaceId.slice(LEGACY_SPACE_ID_PREFIX.length)
+    : spaceId;
+}
+
 function loadStore(): SpaceHubStore {
   try {
     const raw = platform.storage.getSync(STORAGE_KEY);
     if (!raw) return emptyStore();
     const parsed = JSON.parse(raw) as Partial<SpaceHubStore> & { notes?: unknown };
+    const configs = Array.isArray(parsed.configs) ? parsed.configs : [];
+    const seen = new Set<string>();
     return {
       legacyNotes: parsed.notes,
-      activities: Array.isArray(parsed.activities) ? parsed.activities : [],
-      configs: Array.isArray(parsed.configs) ? parsed.configs : [],
+      activities: (Array.isArray(parsed.activities) ? parsed.activities : []).map((activity) => ({
+        ...activity,
+        spaceId: normalizeSpaceId(activity.spaceId),
+      })),
+      // `updateConfig` prepends, so the first entry for an id is the newest.
+      // Two entries can only collide if one was written before the prefix
+      // existed; keeping the newer one is the same rule a write would apply.
+      configs: configs.reduce<SpaceCustomConfig[]>((kept, config) => {
+        const spaceId = normalizeSpaceId(config.spaceId);
+        if (seen.has(spaceId)) return kept;
+        seen.add(spaceId);
+        kept.push({ ...config, spaceId });
+        return kept;
+      }, []),
     };
   } catch {
     return emptyStore();

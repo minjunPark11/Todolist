@@ -7,6 +7,7 @@
 // via the maps below. Unknown values (user-created groups/note types) fall
 // through untouched so custom input still shows exactly what the user typed.
 import type { SpaceTab } from "./spaceHubTypes";
+import type { ProjectType } from "../types";
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -87,7 +88,7 @@ export function tabText(t: TFn, tab: SpaceTab): string {
   return t(`spaceHub.tab.${tab}`);
 }
 
-export function hubTypeText(t: TFn, type: string): string {
+export function hubTypeText(t: TFn, type: ProjectType): string {
   return t(`spaceHub.hubType.${type}`);
 }
 

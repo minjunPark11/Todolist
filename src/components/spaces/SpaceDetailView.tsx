@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type { FocusSession, Folder, GoalSchedule, LearningPath, List, Milestone, Project, Task, TaskDraft } from "../../types";
 import type { ToastState } from "../kit";
 import type { PageId } from "../../types";
 import {
   SPACE_TABS,
-  type SpaceHubType,
   type SpaceLike,
   type SpaceTab,
 } from "../../lib/spaceHubTypes";
@@ -23,7 +22,6 @@ import {
   getTodaySpaceFocusSeconds,
   getUpcomingSpaceItems,
   getWeekSpaceFocusSeconds,
-  spaceTaskTag,
 } from "../../lib/spaceSelectors";
 import { useSpaceHubData } from "../../hooks/useSpaceHubData";
 import { formatDate, getWeekStart, todayValue } from "../../utils/date";
@@ -153,19 +151,21 @@ export function SpaceDetailView({
   const today = todayValue();
   const weekStart = getWeekStart(today);
   const config = hub.getConfig(space.id);
-  const hubType = (["project", "personal", "custom"].includes(space.type) ? space.type : "custom") as SpaceHubType;
-  const preset = getSpacePreset(hubType);
+  const preset = getSpacePreset(space.type);
   const groups = resolveTaskGroups(preset);
 
   const displayName = space.name;
   const displayDescription = space.description || preset.headerSubtitle;
   const displayColor = space.color;
 
-  const sourceProjectId = space.sourceRef === "project" ? space.sourceId : undefined;
-  const spaceTasks = useMemo(() => getSpaceTasks(tasks, space.id, sourceProjectId), [tasks, space.id, sourceProjectId]);
+  // A space IS its Project, so its id is the Project id (SPACES_REDESIGN_II
+  // §0.3.8). This used to arrive as a separate `sourceId` beside a `sourceRef`
+  // discriminator, which was the same value carried twice under two names.
+  const projectId = space.id;
+  const spaceTasks = useMemo(() => getSpaceTasks(tasks, projectId), [tasks, projectId]);
   const spaceSessions = useMemo(
-    () => getSpaceSessions(focusSessions, spaceTasks, sourceProjectId),
-    [focusSessions, spaceTasks, sourceProjectId],
+    () => getSpaceSessions(focusSessions, spaceTasks, projectId),
+    [focusSessions, spaceTasks, projectId],
   );
   const activities = useMemo(
     () => deriveSpaceActivities(space.id, spaceTasks, spaceSessions, hub.activities, t),
@@ -174,11 +174,11 @@ export function SpaceDetailView({
 
   // === Tasks board (CLICKUP_IMPORT_DESIGN §4.2: filter{space} + groupBy status) ===
   //
-  // Built from `spaceTasks` rather than filtered by `spaceId` in the spec,
-  // because membership here is not always projectId — a Space with no source
-  // project claims its tasks by tag (getSpaceTasks). Resolving membership
-  // first and handing the engine the answer keeps that one rule in one place.
-  const sourceProject = sourceProjectId ? projects.find((p) => p.id === sourceProjectId) : undefined;
+  // Built from `spaceTasks` rather than re-filtering by `spaceId` in the spec:
+  // membership is resolved once, in one place, and the engine is handed the
+  // answer. There is exactly one rule to resolve now — the Project behind the
+  // space (SPACES_REDESIGN_II §0.3.7).
+  const sourceProject = projectId ? projects.find((p) => p.id === projectId) : undefined;
   const boardStatuses = useMemo(
     () => (sourceProject ? statusesWithCustom(sourceProject) : DEFAULT_STATUSES),
     [sourceProject],
@@ -186,8 +186,8 @@ export function SpaceDetailView({
   // Every source is projected once; which of them a view shows is its
   // `filter.sources` (spaceViews.ts), not a second projection per screen.
   const spaceGoals = useMemo(
-    () => paths.filter((path) => path.projectId && path.projectId === sourceProjectId),
-    [paths, sourceProjectId],
+    () => paths.filter((path) => path.projectId && path.projectId === projectId),
+    [paths, projectId],
   );
   const boardItems = useMemo(
     () =>
@@ -274,7 +274,7 @@ export function SpaceDetailView({
 
   const counts = getSpaceTaskCounts(spaceTasks, today);
   const nextAction = getNextActionTask(spaceTasks, config, today);
-  const signal = getSpaceSignal(hubType, spaceTasks, spaceSessions, t, today);
+  const signal = getSpaceSignal(spaceTasks, spaceSessions, t, today);
   const todayFocusSeconds = getTodaySpaceFocusSeconds(spaceSessions, today);
   const weekFocusSeconds = getWeekSpaceFocusSeconds(spaceSessions, weekStart);
   const upcoming = getUpcomingSpaceItems(spaceTasks, today);
@@ -321,7 +321,6 @@ export function SpaceDetailView({
 
   function handleCreateSpaceTask(input: SpaceTaskInput) {
     const tags: string[] = [];
-    if (!sourceProjectId) tags.push(spaceTaskTag(space.id));
     if (input.group) tags.push(`group:${input.group}`);
     onCreateTask({
       title: input.title,
@@ -329,7 +328,7 @@ export function SpaceDetailView({
       priority: input.priority,
       dueDate: input.dueDate,
       notes: input.notes,
-      projectId: sourceProjectId ?? "",
+      projectId,
       tags,
     });
     showToast({ message: t("spaceHub.toast.taskAdded", { name: displayName }) });
@@ -397,8 +396,8 @@ export function SpaceDetailView({
       overviewCards: input.overviewCards,
       defaults: input.defaults,
     });
-    if (sourceProjectId) {
-      onUpdateProject(sourceProjectId, { name: input.name, description: input.description, color: input.color });
+    if (projectId) {
+      onUpdateProject(projectId, { name: input.name, description: input.description, color: input.color });
     }
     showToast({ message: t("spaceHub.toast.settingsSaved") });
     setDrawer({ kind: "none" });
@@ -438,7 +437,7 @@ export function SpaceDetailView({
             <p className="sdv-header-subtitle">
               {preset.headerSubtitle === displayDescription
                 ? presetText(t, displayDescription)
-                : t("spaceHub.headerSubtitle", { type: hubTypeText(t, hubType), desc: displayDescription })}
+                : t("spaceHub.headerSubtitle", { type: hubTypeText(t, space.type), desc: displayDescription })}
             </p>
             <p className="sdv-header-counts">
               {t("spaceHub.header.tasksScheduled", { total: counts.total, scheduled: counts.scheduled })} ·{" "}
@@ -598,19 +597,19 @@ export function SpaceDetailView({
                 <button type="button" onClick={onClearScope}>{t("scope.clear")}</button>
               </p>
             ) : null}
-            {showsGoals(activeView) && sourceProjectId ? (
+            {showsGoals(activeView) && projectId ? (
               <>
                 <GoalQuickAdd
                   onCreate={(goal) =>
-                    onCreateGoal({ goal, projectId: sourceProjectId, schedule: { unit: "unscheduled" } })
+                    onCreateGoal({ goal, projectId, schedule: { unit: "unscheduled" } })
                   }
                 />
                 <StatusManager
                   statuses={sourceProject?.boardLists ?? []}
-                  onCreate={(name) => onCreateStatus(sourceProjectId, name)}
-                  onRename={(statusId, name) => onUpdateStatus(sourceProjectId, statusId, { name })}
-                  onReorder={(statusId, order) => onUpdateStatus(sourceProjectId, statusId, { order })}
-                  onArchive={(statusId) => onArchiveStatus(sourceProjectId, statusId)}
+                  onCreate={(name) => onCreateStatus(projectId, name)}
+                  onRename={(statusId, name) => onUpdateStatus(projectId, statusId, { name })}
+                  onReorder={(statusId, order) => onUpdateStatus(projectId, statusId, { order })}
+                  onArchive={(statusId) => onArchiveStatus(projectId, statusId)}
                 />
               </>
             ) : null}
@@ -660,7 +659,6 @@ export function SpaceDetailView({
       {modal.kind === "delete_space" ? (
         <DeleteSpaceConfirmModal
           spaceName={displayName}
-          isProject={Boolean(sourceProjectId)}
           onConfirm={handleDeleteSpace}
           onClose={() => setModal({ kind: "none" })}
         />

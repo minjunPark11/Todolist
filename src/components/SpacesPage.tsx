@@ -11,17 +11,20 @@ import { buildSpaceBriefing, buildSpaceBriefingContext, type SpaceBriefing } fro
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
-type SpaceType = "project" | "custom";
+// A page-local `SpaceType = "project" | "custom"` used to live here, shadowing
+// the stored `ProjectType = "project" | "area"` it was derived from
+// (SPACES_REDESIGN_II §0.3.8). The stored type is the one the record keeps, so
+// it is the one the screen uses.
 type SpaceStatus = "Blocked" | "Needs Focus" | "Review Needed" | "In Progress" | "On Track" | "New";
 type AiPriority = "High" | "Medium" | "Low";
-type FilterType = "all" | SpaceType;
+type FilterType = "all" | ProjectType;
 type AddStep = "choose_type" | "form";
 type AddState = "choose_type_idle" | "choose_type_selected" | "form_editing" | "form_validation_error" | "creating" | "discard_confirm" | "create_error";
 
 type Space = {
   id: string;
   name: string;
-  type: SpaceType;
+  type: ProjectType;
   status: SpaceStatus;
   mainSignal: string;
   aiPriority: AiPriority;
@@ -30,9 +33,9 @@ type Space = {
   color: string;
   updatedLabel: string;
   topics: string[];
-  sourceId?: string;
-  // No "local": every space is backed by a planner record now (Phase S4).
-  sourceRef?: "project";
+  // `sourceId` and `sourceRef` used to live here. Every space is backed by a
+  // Project (Phase S4) and `id` is now that Project's id, so the pair was the
+  // same value twice plus a discriminator with one arm.
   pinned?: boolean;
   objective?: string;
   learningGoal?: string;
@@ -50,7 +53,7 @@ type ActivitySignal = {
 type AnalysisState = "baseline" | "loading" | "success";
 
 type AddSpaceDraft = {
-  type: SpaceType | null;
+  type: ProjectType | null;
   name: string;
   description: string;
   objective: string;
@@ -110,9 +113,9 @@ type SpacesPageProps = {
   showToast: (toast: ToastState) => void;
 };
 
-const typeColor: Record<SpaceType, string> = {
+const typeColor: Record<ProjectType, string> = {
   project: "#7c3aed",
-  custom: "#f97316",
+  area: "#f97316",
 };
 
 const STATUS_KEY: Record<SpaceStatus, string> = {
@@ -124,10 +127,10 @@ const STATUS_KEY: Record<SpaceStatus, string> = {
   New: "new",
 };
 
-function typeLabel(t: TFn, type: SpaceType) {
+function typeLabel(t: TFn, type: ProjectType) {
   return t(`spaces.type.${type}`);
 }
-function typeDesc(t: TFn, type: SpaceType) {
+function typeDesc(t: TFn, type: ProjectType) {
   return t(`spaces.typeDesc.${type}`);
 }
 function statusLabel(t: TFn, status: SpaceStatus) {
@@ -221,7 +224,9 @@ export function SpacesPage({
   const activeBriefing = analysisState === "success" && aiBriefing ? aiBriefing : baselineBriefing;
   const effectiveAnalysisState = spaces.length === 0 ? "empty" : analysisState;
   const reasonLines = activeBriefing.detailLines.length > 0 ? activeBriefing.detailLines : [t("spaces.reason.noSignals")];
-  const selectedSpace = spaces.find((space) => space.id === selectedSpaceId) ?? spaces.find((space) => space.sourceId === selectedProjectId);
+  // One lookup now: the card id, the tree's id and the URL's `:spaceId` are all
+  // the Project id, so there is no second namespace to fall back through.
+  const selectedSpace = spaces.find((space) => space.id === (selectedSpaceId || selectedProjectId));
   const pendingDeleteSpace = spaces.find((space) => space.id === pendingDeleteSpaceId);
   const pendingRenameSpace = spaces.find((space) => space.id === pendingRenameSpaceId);
   const isDetailOpen = Boolean(selectedSpace) && (detailOpen || selectedSpaceId);
@@ -286,9 +291,7 @@ export function SpacesPage({
     setOpenMenuSpaceId("");
     setSelectedSpaceId(space.id);
     setHighlightSignalId(signalId);
-    if (space.sourceRef === "project" && space.sourceId) {
-      onOpenProject(space.sourceId);
-    }
+    onOpenProject(space.id);
   }
 
   function closeSpace() {
@@ -299,7 +302,7 @@ export function SpacesPage({
 
   // One source now: every space is a Project (SPACES_BOARD_DESIGN.md Phase S4).
   function deleteSpace(space: Space) {
-    if (space.sourceId) onRequestDeleteProject(space.sourceId);
+    onRequestDeleteProject(space.id);
     setPendingDeleteSpaceId("");
   }
 
@@ -308,7 +311,7 @@ export function SpacesPage({
     // Pins used to live in a device-local blob for anything that was not a
     // project, so a pin did not survive to another device. Project.pinned is
     // synced, and every space has a Project behind it now.
-    if (space.sourceId) onToggleStar(space.sourceId);
+    onToggleStar(space.id);
     showToast({ message: t(space.pinned ? "spaces.pin.unpinned" : "spaces.pin.pinned", { name: space.name }) });
   }
 
@@ -329,7 +332,7 @@ export function SpacesPage({
       setRenameError(t("spaces.rename.duplicate"));
       return;
     }
-    if (space.sourceId) onUpdateProject(space.sourceId, { name: trimmed });
+    onUpdateProject(space.id, { name: trimmed });
     setPendingRenameSpaceId("");
     setRenameDraft("");
     setRenameError("");
@@ -426,7 +429,7 @@ export function SpacesPage({
           if (projectId) {
             // The planner project persists this space; a local copy would
             // render as a duplicate card next to the derived one.
-            setSelectedSpaceId(`project-space-${projectId}`);
+            setSelectedSpaceId(projectId);
             showToast({ message: t("spaces.add.created", { name: space.name }) });
             resetAdd();
             return;
@@ -440,7 +443,7 @@ export function SpacesPage({
           type: "area",
           description: space.description,
         });
-        setSelectedSpaceId(areaId ? `project-space-${areaId}` : "");
+        setSelectedSpaceId(areaId ?? "");
         showToast({ message: t("spaces.add.created", { name: space.name }) });
         resetAdd();
       } catch {
@@ -482,7 +485,7 @@ export function SpacesPage({
         onDeleteSpace={() => deleteSpace(selectedSpace)}
         onNavigate={onNavigate}
         onOpenCalendar={() =>
-          onOpenCalendar(selectedSpace.sourceRef === "project" ? selectedSpace.sourceId : undefined)
+          onOpenCalendar(selectedSpace.id)
         }
         showToast={showToast}
       />
@@ -543,7 +546,7 @@ export function SpacesPage({
       </section>
 
       <section className="spc-filter-bar" aria-label={t("spaces.filterLabel")}>
-        {(["all", "project", "custom"] as FilterType[]).map((item) => (
+        {(["all", "project", "area"] as FilterType[]).map((item) => (
           <button key={item} type="button" className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>
             {item === "all" ? t("spaces.filter.all") : typeLabel(t, item)}
           </button>
@@ -653,7 +656,6 @@ export function SpacesPage({
       {pendingDeleteSpace ? (
         <DeleteSpaceConfirmModal
           spaceName={pendingDeleteSpace.name}
-          isProject={pendingDeleteSpace.sourceRef === "project"}
           onConfirm={() => deleteSpace(pendingDeleteSpace)}
           onClose={() => setPendingDeleteSpaceId("")}
         />
@@ -766,7 +768,7 @@ function AddSpaceModal({
   state: AddState;
   draft: AddSpaceDraft;
   error: string;
-  onChooseType: (type: SpaceType) => void;
+  onChooseType: (type: ProjectType) => void;
   onContinue: () => void;
   onBack: () => void;
   onUpdate: (patch: Partial<AddSpaceDraft>) => void;
@@ -807,7 +809,7 @@ function AddSpaceModal({
           <>
             <p className="spc-field-title">{t("spaces.add.selectType")}</p>
             <div className="spc-type-grid">
-              {(["project", "custom"] as SpaceType[]).map((type) => (
+              {(["project", "area"] as ProjectType[]).map((type) => (
                 <button key={type} type="button" className={draft.type === type ? "selected" : ""} aria-pressed={draft.type === type} onClick={() => onChooseType(type)}>
                   <span style={{ color: typeColor[type] }}><SpaceIcon type={type} /></span>
                   <strong>{typeLabel(t, type)}</strong>
@@ -924,7 +926,12 @@ function deriveProjectSpaces(projects: Project[], tasks: Task[], t: TFn): Space[
       const type = inferProjectType(project);
       const status: SpaceStatus = waiting ? "Blocked" : high ? "Needs Focus" : projectTasks.some((task) => task.status === "doing") ? "In Progress" : "On Track";
       return {
-        id: `project-space-${project.id}`,
+        // The Project id, unprefixed. A `project-space-` prefix used to live
+        // here, which made this screen name every space differently from the
+        // tree and the URL (`/s/:spaceId`), so the two had to be reconciled at
+        // every boundary — including `sourceId`, the same value carried twice
+        // under two names (SPACES_REDESIGN_II §0.3.8).
+        id: project.id,
         name: project.name,
         type,
         status,
@@ -936,8 +943,6 @@ function deriveProjectSpaces(projects: Project[], tasks: Task[], t: TFn): Space[
         updatedLabel: relativeUpdated(t, project.updatedAt),
         topics: projectTasks.flatMap((task) => task.tags).filter(Boolean).slice(0, 6),
         objective: project.description,
-        sourceRef: "project",
-        sourceId: project.id,
         pinned: Boolean(project.pinned),
       };
     });
@@ -949,7 +954,7 @@ function deriveSignals(spaces: Space[], tasks: Task[], t: TFn): ActivitySignal[]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5)
     .flatMap((task): ActivitySignal[] => {
-      const space = spaces.find((item) => item.sourceRef === "project" && item.sourceId === task.projectId);
+      const space = spaces.find((item) => item.id === task.projectId);
       if (!space) return [];
       return [{
         id: `task-signal-${task.id}`,
@@ -1011,7 +1016,7 @@ function validateDraft(draft: AddSpaceDraft, spaces: Space[], t: TFn) {
 }
 
 function createSpaceFromDraft(draft: AddSpaceDraft, t: TFn): Space {
-  const type = draft.type ?? "custom";
+  const type = draft.type ?? "area";
   const topics =
     type === "project" ? parseLines(draft.initialMilestonesText)
     : parseLines(draft.customSectionsText || "Notes\nTasks\nActivity");
@@ -1021,7 +1026,7 @@ function createSpaceFromDraft(draft: AddSpaceDraft, t: TFn): Space {
     type,
     status: "New",
     mainSignal: t("spaces.mainSignal.newSpace", { type: typeLabel(t, type) }),
-    aiPriority: type === "custom" ? "Low" : "Medium",
+    aiPriority: type === "area" ? "Low" : "Medium",
     recentActivityCount: 0,
     description: draft.description.trim() || draft.objective || draft.learningGoal || t("spaces.desc.newSpace"),
     color: typeColor[type],
@@ -1044,12 +1049,13 @@ function parseTags(value: string) {
   return value.split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
 }
 
-function inferProjectType(project: Project): SpaceType {
-  // An explicit type is an answer, not a hint: "area" is what a custom space
-  // becomes, and guessing from its name would relabel it (Phase S4).
-  if (project.type === "area") return "custom";
-  const text = `${project.name} ${project.description}`.toLowerCase();
-  return "project";
+/**
+ * The stored type, with the default spelled out. A Project that has never been
+ * given one is a project — guessing from its name would relabel it (Phase S4),
+ * and there used to be a half-written attempt at exactly that here.
+ */
+function inferProjectType(project: Project): ProjectType {
+  return project.type === "area" ? "area" : "project";
 }
 
 function relativeUpdated(t: TFn, value: string) {
@@ -1076,8 +1082,8 @@ function statusClass(status: SpaceStatus) {
   return "progress";
 }
 
-function SpaceIcon({ type }: { type: SpaceType }) {
-  if (type === "custom") return <SlidersIcon />;
+function SpaceIcon({ type }: { type: ProjectType }) {
+  if (type === "area") return <SlidersIcon />;
   return <ScreenIcon />;
 }
 
