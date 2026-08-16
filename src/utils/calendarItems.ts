@@ -212,9 +212,12 @@ export function buildCalendarItems({
     // plan remains visible as a completed schedule. Completed, unscheduled
     // tasks still obey the optional Completed layer.
     if (done && !hasScheduledBlock && !layers.completed) continue;
-    if (!projectAllowed(item.spaceId, projectFilter)) continue;
+    // The calendar filters and colours by PROJECT. `Item.spaceId` named one
+    // until STEP 7 and now names the Space above it, which would let one
+    // project's filter match every project beside it.
+    if (!projectAllowed(item.projectId, projectFilter)) continue;
 
-    const project = projectById.get(item.spaceId);
+    const project = projectById.get(item.projectId);
     const repeating = task.repeatType !== "none";
     const taskCategoryId = resolveTaskCategoryId(task);
     if (!categoryAllowed(taskCategoryId)) continue;

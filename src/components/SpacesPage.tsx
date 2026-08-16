@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+﻿import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import type { Folder, FocusSession, GoalSchedule, LearningPath, List, Milestone, PageId, Project, ProjectType, Subtask, Task, TaskDraft } from "../types";
 import type { ToastState } from "./kit";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
@@ -88,7 +88,7 @@ type SpacesPageProps = {
   selectedTaskId: string;
   taskDetail: ReactNode;
   selectedProjectId: string;
-  viewScope: { spaceId?: string; folderId?: string; listId?: string };
+  viewScope: { spaceId?: string; projectId?: string; folderId?: string; listId?: string };
   folders: Folder[];
   onClearScope: () => void;
   detailOpen: boolean;

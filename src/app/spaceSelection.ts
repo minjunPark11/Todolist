@@ -146,16 +146,21 @@ export function selectedListId(selection: Selection): string {
 }
 
 /**
- * What a selection means as a view scope (§16).
+ * The Scope Resolver (§17): where the user is standing, as the set of Items
+ * that place contains.
  *
- * `ViewFilter.spaceId` still holds a PROJECT id — the filter language has not
- * moved yet, and rewriting it is STEP 7's job, not this one's. So a Project
- * selection is what fills it, and a Space selection narrows nothing: the level
- * has no expression in the current filter vocabulary, and inventing one here
- * would put the same decision in two places.
+ * Each level names exactly ONE field, and the tightest one is the whole
+ * answer — a Folder view is not silently also a Project view. That is what
+ * lets every view share one query instead of writing its own (§44): the
+ * screen picks a layout, this picks the records.
+ *
+ * A Space narrows to `spaceId`, which every Item resolves through its Project
+ * (`Item.spaceId`). Nothing walks the tree here, and no Item stores its Space:
+ * moving a Project between Spaces stays one row (H-INV-05, §43).
  */
 export function filterForSelection(selection: Selection): {
   spaceId?: string;
+  projectId?: string;
   folderId?: string;
   listId?: string;
 } {
@@ -165,7 +170,9 @@ export function filterForSelection(selection: Selection): {
     case "folder":
       return { folderId: selection.folderId };
     case "project":
-      return { spaceId: selection.projectId };
+      return { projectId: selection.projectId };
+    case "space":
+      return { spaceId: selection.spaceId };
     default:
       return {};
   }

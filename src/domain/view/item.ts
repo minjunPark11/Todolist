@@ -1,4 +1,4 @@
-// One projection for everything a view can show (CLICKUP_IMPORT_DESIGN §4.1).
+﻿// One projection for everything a view can show (CLICKUP_IMPORT_DESIGN §4.1).
 //
 // This repository has independently arrived at this shape four times:
 // calendarItems.ts folds five sources into a CalendarItem, horizonItems.ts
@@ -20,6 +20,7 @@
 import type { LearningPath, List, Project, Status, Task, TaskPriority } from "../../types";
 import { blockedTaskIds } from "../tasks/dependencies";
 import { listIdFor, goalListIdFor, statusIdFor, statusesForSpace, statusesWithCustom } from "../spaces/membership";
+import { spaceIdForProject } from "../spaces/spaces";
 import { horizonForGoalSchedule, normalizeGoalSchedule } from "../horizons/goalSchedule";
 import { deriveHorizon } from "../../utils/horizons";
 import type { Horizon } from "../../utils/horizons";
@@ -36,7 +37,20 @@ export interface Item {
   title: string;
 
   // --- area axis
+  /**
+   * The Space its Project hangs in (H-INV-01).
+   *
+   * This field held a PROJECT id until STEP 7, because a Project was the top
+   * of the tree. Both are here now, and they are different records: a Space
+   * scope has to gather several Projects, which one id could not express.
+   *
+   * Derived, never stored. Space membership is computed through the Project
+   * relation rather than copied onto every Task (§43) — a denormalised copy is
+   * one more thing that can disagree, and moving a Project between Spaces
+   * would have to rewrite every item under it (H-INV-05).
+   */
   spaceId: string;
+  projectId: string;
   listId: string;
   /**
    * The Folder the Item's List hangs in; "" for a Folderless List (D4).
@@ -88,6 +102,11 @@ function colorMap(projects: Project[]): Map<string, string> {
   return new Map(projects.map((project) => [project.id, project.color]));
 }
 
+/** Project id -> the Space it hangs in. The only place membership is joined. */
+function spaceMap(projects: Project[]): Map<string, string> {
+  return new Map(projects.map((project) => [project.id, spaceIdForProject(project)]));
+}
+
 /** List id -> the Folder it hangs in. Absent for a Folderless List (D4). */
 function folderMap(lists: List[]): Map<string, string> {
   const map = new Map<string, string>();
@@ -137,6 +156,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
   const wanted = new Set<ItemSource>(input.sources ?? ["task", "goal", "milestone"]);
   const colors = colorMap(projects);
   const statuses = statusMap(projects);
+  const spaces = spaceMap(projects);
   const folders = folderMap(lists);
   const blocked = blockedTaskIds(tasks);
   const items: Item[] = [];
@@ -152,7 +172,8 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         sourceId: task.id,
         parentId: task.parentTaskId,
         title: task.title,
-        spaceId: task.projectId,
+        spaceId: spaces.get(task.projectId) ?? "",
+        projectId: task.projectId,
         listId: taskListId,
         folderId: folders.get(taskListId) ?? "",
         color: colors.get(task.projectId) ?? DEFAULT_COLOR,
@@ -177,9 +198,10 @@ export function projectItems(input: ProjectItemsInput): Item[] {
   }
 
   for (const path of paths) {
-    const spaceId = path.projectId ?? "";
-    const color = colors.get(spaceId) ?? DEFAULT_COLOR;
-    const spaceStatuses = statuses.get(spaceId) ?? statusesForSpace(undefined);
+    const projectId = path.projectId ?? "";
+    const spaceId = spaces.get(projectId) ?? "";
+    const color = colors.get(projectId) ?? DEFAULT_COLOR;
+    const spaceStatuses = statuses.get(projectId) ?? statusesForSpace(undefined);
     const listId = goalListIdFor(path, lists);
     const folderId = folders.get(listId) ?? "";
     const schedule = normalizeGoalSchedule(path.schedule, path.targetDate, today);
@@ -193,6 +215,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         parentId: "",
         title: path.goal,
         spaceId,
+        projectId,
         listId,
         folderId,
         color,
@@ -230,6 +253,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         parentId: path.id,
         title: milestone.title,
         spaceId,
+        projectId,
         listId,
         folderId,
         color,

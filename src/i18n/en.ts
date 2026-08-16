@@ -73,7 +73,7 @@ export const en: Dictionary = {
   "timeline.zoom.week": "12 weeks",
   "timeline.zoom.month": "12 months",
   "timeline.zoom.year": "5 years",
-  "timeline.axis.space": "Space",
+  "timeline.axis.project": "Project",
   "timeline.axis.list": "List",
   "timeline.axis.none": "No grouping",
   "timeline.prev": "Back",

@@ -189,9 +189,12 @@ describe("isSelected", () => {
   });
 });
 
-describe("filterForSelection", () => {
-  it("narrows to exactly one level", () => {
-    expect(filterForSelection({ kind: "project", spaceId: "s-1", projectId: "p-1" })).toEqual({ spaceId: "p-1" });
+describe("filterForSelection — the Scope Resolver (§17)", () => {
+  it("names exactly one field per level, tightest wins", () => {
+    // A Folder view must not silently also be a Project view: the tightest
+    // scope is the whole answer, which is what lets every view share one query.
+    expect(filterForSelection({ kind: "space", spaceId: "s-1" })).toEqual({ spaceId: "s-1" });
+    expect(filterForSelection({ kind: "project", spaceId: "s-1", projectId: "p-1" })).toEqual({ projectId: "p-1" });
     expect(filterForSelection({ kind: "folder", spaceId: "s-1", projectId: "p-1", folderId: "f-1" })).toEqual({
       folderId: "f-1",
     });
@@ -199,12 +202,5 @@ describe("filterForSelection", () => {
       listId: "l-1",
     });
     expect(filterForSelection(NO_SELECTION)).toEqual({});
-  });
-
-  it("narrows nothing at the Space level", () => {
-    // `ViewFilter.spaceId` still holds a Project id — the filter language moves
-    // in STEP 7. Until then a Space scope has no expression, and guessing one
-    // here would put that decision in two places.
-    expect(filterForSelection({ kind: "space", spaceId: "s-1" })).toEqual({});
   });
 });

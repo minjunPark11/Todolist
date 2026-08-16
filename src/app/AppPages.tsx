@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+﻿import { ReactNode, useState } from "react";
 import { ArchivePage } from "../components/ArchivePage";
 import { BoardPage } from "../components/BoardPage";
 import { TimelinePage } from "../components/TimelinePage";
@@ -26,7 +26,7 @@ type AppPagesProps = {
   activeProjects: Project[];
   selectedProjectId: string;
   /** What the tree selected, as a view scope (§16). */
-  viewScope: { spaceId?: string; folderId?: string; listId?: string };
+  viewScope: { spaceId?: string; projectId?: string; folderId?: string; listId?: string };
   onClearScope: () => void;
   onSelectSpace: (spaceId: string) => void;
   isProjectDetailOpen: boolean;

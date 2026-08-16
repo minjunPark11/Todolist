@@ -53,7 +53,7 @@ export type SpaceDetailViewProps = {
   projects: Project[];
   // Board time axis (SPACES_BOARD_DESIGN.md D2).
   paths: LearningPath[];
-  viewScope: { spaceId?: string; folderId?: string; listId?: string };
+  viewScope: { spaceId?: string; projectId?: string; folderId?: string; listId?: string };
   folders: Folder[];
   /** Widens the view back to the whole Space without touching the tree. */
   onClearScope: () => void;
@@ -200,10 +200,12 @@ export function SpaceDetailView({
     () => ({ today, taskById: new Map(spaceTasks.map((task) => [task.id, task])) }),
     [today, spaceTasks],
   );
-  // Same view, opened at whatever level the tree is standing on (§16). The
-  // Space level contributes no filter of its own: membership was already
-  // resolved into `spaceTasks` above, and filtering by `spaceId` again would
-  // drop the tag-claimed tasks of a Space with no project behind it.
+  // Same view, opened at whatever level the tree is standing on (§16).
+  //
+  // The Project level contributes no filter of its own because membership was
+  // already resolved into `spaceTasks` above; naming it again would be the
+  // same narrowing done twice. This screen is per-Project, so a Space scope
+  // never reaches it — that view is STEP 10's.
   const scopeFilter = useMemo(
     () =>
       viewScope.listId !== undefined

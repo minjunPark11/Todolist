@@ -1,4 +1,4 @@
-// The timeline page (GANTT_TIMELINE_DESIGN P1, read-only).
+﻿// The timeline page (GANTT_TIMELINE_DESIGN P1, read-only).
 //
 // Shares the board's vocabulary on purpose: same scope selector, same
 // grouping axis, same `Item[]`. Only `layout` differs — this is the engine's
@@ -15,11 +15,15 @@ import { TimelineView } from "./TimelineView";
 import { EmptyState } from "./kit";
 import { useT } from "../i18n";
 
-const ALL_SPACES = "";
+const ALL_PROJECTS = "";
 const ZOOMS: TimelineZoom[] = ["day", "week", "month", "year"];
-// Space and List are the axes a timeline reads as rows; status would put a
+// Project and List are the axes a timeline reads as rows; status would put a
 // bar's colour and its row in disagreement.
-const AXES: GroupAxis[] = ["space", "list", "none"];
+//
+// The scope picker lists Projects, so "project" is the axis that matches it.
+// Grouping by the real Space is a different question and belongs to the Space
+// screen (STEP 10), not to a picker that offers no Spaces to pick.
+const AXES: GroupAxis[] = ["project", "list", "none"];
 
 interface TimelinePageProps {
   tasks: Task[];
@@ -44,16 +48,16 @@ export function TimelinePage({
   const today = todayValue();
   const [zoom, setZoom] = useState<TimelineZoom>("week");
   const [anchor, setAnchor] = useState<string>(today);
-  const [spaceId, setSpaceId] = useState<string>(ALL_SPACES);
-  const [axis, setAxis] = useState<GroupAxis>("space");
+  const [projectId, setProjectId] = useState<string>(ALL_PROJECTS);
+  const [axis, setAxis] = useState<GroupAxis>("project");
   // D12: shown by default, and one click from gone.
   const [showDone, setShowDone] = useState(true);
 
-  const activeSpaces = useMemo(
+  const activeProjects = useMemo(
     () => projects.filter((project) => project.status !== "archived" && !project.archivedAt),
     [projects],
   );
-  const scope = activeSpaces.some((space) => space.id === spaceId) ? spaceId : ALL_SPACES;
+  const scope = activeProjects.some((project) => project.id === projectId) ? projectId : ALL_PROJECTS;
   const window = useMemo(() => timelineWindow(zoom, anchor), [zoom, anchor]);
 
   const allItems = useMemo(
@@ -65,7 +69,7 @@ export function TimelinePage({
   );
 
   const scoped = useMemo(
-    () => (scope ? allItems.filter((item) => item.spaceId === scope) : allItems),
+    () => (scope ? allItems.filter((item) => item.projectId === scope) : allItems),
     [allItems, scope],
   );
 
@@ -86,10 +90,10 @@ export function TimelinePage({
     () => ({
       today,
       taskById: new Map(tasks.map((task) => [task.id, task])),
-      // D10: the board and the timeline must order Spaces identically.
-      groupRank: groupRank(axis, { projects: activeSpaces, lists }),
+      // D10: the board and the timeline must order Projects identically.
+      groupRank: groupRank(axis, { projects: activeProjects, lists }),
     }),
-    [today, tasks, axis, activeSpaces, lists],
+    [today, tasks, axis, activeProjects, lists],
   );
 
   const spec: ViewSpec = useMemo(
@@ -111,7 +115,7 @@ export function TimelinePage({
 
   function groupLabel(groupId: string): string {
     if (!groupId) return t("timeline.ungrouped");
-    if (axis === "space") return projects.find((p) => p.id === groupId)?.name ?? t("timeline.ungrouped");
+    if (axis === "project") return projects.find((p) => p.id === groupId)?.name ?? t("timeline.ungrouped");
     if (axis === "list") return lists.find((l) => l.id === groupId)?.name ?? t("timeline.ungrouped");
     return groupId;
   }
@@ -137,11 +141,11 @@ export function TimelinePage({
         <div className="ff-board-controls">
           <label className="ff-board-control">
             <span>{t("board.scope")}</span>
-            <select value={scope} onChange={(event) => setSpaceId(event.target.value)}>
-              <option value={ALL_SPACES}>{t("board.allSpaces")}</option>
-              {activeSpaces.map((space) => (
-                <option key={space.id} value={space.id}>
-                  {space.name}
+            <select value={scope} onChange={(event) => setProjectId(event.target.value)}>
+              <option value={ALL_PROJECTS}>{t("board.allSpaces")}</option>
+              {activeProjects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
                 </option>
               ))}
             </select>

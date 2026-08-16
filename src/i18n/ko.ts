@@ -73,7 +73,7 @@ export const ko: Dictionary = {
   "timeline.zoom.week": "12주",
   "timeline.zoom.month": "12개월",
   "timeline.zoom.year": "5년",
-  "timeline.axis.space": "스페이스",
+  "timeline.axis.project": "프로젝트",
   "timeline.axis.list": "리스트",
   "timeline.axis.none": "묶지 않음",
   "timeline.prev": "이전",

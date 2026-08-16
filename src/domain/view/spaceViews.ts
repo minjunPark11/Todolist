@@ -62,11 +62,12 @@ export function showsGoals(id: SpaceViewId): boolean {
  */
 export function specForSpaceView(
   id: SpaceViewId,
-  scope: Pick<ViewFilter, "spaceId" | "folderId" | "listId">,
+  scope: Pick<ViewFilter, "spaceId" | "projectId" | "folderId" | "listId">,
   name: string,
 ): ViewSpec {
   const def = spaceViewDef(id);
-  const at = scope.listId ?? scope.folderId ?? scope.spaceId ?? "all";
+  // Narrowest first: the tightest scope is what names the view.
+  const at = scope.listId ?? scope.folderId ?? scope.projectId ?? scope.spaceId ?? "all";
   return {
     id: `space-view-${def.id}-${at}`,
     name,

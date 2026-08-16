@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import type { LearningPath, List, Project, Task } from "../../types";
 import { getMatrixPosition } from "../../utils/eisenhower";
 import { collectTodayEntries } from "../../utils/todayView";
 import { makeDefaultList } from "../spaces/hierarchy";
 import { defaultListIdFor, statusesWithCustom } from "../spaces/membership";
+import { DEFAULT_SPACE_ID } from "../spaces/spaces";
 import { statusPatch } from "./board";
 import { projectItems } from "./item";
 import {
@@ -96,7 +97,7 @@ describe("projectItems", () => {
       [goal({ milestones: [{ id: "m-1", title: "First", doneCriteria: "", cardIds: [] }] })],
     );
     expect(items.map((item) => item.source).sort()).toEqual(["goal", "milestone", "task"]);
-    expect(items.every((item) => item.key && item.spaceId === "space-1")).toBe(true);
+    expect(items.every((item) => item.key && item.projectId === "space-1")).toBe(true);
   });
 
   it("resolves the list without any task having been rewritten", () => {
@@ -142,9 +143,9 @@ describe("projectItems", () => {
 describe("matchesFilter", () => {
   const [item] = build([task({ tags: ["deep", "writing"], priority: "high" })]).items;
 
-  it("matches on space, list, source, status and priority", () => {
-    expect(matchesFilter(item, { spaceId: "space-1" })).toBe(true);
-    expect(matchesFilter(item, { spaceId: "space-2" })).toBe(false);
+  it("matches on project, list, source, status and priority", () => {
+    expect(matchesFilter(item, { projectId: "space-1" })).toBe(true);
+    expect(matchesFilter(item, { projectId: "space-2" })).toBe(false);
     expect(matchesFilter(item, { sources: ["task"] })).toBe(true);
     expect(matchesFilter(item, { sources: ["goal"] })).toBe(false);
     expect(matchesFilter(item, { statusIds: ["todo"] })).toBe(true);
@@ -197,7 +198,7 @@ describe("applyView grouping", () => {
     expect(axisGroupIds("space")).toBeUndefined();
   });
 
-  it("orders Space groups by the user's arrangement, not the alphabet (D10)", () => {
+  it("orders Project groups by the user's arrangement, not the alphabet (D10)", () => {
     // "Career" sorts before "Health" by name; the user put Health first.
     const arranged = [
       { ...projects[0], order: 1 },
@@ -205,23 +206,23 @@ describe("applyView grouping", () => {
     ];
     const { items, context } = build([task({ id: "a" }), task({ id: "b", projectId: "space-2" })]);
     const spec: ViewSpec = {
-      id: "v", name: "v", filter: {}, groupBy: "space", sort: { key: "title" }, layout: "list",
+      id: "v", name: "v", filter: {}, groupBy: "project", sort: { key: "title" }, layout: "list",
     };
-    const ranked = { ...context, groupRank: groupRank("space", { projects: arranged }) };
+    const ranked = { ...context, groupRank: groupRank("project", { projects: arranged }) };
     expect(applyView(items, spec, ranked).map((group) => group.id)).toEqual(["space-2", "space-1"]);
     // Without a rank it falls back to name order, which is id order here.
     expect(applyView(items, spec, context).map((group) => group.id)).toEqual(["space-1", "space-2"]);
   });
 
-  it("sorts a Space the user never arranged after the ones they did", () => {
+  it("sorts a Project the user never arranged after the ones they did", () => {
     const partly = [{ ...projects[1], order: 5 }, projects[0]];
-    const rank = groupRank("space", { projects: partly })!;
+    const rank = groupRank("project", { projects: partly })!;
     expect(rank.get("space-2")).toBeLessThan(rank.get("space-1")!);
   });
 
   it("has no rank to give for an axis the user does not own", () => {
     expect(groupRank("status", { projects })).toBeUndefined();
-    expect(groupRank("space", { projects: [] })).toBeUndefined();
+    expect(groupRank("project", { projects: [] })).toBeUndefined();
   });
 
   it("breaks sort ties by key, so two runs cannot disagree", () => {
@@ -377,8 +378,64 @@ describe("columns the user named", () => {
   });
 });
 
-// §16: the same view opened at three depths. Space -> Folder -> List, and the
-// filter language says which by naming one field.
+// §16-§18: the same view opened at four depths.
+// Space -> Project -> Folder -> List, and the filter language says which by
+// naming one field.
+describe("the Space scope (STEP 7)", () => {
+  // Two Projects filed under one Space, and a third somewhere else. This is
+  // the case a single id could not express before the level existed.
+  const research: Project[] = [
+    { ...projects[0], spaceId: "space-research" },
+    { ...projects[1], spaceId: "space-research" },
+    { id: "p-3", name: "Blog", description: "", color: "#ff9500", spaceId: "space-personal", createdAt: NOW, updatedAt: NOW },
+  ];
+  const spread = [
+    ...lists,
+    makeDefaultList(defaultListIdFor("p-3"), "p-3", NOW),
+  ];
+  const items = projectItems({
+    tasks: [task({ id: "a" }), task({ id: "b", projectId: "space-2" }), task({ id: "c", projectId: "p-3" })],
+    paths: [],
+    projects: research,
+    lists: spread,
+    today: TODAY,
+  });
+
+  it("gathers every Project under it", () => {
+    const inSpace = items.filter((item) => matchesFilter(item, { spaceId: "space-research" }));
+    expect(inSpace.map((item) => item.sourceId).sort()).toEqual(["a", "b"]);
+  });
+
+  it("still narrows to one Project when asked for one", () => {
+    const inProject = items.filter((item) => matchesFilter(item, { projectId: "space-1" }));
+    expect(inProject.map((item) => item.sourceId)).toEqual(["a"]);
+  });
+
+  it("resolves the Space through the Project rather than storing it (§43)", () => {
+    // Every Item carries both, and the Space half is derived. Moving a
+    // Project between Spaces has to stay one row (H-INV-05), which it cannot
+    // if each Item keeps its own copy.
+    const item = items.find((entry) => entry.sourceId === "c");
+    expect(item).toMatchObject({ projectId: "p-3", spaceId: "space-personal" });
+  });
+
+  it("files a Project that predates the backfill under the default Space", () => {
+    // `projects` here have no spaceId at all.
+    const legacy = projectItems({ tasks: [task({ id: "a" })], paths: [], projects, lists, today: TODAY });
+    expect(legacy[0].spaceId).toBe(DEFAULT_SPACE_ID);
+  });
+
+  it("groups by Space, which is a different axis from Project", () => {
+    const spec: ViewSpec = {
+      id: "v", name: "v", filter: {}, groupBy: "space", sort: { key: "title" }, layout: "list",
+    };
+    const context: GroupContext = { today: TODAY, taskById: new Map() };
+    const groups = applyView(items, spec, context);
+    expect(groups.map((group) => group.id)).toEqual(["space-personal", "space-research"]);
+    expect(groups.find((group) => group.id === "space-research")?.items).toHaveLength(2);
+  });
+});
+
 describe("view scope", () => {
   const inFolder: List = {
     id: "list-experiment",
@@ -436,7 +493,7 @@ describe("view scope", () => {
     ]);
     const count = (filter: Parameters<typeof matchesFilter>[1]) =>
       items.filter((item) => matchesFilter(item, filter)).length;
-    expect(count({ spaceId: "space-1" })).toBe(3);
+    expect(count({ projectId: "space-1" })).toBe(3);
     expect(count({ folderId: "folder-drone" })).toBe(2);
     expect(count({ listId: inFolder.id })).toBe(1);
   });

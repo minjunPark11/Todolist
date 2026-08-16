@@ -1,4 +1,4 @@
-// The Space's work board (SPACES_CLICKUP_REDESIGN D7, CLICKUP_IMPORT_DESIGN
+﻿// The Space's work board (SPACES_CLICKUP_REDESIGN D7, CLICKUP_IMPORT_DESIGN
 // §4.2): `filter:{spaceId}, groupBy:"status", layout:"board"` — a saved view,
 // not a screen with rules of its own.
 //
@@ -23,7 +23,7 @@ import { EmptyState, type ToastState } from "./kit";
 import { ExpandableAdd } from "./motion/ExpandableAdd";
 import { useT } from "../i18n";
 
-const ALL_SPACES = "";
+const ALL_PROJECTS = "";
 
 const DEFAULT_STATUS_IDS = new Set(DEFAULT_STATUSES.map((status) => status.id));
 
@@ -60,18 +60,18 @@ export function BoardPage({
 }: BoardPageProps) {
   const { t } = useT();
   const today = todayValue();
-  const [spaceId, setSpaceId] = useState<string>(ALL_SPACES);
+  const [projectId, setProjectId] = useState<string>(ALL_PROJECTS);
   const [axis, setAxis] = useState<GroupAxis>("status");
 
-  const activeSpaces = useMemo(
+  const activeProjects = useMemo(
     () => projects.filter((project) => project.status !== "archived" && !project.archivedAt),
     [projects],
   );
 
   // A Space that was archived while selected would otherwise leave the board
   // scoped to something the picker no longer offers.
-  const scope = activeSpaces.some((space) => space.id === spaceId) ? spaceId : ALL_SPACES;
-  const space = activeSpaces.find((candidate) => candidate.id === scope);
+  const scope = activeProjects.some((project) => project.id === projectId) ? projectId : ALL_PROJECTS;
+  const space = activeProjects.find((candidate) => candidate.id === scope);
   const statuses = useMemo(
     () => (space ? statusesWithCustom(space) : DEFAULT_STATUSES),
     [space],
@@ -96,7 +96,7 @@ export function BoardPage({
       filter: {
         // Children belong under their parent, not beside it — see spaceViews.
         parentId: "",
-        ...(scope ? { spaceId: scope } : {}),
+        ...(scope ? { projectId: scope } : {}),
         ...(axis === "quadrant" ? { sources: ["task" as const] } : {}),
       },
       groupBy: axis,
@@ -187,9 +187,9 @@ export function BoardPage({
           />
           <label className="ff-board-control">
             <span>{t("board.scope")}</span>
-            <select value={scope} onChange={(event) => setSpaceId(event.target.value)}>
-              <option value={ALL_SPACES}>{t("board.allSpaces")}</option>
-              {activeSpaces.map((candidate) => (
+            <select value={scope} onChange={(event) => setProjectId(event.target.value)}>
+              <option value={ALL_PROJECTS}>{t("board.allSpaces")}</option>
+              {activeProjects.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {candidate.name}
                 </option>

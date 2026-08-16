@@ -11,7 +11,7 @@
 // still driving the live screens. The equivalence tests assert that a view
 // and its screen answer identically, so this cannot quietly drift while the
 // two exist side by side.
-import type { Folder, List, Project, Task, TaskPriority } from "../../types";
+import type { Folder, List, Project, Space, Task, TaskPriority } from "../../types";
 import { getMatrixPosition } from "../../utils/eisenhower";
 import { defaultBucketFor } from "../../utils/todayView";
 import { HORIZONS } from "../../utils/horizons";
@@ -23,6 +23,7 @@ export type GroupAxis =
   | "quadrant"
   | "horizon"
   | "space"
+  | "project"
   | "folder"
   | "list"
   | "priority"
@@ -32,10 +33,15 @@ export type GroupAxis =
 export type SortKey = "manual" | "dueDate" | "scheduledDate" | "priority" | "title" | "createdAt";
 
 export interface ViewFilter {
-  // The three scopes a view can be opened at (SPACES_CLICKUP_UI_DESIGN §16).
+  // The four scopes a view can be opened at (SPACES_REDESIGN_II §16-§18).
   // They are not exclusive and they do not need to be: a Folder is inside a
-  // Space, so naming both narrows to the same set rather than contradicting.
+  // Project, so naming both narrows to the same set rather than contradicting.
+  //
+  // `spaceId` held a PROJECT id until STEP 7. The two are separate records
+  // now, and the distinction is the point of the level: a Space scope gathers
+  // every Project under it, which one id could not express.
   spaceId?: string;
+  projectId?: string;
   /** "" matches the Folderless Lists — a real scope, not "any folder". */
   folderId?: string;
   listId?: string;
@@ -94,6 +100,7 @@ function matchesDateWindow(item: Item, from?: string, to?: string): boolean {
 
 export function matchesFilter(item: Item, filter: ViewFilter): boolean {
   if (filter.spaceId !== undefined && item.spaceId !== filter.spaceId) return false;
+  if (filter.projectId !== undefined && item.projectId !== filter.projectId) return false;
   if (filter.folderId !== undefined && item.folderId !== filter.folderId) return false;
   if (filter.listId !== undefined && item.listId !== filter.listId) return false;
   if (filter.parentId !== undefined && item.parentId !== filter.parentId) return false;
@@ -139,16 +146,18 @@ export interface GroupContext {
  */
 export function groupRank(
   axis: GroupAxis,
-  records: { projects?: Project[]; lists?: List[]; folders?: Folder[] },
+  records: { spaces?: Space[]; projects?: Project[]; lists?: List[]; folders?: Folder[] },
 ): ReadonlyMap<string, number> | undefined {
   const source =
     axis === "space"
-      ? records.projects?.map((p) => ({ id: p.id, order: p.order, name: p.name }))
-      : axis === "folder"
-        ? records.folders?.map((f) => ({ id: f.id, order: f.order, name: f.name }))
-        : axis === "list"
-          ? records.lists?.map((l) => ({ id: l.id, order: l.order, name: l.name }))
-          : undefined;
+      ? records.spaces?.map((s) => ({ id: s.id, order: s.order, name: s.name }))
+      : axis === "project"
+        ? records.projects?.map((p) => ({ id: p.id, order: p.order, name: p.name }))
+        : axis === "folder"
+          ? records.folders?.map((f) => ({ id: f.id, order: f.order, name: f.name }))
+          : axis === "list"
+            ? records.lists?.map((l) => ({ id: l.id, order: l.order, name: l.name }))
+            : undefined;
   if (!source || source.length === 0) return undefined;
 
   const ordered = [...source].sort((a, b) => {
@@ -166,6 +175,8 @@ export function groupKeyFor(item: Item, axis: GroupAxis, context: GroupContext):
       return "";
     case "space":
       return item.spaceId;
+    case "project":
+      return item.projectId;
     case "folder":
       return item.folderId;
     case "list":
@@ -328,6 +339,6 @@ export function presetTodayQueue(today: string): ViewSpec {
 }
 
 /** The Space detail's time axis — the 179 lines SpaceHorizons.tsx spends. */
-export function presetSpaceHorizons(spaceId: string): ViewSpec {
-  return { ...PRESET_HORIZONS, id: `preset-space-horizons`, filter: { spaceId }, layout: "rows" };
+export function presetSpaceHorizons(projectId: string): ViewSpec {
+  return { ...PRESET_HORIZONS, id: `preset-space-horizons`, filter: { projectId }, layout: "rows" };
 }

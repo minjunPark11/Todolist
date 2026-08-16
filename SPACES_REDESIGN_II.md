@@ -10547,9 +10547,84 @@ Space 수준 화면은 없다. `/s/:spaceId`는 유효한 경로이고 선택도
 
 ---
 
-## STEP 7 — Scope
+## STEP 7 — Scope — 완료 (2026-08-17)
 
 새 계층을 기존 View Engine과 연결한다.
+
+### 어휘 교정 — `spaceId`가 Project를 뜻하던 곳
+
+STEP 7의 본체는 새 기능이 아니라 **한 단어가 두 가지를 뜻하던 것을 가르는 일**이다.
+
+```text
+Item.spaceId       Project id  →  실제 Space (Project를 통해 파생)
+Item.projectId     (없음)      →  신규
+ViewFilter.spaceId Project id  →  실제 Space
+ViewFilter.projectId (없음)    →  신규
+GroupAxis "space"  Project 축  →  실제 Space 축
+GroupAxis "project" (없음)     →  신규
+```
+
+한 id로는 Space 스코프를 표현할 수 없다 — **여러 Project를 모아야 하는데 그게 레벨의 존재 이유다.**
+
+### Scope Resolver (§17)
+
+`filterForSelection`이 네 단계를 모두 표현한다. 각 단계는 **정확히 한 필드만** 이름 붙이고, 가장 좁은 것이 답 전체다.
+
+```text
+space   → { spaceId }      Item이 자기 Project를 통해 해소
+project → { projectId }
+folder  → { folderId }
+list    → { listId }
+```
+
+이것이 모든 뷰가 각자 쿼리를 쓰지 않고 하나를 공유하게 하는 지점이다(§44). 화면은 layout을 고르고, 이쪽이 레코드를 고른다.
+
+### 비정규화하지 않는다 (§43)
+
+`Item.spaceId`는 **파생값이며 저장되지 않는다.** Project 관계를 통해 계산한다.
+
+```text
+Project.spaceId  →  Item.spaceId
+```
+
+복사본을 Task마다 두면 (1) 어긋날 수 있는 것이 하나 늘고 (2) **Project를 다른 Space로 옮길 때 그 아래 모든 Item을 다시 써야 한다** — H-INV-05가 금지하는 바로 그것이다.
+
+### 고친 의미 오류
+
+`spaceId`가 Project를 뜻한다는 전제로 쓰인 곳들:
+
+```text
+calendarItems      프로젝트 필터·색 조회 → item.projectId
+                   (안 고쳤으면 Space id로 조회해 전부 색을 잃는다)
+TimelinePage       스코프 필터·그룹 축·라벨 → project
+BoardPage          filter.projectId
+SpaceDetailView    Project 수준 화면임을 주석에 명시
+activeSpaces       → activeProjects (실제로 Project 목록이었다)
+timeline.axis.space → timeline.axis.project
+```
+
+### 검증
+
+typecheck 통과, 테스트 **654개** 통과. Space 스코프 전용 스위트를 새로 추가했다 — 한 Space 아래 두 Project + 다른 Space의 Project 하나로, 이전 모델이 표현할 수 없던 경우다.
+
+실제 앱(Space 2 · Project 3):
+
+```text
+/s/sp-research         → Space 선택 유지 (화면은 STEP 10)
+/s/sp-research/p/p1    → p1의 태스크만
+타임라인               → 프로젝트 축 3그룹, 스코프 picker에 Project 3개
+캘린더                 → 태스크마다 자기 Project 색 (#0066cc / #5856d6 / #f97316)
+```
+
+캘린더 색이 결정적 증거다 — `item.spaceId`를 남겼다면 `projectById.get()`이 Space id로 조회해 전부 실패했을 것이다.
+
+### 범위 밖에서 발견한 것
+
+캘린더 좌측 사이드바의 프로젝트 표시 토글이 **기록만 되고 실제로 가리지 않는다.** `projectFilter`가 `"all"`로 하드코딩돼 있고(이 작업 이전부터), 토글은 카테고리 경로를 타는데 `categoryId`가 빈 태스크가 기본 카테고리로 떨어진다. 이 재설계와 무관하며 별도 작업으로 분리했다.
+
+### 이 단계가 하지 않은 것
+
+Space 수준 **화면**은 없다. 스코프는 해소되지만 그릴 곳이 STEP 10이다. Space 축으로 묶는 picker도 아직 없다 — 지금 picker는 Project를 나열하므로 "project" 축이 맞다.
 
 ---
 
