@@ -10628,9 +10628,58 @@ Space 수준 **화면**은 없다. 스코프는 해소되지만 그릴 곳이 ST
 
 ---
 
-## STEP 8 — Navigation Registry
+## STEP 8 — Navigation Registry — 완료 (2026-08-17)
 
 Section과 Task View를 내부적으로 분리하고 §14의 Canonical View Bar와 연결한다.
+
+### 분류를 타입으로 옮겼다
+
+`domain/view/spaceNav.ts` 신설. §13의 두 종류가 판별 유니온이 된다.
+
+```ts
+type SpaceNavItem =
+  | { kind: "section";   id: "overview" | "goals" | "horizons" }
+  | { kind: "task-view"; id: SpaceViewId }
+```
+
+`BuiltInTaskViewId`는 `SpaceViewId`에서 **파생**한다 — 두 목록이 어긋날 수 없다. 테스트가 그것도 지킨다.
+
+### `SPACE_VIEWS`에서 Section을 뺐다
+
+이전에는 `goals`가 `layout: "board"`, `horizons`가 `layout: "board"`로 view 테이블에 있었다. **Goal은 Task를 다르게 읽은 것이 아니라 자기 Source of Truth를 가진 다른 레코드다**(§26, §27.2). `layout`을 준다는 것은 엔진이 답하지 않는 질문에 답한다고 주장하는 것이다.
+
+테이블은 이제 §25의 Task View 넷만 담는다.
+
+```text
+list     none   / list      task+goal
+board    status / board     task
+gantt    none   / timeline  task+goal+milestone
+calendar none   / timegrid  task
+```
+
+넷 다 선언하되 렌더러가 붙은 것은 `board`뿐이다. `PENDING_TASK_VIEWS`가 나머지를 바에서 가린다 — **아무것도 그리지 않는 탭은 없는 탭보다 나쁘다.** STEP 9가 하나씩 연결하며 이 집합을 비우고, 마지막에 집합 자체가 사라진다.
+
+### 사용자에게는 한 줄이다 (§14)
+
+내부 분류는 코드용이지 독자에게 넘길 판단이 아니다. 두 번째 네비게이션 행을 만들지 않고, active는 정확히 하나다. 순서는 `SPACE_NAV` 한 곳에만 적혀 있고 화면은 active id만 지정한다.
+
+`navItemsForScope`가 스코프별 차이를 낸다 — **항목이 빠질 뿐 순서는 바뀌지 않는다.** 테스트가 이 불변을 검사한다.
+
+### 임시로 남긴 것
+
+Goals·Horizons의 실제 화면은 §50E·§50F이고 STEP 10이 만든다. 그때까지 두 섹션은 지금의 보드 렌더링을 유지하되, 그 spec을 **view 테이블이 아니라 화면 안에** 적어두었다. 차이는 장식이 아니다 — 화면은 임시 형태를 가질 수 있지만, 레지스트리의 한 줄은 엔진이 무엇을 담는지에 대한 주장이다.
+
+### 검증
+
+typecheck 통과, 테스트 **664개** 통과 (spaceNav 10개 신규). 실제 앱에서 세 탭이 이전과 동일하게 렌더된다.
+
+```text
+개요 · 보드 · 목표 · 지평     바가 registry에서 생성, active 정확히 하나
+보드                          상태 5컬럼, 태스크만 (목표 없음)
+목표                          상태 컬럼, 목표만 (태스크 없음)
+지평                          평생/올해/이번 달/이번 주/오늘 5컬럼
+?view=goals                   딥링크 유지
+```
 
 ---
 

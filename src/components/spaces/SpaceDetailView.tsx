@@ -3,10 +3,10 @@ import type { FocusSession, Folder, GoalSchedule, LearningPath, List, Milestone,
 import type { ToastState } from "../kit";
 import type { PageId } from "../../types";
 import {
-  SPACE_TABS,
   type SpaceLike,
   type SpaceTab,
 } from "../../lib/spaceHubTypes";
+import { isSpaceNavId, isTaskView, navItemsForScope } from "../../domain/view/spaceNav";
 import { getSpacePreset, resolveTaskGroups } from "../../lib/spaceTypeConfig";
 import { useT } from "../../i18n";
 import { presetText, tabText, hubTypeText, upcomingKindText } from "../../lib/spaceHubI18n";
@@ -108,7 +108,7 @@ function readTabFromUrl(): SpaceTab {
   const params = new URLSearchParams(window.location.search);
   const legacy = params.get("tab");
   const value = params.get("view") ?? (legacy === "tasks" ? "board" : legacy);
-  return SPACE_TABS.includes(value as SpaceTab) ? (value as SpaceTab) : "overview";
+  return isSpaceNavId(value) ? value : "overview";
 }
 
 export function SpaceDetailView({
@@ -150,6 +150,10 @@ export function SpaceDetailView({
   const [drawer, setDrawer] = useState<DrawerState>({ kind: "none" });
   const today = todayValue();
   const weekStart = getWeekStart(today);
+  // This screen is opened at a Project or below, so the bar it draws is the
+  // Project one. The Space-level bar (which drops Board — §0.3.3) belongs to
+  // the Space screen, STEP 10.
+  const navItems = useMemo(() => navItemsForScope("project"), []);
   const config = hub.getConfig(space.id);
   const preset = getSpacePreset(space.type);
   const groups = resolveTaskGroups(preset);
@@ -225,10 +229,45 @@ export function SpaceDetailView({
     return "";
   }, [viewScope.listId, viewScope.folderId, lists, folders]);
 
-  const activeView: SpaceViewId = tab === "overview" ? "board" : tab;
+  /**
+   * INTERIM (STEP 8 -> STEP 10). Goals and Horizons are Domain Sections, not
+   * Task Views (§12) — they no longer have a row in `SPACE_VIEWS`, and the
+   * engine no longer claims to answer for them. Their real screens are §50E
+   * and §50F, built in STEP 10.
+   *
+   * Until then they keep the board rendering they have always had, spelled out
+   * HERE rather than in the view table. The difference is not cosmetic: a
+   * screen is allowed a temporary shape, while a row in the registry is a
+   * claim about what the engine holds.
+   */
+  const sectionSpec: ViewSpec | null = useMemo(() => {
+    if (tab === "goals") {
+      return {
+        id: `section-goals-${scopeName || projectId}`,
+        name: tabText(t, "goals"),
+        filter: { ...scopeFilter, sources: ["goal"], parentId: "" },
+        groupBy: "status",
+        sort: { key: "dueDate" },
+        layout: "board",
+      };
+    }
+    if (tab === "horizons") {
+      return {
+        id: `section-horizons-${scopeName || projectId}`,
+        name: tabText(t, "horizons"),
+        filter: { ...scopeFilter, sources: ["task", "goal", "milestone"], parentId: "" },
+        groupBy: "horizon",
+        sort: { key: "dueDate" },
+        layout: "board",
+      };
+    }
+    return null;
+  }, [tab, scopeFilter, scopeName, projectId, t]);
+
+  const activeView: SpaceViewId = isTaskView(tab) ? tab : "board";
   const boardSpec: ViewSpec = useMemo(
-    () => specForSpaceView(activeView, scopeFilter, tabText(t, activeView)),
-    [activeView, scopeFilter, t],
+    () => sectionSpec ?? specForSpaceView(activeView, scopeFilter, tabText(t, activeView)),
+    [sectionSpec, activeView, scopeFilter, t],
   );
 
   /**
@@ -548,9 +587,11 @@ export function SpaceDetailView({
         ) : null}
       </section>
 
-      {/* Tab navigation (§13) */}
+      {/* One flat View Bar (§14). The Section/Task View split is internal —
+          the reader is not asked to classify what they are clicking, so there
+          is no second navigation row and exactly one item is active. */}
       <nav className="sdv-tab-nav" role="tablist" aria-label={t("spaceHub.aria.sections")}>
-        {SPACE_TABS.map((item) => (
+        {navItems.map(({ id: item }) => (
           <button
             key={item}
             type="button"

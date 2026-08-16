@@ -1,10 +1,15 @@
-// The views a Space offers, as data (SPACES_CLICKUP_UI_DESIGN U4).
+// The Task Views a scope offers, as data (SPACES_CLICKUP_UI_DESIGN U4,
+// SPACES_REDESIGN_II §21/§25).
 //
-// Three screens that were three tabs are three rows in this table. They differ
-// only in `filter.sources`, `groupBy` and `layout` — which is the claim U4
-// makes, written down where it can be checked instead of asserted: the Goals
-// tab was 81 lines and SpaceHorizons 179, and neither held a rule the engine
-// did not already have.
+// Screens that were hand-written tabs are rows in this table. They differ only
+// in `filter.sources`, `groupBy` and `layout` — which is the claim U4 makes,
+// written down where it can be checked instead of asserted.
+//
+// `goals` and `horizons` USED to be rows here, carried as boards. They are
+// gone: a Goal is not a Task read a different way, it is a different record
+// with its own Source of Truth (§26, §27.2), and giving it a `layout` made the
+// engine answer a question it does not hold. Both are Domain Sections now —
+// see ./spaceNav, which classifies what the bar shows.
 //
 // A view is NOT inherited down the tree. It is defined once here and opened at
 // whatever scope the tree is standing on (§16), which is why the scope arrives
@@ -12,7 +17,7 @@
 import type { ItemSource } from "./item";
 import type { GroupAxis, SortSpec, ViewFilter, ViewSpec } from "./viewSpec";
 
-export type SpaceViewId = "board" | "goals" | "horizons";
+export type SpaceViewId = "list" | "board" | "gantt" | "calendar";
 
 export interface SpaceViewDef {
   id: SpaceViewId;
@@ -23,21 +28,29 @@ export interface SpaceViewDef {
 }
 
 /**
- * `board` carries tasks only and `goals` carries goals only, which is U5 read
- * the other way round: the two mix in a List, and separating them is a filter
- * rather than a place. Horizons takes both, because "when is this happening"
- * is a question about all the work, not one kind of it.
+ * The four of §25, each answering a different question about the same Items:
+ * what is there, what state it is in, when it happens, over what span.
+ *
+ * All four are declared even though only `board` has a renderer wired — the
+ * table is the contract, and `PENDING_TASK_VIEWS` in ./spaceNav is what keeps
+ * the unwired ones out of the bar until STEP 9 connects them.
+ *
+ * `board` carries tasks only, which is U5 read the other way round: tasks and
+ * goals mix in a List, and separating them is a filter rather than a place.
+ * `list` and `gantt` take both, because "what is here" and "when is this
+ * happening" are questions about all the work, not one kind of it.
  */
 export const SPACE_VIEWS: readonly SpaceViewDef[] = [
+  { id: "list", groupBy: "none", layout: "list", sources: ["task", "goal"], sort: { key: "dueDate" } },
   { id: "board", groupBy: "status", layout: "board", sources: ["task"], sort: { key: "dueDate" } },
-  { id: "goals", groupBy: "status", layout: "board", sources: ["goal"], sort: { key: "dueDate" } },
   {
-    id: "horizons",
-    groupBy: "horizon",
-    layout: "board",
+    id: "gantt",
+    groupBy: "none",
+    layout: "timeline",
     sources: ["task", "goal", "milestone"],
-    sort: { key: "dueDate" },
+    sort: { key: "scheduledDate" },
   },
+  { id: "calendar", groupBy: "none", layout: "timegrid", sources: ["task"], sort: { key: "scheduledDate" } },
 ];
 
 export function isSpaceViewId(value: unknown): value is SpaceViewId {

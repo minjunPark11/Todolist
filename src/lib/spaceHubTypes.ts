@@ -2,7 +2,7 @@
 // Spaces themselves are derived from projects/study topics on SpacesPage; the
 // hub adds notes, activity records, and per-space customization on top.
 
-import { SPACE_VIEWS, type SpaceViewId } from "../domain/view/spaceViews";
+import type { SpaceNavId } from "../domain/view/spaceNav";
 import type { ProjectType } from "../types";
 
 // `SpaceHubType` ("project" | "personal" | "custom") used to live here, beside
@@ -19,18 +19,15 @@ import type { ProjectType } from "../types";
 // spec) — scheduling lives in the main Calendar page. Legacy ?tab=calendar
 // URLs fall back to "overview" because the value is no longer in SPACE_TABS.
 /**
- * What the Views Bar offers (U4). Overview stays a tab because it is not a
- * filter over Items but a summary of the Space (U7); everything after it is a
- * view — the same engine, a different `groupBy` and `sources`
- * (domain/view/spaceViews.ts).
+ * What the View Bar offers.
  *
- * `tasks` and `goals` were tabs holding hand-written screens. They are the
- * same list of Items seen through different filters, which is what made two
- * components out of one idea.
+ * This used to be `"overview" | SpaceViewId`, which said every tab after
+ * Overview was a view over Items — true of Board, false of Goals and Horizons
+ * (§12). The registry in domain/view/spaceNav.ts holds the classification now,
+ * and its ids are the tabs; this alias exists so the screens keep one name for
+ * "which tab is open".
  */
-export type SpaceTab = "overview" | SpaceViewId;
-
-export const SPACE_TABS: SpaceTab[] = ["overview", ...SPACE_VIEWS.map((view) => view.id)];
+export type SpaceTab = SpaceNavId;
 
 export type SpaceSignalStatus =
   | "on_track"
