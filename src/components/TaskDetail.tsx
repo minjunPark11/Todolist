@@ -1,4 +1,8 @@
-import type { Project, RepeatType, Subtask, Task, TaskPriority } from "../types";
+import type { List, Project, RepeatType, Subtask, Task, TaskPriority } from "../types";
+import { activeLists } from "../domain/spaces/hierarchy";
+import { listIdFor } from "../domain/spaces/membership";
+import { childProgress, childrenOf } from "../domain/tasks/children";
+import { useState } from "react";
 import { todayValue } from "../utils/date";
 import { getMatrixPosition, patchForQuadrant, type MatrixQuadrant } from "../utils/eisenhower";
 import { dependentsOf, eligibleBlockers } from "../domain/tasks/dependencies";
@@ -10,6 +14,9 @@ interface TaskDetailProps {
   task: Task | null;
   tasks: Task[];
   projects: Project[];
+  lists: List[];
+  /** The keyboard-reachable half of U9 — the tree's drop target is the other. */
+  onMoveToList: (taskId: string, listId: string) => void;
   subtasks: Subtask[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   onRequestDeleteTask: (taskId: string) => void;
@@ -34,13 +41,21 @@ const matrixQuadrants: Array<{ key: MatrixQuadrant; labelKey: string; hintKey: s
 export function TaskDetail({
   task,
   tasks,
+  projects,
+  lists,
+  onMoveToList,
   onUpdateTask,
   onRequestDeleteTask,
   onArchiveTask,
   onDuplicateTask,
+  subtasks,
+  onAddSubtask,
+  onToggleSubtask,
+  onDeleteSubtask,
   onClose,
 }: TaskDetailProps) {
   const { t } = useT();
+  const [childTitle, setChildTitle] = useState("");
 
   if (!task) {
     return (
@@ -50,6 +65,9 @@ export function TaskDetail({
       </MotionPanelShell>
     );
   }
+
+  const children = childrenOf(task.id, tasks, subtasks);
+  const progress = childProgress(children);
 
   const repeatLabels: Record<RepeatType, string> = {
     none: t("taskDetail.repeatNone"),
@@ -187,6 +205,33 @@ export function TaskDetail({
               is derived from this field plus the due date, so the two controls
               cannot disagree: setting Low here immediately reads as Unsorted
               below. */}
+          {/* Where the task LIVES. The panel had no such control at all, so a
+              task could only ever be filed by dragging it. One picker rather
+              than a Space picker plus a List picker: the List determines the
+              Space (membership.resolveListMove), and two controls that can
+              contradict each other is one more state to reconcile. */}
+          <label>
+            <span>{t("taskDetail.list")}</span>
+            <select
+              value={listIdFor(task, lists)}
+              onChange={(event) => onMoveToList(task.id, event.target.value)}
+            >
+              {/* A task with no Space has no List either; the placeholder keeps
+                  the control from showing someone else's list as its value. */}
+              {listIdFor(task, lists) ? null : <option value="">{t("taskDetail.noList")}</option>}
+              {projects
+                .filter((project) => project.status !== "archived" && !project.archivedAt)
+                .map((project) => (
+                  <optgroup key={project.id} label={project.name}>
+                    {activeLists(lists, project.id).map((list) => (
+                      <option key={list.id} value={list.id}>
+                        {list.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+            </select>
+          </label>
           <label>
             <span>{t("taskDetail.priority")}</span>
             <select
@@ -253,6 +298,61 @@ export function TaskDetail({
             </div>
           ) : null}
         </div>
+      </section>
+      {/* The four subtask props were declared here and never rendered, which
+          is how the app came to have two subtask features and show neither in
+          this panel. `childrenOf` answers with both kinds at once, so a legacy
+          Subtask is visible again — and promotes to a Task the moment it is
+          ticked (domain/tasks/children.ts). */}
+      <section className="detail-section">
+        <h3>
+          {t("spaceHub.section.subtasks")}
+          {progress.total > 0 ? (
+            <span className="detail-subtask-progress">
+              {progress.done}/{progress.total}
+            </span>
+          ) : null}
+        </h3>
+        {children.length > 0 ? (
+          <ul className="detail-subtasks">
+            {children.map((child) => (
+              <li key={child.id}>
+                <label>
+                  <input type="checkbox" checked={child.done} onChange={() => onToggleSubtask(child.id)} />
+                  <span className={child.done ? "is-done" : ""}>{child.title}</span>
+                </label>
+                <button
+                  type="button"
+                  aria-label={t("common.delete")}
+                  onClick={() => onDeleteSubtask(child.id)}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <form
+          className="detail-subtask-add"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const title = childTitle.trim();
+            if (!title) return;
+            onAddSubtask(task.id, title);
+            setChildTitle("");
+          }}
+        >
+          <input
+            value={childTitle}
+            placeholder={t("spaceHub.action.addSubtask")}
+            aria-label={t("spaceHub.action.addSubtask")}
+            onChange={(event) => setChildTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault();
+            }}
+          />
+          <button type="submit">{t("common.add")}</button>
+        </form>
       </section>
       <section className="detail-section">
         <h3>{t("taskDetail.notes")}</h3>

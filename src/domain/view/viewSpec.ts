@@ -11,7 +11,7 @@
 // still driving the live screens. The equivalence tests assert that a view
 // and its screen answer identically, so this cannot quietly drift while the
 // two exist side by side.
-import type { List, Project, Task, TaskPriority } from "../../types";
+import type { Folder, List, Project, Task, TaskPriority } from "../../types";
 import { getMatrixPosition } from "../../utils/eisenhower";
 import { defaultBucketFor } from "../../utils/todayView";
 import { HORIZONS } from "../../utils/horizons";
@@ -23,6 +23,7 @@ export type GroupAxis =
   | "quadrant"
   | "horizon"
   | "space"
+  | "folder"
   | "list"
   | "priority"
   | "dueDate"
@@ -31,8 +32,19 @@ export type GroupAxis =
 export type SortKey = "manual" | "dueDate" | "scheduledDate" | "priority" | "title" | "createdAt";
 
 export interface ViewFilter {
+  // The three scopes a view can be opened at (SPACES_CLICKUP_UI_DESIGN §16).
+  // They are not exclusive and they do not need to be: a Folder is inside a
+  // Space, so naming both narrows to the same set rather than contradicting.
   spaceId?: string;
+  /** "" matches the Folderless Lists — a real scope, not "any folder". */
+  folderId?: string;
   listId?: string;
+  /**
+   * Whose child an Item is. "" selects the top level, which is what a board
+   * of cards wants: a child beside its parent reads as two pieces of work
+   * rather than one inside the other.
+   */
+  parentId?: string;
   /** An item matches when it carries every tag named. */
   tags?: string[];
   statusIds?: string[];
@@ -82,7 +94,9 @@ function matchesDateWindow(item: Item, from?: string, to?: string): boolean {
 
 export function matchesFilter(item: Item, filter: ViewFilter): boolean {
   if (filter.spaceId !== undefined && item.spaceId !== filter.spaceId) return false;
+  if (filter.folderId !== undefined && item.folderId !== filter.folderId) return false;
   if (filter.listId !== undefined && item.listId !== filter.listId) return false;
+  if (filter.parentId !== undefined && item.parentId !== filter.parentId) return false;
   if (filter.sources && !filter.sources.includes(item.source)) return false;
   if (filter.statusIds && !filter.statusIds.includes(item.statusId)) return false;
   if (filter.priorities && !filter.priorities.includes(item.priority)) return false;
@@ -125,14 +139,16 @@ export interface GroupContext {
  */
 export function groupRank(
   axis: GroupAxis,
-  records: { projects?: Project[]; lists?: List[] },
+  records: { projects?: Project[]; lists?: List[]; folders?: Folder[] },
 ): ReadonlyMap<string, number> | undefined {
   const source =
     axis === "space"
       ? records.projects?.map((p) => ({ id: p.id, order: p.order, name: p.name }))
-      : axis === "list"
-        ? records.lists?.map((l) => ({ id: l.id, order: l.order, name: l.name }))
-        : undefined;
+      : axis === "folder"
+        ? records.folders?.map((f) => ({ id: f.id, order: f.order, name: f.name }))
+        : axis === "list"
+          ? records.lists?.map((l) => ({ id: l.id, order: l.order, name: l.name }))
+          : undefined;
   if (!source || source.length === 0) return undefined;
 
   const ordered = [...source].sort((a, b) => {
@@ -150,6 +166,8 @@ export function groupKeyFor(item: Item, axis: GroupAxis, context: GroupContext):
       return "";
     case "space":
       return item.spaceId;
+    case "folder":
+      return item.folderId;
     case "list":
       return item.listId;
     case "priority":

@@ -19,7 +19,7 @@
 // storage never is".
 import type { LearningPath, List, Project, Status, Task, TaskPriority } from "../../types";
 import { blockedTaskIds } from "../tasks/dependencies";
-import { listIdFor, goalListIdFor, statusIdFor, statusesForSpace } from "../spaces/membership";
+import { listIdFor, goalListIdFor, statusIdFor, statusesForSpace, statusesWithCustom } from "../spaces/membership";
 import { horizonForGoalSchedule, normalizeGoalSchedule } from "../horizons/goalSchedule";
 import { deriveHorizon } from "../../utils/horizons";
 import type { Horizon } from "../../utils/horizons";
@@ -38,6 +38,15 @@ export interface Item {
   // --- area axis
   spaceId: string;
   listId: string;
+  /**
+   * The Folder the Item's List hangs in; "" for a Folderless List (D4).
+   *
+   * Derived here rather than looked up at filter time because `matchesFilter`
+   * sees one Item and nothing else — giving it the collections so it could
+   * walk List -> Folder would hand the filter language a dependency the rest
+   * of it does not have.
+   */
+  folderId: string;
   color: string;
 
   // --- time axis. Four fields answering four different questions; folding
@@ -79,8 +88,48 @@ function colorMap(projects: Project[]): Map<string, string> {
   return new Map(projects.map((project) => [project.id, project.color]));
 }
 
+/** List id -> the Folder it hangs in. Absent for a Folderless List (D4). */
+function folderMap(lists: List[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const list of lists) {
+    if (list.folderId) map.set(list.id, list.folderId);
+  }
+  return map;
+}
+
+/**
+ * The set an Item resolves its status against.
+ *
+ * It must be the SAME set a board draws its columns from, and that is
+ * `statusesWithCustom` — defaults plus every column the user named. While
+ * this used `statusesForSpace`, a named column existed on screen but not in
+ * the set `statusIdFor` validates against, so every item on it fell back to
+ * `task.status`: the column could never hold anything, and a card dropped on
+ * it snapped back.
+ */
 function statusMap(projects: Project[]): Map<string, Status[]> {
-  return new Map(projects.map((project) => [project.id, statusesForSpace(project)]));
+  return new Map(projects.map((project) => [project.id, statusesWithCustom(project)]));
+}
+
+/**
+ * A goal's column.
+ *
+ * Completion is the user's explicit assertion and outranks the column (D10),
+ * so a finished goal reads `done` wherever it was filed. Otherwise the board
+ * column it sits in IS its status: `boardListId` is the only field a goal has
+ * ever had for this, and it is exactly what `statusesWithCustom` puts in
+ * the set. Dropping it here is what let the Goals tab and the board give two
+ * different answers about one goal.
+ *
+ * A dangling id falls back rather than rendering into a column that no longer
+ * exists — the same rule `statusIdFor` follows for a task.
+ */
+function goalStatusId(path: LearningPath, statuses: Status[]): string {
+  if (path.completedAt) return "done";
+  if (path.boardListId && statuses.some((status) => status.id === path.boardListId)) {
+    return path.boardListId;
+  }
+  return "todo";
 }
 
 export function projectItems(input: ProjectItemsInput): Item[] {
@@ -88,6 +137,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
   const wanted = new Set<ItemSource>(input.sources ?? ["task", "goal", "milestone"]);
   const colors = colorMap(projects);
   const statuses = statusMap(projects);
+  const folders = folderMap(lists);
   const blocked = blockedTaskIds(tasks);
   const items: Item[] = [];
 
@@ -95,6 +145,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
     for (const task of tasks) {
       if (task.deletedAt) continue;
       const spaceStatuses = statuses.get(task.projectId) ?? statusesForSpace(undefined);
+      const taskListId = listIdFor(task, lists);
       items.push({
         key: `task:${task.id}`,
         source: "task",
@@ -102,7 +153,8 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         parentId: task.parentTaskId,
         title: task.title,
         spaceId: task.projectId,
-        listId: listIdFor(task, lists),
+        listId: taskListId,
+        folderId: folders.get(taskListId) ?? "",
         color: colors.get(task.projectId) ?? DEFAULT_COLOR,
         startDate: task.startDate,
         scheduledDate: task.scheduledDate,
@@ -127,7 +179,9 @@ export function projectItems(input: ProjectItemsInput): Item[] {
   for (const path of paths) {
     const spaceId = path.projectId ?? "";
     const color = colors.get(spaceId) ?? DEFAULT_COLOR;
+    const spaceStatuses = statuses.get(spaceId) ?? statusesForSpace(undefined);
     const listId = goalListIdFor(path, lists);
+    const folderId = folders.get(listId) ?? "";
     const schedule = normalizeGoalSchedule(path.schedule, path.targetDate, today);
     const horizon = horizonForGoalSchedule(schedule);
 
@@ -140,6 +194,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         title: path.goal,
         spaceId,
         listId,
+        folderId,
         color,
         // "unscheduled" and "life" carry no start; both are periods without
         // a first day, so the span resolver falls back to the deadline.
@@ -149,9 +204,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         horizon: horizon ?? undefined,
         startTime: "",
         endTime: "",
-        // Goals carry no workflow status of their own; completion is the
-        // user's explicit assertion (HORIZONS_DESIGN D10).
-        statusId: path.completedAt ? "done" : "todo",
+        statusId: goalStatusId(path, spaceStatuses),
         priority: "none",
         done: Boolean(path.completedAt),
         blocked: false,
@@ -178,6 +231,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         title: milestone.title,
         spaceId,
         listId,
+        folderId,
         color,
         startDate: "",
         scheduledDate: "",

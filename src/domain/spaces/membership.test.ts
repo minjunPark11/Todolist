@@ -7,8 +7,11 @@ import {
   itemsInList,
   listIdFor,
   MIGRATED_TASK_STATUSES,
+  patchForGoalListMove,
+  patchForListMove,
+  resolveListMove,
   statusesForSpace,
-  statusesWithBoardLists,
+  statusesWithCustom,
   statusFor,
   statusIdFor,
 } from "./membership";
@@ -139,12 +142,12 @@ describe("statusesForSpace", () => {
   });
 });
 
-describe("statusesWithBoardLists", () => {
+describe("statusesWithCustom", () => {
   it("reads board lists as extra active statuses instead of rewriting them", () => {
     const space = project({
       boardLists: [{ id: "bl-1", name: "In review", order: 0 }],
     });
-    const statuses = statusesWithBoardLists(space);
+    const statuses = statusesWithCustom(space);
     const added = statuses.find((status) => status.id === "bl-1");
     expect(added).toMatchObject({ label: "In review", group: "active" });
     // Appended after the defaults, not interleaved with them.
@@ -153,16 +156,16 @@ describe("statusesWithBoardLists", () => {
 
   it("ignores archived board lists", () => {
     const space = project({ boardLists: [{ id: "bl-1", name: "Old", order: 0, archivedAt: NOW }] });
-    expect(statusesWithBoardLists(space)).toBe(DEFAULT_STATUSES);
+    expect(statusesWithCustom(space)).toBe(DEFAULT_STATUSES);
   });
 
   it("returns the base set unchanged when there are no board lists", () => {
-    expect(statusesWithBoardLists(project())).toBe(DEFAULT_STATUSES);
+    expect(statusesWithCustom(project())).toBe(DEFAULT_STATUSES);
   });
 
   it("does not shadow a default status with a board list of the same id", () => {
     const space = project({ boardLists: [{ id: "done", name: "Done column", order: 0 }] });
-    expect(statusesWithBoardLists(space)).toBe(DEFAULT_STATUSES);
+    expect(statusesWithCustom(space)).toBe(DEFAULT_STATUSES);
   });
 });
 
@@ -212,5 +215,91 @@ describe("ensureDefaultLists", () => {
 
   it("skips empty space ids", () => {
     expect(ensureDefaultLists([""], [], NOW, defaultListIdFor)).toEqual([]);
+  });
+});
+
+describe("moving an Item into a List", () => {
+  // Two Spaces, and a second List in the first — the shapes a tree can drop on.
+  const otherDefault: List = makeDefaultList(defaultListIdFor("space-2"), "space-2", NOW);
+  const reading: List = {
+    id: "list-reading",
+    spaceId: "space-1",
+    name: "Reading",
+    order: 1,
+    isDefault: false,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+  const lists = [defaultList, otherDefault, reading];
+
+  it("stores the id only for a List that is not the default", () => {
+    expect(resolveListMove(reading.id, lists)).toEqual({ spaceId: "space-1", listId: reading.id });
+  });
+
+  it("clears the id when landing on the default List", () => {
+    // The answer is derivable from projectId again, so nothing should be
+    // stored — the same discipline listIdFor is built on.
+    expect(resolveListMove(defaultList.id, lists)).toEqual({ spaceId: "space-1", listId: "" });
+  });
+
+  it("refuses a List that is gone or archived", () => {
+    expect(resolveListMove("list-missing", lists)).toBeNull();
+    expect(resolveListMove(reading.id, [{ ...reading, archivedAt: NOW }])).toBeNull();
+  });
+
+  it("writes the stored id when a task moves off its default List", () => {
+    expect(patchForListMove(task(), reading.id, lists)).toEqual({ listId: reading.id });
+  });
+
+  it("clears it again when the task comes back", () => {
+    expect(patchForListMove(task({ listId: reading.id }), defaultList.id, lists)).toEqual({ listId: "" });
+  });
+
+  it("round-trips through listIdFor", () => {
+    // The move and the read have to agree, or the card lands somewhere the
+    // tree does not show it.
+    const moved = { ...task(), ...patchForListMove(task(), reading.id, lists) };
+    expect(listIdFor(moved, lists)).toBe(reading.id);
+    const back = { ...moved, ...patchForListMove(moved, defaultList.id, lists) };
+    expect(listIdFor(back, lists)).toBe(defaultList.id);
+  });
+
+  it("takes the task to the List's Space, because the List decides", () => {
+    expect(patchForListMove(task(), otherDefault.id, lists)).toEqual({
+      listId: "",
+      projectId: "space-2",
+    });
+  });
+
+  it("drops a custom status when the Space changes", () => {
+    // The column belongs to the Space that defined it; the new one has no
+    // such id, so keeping it stores something that only looks meaningful.
+    expect(patchForListMove(task({ statusId: "col-review" }), otherDefault.id, lists)).toEqual({
+      listId: "",
+      projectId: "space-2",
+      statusId: "",
+    });
+  });
+
+  it("keeps the status when the task stays in its Space", () => {
+    expect(patchForListMove(task({ statusId: "col-review" }), reading.id, lists)).toEqual({
+      listId: reading.id,
+    });
+  });
+
+  it("writes nothing when the Item is already there", () => {
+    expect(patchForListMove(task(), defaultList.id, lists)).toEqual({});
+    expect(patchForListMove(task({ listId: reading.id }), reading.id, lists)).toEqual({});
+    expect(patchForListMove(task(), "list-missing", lists)).toEqual({});
+  });
+
+  it("moves a goal the same way", () => {
+    const goal = { projectId: "space-1" };
+    expect(patchForGoalListMove(goal, reading.id, lists)).toEqual({ listId: reading.id });
+    expect(patchForGoalListMove(goal, otherDefault.id, lists)).toEqual({
+      listId: "",
+      projectId: "space-2",
+    });
+    expect(patchForGoalListMove(goal, defaultList.id, lists)).toEqual({});
   });
 });

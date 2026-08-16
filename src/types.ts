@@ -168,7 +168,16 @@ export interface List {
 export type ProjectStatus = "active" | "paused" | "completed" | "archived";
 export type ProjectType = "project" | "area";
 
-export interface BoardList {
+/**
+ * A status the user added to a Space, stored in the reduced form it was first
+ * written in — `membership.statusesWithCustom` supplies the colour and the
+ * group the full `Status` needs.
+ *
+ * Not a `List`. A List is where an Item is stored; this is a column it can be
+ * shown in. The two shared the word "board list" until the hierarchy arrived
+ * and made the collision expensive.
+ */
+export interface CustomStatus {
   id: string;
   name: string;
   order: number;
@@ -190,7 +199,12 @@ export interface Project {
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;
-  boardLists?: BoardList[];
+  /**
+   * The statuses the user added. Keyed `boardLists` because that is what it
+   * was called when the field started syncing, and a renamed key is a key an
+   * older client erases (M0). Read together with `statuses` below.
+   */
+  boardLists?: CustomStatus[];
   // === Space fields (P4, SPACES_CLICKUP_REDESIGN D1/D7) ===
   // A Project IS the Space; the record keeps its id so Task.projectId,
   // LearningPath.projectId, calendar categories and space:<id> tags all keep
@@ -349,6 +363,8 @@ export interface TaskDraft {
   projectId?: string;
   categoryId?: string;
   parentTaskId?: string;
+  /** Keeps a child in the same List as its parent (domain/tasks/children.ts). */
+  listId?: string;
   priority?: TaskPriority;
   status?: TaskStatus;
   tags?: string[];

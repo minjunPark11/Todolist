@@ -31,12 +31,13 @@ import {
 } from "../lib/spaces/legacyLocalSpaces";
 import * as hierarchy from "../domain/spaces/hierarchy";
 import { sanitizeFolder, sanitizeList } from "../domain/spaces/hierarchy";
-import { defaultListIdFor } from "../domain/spaces/membership";
+import { defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
 import * as pathOps from "../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
+import { childDraft, promoteDraft } from "../domain/tasks/children";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
-import { addBoardList as addBoardListRecord, archiveBoardList as archiveBoardListRecord, moveGoalToBoardList as moveGoalToBoardListRecord, patchBoardList as patchBoardListRecord, reconcileBoardAssignments, sanitizeBoardLists } from "../domain/horizons/boardLists";
+import { addCustomStatus as addCustomStatusRecord, archiveCustomStatus as archiveCustomStatusRecord, moveGoalToStatus as moveGoalToStatusRecord, patchCustomStatus as patchCustomStatusRecord, reconcileGoalStatuses, sanitizeCustomStatuses } from "../domain/spaces/customStatuses";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
 import {
   buildSyncPlan,
@@ -193,7 +194,7 @@ function normalizeProject(project: Partial<Project>): Project {
     archivedAt: project.archivedAt ?? "",
     createdAt: project.createdAt ?? now,
     updatedAt: project.updatedAt ?? now,
-    boardLists: sanitizeBoardLists(project.boardLists),
+    boardLists: sanitizeCustomStatuses(project.boardLists),
   };
 }
 
@@ -366,7 +367,7 @@ export function normalizeData(data: RawPlannerData): PlannerData {
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
   };
-  return { ...normalized, learningPaths: reconcileBoardAssignments(normalized.projects, normalized.learningPaths) };
+  return { ...normalized, learningPaths: reconcileGoalStatuses(normalized.projects, normalized.learningPaths) };
 }
 
 function emptyData(): PlannerData {
@@ -1119,26 +1120,17 @@ export function usePlannerData() {
     }));
   }
 
+  /**
+   * A child is a Task now (domain/tasks/children.ts). The `subtasks`
+   * collection is no longer written to — it is only read, so the rows already
+   * there keep working until each is touched.
+   */
   function addSubtask(taskId: string, title: string) {
     const trimmed = title.trim();
-    if (!trimmed) {
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const subtask: Subtask = {
-      id: createId("subtask"),
-      taskId,
-      title: trimmed,
-      completed: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    setData((current) => ({
-      ...current,
-      subtasks: [...current.subtasks, subtask],
-    }));
+    if (!trimmed) return;
+    const parent = data.tasks.find((task) => task.id === taskId);
+    if (!parent) return;
+    createTask(childDraft(parent, trimmed));
   }
 
 
@@ -1324,24 +1316,42 @@ export function usePlannerData() {
     }));
   }
 
+  /**
+   * Completing a legacy Subtask promotes it, because this is the moment its
+   * record has to be written anyway — the conversion rides along and costs no
+   * extra row. Nothing scans the collection to do this in bulk; a Subtask
+   * nobody touches stays a Subtask, and stays readable.
+   */
   function toggleSubtask(subtaskId: string) {
-    const now = new Date().toISOString();
-
+    const subtask = data.subtasks.find((item) => item.id === subtaskId);
+    if (!subtask) {
+      // Already a Task — the id is a task id, and completion is that path's.
+      toggleTaskDone(subtaskId);
+      return;
+    }
+    const parent = data.tasks.find((task) => task.id === subtask.taskId);
+    if (!parent) return;
+    createTask({ ...promoteDraft(parent, subtask), status: subtask.completed ? "todo" : "done" });
     setData((current) => ({
       ...current,
-      subtasks: current.subtasks.map((subtask) =>
-        subtask.id === subtaskId
-          ? { ...subtask, completed: !subtask.completed, updatedAt: now }
-          : subtask,
-      ),
+      subtasks: current.subtasks.filter((item) => item.id !== subtaskId),
     }));
   }
 
   function deleteSubtask(subtaskId: string) {
-    setData((current) => ({
-      ...current,
-      subtasks: current.subtasks.filter((subtask) => subtask.id !== subtaskId),
-    }));
+    setData((current) => {
+      if (current.subtasks.some((item) => item.id === subtaskId)) {
+        return { ...current, subtasks: current.subtasks.filter((item) => item.id !== subtaskId) };
+      }
+      // A promoted child is a Task; deleting it is the Task path, soft-delete
+      // and all, so it can be undone like any other.
+      return {
+        ...current,
+        tasks: current.tasks.map((task) =>
+          task.id === subtaskId ? { ...task, deletedAt: new Date().toISOString() } : task,
+        ),
+      };
+    });
   }
 
   // === Shared task lifecycle (spec §0.1.1) ===
@@ -1390,29 +1400,29 @@ export function usePlannerData() {
     }));
   }
 
-  function createBoardList(projectId: string, name: string) {
+  function createStatus(projectId: string, name: string) {
     const title = name.trim();
     if (!title) return;
     const now = new Date().toISOString();
-    setData((current) => ({ ...current, projects: addBoardListRecord(current.projects, projectId, { id: createId("blist"), name: title, order: current.projects.find((project) => project.id === projectId)?.boardLists?.length ?? 0 }, now) }));
+    setData((current) => ({ ...current, projects: addCustomStatusRecord(current.projects, projectId, { id: createId("blist"), name: title, order: current.projects.find((project) => project.id === projectId)?.boardLists?.length ?? 0 }, now) }));
   }
 
-  function updateBoardList(projectId: string, listId: string, patch: { name?: string; order?: number }) {
+  function updateStatus(projectId: string, listId: string, patch: { name?: string; order?: number }) {
     const now = new Date().toISOString();
-    setData((current) => ({ ...current, projects: patchBoardListRecord(current.projects, projectId, listId, patch, now) }));
+    setData((current) => ({ ...current, projects: patchCustomStatusRecord(current.projects, projectId, listId, patch, now) }));
   }
 
-  function archiveBoardList(projectId: string, listId: string) {
+  function archiveStatus(projectId: string, listId: string) {
     const now = new Date().toISOString();
     setData((current) => {
-      const next = archiveBoardListRecord(current.projects, current.learningPaths, projectId, listId, now);
+      const next = archiveCustomStatusRecord(current.projects, current.learningPaths, projectId, listId, now);
       return { ...current, projects: next.projects, learningPaths: next.paths };
     });
   }
 
-  function moveGoalToBoardList(pathId: string, listId?: string) {
+  function moveGoalToStatus(pathId: string, listId?: string) {
     const now = new Date().toISOString();
-    setData((current) => ({ ...current, learningPaths: moveGoalToBoardListRecord(current.learningPaths, current.projects, pathId, listId, now) }));
+    setData((current) => ({ ...current, learningPaths: moveGoalToStatusRecord(current.learningPaths, current.projects, pathId, listId, now) }));
   }
 
   function toggleProjectPinned(projectId: string) {
@@ -1569,14 +1579,26 @@ export function usePlannerData() {
       createdAt: now,
       updatedAt: now,
     };
-    setData((current) => ({ ...current, lists: hierarchy.addList(current.lists, list) }));
-    // TODO(P4): set `listsRevealed` on the Space here, so the tree keeps
-    // showing the List level after the count drops back to one (U2). It is a
-    // new field on the existing Project record, which a client older than
-    // v0.6.0 would strip on its next save (M0) — so it waits until that
-    // release has reached the user's devices. Until then shouldRevealLists()
-    // falls back to the live count, which is correct while nothing has been
-    // deleted yet.
+    setData((current) => {
+      const lists = hierarchy.addList(current.lists, list);
+      // U2's one-way reveal. Once a second List has EXISTED the tree keeps
+      // showing the level, even if the count later drops back to one —
+      // re-deciding from the live count would make a whole tree level vanish
+      // because the user deleted a list, which reads as losing the lists.
+      //
+      // Writing it was blocked on M0: a client older than v0.6.0 would strip
+      // this field on its next save. v0.6.0 shipped the passthrough, and
+      // 0.6.1/0.7.0 followed, so the field now survives a round trip.
+      const revealed = hierarchy.activeLists(lists, spaceId).length > 1;
+      const projects = revealed
+        ? current.projects.map((project) =>
+            project.id === spaceId && project.listsRevealed !== true
+              ? { ...project, listsRevealed: true, updatedAt: now }
+              : project,
+          )
+        : current.projects;
+      return { ...current, lists, projects };
+    });
     return list.id;
   }
 
@@ -1615,6 +1637,37 @@ export function usePlannerData() {
     setData((current) => {
       const lists = hierarchy.moveListToFolder(current.lists, listId, folderId, current.folders, now);
       return lists === current.lists ? current : { ...current, lists };
+    });
+  }
+
+  /**
+   * Drop an Item onto a List. The patch is empty when the move changes
+   * nothing, so a drag that ends where it started puts no row on the wire.
+   */
+  function moveTaskToList(taskId: string, listId: string) {
+    setData((current) => {
+      const task = current.tasks.find((item) => item.id === taskId);
+      if (!task) return current;
+      const patch = patchForListMove(task, listId, current.lists);
+      if (Object.keys(patch).length === 0) return current;
+      const now = new Date().toISOString();
+      return {
+        ...current,
+        tasks: current.tasks.map((item) => (item.id === taskId ? { ...item, ...patch, updatedAt: now } : item)),
+      };
+    });
+  }
+
+  function moveGoalToList(pathId: string, listId: string) {
+    setData((current) => {
+      const path = current.learningPaths.find((item) => item.id === pathId);
+      if (!path) return current;
+      const patch = patchForGoalListMove(path, listId, current.lists);
+      if (Object.keys(patch).length === 0) return current;
+      // Through patchPath, which drops the goal's Space-scoped column when the
+      // Space changes — that rule stays in one place.
+      const now = new Date().toISOString();
+      return { ...current, learningPaths: pathOps.patchPath(current.learningPaths, pathId, patch, now) };
     });
   }
 
@@ -1729,10 +1782,10 @@ export function usePlannerData() {
     addProject,
     createProject,
     updateProject,
-    createBoardList,
-    updateBoardList,
-    archiveBoardList,
-    moveGoalToBoardList,
+    createStatus,
+    updateStatus,
+    archiveStatus,
+    moveGoalToStatus,
     toggleProjectPinned,
     archiveProject,
     restoreProject,
@@ -1753,6 +1806,8 @@ export function usePlannerData() {
     updateList,
     archiveList,
     moveListToFolder,
+    moveTaskToList,
+    moveGoalToList,
     createFolder,
     updateFolder,
     archiveFolder,

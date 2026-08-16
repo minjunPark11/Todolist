@@ -65,7 +65,7 @@ export function SpaceOverviewTab({
               <button type="button" className="sdv-btn sdv-btn-sm" onClick={onAddTask}>
                 {presetText(t, preset.addTaskLabel)}
               </button>
-              <button type="button" className="sdv-link" onClick={() => onOpenTab("tasks")}>
+              <button type="button" className="sdv-link" onClick={() => onOpenTab("board")}>
                 {t("spaceHub.action.viewAll")}
               </button>
             </div>

@@ -51,6 +51,76 @@ export function goalListIdFor(path: Pick<LearningPath, "listId" | "projectId">, 
   return defaultListFor(lists, path.projectId)?.id ?? "";
 }
 
+// === moving an Item into a List ===
+
+/**
+ * Where a drop on a List lands, as the two facts a record has to hold.
+ *
+ * The List decides the Space, not the other way round — that is what makes the
+ * tree somewhere you can put things. Dragging into another Space's List moves
+ * the Item to that Space, because a List has nowhere else to put it.
+ */
+export interface ListMove {
+  spaceId: string;
+  /** "" when the target is that Space's default List — see below. */
+  listId: string;
+}
+
+/**
+ * Landing on the default List CLEARS the stored id rather than writing the one
+ * it would have computed. This is `listIdFor` read backwards, and it has to
+ * keep that function's discipline: the field exists only for answers that
+ * stopped being derivable. A stored value that merely agrees with the
+ * derivation is one more thing that can later disagree with it — and it is
+ * exactly the write amplification the whole expand step exists to avoid.
+ */
+export function resolveListMove(targetListId: string, lists: List[]): ListMove | null {
+  const target = lists.find((list) => list.id === targetListId && !list.archivedAt);
+  if (!target) return null;
+  const isDefault = defaultListFor(lists, target.spaceId)?.id === target.id;
+  return { spaceId: target.spaceId, listId: isDefault ? "" : target.id };
+}
+
+/** Empty when the move changes nothing, so a no-op drop writes no row. */
+export function patchForListMove(
+  task: Pick<Task, "projectId" | "listId" | "statusId">,
+  targetListId: string,
+  lists: List[],
+): Partial<Task> {
+  const move = resolveListMove(targetListId, lists);
+  if (!move) return {};
+  const spaceChanged = task.projectId !== move.spaceId;
+  if (!spaceChanged && (task.listId ?? "") === move.listId) return {};
+
+  const patch: Partial<Task> = { listId: move.listId };
+  if (spaceChanged) {
+    patch.projectId = move.spaceId;
+    // A status the user invented belongs to the Space that defined it.
+    // `statusIdFor` would fall back anyway, so carrying the id across would
+    // leave dead weight that still looks meaningful.
+    if (task.statusId) patch.statusId = "";
+  }
+  return patch;
+}
+
+/**
+ * The same move for a goal. Its Space-scoped column is dropped by `patchPath`
+ * whenever `projectId` changes, so this does not restate that rule.
+ */
+export function patchForGoalListMove(
+  path: Pick<LearningPath, "projectId" | "listId">,
+  targetListId: string,
+  lists: List[],
+): Partial<LearningPath> {
+  const move = resolveListMove(targetListId, lists);
+  if (!move) return {};
+  const spaceChanged = (path.projectId ?? "") !== move.spaceId;
+  if (!spaceChanged && (path.listId ?? "") === move.listId) return {};
+  return spaceChanged
+    ? { projectId: move.spaceId, listId: move.listId }
+    : { listId: move.listId };
+}
+
 /**
  * The stored id wins; otherwise the task's own status is the id, which holds
  * exactly because DEFAULT_STATUSES is keyed by TaskStatus. A stored id that no
@@ -78,27 +148,35 @@ export function itemsInList(tasks: Task[], lists: List[], listId: string): Task[
 }
 
 /**
- * Board lists become statuses (M4), and they are read rather than converted:
- * a board list is a column a goal sits in, so the Space's set is its defaults
- * plus one `active` status per board list. Converting in place would mean
- * rewriting every Project, for a value that can simply be computed.
+ * The Space's full status set: the base set plus every column the user added.
+ *
+ * The two are stored apart on purpose. `statuses` REPLACES the base set, so it
+ * is written only when the user edits the defaults themselves; the columns they
+ * add ride in `boardLists`, where adding one costs one small record instead of
+ * rewriting all seven. They are read together rather than merged in storage —
+ * converting in place would mean rewriting every Project for a value that can
+ * simply be computed (M4).
+ *
+ * The stored field is still called `boardLists` because renaming a key inside a
+ * synced record is how an older client comes to erase it (M0). It holds
+ * statuses; only the wire remembers the old word.
  */
-export function statusesWithBoardLists(space: Project): Status[] {
+export function statusesWithCustom(space: Project): Status[] {
   const base = statusesForSpace(space);
-  const boardLists = (space.boardLists ?? []).filter((list) => !list.archivedAt);
-  if (boardLists.length === 0) return base;
+  const custom = (space.boardLists ?? []).filter((status) => !status.archivedAt);
+  if (custom.length === 0) return base;
 
   const known = new Set(base.map((status) => status.id));
   const extra: Status[] = [];
-  // Inserted after the last `active` default so board columns read as work in
-  // progress, which is what they have always been used for.
+  // Inserted after the last `active` default so an added column reads as work
+  // in progress, which is what they have always been used for.
   let order = base.reduce((max, status) => Math.max(max, status.order), 0);
-  for (const boardList of boardLists) {
-    if (known.has(boardList.id)) continue;
+  for (const added of custom) {
+    if (known.has(added.id)) continue;
     order += 1;
     extra.push({
-      id: boardList.id,
-      label: boardList.name,
+      id: added.id,
+      label: added.name,
       color: space.color || "#8e8e93",
       order,
       group: "active",

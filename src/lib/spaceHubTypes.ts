@@ -2,14 +2,26 @@
 // Spaces themselves are derived from projects/study topics on SpacesPage; the
 // hub adds notes, activity records, and per-space customization on top.
 
+import { SPACE_VIEWS, type SpaceViewId } from "../domain/view/spaceViews";
+
 export type SpaceHubType = "project" | "personal" | "custom";
 
 // The per-space "calendar" tab was removed (PROJECT_DETAIL_REMOVE_CALENDAR_TAB
 // spec) — scheduling lives in the main Calendar page. Legacy ?tab=calendar
 // URLs fall back to "overview" because the value is no longer in SPACE_TABS.
-export type SpaceTab = "overview" | "goals" | "tasks";
+/**
+ * What the Views Bar offers (U4). Overview stays a tab because it is not a
+ * filter over Items but a summary of the Space (U7); everything after it is a
+ * view — the same engine, a different `groupBy` and `sources`
+ * (domain/view/spaceViews.ts).
+ *
+ * `tasks` and `goals` were tabs holding hand-written screens. They are the
+ * same list of Items seen through different filters, which is what made two
+ * components out of one idea.
+ */
+export type SpaceTab = "overview" | SpaceViewId;
 
-export const SPACE_TABS: SpaceTab[] = ["overview", "goals", "tasks"];
+export const SPACE_TABS: SpaceTab[] = ["overview", ...SPACE_VIEWS.map((view) => view.id)];
 
 export type SpaceSignalStatus =
   | "on_track"

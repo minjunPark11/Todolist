@@ -13,9 +13,9 @@
 import { useMemo, useState } from "react";
 import type { LearningPath, List, Project, Task, TaskDraft } from "../types";
 import { projectItems, type Item } from "../domain/view/item";
-import { patchForColumn } from "../domain/view/board";
+import { goalDropFor, patchForColumn } from "../domain/view/board";
 import { type GroupAxis, type GroupContext, type ViewSpec } from "../domain/view/viewSpec";
-import { statusesWithBoardLists } from "../domain/spaces/membership";
+import { statusesWithCustom } from "../domain/spaces/membership";
 import { DEFAULT_STATUSES } from "../domain/spaces/hierarchy";
 import { todayValue } from "../utils/date";
 import { BoardView, type BoardColumn } from "./BoardView";
@@ -40,6 +40,8 @@ interface BoardPageProps {
   onOpenTask: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: TaskDraft) => string;
+  onUpdatePath: (id: string, patch: Partial<Omit<LearningPath, "id">>) => void;
+  onMoveGoalToStatus: (pathId: string, listId?: string) => void;
   showToast: (toast: ToastState) => void;
 }
 
@@ -52,6 +54,8 @@ export function BoardPage({
   onOpenTask,
   onUpdateTask,
   onCreateTask,
+  onUpdatePath,
+  onMoveGoalToStatus,
   showToast,
 }: BoardPageProps) {
   const { t } = useT();
@@ -69,7 +73,7 @@ export function BoardPage({
   const scope = activeSpaces.some((space) => space.id === spaceId) ? spaceId : ALL_SPACES;
   const space = activeSpaces.find((candidate) => candidate.id === scope);
   const statuses = useMemo(
-    () => (space ? statusesWithBoardLists(space) : DEFAULT_STATUSES),
+    () => (space ? statusesWithCustom(space) : DEFAULT_STATUSES),
     [space],
   );
 
@@ -90,6 +94,8 @@ export function BoardPage({
       // An archived task is closed work; it belongs in the Archive, not as a
       // column on the working board.
       filter: {
+        // Children belong under their parent, not beside it — see spaceViews.
+        parentId: "",
         ...(scope ? { spaceId: scope } : {}),
         ...(axis === "quadrant" ? { sources: ["task" as const] } : {}),
       },
@@ -137,9 +143,25 @@ export function BoardPage({
   }
 
   function handleDrop(item: Item, columnId: string) {
-    // Only tasks carry the fields every axis is derived from. A goal has no
-    // priority and no workflow status, so dropping one is a no-op rather than
-    // a write that would mean something different from what it looks like.
+    // A goal carries no priority and no quadrant, so only the status axis can
+    // mean anything for one — and there its column is `boardListId`, which is
+    // a different record and a different write from a task's.
+    if (item.source === "goal") {
+      if (axis !== "status") return;
+      const goal = learningPaths.find((path) => path.id === item.sourceId);
+      if (!goal) return;
+      const drop = goalDropFor(goal, columnId, statuses);
+      if (drop.kind === "complete") {
+        onUpdatePath(goal.id, { completedAt: new Date().toISOString() });
+      } else if (drop.kind === "file") {
+        // Filing computes `boardOrder`, which the Goals tab still sorts by, so
+        // it goes through the same move the tab uses rather than a raw patch.
+        onMoveGoalToStatus(goal.id, drop.listId);
+        if (goal.completedAt) onUpdatePath(goal.id, { completedAt: undefined });
+      }
+      return;
+    }
+    // A milestone lives inside its goal; there is nothing to file it into.
     if (item.source !== "task") return;
     const task = context.taskById.get(item.sourceId);
     if (!task) return;

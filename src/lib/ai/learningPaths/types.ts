@@ -76,6 +76,12 @@ export type LearningPath = {
   // Set only when the goal is moved off its Space's default List (P4).
   // membership.goalListIdFor resolves it; projectId answers when absent.
   listId?: string;
+  /**
+   * The status the goal sits in — NOT a List, despite sitting next to one.
+   * `listId` is where the goal is stored; this is which column it shows up in
+   * (domain/spaces/customStatuses.ts, which explains why the key still says
+   * "list"). Absent means unsorted.
+   */
   boardListId?: string;
   boardOrder?: number;
   completedAt?: string; // user-asserted completion (D10)

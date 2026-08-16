@@ -25,9 +25,12 @@ type AppPagesProps = {
   appSettings: AppSettings;
   activeProjects: Project[];
   selectedProjectId: string;
-  setSelectedProjectId: (id: string) => void;
+  /** What the tree selected, as a view scope (§16). */
+  viewScope: { spaceId?: string; folderId?: string; listId?: string };
+  onClearScope: () => void;
+  onSelectSpace: (spaceId: string) => void;
   isProjectDetailOpen: boolean;
-  setIsProjectDetailOpen: (open: boolean) => void;
+  onCloseSpace: () => void;
   todayIntent: TodayIntent;
   onTodayIntentHandled: () => void;
   renderTaskDetail: () => ReactNode;
@@ -79,9 +82,11 @@ export function AppPages({
   appSettings,
   activeProjects,
   selectedProjectId,
-  setSelectedProjectId,
+  viewScope,
+  onClearScope,
+  onSelectSpace,
   isProjectDetailOpen,
-  setIsProjectDetailOpen,
+  onCloseSpace,
   todayIntent,
   onTodayIntentHandled,
   renderTaskDetail,
@@ -226,6 +231,8 @@ export function AppPages({
           onOpenTask={planner.selectTask}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
+          onUpdatePath={planner.updateLearningPath}
+          onMoveGoalToStatus={planner.moveGoalToStatus}
           showToast={showToast}
         />
         {renderTaskDetail()}
@@ -335,10 +342,10 @@ export function AppPages({
         onUpdateMilestone={planner.updateMilestone}
         onCreateGoal={planner.createLearningPath}
         onOpenGoal={openGoal}
-        onCreateBoardList={planner.createBoardList}
-        onUpdateBoardList={planner.updateBoardList}
-        onArchiveBoardList={planner.archiveBoardList}
-        onMoveGoalToBoardList={planner.moveGoalToBoardList}
+        onCreateStatus={planner.createStatus}
+        onUpdateStatus={planner.updateStatus}
+        onArchiveStatus={planner.archiveStatus}
+        onMoveGoalToStatus={planner.moveGoalToStatus}
         subtasks={planner.subtasks}
         focusSessions={planner.focusSessions}
         activeFocusSession={planner.activeFocusSession}
@@ -351,15 +358,11 @@ export function AppPages({
         taskDetail={renderTaskDetail()}
         selectedProjectId={selectedProjectId}
         detailOpen={isProjectDetailOpen}
-        onOpenProject={(id) => {
-          setSelectedProjectId(id);
-          setIsProjectDetailOpen(true);
-          planner.selectTask("");
-        }}
-        onCloseProject={() => {
-          setIsProjectDetailOpen(false);
-          planner.selectTask("");
-        }}
+        viewScope={viewScope}
+        folders={planner.folders}
+        onClearScope={onClearScope}
+        onOpenProject={onSelectSpace}
+        onCloseProject={onCloseSpace}
         onOpenTask={planner.selectTask}
         onToggleDone={planner.toggleTaskDone}
         onUpdateTask={planner.updateTask}

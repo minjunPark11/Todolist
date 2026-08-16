@@ -1,6 +1,8 @@
 import { ReactNode, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { PageId, Project, Task } from "../types";
+import type { Folder, List, PageId, Project, Task } from "../types";
+import { SpaceTree } from "./sidebar/SpaceTree";
+import type { Selection } from "../app/spaceSelection";
 import { todayValue } from "../utils/date";
 import { getTodayBuckets } from "../utils/planner";
 import { useT } from "../i18n";
@@ -33,7 +35,19 @@ interface SidebarProps {
   showCounts?: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  folders: Folder[];
+  lists: List[];
+  selection: Selection;
   onSelectProject: (projectId: string) => void;
+  onSelectList: (spaceId: string, listId: string) => void;
+  onSelectFolder: (spaceId: string, folderId: string) => void;
+  onCreateList: (spaceId: string, name: string, folderId?: string) => void;
+  onCreateFolder: (spaceId: string, name: string) => void;
+  onRenameList: (listId: string, name: string) => void;
+  onArchiveList: (listId: string) => void;
+  onRenameFolder: (folderId: string, name: string) => void;
+  onArchiveFolder: (folderId: string) => void;
+  onMoveItemToList: (itemKey: string, listId: string) => void;
   onAddProject: (name: string) => void;
   onOpenSettings: () => void;
   search: ReactNode;
@@ -154,7 +168,19 @@ export function Sidebar({
   showCounts = true,
   collapsed,
   onToggleCollapse,
+  folders,
+  lists,
+  selection,
   onSelectProject,
+  onSelectList,
+  onSelectFolder,
+  onCreateList,
+  onCreateFolder,
+  onRenameList,
+  onArchiveList,
+  onRenameFolder,
+  onArchiveFolder,
+  onMoveItemToList,
   onAddProject,
   onOpenSettings,
   search,
@@ -179,6 +205,11 @@ export function Sidebar({
     buckets.dueToday.length +
     buckets.scheduledToday.length;
   const activeProjectCount = projects.filter((project) => project.status !== "archived").length;
+  const openCountsBySpace = new Map<string, number>();
+  for (const task of tasks) {
+    if (!task.projectId || !isOpen(task)) continue;
+    openCountsBySpace.set(task.projectId, (openCountsBySpace.get(task.projectId) ?? 0) + 1);
+  }
 
   // The two screens the day actually runs on stay at the top. Everything else
   // is reached occasionally, so it moves below the project list rather than
@@ -296,25 +327,29 @@ export function Sidebar({
           <span className="side-chevron" style={{ transform: projectsOpen ? "rotate(90deg)" : "none" }}>
             &rsaquo;
           </span>
-          {t("sidebar.projectShortcuts")}
+          {t("tree.section")}
         </button>
         <MotionCollapse open={projectsOpen && !railed}>
           <div className="side-list">
-            {projects.map((project) => {
-              const count = tasks.filter((task) => task.projectId === project.id && isOpen(task)).length;
-              const active = activePage === "projects" && selectedProjectId === project.id;
-              return (
-                <button
-                  key={project.id}
-                  className={active ? "side-item active" : "side-item"}
-                  onClick={() => onSelectProject(project.id)}
-                >
-                  <span className="side-dot" style={{ backgroundColor: project.color }} />
-                  <span className="side-item-label">{project.name}</span>
-                  {count > 0 ? <span className="side-item-badge">{count}</span> : null}
-                </button>
-              );
-            })}
+            {/* The flat shortcut list this replaces could name a Space but
+                nothing inside one (U1). The tree is its superset. */}
+            <SpaceTree
+              spaces={projects}
+              folders={folders}
+              lists={lists}
+              selection={selection}
+              counts={showCounts ? openCountsBySpace : undefined}
+              onSelectSpace={onSelectProject}
+              onSelectList={onSelectList}
+              onSelectFolder={onSelectFolder}
+              onCreateList={onCreateList}
+              onCreateFolder={onCreateFolder}
+              onRenameList={onRenameList}
+              onArchiveList={onArchiveList}
+              onRenameFolder={onRenameFolder}
+              onArchiveFolder={onArchiveFolder}
+              onMoveItemToList={onMoveItemToList}
+            />
             <form
               className="side-add"
               onSubmit={(event) => {

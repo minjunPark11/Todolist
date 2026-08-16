@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FocusSession, GoalSchedule, LearningPath, List, Milestone, Project, Task, TaskDraft } from "../../types";
+import type { FocusSession, Folder, GoalSchedule, LearningPath, List, Milestone, Project, Task, TaskDraft } from "../../types";
 import type { ToastState } from "../kit";
 import type { PageId } from "../../types";
 import {
@@ -28,13 +28,13 @@ import {
 import { useSpaceHubData } from "../../hooks/useSpaceHubData";
 import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { SpaceOverviewTab } from "./SpaceOverviewTab";
-import { SpaceHorizons } from "./SpaceHorizons";
-import { SpaceGoalsTab } from "./SpaceGoalsTab";
+import { GoalQuickAdd, StatusManager } from "./SpaceViewTools";
 import { BoardView, type BoardColumn } from "../BoardView";
 import { projectItems, type Item } from "../../domain/view/item";
-import { patchForColumn } from "../../domain/view/board";
-import type { GroupContext, ViewSpec } from "../../domain/view/viewSpec";
-import { statusesWithBoardLists } from "../../domain/spaces/membership";
+import { goalDropFor, patchForColumn } from "../../domain/view/board";
+import { axisGroupIds, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
+import { showsGoals, specForSpaceView, type SpaceViewId } from "../../domain/view/spaceViews";
+import { statusesWithCustom } from "../../domain/spaces/membership";
 import { DEFAULT_STATUSES } from "../../domain/spaces/hierarchy";
 import {
   AddSpaceTaskModal,
@@ -55,14 +55,18 @@ export type SpaceDetailViewProps = {
   projects: Project[];
   // Board time axis (SPACES_BOARD_DESIGN.md D2).
   paths: LearningPath[];
+  viewScope: { spaceId?: string; folderId?: string; listId?: string };
+  folders: Folder[];
+  /** Widens the view back to the whole Space without touching the tree. */
+  onClearScope: () => void;
   onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
   onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
   onCreateGoal: (input: { goal: string; projectId: string; boardListId?: string; schedule?: GoalSchedule }) => void;
   onOpenGoal: (pathId: string, milestoneId?: string) => void;
-  onCreateBoardList: (projectId: string, name: string) => void;
-  onUpdateBoardList: (projectId: string, listId: string, patch: { name?: string; order?: number }) => void;
-  onArchiveBoardList: (projectId: string, listId: string) => void;
-  onMoveGoalToBoardList: (pathId: string, listId?: string) => void;
+  onCreateStatus: (projectId: string, name: string) => void;
+  onUpdateStatus: (projectId: string, listId: string, patch: { name?: string; order?: number }) => void;
+  onArchiveStatus: (projectId: string, listId: string) => void;
+  onMoveGoalToStatus: (pathId: string, listId?: string) => void;
   onToggleTaskDone: (taskId: string) => void;
   // Read only by the Tasks board, to resolve an Item's List. Passed rather
   // than defaulted to [] so a future grouping on that axis is not silently wrong.
@@ -98,8 +102,14 @@ type DrawerState =
 
 const DEFAULT_STATUS_IDS = new Set(DEFAULT_STATUSES.map((status) => status.id));
 
+/**
+ * `?view=` is the parameter now (U3). `?tab=` is still read so links made before
+ * this change land where they meant to; only the new name is ever written.
+ */
 function readTabFromUrl(): SpaceTab {
-  const value = new URLSearchParams(window.location.search).get("tab");
+  const params = new URLSearchParams(window.location.search);
+  const legacy = params.get("tab");
+  const value = params.get("view") ?? (legacy === "tasks" ? "board" : legacy);
   return SPACE_TABS.includes(value as SpaceTab) ? (value as SpaceTab) : "overview";
 }
 
@@ -108,14 +118,17 @@ export function SpaceDetailView({
   tasks,
   projects,
   paths,
+  viewScope,
+  folders,
+  onClearScope,
   onUpdatePath,
   onUpdateMilestone,
   onCreateGoal,
   onOpenGoal,
-  onCreateBoardList,
-  onUpdateBoardList,
-  onArchiveBoardList,
-  onMoveGoalToBoardList,
+  onCreateStatus,
+  onUpdateStatus,
+  onArchiveStatus,
+  onMoveGoalToStatus,
   onToggleTaskDone,
   lists,
   focusSessions,
@@ -167,45 +180,92 @@ export function SpaceDetailView({
   // first and handing the engine the answer keeps that one rule in one place.
   const sourceProject = sourceProjectId ? projects.find((p) => p.id === sourceProjectId) : undefined;
   const boardStatuses = useMemo(
-    () => (sourceProject ? statusesWithBoardLists(sourceProject) : DEFAULT_STATUSES),
+    () => (sourceProject ? statusesWithCustom(sourceProject) : DEFAULT_STATUSES),
     [sourceProject],
+  );
+  // Every source is projected once; which of them a view shows is its
+  // `filter.sources` (spaceViews.ts), not a second projection per screen.
+  const spaceGoals = useMemo(
+    () => paths.filter((path) => path.projectId && path.projectId === sourceProjectId),
+    [paths, sourceProjectId],
   );
   const boardItems = useMemo(
     () =>
-      projectItems({ tasks: spaceTasks, paths: [], projects, lists, today, sources: ["task"] })
+      projectItems({ tasks: spaceTasks, paths: spaceGoals, projects, lists, today })
         // Archived work belongs in the Archive, not as a column here.
         .filter((item) => item.statusId !== "archived"),
-    [spaceTasks, projects, lists, today],
+    [spaceTasks, spaceGoals, projects, lists, today],
   );
   const boardContext: GroupContext = useMemo(
     () => ({ today, taskById: new Map(spaceTasks.map((task) => [task.id, task])) }),
     [today, spaceTasks],
   );
-  const boardSpec: ViewSpec = useMemo(
-    () => ({
-      id: `space-board-${space.id}`,
-      name: tabText(t, "tasks"),
-      filter: {},
-      groupBy: "status",
-      sort: { key: "dueDate" },
-      layout: "board",
-    }),
-    [space.id, t],
-  );
-  const boardColumns: BoardColumn[] = useMemo(
+  // Same view, opened at whatever level the tree is standing on (§16). The
+  // Space level contributes no filter of its own: membership was already
+  // resolved into `spaceTasks` above, and filtering by `spaceId` again would
+  // drop the tag-claimed tasks of a Space with no project behind it.
+  const scopeFilter = useMemo(
     () =>
-      boardStatuses
-        .filter((status) => status.id !== "archived")
-        .map((status) => ({
-          id: status.id,
-          // A default status has a translation; a column the Space named does not.
-          label: DEFAULT_STATUS_IDS.has(status.id) ? t(`status.${status.id}`) : status.label,
-          color: status.color,
-        })),
-    [boardStatuses, t],
+      viewScope.listId !== undefined
+        ? { listId: viewScope.listId }
+        : viewScope.folderId !== undefined
+          ? { folderId: viewScope.folderId }
+          : {},
+    [viewScope.listId, viewScope.folderId],
+  );
+  const scopeName = useMemo(() => {
+    if (viewScope.listId !== undefined) {
+      return lists.find((list) => list.id === viewScope.listId)?.name ?? "";
+    }
+    if (viewScope.folderId !== undefined) {
+      return folders.find((folder) => folder.id === viewScope.folderId)?.name ?? "";
+    }
+    return "";
+  }, [viewScope.listId, viewScope.folderId, lists, folders]);
+
+  const activeView: SpaceViewId = tab === "overview" ? "board" : tab;
+  const boardSpec: ViewSpec = useMemo(
+    () => specForSpaceView(activeView, scopeFilter, tabText(t, activeView)),
+    [activeView, scopeFilter, t],
   );
 
+  /**
+   * A board's columns are its axis spelled out. Status columns come from the
+   * Space; horizon columns are the five fixed periods, drawn even when empty
+   * because the perspective IS the product (HORIZONS_DESIGN D8).
+   */
+  const boardColumns: BoardColumn[] = useMemo(() => {
+    if (boardSpec.groupBy === "horizon") {
+      return (axisGroupIds("horizon") ?? []).map((horizon) => ({
+        id: horizon,
+        label: t(`horizons.${horizon}`),
+      }));
+    }
+    return boardStatuses
+      .filter((status) => status.id !== "archived")
+      .map((status) => ({
+        id: status.id,
+        // A default status has a translation; a column the Space named does not.
+        label: DEFAULT_STATUS_IDS.has(status.id) ? t(`status.${status.id}`) : status.label,
+        color: status.color,
+      }));
+  }, [boardSpec.groupBy, boardStatuses, t]);
+
   function handleBoardDrop(item: Item, columnId: string) {
+    // Only the status axis has an inverse here; dropping onto a horizon would
+    // have to invent a date the user never chose (domain/view/board.ts).
+    if (boardSpec.groupBy !== "status") return;
+    if (item.source === "goal") {
+      const goal = paths.find((path) => path.id === item.sourceId);
+      if (!goal) return;
+      const drop = goalDropFor(goal, columnId, boardStatuses);
+      if (drop.kind === "complete") onUpdatePath(goal.id, { completedAt: new Date().toISOString() });
+      else if (drop.kind === "file") {
+        onMoveGoalToStatus(goal.id, drop.listId);
+        if (goal.completedAt) onUpdatePath(goal.id, { completedAt: undefined });
+      }
+      return;
+    }
     const task = boardContext.taskById.get(item.sourceId);
     if (!task) return;
     const patch = patchForColumn("status", task, columnId, { today, statuses: boardStatuses });
@@ -219,11 +279,14 @@ export function SpaceDetailView({
   const weekFocusSeconds = getWeekSpaceFocusSeconds(spaceSessions, weekStart);
   const upcoming = getUpcomingSpaceItems(spaceTasks, today);
   const recentSessions = getRecentSpaceFocusSessions(spaceSessions, 3);
-  // Tab <-> URL query sync (§3.2): pushState on change, restore on popstate.
+  // View <-> URL query sync (U3): pushState on change, restore on popstate.
   function setTab(next: SpaceTab) {
     if (next === tab) return;
     const url = new URL(window.location.href);
-    url.searchParams.set("tab", next);
+    url.searchParams.set("view", next);
+    // The old key would otherwise sit there naming a different view than the
+    // one on screen, and win on the next reload.
+    url.searchParams.delete("tab");
     window.history.pushState(null, "", url.toString());
     setTabState(next);
   }
@@ -502,21 +565,9 @@ export function SpaceDetailView({
 
       {tab === "overview" ? (
         <>
-        {/* Where this board stands across time, before the task/activity
-            cards answer "what is moving" (SPACES_BOARD_DESIGN.md D2). */}
-        <SpaceHorizons
-          boardId={space.sourceRef === "project" ? space.sourceId ?? "" : ""}
-          paths={paths}
-          tasks={tasks}
-          projects={projects}
-          onUpdatePath={onUpdatePath}
-          onUpdateMilestone={onUpdateMilestone}
-          onCreateGoal={onCreateGoal}
-          onOpenGoal={onOpenGoal}
-          onToggleTaskDone={onToggleTaskDone}
-          onOpenTask={openTaskDrawer}
-          onOpenHorizons={() => onNavigate("horizons")}
-        />
+        {/* The time axis that used to sit here is the Horizons view now: same
+            items, `groupBy:"horizon"`, one tab across (D2/U4). Overview is
+            what is moving, not where everything sits. */}
         <SpaceOverviewTab
           preset={preset}
           spaceTasks={spaceTasks}
@@ -532,32 +583,54 @@ export function SpaceDetailView({
         />
         </>
       ) : null}
-      {tab === "goals" ? (
-        <SpaceGoalsTab
-          boardId={space.sourceRef === "project" ? space.sourceId ?? "" : ""}
-          paths={paths}
-          lists={projects.find((project) => project.id === space.sourceId)?.boardLists ?? []}
-          onCreateGoal={onCreateGoal}
-          onCreateList={(name) => space.sourceId && onCreateBoardList(space.sourceId, name)}
-          onUpdateList={(listId, patch) => space.sourceId && onUpdateBoardList(space.sourceId, listId, patch)}
-          onArchiveList={(listId) => space.sourceId && onArchiveBoardList(space.sourceId, listId)}
-          onMoveGoal={onMoveGoalToBoardList}
-          onUpdatePath={onUpdatePath}
-          onOpenGoal={onOpenGoal}
-        />
-      ) : null}
-      {tab === "tasks" ? (
-        <BoardView
-          items={boardItems}
-          spec={boardSpec}
-          context={boardContext}
-          columns={boardColumns}
-          projects={projects}
-          today={today}
-          otherLabel={t("board.other")}
-          onOpenItem={(item: Item) => openTaskDrawer(item.sourceId)}
-          onDropItem={handleBoardDrop}
-        />
+      {/* One panel for every view. What differs between them is the spec, and
+          the spec is data (spaceViews.ts) — so a fourth view is a row in a
+          table, not another branch here. */}
+      {tab !== "overview" ? (
+        <>
+          <div className="sdv-view-bar">
+            {/* A narrowed board and an empty one look identical without this.
+                The scope comes from the tree, which may be collapsed or off
+                screen, so the view has to say what it is showing. */}
+            {scopeName ? (
+              <p className="sdv-scope">
+                {scopeName}
+                <button type="button" onClick={onClearScope}>{t("scope.clear")}</button>
+              </p>
+            ) : null}
+            {showsGoals(activeView) && sourceProjectId ? (
+              <>
+                <GoalQuickAdd
+                  onCreate={(goal) =>
+                    onCreateGoal({ goal, projectId: sourceProjectId, schedule: { unit: "unscheduled" } })
+                  }
+                />
+                <StatusManager
+                  statuses={sourceProject?.boardLists ?? []}
+                  onCreate={(name) => onCreateStatus(sourceProjectId, name)}
+                  onRename={(statusId, name) => onUpdateStatus(sourceProjectId, statusId, { name })}
+                  onReorder={(statusId, order) => onUpdateStatus(sourceProjectId, statusId, { order })}
+                  onArchive={(statusId) => onArchiveStatus(sourceProjectId, statusId)}
+                />
+              </>
+            ) : null}
+          </div>
+          <BoardView
+            items={boardItems}
+            spec={boardSpec}
+            context={boardContext}
+            columns={boardColumns}
+            projects={projects}
+            today={today}
+            otherLabel={t("board.other")}
+            onOpenItem={(item: Item) => {
+              if (item.source === "task") openTaskDrawer(item.sourceId);
+              else if (item.source === "goal") onOpenGoal(item.sourceId);
+              else if (item.source === "milestone") onOpenGoal(item.parentId, item.sourceId);
+            }}
+            onDropItem={handleBoardDrop}
+          />
+        </>
       ) : null}
       {/* Modals (§32) */}
       {modal.kind === "add_task" ? (

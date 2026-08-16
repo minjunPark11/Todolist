@@ -1,6 +1,7 @@
 // Calendar derived-item model (CALENDAR_DESIGN.md §1.3/§1.4).
 // Shared by CalendarView rendering and the Ollama calendar context builder.
-import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, Project, Task, TaskPriority, TaskStatus } from "../types";
+import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Project, Task, TaskPriority, TaskStatus } from "../types";
+import { projectItems } from "../domain/view/item";
 import { externalEventDate, externalEventEndDate, externalEventEndTime, externalEventStartTime } from "../lib/externalCalendars";
 import {
   externalCategoryId,
@@ -9,7 +10,7 @@ import {
   FOCUS_ACTUAL_COLOR,
   type CalendarCategory,
 } from "../lib/calendarCategories";
-import { addDays } from "./date";
+import { addDays, todayValue } from "./date";
 
 export type CalendarLayer = "task" | "deadline" | "project-deadline" | "external" | "focus-actual";
 
@@ -120,6 +121,14 @@ function projectAllowed(projectId: string, projectFilter: ProjectFilter): boolea
 export interface BuildCalendarItemsInput {
   tasks: Task[];
   projects: Project[];
+  /**
+   * Resolves each Item's List and Folder. Optional, and no caller passes it
+   * yet, because nothing the calendar draws reads them — it is the input a
+   * List- or Folder-scoped calendar would need (§16), and passing it is the
+   * whole of that change. Absent, every Item's `listId` resolves to "" and is
+   * simply unused.
+   */
+  lists?: List[];
   externalCalendars?: ExternalCalendar[];
   externalCalendarEvents?: ExternalCalendarEvent[];
   // Completed sessions become read-only "actual focus time" blocks.
@@ -137,6 +146,7 @@ export interface BuildCalendarItemsInput {
 export function buildCalendarItems({
   tasks,
   projects,
+  lists = [],
   externalCalendars = [],
   externalCalendarEvents = [],
   focusSessions = [],
@@ -169,37 +179,62 @@ export function buildCalendarItems({
     return visibleCategoryIds.has(categoryId);
   }
 
-  for (const task of tasks) {
-    if (task.status === "archived" || task.deletedAt) continue;
-    const done = task.status === "done";
-    const hasScheduledBlock = Boolean(task.scheduledDate);
+  // The task half runs on the shared projection (CLICKUP_IMPORT_DESIGN §4.1),
+  // so "one Task, different renderings" holds here as it does on the board and
+  // the timeline. What the calendar adds is not a second reading of a Task —
+  // it is the expansion of one Item into the chips its dates earn: a work
+  // block from `scheduledDate`, a marker from `dueDate`. That is presentation,
+  // and it stays here.
+  //
+  // `taskById` carries the fields no view needs but this renderer does —
+  // repeat, category, the raw status for the popover.
+  const taskById = new Map(tasks.map((entry) => [entry.id, entry]));
+  const viewItems = projectItems({
+    tasks,
+    paths: [],
+    projects,
+    lists,
+    today: todayValue(),
+    // Goals and milestones have deadlines too, and adding them here is now a
+    // one-word change. It is not this refactor's to make: the calendar has
+    // never shown them, and quietly starting to would be a new feature
+    // arriving disguised as a cleanup.
+    sources: ["task"],
+  });
+
+  for (const item of viewItems) {
+    const task = taskById.get(item.sourceId);
+    if (!task) continue;
+    if (item.statusId === "archived" || task.status === "archived") continue;
+    const done = item.done;
+    const hasScheduledBlock = Boolean(item.scheduledDate);
     // Scheduled work blocks stay on the calendar after completion so the
     // plan remains visible as a completed schedule. Completed, unscheduled
     // tasks still obey the optional Completed layer.
     if (done && !hasScheduledBlock && !layers.completed) continue;
-    if (!projectAllowed(task.projectId, projectFilter)) continue;
+    if (!projectAllowed(item.spaceId, projectFilter)) continue;
 
-    const project = projectById.get(task.projectId);
+    const project = projectById.get(item.spaceId);
     const repeating = task.repeatType !== "none";
     const taskCategoryId = resolveTaskCategoryId(task);
     if (!categoryAllowed(taskCategoryId)) continue;
     const taskCategory = categories?.get(taskCategoryId);
 
     // D1: scheduledDate drives the work-time block; startTime/endTime belong to it.
-    if (layers.task && task.scheduledDate) {
+    if (layers.task && item.scheduledDate) {
       items.push({
-        key: `task-block:${task.id}`,
+        key: `task-block:${item.sourceId}`,
         layer: "task",
         sourceType: "task",
-        sourceId: task.id,
-        title: task.title,
-        date: task.scheduledDate,
-        startTime: task.startTime || undefined,
-        endTime: task.endTime || undefined,
-        allDay: !task.startTime,
+        sourceId: item.sourceId,
+        title: item.title,
+        date: item.scheduledDate,
+        startTime: item.startTime || undefined,
+        endTime: item.endTime || undefined,
+        allDay: !item.startTime,
         color: taskCategory?.color ?? project?.color ?? LAYER_COLOR.task,
         categoryId: taskCategoryId,
-        priority: task.priority,
+        priority: item.priority,
         status: task.status,
         draggable: !done,
         repeating,
@@ -207,18 +242,18 @@ export function buildCalendarItems({
     }
 
     // D2: dueDate is always an all-day, non-draggable deadline marker.
-    if (layers.deadline && task.dueDate && (!done || layers.completed)) {
+    if (layers.deadline && item.dueDate && (!done || layers.completed)) {
       items.push({
-        key: `deadline:${task.id}`,
+        key: `deadline:${item.sourceId}`,
         layer: "deadline",
         sourceType: "task",
-        sourceId: task.id,
-        title: task.title,
-        date: task.dueDate,
+        sourceId: item.sourceId,
+        title: item.title,
+        date: item.dueDate,
         allDay: true,
         color: taskCategory?.color ?? project?.color ?? LAYER_COLOR.deadline,
         categoryId: taskCategoryId,
-        priority: task.priority,
+        priority: item.priority,
         status: task.status,
         draggable: false,
         repeating,

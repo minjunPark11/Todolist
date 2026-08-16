@@ -3,7 +3,8 @@ import type { LearningPath, List, Project, Task } from "../../types";
 import { getMatrixPosition } from "../../utils/eisenhower";
 import { collectTodayEntries } from "../../utils/todayView";
 import { makeDefaultList } from "../spaces/hierarchy";
-import { defaultListIdFor } from "../spaces/membership";
+import { defaultListIdFor, statusesWithCustom } from "../spaces/membership";
+import { statusPatch } from "./board";
 import { projectItems } from "./item";
 import {
   applyView,
@@ -310,5 +311,148 @@ describe("equivalence with the screens it replaces", () => {
     const ids = groups.flatMap((group) => group.items.map((item) => item.sourceId));
     expect(ids).toContain("here");
     expect(ids).not.toContain("elsewhere");
+  });
+});
+
+// The seam the unit tests each side of this were passing over: the board draws
+// its columns from `statusesWithCustom` while the projection resolved
+// against `statusesForSpace`, so a column the user named was rendered and then
+// could never hold anything.
+describe("columns the user named", () => {
+  const review = { id: "bl-review", name: "In review", order: 0 };
+  const spaces: Project[] = [{ ...projects[0], boardLists: [review] }, projects[1]];
+  const columnStatuses = statusesWithCustom(spaces[0]);
+
+  function project(tasks: Task[], paths: LearningPath[] = []) {
+    return projectItems({ tasks, paths, projects: spaces, lists, today: TODAY });
+  }
+
+  it("keeps a task on the column it was filed under", () => {
+    expect(project([task({ statusId: review.id })])[0].statusId).toBe(review.id);
+  });
+
+  it("survives the drop that put it there", () => {
+    // The round trip. Patch the record the way the board does, project it
+    // again, and it must land on the column it was dragged to — the assertion
+    // whose absence let the two sides drift.
+    const dragged = task({ status: "inbox" });
+    const patch = statusPatch(dragged, review.id, columnStatuses);
+    expect(project([{ ...dragged, ...patch }])[0].statusId).toBe(review.id);
+  });
+
+  it("falls back when the column is gone", () => {
+    expect(project([task({ statusId: "bl-deleted" })])[0].statusId).toBe("todo");
+  });
+
+  it("reads a goal's board column as its status", () => {
+    const items = project([], [goal({ boardListId: review.id })]);
+    expect(items.find((item) => item.source === "goal")?.statusId).toBe(review.id);
+  });
+
+  it("lets completion outrank the column", () => {
+    const items = project([], [goal({ boardListId: review.id, completedAt: NOW })]);
+    const item = items.find((entry) => entry.source === "goal");
+    expect(item?.statusId).toBe("done");
+    expect(item?.done).toBe(true);
+  });
+
+  it("falls back when a goal's column is gone", () => {
+    const items = project([], [goal({ boardListId: "bl-deleted" })]);
+    expect(items.find((item) => item.source === "goal")?.statusId).toBe("todo");
+  });
+
+  it("puts the goal and the task in one column, not two answers", () => {
+    const items = project([task({ statusId: review.id })], [goal({ boardListId: review.id })]);
+    const spec: ViewSpec = {
+      id: "columns",
+      name: "",
+      filter: {},
+      groupBy: "status",
+      sort: { key: "title" },
+      layout: "board",
+    };
+    const context: GroupContext = { today: TODAY, taskById: new Map() };
+    const column = applyView(items, spec, context).find((group) => group.id === review.id);
+    expect(column?.items.map((item) => item.source).sort()).toEqual(["goal", "task"]);
+  });
+});
+
+// §16: the same view opened at three depths. Space -> Folder -> List, and the
+// filter language says which by naming one field.
+describe("view scope", () => {
+  const inFolder: List = {
+    id: "list-experiment",
+    spaceId: "space-1",
+    folderId: "folder-drone",
+    name: "Experiment",
+    order: 1,
+    isDefault: false,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+  const alsoInFolder: List = { ...inFolder, id: "list-writing", name: "Writing", order: 2 };
+  const scoped = [...lists, inFolder, alsoInFolder];
+
+  function build(tasks: Task[]) {
+    return projectItems({ tasks, paths: [], projects, lists: scoped, today: TODAY });
+  }
+
+  it("derives the Folder from the List the Item is in", () => {
+    const [item] = build([task({ listId: inFolder.id })]);
+    expect(item.folderId).toBe("folder-drone");
+  });
+
+  it("leaves a Folderless List with no Folder", () => {
+    // D4: a List can hang straight off the Space, and "" is that answer — not
+    // a missing value.
+    const [item] = build([task()]);
+    expect(item.listId).toBe(defaultListIdFor("space-1"));
+    expect(item.folderId).toBe("");
+  });
+
+  it("narrows to a Folder across every List inside it", () => {
+    const items = build([
+      task({ id: "a", listId: inFolder.id }),
+      task({ id: "b", listId: alsoInFolder.id }),
+      task({ id: "c" }),
+    ]);
+    const matched = items.filter((item) => matchesFilter(item, { folderId: "folder-drone" }));
+    expect(matched.map((item) => item.sourceId).sort()).toEqual(["a", "b"]);
+  });
+
+  it("treats the Folderless Lists as a scope of their own", () => {
+    // `folderId: ""` is a real question — "what is not in a folder" — and has
+    // to be answerable, which is why the field is "" rather than undefined.
+    const items = build([task({ id: "a", listId: inFolder.id }), task({ id: "c" })]);
+    const matched = items.filter((item) => matchesFilter(item, { folderId: "" }));
+    expect(matched.map((item) => item.sourceId)).toEqual(["c"]);
+  });
+
+  it("gets tighter at each level", () => {
+    const items = build([
+      task({ id: "a", listId: inFolder.id }),
+      task({ id: "b", listId: alsoInFolder.id }),
+      task({ id: "c" }),
+    ]);
+    const count = (filter: Parameters<typeof matchesFilter>[1]) =>
+      items.filter((item) => matchesFilter(item, filter)).length;
+    expect(count({ spaceId: "space-1" })).toBe(3);
+    expect(count({ folderId: "folder-drone" })).toBe(2);
+    expect(count({ listId: inFolder.id })).toBe(1);
+  });
+
+  it("groups by Folder, with the Folderless items in the catch-all", () => {
+    const items = build([task({ id: "a", listId: inFolder.id }), task({ id: "c" })]);
+    const context: GroupContext = { today: TODAY, taskById: new Map() };
+    const spec: ViewSpec = {
+      id: "by-folder",
+      name: "",
+      filter: {},
+      groupBy: "folder",
+      sort: { key: "title" },
+      layout: "columns",
+    };
+    const groups = applyView(items, spec, context);
+    expect(groups.map((group) => group.id)).toEqual(["folder-drone", ""]);
   });
 });

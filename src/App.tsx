@@ -8,6 +8,7 @@ import { UpdateChecker } from "./components/UpdateChecker";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
+import { filterForSelection, parseSelection, pathForSelection, selectedSpaceId } from "./app/spaceSelection";
 import type { TodayIntent } from "./components/TodayPage";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
@@ -105,6 +106,9 @@ export default function App() {
   // Open the user's chosen default start page on boot. /inbox opens Today with
   // the triage drawer (handled by todayIntent below), so it maps to "today".
   const [activePage, setActivePage] = useState<PageId>(() => {
+    // A deep link into the tree outranks the default start page — arriving at
+    // /s/:spaceId and being shown Today would discard the link.
+    if (parseSelection(window.location.pathname).kind !== "none") return "projects";
     switch (appSettings.defaultView) {
       case "/calendar":
         return "calendar";
@@ -130,8 +134,10 @@ export default function App() {
     return hasInboxRedirect || appSettings.defaultView === "/inbox" ? "triage" : "";
   });
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [isProjectDetailOpen, setIsProjectDetailOpen] = useState(false);
+  // Where in the Space tree the user is standing. Derived from the path, never
+  // mirrored into state: the two flat fields this replaces could not say which
+  // List was open and did not survive a reload (SPACES_CLICKUP_UI_DESIGN §1).
+  // `selectSpace` / `selectList` / `clearSelection` below are the only writers.
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState("");
   const [pendingResetAllData, setPendingResetAllData] = useState(false);
@@ -162,6 +168,9 @@ export default function App() {
     }
   });
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  const selection = useMemo(() => parseSelection(currentPath), [currentPath]);
+  const selectedProjectId = selectedSpaceId(selection);
+  const isProjectDetailOpen = selection.kind !== "none";
   const searchInputRef = useRef<HTMLInputElement>(null);
   const originalTitleRef = useRef(document.title || "FocusFlow");
   const completedNotificationRef = useRef<Set<string>>(new Set());
@@ -393,6 +402,28 @@ export default function App() {
     }
     window.history[mode === "replace" ? "replaceState" : "pushState"](null, "", path);
     setCurrentPath(path);
+  }
+
+  function selectSpace(spaceId: string) {
+    planner.selectTask("");
+    navigate(pathForSelection({ kind: "space", spaceId }));
+    setActivePage("projects");
+  }
+
+  function selectList(spaceId: string, listId: string) {
+    planner.selectTask("");
+    navigate(pathForSelection({ kind: "list", spaceId, listId }));
+    setActivePage("projects");
+  }
+
+  function selectFolder(spaceId: string, folderId: string) {
+    planner.selectTask("");
+    navigate(pathForSelection({ kind: "folder", spaceId, folderId }));
+    setActivePage("projects");
+  }
+
+  function clearSelection() {
+    if (selection.kind !== "none") navigate("/app");
   }
 
   useEffect(() => {
@@ -749,8 +780,7 @@ export default function App() {
 
   function handleArchiveProject(projectId: string) {
     planner.archiveProject(projectId);
-    setIsProjectDetailOpen(false);
-    setSelectedProjectId("");
+    clearSelection();
     planner.selectTask("");
     showToast({
       message: t("app.toastProjectArchived"),
@@ -793,8 +823,7 @@ export default function App() {
       .filter((item) => item.projectId === projectId)
       .map((item) => item.id);
     planner.deleteProject(projectId);
-    setIsProjectDetailOpen(false);
-    setSelectedProjectId("");
+    clearSelection();
     planner.selectTask("");
     showToast({
       message: t("app.toastProjectDeleted"),
@@ -838,8 +867,7 @@ export default function App() {
   function confirmResetAllData() {
     planner.resetData();
     setPendingResetAllData(false);
-    setSelectedProjectId("");
-    setIsProjectDetailOpen(false);
+    clearSelection();
     planner.selectTask("");
     try {
       localStorage.removeItem("todo-planner-space-hub-v1");
@@ -872,9 +900,7 @@ export default function App() {
     }
 
     if (task.projectId) {
-      setSelectedProjectId(task.projectId);
-      setIsProjectDetailOpen(true);
-      setActivePage("projects");
+      selectSpace(task.projectId);
       return;
     }
 
@@ -882,10 +908,7 @@ export default function App() {
   }
 
   function openProjectFromCalendar(projectId: string) {
-    planner.selectTask("");
-    setSelectedProjectId(projectId);
-    setIsProjectDetailOpen(true);
-    setActivePage("projects");
+    selectSpace(projectId);
   }
 
   function viewTaskInCalendar(taskId: string) {
@@ -914,6 +937,10 @@ export default function App() {
 
   function navigateSection(page: PageId) {
     setActivePage(page);
+    // Leaving the tree drops the selection with it. Keeping /s/:spaceId in the
+    // address bar while showing Today would make the URL describe a place the
+    // user is no longer standing.
+    clearSelection();
     // Plain navigation (sidebar etc.) always shows the unfiltered calendar.
     setCalendarFocusProjectId("");
     planner.selectTask("");
@@ -955,7 +982,9 @@ export default function App() {
             task={planner.selectedTask}
             tasks={planner.tasks}
             projects={activeProjects}
+            lists={planner.lists}
             subtasks={planner.subtasks}
+            onMoveToList={planner.moveTaskToList}
             onUpdateTask={planner.updateTask}
             onRequestDeleteTask={setPendingDeleteTaskId}
             onArchiveTask={handleArchiveTask}
@@ -978,9 +1007,11 @@ export default function App() {
         appSettings={appSettings}
         activeProjects={activeProjects}
         selectedProjectId={selectedProjectId}
-        setSelectedProjectId={setSelectedProjectId}
+        viewScope={filterForSelection(selection)}
+        onClearScope={() => { if (selection.kind !== "none") selectSpace(selection.spaceId); }}
         isProjectDetailOpen={isProjectDetailOpen}
-        setIsProjectDetailOpen={setIsProjectDetailOpen}
+        onSelectSpace={selectSpace}
+        onCloseSpace={clearSelection}
         todayIntent={todayIntent}
         onTodayIntentHandled={() => setTodayIntent("")}
         renderTaskDetail={renderTaskDetail}
@@ -1080,11 +1111,34 @@ export default function App() {
         showCounts={appSettings.showSidebarCounts}
         collapsed={sidebarCollapsed}
         onToggleCollapse={toggleSidebarCollapsed}
+        selection={selection}
+        folders={planner.folders}
+        lists={planner.lists}
         onSelectProject={(projectId) => {
-          setSelectedProjectId(projectId);
-          setIsProjectDetailOpen(true);
-          navigateSection("projects");
+          selectSpace(projectId);
           setMobileMenuOpen(false);
+        }}
+        onSelectList={(spaceId, listId) => {
+          selectList(spaceId, listId);
+          setMobileMenuOpen(false);
+        }}
+        onSelectFolder={(spaceId, folderId) => {
+          selectFolder(spaceId, folderId);
+          setMobileMenuOpen(false);
+        }}
+        onCreateList={planner.createList}
+        onCreateFolder={planner.createFolder}
+        onRenameList={(listId, name) => planner.updateList(listId, { name })}
+        onArchiveList={planner.archiveList}
+        onRenameFolder={(folderId, name) => planner.updateFolder(folderId, { name })}
+        onArchiveFolder={planner.archiveFolder}
+        onMoveItemToList={(itemKey, listId) => {
+          // `Item.key` is `source:id` — the projection's own encoding, so the
+          // tree never has to know which collection a card came from.
+          const [source, id] = itemKey.split(":");
+          if (source === "task") planner.moveTaskToList(id, listId);
+          else if (source === "goal") planner.moveGoalToList(id, listId);
+          // A milestone lives inside its goal and has no List of its own.
         }}
         onAddProject={(name) => planner.addProject(name, "#0066cc")}
         onOpenSettings={() => {
@@ -1099,9 +1153,7 @@ export default function App() {
             onChange={setSearchQuery}
             onSelectTask={openTaskInOfficialPage}
             onSelectProject={(projectId) => {
-              setSelectedProjectId(projectId);
-              setIsProjectDetailOpen(true);
-              navigateSection("projects");
+              selectSpace(projectId);
               setSearchQuery("");
             }}
           />

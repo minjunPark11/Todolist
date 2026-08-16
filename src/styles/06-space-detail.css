@@ -1299,3 +1299,87 @@
   cursor: pointer;
 }
 
+
+/* Says which level the board is opened at, because the tree that decided it
+   may be collapsed or off screen. */
+.sdv-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.sdv-scope button {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent, #0066cc);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* Controls that sit above a view: what it is scoped to, and the two things
+   the Goals tab used to hold before the listing became a view. */
+.sdv-view-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sdv-view-bar .sdv-scope {
+  margin: 0;
+}
+
+.sdv-view-add {
+  display: flex;
+  gap: 6px;
+}
+
+.sdv-view-add input {
+  min-width: 180px;
+}
+
+.sdv-statuses {
+  position: relative;
+}
+
+.sdv-statuses-toggle {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 7px;
+  background: none;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.sdv-statuses-body {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 6px;
+  min-width: 260px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  padding: 10px;
+}
+
+.sdv-status-row,
+.sdv-status-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sdv-status-row input,
+.sdv-status-add input {
+  flex: 1;
+  min-width: 0;
+}
