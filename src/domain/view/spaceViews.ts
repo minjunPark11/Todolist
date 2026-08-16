@@ -44,8 +44,13 @@ export const SPACE_VIEWS: readonly SpaceViewDef[] = [
   { id: "list", groupBy: "none", layout: "list", sources: ["task", "goal"], sort: { key: "dueDate" } },
   { id: "board", groupBy: "status", layout: "board", sources: ["task"], sort: { key: "dueDate" } },
   {
+    // Grouped by List, not flat. §50C.20 asks that a row identify its List and
+    // prefers a flat table with a List column; the timeline row has no column
+    // to put one in — it is a label and a bar — so the group heading is where
+    // that context can live. Using the engine's axis beats widening the shared
+    // row for one caller.
     id: "gantt",
-    groupBy: "none",
+    groupBy: "list",
     layout: "timeline",
     sources: ["task", "goal", "milestone"],
     sort: { key: "scheduledDate" },

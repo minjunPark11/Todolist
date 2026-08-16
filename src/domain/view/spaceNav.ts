@@ -46,10 +46,7 @@ export const SPACE_NAV: readonly SpaceNavItem[] = [
  * the bar because a tab that renders nothing is worse than a tab that is not
  * there. This set shrinks as STEP 9 connects each one, and goes with the last.
  */
-export const PENDING_TASK_VIEWS: ReadonlySet<BuiltInTaskViewId> = new Set([
-  "gantt",
-  "calendar",
-]);
+export const PENDING_TASK_VIEWS: ReadonlySet<BuiltInTaskViewId> = new Set(["calendar"]);
 
 /** The level a View Bar is being drawn at. */
 export type NavScopeKind = "space" | "project" | "folder" | "list";

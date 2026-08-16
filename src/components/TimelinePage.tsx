@@ -1,22 +1,19 @@
-﻿// The timeline page (GANTT_TIMELINE_DESIGN P1, read-only).
+// The timeline page (GANTT_TIMELINE_DESIGN P1).
 //
-// Shares the board's vocabulary on purpose: same scope selector, same
-// grouping axis, same `Item[]`. Only `layout` differs — this is the engine's
-// "timeline", not a second engine.
+// What is left here after STEP 9 is the part that is ABOUT this page: which
+// Project to scope to, and which axis to group by. The timeline itself —
+// window, zoom, navigation, the undated tray, the span drag — moved into
+// `TaskGanttView`, which the Space screen mounts too. One renderer, two
+// places to open it (§50C.29).
 import { useMemo, useState } from "react";
 import type { LearningPath, List, Project, Task } from "../types";
 import { projectItems, type Item } from "../domain/view/item";
-import { patchForSpanDrag, type SpanDrag } from "../domain/view/board";
 import { groupRank, type GroupAxis, type GroupContext, type ViewSpec } from "../domain/view/viewSpec";
-import { spanForItem, spanIntersects } from "../domain/view/span";
-import { shiftWindow, timelineWindow, ZOOM_COLUMNS, type TimelineZoom } from "../domain/view/timeline";
 import { todayValue } from "../utils/date";
-import { TimelineView } from "./TimelineView";
-import { EmptyState } from "./kit";
+import { TaskGanttView } from "./TaskGanttView";
 import { useT } from "../i18n";
 
 const ALL_PROJECTS = "";
-const ZOOMS: TimelineZoom[] = ["day", "week", "month", "year"];
 // Project and List are the axes a timeline reads as rows; status would put a
 // bar's colour and its row in disagreement.
 //
@@ -44,47 +41,29 @@ export function TimelinePage({
   onOpenTask,
   onUpdateTask,
 }: TimelinePageProps) {
-  const { t, lang } = useT();
+  const { t } = useT();
   const today = todayValue();
-  const [zoom, setZoom] = useState<TimelineZoom>("week");
-  const [anchor, setAnchor] = useState<string>(today);
   const [projectId, setProjectId] = useState<string>(ALL_PROJECTS);
   const [axis, setAxis] = useState<GroupAxis>("project");
-  // D12: shown by default, and one click from gone.
-  const [showDone, setShowDone] = useState(true);
 
   const activeProjects = useMemo(
     () => projects.filter((project) => project.status !== "archived" && !project.archivedAt),
     [projects],
   );
   const scope = activeProjects.some((project) => project.id === projectId) ? projectId : ALL_PROJECTS;
-  const window = useMemo(() => timelineWindow(zoom, anchor), [zoom, anchor]);
 
   const allItems = useMemo(
     () =>
       projectItems({ tasks, paths: learningPaths, projects, lists, today }).filter(
-        (item) => item.statusId !== "archived" && (showDone || !item.done),
+        (item) => item.statusId !== "archived",
       ),
-    [tasks, learningPaths, projects, lists, today, showDone],
+    [tasks, learningPaths, projects, lists, today],
   );
 
   const scoped = useMemo(
     () => (scope ? allItems.filter((item) => item.projectId === scope) : allItems),
     [allItems, scope],
   );
-
-  // Split once: what the window can draw, and what has no dates to draw with.
-  // D4 keeps off-window items out of the grid entirely rather than as blanks.
-  const { onWindow, undated } = useMemo(() => {
-    const drawn: Item[] = [];
-    const tray: Item[] = [];
-    for (const item of scoped) {
-      const span = spanForItem(item);
-      if (!span) tray.push(item);
-      else if (spanIntersects(span, window.from, window.to)) drawn.push(item);
-    }
-    return { onWindow: drawn, undated: tray };
-  }, [scoped, window]);
 
   const context: GroupContext = useMemo(
     () => ({
@@ -108,27 +87,11 @@ export function TimelinePage({
     [axis, scope, t],
   );
 
-  const columnLabels = useMemo(
-    () => window.edges.slice(0, ZOOM_COLUMNS[zoom]).map((edge) => columnLabel(edge, zoom, lang)),
-    [window, zoom, lang],
-  );
-
   function groupLabel(groupId: string): string {
     if (!groupId) return t("timeline.ungrouped");
     if (axis === "project") return projects.find((p) => p.id === groupId)?.name ?? t("timeline.ungrouped");
     if (axis === "list") return lists.find((l) => l.id === groupId)?.name ?? t("timeline.ungrouped");
     return groupId;
-  }
-
-  const isCurrentWindow = today >= window.from && today <= window.to;
-
-  function handleDrag(item: Item, drag: SpanDrag) {
-    const task = context.taskById.get(item.sourceId);
-    if (!task) return;
-    const patch = patchForSpanDrag(task, drag);
-    // An empty patch means the drag landed where the bar already was; writing
-    // it would touch `updatedAt` and put a no-op row on the wire.
-    if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
   }
 
   return (
@@ -160,97 +123,23 @@ export function TimelinePage({
               ))}
             </select>
           </label>
-          <label className="ff-board-control">
-            <span>{t("timeline.zoom")}</span>
-            <select value={zoom} onChange={(event) => setZoom(event.target.value as TimelineZoom)}>
-              {ZOOMS.map((option) => (
-                <option key={option} value={option}>
-                  {t(`timeline.zoom.${option}`)}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
       </header>
 
-      <div className="ff-timeline-bar-controls">
-        <div className="ff-timeline-nav">
-          <button type="button" className="ff-btn ff-btn-sm" onClick={() => setAnchor(shiftWindow(window, -1))}>
-            ‹ {t("timeline.prev")}
-          </button>
-          {/* The cost of dropping horizontal scrolling: there is no scrollbar
-              to say where you are, so the way back has to be one click (D3). */}
-          <button
-            type="button"
-            className="ff-btn ff-btn-sm"
-            onClick={() => setAnchor(today)}
-            disabled={isCurrentWindow}
-          >
-            {t("timeline.today")}
-          </button>
-          <button type="button" className="ff-btn ff-btn-sm" onClick={() => setAnchor(shiftWindow(window, 1))}>
-            {t("timeline.next")} ›
-          </button>
-          <span className="ff-timeline-range">
-            {window.from} → {window.to}
-          </span>
-        </div>
-        <label className="ff-timeline-toggle">
-          <input type="checkbox" checked={showDone} onChange={(event) => setShowDone(event.target.checked)} />
-          <span>{t("timeline.showDone")}</span>
-        </label>
-      </div>
-
-      {onWindow.length === 0 && undated.length === 0 ? (
-        <EmptyState icon="📆" title={t("timeline.empty")} text={t("timeline.emptyHint")} />
-      ) : (
-        <TimelineView
-          items={onWindow}
-          spec={spec}
-          context={context}
-          window={window}
-          today={today}
-          projects={projects}
-          tasks={tasks}
-          groupLabel={groupLabel}
-          columnLabels={columnLabels}
-          selectedTaskId={selectedTaskId}
-          onOpenItem={(item) => {
-            if (item.source === "task") onOpenTask(item.sourceId);
-          }}
-          onDragItem={handleDrag}
-        />
-      )}
-
-      {undated.length > 0 ? (
-        <section className="ff-timeline-tray">
-          <h3>{t("timeline.trayTitle", { n: undated.length })}</h3>
-          <p className="ff-timeline-tray-hint">{t("timeline.trayHint")}</p>
-          <ul>
-            {undated.map((item) => (
-              <li key={item.key}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (item.source === "task") onOpenTask(item.sourceId);
-                  }}
-                >
-                  <span className="ff-dot" style={{ background: item.color }} />
-                  {item.title}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <TaskGanttView
+        items={scoped}
+        spec={spec}
+        context={context}
+        today={today}
+        projects={projects}
+        tasks={tasks}
+        groupLabel={groupLabel}
+        selectedTaskId={selectedTaskId}
+        onOpenItem={(item: Item) => {
+          if (item.source === "task") onOpenTask(item.sourceId);
+        }}
+        onUpdateTask={onUpdateTask}
+      />
     </div>
   );
-}
-
-/** Narrow screens get a shorter label, never a shorter window (D11). */
-function columnLabel(edge: string, zoom: TimelineZoom, lang: string): string {
-  if (zoom === "year") return edge.slice(0, 4);
-  if (zoom === "month") return lang === "ko" ? `${Number(edge.slice(5, 7))}월` : edge.slice(0, 7);
-  // Day and week columns are both identified by their first day.
-  return `${edge.slice(5, 7)}.${edge.slice(8, 10)}`;
 }

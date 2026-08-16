@@ -76,6 +76,7 @@ describe("navItemsForScope (§14)", () => {
       "overview",
       "list",
       "board",
+      "gantt",
       "goals",
       "horizons",
     ]);

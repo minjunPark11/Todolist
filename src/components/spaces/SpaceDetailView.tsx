@@ -29,10 +29,11 @@ import { SpaceOverviewTab } from "./SpaceOverviewTab";
 import { GoalQuickAdd, StatusManager } from "./SpaceViewTools";
 import { BoardView, type BoardColumn } from "../BoardView";
 import { TaskListView } from "../TaskListView";
+import { TaskGanttView } from "../TaskGanttView";
 import { statusPatch } from "../../domain/view/board";
 import { projectItems, type Item } from "../../domain/view/item";
 import { goalDropFor, patchForColumn } from "../../domain/view/board";
-import { axisGroupIds, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
+import { axisGroupIds, groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { showsGoals, specForSpaceView, type SpaceViewId } from "../../domain/view/spaceViews";
 import { statusesWithCustom } from "../../domain/spaces/membership";
 import { DEFAULT_STATUSES } from "../../domain/spaces/hierarchy";
@@ -202,10 +203,6 @@ export function SpaceDetailView({
         .filter((item) => item.statusId !== "archived"),
     [spaceTasks, spaceGoals, projects, lists, today],
   );
-  const boardContext: GroupContext = useMemo(
-    () => ({ today, taskById: new Map(spaceTasks.map((task) => [task.id, task])) }),
-    [today, spaceTasks],
-  );
   // Same view, opened at whatever level the tree is standing on (§16).
   //
   // The Project level contributes no filter of its own because membership was
@@ -270,6 +267,18 @@ export function SpaceDetailView({
   const boardSpec: ViewSpec = useMemo(
     () => sectionSpec ?? specForSpaceView(activeView, scopeFilter, tabText(t, activeView)),
     [sectionSpec, activeView, scopeFilter, t],
+  );
+  const boardContext: GroupContext = useMemo(
+    () => ({
+      today,
+      taskById: new Map(spaceTasks.map((task) => [task.id, task])),
+      // D10: the user's arrangement outranks the alphabet, and every view on
+      // this screen has to agree about it. `groupRank` answers undefined for
+      // an axis nobody arranged (status, horizon), so passing it always is
+      // cheaper than deciding per view which one needs it.
+      groupRank: groupRank(boardSpec.groupBy, { projects, lists, folders }),
+    }),
+    [today, spaceTasks, boardSpec.groupBy, projects, lists, folders],
   );
 
   /**
@@ -666,7 +675,21 @@ export function SpaceDetailView({
               </>
             ) : null}
           </div>
-          {tab === "list" ? (
+          {tab === "gantt" ? (
+            <TaskGanttView
+              items={boardItems}
+              spec={boardSpec}
+              context={boardContext}
+              today={today}
+              projects={projects}
+              tasks={tasks}
+              groupLabel={(groupId) =>
+                lists.find((list) => list.id === groupId)?.name ?? t("timeline.ungrouped")
+              }
+              onOpenItem={openItem}
+              onUpdateTask={onUpdateTask}
+            />
+          ) : tab === "list" ? (
             <TaskListView
               items={boardItems}
               spec={boardSpec}

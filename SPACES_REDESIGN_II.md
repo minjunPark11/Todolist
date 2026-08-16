@@ -10718,7 +10718,41 @@ typecheck 통과, 테스트 **667개** 통과. `PENDING_TASK_VIEWS`에서 `list`
 
 ### 아직 안 한 것
 
-Filter 컨트롤(§50A.13)과 Display/column settings(§50A.6)는 붙이지 않았다. Bulk action(§50A.12)은 선택 상태만 있고 동작은 없다 — §50A.12가 "지원하지 않는 Bulk Action을 UI를 맞추려고 추가하지 않는다"고 한다. Gantt·Calendar는 `PENDING_TASK_VIEWS`에 남아 있다.
+Filter 컨트롤(§50A.13)과 Display/column settings(§50A.6)는 붙이지 않았다. Bulk action(§50A.12)은 선택 상태만 있고 동작은 없다 — §50A.12가 "지원하지 않는 Bulk Action을 UI를 맞추려고 추가하지 않는다"고 한다.
+
+---
+
+### Gantt (§50C) — 완료 (2026-08-17)
+
+List와 성격이 다르다. 이건 **진짜 wiring**이었다.
+
+**두 번째 타임라인을 만들지 않았다.** `TimelinePage`에서 스코프에 무관한 부분 — 윈도우·줌·이동·미기간 트레이·span 드래그 — 을 `TaskGanttView`로 뽑고, 전역 페이지와 Space 화면이 **같은 컴포넌트를 마운트**한다(§50C.29). 페이지에 남은 것은 그 페이지에 관한 것뿐이다: 어느 Project로 좁힐지, 어느 축으로 묶을지.
+
+날짜 의미는 여기서 정하지 않는다. `spanForItem`이 이미 소유한다(`G-GANTT-01`, §0.3.5) — 날짜가 하나라도 있으면 막대가 생기고, 없으면 그리드에서 빠지며, 추론된 시작일은 표시하되 저장하지 않는다.
+
+**`groupBy`를 `"none"`에서 `"list"`로 바꿨다.** §50C.20은 행이 자기 List를 식별할 수 있어야 한다면서 flat rows + List column을 선호한다. 그런데 타임라인 행에는 컬럼이 없다 — 라벨과 막대뿐이다. 그래서 그 컨텍스트가 살 수 있는 곳은 그룹 헤딩이고, **공유 행을 호출자 하나 때문에 넓히는 것보다 엔진의 축을 쓰는 편이 낫다.**
+
+### 검증 — §50C.31
+
+start+due · due-only · no-date · dependency 네 경우를 모두 태웠다.
+
+```text
+T-GV02  Gantt만 active                        ✓
+T-GV03  왼쪽 라벨 + 오른쪽 타임라인            ✓
+T-GV05  기간에 맞는 위치와 길이                ✓
+T-GV06  날짜 없는 Task에 가짜 날짜 안 만듦     ✓ "기간 없음 (1)" 트레이로
+T-GV07  Today indicator                        ✓
+T-GV10  교차 뷰 동기화                         ✓ 리스트에서 마감일 변경 → 막대 1열 → 4열
+T-GV11  실제 Dependency만 connector로          ✓ connector path 2개
+T-GV13  공통 TaskDetail                        ✓
+§50C.20 행이 자기 List를 식별                  ✓ 그룹 헤딩 "문헌" / "실험"
+```
+
+전역 타임라인 페이지도 리팩터 후 동일하게 동작한다 — picker 2개, 줌, 그룹, 트레이 모두 유지.
+
+**직접 확인하지 못한 것:** 막대 드래그/리사이즈(T-GV09)는 HTML5 drag-and-drop이라 시뮬레이션하지 못했다. 배선은 확인했고(`draggable="true"`, `onUpdateTask` 전달) 쓰기 규칙 `patchForSpanDrag`는 단위 테스트가 덮는다.
+
+Calendar만 `PENDING_TASK_VIEWS`에 남았다.
 
 ---
 
