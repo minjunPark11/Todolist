@@ -21,9 +21,7 @@ import type { LearningPath, List, Project, Status, Task, TaskPriority } from "..
 import { blockedTaskIds } from "../tasks/dependencies";
 import { listIdFor, goalListIdFor, statusIdFor, statusesForSpace, statusesWithCustom } from "../spaces/membership";
 import { spaceIdForProject } from "../spaces/spaces";
-import { horizonForGoalSchedule, normalizeGoalSchedule } from "../horizons/goalSchedule";
-import { deriveHorizon } from "../../utils/horizons";
-import type { Horizon } from "../../utils/horizons";
+import { normalizeGoalSchedule } from "../horizons/goalSchedule";
 
 export type ItemSource = "task" | "goal" | "milestone";
 
@@ -71,8 +69,9 @@ export interface Item {
   scheduledDate: string;
   /** When it is due. */
   dueDate: string;
-  /** Which calendar period it belongs to (goals). */
-  horizon?: Horizon;
+  // A `horizon` field sat here — which of the five periods, life to day, an
+  // Item belonged to. Only the `groupBy: "horizon"` axis read it, and both it
+  // and the Horizons screen are gone.
   startTime: string;
   endTime: string;
 
@@ -180,10 +179,6 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         startDate: task.startDate,
         scheduledDate: task.scheduledDate,
         dueDate: task.dueDate,
-        // A task's period comes from the date it is meant to be worked on, or
-        // failing that its deadline — the compatibility path horizonItems has
-        // always used for tasks that predate goal schedules.
-        horizon: deriveHorizon(task.scheduledDate || task.dueDate || undefined, today),
         startTime: task.startTime,
         endTime: task.endTime,
         statusId: statusIdFor(task, spaceStatuses),
@@ -205,7 +200,6 @@ export function projectItems(input: ProjectItemsInput): Item[] {
     const listId = goalListIdFor(path, lists);
     const folderId = folders.get(listId) ?? "";
     const schedule = normalizeGoalSchedule(path.schedule, path.targetDate, today);
-    const horizon = horizonForGoalSchedule(schedule);
 
     if (wanted.has("goal")) {
       items.push({
@@ -224,7 +218,6 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         startDate: schedule && "startDate" in schedule ? schedule.startDate : "",
         scheduledDate: "",
         dueDate: path.deadlineDate ?? "",
-        horizon: horizon ?? undefined,
         startTime: "",
         endTime: "",
         statusId: goalStatusId(path, spaceStatuses),
@@ -239,13 +232,6 @@ export function projectItems(input: ProjectItemsInput): Item[] {
 
     if (!wanted.has("milestone")) continue;
     for (const milestone of path.milestones) {
-      // A milestone with no timing of its own sits where its goal sits, so a
-      // freshly written goal does not scatter its parts across the horizons.
-      const own = normalizeGoalSchedule(milestone.schedule, milestone.targetDate, today);
-      const milestoneHorizon =
-        (milestone.schedule || milestone.targetDate || milestone.deadlineDate
-          ? horizonForGoalSchedule(own)
-          : horizon) ?? undefined;
       items.push({
         key: `milestone:${path.id}:${milestone.id}`,
         source: "milestone",
@@ -260,7 +246,6 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         startDate: "",
         scheduledDate: "",
         dueDate: milestone.deadlineDate ?? "",
-        horizon: milestoneHorizon,
         startTime: "",
         endTime: "",
         statusId: milestone.completedAt ? "done" : "todo",

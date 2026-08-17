@@ -16,7 +16,7 @@
 // decision to hand the reader.
 import { spaceViewDef, type SpaceViewDef, type SpaceViewId } from "./spaceViews";
 
-export type SpaceSectionId = "overview" | "goals" | "horizons";
+export type SpaceSectionId = "overview" | "goals";
 /** Derived from the view table, so the two cannot drift apart. */
 export type BuiltInTaskViewId = SpaceViewId;
 export type SpaceNavId = SpaceSectionId | BuiltInTaskViewId;
@@ -36,7 +36,12 @@ export const SPACE_NAV: readonly SpaceNavItem[] = [
   { kind: "task-view", id: "gantt" },
   { kind: "task-view", id: "calendar" },
   { kind: "section", id: "goals" },
-  { kind: "section", id: "horizons" },
+  // A "horizons" section stood here — five time columns, life to day, that a
+  // Goal was dragged between. It is gone from the product: the perspective it
+  // sold was a cross-Space one, and a scope shows only its own goals, so what
+  // was left after v0.10.0 removed the global page was the frame without the
+  // view. A Goal still carries its schedule; the Goals section is where it is
+  // read and the detail drawer is where it is set.
 ];
 
 /**

@@ -15,7 +15,6 @@ import {
   matchesFilter,
   PRESET_ARCHIVE,
   PRESET_PLANNING,
-  presetSpaceHorizons,
   presetTodayQueue,
   type GroupContext,
   type ViewSpec,
@@ -122,7 +121,9 @@ describe("projectItems", () => {
       ],
     );
     const milestone = items.find((item) => item.source === "milestone");
-    expect(milestone?.horizon).toBe("year");
+    // The milestone inherits its goal's placement; it used to be asserted
+    // through the Item's `horizon`, which the Horizons removal took with it.
+    expect(milestone?.parentId).toBe("goal-1");
   });
 
   it("omits deleted tasks", () => {
@@ -193,7 +194,6 @@ describe("applyView grouping", () => {
   });
 
   it("exposes the columns a view must draw even when empty", () => {
-    expect(axisGroupIds("horizon")).toEqual(["life", "year", "month", "week", "day"]);
     expect(axisGroupIds("bucket")).toEqual(["now", "next", "later"]);
     expect(axisGroupIds("space")).toBeUndefined();
   });
@@ -303,12 +303,15 @@ describe("equivalence with the screens it replaces", () => {
     expect(applyView(items, PRESET_ARCHIVE, context)).toEqual([]);
   });
 
-  it("narrows Horizons to one board, which is what SpaceHorizons.tsx does by hand", () => {
+  // This asserted the same narrowing through `presetSpaceHorizons`, which went
+  // with Horizons. The property is the filter's, not that preset's, so it is
+  // checked through one that still exists.
+  it("narrows a preset to one Project", () => {
     const { items, context } = build(
       [task({ id: "here" }), task({ id: "elsewhere", projectId: "space-2" })],
       [goal()],
     );
-    const groups = applyView(items, presetSpaceHorizons("space-1"), context);
+    const groups = applyView(items, { ...PRESET_PLANNING, filter: { projectId: "space-1" } }, context);
     const ids = groups.flatMap((group) => group.items.map((item) => item.sourceId));
     expect(ids).toContain("here");
     expect(ids).not.toContain("elsewhere");

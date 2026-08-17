@@ -8,8 +8,7 @@
 // it, because statuses belong to a Project and a Space holding two of them
 // has no defined column set (§0.3.3).
 import { useMemo } from "react";
-import type { Folder, GoalSchedule, LearningPath, List, Milestone, Project, Task } from "../../types";
-import type { ToastState } from "../kit";
+import type { Folder, LearningPath, List, Project, Task } from "../../types";
 import type { SpaceTab } from "../../lib/spaceHubTypes";
 import { projectItems, type Item } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
@@ -21,7 +20,6 @@ import { TaskListView } from "../TaskListView";
 import { TaskGanttView } from "../TaskGanttView";
 import { TaskCalendarView } from "../TaskCalendarView";
 import { GoalsSection } from "./GoalsSection";
-import { HorizonsPage } from "../HorizonsPage";
 import { useT } from "../../i18n";
 
 interface SpaceScopedViewProps {
@@ -33,15 +31,9 @@ interface SpaceScopedViewProps {
   onOpenTask: (taskId: string) => void;
   onOpenGoal: (goalId: string, milestoneId?: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
-  onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
-  onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
-  onDeletePath: (pathId: string) => void;
-  onAddMilestone: (pathId: string, input: { title: string }) => void;
-  onDeleteMilestone: (pathId: string, milestoneId: string) => void;
-  onCreateTaskFromMilestone: (pathId: string, milestoneId: string, title: string) => void;
-  onCreateGoal: (input: { goal: string; projectId: string; schedule?: GoalSchedule }) => void;
-  onToggleTaskDone: (taskId: string) => void;
-  showToast: (toast: ToastState) => void;
+  // The goal-writing callbacks — create, delete, milestones, schedule — went
+  // with the Horizons branch. This view reads goals now; the Goals section's
+  // own cards and the detail drawer are where one is changed.
 }
 
 export function SpaceScopedView({
@@ -53,15 +45,6 @@ export function SpaceScopedView({
   onOpenTask,
   onOpenGoal,
   onUpdateTask,
-  onUpdatePath,
-  onUpdateMilestone,
-  onDeletePath,
-  onAddMilestone,
-  onDeleteMilestone,
-  onCreateTaskFromMilestone,
-  onCreateGoal,
-  onToggleTaskDone,
-  showToast,
 }: SpaceScopedViewProps) {
   const { t } = useT();
   const today = todayValue();
@@ -152,41 +135,17 @@ export function SpaceScopedView({
     );
   }
 
-  if (tab === "goals") {
-    return (
-      <GoalsSection
-        goals={scoped.goals}
-        tasks={scoped.tasks}
-        projects={projects}
-        // Several Projects in scope, so each card names its own (§50E.17).
-        showProjectContext
-        onOpenGoal={onOpenGoal}
-      />
-    );
-  }
-
+  // Goals is the last section the bar offers. A Horizons branch stood after
+  // this one and was the fallback; both it and the tab that reached it are
+  // gone (domain/view/spaceNav.ts).
   return (
-    <HorizonsPage
-      embedded
-      paths={scoped.goals}
+    <GoalsSection
+      goals={scoped.goals}
       tasks={scoped.tasks}
       projects={projects}
-      onCreatePath={(input) =>
-        input.projectId
-          ? onCreateGoal({ goal: input.goal, projectId: input.projectId, schedule: input.schedule })
-          : undefined
-      }
-      onUpdatePath={onUpdatePath}
-      onDeletePath={onDeletePath}
-      onAddMilestone={onAddMilestone}
-      onUpdateMilestone={onUpdateMilestone}
-      onDeleteMilestone={onDeleteMilestone}
-      onUpdateTask={onUpdateTask}
-      onToggleTaskDone={onToggleTaskDone}
-      onCreateTaskFromMilestone={onCreateTaskFromMilestone}
-      onOpenTask={onOpenTask}
+      // Several Projects in scope, so each card names its own (§50E.17).
+      showProjectContext
       onOpenGoal={onOpenGoal}
-      showToast={showToast}
     />
   );
 }

@@ -14,14 +14,12 @@
 import type { Folder, List, Project, Space, Task, TaskPriority } from "../../types";
 import { getMatrixPosition } from "../../utils/eisenhower";
 import { defaultBucketFor } from "../../utils/todayView";
-import { HORIZONS } from "../../utils/horizons";
 import type { Item, ItemSource } from "./item";
 
 export type GroupAxis =
   | "none"
   | "bucket"
   | "quadrant"
-  | "horizon"
   | "space"
   | "project"
   | "folder"
@@ -198,8 +196,6 @@ export function groupKeyFor(item: Item, axis: GroupAxis, context: GroupContext):
       return item.priority;
     case "status":
       return item.statusId;
-    case "horizon":
-      return item.horizon ?? "";
     case "dueDate":
       return item.dueDate || "";
     case "quadrant": {
@@ -219,7 +215,6 @@ export function groupKeyFor(item: Item, axis: GroupAxis, context: GroupContext):
 const AXIS_ORDER: Partial<Record<GroupAxis, readonly string[]>> = {
   bucket: ["now", "next", "later"],
   quadrant: ["I", "II", "III", "IV"],
-  horizon: HORIZONS,
   priority: ["high", "medium", "low", "none"],
 };
 
@@ -313,15 +308,6 @@ export function axisGroupIds(axis: GroupAxis): readonly string[] | undefined {
 // exist so the engine is exercised against the real shapes rather than
 // invented ones, and so the equivalence tests have something to compare.
 
-export const PRESET_HORIZONS: ViewSpec = {
-  id: "preset-horizons",
-  name: "Horizons",
-  filter: {},
-  groupBy: "horizon",
-  sort: { key: "dueDate" },
-  layout: "columns",
-};
-
 export const PRESET_PLANNING: ViewSpec = {
   id: "preset-planning",
   name: "Planning",
@@ -351,7 +337,3 @@ export function presetTodayQueue(today: string): ViewSpec {
   };
 }
 
-/** The Space detail's time axis — the 179 lines SpaceHorizons.tsx spends. */
-export function presetSpaceHorizons(projectId: string): ViewSpec {
-  return { ...PRESET_HORIZONS, id: `preset-space-horizons`, filter: { projectId }, layout: "rows" };
-}

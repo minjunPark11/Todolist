@@ -29,11 +29,10 @@ import { TaskListView } from "../TaskListView";
 import { TaskGanttView } from "../TaskGanttView";
 import { TaskCalendarView } from "../TaskCalendarView";
 import { GoalsSection } from "./GoalsSection";
-import { HorizonsPage } from "../HorizonsPage";
 import { statusPatch } from "../../domain/view/board";
 import { projectItems, type Item } from "../../domain/view/item";
 import { goalDropFor, patchForColumn } from "../../domain/view/board";
-import { axisGroupIds, groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
+import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { showsGoals, specForSpaceView, type SpaceViewId } from "../../domain/view/spaceViews";
 import { statusesWithCustom } from "../../domain/spaces/membership";
 import { activeLists, DEFAULT_STATUSES, listDisplayName } from "../../domain/spaces/hierarchy";
@@ -250,17 +249,12 @@ export function SpaceDetailView({
   );
 
   /**
-   * A board's columns are its axis spelled out. Status columns come from the
-   * Space; horizon columns are the five fixed periods, drawn even when empty
-   * because the perspective IS the product (HORIZONS_DESIGN D8).
+   * A board's columns are its axis spelled out, and the axis is the Space's
+   * statuses. A `groupBy: "horizon"` branch stood here drawing the five fixed
+   * periods; no spec this screen builds ever asked for that axis, and Horizons
+   * is gone besides.
    */
   const boardColumns: BoardColumn[] = useMemo(() => {
-    if (boardSpec.groupBy === "horizon") {
-      return (axisGroupIds("horizon") ?? []).map((horizon) => ({
-        id: horizon,
-        label: t(`horizons.${horizon}`),
-      }));
-    }
     return boardStatuses
       .filter((status) => status.id !== "archived")
       .map((status) => ({
@@ -676,28 +670,6 @@ export function SpaceDetailView({
                   ? (goal) => onCreateGoal({ goal, projectId, schedule: { unit: "unscheduled" } })
                   : undefined
               }
-            />
-          ) : tab === "horizons" ? (
-            // The Horizons screen, opened at this scope. Period anchors,
-            // carryover and the goal drag all already live there (§50F); a
-            // second implementation would be the thing to avoid.
-            <HorizonsPage
-              embedded
-              paths={spaceGoals}
-              tasks={spaceTasks}
-              projects={projects}
-              onCreatePath={(input) => onCreateGoal({ goal: input.goal, projectId: input.projectId ?? projectId, schedule: input.schedule })}
-              onUpdatePath={onUpdatePath}
-              onDeletePath={onDeletePath}
-              onAddMilestone={onAddMilestone}
-              onUpdateMilestone={onUpdateMilestone}
-              onDeleteMilestone={onDeleteMilestone}
-              onUpdateTask={onUpdateTask}
-              onToggleTaskDone={onToggleTaskDone}
-              onCreateTaskFromMilestone={onCreateTaskFromMilestone}
-              onOpenTask={openTaskDrawer}
-              onOpenGoal={onOpenGoal}
-              showToast={showToast}
             />
           ) : tab === "calendar" ? (
             <TaskCalendarView

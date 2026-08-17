@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "./date";
-import { canDropOnHorizon, dateForHorizonDrop, deriveHorizon, HORIZONS } from "./horizons";
+import { deriveHorizon } from "./horizons";
 
 const TODAY = "2026-08-14";
 
@@ -35,43 +35,4 @@ describe("deriveHorizon", () => {
     expect(deriveHorizon("2026-13", TODAY)).toBe("life");
   });
 
-  it("orders the columns widest to nearest", () => {
-    expect([...HORIZONS]).toEqual(["life", "year", "month", "week", "day"]);
-  });
-});
-
-describe("dateForHorizonDrop", () => {
-  it("round-trips: a dropped card lands in the column it was dropped on", () => {
-    // The property that actually matters — the drag writes a date, and the
-    // column is re-derived from that date (D2). If these two disagreed, cards
-    // would jump columns the moment they were released.
-    for (const horizon of HORIZONS) {
-      expect(deriveHorizon(dateForHorizonDrop(horizon, TODAY), TODAY)).toBe(horizon);
-    }
-  });
-
-  it("aims at the middle of a band, not its edge", () => {
-    // A card dropped on "week" should not be one day from falling into "day".
-    expect(dateForHorizonDrop("week", TODAY)).toBe(addDays(TODAY, 3));
-    expect(dateForHorizonDrop("life", TODAY)).toBeUndefined();
-  });
-});
-
-describe("canDropOnHorizon", () => {
-  it("lets goals and milestones go anywhere", () => {
-    for (const horizon of HORIZONS) {
-      expect(canDropOnHorizon("path", horizon)).toBe(true);
-      expect(canDropOnHorizon("milestone", horizon)).toBe(true);
-    }
-  });
-
-  it("keeps tasks out of the undated horizons", () => {
-    // Dropping a task on life/year would clear its date and drop it out of
-    // every column — a card vanishing is worse than a refused drop.
-    expect(canDropOnHorizon("task", "life")).toBe(false);
-    expect(canDropOnHorizon("task", "year")).toBe(false);
-    expect(canDropOnHorizon("task", "month")).toBe(true);
-    expect(canDropOnHorizon("task", "week")).toBe(true);
-    expect(canDropOnHorizon("task", "day")).toBe(true);
-  });
 });

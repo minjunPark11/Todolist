@@ -234,21 +234,14 @@ describe("Domain Sections keep their own Source of Truth (§27.2)", () => {
     expect(horizon).not.toBe(deriveHorizon(scheduled.deadlineDate, TODAY));
   });
 
-  it("a Task's horizon comes from its dates, with no schedule invented (T-HZ08)", () => {
+  // T-HZ08 asserted that a Task's horizon came from its dates and that no
+  // schedule was invented for it. The Item no longer carries a horizon, and
+  // Horizons is gone; what still matters is the second half — projecting a
+  // Task must not write a goal's scheduling field onto it.
+  it("invents no schedule for a Task (T-HZ08)", () => {
     const soon = task({ id: "t1", scheduledDate: TODAY });
-    const [item] = items({ tasks: [soon] });
-    expect(item.horizon).toBe(deriveHorizon(TODAY, TODAY));
+    items({ tasks: [soon] });
     expect((soon as unknown as { schedule?: unknown }).schedule).toBeUndefined();
-  });
-
-  it("a Goal and a Task can share one Horizon projection", () => {
-    const all = items({
-      tasks: [task({ id: "t1", scheduledDate: TODAY })],
-      paths: [goal({ schedule: { unit: "day", startDate: TODAY } })],
-    });
-    const horizons = all.filter((item) => item.horizon === "day").map((item) => item.source);
-    expect(horizons).toContain("task");
-    expect(horizons).toContain("goal");
   });
 });
 

@@ -12,11 +12,10 @@ import {
 import { SPACE_VIEWS } from "./spaceViews";
 
 describe("the classification (§12)", () => {
-  it("calls Goals and Horizons Sections, not Task Views", () => {
+  it("calls Goals a Section, not a Task View", () => {
     // The distinction the registry exists for: a Goal is a different record
     // with its own Source of Truth, not a Task read a different way (§26).
     expect(isSection("goals")).toBe(true);
-    expect(isSection("horizons")).toBe(true);
     expect(isSection("overview")).toBe(true);
     expect(isTaskView("board")).toBe(true);
     expect(isTaskView("list")).toBe(true);
@@ -26,7 +25,6 @@ describe("the classification (§12)", () => {
     // Absence IS the classification. A Section with a definition would be a
     // Task View wearing a different label, which is what this replaced.
     expect(viewDefForNav("goals")).toBeUndefined();
-    expect(viewDefForNav("horizons")).toBeUndefined();
     expect(viewDefForNav("overview")).toBeUndefined();
     expect(viewDefForNav("board")?.groupBy).toBe("status");
   });
@@ -83,7 +81,6 @@ describe("navItemsForScope (§14)", () => {
       "gantt",
       "calendar",
       "goals",
-      "horizons",
     ]);
   });
 
@@ -92,7 +89,6 @@ describe("navItemsForScope (§14)", () => {
       const ids = navItemsForScope(scope).map((item) => item.id);
       expect(ids).toContain("overview");
       expect(ids).toContain("goals");
-      expect(ids).toContain("horizons");
     }
   });
 });

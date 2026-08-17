@@ -173,7 +173,7 @@ export function GoalDetailDrawer({
             <button
               type="button"
               className={`hz-check${path.completedAt ? " checked" : ""}`}
-              aria-label={path.completedAt ? t("horizons.markNotDone") : t("horizons.markDone")}
+              aria-label={path.completedAt ? t("goalDetail.markNotDone") : t("goalDetail.markDone")}
               onClick={() => onUpdatePath(path.id, { completedAt: path.completedAt ? undefined : new Date().toISOString() })}
             >
               {path.completedAt ? "✓" : ""}
@@ -200,7 +200,7 @@ export function GoalDetailDrawer({
           {editing ? (
             <section className="goal-detail-form">
               <label>{t("goalDetail.title")}<input value={draft.goal} maxLength={300} onChange={(e) => setDraft({ ...draft, goal: e.target.value })} /></label>
-              <label>{t("horizons.board")}<select value={draft.projectId} onChange={(e) => setDraft({ ...draft, projectId: e.target.value, boardListId: "" })}><option value="">{t("horizons.noBoard")}</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+              <label>{t("goalDetail.board")}<select value={draft.projectId} onChange={(e) => setDraft({ ...draft, projectId: e.target.value, boardListId: "" })}><option value="">{t("goalDetail.noBoard")}</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
               {draft.projectId ? <label>{t("spaceGoals.status")}<select value={draft.boardListId} onChange={(e) => setDraft({ ...draft, boardListId: e.target.value })}><option value="">{t("spaceGoals.unsorted")}</option>{(projects.find((project) => project.id === draft.projectId)?.boardLists ?? []).filter((list) => !list.archivedAt).map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select></label> : null}
               <div className="goal-detail-grid">
                 <label>{t("goalDetail.period")}<select value={draft.scheduleUnit} onChange={(e) => setDraft({ ...draft, scheduleUnit: e.target.value as GoalSchedule["unit"] })}>{["unscheduled", "life", "year", "month", "week", "day"].map((unit) => <option key={unit} value={unit}>{t(`goalDetail.schedule.${unit}`)}</option>)}</select></label>
@@ -220,7 +220,7 @@ export function GoalDetailDrawer({
             </section>
           ) : (
             <section className="goal-detail-read">
-              <div className="goal-detail-facts"><span>{projects.find((project) => project.id === path.projectId)?.name ?? t("horizons.noBoard")}</span><span>{t(`goalDetail.schedule.${path.schedule?.unit ?? "unscheduled"}`)}</span>{path.deadlineDate ? <span>{t("goalDetail.due", { date: path.deadlineDate })}</span> : null}</div>
+              <div className="goal-detail-facts"><span>{projects.find((project) => project.id === path.projectId)?.name ?? t("goalDetail.noBoard")}</span><span>{t(`goalDetail.schedule.${path.schedule?.unit ?? "unscheduled"}`)}</span>{path.deadlineDate ? <span>{t("goalDetail.due", { date: path.deadlineDate })}</span> : null}</div>
               <section><h3>{t("common.description")}</h3><p>{path.description || t("goalDetail.emptyDescription")}</p></section>
               <section><h3>{t("goalDetail.successCriteria")}</h3><p>{path.successCriteria || t("goalDetail.emptySuccess")}</p></section>
               {path.tags?.length ? <div className="goal-tags">{path.tags.map((tag) => <span key={tag}>#{tag}</span>)}</div> : null}
@@ -230,7 +230,7 @@ export function GoalDetailDrawer({
 
           <section className="goal-detail-section">
             <h3>{t("goalDetail.milestones")}</h3>
-            <form className="goal-milestone-add" onSubmit={(event) => { event.preventDefault(); const title = newMilestone.trim(); if (!title) return; onAddMilestone(path.id, { title }); setNewMilestone(""); }}><input value={newMilestone} onChange={(e) => setNewMilestone(e.target.value)} placeholder={t("horizons.milestonePlaceholder")} /><button type="submit">{t("common.add")}</button></form>
+            <form className="goal-milestone-add" onSubmit={(event) => { event.preventDefault(); const title = newMilestone.trim(); if (!title) return; onAddMilestone(path.id, { title }); setNewMilestone(""); }}><input value={newMilestone} onChange={(e) => setNewMilestone(e.target.value)} placeholder={t("goalDetail.milestonePlaceholder")} /><button type="submit">{t("common.add")}</button></form>
             <div className="goal-milestones">{path.milestones.map((milestone) => <MilestoneRow key={milestone.id} pathId={path.id} milestone={milestone} highlighted={milestone.id === initialMilestoneId} onUpdate={onUpdateMilestone} onDelete={onDeleteMilestone} onMaterialise={onCreateTaskFromMilestone} />)}</div>
           </section>
 
@@ -285,6 +285,6 @@ function MilestoneRow({ pathId, milestone, highlighted, onUpdate, onDelete, onMa
         });
         setEditing(false);
       }}>{t("common.save")}</button><button type="button" onClick={() => setEditing(false)}>{t("common.cancel")}</button></div>
-    </> : <><strong>{milestone.title}</strong>{milestone.doneCriteria ? <p>{milestone.doneCriteria}</p> : null}<div className="goal-milestone-actions"><button type="button" onClick={() => setEditing(true)}>{t("common.edit")}</button><button type="button" onClick={() => onMaterialise(pathId, milestone.id, milestone.title)}>{t("horizons.materialise")}</button>{deleting ? <><button type="button" className="danger" onClick={() => onDelete(pathId, milestone.id)}>{t("common.confirm")}</button><button type="button" onClick={() => setDeleting(false)}>{t("common.cancel")}</button></> : <button type="button" className="danger-text" onClick={() => setDeleting(true)}>{t("common.delete")}</button>}</div></>}</div>
+    </> : <><strong>{milestone.title}</strong>{milestone.doneCriteria ? <p>{milestone.doneCriteria}</p> : null}<div className="goal-milestone-actions"><button type="button" onClick={() => setEditing(true)}>{t("common.edit")}</button><button type="button" onClick={() => onMaterialise(pathId, milestone.id, milestone.title)}>{t("goalDetail.materialise")}</button>{deleting ? <><button type="button" className="danger" onClick={() => onDelete(pathId, milestone.id)}>{t("common.confirm")}</button><button type="button" onClick={() => setDeleting(false)}>{t("common.cancel")}</button></> : <button type="button" className="danger-text" onClick={() => setDeleting(true)}>{t("common.delete")}</button>}</div></>}</div>
   </article>;
 }

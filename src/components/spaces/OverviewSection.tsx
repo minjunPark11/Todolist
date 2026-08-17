@@ -12,8 +12,6 @@ import { useMemo } from "react";
 import type { LearningPath, Task } from "../../types";
 import type { SpaceTab } from "../../lib/spaceHubTypes";
 import { goalProgress } from "../../domain/horizons/goalDetails";
-import { deriveHorizon, HORIZONS } from "../../utils/horizons";
-import { horizonForGoalSchedule, normalizeGoalSchedule } from "../../domain/horizons/goalSchedule";
 import { isTaskDone, isTaskOverdue } from "../../lib/spaceSelectors";
 import { EmptyState } from "../kit";
 import { useT } from "../../i18n";
@@ -78,22 +76,6 @@ export function OverviewSection({
   }, [tasks, today]);
 
   const activeGoals = useMemo(() => goals.filter((goal) => !goal.completedAt), [goals]);
-
-  // §50.12: the same five horizons the section itself uses, counted from the
-  // same sources — a Goal by its explicit schedule, a Task by its dates.
-  const horizonCounts = useMemo(() => {
-    const counts = new Map(HORIZONS.map((horizon) => [horizon, 0]));
-    for (const goal of activeGoals) {
-      const horizon = horizonForGoalSchedule(normalizeGoalSchedule(goal.schedule, goal.targetDate, today));
-      if (horizon) counts.set(horizon, (counts.get(horizon) ?? 0) + 1);
-    }
-    for (const task of tasks) {
-      if (isTaskDone(task)) continue;
-      const horizon = deriveHorizon(task.scheduledDate || task.dueDate || undefined, today);
-      if (horizon) counts.set(horizon, (counts.get(horizon) ?? 0) + 1);
-    }
-    return counts;
-  }, [activeGoals, tasks, today]);
 
   return (
     <div className="ovs">
@@ -215,22 +197,9 @@ export function OverviewSection({
             )}
           </section>
 
-          <section className="ovs-card">
-            <h3>
-              {t("overview.horizons")}
-              <button type="button" className="ovs-more" onClick={() => onOpenTab("horizons")}>
-                {t("overview.seeAll")}
-              </button>
-            </h3>
-            <ul className="ovs-horizons">
-              {HORIZONS.map((horizon) => (
-                <li key={horizon}>
-                  <span>{t(`horizons.${horizon}`)}</span>
-                  <strong>{horizonCounts.get(horizon) ?? 0}</strong>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {/* A Horizons card stood here: the five periods, life to day, with
+              a count each and a link to the section that drew them as columns.
+              Both are gone (domain/view/spaceNav.ts). */}
         </aside>
       </div>
 

@@ -196,15 +196,6 @@ export function SpacesPage({
             onOpenTask={onOpenTask}
             onOpenGoal={onOpenGoal}
             onUpdateTask={onUpdateTask}
-            onUpdatePath={onUpdatePath}
-            onUpdateMilestone={onUpdateMilestone}
-            onDeletePath={onDeletePath}
-            onAddMilestone={onAddMilestone}
-            onDeleteMilestone={onDeleteMilestone}
-            onCreateTaskFromMilestone={onCreateTaskFromMilestone}
-            onCreateGoal={onCreateGoal}
-            onToggleTaskDone={onToggleDone}
-            showToast={showToast}
           />
         )}
       />
