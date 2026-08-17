@@ -345,6 +345,7 @@ export function AppPages({
         onCreateStatus={planner.createStatus}
         onUpdateStatus={planner.updateStatus}
         onArchiveStatus={planner.archiveStatus}
+        spaces={planner.spaces}
         onMoveGoalToStatus={planner.moveGoalToStatus}
         onDeletePath={planner.deleteLearningPath}
         onAddMilestone={planner.addMilestone}

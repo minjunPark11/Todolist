@@ -10855,9 +10855,53 @@ T-HZ08  Task는 기존 날짜 규칙                   ✓ scheduledDate → 이
 
 typecheck 통과, 테스트 668개 통과.
 
-### STEP 10 남은 것
+### Overview (§50) · Space 화면 (§51) — 완료 (2026-08-17)
 
-Overview 재구성(§50의 KPI 4장 + Main/Aside)과 **Space 수준 화면**. 지금 `/s/:spaceId`는 유효한 경로인데 그릴 곳이 없어 카드 목록으로 떨어진다.
+**둘을 같이 했다.** §50.14가 "Overview를 Space용과 Project용으로 완전히 별도 구현하지 말라"고 하므로, 하나의 컴포넌트에 인자만 다르게 준다.
+
+```text
+OverviewSection
+├── Summary Row   Open · In Progress · Completed · Overdue   4장 고정
+└── Body
+    ├── Main      [Projects | Lists] → Recently updated
+    └── Aside     Upcoming → Goals → Horizons               순서 고정
+```
+
+**Main의 첫 카드만 레벨에 따라 바뀐다** — Space는 Projects, Project는 Lists. 나머지는 같은 컴포넌트가 같은 스코프를 읽는다.
+
+모든 숫자는 호출자가 해소한 Task 집합에서 나온다(§50.4). **자기 쿼리를 가진 Overview는 옆 화면과 다른 말을 할 수 있는 Overview다.**
+
+빈 컨테이너의 진행률은 `—`이지 100%가 아니다(§50.7) — 존재한 적 없는 완료를 보고하는 셈이 된다.
+
+### Space 화면
+
+`/s/:spaceId`가 STEP 6부터 유효한 경로였는데 그릴 것이 없어 카드 목록으로 떨어졌다. 이제 자기 화면이 있다.
+
+Project 화면의 shell과 Overview를 공유하고, 다른 것은 레벨뿐이다 — Main 첫 카드가 Projects이고 **View Bar에서 Board가 빠진다**(§0.3.3).
+
+멤버십은 Project 관계를 통해서만 계산한다(§43, T-HZ11). Task에 Space를 복사해두면 Project 이동이 한 행으로 끝나지 않는다.
+
+### 검증
+
+```text
+T-OV02  KPI 4장 한 행                         ✓ 열린 3 · 진행 1 · 완료 1 · 초과 1
+T-OV03  Main + Aside, Main이 넓음             ✓
+T-OV04  Project → Main 첫 카드가 Lists        ✓ 문헌 · 실험
+T-OV05  Space → Main 첫 카드가 Projects       ✓ 드론 배송 연구 · VR 프로젝트
+T-OV06  Aside 순서 Upcoming→Goals→Horizons    ✓
+T-OV07  Recently updated가 그 아래            ✓
+T-OV11  좁은 화면에서 Aside가 아래로, 안 사라짐 ✓ 375px, 순서 유지
+§51     Space View Bar에서 Board 제외          ✓ 개요·리스트·간트·캘린더·목표·지평
+§51     Project View Bar에는 Board 있음        ✓
+```
+
+typecheck 통과, 테스트 668개 통과.
+
+### 미뤄둔 것
+
+§50.8은 List 행 클릭이 그 List로 스코프를 좁히길 원하는데, 그 선택자는 트리가 갖고 있고 이 화면에는 없다. 지금은 List 뷰를 여는 것으로 두었다 — **스코프를 좁혔다고 주장하고 안 하는 클릭보다 실제로 가는 곳이 있는 클릭이 낫다.** 선택자를 내려주는 것이 후속 작업이다.
+
+`SpaceOverviewTab`(다음 행동·시그널·집중 시간)은 더 이상 쓰이지 않는다. §50.15가 Current Focus를 optional로 두므로 삭제 후보이나, 등가성 확인 전까지 남긴다(STEP 13).
 
 ---
 

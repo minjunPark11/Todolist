@@ -1,0 +1,198 @@
+/* Overview (SPACES_REDESIGN_II §50), shared by the Space and Project levels.
+ *
+ * Summary row, then Main + Aside. The Aside never disappears on a narrow
+ * screen — it moves below Main and keeps its order (§50.22). */
+
+.ovs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* §50.3 — four equal cards in one row. */
+.ovs-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ovs-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 84px;
+  padding: 14px 16px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+
+.ovs-metric-label {
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+}
+
+.ovs-metric-value {
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Colour is a secondary cue; the label carries the meaning (§50.3). */
+.ovs-metric.is-active .ovs-metric-value { color: var(--accent, #5856d6); }
+.ovs-metric.is-done .ovs-metric-value { color: var(--success, #34c759); }
+.ovs-metric.is-danger .ovs-metric-value { color: var(--danger, #dc2626); }
+
+/* §50.2 — Main is the wider column. */
+.ovs-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.ovs-main,
+.ovs-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.ovs-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+
+.ovs-card h3 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ovs-more {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--accent, #0066cc);
+  cursor: pointer;
+}
+
+.ovs-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* A row, not a nested card (§50.5). */
+.ovs-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--border-subtle, #f3f4f6);
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ovs-rows li:first-child .ovs-row { border-top: 0; }
+.ovs-row:hover .ovs-row-name { text-decoration: underline; }
+
+.ovs-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ovs-row-open {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #6b7280);
+  min-width: 3ch;
+  text-align: right;
+}
+
+.ovs-row-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 110px;
+  flex: none;
+}
+
+.ovs-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border-subtle, #f3f4f6);
+  overflow: hidden;
+}
+
+.ovs-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent, #0066cc);
+}
+
+.ovs-percent,
+.ovs-date {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #6b7280);
+}
+
+.ovs-date { min-width: 5ch; }
+.ovs-muted { color: var(--text-muted, #6b7280); }
+
+.ovs-none {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted, #6b7280);
+}
+
+.ovs-horizons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+}
+
+.ovs-horizons li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+}
+
+.ovs-horizons strong { font-variant-numeric: tabular-nums; }
+
+/* §50.22 — the Aside drops below Main, it does not disappear. */
+@media (max-width: 1100px) {
+  .ovs-body { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 720px) {
+  .ovs-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ovs-row-progress { width: 72px; }
+}

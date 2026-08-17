@@ -1,8 +1,15 @@
 ﻿import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import type { Folder, FocusSession, GoalSchedule, LearningPath, List, Milestone, PageId, Project, ProjectType, Subtask, Task, TaskDraft } from "../types";
 import type { ToastState } from "./kit";
+// The stored work area. Aliased because this file's local `Space` is the card
+// it derives for a Project — a different thing that had the name first.
+import type { Space as SpaceRecord } from "../types";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
+import { SpaceScreen } from "./spaces/SpaceScreen";
+import { SpaceScopedView } from "./spaces/SpaceScopedView";
 import { DeleteSpaceConfirmModal } from "./spaces/SpaceModals";
+import type { SpaceTab } from "../lib/spaceHubTypes";
+import { todayValue } from "../utils/date";
 import { useT } from "../i18n";
 import { sendAiChat } from "../lib/ai/gateway";
 import { SPACES_BRIEFING_PROMPT } from "../lib/ai/agent/prompts";
@@ -68,6 +75,8 @@ type AddSpaceDraft = {
 
 type SpacesPageProps = {
   projects: Project[];
+  /** The work areas above them, for the Space level (§51). */
+  spaces: SpaceRecord[];
   tasks: Task[];
   // The board's time axis (SPACES_BOARD_DESIGN.md D2). Passed straight
   // through to the detail hub; the card list itself has no horizon axis.
@@ -162,7 +171,9 @@ const emptyDraft: AddSpaceDraft = {
 
 export function SpacesPage({
   projects,
+  spaces,
   lists,
+  onOpenTask,
   paths,
   onUpdatePath,
   onUpdateMilestone,
@@ -205,6 +216,7 @@ export function SpacesPage({
   const [filter, setFilter] = useState<FilterType>("all");
   const [selectedSpaceId, setSelectedSpaceId] = useState("");
   const [highlightSignalId, setHighlightSignalId] = useState("");
+  const [spaceTab, setSpaceTab] = useState<SpaceTab>("overview");
   const [analysisState, setAnalysisState] = useState<AnalysisState>("baseline");
   const [aiBriefing, setAiBriefing] = useState<SpaceBriefing | null>(null);
   const [analysisHint, setAnalysisHint] = useState("");
@@ -225,24 +237,35 @@ export function SpacesPage({
   // Two sources, both planner records (SPACES_BOARD_DESIGN.md Phase S4). The
   // third — a device-local blob of custom spaces — was drained into Projects
   // on load; see lib/spaces/legacyLocalSpaces.ts.
-  const spaces = useMemo(
+  // Cards derived from Projects — NOT the stored `spaces` prop, which is the
+  // work area above them. The two shared the word until STEP 5 made one of
+  // them a record.
+  const derivedSpaces = useMemo(
     () => deriveProjectSpaces(projects, tasks, t),
     [projects, tasks, t],
   );
-  const signals = useMemo(() => deriveSignals(spaces, tasks, t), [spaces, tasks, t]);
-  const baselineBriefing = useMemo(() => buildSpaceBriefing(spaces, signals, t), [signals, spaces, t]);
+  const signals = useMemo(() => deriveSignals(derivedSpaces, tasks, t), [derivedSpaces, tasks, t]);
+  const baselineBriefing = useMemo(
+    () => buildSpaceBriefing(derivedSpaces, signals, t),
+    [signals, derivedSpaces, t],
+  );
   const activeBriefing = analysisState === "success" && aiBriefing ? aiBriefing : baselineBriefing;
-  const effectiveAnalysisState = spaces.length === 0 ? "empty" : analysisState;
+  const effectiveAnalysisState = derivedSpaces.length === 0 ? "empty" : analysisState;
   const reasonLines = activeBriefing.detailLines.length > 0 ? activeBriefing.detailLines : [t("spaces.reason.noSignals")];
   // One lookup now: the card id, the tree's id and the URL's `:spaceId` are all
   // the Project id, so there is no second namespace to fall back through.
-  const selectedSpace = spaces.find((space) => space.id === (selectedSpaceId || selectedProjectId));
-  const pendingDeleteSpace = spaces.find((space) => space.id === pendingDeleteSpaceId);
-  const pendingRenameSpace = spaces.find((space) => space.id === pendingRenameSpaceId);
+  const selectedSpace = derivedSpaces.find((space) => space.id === (selectedSpaceId || selectedProjectId));
+  const pendingDeleteSpace = derivedSpaces.find((space) => space.id === pendingDeleteSpaceId);
+  const pendingRenameSpace = derivedSpaces.find((space) => space.id === pendingRenameSpaceId);
+  // The Space the URL names, when it names one. `viewScope.spaceId` is filled
+  // only by a Space selection — a Project selection fills `projectId`.
+  const selectedSpaceRecord = viewScope.spaceId
+    ? spaces.find((space) => space.id === viewScope.spaceId && !space.archivedAt)
+    : undefined;
   const isDetailOpen = Boolean(selectedSpace) && (detailOpen || selectedSpaceId);
   const normalizedQuery = query.trim().toLowerCase();
 
-  const visibleSpaces = spaces
+  const visibleSpaces = derivedSpaces
     .filter((space) => {
       if (filter !== "all" && space.type !== filter) return false;
       if (!normalizedQuery) return true;
@@ -338,7 +361,7 @@ export function SpacesPage({
       setRenameError(t("spaces.rename.required"));
       return;
     }
-    if (spaces.some((item) => item.id !== space.id && item.name.trim().toLowerCase() === trimmed.toLowerCase())) {
+    if (derivedSpaces.some((item) => item.id !== space.id && item.name.trim().toLowerCase() === trimmed.toLowerCase())) {
       setRenameError(t("spaces.rename.duplicate"));
       return;
     }
@@ -359,7 +382,7 @@ export function SpacesPage({
   }
 
   async function analyzeSpaces() {
-    if (spaces.length === 0) return;
+    if (derivedSpaces.length === 0) return;
     setAnalysisState("loading");
     setAiBriefing(null);
     setAnalysisHint("");
@@ -378,7 +401,7 @@ export function SpacesPage({
         temperature: 0.3,
         messages: [
           { role: "system", content: SPACES_BRIEFING_PROMPT },
-          { role: "system", content: buildSpaceBriefingContext(spaces, signals) },
+          { role: "system", content: buildSpaceBriefingContext(derivedSpaces, signals) },
           { role: "user", content: t("spaces.brief.aiUserPrompt") },
         ],
       });
@@ -417,7 +440,7 @@ export function SpacesPage({
 
   function submitAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const error = validateDraft(draft, spaces, t);
+    const error = validateDraft(draft, derivedSpaces, t);
     if (error) {
       setFormError(error);
       setAddState("form_validation_error");
@@ -461,6 +484,47 @@ export function SpacesPage({
         setAddState("create_error");
       }
     }, 520);
+  }
+
+  // The Space level (§51). `/s/:spaceId` has been routable since STEP 6 and
+  // fell through to this card list for want of a screen; it has one now.
+  if (selectedSpaceRecord) {
+    return (
+      <SpaceScreen
+        space={selectedSpaceRecord}
+        projects={projects}
+        tasks={tasks}
+        goals={paths}
+        today={todayValue()}
+        tab={spaceTab}
+        onChangeTab={setSpaceTab}
+        onOpenProject={onOpenProject}
+        onOpenTask={onOpenTask}
+        onOpenGoal={onOpenGoal}
+        onBack={closeSpace}
+        renderView={(tab, scoped) => (
+          <SpaceScopedView
+            tab={tab}
+            scoped={scoped}
+            projects={projects}
+            lists={lists}
+            folders={folders}
+            onOpenTask={onOpenTask}
+            onOpenGoal={onOpenGoal}
+            onUpdateTask={onUpdateTask}
+            onUpdatePath={onUpdatePath}
+            onUpdateMilestone={onUpdateMilestone}
+            onDeletePath={onDeletePath}
+            onAddMilestone={onAddMilestone}
+            onDeleteMilestone={onDeleteMilestone}
+            onCreateTaskFromMilestone={onCreateTaskFromMilestone}
+            onCreateGoal={onCreateGoal}
+            onToggleTaskDone={onToggleDone}
+            showToast={showToast}
+          />
+        )}
+      />
+    );
   }
 
   if (isDetailOpen && selectedSpace) {
@@ -600,7 +664,7 @@ export function SpacesPage({
         </div>
         <div className="spc-signal-list">
           {signals.slice(0, 6).map((signal) => {
-            const space = spaces.find((item) => item.id === signal.spaceId);
+            const space = derivedSpaces.find((item) => item.id === signal.spaceId);
             if (!space) return null;
             return (
               <button key={signal.id} type="button" className="spc-signal-row" onClick={() => openSpace(space, signal.id)}>

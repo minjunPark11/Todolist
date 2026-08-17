@@ -25,7 +25,7 @@ import {
 } from "../../lib/spaceSelectors";
 import { useSpaceHubData } from "../../hooks/useSpaceHubData";
 import { formatDate, getWeekStart, todayValue } from "../../utils/date";
-import { SpaceOverviewTab } from "./SpaceOverviewTab";
+import { OverviewSection, type OverviewChild } from "./OverviewSection";
 import { GoalQuickAdd, StatusManager } from "./SpaceViewTools";
 import { BoardView, type BoardColumn } from "../BoardView";
 import { TaskListView } from "../TaskListView";
@@ -39,7 +39,7 @@ import { goalDropFor, patchForColumn } from "../../domain/view/board";
 import { axisGroupIds, groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { showsGoals, specForSpaceView, type SpaceViewId } from "../../domain/view/spaceViews";
 import { statusesWithCustom } from "../../domain/spaces/membership";
-import { DEFAULT_STATUSES } from "../../domain/spaces/hierarchy";
+import { activeLists, DEFAULT_STATUSES } from "../../domain/spaces/hierarchy";
 import {
   AddSpaceTaskModal,
   DeleteSpaceConfirmModal,
@@ -347,6 +347,28 @@ export function SpaceDetailView({
 
   // === Handlers (§31) ===
 
+  // The Lists of this Project, each with the Tasks that resolve to it. Rows
+  // for the Overview's first card (§50.5); membership comes from `listIdFor`
+  // via the projection rather than being counted a second way here.
+  const overviewChildren: OverviewChild[] = useMemo(() => {
+    const listIdOf = new Map(boardItems.map((item) => [item.sourceId, item.listId]));
+    return activeLists(lists, projectId).map((list) => ({
+      id: list.id,
+      name: list.name,
+      tasks: spaceTasks.filter((task) => listIdOf.get(task.id) === list.id),
+    }));
+  }, [lists, projectId, boardItems, spaceTasks]);
+
+  /**
+   * §50.8 wants a List row to narrow the scope to that List, which needs a
+   * selector this screen is not given — the tree owns it. Opening the List
+   * view, grouped by List, is the nearest true action; a click that claimed to
+   * scope and did not would be worse than one that goes somewhere real.
+   */
+  function openListRow() {
+    setTab("list");
+  }
+
   /** One route into the shared detail surface, whatever view opened it (§49A.4). */
   function openItem(item: Item) {
     if (item.source === "task") openTaskDrawer(item.sourceId);
@@ -604,17 +626,18 @@ export function SpaceDetailView({
         {/* The time axis that used to sit here is the Horizons view now: same
             items, `groupBy:"horizon"`, one tab across (D2/U4). Overview is
             what is moving, not where everything sits. */}
-        <SpaceOverviewTab
-          preset={preset}
-          spaceTasks={spaceTasks}
-          activities={activities}
-          recentSessions={recentSessions}
+        {/* §50.14: the same Overview the Space screen mounts. Only the Main
+            column's first card changes with the level — Lists here, Projects
+            there — so the two are one component with a different argument. */}
+        <OverviewSection
+          tasks={spaceTasks}
+          goals={spaceGoals}
+          today={today}
+          childLabel={t("overview.lists")}
+          children={overviewChildren}
+          onOpenChild={openListRow}
           onOpenTask={openTaskDrawer}
-          onToggleDone={handleCompleteTask}
-          onStartFocus={handleStartFocus}
-          onAddTask={() => setModal({ kind: "add_task" })}
-          onOpenSession={(sessionId) => setDrawer({ kind: "session", sessionId })}
-          onOpenFocusPage={() => onNavigate("focus")}
+          onOpenGoal={onOpenGoal}
           onOpenTab={setTab}
         />
         </>
