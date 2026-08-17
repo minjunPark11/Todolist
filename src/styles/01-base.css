@@ -1796,23 +1796,72 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
-/* Row controls stay out of the way until the row is under the pointer or the
-   keyboard, so the tree reads as names rather than as a toolbar. */
-.spt-act {
+/* One control per row, not a toolbar of them. Three 16x14 glyphs revealed on
+   hover used to sit here: under WCAG 2.5.8's 24x24 minimum, and unreachable
+   without a pointer. The button stays visible — dimmed until the row is under
+   the pointer or the keyboard, so the tree still reads as names. */
+.spt-menu {
+  position: relative;
   flex: 0 0 auto;
-  border: 0;
-  background: none;
-  padding: 2px 3px;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 0.72rem;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0;
 }
 
-.spt-row:hover .spt-act,
-.spt-act:focus-visible {
+.spt-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.45;
+}
+
+.spt-row:hover .spt-menu-btn,
+.spt-menu-btn:hover,
+.spt-menu-btn:focus-visible,
+.spt-menu-btn[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
   opacity: 1;
+}
+
+.spt-menu-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 132px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: #2a2a2e;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.spt-menu-item {
+  min-height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  padding: 6px 10px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.78rem;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.spt-menu-item:hover,
+.spt-menu-item:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 .spt-children {
@@ -1862,12 +1911,14 @@ textarea {
   font-size: 0.8rem;
 }
 
+/* A List row has no twisty, so without this its label starts where its
+   PARENT's label does and the level disappears — the nesting indent and the
+   missing 18px twisty cancelled each other out exactly. The pad stands in for
+   the twisty, which is what puts the row one step in from the Project holding
+   it. Indentation is the only thing carrying depth here, so it has to be
+   right. */
 .spt-list-row .spt-label {
   padding-left: 22px;
-}
-
-.spt-children .spt-list-row .spt-label {
-  padding-left: 4px;
 }
 
 /* The one row in the tree that can receive a card. */

@@ -57,6 +57,7 @@ export const ko: Dictionary = {
   "scope.clear": "전체 보기",
   "tree.expand": "펼치기",
   "tree.collapse": "접기",
+  "tree.more": "더 보기",
   "tree.rename": "이름 바꾸기",
   "tree.renameFolder": "폴더 이름",
   "tree.listName": "리스트 이름",

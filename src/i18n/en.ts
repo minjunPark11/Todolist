@@ -57,6 +57,7 @@ export const en: Dictionary = {
   "scope.clear": "Show all",
   "tree.expand": "Expand",
   "tree.collapse": "Collapse",
+  "tree.more": "More actions",
   "tree.rename": "Rename",
   "tree.renameFolder": "Folder name",
   "tree.listName": "List name",

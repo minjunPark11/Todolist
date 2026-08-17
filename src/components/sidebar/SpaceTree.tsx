@@ -56,6 +56,78 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
+interface RowAction {
+  id: string;
+  label: string;
+  onSelect: () => void;
+}
+
+/**
+ * One target per row instead of three.
+ *
+ * The actions used to sit on the row as bare glyphs — 16x14px and transparent
+ * until hover. That is under WCAG 2.5.8's 24x24 minimum, and hover is a
+ * gesture a touch device does not have, so rename and archive had no reachable
+ * path at all there. A single always-visible button carries them now: the row
+ * still reads as a name, and what it can do is one press away on any input.
+ *
+ * Which actions a row gets is still the row's decision — an action that would
+ * refuse is not passed in, so the menu never offers one that cannot run
+ * (H-INV-06).
+ */
+function RowMenu({ actions }: { actions: RowAction[] }) {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+
+  if (actions.length === 0) return null;
+
+  return (
+    <div className="spt-menu">
+      <button
+        type="button"
+        className="spt-menu-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t("tree.more")}
+        title={t("tree.more")}
+        onClick={() => setOpen((value) => !value)}
+      >
+        ⋯
+      </button>
+      {open ? (
+        <div
+          className="spt-menu-list"
+          role="menu"
+          // focusout bubbles, so this closes on the same gesture that dismisses
+          // any menu — moving focus out of it — without a document listener.
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setOpen(false);
+          }}
+        >
+          {actions.map((action, index) => (
+            <button
+              key={action.id}
+              type="button"
+              role="menuitem"
+              className="spt-menu-item"
+              autoFocus={index === 0}
+              onClick={() => {
+                setOpen(false);
+                action.onSelect();
+              }}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Inline, because a modal to name a list is more ceremony than the act (§4). */
 function InlineAdd({ label, placeholder, onSubmit }: { label: string; placeholder: string; onSubmit: (name: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -145,12 +217,14 @@ function ListRow({ list, spaceId, projectId, selection, onSelect, onRename, onAr
       <button type="button" className="spt-label" onClick={onSelect}>
         {list.name}
       </button>
-      <button type="button" className="spt-act" title={t("tree.rename")} onClick={() => setRenaming(true)}>✎</button>
-      {/* The default List is the floor an Item falls back to (D5), so it has no
-          archive control rather than one that silently refuses. */}
-      {list.isDefault ? null : (
-        <button type="button" className="spt-act" title={t("common.archive")} onClick={onArchive}>⌫</button>
-      )}
+      <RowMenu
+        actions={[
+          { id: "rename", label: t("tree.rename"), onSelect: () => setRenaming(true) },
+          // The default List is the floor an Item falls back to (D5), so it has
+          // no archive action rather than one that silently refuses.
+          ...(list.isDefault ? [] : [{ id: "archive", label: t("common.archive"), onSelect: onArchive }]),
+        ]}
+      />
     </div>
   );
 }
@@ -208,29 +282,23 @@ export function SpaceTree({
                 {area.name}
               </button>
               {counts && areaCount > 0 ? <span className="spt-count">{areaCount}</span> : null}
-              <button
-                type="button"
-                className="spt-act"
-                title={t("tree.rename")}
-                onClick={() => {
-                  const name = window.prompt(t("tree.renameSpace"), area.name);
-                  if (name && name.trim()) onRenameSpace(area.id, name.trim());
-                }}
-              >
-                ✎
-              </button>
-              {/* H-INV-06: a Space holding Projects is not deletable, so the
-                  control is absent rather than one that refuses on click. */}
-              {areaProjects.length === 0 ? (
-                <button
-                  type="button"
-                  className="spt-act"
-                  title={t("common.archive")}
-                  onClick={() => onArchiveSpace(area.id)}
-                >
-                  ⌫
-                </button>
-              ) : null}
+              <RowMenu
+                actions={[
+                  {
+                    id: "rename",
+                    label: t("tree.rename"),
+                    onSelect: () => {
+                      const name = window.prompt(t("tree.renameSpace"), area.name);
+                      if (name && name.trim()) onRenameSpace(area.id, name.trim());
+                    },
+                  },
+                  // H-INV-06: a Space holding Projects is not deletable, so the
+                  // action is absent rather than one that refuses on click.
+                  ...(areaProjects.length === 0
+                    ? [{ id: "archive", label: t("common.archive"), onSelect: () => onArchiveSpace(area.id) }]
+                    : []),
+                ]}
+              />
             </div>
             {!areaOpen ? null : (
       <div className="spt-children">
@@ -264,34 +332,26 @@ export function SpaceTree({
               </button>
               {counts && count > 0 ? <span className="spt-count">{count}</span> : null}
               {/* The card grid's row menu lived here in everything but name.
-                  Moving it onto the row is what let that screen go (U1). */}
-              <button
-                type="button"
-                className="spt-act"
-                title={space.pinned ? t("tree.unpin") : t("tree.pin")}
-                onClick={() => onTogglePinProject(space.id)}
-              >
-                {space.pinned ? "★" : "☆"}
-              </button>
-              <button
-                type="button"
-                className="spt-act"
-                title={t("tree.rename")}
-                onClick={() => {
-                  const name = window.prompt(t("tree.renameProject"), space.name);
-                  if (name && name.trim()) onRenameProject(space.id, name.trim());
-                }}
-              >
-                ✎
-              </button>
-              <button
-                type="button"
-                className="spt-act"
-                title={t("common.archive")}
-                onClick={() => onArchiveProject(space.id)}
-              >
-                ⌫
-              </button>
+                  Moving it onto the row is what let that screen go (U1) — and
+                  it is a menu again, rather than three glyphs too small to hit. */}
+              <RowMenu
+                actions={[
+                  {
+                    id: "pin",
+                    label: space.pinned ? t("tree.unpin") : t("tree.pin"),
+                    onSelect: () => onTogglePinProject(space.id),
+                  },
+                  {
+                    id: "rename",
+                    label: t("tree.rename"),
+                    onSelect: () => {
+                      const name = window.prompt(t("tree.renameProject"), space.name);
+                      if (name && name.trim()) onRenameProject(space.id, name.trim());
+                    },
+                  },
+                  { id: "archive", label: t("common.archive"), onSelect: () => onArchiveProject(space.id) },
+                ]}
+              />
             </div>
 
             {open ? (
@@ -321,11 +381,19 @@ export function SpaceTree({
                         >
                           {folder.name}
                         </button>
-                        <button type="button" className="spt-act" title={t("tree.rename")} onClick={() => {
-                          const name = window.prompt(t("tree.renameFolder"), folder.name);
-                          if (name && name.trim()) onRenameFolder(folder.id, name.trim());
-                        }}>✎</button>
-                        <button type="button" className="spt-act" title={t("common.archive")} onClick={() => onArchiveFolder(folder.id)}>⌫</button>
+                        <RowMenu
+                          actions={[
+                            {
+                              id: "rename",
+                              label: t("tree.rename"),
+                              onSelect: () => {
+                                const name = window.prompt(t("tree.renameFolder"), folder.name);
+                                if (name && name.trim()) onRenameFolder(folder.id, name.trim());
+                              },
+                            },
+                            { id: "archive", label: t("common.archive"), onSelect: () => onArchiveFolder(folder.id) },
+                          ]}
+                        />
                       </div>
                       {folderOpen ? (
                         <div className="spt-children">
