@@ -25,6 +25,8 @@ interface SpaceTreeProps {
   selection: Selection;
   /** Open task count per PROJECT id; a Space sums the ones under it. */
   counts?: Map<string, number>;
+  /** The same, per LIST id; a Folder sums the Lists inside it. */
+  listCounts?: Map<string, number>;
   onSelectSpace: (spaceId: string) => void;
   onSelectProject: (projectId: string) => void;
   onCreateSpace: (name: string) => void;
@@ -164,11 +166,13 @@ function InlineAdd({ label, placeholder, onSubmit }: { label: string; placeholde
   );
 }
 
-function ListRow({ list, spaceId, projectId, selection, onSelect, onRename, onArchive, onDropItem }: {
+function ListRow({ list, spaceId, projectId, selection, count, onSelect, onRename, onArchive, onDropItem }: {
   list: List;
   spaceId: string;
   projectId: string;
   selection: Selection;
+  /** Undefined when counts are switched off, which is not the same as zero. */
+  count?: number;
   onSelect: () => void;
   onRename: (name: string) => void;
   onArchive: () => void;
@@ -223,6 +227,7 @@ function ListRow({ list, spaceId, projectId, selection, onSelect, onRename, onAr
       <button type="button" className="spt-label" onClick={onSelect}>
         {displayName}
       </button>
+      {count ? <span className="spt-count">{count}</span> : null}
       <RowMenu
         actions={[
           { id: "rename", label: t("tree.rename"), onSelect: () => setRenaming(true) },
@@ -236,7 +241,7 @@ function ListRow({ list, spaceId, projectId, selection, onSelect, onRename, onAr
 }
 
 export function SpaceTree({
-  workAreas, projects, folders, lists, selection, counts,
+  workAreas, projects, folders, lists, selection, counts, listCounts,
   onSelectSpace, onSelectProject, onCreateSpace, onCreateProject,
   onRenameSpace, onArchiveSpace, onRenameProject, onArchiveProject, onTogglePinProject,
   onSelectList, onSelectFolder, onCreateList, onCreateFolder,
@@ -365,6 +370,11 @@ export function SpaceTree({
                 {spaceFolders.map((folder) => {
                   const folderOpen = openFolders.has(folder.id);
                   const folderRow: Selection = { kind: "folder", spaceId, projectId: space.id, folderId: folder.id };
+                  // Summed from the Lists inside, the same way a Space sums its
+                  // Projects — otherwise closing a Folder hides its numbers.
+                  const folderCount = listCounts
+                    ? listsInFolder(lists, folder.id).reduce((sum, list) => sum + (listCounts.get(list.id) ?? 0), 0)
+                    : 0;
                   return (
                     <div key={folder.id} className="spt-folder">
                       <div className={`spt-row spt-folder-row${isSelected(selection, folderRow) ? " is-selected" : ""}`}>
@@ -387,6 +397,7 @@ export function SpaceTree({
                         >
                           {folder.name}
                         </button>
+                        {folderCount ? <span className="spt-count">{folderCount}</span> : null}
                         <RowMenu
                           actions={[
                             {
@@ -410,6 +421,7 @@ export function SpaceTree({
                               spaceId={spaceId}
                               projectId={space.id}
                               selection={selection}
+                              count={listCounts?.get(list.id)}
                               onSelect={() => onSelectList(space.id, list.id)}
                               onRename={(name) => onRenameList(list.id, name)}
                               onArchive={() => onArchiveList(list.id)}
@@ -438,6 +450,7 @@ export function SpaceTree({
                         spaceId={spaceId}
                         projectId={space.id}
                         selection={selection}
+                        count={listCounts?.get(list.id)}
                         onSelect={() => onSelectList(space.id, list.id)}
                         onRename={(name) => onRenameList(list.id, name)}
                         onArchive={() => onArchiveList(list.id)}

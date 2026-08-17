@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { Folder, List, PageId, Project, Space, Task } from "../types";
 import { SpaceTree } from "./sidebar/SpaceTree";
 import type { Selection } from "../app/spaceSelection";
+import { listIdFor } from "../domain/spaces/membership";
 import { todayValue } from "../utils/date";
 import { getTodayBuckets } from "../utils/planner";
 import { useT } from "../i18n";
@@ -215,9 +216,17 @@ export function Sidebar({
     buckets.dueToday.length +
     buckets.scheduledToday.length;
   const openCountsBySpace = new Map<string, number>();
+  // A second map rather than deriving the Project number by summing this one.
+  // `listIdFor` answers "" for a Task whose Project has no List at all, and an
+  // archived List keeps its Tasks — so the sum is not always the Project's
+  // total, and the badge a user already reads must not start drifting to make
+  // a new one easier to compute.
+  const openCountsByList = new Map<string, number>();
   for (const task of tasks) {
     if (!task.projectId || !isOpen(task)) continue;
     openCountsBySpace.set(task.projectId, (openCountsBySpace.get(task.projectId) ?? 0) + 1);
+    const listId = listIdFor(task, lists);
+    if (listId) openCountsByList.set(listId, (openCountsByList.get(listId) ?? 0) + 1);
   }
 
   // The two screens the day actually runs on stay at the top. Everything else
@@ -356,6 +365,7 @@ export function Sidebar({
               lists={lists}
               selection={selection}
               counts={showCounts ? openCountsBySpace : undefined}
+              listCounts={showCounts ? openCountsByList : undefined}
               onSelectSpace={onSelectSpace}
               onSelectProject={onSelectProject}
               onCreateSpace={onCreateSpace}
