@@ -16,7 +16,7 @@ import { projectItems, type Item } from "../domain/view/item";
 import { goalDropFor, patchForColumn } from "../domain/view/board";
 import { type GroupAxis, type GroupContext, type ViewSpec } from "../domain/view/viewSpec";
 import { statusesWithCustom } from "../domain/spaces/membership";
-import { DEFAULT_STATUSES } from "../domain/spaces/hierarchy";
+import { DEFAULT_STATUSES, statusDisplayLabel } from "../domain/spaces/hierarchy";
 import { todayValue } from "../utils/date";
 import { BoardView, type BoardColumn } from "./BoardView";
 import { EmptyState, type ToastState } from "./kit";
@@ -25,7 +25,6 @@ import { useT } from "../i18n";
 
 const ALL_PROJECTS = "";
 
-const DEFAULT_STATUS_IDS = new Set(DEFAULT_STATUSES.map((status) => status.id));
 
 // The axes this board offers. Both are droppable, which is the point: an axis
 // you can only look at is a report, not a board.
@@ -123,10 +122,8 @@ export function BoardPage({
     return statuses
       .filter((status) => status.id !== "archived")
       .map((status) => ({
-        // A default status has a translation; a column the user named is
-        // already in their own words and must not be overwritten by one.
         id: status.id,
-        label: DEFAULT_STATUS_IDS.has(status.id) ? t(`status.${status.id}`) : status.label,
+        label: statusDisplayLabel(status, t),
         color: status.color,
       }));
   }, [axis, statuses, t]);

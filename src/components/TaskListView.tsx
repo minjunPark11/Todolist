@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 import type { List, Status, Task, TaskPriority } from "../types";
 import type { Item } from "../domain/view/item";
 import { applyView, type GroupAxis, type GroupContext, type SortKey, type ViewSpec } from "../domain/view/viewSpec";
-import { listDisplayName } from "../domain/spaces/hierarchy";
+import { listDisplayName, statusDisplayLabel } from "../domain/spaces/hierarchy";
 import { EmptyState } from "./kit";
 import { useT } from "../i18n";
 
@@ -162,7 +162,10 @@ export function TaskListView({
                     item={item}
                     statuses={statuses}
                     listName={listName.get(item.listId) ?? ""}
-                    statusLabel={statusById.get(item.statusId)?.label ?? item.statusId}
+                    statusLabel={(() => {
+                      const status = statusById.get(item.statusId);
+                      return status ? statusDisplayLabel(status, t) : item.statusId;
+                    })()}
                     today={today}
                     isSelected={selectedTaskId === item.sourceId}
                     isChecked={selected.has(item.key)}
@@ -264,7 +267,7 @@ function TaskRow({
           >
             {statuses.map((status) => (
               <option key={status.id} value={status.id}>
-                {status.label}
+                {statusDisplayLabel(status, t)}
               </option>
             ))}
           </select>

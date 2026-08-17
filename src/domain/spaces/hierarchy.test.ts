@@ -18,6 +18,7 @@ import {
   sanitizeFolder,
   sanitizeList,
   shouldRevealLists,
+  statusDisplayLabel,
   statusesFor,
 } from "./hierarchy";
 
@@ -165,6 +166,26 @@ describe("listDisplayName", () => {
 
   it("answers for a List that is not there, so callers need no second branch", () => {
     expect(listDisplayName(undefined, LABEL)).toBe("");
+  });
+});
+
+describe("statusDisplayLabel", () => {
+  const t = (key: string) => `t:${key}`;
+
+  it("translates a default status by its id", () => {
+    expect(statusDisplayLabel(DEFAULT_STATUSES[0], t)).toBe("t:status.inbox");
+    expect(statusDisplayLabel({ id: "done", label: "Done" }, t)).toBe("t:status.done");
+  });
+
+  it("leaves a column the user named alone", () => {
+    // Their words already — a translation would overwrite them.
+    expect(statusDisplayLabel({ id: "bl-review", label: "In review" }, t)).toBe("In review");
+  });
+
+  it("gives every default an answer, so no column falls back to English", () => {
+    for (const status of DEFAULT_STATUSES) {
+      expect(statusDisplayLabel(status, t)).toBe(`t:status.${status.id}`);
+    }
   });
 });
 

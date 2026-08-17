@@ -35,7 +35,7 @@ import { goalDropFor, patchForColumn } from "../../domain/view/board";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { showsGoals, specForSpaceView, type SpaceViewId } from "../../domain/view/spaceViews";
 import { statusesWithCustom } from "../../domain/spaces/membership";
-import { activeLists, DEFAULT_STATUSES, listDisplayName } from "../../domain/spaces/hierarchy";
+import { activeLists, DEFAULT_STATUSES, listDisplayName, statusDisplayLabel } from "../../domain/spaces/hierarchy";
 import {
   AddSpaceTaskModal,
   DeleteSpaceConfirmModal,
@@ -105,7 +105,6 @@ type DrawerState =
   | { kind: "session"; sessionId: string }
   | { kind: "settings" };
 
-const DEFAULT_STATUS_IDS = new Set(DEFAULT_STATUSES.map((status) => status.id));
 
 /**
  * `?view=` is the parameter now (U3). `?tab=` is still read so links made before
@@ -259,8 +258,7 @@ export function SpaceDetailView({
       .filter((status) => status.id !== "archived")
       .map((status) => ({
         id: status.id,
-        // A default status has a translation; a column the Space named does not.
-        label: DEFAULT_STATUS_IDS.has(status.id) ? t(`status.${status.id}`) : status.label,
+        label: statusDisplayLabel(status, t),
         color: status.color,
       }));
   }, [boardSpec.groupBy, boardStatuses, t]);

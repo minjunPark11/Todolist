@@ -58,6 +58,32 @@ export function listDisplayName(
   return list.isDefault && list.name === DEFAULT_LIST_NAME ? defaultLabel : list.name;
 }
 
+const DEFAULT_STATUS_IDS = new Set(DEFAULT_STATUSES.map((status) => status.id));
+
+/**
+ * The label to SHOW for a status.
+ *
+ * Same rule as `listDisplayName`, one axis over: the six defaults carry an
+ * English `label` because that is what the app named them, and a column the
+ * user added is already in their own words. Translating the first and leaving
+ * the second alone is the whole of it.
+ *
+ * It lives here rather than at each call site because it had already been
+ * written twice — the Board and the Project screen's columns each spelled the
+ * ternary out — while the List view rendered `status.label` raw. The result
+ * was two tabs of one screen disagreeing: a Korean board beside an English
+ * "Inbox / To Do / Doing" dropdown.
+ *
+ * `translate` is passed in so the domain does not reach for the i18n context;
+ * the caller holds `t`.
+ */
+export function statusDisplayLabel(
+  status: Pick<Status, "id" | "label">,
+  translate: (key: string) => string,
+): string {
+  return DEFAULT_STATUS_IDS.has(status.id) ? translate(`status.${status.id}`) : status.label;
+}
+
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
