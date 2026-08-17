@@ -85,7 +85,7 @@ export function SpaceScreen({
     <div className="sdv-detail spc">
       <header className="sdv-header">
         <button type="button" className="sdv-back" onClick={onBack}>
-          ← {t("spaceHub.back")}
+          ← {t("spaceHub.backToSpaces")}
         </button>
         <div className="sdv-header-main">
           <span className="sdv-header-icon" style={{ background: space.color }} aria-hidden="true">

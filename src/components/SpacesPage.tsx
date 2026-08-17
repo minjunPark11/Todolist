@@ -9,6 +9,7 @@ import { SpaceScreen } from "./spaces/SpaceScreen";
 import { SpaceScopedView } from "./spaces/SpaceScopedView";
 import { DeleteSpaceConfirmModal } from "./spaces/SpaceModals";
 import type { SpaceTab } from "../lib/spaceHubTypes";
+import { projectsInSpace } from "../domain/spaces/spaces";
 import { todayValue } from "../utils/date";
 import { useT } from "../i18n";
 import { sendAiChat } from "../lib/ai/gateway";
@@ -508,7 +509,12 @@ export function SpacesPage({
           <SpaceScopedView
             tab={tab}
             scoped={scoped}
-            projects={projects}
+            // Scoped, not the whole collection. `scoped` already holds only
+            // this Space's Items, but the views also OFFER Projects — the goal
+            // card's board picker most visibly — and an unscoped list let a
+            // goal be filed into another Space's Project, after which it
+            // vanished from the view that moved it.
+            projects={projectsInSpace(projects, selectedSpaceRecord.id)}
             lists={lists}
             folders={folders}
             onOpenTask={onOpenTask}
