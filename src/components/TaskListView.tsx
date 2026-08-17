@@ -12,7 +12,7 @@
 // `Assignee` is in §50A's column list and absent here on purpose: a Task has
 // no assignee field, and §50A.25 forbids inventing one to satisfy the mockup.
 import { useMemo, useState } from "react";
-import type { List, Status, Task, TaskPriority } from "../types";
+import type { List, Project, Status, Task, TaskPriority } from "../types";
 import type { Item } from "../domain/view/item";
 import { applyView, type GroupAxis, type GroupContext, type SortKey, type ViewSpec } from "../domain/view/viewSpec";
 import { listDisplayName, statusDisplayLabel } from "../domain/spaces/hierarchy";
@@ -31,6 +31,13 @@ interface TaskListViewProps {
   context: GroupContext;
   statuses: Status[];
   lists: List[];
+  /** Only needed with `showProjectContext`, to name a List's owner. */
+  projects?: Project[];
+  /**
+   * Several Projects in scope, so a List name alone does not identify it —
+   * the same flag `GoalsSection` takes for the same reason (§50E.17).
+   */
+  showProjectContext?: boolean;
   today: string;
   selectedTaskId?: string;
   onOpenItem: (item: Item) => void;
@@ -52,6 +59,8 @@ export function TaskListView({
   context,
   statuses,
   lists,
+  projects,
+  showProjectContext = false,
   today,
   selectedTaskId = "",
   onOpenItem,
@@ -66,10 +75,24 @@ export function TaskListView({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState("");
 
-  const listName = useMemo(
-    () => new Map(lists.map((list) => [list.id, listDisplayName(list, t("list.defaultName"))])),
-    [lists, t],
-  );
+  // List id -> what to call it here.
+  //
+  // At a Space scope this qualifies the name with its Project, because every
+  // Project's default List is called the same thing: two Projects in scope
+  // produced two groups both headed "작업", and a row named its List and
+  // nothing else. Below a Project the header already says which one, so the
+  // bare name is right there and the qualifier would be noise.
+  const listName = useMemo(() => {
+    const projectName = new Map((projects ?? []).map((project) => [project.id, project.name]));
+    return new Map(
+      lists.map((list) => {
+        const label = listDisplayName(list, t("list.defaultName"));
+        // `List.spaceId` holds the PROJECT id (see the field's own comment).
+        const owner = showProjectContext ? projectName.get(list.spaceId) : undefined;
+        return [list.id, owner ? `${owner} · ${label}` : label];
+      }),
+    );
+  }, [lists, projects, showProjectContext, t]);
   const statusById = useMemo(() => new Map(statuses.map((status) => [status.id, status])), [statuses]);
 
   // The toolbar is the spec. Search rides in `filter` so the scope narrows
@@ -85,7 +108,10 @@ export function TaskListView({
   function groupLabel(id: string): string {
     if (!id) return t("list.ungrouped");
     if (groupBy === "list") return listName.get(id) ?? t("list.ungrouped");
-    if (groupBy === "status") return statusById.get(id)?.label ?? id;
+    if (groupBy === "status") {
+      const status = statusById.get(id);
+      return status ? statusDisplayLabel(status, t) : id;
+    }
     if (groupBy === "priority") return t(`priority.${id}`);
     return id;
   }

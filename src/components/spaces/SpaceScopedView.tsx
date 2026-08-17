@@ -87,6 +87,10 @@ export function SpaceScopedView({
         // shared default set is the only one true of all of them (§0.3.3).
         statuses={DEFAULT_STATUSES}
         lists={lists}
+        // Several Projects in scope, so a List names its owner (§50E.17) —
+        // otherwise every Project's default List reads the same.
+        projects={projects}
+        showProjectContext
         today={today}
         onOpenItem={openItem}
         onPatchTask={onUpdateTask}
