@@ -19,7 +19,7 @@
 // storage never is".
 import type { LearningPath, List, Project, Status, Task, TaskPriority } from "../../types";
 import { blockedTaskIds } from "../tasks/dependencies";
-import { listIdFor, goalListIdFor, statusIdFor, statusesForSpace, statusesWithCustom } from "../spaces/membership";
+import { listIdFor, goalListIdFor, projectIdFor, statusIdFor, statusesForSpace, statusesWithCustom } from "../spaces/membership";
 import { spaceIdForProject } from "../spaces/spaces";
 import { normalizeGoalSchedule } from "../horizons/goalSchedule";
 
@@ -163,19 +163,25 @@ export function projectItems(input: ProjectItemsInput): Item[] {
   if (wanted.has("task")) {
     for (const task of tasks) {
       if (task.deletedAt) continue;
-      const spaceStatuses = statuses.get(task.projectId) ?? statusesForSpace(undefined);
       const taskListId = listIdFor(task, lists);
+      // The List is the owner and the Project is read through it (§6.77), so
+      // the chain here runs List -> Project -> Space rather than starting from
+      // a Project id stored on the Task. Moving a List between Projects moves
+      // its Tasks with it and rewrites none of them; an Inbox Task resolves to
+      // no Project and so to no Space, which is what §6.80 asks for.
+      const taskProjectId = projectIdFor(task, lists);
+      const spaceStatuses = statuses.get(taskProjectId) ?? statusesForSpace(undefined);
       items.push({
         key: `task:${task.id}`,
         source: "task",
         sourceId: task.id,
         parentId: task.parentTaskId,
         title: task.title,
-        spaceId: spaces.get(task.projectId) ?? "",
-        projectId: task.projectId,
+        spaceId: spaces.get(taskProjectId) ?? "",
+        projectId: taskProjectId,
         listId: taskListId,
         folderId: folders.get(taskListId) ?? "",
-        color: colors.get(task.projectId) ?? DEFAULT_COLOR,
+        color: colors.get(taskProjectId) ?? DEFAULT_COLOR,
         startDate: task.startDate,
         scheduledDate: task.scheduledDate,
         dueDate: task.dueDate,

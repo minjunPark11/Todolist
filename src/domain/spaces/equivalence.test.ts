@@ -13,8 +13,8 @@ import type { Folder, LearningPath, List, Project, Space, Task } from "../../typ
 import { projectItems } from "../view/item";
 import { matchesFilter } from "../view/viewSpec";
 import { spanForItem } from "../view/span";
-import { makeDefaultList } from "./hierarchy";
-import { defaultListIdFor, listIdFor, statusIdFor, statusesForSpace } from "./membership";
+import { ensureInboxList, makeDefaultList } from "./hierarchy";
+import { backfillTaskListId, defaultListIdFor, listIdFor, projectIdFor, statusIdFor, statusesForSpace } from "./membership";
 import {
   canDeleteSpace,
   DEFAULT_SPACE_ID,
@@ -168,6 +168,54 @@ describe("one Task, every view (§44, T-LV07 / T-GV10 / T-CV12)", () => {
     const [item] = items({ tasks: [task({ id: "t1", title: "Original" })] });
     expect(item.sourceId).toBe("t1");
     expect(item.title).toBe("Original");
+  });
+});
+
+// §75 forbids removing a legacy path before its replacement is shown
+// equivalent. The TickTick plan inverts membership — the Project is read
+// THROUGH the List (§6.77) where it used to be read off the Task — so this is
+// where the two are shown to answer the same thing.
+describe("membership inversion answers what the legacy path answered (§6.77)", () => {
+  const migrated = backfillTaskListId(tasks, lists, NOW);
+
+  it("gives every backfilled Task the same Project the stored field did", () => {
+    for (const task of migrated) {
+      expect(projectIdFor(task, lists)).toBe(task.projectId);
+    }
+  });
+
+  it("projects the same Project onto every Item as before the inversion", () => {
+    const before = new Map(items({ tasks }).map((item) => [item.key, item.projectId]));
+    const after = items({ tasks: migrated });
+    for (const item of after) {
+      expect(item.projectId).toBe(before.get(item.key));
+    }
+  });
+
+  it("gathers the same Space set through Lists as through stored ids (§6.78)", () => {
+    const scoped = items({ tasks: migrated }).filter((item) =>
+      matchesFilter(item, { spaceId: "sp-research" }),
+    );
+    expect(scoped.map((item) => item.sourceId).sort()).toEqual(["t1", "t2"]);
+  });
+
+  it("moving a List to another Project moves its Tasks, rewriting no Task", () => {
+    // The property the inversion exists for. Nothing under the List is touched.
+    const moved = lists.map((list) =>
+      list.id === defaultListIdFor("p1") ? { ...list, projectId: "p3", spaceId: "p3" } : list,
+    );
+    const task1 = migrated.find((item) => item.id === "t1")!;
+    expect(projectIdFor(task1, moved)).toBe("p3");
+    expect(task1.projectId).toBe("p1"); // the record itself is untouched
+  });
+
+  it("puts an Inbox Task in no Project and so in no Space (§6.80)", () => {
+    const orphan = task({ id: "t-orphan", projectId: "" });
+    const withInbox = ensureInboxList(lists, NOW);
+    const [filed] = backfillTaskListId([orphan], withInbox, NOW);
+    expect(projectIdFor(filed, withInbox)).toBe("");
+    const [item] = projectItems({ tasks: [filed], paths: [], projects, lists: withInbox, today: TODAY });
+    expect(item.spaceId).toBe("");
   });
 });
 
