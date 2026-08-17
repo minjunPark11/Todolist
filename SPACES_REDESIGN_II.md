@@ -10982,6 +10982,54 @@ Space
 
 ---
 
+## STEP 12 — Equivalence / Regression Tests — 완료 (2026-08-17)
+
+`domain/spaces/equivalence.test.ts` 신설, 23개.
+
+### 왜 별도 파일인가
+
+각 모듈에는 이미 자기 단위 테스트가 있다. **그것들이 잡지 못하는 것은 모듈 *사이의* 불일치다** — 스코프가 모으는 집합과 Overview가 세는 집합이 다르거나, 뷰가 읽는 날짜 필드를 쓰는 쪽이 쓰지 않거나, Project 이동이 아래 작업을 조용히 재작성하는 경우. 하나같이 양쪽 테스트를 모두 통과하고 제품에서 실패한다.
+
+### 덮은 불변
+
+```text
+§16/T-OV08   Space 스코프 = 그 안 Project들의 합집합
+             레벨이 내려갈수록 좁아지고 넓어지지 않음
+             Scope Resolver의 답 = 필터가 좁히는 기준
+§44          한 Task를 네 뷰의 필터로 봐도 같은 레코드
+             뷰별 사본 없음
+H-INV-05     Project 이동 시 하위 id 전부 유지, 이동한 Project 객체만 바뀜
+H-INV-06     하위가 있는 Space 삭제 거부, 기본 Space 의존 Project도 계산
+§27.2        Goal의 지평은 schedule에서, Task의 지평은 날짜에서
+             둘이 한 projection을 공유
+G-CALENDAR-01 scheduledDate와 dueDate가 서로 다른 답으로 남음
+G-GANTT-01   마감만 있어도 하루짜리 막대, 날짜 없으면 막대 없음(레코드도 불변)
+G-CTX-01     저장된 list 우선, 없으면 기본 List, Project 없으면 추측 안 함
+G-STATUS-01  Space 바에서 Board 제외
+§34/§75      parse → resolve → path 왕복, 레거시 1회 승격 후 고정
+             레코드 도착 전 딥링크 보존
+```
+
+### 테스트가 실제로 무는지 확인했다
+
+**결함을 주입해 봤다.** `Item.spaceId`가 Project 관계 대신 `projectId`를 답하게 바꾸자 3개가 실패했다.
+
+```text
+× a Space gathers exactly the union of its Projects
+× gets tighter at every level and never wider
+× changes one row and leaves every descendant id alone
+```
+
+되돌린 뒤 다시 통과. **통과만 하는 테스트는 장식이고, 이 확인이 그 차이를 만든다.**
+
+### 결과
+
+typecheck 통과, 테스트 **692개** 통과 (신규 23).
+
+§75가 "등가성이 확인되지 않은 Legacy Path는 제거 대상으로 승격하지 않는다"고 하므로, STEP 13의 삭제가 이제 열린다.
+
+---
+
 ## STEP 12 — Equivalence / Regression Tests
 
 Legacy Cleanup 전에 새 경로가 기존 기능과 Domain 의미를 보존하는지 검증한다.
