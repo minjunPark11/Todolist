@@ -61,6 +61,9 @@ export const ko: Dictionary = {
   "tree.rename": "이름 바꾸기",
   "tree.renameFolder": "폴더 이름",
   "tree.listName": "리스트 이름",
+  // The name every Project's default List is created with. Stored in English
+  // (DEFAULT_LIST_NAME); shown through listDisplayName.
+  "list.defaultName": "작업",
   "tree.space": "공간",
   "tree.spacePlaceholder": "새 공간 이름",
   "tree.project": "프로젝트",

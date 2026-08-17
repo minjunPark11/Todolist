@@ -1,5 +1,5 @@
 import type { List, Project, RepeatType, Subtask, Task, TaskPriority } from "../types";
-import { activeLists } from "../domain/spaces/hierarchy";
+import { activeLists, listDisplayName } from "../domain/spaces/hierarchy";
 import { listIdFor } from "../domain/spaces/membership";
 import { childProgress, childrenOf } from "../domain/tasks/children";
 import { useState } from "react";
@@ -225,7 +225,7 @@ export function TaskDetail({
                   <optgroup key={project.id} label={project.name}>
                     {activeLists(lists, project.id).map((list) => (
                       <option key={list.id} value={list.id}>
-                        {list.name}
+                        {listDisplayName(list, t("list.defaultName"))}
                       </option>
                     ))}
                   </optgroup>

@@ -15,7 +15,7 @@ import { projectItems, type Item } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext } from "../../domain/view/viewSpec";
 import { statusPatch } from "../../domain/view/board";
-import { DEFAULT_STATUSES } from "../../domain/spaces/hierarchy";
+import { DEFAULT_STATUSES, listDisplayName } from "../../domain/spaces/hierarchy";
 import { todayValue } from "../../utils/date";
 import { TaskListView } from "../TaskListView";
 import { TaskGanttView } from "../TaskGanttView";
@@ -130,7 +130,10 @@ export function SpaceScopedView({
         today={today}
         projects={projects}
         tasks={scoped.tasks}
-        groupLabel={(groupId) => lists.find((list) => list.id === groupId)?.name ?? t("timeline.ungrouped")}
+        groupLabel={(groupId) => {
+          const list = lists.find((candidate) => candidate.id === groupId);
+          return list ? listDisplayName(list, t("list.defaultName")) : t("timeline.ungrouped");
+        }}
         onOpenItem={openItem}
         onUpdateTask={onUpdateTask}
       />

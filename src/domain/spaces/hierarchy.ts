@@ -33,6 +33,31 @@ export const DEFAULT_STATUSES: Status[] = [
 
 export const DEFAULT_LIST_NAME = "Tasks";
 
+/**
+ * The name to SHOW for a List.
+ *
+ * `DEFAULT_LIST_NAME` is the app's word, not the user's: `makeDefaultList`
+ * stamps it on every Project at creation, in English, whatever language the
+ * app is running in. A Korean sidebar read "작업 / Tasks / 디자인 검토" — two
+ * of the user's names and one of ours.
+ *
+ * Translating it here is the rule the Board already applies to statuses: a
+ * default has a translation, and a name the user chose is already in their own
+ * words and must not be overwritten by one (see BoardPage's column labels).
+ * The label arrives as an argument because the domain does not read the i18n
+ * context — the caller holds `t`.
+ *
+ * Keyed on the stored name as well as `isDefault`, so a user who renamed their
+ * default List keeps the name they gave it.
+ */
+export function listDisplayName(
+  list: Pick<List, "name" | "isDefault"> | undefined,
+  defaultLabel: string,
+): string {
+  if (!list) return "";
+  return list.isDefault && list.name === DEFAULT_LIST_NAME ? defaultLabel : list.name;
+}
+
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }

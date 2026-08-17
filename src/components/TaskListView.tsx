@@ -15,6 +15,7 @@ import { useMemo, useState } from "react";
 import type { List, Status, Task, TaskPriority } from "../types";
 import type { Item } from "../domain/view/item";
 import { applyView, type GroupAxis, type GroupContext, type SortKey, type ViewSpec } from "../domain/view/viewSpec";
+import { listDisplayName } from "../domain/spaces/hierarchy";
 import { EmptyState } from "./kit";
 import { useT } from "../i18n";
 
@@ -65,7 +66,10 @@ export function TaskListView({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState("");
 
-  const listName = useMemo(() => new Map(lists.map((list) => [list.id, list.name])), [lists]);
+  const listName = useMemo(
+    () => new Map(lists.map((list) => [list.id, listDisplayName(list, t("list.defaultName"))])),
+    [lists, t],
+  );
   const statusById = useMemo(() => new Map(statuses.map((status) => [status.id, status])), [statuses]);
 
   // The toolbar is the spec. Search rides in `filter` so the scope narrows

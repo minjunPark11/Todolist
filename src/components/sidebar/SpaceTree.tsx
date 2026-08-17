@@ -10,7 +10,7 @@
 // hierarchy. The reveal is ONE-WAY — see `shouldRevealLists`.
 import { useState } from "react";
 import type { Folder, List, Project, Space } from "../../types";
-import { activeFolders, folderlessLists, listsInFolder, shouldRevealLists } from "../../domain/spaces/hierarchy";
+import { activeFolders, folderlessLists, listDisplayName, listsInFolder, shouldRevealLists } from "../../domain/spaces/hierarchy";
 import { projectsInSpace, spaceIdForProject } from "../../domain/spaces/spaces";
 import { isSelected, selectedProjectId, selectedSpaceId, type Selection } from "../../app/spaceSelection";
 import { useT } from "../../i18n";
@@ -178,6 +178,7 @@ function ListRow({ list, spaceId, projectId, selection, onSelect, onRename, onAr
   const [renaming, setRenaming] = useState(false);
   const [over, setOver] = useState(false);
   const selected = isSelected(selection, { kind: "list", spaceId, projectId, listId: list.id });
+  const displayName = listDisplayName(list, t("list.defaultName"));
 
   if (renaming) {
     return (
@@ -186,11 +187,16 @@ function ListRow({ list, spaceId, projectId, selection, onSelect, onRename, onAr
         onSubmit={(event) => {
           event.preventDefault();
           const name = new FormData(event.currentTarget).get("name");
-          if (typeof name === "string" && name.trim()) onRename(name.trim());
+          // Unchanged means unchanged. The field is seeded with the TRANSLATED
+          // default, so writing it back would turn the app's word into the
+          // user's — and then it would stop following the language.
+          if (typeof name === "string" && name.trim() && name.trim() !== displayName) {
+            onRename(name.trim());
+          }
           setRenaming(false);
         }}
       >
-        <input autoFocus name="name" defaultValue={list.name} aria-label={t("tree.listName")} onBlur={() => setRenaming(false)} />
+        <input autoFocus name="name" defaultValue={displayName} aria-label={t("tree.listName")} onBlur={() => setRenaming(false)} />
       </form>
     );
   }
@@ -215,7 +221,7 @@ function ListRow({ list, spaceId, projectId, selection, onSelect, onRename, onAr
       }}
     >
       <button type="button" className="spt-label" onClick={onSelect}>
-        {list.name}
+        {displayName}
       </button>
       <RowMenu
         actions={[

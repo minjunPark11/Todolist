@@ -10,6 +10,7 @@ import {
   defaultListFor,
   folderlessLists,
   hasDoneStatus,
+  listDisplayName,
   listsInFolder,
   makeDefaultList,
   moveListToFolder,
@@ -142,6 +143,28 @@ describe("statusesFor", () => {
 
   it("ships a default set that can express completion", () => {
     expect(hasDoneStatus(DEFAULT_STATUSES)).toBe(true);
+  });
+});
+
+describe("listDisplayName", () => {
+  const LABEL = "작업";
+
+  it("translates the name the app gave", () => {
+    expect(listDisplayName(makeDefaultList("list-1", "space-1", NOW), LABEL)).toBe(LABEL);
+  });
+
+  it("leaves a name the user gave alone", () => {
+    // The whole point: a default List someone renamed is in their own words
+    // already, and a translation must not overwrite it.
+    expect(listDisplayName(list({ isDefault: true, name: "디자인 검토" }), LABEL)).toBe("디자인 검토");
+  });
+
+  it("does not translate a non-default List that happens to be called Tasks", () => {
+    expect(listDisplayName(list({ isDefault: false, name: "Tasks" }), LABEL)).toBe("Tasks");
+  });
+
+  it("answers for a List that is not there, so callers need no second branch", () => {
+    expect(listDisplayName(undefined, LABEL)).toBe("");
   });
 });
 

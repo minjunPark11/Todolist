@@ -37,7 +37,7 @@ import { goalDropFor, patchForColumn } from "../../domain/view/board";
 import { axisGroupIds, groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { showsGoals, specForSpaceView, type SpaceViewId } from "../../domain/view/spaceViews";
 import { statusesWithCustom } from "../../domain/spaces/membership";
-import { activeLists, DEFAULT_STATUSES } from "../../domain/spaces/hierarchy";
+import { activeLists, DEFAULT_STATUSES, listDisplayName } from "../../domain/spaces/hierarchy";
 import {
   AddSpaceTaskModal,
   DeleteSpaceConfirmModal,
@@ -228,7 +228,7 @@ export function SpaceDetailView({
   );
   const scopeName = useMemo(() => {
     if (viewScope.listId !== undefined) {
-      return lists.find((list) => list.id === viewScope.listId)?.name ?? "";
+      return listDisplayName(lists.find((list) => list.id === viewScope.listId), t("list.defaultName"));
     }
     if (viewScope.folderId !== undefined) {
       return folders.find((folder) => folder.id === viewScope.folderId)?.name ?? "";
@@ -350,7 +350,7 @@ export function SpaceDetailView({
     const listIdOf = new Map(boardItems.map((item) => [item.sourceId, item.listId]));
     return activeLists(lists, projectId).map((list) => ({
       id: list.id,
-      name: list.name,
+      name: listDisplayName(list, t("list.defaultName")),
       tasks: spaceTasks.filter((task) => listIdOf.get(task.id) === list.id),
     }));
   }, [lists, projectId, boardItems, spaceTasks]);
@@ -718,9 +718,10 @@ export function SpaceDetailView({
               today={today}
               projects={projects}
               tasks={tasks}
-              groupLabel={(groupId) =>
-                lists.find((list) => list.id === groupId)?.name ?? t("timeline.ungrouped")
-              }
+              groupLabel={(groupId) => {
+                const list = lists.find((candidate) => candidate.id === groupId);
+                return list ? listDisplayName(list, t("list.defaultName")) : t("timeline.ungrouped");
+              }}
               onOpenItem={openItem}
               onUpdateTask={onUpdateTask}
             />

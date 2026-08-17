@@ -61,6 +61,9 @@ export const en: Dictionary = {
   "tree.rename": "Rename",
   "tree.renameFolder": "Folder name",
   "tree.listName": "List name",
+  // The name every Project's default List is created with. Stored in English
+  // (DEFAULT_LIST_NAME); shown through listDisplayName.
+  "list.defaultName": "Tasks",
   "tree.space": "Space",
   "tree.spacePlaceholder": "New space name",
   "tree.project": "Project",
