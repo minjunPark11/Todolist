@@ -30,6 +30,7 @@ import { GoalQuickAdd, StatusManager } from "./SpaceViewTools";
 import { BoardView, type BoardColumn } from "../BoardView";
 import { TaskListView } from "../TaskListView";
 import { TaskGanttView } from "../TaskGanttView";
+import { TaskCalendarView } from "../TaskCalendarView";
 import { statusPatch } from "../../domain/view/board";
 import { projectItems, type Item } from "../../domain/view/item";
 import { goalDropFor, patchForColumn } from "../../domain/view/board";
@@ -675,7 +676,15 @@ export function SpaceDetailView({
               </>
             ) : null}
           </div>
-          {tab === "gantt" ? (
+          {tab === "calendar" ? (
+            <TaskCalendarView
+              tasks={spaceTasks}
+              projects={projects}
+              today={today}
+              onOpenTask={openTaskDrawer}
+              onUpdateTask={onUpdateTask}
+            />
+          ) : tab === "gantt" ? (
             <TaskGanttView
               items={boardItems}
               spec={boardSpec}

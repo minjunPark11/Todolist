@@ -1,0 +1,35 @@
+/* Calendar at a scope (SPACES_REDESIGN_II §50D).
+ *
+ * The month grid itself is `calendar/MonthView` and keeps its own styles —
+ * only the toolbar above it belongs to this view. */
+
+.tcv {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* §50D.3 — one row: prev / range / next on the left, Today on the right. */
+.tcv-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.tcv-range {
+  font-weight: 600;
+  font-size: 14px;
+  min-width: 8ch;
+  text-align: center;
+}
+
+.tcv-today {
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .tcv-toolbar { flex-wrap: wrap; }
+  .tcv-today { margin-left: 0; }
+}

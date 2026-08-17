@@ -10752,7 +10752,41 @@ T-GV13  공통 TaskDetail                        ✓
 
 **직접 확인하지 못한 것:** 막대 드래그/리사이즈(T-GV09)는 HTML5 drag-and-drop이라 시뮬레이션하지 못했다. 배선은 확인했고(`draggable="true"`, `onUpdateTask` 전달) 쓰기 규칙 `patchForSpanDrag`는 단위 테스트가 덮는다.
 
-Calendar만 `PENDING_TASK_VIEWS`에 남았다.
+---
+
+### Calendar (§50D) — 완료 (2026-08-17)
+
+셋 중 결합도가 가장 높아 보였는데, **재사용할 것과 버릴 것의 경계가 오히려 제일 분명했다.**
+
+`calendar/MonthView`는 7열 그리드에 compact chip과 `+N` 오버플로까지 갖춘 **순수 렌더러**다(164줄). `buildCalendarItems`는 Task를 그 날짜가 버는 chip으로 이미 펼친다. `TaskCalendarView`는 이 둘을 스코프에 마운트할 뿐이고, 그게 Calendar 페이지와의 차이 전부다.
+
+**가져오지 않은 것**은 그 페이지에서 Task가 아닌 모든 것이다 — 외부 캘린더, 집중 세그먼트, 카테고리 관리, 공유. **어느 것도 Item이 아니므로 스코프가 할 말이 없다.**
+
+날짜는 `G-CALENDAR-01`(§0.3.4) 그대로 둘을 분리한다. `scheduledDate`가 드래그 가능한 작업 블록이고 `dueDate`는 읽기 전용 마감 마커라, 드롭은 전자만 쓴다. 마커 드래그는 `handleDragStart`에서 막는다 — 마감일을 옮기는 것은 "언제까지"를 바꾸는 것이지 "언제 할지"가 아니다.
+
+Month만 노출한다. §50D.4가 미지원 Mode를 목업 때문에 먼저 만들지 말라고 하고, Week 렌더러는 페이지에 강하게 묶여 있다.
+
+### 검증 — §50D의 T-CV
+
+```text
+T-CV02  Calendar만 active                     ✓
+T-CV03  7열 월 그리드                          ✓
+T-CV04  이전/다음/오늘                         ✓ 8월 → 9월 → 8월
+T-CV05  명시된 날짜 필드와 일치                ✓ 예정=블록, 마감=마커
+T-CV07  날짜 없는 Task에 가짜 날짜 안 만듦     ✓ 그리드에 없음
+T-CV09  +N 오버플로                            ✓ chip 5개 + "+2개 더"
+T-CV10  공통 TaskDetail                        ✓
+T-CV11  드롭이 Canonical date 변경              ✓ scheduledDate만, dueDate 불변
+T-CV12  교차 뷰 동기화                          ✓ 리스트 예정일 정렬 맨 앞으로
+T-CV14  좁은 화면에서 본문 가로 스크롤 없음    ✓ 375px
+스코프   다른 Project의 Task 안 섞임            ✓
+```
+
+`PENDING_TASK_VIEWS`가 비었다. §14의 View Bar 일곱 항목이 모두 실제로 열린다.
+
+### STEP 9 남은 것
+
+Filter·Display 컨트롤(§50A.13/§50A.6), Bulk action(§50A.12), 막대 드래그 실측(T-GV09), Calendar의 Week mode. 그리고 별도 작업으로 뺀 **캘린더 페이지의 프로젝트 표시 토글 결함**은 그대로 남아 있다 — 이 뷰는 그 경로를 쓰지 않는다.
 
 ---
 

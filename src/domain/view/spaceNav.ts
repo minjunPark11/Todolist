@@ -40,13 +40,14 @@ export const SPACE_NAV: readonly SpaceNavItem[] = [
 ];
 
 /**
- * Task Views whose renderer is not connected yet (STEP 9).
+ * Task Views whose renderer is not connected yet.
  *
- * They are in the registry because the registry is the contract, and out of
- * the bar because a tab that renders nothing is worse than a tab that is not
- * there. This set shrinks as STEP 9 connects each one, and goes with the last.
+ * Empty since STEP 9 connected the last one. Kept rather than deleted because
+ * it is where a fifth view waits between being declared in the table and
+ * having something to draw — and because an empty set says that plainly,
+ * where its absence would say nothing at all.
  */
-export const PENDING_TASK_VIEWS: ReadonlySet<BuiltInTaskViewId> = new Set(["calendar"]);
+export const PENDING_TASK_VIEWS: ReadonlySet<BuiltInTaskViewId> = new Set();
 
 /** The level a View Bar is being drawn at. */
 export type NavScopeKind = "space" | "project" | "folder" | "list";

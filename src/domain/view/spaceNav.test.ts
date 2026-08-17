@@ -67,16 +67,21 @@ describe("navItemsForScope (§14)", () => {
   });
 
   it("hides a Task View whose renderer is not connected yet", () => {
-    // A tab that renders nothing is worse than a tab that is not there. This
-    // set empties in STEP 9 and goes with it.
+    // A tab that renders nothing is worse than a tab that is not there. The
+    // set is empty now that STEP 9 connected the last view; the rule still
+    // has to hold for whatever is declared next.
     for (const pending of PENDING_TASK_VIEWS) {
       expect(navItemsForScope("project").map((item) => item.id)).not.toContain(pending);
     }
+  });
+
+  it("offers every view of §14 at a Project", () => {
     expect(navItemsForScope("project").map((item) => item.id)).toEqual([
       "overview",
       "list",
       "board",
       "gantt",
+      "calendar",
       "goals",
       "horizons",
     ]);
