@@ -6,9 +6,10 @@ import {
   type SpaceLike,
   type SpaceTab,
 } from "../../lib/spaceHubTypes";
-import { isSpaceNavId, isTaskView, navItemsForScope } from "../../domain/view/spaceNav";
+import { isTaskView, navItemsForScope } from "../../domain/view/spaceNav";
 import { useT } from "../../i18n";
 import { SPACE_TASK_GROUPS, tabText, upcomingKindText } from "../../lib/spaceHubI18n";
+import { useTabInUrl } from "../../lib/spaceTabUrl";
 import {
   formatSeconds,
   getNextActionTask,
@@ -106,17 +107,6 @@ type DrawerState =
   | { kind: "settings" };
 
 
-/**
- * `?view=` is the parameter now (U3). `?tab=` is still read so links made before
- * this change land where they meant to; only the new name is ever written.
- */
-function readTabFromUrl(): SpaceTab {
-  const params = new URLSearchParams(window.location.search);
-  const legacy = params.get("tab");
-  const value = params.get("view") ?? (legacy === "tasks" ? "board" : legacy);
-  return isSpaceNavId(value) ? value : "overview";
-}
-
 export function SpaceDetailView({
   space,
   tasks,
@@ -155,7 +145,7 @@ export function SpaceDetailView({
 }: SpaceDetailViewProps) {
   const { t } = useT();
   const hub = useSpaceHubData();
-  const [tab, setTabState] = useState<SpaceTab>(readTabFromUrl);
+  const [tab, setTab] = useTabInUrl("project");
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
   const [drawer, setDrawer] = useState<DrawerState>({ kind: "none" });
   const today = todayValue();
@@ -290,34 +280,6 @@ export function SpaceDetailView({
   const todayFocusSeconds = getTodaySpaceFocusSeconds(spaceSessions, today);
   const weekFocusSeconds = getWeekSpaceFocusSeconds(spaceSessions, weekStart);
   const upcoming = getUpcomingSpaceItems(spaceTasks, today);
-  // View <-> URL query sync (U3): pushState on change, restore on popstate.
-  function setTab(next: SpaceTab) {
-    if (next === tab) return;
-    const url = new URL(window.location.href);
-    url.searchParams.set("view", next);
-    // The old key would otherwise sit there naming a different view than the
-    // one on screen, and win on the next reload.
-    url.searchParams.delete("tab");
-    window.history.pushState(null, "", url.toString());
-    setTabState(next);
-  }
-
-  useEffect(() => {
-    function handlePopState() {
-      setTabState(readTabFromUrl());
-    }
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-      // Leave the URL clean when navigating away from the detail view.
-      const url = new URL(window.location.href);
-      if (url.searchParams.has("tab")) {
-        url.searchParams.delete("tab");
-        window.history.replaceState(null, "", url.toString());
-      }
-    };
-  }, []);
-
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;

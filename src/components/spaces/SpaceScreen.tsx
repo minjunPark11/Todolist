@@ -15,6 +15,7 @@ import type { SpaceTab } from "../../lib/spaceHubTypes";
 import { navItemsForScope } from "../../domain/view/spaceNav";
 import { projectsInSpace, spaceIdForProject } from "../../domain/spaces/spaces";
 import { tabText } from "../../lib/spaceHubI18n";
+import { useTabInUrl } from "../../lib/spaceTabUrl";
 import { isTaskDone } from "../../lib/spaceSelectors";
 import { OverviewSection, type OverviewChild } from "./OverviewSection";
 import { useT } from "../../i18n";
@@ -25,8 +26,6 @@ interface SpaceScreenProps {
   tasks: Task[];
   goals: LearningPath[];
   today: string;
-  tab: SpaceTab;
-  onChangeTab: (tab: SpaceTab) => void;
   onOpenProject: (projectId: string) => void;
   onOpenTask: (taskId: string) => void;
   onOpenGoal: (goalId: string) => void;
@@ -40,14 +39,15 @@ export function SpaceScreen({
   tasks,
   goals,
   today,
-  tab,
-  onChangeTab,
   onOpenProject,
   onOpenTask,
   onOpenGoal,
   renderView,
 }: SpaceScreenProps) {
   const { t } = useT();
+  // The open view is part of the address here too, so a reload or a shared
+  // link opens what it names rather than always Overview.
+  const [tab, onChangeTab] = useTabInUrl("space");
 
   const navItems = useMemo(() => navItemsForScope("space"), []);
 

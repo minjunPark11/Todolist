@@ -15,7 +15,7 @@
 //
 // What routes to the two screens is all that remains, so this file no longer
 // derives anything a Project does not already say.
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type {
   FocusSession,
   Folder,
@@ -34,7 +34,7 @@ import type { Space as SpaceRecord } from "../types";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
 import { SpaceScreen } from "./spaces/SpaceScreen";
 import { SpaceScopedView } from "./spaces/SpaceScopedView";
-import type { SpaceLike, SpaceTab } from "../lib/spaceHubTypes";
+import type { SpaceLike } from "../lib/spaceHubTypes";
 import { projectsInSpace } from "../domain/spaces/spaces";
 import { EmptyState, type ToastState } from "./kit";
 import { todayValue } from "../utils/date";
@@ -150,7 +150,8 @@ export function SpacesPage({
   showToast,
 }: SpacesPageProps) {
   const { t } = useT();
-  const [spaceTab, setSpaceTab] = useState<SpaceTab>("overview");
+  // The open tab is the Space screen's own business now, and it keeps it in
+  // the URL (lib/spaceTabUrl.ts) rather than in state that a reload forgets.
 
   // One lookup: the tree's id and the URL's `:spaceId` are both the Project
   // id, so there is no second namespace to fall back through.
@@ -176,8 +177,6 @@ export function SpacesPage({
         tasks={tasks}
         goals={paths}
         today={todayValue()}
-        tab={spaceTab}
-        onChangeTab={setSpaceTab}
         onOpenProject={onOpenProject}
         onOpenTask={onOpenTask}
         onOpenGoal={onOpenGoal}
