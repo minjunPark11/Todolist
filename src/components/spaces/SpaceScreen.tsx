@@ -15,6 +15,7 @@ import type { SpaceTab } from "../../lib/spaceHubTypes";
 import { navItemsForScope } from "../../domain/view/spaceNav";
 import { projectsInSpace, spaceIdForProject } from "../../domain/spaces/spaces";
 import { tabText } from "../../lib/spaceHubI18n";
+import { isTaskDone } from "../../lib/spaceSelectors";
 import { OverviewSection, type OverviewChild } from "./OverviewSection";
 import { useT } from "../../i18n";
 
@@ -69,6 +70,11 @@ export function SpaceScreen({
     [goals, projectIds],
   );
 
+  const openTaskCount = useMemo(
+    () => spaceTasks.filter((task) => !isTaskDone(task)).length,
+    [spaceTasks],
+  );
+
   const children: OverviewChild[] = useMemo(
     () =>
       spaceProjects.map((project) => ({
@@ -95,7 +101,10 @@ export function SpaceScreen({
               {space.description || t("space.subtitle", { n: spaceProjects.length })}
             </p>
             <p className="sdv-header-counts">
-              {t("space.counts", { projects: spaceProjects.length, tasks: spaceTasks.length })}
+              {/* Open work, which is what the tree badge beside it counts.
+                  `spaceTasks` already drops archived, so this is the same
+                  predicate the sidebar applies. */}
+              {t("space.counts", { projects: spaceProjects.length, tasks: openTaskCount })}
             </p>
           </div>
         </div>

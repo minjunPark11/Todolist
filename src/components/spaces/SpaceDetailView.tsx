@@ -477,7 +477,12 @@ export function SpaceDetailView({
               {displayDescription || t("spaceHub.preset.subtitleProject")}
             </p>
             <p className="sdv-header-counts">
-              {t("spaceHub.header.tasksScheduled", { total: counts.total, scheduled: counts.scheduled })} ·{" "}
+              {/* `open`, not `total`. The tree badge beside this counts what
+                  is left, and one Project reading 4 in the sidebar and 5 in
+                  its own header is two numbers for one thing. The other two
+                  figures on this line are about work still to do, so the
+                  headline was the odd one out. */}
+              {t("spaceHub.header.tasksScheduled", { total: counts.open, scheduled: counts.scheduled })} ·{" "}
               <span className={counts.overdue > 0 ? "sdv-overdue" : ""}>{t("spaceHub.header.overdue", { n: counts.overdue })}</span>
             </p>
           </div>
