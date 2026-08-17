@@ -378,8 +378,6 @@ export type PageId =
   | "projects"
   | "focus"
   | "board"
-  | "timeline"
-  | "horizons"
   | "archive"
   | "settings"
   | "calendar";

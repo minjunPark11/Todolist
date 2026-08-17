@@ -3,9 +3,11 @@
 // Everything the timeline needs that is NOT "which Items" lives here: the
 // zoom, the window and its navigation, the split into what the window can
 // draw and what has no dates to draw with, and the drag that writes a span
-// back. `TimelinePage` and the Space screen both mount this, which is the
-// point — a second timeline implementation is exactly what §50C.29 and this
-// repository's own rule against parallel renderers forbid.
+// back. Every scope that offers a Gantt mounts this one component, which is
+// the point — a second timeline implementation is exactly what §50C.29 and
+// this repository's own rule against parallel renderers forbid. The global
+// `TimelinePage` was the other mount until the sidebar stopped offering a
+// top-level Timeline; the renderer is unchanged by its going.
 //
 // Date semantics are NOT decided here. `spanForItem` already owns them
 // (G-GANTT-01, §0.3.5): any one date produces a bar, only an Item with none

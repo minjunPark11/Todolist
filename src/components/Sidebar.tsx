@@ -70,7 +70,6 @@ type IconName =
   | "projects"
   | "focus"
   | "planning"
-  | "horizons"
   | "study"
   | "archive"
   | "settings"
@@ -127,15 +126,6 @@ function Icon({ name }: { name: IconName }) {
       <>
         <rect x="4" y="5" width="6" height="14" rx="1" />
         <rect x="14" y="5" width="6" height="9" rx="1" />
-      </>
-    ),
-    // Receding horizon lines: widest at the bottom, nearest at the top.
-    horizons: (
-      <>
-        <path d="M3 18h18" />
-        <path d="M5 13h14" />
-        <path d="M7 8h10" />
-        <path d="M9 4h6" />
       </>
     ),
     study: (
@@ -239,8 +229,11 @@ export function Sidebar({
   ];
   const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
     { id: "board", label: t("sidebar.board"), icon: "planning", count: 0 },
-    { id: "timeline", label: t("sidebar.timeline"), icon: "calendar", count: 0 },
-    { id: "horizons", label: t("sidebar.horizons"), icon: "horizons", count: 0 },
+    // Timeline and Horizons stood here as top-level destinations. Both are
+    // reached inside a scope now — the Gantt view and the Horizons section of
+    // the View Bar (domain/view/spaceNav.ts) — so a second door to the same
+    // room is all they were. Board stays: a Space offers no board at all
+    // (§0.3.3), and the quadrant axis lives nowhere else.
     // A "공간" entry stood here and opened a card grid of Projects labelled as
     // spaces. SPACES_CLICKUP_UI_DESIGN U1 decided to remove it — the tree IS
     // the space explorer — and the decision went unexecuted. Adding a real

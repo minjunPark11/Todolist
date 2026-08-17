@@ -1,10 +1,8 @@
 ﻿import { ReactNode, useState } from "react";
 import { ArchivePage } from "../components/ArchivePage";
 import { BoardPage } from "../components/BoardPage";
-import { TimelinePage } from "../components/TimelinePage";
 import { CalendarView } from "../components/CalendarView";
 import { FocusPage } from "../components/FocusPage";
-import { HorizonsPage } from "../components/HorizonsPage";
 import { GoalDetailDrawer } from "../components/horizons/GoalDetailDrawer";
 import { SpacesPage } from "../components/SpacesPage";
 import { SettingsPage } from "../components/SettingsPage";
@@ -204,23 +202,6 @@ export function AppPages({
     );
   }
 
-  if (activePage === "timeline") {
-    return (
-      <section className={pageGridClass()}>
-        <TimelinePage
-          tasks={planner.tasks}
-          projects={planner.projects}
-          lists={planner.lists}
-          learningPaths={planner.learningPaths}
-          selectedTaskId={planner.selectedTask?.id ?? ""}
-          onOpenTask={planner.selectTask}
-          onUpdateTask={planner.updateTask}
-        />
-        {renderTaskDetail()}
-      </section>
-    );
-  }
-
   if (activePage === "board") {
     return (
       <section className={pageGridClass()}>
@@ -238,32 +219,6 @@ export function AppPages({
           showToast={showToast}
         />
         {renderTaskDetail()}
-      </section>
-    );
-  }
-
-  if (activePage === "horizons") {
-    return (
-      <section className={pageGridClass()}>
-        <HorizonsPage
-          paths={planner.learningPaths}
-          tasks={planner.tasks}
-          projects={activeProjects}
-          onCreatePath={planner.createLearningPath}
-          onUpdatePath={planner.updateLearningPath}
-          onDeletePath={planner.deleteLearningPath}
-          onAddMilestone={planner.addMilestone}
-          onUpdateMilestone={planner.updateMilestone}
-          onDeleteMilestone={planner.deleteMilestone}
-          onUpdateTask={planner.updateTask}
-          onToggleTaskDone={planner.toggleTaskDone}
-          onCreateTaskFromMilestone={planner.createTaskFromMilestone}
-          onOpenTask={planner.selectTask}
-          onOpenGoal={openGoal}
-          showToast={showToast}
-        />
-        {renderTaskDetail()}
-        {goalDrawer}
       </section>
     );
   }

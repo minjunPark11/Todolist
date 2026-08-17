@@ -70,19 +70,15 @@ export const ko: Dictionary = {
   "tree.folderPlaceholder": "새 폴더 이름",
   "sidebar.focus": "집중",
   "sidebar.board": "보드",
-  "sidebar.timeline": "타임라인",
 
   // ---- timeline ----
-  "timeline.title": "타임라인",
-  "timeline.subtitle": "한 번에 한 창씩 — 스크롤 대신 넘겨서 본다.",
+  // `title`/`subtitle`과 축 라벨은 독립 TimelinePage의 것이었다. 남은 것은
+  // 렌더러 자신의 어휘로, 모든 스코프의 간트 뷰가 함께 쓴다.
   "timeline.zoom": "확대",
   "timeline.zoom.day": "2주",
   "timeline.zoom.week": "12주",
   "timeline.zoom.month": "12개월",
   "timeline.zoom.year": "5년",
-  "timeline.axis.project": "프로젝트",
-  "timeline.axis.list": "리스트",
-  "timeline.axis.none": "묶지 않음",
   "timeline.prev": "이전",
   "timeline.next": "다음",
   "timeline.today": "오늘",
@@ -152,7 +148,6 @@ export const ko: Dictionary = {
   "timeline.dependencies": "의존 관계",
   "timeline.blockerOffWindow": "이 창 밖의 작업을 기다리는 중",
   "timeline.dependentOffWindow": "이 창 밖의 작업이 이것을 기다리는 중",
-  "sidebar.horizons": "지평",
   "sidebar.planning": "계획",
 
   // ---- board ----
