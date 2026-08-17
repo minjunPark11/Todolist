@@ -33,7 +33,7 @@ import {
 import * as hierarchy from "../domain/spaces/hierarchy";
 import * as spaceTree from "../domain/spaces/spaces";
 import { sanitizeFolder, sanitizeList } from "../domain/spaces/hierarchy";
-import { defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
+import { backfillTaskListId, defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
 import * as pathOps from "../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
 import { childDraft, promoteDraft } from "../domain/tasks/children";
@@ -399,22 +399,29 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   // to be. Tasks and goals are not rewritten, because while a Project has one
   // List their membership is already answered by projectId
   // (domain/spaces/membership).
-  const lists = hierarchy.ensureDefaultLists(
+  const withDefaults = hierarchy.ensureDefaultLists(
     projects.filter((project) => !project.archivedAt).map((project) => project.id),
     data.lists,
     now,
     defaultListIdFor,
   );
+  // TickTick plan Migration Phase 2 (§6.69): the account gets its Inbox, the
+  // one List belonging to no Project. Phase 3 (§6.70) then writes down which
+  // List owns each Task, so `listIdFor`'s derivation stops being the answer
+  // and becomes a fallback for records neither phase has reached.
+  const lists = hierarchy.ensureInboxList(withDefaults, now);
+  const tasks = backfillTaskListId(data.tasks, lists, now);
   if (
     focusSessions === data.focusSessions &&
     learningPaths === data.learningPaths &&
     projects === data.projects &&
     spaces === data.spaces &&
-    lists === data.lists
+    lists === data.lists &&
+    tasks === data.tasks
   ) {
     return data;
   }
-  return { ...data, focusSessions, learningPaths, projects, spaces, lists };
+  return { ...data, focusSessions, learningPaths, projects, spaces, lists, tasks };
 }
 
 // Phase S4 migration, and the same shape as the one below it: custom spaces

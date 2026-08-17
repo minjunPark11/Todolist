@@ -33,6 +33,9 @@ export const DEFAULT_STATUSES: Status[] = [
 
 export const DEFAULT_LIST_NAME = "Tasks";
 
+/** The app's name for the Inbox, translated at display time like the above. */
+export const INBOX_LIST_NAME = "Inbox";
+
 /**
  * The name to SHOW for a List.
  *
@@ -51,10 +54,14 @@ export const DEFAULT_LIST_NAME = "Tasks";
  * default List keeps the name they gave it.
  */
 export function listDisplayName(
-  list: Pick<List, "name" | "isDefault"> | undefined,
+  list: Pick<List, "name" | "isDefault" | "kind"> | undefined,
   defaultLabel: string,
+  inboxLabel?: string,
 ): string {
   if (!list) return "";
+  // The Inbox's name is the app's and is not the user's to change (§6.7), so
+  // it translates unconditionally — there is no "they renamed it" case.
+  if (list.kind === "inbox") return inboxLabel ?? list.name;
   return list.isDefault && list.name === DEFAULT_LIST_NAME ? defaultLabel : list.name;
 }
 
@@ -162,7 +169,11 @@ export function sanitizeList(value: unknown): List | null {
   // before this release has only `spaceId`, and a client from before it drops
   // any List that lacks one, so the mirror is what makes the rename safe.
   const projectId = asString(record.projectId).trim() || asString(record.spaceId).trim();
-  if (!id || !projectId) return null;
+  const kind = record.kind === "inbox" ? "inbox" : undefined;
+  // The Inbox belongs to no Project by definition (§6.5), so it is the one
+  // List allowed through without an owner. Everything else without one cannot
+  // be reached from anywhere and would sync forever unseen.
+  if (!id || (!projectId && !kind)) return null;
   const statuses = sanitizeStatuses(record.statuses);
   const createdAt = asString(record.createdAt);
   const updatedAt = asString(record.updatedAt);
@@ -171,6 +182,7 @@ export function sanitizeList(value: unknown): List | null {
     id,
     projectId,
     spaceId: projectId,
+    ...(kind ? { kind } : {}),
     folderId: asString(record.folderId).trim() || undefined,
     name: asString(record.name),
     order: asOrder(record.order),
@@ -266,6 +278,48 @@ export function ensureDefaultLists(
     added.push(makeDefaultList(id, spaceId, now));
   }
   return added.length > 0 ? [...lists, ...added] : lists;
+}
+
+/**
+ * The one List that belongs to no Project (TickTick plan §6.5, §6.6).
+ *
+ * Fixed rather than generated, for the same reason `defaultListIdFor` is: a
+ * second device running the migration on its own has to arrive at the same
+ * row, not a duplicate. It is also what lets the record be rebuilt after an
+ * older client drops it for having no `spaceId`.
+ */
+export const INBOX_LIST_ID = "list-inbox";
+
+export function isInboxList(list: Pick<List, "kind">): boolean {
+  return list.kind === "inbox";
+}
+
+/**
+ * Give the account its Inbox (Migration Phase 2).
+ *
+ * Returns the SAME array when one already exists, so a load that changes
+ * nothing marks nothing dirty. The name is the app's, not the user's (§6.7) —
+ * `listDisplayName` is what turns it into the reader's language.
+ */
+export function ensureInboxList(lists: List[], now: string): List[] {
+  if (lists.some((list) => isInboxList(list) || list.id === INBOX_LIST_ID)) return lists;
+  return [
+    ...lists,
+    {
+      id: INBOX_LIST_ID,
+      // No Project owns the Inbox. Both keys stay empty rather than pointing
+      // at a sentinel, which would file it under a Project on any screen that
+      // groups by one.
+      projectId: "",
+      spaceId: "",
+      kind: "inbox",
+      name: INBOX_LIST_NAME,
+      order: -1,
+      isDefault: false,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
 }
 
 export function addList(current: List[], list: List): List[] {

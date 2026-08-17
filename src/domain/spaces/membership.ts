@@ -36,13 +36,73 @@ export function defaultListIdFor(spaceId: string): string {
 }
 
 /**
- * The stored value wins; otherwise the Space's default List answers. An Item
- * whose Space has no List at all resolves to "" rather than guessing.
+ * The stored value wins; otherwise the Project's default List answers. An Item
+ * whose Project has no List at all resolves to "" rather than guessing.
+ *
+ * The fallback is the leg being removed. The TickTick plan makes `Task.listId`
+ * the single owner (§6.5) and reads the Project THROUGH the List (§6.77),
+ * where this derives the List from the Project — the opposite direction.
+ * `backfillTaskListId` writes the answer down once so the fallback stops being
+ * load-bearing; this stays until nothing reaches it.
  */
 export function listIdFor(item: Pick<Task, "listId" | "projectId">, lists: List[]): string {
   if (item.listId) return item.listId;
-  if (!item.projectId) return "";
+  if (!item.projectId) return inboxListId(lists);
   return defaultListFor(lists, item.projectId)?.id ?? "";
+}
+
+/** The account's Inbox, or "" before the migration has created it. */
+export function inboxListId(lists: List[]): string {
+  return lists.find((list) => list.kind === "inbox" && !list.archivedAt)?.id ?? "";
+}
+
+/**
+ * The Project a Task belongs to, read through its List (§6.77).
+ *
+ * "Task에 별도 projectId를 읽지 않는다" — membership flows one way, so moving a
+ * List between Projects never has to rewrite the Tasks under it. Falls back to
+ * the stored `projectId` for a Task the backfill has not reached yet, and
+ * answers "" for one in the Inbox, which belongs to no Project (§6.80).
+ */
+export function projectIdFor(task: Pick<Task, "listId" | "projectId">, lists: List[]): string {
+  const list = task.listId ? lists.find((candidate) => candidate.id === task.listId) : undefined;
+  if (list) return list.kind === "inbox" ? "" : list.projectId;
+  return task.projectId;
+}
+
+/**
+ * Write every Task's owning List down (Migration Phase 3, §6.70).
+ *
+ * The plan's three cases, in its order:
+ *
+ *   A  already has a `listId`            → left alone
+ *   B  has a Project but no List         → that Project's default List
+ *   C  has neither                       → the Inbox
+ *
+ * B does NOT go to the Inbox, and the plan is emphatic about why (§6.71):
+ * moving a Project's Tasks there would make them vanish from the Space and
+ * Project screens that show them today. The default List already exists —
+ * `ensureDefaultLists` has been creating one per Project since P4 — so this
+ * only records what `listIdFor` was already computing.
+ *
+ * Returns the SAME array when nothing needs writing, and spreads only the
+ * Tasks it touches, because the sync plan decides what to upload by object
+ * identity.
+ */
+export function backfillTaskListId(tasks: Task[], lists: List[], now: string): Task[] {
+  const inbox = inboxListId(lists);
+  let touched = false;
+  const next = tasks.map((task) => {
+    if (task.listId) return task;
+    const listId = task.projectId ? defaultListFor(lists, task.projectId)?.id ?? "" : inbox;
+    // No answer yet — a Project whose default List has not been created, or an
+    // account whose Inbox is missing. Leaving it unwritten is right: the
+    // fallback still resolves it, and the next load will have the List.
+    if (!listId) return task;
+    touched = true;
+    return { ...task, listId, updatedAt: now };
+  });
+  return touched ? next : tasks;
 }
 
 export function goalListIdFor(path: Pick<LearningPath, "listId" | "projectId">, lists: List[]): string {

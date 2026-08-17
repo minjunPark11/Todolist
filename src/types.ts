@@ -192,6 +192,21 @@ export interface List {
   projectId: string;
   /** @deprecated Legacy mirror of `projectId`, written for older clients. */
   spaceId?: string;
+  /**
+   * What kind of List this is (TickTick plan §6.4).
+   *
+   * `"inbox"` marks the one system List that holds Tasks belonging to no
+   * Project — the record the plan replaces `Task.status === "inbox"` with, so
+   * every Task has the same kind of owner (§6.5). There is exactly one per
+   * account and its name is not the user's to change (§6.7).
+   *
+   * Optional because a record written before this release has none, and
+   * absent reads as `"regular"`. An older client drops the Inbox List
+   * entirely — it has no `spaceId` to file under — which is survivable only
+   * because `Task.status === "inbox"` is still written beside `listId`, and
+   * because `ensureInboxList` rebuilds the row from a fixed id.
+   */
+  kind?: "inbox" | "regular";
   /** Absent for a Folderless List (D4). */
   folderId?: string;
   name: string;

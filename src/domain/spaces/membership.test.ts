@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { List, Project, Status, Task } from "../../types";
-import { DEFAULT_STATUSES, ensureDefaultLists, makeDefaultList } from "./hierarchy";
+import { DEFAULT_STATUSES, ensureDefaultLists, ensureInboxList, makeDefaultList } from "./hierarchy";
 import {
+  backfillTaskListId,
   defaultListIdFor,
   isDoneStatus,
   itemsInList,
@@ -9,6 +10,7 @@ import {
   MIGRATED_TASK_STATUSES,
   patchForGoalListMove,
   patchForListMove,
+  projectIdFor,
   resolveListMove,
   statusesForSpace,
   statusesWithCustom,
@@ -69,6 +71,61 @@ function task(overrides: Partial<Task> = {}): Task {
 }
 
 const defaultList: List = makeDefaultList(defaultListIdFor("space-1"), "space-1", NOW);
+const inbox: List = ensureInboxList([], NOW)[0];
+
+// TickTick plan Migration Phase 3 (§6.70). The three cases are the plan's own,
+// and case B is the one with a trap in it.
+describe("backfillTaskListId", () => {
+  const lists = [defaultList, inbox];
+
+  it("A — leaves a Task that already names its List untouched", () => {
+    const already = task({ listId: "list-chosen" });
+    expect(backfillTaskListId([already], lists, NOW)[0]).toBe(already);
+  });
+
+  it("B — files a Project's Task under that Project's default List, NOT the Inbox", () => {
+    // §6.71: sending these to the Inbox would make them disappear from the
+    // Space and Project screens that show them today.
+    const [filed] = backfillTaskListId([task({ projectId: "space-1" })], lists, NOW);
+    expect(filed.listId).toBe(defaultList.id);
+    expect(filed.listId).not.toBe(inbox.id);
+  });
+
+  it("C — files a Task with no Project at all into the Inbox", () => {
+    const [filed] = backfillTaskListId([task({ projectId: "" })], lists, NOW);
+    expect(filed.listId).toBe(inbox.id);
+  });
+
+  it("returns the SAME array when there is nothing to write", () => {
+    const settled = [task({ listId: defaultList.id })];
+    expect(backfillTaskListId(settled, lists, NOW)).toBe(settled);
+  });
+
+  it("leaves a Task alone when no List can answer for it yet", () => {
+    // A Project whose default List has not been created. Writing "" would be
+    // worse than waiting: the fallback still resolves it next load.
+    const orphan = task({ projectId: "space-9" });
+    expect(backfillTaskListId([orphan], [defaultList], NOW)[0]).toBe(orphan);
+  });
+});
+
+describe("projectIdFor — membership read through the List (§6.77)", () => {
+  const lists = [defaultList, inbox];
+
+  it("answers from the List, not from the Task's own projectId", () => {
+    // The stored `projectId` is deliberately wrong here: the List is the owner.
+    const moved = task({ listId: defaultList.id, projectId: "stale" });
+    expect(projectIdFor(moved, lists)).toBe("space-1");
+  });
+
+  it("answers '' for a Task in the Inbox, which belongs to no Project (§6.80)", () => {
+    expect(projectIdFor(task({ listId: inbox.id, projectId: "" }), lists)).toBe("");
+  });
+
+  it("falls back to the stored projectId for a Task the backfill has not reached", () => {
+    expect(projectIdFor(task({ listId: "", projectId: "space-1" }), lists)).toBe("space-1");
+  });
+});
 
 // The migration writes nothing to tasks, which only works if every status the
 // app can store already exists in the default set. If TaskStatus ever gains a
