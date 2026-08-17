@@ -10919,6 +10919,53 @@ Overview는 Canonical Task/Domain 집계를 사용하고, Goals/Horizons는 각�
 
 ---
 
+## STEP 11 — Sidebar / SpaceTree — 완료 (2026-08-17)
+
+트리가 네 단계가 됐다.
+
+```text
+Space
+└── Project
+    ├── Folder
+    │   └── List
+    └── List          (Folderless, U2로 드러난 뒤)
+```
+
+기존 Project 행 로직은 건드리지 않고 위에 한 겹을 얹었다. Project 행은 여전히 `spaceIdForProject`로 자기 Space를 읽는다 — **그려진 위치가 아니라 레코드에서 경로를 만든다.**
+
+펼침 상태는 두 레벨 모두 선택에서 시작한다. 딥링크가 두 개의 닫힌 행 뒤가 아니라 이름한 List가 보이는 채로 도착한다.
+
+### 생성이 자리를 얻었다
+
+사이드바 바닥의 평평한 "프로젝트 추가" 필드를 없앴다. **그 필드는 어느 Space에 넣을지 말할 수 없었다.** 생성은 트리 안으로 들어가 클릭한 Space 아래에서 일어난다.
+
+`addProject(name, color, spaceId?)`로 확장했다. 만들고 나서 옮기면 한 동작에 두 행이 나간다.
+
+### 고친 결함
+
+`ensureDefaultSpace`가 **모든 Project가 이미 Space를 가진 계정에도 "My Space"를 만들고 있었다.** 조건이 "Project가 하나라도 있으면"이었기 때문이다. 사용자가 만든 적 없고, 실제 Space에서 뭔가를 빼내지 않으면 채울 수도 없는 빈 작업 영역이 트리 맨 위에 앉아 있었다.
+
+조건을 "**Space가 없는 Project가 하나라도 있으면**"으로 고쳤다. 테스트가 이 경우를 덮는다.
+
+### 검증
+
+```text
+4단계 트리          0:연구 → 1:드론 배송 연구 → 2:문헌 · 2:실험
+딥링크              /s/sp-research/p/p1/l/list-exp → 양쪽 분기 열림, List 행만 선택
+Space 행 클릭       /s/sp-life → Space 화면, 정확히 한 행 선택
+Space 아래 생성     신규 프로젝트 → spaceId: sp-research (한 번의 쓰기)
+유령 Space          없음 (storedSpaces: sp-research, sp-life)
+추가 버튼            + 리스트 · + 폴더 · + 프로젝트 · + 공간
+```
+
+typecheck 통과, 테스트 **669개** 통과.
+
+### 남은 것
+
+§50.8의 List 행 스코프 이동은 여전히 미뤄져 있다. 트리가 이제 선택자를 갖고 있으므로, Overview에 내려주는 것은 STEP 13에서 정리할 배선이다.
+
+---
+
 ## STEP 11 — Sidebar / SpaceTree
 
 Location + Scope가 안정된 뒤 Sidebar를 새 Hierarchy에 연결한다.

@@ -1071,7 +1071,14 @@ export function usePlannerData() {
     });
   }
 
-  function addProject(name: string, color: string) {
+  /**
+   * `spaceId` is optional and answered by `spaceIdForProject` when absent, so
+   * a caller with no Space in hand still creates a Project that appears in the
+   * tree. The sidebar passes one because it knows which row was clicked —
+   * writing it there beats creating the Project and moving it a moment later,
+   * which would put two rows on the wire for one action.
+   */
+  function addProject(name: string, color: string, spaceId?: string) {
     const trimmed = name.trim();
     if (!trimmed) {
       return;
@@ -1085,6 +1092,7 @@ export function usePlannerData() {
       color,
       status: "active",
       archivedAt: "",
+      ...(spaceId ? { spaceId } : {}),
       createdAt: now,
       updatedAt: now,
     };

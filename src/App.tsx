@@ -424,6 +424,12 @@ export default function App() {
     return project ? spaceIdForProject(project) : "";
   }
 
+  function selectSpace(spaceId: string) {
+    planner.selectTask("");
+    navigate(pathForSelection({ kind: "space", spaceId }));
+    setActivePage("projects");
+  }
+
   function selectProject(projectId: string) {
     planner.selectTask("");
     navigate(pathForSelection({ kind: "project", spaceId: spaceIdOf(projectId), projectId }));
@@ -1181,6 +1187,10 @@ export default function App() {
           // A milestone lives inside its goal and has no List of its own.
         }}
         onAddProject={(name) => planner.addProject(name, "#0066cc")}
+        spaces={planner.spaces}
+        onSelectSpace={selectSpace}
+        onCreateSpace={planner.createSpace}
+        onCreateProject={(spaceId, name) => planner.addProject(name, "#0066cc", spaceId)}
         onOpenSettings={() => {
           navigateSection("settings");
           setMobileMenuOpen(false);

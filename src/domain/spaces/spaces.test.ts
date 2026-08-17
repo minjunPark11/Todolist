@@ -73,6 +73,13 @@ describe("ensureDefaultSpace", () => {
     expect(ensureDefaultSpace(spaces, [], NOW)).toBe(spaces);
   });
 
+  it("creates nothing when every Project is already filed", () => {
+    // Otherwise an empty "My Space" appears at the top of the tree: a work
+    // area the user never made and cannot fill without emptying a real one.
+    const spaces: Space[] = [];
+    expect(ensureDefaultSpace(spaces, [project({ spaceId: "s-1" })], NOW)).toBe(spaces);
+  });
+
   it("creates one Space with a fixed id so a second run cannot duplicate it", () => {
     const first = ensureDefaultSpace([], [project()], NOW);
     expect(first.map((s) => s.id)).toEqual([DEFAULT_SPACE_ID]);

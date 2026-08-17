@@ -1823,6 +1823,17 @@ textarea {
   border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* The work area, added above Project in STEP 11. Read as the top of the tree
+ * without a second visual language: the same row, one step heavier. */
+.spt-area-row .spt-label {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.spt-area + .spt-area {
+  margin-top: 6px;
+}
+
 .spt-add {
   border: 0;
   background: none;

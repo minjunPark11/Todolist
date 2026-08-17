@@ -103,14 +103,18 @@ export function makeSpace(id: string, name: string, now: string, order = 0): Spa
 }
 
 /**
- * Create the default Space if the account has none (§39 M2).
+ * Create the default Space, but only for Projects that need one (§39 M2).
+ *
+ * "Need" means having no `spaceId` of their own. An account whose Projects are
+ * already filed gets nothing — creating it anyway left an empty "My Space"
+ * sitting at the top of the tree, a work area the user never made and cannot
+ * put anything in without moving something out of a real one.
  *
  * Returns the SAME array when there is nothing to add, so a load that changes
- * nothing marks nothing dirty. Only runs when there is something to file: an
- * empty account gets its Space when it gets its first Project, not before.
+ * nothing marks nothing dirty.
  */
 export function ensureDefaultSpace(spaces: Space[], projects: Project[], now: string, name = DEFAULT_SPACE_NAME): Space[] {
-  if (projects.length === 0) return spaces;
+  if (!projects.some((project) => !project.spaceId)) return spaces;
   if (spaces.some((space) => space.id === DEFAULT_SPACE_ID)) return spaces;
   return [...spaces, makeSpace(DEFAULT_SPACE_ID, name, now)];
 }

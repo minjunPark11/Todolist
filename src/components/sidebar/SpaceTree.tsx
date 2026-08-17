@@ -9,20 +9,26 @@
 // List hides the List level entirely, so simple use never pays for the
 // hierarchy. The reveal is ONE-WAY — see `shouldRevealLists`.
 import { useState } from "react";
-import type { Folder, List, Project } from "../../types";
+import type { Folder, List, Project, Space } from "../../types";
 import { activeFolders, folderlessLists, listsInFolder, shouldRevealLists } from "../../domain/spaces/hierarchy";
-import { spaceIdForProject } from "../../domain/spaces/spaces";
-import { isSelected, selectedProjectId, type Selection } from "../../app/spaceSelection";
+import { projectsInSpace, spaceIdForProject } from "../../domain/spaces/spaces";
+import { isSelected, selectedProjectId, selectedSpaceId, type Selection } from "../../app/spaceSelection";
 import { useT } from "../../i18n";
 
 interface SpaceTreeProps {
-  spaces: Project[];
+  /** The work areas — the level STEP 11 added above Project. */
+  workAreas: Space[];
+  /** Every active Project; each row is filed under its `spaceId`. */
+  projects: Project[];
   folders: Folder[];
   lists: List[];
   selection: Selection;
-  /** Open task count per Space id; omitted when the user turned counts off. */
+  /** Open task count per PROJECT id; a Space sums the ones under it. */
   counts?: Map<string, number>;
   onSelectSpace: (spaceId: string) => void;
+  onSelectProject: (projectId: string) => void;
+  onCreateSpace: (name: string) => void;
+  onCreateProject: (spaceId: string, name: string) => void;
   onSelectList: (spaceId: string, listId: string) => void;
   onSelectFolder: (spaceId: string, folderId: string) => void;
   onCreateList: (spaceId: string, name: string, folderId?: string) => void;
@@ -143,16 +149,19 @@ function ListRow({ list, spaceId, projectId, selection, onSelect, onRename, onAr
 }
 
 export function SpaceTree({
-  spaces, folders, lists, selection, counts,
-  onSelectSpace, onSelectList, onSelectFolder, onCreateList, onCreateFolder,
+  workAreas, projects, folders, lists, selection, counts,
+  onSelectSpace, onSelectProject, onCreateSpace, onCreateProject,
+  onSelectList, onSelectFolder, onCreateList, onCreateFolder,
   onRenameList, onArchiveList, onRenameFolder, onArchiveFolder, onMoveItemToList,
 }: SpaceTreeProps) {
   const { t } = useT();
-  // A selected branch starts open, so a deep link or a reload lands with the
-  // list it names already in view rather than behind a closed row.
-  //
-  // Keyed by PROJECT id, which is what these rows are. `selection.spaceId`
-  // names the Space above them since STEP 6 and would never match.
+  // A selected branch starts open at BOTH levels, so a deep link or a reload
+  // lands with the list it names in view rather than behind two closed rows.
+  // Each set is keyed by the id of the rows it controls.
+  const [openAreas, setOpenAreas] = useState<Set<string>>(() => {
+    const spaceId = selectedSpaceId(selection);
+    return new Set(spaceId ? [spaceId] : []);
+  });
   const [openSpaces, setOpenSpaces] = useState<Set<string>>(() => {
     const projectId = selectedProjectId(selection);
     return new Set(projectId ? [projectId] : []);
@@ -168,10 +177,35 @@ export function SpaceTree({
 
   return (
     <div className="spt-tree">
-      {spaces.map((space) => {
-        // Rows are Projects. The Space level above them arrives in STEP 11;
-        // until then each row carries the Space its Project hangs in so the
-        // paths this tree builds are complete.
+      {workAreas.map((area) => {
+        const areaOpen = openAreas.has(area.id);
+        const areaProjects = projectsInSpace(projects, area.id);
+        const areaCount = areaProjects.reduce((sum, project) => sum + (counts?.get(project.id) ?? 0), 0);
+        const areaSelected = isSelected(selection, { kind: "space", spaceId: area.id });
+
+        return (
+          <div key={area.id} className="spt-area">
+            <div className={`spt-row spt-area-row${areaSelected ? " is-selected" : ""}`}>
+              <button
+                type="button"
+                className="spt-twisty"
+                aria-expanded={areaOpen}
+                aria-label={areaOpen ? t("tree.collapse") : t("tree.expand")}
+                onClick={() => toggle(openAreas, area.id, setOpenAreas)}
+              >
+                <Chevron open={areaOpen} />
+              </button>
+              <button type="button" className="spt-label" onClick={() => onSelectSpace(area.id)}>
+                <span className="spt-dot" style={{ background: area.color }} aria-hidden="true" />
+                {area.name}
+              </button>
+              {counts && areaCount > 0 ? <span className="spt-count">{areaCount}</span> : null}
+            </div>
+            {!areaOpen ? null : (
+      <div className="spt-children">
+      {areaProjects.map((space) => {
+        // Project rows. `spaceIdForProject` rather than `area.id` so the path
+        // is built from the record, not from where it happens to be drawn.
         const spaceId = spaceIdForProject(space);
         const open = openSpaces.has(space.id);
         const spaceFolders = activeFolders(folders, space.id);
@@ -192,7 +226,7 @@ export function SpaceTree({
               >
                 <Chevron open={open} />
               </button>
-              <button type="button" className="spt-label" onClick={() => onSelectSpace(space.id)}>
+              <button type="button" className="spt-label" onClick={() => onSelectProject(space.id)}>
                 <span className="spt-dot" style={{ background: space.color }} aria-hidden="true" />
                 {space.name}
               </button>
@@ -296,6 +330,23 @@ export function SpaceTree({
           </div>
         );
       })}
+              {/* A Project is created INSIDE a Space now — the flat field at
+                  the bottom of the sidebar could not say which one. */}
+              <InlineAdd
+                label={t("tree.project")}
+                placeholder={t("tree.projectPlaceholder")}
+                onSubmit={(name) => onCreateProject(area.id, name)}
+              />
+      </div>
+            )}
+          </div>
+        );
+      })}
+      <InlineAdd
+        label={t("tree.space")}
+        placeholder={t("tree.spacePlaceholder")}
+        onSubmit={onCreateSpace}
+      />
     </div>
   );
 }

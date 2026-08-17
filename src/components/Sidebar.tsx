@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { Folder, List, PageId, Project, Task } from "../types";
+import type { Folder, List, PageId, Project, Space, Task } from "../types";
 import { SpaceTree } from "./sidebar/SpaceTree";
 import type { Selection } from "../app/spaceSelection";
 import { todayValue } from "../utils/date";
@@ -30,6 +30,8 @@ interface SidebarProps {
   onNavigate: (page: PageId) => void;
   tasks: Task[];
   projects: Project[];
+  /** The work areas the tree files Projects under (STEP 11). */
+  spaces: Space[];
   selectedProjectId: string;
   userEmail: string;
   showCounts?: boolean;
@@ -39,6 +41,10 @@ interface SidebarProps {
   lists: List[];
   selection: Selection;
   onSelectProject: (projectId: string) => void;
+  onSelectSpace: (spaceId: string) => void;
+  onCreateSpace: (name: string) => void;
+  /** A Project is created inside a Space, so the id is required. */
+  onCreateProject: (spaceId: string, name: string) => void;
   onSelectList: (spaceId: string, listId: string) => void;
   onSelectFolder: (spaceId: string, folderId: string) => void;
   onCreateList: (spaceId: string, name: string, folderId?: string) => void;
@@ -172,6 +178,10 @@ export function Sidebar({
   lists,
   selection,
   onSelectProject,
+  spaces,
+  onSelectSpace,
+  onCreateSpace,
+  onCreateProject,
   onSelectList,
   onSelectFolder,
   onCreateList,
@@ -334,12 +344,16 @@ export function Sidebar({
             {/* The flat shortcut list this replaces could name a Space but
                 nothing inside one (U1). The tree is its superset. */}
             <SpaceTree
-              spaces={projects}
+              workAreas={spaces}
+              projects={projects}
               folders={folders}
               lists={lists}
               selection={selection}
               counts={showCounts ? openCountsBySpace : undefined}
-              onSelectSpace={onSelectProject}
+              onSelectSpace={onSelectSpace}
+              onSelectProject={onSelectProject}
+              onCreateSpace={onCreateSpace}
+              onCreateProject={onCreateProject}
               onSelectList={onSelectList}
               onSelectFolder={onSelectFolder}
               onCreateList={onCreateList}
@@ -350,27 +364,9 @@ export function Sidebar({
               onArchiveFolder={onArchiveFolder}
               onMoveItemToList={onMoveItemToList}
             />
-            <form
-              className="side-add"
-              onSubmit={(event) => {
-                event.preventDefault();
-                submitNewProject();
-              }}
-            >
-              <input
-                placeholder={t("sidebar.addProjectPlaceholder")}
-                value={newProject}
-                onChange={(event) => setNewProject(event.target.value)}
-                onKeyDown={(event) => {
-                  // Sole text field in the form, so Enter submits implicitly —
-                  // including the Enter an IME sends to commit a composition.
-                  // Swallow that one so a half-typed name is not created.
-                  if (event.key === "Enter" && event.nativeEvent.isComposing) {
-                    event.preventDefault();
-                  }
-                }}
-              />
-            </form>
+            {/* The flat "add project" field that stood here could not say
+                which Space the Project belonged to. Creation moved inside the
+                tree, under the Space it lands in. */}
           </div>
         </MotionCollapse>
       </div>
