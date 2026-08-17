@@ -11,10 +11,8 @@ import { getSpacePreset, resolveTaskGroups } from "../../lib/spaceTypeConfig";
 import { useT } from "../../i18n";
 import { presetText, tabText, hubTypeText, upcomingKindText } from "../../lib/spaceHubI18n";
 import {
-  deriveSpaceActivities,
   formatSeconds,
   getNextActionTask,
-  getRecentSpaceFocusSessions,
   getSpaceSignal,
   getSpaceTaskCounts,
   getSpaceTasks,
@@ -63,6 +61,8 @@ export type SpaceDetailViewProps = {
   folders: Folder[];
   /** Widens the view back to the whole Space without touching the tree. */
   onClearScope: () => void;
+  /** Narrows to one List — the same selector the tree uses (§50.8). */
+  onSelectList: (listId: string) => void;
   onUpdatePath: (pathId: string, patch: Partial<Omit<LearningPath, "id">>) => void;
   onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
   onCreateGoal: (input: { goal: string; projectId: string; boardListId?: string; schedule?: GoalSchedule }) => void;
@@ -129,6 +129,7 @@ export function SpaceDetailView({
   viewScope,
   folders,
   onClearScope,
+  onSelectList,
   onUpdatePath,
   onUpdateMilestone,
   onCreateGoal,
@@ -184,10 +185,6 @@ export function SpaceDetailView({
   const spaceSessions = useMemo(
     () => getSpaceSessions(focusSessions, spaceTasks, projectId),
     [focusSessions, spaceTasks, projectId],
-  );
-  const activities = useMemo(
-    () => deriveSpaceActivities(space.id, spaceTasks, spaceSessions, hub.activities, t),
-    [space.id, spaceTasks, spaceSessions, hub.activities, t],
   );
 
   // === Tasks board (CLICKUP_IMPORT_DESIGN §4.2: filter{space} + groupBy status) ===
@@ -306,7 +303,6 @@ export function SpaceDetailView({
   const todayFocusSeconds = getTodaySpaceFocusSeconds(spaceSessions, today);
   const weekFocusSeconds = getWeekSpaceFocusSeconds(spaceSessions, weekStart);
   const upcoming = getUpcomingSpaceItems(spaceTasks, today);
-  const recentSessions = getRecentSpaceFocusSessions(spaceSessions, 3);
   // View <-> URL query sync (U3): pushState on change, restore on popstate.
   function setTab(next: SpaceTab) {
     if (next === tab) return;
@@ -359,14 +355,9 @@ export function SpaceDetailView({
     }));
   }, [lists, projectId, boardItems, spaceTasks]);
 
-  /**
-   * §50.8 wants a List row to narrow the scope to that List, which needs a
-   * selector this screen is not given — the tree owns it. Opening the List
-   * view, grouped by List, is the nearest true action; a click that claimed to
-   * scope and did not would be worse than one that goes somewhere real.
-   */
-  function openListRow() {
-    setTab("list");
+  /** §50.8: a List row narrows the scope to that List. */
+  function openListRow(listId: string) {
+    onSelectList(listId);
   }
 
   /** One route into the shared detail surface, whatever view opened it (§49A.4). */

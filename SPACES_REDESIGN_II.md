@@ -11056,6 +11056,48 @@ Non-empty Space delete가 하위 Domain을 cascade delete하지 않음
 
 ---
 
+## STEP 13 — Remove Legacy Duplication — 완료 (2026-08-17)
+
+STEP 12가 등가성을 보였으므로 삭제가 열렸다.
+
+### 지운 것
+
+```text
+SpaceOverviewTab.tsx           호출자 0. §50 Overview가 대체
+deriveSpaceActivities          활동 타임라인 파생 — 보여줄 화면이 없다
+getRecentSpaceFocusSessions    같은 이유
+activities / recentSessions    SpaceDetailView에서 계산만 되고 소비 0
+i18n 키 9개                    spaceHub.activity.* · signal.overdue/pendingItems*
+```
+
+활동 타임라인은 **Overview가 같은 질문에 레코드에서 직접 답하기 때문에** 두 번째 파생 피드가 할 말이 없어졌다. `SpaceActivity` 타입은 남긴다 — `useSpaceHubData`가 아직 사용자가 손으로 적은 기록을 blob에 들고 있고, 타입을 지우면 그것들이 사라진다.
+
+`signal.overdue`/`pendingItems` 계열은 STEP 4.5에서 지운 "personal" 분기의 것이다.
+
+### 미뤄뒀던 것을 끝냈다
+
+§50.8의 List 행 스코프 이동을 배선했다. STEP 10에서 "선택자가 이 화면에 없다"고 미뤘고 STEP 11이 트리에 그 선택자를 만들었으므로, App의 `selectList`를 Overview까지 내려주면 끝이었다.
+
+```text
+Overview의 "실험" 행 클릭
+→ /s/sp-research/p/p1/l/list-exp
+→ 트리에서 "실험" 행 선택
+```
+
+**주장하지 않고 미뤄둔 것이 실제로 갚혔다.**
+
+### 안 지운 것
+
+죽은 i18n 키가 **약 130개 더 있다.** 이 재설계 이전 여러 릴리스에 걸쳐 삭제된 화면들의 잔해다(노트 타입, AI 명령 팔레트, 기록/집중 통계 패널 등). 일부는 템플릿 리터럴로 만들어질 수 있어 한 번에 쓸어내는 것은 별도 위험이고, **이번 작업이 죽인 것이 아니다.** 별도 작업으로 분리했다.
+
+### 검증
+
+typecheck 통과, 테스트 **692개** 통과, i18n 키 수 좌우 대칭(1337/1337).
+
+실제 앱에서 일곱 탭 전부 열림, 콘솔 오류 없음.
+
+---
+
 ## STEP 13 — Remove Legacy Duplication
 
 STEP 12를 통과한 경로에 대해서만 기존 수동 Rendering / Filtering / Legacy Navigation 중복을 제거한다.

@@ -1055,6 +1055,7 @@ export default function App() {
         selectedProjectId={selectedProjectId}
         viewScope={filterForSelection(selection)}
         onClearScope={clearScope}
+        onSelectList={(listId) => selectList(selectedProjectId, listId)}
         isProjectDetailOpen={isProjectDetailOpen}
         onSelectSpace={selectProject}
         onCloseSpace={clearSelection}

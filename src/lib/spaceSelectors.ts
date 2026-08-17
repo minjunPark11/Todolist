@@ -1,9 +1,5 @@
 import type { FocusSession, Task } from "../types";
-import type {
-  SpaceActivity,
-  SpaceCustomConfig,
-  SpaceSignalStatus,
-} from "./spaceHubTypes";
+import type { SpaceCustomConfig, SpaceSignalStatus } from "./spaceHubTypes";
 import { addDays, todayValue } from "../utils/date";
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
@@ -154,13 +150,6 @@ export function getWeekSpaceFocusSeconds(spaceSessions: FocusSession[], weekStar
     .reduce((sum, session) => sum + sessionSeconds(session), 0);
 }
 
-export function getRecentSpaceFocusSessions(spaceSessions: FocusSession[], limit = 3): FocusSession[] {
-  return spaceSessions
-    .filter((session) => session.status === "completed")
-    .sort((a, b) => (b.endAt || b.createdAt).localeCompare(a.endAt || a.createdAt))
-    .slice(0, limit);
-}
-
 export interface UpcomingItem {
   id: string;
   title: string;
@@ -190,69 +179,13 @@ export function getUpcomingSpaceItems(
 }
 
 
-// Activity timeline (§16): derived from real records + stored manual entries.
-export function deriveSpaceActivities(
-  spaceId: string,
-  spaceTasks: Task[],
-  spaceSessions: FocusSession[],
-  storedActivities: SpaceActivity[],
-  t: TFn,
-  limit = 30,
-): SpaceActivity[] {
-  const derived: SpaceActivity[] = [];
-  const untitled = t("spaceHub.untitled");
-
-  for (const task of spaceTasks) {
-    derived.push({
-      id: `act-created-${task.id}`,
-      spaceId,
-      type: "task_created",
-      title: t("spaceHub.activity.taskCreated", { title: task.title }),
-      description: "",
-      relatedTaskId: task.id,
-      relatedSessionId: "",      createdAt: task.createdAt,
-    });
-    if (task.completedAt) {
-      derived.push({
-        id: `act-done-${task.id}`,
-        spaceId,
-        type: "task_completed",
-        title: t("spaceHub.activity.taskCompleted", { title: task.title }),
-        description: "",
-        relatedTaskId: task.id,
-        relatedSessionId: "",        createdAt: task.completedAt,
-      });
-    }
-  }
-  for (const session of spaceSessions) {
-    if (session.status === "completed") {
-      derived.push({
-        id: `act-focus-${session.id}`,
-        spaceId,
-        type: "focus_completed",
-        title: t("spaceHub.activity.focusCompleted", { title: session.title || untitled }),
-        description: `${Math.max(1, Math.round(sessionSeconds(session) / 60))}m`,
-        relatedTaskId: session.taskId,
-        relatedSessionId: session.id,        createdAt: session.endAt || session.createdAt,
-      });
-    } else if (session.status === "running" || session.status === "paused") {
-      derived.push({
-        id: `act-focus-start-${session.id}`,
-        spaceId,
-        type: "focus_started",
-        title: t("spaceHub.activity.focusStarted", { title: session.title || untitled }),
-        description: "",
-        relatedTaskId: session.taskId,
-        relatedSessionId: session.id,        createdAt: session.startedAt || session.createdAt,
-      });
-    }
-  }
-  const manual = storedActivities.filter((activity) => activity.spaceId === spaceId);
-  return [...derived, ...manual]
-    .filter((activity) => Boolean(activity.createdAt))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, limit);
-}
+// The Space detail's activity timeline went with the screen that showed it
+// (STEP 10). The Overview answers "what is here and how is it going" from the
+// records themselves, and a second derived feed of the same events had nothing
+// left to tell anyone.
+//
+// `SpaceActivity` stays in spaceHubTypes: `useSpaceHubData` still carries the
+// stored manual entries, and dropping the type would drop those from the blob.
 
 export function formatSeconds(totalSeconds: number): string {
   const minutes = Math.round(totalSeconds / 60);

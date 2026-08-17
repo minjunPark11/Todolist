@@ -28,6 +28,7 @@ type AppPagesProps = {
   /** What the tree selected, as a view scope (§16). */
   viewScope: { spaceId?: string; projectId?: string; folderId?: string; listId?: string };
   onClearScope: () => void;
+  onSelectList: (listId: string) => void;
   onSelectSpace: (spaceId: string) => void;
   isProjectDetailOpen: boolean;
   onCloseSpace: () => void;
@@ -84,6 +85,7 @@ export function AppPages({
   selectedProjectId,
   viewScope,
   onClearScope,
+  onSelectList,
   onSelectSpace,
   isProjectDetailOpen,
   onCloseSpace,
@@ -366,6 +368,7 @@ export function AppPages({
         viewScope={viewScope}
         folders={planner.folders}
         onClearScope={onClearScope}
+        onSelectList={onSelectList}
         onOpenProject={onSelectSpace}
         onCloseProject={onCloseSpace}
         onOpenTask={planner.selectTask}

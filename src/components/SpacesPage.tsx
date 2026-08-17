@@ -106,6 +106,7 @@ type SpacesPageProps = {
   viewScope: { spaceId?: string; projectId?: string; folderId?: string; listId?: string };
   folders: Folder[];
   onClearScope: () => void;
+  onSelectList: (listId: string) => void;
   detailOpen: boolean;
   onOpenProject: (id: string) => void;
   onCloseProject: () => void;
@@ -195,6 +196,7 @@ export function SpacesPage({
   viewScope,
   folders,
   onClearScope,
+  onSelectList,
   detailOpen,
   onOpenProject,
   onCloseProject,
@@ -533,6 +535,7 @@ export function SpacesPage({
         viewScope={viewScope}
         folders={folders}
         onClearScope={onClearScope}
+        onSelectList={onSelectList}
         space={selectedSpace}
         tasks={tasks}
         lists={lists}
