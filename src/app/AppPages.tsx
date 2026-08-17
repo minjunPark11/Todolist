@@ -308,7 +308,6 @@ export function AppPages({
         onAddMilestone={planner.addMilestone}
         onDeleteMilestone={planner.deleteMilestone}
         onCreateTaskFromMilestone={planner.createTaskFromMilestone}
-        subtasks={planner.subtasks}
         focusSessions={planner.focusSessions}
         activeFocusSession={planner.activeFocusSession}
         onCompleteTask={planner.completeTask}
@@ -316,8 +315,6 @@ export function AppPages({
         onStartFocus={planner.startFocusSession}
         onNavigate={onNavigate}
         onOpenCalendar={openCalendarForProject}
-        selectedTaskId={planner.selectedTask?.id ?? ""}
-        taskDetail={renderTaskDetail()}
         selectedProjectId={selectedProjectId}
         detailOpen={isProjectDetailOpen}
         viewScope={viewScope}
@@ -325,17 +322,12 @@ export function AppPages({
         onClearScope={onClearScope}
         onSelectList={onSelectList}
         onOpenProject={onSelectSpace}
-        onCloseProject={onCloseSpace}
         onOpenTask={planner.selectTask}
         onToggleDone={planner.toggleTaskDone}
         onUpdateTask={planner.updateTask}
         onCreateTask={planner.createTask}
-        onCreateProject={planner.createProject}
         onUpdateProject={planner.updateProject}
-        onToggleStar={planner.toggleProjectPinned}
-        onArchiveProject={handleArchiveProject}
         onRequestDeleteProject={deleteProjectNow}
-        onSaveNotes={(id, value) => planner.updateProject(id, { notes: value })}
         showToast={showToast}
       />
       {goalDrawer}

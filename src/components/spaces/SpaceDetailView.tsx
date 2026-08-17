@@ -81,7 +81,6 @@ export type SpaceDetailViewProps = {
   lists: List[];
   focusSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
-  onBack: () => void;
   onCreateTask: (draft: TaskDraft) => string;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCompleteTask: (id: string) => void;
@@ -146,7 +145,6 @@ export function SpaceDetailView({
   lists,
   focusSessions,
   activeFocusSession,
-  onBack,
   onCreateTask,
   onUpdateTask,
   onCompleteTask,
@@ -470,9 +468,8 @@ export function SpaceDetailView({
 
   return (
     <div className="sdv-page" style={{ ["--sdv-accent" as string]: displayColor }}>
-      <button type="button" className="sdv-back" onClick={onBack}>
-        <span aria-hidden="true">←</span> {t("spaceHub.backToSpaces")}
-      </button>
+      {/* A "back to Spaces" button stood here and returned to the card grid.
+          The grid is gone — the tree is how you leave, and it is still there. */}
 
       {/* Space Header Card (§7) */}
       <header className="sdv-header-card">

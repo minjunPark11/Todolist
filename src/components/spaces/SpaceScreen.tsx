@@ -29,7 +29,6 @@ interface SpaceScreenProps {
   onOpenProject: (projectId: string) => void;
   onOpenTask: (taskId: string) => void;
   onOpenGoal: (goalId: string) => void;
-  onBack: () => void;
   /** Rendered for every tab but `overview`, so the Space owns only its own. */
   renderView: (tab: SpaceTab, scoped: { tasks: Task[]; goals: LearningPath[] }) => React.ReactNode;
 }
@@ -45,7 +44,6 @@ export function SpaceScreen({
   onOpenProject,
   onOpenTask,
   onOpenGoal,
-  onBack,
   renderView,
 }: SpaceScreenProps) {
   const { t } = useT();
@@ -84,9 +82,9 @@ export function SpaceScreen({
   return (
     <div className="sdv-detail spc">
       <header className="sdv-header">
-        <button type="button" className="sdv-back" onClick={onBack}>
-          ← {t("spaceHub.backToSpaces")}
-        </button>
+        {/* A "back to Spaces" button stood here and returned to the card grid.
+            The grid is gone — the tree is how you leave, and it never went
+            away while you were here. */}
         <div className="sdv-header-main">
           <span className="sdv-header-icon" style={{ background: space.color }} aria-hidden="true">
             {space.name.slice(0, 2)}
