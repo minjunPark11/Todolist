@@ -124,8 +124,9 @@ export default function App() {
       // Legacy: Planning is now the Board grouped by quadrant.
       case "/planning":
         return "board";
-      case "/projects":
-        return "projects";
+      // "/projects" fell here and opened the card grid. Anyone who had it
+      // stored now starts on Today (the default branch) — a Space is reached
+      // from the tree, and there is no screen to land on without one.
       case "/focus":
         return "focus";
       default:
@@ -1188,6 +1189,11 @@ export default function App() {
           // A milestone lives inside its goal and has no List of its own.
         }}
         onAddProject={(name) => planner.addProject(name, "#0066cc")}
+        onRenameSpace={(spaceId, name) => planner.updateSpace(spaceId, { name })}
+        onArchiveSpace={planner.archiveSpace}
+        onRenameProject={(projectId, name) => planner.updateProject(projectId, { name })}
+        onArchiveProject={handleArchiveProject}
+        onTogglePinProject={planner.toggleProjectPinned}
         spaces={planner.spaces}
         onSelectSpace={selectSpace}
         onCreateSpace={planner.createSpace}

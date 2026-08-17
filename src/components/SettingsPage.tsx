@@ -217,7 +217,6 @@ export function SettingsPage({
               <option value="/today">{t("sidebar.today")}</option>
               <option value="/calendar">{t("sidebar.calendar")}</option>
               <option value="/board">{t("sidebar.board")}</option>
-              <option value="/projects">{t("sidebar.spaces")}</option>
               <option value="/focus">{t("sidebar.focus")}</option>
               <option value="/inbox">{t("settings.defaultStartPageInboxOption")}</option>
             </select>

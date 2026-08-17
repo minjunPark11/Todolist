@@ -29,6 +29,13 @@ interface SpaceTreeProps {
   onSelectProject: (projectId: string) => void;
   onCreateSpace: (name: string) => void;
   onCreateProject: (spaceId: string, name: string) => void;
+  // Row actions. These were the card grid's row menu; the grid went with U1,
+  // so they live on the rows they always described.
+  onRenameSpace: (spaceId: string, name: string) => void;
+  onArchiveSpace: (spaceId: string) => void;
+  onRenameProject: (projectId: string, name: string) => void;
+  onArchiveProject: (projectId: string) => void;
+  onTogglePinProject: (projectId: string) => void;
   onSelectList: (spaceId: string, listId: string) => void;
   onSelectFolder: (spaceId: string, folderId: string) => void;
   onCreateList: (spaceId: string, name: string, folderId?: string) => void;
@@ -151,6 +158,7 @@ function ListRow({ list, spaceId, projectId, selection, onSelect, onRename, onAr
 export function SpaceTree({
   workAreas, projects, folders, lists, selection, counts,
   onSelectSpace, onSelectProject, onCreateSpace, onCreateProject,
+  onRenameSpace, onArchiveSpace, onRenameProject, onArchiveProject, onTogglePinProject,
   onSelectList, onSelectFolder, onCreateList, onCreateFolder,
   onRenameList, onArchiveList, onRenameFolder, onArchiveFolder, onMoveItemToList,
 }: SpaceTreeProps) {
@@ -200,6 +208,29 @@ export function SpaceTree({
                 {area.name}
               </button>
               {counts && areaCount > 0 ? <span className="spt-count">{areaCount}</span> : null}
+              <button
+                type="button"
+                className="spt-act"
+                title={t("tree.rename")}
+                onClick={() => {
+                  const name = window.prompt(t("tree.renameSpace"), area.name);
+                  if (name && name.trim()) onRenameSpace(area.id, name.trim());
+                }}
+              >
+                ✎
+              </button>
+              {/* H-INV-06: a Space holding Projects is not deletable, so the
+                  control is absent rather than one that refuses on click. */}
+              {areaProjects.length === 0 ? (
+                <button
+                  type="button"
+                  className="spt-act"
+                  title={t("common.archive")}
+                  onClick={() => onArchiveSpace(area.id)}
+                >
+                  ⌫
+                </button>
+              ) : null}
             </div>
             {!areaOpen ? null : (
       <div className="spt-children">
@@ -228,9 +259,39 @@ export function SpaceTree({
               </button>
               <button type="button" className="spt-label" onClick={() => onSelectProject(space.id)}>
                 <span className="spt-dot" style={{ background: space.color }} aria-hidden="true" />
+                {space.pinned ? "★ " : ""}
                 {space.name}
               </button>
               {counts && count > 0 ? <span className="spt-count">{count}</span> : null}
+              {/* The card grid's row menu lived here in everything but name.
+                  Moving it onto the row is what let that screen go (U1). */}
+              <button
+                type="button"
+                className="spt-act"
+                title={space.pinned ? t("tree.unpin") : t("tree.pin")}
+                onClick={() => onTogglePinProject(space.id)}
+              >
+                {space.pinned ? "★" : "☆"}
+              </button>
+              <button
+                type="button"
+                className="spt-act"
+                title={t("tree.rename")}
+                onClick={() => {
+                  const name = window.prompt(t("tree.renameProject"), space.name);
+                  if (name && name.trim()) onRenameProject(space.id, name.trim());
+                }}
+              >
+                ✎
+              </button>
+              <button
+                type="button"
+                className="spt-act"
+                title={t("common.archive")}
+                onClick={() => onArchiveProject(space.id)}
+              >
+                ⌫
+              </button>
             </div>
 
             {open ? (

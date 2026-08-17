@@ -45,6 +45,11 @@ interface SidebarProps {
   onCreateSpace: (name: string) => void;
   /** A Project is created inside a Space, so the id is required. */
   onCreateProject: (spaceId: string, name: string) => void;
+  onRenameSpace: (spaceId: string, name: string) => void;
+  onArchiveSpace: (spaceId: string) => void;
+  onRenameProject: (projectId: string, name: string) => void;
+  onArchiveProject: (projectId: string) => void;
+  onTogglePinProject: (projectId: string) => void;
   onSelectList: (spaceId: string, listId: string) => void;
   onSelectFolder: (spaceId: string, folderId: string) => void;
   onCreateList: (spaceId: string, name: string, folderId?: string) => void;
@@ -182,6 +187,11 @@ export function Sidebar({
   onSelectSpace,
   onCreateSpace,
   onCreateProject,
+  onRenameSpace,
+  onArchiveSpace,
+  onRenameProject,
+  onArchiveProject,
+  onTogglePinProject,
   onSelectList,
   onSelectFolder,
   onCreateList,
@@ -214,7 +224,6 @@ export function Sidebar({
     buckets.overdue.length +
     buckets.dueToday.length +
     buckets.scheduledToday.length;
-  const activeProjectCount = projects.filter((project) => project.status !== "archived").length;
   const openCountsBySpace = new Map<string, number>();
   for (const task of tasks) {
     if (!task.projectId || !isOpen(task)) continue;
@@ -232,7 +241,11 @@ export function Sidebar({
     { id: "board", label: t("sidebar.board"), icon: "planning", count: 0 },
     { id: "timeline", label: t("sidebar.timeline"), icon: "calendar", count: 0 },
     { id: "horizons", label: t("sidebar.horizons"), icon: "horizons", count: 0 },
-    { id: "projects", label: t("sidebar.spaces"), icon: "projects", count: activeProjectCount },
+    // A "공간" entry stood here and opened a card grid of Projects labelled as
+    // spaces. SPACES_CLICKUP_UI_DESIGN U1 decided to remove it — the tree IS
+    // the space explorer — and the decision went unexecuted. Adding a real
+    // Space above Project turned the leftover into a contradiction: one word
+    // naming two levels, with a badge counting the other one.
     { id: "focus", label: t("sidebar.focus"), icon: "focus", count: tasks.filter((task) => task.activeSessionId).length },
     { id: "archive", label: t("sidebar.archive"), icon: "archive", count: 0 },
     { id: "settings", label: t("sidebar.settings"), icon: "settings", count: 0 },
@@ -354,6 +367,11 @@ export function Sidebar({
               onSelectProject={onSelectProject}
               onCreateSpace={onCreateSpace}
               onCreateProject={onCreateProject}
+              onRenameSpace={onRenameSpace}
+              onArchiveSpace={onArchiveSpace}
+              onRenameProject={onRenameProject}
+              onArchiveProject={onArchiveProject}
+              onTogglePinProject={onTogglePinProject}
               onSelectList={onSelectList}
               onSelectFolder={onSelectFolder}
               onCreateList={onCreateList}
