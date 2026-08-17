@@ -35,7 +35,7 @@ import { projectItems, type Item } from "../../domain/view/item";
 import { goalDropFor, patchForColumn } from "../../domain/view/board";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { showsGoals, specForSpaceView, type SpaceViewId } from "../../domain/view/spaceViews";
-import { statusesWithCustom } from "../../domain/spaces/membership";
+import { listIdFor, statusesWithCustom } from "../../domain/spaces/membership";
 import { activeLists, DEFAULT_STATUSES, listDisplayName, statusDisplayLabel } from "../../domain/spaces/hierarchy";
 import {
   AddSpaceTaskModal,
@@ -219,6 +219,38 @@ export function SpaceDetailView({
     return "";
   }, [viewScope.listId, viewScope.folderId, lists, folders]);
 
+  /**
+   * The Tasks the header and its cards are about.
+   *
+   * `spaceTasks` is the whole Project. Standing on a Folder or a List narrows
+   * the view below it, and the header used to keep answering for the Project:
+   * counts that disagreed with what was on screen, and a Next Action that
+   * recommended a Task the view was not showing. The Project's NAME stays —
+   * that is what you are inside — but its numbers follow the scope.
+   */
+  const scopedTasks = useMemo(() => {
+    if (viewScope.listId !== undefined) {
+      return spaceTasks.filter((task) => listIdFor(task, lists) === viewScope.listId);
+    }
+    if (viewScope.folderId !== undefined) {
+      const inFolder = new Set(
+        lists.filter((list) => list.folderId === viewScope.folderId).map((list) => list.id),
+      );
+      return spaceTasks.filter((task) => inFolder.has(listIdFor(task, lists)));
+    }
+    return spaceTasks;
+  }, [spaceTasks, lists, viewScope.listId, viewScope.folderId]);
+
+  /** The Lists the Overview's progress rows cover — the same narrowing. */
+  const scopedLists = useMemo(() => {
+    const all = activeLists(lists, projectId);
+    if (viewScope.listId !== undefined) return all.filter((list) => list.id === viewScope.listId);
+    if (viewScope.folderId !== undefined) {
+      return all.filter((list) => list.folderId === viewScope.folderId);
+    }
+    return all;
+  }, [lists, projectId, viewScope.listId, viewScope.folderId]);
+
   const activeView: SpaceViewId = isTaskView(tab) ? tab : "board";
   const boardSpec: ViewSpec = useMemo(
     () => specForSpaceView(activeView, scopeFilter, tabText(t, activeView)),
@@ -274,12 +306,16 @@ export function SpaceDetailView({
     if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
   }
 
-  const counts = getSpaceTaskCounts(spaceTasks, today);
-  const nextAction = getNextActionTask(spaceTasks, config, today);
-  const signal = getSpaceSignal(spaceTasks, spaceSessions, t, today);
+  const counts = getSpaceTaskCounts(scopedTasks, today);
+  const nextAction = getNextActionTask(scopedTasks, config, today);
+  const signal = getSpaceSignal(scopedTasks, spaceSessions, t, today);
+  // Focus time stays the Project's. A session is matched by its own
+  // `projectId` as well as by its Task (getSpaceSessions), so there is no
+  // honest way to attribute one to a Folder — and "how long have I worked on
+  // this Project" is the question the card asks either way.
   const todayFocusSeconds = getTodaySpaceFocusSeconds(spaceSessions, today);
   const weekFocusSeconds = getWeekSpaceFocusSeconds(spaceSessions, weekStart);
-  const upcoming = getUpcomingSpaceItems(spaceTasks, today);
+  const upcoming = getUpcomingSpaceItems(scopedTasks, today);
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
@@ -297,12 +333,12 @@ export function SpaceDetailView({
   // via the projection rather than being counted a second way here.
   const overviewChildren: OverviewChild[] = useMemo(() => {
     const listIdOf = new Map(boardItems.map((item) => [item.sourceId, item.listId]));
-    return activeLists(lists, projectId).map((list) => ({
+    return scopedLists.map((list) => ({
       id: list.id,
       name: listDisplayName(list, t("list.defaultName")),
-      tasks: spaceTasks.filter((task) => listIdOf.get(task.id) === list.id),
+      tasks: scopedTasks.filter((task) => listIdOf.get(task.id) === list.id),
     }));
-  }, [lists, projectId, boardItems, spaceTasks]);
+  }, [scopedLists, boardItems, scopedTasks, t]);
 
   /** §50.8: a List row narrows the scope to that List. */
   function openListRow(listId: string) {
@@ -577,7 +613,11 @@ export function SpaceDetailView({
             column's first card changes with the level — Lists here, Projects
             there — so the two are one component with a different argument. */}
         <OverviewSection
-          tasks={spaceTasks}
+          // Its "recently updated" and "upcoming" cards are about the work in
+          // view, so they narrow with the scope like the header does. Goals do
+          // not: a Goal belongs to the Project, and the Goals section shows the
+          // Project's whatever scope you stand on.
+          tasks={scopedTasks}
           goals={spaceGoals}
           today={today}
           childLabel={t("overview.lists")}
