@@ -82,6 +82,12 @@ type SpacesPageProps = {
   onUpdateStatus: (projectId: string, listId: string, patch: { name?: string; order?: number }) => void;
   onArchiveStatus: (projectId: string, listId: string) => void;
   onMoveGoalToStatus: (pathId: string, listId?: string) => void;
+  // Passed straight through to the Horizons section, which is the Horizons
+  // screen opened at a scope rather than a second implementation of it.
+  onDeletePath: (pathId: string) => void;
+  onAddMilestone: (pathId: string, input: { title: string }) => void;
+  onDeleteMilestone: (pathId: string, milestoneId: string) => void;
+  onCreateTaskFromMilestone: (pathId: string, milestoneId: string, title: string) => void;
   subtasks: Subtask[];
   focusSessions: FocusSession[];
   activeFocusSession: FocusSession | null;
@@ -166,6 +172,10 @@ export function SpacesPage({
   onUpdateStatus,
   onArchiveStatus,
   onMoveGoalToStatus,
+  onDeletePath,
+  onAddMilestone,
+  onDeleteMilestone,
+  onCreateTaskFromMilestone,
   onToggleDone,
   tasks,
   focusSessions,
@@ -472,6 +482,10 @@ export function SpacesPage({
         onUpdateStatus={onUpdateStatus}
         onArchiveStatus={onArchiveStatus}
         onMoveGoalToStatus={onMoveGoalToStatus}
+        onDeletePath={onDeletePath}
+        onAddMilestone={onAddMilestone}
+        onDeleteMilestone={onDeleteMilestone}
+        onCreateTaskFromMilestone={onCreateTaskFromMilestone}
         onToggleTaskDone={onToggleDone}
         focusSessions={focusSessions}
         activeFocusSession={activeFocusSession}

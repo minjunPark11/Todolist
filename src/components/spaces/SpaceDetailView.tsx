@@ -31,6 +31,8 @@ import { BoardView, type BoardColumn } from "../BoardView";
 import { TaskListView } from "../TaskListView";
 import { TaskGanttView } from "../TaskGanttView";
 import { TaskCalendarView } from "../TaskCalendarView";
+import { GoalsSection } from "./GoalsSection";
+import { HorizonsPage } from "../HorizonsPage";
 import { statusPatch } from "../../domain/view/board";
 import { projectItems, type Item } from "../../domain/view/item";
 import { goalDropFor, patchForColumn } from "../../domain/view/board";
@@ -69,6 +71,10 @@ export type SpaceDetailViewProps = {
   onUpdateStatus: (projectId: string, listId: string, patch: { name?: string; order?: number }) => void;
   onArchiveStatus: (projectId: string, listId: string) => void;
   onMoveGoalToStatus: (pathId: string, listId?: string) => void;
+  onDeletePath: (pathId: string) => void;
+  onAddMilestone: (pathId: string, input: { title: string }) => void;
+  onDeleteMilestone: (pathId: string, milestoneId: string) => void;
+  onCreateTaskFromMilestone: (pathId: string, milestoneId: string, title: string) => void;
   onToggleTaskDone: (taskId: string) => void;
   // Read only by the Tasks board, to resolve an Item's List. Passed rather
   // than defaulted to [] so a future grouping on that axis is not silently wrong.
@@ -131,6 +137,10 @@ export function SpaceDetailView({
   onUpdateStatus,
   onArchiveStatus,
   onMoveGoalToStatus,
+  onDeletePath,
+  onAddMilestone,
+  onDeleteMilestone,
+  onCreateTaskFromMilestone,
   onToggleTaskDone,
   lists,
   focusSessions,
@@ -229,45 +239,10 @@ export function SpaceDetailView({
     return "";
   }, [viewScope.listId, viewScope.folderId, lists, folders]);
 
-  /**
-   * INTERIM (STEP 8 -> STEP 10). Goals and Horizons are Domain Sections, not
-   * Task Views (§12) — they no longer have a row in `SPACE_VIEWS`, and the
-   * engine no longer claims to answer for them. Their real screens are §50E
-   * and §50F, built in STEP 10.
-   *
-   * Until then they keep the board rendering they have always had, spelled out
-   * HERE rather than in the view table. The difference is not cosmetic: a
-   * screen is allowed a temporary shape, while a row in the registry is a
-   * claim about what the engine holds.
-   */
-  const sectionSpec: ViewSpec | null = useMemo(() => {
-    if (tab === "goals") {
-      return {
-        id: `section-goals-${scopeName || projectId}`,
-        name: tabText(t, "goals"),
-        filter: { ...scopeFilter, sources: ["goal"], parentId: "" },
-        groupBy: "status",
-        sort: { key: "dueDate" },
-        layout: "board",
-      };
-    }
-    if (tab === "horizons") {
-      return {
-        id: `section-horizons-${scopeName || projectId}`,
-        name: tabText(t, "horizons"),
-        filter: { ...scopeFilter, sources: ["task", "goal", "milestone"], parentId: "" },
-        groupBy: "horizon",
-        sort: { key: "dueDate" },
-        layout: "board",
-      };
-    }
-    return null;
-  }, [tab, scopeFilter, scopeName, projectId, t]);
-
   const activeView: SpaceViewId = isTaskView(tab) ? tab : "board";
   const boardSpec: ViewSpec = useMemo(
-    () => sectionSpec ?? specForSpaceView(activeView, scopeFilter, tabText(t, activeView)),
-    [sectionSpec, activeView, scopeFilter, t],
+    () => specForSpaceView(activeView, scopeFilter, tabText(t, activeView)),
+    [activeView, scopeFilter, t],
   );
   const boardContext: GroupContext = useMemo(
     () => ({
@@ -676,7 +651,44 @@ export function SpaceDetailView({
               </>
             ) : null}
           </div>
-          {tab === "calendar" ? (
+          {tab === "goals" ? (
+            <GoalsSection
+              goals={spaceGoals}
+              tasks={spaceTasks}
+              projects={projects}
+              // One Project in scope, so its name on every card would be the
+              // same word repeated (§50E.17). The Space screen sets this.
+              showProjectContext={false}
+              onOpenGoal={onOpenGoal}
+              onCreateGoal={
+                projectId
+                  ? (goal) => onCreateGoal({ goal, projectId, schedule: { unit: "unscheduled" } })
+                  : undefined
+              }
+            />
+          ) : tab === "horizons" ? (
+            // The Horizons screen, opened at this scope. Period anchors,
+            // carryover and the goal drag all already live there (§50F); a
+            // second implementation would be the thing to avoid.
+            <HorizonsPage
+              embedded
+              paths={spaceGoals}
+              tasks={spaceTasks}
+              projects={projects}
+              onCreatePath={(input) => onCreateGoal({ goal: input.goal, projectId: input.projectId ?? projectId, schedule: input.schedule })}
+              onUpdatePath={onUpdatePath}
+              onDeletePath={onDeletePath}
+              onAddMilestone={onAddMilestone}
+              onUpdateMilestone={onUpdateMilestone}
+              onDeleteMilestone={onDeleteMilestone}
+              onUpdateTask={onUpdateTask}
+              onToggleTaskDone={onToggleTaskDone}
+              onCreateTaskFromMilestone={onCreateTaskFromMilestone}
+              onOpenTask={openTaskDrawer}
+              onOpenGoal={onOpenGoal}
+              showToast={showToast}
+            />
+          ) : tab === "calendar" ? (
             <TaskCalendarView
               tasks={spaceTasks}
               projects={projects}

@@ -1,0 +1,154 @@
+/* Goals as a Domain Section (SPACES_REDESIGN_II §50E).
+ *
+ * One column of stacked cards, not a dashboard grid: a Goal carries enough on
+ * its own that three per row would make each of them unreadable (§50E.4). */
+
+.gls {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.gls-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* The Context Header already names the Project, so this identifies the
+ * section and no more (§50E.5). */
+.gls-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.gls-head p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted, #6b7280);
+}
+
+.gls-add {
+  display: flex;
+  gap: 6px;
+}
+
+.gls-add input {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  font: inherit;
+  font-size: 13px;
+  min-width: 180px;
+}
+
+.gls-group h3 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #6b7280);
+}
+
+.gls-count {
+  margin-left: 6px;
+  font-weight: 400;
+}
+
+.gls-none {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted, #6b7280);
+}
+
+.gls-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gls-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+
+.gls-card.is-done { opacity: 0.72; }
+
+/* Title carries the highest hierarchy in the card (§50E.7). */
+.gls-card-title {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gls-card-title:hover { text-decoration: underline; }
+
+.gls-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gls-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border-subtle, #f3f4f6);
+  overflow: hidden;
+}
+
+.gls-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent, #0066cc);
+}
+
+.gls-percent {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #6b7280);
+  min-width: 4ch;
+  text-align: right;
+}
+
+.gls-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+}
+
+.gls-chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--border-subtle, #f3f4f6);
+}
+
+/* §50E.21 / T-GL13 — the card is already one column; on narrow screens the
+ * meta row stacks so title, progress and dates stay in a readable order. */
+@media (max-width: 600px) {
+  .gls-meta { flex-direction: column; gap: 4px; }
+  .gls-add input { min-width: 0; flex: 1; }
+}

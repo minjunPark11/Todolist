@@ -10816,6 +10816,51 @@ Gate가 미해소인 상태에서 Mockup을 맞추기 위해 임시 Domain seman
 
 ---
 
+## STEP 10 — Domain Sections — Goals · Horizons 완료 (2026-08-17)
+
+STEP 8이 임시로 남긴 것 — 두 Section이 보드 렌더링을 빌려 쓰던 부분 — 을 교체했다. `sectionSpec` 임시 코드는 삭제됐다.
+
+### Goals (§50E) — 신규
+
+`components/spaces/GoalsSection.tsx`. Active / Completed로 나뉜 1열 카드 스택이다. Goal 하나의 정보량이 커서 대시보드처럼 한 행에 여러 개를 밀어넣지 않는다(§50E.4).
+
+**Progress는 `goalProgress`에서만 온다**(§50E.8 Case A). 마일스톤은 Goal 자신의 구조이므로 그 완료율이 곧 진행률이고, **마일스톤도 연결 작업도 없는 Goal은 바를 아예 그리지 않는다**(Case C). 기간이 얼마나 지났는지로 퍼센트를 만들지 않는다 — T-GL07이 금지하는 바로 그것이다.
+
+바와 숫자를 함께 낸다. 바만으로는 값이 길이에만 실리는데 §49A.7이 그것을 허용하지 않는다.
+
+### Horizons (§50F) — wiring
+
+`HorizonsPage`가 이미 다섯 컬럼·기간 앵커·carryover·드래그를 전부 갖고 있었고, `paths`/`tasks`로 파라미터화까지 되어 있었다. **스코프된 데이터를 넘겨 그대로 마운트한다.**
+
+유일한 차이는 제목이다. §49A.1이 뷰 안의 두 번째 대제목을 금지하므로 `embedded` prop이 `<h1>`을 `<h2>`로 낮추고 부제를 없앤다. 컨트롤은 남는다 — §50F.4의 canonical 배치가 그 줄에 두 컨트롤을 그린다.
+
+이를 위해 `onDeletePath` · `onAddMilestone` · `onDeleteMilestone` · `onCreateTaskFromMilestone` 네 핸들러를 App → SpacesPage → SpaceDetailView로 이었다. **두 번째 Horizons 구현을 만드는 것보다 prop 네 개를 잇는 편이 싸다.**
+
+### 검증
+
+```text
+T-GL03  Goals가 Task layout으로 처리되지 않음   ✓ 보드 컬럼 0개
+T-GL04  Active / Completed 구분                 ✓ 진행 중 2 · 완료 1
+T-GL06  Progress가 Domain에서만                 ✓ 마일스톤 1/3 → 33%
+T-GL07  Source 없으면 임의 퍼센트 없음          ✓ 바 자체가 없음
+T-HZ02  Horizons만 active                       ✓
+T-HZ03  다섯 지평 고정                          ✓ 평생·올해·이번 달·이번 주·오늘
+T-HZ04  빈 지평도 사라지지 않음                 ✓ 올해 0 · 오늘 0
+T-HZ05  Year/Month/Week/Day가 각자 기간         ✓ ‹ › 앵커
+T-HZ06  Life에는 기간 이동 없음                 ✓
+T-HZ07  Goal은 GoalSchedule 기준                ✓ month → 이번 달
+T-HZ08  Task는 기존 날짜 규칙                   ✓ scheduledDate → 이번 주
+§49A.1  뷰 안 두 번째 대제목 없음               ✓ h1 없음
+```
+
+typecheck 통과, 테스트 668개 통과.
+
+### STEP 10 남은 것
+
+Overview 재구성(§50의 KPI 4장 + Main/Aside)과 **Space 수준 화면**. 지금 `/s/:spaceId`는 유효한 경로인데 그릴 곳이 없어 카드 목록으로 떨어진다.
+
+---
+
 ## STEP 10 — Domain Sections
 
 Task View 연결 뒤 같은 Hierarchy Scope 아래에서 다음 Domain Section을 연결한다.

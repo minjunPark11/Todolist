@@ -610,3 +610,17 @@
   .goal-milestone-timing { grid-template-columns: 1fr; }
   .goal-task-list > button { align-items: flex-start; flex-direction: column; gap: 3px; }
 }
+
+/* Embedded in a scope's View Bar (SPACES_REDESIGN_II §50F).
+ *
+ * The Context Header already names the place, so the page padding and the
+ * page-sized heading both go; the columns and their controls do not. */
+.hz-page.is-embedded {
+  padding: 0;
+}
+
+.hz-page.is-embedded .hz-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}

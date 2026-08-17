@@ -50,6 +50,14 @@ interface HorizonsPageProps {
   onOpenTask: (taskId: string) => void;
   onOpenGoal: (pathId: string, milestoneId?: string) => void;
   showToast: (toast: ToastState) => void;
+  /**
+   * Mounted inside a scope's View Bar rather than as its own page (§50F).
+   *
+   * The only difference is the heading: §49A.1 forbids a second big page
+   * title inside a view, because the Context Header already names the place.
+   * The controls stay — §50F.4's canonical layout puts them on that same row.
+   */
+  embedded?: boolean;
 }
 
 export function HorizonsPage({
@@ -68,6 +76,7 @@ export function HorizonsPage({
   onOpenTask,
   onOpenGoal,
   showToast,
+  embedded = false,
 }: HorizonsPageProps) {
   const { t, lang } = useT();
   const today = todayValue();
@@ -424,11 +433,17 @@ export function HorizonsPage({
   }
 
   return (
-    <div className="hz-page">
+    <div className={`hz-page${embedded ? " is-embedded" : ""}`}>
       <header className="hz-head">
         <div>
-          <h1>{t("horizons.title")}</h1>
-          <p>{t("horizons.subtitle")}</p>
+          {embedded ? (
+            <h2>{t("horizons.title")}</h2>
+          ) : (
+            <>
+              <h1>{t("horizons.title")}</h1>
+              <p>{t("horizons.subtitle")}</p>
+            </>
+          )}
         </div>
         <div className="hz-toolbar">
           <label>

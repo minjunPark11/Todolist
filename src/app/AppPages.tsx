@@ -346,6 +346,10 @@ export function AppPages({
         onUpdateStatus={planner.updateStatus}
         onArchiveStatus={planner.archiveStatus}
         onMoveGoalToStatus={planner.moveGoalToStatus}
+        onDeletePath={planner.deleteLearningPath}
+        onAddMilestone={planner.addMilestone}
+        onDeleteMilestone={planner.deleteMilestone}
+        onCreateTaskFromMilestone={planner.createTaskFromMilestone}
         subtasks={planner.subtasks}
         focusSessions={planner.focusSessions}
         activeFocusSession={planner.activeFocusSession}
