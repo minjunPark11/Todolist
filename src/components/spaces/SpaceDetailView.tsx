@@ -7,9 +7,8 @@ import {
   type SpaceTab,
 } from "../../lib/spaceHubTypes";
 import { isSpaceNavId, isTaskView, navItemsForScope } from "../../domain/view/spaceNav";
-import { getSpacePreset, resolveTaskGroups } from "../../lib/spaceTypeConfig";
 import { useT } from "../../i18n";
-import { presetText, tabText, hubTypeText, upcomingKindText } from "../../lib/spaceHubI18n";
+import { SPACE_TASK_GROUPS, tabText, upcomingKindText } from "../../lib/spaceHubI18n";
 import {
   formatSeconds,
   getNextActionTask,
@@ -168,11 +167,9 @@ export function SpaceDetailView({
   // the Space screen, STEP 10.
   const navItems = useMemo(() => navItemsForScope("project"), []);
   const config = hub.getConfig(space.id);
-  const preset = getSpacePreset(space.type);
-  const groups = resolveTaskGroups(preset);
 
   const displayName = space.name;
-  const displayDescription = space.description || preset.headerSubtitle;
+  const displayDescription = space.description;
   const displayColor = space.color;
 
   // A space IS its Project, so its id is the Project id (SPACES_REDESIGN_II
@@ -479,10 +476,13 @@ export function SpaceDetailView({
           </span>
           <div>
             <h1>{displayName}</h1>
+            {/* The Project's own words when it has them, the default line when
+                it does not. This used to prefix the description with the space
+                TYPE — "프로젝트 공간 · …" — which named a distinction the app
+                no longer draws, in a third vocabulary again ("area" stored,
+                "Custom" displayed). */}
             <p className="sdv-header-subtitle">
-              {preset.headerSubtitle === displayDescription
-                ? presetText(t, displayDescription)
-                : t("spaceHub.headerSubtitle", { type: hubTypeText(t, space.type), desc: displayDescription })}
+              {displayDescription || t("spaceHub.preset.subtitleProject")}
             </p>
             <p className="sdv-header-counts">
               {t("spaceHub.header.tasksScheduled", { total: counts.total, scheduled: counts.scheduled })} ·{" "}
@@ -492,10 +492,10 @@ export function SpaceDetailView({
         </div>
         <div className="sdv-header-actions">
           <button type="button" className="sdv-btn" onClick={() => setModal({ kind: "add_task" })}>
-            {presetText(t, preset.addTaskLabel)}
+            {t("spaceHub.preset.addTask")}
           </button>
           <button type="button" className="sdv-btn sdv-btn-primary" onClick={() => handleStartFocus()}>
-            {presetText(t, preset.startFocusLabel)}
+            {t("spaceHub.preset.startFocus")}
           </button>
           <span className={`sdv-status-pill sdv-status-${signal.status}`}>{signal.label}</span>
           <button type="button" className="sdv-btn" onClick={handleOpenGlobalAi}>
@@ -516,14 +516,14 @@ export function SpaceDetailView({
       <section className="sdv-metric-grid" aria-label={t("spaceHub.aria.overviewCards")}>
         {config.overviewCards.nextAction ? (
           <article className="sdv-metric-card">
-            <h3>{presetText(t, preset.nextActionLabel)}</h3>
+            <h3>{t("spaceHub.preset.nextAction")}</h3>
             {nextAction ? (
               <>
                 <strong className="sdv-metric-title">{nextAction.title}</strong>
                 {nextAction.dueDate ? <small>{t("spaceHub.est.due", { date: formatDate(nextAction.dueDate) })}</small> : null}
                 <div className="sdv-metric-actions">
                   <button type="button" className="sdv-btn sdv-btn-primary sdv-btn-sm" onClick={() => handleStartFocus(nextAction.id)}>
-                    {presetText(t, preset.startFocusLabel)}
+                    {t("spaceHub.preset.startFocus")}
                   </button>
                 </div>
               </>
@@ -534,14 +534,14 @@ export function SpaceDetailView({
         ) : null}
         {config.overviewCards.signal ? (
           <article className="sdv-metric-card">
-            <h3>{presetText(t, preset.signalLabel)}</h3>
+            <h3>{t("spaceHub.preset.currentSignal")}</h3>
             <strong className={`sdv-metric-title sdv-signal-${signal.status}`}>{signal.label}</strong>
             <small>{signal.detail}</small>
           </article>
         ) : null}
         {config.overviewCards.focusTime ? (
           <article className="sdv-metric-card">
-            <h3>{presetText(t, preset.focusTimeLabel)}</h3>
+            <h3>{t("spaceHub.preset.projectFocus")}</h3>
             <strong className="sdv-metric-title">{t("spaceHub.focus.thisWeek", { time: formatSeconds(weekFocusSeconds) })}</strong>
             <small>
               {t("spaceHub.focus.todayGoal", {
@@ -567,7 +567,7 @@ export function SpaceDetailView({
         ) : null}
         {config.overviewCards.upcoming ? (
           <article className="sdv-metric-card">
-            <h3>{presetText(t, preset.upcomingLabel)}</h3>
+            <h3>{t("spaceHub.preset.upcoming")}</h3>
             {upcoming.length === 0 ? (
               <p className="sdv-empty-inline">{t("spaceHub.empty.nothingUpcoming")}</p>
             ) : (
@@ -760,8 +760,7 @@ export function SpaceDetailView({
       {/* Modals (§32) */}
       {modal.kind === "add_task" ? (
         <AddSpaceTaskModal
-          preset={preset}
-          groups={groups.map((group) => group.label)}
+          groups={SPACE_TASK_GROUPS}
           onSubmit={handleCreateSpaceTask}
           onClose={() => setModal({ kind: "none" })}
         />

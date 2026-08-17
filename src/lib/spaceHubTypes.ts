@@ -59,13 +59,6 @@ export interface SpaceActivity {
   createdAt: string;
 }
 
-export interface SpaceSectionGroup {
-  id: string;
-  label: string;
-  order: number;
-  hidden?: boolean;
-}
-
 export interface SpaceCustomConfig {
   spaceId: string;
   overviewCards: {
@@ -108,25 +101,16 @@ export function emptySpaceConfig(spaceId: string): SpaceCustomConfig {
 export interface SpaceLike {
   id: string;
   name: string;
-  type: ProjectType;
   description: string;
   color: string;
   // `id` IS the Project id (SPACES_REDESIGN_II §0.3.8). A `sourceId` beside it
   // and a `sourceRef` discriminator whose only arm was "project" — "study" had
   // no producer at all — are gone; they described a time when a space could be
   // something other than a Project.
-}
-
-// Preset per space type (§27): same layout, different labels/groups/rules.
-export interface SpaceTypePreset {
-  headerSubtitle: string;
-  addTaskLabel: string;
-  startFocusLabel: string;
-  primaryTaskSectionLabel: string;
-  nextActionLabel: string;
-  signalLabel: string;
-  focusTimeLabel: string;
-  upcomingLabel: string;
-  taskGroups: string[];  // Example first tasks shown under the tasks-tab empty state ("e.g. …").
-  emptyTaskExamples: string;
+  //
+  // `type: ProjectType` was here too, and chose between two label presets — a
+  // "project" set and an "area" set. `Project.type` is still stored and synced
+  // (M0: do not erase a field an older client may write), but nothing displays
+  // it now. The two sets differed in four strings and no behaviour, and once
+  // the card grid went there was no way to produce an "area" at all.
 }

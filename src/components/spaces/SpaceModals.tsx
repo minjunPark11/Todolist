@@ -1,7 +1,6 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import type { Task, TaskPriority } from "../../types";
-import type { SpaceTypePreset } from "../../lib/spaceHubTypes";
 import { isTaskDone } from "../../lib/spaceSelectors";
 import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
@@ -65,12 +64,11 @@ export interface SpaceTaskInput {
 }
 
 export function AddSpaceTaskModal({
-  preset,
   groups,
   onSubmit,
   onClose,
 }: {
-  preset: SpaceTypePreset;
+  /** Stored values, not labels — `groupText` renders them (spaceHubI18n). */
   groups: string[];
   onSubmit: (input: SpaceTaskInput) => void;
   onClose: () => void;

@@ -7,46 +7,23 @@
 // via the maps below. Unknown values (user-created groups/note types) fall
 // through untouched so custom input still shows exactly what the user typed.
 import type { SpaceTab } from "./spaceHubTypes";
-import type { ProjectType } from "../types";
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
-const PRESET_KEY: Record<string, string> = {
-  "Hub for the work in progress": "spaceHub.preset.subtitleProject",
-  "Space for study and problem solving": "spaceHub.preset.subtitleStudy",
-  "Space for routines and life admin": "spaceHub.preset.subtitlePersonal",
-  "Flexible space for your own work": "spaceHub.preset.subtitleCustom",
-  "+ Task": "spaceHub.preset.addTask",
-  "+ Study Task": "spaceHub.preset.addStudyTask",
-  "+ Note": "spaceHub.preset.addNote",
-  "+ Study Note": "spaceHub.preset.addStudyNote",
-  Schedule: "spaceHub.preset.schedule",
-  "Schedule Review": "spaceHub.preset.scheduleReview",
-  "Start Focus": "spaceHub.preset.startFocus",
-  "Start Study": "spaceHub.preset.startStudy",
-  Start: "spaceHub.preset.start",
-  "Tasks for this Space": "spaceHub.preset.tasksForSpace",
-  "Study Queue": "spaceHub.preset.studyQueue",
-  "Personal Tasks": "spaceHub.preset.personalTasks",
-  "Next Action": "spaceHub.preset.nextAction",
-  "Next Study Action": "spaceHub.preset.nextStudyAction",
-  "Current Signal": "spaceHub.preset.currentSignal",
-  "Study Signal": "spaceHub.preset.studySignal",
-  "Personal Signal": "spaceHub.preset.personalSignal",
-  "Project Focus": "spaceHub.preset.projectFocus",
-  "Study Time": "spaceHub.preset.studyTime",
-  "Focus Time": "spaceHub.preset.focusTime",
-  "Time Spent": "spaceHub.preset.timeSpent",
-  Upcoming: "spaceHub.preset.upcoming",
-  "Upcoming Review": "spaceHub.preset.upcomingReview",
-  "AI Space Summary": "spaceHub.preset.aiSpaceSummary",
-  "AI Study Summary": "spaceHub.preset.aiStudySummary",
-  "AI Personal Summary": "spaceHub.preset.aiPersonalSummary",
-  "Outline the paper · Read prior research": "spaceHub.preset.taskExamplesProject",
-  "Review wrong answers · Revisit key concepts": "spaceHub.preset.taskExamplesStudy",
-  "Make a grocery list · 30-minute workout": "spaceHub.preset.taskExamplesPersonal",
-  "Write down today's tasks · Gather references": "spaceHub.preset.taskExamplesCustom",
-};
+/**
+ * The groups the "add task" picker offers.
+ *
+ * English, and deliberately so: the chosen value is STORED, as a `group:<label>`
+ * tag on the Task. They are identity, and `GROUP_KEY` below is what turns them
+ * back into the reader's language. Changing a string here orphans every tag
+ * already carrying it.
+ *
+ * A per-space-type table used to choose between two of these lists — a
+ * "project" set and an "area" set differing by one entry. Nothing could create
+ * an area, and the type changed no behaviour, so the table went and this is
+ * what it resolved to.
+ */
+export const SPACE_TASK_GROUPS = ["In Progress", "To Schedule", "Blocked", "Review Needed", "Done"];
 
 const GROUP_KEY: Record<string, string> = {
   "In Progress": "spaceHub.group.inProgress",
@@ -74,11 +51,6 @@ const GROUP_KEY: Record<string, string> = {
   Work: "spaceHub.group.work",
 };
 
-export function presetText(t: TFn, value: string): string {
-  const key = PRESET_KEY[value];
-  return key ? t(key) : value;
-}
-
 export function groupText(t: TFn, value: string): string {
   const key = GROUP_KEY[value];
   return key ? t(key) : value;
@@ -86,10 +58,6 @@ export function groupText(t: TFn, value: string): string {
 
 export function tabText(t: TFn, tab: SpaceTab): string {
   return t(`spaceHub.tab.${tab}`);
-}
-
-export function hubTypeText(t: TFn, type: ProjectType): string {
-  return t(`spaceHub.hubType.${type}`);
 }
 
 export function upcomingKindText(t: TFn, kind: string): string {

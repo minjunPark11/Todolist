@@ -92,9 +92,9 @@ type SpacesPageProps = {
  * `deriveProjectSpaces` stood here and computed a status, a "main signal", an
  * AI priority, an activity count, a relative-time label and a topic list — all
  * of it read by the card grid and none of it by the screen, which wants the
- * five fields below. The description is passed raw now: the screen already
- * falls back to its type preset when it is empty, so a second fallback here
- * only overwrote one of them with the other.
+ * four fields below. The description is passed raw: the screen supplies its own
+ * default line when it is empty, so a fallback here only overwrote one with
+ * the other.
  */
 function spaceCardFor(project: Project): SpaceLike {
   return {
@@ -104,7 +104,6 @@ function spaceCardFor(project: Project): SpaceLike {
     // boundary (SPACES_REDESIGN_II §0.3.8).
     id: project.id,
     name: project.name,
-    type: project.type === "area" ? "area" : "project",
     description: project.description,
     color: project.color,
   };
