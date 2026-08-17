@@ -138,6 +138,17 @@
   max-width: 140px;
 }
 
+/* Stands where the add field would, and reads as prose rather than as a
+   control: there is nothing to click, and the point is to say so. */
+.tlv-add-unavailable {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px dashed var(--border, #e5e7eb);
+  border-radius: 8px;
+  color: var(--text-muted, #6b7280);
+  font-size: 13px;
+}
+
 .tlv-add input {
   width: 100%;
   height: 34px;

@@ -142,6 +142,7 @@ export const en: Dictionary = {
   "list.col.priority": "Priority",
   "list.selectRow": "Select {{title}}",
   "list.addPlaceholder": "+ Add task — Enter to save",
+  "list.addNeedsProject": "Tasks are made inside a Project. Pick a Project or a List in the tree on the left.",
   "list.selectedCount": "{{n}} selected",
   "list.showing": "Showing {{shown}} of {{total}}",
   "timeline.noBars": "Nothing falls in this window.",

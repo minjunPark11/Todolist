@@ -101,9 +101,8 @@ export function SpaceScopedView({
           if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
         }}
         // Creation needs a Project, which a Space scope does not name
-        // (G-CTX-01). Until that picker exists the row is not offered rather
-        // than guessing which Project the task belongs to.
-        onCreateTask={() => undefined}
+        // (G-CTX-01). Omitted rather than handed a handler that does nothing —
+        // the view says why instead of drawing a field that swallows typing.
       />
     );
   }

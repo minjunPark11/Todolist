@@ -141,6 +141,7 @@ export const ko: Dictionary = {
   "list.col.priority": "우선순위",
   "list.selectRow": "{{title}} 선택",
   "list.addPlaceholder": "+ 작업 추가 — Enter로 저장",
+  "list.addNeedsProject": "작업은 프로젝트 안에서 만듭니다. 왼쪽 트리에서 프로젝트나 리스트를 고르세요.",
   "list.selectedCount": "{{n}}개 선택됨",
   "list.showing": "{{total}}개 중 {{shown}}개 표시",
   "timeline.noBars": "이 기간에 해당하는 항목이 없습니다.",

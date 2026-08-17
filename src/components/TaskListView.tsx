@@ -50,7 +50,16 @@ interface TaskListViewProps {
    * needs, so the rule stays in one place instead of being restated here.
    */
   onSetStatus: (item: Item, statusId: string) => void;
-  onCreateTask: (title: string) => void;
+  /**
+   * Omitted where the scope cannot say where a Task would land.
+   *
+   * A Space spans Projects and a Task lives in a List inside one of them, so
+   * there is no answer to "which" at that level (G-CTX-01). The row used to be
+   * drawn anyway with a handler that did nothing: it took focus, accepted
+   * typing, and swallowed the Enter. An affordance that looks live and is not
+   * is worse than none, so absence is now stated rather than mimed.
+   */
+  onCreateTask?: (title: string) => void;
 }
 
 export function TaskListView({
@@ -207,23 +216,27 @@ export function TaskListView({
         </div>
       )}
 
-      <form
-        className="tlv-add"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const title = draft.trim();
-          if (!title) return;
-          onCreateTask(title);
-          setDraft("");
-        }}
-      >
-        <input
-          value={draft}
-          placeholder={t("list.addPlaceholder")}
-          aria-label={t("list.addPlaceholder")}
-          onChange={(event) => setDraft(event.target.value)}
-        />
-      </form>
+      {onCreateTask ? (
+        <form
+          className="tlv-add"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const title = draft.trim();
+            if (!title) return;
+            onCreateTask(title);
+            setDraft("");
+          }}
+        >
+          <input
+            value={draft}
+            placeholder={t("list.addPlaceholder")}
+            aria-label={t("list.addPlaceholder")}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        </form>
+      ) : (
+        <p className="tlv-add-unavailable">{t("list.addNeedsProject")}</p>
+      )}
 
       <p className="tlv-footer">
         {selected.size > 0
