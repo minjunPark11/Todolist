@@ -173,11 +173,11 @@ describe("one Task, every view (§44, T-LV07 / T-GV10 / T-CV12)", () => {
 
 describe("H-INV-05 — moving a Project rewrites nothing beneath it", () => {
   const folders: Folder[] = [
-    { id: "f1", spaceId: "p1", name: "Papers", order: 0, createdAt: NOW, updatedAt: NOW },
+    { id: "f1", projectId: "p1", spaceId: "p1", name: "Papers", order: 0, createdAt: NOW, updatedAt: NOW },
   ];
   const scopedLists: List[] = [
     ...lists,
-    { id: "l-in-folder", spaceId: "p1", folderId: "f1", name: "Draft", order: 1, isDefault: false, createdAt: NOW, updatedAt: NOW },
+    { id: "l-in-folder", projectId: "p1", spaceId: "p1", folderId: "f1", name: "Draft", order: 1, isDefault: false, createdAt: NOW, updatedAt: NOW },
   ];
 
   it("changes one row and leaves every descendant id alone", () => {

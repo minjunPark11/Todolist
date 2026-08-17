@@ -1631,11 +1631,14 @@ export function usePlannerData() {
   // Nothing calls these yet — the Spaces UI arrives in P6. They exist now so
   // the collections have a single owner from the start, the way every other
   // record type does, rather than being written from a component later.
-  function createList(spaceId: string, name: string, folderId?: string): string {
+  function createList(projectId: string, name: string, folderId?: string): string {
     const now = new Date().toISOString();
     const list: List = {
       id: createId("list"),
-      spaceId,
+      projectId,
+      // The legacy mirror, written so a client from before the rename still
+      // sees the List instead of dropping it (see `List.projectId`).
+      spaceId: projectId,
       folderId,
       name: name.trim(),
       order: 0,
@@ -1653,10 +1656,10 @@ export function usePlannerData() {
       // Writing it was blocked on M0: a client older than v0.6.0 would strip
       // this field on its next save. v0.6.0 shipped the passthrough, and
       // 0.6.1/0.7.0 followed, so the field now survives a round trip.
-      const revealed = hierarchy.activeLists(lists, spaceId).length > 1;
+      const revealed = hierarchy.activeLists(lists, projectId).length > 1;
       const projects = revealed
         ? current.projects.map((project) =>
-            project.id === spaceId && project.listsRevealed !== true
+            project.id === projectId && project.listsRevealed !== true
               ? { ...project, listsRevealed: true, updatedAt: now }
               : project,
           )
@@ -1735,11 +1738,12 @@ export function usePlannerData() {
     });
   }
 
-  function createFolder(spaceId: string, name: string): string {
+  function createFolder(projectId: string, name: string): string {
     const now = new Date().toISOString();
     const folder: Folder = {
       id: createId("folder"),
-      spaceId,
+      projectId,
+      spaceId: projectId,
       name: name.trim(),
       order: 0,
       createdAt: now,

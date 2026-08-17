@@ -27,6 +27,7 @@ const NOW = "2026-08-15T00:00:00.000Z";
 function list(overrides: Partial<List> = {}): List {
   return {
     id: "list-1",
+    projectId: "space-1",
     spaceId: "space-1",
     name: "Tasks",
     order: 0,
@@ -40,6 +41,7 @@ function list(overrides: Partial<List> = {}): List {
 function folder(overrides: Partial<Folder> = {}): Folder {
   return {
     id: "folder-1",
+    projectId: "space-1",
     spaceId: "space-1",
     name: "H1",
     order: 0,
@@ -63,6 +65,7 @@ describe("sanitizeList", () => {
   it("keeps a status override only when it can still express done", () => {
     const usable = sanitizeList({
       id: "l",
+      projectId: "s",
       spaceId: "s",
       statuses: [{ id: "a", group: "active" }, { id: "d", group: "done" }],
     });
@@ -72,6 +75,7 @@ describe("sanitizeList", () => {
     // override is discarded and the Space's set is inherited instead.
     const unusable = sanitizeList({
       id: "l",
+      projectId: "s",
       spaceId: "s",
       statuses: [{ id: "a", group: "active" }],
     });
@@ -80,6 +84,22 @@ describe("sanitizeList", () => {
 
   it("carries fields it does not know (M0)", () => {
     expect(sanitizeList({ id: "l", spaceId: "s", futureField: 1 })).toMatchObject({ futureField: 1 });
+  });
+
+  // The rename's whole safety story. A record written before it carries only
+  // `spaceId`; a client from before it DROPS any List without one. So the old
+  // key is read as the owner and written straight back beside the new one.
+  it("reads a pre-rename record through its legacy key", () => {
+    expect(sanitizeList({ id: "l", spaceId: "p1" })).toMatchObject({ projectId: "p1", spaceId: "p1" });
+  });
+
+  it("always writes both keys, so an older client still sees the List", () => {
+    expect(sanitizeList({ id: "l", projectId: "p1" })).toMatchObject({ projectId: "p1", spaceId: "p1" });
+  });
+
+  it("lets the new key win when the two disagree", () => {
+    const list = sanitizeList({ id: "l", projectId: "p1", spaceId: "stale" });
+    expect(list).toMatchObject({ projectId: "p1", spaceId: "p1" });
   });
 });
 
@@ -257,7 +277,7 @@ describe("moveListToFolder", () => {
 
   it("refuses a folder belonging to another space", () => {
     const current = [list()];
-    const other = [folder({ id: "folder-9", spaceId: "space-9" })];
+    const other = [folder({ id: "folder-9", projectId: "space-9", spaceId: "space-9" })];
     expect(moveListToFolder(current, "list-1", "folder-9", other, NOW)).toBe(current);
   });
 

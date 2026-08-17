@@ -96,8 +96,7 @@ export function TaskListView({
     return new Map(
       lists.map((list) => {
         const label = listDisplayName(list, t("list.defaultName"));
-        // `List.spaceId` holds the PROJECT id (see the field's own comment).
-        const owner = showProjectContext ? projectName.get(list.spaceId) : undefined;
+        const owner = showProjectContext ? projectName.get(list.projectId) : undefined;
         return [list.id, owner ? `${owner} · ${label}` : label];
       }),
     );

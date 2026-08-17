@@ -77,8 +77,10 @@ export interface ListMove {
 export function resolveListMove(targetListId: string, lists: List[]): ListMove | null {
   const target = lists.find((list) => list.id === targetListId && !list.archivedAt);
   if (!target) return null;
-  const isDefault = defaultListFor(lists, target.spaceId)?.id === target.id;
-  return { spaceId: target.spaceId, listId: isDefault ? "" : target.id };
+  const isDefault = defaultListFor(lists, target.projectId)?.id === target.id;
+  // `ListMove.spaceId` is the Task's `projectId` — a different field that kept
+  // the same old name. Renaming it is its own step; this one is about `List`.
+  return { spaceId: target.projectId, listId: isDefault ? "" : target.id };
 }
 
 /** Empty when the move changes nothing, so a no-op drop writes no row. */

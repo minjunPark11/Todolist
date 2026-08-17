@@ -465,6 +465,7 @@ describe("the Space scope (STEP 7)", () => {
 describe("view scope", () => {
   const inFolder: List = {
     id: "list-experiment",
+    projectId: "space-1",
     spaceId: "space-1",
     folderId: "folder-drone",
     name: "Experiment",

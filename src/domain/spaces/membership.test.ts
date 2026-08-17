@@ -223,6 +223,7 @@ describe("moving an Item into a List", () => {
   const otherDefault: List = makeDefaultList(defaultListIdFor("space-2"), "space-2", NOW);
   const reading: List = {
     id: "list-reading",
+    projectId: "space-1",
     spaceId: "space-1",
     name: "Reading",
     order: 1,

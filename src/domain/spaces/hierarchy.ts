@@ -132,16 +132,20 @@ export function sanitizeFolder(value: unknown): Folder | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const id = asString(record.id).trim();
-  const spaceId = asString(record.spaceId).trim();
-  // A folder with no space cannot be shown anywhere; keeping it would leave an
+  // Either key names the owning Project. `spaceId` is what every record
+  // written before this release carries; `projectId` is what they are read as
+  // from here on. Both are emitted — see `List.projectId`.
+  const projectId = asString(record.projectId).trim() || asString(record.spaceId).trim();
+  // A folder with no owner cannot be shown anywhere; keeping it would leave an
   // invisible record that still syncs.
-  if (!id || !spaceId) return null;
+  if (!id || !projectId) return null;
   const createdAt = asString(record.createdAt);
   const updatedAt = asString(record.updatedAt);
   return {
     ...(record as Partial<Folder>), // M0 passthrough
     id,
-    spaceId,
+    projectId,
+    spaceId: projectId,
     name: asString(record.name),
     order: asOrder(record.order),
     archivedAt: asString(record.archivedAt) || undefined,
@@ -154,15 +158,19 @@ export function sanitizeList(value: unknown): List | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const id = asString(record.id).trim();
-  const spaceId = asString(record.spaceId).trim();
-  if (!id || !spaceId) return null;
+  // Either key names the owning Project; both are written back. A record from
+  // before this release has only `spaceId`, and a client from before it drops
+  // any List that lacks one, so the mirror is what makes the rename safe.
+  const projectId = asString(record.projectId).trim() || asString(record.spaceId).trim();
+  if (!id || !projectId) return null;
   const statuses = sanitizeStatuses(record.statuses);
   const createdAt = asString(record.createdAt);
   const updatedAt = asString(record.updatedAt);
   return {
     ...(record as Partial<List>), // M0 passthrough
     id,
-    spaceId,
+    projectId,
+    spaceId: projectId,
     folderId: asString(record.folderId).trim() || undefined,
     name: asString(record.name),
     order: asOrder(record.order),
@@ -178,15 +186,15 @@ export function sanitizeList(value: unknown): List | null {
 
 // === reads ===
 
-export function activeFolders(folders: Folder[], spaceId: string): Folder[] {
+export function activeFolders(folders: Folder[], projectId: string): Folder[] {
   return folders
-    .filter((folder) => folder.spaceId === spaceId && !folder.archivedAt)
+    .filter((folder) => folder.projectId === projectId && !folder.archivedAt)
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
-export function activeLists(lists: List[], spaceId: string): List[] {
+export function activeLists(lists: List[], projectId: string): List[] {
   return lists
-    .filter((list) => list.spaceId === spaceId && !list.archivedAt)
+    .filter((list) => list.projectId === projectId && !list.archivedAt)
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
@@ -230,8 +238,9 @@ function nextOrder(items: Array<{ order: number }>): number {
   return items.reduce((max, item) => Math.max(max, item.order), -1) + 1;
 }
 
-export function makeDefaultList(id: string, spaceId: string, now: string, name = DEFAULT_LIST_NAME): List {
-  return { id, spaceId, name, order: 0, isDefault: true, createdAt: now, updatedAt: now };
+export function makeDefaultList(id: string, projectId: string, now: string, name = DEFAULT_LIST_NAME): List {
+  // Both keys, always: `spaceId` is the mirror an older client reads.
+  return { id, projectId, spaceId: projectId, name, order: 0, isDefault: true, createdAt: now, updatedAt: now };
 }
 
 /**
@@ -260,11 +269,11 @@ export function ensureDefaultLists(
 }
 
 export function addList(current: List[], list: List): List[] {
-  return [...current, { ...list, order: list.order || nextOrder(activeLists(current, list.spaceId)) }];
+  return [...current, { ...list, order: list.order || nextOrder(activeLists(current, list.projectId)) }];
 }
 
 export function addFolder(current: Folder[], folder: Folder): Folder[] {
-  return [...current, { ...folder, order: folder.order || nextOrder(activeFolders(current, folder.spaceId)) }];
+  return [...current, { ...folder, order: folder.order || nextOrder(activeFolders(current, folder.projectId)) }];
 }
 
 export function patchList(current: List[], listId: string, patch: Partial<List>, now: string): List[] {
@@ -274,7 +283,7 @@ export function patchList(current: List[], listId: string, patch: Partial<List>,
     touched = true;
     // id/spaceId are identity: moving a List between Spaces would strand every
     // Item in it, so that is a separate operation, not a field edit.
-    return { ...list, ...patch, id: list.id, spaceId: list.spaceId, updatedAt: now };
+    return { ...list, ...patch, id: list.id, projectId: list.projectId, spaceId: list.projectId, updatedAt: now };
   });
   return touched ? next : current;
 }
@@ -284,7 +293,7 @@ export function patchFolder(current: Folder[], folderId: string, patch: Partial<
   const next = current.map((folder) => {
     if (folder.id !== folderId) return folder;
     touched = true;
-    return { ...folder, ...patch, id: folder.id, spaceId: folder.spaceId, updatedAt: now };
+    return { ...folder, ...patch, id: folder.id, projectId: folder.projectId, spaceId: folder.projectId, updatedAt: now };
   });
   return touched ? next : current;
 }
@@ -327,7 +336,7 @@ export function moveListToFolder(
   if (!list) return current;
   if (folderId) {
     const folder = folders.find((item) => item.id === folderId);
-    if (!folder || folder.spaceId !== list.spaceId) return current;
+    if (!folder || folder.projectId !== list.projectId) return current;
   }
   if ((list.folderId ?? undefined) === folderId) return current;
   return patchList(current, listId, { folderId }, now);

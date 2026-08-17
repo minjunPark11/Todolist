@@ -152,7 +152,17 @@ export interface Space {
 /** Optional grouping inside a Project. Absent until someone makes one (D4). */
 export interface Folder {
   id: string;
-  spaceId: string;
+  /**
+   * The Project this Folder groups Lists inside.
+   *
+   * Called `spaceId` while holding a Project id: the field predates the Space
+   * record and kept the old word after Space became a level of its own. The
+   * name is the thing being fixed — see `List.projectId` for why both are
+   * written and only this one is read.
+   */
+  projectId: string;
+  /** @deprecated Legacy mirror of `projectId`, written for older clients. */
+  spaceId?: string;
   name: string;
   order: number;
   archivedAt?: string;
@@ -163,11 +173,25 @@ export interface Folder {
 export interface List {
   id: string;
   /**
-   * Always set, even when the List sits inside a Folder. Reaching the Space
-   * through the Folder would make every lookup a two-hop join, and a
-   * Folderless List could not be resolved that way at all.
+   * The Project that owns this List. Always set, even when the List sits
+   * inside a Folder: reaching the owner through the Folder would make every
+   * lookup a two-hop join, and a Folderless List could not be resolved that
+   * way at all.
+   *
+   * This was `spaceId` and held a Project id the whole time — the field
+   * predates the Space record and kept the word after Space became a separate
+   * level above Project. A reader had to know that to be right, and enough of
+   * them did not.
+   *
+   * The stored key was NOT renamed in place. An older client's `sanitizeList`
+   * drops any List whose `spaceId` is missing, and this app auto-updates, so
+   * writing only the new key would delete every List on a device that had not
+   * updated yet (M0). Both keys are written; only this one is read. The mirror
+   * goes when no client that needs it is left — the plan's Migration Phase 7.
    */
-  spaceId: string;
+  projectId: string;
+  /** @deprecated Legacy mirror of `projectId`, written for older clients. */
+  spaceId?: string;
   /** Absent for a Folderless List (D4). */
   folderId?: string;
   name: string;
