@@ -16,3 +16,9 @@ src-tauri/binaries/*
 vite.config.d.ts
 .claude/
 docs/.obsidian/workspace.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

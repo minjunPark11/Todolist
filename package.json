@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build --configLoader runner",
     "typecheck": "tsc -b",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
@@ -31,9 +32,11 @@
     "vite": "^6.0.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tauri-apps/cli": "^2.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.5",
+    "@types/node": "^26.2.0",
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "axe-core": "^4.13.0",

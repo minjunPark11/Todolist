@@ -1643,3 +1643,31 @@
     width: 100%;
   }
 }
+
+/* §1.2: a group's own way into the same dialog. */
+.tm-group-head {
+  display: flex;
+  align-items: center;
+}
+
+.tm-group-head .tm-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.tm-group-action {
+  flex: none;
+  padding: 2px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tm-group-action:hover,
+.tm-group-action:focus-visible {
+  color: var(--accent, #0a84ff);
+}

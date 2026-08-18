@@ -6,6 +6,9 @@ export default defineConfig({
     // them touch a DOM. The few that render a component opt in per file with
     // `// @vitest-environment jsdom`, so the fast path stays fast.
     environment: "node",
+    // `src/**` only: the Playwright specs live in ./e2e and are run by
+    // `npm run test:e2e`. Vitest picking them up would try to execute
+    // @playwright/test's runner inside the unit run.
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });

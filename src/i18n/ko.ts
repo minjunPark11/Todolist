@@ -1249,6 +1249,7 @@ export const ko: Dictionary = {
   "tasks.noLists": "아직 리스트가 없습니다.",
   "tasks.manageLists": "관리",
   "tasks.createList": "리스트 추가",
+  "tasks.createListIn": "{{folder}}에 리스트 추가",
   "tasks.createListTitle": "새 리스트",
   "tasks.createListNameLabel": "이름",
   "tasks.createListNamePlaceholder": "리스트 이름",

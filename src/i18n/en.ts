@@ -1255,6 +1255,7 @@ export const en: Dictionary = {
   "tasks.noLists": "No lists yet.",
   "tasks.manageLists": "Manage",
   "tasks.createList": "Add list",
+  "tasks.createListIn": "Add list in {{folder}}",
   "tasks.createListTitle": "New list",
   "tasks.createListNameLabel": "Name",
   "tasks.createListNamePlaceholder": "List name",

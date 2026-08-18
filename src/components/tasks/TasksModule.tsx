@@ -442,7 +442,7 @@ export function TasksModule(props: TasksModuleProps) {
         tags={tags}
         savedFilters={savedFilters}
         onManageLists={() => setManaging(true)}
-        onCreateList={() => setCreatingListIn("")}
+        onCreateList={(contextFolderId) => setCreatingListIn(contextFolderId)}
         current={searchQuery === null ? scope : null}
         onNavigate={(next) => {
           setSidebarOpen(false);

@@ -28,8 +28,15 @@ interface TasksSidebarProps {
   savedFilters: SavedFilter[];
   /** §13.25's management surface, opened from the Lists section. */
   onManageLists: () => void;
-  /** §1.1: opens the Add List dialog. Opening changes nothing else. */
-  onCreateList: () => void;
+  /**
+   * §1.1/§1.2: opens the Add List dialog. Opening changes nothing else.
+   *
+   * The argument is the Folder the dialog should start in — "" from the Lists
+   * header, a group's id from its own `+`. §1.2 is explicit that this is a
+   * DEFAULT and not a constraint: the dialog still lets the user pick another
+   * group, or none.
+   */
+  onCreateList: (contextFolderId: string) => void;
   /** Null on the Search Page, which is not a Scope and highlights nothing. */
   current: TaskScopeRef | null;
   onNavigate: (scope: TaskScopeRef) => void;
@@ -130,7 +137,7 @@ export function TasksSidebar({
           <button
             type="button"
             className="tm-section-action"
-            onClick={onCreateList}
+            onClick={() => onCreateList("")}
             aria-label={t("tasks.createList")}
           >
             +
@@ -144,7 +151,18 @@ export function TasksSidebar({
           if (inside.length === 0) return null;
           return (
             <div key={folder.id} className="tm-group">
-              {row({ kind: "folder", id: folder.id }, folder.name)}
+              <div className="tm-group-head">
+                {row({ kind: "folder", id: folder.id }, folder.name)}
+                {/* §1.2. Same dialog, one default filled in. */}
+                <button
+                  type="button"
+                  className="tm-group-action"
+                  onClick={() => onCreateList(folder.id)}
+                  aria-label={t("tasks.createListIn", { folder: folder.name })}
+                >
+                  +
+                </button>
+              </div>
                     {inside.map((list) =>
                 row({ kind: "list", id: list.id }, list.name, { indent: true, dot: listColorHex(list.color) }),
               )}
