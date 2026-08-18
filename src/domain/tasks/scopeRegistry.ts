@@ -25,8 +25,29 @@ export type TaskScopeKind =
   | "completed"
   | "trash";
 
-/** MVP allows Board on Inbox and a real List only (§5.45). */
-export type TaskViewKind = "list" | "board";
+/**
+ * MVP allows Board on Inbox and a real List only (§5.45), and Gantt with it.
+ *
+ * Gantt joins on the same terms rather than on its own: §5.45's rule is about
+ * which Scopes are ONE List's screen, and a timeline over a Scope that gathers
+ * several Lists would draw bars whose rows belong to different places. The two
+ * Scopes that pass that test are the two that already offer Board.
+ *
+ * This is the Tasks Module's set, not the whole app's. `List.defaultViewKey`
+ * stores a free string on purpose (Add List design §13.7) — a key this build
+ * cannot open is kept and resolved to something it can, never dropped.
+ */
+export type TaskViewKind = "list" | "board" | "gantt";
+
+/**
+ * Every View this module knows, as a value.
+ *
+ * Exported so tests can sweep the whole set rather than a list someone typed
+ * out: the hardening sweep for "unsupported URL state 0" was checking `list`
+ * and `board` by name and so said nothing at all about `gantt` on the day it
+ * arrived. A widened union now widens the sweep with it.
+ */
+export const TASK_VIEW_KINDS: readonly TaskViewKind[] = ["list", "board", "gantt"];
 
 /**
  * Where the user is standing, as a typed value rather than a path string
@@ -73,7 +94,7 @@ export interface TaskScopePolicy {
 }
 
 const LIST_ONLY = ["list"] as const;
-const LIST_AND_BOARD = ["list", "board"] as const;
+const ONE_LIST_VIEWS = ["list", "board", "gantt"] as const;
 
 export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
   today: {
@@ -104,7 +125,7 @@ export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
     kind: "inbox",
     segment: "inbox",
     hasId: false,
-    allowedViews: LIST_AND_BOARD,
+    allowedViews: ONE_LIST_VIEWS,
     defaultView: "list",
     canCreate: true,
     canManualReorder: true,
@@ -115,7 +136,7 @@ export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
     kind: "list",
     segment: "list",
     hasId: true,
-    allowedViews: LIST_AND_BOARD,
+    allowedViews: ONE_LIST_VIEWS,
     defaultView: "list",
     canCreate: true,
     canManualReorder: true,

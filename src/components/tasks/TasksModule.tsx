@@ -44,6 +44,10 @@ import { TaskBoard } from "./TaskBoard";
 import { CommandPalette } from "./CommandPalette";
 import { ListManager } from "./ListManager";
 import { CreateListModal } from "./CreateListModal";
+import { TaskGanttView } from "../TaskGanttView";
+import { projectItems } from "../../domain/view/item";
+import { specForSpaceView } from "../../domain/view/spaceViews";
+import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
 import { useResponsiveMode, useViewportHeightVar } from "./useResponsiveMode";
 import { detailIsFullScreen, sidebarPresentationFor, taskDetailPresentationFor } from "../../domain/tasks/responsive";
@@ -325,6 +329,32 @@ export function TasksModule(props: TasksModuleProps) {
   // only thing the two Boards do not share.
   const boardListId = scope.kind === "list" ? scope.id : "";
   const columns = scope.kind === "inbox" ? INBOX_COLUMNS : listBoardColumns(boardListId, listSections);
+
+  // The timeline's three arguments, built from the rows the Scope already
+  // chose. `sources: ["task"]` because this module is about Tasks — a Goal or
+  // a milestone is not in any of the nine Scopes, so drawing one here would
+  // put work on screen that the count beside it does not know about.
+  const ganttItems = useMemo(
+    () => projectItems({ tasks: rows, paths: [], projects, lists, today, sources: ["task"] }),
+    [rows, projects, lists, today],
+  );
+  const ganttSpec: ViewSpec = useMemo(
+    // The scope is passed empty on purpose: `queryScopeTasks` has already
+    // answered "which Tasks", and naming it again here would be the same
+    // narrowing done twice — with two chances to disagree (§12.19).
+    () => specForSpaceView("gantt", {}, title),
+    [title],
+  );
+  const ganttContext: GroupContext = useMemo(
+    () => ({
+      today,
+      taskById: new Map(rows.map((task) => [task.id, task])),
+      // D10: the order the user arranged Lists in outranks the alphabet, and
+      // the sidebar and this timeline have to agree about it.
+      groupRank: groupRank(ganttSpec.groupBy, { projects, lists, folders }),
+    }),
+    [today, rows, ganttSpec.groupBy, projects, lists, folders],
+  );
   const columnOf = (task: Task) =>
     scope.kind === "inbox" ? (inboxBucketOf(task) as string) : sectionIdFor(task, lists, listSections);
   const tasksIn = (columnId: string) => sortByManualOrder(rows.filter((task) => columnOf(task) === columnId));
@@ -451,7 +481,7 @@ export function TasksModule(props: TasksModuleProps) {
                   aria-pressed={view === state.view}
                   onClick={() => setView(view)}
                 >
-                  {t(view === "board" ? "tasks.viewBoard" : "tasks.viewList")}
+                  {t(`tasks.view.${view}`)}
                 </button>
               ))}
             </div>
@@ -508,10 +538,31 @@ export function TasksModule(props: TasksModuleProps) {
           <p className="tm-state" role="status">
             {t("tasks.missingHint")}
           </p>
-        ) : rows.length === 0 && state.view !== "board" ? (
+        ) : rows.length === 0 && state.view === "list" ? (
           <p className="tm-state" role="status">
             {t(emptyKeyFor(scope.kind))}
           </p>
+        ) : state.view === "gantt" ? (
+          /* §50C.29's rule kept: every Scope that offers a timeline mounts the
+             ONE renderer. It is scope-free by construction — `items` arrive
+             already narrowed, here by `queryScopeTasks`, so the Scope decides
+             membership exactly as it does for the list and the board and the
+             timeline never asks a second question about it. */
+          <TaskGanttView
+            items={ganttItems}
+            spec={ganttSpec}
+            context={ganttContext}
+            today={today}
+            projects={projects}
+            tasks={tasks}
+            groupLabel={(groupId) => {
+              const owner = lists.find((list) => list.id === groupId);
+              return owner ? listDisplayName(owner, t("list.defaultName")) : t("timeline.ungrouped");
+            }}
+            selectedTaskId={state.taskId}
+            onOpenItem={(item) => openTask(item.sourceId)}
+            onUpdateTask={props.drawer.onUpdate}
+          />
         ) : state.view === "board" ? (
           <TaskBoard
             columns={columns}

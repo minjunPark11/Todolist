@@ -4,6 +4,7 @@ import {
   resolveView,
   scopeRegistry,
   TASK_SCOPE_KINDS,
+  TASK_VIEW_KINDS,
   type TaskScopeKind,
 } from "./scopeRegistry";
 
@@ -88,6 +89,37 @@ describe("resolveView", () => {
     for (const kind of TASK_SCOPE_KINDS as TaskScopeKind[]) {
       for (const requested of ["list", "board", "gantt", ""]) {
         expect(isViewAllowed(kind, resolveView(kind, requested))).toBe(true);
+      }
+    }
+  });
+});
+
+// Add List design Phase 3 (§R.6). Gantt joins on §5.45's terms, not its own.
+describe("Gantt is offered where a Scope is one List's screen", () => {
+  it("is allowed exactly where Board is", () => {
+    const withGantt = TASK_SCOPE_KINDS.filter((kind) => scopeRegistry[kind].allowedViews.includes("gantt"));
+    const withBoard = TASK_SCOPE_KINDS.filter((kind) => scopeRegistry[kind].allowedViews.includes("board"));
+
+    // Not a coincidence to be kept in step by hand: both answer "is this one
+    // List's screen", and a timeline over a Scope gathering several Lists
+    // would draw bars whose rows belong to different places.
+    expect(withGantt).toEqual(withBoard);
+    expect(withGantt).toEqual(["inbox", "list"]);
+  });
+
+  it("never becomes a Scope's default — the List is still what opens", () => {
+    for (const kind of TASK_SCOPE_KINDS) {
+      expect(scopeRegistry[kind].defaultView).toBe("list");
+    }
+  });
+
+  it("is in the set the hardening sweep walks", () => {
+    expect(TASK_VIEW_KINDS).toContain("gantt");
+    // Every allowed view of every Scope has to be a view this module knows,
+    // or the sweep would be checking a smaller set than the registry offers.
+    for (const kind of TASK_SCOPE_KINDS) {
+      for (const view of scopeRegistry[kind].allowedViews) {
+        expect(TASK_VIEW_KINDS).toContain(view);
       }
     }
   });

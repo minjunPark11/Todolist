@@ -166,6 +166,8 @@ describe("Tasks Module accessibility (Gate 11)", () => {
     ["Inbox", "/inbox"],
     ["a List as a list", "/list/l1"],
     ["a List as a board", "/list/l1?view=board"],
+    ["a List as a timeline", "/list/l1?view=gantt"],
+    ["the Inbox as a timeline", "/inbox?view=gantt"],
     ["a List with the Task Detail open", "/list/l1?task=t1"],
     ["a board with the Task Detail open", "/list/l1?view=board&task=t1"],
     ["Completed", "/completed"],

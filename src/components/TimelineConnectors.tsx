@@ -75,6 +75,12 @@ export function TimelineConnectors({
 
     // Bars move when the window resizes even though no state changed, so the
     // measurement has to follow the layout rather than only the data.
+    //
+    // Guarded the way `useResponsiveMode` guards its own: an environment
+    // without the API — a test renderer, an old engine — should draw the
+    // connectors it measured once, not throw on mount and take the whole
+    // timeline with it. The measurement above has already run.
+    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     if (containerRef.current) observer.observe(containerRef.current);
     return () => observer.disconnect();

@@ -105,6 +105,20 @@
 
 `TaskViewKind`를 넓히면 **Gate 11의 `unsupported URL state 0`** 을 고정한 `domain/tasks/hardening.test.ts`와 `scopeRegistry`의 `allowedViews`가 함께 바뀐다. 그건 부수 작업이 아니라 Phase 3의 본체다.
 
+### Phase 3 결과 — Gantt는 §5.45의 조건으로 합류했다
+
+`TaskViewKind`가 `list | board | gantt`가 되고, **Board가 허용된 Scope에만** Gantt도 허용된다(Inbox와 실제 List). 새 규칙을 만들지 않은 이유가 있다 — §5.45가 정한 것은 "이 Scope가 **하나의 List의 화면인가**"이고, 여러 List를 모으는 Scope 위의 타임라인은 **행마다 다른 곳에 속한 막대**를 그린다. 그 시험을 통과하는 Scope가 이미 Board를 가진 그 둘이다. `defaultView`는 아홉 Scope 모두 여전히 `list`다.
+
+**렌더러는 새로 짓지 않았다.** `TaskGanttView`는 자기 주석대로 scope-free이고 `items`를 이미 좁혀진 것으로 받으므로, `queryScopeTasks`의 결과를 `projectItems({sources:["task"]})`로 통과시켜 넘긴다. ViewSpec의 filter는 **비워서** 넘긴다 — 어느 Task인지는 Scope가 이미 답했고, 여기서 다시 이름 붙이면 §12.19가 금지한 "같은 좁히기 두 번, 어긋날 기회 두 번"이 된다.
+
+**하드코딩 하나를 걷어냈다.** `hardening.test.ts`가 `["list","board"]`를 손으로 적어두고 있었다 — Gate 11의 `unsupported URL state 0`을 지키는 그 sweep이, gantt가 생긴 날 **gantt에 대해 아무 말도 하지 않는다**는 뜻이다. 이제 `TASK_VIEW_KINDS`를 순회하므로 유니온이 넓어지면 sweep도 함께 넓어진다.
+
+**`TimelineConnectors`의 `ResizeObserver`가 무방비였다.** API가 없는 환경에서 마운트하는 순간 던지고 타임라인 전체를 데려간다. `useResponsiveMode`가 이미 쓰던 가드를 붙였다 — 한 번 잰 연결선은 그리고, 리사이즈 추적만 포기한다.
+
+**앱에서 확인:** `/inbox?view=gantt`에서 타임라인이 List별로 묶여 그려지고, 날짜 없는 작업은 "No dates" 트레이로 빠지며, 토글은 List/Board/Timeline 셋이 되고 `aria-pressed`가 따라간다. `/today?view=gantt`는 Gantt를 그리지 않고 토글도 내주지 않는다. 가로 오버플로 0. 두 타임라인 표면 모두 axe serious/critical 0.
+
+**남은 것 하나, Phase 3의 것이 아니다.** 직접 로드한 `/today?view=gantt`는 주소창에 `?view=gantt`를 남긴다 — 모듈은 canonical 상태로 그리지만 주소는 다시 쓰이지 않는다. `?view=board`도 **똑같이** 그렇다(확인함). 즉 이 릴리스가 만든 것이 아니라 §5.35의 기존 동작이며, Add List 설계의 범위 밖이다.
+
 ### 저장 타입은 유니온이 아니라 문자열이다 — MUST (Phase 1에서 확정)
 
 `List.defaultViewKey`와 `List.color`는 **`string`으로 저장한다.** `TaskViewKind`도, 팔레트 토큰의 유니온도 아니다.
@@ -143,7 +157,7 @@
 | **0** ✅ | 이 절 (매핑 확정) | 이 문서가 리포에 있고 R.2 표가 합의됨 |
 | **1** ✅ | §13 데이터 모델 | `List.color?` / `List.defaultViewKey?` 추가, `sanitizeList` 통과, **구버전 라운드트립 유지** (`forwardCompat.test.ts`) |
 | **2** ✅ | §1~§3 Modal + Name | Name 하나로 Enter 생성 → Sidebar 반영 → 새 List 진입 → 첫 Task 입력 가능 |
-| **3** | Gantt View 배선 | `?view=gantt`가 아홉 Scope 중 허용된 곳에서 열리고, `hardening.test.ts`가 갱신됨 |
+| **3** ✅ | Gantt View 배선 | `?view=gantt`가 아홉 Scope 중 허용된 곳에서 열리고, `hardening.test.ts`가 갱신됨 |
 | **4** | §4~§5 Color + Default View | 저장한 `defaultViewKey`가 실제로 그 View를 연다 |
 | **5** | §6 Folder | inline Folder 생성 포함 |
 | **6** | §8 Preview | 순수 표현 계층 — 잘라내도 기능이 성립한다 |

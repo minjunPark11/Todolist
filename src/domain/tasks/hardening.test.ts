@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { List, Task, TaskDailyPlan } from "../../types";
 import { canonicalizeTaskUrl, parseTaskScope, parseTaskUrl, taskUrlFor } from "../../app/taskScopeUrl";
 import { queryScopeCount, queryScopeTasks, type ScopeContext } from "./scopeQuery";
-import { TASK_SCOPE_KINDS, scopeRegistry } from "./scopeRegistry";
+import { TASK_SCOPE_KINDS, scopeRegistry, TASK_VIEW_KINDS } from "./scopeRegistry";
 import { collectTodayEntries } from "../../utils/todayView";
 
 const TODAY = "2026-08-18";
@@ -131,6 +131,11 @@ describe("no URL can leave the module in a state it does not define", () => {
       "/today",
       "/today?view=board",
       "/today?view=banana&task=",
+      // Gantt is allowed on some Scopes and not others, so it is junk here and
+      // canonical elsewhere — exactly the case a hardcoded pair missed.
+      "/today?view=gantt",
+      "/list/l1?view=gantt&task=t1",
+      "/upcoming?view=gantt",
       "/inbox?view=board&view=list",
       "/list/l1?task=t1&ignored=1",
       "/list/",
@@ -162,7 +167,7 @@ describe("no URL can leave the module in a state it does not define", () => {
     for (const kind of TASK_SCOPE_KINDS) {
       const policy = scopeRegistry[kind];
       const scope = (policy.hasId ? { kind, id: "x" } : { kind }) as Parameters<typeof taskUrlFor>[0]["scope"];
-      for (const view of ["list", "board"] as const) {
+      for (const view of TASK_VIEW_KINDS) {
         const written = taskUrlFor({ scope, view, taskId: "" });
         const parsed = parseTaskUrl(written)!;
         expect(policy.allowedViews).toContain(parsed.view);
