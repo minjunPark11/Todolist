@@ -376,3 +376,24 @@ describe("standalone List (Migration Phase 4)", () => {
     expect(standaloneLists(all).map((entry) => entry.id)).toEqual(["standalone"]);
   });
 });
+
+// Add List Phase 2. A List made from the Tasks sidebar belongs to no Project,
+// so `kind` is the only thing standing between it and `sanitizeList`.
+describe("a List that belongs to no Project", () => {
+  it("survives a round trip when it says what kind it is", () => {
+    const standalone = sanitizeList({ id: "l1", projectId: "", kind: "regular", name: "학교" });
+    expect(standalone).toMatchObject({ id: "l1", projectId: "", kind: "regular" });
+  });
+
+  it("is still dropped when it merely lost its owner", () => {
+    expect(sanitizeList({ id: "l1", projectId: "", name: "학교" })).toBeNull();
+  });
+
+  it("is what standaloneLists gathers", () => {
+    const lists = [
+      sanitizeList({ id: "l1", projectId: "", kind: "regular", name: "학교" })!,
+      sanitizeList({ id: "l2", projectId: "p1", name: "일" })!,
+    ];
+    expect(standaloneLists(lists).map((list) => list.id)).toEqual(["l1"]);
+  });
+});

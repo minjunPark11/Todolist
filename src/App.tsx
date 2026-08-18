@@ -1104,6 +1104,15 @@ export default function App() {
             onToggleSubtask: planner.toggleSubtask,
             onDeleteSubtask: planner.deleteSubtask,
           }}
+          // Add List design §1.10. A List made from the Tasks sidebar belongs
+          // to no Project: this module is Project-agnostic — it shows Lists,
+          // Folders and Tags and never a Project — so there is no owner to
+          // inherit and inventing one would file the List somewhere the user
+          // never chose. §6.3 makes a standalone List first-class exactly for
+          // this, and `createList` writes the `kind` that keeps it alive.
+          onCreateList={({ name, color, defaultViewKey, folderId }) =>
+            planner.createList("", name, folderId, { color, defaultViewKey })
+          }
           // Straight to the store. The legacy confirmation modal lives in
           // AppModals, which this branch does not render — and §9.45 keeps
           // confirmation for what cannot be taken back, which a soft delete

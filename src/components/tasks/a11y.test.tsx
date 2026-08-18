@@ -116,6 +116,7 @@ function renderModule(url: string) {
         url={url}
         onNavigate={() => {}}
         onCreate={() => {}}
+        onCreateList={() => "list-new"}
         drawer={{
           childrenOf: () => [],
           onUpdate: () => {},
@@ -178,6 +179,17 @@ describe("Tasks Module accessibility (Gate 11)", () => {
       expect(await seriousViolations(container)).toEqual([]);
     });
   }
+
+  it("has no serious or critical violation with the Add List dialog open", async () => {
+    const user = userEvent.setup();
+    const { container } = renderModule("/today");
+    // §0.7 R0-3 keeps the dialog out of the URL, so it is opened the way a
+    // user opens it — from the Lists header.
+    await user.click(container.querySelector<HTMLElement>('.tm-section-action[aria-label]')!);
+
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(await seriousViolations(container)).toEqual([]);
+  });
 
   it("has no serious or critical violation with the Command Palette open", async () => {
     const user = userEvent.setup();

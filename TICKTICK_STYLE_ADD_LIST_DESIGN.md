@@ -142,7 +142,7 @@
 |---|---|---|
 | **0** ✅ | 이 절 (매핑 확정) | 이 문서가 리포에 있고 R.2 표가 합의됨 |
 | **1** ✅ | §13 데이터 모델 | `List.color?` / `List.defaultViewKey?` 추가, `sanitizeList` 통과, **구버전 라운드트립 유지** (`forwardCompat.test.ts`) |
-| **2** | §1~§3 Modal + Name | Name 하나로 Enter 생성 → Sidebar 반영 → 새 List 진입 → 첫 Task 입력 가능 |
+| **2** ✅ | §1~§3 Modal + Name | Name 하나로 Enter 생성 → Sidebar 반영 → 새 List 진입 → 첫 Task 입력 가능 |
 | **3** | Gantt View 배선 | `?view=gantt`가 아홉 Scope 중 허용된 곳에서 열리고, `hardening.test.ts`가 갱신됨 |
 | **4** | §4~§5 Color + Default View | 저장한 `defaultViewKey`가 실제로 그 View를 연다 |
 | **5** | §6 Folder | inline Folder 생성 포함 |
@@ -160,6 +160,22 @@
 **§17.3의 E2E 릴리스 게이트** — 본문은 Desktop / Tablet / Mobile E2E PASS를 릴리스 조건으로 건다. 이 저장소에는 브라우저 E2E 하니스가 없고, TickTick 계획서 Gate 11에서도 그 줄은 **의도적으로 미완(❌)으로 남겨져 있다**(감사 문서 25번).
 
 기능마다 다시 정하지 않기 위해 **Phase 2를 지어본 뒤 한 번에 결정한다.** 그때 판단 재료가 생긴다 — 연타 방지(E2E-12/13)와 IME Enter(E2E-11)가 도메인/jsdom 레벨에서 잡히는지 아닌지가 Phase 2에서 드러나고, 잡히지 않는 것이 무엇인지가 곧 Playwright가 사야 할 것의 목록이다.
+
+### Phase 2가 실제로 알려준 것
+
+**순수 도메인 테스트는 연타를 잡지 못한다.** `createListDraft.test.ts`의 18개가 전부 통과하는 동안, 앱은 Enter 세 번에 **리스트를 세 개 만들었다.** 규칙 함수는 틀린 적이 없었다 — 틀린 것은 그 함수에 넘긴 값이었다. `submitting`이 React state였고, state는 **자기를 세팅한 tick 안에서 바뀌지 않으므로** 세 클로저가 모두 "제출 중 아님"을 읽었다. 버튼의 `disabled`는 Enter가 지나쳐 간다.
+
+즉 §13.32가 서버 idempotency로 막으려던 그 사고가, 서버가 없는 이 앱에서도 **같은 모양으로 실재한다.** R.4가 "제출 락"이라고 쓴 것을 state로 구현하면 락이 아니다. 지금은 ref다.
+
+**그래서 E2E 판단의 재료는 이렇게 정리된다.**
+
+| 잡은 층 | 무엇을 |
+|---|---|
+| 순수 도메인 | 이름 정규화·검증·중복 허용·payload — 규칙 그 자체 |
+| **jsdom (이벤트 루프 있음)** | **연타 1회 제출, IME Enter, 실패 후 Draft 보존, 실패 후 재시도, scrim 무시** — Phase 2의 진짜 버그가 여기서 잡혔고 여기서만 잡힌다 |
+| 실제 브라우저 | 새로고침 생존(`sanitizeList` 왕복), 실제 포커스 이동, URL 전환, 온스크린 키보드 |
+
+**Playwright가 살 것은 세 번째 줄뿐이고, 그중 앞의 둘은 이미 수동으로 걸었다.** 27개 시나리오 중 다수가 두 번째 줄에서 닫히므로, 전면 도입보다 **jsdom 레벨을 계속 쓰고 브라우저는 수동 확인으로 남기는 쪽**이 지금 시점의 비용 대비 답이다. Phase 5(Folder)까지 지어보고 최종 확정한다.
 
 ---
 

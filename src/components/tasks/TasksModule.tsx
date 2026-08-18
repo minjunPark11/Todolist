@@ -43,6 +43,8 @@ import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
 import { CommandPalette } from "./CommandPalette";
 import { ListManager } from "./ListManager";
+import { CreateListModal } from "./CreateListModal";
+import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
 import { useResponsiveMode, useViewportHeightVar } from "./useResponsiveMode";
 import { detailIsFullScreen, sidebarPresentationFor, taskDetailPresentationFor } from "../../domain/tasks/responsive";
 import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
@@ -90,6 +92,19 @@ interface TasksModuleProps {
     onDeleteSubtask: (id: string) => void;
   };
   /** §13.23/§6.56: restoring a List, and the one hard delete in the app. */
+  /**
+   * Creates the List and answers with its id (Add List design §1.10).
+   *
+   * It returns the id because the flow does not end at the record: the Module
+   * has to select the new List and open it, and §17.2 calls anything short of
+   * that unfinished. Rejecting means the draft is kept and shown again.
+   */
+  onCreateList: (payload: {
+    name: string;
+    color?: string;
+    defaultViewKey?: string;
+    folderId?: string;
+  }) => Promise<string> | string;
   lifecycle: {
     onArchiveList: (listId: string) => void;
     onTrashList: (listId: string) => void;
@@ -134,6 +149,10 @@ export function TasksModule(props: TasksModuleProps) {
   // §13.25: a management surface, not a Scope — so it is state here and not a
   // tenth route.
   const [managing, setManaging] = useState(false);
+  // §0.7 R0-3: the dialog is UI state and nothing about it is in the URL, the
+  // same treatment §10.23 gives the palette. `null` is §1.5's S1 (CLOSED);
+  // a string is the Folder it was started from, "" for the Lists header.
+  const [creatingListIn, setCreatingListIn] = useState<string | null>(null);
   // §15.3. Presentation only: nothing below reads this to decide what a Scope
   // contains, which is what keeps §15.9 true — the URL means the same thing at
   // every width.
@@ -377,6 +396,7 @@ export function TasksModule(props: TasksModuleProps) {
         tags={tags}
         savedFilters={savedFilters}
         onManageLists={() => setManaging(true)}
+        onCreateList={() => setCreatingListIn("")}
         current={searchQuery === null ? scope : null}
         onNavigate={(next) => {
           setSidebarOpen(false);
@@ -526,6 +546,25 @@ export function TasksModule(props: TasksModuleProps) {
         </>
         )}
       </main>
+
+      {creatingListIn !== null ? (
+        <CreateListModal
+          contextFolderId={creatingListIn}
+          onClose={() => setCreatingListIn(null)}
+          onSubmit={async (draft: CreateListDraft) => {
+            const listId = await props.onCreateList(createListPayload(draft));
+            // A creation that answers with no id has not produced a List to
+            // open; treating it as success would close the dialog over a draft
+            // that went nowhere (§1.12).
+            if (!listId) throw new Error("");
+            setCreatingListIn(null);
+            // §1.10, and §17.2's real finish line: the record is not the end,
+            // being in the new List ready to type is. The URL layer already
+            // knows how to say that, so no new routing rule is invented here.
+            onNavigate(taskUrlFor({ scope: { kind: "list", id: listId }, view: "list", taskId: "" }));
+          }}
+        />
+      ) : null}
 
       {managing ? (
         <ListManager

@@ -1845,6 +1845,12 @@ export function usePlannerData() {
       // The legacy mirror, written so a client from before the rename still
       // sees the List instead of dropping it (see `List.projectId`).
       spaceId: projectId,
+      // Written explicitly, and it is not decoration. `sanitizeList` keeps a
+      // List only when it has an owning Project OR says what kind it is, and a
+      // List made from the Tasks sidebar has no Project to belong to (§6.3
+      // makes that first-class). Without this the record would load once and
+      // be dropped on the next read — a List that vanishes overnight.
+      kind: "regular",
       folderId,
       name: name.trim(),
       // Absent rather than "" when unset: the field means "the user chose

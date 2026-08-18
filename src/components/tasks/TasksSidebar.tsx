@@ -27,6 +27,8 @@ interface TasksSidebarProps {
   savedFilters: SavedFilter[];
   /** §13.25's management surface, opened from the Lists section. */
   onManageLists: () => void;
+  /** §1.1: opens the Add List dialog. Opening changes nothing else. */
+  onCreateList: () => void;
   /** Null on the Search Page, which is not a Scope and highlights nothing. */
   current: TaskScopeRef | null;
   onNavigate: (scope: TaskScopeRef) => void;
@@ -44,6 +46,7 @@ export function TasksSidebar({
   tags,
   savedFilters,
   onManageLists,
+  onCreateList,
   current,
   onNavigate,
 }: TasksSidebarProps) {
@@ -73,8 +76,12 @@ export function TasksSidebar({
   // §13.21/§13.22: a List that has been put away leaves the tree. It is not
   // gone — Manage is where both states are — but it is not a place to file
   // work in any more, so it does not sit among the ones that are.
+  // A List made from this sidebar belongs to no Project — §6.3 makes that
+  // first-class, and `standaloneLists` has answered for it all along with
+  // nothing rendering the answer. Requiring `projectId` here is what would
+  // have made a newly created List invisible the moment it was made.
   const treeLists = ctx.lists.filter(
-    (list) => !isInboxList(list) && !list.archivedAt && !list.deletedAt && list.projectId,
+    (list) => !isInboxList(list) && !list.archivedAt && !list.deletedAt && (list.projectId || list.kind === "regular"),
   );
   // Grouped by `folderIdFor`, the same answer the `folder` Scope reads
   // (§12.4). A List the user has put in a sidebar group is therefore under
@@ -117,6 +124,16 @@ export function TasksSidebar({
       <div className="tm-section">
         <h2 className="tm-section-title">
           {t("tasks.sectionLists")}
+          {/* §1.1. `Lists +` opens the dialog with no Folder context; the
+              current Scope and the URL are untouched (§0.7 R0-3). */}
+          <button
+            type="button"
+            className="tm-section-action"
+            onClick={onCreateList}
+            aria-label={t("tasks.createList")}
+          >
+            +
+          </button>
           <button type="button" className="tm-section-action" onClick={onManageLists}>
             {t("tasks.manageLists")}
           </button>

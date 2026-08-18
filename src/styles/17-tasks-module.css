@@ -1045,3 +1045,124 @@
     transition: none !important;
   }
 }
+
+/* --- Add List dialog (Add List design §2) --- */
+
+/*
+ * §1.8's rule made structural: the scrim carries no click handler, so there is
+ * nothing to accidentally dismiss a draft with. Centred rather than dropped
+ * from the top like the palette — this one asks for a decision, it is not a
+ * place you pass through.
+ */
+.tm-modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.tm-modal {
+  display: flex;
+  width: min(420px, 100%);
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px 20px;
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.tm-modal-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--text, #1c1c1e);
+}
+
+.tm-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tm-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-modal-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 15px;
+}
+
+.tm-modal-input:focus-visible {
+  border-color: var(--accent, #0a84ff);
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(10, 132, 255, 0.18));
+}
+
+.tm-modal-input:disabled {
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tm-modal-actions button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tm-modal-cancel {
+  background: var(--surface-2, rgba(0, 0, 0, 0.05));
+  color: var(--text, #1c1c1e);
+}
+
+.tm-modal-submit {
+  background: var(--accent, #0a84ff);
+  color: #fff;
+}
+
+/*
+ * §1.5's S2 and S4 look the same from here: nothing can be submitted. The
+ * cursor says so before the click does.
+ */
+.tm-modal-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* §15.12's floor for a coarse pointer applies to the dialog too. */
+@media (pointer: coarse) {
+  .tm-modal-actions button {
+    min-height: 44px;
+  }
+
+  .tm-modal-input {
+    min-height: 44px;
+  }
+}
