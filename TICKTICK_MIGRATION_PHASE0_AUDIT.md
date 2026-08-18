@@ -39,6 +39,8 @@
 | `completed` | `/completed` | 없음 (보관함은 archived 전용) | **신규** |
 | `trash` | `/trash` | 없음 (`deletedAt`은 있는데 노출 화면 없음) | **신규** — 필드는 이미 있음 |
 
+**개정 (Implementation Phase 1).** 위 표의 "현재 대응물"은 화면 기준이고, 그건 아직 그대로다. 다만 9개 Scope의 **정의는 생겼다** — `domain/tasks/scopeRegistry.ts`가 §12.4 매트릭스를(허용 View·기본 View·생성 가능 여부·수동 정렬·count 의미·생성 owner) 한 표로 들고 있고, `app/taskScopeUrl.ts`가 URL 왕복과 canonical 정리를 한다. 화면은 Implementation Phase 3부터다.
+
 현재 있으나 목표 Scope에 자리가 없는 것:
 
 - **간트(Gantt)** — §12.4 Allowed View는 List/Board뿐. 계획서 전체에서 간트 언급 4회, Scope 배정 없음
@@ -151,3 +153,4 @@
 5. **Phase 1(§6.68) 잔여 필드** — `List.sidebarFolderId`, `Task.sectionId`, `SidebarFolder`, `ListSection`, `SavedFilter`
 6. ~~**`TaskDailyPlan` (§6.68)**~~ — **완료.** A절이 지적한 *"Today override가 localStorage에 있고 동기되지 않는다"*의 정식 해법. 하루치 계획을 Task에 박지 않고(§6.19) 별도 레코드로 두었고, `daily_plans` 테이블과 함께 동기된다. 기기에 남아 있던 블롭은 id로 병합해 흡수하되 덮어쓰지 않는다
 7. ~~**`Tag` / `TaskTag` (§6.45)**~~ — **완료.** B절의 `tag` Scope가 "Tag 레코드 없음"이라 막혀 있던 것이 풀렸다. `Task.tags` 문자열은 그대로 두고 레코드를 옆에 세웠다 — 문자열을 고치면 그 태그를 단 모든 Task를 다시 써야 하지만 레코드는 한 줄이면 되고, 그게 이 조인이 존재하는 이유다. 레거시 `space:`/`group:` 마커는 백필에서 걸러진다
+8. ~~**Implementation Phase 1 (§16.24) — Canonical Registry / URL**~~ — **완료.** Gate 1의 여섯 항목이 전부 테스트로 고정됐다: 9개 Scope URL 왕복, `?view=banana` → 기본 View, `/` → `/today`, 기본 `view=list`는 URL에서 생략, `?task=` 보존, 그리고 쿼리 순서 고정. 화면에는 아직 붙이지 않았다 — §16.48이 "Query 전에 화면을 만들지 않는다"고 못박고, Phase 2(Query/Count)가 그 사이에 있다
