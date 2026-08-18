@@ -54,7 +54,7 @@
 | 목표 (§6.87) | 현재 | 등급 |
 |---|---|---|
 | `kind: 'inbox' \| 'regular'` | ~~없음 (`isDefault: boolean`)~~ → ✅ `kind?: "inbox" \| "regular"` (없으면 regular로 읽음) | ~~신규~~ → **완료** |
-| `projectId: string \| null` | ~~`spaceId: string` (필수, 값은 Project id)~~ → 🟡 `projectId: string` (필수, `spaceId?`는 레거시 미러) | ~~개명 + nullable~~ → **개명 완료 / nullable은 Phase 4** |
+| `projectId: string \| null` | ~~`spaceId: string` (필수, 값은 Project id)~~ → ✅ `projectId: string`, `""`가 계획서의 `null` 역할 (`spaceId?`는 레거시 미러) | ~~개명 + nullable~~ → **완료** (Phase 4) |
 | `sidebarFolderId: string \| null` | 없음 | 신규 |
 | `sortKey` | `order: number` | 개명 |
 | `archivedAt` | `archivedAt?` | **일치** |
@@ -115,7 +115,7 @@
 
 **1급 — 구조 변경 (되돌리기 비쌈)**
 - Task 소유 축을 `projectId`+`listId?`(해석 함수) → `listId` 단일 필수로 — 🟡 **진행 중** (Phase 2·3 완료, 필수화와 fallback 제거가 남음)
-- `List.spaceId` → `projectId` 개명 후 nullable — 🟡 **개명 완료**, nullable은 Phase 4
+- `List.spaceId` → `projectId` 개명 후 nullable — ✅ **완료** (개명 Phase 1, 소유 없는 List 허용 Phase 4)
 - Subtask를 Task self-reference → 별도 엔티티 — ⬜ 착수 전
 - 날짜를 `dueDate`/`scheduledDate` → `dueOn`/`dueAt` + TodayPlan — ⬜ 착수 전
 
@@ -147,5 +147,6 @@
 1. ~~**`List.spaceId` → `List.projectId` 개명**~~ — **완료.** 저장 키를 바꾸지 않고 병행 기록으로 처리했다. `sanitizeList`/`sanitizeFolder`가 두 키 중 하나를 owner로 읽고 항상 둘 다 쓴다. 구버전 클라이언트의 `sanitizeList`는 `spaceId` 없는 List를 **버리므로**, 그냥 개명했으면 업데이트 안 한 기기에서 리스트가 전부 사라졌을 것이다. 미러 제거는 계획서의 Migration Phase 7
 2. ~~**§16.35 P0/P1 경계 읽고 1차 범위 확정**~~ — **읽었다.** 계획서가 리포에 들어왔다. P0 MVP는 9개 Scope를 **전부** 포함한다(Today · Upcoming · Inbox · List · Folder · Tag · Filter · Completed · Trash). P1로 미룬 것은 Repeat / Reminder / Folder Board / advanced grouping / Multi-select / touch DnD / advanced search이며, §17은 *"§1~§16 기준으로 이제 추가적인 큰 UX 설계 없이 Tasks Module MVP 구현을 시작할 수 있다"*고 선언한다. 즉 "일부 Scope부터"는 계획서가 주는 선택지가 아니다
 3. **4급 항목 결정** — 절반은 답이 나왔다. **Repeat / Reminder는 §16.35가 P1로 배치**했으므로 유지하되 뒤로 미루면 된다. 그러나 **간트 · 목표(Goals) · status 6종은 P0에도 P1에도 없다** — 계획서가 다루지 않는 영역이므로 여전히 명시적 결정이 필요하다. 조용히 남겨두면 v0.10.x에서 정리한 것과 같은 잔재가 된다
-4. **Migration Phase 4 (§6.72) — `List.projectId` nullable** — standalone List가 열려야 §1.14의 Presentation IA로 갈 수 있다. Phase 1(§6.68)이 요구한 필드 중 아직 없는 것: `List.sidebarFolderId`, `Task.sectionId`, `SidebarFolder`, `ListSection`, `TaskTag`, `SavedFilter`, `TaskDailyPlan`
-5. **`TaskDailyPlan` (§6.68)** — A절이 지적한 *"Today override가 localStorage에 있고 동기되지 않는다"*의 정식 해법이 이 테이블이다. Today를 Scope로 만들기 전에 필요하다
+4. ~~**Migration Phase 4 (§6.72) — `List.projectId` nullable**~~ — **완료.** 계획서는 `NOT NULL` 제약 완화를 말하지만 `lists` 테이블은 `data jsonb` 한 칸이라 완화할 컬럼이 없었다. 제약은 `sanitizeList`의 게이트에 있었고, 거기서 풀었다 — `kind`가 "스스로 독립을 선언한 List"(`"regular"`/`"inbox"`)와 "그냥 owner를 잃은 레코드"를 가르고, 후자만 계속 버린다. `activeLists`는 빈 Project로 물으면 아무것도 답하지 않는다(§6.79/§6.80). 생성 UI는 Implementation Phase 3(§16.48) 몫이므로 아직 아무것도 독립 List를 만들지 않는다
+5. **Phase 1(§6.68) 잔여 필드** — `List.sidebarFolderId`, `Task.sectionId`, `SidebarFolder`, `ListSection`, `TaskTag`, `SavedFilter`, `TaskDailyPlan`
+6. **`TaskDailyPlan` (§6.68)** — A절이 지적한 *"Today override가 localStorage에 있고 동기되지 않는다"*의 정식 해법이 이 테이블이다. Today를 Scope로 만들기 전에 필요하다

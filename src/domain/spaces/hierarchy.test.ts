@@ -10,6 +10,7 @@ import {
   defaultListFor,
   folderlessLists,
   hasDoneStatus,
+  INBOX_LIST_ID,
   listDisplayName,
   listsInFolder,
   makeDefaultList,
@@ -18,6 +19,7 @@ import {
   sanitizeFolder,
   sanitizeList,
   shouldRevealLists,
+  standaloneLists,
   statusDisplayLabel,
   statusesFor,
 } from "./hierarchy";
@@ -302,5 +304,52 @@ describe("append helpers", () => {
     const created = makeDefaultList("list-1", "space-1", NOW);
     expect(created.isDefault).toBe(true);
     expect(created.order).toBe(0);
+  });
+});
+
+// Migration Phase 4 (§6.72). The plan relaxes a `NOT NULL`; there is no such
+// constraint here, so what it relaxes is `sanitizeList`'s gate. `kind` carries
+// the distinction the constraint used to: a List that says it stands alone is
+// kept, one that merely lost its owner is not.
+describe("standalone List (Migration Phase 4)", () => {
+  const standalone = list({ id: "standalone", projectId: "", kind: "regular", name: "블로그" });
+  const inbox = list({ id: INBOX_LIST_ID, projectId: "", kind: "inbox" });
+  const owned = list({ id: "owned", projectId: "p1" });
+  const all = [standalone, inbox, owned];
+
+  it("keeps a regular List that belongs to no Project (§6.3)", () => {
+    expect(sanitizeList({ id: "l", kind: "regular", name: "블로그" })).toMatchObject({
+      id: "l",
+      projectId: "",
+      kind: "regular",
+    });
+  });
+
+  it("still drops a List that merely lost its owner", () => {
+    expect(sanitizeList({ id: "l", name: "블로그" })).toBeNull();
+  });
+
+  it("keeps the Inbox, which has belonged to no Project since Phase 2", () => {
+    expect(sanitizeList({ id: INBOX_LIST_ID, kind: "inbox" })).toMatchObject({
+      projectId: "",
+      kind: "inbox",
+    });
+  });
+
+  // §6.79 and §6.80 keep both kinds of ownerless List out of Project and Space
+  // queries. The trap is the query that asks with no Project: before this it
+  // gathered exactly the Lists that belong to nobody, which is the opposite of
+  // the right answer.
+  it("answers nothing for an empty Project rather than every ownerless List", () => {
+    expect(activeLists(all, "")).toEqual([]);
+    expect(defaultListFor(all, "")).toBeUndefined();
+  });
+
+  it("leaves a Project's own Lists untouched", () => {
+    expect(activeLists(all, "p1").map((entry) => entry.id)).toEqual(["owned"]);
+  });
+
+  it("gathers standalone Lists without sweeping up the Inbox", () => {
+    expect(standaloneLists(all).map((entry) => entry.id)).toEqual(["standalone"]);
   });
 });

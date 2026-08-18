@@ -217,6 +217,29 @@ describe("membership inversion answers what the legacy path answered (§6.77)", 
     const [item] = projectItems({ tasks: [filed], paths: [], projects, lists: withInbox, today: TODAY });
     expect(item.spaceId).toBe("");
   });
+
+  // Migration Phase 4's half of the same rule. A standalone List belongs to no
+  // Project (§6.3), so §6.79 keeps everything under it out of Space queries —
+  // the Inbox is not a special case, it is the first instance of one.
+  it("puts a Task in a standalone List in no Project and so in no Space (§6.79)", () => {
+    const standalone: List = {
+      ...makeDefaultList("list-blog", "", NOW),
+      kind: "regular",
+      isDefault: false,
+      name: "블로그",
+    };
+    const solo = task({ id: "t-solo", projectId: "", listId: standalone.id });
+    const withStandalone = [...lists, standalone];
+    expect(projectIdFor(solo, withStandalone)).toBe("");
+    const [item] = projectItems({
+      tasks: [solo],
+      paths: [],
+      projects,
+      lists: withStandalone,
+      today: TODAY,
+    });
+    expect(item.spaceId).toBe("");
+  });
 });
 
 describe("H-INV-05 — moving a Project rewrites nothing beneath it", () => {

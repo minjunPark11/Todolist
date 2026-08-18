@@ -188,6 +188,13 @@ export interface List {
    * writing only the new key would delete every List on a device that had not
    * updated yet (M0). Both keys are written; only this one is read. The mirror
    * goes when no client that needs it is left — the plan's Migration Phase 7.
+   *
+   * `""` means the List belongs to no Project (Migration Phase 4, §6.72). The
+   * plan writes that as `null`; this stores `""` because the field is required
+   * and every reader already treats an empty owner as "nobody's". Two Lists can
+   * be nobody's: the Inbox (§6.5) and a standalone List (§6.3). Neither appears
+   * in a Project or Space query — §6.79 and §6.80 — which `activeLists`
+   * enforces by refusing to answer for an empty Project at all.
    */
   projectId: string;
   /** @deprecated Legacy mirror of `projectId`, written for older clients. */
@@ -205,6 +212,14 @@ export interface List {
    * entirely — it has no `spaceId` to file under — which is survivable only
    * because `Task.status === "inbox"` is still written beside `listId`, and
    * because `ensureInboxList` rebuilds the row from a fixed id.
+   *
+   * `"regular"` is not decoration. Since Migration Phase 4 it is what lets a
+   * List with no Project through `sanitizeList`: a record that says it is a
+   * regular List standing alone is kept, while one that simply lost its owner
+   * is still dropped. A standalone List is therefore invisible on a client
+   * older than that change — it has no `spaceId` to file under — but not
+   * deleted, because the sync baseline is the sanitized data, so a record the
+   * old client never loaded is one it never reports as removed.
    */
   kind?: "inbox" | "regular";
   /** Absent for a Folderless List (D4). */

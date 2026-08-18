@@ -169,10 +169,16 @@ export function sanitizeList(value: unknown): List | null {
   // before this release has only `spaceId`, and a client from before it drops
   // any List that lacks one, so the mirror is what makes the rename safe.
   const projectId = asString(record.projectId).trim() || asString(record.spaceId).trim();
-  const kind = record.kind === "inbox" ? "inbox" : undefined;
-  // The Inbox belongs to no Project by definition (§6.5), so it is the one
-  // List allowed through without an owner. Everything else without one cannot
-  // be reached from anywhere and would sync forever unseen.
+  // Migration Phase 4 (§6.72). `kind` is what separates a List that MEANS to
+  // belong to no Project — the Inbox (§6.5), or a standalone List (§6.3) — from
+  // a record that merely lost its owner. The second cannot be reached from
+  // anywhere and would sync forever unseen, so it is still dropped; the first
+  // is now first-class, where before only the Inbox was let through.
+  //
+  // The plan asks Phase 4 to relax a `NOT NULL` constraint. There is none to
+  // relax: `lists` stores one `data` jsonb per row, so this line IS the
+  // constraint, and this is where the relaxing happens.
+  const kind = record.kind === "inbox" ? "inbox" : record.kind === "regular" ? "regular" : undefined;
   if (!id || (!projectId && !kind)) return null;
   const statuses = sanitizeStatuses(record.statuses);
   const createdAt = asString(record.createdAt);
@@ -205,8 +211,27 @@ export function activeFolders(folders: Folder[], projectId: string): Folder[] {
 }
 
 export function activeLists(lists: List[], projectId: string): List[] {
+  // Lists that belong to no Project store `""`, so an empty argument would
+  // gather exactly the ones that are nobody's — the Inbox and every standalone
+  // List. §6.79 and §6.80 keep both out of Project and Space queries, and a
+  // caller asking "which Lists does this Project have" with no Project has no
+  // answer, not that answer.
+  if (!projectId) return [];
   return lists
     .filter((list) => list.projectId === projectId && !list.archivedAt)
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+}
+
+/**
+ * The Lists that belong to no Project and are not the Inbox (§6.3).
+ *
+ * They exist in the Tasks Module only. Nothing creates one yet — the screen
+ * that would is Implementation Phase 3 (§16.48) — but the domain can hold and
+ * round-trip one from here, which is what Migration Phase 4 is for.
+ */
+export function standaloneLists(lists: List[]): List[] {
+  return lists
+    .filter((list) => !list.projectId && list.kind !== "inbox" && !list.archivedAt)
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
