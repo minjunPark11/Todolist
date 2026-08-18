@@ -1,11 +1,13 @@
 # TickTick 재설계 — Phase 0 현행 감사 및 개념 매핑
 
-계획서(`..._v16_E2E_IMPLEMENTATION_PLAN.md`) §6.67이 요구하는 Phase 0 산출물이다.
+계획서(`TICKTICK_STYLE_REDESIGN_IA_SIDEBAR_MAIN_DRAWER_URL_DATA_VIEWS_QUICKADD_INTERACTIONS_SEARCH_VISUAL_v16_E2E_IMPLEMENTATION_PLAN.md`) §6.67이 요구하는 Phase 0 산출물이다.
 
 > 실제 코드/DB를 확인한 후 migration SQL을 작성한다.
 > 문서 설계를 추측으로 바로 migration으로 옮기지 않는다.
 
 여기 적힌 "현재"는 전부 v0.10.2 코드에서 확인한 값이다. 추정은 `추정`으로 표시했다.
+
+**개정 (v0.10.3).** 감사 직후 Migration Phase 1~3이 구현되어 아래 표의 일부가 낡았다. 바뀐 칸은 원래 값을 취소선으로 남기고 `✅`(완료) / `🟡`(진행 중)를 덧붙였다 — 감사 시점의 판단을 지우면 무엇을 왜 고쳤는지가 사라지기 때문이다. 계획서 원본도 이제 리포에 있다.
 
 ---
 
@@ -14,8 +16,8 @@
 | 질문 | 답 | 근거 |
 |---|---|---|
 | Task가 `projectId`를 직접 갖는가 | **그렇다**, 필수 `string` | `types.ts` Task |
-| Task가 `listId`를 항상 갖는가 | **아니다**, `listId?` 선택 | 없으면 `membership.listIdFor`가 프로젝트 기본 List로 해석 |
-| List가 `projectId`를 필수로 갖는가 | **그렇다** — 단 필드명이 `List.spaceId` | 이름은 Space, 값은 Project id |
+| Task가 `listId`를 항상 갖는가 | ~~**아니다**, `listId?` 선택~~ → ✅ 타입은 선택이지만 **값은 전부 채워짐** | Migration Phase 3(`backfillTaskListId`)이 계획서의 A/B/C 세 경우를 모두 기록. `listIdFor`의 유도는 백필이 닿지 않은 레코드용 fallback으로만 남음 |
+| List가 `projectId`를 필수로 갖는가 | **그렇다** — ~~단 필드명이 `List.spaceId`~~ → ✅ 이름이 `projectId`로 정리됨 | 저장 키는 둘 다 쓴다(`sanitizeList`가 `projectId ?? spaceId`로 읽고 항상 병행 기록). nullable화는 Migration Phase 4(§6.72)로 남음 |
 | Folder와 List 관계 | Folder는 Project 소속(`Folder.spaceId`=Project id), List는 `folderId?` | `types.ts` |
 | orphan Task가 있는가 | **있다** — `projectId: ""`인 받은함 작업 | `App.tsx`의 project 없는 Task 폴백 |
 | Today override 저장 위치 | localStorage `todayPage.bucketOverrides.v1` | `utils/todayView.ts:36` — **동기되지 않음** |
@@ -29,7 +31,7 @@
 |---|---|---|---|
 | `today` | `/today` | TodayPage (사이드바 "오늘") | **부분** — 화면은 있으나 Scope/Registry가 아님. plan override가 localStorage |
 | `upcoming` | `/upcoming` | 없음 | **신규** |
-| `inbox` | `/inbox` | `status === "inbox"` + Today 분류 서랍 | **구조 변경** — 화면 없음, 소유 개념 다름 |
+| `inbox` | `/inbox` | ~~`status === "inbox"` + Today 분류 서랍~~ → 🟡 Inbox system List 레코드(`INBOX_LIST_ID`)가 생김 + 기존 두 경로 | **부분** — 소유 구조는 Phase 2에서 갖춰졌다. Scope와 화면이 없다 |
 | `list` | `/list/:id` | 트리의 List 선택 (`/s/:sp/p/:pj/l/:id`) | **부분** — 존재하나 Project 종속 |
 | `folder` | `/folder/:id` | 트리의 Folder 선택 | **부분** — Domain Folder이고 Presentation Folder 아님 |
 | `tag` | `/tag/:id` | 없음 (`task.tags: string[]`만) | **신규** — Tag 레코드 없음 |
@@ -51,8 +53,8 @@
 
 | 목표 (§6.87) | 현재 | 등급 |
 |---|---|---|
-| `kind: 'inbox' \| 'regular'` | 없음 (`isDefault: boolean`) | 신규 |
-| `projectId: string \| null` | `spaceId: string` (필수, 값은 Project id) | **개명 + nullable** |
+| `kind: 'inbox' \| 'regular'` | ~~없음 (`isDefault: boolean`)~~ → ✅ `kind?: "inbox" \| "regular"` (없으면 regular로 읽음) | ~~신규~~ → **완료** |
+| `projectId: string \| null` | ~~`spaceId: string` (필수, 값은 Project id)~~ → 🟡 `projectId: string` (필수, `spaceId?`는 레거시 미러) | ~~개명 + nullable~~ → **개명 완료 / nullable은 Phase 4** |
 | `sidebarFolderId: string \| null` | 없음 | 신규 |
 | `sortKey` | `order: number` | 개명 |
 | `archivedAt` | `archivedAt?` | **일치** |
@@ -63,7 +65,7 @@
 
 | 목표 | 현재 | 등급 |
 |---|---|---|
-| `listId: string` (필수) | `listId?` + `projectId` 필수 | **구조 변경 — 가장 큼** |
+| `listId: string` (필수) | 🟡 `listId?` (백필로 전부 채워짐) + `projectId` 필수 | ~~**구조 변경 — 가장 큼**~~ → **진행 중** — 소유 방향은 역전됐다(`projectIdFor`, §6.77). 남은 것은 필수화와 fallback 제거 |
 | `sectionId` | 없음 | 신규 |
 | `dueOn` / `dueAt` (XOR) | `dueDate` + `startTime`/`endTime` | 구조 변경 |
 | `someday` | `isSomeday: boolean` | **일치** |
@@ -80,6 +82,8 @@
 > 모든 Task Query가 `parentTaskId IS NULL` 예외를 기억해야 하고
 
 현재 코드가 정확히 그 상태다. `domain/view/spaceViews.ts`의 `specForSpaceView`가 **모든 뷰 스펙에** `parentId: ""`를 넣는다. 계획서가 예측한 비용을 이미 치르고 있다.
+
+**v0.10.3에서도 그대로다.** Phase 1~3은 소유 축만 다뤘고 Subtask는 건드리지 않았다.
 
 ### C-4. Folder
 
@@ -110,10 +114,10 @@
 ## E. 충돌 등급 요약
 
 **1급 — 구조 변경 (되돌리기 비쌈)**
-- Task 소유 축을 `projectId`+`listId?`(해석 함수) → `listId` 단일 필수로
-- `List.spaceId` → `projectId` 개명 후 nullable
-- Subtask를 Task self-reference → 별도 엔티티
-- 날짜를 `dueDate`/`scheduledDate` → `dueOn`/`dueAt` + TodayPlan
+- Task 소유 축을 `projectId`+`listId?`(해석 함수) → `listId` 단일 필수로 — 🟡 **진행 중** (Phase 2·3 완료, 필수화와 fallback 제거가 남음)
+- `List.spaceId` → `projectId` 개명 후 nullable — 🟡 **개명 완료**, nullable은 Phase 4
+- Subtask를 Task self-reference → 별도 엔티티 — ⬜ 착수 전
+- 날짜를 `dueDate`/`scheduledDate` → `dueOn`/`dueAt` + TodayPlan — ⬜ 착수 전
 
 **2급 — 신규 추가 (기존을 깨지 않음)**
 - Tag 레코드, SavedFilter, ListSection, SidebarFolder
@@ -141,5 +145,7 @@
 ## G. 다음 단계
 
 1. ~~**`List.spaceId` → `List.projectId` 개명**~~ — **완료.** 저장 키를 바꾸지 않고 병행 기록으로 처리했다. `sanitizeList`/`sanitizeFolder`가 두 키 중 하나를 owner로 읽고 항상 둘 다 쓴다. 구버전 클라이언트의 `sanitizeList`는 `spaceId` 없는 List를 **버리므로**, 그냥 개명했으면 업데이트 안 한 기기에서 리스트가 전부 사라졌을 것이다. 미러 제거는 계획서의 Migration Phase 7
-2. **§16.35 P0/P1 경계 읽고 1차 범위 확정** — 9개 Scope를 다 만들 것인지, `inbox`/`today`/`list`부터인지
-3. **4급 항목 결정** — 간트·목표·상태 컬럼을 유지할지 버릴지. 계획서에 자리가 없으므로 **명시적 결정이 필요**하다. 조용히 남겨두면 v0.10.x에서 정리한 것과 같은 잔재가 된다
+2. ~~**§16.35 P0/P1 경계 읽고 1차 범위 확정**~~ — **읽었다.** 계획서가 리포에 들어왔다. P0 MVP는 9개 Scope를 **전부** 포함한다(Today · Upcoming · Inbox · List · Folder · Tag · Filter · Completed · Trash). P1로 미룬 것은 Repeat / Reminder / Folder Board / advanced grouping / Multi-select / touch DnD / advanced search이며, §17은 *"§1~§16 기준으로 이제 추가적인 큰 UX 설계 없이 Tasks Module MVP 구현을 시작할 수 있다"*고 선언한다. 즉 "일부 Scope부터"는 계획서가 주는 선택지가 아니다
+3. **4급 항목 결정** — 절반은 답이 나왔다. **Repeat / Reminder는 §16.35가 P1로 배치**했으므로 유지하되 뒤로 미루면 된다. 그러나 **간트 · 목표(Goals) · status 6종은 P0에도 P1에도 없다** — 계획서가 다루지 않는 영역이므로 여전히 명시적 결정이 필요하다. 조용히 남겨두면 v0.10.x에서 정리한 것과 같은 잔재가 된다
+4. **Migration Phase 4 (§6.72) — `List.projectId` nullable** — standalone List가 열려야 §1.14의 Presentation IA로 갈 수 있다. Phase 1(§6.68)이 요구한 필드 중 아직 없는 것: `List.sidebarFolderId`, `Task.sectionId`, `SidebarFolder`, `ListSection`, `TaskTag`, `SavedFilter`, `TaskDailyPlan`
+5. **`TaskDailyPlan` (§6.68)** — A절이 지적한 *"Today override가 localStorage에 있고 동기되지 않는다"*의 정식 해법이 이 테이블이다. Today를 Scope로 만들기 전에 필요하다
