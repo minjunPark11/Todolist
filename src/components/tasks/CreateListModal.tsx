@@ -9,7 +9,8 @@
 // wide dialog and a stray click must not take the draft with it), touch the URL
 // (§0.7 R0-3 — the dialog is UI state, the way the command palette is), or
 // decide anything about the List beyond what the user typed.
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useT } from "../../i18n";
 import {
   LIST_NAME_MAX_LENGTH,
@@ -20,6 +21,7 @@ import {
 } from "../../domain/tasks/createListDraft";
 import { LIST_COLOR_PRESETS, isCustomListColor, listColorHex } from "../../domain/tasks/listColor";
 import { CREATE_LIST_VIEW_CHOICES } from "../../domain/tasks/listView";
+import { isRovingKey, rovingNext } from "../../domain/tasks/rovingChoice";
 import { FolderSelect } from "./FolderSelect";
 import { CreateListPreview } from "./CreateListPreview";
 import type { SidebarFolder } from "../../types";
@@ -55,17 +57,46 @@ export function CreateListModal({
   const [folderBusy, setFolderBusy] = useState(false);
   const [error, setError] = useState("");
   const nameRef = useRef<HTMLInputElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const titleId = useId();
   const errorId = useId();
+
+  // §9.9/§9.10: a group is ONE tab stop and the arrows choose within it. The
+  // values are listed in the order they are drawn, so Home and End mean the
+  // ends of what the user can see.
+  const colorValues = ["", ...LIST_COLOR_PRESETS.map((preset) => preset.key)];
+
+  function rove(
+    event: React.KeyboardEvent,
+    values: readonly string[],
+    current: string,
+    apply: (next: string) => void,
+  ) {
+    if (!isRovingKey(event.key)) return;
+    const next = rovingNext(values, current, event.key);
+    if (next === null) return;
+    // §9.9's MUST: the arrow belongs to the group, not to the dialog's focus
+    // order, and it must not also scroll the panel behind it.
+    event.preventDefault();
+    apply(next);
+    // The ARIA radio pattern moves focus with the selection; without this the
+    // ring stays on the swatch the user just left.
+    const group = event.currentTarget as HTMLElement;
+    group.querySelectorAll<HTMLElement>('[role="radio"]')[values.indexOf(next)]?.focus();
+  }
 
   const status = createListStatus(draft, submitting);
   const canSubmit = canSubmitCreateList(draft, submitting) && !folderBusy;
 
-  // §1.14 AC-F03. The dialog exists to receive a name, so it asks for one
-  // immediately rather than making the user click into the only field.
-  useEffect(() => {
-    nameRef.current?.focus();
-  }, []);
+  // §9.2/§9.3, §9.4 and §9.6 in one hook.
+  //
+  // The Name field is named explicitly rather than left to DOM order: §9.2
+  // requires typing to work the moment the dialog appears, and "the first
+  // focusable element" would be whatever markup happens to come first. §9.3
+  // also forbids waiting for the open animation — readiness to type is not a
+  // visual effect, so this runs on mount and not on a timer.
+  const focusName = useCallback(() => nameRef.current, []);
+  useFocusTrap(rootRef, { initial: focusName });
 
   async function submit() {
     // §1.13 INV-04. Asked here rather than trusting the button's disabled
@@ -93,6 +124,7 @@ export function CreateListModal({
       role="presentation"
     >
       <div
+        ref={rootRef}
         className="tm-modal has-preview"
         role="dialog"
         aria-modal="true"
@@ -152,7 +184,14 @@ export function CreateListModal({
               theirs. */}
           <fieldset className="tm-field" disabled={submitting}>
             <legend className="tm-field-label">{t("tasks.createListColorLabel")}</legend>
-            <div className="tm-swatches" role="radiogroup" aria-label={t("tasks.createListColorLabel")}>
+            <div
+              className="tm-swatches"
+              role="radiogroup"
+              aria-label={t("tasks.createListColorLabel")}
+              onKeyDown={(event) =>
+                rove(event, colorValues, draft.color, (color) => setDraft((current) => ({ ...current, color })))
+              }
+            >
               {/* §0.7 R0-2's default, and it is a real choice rather than the
                   absence of one — "none" is what a List has unless asked. */}
               <button
@@ -160,6 +199,7 @@ export function CreateListModal({
                 role="radio"
                 aria-checked={draft.color === ""}
                 aria-label={t("tasks.createListColorNone")}
+                tabIndex={draft.color === "" ? 0 : -1}
                 className={`tm-swatch is-none${draft.color === "" ? " is-selected" : ""}`}
                 onClick={() => setDraft((current) => ({ ...current, color: "" }))}
               />
@@ -170,6 +210,7 @@ export function CreateListModal({
                   role="radio"
                   aria-checked={draft.color === preset.key}
                   aria-label={t(`tasks.color.${preset.key}`)}
+                  tabIndex={draft.color === preset.key ? 0 : -1}
                   className={`tm-swatch${draft.color === preset.key ? " is-selected" : ""}`}
                   style={{ background: preset.hex }}
                   onClick={() => setDraft((current) => ({ ...current, color: preset.key }))}
@@ -216,7 +257,16 @@ export function CreateListModal({
 
           <fieldset className="tm-field" disabled={submitting}>
             <legend className="tm-field-label">{t("tasks.createListViewLabel")}</legend>
-            <div className="tm-views" role="radiogroup" aria-label={t("tasks.createListViewLabel")}>
+            <div
+              className="tm-views"
+              role="radiogroup"
+              aria-label={t("tasks.createListViewLabel")}
+              onKeyDown={(event) =>
+                rove(event, CREATE_LIST_VIEW_CHOICES, draft.defaultViewKey || "list", (defaultViewKey) =>
+                  setDraft((current) => ({ ...current, defaultViewKey })),
+                )
+              }
+            >
               {/* §13.6 narrowed to what this build can open — offering a View
                   that cannot be opened is a choice that cannot be kept. */}
               {CREATE_LIST_VIEW_CHOICES.map((view) => {
@@ -227,6 +277,7 @@ export function CreateListModal({
                     type="button"
                     role="radio"
                     aria-checked={selected}
+                    tabIndex={selected ? 0 : -1}
                     className={`tm-view${selected ? " is-current" : ""}`}
                     onClick={() => setDraft((current) => ({ ...current, defaultViewKey: view }))}
                   >

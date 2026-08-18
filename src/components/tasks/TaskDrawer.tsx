@@ -14,6 +14,7 @@ import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
 import { childProgress } from "../../domain/tasks/children";
 import { useT } from "../../i18n";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 export interface TaskDrawerProps {
   task: Task;
@@ -65,37 +66,7 @@ export function TaskDrawer({
    * Drawer is a column beside the list — trapping focus there would stop the
    * user tabbing back to the rows it belongs to.
    */
-  useEffect(() => {
-    if (presentation === "inline-drawer") return;
-    const opener = document.activeElement as HTMLElement | null;
-    const node = root.current;
-    node?.querySelector<HTMLElement>("input, textarea, button")?.focus();
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Tab" || !node) return;
-      const focusable = node.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      // Restoring focus is what makes Back-from-a-sheet feel like going back
-      // rather than like landing at the top of the page.
-      opener?.focus?.();
-    };
-  }, [presentation]);
+  useFocusTrap(root, { enabled: presentation !== "inline-drawer" });
 
   const progress = childProgress(children);
 

@@ -152,6 +152,70 @@ describe("CreateListModal", () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ color: "" }));
   });
 
+  // §9. Focus and keyboard, at the level they exist at.
+  it("puts focus in the Name field, not on the first element in the markup (§9.2)", () => {
+    const { container } = open(vi.fn().mockResolvedValue(undefined));
+
+    expect(document.activeElement).toBe(container.querySelector(".tm-modal-input"));
+  });
+
+  it("gives focus back to whatever opened it (§9.4)", () => {
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const { unmount } = open(vi.fn().mockResolvedValue(undefined));
+    expect(document.activeElement).not.toBe(trigger);
+
+    unmount();
+
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  // §9.9/§9.10's MUST: a group is ONE tab stop, so an arrow inside it chooses
+  // rather than moving around the dialog.
+  it("makes each radio group a single tab stop", () => {
+    const { container } = open(vi.fn().mockResolvedValue(undefined));
+
+    const tabbableSwatches = [...container.querySelectorAll(".tm-swatch")].filter(
+      (node) => (node as HTMLElement).tabIndex === 0,
+    );
+    const tabbableViews = [...container.querySelectorAll(".tm-modal .tm-view")].filter(
+      (node) => (node as HTMLElement).tabIndex === 0,
+    );
+
+    expect(tabbableSwatches).toHaveLength(1);
+    expect(tabbableViews).toHaveLength(1);
+  });
+
+  it("chooses with the arrows inside a group (§9.9, §9.10)", () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { container } = open(onSubmit);
+
+    fireEvent.keyDown(container.querySelector(".tm-swatches")!, { key: "ArrowRight" });
+    fireEvent.keyDown(container.querySelector(".tm-modal .tm-views")!, { key: "End" });
+    pressEnter(typeName(container, "학교"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ color: "red", defaultViewKey: "gantt" }),
+    );
+  });
+
+  it("sends Home to the ends the design names (§9.9, §9.10)", () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { container } = open(onSubmit);
+
+    fireEvent.keyDown(container.querySelector(".tm-modal .tm-views")!, { key: "End" });
+    fireEvent.keyDown(container.querySelector(".tm-modal .tm-views")!, { key: "Home" });
+    fireEvent.keyDown(container.querySelector(".tm-swatches")!, { key: "End" });
+    fireEvent.keyDown(container.querySelector(".tm-swatches")!, { key: "Home" });
+    pressEnter(typeName(container, "학교"));
+
+    // §9.9 puts Home on "none", §9.10 puts it on List.
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ color: "", defaultViewKey: "list" }));
+  });
+
   // §8. The preview is an illustration of the draft, and §8.37's test of
   // whether it is load-bearing: nothing above depends on it existing.
   it("reflects the draft without becoming part of it (§8.7, §8.9, §8.29)", () => {

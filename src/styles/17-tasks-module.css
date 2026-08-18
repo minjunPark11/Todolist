@@ -1398,13 +1398,19 @@
 /* --- Add List: right preview (Add List design §8) --- */
 
 /*
- * §2's two panels. The dialog only becomes wide once there is a preview beside
- * the form; the single-column version above is still what narrow screens get.
+ * §2.3 and §14.3. Two panels, and the single-column version above is still
+ * what narrow screens get — see the bands at the bottom of this block.
+ *
+ * §2.3.2 puts the floor for keeping two panels at 960px, which is why the
+ * viewport clamp matters as much as the 1200px figure: the dialog has to give
+ * up the second panel before it starts squeezing the first.
  */
 .tm-modal.has-preview {
   display: grid;
-  width: min(880px, 100%);
-  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  width: min(1200px, calc(100vw - 64px));
+  max-height: min(700px, calc(100vh - 64px));
+  /* §2.4 / §14.3: settings 54%, preview 46%. */
+  grid-template-columns: minmax(0, 54fr) minmax(0, 46fr);
   gap: 0;
   padding: 0;
   overflow: hidden;
@@ -1570,19 +1576,70 @@
   background: var(--border-subtle, rgba(0, 0, 0, 0.18));
 }
 
+/* §14.2's four bands. */
+
+/* B. Compact desktop, 960-1279: two panels still, with the preview giving up
+   the width rather than the form (§14.4). */
+@media (max-width: 1279px) {
+  .tm-modal.has-preview {
+    grid-template-columns: minmax(0, 60fr) minmax(0, 40fr);
+  }
+
+  .tm-preview {
+    padding: 28px 20px 20px;
+  }
+}
+
 /*
- * §8.36: below this the preview goes rather than the form being squeezed. It
- * is auxiliary — §8.37 says the form must work identically without it — so it
- * is the half that yields.
+ * C. Tablet, 640-959. §2.3.2's floor for two panels is 960, so this is where
+ * the preview goes — §8.36 and §8.37 make it the half that yields, because the
+ * form must work identically without it and does not work squeezed.
  */
-@media (max-width: 767px) {
+@media (max-width: 959px) {
   .tm-modal.has-preview {
     display: flex;
-    width: min(420px, 100%);
+    width: min(520px, calc(100vw - 32px));
     flex-direction: column;
   }
 
   .tm-preview {
     display: none;
+  }
+}
+
+/*
+ * D. Mobile, under 640: a bottom sheet (§14.13). A centred dialog on a phone
+ * puts its fields under the thumb's reach and its own header where the notch
+ * is; a sheet starts at the bottom, which is where the keyboard comes from.
+ */
+@media (max-width: 639px) {
+  .tm-modal-scrim {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .tm-modal.has-preview {
+    width: 100%;
+    /* §14.14: never a full-screen sheet by default — what is behind stays
+       visible, so the dialog reads as something on top of the app rather than
+       as having navigated away from it. */
+    max-height: min(92dvh, 760px);
+    border-radius: 16px 16px 0 0;
+    /* §14.14 MUST: the home indicator is not somewhere to put a button. */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .tm-modal-settings {
+    overflow-y: auto;
+  }
+
+  /* §14.12: on a sheet the primary action is the full width of the thumb's
+     reach, and Cancel stops competing with it for the same corner. */
+  .tm-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .tm-modal-actions button {
+    width: 100%;
   }
 }
