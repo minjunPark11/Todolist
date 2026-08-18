@@ -48,6 +48,7 @@ function plannerData(path: LearningPath): PlannerData {
     learningPaths: [path],
     folders: [],
     lists: [],
+    sidebarFolders: [],
     listSections: [],
     settings: {} as PlannerData["settings"],
     appSettings: {} as PlannerData["appSettings"],

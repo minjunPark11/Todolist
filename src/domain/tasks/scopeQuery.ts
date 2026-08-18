@@ -13,6 +13,7 @@ import type { List, Task, TaskDailyPlan, TaskTag } from "../../types";
 import type { TaskScopeRef } from "./scopeRegistry";
 import { listIdFor } from "../spaces/membership";
 import { tagIdFor, isUserTag } from "../tags/tags";
+import { folderIdFor } from "./sidebarFolders";
 // The horizon is counted in the user's own days. A local date walked through
 // `toISOString` lands a day early east of UTC, which is what the first run of
 // the §12.6 fixture caught here.
@@ -151,12 +152,14 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     case "list":
       return isActive(task, ctx.lists) && listIdFor(task, ctx.lists) === scope.id;
 
-    // §12.4 asks for `task.list.sidebarFolderId`. The presentation Folder is
-    // Migration Phase 5 and does not exist; §6.36 lets both live at once, so
-    // this reads the domain Folder the Lists already hang under and will read
-    // the other one beside it when there is one.
-    case "folder":
-      return isActive(task, ctx.lists) && ownerList(task, ctx.lists)?.folderId === scope.id;
+    // §12.4 asks for `task.list.sidebarFolderId`, and §6.36 lets the sidebar's
+    // grouping and the domain Folder be true at once. `folderIdFor` is the one
+    // place that decides between them, so the group in the sidebar and the
+    // Scope its header opens cannot come to disagree.
+    case "folder": {
+      const list = ownerList(task, ctx.lists);
+      return isActive(task, ctx.lists) && !!list && folderIdFor(list) === scope.id;
+    }
 
     case "tag":
       return isActive(task, ctx.lists) && hasTag(task, scope.id, ctx.taskTags);

@@ -8,7 +8,7 @@
 //
 // List rendering only, per §16.26 — Board and the rich Drawer come later.
 import { useMemo, useState } from "react";
-import type { Folder, List, Tag, Task, TaskDailyPlan, TaskTag } from "../../types";
+import type { Folder, List, SidebarFolder, Tag, Task, TaskDailyPlan, TaskTag } from "../../types";
 import type { TaskScopeRef, TaskViewKind } from "../../domain/tasks/scopeRegistry";
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, queryScopeTasks, type ScopeContext } from "../../domain/tasks/scopeQuery";
@@ -23,11 +23,13 @@ import type { TaskChild } from "../../domain/tasks/children";
 import type { TaskMutation } from "../../domain/tasks/mutations";
 import { applyPatch, completeTask, leavesScope, reopenTask, trashTask } from "../../domain/tasks/mutations";
 import { isInboxList } from "../../domain/spaces/hierarchy";
+import { folderIdFor } from "../../domain/tasks/sidebarFolders";
 
 interface TasksModuleProps {
   tasks: Task[];
   lists: List[];
   folders: Folder[];
+  sidebarFolders: SidebarFolder[];
   dailyPlans: TaskDailyPlan[];
   tags: Tag[];
   taskTags: TaskTag[];
@@ -61,7 +63,7 @@ interface TasksModuleProps {
 
 export function TasksModule(props: TasksModuleProps) {
   const { t } = useT();
-  const { tasks, lists, folders, dailyPlans, tags, taskTags, today, url, onNavigate } = props;
+  const { tasks, lists, folders, sidebarFolders, dailyPlans, tags, taskTags, today, url, onNavigate } = props;
 
   // One undo at a time, and it is the last thing that happened (§9.40 keeps
   // the stack out of the MVP).
@@ -123,14 +125,21 @@ export function TasksModule(props: TasksModuleProps) {
   // §5.28: an id that names nothing is a broken link, not an empty Scope. The
   // difference matters — "this List has no tasks" and "this List is gone" ask
   // the reader to do different things.
-  const missing = namedRecordMissing(scope, lists, folders, tags);
-  const title = missing ? t("tasks.missingTitle") : titleFor(scope, lists, folders, tags, t);
+  const missing = namedRecordMissing(scope, lists, folders, sidebarFolders, tags);
+  const title = missing ? t("tasks.missingTitle") : titleFor(scope, lists, folders, sidebarFolders, tags, t);
   const rows = missing ? [] : queryScopeTasks(scope, ctx);
   const count = missing ? 0 : queryScopeCount(scope, ctx);
 
   return (
     <section className="tm-shell">
-      <TasksSidebar ctx={ctx} folders={folders} tags={tags} current={scope} onNavigate={go} />
+      <TasksSidebar
+        ctx={ctx}
+        folders={folders}
+        sidebarFolders={sidebarFolders}
+        tags={tags}
+        current={scope}
+        onNavigate={go}
+      />
 
       <main className="tm-main">
         <header className="tm-header">
@@ -164,7 +173,7 @@ export function TasksModule(props: TasksModuleProps) {
             today={today}
             folderLists={
               scope.kind === "folder"
-                ? lists.filter((list) => list.folderId === scope.id && !list.archivedAt)
+                ? lists.filter((list) => folderIdFor(list) === scope.id && !list.archivedAt)
                 : []
             }
             tags={tags}
@@ -260,12 +269,20 @@ export function TasksModule(props: TasksModuleProps) {
   );
 }
 
-function namedRecordMissing(scope: TaskScopeRef, lists: List[], folders: Folder[], tags: Tag[]): boolean {
+function namedRecordMissing(
+  scope: TaskScopeRef,
+  lists: List[],
+  folders: Folder[],
+  sidebarFolders: SidebarFolder[],
+  tags: Tag[],
+): boolean {
   switch (scope.kind) {
     case "list":
       return !lists.some((list) => list.id === scope.id);
+    // Either kind of group — the sidebar's own or the domain's — is a record
+    // the link can name, and the Scope reads both through `folderIdFor`.
     case "folder":
-      return !folders.some((folder) => folder.id === scope.id);
+      return !folders.some((folder) => folder.id === scope.id) && !sidebarFolders.some((folder) => folder.id === scope.id);
     case "tag":
       return !tags.some((tag) => tag.id === scope.id);
     // A Filter names a record that cannot exist yet, so "missing" would be
@@ -279,6 +296,7 @@ function titleFor(
   scope: TaskScopeRef,
   lists: List[],
   folders: Folder[],
+  sidebarFolders: SidebarFolder[],
   tags: Tag[],
   t: (key: string) => string,
 ): string {
@@ -290,7 +308,11 @@ function titleFor(
       return list ? listDisplayName(list, t("tasks.defaultList"), t("tasks.inbox")) : scope.id;
     }
     case "folder":
-      return folders.find((entry) => entry.id === scope.id)?.name ?? scope.id;
+      return (
+        sidebarFolders.find((entry) => entry.id === scope.id)?.name ??
+        folders.find((entry) => entry.id === scope.id)?.name ??
+        scope.id
+      );
     case "tag":
       return tags.find((entry) => entry.id === scope.id)?.name ?? scope.id;
     case "filter":

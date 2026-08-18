@@ -10,16 +10,18 @@
 // forbids a screen from inventing a count formula, and §6.94 asks the sidebar
 // and the thing it points at to run the same query — the two numbers
 // disagreeing is what v0.10.1 and v0.10.2 each fixed by hand.
-import type { Folder, List, Tag } from "../../types";
+import type { Folder, List, SidebarFolder, Tag } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, type ScopeContext } from "../../domain/tasks/scopeQuery";
 import { activeTags } from "../../domain/tags/tags";
+import { activeSidebarFolders, folderIdFor } from "../../domain/tasks/sidebarFolders";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { useT } from "../../i18n";
 
 interface TasksSidebarProps {
   ctx: ScopeContext;
   folders: Folder[];
+  sidebarFolders: SidebarFolder[];
   tags: Tag[];
   current: TaskScopeRef;
   onNavigate: (scope: TaskScopeRef) => void;
@@ -30,7 +32,7 @@ function sameScope(a: TaskScopeRef, b: TaskScopeRef): boolean {
   return ("id" in a ? a.id : "") === ("id" in b ? b.id : "");
 }
 
-export function TasksSidebar({ ctx, folders, tags, current, onNavigate }: TasksSidebarProps) {
+export function TasksSidebar({ ctx, folders, sidebarFolders, tags, current, onNavigate }: TasksSidebarProps) {
   const { t } = useT();
 
   function row(scope: TaskScopeRef, label: string, options: { indent?: boolean; dot?: string } = {}) {
@@ -55,17 +57,30 @@ export function TasksSidebar({ ctx, folders, tags, current, onNavigate }: TasksS
   // The Inbox is a List, but it is shown among the Smart Lists and never in
   // the tree — it belongs to no Project and has nowhere in the tree to hang.
   const treeLists = ctx.lists.filter((list) => !isInboxList(list) && !list.archivedAt && list.projectId);
+  // Grouped by `folderIdFor`, the same answer the `folder` Scope reads
+  // (§12.4). A List the user has put in a sidebar group is therefore under
+  // that group and NOT also under the domain Folder it belongs to — the two
+  // showing it twice is exactly what one shared answer prevents.
   const byFolder = new Map<string, List[]>();
   const loose: List[] = [];
   for (const list of treeLists) {
-    if (list.folderId) {
-      const bucket = byFolder.get(list.folderId) ?? [];
+    const groupId = folderIdFor(list);
+    if (groupId) {
+      const bucket = byFolder.get(groupId) ?? [];
       bucket.push(list);
-      byFolder.set(list.folderId, bucket);
+      byFolder.set(groupId, bucket);
     } else {
       loose.push(list);
     }
   }
+
+  // The user's own groups first, then the ones the domain arranged. Both open
+  // the same `folder` Scope, because from the sidebar they are the same kind
+  // of thing — a group of Lists (§6.33).
+  const groups = [
+    ...activeSidebarFolders(sidebarFolders).map((folder) => ({ id: folder.id, name: folder.name })),
+    ...folders.filter((folder) => !folder.archivedAt).map((folder) => ({ id: folder.id, name: folder.name })),
+  ];
 
   const visibleTags = activeTags(tags);
 
@@ -79,18 +94,16 @@ export function TasksSidebar({ ctx, folders, tags, current, onNavigate }: TasksS
 
       <div className="tm-section">
         <h2 className="tm-section-title">{t("tasks.sectionLists")}</h2>
-        {folders
-          .filter((folder) => !folder.archivedAt)
-          .map((folder) => {
-            const inside = byFolder.get(folder.id) ?? [];
-            if (inside.length === 0) return null;
-            return (
-              <div key={folder.id} className="tm-group">
-                {row({ kind: "folder", id: folder.id }, folder.name)}
-                {inside.map((list) => row({ kind: "list", id: list.id }, list.name, { indent: true }))}
-              </div>
-            );
-          })}
+        {groups.map((folder) => {
+          const inside = byFolder.get(folder.id) ?? [];
+          if (inside.length === 0) return null;
+          return (
+            <div key={folder.id} className="tm-group">
+              {row({ kind: "folder", id: folder.id }, folder.name)}
+              {inside.map((list) => row({ kind: "list", id: list.id }, list.name, { indent: true }))}
+            </div>
+          );
+        })}
         {loose.map((list) => row({ kind: "list", id: list.id }, list.name))}
         {treeLists.length === 0 ? <p className="tm-section-empty">{t("tasks.noLists")}</p> : null}
       </div>

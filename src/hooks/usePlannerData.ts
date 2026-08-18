@@ -18,6 +18,7 @@ import type {
   ProjectType,
   RawPlannerData,
   RepeatType,
+  SidebarFolder,
   Space,
   Subtask,
   Tag,
@@ -47,6 +48,7 @@ import {
 } from "../domain/today/dailyPlan";
 import { backfillTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
 import { sanitizeListSection } from "../domain/tasks/sections";
+import { sanitizeSidebarFolder } from "../domain/tasks/sidebarFolders";
 import { backfillTaskListId, defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
 import * as pathOps from "../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
@@ -384,6 +386,14 @@ export function normalizeData(data: RawPlannerData): PlannerData {
       : [],
     lists: Array.isArray(data.lists)
       ? data.lists.map(sanitizeList).filter((list): list is List => list !== null)
+      : [],
+    // The Tasks sidebar's own grouping of Lists (§6.33), beside the domain
+    // Folder rather than instead of it — every List keeps answering with the
+    // Folder it hangs under until the user moves it.
+    sidebarFolders: Array.isArray(data.sidebarFolders)
+      ? data.sidebarFolders
+          .map(sanitizeSidebarFolder)
+          .filter((folder): folder is SidebarFolder => folder !== null)
       : [],
     // Board columns belonging to one List (§6.26). Empty until something
     // creates one — every Task starts in the unsectioned default column, and
@@ -1909,6 +1919,7 @@ export function usePlannerData() {
     spaces: data.spaces,
     folders: data.folders,
     lists: data.lists,
+    sidebarFolders: data.sidebarFolders,
     listSections: data.listSections,
     dailyPlans: data.dailyPlans,
     tags: data.tags,

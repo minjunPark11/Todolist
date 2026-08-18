@@ -167,6 +167,17 @@ describe("the Scopes that name a container", () => {
     expect(matchesScope(task({ listId: "l1" }), { kind: "folder", id: "f1" }, ctx)).toBe(true);
     expect(matchesScope(task({ listId: "list-inbox" }), { kind: "folder", id: "f1" }, ctx)).toBe(false);
   });
+
+  it("follows the List into a sidebar group, and out of the domain Folder (§12.4)", () => {
+    const grouped = { ...projectList, sidebarFolderId: "sf1" };
+    const moved = context({ lists: [inboxList, grouped] });
+    expect(matchesScope(task({ listId: "l1" }), { kind: "folder", id: "sf1" }, moved)).toBe(true);
+    // The List still records the Folder it belongs to — the sidebar placement
+    // is presentation only (D19) — but the Scope shows it in one place.
+    expect(grouped.folderId).toBe("f1");
+    expect(matchesScope(task({ listId: "l1" }), { kind: "folder", id: "f1" }, moved)).toBe(false);
+  });
+
 });
 
 describe("Tag membership", () => {

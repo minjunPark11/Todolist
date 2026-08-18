@@ -246,6 +246,22 @@ export interface List {
   kind?: "inbox" | "regular";
   /** Absent for a Folderless List (D4). */
   folderId?: string;
+  /**
+   * Where this List is shown in the Tasks sidebar (TickTick plan §6.33, D18).
+   *
+   * A different question from `folderId`, on purpose. The domain Folder says
+   * where the List BELONGS inside its Project; this says where the user
+   * chose to see it, and moving a List between sidebar folders changes only
+   * that (D19) — the Project relation above is untouched, so nothing under
+   * the List has to be rewritten.
+   *
+   * Absent means "grouped where the domain says", which is every List until
+   * something moves one. `folderIdFor` is where the two are resolved into
+   * the single answer the sidebar and the `folder` Scope both use.
+   */
+  sidebarFolderId?: string;
+  /** Manual order within the sidebar group (§6.34). Falls back to `order`. */
+  sidebarSortKey?: number;
   name: string;
   order: number;
   /**
@@ -517,6 +533,27 @@ export interface TaskDailyPlan {
 }
 
 /**
+ * A group of Lists in the Tasks sidebar (TickTick plan §6.33-§6.35, D18).
+ *
+ * Presentation, not hierarchy. The domain already has a `Folder` inside a
+ * Project, and the plan deliberately does not reuse it: this one exists so a
+ * user can put their own Lists side by side in the sidebar regardless of
+ * which Project owns them, and moving a List in or out changes nothing about
+ * the Project (D19).
+ *
+ * Groups Lists only — never Tasks (§6.35) — and does not nest, which is why
+ * there is no `parentFolderId` here.
+ */
+export interface SidebarFolder {
+  id: string;
+  name: string;
+  /** Order among the sidebar's groups. Ties fall back to name. */
+  sortKey?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * A Board column inside one List (TickTick plan §6.26/§6.27).
  *
  * The plan draws a hard line between the two Boards: an Inbox Board column is
@@ -549,6 +586,7 @@ export interface PlannerData {
   spaces: Space[];
   folders: Folder[];
   lists: List[];
+  sidebarFolders: SidebarFolder[];
   listSections: ListSection[];
   dailyPlans: TaskDailyPlan[];
   tags: Tag[];
