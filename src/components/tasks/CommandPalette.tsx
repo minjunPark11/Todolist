@@ -161,12 +161,16 @@ export function CommandPalette({
           onKeyDown={onKeyDown}
         />
 
+        {/* A listbox may own only options and groups of options, so each
+            §10.11 group carries its heading as its NAME and hides the visible
+            copy from the tree — otherwise the heading is read as a broken
+            choice. Found by axe (aria-required-children), not by eye. */}
         <div className="tm-palette-results" id="tm-palette-results" role="listbox">
           {/* §10.8: places, not predictions. The list is what the user did,
               which needs no explaining and cannot be wrong. */}
           {!typing && recents.length > 0 ? (
-            <section className="tm-palette-group">
-              <h3>{t("tasks.groupRecent")}</h3>
+            <section className="tm-palette-group" role="group" aria-label={t("tasks.groupRecent")}>
+              <h3 aria-hidden="true">{t("tasks.groupRecent")}</h3>
               {recents.map((entry) => {
                 const position = index;
                 index += 1;
@@ -183,8 +187,8 @@ export function CommandPalette({
           ) : null}
 
           {commands.length > 0 ? (
-            <section className="tm-palette-group">
-              <h3>{t("tasks.groupCommands")}</h3>
+            <section className="tm-palette-group" role="group" aria-label={t("tasks.groupCommands")}>
+              <h3 aria-hidden="true">{t("tasks.groupCommands")}</h3>
               {commands.map((command) => {
                 const position = index;
                 index += 1;
@@ -194,8 +198,13 @@ export function CommandPalette({
           ) : null}
 
           {groups.map((group) => (
-            <section key={group.kind} className="tm-palette-group">
-              <h3>{t(`tasks.group.${group.kind}`)}</h3>
+            <section
+              key={group.kind}
+              className="tm-palette-group"
+              role="group"
+              aria-label={t(`tasks.group.${group.kind}`)}
+            >
+              <h3 aria-hidden="true">{t(`tasks.group.${group.kind}`)}</h3>
               {group.results.map((result) => {
                 const position = index;
                 index += 1;
@@ -212,27 +221,29 @@ export function CommandPalette({
             </section>
           ))}
 
-          {typing && results.length === 0 && commands.length === 0 ? (
-            <p className="tm-state" role="status">
-              {t("tasks.searchEmpty")}
-            </p>
-          ) : null}
-
           {/* §10.41: search runs into capture. §10.42 is the constraint — the
               title is handed to Quick Add, not written straight to a Task, so
               the user still sees where it is going and can add a date. */}
           {typing
             ? row(rows.length - 1, "capture", <span>{t("tasks.captureAs", { title: query.trim() })}</span>)
             : null}
-
-          {typing ? (
-            <button type="button" className="tm-palette-all" onClick={() => onSeeAll(query)}>
-              {t("tasks.seeAllResults")}
-            </button>
-          ) : recents.length === 0 ? (
-            <p className="tm-state">{t("tasks.paletteHint")}</p>
-          ) : null}
         </div>
+
+        {/* Below the listbox rather than inside it: a message and a link out
+            are not choices in the list, and owning them broke the listbox. */}
+        {typing && results.length === 0 && commands.length === 0 ? (
+          <p className="tm-state" role="status">
+            {t("tasks.searchEmpty")}
+          </p>
+        ) : null}
+
+        {typing ? (
+          <button type="button" className="tm-palette-all" onClick={() => onSeeAll(query)}>
+            {t("tasks.seeAllResults")}
+          </button>
+        ) : recents.length === 0 ? (
+          <p className="tm-state">{t("tasks.paletteHint")}</p>
+        ) : null}
       </div>
     </div>
   );
