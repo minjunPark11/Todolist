@@ -11,6 +11,7 @@ import type {
   Folder,
   Language,
   List,
+  ListSection,
   PlannerData,
   PlannerSettings,
   Project,
@@ -45,6 +46,7 @@ import {
   sanitizeDailyPlan,
 } from "../domain/today/dailyPlan";
 import { backfillTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
+import { sanitizeListSection } from "../domain/tasks/sections";
 import { backfillTaskListId, defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
 import * as pathOps from "../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
@@ -382,6 +384,12 @@ export function normalizeData(data: RawPlannerData): PlannerData {
       : [],
     lists: Array.isArray(data.lists)
       ? data.lists.map(sanitizeList).filter((list): list is List => list !== null)
+      : [],
+    // Board columns belonging to one List (§6.26). Empty until something
+    // creates one — every Task starts in the unsectioned default column, and
+    // the Inbox Board's columns are dates and never records at all (§6.24).
+    listSections: Array.isArray(data.listSections)
+      ? data.listSections.map(sanitizeListSection).filter((section): section is ListSection => section !== null)
       : [],
     // One day's planning decisions per record (§6.18), replacing a blob that
     // never left the device it was made on.
@@ -1901,6 +1909,7 @@ export function usePlannerData() {
     spaces: data.spaces,
     folders: data.folders,
     lists: data.lists,
+    listSections: data.listSections,
     dailyPlans: data.dailyPlans,
     tags: data.tags,
     taskTags: data.taskTags,

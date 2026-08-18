@@ -11,9 +11,10 @@
 // toast lives. Deriving the undo from the task at the moment of change is what
 // makes it exact: "reopen" is not the inverse of "complete" in general, only
 // of completing THIS task, which was `todo` and not `waiting`.
-import type { Task } from "../../types";
+import type { List, ListSection, Task } from "../../types";
 import type { TaskScopeRef } from "./scopeRegistry";
 import { matchesScope, type ScopeContext } from "./scopeQuery";
+import { sectionIdFor } from "./sections";
 
 export interface TaskMutation {
   patch: Partial<Task>;
@@ -80,6 +81,53 @@ export function setTaskSomeday(task: Task, someday: boolean): TaskMutation {
     patch: { isSomeday: someday },
     undo: { isSomeday: task.isSomeday },
     labelKey: "tasks.undoSomeday",
+  };
+}
+
+/**
+ * Move a Task to another List (§6.29).
+ *
+ * The Section goes with it only if the caller names one that the target List
+ * actually has; otherwise it is cleared. That is not tidiness — a Section
+ * belongs to exactly one List (§6.28), so carrying the old id across would
+ * leave the Task pointing at a column that cannot render it. The plan says
+ * the same in one line: "listId 변경 → sectionId = null", and only an explicit
+ * choice of a target Section overrides it.
+ */
+export function moveTaskToList(
+  task: Task,
+  listId: string,
+  sections: ListSection[],
+  sectionId = "",
+): TaskMutation {
+  const target = sectionId ? sections.find((section) => section.id === sectionId) : undefined;
+  return {
+    patch: { listId, sectionId: target?.listId === listId ? target.id : "" },
+    undo: { listId: task.listId, sectionId: task.sectionId },
+    labelKey: "tasks.undoMoved",
+  };
+}
+
+/**
+ * Move a Task between columns of its own List (§6.28).
+ *
+ * Null when the target Section is not this List's — the domain validation the
+ * plan asks for where a constraint cannot be declared. A caller that got null
+ * has a bug in what it offered the user, not a state to recover from, and
+ * turning it into a silent move to the default column would hide that.
+ * `sectionId: ""` is the default column and always allowed.
+ */
+export function moveTaskToSection(
+  task: Task,
+  sectionId: string,
+  lists: List[],
+  sections: ListSection[],
+): TaskMutation | null {
+  if (sectionId && sectionIdFor({ ...task, sectionId }, lists, sections) !== sectionId) return null;
+  return {
+    patch: { sectionId },
+    undo: { sectionId: task.sectionId },
+    labelKey: "tasks.undoMoved",
   };
 }
 

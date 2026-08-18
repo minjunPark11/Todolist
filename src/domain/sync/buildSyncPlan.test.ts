@@ -74,6 +74,7 @@ function data(overrides: Partial<PlannerData> = {}): PlannerData {
     learningPaths: [],
     folders: [],
     lists: [],
+    listSections: [],
     settings,
     appSettings,
     ...overrides,

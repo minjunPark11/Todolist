@@ -1289,4 +1289,5 @@ export const en: Dictionary = {
   "tasks.undoReopened": "Reopened.",
   "tasks.undoDateChanged": "Date changed.",
   "tasks.undoSomeday": "Moved to someday.",
+  "tasks.undoMoved": "Moved.",
 };

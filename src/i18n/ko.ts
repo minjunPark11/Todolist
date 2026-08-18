@@ -1283,4 +1283,5 @@ export const ko: Dictionary = {
   "tasks.undoReopened": "다시 열었습니다.",
   "tasks.undoDateChanged": "날짜를 바꿨습니다.",
   "tasks.undoSomeday": "언젠가로 옮겼습니다.",
+  "tasks.undoMoved": "옮겼습니다.",
 };

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { List, Task, TaskDailyPlan, TaskTag } from "../../types";
+import type { List, ListSection, Task, TaskDailyPlan, TaskTag } from "../../types";
 import type { TaskScopeRef } from "./scopeRegistry";
 import { matchesScope, type ScopeContext } from "./scopeQuery";
 import {
   applyPatch,
   completeTask,
   leavesScope,
+  moveTaskToList,
+  moveTaskToSection,
   reopenTask,
   restoreTask,
   setTaskDueDate,
@@ -181,3 +183,49 @@ describe("leavesScope — §12.21", () => {
   });
 });
 
+
+describe("moving between Lists and Sections", () => {
+  const sectionOfL1: ListSection = { id: "s1", listId: "l1", name: "Doing", createdAt: NOW, updatedAt: NOW };
+  const sectionOfL2: ListSection = { id: "s2", listId: "l2", name: "Doing", createdAt: NOW, updatedAt: NOW };
+  const otherList: List = { id: "l2", projectId: "p1", name: "Other", order: 1, isDefault: false, createdAt: NOW, updatedAt: NOW };
+
+  it("clears the Section when the Task changes List (§6.29)", () => {
+    const moving = task({ listId: "l1", sectionId: "s1" });
+    const mutation = moveTaskToList(moving, "l2", [sectionOfL1, sectionOfL2]);
+    expect(mutation.patch).toEqual({ listId: "l2", sectionId: "" });
+    expect(mutation.undo).toEqual({ listId: "l1", sectionId: "s1" });
+  });
+
+  it("keeps a Section the user chose IN the target List", () => {
+    const moving = task({ listId: "l1", sectionId: "s1" });
+    expect(moveTaskToList(moving, "l2", [sectionOfL1, sectionOfL2], "s2").patch).toEqual({
+      listId: "l2",
+      sectionId: "s2",
+    });
+  });
+
+  it("refuses a Section that is not in the target List", () => {
+    const moving = task({ listId: "l1", sectionId: "" });
+    expect(moveTaskToList(moving, "l2", [sectionOfL1, sectionOfL2], "s1").patch).toEqual({
+      listId: "l2",
+      sectionId: "",
+    });
+  });
+
+  it("moves between columns of the Task's own List", () => {
+    const moving = task({ listId: "l1" });
+    const mutation = moveTaskToSection(moving, "s1", [projectList, otherList], [sectionOfL1]);
+    expect(mutation?.patch).toEqual({ sectionId: "s1" });
+    expect(mutation?.undo).toEqual({ sectionId: undefined });
+  });
+
+  it("answers null rather than silently defaulting when the column is another List's (§6.28)", () => {
+    const moving = task({ listId: "l1", sectionId: "s1" });
+    expect(moveTaskToSection(moving, "s2", [projectList, otherList], [sectionOfL1, sectionOfL2])).toBeNull();
+  });
+
+  it("always allows the default column", () => {
+    const moving = task({ listId: "l1", sectionId: "s1" });
+    expect(moveTaskToSection(moving, "", [projectList, otherList], [sectionOfL1])?.patch).toEqual({ sectionId: "" });
+  });
+});

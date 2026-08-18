@@ -83,6 +83,16 @@ export interface Task {
   // they are absent, which is the normal case.
   listId?: string;
   statusId?: string;
+  /**
+   * The Board column this Task sits in, within its owner List (§6.26).
+   *
+   * A Section belongs to one List and is only meaningful there, so this is
+   * read through `sectionIdFor` rather than directly: a stored id naming a
+   * Section of some other List answers "" — the invariant §6.28 forbids and
+   * that a `data` jsonb column cannot declare. Absent or "" is the default
+   * "unsectioned" column (§6.27), which is where every Task starts.
+   */
+  sectionId?: string;
   repeatType: RepeatType;
   repeatInterval: number;
   repeatDays: number[];
@@ -494,6 +504,29 @@ export interface TaskDailyPlan {
   updatedAt: string;
 }
 
+/**
+ * A Board column inside one List (TickTick plan §6.26/§6.27).
+ *
+ * The plan draws a hard line between the two Boards: an Inbox Board column is
+ * a DATE bucket, derived and stored nowhere, while a List Board column is a
+ * user-made thing with a name — and only that second kind is a record (§6.24,
+ * D24). A Section therefore never exists outside the List that owns it.
+ *
+ * `Task.sectionId` points here, and nothing points back: a Section does not
+ * list its Tasks, so moving a Task between columns writes one task row rather
+ * than editing two collections.
+ */
+export interface ListSection {
+  id: string;
+  /** The List this Section is a column of. A Section is never shared (§6.28). */
+  listId: string;
+  name: string;
+  /** Column order within the List. Ties fall back to name. */
+  sortKey?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PlannerData {
   tasks: Task[];
   projects: Project[];
@@ -504,6 +537,7 @@ export interface PlannerData {
   spaces: Space[];
   folders: Folder[];
   lists: List[];
+  listSections: ListSection[];
   dailyPlans: TaskDailyPlan[];
   tags: Tag[];
   taskTags: TaskTag[];
