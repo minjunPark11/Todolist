@@ -19,8 +19,10 @@ import type {
   RepeatType,
   Space,
   Subtask,
+  Tag,
   Task,
   TaskDailyPlan,
+  TaskTag,
   DailyPlanBucket,
   TaskDraft,
 } from "../types";
@@ -41,6 +43,7 @@ import {
   prunePlansBefore,
   sanitizeDailyPlan,
 } from "../domain/today/dailyPlan";
+import { backfillTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
 import { backfillTaskListId, defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
 import * as pathOps from "../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
@@ -384,6 +387,14 @@ export function normalizeData(data: RawPlannerData): PlannerData {
     dailyPlans: Array.isArray(data.dailyPlans)
       ? data.dailyPlans.map(sanitizeDailyPlan).filter((plan): plan is TaskDailyPlan => plan !== null)
       : [],
+    // Tags as records beside the strings in `Task.tags` (§6.45), not instead
+    // of them — see domain/tags for why both are true at once.
+    tags: Array.isArray(data.tags)
+      ? data.tags.map(sanitizeTag).filter((tag): tag is Tag => tag !== null)
+      : [],
+    taskTags: Array.isArray(data.taskTags)
+      ? data.taskTags.map(sanitizeTaskTag).filter((link): link is TaskTag => link !== null)
+      : [],
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
   };
@@ -429,6 +440,11 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   // screen reads them, and a table that only grows would carry decisions
   // nobody can act on any more.
   const dailyPlans = prunePlansBefore(adoptLegacyBucketOverrides(data.dailyPlans, now), todayValue());
+  // §6.45: the tags the tasks already carry as strings, written down as
+  // records. Nothing rewrites a Task — the strings stay where every current
+  // reader expects them, so this adds rows without putting the task table on
+  // the wire.
+  const tagged = backfillTaskTags(data.tasks, data.tags, data.taskTags, now);
   if (
     focusSessions === data.focusSessions &&
     learningPaths === data.learningPaths &&
@@ -436,11 +452,24 @@ function adoptLoadedData(data: PlannerData): PlannerData {
     spaces === data.spaces &&
     lists === data.lists &&
     tasks === data.tasks &&
-    dailyPlans === data.dailyPlans
+    dailyPlans === data.dailyPlans &&
+    tagged.tags === data.tags &&
+    tagged.taskTags === data.taskTags
   ) {
     return data;
   }
-  return { ...data, focusSessions, learningPaths, projects, spaces, lists, tasks, dailyPlans };
+  return {
+    ...data,
+    focusSessions,
+    learningPaths,
+    projects,
+    spaces,
+    lists,
+    tasks,
+    dailyPlans,
+    tags: tagged.tags,
+    taskTags: tagged.taskTags,
+  };
 }
 // Phase S4 migration, and the same shape as the one below it: custom spaces
 // written before Spaces read Projects sat in a device-local blob. Merged by
@@ -1858,6 +1887,8 @@ export function usePlannerData() {
     folders: data.folders,
     lists: data.lists,
     dailyPlans: data.dailyPlans,
+    tags: data.tags,
+    taskTags: data.taskTags,
     focusSessions: data.focusSessions,
     activeSessionId: data.activeSessionId,
     activeFocusSession:

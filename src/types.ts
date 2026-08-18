@@ -413,6 +413,49 @@ export type RawPlannerData = {
     : Partial<PlannerData[K]>;
 };
 
+/**
+ * A tag as a record rather than a string (TickTick plan §6.45).
+ *
+ * §1.9 draws the line it exists for: a List is where a Task is, a Tag is what
+ * a Task is like. The string form in `Task.tags` cannot carry a colour, be
+ * renamed without rewriting every Task that mentions it, or be the subject of
+ * its own Scope (§12.10).
+ *
+ * No owner field. The plan's `owner/workspace scope` is the `user_id` column
+ * every table here already has; a second copy inside the record would be one
+ * more thing that can disagree with it.
+ */
+export interface Tag {
+  id: string;
+  /** As first written. The id is derived from a case-folded form of it. */
+  name: string;
+  color?: string;
+  /** Manual order in the sidebar's Tags section (§2.21). Unused so far. */
+  sortKey?: number;
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * One Task carrying one Tag (§6.45).
+ *
+ * §6.46 wants UNIQUE(taskId, tagId). The id is derived from both, so the pair
+ * cannot produce two rows however many devices write it — the same trick
+ * `TaskDailyPlan` uses for one plan per task per day.
+ *
+ * This does NOT replace `Task.tags`. Both are true at once for as long as
+ * needed: the strings stay readable to older clients and to every screen that
+ * has not moved, and the plan's Phase 6 (§6.74) is where one becomes the only
+ * source of truth.
+ */
+export interface TaskTag {
+  id: string;
+  taskId: string;
+  tagId: string;
+  createdAt: string;
+}
+
 /** Which part of the day the user put a task in (TickTick plan §6.18). */
 export type DailyPlanBucket = "now" | "next" | "later";
 
@@ -452,6 +495,8 @@ export interface PlannerData {
   folders: Folder[];
   lists: List[];
   dailyPlans: TaskDailyPlan[];
+  tags: Tag[];
+  taskTags: TaskTag[];
   settings: PlannerSettings;
   appSettings: AppSettings;
 }

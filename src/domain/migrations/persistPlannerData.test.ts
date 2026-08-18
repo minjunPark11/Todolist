@@ -41,6 +41,8 @@ function plannerData(path: LearningPath): PlannerData {
     spaces: [],
     subtasks: [],
     dailyPlans: [],
+    tags: [],
+    taskTags: [],
     focusSessions: [],
     activeSessionId: "",
     learningPaths: [path],
