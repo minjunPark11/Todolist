@@ -208,7 +208,12 @@ export default function App() {
     ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null
     : null;
   const activeFocusElapsed = getDisplayedFocusSeconds(planner.activeFocusSession, focusNow);
-  const activeProjects = planner.projects.filter((project) => project.status !== "archived");
+  // §13.28: deleted Projects leave the active views the same way archived ones
+  // do. Their Lists and Tasks are untouched and stay usable in the Tasks
+  // Module — a Project is a List's context, not a Task's owner (§13.19).
+  const activeProjects = planner.projects.filter(
+    (project) => project.status !== "archived" && !project.deletedAt,
+  );
   const { importMessage, exportJson, handleImport } = useDataPortability({
     today,
     exportData: planner.exportData,
@@ -1103,6 +1108,12 @@ export default function App() {
           // AppModals, which this branch does not render — and §9.45 keeps
           // confirmation for what cannot be taken back, which a soft delete
           // with an Undo beside it is not.
+          lifecycle={{
+            onArchiveList: planner.archiveList,
+            onTrashList: planner.trashList,
+            onRestoreList: planner.restoreList,
+            onPermanentlyDeleteList: planner.permanentlyDeleteList,
+          }}
           onMutate={planner.updateTask}
         />
       </I18nProvider>

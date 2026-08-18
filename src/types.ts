@@ -167,6 +167,8 @@ export interface Space {
   icon?: string;
   order: number;
   archivedAt?: string;
+  /** Thrown away and recoverable (§13.20). Never set beside `archivedAt`. */
+  deletedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -188,6 +190,8 @@ export interface Folder {
   name: string;
   order: number;
   archivedAt?: string;
+  /** Thrown away and recoverable (§13.20). Never set beside `archivedAt`. */
+  deletedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -272,7 +276,19 @@ export interface List {
   isDefault: boolean;
   /** Overrides the Space's set when present; inherits when absent (D7). */
   statuses?: Status[];
+  /**
+   * Kept, not emptied (TickTick plan §13.20).
+   *
+   * Archived means put away, deleted means thrown away and recoverable, and a
+   * record is never both — each command clears the other, because "restore"
+   * would otherwise have to guess which state to put back.
+   *
+   * Neither one touches a Task. The Tasks keep their `listId` through both
+   * (§6.56), which is why restoring is one field rather than a migration, and
+   * why the Task Trash stays a list of what the USER deleted.
+   */
   archivedAt?: string;
+  deletedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -309,6 +325,15 @@ export interface Project {
   order?: number;
   status?: ProjectStatus;
   archivedAt?: string;
+  /**
+   * Thrown away and recoverable (§13.20/§13.28).
+   *
+   * A Project's lifecycle does not reach the work under it. Its Lists keep
+   * `projectId` through both states so restore needs no backfill (§13.28), and
+   * the Tasks in those Lists go on being usable in the Tasks Module — a
+   * Project is a List's context, not a Task's owner (§13.19).
+   */
+  deletedAt?: string;
   createdAt: string;
   updatedAt: string;
   /**

@@ -77,7 +77,11 @@ export function isTaskActive(task: Task, lists: List[]): boolean {
   const listId = listIdFor(task, lists);
   if (!listId) return true; // nothing owns it yet; the backfill has not run
   const owner = lists.find((list) => list.id === listId);
-  return !owner || !owner.archivedAt;
+  // §13.19's shared precondition: the Task is active only if its owner List is.
+  // A deleted List takes its Tasks out of every Scope WITHOUT writing anything
+  // on them (§6.56) — which is why restoring the List brings them all back and
+  // why they never appear in the Task Trash.
+  return !owner || (!owner.archivedAt && !owner.deletedAt);
 }
 
 /** §12.4's canonical `active`: alive, and not finished. */

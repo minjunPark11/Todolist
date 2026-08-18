@@ -53,7 +53,7 @@ export function listIdFor(item: Pick<Task, "listId" | "projectId">, lists: List[
 
 /** The account's Inbox, or "" before the migration has created it. */
 export function inboxListId(lists: List[]): string {
-  return lists.find((list) => list.kind === "inbox" && !list.archivedAt)?.id ?? "";
+  return lists.find((list) => list.kind === "inbox" && !list.archivedAt && !list.deletedAt)?.id ?? "";
 }
 
 /**

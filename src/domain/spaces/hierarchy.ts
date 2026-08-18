@@ -197,6 +197,7 @@ export function sanitizeList(value: unknown): List | null {
     // undefined means inherit from the Space, which always has a full set.
     statuses: statuses && hasDoneStatus(statuses) ? statuses : undefined,
     archivedAt: asString(record.archivedAt) || undefined,
+    deletedAt: asString(record.deletedAt) || undefined,
     createdAt: createdAt || updatedAt,
     updatedAt: updatedAt || createdAt,
   };
@@ -206,7 +207,7 @@ export function sanitizeList(value: unknown): List | null {
 
 export function activeFolders(folders: Folder[], projectId: string): Folder[] {
   return folders
-    .filter((folder) => folder.projectId === projectId && !folder.archivedAt)
+    .filter((folder) => folder.projectId === projectId && !folder.archivedAt && !folder.deletedAt)
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
@@ -218,7 +219,9 @@ export function activeLists(lists: List[], projectId: string): List[] {
   // answer, not that answer.
   if (!projectId) return [];
   return lists
-    .filter((list) => list.projectId === projectId && !list.archivedAt)
+    // §13.19: a List that is archived OR deleted is out of every active query,
+    // and so is everything in it — without anything being written on the Tasks.
+    .filter((list) => list.projectId === projectId && !list.archivedAt && !list.deletedAt)
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
@@ -231,7 +234,7 @@ export function activeLists(lists: List[], projectId: string): List[] {
  */
 export function standaloneLists(lists: List[]): List[] {
   return lists
-    .filter((list) => !list.projectId && list.kind !== "inbox" && !list.archivedAt)
+    .filter((list) => !list.projectId && list.kind !== "inbox" && !list.archivedAt && !list.deletedAt)
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
@@ -242,7 +245,7 @@ export function folderlessLists(lists: List[], spaceId: string): List[] {
 
 export function listsInFolder(lists: List[], folderId: string): List[] {
   return lists
-    .filter((list) => list.folderId === folderId && !list.archivedAt)
+    .filter((list) => list.folderId === folderId && !list.archivedAt && !list.deletedAt)
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 

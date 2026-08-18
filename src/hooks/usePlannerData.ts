@@ -38,6 +38,7 @@ import {
   readLegacyLocalSpaces,
 } from "../lib/spaces/legacyLocalSpaces";
 import * as hierarchy from "../domain/spaces/hierarchy";
+import * as lifecycle from "../domain/spaces/lifecycle";
 import * as spaceTree from "../domain/spaces/spaces";
 import { sanitizeFolder, sanitizeList } from "../domain/spaces/hierarchy";
 import {
@@ -1197,6 +1198,7 @@ export function usePlannerData() {
     }));
   }
 
+  /** §13.28: back from either state, since a record is never in both. */
   function restoreProject(projectId: string) {
     const now = new Date().toISOString();
 
@@ -1204,24 +1206,28 @@ export function usePlannerData() {
       ...current,
       projects: current.projects.map((project) =>
         project.id === projectId
-          ? { ...project, status: "active", archivedAt: "", updatedAt: now }
+          ? { ...project, status: "active", archivedAt: "", deletedAt: undefined, updatedAt: now }
           : project,
       ),
     }));
   }
 
+  /**
+   * §13.28, and this used to be the opposite (Phase 9).
+   *
+   * It hard-deleted the row and stripped `projectId` from every Task under it
+   * — unrecoverable, and a write to every one of those Tasks. The plan is
+   * explicit that a Project's lifecycle does not reach the work beneath it:
+   * the row is marked deleted, its Lists keep pointing at it so restore needs
+   * no backfill, and nothing under it moves. `permanentlyDeleteProject` is
+   * where the row actually goes, and even there the Lists survive.
+   */
   function deleteProject(projectId: string) {
     const now = new Date().toISOString();
-    setData((current) => ({
-      ...current,
-      projects: current.projects.filter((project) => project.id !== projectId),
-      tasks: current.tasks.map((task) =>
-        task.projectId === projectId ? { ...task, projectId: "", updatedAt: now } : task,
-      ),
-      learningPaths: current.learningPaths.map((path) => path.projectId === projectId
-        ? { ...path, projectId: undefined, boardListId: undefined, boardOrder: undefined, updatedAt: now }
-        : path),
-    }));
+    setData((current) => {
+      const projects = lifecycle.trashProject(current.projects, projectId, now);
+      return projects === current.projects ? current : { ...current, projects };
+    });
   }
 
   /**
@@ -1699,6 +1705,43 @@ export function usePlannerData() {
     });
   }
 
+  /**
+   * §13.29, and it is not a cascade: the Lists become standalone and every
+   * Task under them is untouched. Deleting the work is a separate action the
+   * user has to take on purpose.
+   */
+  function permanentlyDeleteProject(projectId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const next = lifecycle.permanentlyDeleteProject(current.projects, current.lists, projectId, now);
+      return next.done ? { ...current, projects: next.projects, lists: next.lists } : current;
+    });
+  }
+
+  function trashSpace(spaceId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const spaces = lifecycle.trashSpace(current.spaces, spaceId, now);
+      return spaces === current.spaces ? current : { ...current, spaces };
+    });
+  }
+
+  function restoreSpace(spaceId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const spaces = lifecycle.restoreSpace(current.spaces, spaceId, now);
+      return spaces === current.spaces ? current : { ...current, spaces };
+    });
+  }
+
+  /** §13.32: blocked while any Project still names this Space. */
+  function permanentlyDeleteSpace(spaceId: string) {
+    setData((current) => {
+      const next = lifecycle.permanentlyDeleteSpace(current.spaces, current.projects, spaceId);
+      return next.done ? { ...current, spaces: next.spaces } : current;
+    });
+  }
+
   /** H-INV-05: one row. Nothing under the Project is rewritten. */
   function moveProjectToSpace(projectId: string, spaceId: string) {
     const now = new Date().toISOString();
@@ -1777,6 +1820,42 @@ export function usePlannerData() {
     setData((current) => {
       const lists = hierarchy.archiveList(current.lists, listId, now);
       return lists === current.lists ? current : { ...current, lists };
+    });
+  }
+
+  /**
+   * The container lifecycle (§13.21-§13.24). Soft, every one of them: the
+   * Tasks keep their `listId` through archive and delete alike, which is what
+   * makes `restoreList` one field and keeps the Task Trash a list of what the
+   * user threw away themselves.
+   */
+  function trashList(listId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const lists = lifecycle.trashList(current.lists, listId, now);
+      return lists === current.lists ? current : { ...current, lists };
+    });
+  }
+
+  function restoreList(listId: string) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const lists = lifecycle.restoreList(current.lists, listId, now);
+      return lists === current.lists ? current : { ...current, lists };
+    });
+  }
+
+  /**
+   * §6.56's one permitted hard cascade — the Tasks go with the List.
+   *
+   * Only reachable for a List already in the deleted state, so a single click
+   * cannot arrive here, and the surface that calls it says how many Tasks it
+   * is about to take (`taskCountInList`).
+   */
+  function permanentlyDeleteList(listId: string) {
+    setData((current) => {
+      const next = lifecycle.permanentlyDeleteList(current.lists, current.tasks, listId);
+      return next.done ? { ...current, lists: next.lists, tasks: next.tasks } : current;
     });
   }
 
@@ -1995,6 +2074,13 @@ export function usePlannerData() {
     createDefaultList,
     updateList,
     archiveList,
+    trashList,
+    restoreList,
+    permanentlyDeleteList,
+    permanentlyDeleteProject,
+    trashSpace,
+    restoreSpace,
+    permanentlyDeleteSpace,
     moveListToFolder,
     moveTaskToList,
     moveGoalToList,

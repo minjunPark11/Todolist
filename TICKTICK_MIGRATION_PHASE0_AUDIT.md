@@ -215,3 +215,20 @@
     - **Empty state (§10.46)** — 팔레트는 "결과 없음 + 만들기", 검색 페이지는 검색어를 되짚어 말하고 다른 검색어를 권한다. 두 화면이 다른 말을 하는 것은 §10.46이 각각 따로 적어둔 대로다
 
     남은 것: `>` command prefix(§10.35, P1), remote search의 loading/error 표면(§10.47/§10.48 — 지금 검색은 전부 클라이언트 로컬이라 불러올 것이 없다)
+
+18. **Implementation Phase 9 (§16.32) — Container Lifecycle** — **1차 완료.** Gate 9의 네 줄이 전부 앱에서 확인됐다.
+
+    정책 전체가 한 문장이다: **컨테이너의 생애주기는 그 안의 것을 다시 쓰지 않는다.** List를 보관해도 Task는 움직이지 않고, Project를 지워도 List는 그대로이며, Space를 지우면 아무 일도 일어나지 않는다. 이유는 §13.19에 있다 — *"Project / Space는 List의 고급 context이지 Task의 직접 owner가 아니다"*. `domain/spaces/lifecycle.ts`가 세 컨테이너 × 네 동작을 한곳에서 답한다.
+
+    - **Gate 9-1 (Task orphan 없음)** — Task는 어느 상태에서도 `listId`를 유지한다. 화면에서 사라지는 이유는 **주인 List가 active 조건을 잃어서**지 Task에 무언가 쓰여서가 아니다(§13.19의 공통 precondition을 `isTaskActive` 한 곳에서 답한다)
+    - **Gate 9-2 (List delete가 Task hard delete를 유발하지 않음)** — §6.56의 *"List 삭제 때문에 자식 Task를 개별 Trash Task로 바꾸지 않는다"*. 앱에서 확인: 작업 2개짜리 리스트를 삭제하니 리스트에 `deletedAt`이 붙고 **두 Task는 `deletedAt` 없이 `listId`도 그대로**였다. Today·Upcoming·List 개수는 전부 빠졌고, **휴지통 Scope에는 나타나지 않았다** — 휴지통은 사용자가 버린 Task의 목록이라는 §13.25의 구분이 그대로 지켜진다
+    - **Gate 9-3 (restore가 FK를 보존)** — 관계를 지운 적이 없으니 복원이 필드 하나다. 앱에서 확인: 복원하자 리스트와 **작업 2개가 모든 Scope 멤버십과 함께** 돌아왔다(Today 1, 다음 7일 1, 리스트 2). 백필 없음
+    - **Gate 9-4 (destructive cascade가 §13 정책을 넘지 않음)** — 앱 전체에서 hard delete는 **한 군데**뿐이다: 이미 삭제 상태인 List의 영구 삭제(§6.56). Project 영구 삭제는 연결 List를 **독립 List로 남기고**(§13.29) Task는 건드리지 않으며, Space 영구 삭제는 참조하는 Project가 하나라도 있으면 **차단된다**(§13.32 — 보관/삭제된 Project도 복구 가능하므로 함께 센다)
+
+    **§13.20의 배타성**(archived면 deleted 아님, 반대도)은 각 명령이 반대편을 지우는 것으로 보장한다. 두 타임스탬프가 동시에 설정될 수 있으면 "복원"이 *어느 상태로* 돌아가는지 모호해진다.
+
+    **이 과정에서 기존 `deleteProject`를 고쳤다.** 그것은 Project row를 즉시 hard delete하면서 **그 아래 모든 Task의 `projectId`를 빈 값으로 다시 썼다** — 복구 불가에 Task 전부에 쓰기. §13.28은 정확히 그 반대를 말한다. 이제 soft delete이고, Task는 손대지 않으며, 영구 삭제조차 List를 살려 둔다.
+
+    **관리 화면 (§13.25)** — "보관된 리스트 / 삭제된 리스트"는 **Scope가 아니다.** 계획서가 두 번 못박는다: §12의 9개 레지스트리를 늘리지 않고, 삭제된 List를 Task 휴지통에 섞지 않는다. 사이드바 LISTS 구획의 "관리"에서 열리는 다이얼로그이며, 영구 삭제만 **두 번 묻는다** — 두 번째 문장이 함께 사라질 작업 개수를 말한다("작업 2개도 함께 영구 삭제됩니다"). 앱에서 확인: 첫 클릭은 **아무것도 지우지 않았고**(store 그대로), 확인 후에야 리스트와 작업 2개가 사라졌다
+
+    남은 것: Project/Space의 복원 **화면**(도메인과 store 명령은 전부 있지만 Spaces UI에는 아직 "삭제된 프로젝트" surface가 없다), Folder lifecycle(계획서가 SidebarFolder만 다루고 도메인 Folder의 delete는 정의하지 않는다)

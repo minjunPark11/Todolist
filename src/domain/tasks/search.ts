@@ -155,7 +155,7 @@ export function searchAll(
 
   const lists: Array<SearchResult & { rank: number }> = [];
   for (const list of collections.lists) {
-    if (list.archivedAt) continue;
+    if (list.archivedAt || list.deletedAt) continue;
     const name = listName(list, labels.inbox);
     const rank = matchRank(name, trimmed);
     if (rank === null) continue;
@@ -186,7 +186,7 @@ export function searchAll(
     if (rank !== null) folders.push({ kind: "folder", id: folder.id, title: folder.name, rank });
   }
   for (const folder of collections.folders) {
-    if (folder.archivedAt) continue;
+    if (folder.archivedAt || folder.deletedAt) continue;
     const rank = matchRank(folder.name, trimmed);
     if (rank !== null) folders.push({ kind: "folder", id: folder.id, title: folder.name, rank });
   }
@@ -198,7 +198,7 @@ export function searchAll(
   // record matched.
   const projects: Array<SearchResult & { rank: number }> = [];
   for (const project of collections.projects) {
-    if (project.archivedAt) continue;
+    if (project.archivedAt || project.deletedAt) continue;
     const rank = matchRank(project.name, trimmed);
     if (rank !== null) projects.push({ kind: "project", id: project.id, title: project.name, rank });
   }
@@ -206,7 +206,7 @@ export function searchAll(
 
   const spaces: Array<SearchResult & { rank: number }> = [];
   for (const space of collections.spaces) {
-    if (space.archivedAt) continue;
+    if (space.archivedAt || space.deletedAt) continue;
     const rank = matchRank(space.name, trimmed);
     if (rank !== null) spaces.push({ kind: "space", id: space.id, title: space.name, rank });
   }

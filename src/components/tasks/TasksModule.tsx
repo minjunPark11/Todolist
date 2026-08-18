@@ -42,6 +42,7 @@ import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
 import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
 import { CommandPalette } from "./CommandPalette";
+import { ListManager } from "./ListManager";
 import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
 import { flattenGroups, PAGE_LIMITS, searchAll } from "../../domain/tasks/search";
 import type { TaskCommand } from "../../domain/tasks/commands";
@@ -86,6 +87,13 @@ interface TasksModuleProps {
     onToggleSubtask: (id: string) => void;
     onDeleteSubtask: (id: string) => void;
   };
+  /** §13.23/§6.56: restoring a List, and the one hard delete in the app. */
+  lifecycle: {
+    onArchiveList: (listId: string) => void;
+    onTrashList: (listId: string) => void;
+    onRestoreList: (listId: string) => void;
+    onPermanentlyDeleteList: (listId: string) => void;
+  };
   /**
    * Applies a described mutation and hands back the way to undo it (§16.29).
    *
@@ -121,6 +129,9 @@ export function TasksModule(props: TasksModuleProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   // §10.41's other half: the palette captures a title, Quick Add commits it.
   const [captured, setCaptured] = useState("");
+  // §13.25: a management surface, not a Scope — so it is state here and not a
+  // tenth route.
+  const [managing, setManaging] = useState(false);
   // §10.44: a device preference, not account data. Nothing here is worth
   // syncing, and a list of what someone opened is worth less to them than it
   // would be to anyone reading over their shoulder.
@@ -345,6 +356,7 @@ export function TasksModule(props: TasksModuleProps) {
         sidebarFolders={sidebarFolders}
         tags={tags}
         savedFilters={savedFilters}
+        onManageLists={() => setManaging(true)}
         current={searchQuery === null ? scope : null}
         onNavigate={go}
       />
@@ -384,6 +396,22 @@ export function TasksModule(props: TasksModuleProps) {
               ))}
             </div>
           ) : null}
+
+          {/* §13.21/§13.22 from the List's own screen, which is where the
+              plan puts them. The Inbox is not offered either one: it is the
+              floor a Task falls back to, so putting it away would leave the
+              account with nowhere to capture (§6.5). Both are soft — the
+              Tasks are not touched, and Manage is where they come back. */}
+          {scope.kind === "list" && !missing && !isInboxList(lists.find((list) => list.id === scope.id) ?? { kind: "regular" }) ? (
+            <div className="tm-scope-actions">
+              <button type="button" onClick={() => props.lifecycle.onArchiveList(scope.id)}>
+                {t("tasks.archiveList")}
+              </button>
+              <button type="button" onClick={() => props.lifecycle.onTrashList(scope.id)}>
+                {t("tasks.deleteList")}
+              </button>
+            </div>
+          ) : null}
         </header>
 
         {!missing && !props.loading ? (
@@ -393,7 +421,7 @@ export function TasksModule(props: TasksModuleProps) {
             today={today}
             folderLists={
               scope.kind === "folder"
-                ? lists.filter((list) => folderIdFor(list) === scope.id && !list.archivedAt)
+                ? lists.filter((list) => folderIdFor(list) === scope.id && !list.archivedAt && !list.deletedAt)
                 : []
             }
             tags={tags}
@@ -451,6 +479,16 @@ export function TasksModule(props: TasksModuleProps) {
         </>
         )}
       </main>
+
+      {managing ? (
+        <ListManager
+          lists={lists}
+          tasks={tasks}
+          onRestore={props.lifecycle.onRestoreList}
+          onPermanentlyDelete={props.lifecycle.onPermanentlyDeleteList}
+          onClose={() => setManaging(false)}
+        />
+      ) : null}
 
       {paletteOpen ? (
         <CommandPalette

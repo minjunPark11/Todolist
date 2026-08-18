@@ -25,6 +25,8 @@ interface TasksSidebarProps {
   sidebarFolders: SidebarFolder[];
   tags: Tag[];
   savedFilters: SavedFilter[];
+  /** §13.25's management surface, opened from the Lists section. */
+  onManageLists: () => void;
   /** Null on the Search Page, which is not a Scope and highlights nothing. */
   current: TaskScopeRef | null;
   onNavigate: (scope: TaskScopeRef) => void;
@@ -41,6 +43,7 @@ export function TasksSidebar({
   sidebarFolders,
   tags,
   savedFilters,
+  onManageLists,
   current,
   onNavigate,
 }: TasksSidebarProps) {
@@ -67,7 +70,12 @@ export function TasksSidebar({
 
   // The Inbox is a List, but it is shown among the Smart Lists and never in
   // the tree — it belongs to no Project and has nowhere in the tree to hang.
-  const treeLists = ctx.lists.filter((list) => !isInboxList(list) && !list.archivedAt && list.projectId);
+  // §13.21/§13.22: a List that has been put away leaves the tree. It is not
+  // gone — Manage is where both states are — but it is not a place to file
+  // work in any more, so it does not sit among the ones that are.
+  const treeLists = ctx.lists.filter(
+    (list) => !isInboxList(list) && !list.archivedAt && !list.deletedAt && list.projectId,
+  );
   // Grouped by `folderIdFor`, the same answer the `folder` Scope reads
   // (§12.4). A List the user has put in a sidebar group is therefore under
   // that group and NOT also under the domain Folder it belongs to — the two
@@ -90,7 +98,9 @@ export function TasksSidebar({
   // of thing — a group of Lists (§6.33).
   const groups = [
     ...activeSidebarFolders(sidebarFolders).map((folder) => ({ id: folder.id, name: folder.name })),
-    ...folders.filter((folder) => !folder.archivedAt).map((folder) => ({ id: folder.id, name: folder.name })),
+    ...folders
+      .filter((folder) => !folder.archivedAt && !folder.deletedAt)
+      .map((folder) => ({ id: folder.id, name: folder.name })),
   ];
 
   const visibleTags = activeTags(tags);
@@ -105,7 +115,12 @@ export function TasksSidebar({
       </div>
 
       <div className="tm-section">
-        <h2 className="tm-section-title">{t("tasks.sectionLists")}</h2>
+        <h2 className="tm-section-title">
+          {t("tasks.sectionLists")}
+          <button type="button" className="tm-section-action" onClick={onManageLists}>
+            {t("tasks.manageLists")}
+          </button>
+        </h2>
         {groups.map((folder) => {
           const inside = byFolder.get(folder.id) ?? [];
           if (inside.length === 0) return null;

@@ -111,7 +111,7 @@ export function TaskDrawer({
           <span>{t("tasks.addList")}</span>
           <select value={task.listId ?? ""} onChange={(event) => onMoveToList(event.target.value)}>
             {lists
-              .filter((list) => !list.archivedAt)
+              .filter((list) => !list.archivedAt && !list.deletedAt)
               .map((list) => (
                 <option key={list.id} value={list.id}>
                   {list.name}

@@ -52,6 +52,7 @@ export function sanitizeSpace(value: unknown): Space | null {
     icon: asString(record.icon) || undefined,
     order: asOrder(record.order),
     archivedAt: asString(record.archivedAt) || undefined,
+    deletedAt: asString(record.deletedAt) || undefined,
     createdAt: createdAt || updatedAt,
     updatedAt: updatedAt || createdAt,
   };
@@ -61,7 +62,9 @@ export function sanitizeSpace(value: unknown): Space | null {
 
 export function activeSpaces(spaces: Space[]): Space[] {
   return spaces
-    .filter((space) => !space.archivedAt)
+    // §13.31: a deleted Space leaves the navigation the same way an archived
+    // one does, and changes nothing below it either way.
+    .filter((space) => !space.archivedAt && !space.deletedAt)
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
@@ -83,7 +86,9 @@ export function spaceIdForProject(project: Pick<Project, "spaceId">): string {
 
 export function projectsInSpace(projects: Project[], spaceId: string): Project[] {
   return projects
-    .filter((project) => !project.archivedAt && spaceIdForProject(project) === spaceId)
+    // §13.28: a deleted Project leaves the Spaces navigation, exactly as an
+    // archived one does. Neither changes anything about the Lists beneath it.
+    .filter((project) => !project.archivedAt && !project.deletedAt && spaceIdForProject(project) === spaceId)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
 }
 
