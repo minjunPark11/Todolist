@@ -1,0 +1,51 @@
+// The Schedule domain's public surface (design §19.5).
+//
+// Phase 1 of SCHEDULE_EDITOR_PHASE0_AUDIT.md §7: the meaning of a schedule,
+// fixed in code and tests, with no UI and no persistence attached. Nothing
+// here imports React, Supabase, a browser API, or the `Task` type itself
+// (design §19.3).
+//
+// Still to come, in the order the audit sets:
+//   Phase 2   the Task adapter — `scheduleFromTask` / `scheduleToTaskPatch`,
+//             which is where `scheduledDate` gets absorbed (audit §6, 1-d)
+//   Phase 8   time formatting for the trigger label
+//   Phase 10  recurrence
+//   Phase 11  reminders
+export type {
+  LocalDate,
+  LocalTime,
+  RangeStage,
+  Schedule,
+  ScheduleDraft,
+  ScheduleMode,
+} from "./types";
+export { EMPTY_SCHEDULE, isLocalDate, isLocalTime } from "./types";
+
+export { draftFromSchedule, getScheduleMode, setScheduleMode, toDateMode, toDurationMode } from "./scheduleMode";
+
+export {
+  addDays,
+  clearSchedule,
+  clearTime,
+  daysBetween,
+  selectDate,
+  setEndTime,
+  setStartTime,
+  shiftSchedule,
+} from "./scheduleCommands";
+
+export {
+  getRangeStage,
+  hasSchedule,
+  isOverdue,
+  isTimed,
+  scheduleSpan,
+  scheduleSpanDays,
+} from "./scheduleQueries";
+
+export { normalizeSchedule } from "./normalizeSchedule";
+
+export type { ScheduleIssue, ScheduleIssueCode } from "./validateSchedule";
+export { isConfirmable, isValidSchedule, validateDraft, validateSchedule } from "./validateSchedule";
+
+export { isDirty, schedulesEqual } from "./scheduleEquality";
