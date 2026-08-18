@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Folder, List, SavedFilter, SidebarFolder, Tag, Task } from "../../types";
-import { flattenGroups, matchRank, searchAll, type SearchCollections } from "./search";
+import type { Folder, List, Project, SavedFilter, SidebarFolder, Space, Tag, Task } from "../../types";
+import { flattenGroups, matchRank, PALETTE_LIMITS, searchAll, type SearchCollections } from "./search";
 
 const NOW = "2026-08-18T09:00:00.000Z";
 const LABELS = { inbox: "Inbox", defaultList: "List" };
@@ -70,6 +70,8 @@ function collections(overrides: Partial<SearchCollections> = {}): SearchCollecti
     sidebarFolders: [],
     tags: [],
     savedFilters: [],
+    projects: [],
+    spaces: [],
     ...overrides,
   };
 }
@@ -192,8 +194,48 @@ describe("searchAll", () => {
 
   it("cuts each group at the limit (§10.49)", () => {
     const many = Array.from({ length: 12 }, (_, index) => task({ id: `t${index}`, title: `Report ${index}`, listId: "l1" }));
-    const groups = searchAll("report", collections({ tasks: many }), LABELS, 5);
-    expect(groups[0].results).toHaveLength(5);
-    expect(flattenGroups(groups)).toHaveLength(5);
+    const groups = searchAll("report", collections({ tasks: many }), LABELS, PALETTE_LIMITS);
+    expect(groups[0].results).toHaveLength(PALETTE_LIMITS.task);
+    expect(flattenGroups(groups)).toHaveLength(PALETTE_LIMITS.task);
+  });
+});
+
+describe("what lives above the Tasks Module (§10.16)", () => {
+  const project = { id: "p1", name: "Drone research", createdAt: NOW, updatedAt: NOW } as Project;
+  const space = { id: "s1", name: "Research", createdAt: NOW, updatedAt: NOW } as Space;
+
+  it("answers with Projects and Spaces as their own kinds, last in group order", () => {
+    const groups = searchAll(
+      "res",
+      collections({ projects: [project], spaces: [space] }),
+      LABELS,
+    );
+    expect(groups.map((group) => group.kind)).toEqual(["project", "space"]);
+    expect(groups[0].results[0].title).toBe("Drone research");
+    expect(groups[1].results[0].title).toBe("Research");
+  });
+
+  it("leaves out an archived one, the same as every other container", () => {
+    const groups = searchAll(
+      "res",
+      collections({ projects: [{ ...project, archivedAt: NOW }], spaces: [{ ...space, archivedAt: NOW }] }),
+      LABELS,
+    );
+    expect(groups).toEqual([]);
+  });
+});
+
+describe("per-group limits (§10.49)", () => {
+  it("caps each kind on its own rather than sharing one budget", () => {
+    const tasks = Array.from({ length: 9 }, (_, index) => task({ id: `t${index}`, title: `Report ${index}`, listId: "l1" }));
+    const tags = Array.from({ length: 9 }, (_, index) => ({
+      id: `tag-${index}`,
+      name: `report ${index}`,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })) as Tag[];
+    const groups = searchAll("report", collections({ tasks, tags }), LABELS, PALETTE_LIMITS);
+    expect(groups.find((group) => group.kind === "task")?.results).toHaveLength(PALETTE_LIMITS.task);
+    expect(groups.find((group) => group.kind === "tag")?.results).toHaveLength(PALETTE_LIMITS.tag);
   });
 });

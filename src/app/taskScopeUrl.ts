@@ -13,11 +13,13 @@
 // (`/s/:spaceId/p/:projectId/...`, app/spaceSelection) are a different module's
 // (§5.56), so a path this one does not recognise is left alone rather than
 // swept to `/today` — that answer belongs to the shell, once there is one.
-import type { List } from "../types";
+import type { List, Project } from "../types";
 import type { TaskScopeRef, TaskViewKind } from "../domain/tasks/scopeRegistry";
 import { policyFor, scopeRegistry, TASK_SCOPE_KINDS } from "../domain/tasks/scopeRegistry";
 import type { SearchResult } from "../domain/tasks/search";
 import { isInboxList } from "../domain/spaces/hierarchy";
+import { spaceIdForProject } from "../domain/spaces/spaces";
+import { pathForSelection } from "./spaceSelection";
 
 /** What the address bar says, once parsed (§5.43). */
 export interface TaskNavigationState {
@@ -166,7 +168,7 @@ export function parseSearchUrl(url: string): string | null {
  * happened to be on. The rejected one produces a screen whose list and whose
  * Drawer disagree — the open Task is not among the rows behind it.
  */
-export function urlForSearchResult(result: SearchResult, lists: List[]): string {
+export function urlForSearchResult(result: SearchResult, lists: List[], projects: Project[] = []): string {
   const owner = (id?: string) => lists.find((list) => list.id === id);
   switch (result.kind) {
     case "task": {
@@ -186,5 +188,17 @@ export function urlForSearchResult(result: SearchResult, lists: List[]): string 
       return pathForTaskScope({ kind: "filter", id: result.id });
     case "folder":
       return pathForTaskScope({ kind: "folder", id: result.id });
+    // §10.16: a Project and a Space live above the Tasks Module, so their
+    // destinations come from the Spaces routes rather than from a Scope. A
+    // Project that names no record has no Space to open under, and lands on
+    // the Spaces root instead of on a path built from an empty id.
+    case "project": {
+      const project = projects.find((candidate) => candidate.id === result.id);
+      return project
+        ? pathForSelection({ kind: "project", spaceId: spaceIdForProject(project), projectId: project.id })
+        : pathForSelection({ kind: "none" });
+    }
+    case "space":
+      return pathForSelection({ kind: "space", spaceId: result.id });
   }
 }

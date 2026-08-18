@@ -10,13 +10,42 @@
 // Results are grouped by type and never flattened into one list (§10.10).
 // A user scanning results has to be able to tell a List from a Task without
 // reading the row twice, and one mixed list makes that impossible.
-import type { Folder, List, SavedFilter, SidebarFolder, Tag, Task } from "../../types";
+import type { Folder, List, Project, SavedFilter, SidebarFolder, Space, Tag, Task } from "../../types";
 import { listIdFor } from "../spaces/membership";
 import { isInboxList } from "../spaces/hierarchy";
 
 /** §10.11's group order. Fixed rather than adaptive — MVP predictability. */
-export const SEARCH_KINDS = ["task", "list", "tag", "filter", "folder"] as const;
+export const SEARCH_KINDS = ["task", "list", "tag", "filter", "folder", "project", "space"] as const;
 export type SearchKind = (typeof SEARCH_KINDS)[number];
+
+/**
+ * §10.49's per-group caps.
+ *
+ * Not one number for everything: the palette exists to get somewhere fast, and
+ * five tasks with three of each container is what fits before the list stops
+ * being scannable. The Search Page is where "all of them" lives, which is why
+ * the cap here is not a loss.
+ */
+export const PALETTE_LIMITS: Record<SearchKind, number> = {
+  task: 5,
+  list: 3,
+  tag: 3,
+  filter: 3,
+  folder: 3,
+  project: 3,
+  space: 3,
+};
+
+/** No cap worth the name — the Search Page shows what it found (§10.20). */
+export const PAGE_LIMITS: Record<SearchKind, number> = {
+  task: 50,
+  list: 50,
+  tag: 50,
+  filter: 50,
+  folder: 50,
+  project: 50,
+  space: 50,
+};
 
 export interface SearchResult {
   kind: SearchKind;
@@ -49,6 +78,10 @@ export interface SearchCollections {
   sidebarFolders: SidebarFolder[];
   tags: Tag[];
   savedFilters: SavedFilter[];
+  /** §10.16. Above the Tasks Module, and shown as their own kinds so they are
+      not mistaken for its Lists. */
+  projects: Project[];
+  spaces: Space[];
 }
 
 /**
@@ -92,7 +125,7 @@ export function searchAll(
   query: string,
   collections: SearchCollections,
   labels: { inbox: string; defaultList: string },
-  limit = 8,
+  limits: Record<SearchKind, number> = PALETTE_LIMITS,
 ): SearchGroup[] {
   const trimmed = query.trim();
   if (!trimmed) return [];
@@ -118,7 +151,7 @@ export function searchAll(
       rank: rank + (completed ? 10 : 0),
     });
   }
-  push(groups, "task", tasks, limit);
+  push(groups, "task", tasks, limits);
 
   const lists: Array<SearchResult & { rank: number }> = [];
   for (const list of collections.lists) {
@@ -128,7 +161,7 @@ export function searchAll(
     if (rank === null) continue;
     lists.push({ kind: "list", id: list.id, title: name, rank });
   }
-  push(groups, "list", lists, limit);
+  push(groups, "list", lists, limits);
 
   const tags: Array<SearchResult & { rank: number }> = [];
   for (const tag of collections.tags) {
@@ -136,14 +169,14 @@ export function searchAll(
     const rank = matchRank(tag.name, trimmed);
     if (rank !== null) tags.push({ kind: "tag", id: tag.id, title: tag.name, rank });
   }
-  push(groups, "tag", tags, limit);
+  push(groups, "tag", tags, limits);
 
   const filters: Array<SearchResult & { rank: number }> = [];
   for (const filter of collections.savedFilters) {
     const rank = matchRank(filter.name, trimmed);
     if (rank !== null) filters.push({ kind: "filter", id: filter.id, title: filter.name, rank });
   }
-  push(groups, "filter", filters, limit);
+  push(groups, "filter", filters, limits);
 
   // Both kinds of group, because the sidebar shows both under one heading and
   // `folderIdFor` gives them one Scope (§6.36).
@@ -157,7 +190,27 @@ export function searchAll(
     const rank = matchRank(folder.name, trimmed);
     if (rank !== null) folders.push({ kind: "folder", id: folder.id, title: folder.name, rank });
   }
-  push(groups, "folder", folders, limit);
+  push(groups, "folder", folders, limits);
+
+  // §10.16: a Project and a Space are not Lists, and the groups they appear
+  // under are what keeps them from reading as one. Their destinations are in
+  // the Spaces routes, which is the caller's business — this only says which
+  // record matched.
+  const projects: Array<SearchResult & { rank: number }> = [];
+  for (const project of collections.projects) {
+    if (project.archivedAt) continue;
+    const rank = matchRank(project.name, trimmed);
+    if (rank !== null) projects.push({ kind: "project", id: project.id, title: project.name, rank });
+  }
+  push(groups, "project", projects, limits);
+
+  const spaces: Array<SearchResult & { rank: number }> = [];
+  for (const space of collections.spaces) {
+    if (space.archivedAt) continue;
+    const rank = matchRank(space.name, trimmed);
+    if (rank !== null) spaces.push({ kind: "space", id: space.id, title: space.name, rank });
+  }
+  push(groups, "space", spaces, limits);
 
   return groups;
 }
@@ -166,14 +219,14 @@ function push(
   groups: SearchGroup[],
   kind: SearchKind,
   results: Array<SearchResult & { rank: number }>,
-  limit: number,
+  limits: Record<SearchKind, number>,
 ): void {
   if (results.length === 0) return;
   const ordered = results
     .sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title))
     // §10.49: a long list is cut rather than scrolled forever. The Search Page
     // is where "all of them" lives.
-    .slice(0, limit)
+    .slice(0, limits[kind])
     .map(({ rank: _rank, ...result }) => result);
   groups.push({ kind, results: ordered });
 }

@@ -8,7 +8,19 @@
 //
 // List rendering only, per §16.26 — Board and the rich Drawer come later.
 import { useEffect, useMemo, useState } from "react";
-import type { Folder, List, ListSection, SavedFilter, SidebarFolder, Tag, Task, TaskDailyPlan, TaskTag } from "../../types";
+import type {
+  Folder,
+  List,
+  ListSection,
+  Project,
+  SavedFilter,
+  SidebarFolder,
+  Space,
+  Tag,
+  Task,
+  TaskDailyPlan,
+  TaskTag,
+} from "../../types";
 import type { TaskScopeRef, TaskViewKind } from "../../domain/tasks/scopeRegistry";
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, queryScopeTasks, type ScopeContext } from "../../domain/tasks/scopeQuery";
@@ -23,6 +35,7 @@ import type { TaskChild } from "../../domain/tasks/children";
 import type { TaskMutation } from "../../domain/tasks/mutations";
 import { applyPatch, completeTask, leavesScope, moveTaskToSection, reopenTask, trashTask } from "../../domain/tasks/mutations";
 import { isInboxList } from "../../domain/spaces/hierarchy";
+import { listIdFor } from "../../domain/spaces/membership";
 import { folderIdFor } from "../../domain/tasks/sidebarFolders";
 import { INBOX_COLUMNS, inboxBucketOf, listBoardColumns, moveToInboxBucket, type InboxBucket } from "../../domain/tasks/board";
 import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
@@ -30,8 +43,16 @@ import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
 import { CommandPalette } from "./CommandPalette";
 import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
-import { flattenGroups, searchAll } from "../../domain/tasks/search";
+import { flattenGroups, PAGE_LIMITS, searchAll } from "../../domain/tasks/search";
 import type { TaskCommand } from "../../domain/tasks/commands";
+import type { RecentEntry } from "./CommandPalette";
+import type { RecentState } from "../../domain/tasks/recents";
+import { NO_RECENTS, rememberScope, rememberTask, sanitizeRecents } from "../../domain/tasks/recents";
+import { platform } from "../../platform";
+import { SEARCH_KINDS, type SearchKind } from "../../domain/tasks/search";
+
+/** §10.44: local to this device, and not part of the account's data. */
+const RECENTS_KEY = "focusflow.tasks.recents.v1";
 
 interface TasksModuleProps {
   tasks: Task[];
@@ -40,6 +61,9 @@ interface TasksModuleProps {
   sidebarFolders: SidebarFolder[];
   savedFilters: SavedFilter[];
   listSections: ListSection[];
+  /** Searched by §10.16, and navigated to through the Spaces routes. */
+  projects: Project[];
+  spaces: Space[];
   dailyPlans: TaskDailyPlan[];
   tags: Tag[];
   taskTags: TaskTag[];
@@ -73,14 +97,40 @@ interface TasksModuleProps {
 
 export function TasksModule(props: TasksModuleProps) {
   const { t } = useT();
-  const { tasks, lists, folders, sidebarFolders, savedFilters, listSections, dailyPlans, tags, taskTags, today, url, onNavigate } =
-    props;
+  const {
+    tasks,
+    lists,
+    folders,
+    sidebarFolders,
+    savedFilters,
+    listSections,
+    projects,
+    spaces,
+    dailyPlans,
+    tags,
+    taskTags,
+    today,
+    url,
+    onNavigate,
+  } = props;
 
   // One undo at a time, and it is the last thing that happened (§9.40 keeps
   // the stack out of the MVP).
   const [undo, setUndo] = useState<{ labelKey: string; run: () => void } | null>(null);
   // §10.23: the palette is UI state and nothing about it is in the URL.
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // §10.41's other half: the palette captures a title, Quick Add commits it.
+  const [captured, setCaptured] = useState("");
+  // §10.44: a device preference, not account data. Nothing here is worth
+  // syncing, and a list of what someone opened is worth less to them than it
+  // would be to anyone reading over their shoulder.
+  const [recents, setRecents] = useState<RecentState>(() => {
+    try {
+      return sanitizeRecents(JSON.parse(platform.storage.getSync(RECENTS_KEY) ?? "null"));
+    } catch {
+      return NO_RECENTS;
+    }
+  });
 
   const ctx: ScopeContext = useMemo(
     () => ({ tasks, lists, dailyPlans, taskTags, today, savedFilters }),
@@ -131,6 +181,23 @@ export function TasksModule(props: TasksModuleProps) {
     onNavigate(taskUrlFor({ ...state, taskId: "" }));
   }
 
+  // §10.43. Recorded from the URL rather than from the click that caused it,
+  // so a place reached by Back or by a pasted link counts the same as one
+  // reached from the sidebar.
+  useEffect(() => {
+    if (searchQuery !== null) return;
+    setRecents((current) => rememberScope(current, scope));
+  }, [searchQuery, scope.kind, "id" in scope ? scope.id : ""]);
+
+  useEffect(() => {
+    if (!state.taskId) return;
+    setRecents((current) => rememberTask(current, state.taskId));
+  }, [state.taskId]);
+
+  useEffect(() => {
+    platform.storage.setSync(RECENTS_KEY, JSON.stringify(recents));
+  }, [recents]);
+
   // The open Task is read from the URL, so a reload reopens it. An id that
   // names nothing simply opens nothing — §5.30 refuses to make a dead link an
   // error the reader has to dismiss.
@@ -162,12 +229,46 @@ export function TasksModule(props: TasksModuleProps) {
   const rows = missing ? [] : queryScopeTasks(scope, ctx);
   const count = missing ? 0 : queryScopeCount(scope, ctx);
 
-  const searchCollections: SearchCollections = { tasks, lists, folders, sidebarFolders, tags, savedFilters };
+  const searchCollections: SearchCollections = {
+    tasks,
+    lists,
+    folders,
+    sidebarFolders,
+    tags,
+    savedFilters,
+    projects,
+    spaces,
+  };
+
+  // §10.43's five and five, with anything whose record has gone left out —
+  // a recent row that opens a deleted Task is worse than one row fewer.
+  const recentEntries: RecentEntry[] = [
+    ...recents.scopes
+      .filter((entry) => !namedRecordMissing(entry, lists, folders, sidebarFolders, tags, savedFilters))
+      .map((entry) => ({
+        key: `scope:${entry.kind}:${"id" in entry ? entry.id : ""}`,
+        label: titleFor(entry, lists, folders, sidebarFolders, tags, savedFilters, t),
+        url: taskUrlFor({ scope: entry, view: "list", taskId: "" }),
+      })),
+    ...recents.taskIds
+      .map((taskId) => tasks.find((task) => task.id === taskId))
+      .filter((task): task is Task => Boolean(task) && !task!.deletedAt)
+      .map((task) => ({
+        key: `task:${task.id}`,
+        label: task.title,
+        sublabel: t("tasks.recentTask"),
+        url: urlForSearchResult(
+          { kind: "task", id: task.id, title: task.title, ownerListId: listIdFor(task, lists) },
+          lists,
+          projects,
+        ),
+      })),
+  ];
 
   /** §10.17/§10.18: a result opens at its OWN canonical place, Drawer and all. */
   function openResult(result: SearchResult) {
     setPaletteOpen(false);
-    onNavigate(urlForSearchResult(result, lists));
+    onNavigate(urlForSearchResult(result, lists, projects));
   }
 
   function runCommand(command: TaskCommand) {
@@ -297,7 +398,11 @@ export function TasksModule(props: TasksModuleProps) {
             }
             tags={tags}
             savedFilters={savedFilters}
-            onCreate={props.onCreate}
+            draftTitle={captured}
+            onCreate={(title, resolution) => {
+              setCaptured("");
+              props.onCreate(title, resolution);
+            }}
           />
         ) : null}
 
@@ -351,12 +456,24 @@ export function TasksModule(props: TasksModuleProps) {
         <CommandPalette
           collections={searchCollections}
           ctx={{ scope, view: state.view }}
+          recents={recentEntries}
           onClose={() => setPaletteOpen(false)}
           onPickResult={openResult}
           onRunCommand={runCommand}
+          onOpenUrl={(next) => {
+            setPaletteOpen(false);
+            onNavigate(next);
+          }}
           onSeeAll={(query) => {
             setPaletteOpen(false);
             onNavigate(searchUrlFor(query));
+          }}
+          onCapture={(title) => {
+            // §10.41: owner = Inbox, and the user lands where the task would
+            // go rather than being told after the fact.
+            setPaletteOpen(false);
+            setCaptured(title);
+            onNavigate(taskUrlFor({ scope: { kind: "inbox" }, view: "list", taskId: "" }));
           }}
         />
       ) : null}
@@ -506,8 +623,12 @@ function SearchPage({
   onPick: (result: SearchResult) => void;
 }) {
   const { t } = useT();
-  const groups = searchAll(query, collections, { inbox: t("tasks.inbox"), defaultList: t("tasks.defaultList") }, 50);
-  const total = flattenGroups(groups).length;
+  // §10.22: the type filter is local state. It is worth having and not worth
+  // sharing — `q` is the part of a search someone would send to someone else.
+  const [kind, setKind] = useState<SearchKind | "all">("all");
+  const all = searchAll(query, collections, { inbox: t("tasks.inbox"), defaultList: t("tasks.defaultList") }, PAGE_LIMITS);
+  const groups = kind === "all" ? all : all.filter((group) => group.kind === kind);
+  const total = flattenGroups(all).length;
 
   return (
     <section className="tm-search">
@@ -525,9 +646,30 @@ function SearchPage({
         onChange={(event) => onQueryChange(event.target.value)}
       />
 
+      {/* §10.20: only the types that actually matched, so the row is not a
+          list of dead ends. */}
+      {total > 0 ? (
+        <div className="tm-search-kinds">
+          {(["all", ...SEARCH_KINDS.filter((candidate) => all.some((group) => group.kind === candidate))] as const).map(
+            (candidate) => (
+              <button
+                key={candidate}
+                type="button"
+                className={`tm-chip${candidate === kind ? " is-current" : ""}`}
+                onClick={() => setKind(candidate)}
+              >
+                {candidate === "all" ? t("tasks.filterAll") : t(`tasks.group.${candidate}`)}
+              </button>
+            ),
+          )}
+        </div>
+      ) : null}
+
+      {/* §10.46: the full page names what was searched for and suggests the
+          next move, where the palette offers to create the thing instead. */}
       {query.trim() && total === 0 ? (
         <p className="tm-state" role="status">
-          {t("tasks.searchEmpty")}
+          {t("tasks.searchPageEmpty", { query: query.trim() })}
         </p>
       ) : null}
 

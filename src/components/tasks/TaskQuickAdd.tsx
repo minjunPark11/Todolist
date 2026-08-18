@@ -5,7 +5,7 @@
 // this component asks for the missing answers and hands the resolution back.
 // §12.16 exists because there are many `+ 작업` entry points and each one that
 // works the owner out for itself is a copy of the rule that can drift.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { List, SavedFilter, Tag } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { canCommit, resolveCreateContext, type CreateResolution } from "../../domain/tasks/createResolver";
@@ -20,6 +20,15 @@ interface TaskQuickAddProps {
   tags: Tag[];
   /** Read by the Filter Scope to decide the owner List and the patch (§12.11). */
   savedFilters: SavedFilter[];
+  /**
+   * A title captured elsewhere — today, the palette (§10.41/§10.42).
+   *
+   * It is put in the field and left there. §10.42 forbids creating the Task
+   * outright: the user has to be able to see where it is going and add a date
+   * before committing, which is the whole difference between capture and a
+   * silent write.
+   */
+  draftTitle?: string;
   onCreate: (title: string, resolution: CreateResolution) => void;
 }
 
@@ -30,10 +39,16 @@ export function TaskQuickAdd({
   folderLists,
   tags,
   savedFilters,
+  draftTitle,
   onCreate,
 }: TaskQuickAddProps) {
   const { t } = useT();
   const [title, setTitle] = useState("");
+  // Only when a NEW draft arrives, so typing over a captured title is not
+  // undone by the next render.
+  useEffect(() => {
+    if (draftTitle) setTitle(draftTitle);
+  }, [draftTitle]);
   const [chosenDate, setChosenDate] = useState("");
   const [chosenListId, setChosenListId] = useState("");
 
