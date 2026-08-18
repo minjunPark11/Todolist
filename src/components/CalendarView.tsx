@@ -44,6 +44,7 @@ import { YearView } from "./calendar/YearView";
 import { CalendarPopover, DayAgendaPopover, EventPopover, type PopoverAnchor } from "./calendar/EventPopover";
 import { NewTaskForm, type NewTaskFormResult } from "./calendar/NewTaskForm";
 import { QuickCreatePopover, type QuickCreateDefaults, type QuickCreateResult } from "./calendar/QuickCreatePopover";
+import { hasSchedule, scheduleFromTask, scheduleToTaskPatch } from "../domain/schedule";
 import { useT } from "../i18n";
 
 type CalendarMode = "month" | "week" | "day" | "year";
@@ -242,7 +243,14 @@ export function CalendarView({
   }, [items]);
 
   const unscheduled = useMemo(
-    () => tasks.filter((task) => !(task.scheduledDate || task.status === "done" || task.status === "archived")),
+    // "Unscheduled" now means no date at all. A task with only a deadline is
+    // on the calendar (the two dates merged), so listing it here as well would
+    // show it in both places at once.
+    () =>
+      tasks.filter(
+        (task) =>
+          !(hasSchedule(scheduleFromTask(task)) || task.status === "done" || task.status === "archived"),
+      ),
     [tasks],
   );
 
@@ -464,8 +472,33 @@ export function CalendarView({
     setDragPreview(null);
   }
 
-  // §4.2/D2: drag & drop only ever changes scheduledDate — dueDate (deadline)
-  // markers are non-draggable (WeekView/MonthView never call onDragStart for them).
+  // Every calendar write goes through here (SCHEDULE_EDITOR_PHASE0_AUDIT.md §6).
+  //
+  // It used to set `scheduledDate` and deliberately leave `dueDate` alone,
+  // because the two were different chips answering different questions. They
+  // are one date now, so writing only the old field would leave the record
+  // saying two things — and the reader, which consolidates, would turn a
+  // deadline dragged by one day into a multi-day range.
+  //
+  // Dropping always produces a single-day schedule: the calendar has no
+  // gesture that means "make this a range", and `buildCalendarItems` refuses
+  // to drag one for the same reason.
+  function placeOn(day: string, startTime = "", endTime = "") {
+    return scheduleToTaskPatch({
+      startDate: null,
+      dueDate: day,
+      startTime: startTime || null,
+      endTime: endTime || null,
+      timezone: null,
+    });
+  }
+
+  /** Move a task's existing schedule onto `day`, keeping whatever times it has. */
+  function moveToDay(taskId: string, day: string) {
+    const current = scheduleFromTask(tasks.find((item) => item.id === taskId) ?? {});
+    return scheduleToTaskPatch({ ...current, startDate: null, dueDate: day });
+  }
+
   function dropTime(event: DragEvent, day: string, startTime: string) {
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain");
@@ -483,11 +516,7 @@ export function CalendarView({
       // Overlaps are allowed (spec §10.5 option A) — the grid renders
       // overlapping blocks side by side; the toast just calls it out.
       const overlaps = hasConflict(day, startTime, endTime, taskId);
-      onUpdateTask(taskId, {
-        scheduledDate: day,
-        startTime,
-        endTime,
-      });
+      onUpdateTask(taskId, placeOn(day, startTime, endTime));
       showToast?.({
         message: overlaps
           ? t("calendar.dropScheduledOverlap", { title: task?.title ?? "", time: startTime })
@@ -501,7 +530,7 @@ export function CalendarView({
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain");
     if (taskId) {
-      onUpdateTask(taskId, { scheduledDate: day, startTime: "", endTime: "" });
+      onUpdateTask(taskId, placeOn(day));
     }
     handleDragEnd();
   }
@@ -510,7 +539,7 @@ export function CalendarView({
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain");
     if (taskId) {
-      onUpdateTask(taskId, { scheduledDate: day });
+      onUpdateTask(taskId, moveToDay(taskId, day));
     }
     handleDragEnd();
   }
@@ -520,19 +549,19 @@ export function CalendarView({
   function handleResizeItem(taskId: string, day: string, startTime: string, endTime: string) {
     const duration = timeToMinutes(endTime) - timeToMinutes(startTime);
     if (duration < TIME_SNAP_MINUTES) return;
-    onUpdateTask(taskId, { scheduledDate: day, startTime, endTime, estimatedMinutes: duration });
+    onUpdateTask(taskId, { ...placeOn(day, startTime, endTime), estimatedMinutes: duration });
   }
 
   // Pointer-based block move: silently committed (the moving block itself
   // already previews the exact target slot). Overlaps are allowed.
   function handleMoveItem(taskId: string, day: string, startTime: string, endTime: string) {
-    onUpdateTask(taskId, { scheduledDate: day, startTime, endTime });
+    onUpdateTask(taskId, placeOn(day, startTime, endTime));
   }
 
   // Dropping a time block on the all-day band keeps the date but clears the
   // times, turning it into an all-day item.
   function handleMoveItemToAllDay(taskId: string, day: string) {
-    onUpdateTask(taskId, { scheduledDate: day, startTime: "", endTime: "" });
+    onUpdateTask(taskId, placeOn(day));
   }
 
   function suggestSchedule() {
@@ -572,11 +601,7 @@ export function CalendarView({
 
   function applyAiPlacements() {
     for (const placement of aiPlacements) {
-      onUpdateTask(placement.taskId, {
-        scheduledDate: placement.day,
-        startTime: placement.startTime,
-        endTime: placement.endTime,
-      });
+      onUpdateTask(placement.taskId, placeOn(placement.day, placement.startTime, placement.endTime));
     }
     showToast?.({ message: `${aiPlacements.length} suggested task(s) scheduled.` });
     setAiPlacements([]);

@@ -10,6 +10,8 @@ import {
   FOCUS_ACTUAL_COLOR,
   type CalendarCategory,
 } from "../lib/calendarCategories";
+import { scheduleSpan } from "../domain/schedule/scheduleQueries";
+import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { addDays, todayValue } from "./date";
 
 export type CalendarLayer = "task" | "deadline" | "project-deadline" | "external" | "focus-actual";
@@ -182,9 +184,9 @@ export function buildCalendarItems({
   // The task half runs on the shared projection (CLICKUP_IMPORT_DESIGN §4.1),
   // so "one Task, different renderings" holds here as it does on the board and
   // the timeline. What the calendar adds is not a second reading of a Task —
-  // it is the expansion of one Item into the chips its dates earn: a work
-  // block from `scheduledDate`, a marker from `dueDate`. That is presentation,
-  // and it stays here.
+  // it is the expansion of one Item into the chips its dates earn, which after
+  // the consolidation (audit §6, 1-d) means one chip per day the schedule
+  // covers. That is presentation, and it stays here.
   //
   // `taskById` carries the fields no view needs but this renderer does —
   // repeat, category, the raw status for the popover.
@@ -207,11 +209,6 @@ export function buildCalendarItems({
     if (!task) continue;
     if (item.statusId === "archived" || task.status === "archived") continue;
     const done = item.done;
-    const hasScheduledBlock = Boolean(item.scheduledDate);
-    // Scheduled work blocks stay on the calendar after completion so the
-    // plan remains visible as a completed schedule. Completed, unscheduled
-    // tasks still obey the optional Completed layer.
-    if (done && !hasScheduledBlock && !layers.completed) continue;
     // The calendar filters and colours by PROJECT. `Item.spaceId` named one
     // until STEP 7 and now names the Space above it, which would let one
     // project's filter match every project beside it.
@@ -223,42 +220,61 @@ export function buildCalendarItems({
     if (!categoryAllowed(taskCategoryId)) continue;
     const taskCategory = categories?.get(taskCategoryId);
 
-    // D1: scheduledDate drives the work-time block; startTime/endTime belong to it.
-    if (layers.task && item.scheduledDate) {
+    // One Task, one chip per day it covers (audit §6, 1-e).
+    //
+    // This used to be two chips with different meanings — a draggable work
+    // block from `scheduledDate`, an all-day marker from `dueDate`. The
+    // consolidation collapses those two dates into one (audit 1-d), so a task
+    // that had both would now emit the same chip twice, on the same day, in
+    // two colours. The layers merge with the fields.
+    //
+    // What the user loses is the visual distinction between "doing it" and
+    // "due"; what they gain is that every dated task is now draggable, where
+    // before a deadline could only be moved from the task detail.
+    if (!layers.task) continue;
+    const schedule = scheduleFromTask(item);
+    const span = scheduleSpan(schedule);
+    if (span === null) continue;
+    // Completed tasks stay on the calendar so the plan reads as a finished
+    // schedule; an undated one has no chip to keep, which is what the
+    // Completed layer governs instead.
+    if (done && !layers.completed) continue;
+
+    // A range covers every day between its ends. Same 62-day guard the
+    // external all-day path uses, for the same reason: one malformed record
+    // should not emit ten thousand chips.
+    const dates: string[] = [span.start];
+    let cursor = span.start;
+    while (cursor < span.end && dates.length < 62) {
+      cursor = addDays(cursor, 1);
+      dates.push(cursor);
+    }
+
+    for (const date of dates) {
+      // Times belong to the ends of the range, never to the days between
+      // (audit 1-b). A middle day is all-day by construction.
+      const isStart = date === span.start;
+      const isEnd = date === span.end;
+      const startTime = isStart ? schedule.startTime : null;
+      const endTime = isEnd ? schedule.endTime : null;
       items.push({
-        key: `task-block:${item.sourceId}`,
+        key: dates.length > 1 ? `task-block:${item.sourceId}:${date}` : `task-block:${item.sourceId}`,
         layer: "task",
         sourceType: "task",
         sourceId: item.sourceId,
         title: item.title,
-        date: item.scheduledDate,
-        startTime: item.startTime || undefined,
-        endTime: item.endTime || undefined,
-        allDay: !item.startTime,
+        date,
+        startTime: startTime ?? undefined,
+        endTime: endTime ?? undefined,
+        allDay: startTime === null,
         color: taskCategory?.color ?? project?.color ?? LAYER_COLOR.task,
         categoryId: taskCategoryId,
         priority: item.priority,
         status: task.status,
-        draggable: !done,
-        repeating,
-      });
-    }
-
-    // D2: dueDate is always an all-day, non-draggable deadline marker.
-    if (layers.deadline && item.dueDate && (!done || layers.completed)) {
-      items.push({
-        key: `deadline:${item.sourceId}`,
-        layer: "deadline",
-        sourceType: "task",
-        sourceId: item.sourceId,
-        title: item.title,
-        date: item.dueDate,
-        allDay: true,
-        color: taskCategory?.color ?? project?.color ?? LAYER_COLOR.deadline,
-        categoryId: taskCategoryId,
-        priority: item.priority,
-        status: task.status,
-        draggable: false,
+        // Dragging one day of a range would have to mean either "move the
+        // whole thing" or "resize this end", and the calendar has no gesture
+        // that says which. Ranges are edited in the editor until it does.
+        draggable: !done && dates.length === 1,
         repeating,
       });
     }
