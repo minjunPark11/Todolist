@@ -18,6 +18,7 @@ import { activeSidebarFolders, folderIdFor } from "../../domain/tasks/sidebarFol
 import { activeSavedFilters } from "../../domain/tasks/filters";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { useT } from "../../i18n";
+import { listColorHex } from "../../domain/tasks/listColor";
 
 interface TasksSidebarProps {
   ctx: ScopeContext;
@@ -144,11 +145,13 @@ export function TasksSidebar({
           return (
             <div key={folder.id} className="tm-group">
               {row({ kind: "folder", id: folder.id }, folder.name)}
-              {inside.map((list) => row({ kind: "list", id: list.id }, list.name, { indent: true }))}
+                    {inside.map((list) =>
+                row({ kind: "list", id: list.id }, list.name, { indent: true, dot: listColorHex(list.color) }),
+              )}
             </div>
           );
         })}
-        {loose.map((list) => row({ kind: "list", id: list.id }, list.name))}
+        {loose.map((list) => row({ kind: "list", id: list.id }, list.name, { dot: listColorHex(list.color) }))}
         {treeLists.length === 0 ? <p className="tm-section-empty">{t("tasks.noLists")}</p> : null}
       </div>
 

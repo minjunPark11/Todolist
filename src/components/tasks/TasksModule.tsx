@@ -49,6 +49,7 @@ import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
+import { resolveListView } from "../../domain/tasks/listView";
 import { useResponsiveMode, useViewportHeightVar } from "./useResponsiveMode";
 import { detailIsFullScreen, sidebarPresentationFor, taskDetailPresentationFor } from "../../domain/tasks/responsive";
 import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
@@ -95,7 +96,6 @@ interface TasksModuleProps {
     onToggleSubtask: (id: string) => void;
     onDeleteSubtask: (id: string) => void;
   };
-  /** §13.23/§6.56: restoring a List, and the one hard delete in the app. */
   /**
    * Creates the List and answers with its id (Add List design §1.10).
    *
@@ -109,6 +109,7 @@ interface TasksModuleProps {
     defaultViewKey?: string;
     folderId?: string;
   }) => Promise<string> | string;
+  /** §13.23/§6.56: restoring a List, and the one hard delete in the app. */
   lifecycle: {
     onArchiveList: (listId: string) => void;
     onTrashList: (listId: string) => void;
@@ -206,8 +207,21 @@ export function TasksModule(props: TasksModuleProps) {
   const scope = state.scope;
   const policy = scopeRegistry[scope.kind];
 
+  /**
+   * §13.9's resolve, and the only place it happens.
+   *
+   * Opening a List means opening it the way its owner set it up. The URL layer
+   * stays List-agnostic on purpose — `parseTaskUrl` takes a string and nothing
+   * else, and teaching it about records would make one address mean different
+   * screens for different accounts. So the stored key is resolved HERE, on the
+   * way in, and the address that results says which View it is. `/list/l1`
+   * still means the registry's default; `?view=board` is written when the List
+   * asked for something else.
+   */
   function go(next: TaskScopeRef) {
-    onNavigate(taskUrlFor({ scope: next, view: "list", taskId: "" }));
+    const policy = scopeRegistry[next.kind];
+    const owner = next.kind === "list" ? lists.find((list) => list.id === next.id) : undefined;
+    onNavigate(taskUrlFor({ scope: next, view: resolveListView(owner?.defaultViewKey, policy), taskId: "" }));
   }
 
   function setView(view: TaskViewKind) {
@@ -603,7 +617,8 @@ export function TasksModule(props: TasksModuleProps) {
           contextFolderId={creatingListIn}
           onClose={() => setCreatingListIn(null)}
           onSubmit={async (draft: CreateListDraft) => {
-            const listId = await props.onCreateList(createListPayload(draft));
+            const payload = createListPayload(draft);
+            const listId = await props.onCreateList(payload);
             // A creation that answers with no id has not produced a List to
             // open; treating it as success would close the dialog over a draft
             // that went nowhere (§1.12).
@@ -612,7 +627,16 @@ export function TasksModule(props: TasksModuleProps) {
             // §1.10, and §17.2's real finish line: the record is not the end,
             // being in the new List ready to type is. The URL layer already
             // knows how to say that, so no new routing rule is invented here.
-            onNavigate(taskUrlFor({ scope: { kind: "list", id: listId }, view: "list", taskId: "" }));
+            // §1.10 ends in the View the user just chose, not in the default
+            // one — being sent somewhere other than what you picked, one second
+            // after picking it, reads as the choice not having been taken.
+            onNavigate(
+              taskUrlFor({
+                scope: { kind: "list", id: listId },
+                view: resolveListView(payload.defaultViewKey, scopeRegistry.list),
+                taskId: "",
+              }),
+            );
           }}
         />
       ) : null}

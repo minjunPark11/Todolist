@@ -133,6 +133,20 @@
 
 `ListViewKey = "list" | "board" | "calendar" | "gantt"`라는 도메인 유니온은 **Phase 4에서 resolve 함수와 함께** 생긴다. 저장 타입이 아니라 해석 타입이다.
 
+### Phase 4 결과 — 해석은 여는 자리에서, 색은 문자열 하나로
+
+**`domain/tasks/listView.ts`가 생겼다.** `ListViewKey`는 네 개(`calendar` 포함)이고, `resolveListView(storedKey, policy)`가 세 가지를 한 번에 답한다: 이 빌드가 모르는 View인가, Scope가 금지하는 View인가(§5.45), 아니면 열어도 되는가. 앞의 둘은 **Scope의 기본값으로 떨어지고 저장은 건드리지 않는다** — 폴백을 되쓰는 것은 그 View를 지원하지 않는 기기에서 이 빌드가 사용자의 선택을 조용히 지우는 일이다.
+
+**Add List가 노출하는 것은 `list | board | gantt`다.** §13.6이 Calendar를 빼라고 한 것과, 이 모듈에 Calendar 렌더러가 없다는 사실이 같은 답을 가리킨다 — **열 수 없는 View를 고르게 하는 것은 지킬 수 없는 약속**이고, §17.2가 완료로 치지 않는 상태다.
+
+**resolve는 `go()` 한 곳에서만 일어난다.** URL 층은 List를 모른 채로 둔다 — `parseTaskUrl`은 문자열만 받고, 거기에 레코드를 가르치면 **한 주소가 계정마다 다른 화면을 뜻하게 된다.** 그래서 들어가는 길목에서 풀고, 결과 주소가 어느 View인지 스스로 말한다. `/list/l1`은 여전히 레지스트리 기본값이고, List가 다른 것을 원할 때만 `?view=board`가 쓰인다.
+
+**색은 §13.21의 두 column을 따르지 않는다.** §13.23이 든 근거 셋(query·constraint·migration)은 전부 **관계형 column에 대한 것**인데 이 앱은 행마다 `data` jsonb 하나라 나눌 column이 없다. 오히려 뒤집힌다 — 두 필드는 **서로 어긋날 수 있다.** `kind: "preset"` 옆의 `value: "#4F7AF8"`은 표현 가능하고 무의미하며, §13.22가 constraint를 따로 적어야 했던 이유가 바로 그것이다. **문자열 하나는 자기와 어긋날 수 없고**, preset 키가 `#`로 시작하지 않으므로 세 상태(none/preset/custom)를 모호함 없이 말한다. `domain/tasks/listColor.ts`가 그 유일한 독자다.
+
+Phase 1의 원칙은 여기서도 그대로다 — **모르는 색은 그리지 않되 지우지도 않는다.** 나중 릴리스가 추가한 preset이 이 클라이언트를 왕복해도 살아남아 아는 기기에서 다시 칠해진다.
+
+**앱에서 확인:** 이름 전에 색·View를 고를 수 있고(§1.5 S2) 그 동안 Add는 계속 disabled다. Board를 골라 만들면 `?view=board`로 착지하고 보드가 그려진다. Today로 나갔다 사이드바로 다시 들어와도 **보드로 열린다**(§13.9). 헤더 토글은 그 방문에만 적용된다(`/list/:id`). 커스텀 `#4F7AF8`이 저장되고, 사이드바 점이 그 색으로 칠해진다. 반쪽짜리 `#4F7`은 저장되지 않는다.
+
 ---
 
 ## R.7 이 저장소가 이미 앞서 있는 것 — 다시 짓지 말 것
@@ -158,7 +172,7 @@
 | **1** ✅ | §13 데이터 모델 | `List.color?` / `List.defaultViewKey?` 추가, `sanitizeList` 통과, **구버전 라운드트립 유지** (`forwardCompat.test.ts`) |
 | **2** ✅ | §1~§3 Modal + Name | Name 하나로 Enter 생성 → Sidebar 반영 → 새 List 진입 → 첫 Task 입력 가능 |
 | **3** ✅ | Gantt View 배선 | `?view=gantt`가 아홉 Scope 중 허용된 곳에서 열리고, `hardening.test.ts`가 갱신됨 |
-| **4** | §4~§5 Color + Default View | 저장한 `defaultViewKey`가 실제로 그 View를 연다 |
+| **4** ✅ | §4~§5 Color + Default View | 저장한 `defaultViewKey`가 실제로 그 View를 연다 |
 | **5** | §6 Folder | inline Folder 생성 포함 |
 | **6** | §8 Preview | 순수 표현 계층 — 잘라내도 기능이 성립한다 |
 | **7** | §9·§10·§14 접근성·에러·반응형 | Phase 11의 axe 하니스 재사용 |

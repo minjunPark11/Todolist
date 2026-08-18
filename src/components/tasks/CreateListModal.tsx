@@ -18,6 +18,8 @@ import {
   emptyCreateListDraft,
   type CreateListDraft,
 } from "../../domain/tasks/createListDraft";
+import { LIST_COLOR_PRESETS, isCustomListColor, listColorHex } from "../../domain/tasks/listColor";
+import { CREATE_LIST_VIEW_CHOICES } from "../../domain/tasks/listView";
 
 interface CreateListModalProps {
   /** §1.2: the Folder this was started from, or "" from the Lists header. */
@@ -128,6 +130,81 @@ export function CreateListModal({ contextFolderId = "", onSubmit, onClose }: Cre
               }}
             />
           </label>
+
+          {/* §1.5's S2 is explicit that these are usable before the name is:
+              nothing here reads `name`, so the order the user works in is
+              theirs. */}
+          <fieldset className="tm-field" disabled={submitting}>
+            <legend className="tm-field-label">{t("tasks.createListColorLabel")}</legend>
+            <div className="tm-swatches" role="radiogroup" aria-label={t("tasks.createListColorLabel")}>
+              {/* §0.7 R0-2's default, and it is a real choice rather than the
+                  absence of one — "none" is what a List has unless asked. */}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={draft.color === ""}
+                aria-label={t("tasks.createListColorNone")}
+                className={`tm-swatch is-none${draft.color === "" ? " is-selected" : ""}`}
+                onClick={() => setDraft((current) => ({ ...current, color: "" }))}
+              />
+              {LIST_COLOR_PRESETS.map((preset) => (
+                <button
+                  key={preset.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.color === preset.key}
+                  aria-label={t(`tasks.color.${preset.key}`)}
+                  className={`tm-swatch${draft.color === preset.key ? " is-selected" : ""}`}
+                  style={{ background: preset.hex }}
+                  onClick={() => setDraft((current) => ({ ...current, color: preset.key }))}
+                />
+              ))}
+            </div>
+            <label className="tm-custom-color">
+              <span>{t("tasks.createListColorCustom")}</span>
+              <input
+                type="text"
+                className="tm-modal-input tm-custom-color-input"
+                placeholder="#4F7AF8"
+                value={isCustomListColor(draft.color) ? draft.color : ""}
+                onChange={(event) => {
+                  const next = event.target.value.trim();
+                  // Only a canonical #RRGGBB is stored (§13.22). Half-typed
+                  // input is left on screen without being written, so the
+                  // colour never flickers through wrong values on the way.
+                  setDraft((current) => ({ ...current, color: isCustomListColor(next) ? next : current.color }));
+                }}
+              />
+              <span
+                className="tm-swatch is-preview"
+                style={{ background: listColorHex(draft.color) || "transparent" }}
+                aria-hidden
+              />
+            </label>
+          </fieldset>
+
+          <fieldset className="tm-field" disabled={submitting}>
+            <legend className="tm-field-label">{t("tasks.createListViewLabel")}</legend>
+            <div className="tm-views" role="radiogroup" aria-label={t("tasks.createListViewLabel")}>
+              {/* §13.6 narrowed to what this build can open — offering a View
+                  that cannot be opened is a choice that cannot be kept. */}
+              {CREATE_LIST_VIEW_CHOICES.map((view) => {
+                const selected = draft.defaultViewKey === view || (draft.defaultViewKey === "" && view === "list");
+                return (
+                  <button
+                    key={view}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    className={`tm-view${selected ? " is-current" : ""}`}
+                    onClick={() => setDraft((current) => ({ ...current, defaultViewKey: view }))}
+                  >
+                    {t(`tasks.view.${view}`)}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
 
           {error ? (
             <p className="tm-state is-error" id={errorId} role="alert">

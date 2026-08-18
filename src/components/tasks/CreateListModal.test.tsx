@@ -108,6 +108,53 @@ describe("CreateListModal", () => {
     expect(container.querySelector<HTMLInputElement>(".tm-modal-input")!.value).toBe("학교");
   });
 
+  // §1.5's S2 is explicit: Name is not made the first field.
+  it("lets Colour and Default View be chosen before a name exists", () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { container } = open(onSubmit);
+
+    container.querySelectorAll<HTMLButtonElement>(".tm-swatch")[1].click();
+    container.querySelectorAll<HTMLButtonElement>(".tm-modal .tm-view")[1].click();
+
+    // Chosen, and still not submittable — the one required decision is missing.
+    expect(container.querySelector<HTMLButtonElement>(".tm-modal-submit")!.disabled).toBe(true);
+
+    const input = typeName(container, "학교");
+    pressEnter(input);
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ color: "red", defaultViewKey: "board" }));
+  });
+
+  // §13.6: what is offered is what can be opened.
+  it("offers List, Board and Timeline, and not Calendar", () => {
+    const { container } = open(vi.fn().mockResolvedValue(undefined));
+    const views = [...container.querySelectorAll(".tm-modal .tm-view")].map((node) => node.textContent);
+
+    expect(views).toEqual(["List", "Board", "Timeline"]);
+  });
+
+  // §13.22: a half-typed hex is not a colour, and must not be stored as one.
+  it("stores a custom colour only once it is a whole #RRGGBB", () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { container } = open(onSubmit);
+    const custom = container.querySelector<HTMLInputElement>(".tm-custom-color-input")!;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
+
+    setter.call(custom, "#4F7");
+    custom.dispatchEvent(new Event("input", { bubbles: true }));
+    pressEnter(typeName(container, "학교"));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ color: "" }));
+  });
+
+  it("shows 'no colour' as a choice rather than as a missing swatch", () => {
+    const { container } = open(vi.fn().mockResolvedValue(undefined));
+    const none = container.querySelector(".tm-swatch.is-none")!;
+
+    expect(none.getAttribute("aria-checked")).toBe("true");
+    expect(none.getAttribute("aria-label")).toBeTruthy();
+  });
+
   // §3.13: the dialog hands over what was TYPED and normalizes nothing. The
   // caret is the reason — trimming under it while typing moves it — so the
   // trim belongs to `createListPayload`, which runs on the way to the store.

@@ -1166,3 +1166,90 @@
     min-height: 44px;
   }
 }
+
+/* --- Add List: colour and default view (Add List design §4, §5) --- */
+
+.tm-modal fieldset.tm-field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tm-modal fieldset.tm-field legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+
+.tm-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tm-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.12));
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/*
+ * "No colour" has to look like a choice rather than a missing swatch, or the
+ * default reads as a rendering failure — so it is drawn, not omitted.
+ */
+.tm-swatch.is-none {
+  background: var(--surface-2, rgba(0, 0, 0, 0.05));
+}
+
+.tm-swatch.is-selected {
+  outline: 2px solid var(--accent, #0a84ff);
+  outline-offset: 2px;
+}
+
+.tm-swatch.is-preview {
+  cursor: default;
+  pointer-events: none;
+}
+
+.tm-custom-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-custom-color-input {
+  width: 9em;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+/* The dialog's view picker borrows the header toggle's look; it is the same
+   choice being made ahead of time. */
+.tm-modal .tm-views {
+  gap: 6px;
+}
+
+.tm-modal .tm-view {
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tm-modal .tm-view.is-current {
+  border-color: var(--accent, #0a84ff);
+  background: var(--accent-soft, rgba(10, 132, 255, 0.12));
+}
+
+@media (pointer: coarse) {
+  .tm-swatch {
+    width: 32px;
+    height: 32px;
+  }
+}
