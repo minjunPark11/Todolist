@@ -679,7 +679,6 @@ export function WeekView({
                     style={{ ["--ev-color"]: item.color } as CSSProperties}
                   >
                     <span className="gcal-chip-label">
-                      {item.layer === "deadline" ? "⚠ " : null}
                       {item.layer === "project-deadline" ? "◆ " : null}
                       {item.layer === "external" ? "• " : null}
                       {item.repeating ? "↺ " : null}

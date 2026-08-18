@@ -39,6 +39,7 @@ import { projectsInSpace } from "../domain/spaces/spaces";
 import { EmptyState, type ToastState } from "./kit";
 import { todayValue } from "../utils/date";
 import { useT } from "../i18n";
+import type { Schedule, ScheduleIssue } from "../domain/schedule";
 
 type SpacesPageProps = {
   projects: Project[];
@@ -74,6 +75,7 @@ type SpacesPageProps = {
   onOpenTask: (id: string) => void;
   onToggleDone: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
+  onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   onCreateTask: (draft: TaskDraft) => string;
   onCompleteTask: (id: string) => void;
   onArchiveTask: (id: string) => void;
@@ -140,6 +142,7 @@ export function SpacesPage({
   onOpenProject,
   onCreateTask,
   onUpdateTask,
+  onUpdateTaskSchedule,
   onCompleteTask,
   onArchiveTask,
   onStartFocus,
@@ -195,6 +198,7 @@ export function SpacesPage({
             onOpenTask={onOpenTask}
             onOpenGoal={onOpenGoal}
             onUpdateTask={onUpdateTask}
+            onUpdateTaskSchedule={onUpdateTaskSchedule}
           />
         )}
       />
@@ -230,6 +234,7 @@ export function SpacesPage({
         activeFocusSession={activeFocusSession}
         onCreateTask={onCreateTask}
         onUpdateTask={onUpdateTask}
+        onUpdateTaskSchedule={onUpdateTaskSchedule}
         onCompleteTask={onCompleteTask}
         onArchiveTask={onArchiveTask}
         onStartFocus={onStartFocus}

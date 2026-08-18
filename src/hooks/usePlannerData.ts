@@ -70,6 +70,7 @@ import { buildMigrationUpload } from "../domain/sync/buildMigrationUpload";
 import { createSaveQueue, type SaveQueue } from "../domain/sync/saveQueue";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
+import { planScheduleUpdate, type Schedule, type ScheduleIssue } from "../domain/schedule";
 
 const STORAGE_KEY = PLANNER_STORAGE_KEY;
 const LEGACY_STORAGE_KEY = "todo-planner-data";
@@ -132,17 +133,22 @@ function normalizeTask(task: Partial<Task>): Task {
   const rawStatus = migrateStatus(task.status);
   const rawPrevious = task.previousStatus ? migrateStatus(task.previousStatus) : undefined;
 
-  // CALENDAR_DESIGN.md §1.2/§10.2: startTime/endTime now belong to scheduledDate
-  // (not dueDate). Older records saved by the pre-redesign calendar drag/drop
-  // have a time but no scheduledDate — promote dueDate into scheduledDate so
-  // the timed block keeps showing up. Additive only, and guarded by
-  // `!scheduledDate` so it never re-fires once applied (idempotent).
+  // The promotion that used to live here — copying `dueDate` into
+  // `scheduledDate` when a record had a time but no work day — is gone
+  // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §6, 1-d).
+  //
+  // It ran in the direction the consolidation reverses, so it fought every
+  // write the calendar now makes: a task saved with a time and a date came
+  // straight back out carrying the legacy field again. It is also redundant.
+  // The record it existed for — a time and a `dueDate`, no work day — is what
+  // `scheduleFromTask` calls `canonical`, and reads as a timed block on that
+  // date without help.
+  //
+  // Existing rows keep whatever `scheduledDate` they already have; the adapter
+  // reads both shapes, and the rewrite is its own phase.
   const dueDate = task.dueDate ?? "";
   const startTime = task.startTime ?? "";
-  let scheduledDate = task.scheduledDate ?? "";
-  if (startTime && !scheduledDate && dueDate) {
-    scheduledDate = dueDate;
-  }
+  const scheduledDate = task.scheduledDate ?? "";
 
   return {
     // Forward compatibility (SPACES_CLICKUP_REDESIGN.md M0). Everything below
@@ -1058,6 +1064,26 @@ export function usePlannerData() {
         };
       }),
     }));
+  }
+
+  /**
+   * The canonical way to change a Task's dates (design §13, audit §7 Phase 4).
+   *
+   * Callers pass the schedule they want rather than the fields to set, and get
+   * back whatever was wrong with it. `planScheduleUpdate` owns the three rules
+   * every schedule write needs — normalize, validate, skip a no-op — so that a
+   * new writer cannot arrive without them by simply calling `updateTask`.
+   *
+   * Returns the issues rather than throwing: an editor wants to show them
+   * beside the field that caused them, and a drag handler wants to ignore
+   * them and leave the task where it was.
+   */
+  function updateTaskSchedule(taskId: string, next: Schedule): ScheduleIssue[] {
+    const task = data.tasks.find((entry) => entry.id === taskId);
+    if (!task) return [];
+    const plan = planScheduleUpdate(task, next);
+    if (plan.patch) updateTask(taskId, plan.patch);
+    return plan.issues;
   }
 
   function deleteTask(taskId: string) {
@@ -2151,6 +2177,7 @@ export function usePlannerData() {
     addTask,
     createTask,
     updateTask,
+    updateTaskSchedule,
     completeTask,
     deleteTask,
     restoreDeletedTask,

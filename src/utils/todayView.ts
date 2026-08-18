@@ -8,6 +8,8 @@ import type { TaskScopeRef } from "../domain/tasks/scopeRegistry";
 
 const TODAY_SCOPE: TaskScopeRef = { kind: "today" };
 import { blockedTaskIds } from "../domain/tasks/dependencies";
+import { scheduleSpan } from "../domain/schedule/scheduleQueries";
+import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { todayValue } from "./date";
 
 // The stored bucket, under the name this page has always used for it.
@@ -226,7 +228,11 @@ export function buildTimeRail(
 
   for (const task of tasks) {
     if (task.deletedAt || task.status === "archived") continue;
-    if (task.scheduledDate !== today) continue;
+    // The rail shows blocks that START today. A range's start time belongs to
+    // its first day (audit 1-b), so a multi-day task appears on that day only.
+    const schedule = scheduleFromTask(task);
+    const span = scheduleSpan(schedule);
+    if (span === null || span.start !== today) continue;
     const startMin = parseTimeToMinutes(task.startTime);
     const endMinRaw = parseTimeToMinutes(task.endTime);
     if (startMin === undefined) continue;

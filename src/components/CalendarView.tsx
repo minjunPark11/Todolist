@@ -44,6 +44,13 @@ import { YearView } from "./calendar/YearView";
 import { CalendarPopover, DayAgendaPopover, EventPopover, type PopoverAnchor } from "./calendar/EventPopover";
 import { NewTaskForm, type NewTaskFormResult } from "./calendar/NewTaskForm";
 import { QuickCreatePopover, type QuickCreateDefaults, type QuickCreateResult } from "./calendar/QuickCreatePopover";
+import {
+  hasSchedule,
+  scheduleFromTask,
+  scheduleToTaskPatch,
+  type Schedule,
+  type ScheduleIssue,
+} from "../domain/schedule";
 import { useT } from "../i18n";
 
 type CalendarMode = "month" | "week" | "day" | "year";
@@ -83,6 +90,8 @@ interface CalendarViewProps {
   // (space detail "Open Calendar" hand-off).
   initialProjectId?: string;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
+  /** The canonical schedule write (design §13). Every drop goes through it. */
+  onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   onCreateTask: (draft: TaskDraft) => string;
   onDeleteTask?: (taskId: string) => void;
   onOpenProject?: (projectId: string) => void;
@@ -104,6 +113,7 @@ export function CalendarView({
   onUpdateProject,
   initialProjectId,
   onUpdateTask,
+  onUpdateTaskSchedule,
   onCreateTask,
   onDeleteTask,
   onOpenProject,
@@ -242,7 +252,14 @@ export function CalendarView({
   }, [items]);
 
   const unscheduled = useMemo(
-    () => tasks.filter((task) => !(task.scheduledDate || task.status === "done" || task.status === "archived")),
+    // "Unscheduled" now means no date at all. A task with only a deadline is
+    // on the calendar (the two dates merged), so listing it here as well would
+    // show it in both places at once.
+    () =>
+      tasks.filter(
+        (task) =>
+          !(hasSchedule(scheduleFromTask(task)) || task.status === "done" || task.status === "archived"),
+      ),
     [tasks],
   );
 
@@ -464,8 +481,38 @@ export function CalendarView({
     setDragPreview(null);
   }
 
-  // §4.2/D2: drag & drop only ever changes scheduledDate — dueDate (deadline)
-  // markers are non-draggable (WeekView/MonthView never call onDragStart for them).
+  // Every calendar write goes through here (SCHEDULE_EDITOR_PHASE0_AUDIT.md §6).
+  //
+  // It used to set `scheduledDate` and deliberately leave `dueDate` alone,
+  // because the two were different chips answering different questions. They
+  // are one date now, so writing only the old field would leave the record
+  // saying two things — and the reader, which consolidates, would turn a
+  // deadline dragged by one day into a multi-day range.
+  //
+  // Dropping always produces a single-day schedule: the calendar has no
+  // gesture that means "make this a range", and `buildCalendarItems` refuses
+  // to drag one for the same reason.
+  function scheduleFor(day: string, startTime = "", endTime = ""): Schedule {
+    return {
+      startDate: null,
+      dueDate: day,
+      startTime: startTime || null,
+      endTime: endTime || null,
+      timezone: null,
+    };
+  }
+
+  /** Drop a task onto `day` as a single-day schedule. */
+  function placeOn(taskId: string, day: string, startTime = "", endTime = "") {
+    onUpdateTaskSchedule(taskId, scheduleFor(day, startTime, endTime));
+  }
+
+  /** Move a task's existing schedule onto `day`, keeping whatever times it has. */
+  function moveToDay(taskId: string, day: string) {
+    const current = scheduleFromTask(tasks.find((item) => item.id === taskId) ?? {});
+    onUpdateTaskSchedule(taskId, { ...current, startDate: null, dueDate: day });
+  }
+
   function dropTime(event: DragEvent, day: string, startTime: string) {
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain");
@@ -483,11 +530,7 @@ export function CalendarView({
       // Overlaps are allowed (spec §10.5 option A) — the grid renders
       // overlapping blocks side by side; the toast just calls it out.
       const overlaps = hasConflict(day, startTime, endTime, taskId);
-      onUpdateTask(taskId, {
-        scheduledDate: day,
-        startTime,
-        endTime,
-      });
+      placeOn(taskId, day, startTime, endTime);
       showToast?.({
         message: overlaps
           ? t("calendar.dropScheduledOverlap", { title: task?.title ?? "", time: startTime })
@@ -501,7 +544,7 @@ export function CalendarView({
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain");
     if (taskId) {
-      onUpdateTask(taskId, { scheduledDate: day, startTime: "", endTime: "" });
+      placeOn(taskId, day);
     }
     handleDragEnd();
   }
@@ -510,7 +553,7 @@ export function CalendarView({
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain");
     if (taskId) {
-      onUpdateTask(taskId, { scheduledDate: day });
+      moveToDay(taskId, day);
     }
     handleDragEnd();
   }
@@ -520,19 +563,20 @@ export function CalendarView({
   function handleResizeItem(taskId: string, day: string, startTime: string, endTime: string) {
     const duration = timeToMinutes(endTime) - timeToMinutes(startTime);
     if (duration < TIME_SNAP_MINUTES) return;
-    onUpdateTask(taskId, { scheduledDate: day, startTime, endTime, estimatedMinutes: duration });
+    placeOn(taskId, day, startTime, endTime);
+    onUpdateTask(taskId, { estimatedMinutes: duration });
   }
 
   // Pointer-based block move: silently committed (the moving block itself
   // already previews the exact target slot). Overlaps are allowed.
   function handleMoveItem(taskId: string, day: string, startTime: string, endTime: string) {
-    onUpdateTask(taskId, { scheduledDate: day, startTime, endTime });
+    placeOn(taskId, day, startTime, endTime);
   }
 
   // Dropping a time block on the all-day band keeps the date but clears the
   // times, turning it into an all-day item.
   function handleMoveItemToAllDay(taskId: string, day: string) {
-    onUpdateTask(taskId, { scheduledDate: day, startTime: "", endTime: "" });
+    placeOn(taskId, day);
   }
 
   function suggestSchedule() {
@@ -572,11 +616,7 @@ export function CalendarView({
 
   function applyAiPlacements() {
     for (const placement of aiPlacements) {
-      onUpdateTask(placement.taskId, {
-        scheduledDate: placement.day,
-        startTime: placement.startTime,
-        endTime: placement.endTime,
-      });
+      placeOn(placement.taskId, placement.day, placement.startTime, placement.endTime);
     }
     showToast?.({ message: `${aiPlacements.length} suggested task(s) scheduled.` });
     setAiPlacements([]);
@@ -645,25 +685,16 @@ export function CalendarView({
       showToast?.({ message: t("calendar.readOnlyCategoryToast") });
       return;
     }
-    if (result.type === "deadline") {
-      onCreateTask({
-        title: result.title,
-        status: "todo",
-        dueDate: result.date,
-        categoryId: result.categoryId,
-        projectId: projectIdForCategory(result.categoryId),
-      });
-    } else {
-      onCreateTask({
-        title: result.title,
-        status: "todo",
-        scheduledDate: result.date,
-        startTime: result.startTime || undefined,
-        endTime: result.endTime || undefined,
-        categoryId: result.categoryId,
-        projectId: projectIdForCategory(result.categoryId),
-      });
-    }
+    // The popover used to ask "task or deadline". Those were two fields; they
+    // are one now, so the question had two answers that looked identical on
+    // the calendar (audit §6, 1-e).
+    onCreateTask({
+      title: result.title,
+      status: "todo",
+      ...scheduleToTaskPatch(scheduleFor(result.date, result.startTime, result.endTime)),
+      categoryId: result.categoryId,
+      projectId: projectIdForCategory(result.categoryId),
+    });
     // §16.4: creating in a category re-shows it and keeps it active.
     ensureCategoryVisible(result.categoryId);
     setActiveCategory(result.categoryId);
@@ -696,13 +727,19 @@ export function CalendarView({
       showToast?.({ message: t("calendar.readOnlyCategoryToast") });
       return;
     }
+    // The form can still name a later deadline. Dragged day plus deadline is
+    // exactly the pair that becomes a range (audit 1-d), so build it as one
+    // rather than writing two fields and letting the reader infer it.
     const taskId = onCreateTask({
       title: result.title,
       status: "todo",
-      scheduledDate: draft.date,
-      startTime: draft.startTime,
-      endTime: draft.endTime,
-      dueDate: result.dueDate || undefined,
+      ...scheduleToTaskPatch({
+        startDate: result.dueDate && result.dueDate > draft.date ? draft.date : null,
+        dueDate: result.dueDate && result.dueDate > draft.date ? result.dueDate : draft.date,
+        startTime: draft.startTime || null,
+        endTime: draft.endTime || null,
+        timezone: null,
+      }),
       categoryId: result.categoryId,
       projectId: projectIdForCategory(result.categoryId),
     });

@@ -49,6 +49,7 @@ import {
   SpaceSettingsDrawer,
   TaskDetailDrawer,
 } from "./SpaceDrawers";
+import type { Schedule, ScheduleIssue } from "../../domain/schedule";
 
 export type SpaceDetailViewProps = {
   space: SpaceLike;
@@ -82,6 +83,7 @@ export type SpaceDetailViewProps = {
   activeFocusSession: FocusSession | null;
   onCreateTask: (draft: TaskDraft) => string;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
+  onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   onCompleteTask: (id: string) => void;
   onArchiveTask: (id: string) => void;
   onStartFocus: (taskId: string, source?: FocusSession["source"]) => void;
@@ -134,6 +136,7 @@ export function SpaceDetailView({
   activeFocusSession,
   onCreateTask,
   onUpdateTask,
+  onUpdateTaskSchedule,
   onCompleteTask,
   onArchiveTask,
   onStartFocus,
@@ -683,6 +686,7 @@ export function SpaceDetailView({
               today={today}
               onOpenTask={openTaskDrawer}
               onUpdateTask={onUpdateTask}
+              onUpdateTaskSchedule={onUpdateTaskSchedule}
             />
           ) : tab === "gantt" ? (
             <TaskGanttView

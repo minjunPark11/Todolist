@@ -7,7 +7,14 @@ import { todayValue } from "../utils/date";
 import { getMatrixPosition, patchForQuadrant, type MatrixQuadrant } from "../utils/eisenhower";
 import { dependentsOf, eligibleBlockers } from "../domain/tasks/dependencies";
 import { useT } from "../i18n";
-import { DeferredInput, DeferredTextarea } from "./kit";
+import { DeferredInput, DeferredTextarea, Popover } from "./kit";
+import { ScheduleEditor } from "./schedule/ScheduleEditor";
+import {
+  formatScheduleTrigger,
+  scheduleFromTask,
+  type Schedule,
+  type ScheduleIssue,
+} from "../domain/schedule";
 import { MotionPanelShell } from "./motion/MotionPanelShell";
 
 interface TaskDetailProps {
@@ -19,6 +26,7 @@ interface TaskDetailProps {
   onMoveToList: (taskId: string, listId: string) => void;
   subtasks: Subtask[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
+  onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   onRequestDeleteTask: (taskId: string) => void;
   onArchiveTask: (taskId: string) => void;
   onDuplicateTask: (taskId: string) => void;
@@ -45,6 +53,7 @@ export function TaskDetail({
   lists,
   onMoveToList,
   onUpdateTask,
+  onUpdateTaskSchedule,
   onRequestDeleteTask,
   onArchiveTask,
   onDuplicateTask,
@@ -54,7 +63,9 @@ export function TaskDetail({
   onDeleteSubtask,
   onClose,
 }: TaskDetailProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
+  const locale = lang === "ko" ? "ko-KR" : "en-US";
+  const [editingSchedule, setEditingSchedule] = useState(false);
   const [childTitle, setChildTitle] = useState("");
 
   if (!task) {
@@ -76,6 +87,7 @@ export function TaskDetail({
     monthly: t("taskDetail.repeatMonthly"),
   };
   const today = todayValue();
+  const schedule = scheduleFromTask(task);
   const selectedQuadrant = getMatrixPosition(task, today).quadrant;
   // The picker refuses anything that would close a loop, so the cycle rule is
   // enforced where the value is written rather than guarded at every read.
@@ -112,48 +124,34 @@ export function TaskDetail({
       <section className="detail-section">
         <h3>{t("taskDetail.schedule")}</h3>
         <div className="detail-field-list">
-          <label>
-            <span>{t("taskDetail.startDate")}</span>
-            <input
-              type="date"
-              value={task.startDate}
-              onChange={(event) => onUpdateTask(task.id, { startDate: event.target.value })}
-            />
-          </label>
-          <label>
-            <span>{t("taskDetail.scheduledDate")}</span>
-            <input
-              type="date"
-              value={task.scheduledDate}
-              onChange={(event) => onUpdateTask(task.id, { scheduledDate: event.target.value })}
-            />
-          </label>
-          <label>
-            <span>{t("taskDetail.startTime")}</span>
-            <input
-              type="time"
-              step={600}
-              value={task.startTime}
-              onChange={(event) => onUpdateTask(task.id, { startTime: event.target.value })}
-            />
-          </label>
-          <label>
-            <span>{t("taskDetail.endTime")}</span>
-            <input
-              type="time"
-              step={600}
-              value={task.endTime}
-              onChange={(event) => onUpdateTask(task.id, { endTime: event.target.value })}
-            />
-          </label>
-          <label>
-            <span>{t("common.dueDate")}</span>
-            <input
-              type="date"
-              value={task.dueDate}
-              onChange={(event) => onUpdateTask(task.id, { dueDate: event.target.value })}
-            />
-          </label>
+          {/* The three date inputs that stood here — start, work day, deadline
+              — were the last place those fields were edited separately. They
+              are one schedule now (audit §6), so this is one control, and the
+              times followed in Phase 7, so this is now the only way a task's
+              schedule is edited by hand, and every write goes through
+              `updateTaskSchedule`. */}
+          <div className="detail-field-list-row">
+            <span>{t("taskDetail.schedule")}</span>
+            <button
+              type="button"
+              className="sched-trigger"
+              aria-expanded={editingSchedule}
+              onClick={() => setEditingSchedule((open) => !open)}
+            >
+              {formatScheduleTrigger(schedule, today, locale) || t("schedule.trigger")}
+            </button>
+            <Popover open={editingSchedule} onClose={() => setEditingSchedule(false)}>
+              <ScheduleEditor
+                key={task.id}
+                taskId={task.id}
+                locale={locale}
+                schedule={schedule}
+                today={today}
+                onCommit={onUpdateTaskSchedule}
+                onClose={() => setEditingSchedule(false)}
+              />
+            </Popover>
+          </div>
           <label>
             <span>{t("taskDetail.repeat")}</span>
             <select

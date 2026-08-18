@@ -258,6 +258,7 @@ export function AppPages({
           onUpdateProject={planner.updateProject}
             initialProjectId={calendarFocusProjectId}
           onUpdateTask={planner.updateTask}
+          onUpdateTaskSchedule={planner.updateTaskSchedule}
           onCreateTask={planner.createTask}
           onDeleteTask={requestDeleteTask}
           onOpenProject={openProjectFromCalendar}
@@ -328,6 +329,7 @@ export function AppPages({
         onOpenTask={planner.selectTask}
         onToggleDone={planner.toggleTaskDone}
         onUpdateTask={planner.updateTask}
+        onUpdateTaskSchedule={planner.updateTaskSchedule}
         onCreateTask={planner.createTask}
         onUpdateProject={planner.updateProject}
         onRequestDeleteProject={deleteProjectNow}

@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import type { Project, Task, TaskPriority, TaskStatus } from "../types";
 import { formatDate, todayValue } from "../utils/date";
 import { useDeferredTextField } from "../hooks/useDeferredTextField";
@@ -102,23 +102,34 @@ export function Popover({
 }) {
   const ref = useOutsideClose(onClose);
   const motionEnabled = useMotionEnabled();
+
+  // Rendered conditionally rather than through AnimatePresence.
+  //
+  // AnimatePresence ran the exit animation and then left the node mounted:
+  // opacity 0, `pointer-events: auto`, `z-index: 40`. It looked closed and was
+  // still the top element under the cursor, so a click aimed at whatever the
+  // popover had covered hit the popover instead — `elementFromPoint` in the
+  // middle of a "closed" schedule editor returned one of its calendar cells.
+  // Reproduced in a production build, so it was not StrictMode, and adding the
+  // `key` AnimatePresence documents as required did not change it.
+  //
+  // The cost is the close animation; it opens as before. A control that eats
+  // clicks it cannot be seen to eat is worse than one that disappears
+  // abruptly, and this primitive backs every popover in the app.
+  if (!open) return null;
+
   return (
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          ref={ref}
-          className={`ff-popover ff-popover-${align}`}
-          role="menu"
-          variants={motionEnabled ? popoverVariants : undefined}
-          initial={motionEnabled ? "initial" : false}
-          animate={motionEnabled ? "animate" : undefined}
-          exit={motionEnabled ? "exit" : undefined}
-          transition={motionEnabled ? transitions.fast : reducedTransition}
-        >
-          {children}
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+    <motion.div
+      ref={ref}
+      className={`ff-popover ff-popover-${align}`}
+      role="menu"
+      variants={motionEnabled ? popoverVariants : undefined}
+      initial={motionEnabled ? "initial" : false}
+      animate={motionEnabled ? "animate" : undefined}
+      transition={motionEnabled ? transitions.fast : reducedTransition}
+    >
+      {children}
+    </motion.div>
   );
 }
 

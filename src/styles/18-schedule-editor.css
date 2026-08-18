@@ -1,0 +1,288 @@
+/* Schedule Editor (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 6).
+ *
+ * The range visuals carry the meaning here, so they are built from the cell
+ * classes `calendarCells.ts` decides rather than from any DOM position: a
+ * `start` keeps its rounding on the left and squares off into its neighbour,
+ * a `middle` is square on both sides, and a `single` is round on both. That
+ * is what makes a same-day range read as one day instead of as a start
+ * touching an end. */
+
+.sched-trigger {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sched-trigger:hover {
+  border-color: var(--border-strong);
+}
+
+.sched-editor {
+  width: 268px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sched-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+.sched-tabs button {
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sched-tabs button.is-active {
+  background: var(--surface, #fff);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-soft, 0 1px 2px rgba(0, 0, 0, 0.08));
+}
+
+.sched-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.sched-cal-head button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.sched-cal-weekdays,
+.sched-cal-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.sched-cal-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding-bottom: 4px;
+}
+
+.sched-cell {
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  aspect-ratio: 1;
+  cursor: pointer;
+  /* Square by default so range fills meet with no gap; the endpoints below
+     put the rounding back on the outside edges only. */
+  border-radius: 0;
+}
+
+.sched-cell.is-outside {
+  color: var(--text-tertiary);
+}
+
+.sched-cell.is-today {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sched-cell:hover {
+  background: var(--accent-soft);
+}
+
+/* A preview is deliberately weaker than a selection: it shows what a click
+   WOULD do, and must not read as something already chosen (design §4.22). */
+.sched-cell.is-preview {
+  background: var(--accent-soft);
+}
+
+.sched-cell.is-middle {
+  background: var(--accent-soft);
+}
+
+.sched-cell.is-single,
+.sched-cell.is-start,
+.sched-cell.is-end {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.sched-cell.is-single {
+  border-radius: 50%;
+}
+
+.sched-cell.is-start {
+  border-radius: 50% 0 0 50%;
+}
+
+.sched-cell.is-end {
+  border-radius: 0 50% 50% 0;
+}
+
+.sched-hint,
+.sched-issues {
+  margin: 0;
+  font-size: 12px;
+}
+
+.sched-hint {
+  color: var(--text-tertiary);
+}
+
+.sched-issues {
+  padding-left: 16px;
+  color: #d70015;
+}
+
+.sched-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sched-spacer {
+  flex: 1;
+}
+
+.sched-actions button {
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 5px 11px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sched-actions .sched-clear {
+  border-color: transparent;
+  color: var(--text-tertiary);
+}
+
+.sched-actions .sched-confirm {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sched-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.detail-field-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+.detail-field-list-row > span:first-child {
+  color: var(--text-secondary);
+}
+
+/* The Time row and panel (Phase 7). The row is a summary that opens the
+ * panel; the panel replaces the grid rather than sitting under it, so the
+ * popover keeps one height. */
+
+.sched-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  padding: 8px 2px 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sched-row:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sched-row-value {
+  color: var(--text-tertiary);
+}
+
+.sched-time {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Matches the grid it replaces, so swapping panels does not resize the
+     popover under the cursor. */
+  min-height: 232px;
+}
+
+.sched-time-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sched-time-field > span {
+  display: flex;
+  flex-direction: column;
+  color: var(--text-secondary);
+}
+
+.sched-time-field em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.sched-time-field input {
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 4px 7px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.sched-time-field input:disabled {
+  opacity: 0.45;
+}
+
+.sched-time > .sched-clear {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sched-time > .sched-clear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

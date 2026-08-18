@@ -67,26 +67,60 @@ function build(input: Partial<Parameters<typeof buildCalendarItems>[0]> = {}) {
 
 const keys = (items: { key: string }[]) => items.map((item) => item.key).sort();
 
-describe("task blocks and deadlines", () => {
-  it("makes a work block from scheduledDate and a marker from dueDate", () => {
-    // D1/D2: two chips from one task, because they answer different questions.
+// The five tests below changed with SCHEDULE_EDITOR_PHASE0_AUDIT.md §6, 1-e.
+// The work block and the deadline marker were two chips answering two
+// questions; consolidation leaves one date to answer both (1-d), so keeping
+// both chips would draw the same task twice on the same day. The old
+// expectations are quoted in each case, since what they asserted is exactly
+// what the user will notice.
+describe("task chips", () => {
+  it("draws one chip per day a schedule covers", () => {
+    // WAS: a block on 8/17 and a separate marker on 8/20.
+    // A work day and a deadline that disagree become the range between them,
+    // and a range occupies every day it spans — the same per-day expansion
+    // external all-day events already use.
     const items = build({ tasks: [task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20" })] });
-    expect(keys(items)).toEqual(["deadline:task-1", "task-block:task-1"]);
-    const block = items.find((item) => item.layer === "task");
-    const marker = items.find((item) => item.layer === "deadline");
-    expect(block?.date).toBe("2026-08-17");
-    expect(marker?.date).toBe("2026-08-20");
-    expect(marker?.allDay).toBe(true);
-    expect(marker?.draggable).toBe(false);
+    expect(keys(items)).toEqual([
+      "task-block:task-1:2026-08-17",
+      "task-block:task-1:2026-08-18",
+      "task-block:task-1:2026-08-19",
+      "task-block:task-1:2026-08-20",
+    ]);
+    expect(items.every((item) => item.layer === "task")).toBe(true);
   });
 
-  it("keeps startTime with the work block, never the deadline", () => {
+  it("draws a single-day schedule as one chip with the plain key", () => {
+    const items = build({ tasks: [task({ dueDate: "2026-08-20" })] });
+    expect(keys(items)).toEqual(["task-block:task-1"]);
+    expect(items[0].date).toBe("2026-08-20");
+  });
+
+  // The gain that comes with losing the marker: a deadline used to be
+  // draggable only from the task detail.
+  it("makes a plain deadline draggable, which the marker never was", () => {
+    expect(build({ tasks: [task({ dueDate: "2026-08-20" })] })[0].draggable).toBe(true);
+  });
+
+  it("puts the times on the ends of a range and leaves the middle all-day", () => {
+    // WAS: 09:00–10:30 on the work block, nothing on the marker.
+    // Promotion drops the end time rather than move it to another day, so a
+    // range keeps only its start.
     const items = build({
-      tasks: [task({ scheduledDate: "2026-08-17", startTime: "09:00", endTime: "10:30", dueDate: "2026-08-20" })],
+      tasks: [task({ scheduledDate: "2026-08-17", startTime: "09:00", endTime: "10:30", dueDate: "2026-08-19" })],
     });
-    const block = items.find((item) => item.layer === "task");
-    expect([block?.startTime, block?.endTime, block?.allDay]).toEqual(["09:00", "10:30", false]);
-    expect(items.find((item) => item.layer === "deadline")?.startTime).toBeUndefined();
+    expect([items[0].startTime, items[0].endTime, items[0].allDay]).toEqual(["09:00", undefined, false]);
+    expect(items.slice(1).every((item) => item.allDay && item.startTime === undefined)).toBe(true);
+  });
+
+  it("keeps both times on a single-day timed schedule", () => {
+    const items = build({ tasks: [task({ scheduledDate: "2026-08-17", startTime: "09:00", endTime: "10:30" })] });
+    expect([items[0].startTime, items[0].endTime, items[0].allDay]).toEqual(["09:00", "10:30", false]);
+  });
+
+  // A range has no gesture that says whether a drag moves it or resizes it.
+  it("refuses to drag a multi-day range", () => {
+    const items = build({ tasks: [task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20" })] });
+    expect(items.every((item) => item.draggable)).toBe(false);
   });
 
   it("treats a block with no start time as all-day", () => {
@@ -99,33 +133,45 @@ describe("task blocks and deadlines", () => {
     expect(build({ tasks: [task({ deletedAt: NOW, scheduledDate: "2026-08-17" })] })).toEqual([]);
   });
 
-  it("keeps a completed task's scheduled block but not its deadline", () => {
-    // The plan stays visible as a completed schedule; the deadline is spent.
+  it("hides every completed task unless the Completed layer is on", () => {
+    // WAS: a completed task kept its scheduled block regardless of the toggle,
+    // and hid only its deadline. That split existed because there were two
+    // chip kinds; with one, the toggle either governs it or does not.
+    //
+    // Governing it is the smaller change for most records, since a task with
+    // only a deadline already disappeared on completion — and the plan is
+    // still there for anyone who turns the layer on.
+    const scheduled = task({ status: "done", scheduledDate: "2026-08-17" });
+    expect(build({ tasks: [scheduled] })).toEqual([]);
+    expect(keys(build({ tasks: [scheduled], layers: { ...defaultCalendarLayers, completed: true } }))).toEqual([
+      "task-block:task-1",
+    ]);
+
+    const deadlineOnly = task({ status: "done", dueDate: "2026-08-20" });
+    expect(build({ tasks: [deadlineOnly] })).toEqual([]);
+  });
+
+  it("never lets a completed task be dragged", () => {
     const items = build({
-      tasks: [task({ status: "done", scheduledDate: "2026-08-17", dueDate: "2026-08-20" })],
+      tasks: [task({ status: "done", scheduledDate: "2026-08-17" })],
+      layers: { ...defaultCalendarLayers, completed: true },
     });
-    expect(keys(items)).toEqual(["task-block:task-1"]);
     expect(items[0].draggable).toBe(false);
   });
 
-  it("hides a completed unscheduled task unless the Completed layer is on", () => {
-    const done = task({ status: "done", dueDate: "2026-08-20" });
-    expect(build({ tasks: [done] })).toEqual([]);
-    const shown = build({ tasks: [done], layers: { ...defaultCalendarLayers, completed: true } });
-    expect(keys(shown)).toEqual(["deadline:task-1"]);
+  it("draws nothing for a task with no dates", () => {
+    expect(build({ tasks: [task()] })).toEqual([]);
   });
 
-  it("obeys each layer toggle on its own", () => {
+  it("obeys the task layer toggle", () => {
+    // WAS: a Deadline toggle drew a chip of its own beside this one. The layer
+    // is gone — every task chip answers to `task` now.
     const t = task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20" });
-    expect(keys(build({ tasks: [t], layers: { ...defaultCalendarLayers, task: false } }))).toEqual([
-      "deadline:task-1",
-    ]);
-    expect(keys(build({ tasks: [t], layers: { ...defaultCalendarLayers, deadline: false } }))).toEqual([
-      "task-block:task-1",
-    ]);
+    expect(build({ tasks: [t], layers: { ...defaultCalendarLayers, task: false } })).toEqual([]);
+    expect(build({ tasks: [t] })).toHaveLength(4);
   });
 
-  it("marks a repeating task on both chips", () => {
+  it("marks a repeating task on every chip", () => {
     const items = build({
       tasks: [task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20", repeatType: "weekly" })],
     });

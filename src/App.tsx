@@ -1146,6 +1146,7 @@ export default function App() {
             subtasks={planner.subtasks}
             onMoveToList={planner.moveTaskToList}
             onUpdateTask={planner.updateTask}
+            onUpdateTaskSchedule={planner.updateTaskSchedule}
             onRequestDeleteTask={setPendingDeleteTaskId}
             onArchiveTask={handleArchiveTask}
             onDuplicateTask={handleDuplicateTask}

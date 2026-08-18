@@ -213,8 +213,7 @@ export function Sidebar({
     buckets.waiting.length +
     buckets.inProgress.length +
     buckets.overdue.length +
-    buckets.dueToday.length +
-    buckets.scheduledToday.length;
+    buckets.dueToday.length;
   const openCountsBySpace = new Map<string, number>();
   // A second map rather than deriving the Project number by summing this one.
   // `listIdFor` answers "" for a Task whose Project has no List at all, and an

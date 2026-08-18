@@ -24,6 +24,7 @@ vi.mock("../platform", () => ({
 }));
 
 import { normalizeData } from "./usePlannerData";
+import { scheduleFromTask } from "../domain/schedule";
 
 /** Stands in for a field some future version added and this build has never seen. */
 const FUTURE = { listId: "list-7", futureFlag: true };
@@ -149,11 +150,23 @@ describe("normalizeData still repairs what it does know", () => {
     expect(task.priority).toBe("none");
   });
 
-  it("still promotes a legacy timed task onto scheduledDate", () => {
+  // WAS: "still promotes a legacy timed task onto scheduledDate".
+  //
+  // That repair ran in the direction SCHEDULE_EDITOR_PHASE0_AUDIT.md §6 (1-d)
+  // reverses, so it fought every write the calendar makes — a task saved with
+  // a time and a date came back out carrying the legacy field again. The
+  // record it existed for reads as a timed block on its date without help now,
+  // which `scheduleFromTask` covers directly.
+  it("leaves a legacy timed task's dates exactly as stored", () => {
     const [task] = normalizeData({
       tasks: [{ id: "task-1", title: "Legacy", dueDate: "2026-08-01", startTime: "09:00" }],
     }).tasks;
-    expect(task.scheduledDate).toBe("2026-08-01");
+    expect([task.dueDate, task.scheduledDate, task.startTime]).toEqual(["2026-08-01", "", "09:00"]);
+    expect(scheduleFromTask(task)).toMatchObject({
+      startDate: null,
+      dueDate: "2026-08-01",
+      startTime: "09:00",
+    });
   });
 
   it("never restores a milestone status from disk", () => {

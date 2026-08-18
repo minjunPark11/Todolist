@@ -4,6 +4,7 @@
 import type { Project, Task } from "../types";
 import { getWeekDays, todayValue } from "../utils/date";
 import { buildCalendarItems, defaultCalendarLayers } from "../utils/calendarItems";
+import { hasSchedule, scheduleFromTask } from "../domain/schedule";
 
 export interface CalendarContextInput {
   tasks: Task[];
@@ -36,14 +37,11 @@ export function buildCalendarContextText({ tasks, projects }: CalendarContextInp
       start: item.startTime ?? null,
       end: item.endTime ?? null,
     }));
-  const deadlines = items
-    .filter((item) => item.layer === "deadline")
-    .map((item) => ({ title: item.title, date: item.date }));
   const projectDeadlines = items
     .filter((item) => item.layer === "project-deadline")
     .map((item) => ({ title: item.title, date: item.date }));
   const unscheduledTasks = tasks
-    .filter((task) => !task.scheduledDate && task.status !== "done" && task.status !== "archived")
+    .filter((task) => !hasSchedule(scheduleFromTask(task)) && task.status !== "done" && task.status !== "archived")
     .slice(0, 20)
     .map((task) => ({ title: task.title, dueDate: task.dueDate || null }));
 
@@ -58,8 +56,10 @@ export function buildCalendarContextText({ tasks, projects }: CalendarContextInp
     activePage: "calendar",
     view: "week",
     range: { start: rangeStart, end: rangeEnd },
+    // A task's deadline used to be a layer of its own here. It is the same
+    // date as the work now (audit §6, 1-d), so it arrives inside
+    // `scheduledTasks` and a separate key would always be empty.
     scheduledTasks,
-    deadlines,
     projectDeadlines,
     unscheduledTasks,
     workloadSummary,
