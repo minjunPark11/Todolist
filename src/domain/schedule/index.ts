@@ -54,6 +54,16 @@ export { isDirty, schedulesEqual } from "./scheduleEquality";
 export type { ScheduleUpdatePlan } from "./updateTaskSchedule";
 export { planScheduleUpdate } from "./updateTaskSchedule";
 
+export type { EditorPanel, ScheduleEditorAction, ScheduleEditorState } from "./editorState";
+export {
+  CLOSED,
+  draftSchedule,
+  initialMonth,
+  monthOf,
+  scheduleEditorReducer,
+  stepMonth,
+} from "./editorState";
+
 export type { ScheduleShape, TaskScheduleSource } from "./taskSchedule";
 export {
   classifyTaskSchedule,

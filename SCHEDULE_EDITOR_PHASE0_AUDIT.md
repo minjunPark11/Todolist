@@ -474,8 +474,8 @@ expand → migrate → contract 순서다. 설계서 §22.2의 13단계를 이 �
 | **2** | **읽기 어댑터** `toSchedule()` — 구 형태(`scheduledDate` 포함)와 신 형태를 모두 이해 | — (C 고유) | 자유 |
 | **3** | **reader 전환 + 화면 재작업** — `span` / `calendarItems` / `planner` / `TodayPage` / `filters`가 어댑터 경유. 캘린더 2레이어 통합, Today 버킷 정리 | §14 (구 9 병합) | 자유 |
 | **4** | `updateTaskSchedule()` 단일 mutation | §22.42~ | |
-| **5** | Editor 상태 기계 + Popover | §2, §10 | |
-| **6** | MonthCalendar (신규) + Date/Duration 선택 | §6, §3, §4 | |
+| **5** | Editor 상태 기계 (reducer) | §2 | |
+| **6** | Popover + MonthCalendar (신규) + Date/Duration 선택 | §10, §6, §3, §4 | |
 | **7** | Time — Date + Duration 양쪽 | §7 | 결정 1-b/1-c |
 | — | **v1 여기서 끊는다** | | |
 | **8** | Recurrence — 레거시 `repeat*` 흡수 | §9 | |
@@ -498,6 +498,10 @@ scheduleFromTask(scheduleToTaskPatch(s)) === s
 ```
 
 즉 통합된 레코드와 통합 전 원본은 어댑터를 거치면 **같은 Schedule**을 만든다. 모든 reader가 어댑터를 통과한 뒤에는 데이터 통합이 관찰 가능한 변화를 만들지 않는다. 그래서 되돌릴 수 없는 유일한 단계를 v1 이후로 미뤘다 — 위험을 줄인 것이 아니라, **위험한 단계가 더 이상 필요하지 않은 순서**를 찾은 것이다.
+
+**Popover는 Phase 5가 아니라 6이다.** 초판은 상태 기계와 Popover를 같은 단계에 뒀는데, 달력 없는 Popover는 눌러볼 것이 없어 브라우저에서 검증할 수 없고 사용자에게 내보낼 수도 없다. 껍데기를 먼저 만들어 두는 것은 검증되지 않은 코드를 한 단계 더 오래 방치하는 일이라, 달력이 도착하는 단계로 합쳤다.
+
+**설계서 §2.12~2.14(Save lifecycle)는 채택하지 않는다.** `saving` / `saveError` 상태는 Confirm이 비동기 mutation을 부른다는 전제인데, 이 앱의 `updateTaskSchedule`은 동기다 — 상태를 갱신하고 저장은 별도 큐가 문서 단위로 처리한다. Draft가 "전송 중"인 구간이 존재하지 않으므로, 아무도 관찰할 수 없는 상태를 타입에 넣는 것은 거짓말이 된다. §20과 같은 종류의 불일치다.
 
 **Phase 3이 여전히 이 계획의 관문이다.** 다만 통과 기준이 "아무것도 안 바뀜"이 아니라 **"바뀐 것이 전부 1-e가 예고한 것뿐임"**이다. 예고에 없는 변화가 나오면 그것이 1-d 규칙의 구멍이다.
 
