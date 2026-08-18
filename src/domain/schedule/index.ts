@@ -51,7 +51,7 @@ export { isConfirmable, isValidSchedule, validateDraft, validateSchedule } from 
 
 export { isDirty, schedulesEqual } from "./scheduleEquality";
 
-export { formatScheduleTrigger } from "./scheduleFormatting";
+export { formatScheduleTrigger, formatTimeSummary } from "./scheduleFormatting";
 
 export type { ScheduleUpdatePlan } from "./updateTaskSchedule";
 export { planScheduleUpdate } from "./updateTaskSchedule";

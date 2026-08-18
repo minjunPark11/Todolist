@@ -202,3 +202,87 @@
 .detail-field-list-row > span:first-child {
   color: var(--text-secondary);
 }
+
+/* The Time row and panel (Phase 7). The row is a summary that opens the
+ * panel; the panel replaces the grid rather than sitting under it, so the
+ * popover keeps one height. */
+
+.sched-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  padding: 8px 2px 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sched-row:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sched-row-value {
+  color: var(--text-tertiary);
+}
+
+.sched-time {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Matches the grid it replaces, so swapping panels does not resize the
+     popover under the cursor. */
+  min-height: 232px;
+}
+
+.sched-time-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sched-time-field > span {
+  display: flex;
+  flex-direction: column;
+  color: var(--text-secondary);
+}
+
+.sched-time-field em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.sched-time-field input {
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 4px 7px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.sched-time-field input:disabled {
+  opacity: 0.45;
+}
+
+.sched-time > .sched-clear {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sched-time > .sched-clear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

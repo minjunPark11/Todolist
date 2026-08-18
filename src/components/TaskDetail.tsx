@@ -127,8 +127,9 @@ export function TaskDetail({
           {/* The three date inputs that stood here — start, work day, deadline
               — were the last place those fields were edited separately. They
               are one schedule now (audit §6), so this is one control, and the
-              only writer left that does not go through `updateTaskSchedule`
-              is the time pair below (Phase 7). */}
+              times followed in Phase 7, so this is now the only way a task's
+              schedule is edited by hand, and every write goes through
+              `updateTaskSchedule`. */}
           <div className="detail-field-list-row">
             <span>{t("taskDetail.schedule")}</span>
             <button
@@ -143,6 +144,7 @@ export function TaskDetail({
               <ScheduleEditor
                 key={task.id}
                 taskId={task.id}
+                locale={locale}
                 schedule={schedule}
                 today={today}
                 onCommit={onUpdateTaskSchedule}
@@ -150,24 +152,6 @@ export function TaskDetail({
               />
             </Popover>
           </div>
-          <label>
-            <span>{t("taskDetail.startTime")}</span>
-            <input
-              type="time"
-              step={600}
-              value={task.startTime}
-              onChange={(event) => onUpdateTask(task.id, { startTime: event.target.value })}
-            />
-          </label>
-          <label>
-            <span>{t("taskDetail.endTime")}</span>
-            <input
-              type="time"
-              step={600}
-              value={task.endTime}
-              onChange={(event) => onUpdateTask(task.id, { endTime: event.target.value })}
-            />
-          </label>
           <label>
             <span>{t("taskDetail.repeat")}</span>
             <select

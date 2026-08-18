@@ -9,7 +9,9 @@ import { useReducer } from "react";
 import {
   CLOSED,
   draftSchedule,
+  formatTimeSummary,
   getRangeStage,
+  hasSchedule,
   isConfirmable,
   isDirty,
   scheduleEditorReducer,
@@ -17,10 +19,12 @@ import {
   type ScheduleIssue,
 } from "../../domain/schedule";
 import { MonthCalendar } from "./MonthCalendar";
+import { TimePanel } from "./TimePanel";
 import { useT } from "../../i18n";
 
 interface ScheduleEditorProps {
   taskId: string;
+  locale: string;
   /** The task's schedule as the domain sees it — already consolidated. */
   schedule: Schedule;
   today: string;
@@ -29,7 +33,7 @@ interface ScheduleEditorProps {
   onClose: () => void;
 }
 
-export function ScheduleEditor({ taskId, schedule, today, onCommit, onClose }: ScheduleEditorProps) {
+export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onClose }: ScheduleEditorProps) {
   const { t } = useT();
   const [state, dispatch] = useReducer(scheduleEditorReducer, undefined, () =>
     scheduleEditorReducer(CLOSED, { type: "OPEN", taskId, schedule, today }),
@@ -37,7 +41,7 @@ export function ScheduleEditor({ taskId, schedule, today, onCommit, onClose }: S
 
   if (state.status !== "open") return null;
 
-  const { draft, hoverDate, visibleMonth, issues } = state;
+  const { draft, hoverDate, visibleMonth, issues, panel } = state;
   const stage = getRangeStage(draft);
   const dirty = isDirty(draft, state.saved);
 
@@ -68,15 +72,40 @@ export function ScheduleEditor({ taskId, schedule, today, onCommit, onClose }: S
         ))}
       </div>
 
-      <MonthCalendar
-        visibleMonth={visibleMonth}
-        draft={draft}
-        hoverDate={hoverDate}
-        today={today}
-        onSelect={(date) => dispatch({ type: "SELECT_DATE", date })}
-        onHover={(date) => dispatch({ type: "HOVER_DATE", date })}
-        onStepMonth={(delta) => dispatch({ type: "STEP_MONTH", delta })}
-      />
+      {panel === "time" ? (
+        <TimePanel
+          draft={draft}
+          locale={locale}
+          onStartTime={(time) => dispatch({ type: "SET_START_TIME", time })}
+          onEndTime={(time) => dispatch({ type: "SET_END_TIME", time })}
+          onClear={() => dispatch({ type: "CLEAR_TIME" })}
+          onBack={() => dispatch({ type: "SET_PANEL", panel: "calendar" })}
+        />
+      ) : (
+        <>
+          <MonthCalendar
+            visibleMonth={visibleMonth}
+            draft={draft}
+            hoverDate={hoverDate}
+            today={today}
+            onSelect={(date) => dispatch({ type: "SELECT_DATE", date })}
+            onHover={(date) => dispatch({ type: "HOVER_DATE", date })}
+            onStepMonth={(delta) => dispatch({ type: "STEP_MONTH", delta })}
+          />
+
+          {/* A time needs a day to land on (INV-03), so the row is not
+              offered until there is one. */}
+          <button
+            type="button"
+            className="sched-row"
+            disabled={!hasSchedule(draft)}
+            onClick={() => dispatch({ type: "SET_PANEL", panel: "time" })}
+          >
+            <span>{t("schedule.time")}</span>
+            <span className="sched-row-value">{formatTimeSummary(draft) || t("schedule.noTime")}</span>
+          </button>
+        </>
+      )}
 
       {/* Not an error. A half-picked range is a waypoint, and §2.9 keeps the
           two apart: this says what is missing, the block below says what is

@@ -42,3 +42,20 @@ export function formatScheduleTrigger(schedule: Schedule, today: string, locale 
   // if it applied to both.
   return schedule.startTime ? `${start} ${schedule.startTime}` : start;
 }
+
+/**
+ * The Time row's summary, or "" when the schedule has no time (design §3.34).
+ *
+ * A range shows one time per end, because that is where each belongs (audit
+ * 1-b): `startTime` is the first day starting, `endTime` is the last day
+ * finishing. Writing them as a single "09:00 – 17:00" would read as one
+ * afternoon rather than as the shape of a multi-day block.
+ */
+export function formatTimeSummary(schedule: Schedule): string {
+  if (schedule.startTime === null) return "";
+  if (schedule.endTime === null) return schedule.startTime;
+  const sameDay = schedule.startDate === null || schedule.startDate === schedule.dueDate;
+  return sameDay
+    ? `${schedule.startTime} – ${schedule.endTime}`
+    : `${schedule.startTime} → ${schedule.endTime}`;
+}
