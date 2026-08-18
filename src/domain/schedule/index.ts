@@ -51,10 +51,15 @@ export { isConfirmable, isValidSchedule, validateDraft, validateSchedule } from 
 
 export { isDirty, schedulesEqual } from "./scheduleEquality";
 
+export { formatScheduleTrigger } from "./scheduleFormatting";
+
 export type { ScheduleUpdatePlan } from "./updateTaskSchedule";
 export { planScheduleUpdate } from "./updateTaskSchedule";
 
 export type { EditorPanel, ScheduleEditorAction, ScheduleEditorState } from "./editorState";
+export type { CalendarCell, CellSelection } from "./calendarCells";
+export { gridStart, monthGrid, WEEK_LENGTH } from "./calendarCells";
+
 export {
   CLOSED,
   draftSchedule,
