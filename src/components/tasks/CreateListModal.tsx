@@ -20,16 +20,27 @@ import {
 } from "../../domain/tasks/createListDraft";
 import { LIST_COLOR_PRESETS, isCustomListColor, listColorHex } from "../../domain/tasks/listColor";
 import { CREATE_LIST_VIEW_CHOICES } from "../../domain/tasks/listView";
+import { FolderSelect } from "./FolderSelect";
+import type { SidebarFolder } from "../../types";
 
 interface CreateListModalProps {
   /** §1.2: the Folder this was started from, or "" from the Lists header. */
   contextFolderId?: string;
+  folders: SidebarFolder[];
+  /** Answers the new group's id (§6.32). */
+  onCreateFolder: (name: string) => Promise<string> | string;
   /** Rejects to signal failure; the draft is kept either way (§1.12). */
   onSubmit: (draft: CreateListDraft) => Promise<void>;
   onClose: () => void;
 }
 
-export function CreateListModal({ contextFolderId = "", onSubmit, onClose }: CreateListModalProps) {
+export function CreateListModal({
+  contextFolderId = "",
+  folders,
+  onCreateFolder,
+  onSubmit,
+  onClose,
+}: CreateListModalProps) {
   const { t } = useT();
   const [draft, setDraft] = useState<CreateListDraft>(() => emptyCreateListDraft(contextFolderId));
   const [submitting, setSubmitting] = useState(false);
@@ -38,13 +49,16 @@ export function CreateListModal({ contextFolderId = "", onSubmit, onClose }: Cre
   // the tick that set it — three Enter keydowns in one tick all read `false`
   // and all submit. Verified in the running app: it made three Lists.
   const submittingRef = useRef(false);
+  // §6.35: a Folder being made means `sidebarFolderId` is not settled yet, and
+  // submitting now would file the List somewhere the user did not pick.
+  const [folderBusy, setFolderBusy] = useState(false);
   const [error, setError] = useState("");
   const nameRef = useRef<HTMLInputElement | null>(null);
   const titleId = useId();
   const errorId = useId();
 
   const status = createListStatus(draft, submitting);
-  const canSubmit = canSubmitCreateList(draft, submitting);
+  const canSubmit = canSubmitCreateList(draft, submitting) && !folderBusy;
 
   // §1.14 AC-F03. The dialog exists to receive a name, so it asks for one
   // immediately rather than making the user click into the only field.
@@ -182,6 +196,21 @@ export function CreateListModal({ contextFolderId = "", onSubmit, onClose }: Cre
               />
             </label>
           </fieldset>
+
+          <div className="tm-field">
+            <span className="tm-field-label" id={`${titleId}-folder`}>
+              {t("tasks.folderLabel")}
+            </span>
+            <FolderSelect
+              labelledBy={`${titleId}-folder`}
+              folders={folders}
+              value={draft.sidebarFolderId}
+              onChange={(sidebarFolderId) => setDraft((current) => ({ ...current, sidebarFolderId }))}
+              onCreateFolder={onCreateFolder}
+              onBusyChange={setFolderBusy}
+              disabled={submitting}
+            />
+          </div>
 
           <fieldset className="tm-field" disabled={submitting}>
             <legend className="tm-field-label">{t("tasks.createListViewLabel")}</legend>

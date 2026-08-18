@@ -57,8 +57,8 @@ describe("isListNameValid (§3.14, §3.16)", () => {
 describe("duplicate names (§3.15)", () => {
   it("are allowed, in the same Folder and in different ones", () => {
     const existing = [
-      { id: "l1", name: "자료", folderId: "f1" },
-      { id: "l2", name: "자료", folderId: "f2" },
+      { id: "l1", name: "자료", sidebarFolderId: "f1" },
+      { id: "l2", name: "자료", sidebarFolderId: "f2" },
     ] as List[];
 
     expect(duplicateNamesAreAllowed(existing)).toBe(true);
@@ -85,9 +85,9 @@ describe("createListStatus (§1.5)", () => {
 
   // §1.5's S2 explicitly refuses to make Name the first field.
   it("lets the other choices be made before the name exists", () => {
-    const early = draft({ color: "#ff8800", defaultViewKey: "board", folderId: "f1" });
+    const early = draft({ color: "#ff8800", defaultViewKey: "board", sidebarFolderId: "f1" });
     expect(createListStatus(early, false)).toBe("empty");
-    expect(createListPayload(early)).toMatchObject({ color: "#ff8800", defaultViewKey: "board", folderId: "f1" });
+    expect(createListPayload(early)).toMatchObject({ color: "#ff8800", defaultViewKey: "board", sidebarFolderId: "f1" });
   });
 });
 
@@ -116,17 +116,17 @@ describe("createListPayload", () => {
 
   it("carries every choice that was made (§1.12 has to restore all of them)", () => {
     expect(
-      createListPayload(draft({ name: "학교", color: "#ff8800", defaultViewKey: "board", folderId: "f1" })),
-    ).toEqual({ name: "학교", color: "#ff8800", defaultViewKey: "board", folderId: "f1" });
+      createListPayload(draft({ name: "학교", color: "#ff8800", defaultViewKey: "board", sidebarFolderId: "f1" })),
+    ).toEqual({ name: "학교", color: "#ff8800", defaultViewKey: "board", sidebarFolderId: "f1" });
   });
 });
 
 describe("emptyCreateListDraft (§1.1, §1.2)", () => {
   it("opens with no Folder from the Lists header", () => {
-    expect(emptyCreateListDraft()).toEqual({ name: "", color: "", defaultViewKey: "", folderId: "" });
+    expect(emptyCreateListDraft()).toEqual({ name: "", color: "", defaultViewKey: "", sidebarFolderId: "" });
   });
 
   it("opens inside the Folder it was started from", () => {
-    expect(emptyCreateListDraft("f1").folderId).toBe("f1");
+    expect(emptyCreateListDraft("f1").sidebarFolderId).toBe("f1");
   });
 });

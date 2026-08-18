@@ -16,7 +16,12 @@ import { CreateListModal } from "./CreateListModal";
 function open(onSubmit: (draft: unknown) => Promise<void>) {
   return render(
     <I18nProvider lang="en">
-      <CreateListModal onSubmit={onSubmit as never} onClose={() => {}} />
+      <CreateListModal
+        folders={[]}
+        onCreateFolder={() => "sf-new"}
+        onSubmit={onSubmit as never}
+        onClose={() => {}}
+      />
     </I18nProvider>,
   );
 }

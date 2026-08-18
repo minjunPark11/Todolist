@@ -117,6 +117,7 @@ function renderModule(url: string) {
         onNavigate={() => {}}
         onCreate={() => {}}
         onCreateList={() => "list-new"}
+        onCreateSidebarFolder={() => "sf-new"}
         drawer={{
           childrenOf: () => [],
           onUpdate: () => {},

@@ -1110,9 +1110,13 @@ export default function App() {
           // inherit and inventing one would file the List somewhere the user
           // never chose. §6.3 makes a standalone List first-class exactly for
           // this, and `createList` writes the `kind` that keeps it alive.
-          onCreateList={({ name, color, defaultViewKey, folderId }) =>
-            planner.createList("", name, folderId, { color, defaultViewKey })
+          onCreateList={({ name, color, defaultViewKey, sidebarFolderId }) =>
+            // No domain Folder argument: that one belongs to a Project and
+            // this List has none. The group the dialog offered is the
+            // sidebar's (§R.7).
+            planner.createList("", name, undefined, { color, defaultViewKey, sidebarFolderId })
           }
+          onCreateSidebarFolder={planner.createSidebarFolder}
           // Straight to the store. The legacy confirmation modal lives in
           // AppModals, which this branch does not render — and §9.45 keeps
           // confirmation for what cannot be taken back, which a soft delete

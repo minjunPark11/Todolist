@@ -107,8 +107,10 @@ interface TasksModuleProps {
     name: string;
     color?: string;
     defaultViewKey?: string;
-    folderId?: string;
+    sidebarFolderId?: string;
   }) => Promise<string> | string;
+  /** Makes a sidebar group and answers its id (Add List design §6.32). */
+  onCreateSidebarFolder: (name: string) => Promise<string> | string;
   /** §13.23/§6.56: restoring a List, and the one hard delete in the app. */
   lifecycle: {
     onArchiveList: (listId: string) => void;
@@ -615,6 +617,8 @@ export function TasksModule(props: TasksModuleProps) {
       {creatingListIn !== null ? (
         <CreateListModal
           contextFolderId={creatingListIn}
+          folders={sidebarFolders}
+          onCreateFolder={props.onCreateSidebarFolder}
           onClose={() => setCreatingListIn(null)}
           onSubmit={async (draft: CreateListDraft) => {
             const payload = createListPayload(draft);

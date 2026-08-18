@@ -1253,3 +1253,144 @@
     height: 32px;
   }
 }
+
+/* --- Add List: folder select (Add List design §6) --- */
+
+.tm-folder-select {
+  position: relative;
+}
+
+.tm-folder-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* §6.41: one line, and the end of a long name is cut rather than the field. */
+.tm-folder-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-folder-trigger:focus-visible {
+  border-color: var(--accent, #0a84ff);
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(10, 132, 255, 0.18));
+}
+
+.tm-folder-dropdown {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.1));
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+.tm-folder-search {
+  margin: 8px 8px 4px;
+  width: auto;
+}
+
+/* §6.14: tall enough to be a list, short enough that the dialog stays put. */
+.tm-folder-options {
+  max-height: 216px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.tm-folder-option {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tm-folder-option.is-selected {
+  background: var(--accent-soft, rgba(10, 132, 255, 0.12));
+}
+
+.tm-folder-footer {
+  padding: 6px;
+  border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+}
+
+.tm-folder-new {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent, #0a84ff);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-folder-create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+}
+
+.tm-folder-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.tm-folder-create-actions button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-2, rgba(0, 0, 0, 0.05));
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tm-folder-create-actions button:last-child {
+  background: var(--accent, #0a84ff);
+  color: #fff;
+}
+
+.tm-folder-create-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (pointer: coarse) {
+  .tm-folder-trigger,
+  .tm-folder-option {
+    min-height: 44px;
+  }
+}

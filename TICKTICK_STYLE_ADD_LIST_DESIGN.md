@@ -43,7 +43,7 @@
 | 본문 | 이 저장소 | 비고 |
 |---|---|---|
 | `spaceId` | **`projectId`** | R.3 참조. `List.spaceId`에 쓰지 말 것 |
-| `folderId` | `folderId` | 그대로. 단 `sidebarFolderId`는 별개 축이다 (R.7) |
+| `folderId` | **`sidebarFolderId`** | Phase 5에서 뒤집혔다 — R.7 참조 |
 | `sortKey: string` | `order: number` + `orderBetween()` | R.5 참조 |
 | `ViewKey` | `TaskViewKind` | R.6 참조 |
 | 서버 Command / Transaction | 로컬 리듀서 + 디바운스 diff 저장 | R.4 참조 |
@@ -160,7 +160,21 @@ Phase 1의 원칙은 여기서도 그대로다 — **모르는 색은 그리지 
 | R0-1 (List ≠ View) | 이미 그렇다. `List`에 `type` 필드가 없고 View는 `?view=`다 |
 | §10 network failure / retry | `domain/sync/saveQueue.ts` |
 
-**그리고 Folder는 본문보다 이 저장소가 한 걸음 앞서 있다.** 본문은 `folderId` 하나를 말하지만, 이 저장소는 `folderId`(도메인: List가 **어디에 속하는가**)와 `sidebarFolderId`(표시: 사용자가 **어디서 보기로 했는가**)를 이미 나눠 두었고, `folderIdFor`가 둘을 하나의 답으로 합친다. Add List의 Folder 선택은 **도메인 `folderId`를 정하는 것**으로 해석한다.
+**그리고 Folder는 본문보다 이 저장소가 한 걸음 앞서 있다.** 본문은 `folderId` 하나를 말하지만, 이 저장소는 `folderId`(도메인: List가 **어디에 속하는가**)와 `sidebarFolderId`(표시: 사용자가 **어디서 보기로 했는가**)를 이미 나눠 두었고, `folderIdFor`가 둘을 하나의 답으로 합친다.
+
+### Phase 5에서 뒤집힌 것 — Add List의 Folder는 `sidebarFolderId`다
+
+이 절은 원래 *"도메인 `folderId`를 정하는 것"*이라고 적었다. **틀렸다.** Phase 2가 정한 사실 하나가 그 답을 불가능하게 만든다: 이 모듈이 만드는 List는 **Project가 없다**(standalone, §6.3). 그런데 도메인 `Folder`는 Project에 속하고 `activeFolders(folders, projectId)`는 Project 없이는 아무것도 답하지 않는다 — **고를 것이 아예 없다.**
+
+`sidebarFolders.ts`의 헤더가 이미 같은 말을 하고 있다: *"ladder는 List가 어디에 속하는지를 답하고, 사이드바는 사용자가 어디서 보고 싶은지를 답한다."* Add List의 Folder가 하는 일이 정확히 후자다. 그래서 draft·payload·store 옵션 모두 **`sidebarFolderId`**로 부른다 — 문서의 단어를 그대로 쓰면 리포에서 다른 것을 가리키게 되고, 그건 R.3이 `spaceId`에서 막은 바로 그 사고다.
+
+**`addSidebarFolder`도 도메인에 있고 테스트도 있는데 부르는 곳이 없었다** — Phase 2의 `standaloneLists`와 똑같은 공백이다. `createSidebarFolder`가 스토어 커맨드로 생겼고, 만든 id를 돌려준다(§6.32가 곧바로 선택해야 하므로).
+
+**§6.35의 잠금은 §1.13 INV-04와 같은 종류다.** Folder를 만드는 동안 Add를 막지 않으면 `sidebarFolderId`가 확정되기 전에 List가 생긴다. 그리고 Folder 생성 자체도 ref 잠금이다 — Phase 2가 배운 것을 두 번 배우지 않는다(테스트: Create 3번 클릭 → 1개).
+
+**axe가 또 하나 잡았다.** trigger에 `role="combobox"`를 붙이고 안에 선택된 폴더 이름을 넣었더니 `button-name` **critical**이다. combobox의 내용은 **값**이지 이름이 아니다 — 이름은 레이블에서 와야 한다. `aria-labelledby`로 고쳤다. 팔레트의 listbox 건과 같은 부류: role은 다 붙어 있었고 **무엇이 무엇을 뜻하는지**가 틀렸다.
+
+**앱에서 확인:** 기본값 "없음", 폴더 8개 이하에서 검색 없음(§6.24), `+ 새 폴더` → **두 번째 다이얼로그 없이** footer가 편집기로 바뀌고 포커스가 들어감(§6.30), 생성 즉시 선택 + 드롭다운 닫힘(§6.32), 그 동안 List 이름 draft는 그대로. 만들어진 List에 `sidebarFolderId`가 붙고 사이드바에서 그 그룹 아래에 나타난다.
 
 ---
 
@@ -173,7 +187,7 @@ Phase 1의 원칙은 여기서도 그대로다 — **모르는 색은 그리지 
 | **2** ✅ | §1~§3 Modal + Name | Name 하나로 Enter 생성 → Sidebar 반영 → 새 List 진입 → 첫 Task 입력 가능 |
 | **3** ✅ | Gantt View 배선 | `?view=gantt`가 아홉 Scope 중 허용된 곳에서 열리고, `hardening.test.ts`가 갱신됨 |
 | **4** ✅ | §4~§5 Color + Default View | 저장한 `defaultViewKey`가 실제로 그 View를 연다 |
-| **5** | §6 Folder | inline Folder 생성 포함 |
+| **5** ✅ | §6 Folder | inline Folder 생성 포함 |
 | **6** | §8 Preview | 순수 표현 계층 — 잘라내도 기능이 성립한다 |
 | **7** | §9·§10·§14 접근성·에러·반응형 | Phase 11의 axe 하니스 재사용 |
 

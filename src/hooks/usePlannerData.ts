@@ -50,7 +50,7 @@ import {
 } from "../domain/today/dailyPlan";
 import { backfillTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
 import { sanitizeListSection } from "../domain/tasks/sections";
-import { sanitizeSidebarFolder } from "../domain/tasks/sidebarFolders";
+import { addSidebarFolder, sanitizeSidebarFolder } from "../domain/tasks/sidebarFolders";
 import { sanitizeSavedFilter } from "../domain/tasks/filters";
 import { backfillTaskListId, defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
 import * as pathOps from "../domain/horizons/pathMutations";
@@ -1836,7 +1836,7 @@ export function usePlannerData() {
     projectId: string,
     name: string,
     folderId?: string,
-    options: { color?: string; defaultViewKey?: string } = {},
+    options: { color?: string; defaultViewKey?: string; sidebarFolderId?: string } = {},
   ): string {
     const now = new Date().toISOString();
     const list: List = {
@@ -1857,6 +1857,10 @@ export function usePlannerData() {
       // this", and an empty string is a choice that reads as one.
       ...(options.color?.trim() ? { color: options.color.trim() } : {}),
       ...(options.defaultViewKey?.trim() ? { defaultViewKey: options.defaultViewKey.trim() } : {}),
+      // The sidebar's own grouping, NOT the Project ladder's Folder (D18/D19).
+      // A List made in the Tasks Module has no Project, and a domain Folder
+      // belongs to one — so there is no Folder of that kind it could go in.
+      ...(options.sidebarFolderId?.trim() ? { sidebarFolderId: options.sidebarFolderId.trim() } : {}),
       order: 0,
       isDefault: false,
       createdAt: now,
@@ -1883,6 +1887,25 @@ export function usePlannerData() {
       return { ...current, lists, projects };
     });
     return list.id;
+  }
+
+  /**
+   * A sidebar group, made because a List is going into it (Add List §6.32).
+   *
+   * `addSidebarFolder` has been in the domain, tested, with nothing able to
+   * call it — the same gap `standaloneLists` had. Answers the new id so the
+   * caller can select it straight away, which is the whole reason it was made.
+   */
+  function createSidebarFolder(name: string): string {
+    const trimmed = name.trim();
+    if (!trimmed) return "";
+    const id = createId("sidebar-folder");
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      sidebarFolders: addSidebarFolder(current.sidebarFolders, trimmed, id, now),
+    }));
+    return id;
   }
 
   /** Created with a Space and never deletable, so an Item always has a home (D5). */
@@ -2163,6 +2186,7 @@ export function usePlannerData() {
     archiveSpace,
     moveProjectToSpace,
     createList,
+    createSidebarFolder,
     createDefaultList,
     updateList,
     archiveList,

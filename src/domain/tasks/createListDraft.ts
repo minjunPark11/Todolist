@@ -23,8 +23,16 @@ export interface CreateListDraft {
   color: string;
   /** "" means "let the Scope registry answer", which is the default. */
   defaultViewKey: string;
-  /** The Folder the List will belong to. "" is Folderless (D4). */
-  folderId: string;
+  /**
+   * The sidebar group the List will be shown in. "" is ungrouped.
+   *
+   * The design says `folderId`; here that is the SIDEBAR's folder, not the
+   * Project ladder's — see §R.7. A List made in this module has no Project,
+   * and a domain Folder belongs to one, so there is no Folder of that kind for
+   * it to be in. The sidebar's grouping is also what the design's Folder
+   * actually DOES: it decides where the List is seen (D18/D19).
+   */
+  sidebarFolderId: string;
 }
 
 /**
@@ -32,7 +40,7 @@ export interface CreateListDraft {
  * opens with that Folder already chosen. Nothing else differs between them.
  */
 export function emptyCreateListDraft(contextFolderId = ""): CreateListDraft {
-  return { name: "", color: "", defaultViewKey: "", folderId: contextFolderId };
+  return { name: "", color: "", defaultViewKey: "", sidebarFolderId: contextFolderId };
 }
 
 /**
@@ -88,7 +96,7 @@ export interface CreateListPayload {
   name: string;
   color?: string;
   defaultViewKey?: string;
-  folderId?: string;
+  sidebarFolderId?: string;
 }
 
 /**
@@ -100,11 +108,11 @@ export interface CreateListPayload {
 export function createListPayload(draft: CreateListDraft): CreateListPayload {
   const color = draft.color.trim();
   const defaultViewKey = draft.defaultViewKey.trim();
-  const folderId = draft.folderId.trim();
+  const sidebarFolderId = draft.sidebarFolderId.trim();
   return {
     name: normalizeListName(draft.name),
     ...(color ? { color } : {}),
     ...(defaultViewKey ? { defaultViewKey } : {}),
-    ...(folderId ? { folderId } : {}),
+    ...(sidebarFolderId ? { sidebarFolderId } : {}),
   };
 }
