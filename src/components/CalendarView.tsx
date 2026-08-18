@@ -670,25 +670,16 @@ export function CalendarView({
       showToast?.({ message: t("calendar.readOnlyCategoryToast") });
       return;
     }
-    if (result.type === "deadline") {
-      onCreateTask({
-        title: result.title,
-        status: "todo",
-        dueDate: result.date,
-        categoryId: result.categoryId,
-        projectId: projectIdForCategory(result.categoryId),
-      });
-    } else {
-      onCreateTask({
-        title: result.title,
-        status: "todo",
-        scheduledDate: result.date,
-        startTime: result.startTime || undefined,
-        endTime: result.endTime || undefined,
-        categoryId: result.categoryId,
-        projectId: projectIdForCategory(result.categoryId),
-      });
-    }
+    // The popover used to ask "task or deadline". Those were two fields; they
+    // are one now, so the question had two answers that looked identical on
+    // the calendar (audit §6, 1-e).
+    onCreateTask({
+      title: result.title,
+      status: "todo",
+      ...placeOn(result.date, result.startTime, result.endTime),
+      categoryId: result.categoryId,
+      projectId: projectIdForCategory(result.categoryId),
+    });
     // §16.4: creating in a category re-shows it and keeps it active.
     ensureCategoryVisible(result.categoryId);
     setActiveCategory(result.categoryId);
@@ -721,13 +712,19 @@ export function CalendarView({
       showToast?.({ message: t("calendar.readOnlyCategoryToast") });
       return;
     }
+    // The form can still name a later deadline. Dragged day plus deadline is
+    // exactly the pair that becomes a range (audit 1-d), so build it as one
+    // rather than writing two fields and letting the reader infer it.
     const taskId = onCreateTask({
       title: result.title,
       status: "todo",
-      scheduledDate: draft.date,
-      startTime: draft.startTime,
-      endTime: draft.endTime,
-      dueDate: result.dueDate || undefined,
+      ...scheduleToTaskPatch({
+        startDate: result.dueDate && result.dueDate > draft.date ? draft.date : null,
+        dueDate: result.dueDate && result.dueDate > draft.date ? result.dueDate : draft.date,
+        startTime: draft.startTime || null,
+        endTime: draft.endTime || null,
+        timezone: null,
+      }),
       categoryId: result.categoryId,
       projectId: projectIdForCategory(result.categoryId),
     });

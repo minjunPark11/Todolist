@@ -164,11 +164,11 @@ describe("task chips", () => {
   });
 
   it("obeys the task layer toggle", () => {
-    // WAS: the Deadline toggle drew a chip of its own. It no longer governs
-    // any task chip — only project deadlines still use that layer.
+    // WAS: a Deadline toggle drew a chip of its own beside this one. The layer
+    // is gone — every task chip answers to `task` now.
     const t = task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20" });
     expect(build({ tasks: [t], layers: { ...defaultCalendarLayers, task: false } })).toEqual([]);
-    expect(build({ tasks: [t], layers: { ...defaultCalendarLayers, deadline: false } })).toHaveLength(4);
+    expect(build({ tasks: [t] })).toHaveLength(4);
   });
 
   it("marks a repeating task on every chip", () => {

@@ -132,17 +132,22 @@ function normalizeTask(task: Partial<Task>): Task {
   const rawStatus = migrateStatus(task.status);
   const rawPrevious = task.previousStatus ? migrateStatus(task.previousStatus) : undefined;
 
-  // CALENDAR_DESIGN.md §1.2/§10.2: startTime/endTime now belong to scheduledDate
-  // (not dueDate). Older records saved by the pre-redesign calendar drag/drop
-  // have a time but no scheduledDate — promote dueDate into scheduledDate so
-  // the timed block keeps showing up. Additive only, and guarded by
-  // `!scheduledDate` so it never re-fires once applied (idempotent).
+  // The promotion that used to live here — copying `dueDate` into
+  // `scheduledDate` when a record had a time but no work day — is gone
+  // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §6, 1-d).
+  //
+  // It ran in the direction the consolidation reverses, so it fought every
+  // write the calendar now makes: a task saved with a time and a date came
+  // straight back out carrying the legacy field again. It is also redundant.
+  // The record it existed for — a time and a `dueDate`, no work day — is what
+  // `scheduleFromTask` calls `canonical`, and reads as a timed block on that
+  // date without help.
+  //
+  // Existing rows keep whatever `scheduledDate` they already have; the adapter
+  // reads both shapes, and the rewrite is its own phase.
   const dueDate = task.dueDate ?? "";
   const startTime = task.startTime ?? "";
-  let scheduledDate = task.scheduledDate ?? "";
-  if (startTime && !scheduledDate && dueDate) {
-    scheduledDate = dueDate;
-  }
+  const scheduledDate = task.scheduledDate ?? "";
 
   return {
     // Forward compatibility (SPACES_CLICKUP_REDESIGN.md M0). Everything below

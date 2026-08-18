@@ -730,8 +730,6 @@ export const en: Dictionary = {
   "calendar.dragToCreate": "Drag on the calendar to create a task",
   "calendar.when": "When",
   "calendar.quickCreateTitle": "New Task",
-  "calendar.type": "Type",
-  "calendar.typeDeadline": "Deadline",
   "calendar.date": "Date",
   "calendar.startTime": "Start time",
   "calendar.endTime": "End time",
@@ -941,7 +939,6 @@ export const en: Dictionary = {
   "calendar.createTask": "Create task",
   "calendar.newItemOn": "New item — {{date}}",
   "calendar.newTaskOn": "New task — {{date}}",
-  "calendar.typeTaskScheduled": "Task (scheduled)",
   "common.titleLabel": "Title",
 
   // ---- Planning page ----

@@ -10,15 +10,16 @@
 // Those are the page's subject, not this scope's — and none of them is an
 // Item, so a scope has nothing to say about them.
 //
-// Dates (G-CALENDAR-01, §0.3.4): the two fields stay separate. `scheduledDate`
-// is the draggable work block and `dueDate` is a read-only deadline marker, so
-// a drop writes the former and never the latter — the same rule the Calendar
+// Dates: the fields merged (SCHEDULE_EDITOR_PHASE0_AUDIT.md §6). A drop writes
+// the whole schedule rather than one field of it, because a reader that
+// consolidates would read a half-write as a range — the same rule the Calendar
 // page's own drop follows.
 import { DragEvent, useMemo, useState } from "react";
 import type { Project, Task } from "../types";
 import { buildCalendarItems, type CalendarItem, type CalendarLayerToggles } from "../utils/calendarItems";
 import { addMonths, todayValue } from "../utils/date";
 import { MonthView } from "./calendar/MonthView";
+import { scheduleFromTask, scheduleToTaskPatch } from "../domain/schedule";
 import { useT } from "../i18n";
 
 /**
@@ -29,7 +30,6 @@ import { useT } from "../i18n";
  */
 const SCOPE_LAYERS: CalendarLayerToggles = {
   task: true,
-  deadline: true,
   projectDeadline: false,
   completed: true,
   focusActual: false,
@@ -98,7 +98,10 @@ export function TaskCalendarView({
   function handleDropCell(event: DragEvent, date: string) {
     event.preventDefault();
     const taskId = event.dataTransfer.getData("text/plain");
-    if (taskId) onUpdateTask(taskId, { scheduledDate: date });
+    if (taskId) {
+      const current = scheduleFromTask(tasks.find((item) => item.id === taskId) ?? {});
+      onUpdateTask(taskId, scheduleToTaskPatch({ ...current, startDate: null, dueDate: date }));
+    }
     setDragOverId("");
   }
 

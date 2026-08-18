@@ -13,7 +13,6 @@ export interface QuickCreateDefaults {
 
 export interface QuickCreateResult {
   title: string;
-  type: "task" | "deadline";
   date: string;
   startTime: string;
   endTime: string;
@@ -31,7 +30,6 @@ interface QuickCreatePopoverProps {
 export function QuickCreatePopover({ defaults, categoryGroups, initialCategoryId, onClose, onSave }: QuickCreatePopoverProps) {
   const { t, lang } = useT();
   const [title, setTitle] = useState("");
-  const [type, setType] = useState<"task" | "deadline">("task");
   const [date, setDate] = useState(defaults.date);
   const [startTime, setStartTime] = useState(defaults.startTime ?? "");
   const [endTime, setEndTime] = useState(defaults.endTime ?? "");
@@ -41,7 +39,7 @@ export function QuickCreatePopover({ defaults, categoryGroups, initialCategoryId
   function submit(event?: FormEvent) {
     event?.preventDefault();
     const trimmed = title.trim() || t("calendar.newEventDefaultTitle");
-    onSave({ title: trimmed, type, date, startTime, endTime, categoryId });
+    onSave({ title: trimmed, date, startTime, endTime, categoryId });
   }
 
   return (
@@ -79,16 +77,6 @@ export function QuickCreatePopover({ defaults, categoryGroups, initialCategoryId
             placeholder={t("calendar.newEventDefaultTitle")}
           />
         </label>
-
-        {defaults.allDay ? (
-          <label>
-            <span>{t("calendar.type")}</span>
-            <select value={type} onChange={(event) => setType(event.target.value as "task" | "deadline")}>
-              <option value="task">{t("calendar.typeTaskScheduled")}</option>
-              <option value="deadline">{t("calendar.typeDeadline")}</option>
-            </select>
-          </label>
-        ) : null}
 
         <label>
           <span>{t("calendar.date")}</span>

@@ -16,7 +16,6 @@ const WEEKDAYS_KO = ["일", "월", "화", "수", "목", "금", "토"];
 const CHIP_CAP = 5;
 
 function layerPrefix(layer: CalendarItem["layer"]) {
-  if (layer === "deadline") return "⚠ ";
   if (layer === "project-deadline") return "◆ ";
   if (layer === "external") return "• ";
   if (layer === "focus-actual") return "⏱ ";

@@ -728,8 +728,6 @@ export const ko: Dictionary = {
   "calendar.dragToCreate": "캘린더를 드래그해 할 일을 만드세요",
   "calendar.when": "일정",
   "calendar.quickCreateTitle": "새 할 일",
-  "calendar.type": "유형",
-  "calendar.typeDeadline": "마감일",
   "calendar.date": "날짜",
   "calendar.startTime": "시작 시간",
   "calendar.endTime": "종료 시간",
@@ -935,7 +933,6 @@ export const ko: Dictionary = {
   "calendar.createTask": "할 일 만들기",
   "calendar.newItemOn": "새 항목 — {{date}}",
   "calendar.newTaskOn": "새 할 일 — {{date}}",
-  "calendar.typeTaskScheduled": "할 일 (일정 있음)",
   "common.titleLabel": "제목",
 
   // ---- Planning page ----

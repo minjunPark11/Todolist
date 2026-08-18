@@ -14,11 +14,13 @@ import { scheduleSpan } from "../domain/schedule/scheduleQueries";
 import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { addDays, todayValue } from "./date";
 
-export type CalendarLayer = "task" | "deadline" | "project-deadline" | "external" | "focus-actual";
+// "deadline" is gone: it named the marker a task drew from `dueDate`, and a
+// task draws one chip now (audit §6, 1-e). `project-deadline` stays — a
+// Project's own due date is still a separate thing from work inside it.
+export type CalendarLayer = "task" | "project-deadline" | "external" | "focus-actual";
 
 export interface CalendarLayerToggles {
   task: boolean;
-  deadline: boolean;
   projectDeadline: boolean;
   completed: boolean;
   focusActual: boolean;
@@ -26,7 +28,6 @@ export interface CalendarLayerToggles {
 
 export const defaultCalendarLayers: CalendarLayerToggles = {
   task: true,
-  deadline: true,
   projectDeadline: true,
   completed: false,
   focusActual: true,
@@ -60,10 +61,9 @@ export interface CalendarItem {
 // fallback for items whose category has none (CALENDAR_APPLE_DESIGN.md D1).
 // Hue answers "which calendar is this?" and nothing else — the layer is read
 // from the item's *shape* instead, so recolouring a category can no longer
-// make a deadline marker and a project deadline collide on the same orange.
+// make a task chip and a project deadline collide on the same orange.
 const LAYER_COLOR: Record<CalendarLayer, string> = {
   task: "#0066cc",
-  deadline: "#ff9500",
   "project-deadline": "#ff2d55",
   external: "#4f73ff",
   "focus-actual": FOCUS_ACTUAL_COLOR,
