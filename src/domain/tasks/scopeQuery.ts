@@ -15,6 +15,9 @@ import { listIdFor } from "../spaces/membership";
 import { tagIdFor, isUserTag } from "../tags/tags";
 import { folderIdFor } from "./sidebarFolders";
 import { matchesFilterSpec } from "./filters";
+// The same rules, answered by lookup instead of by scanning the collection.
+// Semantics are untouched — see scopeIndex.ts for why identity is enough.
+import { listsById, planDatesByTask, tagIdsByTask } from "./scopeIndex";
 // The horizon is counted in the user's own days. A local date walked through
 // `toISOString` lands a day early east of UTC, which is what the first run of
 // the §12.6 fixture caught here.
@@ -76,7 +79,7 @@ export function isTaskActive(task: Task, lists: List[]): boolean {
   if (task.status === "archived") return false;
   const listId = listIdFor(task, lists);
   if (!listId) return true; // nothing owns it yet; the backfill has not run
-  const owner = lists.find((list) => list.id === listId);
+  const owner = listsById(lists).get(listId);
   // §13.19's shared precondition: the Task is active only if its owner List is.
   // A deleted List takes its Tasks out of every Scope WITHOUT writing anything
   // on them (§6.56) — which is why restoring the List brings them all back and
@@ -101,12 +104,12 @@ function isActive(task: Task, lists: List[]): boolean {
  */
 export function hasTodayPlan(task: Task, dailyPlans: TaskDailyPlan[], date: string): boolean {
   if (task.scheduledDate === date) return true;
-  return dailyPlans.some((plan) => plan.taskId === task.id && plan.planDate === date);
+  return planDatesByTask(dailyPlans).get(task.id)?.has(date) ?? false;
 }
 
 function ownerList(task: Task, lists: List[]): List | undefined {
   const listId = listIdFor(task, lists);
-  return listId ? lists.find((list) => list.id === listId) : undefined;
+  return listId ? listsById(lists).get(listId) : undefined;
 }
 
 /**
@@ -118,7 +121,7 @@ function ownerList(task: Task, lists: List[]): List | undefined {
  * this second leg once creation writes links itself (Phase 4).
  */
 function hasTag(task: Task, tagId: string, links: TaskTag[]): boolean {
-  if (links.some((link) => link.taskId === task.id && link.tagId === tagId)) return true;
+  if (tagIdsByTask(links).get(task.id)?.has(tagId)) return true;
   return task.tags.some((name) => isUserTag(name) && tagIdFor(name) === tagId);
 }
 

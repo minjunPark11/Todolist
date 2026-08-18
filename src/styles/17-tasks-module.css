@@ -125,6 +125,19 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 16px;
+  /* §16.34's browser zoom. At 400% the viewport is about 320 CSS px and this
+     row stops fitting on one line. Without wrapping, `margin-left: auto` keeps
+     pushing the view toggle right until it passes the edge, where the shell's
+     `overflow-x: hidden` CLIPS it — so Board is not cramped, it is
+     unreachable. Wrapping drops the toggle to its own line instead. */
+  flex-wrap: wrap;
+}
+
+/* A long Scope title must wrap rather than push its neighbours out of the
+   viewport; flex items refuse to shrink past their content without this. */
+.tm-header > .tm-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .tm-title {
