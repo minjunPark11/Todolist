@@ -109,12 +109,21 @@ test.describe("Add List", () => {
     await openApp(page);
     await openFromHeader(page);
 
-    // §13.22: half a hex is not a colour.
-    await page.locator(".tm-custom-color-input").fill("#4F7");
-    await nameField(page).fill("Half");
-    expect((await readStore(page)).lists.find((list) => list.name === "Half")).toBeUndefined();
+    // The hex field lives in the swatch's popover now (§4.19/§4.20), and the
+    // value it holds is the popover's until Apply — which is what keeps a
+    // half-typed code out of the draft.
+    await page.locator(".tm-swatch-custom").click();
+    const hex = page.locator(".tm-color-popover .tm-color-hex input");
 
-    await page.locator(".tm-custom-color-input").fill("#4F7AF8");
+    // §13.22: half a hex is not a colour, so Apply refuses it.
+    await hex.fill("#4F7");
+    await expect(page.locator(".tm-color-popover .tm-modal-submit")).toBeDisabled();
+
+    await hex.fill("#4F7AF8");
+    await page.locator(".tm-color-popover .tm-modal-submit").click();
+    await expect(page.locator(".tm-color-popover")).toBeHidden();
+
+    await nameField(page).fill("Half");
     await nameField(page).press("Enter");
     await expect(dialog(page)).toBeHidden();
 

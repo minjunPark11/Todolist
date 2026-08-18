@@ -19,9 +19,10 @@ import {
   emptyCreateListDraft,
   type CreateListDraft,
 } from "../../domain/tasks/createListDraft";
-import { LIST_COLOR_PRESETS, isCustomListColor, listColorHex } from "../../domain/tasks/listColor";
+import { LIST_COLOR_PRESETS, isCustomListColor } from "../../domain/tasks/listColor";
 import { CREATE_LIST_VIEW_CHOICES } from "../../domain/tasks/listView";
 import { isRovingKey, rovingNext } from "../../domain/tasks/rovingChoice";
+import { CustomColorPicker } from "./CustomColorPicker";
 import { FolderSelect } from "./FolderSelect";
 import { CreateListPreview } from "./CreateListPreview";
 import type { SidebarFolder } from "../../types";
@@ -65,6 +66,10 @@ export function CreateListModal({
   // values are listed in the order they are drawn, so Home and End mean the
   // ends of what the user can see.
   const colorValues = ["", ...LIST_COLOR_PRESETS.map((preset) => preset.key)];
+  // A custom colour is not one of the presets, so no swatch in the group is
+  // checked and the group needs a tab stop anyway — the first one takes it,
+  // the way an empty radio group does.
+  const colorCursor = isCustomListColor(draft.color) ? "" : draft.color;
 
   function rove(
     event: React.KeyboardEvent,
@@ -140,6 +145,21 @@ export function CreateListModal({
         <div className="tm-modal-settings">
           <header className="tm-modal-head">
             <h2 id={titleId}>{t("tasks.createListTitle")}</h2>
+            {/* §2.14 leaves this out on purpose — Cancel and Esc were the two
+                ways out, and a third reads as clutter beside an explicit
+                Cancel. The reference guide the app is being matched against
+                shows it, so it is here: a dialog people expect an × on is one
+                they hunt for it in. It does exactly what Cancel does, and is
+                locked during a submit for the same reason Cancel is. */}
+            <button
+              type="button"
+              className="tm-modal-close"
+              aria-label={t("tasks.createListCancel")}
+              disabled={submitting}
+              onClick={onClose}
+            >
+              ×
+            </button>
           </header>
 
           <form
@@ -150,7 +170,22 @@ export function CreateListModal({
           }}
         >
           <label className="tm-field">
-            <span className="tm-field-label">{t("tasks.createListNameLabel")}</span>
+            <span className="tm-field-label">
+              {t("tasks.createListNameLabel")}
+              {/* §3.12 declines a counter, on the grounds that a List name is
+                  not a username and needs no running feedback. It is here to
+                  match the reference guide — and it earns its place at the one
+                  moment §3.12 did not consider: the input silently stops
+                  accepting characters at the cap, and without a number on
+                  screen that reads as the keyboard having died.
+
+                  `aria-hidden` because the same fact is already announced:
+                  the input carries `maxlength`, which assistive technology
+                  reports without help. */}
+              <span className="tm-field-count" aria-hidden="true">
+                {draft.name.length}/{LIST_NAME_MAX_LENGTH}
+              </span>
+            </span>
             <input
               ref={nameRef}
               type="text"
@@ -184,12 +219,13 @@ export function CreateListModal({
               theirs. */}
           <fieldset className="tm-field" disabled={submitting}>
             <legend className="tm-field-label">{t("tasks.createListColorLabel")}</legend>
+            <div className="tm-swatches">
             <div
-              className="tm-swatches"
+              className="tm-swatch-radios"
               role="radiogroup"
               aria-label={t("tasks.createListColorLabel")}
               onKeyDown={(event) =>
-                rove(event, colorValues, draft.color, (color) => setDraft((current) => ({ ...current, color })))
+                rove(event, colorValues, colorCursor, (color) => setDraft((current) => ({ ...current, color })))
               }
             >
               {/* §0.7 R0-2's default, and it is a real choice rather than the
@@ -199,7 +235,7 @@ export function CreateListModal({
                 role="radio"
                 aria-checked={draft.color === ""}
                 aria-label={t("tasks.createListColorNone")}
-                tabIndex={draft.color === "" ? 0 : -1}
+                tabIndex={colorCursor === "" ? 0 : -1}
                 className={`tm-swatch is-none${draft.color === "" ? " is-selected" : ""}`}
                 onClick={() => setDraft((current) => ({ ...current, color: "" }))}
               />
@@ -210,34 +246,23 @@ export function CreateListModal({
                   role="radio"
                   aria-checked={draft.color === preset.key}
                   aria-label={t(`tasks.color.${preset.key}`)}
-                  tabIndex={draft.color === preset.key ? 0 : -1}
+                  tabIndex={colorCursor === preset.key ? 0 : -1}
                   className={`tm-swatch${draft.color === preset.key ? " is-selected" : ""}`}
                   style={{ background: preset.hex }}
                   onClick={() => setDraft((current) => ({ ...current, color: preset.key }))}
                 />
               ))}
+
             </div>
-            <label className="tm-custom-color">
-              <span>{t("tasks.createListColorCustom")}</span>
-              <input
-                type="text"
-                className="tm-modal-input tm-custom-color-input"
-                placeholder="#4F7AF8"
-                value={isCustomListColor(draft.color) ? draft.color : ""}
-                onChange={(event) => {
-                  const next = event.target.value.trim();
-                  // Only a canonical #RRGGBB is stored (§13.22). Half-typed
-                  // input is left on screen without being written, so the
-                  // colour never flickers through wrong values on the way.
-                  setDraft((current) => ({ ...current, color: isCustomListColor(next) ? next : current.color }));
-                }}
+
+              {/* §4.18: last in the ROW, beside the radiogroup rather than
+                  inside it — see the note in `CustomColorPicker`. */}
+              <CustomColorPicker
+                value={draft.color}
+                disabled={submitting}
+                onChange={(color) => setDraft((current) => ({ ...current, color }))}
               />
-              <span
-                className="tm-swatch is-preview"
-                style={{ background: listColorHex(draft.color) || "transparent" }}
-                aria-hidden
-              />
-            </label>
+            </div>
           </fieldset>
 
           <div className="tm-field">

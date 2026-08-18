@@ -13,14 +13,14 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { I18nProvider } from "../../i18n";
 import { CreateListModal } from "./CreateListModal";
 
-function open(onSubmit: (draft: unknown) => Promise<void>) {
+function open(onSubmit: (draft: unknown) => Promise<void>, options: { onClose?: () => void } = {}) {
   return render(
     <I18nProvider lang="en">
       <CreateListModal
         folders={[]}
         onCreateFolder={() => "sf-new"}
         onSubmit={onSubmit as never}
-        onClose={() => {}}
+        onClose={options.onClose ?? (() => {})}
       />
     </I18nProvider>,
   );
@@ -139,17 +139,46 @@ describe("CreateListModal", () => {
   });
 
   // §13.22: a half-typed hex is not a colour, and must not be stored as one.
+  // §4.20's Cancel/Apply: the popover holds its own value until Apply, so a
+  // half-typed code never reaches the draft.
   it("stores a custom colour only once it is a whole #RRGGBB", () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const { container } = open(onSubmit);
-    const custom = container.querySelector<HTMLInputElement>(".tm-custom-color-input")!;
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
 
-    setter.call(custom, "#4F7");
-    custom.dispatchEvent(new Event("input", { bubbles: true }));
+    fireEvent.click(container.querySelector(".tm-swatch-custom")!);
+    const hex = container.querySelector<HTMLInputElement>(".tm-color-hex input")!;
+    fireEvent.change(hex, { target: { value: "#4F7" } });
+
+    // Apply refuses an incomplete code rather than writing it.
+    expect(container.querySelector<HTMLButtonElement>(".tm-color-actions .tm-modal-submit")!.disabled).toBe(true);
+
+    pressEnter(typeName(container, "학교"));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ color: "" }));
+  });
+
+  it("stores a whole custom colour once it is applied", () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { container } = open(onSubmit);
+
+    fireEvent.click(container.querySelector(".tm-swatch-custom")!);
+    fireEvent.change(container.querySelector(".tm-color-hex input")!, { target: { value: "#4F7AF8" } });
+    fireEvent.click(container.querySelector(".tm-color-actions .tm-modal-submit")!);
     pressEnter(typeName(container, "학교"));
 
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ color: "" }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ color: "#4F7AF8" }));
+  });
+
+  // §9.15 at popover scale. Without the stopPropagation this closes the whole
+  // dialog and takes the name with it.
+  it("lets Esc close the colour popover without closing the dialog", () => {
+    const onClose = vi.fn();
+    const { container } = open(vi.fn().mockResolvedValue(undefined), { onClose });
+
+    fireEvent.click(container.querySelector(".tm-swatch-custom")!);
+    fireEvent.keyDown(container.querySelector(".tm-color-popover")!, { key: "Escape" });
+
+    expect(container.querySelector(".tm-color-popover")).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   // §9. Focus and keyboard, at the level they exist at.
@@ -178,7 +207,10 @@ describe("CreateListModal", () => {
   it("makes each radio group a single tab stop", () => {
     const { container } = open(vi.fn().mockResolvedValue(undefined));
 
-    const tabbableSwatches = [...container.querySelectorAll(".tm-swatch")].filter(
+    // Scoped to the radiogroup: the custom trigger sits in the same row but is
+    // NOT one of the radios, and takes a tab stop of its own on purpose (see
+    // `CustomColorPicker`).
+    const tabbableSwatches = [...container.querySelectorAll(".tm-swatch-radios .tm-swatch")].filter(
       (node) => (node as HTMLElement).tabIndex === 0,
     );
     const tabbableViews = [...container.querySelectorAll(".tm-modal .tm-view")].filter(
@@ -193,7 +225,7 @@ describe("CreateListModal", () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const { container } = open(onSubmit);
 
-    fireEvent.keyDown(container.querySelector(".tm-swatches")!, { key: "ArrowRight" });
+    fireEvent.keyDown(container.querySelector(".tm-swatch-radios")!, { key: "ArrowRight" });
     fireEvent.keyDown(container.querySelector(".tm-modal .tm-views")!, { key: "End" });
     pressEnter(typeName(container, "학교"));
 
@@ -208,8 +240,8 @@ describe("CreateListModal", () => {
 
     fireEvent.keyDown(container.querySelector(".tm-modal .tm-views")!, { key: "End" });
     fireEvent.keyDown(container.querySelector(".tm-modal .tm-views")!, { key: "Home" });
-    fireEvent.keyDown(container.querySelector(".tm-swatches")!, { key: "End" });
-    fireEvent.keyDown(container.querySelector(".tm-swatches")!, { key: "Home" });
+    fireEvent.keyDown(container.querySelector(".tm-swatch-radios")!, { key: "End" });
+    fireEvent.keyDown(container.querySelector(".tm-swatch-radios")!, { key: "Home" });
     pressEnter(typeName(container, "학교"));
 
     // §9.9 puts Home on "none", §9.10 puts it on List.
