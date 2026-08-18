@@ -40,6 +40,7 @@ function plannerData(path: LearningPath): PlannerData {
     projects: [],
     spaces: [],
     subtasks: [],
+    dailyPlans: [],
     focusSessions: [],
     activeSessionId: "",
     learningPaths: [path],

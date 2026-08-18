@@ -1,12 +1,13 @@
 // Derivations for the redesigned Today page (TODAY_PAGE_IMPLEMENTATION_SPEC).
 // Maps the existing Task/Project model onto the spec's
 // TodayTask / TimeBlock / SpaceSignal concepts without changing stored data.
-import type { Project, Task } from "../types";
-import { platform } from "../platform";
+import type { DailyPlanBucket, Project, Task } from "../types";
 import { blockedTaskIds } from "../domain/tasks/dependencies";
 import { todayValue } from "./date";
 
-export type TodayBucketId = "now" | "next" | "later";
+// The stored bucket, under the name this page has always used for it.
+// The record it comes from is domain/today/dailyPlan (§6.18).
+export type TodayBucketId = DailyPlanBucket;
 
 export type TodayReason =
   | "overdue"
@@ -32,32 +33,6 @@ export interface TodayEntry {
 }
 
 export type BucketOverrides = Record<string, TodayBucketId>;
-
-const OVERRIDES_STORAGE_KEY = "todayPage.bucketOverrides.v1";
-
-export function loadBucketOverrides(today = todayValue()): BucketOverrides {
-  try {
-    const raw = platform.storage.getSync(OVERRIDES_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as { date?: string; overrides?: BucketOverrides };
-    // Overrides are a per-day decision; a new day starts from the rule-based default.
-    if (parsed.date !== today || !parsed.overrides) return {};
-    return parsed.overrides;
-  } catch {
-    return {};
-  }
-}
-
-export function saveBucketOverrides(overrides: BucketOverrides, today = todayValue()) {
-  try {
-    platform.storage.setSync(
-      OVERRIDES_STORAGE_KEY,
-      JSON.stringify({ date: today, overrides }),
-    );
-  } catch {
-    // Storage may be unavailable (private mode); overrides then live for the session only.
-  }
-}
 
 export function parseTimeToMinutes(value: string): number | undefined {
   if (!/^\d{1,2}:\d{2}/.test(value)) return undefined;

@@ -24,6 +24,7 @@ export const collectionTables = [
   ["spaces", "spaces"],
   ["folders", "folders"],
   ["lists", "lists"],
+  ["dailyPlans", "daily_plans"],
 ] as const;
 
 // Tables added after the original schema: a client whose project predates them
@@ -33,6 +34,7 @@ export const optionalRemoteTables: ReadonlySet<string> = new Set([
   "spaces",
   "folders",
   "lists",
+  "daily_plans",
 ]);
 
 export type SyncCollectionKey = (typeof collectionTables)[number][0];

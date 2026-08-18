@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PageId, Project, Task, TaskDraft } from "../types";
+import type { PageId, Project, Task, TaskDailyPlan, TaskDraft } from "../types";
 import { formatDate, getDayLabel, todayValue } from "../utils/date";
 import {
   buildTimeRail,
   buildTodayPlan,
   collectTodayEntries,
-  loadBucketOverrides,
-  saveBucketOverrides,
+
+
   type BucketOverrides,
   type TodayBucketId,
 } from "../utils/todayView";
+import { bucketOverridesFor } from "../domain/today/dailyPlan";
 import type { ToastState } from "./kit";
 import { TodayBriefCard } from "./today/TodayBriefCard";
 import { FocusQueue } from "./today/FocusQueue";
@@ -32,6 +33,10 @@ export type TodayIntent = "" | "triage" | "quickAdd";
 interface TodayPageProps {
   tasks: Task[];
   projects: Project[];
+  /** One day-plan record per overridden task (§6.18), synced like everything else. */
+  dailyPlans: TaskDailyPlan[];
+  /** Replaces the whole plan for `planDate` — see usePlannerData.setTodayBuckets. */
+  onSetBuckets: (overrides: BucketOverrides, planDate: string) => void;
   onOpenTask: (id: string) => void;
   onToggleDone: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
@@ -51,6 +56,8 @@ interface TodayPageProps {
 export function TodayPage({
   tasks,
   projects,
+  dailyPlans,
+  onSetBuckets,
   onOpenTask,
   onToggleDone,
   onUpdateTask,
@@ -69,7 +76,12 @@ export function TodayPage({
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [overrides, setOverrides] = useState<BucketOverrides>(() => loadBucketOverrides(today));
+  // Derived from the synced records, not local state: the plan is the same on
+  // every device now (§6.18), so this page reads it rather than owning it.
+  const overrides = useMemo<BucketOverrides>(
+    () => bucketOverridesFor(dailyPlans, today),
+    [dailyPlans, today],
+  );
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [triageOpen, setTriageOpen] = useState(false);
   const [addToToday, setAddToToday] = useState(() => loadCaptureTarget());
@@ -77,10 +89,6 @@ export function TodayPage({
   const sortNowButtonRef = useRef<HTMLButtonElement>(null);
   const captureRef = useRef<HTMLInputElement>(null);
   const triageReturnFocusRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    saveBucketOverrides(overrides, today);
-  }, [overrides, today]);
 
   // Cross-page open requests (keyboard shortcuts, search, /inbox deep link,
   // §14 URL state) — handled once, then cleared by the caller.
@@ -228,16 +236,16 @@ export function TodayPage({
     message: string,
   ) {
     const previous = overrides;
-    setOverrides(updater);
+    onSetBuckets(updater(overrides), today);
     showToast({
       message,
       actionLabel: t("app.undo"),
-      onAction: () => setOverrides(previous),
+      onAction: () => onSetBuckets(previous, today),
     });
   }
 
   function handleMoveBucket(taskId: string, bucket: TodayBucketId) {
-    setOverrides((current) => ({ ...current, [taskId]: bucket }));
+    onSetBuckets({ ...overrides, [taskId]: bucket }, today);
   }
 
   function handleMoveAllLater() {

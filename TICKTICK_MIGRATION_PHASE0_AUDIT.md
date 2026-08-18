@@ -20,7 +20,7 @@
 | List가 `projectId`를 필수로 갖는가 | **그렇다** — ~~단 필드명이 `List.spaceId`~~ → ✅ 이름이 `projectId`로 정리됨 | 저장 키는 둘 다 쓴다(`sanitizeList`가 `projectId ?? spaceId`로 읽고 항상 병행 기록). nullable화는 Migration Phase 4(§6.72)로 남음 |
 | Folder와 List 관계 | Folder는 Project 소속(`Folder.spaceId`=Project id), List는 `folderId?` | `types.ts` |
 | orphan Task가 있는가 | **있다** — `projectId: ""`인 받은함 작업 | `App.tsx`의 project 없는 Task 폴백 |
-| Today override 저장 위치 | localStorage `todayPage.bucketOverrides.v1` | `utils/todayView.ts:36` — **동기되지 않음** |
+| Today override 저장 위치 | ~~localStorage `todayPage.bucketOverrides.v1`~~ → ✅ `TaskDailyPlan` 레코드 (§6.18) | `domain/today/dailyPlan.ts` — **동기된다.** 구 블롭은 읽어서 흡수만 하고 더는 쓰지 않는다 |
 | completed source | `task.status === "done"` + `completedAt` | 두 곳에 있고 `status`가 우선 |
 
 ---
@@ -148,5 +148,5 @@
 2. ~~**§16.35 P0/P1 경계 읽고 1차 범위 확정**~~ — **읽었다.** 계획서가 리포에 들어왔다. P0 MVP는 9개 Scope를 **전부** 포함한다(Today · Upcoming · Inbox · List · Folder · Tag · Filter · Completed · Trash). P1로 미룬 것은 Repeat / Reminder / Folder Board / advanced grouping / Multi-select / touch DnD / advanced search이며, §17은 *"§1~§16 기준으로 이제 추가적인 큰 UX 설계 없이 Tasks Module MVP 구현을 시작할 수 있다"*고 선언한다. 즉 "일부 Scope부터"는 계획서가 주는 선택지가 아니다
 3. **4급 항목 결정** — 절반은 답이 나왔다. **Repeat / Reminder는 §16.35가 P1로 배치**했으므로 유지하되 뒤로 미루면 된다. 그러나 **간트 · 목표(Goals) · status 6종은 P0에도 P1에도 없다** — 계획서가 다루지 않는 영역이므로 여전히 명시적 결정이 필요하다. 조용히 남겨두면 v0.10.x에서 정리한 것과 같은 잔재가 된다
 4. ~~**Migration Phase 4 (§6.72) — `List.projectId` nullable**~~ — **완료.** 계획서는 `NOT NULL` 제약 완화를 말하지만 `lists` 테이블은 `data jsonb` 한 칸이라 완화할 컬럼이 없었다. 제약은 `sanitizeList`의 게이트에 있었고, 거기서 풀었다 — `kind`가 "스스로 독립을 선언한 List"(`"regular"`/`"inbox"`)와 "그냥 owner를 잃은 레코드"를 가르고, 후자만 계속 버린다. `activeLists`는 빈 Project로 물으면 아무것도 답하지 않는다(§6.79/§6.80). 생성 UI는 Implementation Phase 3(§16.48) 몫이므로 아직 아무것도 독립 List를 만들지 않는다
-5. **Phase 1(§6.68) 잔여 필드** — `List.sidebarFolderId`, `Task.sectionId`, `SidebarFolder`, `ListSection`, `TaskTag`, `SavedFilter`, `TaskDailyPlan`
-6. **`TaskDailyPlan` (§6.68)** — A절이 지적한 *"Today override가 localStorage에 있고 동기되지 않는다"*의 정식 해법이 이 테이블이다. Today를 Scope로 만들기 전에 필요하다
+5. **Phase 1(§6.68) 잔여 필드** — `List.sidebarFolderId`, `Task.sectionId`, `SidebarFolder`, `ListSection`, `TaskTag`, `SavedFilter`
+6. ~~**`TaskDailyPlan` (§6.68)**~~ — **완료.** A절이 지적한 *"Today override가 localStorage에 있고 동기되지 않는다"*의 정식 해법. 하루치 계획을 Task에 박지 않고(§6.19) 별도 레코드로 두었고, `daily_plans` 테이블과 함께 동기된다. 기기에 남아 있던 블롭은 id로 병합해 흡수하되 덮어쓰지 않는다

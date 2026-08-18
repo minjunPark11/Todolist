@@ -413,6 +413,34 @@ export type RawPlannerData = {
     : Partial<PlannerData[K]>;
 };
 
+/** Which part of the day the user put a task in (TickTick plan §6.18). */
+export type DailyPlanBucket = "now" | "next" | "later";
+
+/**
+ * One task's place in one day's plan (§6.18).
+ *
+ * Deliberately not a field on Task. §6.19 forbids making now/next/later a
+ * permanent property, because it is a decision about a DATE, not about the
+ * work: the same task tomorrow starts from the rules again. Today itself
+ * stays a Query (§6.17) — this record only says what the user overrode.
+ */
+export interface TaskDailyPlan {
+  id: string;
+  taskId: string;
+  /** YYYY-MM-DD, in the user's own day, not UTC. */
+  planDate: string;
+  bucket: DailyPlanBucket;
+  /**
+   * Manual order within the day (§6.18). Nothing writes it yet — §7.5 keeps
+   * free reordering out of the MVP so that dragging a due-only task cannot
+   * silently create a plan for it — but the field is part of the schema the
+   * plan asks Phase 1 to add ahead of use (§6.68).
+   */
+  sortKey?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PlannerData {
   tasks: Task[];
   projects: Project[];
@@ -423,6 +451,7 @@ export interface PlannerData {
   spaces: Space[];
   folders: Folder[];
   lists: List[];
+  dailyPlans: TaskDailyPlan[];
   settings: PlannerSettings;
   appSettings: AppSettings;
 }

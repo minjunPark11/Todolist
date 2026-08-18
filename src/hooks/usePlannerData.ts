@@ -20,6 +20,8 @@ import type {
   Space,
   Subtask,
   Task,
+  TaskDailyPlan,
+  DailyPlanBucket,
   TaskDraft,
 } from "../types";
 import type { LearningPath, Milestone } from "../lib/ai/learningPaths/types";
@@ -33,6 +35,12 @@ import {
 import * as hierarchy from "../domain/spaces/hierarchy";
 import * as spaceTree from "../domain/spaces/spaces";
 import { sanitizeFolder, sanitizeList } from "../domain/spaces/hierarchy";
+import {
+  adoptLegacyBucketOverrides,
+  applyBucketOverrides,
+  prunePlansBefore,
+  sanitizeDailyPlan,
+} from "../domain/today/dailyPlan";
 import { backfillTaskListId, defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
 import * as pathOps from "../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
@@ -371,6 +379,11 @@ export function normalizeData(data: RawPlannerData): PlannerData {
     lists: Array.isArray(data.lists)
       ? data.lists.map(sanitizeList).filter((list): list is List => list !== null)
       : [],
+    // One day's planning decisions per record (§6.18), replacing a blob that
+    // never left the device it was made on.
+    dailyPlans: Array.isArray(data.dailyPlans)
+      ? data.dailyPlans.map(sanitizeDailyPlan).filter((plan): plan is TaskDailyPlan => plan !== null)
+      : [],
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
   };
@@ -411,19 +424,24 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   // and becomes a fallback for records neither phase has reached.
   const lists = hierarchy.ensureInboxList(withDefaults, now);
   const tasks = backfillTaskListId(data.tasks, lists, now);
+  // §6.18. The plan made on another device arrives with the account; the blob
+  // this replaces arrives from this one. Days already past are dropped — no
+  // screen reads them, and a table that only grows would carry decisions
+  // nobody can act on any more.
+  const dailyPlans = prunePlansBefore(adoptLegacyBucketOverrides(data.dailyPlans, now), todayValue());
   if (
     focusSessions === data.focusSessions &&
     learningPaths === data.learningPaths &&
     projects === data.projects &&
     spaces === data.spaces &&
     lists === data.lists &&
-    tasks === data.tasks
+    tasks === data.tasks &&
+    dailyPlans === data.dailyPlans
   ) {
     return data;
   }
-  return { ...data, focusSessions, learningPaths, projects, spaces, lists, tasks };
+  return { ...data, focusSessions, learningPaths, projects, spaces, lists, tasks, dailyPlans };
 }
-
 // Phase S4 migration, and the same shape as the one below it: custom spaces
 // written before Spaces read Projects sat in a device-local blob. Merged by
 // id so a repeated read (StrictMode, or a failed marker write) adds nothing
@@ -1745,6 +1763,22 @@ export function usePlannerData() {
     });
   }
 
+  /**
+   * Make one day's plan say exactly `overrides` (§6.18).
+   *
+   * The whole map, not one task, because every caller on the Today page —
+   * moving a row, planning the day, clearing it, and the undo that follows
+   * each — deals in complete snapshots. `applyBucketOverrides` is what keeps
+   * that from meaning a rewrite of every row.
+   */
+  function setTodayBuckets(overrides: Record<string, DailyPlanBucket>, planDate: string) {
+    setData((current) => {
+      const now = new Date().toISOString();
+      const dailyPlans = applyBucketOverrides(current.dailyPlans, planDate, overrides, now);
+      return dailyPlans === current.dailyPlans ? current : { ...current, dailyPlans };
+    });
+  }
+
   function createFolder(projectId: string, name: string): string {
     const now = new Date().toISOString();
     const folder: Folder = {
@@ -1823,6 +1857,7 @@ export function usePlannerData() {
     spaces: data.spaces,
     folders: data.folders,
     lists: data.lists,
+    dailyPlans: data.dailyPlans,
     focusSessions: data.focusSessions,
     activeSessionId: data.activeSessionId,
     activeFocusSession:
@@ -1888,6 +1923,7 @@ export function usePlannerData() {
     moveListToFolder,
     moveTaskToList,
     moveGoalToList,
+    setTodayBuckets,
     createFolder,
     updateFolder,
     archiveFolder,
