@@ -16,6 +16,9 @@ import { parseTaskUrl, taskUrlFor } from "../../app/taskScopeUrl";
 import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { useT } from "../../i18n";
 import { TasksSidebar } from "./TasksSidebar";
+import { TaskQuickAdd } from "./TaskQuickAdd";
+import type { CreateResolution } from "../../domain/tasks/createResolver";
+import { isInboxList } from "../../domain/spaces/hierarchy";
 
 interface TasksModuleProps {
   tasks: Task[];
@@ -32,6 +35,8 @@ interface TasksModuleProps {
   loading?: boolean;
   /** Last sync failure, if any — the Scope is showing what it has (§9.43). */
   error?: string;
+  /** Commits what `resolveCreateContext` decided (§12.16). */
+  onCreate: (title: string, resolution: CreateResolution) => void;
 }
 
 export function TasksModule(props: TasksModuleProps) {
@@ -94,6 +99,21 @@ export function TasksModule(props: TasksModuleProps) {
             </div>
           ) : null}
         </header>
+
+        {!missing && !props.loading ? (
+          <TaskQuickAdd
+            scope={scope}
+            inboxListId={lists.find(isInboxList)?.id ?? ""}
+            today={today}
+            folderLists={
+              scope.kind === "folder"
+                ? lists.filter((list) => list.folderId === scope.id && !list.archivedAt)
+                : []
+            }
+            tags={tags}
+            onCreate={props.onCreate}
+          />
+        ) : null}
 
         {props.error ? (
           <p className="tm-state is-error" role="status">

@@ -40,6 +40,7 @@ import { sanitizeFolder, sanitizeList } from "../domain/spaces/hierarchy";
 import {
   adoptLegacyBucketOverrides,
   applyBucketOverrides,
+  planTaskForDate,
   prunePlansBefore,
   sanitizeDailyPlan,
 } from "../domain/today/dailyPlan";
@@ -1808,6 +1809,20 @@ export function usePlannerData() {
     });
   }
 
+  /**
+   * Put a task on a day without saying where in it (§12.5.3).
+   *
+   * What Today's `+ 작업` contributes: the task has no due date, so this record
+   * is the only thing keeping it on the screen that made it.
+   */
+  function planTaskForDay(taskId: string, planDate: string) {
+    setData((current) => {
+      const now = new Date().toISOString();
+      const dailyPlans = planTaskForDate(current.dailyPlans, taskId, planDate, now);
+      return dailyPlans === current.dailyPlans ? current : { ...current, dailyPlans };
+    });
+  }
+
   function createFolder(projectId: string, name: string): string {
     const now = new Date().toISOString();
     const folder: Folder = {
@@ -1955,6 +1970,7 @@ export function usePlannerData() {
     moveTaskToList,
     moveGoalToList,
     setTodayBuckets,
+    planTaskForDay,
     createFolder,
     updateFolder,
     archiveFolder,

@@ -472,7 +472,17 @@ export interface TaskDailyPlan {
   taskId: string;
   /** YYYY-MM-DD, in the user's own day, not UTC. */
   planDate: string;
-  bucket: DailyPlanBucket;
+  /**
+   * Which part of the day, when the user has said (§6.18 makes it optional).
+   *
+   * The record carries two facts and only the first is required: `(taskId,
+   * planDate)` means the task is PLANNED for that day — which is what puts a
+   * task with no due date into Today (§12.5.1) — and `bucket` is the further
+   * choice of where in it. A task captured from Today has the first and not
+   * the second, and clearing the day's plan resets buckets without removing
+   * anything from Today.
+   */
+  bucket?: DailyPlanBucket;
   /**
    * Manual order within the day (§6.18). Nothing writes it yet — §7.5 keeps
    * free reordering out of the MVP so that dragging a due-only task cannot

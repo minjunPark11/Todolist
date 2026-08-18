@@ -1258,4 +1258,11 @@ export const ko: Dictionary = {
   "tasks.emptyCompleted": "완료한 일이 아직 없습니다.",
   "tasks.emptyTrash": "휴지통이 비어 있습니다.",
   "tasks.emptyFilter": "저장된 필터가 아직 없습니다.",
+  "tasks.addPlaceholder": "할 일 추가",
+  "tasks.addDate": "날짜",
+  "tasks.addList": "리스트",
+  "tasks.addPickList": "리스트 선택…",
+  "tasks.needDate": "날짜를 정해야 저장할 수 있습니다.",
+  "tasks.needList": "어느 리스트에 넣을지 골라주세요.",
+  "tasks.willTag": "태그가 함께 붙습니다:",
 };

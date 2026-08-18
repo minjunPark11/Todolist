@@ -1057,6 +1057,28 @@ export default function App() {
           url={canonical ?? currentUrl}
           onNavigate={navigateUrl}
           error={planner.auth.syncError}
+          onCreate={(title, resolution) => {
+            if (!resolution.targetListId) return;
+            const owner = planner.lists.find((list) => list.id === resolution.targetListId);
+            // §12.4's Auto Apply, resolved here rather than in the resolver:
+            // `Task.tags` holds names and the Scope knows an id.
+            const tagNames = (resolution.applyTagIds ?? [])
+              .map((id) => planner.tags.find((tag) => tag.id === id)?.name)
+              .filter((name): name is string => Boolean(name));
+            const taskId = planner.createTask({
+              title,
+              listId: resolution.targetListId,
+              projectId: owner?.projectId ?? "",
+              // The Inbox keeps writing the status it replaced, so a client
+              // older than Migration Phase 2 still finds the task.
+              status: owner?.kind === "inbox" ? "inbox" : "todo",
+              ...(tagNames.length > 0 ? { tags: tagNames } : {}),
+              ...resolution.patch,
+            });
+            if (taskId && resolution.dailyPlan) {
+              planner.planTaskForDay(taskId, resolution.dailyPlan.planDate);
+            }
+          }}
         />
       </I18nProvider>
     );

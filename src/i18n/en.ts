@@ -1264,4 +1264,11 @@ export const en: Dictionary = {
   "tasks.emptyCompleted": "Nothing completed yet.",
   "tasks.emptyTrash": "The trash is empty.",
   "tasks.emptyFilter": "No saved filters yet.",
+  "tasks.addPlaceholder": "Add a task",
+  "tasks.addDate": "Date",
+  "tasks.addList": "List",
+  "tasks.addPickList": "Pick a list…",
+  "tasks.needDate": "Pick a date before saving.",
+  "tasks.needList": "Choose which list this goes in.",
+  "tasks.willTag": "Will be tagged:",
 };

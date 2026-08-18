@@ -16,6 +16,7 @@ import {
   applyBucketOverrides,
   bucketOverridesFor,
   dailyPlanIdFor,
+  planTaskForDate,
   prunePlansBefore,
   readLegacyBucketOverrides,
   sanitizeDailyPlan,
@@ -42,9 +43,19 @@ describe("sanitizeDailyPlan", () => {
   it("drops a plan that decides nothing", () => {
     expect(sanitizeDailyPlan({ planDate: TODAY, bucket: "now" })).toBeNull();
     expect(sanitizeDailyPlan({ taskId: "t1", bucket: "now" })).toBeNull();
-    expect(sanitizeDailyPlan({ taskId: "t1", planDate: TODAY })).toBeNull();
-    expect(sanitizeDailyPlan({ taskId: "t1", planDate: TODAY, bucket: "someday" })).toBeNull();
     expect(sanitizeDailyPlan(null)).toBeNull();
+  });
+
+  // The pair IS the decision: it says the task is planned for that day, which
+  // is what puts a task with no due date into Today (§12.5.1). A bucket that
+  // is not one of the three is dropped without taking the membership with it.
+  it("keeps a plan that names a day but no part of it", () => {
+    expect(sanitizeDailyPlan({ taskId: "t1", planDate: TODAY })).toMatchObject({
+      taskId: "t1",
+      planDate: TODAY,
+    });
+    expect(sanitizeDailyPlan({ taskId: "t1", planDate: TODAY })?.bucket).toBeUndefined();
+    expect(sanitizeDailyPlan({ taskId: "t1", planDate: TODAY, bucket: "someday" })?.bucket).toBeUndefined();
   });
 
   it("rebuilds a missing id from the pair that identifies the row", () => {
@@ -90,14 +101,19 @@ describe("applyBucketOverrides", () => {
     expect(next.find((entry) => entry.taskId === "t2")?.updatedAt).toBe(LATER);
   });
 
-  it("never reads another date", () => {
+  it("never touches another date", () => {
     const next = applyBucketOverrides(existing, TODAY, {}, LATER);
-    expect(next).toEqual([existing[2]]);
+    expect(next.find((entry) => entry.planDate === "2026-08-19")).toBe(existing[2]);
   });
 
-  it("drops a task from the plan so it falls back to its rule-based default", () => {
+  // Clearing the day resets where things sit in it. It does not evict from
+  // Today a task whose only claim to being there is the plan itself.
+  it("clears a dropped task's bucket and keeps it on the day", () => {
     const next = applyBucketOverrides(existing, TODAY, { t2: "next" }, LATER);
-    expect(next.some((entry) => entry.taskId === "t1" && entry.planDate === TODAY)).toBe(false);
+    const t1 = next.find((entry) => entry.taskId === "t1" && entry.planDate === TODAY);
+    expect(t1).toBeDefined();
+    expect(t1?.bucket).toBeUndefined();
+    expect(bucketOverridesFor(next, TODAY)).toEqual({ t2: "next" });
   });
 
   it("creates a plan at the id both devices would pick", () => {
@@ -142,5 +158,25 @@ describe("the localStorage blob this replaces", () => {
     const adopted = adoptLegacyBucketOverrides(synced, NOW);
     expect(bucketOverridesFor(adopted, TODAY)).toEqual({ t1: "now", t2: "now" });
     expect(adoptLegacyBucketOverrides(adopted, NOW)).toBe(adopted);
+  });
+});
+
+// §12.5.3: a task captured from Today has no due date, so this record is the
+// only thing keeping it there.
+describe("planTaskForDate", () => {
+  it("puts a task on a day without deciding where in it", () => {
+    const [added] = planTaskForDate([], "t9", TODAY, NOW);
+    expect(added).toMatchObject({ id: dailyPlanIdFor(TODAY, "t9"), taskId: "t9", planDate: TODAY });
+    expect(added.bucket).toBeUndefined();
+  });
+
+  it("returns the same array when the task is already on that day", () => {
+    const plans = [plan()];
+    expect(planTaskForDate(plans, "t1", TODAY, NOW)).toBe(plans);
+  });
+
+  it("leaves a bucket the user already chose alone", () => {
+    const plans = [plan({ bucket: "later" })];
+    expect(planTaskForDate(plans, "t1", TODAY, NOW)[0].bucket).toBe("later");
   });
 });

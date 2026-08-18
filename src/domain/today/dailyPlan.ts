@@ -36,9 +36,10 @@ export function sanitizeDailyPlan(value: unknown): TaskDailyPlan | null {
   const taskId = typeof record.taskId === "string" ? record.taskId.trim() : "";
   const planDate = typeof record.planDate === "string" ? record.planDate.trim() : "";
   const bucket = asBucket(record.bucket);
-  // A plan that names no task, no date, or no bucket decides nothing. Keeping
-  // it would leave a row that syncs forever and changes no screen.
-  if (!taskId || !planDate || !bucket) return null;
+  // A plan that names no task or no date decides nothing. A plan with no
+  // bucket decides plenty: it is what says the task is planned for that day
+  // at all, which is how a task with no due date reaches Today (§12.5.1).
+  if (!taskId || !planDate) return null;
   const createdAt = typeof record.createdAt === "string" ? record.createdAt : "";
   const updatedAt = typeof record.updatedAt === "string" ? record.updatedAt : "";
   return {
@@ -60,13 +61,15 @@ export function bucketOverridesFor(
   const overrides: Record<string, DailyPlanBucket> = {};
   for (const plan of plans) {
     if (plan.planDate !== planDate) continue;
-    overrides[plan.taskId] = plan.bucket;
+    // Membership without a bucket is not an override — the task is on the day,
+    // and where in the day is still the rule's to decide.
+    if (plan.bucket) overrides[plan.taskId] = plan.bucket;
   }
   return overrides;
 }
 
 /**
- * Make one date's plan say exactly `overrides`, and touch nothing else.
+ * Make one date's BUCKETS say exactly `overrides`, and touch nothing else.
  *
  * Every caller — moving one task, planning the whole day, clearing it, undoing
  * any of those — hands over the whole map for that date, because the undo
@@ -74,6 +77,11 @@ export function bucketOverridesFor(
  * be a rewrite of every row if this replaced them, so a plan whose bucket did
  * not change keeps its object identity and `diffChangedRecords` leaves it
  * alone. Other dates are never even read.
+ *
+ * Dropping a task from the map clears its bucket and KEEPS the record. The two
+ * facts are separable (see `TaskDailyPlan.bucket`), and "clear the plan" means
+ * reset where things sit in the day — not evict from Today a task that has no
+ * due date to fall back on.
  */
 export function applyBucketOverrides(
   plans: TaskDailyPlan[],
@@ -90,13 +98,18 @@ export function applyBucketOverrides(
       next.push(plan);
       continue;
     }
+    seen.add(plan.taskId);
     const bucket = overrides[plan.taskId];
     if (!bucket) {
-      // Dropped from the plan: the task falls back to its rule-based default.
+      // Dropped from the map: the bucket goes, the membership stays.
+      if (!plan.bucket) {
+        next.push(plan);
+        continue;
+      }
       touched = true;
+      next.push({ ...plan, bucket: undefined, updatedAt: now });
       continue;
     }
-    seen.add(plan.taskId);
     if (plan.bucket === bucket) {
       next.push(plan);
       continue;
@@ -119,6 +132,24 @@ export function applyBucketOverrides(
   }
 
   return touched ? next : plans;
+}
+
+/**
+ * Say a task is planned for a day, without saying where in it (§12.5.3).
+ *
+ * This is what a task captured from Today needs: it has no due date, so the
+ * plan record is the only thing putting it there. Returns the SAME array when
+ * the task is already on that day, so capturing twice writes one row.
+ */
+export function planTaskForDate(
+  plans: TaskDailyPlan[],
+  taskId: string,
+  planDate: string,
+  now: string,
+): TaskDailyPlan[] {
+  const id = dailyPlanIdFor(planDate, taskId);
+  if (plans.some((plan) => plan.id === id)) return plans;
+  return [...plans, { id, taskId, planDate, createdAt: now, updatedAt: now }];
 }
 
 /** Plans for days that have passed, which no screen reads any more. */
