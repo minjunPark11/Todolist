@@ -868,3 +868,157 @@
   font-size: 12px;
   cursor: pointer;
 }
+
+/* ============================================================================
+   Responsive contract (§15)
+
+   §15.9 is what this section may not do: none of it changes the URL. A width
+   decides where the Task Detail is drawn, never what `?task=` means. And §15.4
+   keeps two questions apart — width picks the MODE, while `(pointer: coarse)`
+   decides how big a thing has to be to hit. A 1024px window with a mouse and a
+   1024px tablet are the same mode and want different targets.
+   ============================================================================ */
+
+/* §15.22: the main column's breathing room, per mode. */
+.tm-shell.is-wideDesktop .tm-main { padding-inline: 32px; }
+.tm-shell.is-compactDesktop .tm-main { padding-inline: 24px; }
+.tm-shell.is-tablet .tm-main { padding-inline: 20px; }
+.tm-shell.is-mobile .tm-main { padding-inline: 16px; }
+
+/* --- sidebar: persistent column vs overlay sheet (§15.14-§15.16) --- */
+
+.tm-shell.sidebar-overlay {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.tm-shell.sidebar-overlay .tm-sidebar {
+  position: fixed;
+  z-index: 40;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(280px, 82vw);
+  /* Off-canvas rather than display:none, so opening it is a movement the eye
+     can follow and the tree keeps its scroll position. */
+  transform: translateX(-100%);
+  transition: transform 160ms ease;
+  background: var(--bg, #fff);
+  padding-left: max(8px, env(safe-area-inset-left));
+}
+
+.tm-shell.sidebar-open .tm-sidebar {
+  transform: translateX(0);
+}
+
+.tm-scrim {
+  position: fixed;
+  z-index: 35;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.tm-menu-open {
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* --- Task Detail, one component in four presentations (§15.17) --- */
+
+/* Wide desktop: its own column beside the list, sharing no scroll with it. */
+.tm-drawer.is-inline-drawer {
+  width: 400px;
+  overflow-y: auto;
+}
+
+/* Compact desktop: 400px overlay, and deliberately no heavy scrim — §15.19
+   keeps the Main context readable and clickable to the left of it. */
+.tm-drawer.is-overlay-drawer {
+  position: fixed;
+  z-index: 45;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 400px;
+  overflow-y: auto;
+  background: var(--bg, #fff);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Tablet: a wider right sheet (§15.20). */
+.tm-drawer.is-right-sheet {
+  position: fixed;
+  z-index: 45;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(520px, calc(100vw - 84px));
+  overflow-y: auto;
+  background: var(--bg, #fff);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
+}
+
+/* Mobile: the whole screen (§15.21), inside the safe area (§15.39), and
+   sized by the visual viewport so the on-screen keyboard does not push the
+   content out of reach (§15.37). */
+.tm-drawer.is-full-screen {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  height: var(--tm-viewport-height, 100dvh);
+  overflow-y: auto;
+  background: var(--bg, #fff);
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+/* §15.13: the full-screen detail owns the screen. What is behind it is not
+   dimmed, it is out of the way — including the way back into navigation. */
+.tm-shell.detail-full .tm-menu-open,
+.tm-shell.detail-full .tm-search-open {
+  display: none;
+}
+
+/* --- Board (§15.30-§15.33) --- */
+
+/* The columns keep their width and the strip scrolls; a column squeezed to fit
+   three on a phone is three columns nobody can read. */
+.tm-shell.is-mobile .tm-column,
+.tm-shell.is-tablet .tm-column {
+  width: min(78vw, 300px);
+}
+
+/* --- input modality, kept separate from width (§15.4) --- */
+
+@media (pointer: coarse) {
+  /* §15.12's floor, applied wherever a finger has to land. */
+  .tm-row,
+  .tm-task-open,
+  .tm-card-open,
+  .tm-palette-row,
+  .tm-view,
+  .tm-chip {
+    min-height: 44px;
+  }
+
+  .tm-scope-actions button,
+  .tm-manager .tm-task button {
+    min-height: 44px;
+    padding-inline: 12px;
+  }
+}
+
+/* --- safe area (§15.39) --- */
+
+.tm-shell.is-mobile .tm-main {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.tm-undo {
+  bottom: max(16px, env(safe-area-inset-bottom));
+}

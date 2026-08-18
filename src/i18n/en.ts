@@ -1308,6 +1308,7 @@ export const en: Dictionary = {
   "tasks.undoSomeday": "Moved to someday.",
   "tasks.undoMoved": "Moved.",
   "tasks.openSearch": "Search",
+  "tasks.openNav": "Menu",
   "tasks.paletteLabel": "Search and commands",
   "tasks.palettePlaceholder": "Search, or type a command…",
   "tasks.paletteHint": "Type to search tasks, lists, tags and filters.",

@@ -232,3 +232,21 @@
     **관리 화면 (§13.25)** — "보관된 리스트 / 삭제된 리스트"는 **Scope가 아니다.** 계획서가 두 번 못박는다: §12의 9개 레지스트리를 늘리지 않고, 삭제된 List를 Task 휴지통에 섞지 않는다. 사이드바 LISTS 구획의 "관리"에서 열리는 다이얼로그이며, 영구 삭제만 **두 번 묻는다** — 두 번째 문장이 함께 사라질 작업 개수를 말한다("작업 2개도 함께 영구 삭제됩니다"). 앱에서 확인: 첫 클릭은 **아무것도 지우지 않았고**(store 그대로), 확인 후에야 리스트와 작업 2개가 사라졌다
 
     남은 것: Project/Space의 복원 **화면**(도메인과 store 명령은 전부 있지만 Spaces UI에는 아직 "삭제된 프로젝트" surface가 없다), Folder lifecycle(계획서가 SidebarFolder만 다루고 도메인 Folder의 delete는 정의하지 않는다)
+
+19. **Implementation Phase 10 (§16.33) — Responsive Presentation** — **1차 완료.** Gate 10을 세 폭에서 확인했다.
+
+    §15.9가 이 레이어가 **해서는 안 되는 일**을 정한다: *"Responsive rendering은 URL canonicalization의 원인이 아니다."* 창을 390px로 줄여도 `/list/l1?view=board&task=t1`은 그대로고, 바뀌는 것은 Drawer가 그려지는 자리뿐이다. `domain/tasks/responsive.ts`의 어떤 값도 query·count·command가 읽지 않으므로 **Gate 10은 세 폭을 테스트해서 통과한 것이 아니라 구조상 참**이다.
+
+    - **§15.3의 네 모드** — mobile(<768) / tablet(768~1023) / compactDesktop(1024~1279) / wideDesktop(≥1280). 계획서의 상수 그대로
+    - **§15.17의 Task Detail 레지스트리** — inline-drawer / overlay-drawer / right-sheet / full-screen. 컴포넌트는 하나이고 **어디에 그릴지만** 다르다
+    - **§15.4의 분리** — 폭은 모드를, `(pointer: coarse)`는 히트 타깃을 정한다. 마우스를 쓰는 1024px 창과 1024px 태블릿은 같은 모드이면서 다른 크기를 원한다. 앱에서 확인: coarse 포인터에서 행과 작업 버튼이 **44px**로 커졌다(§15.12의 바닥)
+    - **§15.14~§15.16의 사이드바** — desktop에서는 컬럼, 그 아래에서는 오버레이 시트(scrim + 헤더의 메뉴 버튼). `display:none`이 아니라 off-canvas라서 열림이 눈으로 따라갈 수 있는 움직임이고 트리의 스크롤 위치도 유지된다
+    - **§15.20의 focus trap / restore** — 덮는 표현(overlay/sheet/full-screen)에서만 건다. wide desktop의 inline Drawer는 목록 **옆** 컬럼이라 가두면 그 목록으로 탭해 돌아갈 수 없다
+    - **§15.37의 키보드** — `100vh`는 온스크린 키보드가 올라와도 줄지 않아서 full-screen 상세의 하단(하위 작업 입력 등)이 키보드 아래로 들어간다. `visualViewport.height`를 `--tm-viewport-height`로 흘려보내고, API가 없으면 `100dvh`로 떨어진다
+    - **§15.22 / §15.39** — 모드별 좌우 여백(32/24/20/16)과 safe-area inset
+
+    **Gate 10 확인 (동일 Golden Journey, 세 폭).** 1440(wideDesktop·inline-drawer) / 900(tablet·right-sheet) / 375(mobile·full-screen)에서 같은 여정 — 보드에서 카드를 다른 칼럼으로 이동 — 을 실행했고 **도메인 결과가 세 번 모두 동일**했다(`sectionId` 변경, `dueDate`·`isSomeday`·`listId` 불변). URL은 세 폭 모두 `/list/l1?view=board&task=t1` 그대로였다 — 특히 **휴대폰 폭에서도 `?view=board`가 사라지지 않았다**(§15.9가 명시적으로 금지하는 재작성).
+
+    **확인하지 못한 것 두 가지, 도구의 한계다.** 임베디드 미리보기 창은 뷰포트를 바꿔도 페이지에 `resize`·`orientationchange`·`ResizeObserver` 중 **아무 신호도 보내지 않아서**, 실행 중 폭 변경(리로드 없는 모드 전환)은 확인할 수 없었다 — 각 모드는 그 폭에서 **로드해서** 확인했다. 훅은 세 신호를 모두 듣는다. 또 그 창은 프레임을 합성하지 않아 CSS transition이 진행되지 않는다(사이드바가 열림 클래스를 받고도 시작 위치에 멈춰 있었고, transition을 끄자 즉시 제자리로 갔다). 둘 다 앱 쪽 문제가 아니다.
+
+    남은 것: **Mobile Bottom Navigation(§15.12)** — 다섯 칸이 Tasks·Calendar·Spaces·Focus·Search라서 Tasks Module 하나가 아니라 **앱 셸 전체**의 것이다. 지금 Tasks Module은 기존 앱과 공존하고(§16.26의 "기존 앱과 공존한다") 셸을 소유하지 않으므로, 셸이 하나로 합쳐질 때 붙일 항목으로 남긴다. 그 밖에: 터치 DnD(§15.34, §16.35가 P1), Bottom Sheet picker(§15.21), Mobile Quick Add Bottom Sheet(§15.35)

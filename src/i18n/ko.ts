@@ -1302,6 +1302,7 @@ export const ko: Dictionary = {
   "tasks.undoSomeday": "언젠가로 옮겼습니다.",
   "tasks.undoMoved": "옮겼습니다.",
   "tasks.openSearch": "검색",
+  "tasks.openNav": "메뉴",
   "tasks.paletteLabel": "검색 및 명령",
   "tasks.palettePlaceholder": "검색하거나 명령을 입력하세요…",
   "tasks.paletteHint": "작업 · 리스트 · 태그 · 필터를 검색합니다.",

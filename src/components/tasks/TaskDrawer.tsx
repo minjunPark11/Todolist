@@ -8,13 +8,23 @@
 // §16.28 hides Repeat and Reminder for the MVP, and is explicit that a control
 // must not appear as a disabled placeholder before the model behind it exists.
 // So they are absent, not greyed out.
+import { useEffect, useRef } from "react";
 import type { List, Task } from "../../types";
+import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
 import { childProgress } from "../../domain/tasks/children";
 import { useT } from "../../i18n";
 
 export interface TaskDrawerProps {
   task: Task;
+  /**
+   * Where this is drawn (§15.17) — and only that.
+   *
+   * The registry decides inline column, right overlay, right sheet or
+   * full screen. It decides nothing about what is fetched or what a control
+   * does, which is why the same Drawer serves all four.
+   */
+  presentation: TaskDetailPresentation;
   lists: List[];
   children: TaskChild[];
   onClose: () => void;
@@ -31,6 +41,7 @@ export interface TaskDrawerProps {
 const PRIORITIES = ["none", "low", "medium", "high"] as const;
 
 export function TaskDrawer({
+  presentation,
   task,
   lists,
   children,
@@ -44,6 +55,48 @@ export function TaskDrawer({
   onTrash,
 }: TaskDrawerProps) {
   const { t } = useT();
+  const root = useRef<HTMLElement>(null);
+
+  /**
+   * §15.20: focus does not wander out of a sheet that covers what is behind
+   * it, and it goes back where it came from when the sheet closes.
+   *
+   * Only for the presentations that actually cover something. The wide-desktop
+   * Drawer is a column beside the list — trapping focus there would stop the
+   * user tabbing back to the rows it belongs to.
+   */
+  useEffect(() => {
+    if (presentation === "inline-drawer") return;
+    const opener = document.activeElement as HTMLElement | null;
+    const node = root.current;
+    node?.querySelector<HTMLElement>("input, textarea, button")?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Tab" || !node) return;
+      const focusable = node.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      // Restoring focus is what makes Back-from-a-sheet feel like going back
+      // rather than like landing at the top of the page.
+      opener?.focus?.();
+    };
+  }, [presentation]);
+
   const progress = childProgress(children);
 
   function submitSubtask(event: React.FormEvent<HTMLFormElement>) {
@@ -56,7 +109,7 @@ export function TaskDrawer({
   }
 
   return (
-    <aside className="tm-drawer" aria-label={t("tasks.drawerLabel")}>
+    <aside ref={root} className={`tm-drawer is-${presentation}`} aria-label={t("tasks.drawerLabel")}>
       <header className="tm-drawer-head">
         {/* §4: completion is one control and it is the first one. ST-I5 lets a
             parent finish with subtasks still open — they are not a gate. */}

@@ -43,6 +43,8 @@ import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
 import { CommandPalette } from "./CommandPalette";
 import { ListManager } from "./ListManager";
+import { useResponsiveMode, useViewportHeightVar } from "./useResponsiveMode";
+import { detailIsFullScreen, sidebarPresentationFor, taskDetailPresentationFor } from "../../domain/tasks/responsive";
 import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
 import { flattenGroups, PAGE_LIMITS, searchAll } from "../../domain/tasks/search";
 import type { TaskCommand } from "../../domain/tasks/commands";
@@ -132,6 +134,13 @@ export function TasksModule(props: TasksModuleProps) {
   // §13.25: a management surface, not a Scope — so it is state here and not a
   // tenth route.
   const [managing, setManaging] = useState(false);
+  // §15.3. Presentation only: nothing below reads this to decide what a Scope
+  // contains, which is what keeps §15.9 true — the URL means the same thing at
+  // every width.
+  const mode = useResponsiveMode();
+  useViewportHeightVar();
+  const sidebar = sidebarPresentationFor(mode);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   // §10.44: a device preference, not account data. Nothing here is worth
   // syncing, and a list of what someone opened is worth less to them than it
   // would be to anyone reading over their shoulder.
@@ -349,7 +358,18 @@ export function TasksModule(props: TasksModuleProps) {
   }
 
   return (
-    <section className="tm-shell">
+    <section
+      className={`tm-shell is-${mode} sidebar-${sidebar}${sidebarOpen ? " sidebar-open" : ""}${
+        openedTask && detailIsFullScreen(mode) ? " detail-full" : ""
+      }`}
+    >
+      {/* §15.15/§15.16: an overlay Sidebar is a layer the user opened, so it
+          has something to dismiss it with. A persistent one has nothing to
+          close and renders no scrim. */}
+      {sidebar === "overlay" && sidebarOpen ? (
+        <div className="tm-scrim" onMouseDown={() => setSidebarOpen(false)} aria-hidden />
+      ) : null}
+
       <TasksSidebar
         ctx={ctx}
         folders={folders}
@@ -358,7 +378,10 @@ export function TasksModule(props: TasksModuleProps) {
         savedFilters={savedFilters}
         onManageLists={() => setManaging(true)}
         current={searchQuery === null ? scope : null}
-        onNavigate={go}
+        onNavigate={(next) => {
+          setSidebarOpen(false);
+          go(next);
+        }}
       />
 
       <main className="tm-main">
@@ -372,6 +395,19 @@ export function TasksModule(props: TasksModuleProps) {
         ) : (
         <>
         <header className="tm-header">
+          {/* §15.23: the way back to navigation, where the Sidebar is not a
+              column. Absent on desktop, where it would open what is already
+              open. */}
+          {sidebar === "overlay" ? (
+            <button
+              type="button"
+              className="tm-menu-open"
+              aria-expanded={sidebarOpen}
+              onClick={() => setSidebarOpen((open) => !open)}
+            >
+              {t("tasks.openNav")}
+            </button>
+          ) : null}
           <button type="button" className="tm-search-open" onClick={() => setPaletteOpen(true)}>
             {t("tasks.openSearch")}
           </button>
@@ -518,6 +554,7 @@ export function TasksModule(props: TasksModuleProps) {
 
       {openedTask ? (
         <TaskDrawer
+          presentation={taskDetailPresentationFor(mode)}
           key={openedTask.id}
           task={openedTask}
           lists={lists}
