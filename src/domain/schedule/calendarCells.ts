@@ -34,16 +34,24 @@ export interface CalendarCell {
   preview: boolean;
 }
 
-/** Days per row, Sunday first — the order the rest of this app's calendars use. */
+/**
+ * Days per row, MONDAY first.
+ *
+ * Not the Sunday-first order the app's other calendars use. The picker is read
+ * as a work week — the weekend is where a range is dragged past, not into —
+ * and putting Saturday and Sunday together at the end is what makes that
+ * shape visible at a glance.
+ */
 export const WEEK_LENGTH = 7;
 const GRID_ROWS = 6;
 
+/** 0 = Monday … 6 = Sunday, from JS's 0 = Sunday. */
 function weekdayOf(date: LocalDate): number {
-  return new Date(`${date}T00:00:00Z`).getUTCDay();
+  return (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
 }
 
 /**
- * The first cell of the grid: the Sunday on or before the 1st.
+ * The first cell of the grid: the Monday on or before the 1st.
  *
  * Always six rows regardless of the month, so the popover does not change
  * height as someone pages through it — a grid that resizes moves the controls

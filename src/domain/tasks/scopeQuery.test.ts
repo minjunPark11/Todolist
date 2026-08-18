@@ -24,7 +24,6 @@ function task(overrides: Partial<Task> = {}): Task {
     status: "todo",
     priority: "none",
     dueDate: "",
-    scheduledDate: "",
     startDate: "",
     startTime: "",
     endTime: "",
@@ -126,35 +125,37 @@ describe("Today membership (§12.5.1)", () => {
     expect(hasTodayPlan(task(), [plan("t1", "2026-08-17")], TODAY)).toBe(false);
   });
 
-  // The consolidation (SCHEDULE_EDITOR_PHASE0_AUDIT.md §6) folded
-  // `scheduledDate` into the schedule, so `hasTodayPlan` stopped reading it and
-  // the scope asks the span instead. These pin that the answers did not move.
+  // The consolidation (SCHEDULE_EDITOR_PHASE0_AUDIT.md §6) folded the work day
+  // into the schedule, and Phase 11 removed the field entirely. These cases
+  // were written against the legacy shapes; they are stated here in what those
+  // shapes BECAME, so the answers they pinned are still pinned.
   describe("after the schedule fields merged (audit §6, 1-e)", () => {
     const ctx = context();
 
-    it("still takes a task whose only date is a work day today", () => {
-      expect(matchesScope(task({ scheduledDate: TODAY, listId: "l1" }), scope, ctx)).toBe(true);
+    // A lone work day became the date itself.
+    it("still takes a task whose only date is today", () => {
+      expect(matchesScope(task({ dueDate: TODAY, listId: "l1" }), scope, ctx)).toBe(true);
     });
 
-    it("still leaves out a work day in the future", () => {
-      expect(matchesScope(task({ scheduledDate: "2026-09-01", listId: "l1" }), scope, ctx)).toBe(false);
+    it("still leaves out a date in the future", () => {
+      expect(matchesScope(task({ dueDate: "2026-09-01", listId: "l1" }), scope, ctx)).toBe(false);
     });
 
-    // A work day and a deadline that disagree became the range between them.
+    // A work day and a deadline that disagreed became the range between them.
     it("takes a range that has started but not finished", () => {
-      const running = task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20", listId: "l1" });
+      const running = task({ startDate: "2026-08-17", dueDate: "2026-08-20", listId: "l1" });
       expect(matchesScope(running, scope, ctx)).toBe(true);
     });
 
     it("leaves out a range that has not started", () => {
-      const later = task({ scheduledDate: "2026-08-19", dueDate: "2026-08-25", listId: "l1" });
+      const later = task({ startDate: "2026-08-19", dueDate: "2026-08-25", listId: "l1" });
       expect(matchesScope(later, scope, ctx)).toBe(false);
     });
 
     // Overdue belongs to Today (§12.5.1), and a range is late from the day
     // after its END.
     it("keeps a range whose end has passed", () => {
-      const late = task({ scheduledDate: "2026-08-10", dueDate: "2026-08-14", listId: "l1" });
+      const late = task({ startDate: "2026-08-10", dueDate: "2026-08-14", listId: "l1" });
       expect(matchesScope(late, scope, ctx)).toBe(true);
     });
 

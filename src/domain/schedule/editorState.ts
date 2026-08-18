@@ -19,10 +19,20 @@
 //   rangeStage / dirty    Derived, never stored (design §1.28, §2.7, §2.8).
 //   canConfirm            The queries in this folder answer them from the
 //                         draft, which is the only way they cannot drift.
+import { applyQuickDate, type QuickDateKey } from "./quickDate";
+import { reconcileReminder } from "./reminder";
 import { clearSchedule, clearTime, selectDate, setEndTime, setStartTime } from "./scheduleCommands";
 import { draftFromSchedule, setScheduleMode } from "./scheduleMode";
 import { getRangeStage } from "./scheduleQueries";
-import type { LocalDate, LocalTime, Schedule, ScheduleDraft, ScheduleMode } from "./types";
+import type {
+  LocalDate,
+  LocalTime,
+  ReminderPreset,
+  RepeatPreset,
+  Schedule,
+  ScheduleDraft,
+  ScheduleMode,
+} from "./types";
 import type { ScheduleIssue } from "./validateSchedule";
 
 /** Which sub-panel the editor is showing (design §2.4). */
@@ -65,6 +75,14 @@ export type ScheduleEditorAction =
   | { type: "SET_PANEL"; panel: EditorPanel }
   | { type: "STEP_MONTH"; delta: number }
   | { type: "SHOW_MONTH"; date: LocalDate }
+  /**
+   * One of the four shortcuts. Carries `today` and `now` rather than reading a
+   * clock, so that the reducer stays pure and a test can press 오늘 밤 at
+   * 22:51 without owning the machine's time (design §5.40).
+   */
+  | { type: "QUICK_DATE"; key: QuickDateKey; today: LocalDate; now: LocalTime }
+  | { type: "SET_REMINDER"; reminder: ReminderPreset }
+  | { type: "SET_REPEAT"; repeat: RepeatPreset }
   | { type: "REJECT"; issues: ScheduleIssue[] };
 
 export const CLOSED: ScheduleEditorState = { status: "closed" };
@@ -101,6 +119,8 @@ export function draftSchedule(draft: ScheduleDraft): Schedule {
     startTime: draft.startTime,
     endTime: draft.endTime,
     timezone: draft.timezone,
+    reminder: draft.reminder,
+    repeat: draft.repeat,
   };
 }
 
@@ -112,7 +132,13 @@ export function draftSchedule(draft: ScheduleDraft): Schedule {
  * it (design §2.38).
  */
 function edited(state: Extract<ScheduleEditorState, { status: "open" }>, draft: ScheduleDraft) {
-  return { ...state, draft, issues: [] };
+  // Every edit re-checks the reminder, because most of them can invalidate it:
+  // clearing the time removes what 정시 refers to, clearing the dates removes
+  // what any reminder refers to (INV-06). Doing it here rather than in each
+  // case is what stops one new action from being the one that forgets.
+  const reminder = reconcileReminder(draft, draft.reminder);
+  const repeat = draft.dueDate === null && draft.startDate === null ? "none" : draft.repeat;
+  return { ...state, draft: { ...draft, reminder, repeat }, issues: [] };
 }
 
 export function scheduleEditorReducer(
@@ -187,6 +213,23 @@ export function scheduleEditorReducer(
 
     case "SHOW_MONTH":
       return { ...state, visibleMonth: monthOf(action.date) };
+
+    case "QUICK_DATE": {
+      const draft = applyQuickDate(state.draft, action.key, action.today, action.now);
+      const next = edited(state, draft);
+      // Follow the result (design §5.34). A shortcut that set a date three
+      // months out while the grid stayed put would look like it did nothing.
+      const landed = draft.startDate ?? draft.dueDate ?? state.visibleMonth;
+      return { ...next, hoverDate: null, visibleMonth: monthOf(landed) };
+    }
+
+    case "SET_REMINDER":
+      // Through `edited`, which is what rejects a reminder the current draft
+      // cannot carry — the panel filters the list, this enforces it.
+      return edited(state, { ...state.draft, reminder: action.reminder });
+
+    case "SET_REPEAT":
+      return edited(state, { ...state.draft, repeat: action.repeat });
 
     case "REJECT":
       return { ...state, issues: action.issues };

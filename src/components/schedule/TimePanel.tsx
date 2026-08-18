@@ -11,7 +11,12 @@
 // duration really can say "Monday 09:00 through Friday 17:00" — and a user who
 // reads that as "09:00–17:00 every day" has been misled by the layout rather
 // than the data. Hence the dates beside the fields.
-import type { LocalDate, LocalTime, ScheduleDraft } from "../../domain/schedule";
+import {
+  formatLocalTime,
+  type LocalDate,
+  type LocalTime,
+  type ScheduleDraft,
+} from "../../domain/schedule";
 import { useT } from "../../i18n";
 
 interface TimePanelProps {
@@ -22,6 +27,16 @@ interface TimePanelProps {
   onClear: () => void;
   onBack: () => void;
 }
+
+/**
+ * The four times most blocks start at.
+ *
+ * Presets rather than a scroller: a `<input type="time">` is four keystrokes
+ * and the common answers are a click. They set the START only — an end is a
+ * length, and guessing one would put a block on the calendar the user never
+ * sized.
+ */
+const PRESETS: readonly LocalTime[] = ["09:00", "13:00", "18:00", "21:00"];
 
 function dayLabel(date: LocalDate | null, locale: string): string {
   if (date === null) return "";
@@ -39,50 +54,71 @@ export function TimePanel({ draft, locale, onStartTime, onEndTime, onClear, onBa
   const endDay = draft.dueDate;
 
   return (
-    <div className="sched-time">
-      <div className="sched-cal-head">
-        <button type="button" onClick={onBack} aria-label={t("schedule.back")}>
+    <div className="sched-panel">
+      <div className="sched-panel-head">
+        <button type="button" className="sched-panel-back" onClick={onBack} aria-label={t("schedule.back")}>
           ‹
         </button>
-        <span>{t("schedule.time")}</span>
-        <span />
+        <span className="sched-panel-title">{t("schedule.time")}</span>
+        <span className="sched-panel-spacer" />
       </div>
 
-      <label className="sched-time-field">
-        <span>
-          {t("schedule.startTime")}
-          {/* Only when the two ends are different days. On one day it would
-              repeat the date already shown on the trigger. */}
-          {isRange ? <em>{dayLabel(startDay, locale)}</em> : null}
-        </span>
-        <input
-          type="time"
-          step={300}
-          value={draft.startTime ?? ""}
-          onChange={(event) => onStartTime(event.target.value || null)}
-        />
-      </label>
+      <div className="sched-panel-body">
+        <label className="sched-time-field">
+          <span className="sched-time-label">
+            {t("schedule.startTime")}
+            {/* Only when the two ends are different days. On one day it would
+                repeat the date already shown on the trigger. */}
+            {isRange ? <em>{dayLabel(startDay, locale)}</em> : null}
+          </span>
+          <input
+            type="time"
+            step={300}
+            value={draft.startTime ?? ""}
+            onChange={(event) => onStartTime(event.target.value || null)}
+          />
+        </label>
 
-      <label className="sched-time-field">
-        <span>
-          {t("schedule.endTime")}
-          {isRange ? <em>{dayLabel(endDay, locale)}</em> : null}
-        </span>
-        {/* An end with no start is the shape the calendar cannot draw — it
-            renders as all-day and drops the value — so the field is not
-            offered until there is a start to measure from. */}
-        <input
-          type="time"
-          step={300}
-          disabled={draft.startTime === null}
-          value={draft.endTime ?? ""}
-          onChange={(event) => onEndTime(event.target.value || null)}
-        />
-      </label>
+        <div className="sched-time-presets">
+          {PRESETS.map((preset) => (
+            <button
+              type="button"
+              key={preset}
+              className={draft.startTime === preset ? "is-active" : ""}
+              aria-pressed={draft.startTime === preset}
+              onClick={() => onStartTime(preset)}
+            >
+              {formatLocalTime(preset, locale)}
+            </button>
+          ))}
+        </div>
 
-      <button type="button" className="sched-clear" onClick={onClear} disabled={draft.startTime === null}>
-        {t("schedule.removeTime")}
-      </button>
+        {/* An end needs a start to measure from (`setEndTime` refuses one
+            otherwise), so the field appears with it rather than sitting there
+            inert. */}
+        {draft.startTime !== null ? (
+          <label className="sched-time-field">
+            <span className="sched-time-label">
+              {t("schedule.endTime")}
+              {isRange ? <em>{dayLabel(endDay, locale)}</em> : null}
+            </span>
+            <input
+              type="time"
+              step={300}
+              value={draft.endTime ?? ""}
+              onChange={(event) => onEndTime(event.target.value || null)}
+            />
+          </label>
+        ) : null}
+
+        <p className="sched-note">{t("schedule.timeNote")}</p>
+      </div>
+
+      <div className="sched-panel-foot">
+        <button type="button" className="sched-panel-clear" disabled={draft.startTime === null} onClick={onClear}>
+          {t("schedule.removeTime")}
+        </button>
+      </div>
     </div>
   );
 }

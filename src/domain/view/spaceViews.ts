@@ -53,9 +53,9 @@ export const SPACE_VIEWS: readonly SpaceViewDef[] = [
     groupBy: "list",
     layout: "timeline",
     sources: ["task", "goal", "milestone"],
-    sort: { key: "scheduledDate" },
+    sort: { key: "dueDate" },
   },
-  { id: "calendar", groupBy: "none", layout: "timegrid", sources: ["task"], sort: { key: "scheduledDate" } },
+  { id: "calendar", groupBy: "none", layout: "timegrid", sources: ["task"], sort: { key: "dueDate" } },
 ];
 
 export function isSpaceViewId(value: unknown): value is SpaceViewId {

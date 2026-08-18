@@ -16,7 +16,6 @@ function task(overrides: Partial<Task> = {}): Task {
     priority: "none",
     dueDate: "",
     startDate: "",
-    scheduledDate: TODAY,
     startTime: "",
     endTime: "",
     projectId: "space-1",
@@ -111,24 +110,23 @@ describe("patchForSpanDrag", () => {
   it("does NOT invent a start when a bar with an inferred start is moved", () => {
     // The whole point of D6. This bar's start came from its deadline; moving
     // it must not freeze that guess into the record as a user decision.
-    const inferred = task({ startDate: "", scheduledDate: "", dueDate: "2026-08-20" });
+    const inferred = task({ startDate: "", dueDate: "2026-08-20" });
     const patch = patchForSpanDrag(inferred, { kind: "move", zoom: "day", steps: 3 });
     expect(patch).toEqual({ dueDate: "2026-08-23" });
     expect("startDate" in patch).toBe(false);
   });
 
   it("moves every date the record actually holds, together", () => {
-    const spanned = task({ startDate: "2026-08-10", scheduledDate: "2026-08-12", dueDate: "2026-08-14" });
+    const spanned = task({ startDate: "2026-08-10", dueDate: "2026-08-14" });
     expect(patchForSpanDrag(spanned, { kind: "move", zoom: "day", steps: 2 })).toEqual({
       startDate: "2026-08-12",
-      scheduledDate: "2026-08-14",
       dueDate: "2026-08-16",
     });
   });
 
   it("moves by columns, not by days, at coarse zooms", () => {
     // One column right at month zoom is next month, whatever its length.
-    const march = task({ startDate: "2026-03-03", scheduledDate: "", dueDate: "2026-03-20" });
+    const march = task({ startDate: "2026-03-03", dueDate: "2026-03-20" });
     expect(patchForSpanDrag(march, { kind: "move", zoom: "month", steps: 1 })).toEqual({
       startDate: "2026-04-03",
       dueDate: "2026-04-20",
@@ -148,7 +146,7 @@ describe("patchForSpanDrag", () => {
   });
 
   it("leaves an undated task alone — it is not on the timeline to drag", () => {
-    const undated = task({ startDate: "", scheduledDate: "", dueDate: "" });
+    const undated = task({ startDate: "", dueDate: "" });
     expect(patchForSpanDrag(undated, { kind: "move", zoom: "day", steps: 5 })).toEqual({});
   });
 });

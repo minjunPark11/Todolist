@@ -15,6 +15,7 @@ import type { Folder, List, Project, Space, Task, TaskPriority } from "../../typ
 import { getMatrixPosition } from "../../utils/eisenhower";
 import { defaultBucketFor } from "../../utils/todayView";
 import type { Item, ItemSource } from "./item";
+import { spanForItem } from "./span";
 
 export type GroupAxis =
   | "none"
@@ -28,7 +29,23 @@ export type GroupAxis =
   | "dueDate"
   | "status";
 
-export type SortKey = "manual" | "dueDate" | "scheduledDate" | "priority" | "title" | "createdAt";
+// "scheduledDate" was a sixth key here, sorting by the work day. It went with
+// the field (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11); `normalizeSortKey`
+// below is what keeps a view saved under the old key working.
+export type SortKey = "manual" | "dueDate" | "priority" | "title" | "createdAt";
+
+/**
+ * A stored sort key, as this build understands it.
+ *
+ * View specs live in the user's data, so a spec saved months ago can still
+ * name a key that no longer exists. The retired one folds to `dueDate`,
+ * which is the field its dates became.
+ */
+export function normalizeSortKey(key: unknown): SortKey {
+  if (key === "scheduledDate") return "dueDate";
+  const known: SortKey[] = ["manual", "dueDate", "priority", "title", "createdAt"];
+  return known.includes(key as SortKey) ? (key as SortKey) : "manual";
+}
 
 export interface ViewFilter {
   // The four scopes a view can be opened at (SPACES_REDESIGN_II §16-§18).
@@ -63,7 +80,7 @@ export interface ViewFilter {
   statusIds?: string[];
   priorities?: TaskPriority[];
   sources?: ItemSource[];
-  /** Inclusive, matched against dueDate or scheduledDate — whichever is set. */
+  /** Inclusive. An item matches when its span overlaps the window. */
   from?: string;
   to?: string;
   blocked?: boolean;
@@ -97,12 +114,13 @@ const NO_DATE = "9999-12-31";
 
 function matchesDateWindow(item: Item, from?: string, to?: string): boolean {
   if (!from && !to) return true;
-  // Either date can put an item in the window: a task planned for Tuesday and
-  // one due Tuesday are both "this week's work", and a view that showed only
-  // one of them would be lying by omission.
-  const dates = [item.scheduledDate, item.dueDate].filter(Boolean);
-  if (dates.length === 0) return false;
-  return dates.some((date) => (!from || date >= from) && (!to || date <= to));
+  // Overlap, not containment. A task running Monday to Friday belongs to a
+  // window covering Wednesday even though neither of its own dates falls
+  // inside — a view that asked only about the endpoints would hide the task on
+  // every day it is actually being worked on.
+  const span = spanForItem(item);
+  if (span === null) return false;
+  return (!to || span.start <= to) && (!from || span.end >= from);
 }
 
 export function matchesFilter(item: Item, filter: ViewFilter): boolean {
@@ -257,9 +275,6 @@ export function compareItems(a: Item, b: Item, sort: SortSpec): number {
     case "dueDate":
       result = (a.dueDate || NO_DATE).localeCompare(b.dueDate || NO_DATE);
       break;
-    case "scheduledDate":
-      result = (a.scheduledDate || NO_DATE).localeCompare(b.scheduledDate || NO_DATE);
-      break;
     case "priority":
       result = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
       break;
@@ -332,7 +347,7 @@ export function presetTodayQueue(today: string): ViewSpec {
     name: "Today",
     filter: { sources: ["task"], from: today, to: today },
     groupBy: "bucket",
-    sort: { key: "scheduledDate" },
+    sort: { key: "dueDate" },
     layout: "list",
   };
 }

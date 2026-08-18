@@ -165,7 +165,6 @@ export async function buildAssistantContextPack(args: {
         status: task.status,
         priority: task.priority === "none" ? "" : task.priority,
         dueDate: task.dueDate,
-        scheduledDate: task.scheduledDate,
         projectId: task.projectId,
         tags: task.tags,
         estimatedMinutes: task.estimatedMinutes,

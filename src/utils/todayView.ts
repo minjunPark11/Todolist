@@ -61,9 +61,10 @@ export function parseTimeToMinutes(value: string): number | undefined {
  * The plan's rule wins because it is the one every other Scope is written
  * against, and because it is about the DAY rather than about how the work is
  * going: a task nobody has dated is not today's by virtue of having been
- * started. `scheduledDate` still counts, read as the legacy form of "planned
- * for this day" (§6.19's `TaskDailyPlan`) the same way `Task.tags` is still
- * read beside the Tag records.
+ * started. The legacy work-day field counted here too, read as an older form
+ * of "planned for this day"; it folded into the schedule
+ * (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11), so what remains is the
+ * explicit `TaskDailyPlan` record (§6.19) beside the task's own dates.
  *
  * Completed work is NOT membership here. It is a second question this screen
  * also asks — see `completedOn` — because §12.12 gives finished tasks their

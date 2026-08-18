@@ -37,9 +37,17 @@ export function saveCaptureTarget(addToToday: boolean) {
 
 export interface QuickParseResult {
   title: string;
-  /** Relative day words ("내일", "monday") — when to work on it. "" when absent. */
-  scheduledDate: string;
-  /** Explicit calendar dates ("3/15", "2026-03-15") — the deadline. "" when absent. */
+  /**
+   * Relative day words ("내일", "monday"). "" when absent.
+   *
+   * Still separate from `dueDate` below, because the two are different
+   * GRAMMARS and the parser's job is to report what it read. They land in the
+   * same Task field — there is only one date now
+   * (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11) — and the caller decides
+   * which wins when a line somehow contains both.
+   */
+  relativeDate: string;
+  /** Explicit calendar dates ("3/15", "2026-03-15"). "" when absent. */
   dueDate: string;
   /** 24h "HH:MM". "" when absent. */
   startTime: string;
@@ -104,7 +112,7 @@ export function parseQuickCapture(input: string, options: QuickParseOptions): Qu
   const today = options.today ?? todayValue();
   const result: QuickParseResult = {
     title: "",
-    scheduledDate: "",
+    relativeDate: "",
     dueDate: "",
     startTime: "",
     projectId: "",
@@ -146,18 +154,18 @@ export function parseQuickCapture(input: string, options: QuickParseOptions): Qu
     }
   }
 
-  // --- relative days → scheduledDate ---
+  // --- relative days ---
   if (take(/(?:오늘|\btoday\b)/i)) {
-    result.scheduledDate = today;
+    result.relativeDate = today;
   } else if (take(/(?:내일|\btomorrow\b)/i)) {
-    result.scheduledDate = addDays(today, 1);
+    result.relativeDate = addDays(today, 1);
   } else if (take(/모레/)) {
-    result.scheduledDate = addDays(today, 2);
+    result.relativeDate = addDays(today, 2);
   } else {
     for (const weekday of WEEKDAYS) {
       const match = take(new RegExp(weekday.patterns.map(wordPattern).join("|"), "i"));
       if (match) {
-        result.scheduledDate = nextWeekday(today, weekday.index);
+        result.relativeDate = nextWeekday(today, weekday.index);
         break;
       }
     }

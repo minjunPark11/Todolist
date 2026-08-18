@@ -21,7 +21,7 @@ import { useT } from "../i18n";
 
 /** Only axes the engine can actually group these Items by (§50A.5). */
 const GROUP_AXES: GroupAxis[] = ["none", "list", "status", "priority"];
-const SORT_KEYS: SortKey[] = ["dueDate", "scheduledDate", "priority", "title"];
+const SORT_KEYS: SortKey[] = ["dueDate", "priority", "title"];
 const PRIORITIES: TaskPriority[] = ["high", "medium", "low", "none"];
 
 interface TaskListViewProps {

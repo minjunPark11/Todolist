@@ -32,28 +32,28 @@ describe("parseQuickCapture", () => {
   it("leaves plain text alone", () => {
     const result = parse("세금 신고 서류 준비");
     expect(result.title).toBe("세금 신고 서류 준비");
-    expect(result.scheduledDate).toBe("");
+    expect(result.relativeDate).toBe("");
     expect(result.dueDate).toBe("");
     expect(result.startTime).toBe("");
     expect(result.projectId).toBe("");
     expect(result.priority).toBe("");
   });
 
-  it("reads relative days into scheduledDate", () => {
-    expect(parse("오늘 장보기").scheduledDate).toBe(TODAY);
-    expect(parse("내일 장보기").scheduledDate).toBe("2026-03-11");
-    expect(parse("모레 장보기").scheduledDate).toBe("2026-03-12");
-    expect(parse("buy milk tomorrow").scheduledDate).toBe("2026-03-11");
+  it("reads relative days into relativeDate", () => {
+    expect(parse("오늘 장보기").relativeDate).toBe(TODAY);
+    expect(parse("내일 장보기").relativeDate).toBe("2026-03-11");
+    expect(parse("모레 장보기").relativeDate).toBe("2026-03-12");
+    expect(parse("buy milk tomorrow").relativeDate).toBe("2026-03-11");
     expect(parse("내일 장보기").title).toBe("장보기");
   });
 
   it("moves a weekday to its next occurrence, never today", () => {
     // TODAY is a Tuesday.
-    expect(parse("수요일 회의").scheduledDate).toBe("2026-03-11");
-    expect(parse("월요일 회의").scheduledDate).toBe("2026-03-16");
+    expect(parse("수요일 회의").relativeDate).toBe("2026-03-11");
+    expect(parse("월요일 회의").relativeDate).toBe("2026-03-16");
     // Same weekday as today means the coming one, a week out.
-    expect(parse("화요일 회의").scheduledDate).toBe("2026-03-17");
-    expect(parse("standup on friday").scheduledDate).toBe("2026-03-13");
+    expect(parse("화요일 회의").relativeDate).toBe("2026-03-17");
+    expect(parse("standup on friday").relativeDate).toBe("2026-03-13");
   });
 
   it("reads explicit dates into dueDate", () => {
@@ -137,21 +137,21 @@ describe("parseQuickCapture", () => {
   it("combines everything and cleans up whitespace", () => {
     const result = parse("내일 오후 3시 #업무 팀 회의 준비 !!");
     expect(result.title).toBe("팀 회의 준비");
-    expect(result.scheduledDate).toBe("2026-03-11");
+    expect(result.relativeDate).toBe("2026-03-11");
     expect(result.startTime).toBe("15:00");
     expect(result.projectId).toBe("p1");
     expect(result.priority).toBe("high");
   });
 
   it("does not fire on latin words that merely contain a keyword", () => {
-    expect(parse("mondayish plan").scheduledDate).toBe("");
-    expect(parse("update the sunroof").scheduledDate).toBe("");
+    expect(parse("mondayish plan").relativeDate).toBe("");
+    expect(parse("update the sunroof").relativeDate).toBe("");
   });
 
   it("returns an empty title when the input is only tokens", () => {
     const result = parse("내일 !!");
     expect(result.title).toBe("");
-    expect(result.scheduledDate).toBe("2026-03-11");
+    expect(result.relativeDate).toBe("2026-03-11");
     expect(result.priority).toBe("high");
   });
 });

@@ -15,7 +15,6 @@ function task(overrides: Partial<Task> = {}): Task {
     priority: "none",
     dueDate: "",
     startDate: "",
-    scheduledDate: "",
     startTime: "",
     endTime: "",
     projectId: "",
@@ -112,10 +111,10 @@ describe("planRecurringCompletion", () => {
     expect(buckets.dueToday).toHaveLength(0);
   });
 
-  it("shifts the planned work day by the same amount as the deadline", () => {
-    // Planned two days before the deadline; that gap should survive the roll.
+  it("shifts a range's start by the same amount as its end", () => {
+    // Two days long; that length should survive the roll.
     const result = planRecurringCompletion(
-      task({ repeatType: "weekly", dueDate: "2026-08-15", scheduledDate: "2026-08-13" }),
+      task({ repeatType: "weekly", dueDate: "2026-08-15", startDate: "2026-08-13" }),
       "task-copy",
       NOW,
       TODAY,
@@ -123,14 +122,14 @@ describe("planRecurringCompletion", () => {
     if (result.kind !== "rolled") throw new Error("expected the repeat to roll forward");
 
     expect(result.patch.dueDate).toBe("2026-08-22");
-    expect(result.patch.scheduledDate).toBe("2026-08-20");
+    expect(result.patch.startDate).toBe("2026-08-20");
   });
 
-  it("leaves an unset scheduled date unset", () => {
+  it("leaves a single-day task without a start date", () => {
     const result = planRecurringCompletion(task({ dueDate: TODAY }), "task-copy", NOW, TODAY);
     if (result.kind !== "rolled") throw new Error("expected the repeat to roll forward");
 
-    expect(result.patch.scheduledDate).toBe("");
+    expect(result.patch.startDate).toBe("");
   });
 
   it("reports the last occurrence as final so the task itself closes out", () => {
@@ -153,5 +152,35 @@ describe("planRecurringCompletion", () => {
     );
 
     expect(result.kind).toBe("rolled");
+  });
+});
+
+// `repeatDays` has been stored since long before anything read it. The
+// schedule editor's 평일 preset is the first thing that writes a set of days,
+// and a weekly repeat that ignored them would make "every weekday" mean
+// Thursday only.
+describe("getNextDueDate — named weekdays and yearly", () => {
+  // 2026-08-13 is a Thursday.
+  it("advances a weekday repeat to the next weekday", () => {
+    const weekdays = task({ repeatType: "weekly", repeatDays: [1, 2, 3, 4, 5], dueDate: TODAY });
+    expect(getNextDueDate(weekdays, TODAY)).toBe("2026-08-14");
+  });
+
+  it("skips the weekend rather than landing on it", () => {
+    const friday = task({ repeatType: "weekly", repeatDays: [1, 2, 3, 4, 5], dueDate: "2026-08-14" });
+    expect(getNextDueDate(friday, "2026-08-14")).toBe("2026-08-17");
+  });
+
+  it("still adds a week when the repeat names no days", () => {
+    expect(getNextDueDate(task({ repeatType: "weekly", dueDate: TODAY }), TODAY)).toBe("2026-08-20");
+  });
+
+  it("honours the interval once the week has wrapped", () => {
+    const fortnightly = task({ repeatType: "weekly", repeatInterval: 2, repeatDays: [4], dueDate: TODAY });
+    expect(getNextDueDate(fortnightly, TODAY)).toBe("2026-08-27");
+  });
+
+  it("advances a yearly repeat by twelve months", () => {
+    expect(getNextDueDate(task({ repeatType: "yearly", dueDate: TODAY }), TODAY)).toBe("2027-08-13");
   });
 });

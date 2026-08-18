@@ -71,8 +71,8 @@ export function validateAgentAction(
 
   if (action.type === "create_calendar_event") {
     if (!action.payload.title.trim()) return invalid(action, "Event title is required.");
-    if (!isValidDate(action.payload.scheduledDate)) {
-      return invalid(action, "Scheduled date must use YYYY-MM-DD.");
+    if (!isValidDate(action.payload.dueDate)) {
+      return invalid(action, "Date must use YYYY-MM-DD.");
     }
     if (!isValidTime(action.payload.startTime) || !isValidTime(action.payload.endTime)) {
       return invalid(action, "Event time must use HH:mm.");

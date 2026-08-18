@@ -49,7 +49,7 @@ export function executeAgentActions(
       if (action.type === "create_calendar_event") {
         const taskId = planner.createTask({
           title: action.payload.title,
-          scheduledDate: action.payload.scheduledDate,
+          dueDate: action.payload.dueDate,
           startTime: action.payload.startTime,
           endTime: action.payload.endTime,
           status: "todo",

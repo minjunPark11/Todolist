@@ -48,8 +48,8 @@ export function InlineCapture({
     : undefined;
   const startMin = parsed.startTime ? parseTimeToMinutes(parsed.startTime) : undefined;
   const chips = [
-    parsed.scheduledDate
-      ? { key: "scheduled", label: formatDate(parsed.scheduledDate, lang) }
+    parsed.relativeDate
+      ? { key: "scheduled", label: formatDate(parsed.relativeDate, lang) }
       : null,
     parsed.dueDate ? { key: "due", label: `~ ${formatDate(parsed.dueDate, lang)}` } : null,
     startMin !== undefined ? { key: "time", label: formatMinuteOfDay(startMin, lang) } : null,

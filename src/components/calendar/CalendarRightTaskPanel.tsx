@@ -151,15 +151,14 @@ function PanelSection({
           <AnimatePresence initial={false}>
           {tasks.map((task) => {
             const project = projects.find((item) => item.id === task.projectId);
-            const dateLabel = task.scheduledDate
-              ? task.scheduledDate === today
+            // One date, so one label. This used to prefer the work day and
+            // fall back to the deadline; the two are the same field now
+            // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11).
+            const dateLabel = task.dueDate
+              ? task.dueDate === today
                 ? t("eis.today")
-                : task.scheduledDate.slice(5).replace("-", ".")
-              : task.dueDate
-                ? task.dueDate === today
-                  ? t("eis.today")
-                  : task.dueDate.slice(5).replace("-", ".")
-                : "";
+                : task.dueDate.slice(5).replace("-", ".")
+              : "";
             return (
               <MotionTaskRow
                 key={task.id}

@@ -60,20 +60,18 @@ export function buildCalendarShareSnapshot(input: {
 
   input.tasks.forEach((task) => {
     if (!task.title || task.status === "archived") return;
-    if (isDate(task.scheduledDate)) {
+    // One event per task. This used to emit two — a timed block on the work
+    // day and a separate all-day deadline marker — because the record carried
+    // both dates. It carries one now (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7
+    // Phase 11), and emitting the same day twice under two titles would put a
+    // duplicate in every subscriber's calendar.
+    if (isDate(task.dueDate)) {
       events.push({
         uid: `task-scheduled-${task.id}`,
         title: task.title,
-        date: task.scheduledDate,
+        date: task.dueDate,
         startTime: isTime(task.startTime) ? task.startTime : undefined,
         endTime: isTime(task.endTime) ? task.endTime : undefined,
-      });
-    }
-    if (isDate(task.dueDate) && task.dueDate !== task.scheduledDate) {
-      events.push({
-        uid: `task-due-${task.id}`,
-        title: `마감: ${task.title}`,
-        date: task.dueDate,
       });
     }
   });

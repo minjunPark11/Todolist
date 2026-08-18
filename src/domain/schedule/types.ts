@@ -87,6 +87,50 @@ export interface Schedule {
    * dates by a day for people east of UTC.
    */
   timezone: string | null;
+  /**
+   * When to be told about this, as one of the offered choices.
+   *
+   * A single preset rather than the design's `ReminderRule[]` (§1.3.3). The
+   * panel is a one-of list, and a list type whose UI can only ever hold one
+   * element is a type that lies about what the app can do — the array can
+   * arrive with the scheduler that would justify it (audit D5).
+   *
+   * `"none"` is the unset value, not `null`, so that every Schedule has an
+   * answer and no caller has to write `?? "none"`.
+   */
+  reminder: ReminderPreset;
+  /**
+   * How this repeats, as one of the offered choices.
+   *
+   * Stored on the Task as the legacy `repeatType`/`repeatInterval`/
+   * `repeatDays` trio; `recurrence.ts` is the only place that knows the
+   * mapping. Kept as a preset here for the same reason as `reminder`: the
+   * editor offers six choices, and modelling a full RRULE behind six buttons
+   * would be a grammar nobody can enter.
+   */
+  repeat: RepeatPreset;
+}
+
+/**
+ * The choices the 알림 panel offers, in the order it shows them.
+ *
+ * `at-time` needs a time to be meaningful and the rest do not, which is why
+ * the offer is filtered by the draft rather than fixed (see `reminder.ts`).
+ */
+export const REMINDER_PRESETS = ["none", "at-time", "10m", "1h", "1d-9am"] as const;
+export type ReminderPreset = (typeof REMINDER_PRESETS)[number];
+
+/** The choices the 반복 panel offers, in the order it shows them. */
+export const REPEAT_PRESETS = ["none", "daily", "weekdays", "weekly", "monthly", "yearly"] as const;
+export type RepeatPreset = (typeof REPEAT_PRESETS)[number];
+
+/** True for a value this build knows how to show. Anything else normalizes away. */
+export function isReminderPreset(value: unknown): value is ReminderPreset {
+  return REMINDER_PRESETS.includes(value as ReminderPreset);
+}
+
+export function isRepeatPreset(value: unknown): value is RepeatPreset {
+  return REPEAT_PRESETS.includes(value as RepeatPreset);
 }
 
 /**
@@ -121,6 +165,8 @@ export const EMPTY_SCHEDULE: Schedule = {
   startTime: null,
   endTime: null,
   timezone: null,
+  reminder: "none",
+  repeat: "none",
 };
 
 const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;

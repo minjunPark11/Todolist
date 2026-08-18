@@ -18,7 +18,6 @@ function task(overrides: Partial<Task> = {}): Task {
     status: "todo",
     priority: "none",
     dueDate: "",
-    scheduledDate: "",
     startDate: "",
     startTime: "",
     endTime: "",
@@ -52,9 +51,10 @@ const ids = (tasks: Task[]) => tasks.map((entry) => entry.id).sort();
 
 describe("getTodayBuckets", () => {
   it("puts a deadline and a work day on the same row", () => {
-    // WAS: `dueToday` and `scheduledToday`, one each.
+    // WAS: `dueToday` and `scheduledToday`, one each. Both records are the
+    // same shape now — one date — which is the point.
     const buckets = getTodayBuckets(
-      [task({ id: "due", dueDate: TODAY }), task({ id: "work", scheduledDate: TODAY })],
+      [task({ id: "due", dueDate: TODAY }), task({ id: "work", dueDate: TODAY })],
       TODAY,
     );
     expect(ids(buckets.dueToday)).toEqual(["due", "work"]);
@@ -62,7 +62,7 @@ describe("getTodayBuckets", () => {
 
   it("counts a range as today's from its first day", () => {
     const buckets = getTodayBuckets(
-      [task({ id: "running", scheduledDate: TODAY, dueDate: "2026-08-21" })],
+      [task({ id: "running", startDate: TODAY, dueDate: "2026-08-21" })],
       TODAY,
     );
     expect(ids(buckets.dueToday)).toEqual(["running"]);
@@ -70,7 +70,7 @@ describe("getTodayBuckets", () => {
   });
 
   it("keeps a running range out of overdue until its end has passed", () => {
-    const started = [task({ id: "running", scheduledDate: "2026-08-16", dueDate: "2026-08-20" })];
+    const started = [task({ id: "running", startDate: "2026-08-16", dueDate: "2026-08-20" })];
     expect(ids(getTodayBuckets(started, TODAY).dueToday)).toEqual(["running"]);
     expect(ids(getTodayBuckets(started, "2026-08-21").overdue)).toEqual(["running"]);
   });

@@ -18,10 +18,14 @@ describe("planScheduleUpdate — writing", () => {
     expect(plan.unchanged).toBe(false);
     expect(plan.patch).toEqual({
       startDate: "",
-      scheduledDate: "",
       dueDate: "2026-08-20",
       startTime: "",
       endTime: "",
+      scheduledDate: "",
+      reminder: "none",
+      repeatType: "none",
+      repeatInterval: 1,
+      repeatDays: [],
     });
   });
 

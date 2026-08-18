@@ -12,7 +12,8 @@
 //
 // Idempotent by construction: `normalize(normalize(x))` equals `normalize(x)`,
 // which is what lets it run on every load without drifting.
-import { isLocalDate, isLocalTime, type Schedule } from "./types";
+import { reconcileReminder } from "./reminder";
+import { isLocalDate, isLocalTime, isRepeatPreset, isReminderPreset, type Schedule } from "./types";
 
 /**
  * The canonical form of a Schedule.
@@ -75,11 +76,25 @@ export function normalizeSchedule(schedule: Schedule): Schedule {
     endTime = null;
   }
 
-  return {
+  const dated = startDate !== null || dueDate !== null;
+
+  // INV-06 / INV-07 — a reminder or a repeat with no date to hang on. Both are
+  // relative to a day, so without one they name nothing; the design keeps them
+  // in the record only as long as the date they qualify (design §1.20).
+  const reminder = dated && isReminderPreset(schedule.reminder) ? schedule.reminder : "none";
+  const repeat = dated && isRepeatPreset(schedule.repeat) ? schedule.repeat : "none";
+
+  const core = {
     startDate,
     dueDate,
     startTime,
     endTime,
     timezone: typeof schedule.timezone === "string" && schedule.timezone ? schedule.timezone : null,
+    repeat,
   };
+
+  // 정시 survives only while there is a time to be "at". Checked against the
+  // times AFTER they were repaired above, so a reminder is not kept alive by a
+  // startTime this very function just dropped.
+  return { ...core, reminder: reconcileReminder({ ...core, reminder }, reminder) };
 }

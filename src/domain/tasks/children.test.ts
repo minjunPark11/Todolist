@@ -13,7 +13,6 @@ function task(overrides: Partial<Task> = {}): Task {
     priority: "high",
     dueDate: "2026-08-20",
     startDate: "",
-    scheduledDate: "2026-08-17",
     startTime: "",
     endTime: "",
     projectId: "space-1",

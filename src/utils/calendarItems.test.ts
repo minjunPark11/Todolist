@@ -17,7 +17,6 @@ function task(overrides: Partial<Task> = {}): Task {
     priority: "none",
     dueDate: "",
     startDate: "",
-    scheduledDate: "",
     startTime: "",
     endTime: "",
     projectId: "",
@@ -79,7 +78,7 @@ describe("task chips", () => {
     // A work day and a deadline that disagree become the range between them,
     // and a range occupies every day it spans — the same per-day expansion
     // external all-day events already use.
-    const items = build({ tasks: [task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20" })] });
+    const items = build({ tasks: [task({ startDate: "2026-08-17", dueDate: "2026-08-20" })] });
     expect(keys(items)).toEqual([
       "task-block:task-1:2026-08-17",
       "task-block:task-1:2026-08-18",
@@ -102,35 +101,35 @@ describe("task chips", () => {
   });
 
   it("puts the times on the ends of a range and leaves the middle all-day", () => {
-    // WAS: 09:00–10:30 on the work block, nothing on the marker.
-    // Promotion drops the end time rather than move it to another day, so a
-    // range keeps only its start.
+    // Each time belongs to the day it describes (audit 1-b): the start to the
+    // first day, the end to the last. A day in between has neither.
     const items = build({
-      tasks: [task({ scheduledDate: "2026-08-17", startTime: "09:00", endTime: "10:30", dueDate: "2026-08-19" })],
+      tasks: [task({ startDate: "2026-08-17", dueDate: "2026-08-19", startTime: "09:00", endTime: "17:30" })],
     });
     expect([items[0].startTime, items[0].endTime, items[0].allDay]).toEqual(["09:00", undefined, false]);
-    expect(items.slice(1).every((item) => item.allDay && item.startTime === undefined)).toBe(true);
+    expect([items[1].startTime, items[1].endTime, items[1].allDay]).toEqual([undefined, undefined, true]);
+    expect([items[2].startTime, items[2].endTime]).toEqual([undefined, "17:30"]);
   });
 
   it("keeps both times on a single-day timed schedule", () => {
-    const items = build({ tasks: [task({ scheduledDate: "2026-08-17", startTime: "09:00", endTime: "10:30" })] });
+    const items = build({ tasks: [task({ dueDate: "2026-08-17", startTime: "09:00", endTime: "10:30" })] });
     expect([items[0].startTime, items[0].endTime, items[0].allDay]).toEqual(["09:00", "10:30", false]);
   });
 
   // A range has no gesture that says whether a drag moves it or resizes it.
   it("refuses to drag a multi-day range", () => {
-    const items = build({ tasks: [task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20" })] });
+    const items = build({ tasks: [task({ startDate: "2026-08-17", dueDate: "2026-08-20" })] });
     expect(items.every((item) => item.draggable)).toBe(false);
   });
 
   it("treats a block with no start time as all-day", () => {
-    const items = build({ tasks: [task({ scheduledDate: "2026-08-17" })] });
+    const items = build({ tasks: [task({ dueDate: "2026-08-17" })] });
     expect(items[0].allDay).toBe(true);
   });
 
   it("drops archived and deleted tasks entirely", () => {
-    expect(build({ tasks: [task({ status: "archived", scheduledDate: "2026-08-17" })] })).toEqual([]);
-    expect(build({ tasks: [task({ deletedAt: NOW, scheduledDate: "2026-08-17" })] })).toEqual([]);
+    expect(build({ tasks: [task({ status: "archived", dueDate: "2026-08-17" })] })).toEqual([]);
+    expect(build({ tasks: [task({ deletedAt: NOW, dueDate: "2026-08-17" })] })).toEqual([]);
   });
 
   it("hides every completed task unless the Completed layer is on", () => {
@@ -141,7 +140,7 @@ describe("task chips", () => {
     // Governing it is the smaller change for most records, since a task with
     // only a deadline already disappeared on completion — and the plan is
     // still there for anyone who turns the layer on.
-    const scheduled = task({ status: "done", scheduledDate: "2026-08-17" });
+    const scheduled = task({ status: "done", dueDate: "2026-08-17" });
     expect(build({ tasks: [scheduled] })).toEqual([]);
     expect(keys(build({ tasks: [scheduled], layers: { ...defaultCalendarLayers, completed: true } }))).toEqual([
       "task-block:task-1",
@@ -153,7 +152,7 @@ describe("task chips", () => {
 
   it("never lets a completed task be dragged", () => {
     const items = build({
-      tasks: [task({ status: "done", scheduledDate: "2026-08-17" })],
+      tasks: [task({ status: "done", dueDate: "2026-08-17" })],
       layers: { ...defaultCalendarLayers, completed: true },
     });
     expect(items[0].draggable).toBe(false);
@@ -166,20 +165,20 @@ describe("task chips", () => {
   it("obeys the task layer toggle", () => {
     // WAS: a Deadline toggle drew a chip of its own beside this one. The layer
     // is gone — every task chip answers to `task` now.
-    const t = task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20" });
+    const t = task({ startDate: "2026-08-17", dueDate: "2026-08-20" });
     expect(build({ tasks: [t], layers: { ...defaultCalendarLayers, task: false } })).toEqual([]);
     expect(build({ tasks: [t] })).toHaveLength(4);
   });
 
   it("marks a repeating task on every chip", () => {
     const items = build({
-      tasks: [task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20", repeatType: "weekly" })],
+      tasks: [task({ startDate: "2026-08-17", dueDate: "2026-08-20", repeatType: "weekly" })],
     });
     expect(items.every((item) => item.repeating)).toBe(true);
   });
 
   it("takes the project colour when there is no category map", () => {
-    const items = build({ tasks: [task({ projectId: "p1", scheduledDate: "2026-08-17" })], projects: [project] });
+    const items = build({ tasks: [task({ projectId: "p1", dueDate: "2026-08-17" })], projects: [project] });
     expect(items[0].color).toBe("#34c759");
     expect(items[0].categoryId).toBe("");
   });
@@ -189,7 +188,7 @@ describe("project filter", () => {
   it("hides only what belongs to an excluded project", () => {
     // §9.6: a task with no project is never hidden by the filter.
     const items = build({
-      tasks: [task({ id: "a", projectId: "p1", scheduledDate: "2026-08-17" }), task({ id: "b", scheduledDate: "2026-08-17" })],
+      tasks: [task({ id: "a", projectId: "p1", dueDate: "2026-08-17" }), task({ id: "b", dueDate: "2026-08-17" })],
       projects: [project],
       projectFilter: new Set<string>(),
     });

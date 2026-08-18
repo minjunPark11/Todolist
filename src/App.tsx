@@ -62,6 +62,8 @@ import type {
   Project,
   Task,
 } from "./types";
+import { useReminders } from "./hooks/useReminders";
+import { formatLocalTime } from "./domain/schedule";
 import { todayValue } from "./utils/date";
 import { I18nProvider, translate, useT } from "./i18n";
 
@@ -650,6 +652,20 @@ export default function App() {
       if (!sent) showToast({ message: `${title}: ${body}` });
     });
   }
+
+  // Reminder delivery (design §8). The wording lives here rather than in the
+  // hook because it needs the dictionary, and the hook has no business knowing
+  // which language the app is in.
+  useReminders({
+    tasks: planner.tasks,
+    describe: ({ title, at }) => ({
+      title,
+      body: t("schedule.notificationBody", {
+        time: formatLocalTime(at.time, appSettings.language === "ko" ? "ko-KR" : "en-US"),
+      }),
+    }),
+    onFallback: (message) => showToast({ message }),
+  });
 
   function stopFocusWithNotification(sessionId: string, completeTask = false) {
     planner.stopFocusSession(sessionId, completeTask);

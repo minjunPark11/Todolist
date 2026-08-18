@@ -238,20 +238,28 @@ describe("scheduleToTaskPatch", () => {
   it("writes nulls back as the record's empty string", () => {
     expect(scheduleToTaskPatch(EMPTY_SCHEDULE)).toEqual({
       startDate: "",
-      scheduledDate: "",
       dueDate: "",
       startTime: "",
       endTime: "",
+      scheduledDate: "",
+      reminder: "none",
+      repeatType: "none",
+      repeatInterval: 1,
+      repeatDays: [],
     });
   });
 
   it("writes a range", () => {
     expect(scheduleToTaskPatch(schedule({ startDate: "2026-08-27", dueDate: "2026-08-30" }))).toEqual({
       startDate: "2026-08-27",
-      scheduledDate: "",
       dueDate: "2026-08-30",
       startTime: "",
       endTime: "",
+      scheduledDate: "",
+      reminder: "none",
+      repeatType: "none",
+      repeatInterval: 1,
+      repeatDays: [],
     });
   });
 

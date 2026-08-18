@@ -87,7 +87,6 @@ function slimTask(task: Task) {
     status: task.status,
     priority: task.priority,
     dueDate: task.dueDate,
-    scheduledDate: task.scheduledDate,
     startTime: task.startTime,
     endTime: task.endTime,
     projectId: task.projectId,

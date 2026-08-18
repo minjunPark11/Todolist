@@ -33,7 +33,9 @@ export function schedulesEqual(a: Schedule, b: Schedule): boolean {
     left.dueDate === right.dueDate &&
     left.startTime === right.startTime &&
     left.endTime === right.endTime &&
-    left.timezone === right.timezone
+    left.timezone === right.timezone &&
+    left.reminder === right.reminder &&
+    left.repeat === right.repeat
   );
 }
 

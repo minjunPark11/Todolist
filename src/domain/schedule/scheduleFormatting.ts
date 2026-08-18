@@ -20,6 +20,21 @@ function formatDate(date: string, locale: string, withYear: boolean): string {
 }
 
 /**
+ * A wall-clock `HH:mm` as the locale writes it — `오후 6:00`, `6:00 PM`.
+ *
+ * Formatted through a throwaway UTC date pinned to the same day, so the clock
+ * is the only thing Intl is being asked about. The 24-hour string is what is
+ * stored and what `<input type="time">` speaks; this is only ever for reading.
+ */
+export function formatLocalTime(time: string, locale = "en-US"): string {
+  return new Date(`2000-01-01T${time}:00Z`).toLocaleTimeString(locale, {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+  });
+}
+
+/**
  * A one-line label, or "" when there is no schedule.
  *
  * Empty rather than a placeholder: the caller knows what its own empty state
@@ -37,10 +52,13 @@ export function formatScheduleTrigger(schedule: Schedule, today: string, locale 
   const withYear = span.start.slice(0, 4) !== year || span.end.slice(0, 4) !== year;
   const start = formatDate(span.start, locale, withYear);
 
-  if (span.start !== span.end) return `${start} – ${formatDate(span.end, locale, withYear)}`;
+  // An arrow rather than a dash for a range: the trigger sits inline in a
+  // sentence of other fields, and `8월 25일 – 8월 28일` reads as one hyphenated
+  // thing at small sizes where `→` cannot.
+  if (span.start !== span.end) return `${start} → ${formatDate(span.end, locale, withYear)}`;
   // A time belongs to a single day; on a range it names one end and reads as
   // if it applied to both.
-  return schedule.startTime ? `${start} ${schedule.startTime}` : start;
+  return schedule.startTime ? `${start} · ${formatLocalTime(schedule.startTime, locale)}` : start;
 }
 
 /**
@@ -51,11 +69,11 @@ export function formatScheduleTrigger(schedule: Schedule, today: string, locale 
  * finishing. Writing them as a single "09:00 – 17:00" would read as one
  * afternoon rather than as the shape of a multi-day block.
  */
-export function formatTimeSummary(schedule: Schedule): string {
+export function formatTimeSummary(schedule: Schedule, locale = "en-US"): string {
   if (schedule.startTime === null) return "";
-  if (schedule.endTime === null) return schedule.startTime;
+  const start = formatLocalTime(schedule.startTime, locale);
+  if (schedule.endTime === null) return start;
+  const end = formatLocalTime(schedule.endTime, locale);
   const sameDay = schedule.startDate === null || schedule.startDate === schedule.dueDate;
-  return sameDay
-    ? `${schedule.startTime} – ${schedule.endTime}`
-    : `${schedule.startTime} → ${schedule.endTime}`;
+  return sameDay ? `${start} – ${end}` : `${start} → ${end}`;
 }

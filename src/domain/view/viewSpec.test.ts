@@ -30,9 +30,12 @@ function task(overrides: Partial<Task> = {}): Task {
     description: "",
     status: "todo",
     priority: "none",
-    dueDate: "",
+    // Dated today by default. The fixture used to carry a separate work day
+    // here; with one date (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11) that
+    // default has to live on `dueDate`, or the windowed views below have
+    // almost nothing to compare against.
+    dueDate: TODAY,
     startDate: "",
-    scheduledDate: TODAY,
     startTime: "",
     endTime: "",
     projectId: "space-1",
@@ -160,16 +163,21 @@ describe("matchesFilter", () => {
     expect(matchesFilter(item, { tags: ["deep", "absent"] })).toBe(false);
   });
 
-  it("lets either date put an item in the window", () => {
-    // A task planned for Tuesday and one due Tuesday are both this week's work.
-    const [due] = build([task({ scheduledDate: "", dueDate: TODAY })]).items;
+  it("puts a single-day item in a window on its own day", () => {
+    const [due] = build([task({ dueDate: TODAY })]).items;
     expect(matchesFilter(due, { from: TODAY, to: TODAY })).toBe(true);
-    const [scheduled] = build([task({ scheduledDate: TODAY, dueDate: "" })]).items;
-    expect(matchesFilter(scheduled, { from: TODAY, to: TODAY })).toBe(true);
+  });
+
+  // Overlap, not containment: a window inside the range matches even though
+  // neither endpoint falls in it.
+  it("puts a range in every window it overlaps", () => {
+    const [running] = build([task({ startDate: "2026-08-10", dueDate: "2026-08-20" })]).items;
+    expect(matchesFilter(running, { from: "2026-08-14", to: "2026-08-15" })).toBe(true);
+    expect(matchesFilter(running, { from: "2026-08-21", to: "2026-08-25" })).toBe(false);
   });
 
   it("excludes an item with no date at all from a windowed view", () => {
-    const [undated] = build([task({ scheduledDate: "", dueDate: "" })]).items;
+    const [undated] = build([task({ dueDate: "" })]).items;
     expect(matchesFilter(undated, { from: TODAY, to: TODAY })).toBe(false);
   });
 });

@@ -201,7 +201,6 @@ export function patchForSpanDrag(task: Task, drag: SpanDrag): Partial<Task> {
   const patch: Partial<Task> = {};
   // Only what is already there. An absent field stays absent.
   if (task.startDate) patch.startDate = shiftDate(task.startDate, drag.zoom, drag.steps);
-  if (task.scheduledDate) patch.scheduledDate = shiftDate(task.scheduledDate, drag.zoom, drag.steps);
   if (task.dueDate) patch.dueDate = shiftDate(task.dueDate, drag.zoom, drag.steps);
   return patch;
 }

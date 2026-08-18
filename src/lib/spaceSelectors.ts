@@ -38,12 +38,16 @@ export function isTaskDone(task: Task): boolean {
   return task.status === "done";
 }
 
+// "Scheduled" now means "has a date at all". The work day and the deadline
+// were separate fields, so a task could be dated and still unscheduled; with
+// one date that distinction has nothing left to stand on
+// (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11).
 export function isTaskScheduled(task: Task): boolean {
-  return Boolean(task.scheduledDate) && !isTaskDone(task);
+  return Boolean(task.dueDate) && !isTaskDone(task);
 }
 
 export function isTaskUnscheduled(task: Task): boolean {
-  return !task.scheduledDate && !isTaskDone(task) && task.status !== "waiting";
+  return !task.dueDate && !isTaskDone(task) && task.status !== "waiting";
 }
 
 export function isTaskOverdue(task: Task, today = todayValue()): boolean {
@@ -87,8 +91,6 @@ export function getNextActionTask(spaceTasks: Task[], config: SpaceCustomConfig,
   if (dueToday[0]) return dueToday[0];
   const highPriority = open.filter((task) => task.priority === "high").sort(byRecency);
   if (highPriority[0]) return highPriority[0];
-  const scheduledToday = open.filter((task) => task.scheduledDate === today).sort(byRecency);
-  if (scheduledToday[0]) return scheduledToday[0];
   const recentlyFocused = open
     .filter((task) => Boolean(task.lastFocusedAt))
     .sort((a, b) => (b.lastFocusedAt || "").localeCompare(a.lastFocusedAt || ""));
@@ -122,7 +124,7 @@ export function getSpaceSignal(
   const recentSessions = spaceSessions.filter((session) => session.status === "completed" && session.startAt.slice(0, 10) >= weekAgo);
   const recentActivity = recentSessions.length > 0 || spaceTasks.some((task) => (task.updatedAt || "").slice(0, 10) >= weekAgo);
   const dueSoon = spaceTasks.filter(
-    (task) => !isTaskDone(task) && task.dueDate && task.dueDate <= addDays(today, 2) && !task.scheduledDate,
+    (task) => !isTaskDone(task) && task.dueDate && task.dueDate <= addDays(today, 2),
   ).length;
 
   if (blocked > 0) return { status: "blocked", label: t("spaceHub.signal.blocked"), detail: t("spaceHub.signal.blockedDetail", { n: blocked }) };
@@ -170,8 +172,9 @@ export function getUpcomingSpaceItems(
     if (isTaskDone(task)) continue;
     if (task.dueDate && task.dueDate >= today && task.dueDate <= horizon) {
       items.push({ id: `due-${task.id}`, title: task.title, when: task.dueDate, kind: "deadline", taskId: task.id });
-    } else if (task.scheduledDate && task.scheduledDate >= today && task.scheduledDate <= horizon) {
-      items.push({ id: `sch-${task.id}`, title: task.title, when: task.scheduledDate, kind: "scheduled", taskId: task.id });
+    } else if (task.startDate && task.startDate >= today && task.startDate <= horizon) {
+      // A range that has not started yet: its first day is the thing coming up.
+      items.push({ id: `sch-${task.id}`, title: task.title, when: task.startDate, kind: "scheduled", taskId: task.id });
     }
   }
 

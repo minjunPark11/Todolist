@@ -226,3 +226,77 @@ describe("draftSchedule", () => {
     expect(draftSchedule(state.draft)).not.toHaveProperty("mode");
   });
 });
+
+describe("QUICK_DATE (design §5)", () => {
+  it("sets the date and follows it with the visible month", () => {
+    const state = opened(
+      run(open(), { type: "QUICK_DATE", key: "plus7", today: "2026-08-28", now: "10:00" }),
+    );
+    expect(state.draft.dueDate).toBe("2026-09-04");
+    // The grid must move with it, or the shortcut looks like it did nothing.
+    expect(state.visibleMonth).toBe("2026-09-01");
+  });
+
+  it("clears a range preview, since the shortcut settled the dates", () => {
+    const state = opened(
+      run(
+        open(),
+        { type: "SET_MODE", mode: "duration" },
+        { type: "SELECT_DATE", date: "2026-08-20" },
+        { type: "HOVER_DATE", date: "2026-08-25" },
+        { type: "QUICK_DATE", key: "plus7", today: TODAY, now: "10:00" },
+      ),
+    );
+    expect(state.hoverDate).toBeNull();
+  });
+});
+
+describe("SET_REMINDER / SET_REPEAT (design §8, §9)", () => {
+  it("keeps a reminder the draft can carry", () => {
+    const state = opened(
+      run(open(schedule({ dueDate: "2026-08-20" })), { type: "SET_REMINDER", reminder: "1h" }),
+    );
+    expect(state.draft.reminder).toBe("1h");
+    expect(isDirty(state.draft, state.saved)).toBe(true);
+  });
+
+  // The panel filters 정시 out without a time; the reducer is what makes that
+  // true even if something dispatches it anyway.
+  it("refuses a reminder the draft cannot carry", () => {
+    const state = opened(
+      run(open(schedule({ dueDate: "2026-08-20" })), { type: "SET_REMINDER", reminder: "at-time" }),
+    );
+    expect(state.draft.reminder).toBe("none");
+  });
+
+  it("drops the reminder when the time it referred to goes", () => {
+    const state = opened(
+      run(
+        open(schedule({ dueDate: "2026-08-20", startTime: "09:00" })),
+        { type: "SET_REMINDER", reminder: "at-time" },
+        { type: "CLEAR_TIME" },
+      ),
+    );
+    expect(state.draft.reminder).toBe("none");
+  });
+
+  it("drops both when the schedule is cleared (INV-06, INV-07)", () => {
+    const state = opened(
+      run(
+        open(schedule({ dueDate: "2026-08-20" })),
+        { type: "SET_REMINDER", reminder: "1h" },
+        { type: "SET_REPEAT", repeat: "daily" },
+        { type: "CLEAR_SCHEDULE" },
+      ),
+    );
+    expect(state.draft.reminder).toBe("none");
+    expect(state.draft.repeat).toBe("none");
+  });
+
+  it("carries the repeat into the schedule it confirms", () => {
+    const state = opened(
+      run(open(schedule({ dueDate: "2026-08-20" })), { type: "SET_REPEAT", repeat: "weekdays" }),
+    );
+    expect(draftSchedule(state.draft).repeat).toBe("weekdays");
+  });
+});

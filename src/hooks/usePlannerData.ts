@@ -70,7 +70,13 @@ import { buildMigrationUpload } from "../domain/sync/buildMigrationUpload";
 import { createSaveQueue, type SaveQueue } from "../domain/sync/saveQueue";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
-import { planScheduleUpdate, type Schedule, type ScheduleIssue } from "../domain/schedule";
+import {
+  planScheduleUpdate,
+  scheduleFromTask,
+  scheduleToTaskPatch,
+  type Schedule,
+  type ScheduleIssue,
+} from "../domain/schedule";
 
 const STORAGE_KEY = PLANNER_STORAGE_KEY;
 const LEGACY_STORAGE_KEY = "todo-planner-data";
@@ -103,7 +109,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   aiModel: "",
 };
 
-const repeatTypes = ["none", "daily", "weekly", "monthly"] as const;
+const repeatTypes = ["none", "daily", "weekly", "monthly", "yearly"] as const;
 const focusModes = ["focus", "short_break", "long_break"] as const;
 const focusStatuses = ["running", "paused", "completed", "cancelled"] as const;
 const focusSources = ["focus_page", "today_page", "calendar_event", "global_bar"] as const;
@@ -133,22 +139,32 @@ function normalizeTask(task: Partial<Task>): Task {
   const rawStatus = migrateStatus(task.status);
   const rawPrevious = task.previousStatus ? migrateStatus(task.previousStatus) : undefined;
 
-  // The promotion that used to live here — copying `dueDate` into
-  // `scheduledDate` when a record had a time but no work day — is gone
-  // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §6, 1-d).
+  // The three date fields collapse to two, here, on every load
+  // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 10, rule 1-d).
   //
-  // It ran in the direction the consolidation reverses, so it fought every
-  // write the calendar now makes: a task saved with a time and a date came
-  // straight back out carrying the legacy field again. It is also redundant.
-  // The record it existed for — a time and a `dueDate`, no work day — is what
-  // `scheduleFromTask` calls `canonical`, and reads as a timed block on that
-  // date without help.
+  // This is the step the audit marked irreversible, and the reason it is safe
+  // to take now is the order the phases ran in: every reader already goes
+  // through `scheduleFromTask`, so a record that still carries the legacy work
+  // day and the record this produces from it read as the SAME Schedule. The
+  // rewrite therefore changes what is stored without changing anything anyone
+  // can see — which is what §7.1 meant by finding an order where the
+  // dangerous step is no longer needed.
   //
-  // Existing rows keep whatever `scheduledDate` they already have; the adapter
-  // reads both shapes, and the rewrite is its own phase.
-  const dueDate = task.dueDate ?? "";
-  const startTime = task.startTime ?? "";
-  const scheduledDate = task.scheduledDate ?? "";
+  // Idempotent by construction: the adapter's output is already consolidated,
+  // so running this over its own result is a no-op. That matters because it
+  // runs on every load, not once behind a migration flag — there is no schema
+  // and no migration table (audit §2), so the load path IS the migration.
+  const consolidated = scheduleToTaskPatch(scheduleFromTask(task));
+  const dueDate = consolidated.dueDate;
+  const startTime = consolidated.startTime;
+
+  // Taken OUT of the record rather than blanked. The forward-compat spread
+  // below deliberately carries fields this build does not know, and the legacy
+  // work day is the one field that must not survive that — left in, it would
+  // be copied forward on every save and the consolidation above would run
+  // against it forever instead of once.
+  const { scheduledDate: _legacyWorkDay, ...carried } = task as Partial<Task> & { scheduledDate?: string };
+  void _legacyWorkDay;
 
   return {
     // Forward compatibility (SPACES_CLICKUP_REDESIGN.md M0). Everything below
@@ -157,17 +173,16 @@ function normalizeTask(task: Partial<Task>): Task {
     // never heard of. Without it a client one version behind silently erases
     // any field a newer one wrote — it normalizes on load, drops what it does
     // not recognise, and saves the result back over the account.
-    ...task,
+    ...carried,
     id: task.id ?? createId("task"),
     title: task.title ?? "Untitled task",
     description: task.description ?? "",
     status: oneOf(rawStatus, taskStatuses, "todo"),
     priority: oneOf(task.priority, taskPriorities, "none"),
     dueDate,
-    scheduledDate,
-    startDate: task.startDate ?? "",
+    startDate: consolidated.startDate,
     startTime,
-    endTime: task.endTime ?? "",
+    endTime: consolidated.endTime,
     projectId: task.projectId ?? "",
     categoryId: task.categoryId ?? "",
     parentTaskId: task.parentTaskId ?? "",
@@ -195,6 +210,10 @@ function normalizeTask(task: Partial<Task>): Task {
     repeatInterval: task.repeatInterval ?? 1,
     repeatDays: Array.isArray(task.repeatDays) ? task.repeatDays : [],
     repeatEndDate: task.repeatEndDate ?? "",
+    // Not validated against the preset union here — `scheduleFromTask` does
+    // that on the way into the editor, and normalizing it twice would mean two
+    // places to update when a preset is added.
+    reminder: typeof task.reminder === "string" ? task.reminder : "",
   };
 }
 
@@ -1738,7 +1757,7 @@ export function usePlannerData() {
   // created from a milestone but not linked back to it would leave the
   // milestone unable to tell whether its own work is moving.
   function createTaskFromMilestone(pathId: string, milestoneId: string, title: string): string {
-    const taskId = createTask({ title, status: "todo", scheduledDate: todayValue() });
+    const taskId = createTask({ title, status: "todo", dueDate: todayValue() });
     if (!taskId) return "";
     const now = new Date().toISOString();
     setData((current) => ({

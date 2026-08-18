@@ -26,7 +26,7 @@ export type AgentAction =
       risk: "low" | "medium";
       payload: {
         title: string;
-        scheduledDate: string;
+        dueDate: string;
         startTime?: string;
         endTime?: string;
         source: "agent";

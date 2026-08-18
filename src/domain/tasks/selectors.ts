@@ -14,9 +14,16 @@ export function selectActiveTasks(tasks: Task[]): Task[] {
   return selectLiveTasks(tasks).filter((task) => task.status !== "done");
 }
 
-// Nearest future date the task is actionable on (scheduled or due), "" if none.
+// Nearest future date the task is actionable on, "" if none. A range's first
+// day counts: work starting Friday is actionable Friday, whatever its deadline.
 export function nextActionableDateOf(task: Task, today: string): string {
-  return [task.scheduledDate, task.dueDate].filter((date) => date && date > today).sort()[0] ?? "";
+  return [task.startDate, task.dueDate].filter((date) => date && date > today).sort()[0] ?? "";
+}
+
+/** True when today falls inside the task's dates — a range counts on every day of it. */
+function coversToday(task: Task, today: string): boolean {
+  if (task.dueDate === today) return true;
+  return Boolean(task.startDate) && task.startDate <= today && Boolean(task.dueDate) && task.dueDate >= today;
 }
 
 export type RelevantTaskLimits = {
@@ -40,7 +47,7 @@ export function selectRelevantTasks(tasks: Task[], today: string, limits: Releva
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .slice(0, limits.overdueTasks);
   const todays = active
-    .filter((task) => task.scheduledDate === today || task.dueDate === today)
+    .filter((task) => coversToday(task, today))
     .slice(0, limits.todayTasks);
   const upcoming = active
     .filter((task) => nextActionableDateOf(task, today) !== "")

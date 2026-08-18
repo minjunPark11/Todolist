@@ -11,7 +11,6 @@ function task(id: string, title = id): Task {
     priority: "none",
     dueDate: "",
     startDate: "",
-    scheduledDate: "",
     startTime: "",
     endTime: "",
     projectId: "",

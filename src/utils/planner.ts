@@ -136,9 +136,31 @@ export function getNextDueDate(task: Task, today = todayValue()): string {
   const baseDate = task.dueDate && task.dueDate > today ? task.dueDate : today;
 
   if (task.repeatType === "daily") return addDays(baseDate, interval);
-  if (task.repeatType === "weekly") return addDays(baseDate, interval * 7);
+  if (task.repeatType === "weekly") return nextWeeklyDate(baseDate, interval, task.repeatDays ?? []);
   if (task.repeatType === "monthly") return addMonths(baseDate, interval);
+  if (task.repeatType === "yearly") return addMonths(baseDate, interval * 12);
   return baseDate;
+}
+
+// A weekly repeat that names its days lands on the next one of them, not seven
+// days on. `repeatDays` has been stored since long before anything read it —
+// the schedule editor's 평일 preset is the first thing to write a set of days,
+// and "every weekday" that advanced a week at a time would mean Monday only.
+//
+// The interval applies to WEEKS, so a fortnightly Mon/Thu skips the days in
+// between weeks rather than every other occurrence: the scan finds the next
+// named day, then adds the extra weeks only when the week has wrapped.
+function nextWeeklyDate(baseDate: string, interval: number, days: readonly number[]): string {
+  if (days.length === 0) return addDays(baseDate, interval * 7);
+
+  const allowed = new Set(days);
+  const baseWeekday = new Date(`${baseDate}T00:00:00Z`).getUTCDay();
+  for (let ahead = 1; ahead <= 7; ahead += 1) {
+    if (!allowed.has((baseWeekday + ahead) % 7)) continue;
+    const wrapped = baseWeekday + ahead >= 7;
+    return addDays(baseDate, ahead + (wrapped ? (interval - 1) * 7 : 0));
+  }
+  return addDays(baseDate, interval * 7);
 }
 
 export type RecurringCompletion =
@@ -182,8 +204,8 @@ export function planRecurringCompletion(
     updatedAt: now,
   };
 
-  // Keep the planned work day the same distance from the deadline it had
-  // before, rather than stranding it in the past.
+  // A range keeps its length: the start moves by however far the end did,
+  // rather than being stranded behind the new deadline.
   const shiftDays = daysBetween(task.dueDate || today, nextDueDate);
 
   return {
@@ -192,7 +214,7 @@ export function planRecurringCompletion(
     patch: {
       status: "todo",
       dueDate: nextDueDate,
-      scheduledDate: task.scheduledDate ? addDays(task.scheduledDate, shiftDays) : task.scheduledDate,
+      startDate: task.startDate ? addDays(task.startDate, shiftDays) : task.startDate,
       completedAt: "",
     },
   };

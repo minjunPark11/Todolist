@@ -32,8 +32,8 @@ export interface Span {
  * blindly would render a backwards bar. Taking min/max over what is set means
  * the bar always covers the dates the user typed, whatever order they are in.
  */
-export function spanForItem(item: Pick<Item, "startDate" | "scheduledDate" | "dueDate">): Span | null {
-  const dates = [item.startDate, item.scheduledDate, item.dueDate].filter(Boolean);
+export function spanForItem(item: Pick<Item, "startDate" | "dueDate">): Span | null {
+  const dates = [item.startDate, item.dueDate].filter(Boolean);
   if (dates.length === 0) return null;
 
   let start = dates[0];

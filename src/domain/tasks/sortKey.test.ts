@@ -12,7 +12,6 @@ function task(id: string, order: number, createdAt = NOW): Task {
     status: "todo",
     priority: "none",
     dueDate: "",
-    scheduledDate: "",
     startDate: "",
     startTime: "",
     endTime: "",

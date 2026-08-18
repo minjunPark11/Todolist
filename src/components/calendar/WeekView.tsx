@@ -97,7 +97,7 @@ interface LiveMove {
   // then nothing is drawn and pointerup falls through to a normal click.
   moved: boolean;
   // True while the pointer hovers the all-day band: dropping there converts
-  // the block to an all-day item (scheduledDate kept, times cleared).
+  // the block to an all-day item (the date kept, times cleared).
   allDay: boolean;
 }
 

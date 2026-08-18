@@ -101,7 +101,14 @@ export function FocusPage({
     [tasks],
   );
   const groups = useMemo<FocusGroup[]>(() => {
-    const scheduled = openTasks.filter((task) => task.scheduledDate === today);
+    // "Planned for today" and "due today" were different fields and are now
+    // one (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11), so this group would
+    // otherwise be a copy of `deadline` below. It keeps a distinct meaning by
+    // holding the multi-day work that today falls inside — in progress today
+    // without being due today.
+    const scheduled = openTasks.filter(
+      (task) => task.startDate && task.startDate <= today && task.dueDate >= today,
+    );
     const deadline = openTasks.filter((task) => task.dueDate && (task.dueDate === today || isOverdue(task.dueDate)));
     const study = openTasks.filter((task) => isStudyTask(task, projectFor(task, projects)));
     const quickStart = openTasks
@@ -288,7 +295,7 @@ export function FocusPage({
                           <strong>{task.title}</strong>
                           <span>
                             {project?.name ?? t("status.inbox")}
-                            {task.scheduledDate === today && task.startTime ? ` · ${t("common.today")} ${task.startTime}` : ""}
+                            {task.dueDate === today && task.startTime ? ` · ${t("common.today")} ${task.startTime}` : ""}
                           </span>
                           <small>{t("focus.actualTime", { time: formatFocusDuration(task.actualSeconds, true) })}</small>
                         </button>

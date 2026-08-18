@@ -13,7 +13,6 @@ function task(overrides: Partial<Task> = {}): Task {
     status: "todo" as TaskStatus,
     priority: "none" as TaskPriority,
     dueDate: "",
-    scheduledDate: "",
     projectId: "",
     tags: [],
     notes: "",
@@ -40,8 +39,13 @@ describe("isMatrixUrgent", () => {
     expect(isMatrixUrgent({ dueDate: "" }, TODAY)).toBe(false);
   });
 
-  it("ignores scheduledDate — planning a day is not a deadline", () => {
-    expect(isMatrixUrgent(task({ scheduledDate: TODAY }), TODAY)).toBe(false);
+  // The work day was a second date, excluded from urgency. It folded into
+  // `dueDate` (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11), so a task planned
+  // for today IS urgent now — there is no longer a way to say "today, but not
+  // due today".
+  it("treats a range that is already running as urgent from its end date", () => {
+    expect(isMatrixUrgent(task({ startDate: "2026-08-10", dueDate: TOMORROW }), TODAY)).toBe(false);
+    expect(isMatrixUrgent(task({ startDate: "2026-08-10", dueDate: TODAY }), TODAY)).toBe(true);
   });
 });
 
@@ -106,21 +110,19 @@ describe("patchForQuadrant", () => {
     expect(patchForQuadrant(task({ status: "waiting" }), "IV", TODAY).status).toBeUndefined();
   });
 
-  it("pins a de-urgentised task to today so it cannot vanish from Today", () => {
-    // Clearing the deadline is what moves it out of the urgent column, but the
-    // deadline may have been its only tie to the Today list.
+  // WAS: the patch also pinned the task to today through the second date
+  // field, so leaving the urgent column never dropped it off Today. With one
+  // date that would put it straight back in the urgent column, so the date
+  // simply goes — and the task leaves Today with it.
+  it("clears the deadline when de-urgentising, and nothing else", () => {
     const patch = patchForQuadrant(task({ priority: "high", dueDate: TODAY }), "II", TODAY);
     expect(patch.dueDate).toBe("");
-    expect(patch.scheduledDate).toBe(TODAY);
+    expect(Object.keys(patch)).toEqual(["dueDate"]);
   });
 
-  it("leaves an existing scheduled day alone when de-urgentising", () => {
-    const patch = patchForQuadrant(
-      task({ priority: "high", dueDate: TODAY, scheduledDate: TOMORROW }),
-      "II",
-      TODAY,
-    );
-    expect(patch.scheduledDate).toBeUndefined();
+  it("leaves a future deadline alone, since it was never urgent", () => {
+    const patch = patchForQuadrant(task({ priority: "high", dueDate: TOMORROW }), "II", TODAY);
+    expect(patch.dueDate).toBeUndefined();
   });
 
   // Every quadrant the UI offers must actually be reachable from every other:

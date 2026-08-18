@@ -1,4 +1,4 @@
-import type { List, Project, RepeatType, Subtask, Task, TaskPriority } from "../types";
+import type { List, Project, Subtask, Task, TaskPriority } from "../types";
 import { activeLists, listDisplayName } from "../domain/spaces/hierarchy";
 import { listIdFor } from "../domain/spaces/membership";
 import { childProgress, childrenOf } from "../domain/tasks/children";
@@ -36,7 +36,6 @@ interface TaskDetailProps {
   onClose?: () => void;
 }
 
-const repeatTypes: RepeatType[] = ["none", "daily", "weekly", "monthly"];
 // Highest first: the value most worth picking should not be last in the list.
 const taskPriorities: TaskPriority[] = ["high", "medium", "low", "none"];
 const matrixQuadrants: Array<{ key: MatrixQuadrant; labelKey: string; hintKey: string }> = [
@@ -80,14 +79,9 @@ export function TaskDetail({
   const children = childrenOf(task.id, tasks, subtasks);
   const progress = childProgress(children);
 
-  const repeatLabels: Record<RepeatType, string> = {
-    none: t("taskDetail.repeatNone"),
-    daily: t("taskDetail.repeatDaily"),
-    weekly: t("taskDetail.repeatWeekly"),
-    monthly: t("taskDetail.repeatMonthly"),
-  };
   const today = todayValue();
   const schedule = scheduleFromTask(task);
+  const scheduleLabel = formatScheduleTrigger(schedule, today, locale);
   const selectedQuadrant = getMatrixPosition(task, today).quadrant;
   // The picker refuses anything that would close a loop, so the cycle rule is
   // enforced where the value is written rather than guarded at every read.
@@ -126,19 +120,21 @@ export function TaskDetail({
         <div className="detail-field-list">
           {/* The three date inputs that stood here — start, work day, deadline
               — were the last place those fields were edited separately. They
-              are one schedule now (audit §6), so this is one control, and the
-              times followed in Phase 7, so this is now the only way a task's
-              schedule is edited by hand, and every write goes through
+              are one schedule now (audit §6), so this is one control. The
+              times, the reminder and the repeat followed it in — the repeat
+              was three separate inputs here and is now one of six presets
+              inside the editor — so this is the only way a task's schedule is
+              edited by hand, and every write goes through
               `updateTaskSchedule`. */}
           <div className="detail-field-list-row">
             <span>{t("taskDetail.schedule")}</span>
             <button
               type="button"
-              className="sched-trigger"
+              className={scheduleLabel ? "sched-trigger" : "sched-trigger is-empty"}
               aria-expanded={editingSchedule}
               onClick={() => setEditingSchedule((open) => !open)}
             >
-              {formatScheduleTrigger(schedule, today, locale) || t("schedule.trigger")}
+              {scheduleLabel || t("schedule.trigger")}
             </button>
             <Popover open={editingSchedule} onClose={() => setEditingSchedule(false)}>
               <ScheduleEditor
@@ -152,44 +148,6 @@ export function TaskDetail({
               />
             </Popover>
           </div>
-          <label>
-            <span>{t("taskDetail.repeat")}</span>
-            <select
-              value={task.repeatType}
-              onChange={(event) =>
-                onUpdateTask(task.id, { repeatType: event.target.value as RepeatType })
-              }
-            >
-              {repeatTypes.map((repeatType) => (
-                <option key={repeatType} value={repeatType}>
-                  {repeatLabels[repeatType]}
-                </option>
-              ))}
-            </select>
-          </label>
-          {task.repeatType !== "none" ? (
-            <>
-              <label>
-                <span>{t("taskDetail.repeatInterval")}</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={task.repeatInterval}
-                  onChange={(event) =>
-                    onUpdateTask(task.id, { repeatInterval: Number(event.target.value) || 1 })
-                  }
-                />
-              </label>
-              <label>
-                <span>{t("taskDetail.repeatEnd")}</span>
-                <input
-                  type="date"
-                  value={task.repeatEndDate}
-                  onChange={(event) => onUpdateTask(task.id, { repeatEndDate: event.target.value })}
-                />
-              </label>
-            </>
-          ) : null}
         </div>
       </section>
 
@@ -365,7 +323,7 @@ export function TaskDetail({
       <section className="detail-section task-actions-section">
         <h3>{t("taskDetail.actions")}</h3>
         <div className="task-action-row">
-          <button onClick={() => onUpdateTask(task.id, { scheduledDate: todayValue() })}>
+          <button onClick={() => onUpdateTask(task.id, { dueDate: todayValue() })}>
             {t("today.moveToToday")}
           </button>
           <button onClick={() => onDuplicateTask(task.id)}>{t("common.duplicate")}</button>

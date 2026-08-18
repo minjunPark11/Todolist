@@ -17,7 +17,8 @@
 // simply hits the `canonical` case. That property is what makes the eventual
 // rewrite invisible rather than dangerous.
 import { normalizeSchedule } from "./normalizeSchedule";
-import type { Schedule } from "./types";
+import { repeatPresetFromTask, repeatPresetToFields, type RepeatKind } from "./recurrence";
+import { isReminderPreset, type Schedule } from "./types";
 
 /**
  * The fields this reads off a Task.
@@ -33,6 +34,18 @@ export interface TaskScheduleSource {
   dueDate?: string;
   startTime?: string;
   endTime?: string;
+  /** The reminder preset, `""` when unset — see `Schedule.reminder`. */
+  reminder?: string;
+  /**
+   * The legacy repeat trio, which the editor now reads and writes through
+   * `recurrence.ts`. Left on the record in its original shape rather than
+   * replaced by the preset: `getNextDueDate` and every task already repeating
+   * speak these three fields, and a second encoding of the same fact is how
+   * two parts of the app start disagreeing about when something recurs.
+   */
+  repeatType?: RepeatKind;
+  repeatInterval?: number;
+  repeatDays?: number[];
 }
 
 /**
@@ -151,7 +164,14 @@ export function scheduleFromTask(task: TaskScheduleSource): Schedule {
   const startTime = value(task.startTime);
   const endTime = value(task.endTime);
 
-  const base = { timezone: null };
+  // Reminder and repeat ride along untouched by the date consolidation below:
+  // they qualify whatever date survives it, and `normalizeSchedule` is what
+  // drops them if none does (INV-06, INV-07).
+  const base = {
+    timezone: null,
+    reminder: isReminderPreset(task.reminder) ? task.reminder : ("none" as const),
+    repeat: repeatPresetFromTask(task),
+  };
 
   switch (classifyTaskSchedule(task)) {
     case "empty":
@@ -203,11 +223,16 @@ export function scheduleFromTask(task: TaskScheduleSource): Schedule {
  */
 export function scheduleToTaskPatch(schedule: Schedule): Required<TaskScheduleSource> {
   const canonical = normalizeSchedule(schedule);
+  // 매주 needs a weekday, and the schedule's own start is the one that keeps
+  // the task where it already is (see `repeatPresetToFields`).
+  const anchor = canonical.startDate ?? canonical.dueDate;
   return {
     startDate: canonical.startDate ?? "",
     dueDate: canonical.dueDate ?? "",
     startTime: canonical.startTime ?? "",
     endTime: canonical.endTime ?? "",
     scheduledDate: "",
+    reminder: canonical.reminder,
+    ...repeatPresetToFields(canonical.repeat, anchor),
   };
 }

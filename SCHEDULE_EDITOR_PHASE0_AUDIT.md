@@ -478,10 +478,16 @@ expand → migrate → contract 순서다. 설계서 §22.2의 13단계를 이 �
 | **6** | Popover + MonthCalendar (신규) + Date/Duration 선택 | §10, §6, §3, §4 | |
 | **7** | Time — Date + Duration 양쪽 | §7 | 결정 1-b/1-c |
 | — | **v1 여기서 끊는다** | | |
-| **8** | Recurrence — 레거시 `repeat*` 흡수 | §9 | |
-| **9** | Reminder — 예약 스케줄러 별도 설계 선행 | §8 | D5 |
-| **10** | **데이터 통합** — `normalizeTask`에 1-d 규칙 적용(멱등) + §2.1 legacy 코드 삭제 | §22.31~41 대체 | ⚠️ 불가 |
-| **11** | contract — `Task`에서 `scheduledDate`·`repeat*` 제거 | §22.13 | |
+| **8** | Recurrence — 레거시 `repeat*` 흡수 | §9 | ✅ 완료 |
+| **9** | Reminder — 배달까지 (`reminderQueue` + `useReminders`) | §8 | ✅ 완료 · D5 참고 |
+| **10** | **데이터 통합** — `normalizeTask`에 1-d 규칙 적용(멱등) | §22.31~41 대체 | ✅ 완료 · ⚠️ 불가역 |
+| **11** | contract — `Task`에서 `scheduledDate` 제거 | §22.13 | ✅ 완료 |
+
+Phase 8~11 완료 시점의 주의사항 세 가지.
+
+1. **Reminder는 앱이 켜져 있을 때만 울린다.** 백그라운드 서비스가 없고 Tauri의 notification 플러그인은 예약이 아니라 즉시 발송이라, `useReminders`가 30초마다 전경에서 훑는다. 30분(`GRACE_MINUTES`)보다 오래 지난 알림은 발송하지 않고 조용히 기록만 한다 — 노트북을 일주일 만에 열었을 때 마흔 개가 쏟아지지 않게 하기 위해서다.
+2. **`repeat*`는 남는다.** Phase 11이 지운 것은 `scheduledDate` 하나다. 반복은 프리셋 6개로 편집하되 저장은 여전히 `repeatType`/`repeatInterval`/`repeatDays`이며, 그 변환은 `domain/schedule/recurrence.ts` 한 곳에만 있다. `getNextDueDate`와 이미 반복 중인 태스크가 그 세 필드를 쓰기 때문이다.
+3. **1-d가 예고하지 않은 동작 변화 두 개.** (a) 아이젠하워에서 긴급 해제 시 마감일을 지우면 그 태스크는 Today에서도 빠진다 — 예전엔 두 번째 날짜로 붙잡아 뒀지만, 날짜가 하나면 "오늘이지만 오늘 마감은 아님"을 표현할 수 없다. (b) 캘린더 공유(ICS)가 태스크당 이벤트 하나만 내보낸다 — 작업일 블록과 마감 마커가 같은 날짜가 되어 중복이 되기 때문이다.
 
 ## 7.1 순서를 고친 이유 (v1 계획의 오류 수정)
 

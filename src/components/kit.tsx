@@ -288,28 +288,29 @@ export function StatusBadge({
 
 export function DueDatePill({
   task,
-  field = "dueDate",
   onChange,
 }: {
   task: Task;
-  field?: "dueDate" | "scheduledDate";
   onChange?: (value: string) => void;
 }) {
   const { t, lang } = useT();
   const [open, setOpen] = useState(false);
-  const value = field === "dueDate" ? task.dueDate : task.scheduledDate;
+  // A `field` prop chose between the deadline and the work day here. There is
+  // one date now (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11), so there is
+  // nothing to choose.
+  const value = task.dueDate;
   const today = todayValue();
   let tone = "muted";
   let label: string;
   if (!value) {
-    label = field === "dueDate" ? t("kit.needsDate") : t("kit.notScheduled");
-    tone = field === "dueDate" ? "danger-ghost" : "muted";
+    label = t("kit.needsDate");
+    tone = "danger-ghost";
   } else if (value < today) {
     label = formatDate(value, lang);
     tone = "danger";
   } else if (value === today) {
-    label = field === "dueDate" ? t("common.today") : t("kit.plannedToday");
-    tone = field === "dueDate" ? "warning" : "accent";
+    label = t("common.today");
+    tone = "warning";
   } else {
     label = formatDate(value, lang);
     tone = "muted";
@@ -322,7 +323,7 @@ export function DueDatePill({
         className={`ff-pill ff-pill-${tone}`}
         onClick={() => onChange && setOpen((v) => !v)}
       >
-        <span className="ff-pill-icon">{field === "dueDate" ? "📅" : "🗓"}</span>
+        <span className="ff-pill-icon">📅</span>
         {label}
       </button>
       {onChange ? (
@@ -417,7 +418,6 @@ export interface TaskRowProps {
   projects: Project[];
   subtaskProgress?: { done: number; total: number };
   selected?: boolean;
-  dateField?: "dueDate" | "scheduledDate" | "both";
   onOpen: (taskId: string) => void;
   onToggleDone: (taskId: string) => void;
   onUpdate?: (taskId: string, patch: Partial<Task>) => void;
@@ -431,7 +431,6 @@ export function TaskRow({
   projects,
   subtaskProgress,
   selected,
-  dateField = "dueDate",
   onOpen,
   onToggleDone,
   onUpdate,
@@ -480,20 +479,7 @@ export function TaskRow({
       <div className="ff-task-meta">
         {metaSlot}
         <ProjectBadge task={task} projects={projects} onChange={update ? (id) => update({ projectId: id }) : undefined} />
-        {dateField === "both" ? (
-          <>
-            <DueDatePill task={task} field="dueDate" onChange={update ? (v) => update({ dueDate: v }) : undefined} />
-            {task.scheduledDate ? (
-              <DueDatePill
-                task={task}
-                field="scheduledDate"
-                onChange={update ? (v) => update({ scheduledDate: v }) : undefined}
-              />
-            ) : null}
-          </>
-        ) : (
-          <DueDatePill task={task} field={dateField} onChange={update ? (v) => update({ [dateField]: v }) : undefined} />
-        )}
+        <DueDatePill task={task} onChange={update ? (v) => update({ dueDate: v }) : undefined} />
         <PriorityBadge priority={task.priority} onChange={update ? (p) => update({ priority: p }) : undefined} />
         {rightSlot}
         {moreItems && moreItems.length > 0 ? <MoreMenu items={moreItems} /> : null}

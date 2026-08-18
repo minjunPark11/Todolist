@@ -3,9 +3,10 @@
 // fields so it can't drift out of sync:
 //   important = priority is high or medium
 //   urgent    = due today, or overdue
-// scheduledDate ("planned for today") is deliberately excluded from urgency:
-// it drives the Today page's plan, not the deadline pressure that defines
-// quadrants I/III, so moving a task into Q2 no longer wipes today's plan.
+// The work day used to be a second date, excluded from urgency so that moving
+// a task into Q2 did not wipe today's plan. It folded into `dueDate`
+// (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11), so urgency now reads the only
+// date there is.
 // Quadrant IV carries the unsorted / on-hold / completed sub-groups, mapped
 // onto the existing statuses (inbox / waiting / done).
 import type { Task, TaskDraft } from "../types";
@@ -38,7 +39,7 @@ export function isMatrixUrgent(
 }
 
 export function getMatrixPosition(
-  task: Pick<Task, "status" | "priority" | "scheduledDate" | "dueDate">,
+  task: Pick<Task, "status" | "priority" | "dueDate">,
   today: string,
 ): MatrixPosition {
   // Finished / parked work always lives in IV, regardless of its fields.
@@ -56,14 +57,13 @@ export function getMatrixPosition(
 
 // Preview helper for the add-task panel: where would a draft land?
 export function getDraftMatrixPosition(
-  draft: Pick<TaskDraft, "priority" | "scheduledDate" | "dueDate">,
+  draft: Pick<TaskDraft, "priority" | "dueDate">,
   today: string,
 ): MatrixPosition {
   return getMatrixPosition(
     {
       status: "todo",
       priority: draft.priority ?? "none",
-      scheduledDate: draft.scheduledDate ?? "",
       dueDate: draft.dueDate ?? "",
     },
     today,
@@ -97,16 +97,16 @@ export function patchForQuadrant(task: Task, quadrant: MatrixQuadrant, today: st
   if (quadrant === "I" || quadrant === "III") {
     if (!urgent) patch.dueDate = today;
   } else if (urgent) {
-    // De-urgentize: clearing today's/overdue deadline is what actually moves
-    // the card out of the urgent column. But that deadline may have been the
-    // task's only tie to the Today list — if it has no scheduled day, pin it
-    // to today's plan so classifying it as "important, not urgent" (Q2) or
-    // "neither" (Q4) never makes it vanish from Today. scheduledDate no longer
-    // affects urgency, so the card still lands in Q2/Q4.
-    if (task.dueDate && task.dueDate <= today) {
-      patch.dueDate = "";
-      if (!task.scheduledDate) patch.scheduledDate = today;
-    }
+    // De-urgentize: clearing today's/overdue deadline is what moves the card
+    // out of the urgent column.
+    //
+    // This used to re-pin the task to today's plan through the second date
+    // field, so that leaving the urgent column never dropped it off Today.
+    // With one date that compensation contradicts itself — a task dated today
+    // IS urgent — so the date simply goes, and the task leaves Today with it.
+    // Keeping the card visible by inventing a deadline the user never chose
+    // would be the worse of the two surprises.
+    if (task.dueDate && task.dueDate <= today) patch.dueDate = "";
   }
 
   return patch;

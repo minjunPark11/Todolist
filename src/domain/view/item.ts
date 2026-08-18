@@ -61,13 +61,13 @@ export interface Item {
   folderId: string;
   color: string;
 
-  // --- time axis. Four fields answering four different questions; folding
-  // them together would lose information the app already relies on.
+  // --- time axis. `scheduledDate` — "the day actually blocked out" — used to
+  // sit between these two, and folded into them when the Task record dropped
+  // to two dates (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11). A single-day
+  // item is a `dueDate` alone; an item with both is a span.
   /** When the work begins. "" for anything with no span of its own. */
   startDate: string;
-  /** When it is meant to be worked on. */
-  scheduledDate: string;
-  /** When it is due. */
+  /** The day, for a single-day item; the last day, for a span. */
   dueDate: string;
   // A `horizon` field sat here — which of the five periods, life to day, an
   // Item belonged to. Only the `groupBy: "horizon"` axis read it, and both it
@@ -183,7 +183,6 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         folderId: folders.get(taskListId) ?? "",
         color: colors.get(taskProjectId) ?? DEFAULT_COLOR,
         startDate: task.startDate,
-        scheduledDate: task.scheduledDate,
         dueDate: task.dueDate,
         startTime: task.startTime,
         endTime: task.endTime,
@@ -222,7 +221,6 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         // "unscheduled" and "life" carry no start; both are periods without
         // a first day, so the span resolver falls back to the deadline.
         startDate: schedule && "startDate" in schedule ? schedule.startDate : "",
-        scheduledDate: "",
         dueDate: path.deadlineDate ?? "",
         startTime: "",
         endTime: "",
@@ -250,7 +248,6 @@ export function projectItems(input: ProjectItemsInput): Item[] {
         folderId,
         color,
         startDate: "",
-        scheduledDate: "",
         dueDate: milestone.deadlineDate ?? "",
         startTime: "",
         endTime: "",

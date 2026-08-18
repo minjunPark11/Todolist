@@ -26,11 +26,14 @@ describe("grid shape", () => {
     }
   });
 
-  it("starts on the Sunday on or before the first", () => {
-    // 2026-08-01 is a Saturday, so the grid opens on 2026-07-26.
-    expect(gridStart("2026-08-01")).toBe("2026-07-26");
-    // 2026-11-01 is a Sunday and starts the grid itself.
-    expect(gridStart("2026-11-01")).toBe("2026-11-01");
+  it("starts on the Monday on or before the first", () => {
+    // 2026-08-01 is a Saturday, so the grid opens on 2026-07-27.
+    expect(gridStart("2026-08-01")).toBe("2026-07-27");
+    // 2026-06-01 is a Monday and starts the grid itself.
+    expect(gridStart("2026-06-01")).toBe("2026-06-01");
+    // A Sunday is the LAST cell of its week, not the first: 2026-11-01 is a
+    // Sunday, so its grid opens six days earlier.
+    expect(gridStart("2026-11-01")).toBe("2026-10-26");
   });
 
   it("marks days of neighbouring months as outside", () => {

@@ -11,9 +11,8 @@ function task(overrides: Partial<Task> = {}): Task {
     description: "",
     status: "todo",
     priority: "none",
-    dueDate: "",
+    dueDate: TODAY,
     startDate: "",
-    scheduledDate: TODAY,
     startTime: "",
     endTime: "",
     projectId: "",
@@ -69,9 +68,13 @@ describe("collectTodayEntries ordering", () => {
     expect(idsOf(tasks)).toEqual(["timed", "untimed"]);
   });
 
+  // These used to give every fixture today's WORK DAY and vary the deadline
+  // independently. One date now (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11),
+  // so a task is in today's list and dated later only as a RANGE that today
+  // falls inside — which is what varies the deadline here.
   it("orders untimed tasks by the nearer deadline", () => {
     const tasks = [
-      task({ id: "later", dueDate: "2026-08-20" }),
+      task({ id: "later", startDate: "2026-08-10", dueDate: "2026-08-20" }),
       task({ id: "overdue", dueDate: "2026-08-01" }),
       task({ id: "today", dueDate: TODAY }),
     ];
@@ -81,11 +84,22 @@ describe("collectTodayEntries ordering", () => {
 
   it("sorts tasks with no deadline after ones that have a date", () => {
     const tasks = [
-      task({ id: "no-date", status: "doing" }),
-      task({ id: "far-off", dueDate: "2026-12-31" }),
+      task({ id: "no-date", status: "doing", dueDate: "" }),
+      task({ id: "far-off", startDate: "2026-08-10", dueDate: "2026-12-31" }),
     ];
+    // An undated task is today's only because someone PLANNED it for today
+    // (§12.5.1). The fixture used to hand it today's work day instead, and
+    // that field is gone (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11) — being
+    // started is deliberately not enough on its own.
+    const planned = {
+      tasks,
+      lists: [],
+      dailyPlans: [{ id: "p1", taskId: "no-date", planDate: TODAY, createdAt: "", updatedAt: "" }],
+      taskTags: [],
+      today: TODAY,
+    };
 
-    expect(idsOf(tasks)).toEqual(["far-off", "no-date"]);
+    expect(collectTodayEntries(planned, {}).map((entry) => entry.task.id)).toEqual(["far-off", "no-date"]);
   });
 
   it("falls back to creation order when nothing else separates two tasks", () => {

@@ -24,6 +24,7 @@ vi.mock("../platform", () => ({
 }));
 
 import { normalizeData } from "./usePlannerData";
+import type { Task } from "../types";
 import { scheduleFromTask } from "../domain/schedule";
 
 /** Stands in for a field some future version added and this build has never seen. */
@@ -161,7 +162,7 @@ describe("normalizeData still repairs what it does know", () => {
     const [task] = normalizeData({
       tasks: [{ id: "task-1", title: "Legacy", dueDate: "2026-08-01", startTime: "09:00" }],
     }).tasks;
-    expect([task.dueDate, task.scheduledDate, task.startTime]).toEqual(["2026-08-01", "", "09:00"]);
+    expect([task.dueDate, task.startTime]).toEqual(["2026-08-01", "09:00"]);
     expect(scheduleFromTask(task)).toMatchObject({
       startDate: null,
       dueDate: "2026-08-01",
@@ -185,5 +186,52 @@ describe("normalizeData still repairs what it does know", () => {
       ],
     }).learningPaths;
     expect(path.milestones[0].status).toBeUndefined();
+  });
+});
+
+// The one exception to M0's "carry what you do not know".
+//
+// `scheduledDate` is not an unknown field from a newer client — it is a field
+// this build deliberately retired (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7
+// Phase 11). Carrying it forward would re-run the consolidation against it on
+// every load instead of once, and leave two answers on disk indefinitely.
+describe("normalizeData retires the legacy work day", () => {
+  it("takes the field off the record entirely", () => {
+    const [task] = normalizeData({
+      // Cast because the field is gone from `Task` — which is exactly the
+      // shape this test is about: data written before it was retired.
+      tasks: [{ id: "task-1", title: "Legacy", scheduledDate: "2026-08-19" } as Partial<Task>],
+    }).tasks;
+    expect("scheduledDate" in task).toBe(false);
+  });
+
+  it("keeps what the field meant, as the task's date", () => {
+    const [task] = normalizeData({
+      // Cast because the field is gone from `Task` — which is exactly the
+      // shape this test is about: data written before it was retired.
+      tasks: [{ id: "task-1", title: "Legacy", scheduledDate: "2026-08-19" } as Partial<Task>],
+    }).tasks;
+    expect(task.dueDate).toBe("2026-08-19");
+  });
+
+  // A work day and a deadline that disagreed become the range between them
+  // (rule 1-d), so neither date is lost.
+  it("turns a disagreeing pair into the range that covers both", () => {
+    const [task] = normalizeData({
+      tasks: [
+        { id: "task-1", title: "Legacy", scheduledDate: "2026-08-17", dueDate: "2026-08-20" } as Partial<Task>,
+      ],
+    }).tasks;
+    expect([task.startDate, task.dueDate]).toEqual(["2026-08-17", "2026-08-20"]);
+  });
+
+  it("is idempotent, since it runs on every load rather than once", () => {
+    const once = normalizeData({
+      tasks: [
+        { id: "task-1", title: "Legacy", scheduledDate: "2026-08-17", dueDate: "2026-08-20" } as Partial<Task>,
+      ],
+    }).tasks;
+    const twice = normalizeData({ tasks: once }).tasks;
+    expect(twice).toEqual(once);
   });
 });

@@ -202,7 +202,7 @@ function BoardCard({
   const project = projects.find((candidate) => candidate.id === item.spaceId);
   // Same reading as the Planning card: the deadline speaks first, the planned
   // day answers when there is no deadline.
-  const date = item.dueDate || item.scheduledDate;
+  const date = item.dueDate;
   const dateLabel = !date
     ? ""
     : item.dueDate && item.dueDate < today

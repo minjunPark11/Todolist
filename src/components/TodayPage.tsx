@@ -193,8 +193,10 @@ export function TodayPage({
     onCreateTask({
       title: input.title,
       status: "todo",
-      scheduledDate: today,
-      dueDate: input.dueDate,
+      // Was `scheduledDate: today` plus a separate `dueDate`. With one date
+      // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11) an explicit deadline is
+      // what the user typed and today is only the default for its absence.
+      dueDate: input.dueDate || today,
       priority: input.priority,
       projectId: input.projectId || undefined,
       notes: input.notes || undefined,
@@ -213,15 +215,15 @@ export function TodayPage({
     onCreateTask({
       title,
       status: addToToday ? "todo" : "inbox",
-      scheduledDate: parsed.scheduledDate || (addToToday ? today : ""),
-      dueDate: parsed.dueDate,
+      // The parser's date first, then its deadline, then the toggle's default.
+      dueDate: parsed.relativeDate || parsed.dueDate || (addToToday ? today : ""),
       startTime: parsed.startTime,
       priority: parsed.priority || undefined,
       projectId: parsed.projectId || undefined,
     });
     // A parsed date can send a "Today" capture to another day, so the toast
     // names the day it actually landed on rather than always saying "Today".
-    const landedOn = parsed.scheduledDate || (addToToday ? today : "");
+    const landedOn = parsed.relativeDate || parsed.dueDate || (addToToday ? today : "");
     showToast({
       message: !addToToday
         ? t("todayv.toastAddedToInbox")
@@ -315,11 +317,11 @@ export function TodayPage({
     action: Exclude<BulkTriageAction, { type: "archive" }>,
   ): Partial<Task> {
     if (action.type === "addToToday") {
-      return { status: "todo", scheduledDate: today };
+      return { status: "todo", dueDate: today };
     }
     return {
       projectId: action.projectId,
-      ...(task?.status === "inbox" ? { status: "todo" as const, scheduledDate: today } : {}),
+      ...(task?.status === "inbox" ? { status: "todo" as const, dueDate: today } : {}),
     };
   }
 
@@ -354,7 +356,7 @@ export function TodayPage({
       .map((task) => ({
         id: task.id,
         status: task.status,
-        scheduledDate: task.scheduledDate,
+        dueDate: task.dueDate,
         projectId: task.projectId,
       }));
 
@@ -372,7 +374,7 @@ export function TodayPage({
         for (const entry of previous) {
           onUpdateTask(entry.id, {
             status: entry.status,
-            scheduledDate: entry.scheduledDate,
+            dueDate: entry.dueDate,
             projectId: entry.projectId,
           });
         }

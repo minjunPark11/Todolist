@@ -40,7 +40,6 @@ function task(overrides: Partial<Task> = {}): Task {
     priority: "none",
     dueDate: "",
     startDate: "",
-    scheduledDate: "",
     startTime: "",
     endTime: "",
     projectId: "p1",
@@ -310,7 +309,7 @@ describe("Domain Sections keep their own Source of Truth (§27.2)", () => {
   // Horizons is gone; what still matters is the second half — projecting a
   // Task must not write a goal's scheduling field onto it.
   it("invents no schedule for a Task (T-HZ08)", () => {
-    const soon = task({ id: "t1", scheduledDate: TODAY });
+    const soon = task({ id: "t1", dueDate: TODAY });
     items({ tasks: [soon] });
     expect((soon as unknown as { schedule?: unknown }).schedule).toBeUndefined();
   });
@@ -329,14 +328,17 @@ describe("date fields stay separate (G-CALENDAR-01, G-GANTT-01)", () => {
     // And nothing was written to the record to put it there.
     expect(item.startDate).toBe("");
     expect(item.dueDate).toBe("");
-    expect(item.scheduledDate).toBe("");
   });
 
-  it("keeps scheduledDate and dueDate as different answers", () => {
+  // WAS: "keeps scheduledDate and dueDate as different answers". The work day
+  // and the deadline were two fields and are now one range
+  // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11); what still has to hold is
+  // that the two dates a Task DOES have stay distinct through the projection.
+  it("keeps a range's two ends as different answers", () => {
     const [item] = items({
-      tasks: [task({ id: "t1", scheduledDate: "2026-08-18", dueDate: "2026-08-25" })],
+      tasks: [task({ id: "t1", startDate: "2026-08-18", dueDate: "2026-08-25" })],
     });
-    expect(item.scheduledDate).toBe("2026-08-18");
+    expect(item.startDate).toBe("2026-08-18");
     expect(item.dueDate).toBe("2026-08-25");
   });
 });

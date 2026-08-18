@@ -22,7 +22,9 @@ export type TaskStatus =
   | "in_progress"
   | "blocked";
 export type TaskPriority = "none" | "low" | "medium" | "high";
-export type RepeatType = "none" | "daily" | "weekly" | "monthly";
+// "yearly" joined the set with the schedule editor's 반복 panel, which
+// offers it alongside the four that already existed.
+export type RepeatType = "none" | "daily" | "weekly" | "monthly" | "yearly";
 export type FocusMode = "focus" | "short_break" | "long_break";
 
 export interface Task {
@@ -33,15 +35,13 @@ export interface Task {
   priority: TaskPriority;
   // Dates use "" as the "not set" sentinel (kept as string for legacy callers).
   dueDate: string; // deadline (YYYY-MM-DD)
-  scheduledDate: string; // planned work date (YYYY-MM-DD)
   /**
    * When the work BEGINS (YYYY-MM-DD, "" = unset). Added for the timeline,
    * which needs a span and not a point.
    *
-   * Deliberately not the same thing as `scheduledDate`: a task can start on
-   * Monday and be due Friday while the day actually blocked out on the
-   * calendar is Wednesday. Folding the two together would make every
-   * multi-day task either lose its span or lie about its calendar block.
+   * With `scheduledDate` gone (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11),
+   * a task has two dates and not three: this one and `dueDate`. A record with
+   * both is a range; a record with only `dueDate` is a single day.
    *
    * Additive only (M0). It rides inside the `data` jsonb, so no table change
    * is needed, and `normalizeTask` spreads unknown fields first — which is
@@ -109,6 +109,19 @@ export interface Task {
   repeatInterval: number;
   repeatDays: number[];
   repeatEndDate: string;
+  /**
+   * When to be reminded, as a `ReminderPreset` ("" = none).
+   *
+   * Stored as a plain string rather than the domain union so this file stays
+   * free of a dependency on `domain/schedule`; the adapter there validates it
+   * on the way in, and an unknown value reads as "none".
+   *
+   * Optional, like `sectionId` above: a record written before this field
+   * existed simply has no reminder, which is the same thing "" means.
+   *
+   * Nothing delivers these yet — see `domain/schedule/reminder.ts`.
+   */
+  reminder?: string;
 }
 
 export interface Subtask {
@@ -714,7 +727,6 @@ export interface TaskDraft {
   title: string;
   description?: string;
   dueDate?: string;
-  scheduledDate?: string;
   startTime?: string;
   endTime?: string;
   projectId?: string;
@@ -737,4 +749,5 @@ export interface TaskDraft {
   repeatInterval?: number;
   repeatDays?: number[];
   repeatEndDate?: string;
+  reminder?: string;
 }

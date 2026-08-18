@@ -21,7 +21,7 @@ function formatPayload(action: AgentAction) {
   }
 
   if (action.type === "create_calendar_event") {
-    return [action.payload.title, action.payload.scheduledDate, action.payload.startTime].filter(Boolean).join(" - ");
+    return [action.payload.title, action.payload.dueDate, action.payload.startTime].filter(Boolean).join(" - ");
   }
 
   if (action.type === "split_task") {

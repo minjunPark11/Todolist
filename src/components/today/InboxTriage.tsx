@@ -361,7 +361,7 @@ function TriageRow({
     month: "short",
     day: "numeric",
   }).format(new Date(item.createdAt));
-  const hasNoDate = !item.dueDate && !item.scheduledDate;
+  const hasNoDate = !item.dueDate;
   const hasNoSpace = !item.projectId;
   const hasNoPriority = item.priority === "none";
 

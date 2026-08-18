@@ -8,19 +8,38 @@
 // Phase 2 adds the Task adapter, the one file here that knows the record's
 // three date fields and its `""` sentinel (taskSchedule.ts).
 //
-// Still to come, in the order the audit sets:
-//   Phase 8   time formatting for the trigger label
-//   Phase 10  recurrence
-//   Phase 11  reminders
+// Still to come: reminder DELIVERY. The panel stores an intent and
+// `reminderInstant` resolves it to a moment; nothing fires it yet (audit D5).
 export type {
   LocalDate,
   LocalTime,
   RangeStage,
+  ReminderPreset,
+  RepeatPreset,
   Schedule,
   ScheduleDraft,
   ScheduleMode,
 } from "./types";
-export { EMPTY_SCHEDULE, isLocalDate, isLocalTime } from "./types";
+export {
+  EMPTY_SCHEDULE,
+  isLocalDate,
+  isLocalTime,
+  isReminderPreset,
+  isRepeatPreset,
+  REMINDER_PRESETS,
+  REPEAT_PRESETS,
+} from "./types";
+
+export type { QuickDateKey } from "./quickDate";
+export { applyQuickDate, QUICK_DATES, quickTargetDate, tonightTime } from "./quickDate";
+
+export { availableReminders, reconcileReminder, reminderInstant } from "./reminder";
+
+export type { DueReminder, LocalMoment, ReminderSweep, ReminderTaskSource } from "./reminderQueue";
+export { GRACE_MINUTES, keyMoment, pruneSeen, reminderKey, sweepReminders } from "./reminderQueue";
+
+export type { RepeatFields, RepeatSource } from "./recurrence";
+export { repeatPresetFromTask, repeatPresetToFields } from "./recurrence";
 
 export { draftFromSchedule, getScheduleMode, setScheduleMode, toDateMode, toDurationMode } from "./scheduleMode";
 
@@ -51,7 +70,7 @@ export { isConfirmable, isValidSchedule, validateDraft, validateSchedule } from 
 
 export { isDirty, schedulesEqual } from "./scheduleEquality";
 
-export { formatScheduleTrigger, formatTimeSummary } from "./scheduleFormatting";
+export { formatLocalTime, formatScheduleTrigger, formatTimeSummary } from "./scheduleFormatting";
 
 export type { ScheduleUpdatePlan } from "./updateTaskSchedule";
 export { planScheduleUpdate } from "./updateTaskSchedule";

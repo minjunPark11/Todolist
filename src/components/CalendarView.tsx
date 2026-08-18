@@ -492,8 +492,14 @@ export function CalendarView({
   // Dropping always produces a single-day schedule: the calendar has no
   // gesture that means "make this a range", and `buildCalendarItems` refuses
   // to drag one for the same reason.
-  function scheduleFor(day: string, startTime = "", endTime = ""): Schedule {
+  //
+  // Built by spreading the task's CURRENT schedule rather than from nothing:
+  // the write is a whole-schedule replacement, so a literal here would drop
+  // the reminder and the repeat the task already had — dragging a daily task
+  // to Thursday would quietly stop it repeating.
+  function scheduleFor(taskId: string, day: string, startTime = "", endTime = ""): Schedule {
     return {
+      ...scheduleFromTask(tasks.find((item) => item.id === taskId) ?? {}),
       startDate: null,
       dueDate: day,
       startTime: startTime || null,
@@ -504,7 +510,7 @@ export function CalendarView({
 
   /** Drop a task onto `day` as a single-day schedule. */
   function placeOn(taskId: string, day: string, startTime = "", endTime = "") {
-    onUpdateTaskSchedule(taskId, scheduleFor(day, startTime, endTime));
+    onUpdateTaskSchedule(taskId, scheduleFor(taskId, day, startTime, endTime));
   }
 
   /** Move a task's existing schedule onto `day`, keeping whatever times it has. */
@@ -739,6 +745,8 @@ export function CalendarView({
         startTime: draft.startTime || null,
         endTime: draft.endTime || null,
         timezone: null,
+        reminder: "none",
+        repeat: "none",
       }),
       categoryId: result.categoryId,
       projectId: projectIdForCategory(result.categoryId),

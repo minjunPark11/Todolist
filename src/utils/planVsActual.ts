@@ -1,5 +1,5 @@
 // Planned time vs. executed (focus-measured) time, per day and per task.
-// Planned = a task's scheduled calendar block (scheduledDate + start/end
+// Planned = a task's scheduled calendar block (its date + start/end
 // time). Actual = completed focus-session segments. Shared by the AI
 // context builder; UI reports can reuse it as-is.
 import type { FocusSession, Task } from "../types";
@@ -60,11 +60,14 @@ export function buildPlanVsActual(
 
   for (const task of tasks) {
     if (task.deletedAt) continue;
-    if (!task.scheduledDate || task.scheduledDate < from || task.scheduledDate > to) continue;
+    // The block's day is the schedule's start — its first day for a range,
+    // the date itself otherwise. `startTime` belongs to that day (audit 1-b).
+    const blockDay = task.startDate || task.dueDate;
+    if (!blockDay || blockDay < from || blockDay > to) continue;
     if (!task.startTime || !task.endTime) continue;
     const planned = minutesOf(task.endTime) - minutesOf(task.startTime);
     if (planned <= 0) continue;
-    tally(task.scheduledDate, task.id, task.title).plannedMinutes += planned;
+    tally(blockDay, task.id, task.title).plannedMinutes += planned;
   }
 
   for (const session of focusSessions) {
