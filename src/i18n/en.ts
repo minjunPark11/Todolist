@@ -1283,4 +1283,10 @@ export const en: Dictionary = {
   "tasks.subtasks": "Subtasks",
   "tasks.addSubtask": "Add a subtask",
   "tasks.moveToTrash": "Move to trash",
+  "tasks.undoTrashed": "Moved to trash.",
+  "tasks.undoRestored": "Restored.",
+  "tasks.undoCompleted": "Marked complete.",
+  "tasks.undoReopened": "Reopened.",
+  "tasks.undoDateChanged": "Date changed.",
+  "tasks.undoSomeday": "Moved to someday.",
 };

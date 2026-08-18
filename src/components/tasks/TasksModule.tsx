@@ -7,7 +7,7 @@
 // Scopes allow Board, which have counts, or where `/` goes.
 //
 // List rendering only, per §16.26 — Board and the rich Drawer come later.
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Folder, List, Tag, Task, TaskDailyPlan, TaskTag } from "../../types";
 import type { TaskScopeRef, TaskViewKind } from "../../domain/tasks/scopeRegistry";
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
@@ -20,6 +20,8 @@ import { TaskQuickAdd } from "./TaskQuickAdd";
 import { TaskDrawer } from "./TaskDrawer";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
 import type { TaskChild } from "../../domain/tasks/children";
+import type { TaskMutation } from "../../domain/tasks/mutations";
+import { applyPatch, completeTask, leavesScope, reopenTask, trashTask } from "../../domain/tasks/mutations";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 
 interface TasksModuleProps {
@@ -47,13 +49,23 @@ interface TasksModuleProps {
     onAddSubtask: (taskId: string, title: string) => void;
     onToggleSubtask: (id: string) => void;
     onDeleteSubtask: (id: string) => void;
-    onTrash: (taskId: string) => void;
   };
+  /**
+   * Applies a described mutation and hands back the way to undo it (§16.29).
+   *
+   * The Module decides WHAT changes and whether the Task has left the Scope;
+   * the caller owns the store.
+   */
+  onMutate: (taskId: string, patch: Partial<Task>) => void;
 }
 
 export function TasksModule(props: TasksModuleProps) {
   const { t } = useT();
   const { tasks, lists, folders, dailyPlans, tags, taskTags, today, url, onNavigate } = props;
+
+  // One undo at a time, and it is the last thing that happened (§9.40 keeps
+  // the stack out of the MVP).
+  const [undo, setUndo] = useState<{ labelKey: string; run: () => void } | null>(null);
 
   const ctx: ScopeContext = useMemo(
     () => ({ tasks, lists, dailyPlans, taskTags, today }),
@@ -89,6 +101,24 @@ export function TasksModule(props: TasksModuleProps) {
   // names nothing simply opens nothing — §5.30 refuses to make a dead link an
   // error the reader has to dismiss.
   const openedTask = state.taskId ? tasks.find((task) => task.id === state.taskId) : undefined;
+
+  /**
+   * §12.21, in one place: apply, then ask whether the Task still belongs here.
+   *
+   * A Task that has left the Scope takes the Drawer with it — leaving it open
+   * over a row that is no longer in the list is the state §4.64 refuses. The
+   * undo comes from the mutation rather than from inverting the patch, so
+   * pressing it restores what was there and not an approximation (§9.35).
+   */
+  function mutate(target: Task, mutation: TaskMutation) {
+    props.onMutate(target.id, mutation.patch);
+    const left = leavesScope(target, applyPatch(target, mutation.patch), scope, ctx);
+    if (left && target.id === state.taskId) closeTask();
+    setUndo({
+      labelKey: mutation.labelKey,
+      run: () => props.onMutate(target.id, mutation.undo),
+    });
+  }
 
   // §5.28: an id that names nothing is a broken link, not an empty Scope. The
   // difference matters — "this List has no tasks" and "this List is gone" ask
@@ -195,13 +225,36 @@ export function TasksModule(props: TasksModuleProps) {
           onAddSubtask={(title) => props.drawer.onAddSubtask(openedTask.id, title)}
           onToggleSubtask={props.drawer.onToggleSubtask}
           onDeleteSubtask={props.drawer.onDeleteSubtask}
-          onTrash={() => {
-            props.drawer.onTrash(openedTask.id);
-            // §4.64: the Task has left this Scope, so the Drawer cannot stay
-            // open over a row that is no longer there.
-            closeTask();
-          }}
+          onComplete={() =>
+            mutate(
+              openedTask,
+              openedTask.status === "done"
+                ? reopenTask(openedTask)
+                : completeTask(openedTask, new Date().toISOString()),
+            )
+          }
+          onTrash={() => mutate(openedTask, trashTask(openedTask, new Date().toISOString()))}
         />
+      ) : null}
+
+      {/* §9.36: the toast is where the way back lives, and it says what it
+          would undo rather than just offering the word. */}
+      {undo ? (
+        <div className="tm-undo" role="status">
+          <span>{t(undo.labelKey)}</span>
+          <button
+            type="button"
+            onClick={() => {
+              undo.run();
+              setUndo(null);
+            }}
+          >
+            {t("app.undo")}
+          </button>
+          <button type="button" onClick={() => setUndo(null)} aria-label={t("common.close")}>
+            ×
+          </button>
+        </div>
       ) : null}
     </section>
   );

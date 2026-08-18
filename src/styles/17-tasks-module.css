@@ -469,3 +469,30 @@
   font-size: 13px;
   cursor: pointer;
 }
+
+/* --- undo (§9.36, §9.37) --- */
+
+.tm-undo {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--text, #1c1c1e);
+  color: #fff;
+  font-size: 13px;
+  transform: translateX(-50%);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+}
+
+.tm-undo button {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

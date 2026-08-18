@@ -19,6 +19,8 @@ export interface TaskDrawerProps {
   children: TaskChild[];
   onClose: () => void;
   onUpdate: (patch: Partial<Task>) => void;
+  /** Completion goes through the mutation path so it can be undone (§16.29). */
+  onComplete: () => void;
   onMoveToList: (listId: string) => void;
   onAddSubtask: (title: string) => void;
   onToggleSubtask: (id: string) => void;
@@ -34,6 +36,7 @@ export function TaskDrawer({
   children,
   onClose,
   onUpdate,
+  onComplete,
   onMoveToList,
   onAddSubtask,
   onToggleSubtask,
@@ -61,7 +64,7 @@ export function TaskDrawer({
           <input
             type="checkbox"
             checked={task.status === "done"}
-            onChange={() => onUpdate({ status: task.status === "done" ? "todo" : "done" })}
+            onChange={onComplete}
           />
           <span>{t("tasks.markDone")}</span>
         </label>

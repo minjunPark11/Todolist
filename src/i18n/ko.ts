@@ -1277,4 +1277,10 @@ export const ko: Dictionary = {
   "tasks.subtasks": "하위 작업",
   "tasks.addSubtask": "하위 작업 추가",
   "tasks.moveToTrash": "휴지통으로",
+  "tasks.undoTrashed": "휴지통으로 옮겼습니다.",
+  "tasks.undoRestored": "복원했습니다.",
+  "tasks.undoCompleted": "완료로 표시했습니다.",
+  "tasks.undoReopened": "다시 열었습니다.",
+  "tasks.undoDateChanged": "날짜를 바꿨습니다.",
+  "tasks.undoSomeday": "언젠가로 옮겼습니다.",
 };

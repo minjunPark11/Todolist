@@ -1090,8 +1090,12 @@ export default function App() {
             onAddSubtask: planner.addSubtask,
             onToggleSubtask: planner.toggleSubtask,
             onDeleteSubtask: planner.deleteSubtask,
-            onTrash: requestDeleteTask,
           }}
+          // Straight to the store. The legacy confirmation modal lives in
+          // AppModals, which this branch does not render — and §9.45 keeps
+          // confirmation for what cannot be taken back, which a soft delete
+          // with an Undo beside it is not.
+          onMutate={planner.updateTask}
         />
       </I18nProvider>
     );
