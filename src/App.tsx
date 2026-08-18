@@ -20,6 +20,7 @@ import { spaceIdForProject } from "./domain/spaces/spaces";
 import type { TodayIntent } from "./components/TodayPage";
 import { TasksModule } from "./components/tasks/TasksModule";
 import { canonicalizeTaskUrl, parseTaskScope } from "./app/taskScopeUrl";
+import { childrenOf } from "./domain/tasks/children";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
 import { useDataPortability } from "./app/useDataPortability";
@@ -1078,6 +1079,18 @@ export default function App() {
             if (taskId && resolution.dailyPlan) {
               planner.planTaskForDay(taskId, resolution.dailyPlan.planDate);
             }
+          }}
+          drawer={{
+            // Both kinds of child, through the reader that already knows there
+            // are two: legacy `Subtask` rows and the child Tasks `addSubtask`
+            // has been writing since the promotion path landed.
+            childrenOf: (taskId) => childrenOf(taskId, planner.tasks, planner.subtasks),
+            onUpdate: planner.updateTask,
+            onMoveToList: planner.moveTaskToList,
+            onAddSubtask: planner.addSubtask,
+            onToggleSubtask: planner.toggleSubtask,
+            onDeleteSubtask: planner.deleteSubtask,
+            onTrash: requestDeleteTask,
           }}
         />
       </I18nProvider>

@@ -17,7 +17,9 @@ import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { useT } from "../../i18n";
 import { TasksSidebar } from "./TasksSidebar";
 import { TaskQuickAdd } from "./TaskQuickAdd";
+import { TaskDrawer } from "./TaskDrawer";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
+import type { TaskChild } from "../../domain/tasks/children";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 
 interface TasksModuleProps {
@@ -37,6 +39,16 @@ interface TasksModuleProps {
   error?: string;
   /** Commits what `resolveCreateContext` decided (§12.16). */
   onCreate: (title: string, resolution: CreateResolution) => void;
+  /** Everything the Drawer can change about the Task it has open (§16.28). */
+  drawer: {
+    childrenOf: (taskId: string) => TaskChild[];
+    onUpdate: (taskId: string, patch: Partial<Task>) => void;
+    onMoveToList: (taskId: string, listId: string) => void;
+    onAddSubtask: (taskId: string, title: string) => void;
+    onToggleSubtask: (id: string) => void;
+    onDeleteSubtask: (id: string) => void;
+    onTrash: (taskId: string) => void;
+  };
 }
 
 export function TasksModule(props: TasksModuleProps) {
@@ -62,6 +74,21 @@ export function TasksModule(props: TasksModuleProps) {
   function setView(view: TaskViewKind) {
     onNavigate(taskUrlFor({ ...state, view }), "replace");
   }
+
+  // Opening the Drawer is a push and closing it is a pop, which is what makes
+  // one Back close it (§16.28 Gate 5) rather than leave the Scope behind.
+  function openTask(taskId: string) {
+    onNavigate(taskUrlFor({ ...state, taskId }));
+  }
+
+  function closeTask() {
+    onNavigate(taskUrlFor({ ...state, taskId: "" }));
+  }
+
+  // The open Task is read from the URL, so a reload reopens it. An id that
+  // names nothing simply opens nothing — §5.30 refuses to make a dead link an
+  // error the reader has to dismiss.
+  const openedTask = state.taskId ? tasks.find((task) => task.id === state.taskId) : undefined;
 
   // §5.28: an id that names nothing is a broken link, not an empty Scope. The
   // difference matters — "this List has no tasks" and "this List is gone" ask
@@ -143,14 +170,39 @@ export function TasksModule(props: TasksModuleProps) {
         ) : (
           <ul className="tm-list">
             {rows.map((task) => (
-              <li key={task.id} className="tm-task">
-                <span className={`tm-task-title${task.status === "done" ? " is-done" : ""}`}>{task.title}</span>
-                {task.dueDate ? <span className="tm-task-due">{task.dueDate}</span> : null}
+              <li key={task.id} className={`tm-task${task.id === state.taskId ? " is-open" : ""}`}>
+                <button type="button" className="tm-task-open" onClick={() => openTask(task.id)}>
+                  <span className={`tm-task-title${task.status === "done" ? " is-done" : ""}`}>
+                    {task.title}
+                  </span>
+                  {task.dueDate ? <span className="tm-task-due">{task.dueDate}</span> : null}
+                </button>
               </li>
             ))}
           </ul>
         )}
       </main>
+
+      {openedTask ? (
+        <TaskDrawer
+          key={openedTask.id}
+          task={openedTask}
+          lists={lists}
+          children={props.drawer.childrenOf(openedTask.id)}
+          onClose={closeTask}
+          onUpdate={(patch) => props.drawer.onUpdate(openedTask.id, patch)}
+          onMoveToList={(listId) => props.drawer.onMoveToList(openedTask.id, listId)}
+          onAddSubtask={(title) => props.drawer.onAddSubtask(openedTask.id, title)}
+          onToggleSubtask={props.drawer.onToggleSubtask}
+          onDeleteSubtask={props.drawer.onDeleteSubtask}
+          onTrash={() => {
+            props.drawer.onTrash(openedTask.id);
+            // §4.64: the Task has left this Scope, so the Drawer cannot stay
+            // open over a row that is no longer there.
+            closeTask();
+          }}
+        />
+      ) : null}
     </section>
   );
 }

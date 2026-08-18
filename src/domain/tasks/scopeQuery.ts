@@ -106,6 +106,16 @@ function hasTag(task: Task, tagId: string, links: TaskTag[]): boolean {
  * asks this whether the row still belongs where it is showing (§12.21).
  */
 export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext): boolean {
+  // A subtask is not a row in any Scope; it is shown inside its parent.
+  //
+  // This is the cost §13.3 predicted, and paying it here is the point: the
+  // plan refuses `Task.parentTaskId` precisely because "every Task query has
+  // to remember `parentTaskId IS NULL`", and a rule remembered in nine places
+  // is remembered in eight. `addSubtask` writes a child Task today, so until
+  // subtasks become their own records the exception is real — it just lives in
+  // one line instead of one per Scope.
+  if (task.parentTaskId) return false;
+
   switch (scope.kind) {
     // §12.12 and §12.13 are the two Scopes the `active` precondition does not
     // apply to — they exist to show exactly what it excludes.

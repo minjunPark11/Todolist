@@ -259,3 +259,29 @@ describe("Gate 2 — one rule, three readers", () => {
     expect(ids({ kind: "filter", id: "flt_1" })).toEqual([]);
   });
 });
+
+// §13.3's prediction, made concrete: `addSubtask` writes a child Task, so
+// without this a subtask appears as a top-level row in its parent's List and
+// is counted there. The plan refuses the self-reference for exactly this.
+describe("a subtask is not a row in any Scope (§13.3)", () => {
+  const parent = task({ id: "p", listId: "l1", dueDate: TODAY });
+  const child = task({ id: "c", listId: "l1", dueDate: TODAY, parentTaskId: "p" });
+  const ctx = context({ tasks: [parent, child] });
+
+  it("keeps the child out of every Scope, and out of the count", () => {
+    for (const scope of [
+      { kind: "today" } as const,
+      { kind: "upcoming" } as const,
+      { kind: "list", id: "l1" } as const,
+      { kind: "folder", id: "f1" } as const,
+    ]) {
+      expect(queryScopeTasks(scope, ctx).map((entry) => entry.id)).toEqual(["p"]);
+      expect(queryScopeCount(scope, ctx)).toBe(1);
+    }
+  });
+
+  it("keeps a deleted child out of Trash too, where it would also be a row", () => {
+    const gone = task({ id: "c", parentTaskId: "p", deletedAt: NOW });
+    expect(matchesScope(gone, { kind: "trash" }, ctx)).toBe(false);
+  });
+});

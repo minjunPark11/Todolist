@@ -6,7 +6,7 @@
 
 .tm-shell {
   display: grid;
-  grid-template-columns: var(--tm-sidebar-w, 240px) minmax(0, 1fr);
+  grid-template-columns: var(--tm-sidebar-w, 240px) minmax(0, 1fr) auto;
   height: 100%;
   min-height: 0;
   background: var(--bg, #fff);
@@ -275,4 +275,197 @@
   margin: 0;
   font-size: 12px;
   color: var(--text-muted, #8e8e93);
+}
+
+/* --- detail drawer (§4, §15.18) --- */
+
+.tm-task-open {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-task.is-open {
+  background: var(--selected, rgba(0, 122, 255, 0.08));
+}
+
+.tm-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 340px;
+  padding: 16px;
+  overflow-y: auto;
+  border-left: 1px solid var(--border, #e5e5e7);
+  background: var(--bg, #fff);
+}
+
+.tm-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tm-drawer-done {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-drawer-close {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tm-drawer-title {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.tm-drawer-title:focus {
+  border-color: var(--border, #e5e5e7);
+  outline: none;
+}
+
+.tm-drawer-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tm-drawer-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-drawer-field.is-block {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.tm-drawer-field input,
+.tm-drawer-field select,
+.tm-drawer-field textarea {
+  padding: 5px 8px;
+  border: 1px solid var(--border, #e5e5e7);
+  border-radius: 6px;
+  background: var(--bg, #fff);
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 13px;
+}
+
+.tm-drawer-subtasks h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-drawer-subtasks ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-drawer-subtasks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.tm-drawer-subtasks li label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tm-drawer-subtasks li .is-done {
+  color: var(--text-muted, #8e8e93);
+  text-decoration: line-through;
+}
+
+.tm-drawer-subtasks li button {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  cursor: pointer;
+}
+
+.tm-drawer-subtasks form {
+  display: flex;
+  gap: 6px;
+}
+
+.tm-drawer-subtasks form button {
+  flex: none;
+  padding: 0 10px;
+  border: 1px solid var(--border, #e5e5e7);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tm-drawer-subtasks form input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border, #e5e5e7);
+  border-radius: 6px;
+  background: var(--bg, #fff);
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 13px;
+}
+
+.tm-drawer-trash {
+  margin-top: auto;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--danger, #d70015);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
 }
