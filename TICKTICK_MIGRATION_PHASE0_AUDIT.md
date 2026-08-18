@@ -339,6 +339,24 @@
 
     1010 tests(1007에서).
 
+25. **Gate 11 현재 상태 (§16.34)** — 21~24번을 마친 시점의 여섯 줄. 통과를 선언하지 않고 각 줄이 **무엇으로** 확인됐는지 적는다.
+
+    | Gate 11 | 상태 | 무엇으로 |
+    |---|---|---|
+    | P0 Golden Journey 12개 | ✅ | `goldenJourneys.test.ts` — **도메인 레벨**(브라우저 하니스 없음). 각 여정은 앱에서도 걸었고 기록이 위에 있다 |
+    | P0 E2E 전부 | ❌ **미완** | 브라우저 E2E 하니스를 붙이지 않았다 — 아래 참조 |
+    | critical accessibility violation 0 | ✅ | 화면 11개에 axe, serious/critical이면 스위트 실패(22번). `color-contrast`·`region`은 jsdom 한계로 제외 |
+    | known destructive data-loss bug 0 | ✅ | store의 파괴적 경로 전수 감사, 결함 7개 발견·수정(18·20·21·24번) |
+    | query/count semantic mismatch 0 | ✅ | `matchesScope` 하나가 멤버십을 답하고 count는 그 row 수다. Today 이중 정의 해소가 마지막이었다(20번) |
+    | unsupported URL state 0 | ✅ | `hardening.test.ts`가 쓰레기 URL 12개를 왕복시킨다 |
+
+    **E2E를 붙이지 않은 것은 판단이고, 그 판단을 적어 둔다.** Playwright는 브라우저 다운로드·dev 서버·Supabase 목킹을 함께 요구하고, 이 리포가 지금 그것으로 더 사게 되는 것은 **"버튼이 눌리는가"** 뿐이다. 규칙이 맞물리는지는 Golden Journey가, 이름·role·관계는 axe가, 화면에서의 동작은 단계마다의 수동 확인이 이미 답하고 있다. Gate 11을 **문자 그대로** 통과하려면 필요하고, 그래서 ❌로 남긴다 — 통과했다고 쓰는 것보다 낫다.
+
+    **§16.34의 구현 목록 중 따로 재지 않은 둘.** `rapid navigation`은 별도 테스트가 없다 — URL 레이어가 순수 함수이고 canonicalize가 멱등임이 `hardening.test.ts`에 고정돼 있어 **구조상** 빠른 연타가 만들 수 있는 상태가 이미 그 12개 안에 있지만, 연타 자체를 재현한 적은 없다. `focus order`는 Phase 10의 focus trap/restore까지이고, axe는 **이름은 보지만 순서는 보지 않는다** — 실제 합성기 위에서 탭 순서를 따라가는 것은 아직 사람의 몫이다.
+
+    이 표대로면 §16.34가 말하는 **MVP release candidate에 한 줄 모자란다.**
+
+
 
 
 
