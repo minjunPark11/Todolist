@@ -9,12 +9,13 @@
 // folder. `scheduledDate` — "the day actually blocked out", distinct from the
 // deadline — has no place in the design's model, and every reader that wants a
 // schedule has to be told what became of it. Telling them once, here, is what
-// lets Phase 3 move the readers over without also deciding the semantics.
+// lets the readers move over one at a time without each deciding the semantics.
 //
-// READ-ONLY as of Phase 2. This translates on the way out of storage; the data
-// on disk still has `scheduledDate` and keeps it until Phase 4 rewrites it. So
-// the adapter must stay able to read BOTH shapes, and does: a record that has
-// already been consolidated simply hits the `canonical` case.
+// READ-ONLY. This translates on the way out of storage, and the data on disk
+// keeps `scheduledDate` for the whole of v1 (audit §7.1) — so the adapter must
+// stay able to read BOTH shapes, and does: a record already in the new terms
+// simply hits the `canonical` case. That property is what makes the eventual
+// rewrite invisible rather than dangerous.
 import { normalizeSchedule } from "./normalizeSchedule";
 import type { Schedule } from "./types";
 
@@ -38,9 +39,8 @@ export interface TaskScheduleSource {
  * Which consolidation rule a record falls under (audit §6, 1-d).
  *
  * Exported for instrumentation, not for branching: audit §10 asks for counts
- * of `promoted` and `start-kept` before Phase 4 rewrites anything, because
- * those are the two cases that change what a record means. If `start-kept`
- * turns out to be common, rule 1-d needs revisiting rather than running.
+ * of `promoted` and `widened` before the data is rewritten, because those are
+ * the two cases that change what a record means.
  */
 export type ScheduleShape =
   /** No dates at all. */
@@ -56,11 +56,25 @@ export type ScheduleShape =
   | "aligned"
   /** Work day and deadline differ, and become a range. */
   | "promoted"
-  /** A range already exists and disagrees with the work day, which is dropped. */
-  | "start-kept";
+  /** A range already exists and the work day is absorbed into it. */
+  | "widened";
 
 function value(raw: string | undefined): string | null {
   return typeof raw === "string" && raw !== "" ? raw : null;
+}
+
+/** Earlier of two dates, treating null as "no opinion". */
+function min(a: string | null, b: string | null): string | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a <= b ? a : b;
+}
+
+/** Later of two dates, treating null as "no opinion". */
+function max(a: string | null, b: string | null): string | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a >= b ? a : b;
 }
 
 /**
@@ -68,9 +82,9 @@ function value(raw: string | undefined): string | null {
  *
  * Phase 4 rewrites the data, and two of these cases change what a record means
  * rather than just where it is stored — `promoted` turns a work day into a
- * three-day range, `start-kept` discards a date outright. The risk register
- * asks for both counts BEFORE that runs, because a large `start-kept` is not a
- * migration to monitor, it is a sign rule 1-d is wrong for this data.
+ * range, `widened` stretches one. The risk register asks for both counts
+ * before the rewrite, because a large `widened` would mean this data routinely
+ * carries three independent dates and rule 1-d is too lossy for it.
  */
 export function countScheduleShapes(tasks: readonly TaskScheduleSource[]): Record<ScheduleShape, number> {
   const counts: Record<ScheduleShape, number> = {
@@ -79,7 +93,7 @@ export function countScheduleShapes(tasks: readonly TaskScheduleSource[]): Recor
     "scheduled-only": 0,
     aligned: 0,
     promoted: 0,
-    "start-kept": 0,
+    widened: 0,
   };
   for (const task of tasks) counts[classifyTaskSchedule(task)] += 1;
   return counts;
@@ -91,7 +105,7 @@ export function classifyTaskSchedule(task: TaskScheduleSource): ScheduleShape {
   const scheduledDate = value(task.scheduledDate);
   const dueDate = value(task.dueDate);
 
-  if (startDate !== null && scheduledDate !== null && scheduledDate !== startDate) return "start-kept";
+  if (startDate !== null && scheduledDate !== null && scheduledDate !== startDate) return "widened";
   if (scheduledDate === null) {
     if (dueDate === null) return startDate === null ? "empty" : "canonical";
     return "canonical";
@@ -112,10 +126,13 @@ export function classifyTaskSchedule(task: TaskScheduleSource): ScheduleShape {
  * work rather than one — but it is the closest one available, and it is
  * recoverable.
  *
- * `start-kept` is the case with no good answer: three dates, two slots. The
- * range the user built explicitly wins over the work day, which was often set
- * implicitly by dragging on a calendar. Audit §10 asks for a count of these
- * before Phase 4 makes it permanent.
+ * `widened` is three dates into two slots. The range STRETCHES to cover the
+ * work day rather than discarding it: `span.ts` already draws the bar over all
+ * three dates, and its own test says why — "the calendar block is real work; a
+ * bar that excluded it would hide it". Dropping the work day would shrink that
+ * bar and hide a day someone planned. Stretching keeps every date, and in the
+ * ordinary case where the work day already sits inside the range it changes
+ * nothing at all.
  *
  * Times ride on `scheduledDate` today (`calendarItems.ts:226`), so where they
  * end up depends on where that date went:
@@ -152,8 +169,22 @@ export function scheduleFromTask(task: TaskScheduleSource): Schedule {
     case "promoted":
       return normalizeSchedule({ ...base, startDate: scheduledDate, dueDate, startTime, endTime: null });
 
-    case "start-kept":
-      return normalizeSchedule({ ...base, startDate, dueDate, startTime: null, endTime: null });
+    case "widened": {
+      // `dueDate` may be absent here — a range with a start, a work day and no
+      // deadline still stretches; `min`/`max` treat null as no opinion.
+      const start = min(startDate, scheduledDate);
+      const end = max(dueDate, scheduledDate);
+      // The block's start survives only if its day became the range start.
+      // Anywhere else it is an interior day the two-field model cannot name.
+      const keepsStart = start === scheduledDate;
+      return normalizeSchedule({
+        ...base,
+        startDate: start,
+        dueDate: end,
+        startTime: keepsStart ? startTime : null,
+        endTime: null,
+      });
+    }
   }
 }
 

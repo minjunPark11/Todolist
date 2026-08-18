@@ -451,17 +451,15 @@ C에서는 종속 대상까지 설계서와 같아지므로 순수 명명 치환
 리포에 feature flag 시스템이 없고, 이를 위해 새로 도입하지도 않는다. 그러나 **C는 데이터를 바꾸므로 "커밋 revert"만으로는 안 돌아간다.** B판의 결론을 폐기하고 다음으로 대체한다.
 
 ```text
-Phase 1~3  (읽기 어댑터 + reader 전환)
-  → 데이터 변경 없음. revert 자유. 화면 동작도 불변이어야 함
+Phase 1~9  (어댑터 · reader 전환 · Editor 전체)
+  → 데이터 변경 없음. 전부 revert 자유
 
-Phase 4    (데이터 통합)
-  → 여기서부터 되돌릴 수 없음. forward-fix만 가능
-
-Phase 5~   (Editor)
-  → UI 교체 커밋을 마지막에 두어 revert 가능하게 유지
+Phase 10   (데이터 통합)
+  → 되돌릴 수 없는 유일한 단계. §7.1에 따라 v1 이후로 밀었고,
+     이 시점에는 관찰 가능한 효과가 없다
 ```
 
-Phase 3까지 화면이 그대로라는 점이 안전망이다. 어댑터가 구·신 두 형태를 모두 이해하는 동안 실제 데이터는 아직 옛 형태이므로, 문제가 보이면 Phase 4에 진입하지 않고 멈출 수 있다.
+핵심은 **디스크의 데이터가 v1 내내 옛 형태 그대로라는 것**이다. 어댑터가 읽는 쪽에서 통합하므로, 어느 단계에서 문제가 보여도 커밋을 되돌리면 원래 앱으로 돌아간다. 되돌릴 수 없는 단계는 남아 있지만 더 이상 급하지 않다.
 
 ---
 
@@ -474,19 +472,34 @@ expand → migrate → contract 순서다. 설계서 §22.2의 13단계를 이 �
 | **0** | 이 문서 | §22.10~15 | ✅ 완료 |
 | **1** | `src/domain/schedule/` 코어 — types, mode 파생, Date/Duration 전환, normalize, validate, equality + 테스트 | §22.16~22 | 자유 |
 | **2** | **읽기 어댑터** `toSchedule()` — 구 형태(`scheduledDate` 포함)와 신 형태를 모두 이해 | — (C 고유) | 자유 |
-| **3** | **reader 전환** — `calendarItems` / `planner` / `span` / `filters` / `quickParse` / `TodayPage`가 어댑터 경유. **화면 동작 불변을 e2e로 검증** | — (C 고유) | 자유 |
-| **4** | **데이터 통합** — `normalizeTask`에 1-d 규칙 적용(멱등) + §2.1 legacy 코드 삭제 | §22.31~41 대체 | ⚠️ 불가 |
-| **5** | `updateTaskSchedule()` 단일 mutation | §22.42~ | |
-| **6** | Editor 상태 기계 + Popover | §2, §10 | |
-| **7** | MonthCalendar (신규) + Date/Duration 선택 | §6, §3, §4 | |
-| **8** | Time — Date + Duration 양쪽 | §7 | 결정 1-b/1-c |
-| **9** | 캘린더 레이어 통합 + 주간뷰 다일 블록 + Today 버킷 정리 | §14 | 결정 1-e |
+| **3** | **reader 전환 + 화면 재작업** — `span` / `calendarItems` / `planner` / `TodayPage` / `filters`가 어댑터 경유. 캘린더 2레이어 통합, Today 버킷 정리 | §14 (구 9 병합) | 자유 |
+| **4** | `updateTaskSchedule()` 단일 mutation | §22.42~ | |
+| **5** | Editor 상태 기계 + Popover | §2, §10 | |
+| **6** | MonthCalendar (신규) + Date/Duration 선택 | §6, §3, §4 | |
+| **7** | Time — Date + Duration 양쪽 | §7 | 결정 1-b/1-c |
 | — | **v1 여기서 끊는다** | | |
-| **10** | Recurrence — 레거시 `repeat*` 흡수 | §9 | |
-| **11** | Reminder — 예약 스케줄러 별도 설계 선행 | §8 | D5 |
-| **12** | contract — `Task`에서 `scheduledDate`·`repeat*` 제거 | §22.13 | |
+| **8** | Recurrence — 레거시 `repeat*` 흡수 | §9 | |
+| **9** | Reminder — 예약 스케줄러 별도 설계 선행 | §8 | D5 |
+| **10** | **데이터 통합** — `normalizeTask`에 1-d 규칙 적용(멱등) + §2.1 legacy 코드 삭제 | §22.31~41 대체 | ⚠️ 불가 |
+| **11** | contract — `Task`에서 `scheduledDate`·`repeat*` 제거 | §22.13 | |
 
-**Phase 3이 이 계획의 안전망이다.** 데이터를 건드리기 전에 모든 reader가 어댑터를 통과하게 만들고, 그 상태에서 화면이 조금도 달라지지 않음을 확인한다. 여기서 어긋나는 게 나오면 그것이 곧 1-d 규칙의 구멍이다.
+## 7.1 순서를 고친 이유 (v1 계획의 오류 수정)
+
+초판 §7은 Phase 3을 "reader 전환, **화면 동작 불변**"으로, Phase 4를 데이터 통합으로 두었다. **둘 다 틀렸다.**
+
+**첫째, "reader 전환 + 동작 불변"은 동시에 성립하지 않는다.** 어댑터는 의도적으로 통합한다(1-d). reader가 어댑터를 거치는 순간 `scheduled-only`와 `promoted` 레코드의 표시가 달라진다. 실제로 `calendarItems.test.ts`에는 이미 `"makes a work block from scheduledDate and a marker from dueDate"`라는 테스트가 있고, 이것은 전환과 **동시에** 깨지는 것이 정상이다. 결정 1-e가 예고한 화면 변화가 곧 그것이다. 그래서 구 Phase 9(레이어 통합)를 Phase 3에 병합했다 — 같은 변화를 두 단계로 쪼갤 수 없다.
+
+**둘째, 데이터 통합이 reader 전환보다 앞서면 안 된다.** `scheduledDate`가 비워진 상태에서 `calendarItems`가 여전히 그것을 읽으면 모든 작업 블록이 사라진다. 순서가 반대였다.
+
+**그리고 순서를 바로잡으면 통합이 거의 공짜가 된다.** Phase 2가 다음을 테스트로 고정했다.
+
+```text
+scheduleFromTask(scheduleToTaskPatch(s)) === s
+```
+
+즉 통합된 레코드와 통합 전 원본은 어댑터를 거치면 **같은 Schedule**을 만든다. 모든 reader가 어댑터를 통과한 뒤에는 데이터 통합이 관찰 가능한 변화를 만들지 않는다. 그래서 되돌릴 수 없는 유일한 단계를 v1 이후로 미뤘다 — 위험을 줄인 것이 아니라, **위험한 단계가 더 이상 필요하지 않은 순서**를 찾은 것이다.
+
+**Phase 3이 여전히 이 계획의 관문이다.** 다만 통과 기준이 "아무것도 안 바뀜"이 아니라 **"바뀐 것이 전부 1-e가 예고한 것뿐임"**이다. 예고에 없는 변화가 나오면 그것이 1-d 규칙의 구멍이다.
 
 설계서 §22.7의 P0 정의에서 **Reminder / Repeat를 제외**했다. 근거는 D5(배달 수단 부재)와, 현재 `repeat*`가 이미 동작 중이라 반복이 v1의 회귀 항목이 아니라는 점이다.
 

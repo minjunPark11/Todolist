@@ -38,7 +38,7 @@ describe("classifyTaskSchedule", () => {
     expect(classifyTaskSchedule(task({ scheduledDate: "2026-08-27", dueDate: "2026-08-30" }))).toBe("promoted");
     expect(
       classifyTaskSchedule(task({ startDate: "2026-08-20", scheduledDate: "2026-08-27", dueDate: "2026-08-30" })),
-    ).toBe("start-kept");
+    ).toBe("widened");
   });
 
   // A record already carrying a range and no work day needs no consolidation.
@@ -87,13 +87,31 @@ describe("scheduleFromTask — consolidation (audit 1-d)", () => {
     expect(getScheduleMode(next)).toBe("duration");
   });
 
-  // Three dates, two slots. The explicit range wins over the work day.
-  it("keeps an existing range and drops a conflicting work day", () => {
+  // Three dates, two slots — the range absorbs the work day instead of losing it.
+  it("leaves a range alone when the work day already sits inside it", () => {
     const next = scheduleFromTask(
       task({ startDate: "2026-08-20", scheduledDate: "2026-08-27", dueDate: "2026-08-30" }),
     );
     expect(next.startDate).toBe("2026-08-20");
     expect(next.dueDate).toBe("2026-08-30");
+  });
+
+  // span.ts already draws the bar over all three dates and its own test says
+  // why: "the calendar block is real work; a bar that excluded it would hide it".
+  it("stretches the range back to cover a work day before its start", () => {
+    const next = scheduleFromTask(
+      task({ startDate: "2026-08-20", scheduledDate: "2026-08-13", dueDate: "2026-08-30" }),
+    );
+    expect(next.startDate).toBe("2026-08-13");
+    expect(next.dueDate).toBe("2026-08-30");
+  });
+
+  it("stretches the range forward to cover a work day past its end", () => {
+    const next = scheduleFromTask(
+      task({ startDate: "2026-08-20", scheduledDate: "2026-09-05", dueDate: "2026-08-30" }),
+    );
+    expect(next.startDate).toBe("2026-08-20");
+    expect(next.dueDate).toBe("2026-09-05");
   });
 });
 
@@ -112,7 +130,7 @@ describe("scheduleFromTask — where the times land", () => {
     expect(next.endTime).toBeNull();
   });
 
-  it("drops both times when the work day they belonged to is dropped", () => {
+  it("drops the times when the work day lands inside the range, which has no slot for it", () => {
     const next = scheduleFromTask(
       task({
         startDate: "2026-08-20",
@@ -123,6 +141,21 @@ describe("scheduleFromTask — where the times land", () => {
       }),
     );
     expect(next.startTime).toBeNull();
+    expect(next.endTime).toBeNull();
+  });
+
+  it("keeps the block start when the work day becomes the range start", () => {
+    const next = scheduleFromTask(
+      task({
+        startDate: "2026-08-20",
+        scheduledDate: "2026-08-13",
+        dueDate: "2026-08-30",
+        startTime: "09:00",
+        endTime: "11:00",
+      }),
+    );
+    expect(next.startDate).toBe("2026-08-13");
+    expect(next.startTime).toBe("09:00");
     expect(next.endTime).toBeNull();
   });
 
@@ -185,7 +218,7 @@ describe("countScheduleShapes", () => {
       "scheduled-only": 1,
       aligned: 1,
       promoted: 2,
-      "start-kept": 1,
+      "widened": 1,
     });
   });
 
@@ -196,7 +229,7 @@ describe("countScheduleShapes", () => {
       "scheduled-only": 0,
       aligned: 0,
       promoted: 0,
-      "start-kept": 0,
+      "widened": 0,
     });
   });
 });
