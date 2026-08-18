@@ -19,7 +19,7 @@ import {
 import { spaceIdForProject } from "./domain/spaces/spaces";
 import type { TodayIntent } from "./components/TodayPage";
 import { TasksModule } from "./components/tasks/TasksModule";
-import { canonicalizeTaskUrl, parseTaskScope } from "./app/taskScopeUrl";
+import { canonicalizeTaskUrl, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
 import { childrenOf } from "./domain/tasks/children";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
@@ -1043,7 +1043,10 @@ export default function App() {
   // `parseTaskScope` returning null is what keeps the Spaces routes and every
   // page above working — this branch claims `/today`, `/list/:id` and the rest,
   // not "any path I do not recognise" (§5.56).
-  if (parseTaskScope(currentUrl.split("?")[0])) {
+  // §10.19 adds a tenth route to the module: the Search Page. It is not a
+  // Scope — `canonicalizeTaskUrl` has nothing to tidy about it — but it opens
+  // in the same shell, so the module claims it too.
+  if (parseTaskScope(currentUrl.split("?")[0]) || parseSearchUrl(currentUrl) !== null) {
     const canonical = canonicalizeTaskUrl(currentUrl);
     return (
       <I18nProvider lang={appSettings.language}>

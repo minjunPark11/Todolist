@@ -13,8 +13,11 @@
 // (`/s/:spaceId/p/:projectId/...`, app/spaceSelection) are a different module's
 // (§5.56), so a path this one does not recognise is left alone rather than
 // swept to `/today` — that answer belongs to the shell, once there is one.
+import type { List } from "../types";
 import type { TaskScopeRef, TaskViewKind } from "../domain/tasks/scopeRegistry";
 import { policyFor, scopeRegistry, TASK_SCOPE_KINDS } from "../domain/tasks/scopeRegistry";
+import type { SearchResult } from "../domain/tasks/search";
+import { isInboxList } from "../domain/spaces/hierarchy";
 
 /** What the address bar says, once parsed (§5.43). */
 export interface TaskNavigationState {
@@ -127,4 +130,61 @@ export function canonicalizeTaskUrl(url: string): string | null {
   const state = parseTaskUrl(url);
   if (!state) return null;
   return taskUrlFor(state);
+}
+
+/**
+ * The Search Page (§10.19-§10.21).
+ *
+ * Not a Scope: no registry entry, no allowed views, nothing to count. It is a
+ * page inside the same shell, and the query lives in the URL because
+ * refreshing, sharing and going back to a search are all worth being able to
+ * do (§10.21).
+ *
+ * The palette's own typing is NOT this (§10.23, Gate 8). That query is
+ * transient UI state and never touches the address bar; only leaving the
+ * palette for the full page writes one of these.
+ */
+export const SEARCH_PATH = "/search";
+
+export function searchUrlFor(query: string): string {
+  const trimmed = query.trim();
+  return trimmed ? `${SEARCH_PATH}?q=${encodeURIComponent(trimmed)}` : SEARCH_PATH;
+}
+
+/** The searched-for text, or null when this is not the Search Page. */
+export function parseSearchUrl(url: string): string | null {
+  const [path, query = ""] = url.split("?");
+  if (splitPath(path).join("/") !== "search") return null;
+  return firstParam(new URLSearchParams(query), "q");
+}
+
+/**
+ * Where a search result opens (§10.17), and Gate 8's first line.
+ *
+ * §10.18 weighs two strategies and picks B: a Task opens at its OWN canonical
+ * Scope with the Drawer open, not as a Drawer over whatever screen the user
+ * happened to be on. The rejected one produces a screen whose list and whose
+ * Drawer disagree — the open Task is not among the rows behind it.
+ */
+export function urlForSearchResult(result: SearchResult, lists: List[]): string {
+  const owner = (id?: string) => lists.find((list) => list.id === id);
+  switch (result.kind) {
+    case "task": {
+      const list = owner(result.ownerListId);
+      // A Task whose owner cannot be found still has to open somewhere, and
+      // the Inbox is where a Task with no other home belongs (§6.5).
+      const scope: TaskScopeRef = !list || isInboxList(list) ? { kind: "inbox" } : { kind: "list", id: list.id };
+      return taskUrlFor({ scope, view: "list", taskId: result.id });
+    }
+    case "list": {
+      const list = owner(result.id);
+      return pathForTaskScope(list && isInboxList(list) ? { kind: "inbox" } : { kind: "list", id: result.id });
+    }
+    case "tag":
+      return pathForTaskScope({ kind: "tag", id: result.id });
+    case "filter":
+      return pathForTaskScope({ kind: "filter", id: result.id });
+    case "folder":
+      return pathForTaskScope({ kind: "folder", id: result.id });
+  }
 }

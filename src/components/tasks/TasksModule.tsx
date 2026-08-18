@@ -7,12 +7,12 @@
 // Scopes allow Board, which have counts, or where `/` goes.
 //
 // List rendering only, per §16.26 — Board and the rich Drawer come later.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Folder, List, ListSection, SavedFilter, SidebarFolder, Tag, Task, TaskDailyPlan, TaskTag } from "../../types";
 import type { TaskScopeRef, TaskViewKind } from "../../domain/tasks/scopeRegistry";
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, queryScopeTasks, type ScopeContext } from "../../domain/tasks/scopeQuery";
-import { parseTaskUrl, taskUrlFor } from "../../app/taskScopeUrl";
+import { parseSearchUrl, searchUrlFor, taskUrlFor, urlForSearchResult, parseTaskUrl } from "../../app/taskScopeUrl";
 import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { useT } from "../../i18n";
 import { TasksSidebar } from "./TasksSidebar";
@@ -28,6 +28,10 @@ import { INBOX_COLUMNS, inboxBucketOf, listBoardColumns, moveToInboxBucket, type
 import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
 import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
+import { CommandPalette } from "./CommandPalette";
+import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
+import { flattenGroups, searchAll } from "../../domain/tasks/search";
+import type { TaskCommand } from "../../domain/tasks/commands";
 
 interface TasksModuleProps {
   tasks: Task[];
@@ -75,11 +79,32 @@ export function TasksModule(props: TasksModuleProps) {
   // One undo at a time, and it is the last thing that happened (§9.40 keeps
   // the stack out of the MVP).
   const [undo, setUndo] = useState<{ labelKey: string; run: () => void } | null>(null);
+  // §10.23: the palette is UI state and nothing about it is in the URL.
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const ctx: ScopeContext = useMemo(
     () => ({ tasks, lists, dailyPlans, taskTags, today, savedFilters }),
     [tasks, lists, dailyPlans, taskTags, today, savedFilters],
   );
+
+  // §10.6. The shortcut is caught here rather than on a button, because the
+  // palette is reachable from anywhere in the module and a focused input must
+  // not swallow it.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // §10.19: the Search Page opens inside this shell. It is not a Scope — no
+  // registry entry, no allowed views, nothing to count — so it is read from
+  // the URL separately and the sidebar highlights nothing while it is open.
+  const searchQuery = parseSearchUrl(url);
 
   // The URL is the state. Nothing mirrors it into a field here, so the back
   // button restores a Scope by doing what it already does to the address bar
@@ -136,6 +161,24 @@ export function TasksModule(props: TasksModuleProps) {
   const title = missing ? t("tasks.missingTitle") : titleFor(scope, lists, folders, sidebarFolders, tags, savedFilters, t);
   const rows = missing ? [] : queryScopeTasks(scope, ctx);
   const count = missing ? 0 : queryScopeCount(scope, ctx);
+
+  const searchCollections: SearchCollections = { tasks, lists, folders, sidebarFolders, tags, savedFilters };
+
+  /** §10.17/§10.18: a result opens at its OWN canonical place, Drawer and all. */
+  function openResult(result: SearchResult) {
+    setPaletteOpen(false);
+    onNavigate(urlForSearchResult(result, lists));
+  }
+
+  function runCommand(command: TaskCommand) {
+    setPaletteOpen(false);
+    const target = command.target({ scope, view: state.view });
+    if ("search" in target) {
+      onNavigate(searchUrlFor(""));
+      return;
+    }
+    onNavigate(taskUrlFor({ scope: target.scope, view: target.view ?? "list", taskId: "" }));
+  }
 
   // The Board's two adapters (§16.30). The component below knows about
   // columns and cards; which command a drop is belongs here, because it is the
@@ -201,12 +244,24 @@ export function TasksModule(props: TasksModuleProps) {
         sidebarFolders={sidebarFolders}
         tags={tags}
         savedFilters={savedFilters}
-        current={scope}
+        current={searchQuery === null ? scope : null}
         onNavigate={go}
       />
 
       <main className="tm-main">
+        {searchQuery !== null ? (
+          <SearchPage
+            query={searchQuery}
+            collections={searchCollections}
+            onQueryChange={(next) => onNavigate(searchUrlFor(next), "replace")}
+            onPick={openResult}
+          />
+        ) : (
+        <>
         <header className="tm-header">
+          <button type="button" className="tm-search-open" onClick={() => setPaletteOpen(true)}>
+            {t("tasks.openSearch")}
+          </button>
           <h1 className="tm-title">{title}</h1>
           {!missing && count > 0 ? <span className="tm-title-count">{count}</span> : null}
 
@@ -288,7 +343,23 @@ export function TasksModule(props: TasksModuleProps) {
             ))}
           </ul>
         )}
+        </>
+        )}
       </main>
+
+      {paletteOpen ? (
+        <CommandPalette
+          collections={searchCollections}
+          ctx={{ scope, view: state.view }}
+          onClose={() => setPaletteOpen(false)}
+          onPickResult={openResult}
+          onRunCommand={runCommand}
+          onSeeAll={(query) => {
+            setPaletteOpen(false);
+            onNavigate(searchUrlFor(query));
+          }}
+        />
+      ) : null}
 
       {openedTask ? (
         <TaskDrawer
@@ -413,4 +484,70 @@ function emptyKeyFor(kind: TaskScopeRef["kind"]): string {
     default:
       return "tasks.empty";
   }
+}
+
+/**
+ * The full Search Page (§10.19-§10.21).
+ *
+ * The query is in the URL and the input is bound to it, so a refresh, a back
+ * button and a shared link all show the same results — which is the whole
+ * reason §10.21 puts it there. Typing replaces rather than pushes: every
+ * keystroke as a history entry would make Back mean "delete one character".
+ */
+function SearchPage({
+  query,
+  collections,
+  onQueryChange,
+  onPick,
+}: {
+  query: string;
+  collections: SearchCollections;
+  onQueryChange: (query: string) => void;
+  onPick: (result: SearchResult) => void;
+}) {
+  const { t } = useT();
+  const groups = searchAll(query, collections, { inbox: t("tasks.inbox"), defaultList: t("tasks.defaultList") }, 50);
+  const total = flattenGroups(groups).length;
+
+  return (
+    <section className="tm-search">
+      <header className="tm-header">
+        <h1>{t("tasks.searchTitle")}</h1>
+        {total > 0 ? <span className="tm-count">{total}</span> : null}
+      </header>
+
+      <input
+        className="tm-search-input"
+        type="search"
+        autoFocus
+        value={query}
+        placeholder={t("tasks.palettePlaceholder")}
+        onChange={(event) => onQueryChange(event.target.value)}
+      />
+
+      {query.trim() && total === 0 ? (
+        <p className="tm-state" role="status">
+          {t("tasks.searchEmpty")}
+        </p>
+      ) : null}
+
+      {groups.map((group) => (
+        <section key={group.kind} className="tm-search-group">
+          <h2>
+            {t(`tasks.group.${group.kind}`)} <span className="tm-count">{group.results.length}</span>
+          </h2>
+          <ul className="tm-list">
+            {group.results.map((result) => (
+              <li key={`${result.kind}:${result.id}`} className="tm-task">
+                <button type="button" className="tm-task-open" onClick={() => onPick(result)}>
+                  <span className={`tm-task-title${result.completed ? " is-done" : ""}`}>{result.title}</span>
+                  {result.subtitle ? <span className="tm-task-due">{result.subtitle}</span> : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </section>
+  );
 }

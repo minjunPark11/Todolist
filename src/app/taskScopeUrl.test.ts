@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { TaskScopeRef } from "../domain/tasks/scopeRegistry";
 import { scopeRegistry, TASK_SCOPE_KINDS } from "../domain/tasks/scopeRegistry";
+import type { List } from "../types";
+import type { SearchResult } from "../domain/tasks/search";
 import {
   canonicalizeTaskUrl,
+  parseSearchUrl,
   parseTaskScope,
   parseTaskUrl,
   pathForTaskScope,
+  searchUrlFor,
   taskUrlFor,
+  urlForSearchResult,
 } from "./taskScopeUrl";
 
 // One ref per Scope, built FROM the registry so a Scope added later cannot
@@ -116,5 +121,62 @@ describe("taskUrlFor", () => {
 
   it("refuses to write a view the Scope does not allow", () => {
     expect(taskUrlFor({ scope: { kind: "today" }, view: "board", taskId: "" })).toBe("/today");
+  });
+});
+
+// Gate 8, first and fourth lines: a result opens where the record lives, and
+// the Search Page's query is in the URL while the palette's never is.
+describe("the Search Page URL (§10.19-§10.23)", () => {
+  it("round-trips the query", () => {
+    expect(parseSearchUrl(searchUrlFor("ABM 연구"))).toBe("ABM 연구");
+    expect(parseSearchUrl(searchUrlFor("  spaced  "))).toBe("spaced");
+  });
+
+  it("is an empty search rather than a missing page when there is no query", () => {
+    expect(searchUrlFor("   ")).toBe("/search");
+    expect(parseSearchUrl("/search")).toBe("");
+  });
+
+  it("is not a Scope, and every Scope path is not it", () => {
+    expect(parseSearchUrl("/today")).toBeNull();
+    expect(parseSearchUrl("/list/l1")).toBeNull();
+    expect(parseTaskScope("/search")).toBeNull();
+    // Nothing to tidy: canonicalization is the Scopes' rule, not this page's.
+    expect(canonicalizeTaskUrl("/search?q=abm")).toBeNull();
+  });
+});
+
+describe("urlForSearchResult (§10.17/§10.18)", () => {
+  const NOW = "2026-08-18T09:00:00.000Z";
+  const lists: List[] = [
+    { id: "list-inbox", projectId: "", kind: "inbox", name: "Inbox", order: -1, isDefault: false, createdAt: NOW, updatedAt: NOW },
+    { id: "l1", projectId: "p1", name: "Work", order: 0, isDefault: true, createdAt: NOW, updatedAt: NOW },
+  ];
+  const result = (over: Partial<SearchResult>): SearchResult =>
+    ({ kind: "task", id: "t1", title: "Task", ...over }) as SearchResult;
+
+  it("opens a Task at its own List with the Drawer open — strategy B", () => {
+    expect(urlForSearchResult(result({ ownerListId: "l1" }), lists)).toBe("/list/l1?task=t1");
+  });
+
+  it("opens an Inbox Task at /inbox, not at a List named after it", () => {
+    expect(urlForSearchResult(result({ ownerListId: "list-inbox" }), lists)).toBe("/inbox?task=t1");
+  });
+
+  it("still opens a Task whose owner is unknown, in the Inbox", () => {
+    expect(urlForSearchResult(result({ ownerListId: "gone" }), lists)).toBe("/inbox?task=t1");
+  });
+
+  it("opens every other kind at its own Scope", () => {
+    expect(urlForSearchResult(result({ kind: "list", id: "l1" }), lists)).toBe("/list/l1");
+    expect(urlForSearchResult(result({ kind: "list", id: "list-inbox" }), lists)).toBe("/inbox");
+    expect(urlForSearchResult(result({ kind: "tag", id: "tag-work" }), lists)).toBe("/tag/tag-work");
+    expect(urlForSearchResult(result({ kind: "filter", id: "f1" }), lists)).toBe("/filter/f1");
+    expect(urlForSearchResult(result({ kind: "folder", id: "sf1" }), lists)).toBe("/folder/sf1");
+  });
+
+  it("produces URLs the parser accepts, which is what makes the Drawer open", () => {
+    const url = urlForSearchResult(result({ ownerListId: "l1" }), lists);
+    expect(parseTaskUrl(url)).toEqual({ scope: { kind: "list", id: "l1" }, view: "list", taskId: "t1" });
   });
 });

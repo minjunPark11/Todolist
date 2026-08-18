@@ -617,3 +617,129 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* --- search and the command palette (§10.4, §10.20) --- */
+
+.tm-search-open {
+  margin-right: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tm-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  /* §10.5: a light palette near the top, not a modal covering the screen. */
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.tm-palette {
+  display: flex;
+  width: min(620px, 92vw);
+  max-height: 65vh;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.tm-palette-input {
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  background: transparent;
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.tm-palette-results {
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.tm-palette-group h3 {
+  margin: 8px 8px 4px;
+  color: var(--text-muted, #8e8e93);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tm-palette-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-palette-row.is-active {
+  background: var(--accent-soft, rgba(10, 132, 255, 0.12));
+}
+
+.tm-palette-row .is-done {
+  color: var(--text-muted, #8e8e93);
+  text-decoration: line-through;
+}
+
+.tm-palette-sub {
+  color: var(--text-muted, #8e8e93);
+  font-size: 12px;
+}
+
+.tm-palette-all {
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  background: transparent;
+  color: var(--accent, #0a84ff);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tm-search-input {
+  width: 100%;
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  font: inherit;
+  font-size: 14px;
+}
+
+.tm-search-group h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #8e8e93);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

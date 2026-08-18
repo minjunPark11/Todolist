@@ -25,12 +25,13 @@ interface TasksSidebarProps {
   sidebarFolders: SidebarFolder[];
   tags: Tag[];
   savedFilters: SavedFilter[];
-  current: TaskScopeRef;
+  /** Null on the Search Page, which is not a Scope and highlights nothing. */
+  current: TaskScopeRef | null;
   onNavigate: (scope: TaskScopeRef) => void;
 }
 
-function sameScope(a: TaskScopeRef, b: TaskScopeRef): boolean {
-  if (a.kind !== b.kind) return false;
+function sameScope(a: TaskScopeRef, b: TaskScopeRef | null): boolean {
+  if (!b || a.kind !== b.kind) return false;
   return ("id" in a ? a.id : "") === ("id" in b ? b.id : "");
 }
 
