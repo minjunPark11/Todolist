@@ -5,9 +5,10 @@
 // here imports React, Supabase, a browser API, or the `Task` type itself
 // (design §19.3).
 //
+// Phase 2 adds the Task adapter, the one file here that knows the record's
+// three date fields and its `""` sentinel (taskSchedule.ts).
+//
 // Still to come, in the order the audit sets:
-//   Phase 2   the Task adapter — `scheduleFromTask` / `scheduleToTaskPatch`,
-//             which is where `scheduledDate` gets absorbed (audit §6, 1-d)
 //   Phase 8   time formatting for the trigger label
 //   Phase 10  recurrence
 //   Phase 11  reminders
@@ -49,3 +50,11 @@ export type { ScheduleIssue, ScheduleIssueCode } from "./validateSchedule";
 export { isConfirmable, isValidSchedule, validateDraft, validateSchedule } from "./validateSchedule";
 
 export { isDirty, schedulesEqual } from "./scheduleEquality";
+
+export type { ScheduleShape, TaskScheduleSource } from "./taskSchedule";
+export {
+  classifyTaskSchedule,
+  countScheduleShapes,
+  scheduleFromTask,
+  scheduleToTaskPatch,
+} from "./taskSchedule";
