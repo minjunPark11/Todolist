@@ -304,6 +304,7 @@ export const en: Dictionary = {
   "sync.synced": "Synced",
   "sync.loadFailed": "Supabase load failed. Local data is still available.",
   "sync.syncFailed": "Supabase sync failed. Changes remain in localStorage.",
+  "sync.retrying": "Upload failed. Your changes are saved locally and will be retried.",
   "sync.verificationSent": "Verification email sent. Please check your inbox.",
   "sync.accountCreated": "Account created.",
   "sync.signedOut": "Signed out. LocalStorage mode",

@@ -302,6 +302,7 @@ export const ko: Dictionary = {
   "sync.synced": "동기화됨",
   "sync.loadFailed": "Supabase 불러오기 실패. 로컬 데이터는 그대로 사용할 수 있습니다.",
   "sync.syncFailed": "Supabase 동기화 실패. 변경사항은 로컬 저장소에 남아 있습니다.",
+  "sync.retrying": "업로드 실패. 변경사항은 로컬에 저장되어 있고 곧 다시 시도합니다.",
   "sync.verificationSent": "인증 이메일을 보냈습니다. 받은 편지함을 확인해 주세요.",
   "sync.accountCreated": "계정이 생성되었습니다.",
   "sync.signedOut": "로그아웃됨. 로컬 저장소 모드",

@@ -66,6 +66,8 @@ import {
   isEmptySyncPlan,
   optionalRemoteTables,
 } from "../domain/sync/buildSyncPlan";
+import { buildMigrationUpload } from "../domain/sync/buildMigrationUpload";
+import { createSaveQueue, type SaveQueue } from "../domain/sync/saveQueue";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
 
@@ -587,6 +589,36 @@ export function usePlannerData() {
   // Last state we know the account holds; the save diffs against it so an edit
   // uploads the records it touched instead of every row in every table.
   const syncedSnapshotRef = useRef<PlannerData | null>(null);
+  // Which account the writes below belong to, readable from callbacks that were
+  // created before the current render (§16.34's account-switch race).
+  const userEmailRef = useRef(userEmail);
+  userEmailRef.current = userEmail;
+  // One save at a time, newest state last, retried when the network refuses.
+  // Created once: everything it reads is a ref or a hoisted declaration, so it
+  // never needs rebuilding for a later render.
+  const saveQueueRef = useRef<SaveQueue<SaveRequest> | null>(null);
+  if (!saveQueueRef.current) {
+    saveQueueRef.current = createSaveQueue<SaveRequest>({
+      perform: ({ data: nextData, ownerEmail }) => performSave(nextData, ownerEmail),
+      onSettled: ({ ok, error, willRetry }) => {
+        if (ok) {
+          setSyncError("");
+          setSyncStatus("sync.synced");
+          return;
+        }
+        console.error("[Supabase] save failed:", error);
+        setSyncError(error instanceof Error ? error.message : "Could not save Supabase data.");
+        // A queued retry is a different state from a save that gave up: the
+        // edit is still going to be uploaded, and saying "failed" would push
+        // the user toward re-entering work that is not lost.
+        setSyncStatus(willRetry ? "sync.retrying" : "sync.syncFailed");
+      },
+      scheduleRetry: (run, delayMs) => {
+        window.setTimeout(run, delayMs);
+      },
+    });
+  }
+  const saveQueue = saveQueueRef.current;
 
   useEffect(() => {
     persistPlannerData(data);
@@ -626,8 +658,10 @@ export function usePlannerData() {
     if (!supabase || !userEmail) {
       setRemoteLoaded(false);
       // Signed out, or switching accounts: the old baseline describes someone
-      // else's rows, so the next sign-in must start from a fresh load.
+      // else's rows, so the next sign-in must start from a fresh load, and
+      // anything still queued was meant for the account we just left.
       syncedSnapshotRef.current = null;
+      saveQueue.reset();
       return;
     }
 
@@ -649,7 +683,9 @@ export function usePlannerData() {
     }
 
     syncTimerRef.current = window.setTimeout(() => {
-      saveSupabaseData(data);
+      // The queue owns ordering and retry; the debounce only decides when the
+      // user has stopped typing.
+      saveQueue.request({ data, ownerEmail: userEmail });
     }, 700);
 
     return () => {
@@ -766,8 +802,20 @@ export function usePlannerData() {
     }
   }
 
-  async function saveSupabaseData(nextData: PlannerData) {
+  /** One request the save queue can run: a whole state, and whose account it is. */
+  type SaveRequest = { data: PlannerData; ownerEmail: string };
+
+  // Performs ONE save. It throws on failure rather than reporting it, because
+  // the queue decides what a failure means — retry, or drop because the account
+  // has changed — and a swallowed error is indistinguishable from a save that
+  // worked. Ordering, coalescing and retry all live in createSaveQueue.
+  async function performSave(nextData: PlannerData, ownerEmail: string) {
     if (!supabase) {
+      return;
+    }
+
+    // This state was captured for an account we are no longer signed into.
+    if (ownerEmail !== userEmailRef.current) {
       return;
     }
 
@@ -781,75 +829,79 @@ export function usePlannerData() {
       return;
     }
 
-    try {
-      const userId = await getUserId();
-      if (!userId) {
-        return;
-      }
-
-      for (const operation of plan.tables) {
-        if (operation.upsert.length > 0) {
-          const rows = operation.upsert.map((item) => ({ id: item.id, user_id: userId, data: item }));
-          const { error } = await supabase
-            .from(operation.table)
-            .upsert(rows, { onConflict: "id,user_id" });
-          if (error) {
-            if (optionalRemoteTables.has(operation.table) && isMissingRemoteTableError(error)) {
-              missingRemoteTablesRef.current.add(operation.table);
-              continue;
-            }
-            throw error;
-          }
-        }
-
-        if (operation.removeIds.length > 0) {
-          const { error: deleteError } = await supabase
-            .from(operation.table)
-            .delete()
-            .eq("user_id", userId)
-            .in("id", operation.removeIds);
-          if (deleteError) {
-            if (optionalRemoteTables.has(operation.table) && isMissingRemoteTableError(deleteError)) {
-              missingRemoteTablesRef.current.add(operation.table);
-              continue;
-            }
-            throw deleteError;
-          }
-        }
-      }
-
-      if (plan.settings) {
-        const { error: settingsError } = await supabase.from("settings").upsert(
-          { id: "settings", user_id: userId, data: plan.settings },
-          { onConflict: "id,user_id" },
-        );
-        if (settingsError) {
-          throw settingsError;
-        }
-      }
-
-      // Device-level preferences (theme accent, language, font size, view
-      // prefs, active focus session, recent items) are synced too, so a single
-      // account looks and behaves the same on app and web.
-      if (plan.appState) {
-        const { error: appSettingsError } = await supabase.from("settings").upsert(
-          { id: "app_settings", user_id: userId, data: plan.appState },
-          { onConflict: "id,user_id" },
-        );
-        if (appSettingsError) {
-          throw appSettingsError;
-        }
-      }
-
-      // Only advance the baseline once everything above succeeded; a failed
-      // save must stay "not yet uploaded" so the next attempt resends it.
-      syncedSnapshotRef.current = nextData;
-      setSyncError("");
-      setSyncStatus("sync.synced");
-    } catch (error) {
-      setSyncError(error instanceof Error ? error.message : "Could not save Supabase data.");
-      setSyncStatus("sync.syncFailed");
+    const userId = await getUserId();
+    if (!userId) {
+      return;
     }
+    // getUserId answers for whoever is signed in NOW. Signing out and back in
+    // as someone else during that round trip used to write the previous
+    // account's rows under the new account's user_id.
+    if (ownerEmail !== userEmailRef.current) {
+      return;
+    }
+
+    for (const operation of plan.tables) {
+      if (operation.upsert.length > 0) {
+        const rows = operation.upsert.map((item) => ({ id: item.id, user_id: userId, data: item }));
+        const { error } = await supabase
+          .from(operation.table)
+          .upsert(rows, { onConflict: "id,user_id" });
+        if (error) {
+          if (optionalRemoteTables.has(operation.table) && isMissingRemoteTableError(error)) {
+            missingRemoteTablesRef.current.add(operation.table);
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      if (operation.removeIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from(operation.table)
+          .delete()
+          .eq("user_id", userId)
+          .in("id", operation.removeIds);
+        if (deleteError) {
+          if (optionalRemoteTables.has(operation.table) && isMissingRemoteTableError(deleteError)) {
+            missingRemoteTablesRef.current.add(operation.table);
+            continue;
+          }
+          throw deleteError;
+        }
+      }
+    }
+
+    if (plan.settings) {
+      const { error: settingsError } = await supabase.from("settings").upsert(
+        { id: "settings", user_id: userId, data: plan.settings },
+        { onConflict: "id,user_id" },
+      );
+      if (settingsError) {
+        throw settingsError;
+      }
+    }
+
+    // Device-level preferences (theme accent, language, font size, view
+    // prefs, active focus session, recent items) are synced too, so a single
+    // account looks and behaves the same on app and web.
+    if (plan.appState) {
+      const { error: appSettingsError } = await supabase.from("settings").upsert(
+        { id: "app_settings", user_id: userId, data: plan.appState },
+        { onConflict: "id,user_id" },
+      );
+      if (appSettingsError) {
+        throw appSettingsError;
+      }
+    }
+
+    // The account may have changed while the writes were in flight; the
+    // baseline describes one account's rows and must not be set from another.
+    if (ownerEmail !== userEmailRef.current) {
+      return;
+    }
+    // Only advance the baseline once everything above succeeded; a failed
+    // save must stay "not yet uploaded" so the retry resends it.
+    syncedSnapshotRef.current = nextData;
   }
 
   async function signIn(email: string, password: string) {
@@ -932,8 +984,12 @@ export function usePlannerData() {
       return false;
     }
 
-    await saveSupabaseData(localMigrationData);
-    setDataState(localMigrationData);
+    // Merge, never replace — see buildMigrationUpload. Saving the local state
+    // directly diffed to "delete every record the account holds and this device
+    // does not", which is not what a button labelled "upload" may do.
+    const merged = buildMigrationUpload(localMigrationData, syncedSnapshotRef.current ?? data);
+    setDataState(merged);
+    saveQueue.request({ data: merged, ownerEmail: userEmailRef.current });
     setLocalMigrationData(null);
     setRemoteLoaded(true);
     return true;
