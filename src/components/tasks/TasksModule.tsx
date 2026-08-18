@@ -8,7 +8,7 @@
 //
 // List rendering only, per §16.26 — Board and the rich Drawer come later.
 import { useMemo, useState } from "react";
-import type { Folder, List, SavedFilter, SidebarFolder, Tag, Task, TaskDailyPlan, TaskTag } from "../../types";
+import type { Folder, List, ListSection, SavedFilter, SidebarFolder, Tag, Task, TaskDailyPlan, TaskTag } from "../../types";
 import type { TaskScopeRef, TaskViewKind } from "../../domain/tasks/scopeRegistry";
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, queryScopeTasks, type ScopeContext } from "../../domain/tasks/scopeQuery";
@@ -21,9 +21,13 @@ import { TaskDrawer } from "./TaskDrawer";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
 import type { TaskChild } from "../../domain/tasks/children";
 import type { TaskMutation } from "../../domain/tasks/mutations";
-import { applyPatch, completeTask, leavesScope, reopenTask, trashTask } from "../../domain/tasks/mutations";
+import { applyPatch, completeTask, leavesScope, moveTaskToSection, reopenTask, trashTask } from "../../domain/tasks/mutations";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { folderIdFor } from "../../domain/tasks/sidebarFolders";
+import { INBOX_COLUMNS, inboxBucketOf, listBoardColumns, moveToInboxBucket, type InboxBucket } from "../../domain/tasks/board";
+import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
+import { sectionIdFor } from "../../domain/tasks/sections";
+import { TaskBoard } from "./TaskBoard";
 
 interface TasksModuleProps {
   tasks: Task[];
@@ -31,6 +35,7 @@ interface TasksModuleProps {
   folders: Folder[];
   sidebarFolders: SidebarFolder[];
   savedFilters: SavedFilter[];
+  listSections: ListSection[];
   dailyPlans: TaskDailyPlan[];
   tags: Tag[];
   taskTags: TaskTag[];
@@ -64,7 +69,7 @@ interface TasksModuleProps {
 
 export function TasksModule(props: TasksModuleProps) {
   const { t } = useT();
-  const { tasks, lists, folders, sidebarFolders, savedFilters, dailyPlans, tags, taskTags, today, url, onNavigate } =
+  const { tasks, lists, folders, sidebarFolders, savedFilters, listSections, dailyPlans, tags, taskTags, today, url, onNavigate } =
     props;
 
   // One undo at a time, and it is the last thing that happened (§9.40 keeps
@@ -131,6 +136,62 @@ export function TasksModule(props: TasksModuleProps) {
   const title = missing ? t("tasks.missingTitle") : titleFor(scope, lists, folders, sidebarFolders, tags, savedFilters, t);
   const rows = missing ? [] : queryScopeTasks(scope, ctx);
   const count = missing ? 0 : queryScopeCount(scope, ctx);
+
+  // The Board's two adapters (§16.30). The component below knows about
+  // columns and cards; which command a drop is belongs here, because it is the
+  // only thing the two Boards do not share.
+  const boardListId = scope.kind === "list" ? scope.id : "";
+  const columns = scope.kind === "inbox" ? INBOX_COLUMNS : listBoardColumns(boardListId, listSections);
+  const columnOf = (task: Task) =>
+    scope.kind === "inbox" ? (inboxBucketOf(task) as string) : sectionIdFor(task, lists, listSections);
+  const tasksIn = (columnId: string) => sortByManualOrder(rows.filter((task) => columnOf(task) === columnId));
+
+  /**
+   * A card was dropped, in two parts: which column it is now in, and where in
+   * that column it sits.
+   *
+   * The first part is the canonical command — different per Board, which is
+   * Gate 7 — and it is the one that gets the Undo, because it is the one that
+   * changed something about the Task rather than about the view. The second is
+   * `sortKey`: a renumbered neighbour keeps its place relative to everything
+   * else, so it needs no undo of its own.
+   */
+  function dropOnBoard(taskId: string, columnId: string, index: number, date?: string) {
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target) return;
+
+    const from = columnOf(target);
+    const mutation =
+      from === columnId
+        ? null
+        : scope.kind === "inbox"
+          ? moveToInboxBucket(target, columnId as InboxBucket, date)
+          : moveTaskToSection(target, columnId, lists, listSections);
+    // Null means the domain refused the drop — a date that was never supplied,
+    // or a Section belonging to another List. Nothing is written, and the card
+    // stays where it was rather than moving to a column it does not belong in.
+    if (from !== columnId && !mutation) return;
+
+    // Ordered against the column as it will be, not as it is: a card arriving
+    // from another column is not in these rows yet.
+    const column = tasksIn(columnId).filter((task) => task.id !== taskId);
+    const placed = [...column.slice(0, index), target, ...column.slice(index)];
+    const moves = placeTask(placed, taskId, index);
+    const ownOrder = moves.find((row) => row.id === taskId);
+    for (const row of moves) {
+      if (row.id !== taskId) props.onMutate(row.id, { order: row.order });
+    }
+
+    if (mutation) {
+      mutate(target, {
+        patch: { ...mutation.patch, ...(ownOrder ? { order: ownOrder.order } : {}) },
+        undo: { ...mutation.undo, ...(ownOrder ? { order: target.order } : {}) },
+        labelKey: mutation.labelKey,
+      });
+    } else if (ownOrder) {
+      props.onMutate(taskId, { order: ownOrder.order });
+    }
+  }
 
   return (
     <section className="tm-shell">
@@ -199,17 +260,20 @@ export function TasksModule(props: TasksModuleProps) {
           <p className="tm-state" role="status">
             {t("tasks.missingHint")}
           </p>
-        ) : rows.length === 0 ? (
+        ) : rows.length === 0 && state.view !== "board" ? (
           <p className="tm-state" role="status">
             {t(emptyKeyFor(scope.kind))}
           </p>
         ) : state.view === "board" ? (
-          // Board is Phase 7 (§16.30). The Scope allows it, so the selector
-          // offers it; saying so is better than rendering a list under the
-          // wrong label.
-          <p className="tm-state" role="status">
-            {t("tasks.boardLater")}
-          </p>
+          <TaskBoard
+            columns={columns}
+            tasksIn={tasksIn}
+            columnOf={columnOf}
+            openTaskId={state.taskId}
+            onOpen={openTask}
+            onDrop={dropOnBoard}
+            canReorder={policy.canManualReorder}
+          />
         ) : (
           <ul className="tm-list">
             {rows.map((task) => (

@@ -171,3 +171,20 @@
     실제 앱에서 확인(테스트만이 아니라): 씨앗 데이터로 `list=l1 AND priority=high` Filter를 만들었더니 사이드바에 FILTERS 구획이 생기고 개수 1이 떴으며, 완료된 것과 휴지통에 있는 것은 둘 다 조건에 맞는데도 빠졌다(§12.11의 baseline). 그 Filter 안에서 작업을 만들자 **`l1`에 `priority: high`로 들어가 화면에서 사라지지 않았다.** 사이드바 그룹에 넣은 List는 "My group" 아래에만 뜨고 원래의 "Domain folder" 아래에는 뜨지 않았으며, 그 그룹을 열면 Quick Add가 그 그룹의 List만 골라 준다.
 
     남은 것: 이 레코드들을 **만드는 UI**가 아직 없다(Section은 Phase 7, SidebarFolder 이동은 Phase 9, Filter 편집기는 §8.30). 그리고 **C-3(Subtask)은 여전히 열려 있다** — Gate 0이 요구하는 `TaskSubtask` 불변식만은 스키마로 답하지 않았다. 12번 항목이 적은 대로 지금의 하위 작업은 `parentTaskId`를 가진 자식 Task이고, 그것을 별도 엔티티로 되돌릴지는 스키마 결정이 아니라 제품 결정이다(자식 Task는 마감일·상태·보드 자리를 갖지만 §13.3의 `TaskSubtask`는 체크박스다)
+
+15. **Implementation Phase 7 (§16.30) — Board / DnD** — **1차 완료.** Gate 7의 네 줄이 전부 앱에서 확인됐다.
+
+    계획서가 허용한 대로 **컬럼 컴포넌트는 하나**(`TaskBoard.tsx`)이고 **도메인 의미만 adapter로 갈린다**(`domain/tasks/board.ts`). 이 분리가 Gate 7 그 자체다 — 같은 드래그가 Inbox Board에서는 날짜를, List Board에서는 `sectionId`를 쓴다. 한 커맨드에 플래그를 다는 대신 두 커맨드로 둔 이유는 §6.24에 있다: Inbox 칼럼은 Task의 날짜에서 **계산되는 가상 칼럼**이고 List 칼럼은 `ListSection` **레코드**다. 하나로 합치면 "이 칼럼으로 옮겨라"가 무엇을 뜻하는지 코드가 추측해야 한다.
+
+    - **Gate 7-1 (Scope별 다른 커맨드)** — Inbox에서 카드를 옮기면 `{isSomeday, dueDate}`가, List에서 옮기면 `{sectionId}`가 바뀐다. 앱에서 둘 다 확인
+    - **Gate 7-2 (Inbox 드래그가 sectionId를 만들지 않는다)** — `moveToInboxBucket`은 그 필드에 **닿을 수가 없다**(쓰는 필드가 둘뿐이다). 실제 이동 후에도 `sectionId`는 계속 없음
+    - **Gate 7-3 (List 드래그가 due/someday를 건드리지 않는다)** — 마감일 `2026-08-22`를 가진 작업을 Doing → Review로 옮겼고 날짜는 그대로였다
+    - **Gate 7-4 (파생 정렬에서 수동 정렬 비활성)** — Board는 `canManualReorder`가 참인 두 Scope(Inbox·List)에서만 열린다. `allowedViews`가 이미 그렇게 정의돼 있어서 구조적으로 참이고, 플래그는 그래도 `TaskBoard`까지 전달된다
+
+    §6.25의 "미분류 → 일정"은 **날짜를 먼저 묻는다.** 그 칼럼이 곧 날짜라서, 날짜 없이 떨어뜨리면 자기 칼럼의 규칙을 만족하지 않는 카드가 된다 — Upcoming Scope에서 생성이 날짜를 요구하는 것과 같은 거절이다(§12.6). 앱에서 확인: 날짜를 고르기 전에는 **아무것도 쓰이지 않았고**, 고른 뒤에야 `dueDate`가 들어갔다. §6.23의 불변식(someday면 날짜 없음)은 같은 patch 안에서 함께 지워진다.
+
+    **드래그가 유일한 길이 아니다.** §16.30이 요구하는 non-drag 대안으로 카드마다 "옮기기" 셀렉터가 있다 — 키보드로 닿고 터치로 눌린다. 드래그는 정밀 포인터와 양쪽 끝을 동시에 보는 시야를 요구하는데, 그건 기능이 아니라 전제 조건이다.
+
+    수동 정렬은 §6.30의 sortKey를 쓴다. 앱에서 확인: 마지막 카드를 맨 앞으로 끌었을 때 **그 한 행만** `order: -1000`이 됐고 나머지 셋은 0 그대로였다. Undo는 칼럼과 자리를 **함께** 되돌린다(someday로 옮긴 뒤 Undo → `isSomeday: false` + 원래 `order`).
+
+    남은 것: 완료된 Task의 Board 표시(§7.35), Section을 **만드는** UI(지금은 레코드가 있어야 칼럼이 보인다), 터치 드래그(§16.35에서 P1), Upcoming Board(§7.18)

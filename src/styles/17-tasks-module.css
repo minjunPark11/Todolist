@@ -496,3 +496,124 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* --- board (§7.21, §7.34, §16.30) --- */
+
+.tm-board {
+  display: flex;
+  gap: 12px;
+  /* §15's Board rule: the columns scroll sideways rather than shrinking until
+     a card is unreadable. */
+  overflow-x: auto;
+  padding: 4px 4px 12px;
+  align-items: flex-start;
+}
+
+.tm-column {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  border-radius: 12px;
+  background: var(--surface-muted, rgba(0, 0, 0, 0.02));
+}
+
+/* The column being dragged over says so. Without it the only feedback is the
+   card landing, which is too late to correct. */
+.tm-column.is-over {
+  border-color: var(--accent, #0a84ff);
+  background: var(--accent-soft, rgba(10, 132, 255, 0.08));
+}
+
+.tm-column-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tm-column-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #1c1c1e);
+}
+
+.tm-column-date {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  font-size: 12px;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-column-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  /* A column with nothing in it is still a drop target, so it keeps a height
+     rather than collapsing to its header. */
+  min-height: 40px;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  font-size: 14px;
+  cursor: grab;
+}
+
+.tm-card.is-dragging {
+  opacity: 0.5;
+}
+
+.tm-card.is-open {
+  border-color: var(--accent, #0a84ff);
+}
+
+.tm-card-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-card-move select {
+  max-width: 92px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font-size: 12px;
+}
+
+.tm-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
