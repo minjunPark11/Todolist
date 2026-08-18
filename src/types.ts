@@ -67,6 +67,18 @@ export interface Task {
   isSomeday: boolean;
   waitingReason: string;
   waitingFollowUpDate: string;
+  /**
+   * Manual order, and the plan's `sortKey` (§6.30/§6.31).
+   *
+   * It sorts within `(listId, sectionId)` and nowhere else: a Task has one
+   * hand-placed position, not one per screen, which is why a Scope gathering
+   * Tasks from several Lists cannot be reordered by hand at all
+   * (`scopeRegistry.canManualReorder`).
+   *
+   * Not an index. Keys are spaced so a drop between two Tasks writes one row
+   * instead of renumbering the column — see domain/tasks/sortKey.ts, which is
+   * the only thing that should compute a value for this field.
+   */
   order: number;
   createdAt: string;
   updatedAt: string;
