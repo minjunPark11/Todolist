@@ -2,6 +2,11 @@
 // Maps the existing Task/Project model onto the spec's
 // TodayTask / TimeBlock / SpaceSignal concepts without changing stored data.
 import type { DailyPlanBucket, Project, Task } from "../types";
+import type { ScopeContext } from "../domain/tasks/scopeQuery";
+import { matchesScope } from "../domain/tasks/scopeQuery";
+import type { TaskScopeRef } from "../domain/tasks/scopeRegistry";
+
+const TODAY_SCOPE: TaskScopeRef = { kind: "today" };
 import { blockedTaskIds } from "../domain/tasks/dependencies";
 import { todayValue } from "./date";
 
@@ -41,16 +46,40 @@ export function parseTimeToMinutes(value: string): number | undefined {
   return h * 60 + m;
 }
 
-function isTodayTask(task: Task, today: string): boolean {
-  if (task.deletedAt || task.status === "archived" || task.status === "inbox") return false;
-  if (task.completedAt && task.completedAt.slice(0, 10) === today) return true;
-  if (task.status === "done") return false;
-  return (
-    Boolean(task.dueDate && task.dueDate < today) ||
-    task.status === "doing" ||
-    task.status === "waiting" ||
-    task.dueDate === today ||
-    task.scheduledDate === today
+/**
+ * What is on Today, asked of the one predicate (TickTick plan §12.5.1).
+ *
+ * This screen used to answer it itself, and the two answers had drifted: this
+ * one counted `doing` and `waiting` whatever their dates said, while
+ * `matchesScope` counts overdue, due-today and planned-for-today. Gate 11 asks
+ * for zero query/count mismatches, and two definitions of Today is the
+ * mismatch — the sidebar's number and this list could disagree about the same
+ * day.
+ *
+ * The plan's rule wins because it is the one every other Scope is written
+ * against, and because it is about the DAY rather than about how the work is
+ * going: a task nobody has dated is not today's by virtue of having been
+ * started. `scheduledDate` still counts, read as the legacy form of "planned
+ * for this day" (§6.19's `TaskDailyPlan`) the same way `Task.tags` is still
+ * read beside the Tag records.
+ *
+ * Completed work is NOT membership here. It is a second question this screen
+ * also asks — see `completedOn` — because §12.12 gives finished tasks their
+ * own Scope and mixing them in was how "done today" ended up inside the same
+ * list as "to do today".
+ */
+function isTodayTask(task: Task, ctx: ScopeContext): boolean {
+  return matchesScope(task, TODAY_SCOPE, ctx);
+}
+
+/** Finished on this day. A separate list, not part of Today's membership. */
+export function completedOn(tasks: Task[], date: string): Task[] {
+  return tasks.filter(
+    (task) =>
+      !task.deletedAt &&
+      !task.parentTaskId &&
+      task.status === "done" &&
+      task.completedAt.slice(0, 10) === date,
   );
 }
 
@@ -113,11 +142,21 @@ function compareTodayEntries(a: TodayEntry, b: TodayEntry): number {
   return a.task.createdAt.localeCompare(b.task.createdAt);
 }
 
+/**
+ * The day's list, from the canonical membership plus this screen's own
+ * ordering.
+ *
+ * Takes a `ScopeContext` rather than a bare task array because membership is
+ * not a property of a task alone: it reads the owning List's lifecycle
+ * (§13.19) and the day's plan records (§6.18). That is the same context the
+ * sidebar counts with, which is what makes the two agree by construction.
+ */
 export function collectTodayEntries(
-  tasks: Task[],
+  ctx: ScopeContext,
   overrides: BucketOverrides,
-  today = todayValue(),
+  today = ctx.today || todayValue(),
 ): TodayEntry[] {
+  const tasks = ctx.tasks;
   const entries: TodayEntry[] = [];
   // Computed once over the whole list: a task's blocked-ness is a fact about
   // its blocker, so it cannot be read from the task alone. The user's own
@@ -125,7 +164,7 @@ export function collectTodayEntries(
   // does for every other rule here.
   const blockedIds = blockedTaskIds(tasks);
   for (const task of tasks) {
-    if (!isTodayTask(task, today)) continue;
+    if (!isTodayTask(task, ctx)) continue;
     const blocked = blockedIds.has(task.id);
     const defaultBucket = defaultBucketFor(task, today, blocked);
     entries.push({
@@ -134,6 +173,18 @@ export function collectTodayEntries(
       bucket: overrides[task.id] ?? defaultBucket,
       reason: reasonFor(task, today, blocked),
       completed: task.status === "done",
+    });
+  }
+  // §12.12's Scope holds finished work; this screen shows the day's own
+  // completions beneath the open ones, so they are gathered separately and
+  // marked rather than being let into the membership rule.
+  for (const task of completedOn(tasks, today)) {
+    entries.push({
+      task,
+      defaultBucket: defaultBucketFor(task, today),
+      bucket: overrides[task.id] ?? defaultBucketFor(task, today),
+      reason: reasonFor(task, today, false),
+      completed: true,
     });
   }
   entries.sort(compareTodayEntries);

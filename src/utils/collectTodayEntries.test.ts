@@ -42,7 +42,10 @@ function task(overrides: Partial<Task> = {}): Task {
   };
 }
 
-const idsOf = (tasks: Task[]) => collectTodayEntries(tasks, {}, TODAY).map((entry) => entry.task.id);
+// Membership reads the owning List's lifecycle now (§13.19), so the fixtures
+// hand over the same context the sidebar counts with.
+const ctx = (tasks: Task[]) => ({ tasks, lists: [], dailyPlans: [], taskTags: [], today: TODAY });
+const idsOf = (tasks: Task[]) => collectTodayEntries(ctx(tasks), {}).map((entry) => entry.task.id);
 
 describe("collectTodayEntries ordering", () => {
   it("puts timed tasks in clock order regardless of when they were created", () => {
@@ -111,7 +114,7 @@ describe("collectTodayEntries ordering", () => {
 // the blocker releases it with no cleanup pass.
 describe("collectTodayEntries blocked demotion", () => {
   const entryFor = (tasks: Task[], id: string) =>
-    collectTodayEntries(tasks, {}, TODAY).find((entry) => entry.task.id === id);
+    collectTodayEntries(ctx(tasks), {}).find((entry) => entry.task.id === id);
 
   it("sends a blocked task to later and says why", () => {
     const tasks = [task({ id: "blocked", blockedByTaskId: "blocker" }), task({ id: "blocker" })];
@@ -150,7 +153,7 @@ describe("collectTodayEntries blocked demotion", () => {
 
   it("lets the user's own override win, exactly as it does for every other rule", () => {
     const tasks = [task({ id: "blocked", blockedByTaskId: "blocker" }), task({ id: "blocker" })];
-    const [entry] = collectTodayEntries(tasks, { blocked: "now" }, TODAY).filter(
+    const [entry] = collectTodayEntries(ctx(tasks), { blocked: "now" }).filter(
       (item) => item.task.id === "blocked",
     );
     expect(entry.bucket).toBe("now");

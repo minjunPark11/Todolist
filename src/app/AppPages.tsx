@@ -177,6 +177,7 @@ export function AppPages({
           tasks={planner.tasks}
           projects={activeProjects}
           dailyPlans={planner.dailyPlans}
+          lists={planner.lists}
           onSetBuckets={planner.setTodayBuckets}
           onOpenTask={planner.selectTask}
           onToggleDone={planner.toggleTaskDone}

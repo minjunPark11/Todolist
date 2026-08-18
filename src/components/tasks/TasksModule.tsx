@@ -412,7 +412,11 @@ export function TasksModule(props: TasksModuleProps) {
             {t("tasks.openSearch")}
           </button>
           <h1 className="tm-title">{title}</h1>
-          {!missing && count > 0 ? <span className="tm-title-count">{count}</span> : null}
+          {!missing && count > 0 ? (
+            <span className="tm-title-count" aria-label={t("tasks.countLabel", { count })}>
+              {count}
+            </span>
+          ) : null}
 
           {/* §16.26 Gate 3: only the views the Scope allows are offered. The
               selector is absent entirely where there is nothing to choose,
@@ -499,10 +503,17 @@ export function TasksModule(props: TasksModuleProps) {
             canReorder={policy.canManualReorder}
           />
         ) : (
-          <ul className="tm-list">
+          <ul className="tm-list" aria-label={title}>
             {rows.map((task) => (
               <li key={task.id} className={`tm-task${task.id === state.taskId ? " is-open" : ""}`}>
-                <button type="button" className="tm-task-open" onClick={() => openTask(task.id)}>
+                <button
+                  type="button"
+                  className="tm-task-open"
+                  // §16.34: a row opens a Task, and a screen reader should say
+                  // so rather than reading the title as if it were a heading.
+                  aria-label={t("tasks.openTask", { title: task.title })}
+                  onClick={() => openTask(task.id)}
+                >
                   <span className={`tm-task-title${task.status === "done" ? " is-done" : ""}`}>
                     {task.title}
                   </span>

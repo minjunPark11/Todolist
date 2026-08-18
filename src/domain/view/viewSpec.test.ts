@@ -266,7 +266,7 @@ describe("equivalence with the screens it replaces", () => {
     }
 
     let compared = 0;
-    for (const entry of collectTodayEntries(tasks, {}, TODAY)) {
+    for (const entry of collectTodayEntries({ tasks, lists: [], dailyPlans: [], taskTags: [], today: TODAY }, {})) {
       // The queue includes overdue work regardless of date, which a windowed
       // view does not; compare only the tasks both actually contain.
       if (!fromView.has(entry.task.id)) continue;

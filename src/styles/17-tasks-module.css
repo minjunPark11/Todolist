@@ -1022,3 +1022,13 @@
 .tm-undo {
   bottom: max(16px, env(safe-area-inset-bottom));
 }
+
+/* §16.34: motion is decoration here — every transition in this module can be
+   dropped without changing what anything means. */
+@media (prefers-reduced-motion: reduce) {
+  .tm-sidebar,
+  .tm-card,
+  .tm-column {
+    transition: none !important;
+  }
+}

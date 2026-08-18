@@ -582,6 +582,8 @@ export function usePlannerData() {
   const [recoveryMode, setRecoveryMode] = useState(false);
   const syncTimerRef = useRef<number | null>(null);
   const missingRemoteTablesRef = useRef<Set<string>>(new Set());
+  /** Which load is the current one, so an older answer cannot win (§16.34). */
+  const loadTicketRef = useRef(0);
   // Last state we know the account holds; the save diffs against it so an edit
   // uploads the records it touched instead of every row in every table.
   const syncedSnapshotRef = useRef<PlannerData | null>(null);
@@ -680,6 +682,14 @@ export function usePlannerData() {
       return;
     }
 
+    // §16.34's "stale response ignore". Two loads can be in flight at once —
+    // a retry, a re-auth, a tab coming back — and the network does not promise
+    // they finish in order. Without this the OLDER answer can land last and
+    // replace the account's state with what it looked like a moment ago, which
+    // is a data-loss bug that only shows up on a slow connection.
+    const ticket = (loadTicketRef.current += 1);
+    const isStale = () => loadTicketRef.current !== ticket;
+
     setSyncStatus("sync.syncing");
     setSyncError("");
 
@@ -735,6 +745,9 @@ export function usePlannerData() {
         : data.activeSessionId;
 
       const loaded = adoptLoadedData(normalizeData(partial));
+      // A newer load has started since this one began; its answer is the one
+      // that should win, and this one has nothing to add.
+      if (isStale()) return;
       setDataState(loaded);
       // What we just read IS what the account holds, so the next save has
       // nothing to push until the user actually changes something.
@@ -742,6 +755,9 @@ export function usePlannerData() {
       setRemoteLoaded(true);
       setSyncStatus("sync.synced");
     } catch (error) {
+      // A failure from a superseded load is not this load's failure to report:
+      // showing it would put an error on screen while a good load is running.
+      if (isStale()) return;
       const message = error instanceof Error ? error.message : "Could not load Supabase data.";
       console.error("[Supabase] load failed:", error);
       setRemoteLoaded(false);

@@ -250,3 +250,13 @@
     **확인하지 못한 것 두 가지, 도구의 한계다.** 임베디드 미리보기 창은 뷰포트를 바꿔도 페이지에 `resize`·`orientationchange`·`ResizeObserver` 중 **아무 신호도 보내지 않아서**, 실행 중 폭 변경(리로드 없는 모드 전환)은 확인할 수 없었다 — 각 모드는 그 폭에서 **로드해서** 확인했다. 훅은 세 신호를 모두 듣는다. 또 그 창은 프레임을 합성하지 않아 CSS transition이 진행되지 않는다(사이드바가 열림 클래스를 받고도 시작 위치에 멈춰 있었고, transition을 끄자 즉시 제자리로 갔다). 둘 다 앱 쪽 문제가 아니다.
 
     남은 것: **Mobile Bottom Navigation(§15.12)** — 다섯 칸이 Tasks·Calendar·Spaces·Focus·Search라서 Tasks Module 하나가 아니라 **앱 셸 전체**의 것이다. 지금 Tasks Module은 기존 앱과 공존하고(§16.26의 "기존 앱과 공존한다") 셸을 소유하지 않으므로, 셸이 하나로 합쳐질 때 붙일 항목으로 남긴다. 그 밖에: 터치 DnD(§15.34, §16.35가 P1), Bottom Sheet picker(§15.21), Mobile Quick Add Bottom Sheet(§15.35)
+
+20. **Implementation Phase 11 (§16.34) — Hardening** — **진행 중.** Gate 11의 여섯 줄 중 넷을 닫았다.
+
+    - **Today 이중 정의 해소 (Gate 11의 "query/count semantic mismatch 0")** — 9번 항목이 남긴 마지막 불일치다. `utils/todayView.ts`의 `isTodayTask`가 사라지고 `matchesScope`를 부른다. **이건 화면이 바뀌는 변경이다**: 날짜 없는 `doing`/`waiting` 작업이 Today에서 빠진다(§12.5.1은 Today를 *날짜*로 정의하지, 일이 어떻게 진행 중인지로 정의하지 않는다). 잃지 않은 것 둘: `scheduledDate === today`는 §6.18 `TaskDailyPlan`의 **레거시 형태**로 계속 읽히고(`Task.tags`를 Tag 레코드 옆에서 계속 읽는 것과 같은 dual read), "오늘 완료함" 줄은 멤버십이 아니라 **별도 질문**(`completedOn`)으로 그 자리에 남는다. 덤으로 §13.19가 공짜로 붙었다 — 보관/삭제된 List의 작업이 Today 화면에서도 빠진다
+    - **P0 Golden Journey 12개 (§16.21)** — `domain/tasks/goldenJourneys.test.ts`. 다만 **도메인 레벨**이다: 이 리포에는 브라우저 하니스가 없어서, 화면이 부르는 그 함수들을 사용자가 일으키는 순서대로 조립해 확인한다. 버튼이 눌리는지가 아니라 규칙이 맞물리는지를 본다. 각 여정은 단계별로 실제 앱에서도 걸어봤고 그 기록이 이 문서 위쪽에 있다
+    - **unsupported URL state 0** — `domain/tasks/hardening.test.ts`가 쓰레기 URL 열두 개를 넣고, **모듈이 주장한 것은 전부** 9개 Scope 중 하나로 canonical하게 왕복하며 두 번 정리해도 안 바뀌고 허용되지 않은 View를 절대 갖지 않음을, **주장하지 않은 것은** 파서도 남의 경로로 인정함을 고정한다
+    - **stale response ignore (loading race)** — `loadSupabaseData`에 티켓이 생겼다. 두 로드가 동시에 떠 있을 때(재시도·재인증·탭 복귀) **오래된 응답이 마지막에 도착해 계정 상태를 조금 전으로 되돌리는** 데이터 손실 버그가 있었다. 느린 회선에서만 보이는 종류다. 이제 자기보다 새 로드가 시작됐으면 결과도 에러도 버린다
+    - **접근성** — 메인 목록·보드 칼럼에 이름, 행 버튼에 "무엇을 여는지", 팔레트에 `combobox`/`listbox`/`option`(+`aria-selected`), 카드의 칼럼 이동 셀렉트에 라벨, `prefers-reduced-motion`에서 이 모듈의 transition 제거
+
+    남은 것(Gate 11 미완): **P0 E2E 전부** — 브라우저 하니스가 없다. **critical accessibility violation 0** — 자동 검사 도구(axe 등)를 아직 붙이지 않았고, 위 손질은 코드 읽기 기반이다. **known destructive data-loss bug 0** — Phase 9의 `deleteProject`와 위 stale load 둘을 고쳤지만 "0"이라고 선언하려면 감사 한 바퀴가 더 필요하다. 그리고 §16.34의 나머지: mutation race test, query/cache profiling, 큰 목록의 virtualization 필요성 검증, browser zoom

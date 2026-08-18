@@ -116,7 +116,7 @@ export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onDr
               </label>
             ) : null}
 
-            <ul className="tm-column-cards">
+            <ul className="tm-column-cards" aria-label={label(column)}>
               {cards.map((task, index) => (
                 <li
                   key={task.id}
@@ -144,6 +144,7 @@ export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onDr
                   <label className="tm-card-move">
                     <span className="tm-visually-hidden">{t("tasks.moveTo")}</span>
                     <select
+                      aria-label={t("tasks.moveToColumn", { title: task.title })}
                       value={columnOf(task)}
                       onChange={(event) => {
                         const target = columns.find((candidate) => candidate.id === event.target.value);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PageId, Project, Task, TaskDailyPlan, TaskDraft } from "../types";
+import type { List, PageId, Project, Task, TaskDailyPlan, TaskDraft } from "../types";
 import { formatDate, getDayLabel, todayValue } from "../utils/date";
 import {
   buildTimeRail,
@@ -33,6 +33,11 @@ export type TodayIntent = "" | "triage" | "quickAdd";
 interface TodayPageProps {
   tasks: Task[];
   projects: Project[];
+  /**
+   * Membership needs them (§13.19): a Task whose owning List is archived or
+   * deleted is not on Today, and that cannot be read from the Task alone.
+   */
+  lists: List[];
   /** One day-plan record per overridden task (§6.18), synced like everything else. */
   dailyPlans: TaskDailyPlan[];
   /** Replaces the whole plan for `planDate` — see usePlannerData.setTodayBuckets. */
@@ -57,6 +62,7 @@ export function TodayPage({
   tasks,
   projects,
   dailyPlans,
+  lists,
   onSetBuckets,
   onOpenTask,
   onToggleDone,
@@ -127,10 +133,13 @@ export function TodayPage({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const entries = useMemo(
-    () => collectTodayEntries(tasks, overrides, today),
-    [tasks, overrides, today],
+  // The same context the Tasks Module counts with, so this list and the
+  // sidebar's number cannot disagree about the day (Gate 11).
+  const scopeCtx = useMemo(
+    () => ({ tasks, lists, dailyPlans, taskTags: [], today }),
+    [tasks, lists, dailyPlans, today],
   );
+  const entries = useMemo(() => collectTodayEntries(scopeCtx, overrides), [scopeCtx, overrides]);
   const rail = useMemo(() => buildTimeRail(tasks, projects, today), [tasks, projects, today]);
 
   // Inbox Triage shows only unsorted (status === "inbox") items. Scheduled
@@ -272,7 +281,7 @@ export function TodayPage({
   // where it did, and the toast undoes the whole plan. A preview step in front
   // of that was only a second place for the two to disagree.
   function handlePlanToday() {
-    const result = buildTodayPlan(collectTodayEntries(tasks, overrides, today), today);
+    const result = buildTodayPlan(collectTodayEntries(scopeCtx, overrides), today);
     // Unknown / completed ids are ignored (spec §30 Apply rules). Resolved up
     // front so the toast can report real counts and the updater stays pure.
     const known = new Set(entries.filter((entry) => !entry.completed).map((entry) => entry.task.id));

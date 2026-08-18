@@ -122,6 +122,8 @@ export function CommandPalette({
       <button
         key={key}
         type="button"
+        role="option"
+        aria-selected={index === active}
         className={`tm-palette-row${index === active ? " is-active" : ""}`}
         onMouseEnter={() => setActive(index)}
         onClick={() => run(index)}
@@ -146,13 +148,20 @@ export function CommandPalette({
           className="tm-palette-input"
           type="text"
           autoFocus
+          // §16.34: the input owns a list that changes as it is typed in, and
+          // `combobox` is what says so — otherwise the results are a silent
+          // region and Enter appears to do nothing.
+          role="combobox"
+          aria-expanded={rows.length > 0}
+          aria-controls="tm-palette-results"
+          aria-autocomplete="list"
           value={query}
           placeholder={t("tasks.palettePlaceholder")}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={onKeyDown}
         />
 
-        <div className="tm-palette-results">
+        <div className="tm-palette-results" id="tm-palette-results" role="listbox">
           {/* §10.8: places, not predictions. The list is what the user did,
               which needs no explaining and cannot be wrong. */}
           {!typing && recents.length > 0 ? (

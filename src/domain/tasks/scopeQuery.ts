@@ -89,8 +89,18 @@ function isActive(task: Task, lists: List[]): boolean {
   return isTaskActive(task, lists) && !isCompleted(task);
 }
 
-/** §12.5.1: the user planned this task for that day, whatever its due date. */
+/**
+ * §12.5.1: the user planned this task for that day, whatever its due date.
+ *
+ * Two forms of the same claim, read the way `listIdFor` and `hasTag` read
+ * theirs. The record is canonical (§6.18); `scheduledDate` is the field the
+ * app carried that decision in before the record existed, and it is still
+ * what the calendar and the Today page write. Reading only the record would
+ * drop every task planned by the older path — which is the difference the
+ * Today screen and the sidebar count had drifted over.
+ */
 export function hasTodayPlan(task: Task, dailyPlans: TaskDailyPlan[], date: string): boolean {
+  if (task.scheduledDate === date) return true;
   return dailyPlans.some((plan) => plan.taskId === task.id && plan.planDate === date);
 }
 
