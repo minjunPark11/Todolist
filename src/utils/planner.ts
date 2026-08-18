@@ -3,6 +3,8 @@ import type {
   Task,
   TaskPriority,
 } from "../types";
+import { scheduleSpan } from "../domain/schedule/scheduleQueries";
+import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { addDays, addMonths, daysBetween, todayValue } from "./date";
 
 // === Task filters (spec §4.1.1) ===
@@ -27,8 +29,14 @@ export type TodayBuckets = {
   waiting: Task[];
   inProgress: Task[];
   overdue: Task[];
+  /**
+   * Everything landing on today (audit §6, 1-e).
+   *
+   * This was two buckets — `dueToday` and `scheduledToday` — because a task
+   * could be due one day and planned for another. The two dates merged, so
+   * the two rows would now hold the same tasks.
+   */
   dueToday: Task[];
-  scheduledToday: Task[];
 };
 
 // Assign each task to the FIRST matching bucket only (spec §0.1.7).
@@ -39,7 +47,6 @@ export function getTodayBuckets(tasks: Task[], today = todayValue()): TodayBucke
     inProgress: [],
     overdue: [],
     dueToday: [],
-    scheduledToday: [],
   };
 
   for (const task of tasks) {
@@ -61,16 +68,16 @@ export function getTodayBuckets(tasks: Task[], today = todayValue()): TodayBucke
       buckets.inProgress.push(task);
       continue;
     }
-    if (task.dueDate && task.dueDate < today) {
+    // A range is late only once its END has passed, and it is "today's" from
+    // its first day onward — so the span answers both questions.
+    const span = scheduleSpan(scheduleFromTask(task));
+    if (span === null) continue;
+    if (span.end < today) {
       buckets.overdue.push(task);
       continue;
     }
-    if (task.dueDate === today) {
+    if (span.start <= today) {
       buckets.dueToday.push(task);
-      continue;
-    }
-    if (task.scheduledDate === today) {
-      buckets.scheduledToday.push(task);
     }
   }
 

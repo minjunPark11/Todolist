@@ -125,6 +125,50 @@ describe("Today membership (§12.5.1)", () => {
   it("reads a plan for another day as another day", () => {
     expect(hasTodayPlan(task(), [plan("t1", "2026-08-17")], TODAY)).toBe(false);
   });
+
+  // The consolidation (SCHEDULE_EDITOR_PHASE0_AUDIT.md §6) folded
+  // `scheduledDate` into the schedule, so `hasTodayPlan` stopped reading it and
+  // the scope asks the span instead. These pin that the answers did not move.
+  describe("after the schedule fields merged (audit §6, 1-e)", () => {
+    const ctx = context();
+
+    it("still takes a task whose only date is a work day today", () => {
+      expect(matchesScope(task({ scheduledDate: TODAY, listId: "l1" }), scope, ctx)).toBe(true);
+    });
+
+    it("still leaves out a work day in the future", () => {
+      expect(matchesScope(task({ scheduledDate: "2026-09-01", listId: "l1" }), scope, ctx)).toBe(false);
+    });
+
+    // A work day and a deadline that disagree became the range between them.
+    it("takes a range that has started but not finished", () => {
+      const running = task({ scheduledDate: "2026-08-17", dueDate: "2026-08-20", listId: "l1" });
+      expect(matchesScope(running, scope, ctx)).toBe(true);
+    });
+
+    it("leaves out a range that has not started", () => {
+      const later = task({ scheduledDate: "2026-08-19", dueDate: "2026-08-25", listId: "l1" });
+      expect(matchesScope(later, scope, ctx)).toBe(false);
+    });
+
+    // Overdue belongs to Today (§12.5.1), and a range is late from the day
+    // after its END.
+    it("keeps a range whose end has passed", () => {
+      const late = task({ scheduledDate: "2026-08-10", dueDate: "2026-08-14", listId: "l1" });
+      expect(matchesScope(late, scope, ctx)).toBe(true);
+    });
+
+    it("leaves out a task with no dates and no plan", () => {
+      expect(matchesScope(task({ listId: "l1" }), scope, ctx)).toBe(false);
+    });
+
+    // The explicit plan record is a separate statement about a day and
+    // survives the merge untouched.
+    it("still takes an undated task planned for today", () => {
+      const planned = context({ dailyPlans: [plan("t-planned")] });
+      expect(matchesScope(task({ id: "t-planned", listId: "l1" }), scope, planned)).toBe(true);
+    });
+  });
 });
 
 describe("Upcoming horizon (§12.6)", () => {

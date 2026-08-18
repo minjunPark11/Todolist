@@ -21,6 +21,8 @@ import { listsById, planDatesByTask, tagIdsByTask } from "./scopeIndex";
 // The horizon is counted in the user's own days. A local date walked through
 // `toISOString` lands a day early east of UTC, which is what the first run of
 // the §12.6 fixture caught here.
+import { scheduleSpan } from "../schedule/scheduleQueries";
+import { scheduleFromTask } from "../schedule/taskSchedule";
 import { addDays } from "../../utils/date";
 
 /** Everything a Scope needs to answer, gathered once by the caller. */
@@ -103,7 +105,10 @@ function isActive(task: Task, lists: List[]): boolean {
  * Today screen and the sidebar count had drifted over.
  */
 export function hasTodayPlan(task: Task, dailyPlans: TaskDailyPlan[], date: string): boolean {
-  if (task.scheduledDate === date) return true;
+  // The legacy `scheduledDate === date` read is gone: that field folded into
+  // the schedule (audit §6, 1-d), and the `today` scope now asks the span
+  // directly. What remains here is the explicit plan record, which is a
+  // separate statement about a day and outlives the consolidation.
   return planDatesByTask(dailyPlans).get(task.id)?.has(date) ?? false;
 }
 
@@ -154,10 +159,16 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     // §12.5.1. Today is NOT `dueDate == today`: it is overdue, plus due today,
     // plus anything explicitly planned for today — and a future task with a
     // plan comes in WITHOUT its due date being changed.
+    //
+    // "Has it started?" is the span's question after the consolidation (audit
+    // §6, 1-e). A schedule whose first day has arrived is today's, whether
+    // that day is its only one or the start of a range, and it stays today's
+    // once the last day has passed — which is what makes overdue part of
+    // Today rather than a bucket beside it.
     case "today": {
       if (!isActive(task, ctx.lists)) return false;
-      const due = effectiveDueDate(task);
-      if (due && due <= ctx.today) return true;
+      const span = scheduleSpan(scheduleFromTask(task));
+      if (span !== null && span.start <= ctx.today) return true;
       return hasTodayPlan(task, ctx.dailyPlans, ctx.today);
     }
 
