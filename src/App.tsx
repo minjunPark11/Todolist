@@ -18,6 +18,8 @@ import {
 } from "./app/spaceSelection";
 import { spaceIdForProject } from "./domain/spaces/spaces";
 import type { TodayIntent } from "./components/TodayPage";
+import { TasksModule } from "./components/tasks/TasksModule";
+import { canonicalizeTaskUrl, parseTaskScope } from "./app/taskScopeUrl";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
 import { useDataPortability } from "./app/useDataPortability";
@@ -177,6 +179,11 @@ export default function App() {
     }
   });
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
+  // The Tasks Module reads path AND query — `?view=` and `?task=` are part of
+  // where you are (§5.62), where every route above it is a path alone.
+  const [currentUrl, setCurrentUrl] = useState(
+    () => `${window.location.pathname}${window.location.search}`,
+  );
   // Parsing is syntactic; resolving is what turns an old `/s/:projectId` link
   // into a Project scope under its Space (§33). It re-runs when the records
   // arrive, so a deep link followed before the first load still lands.
@@ -417,6 +424,15 @@ export default function App() {
     }
     window.history[mode === "replace" ? "replaceState" : "pushState"](null, "", path);
     setCurrentPath(path);
+    setCurrentUrl(path);
+  }
+
+  /** Same, for a destination whose query is part of the address (§5.62). */
+  function navigateUrl(url: string, mode: "push" | "replace" = "push") {
+    if (`${window.location.pathname}${window.location.search}` === url) return;
+    window.history[mode === "replace" ? "replaceState" : "pushState"](null, "", url);
+    setCurrentPath(url.split("?")[0]);
+    setCurrentUrl(url);
   }
 
   /** The Space a Project hangs in, for building a full path to it. */
@@ -476,6 +492,7 @@ export default function App() {
   useEffect(() => {
     function handlePopState() {
       setCurrentPath(window.location.pathname);
+      setCurrentUrl(`${window.location.pathname}${window.location.search}`);
     }
 
     window.addEventListener("popstate", handlePopState);
@@ -574,14 +591,15 @@ export default function App() {
     };
   }, [calendarShare.enabled, calendarShare.token, planner.tasks, planner.projects]);
 
-  // One-time cleanup for the legacy /inbox route and ?triage=inbox deep
-  // links — the intent was already captured into todayIntent above.
+  // One-time cleanup for the ?triage=inbox deep link — the intent was already
+  // captured into todayIntent above.
+  //
+  // `/inbox` used to be redirected here too, because Inbox was a drawer inside
+  // Today and not a place. It is a Scope now (§12.3) with a screen of its own,
+  // so the route is answered rather than swept away.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (window.location.pathname === "/inbox") {
-      window.history.replaceState(null, "", "/app");
-      setCurrentPath("/app");
-    } else if (params.get("triage") === "inbox") {
+    if (params.get("triage") === "inbox") {
       params.delete("triage");
       const query = params.toString();
       const cleanPath = `${window.location.pathname}${query ? `?${query}` : ""}`;
@@ -1015,6 +1033,30 @@ export default function App() {
           onSignUp={planner.signUp}
           onResetPassword={planner.resetPassword}
           onAuthenticated={() => navigate("/app", "replace")}
+        />
+      </I18nProvider>
+    );
+  }
+
+  // The Tasks Module answers its own nine routes (§12.3) and nothing else.
+  // `parseTaskScope` returning null is what keeps the Spaces routes and every
+  // page above working — this branch claims `/today`, `/list/:id` and the rest,
+  // not "any path I do not recognise" (§5.56).
+  if (parseTaskScope(currentUrl.split("?")[0])) {
+    const canonical = canonicalizeTaskUrl(currentUrl);
+    return (
+      <I18nProvider lang={appSettings.language}>
+        <TasksModule
+          tasks={planner.tasks}
+          lists={planner.lists}
+          folders={planner.folders}
+          dailyPlans={planner.dailyPlans}
+          tags={planner.tags}
+          taskTags={planner.taskTags}
+          today={today}
+          url={canonical ?? currentUrl}
+          onNavigate={navigateUrl}
+          error={planner.auth.syncError}
         />
       </I18nProvider>
     );

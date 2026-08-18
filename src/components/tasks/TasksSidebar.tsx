@@ -1,0 +1,117 @@
+// The Tasks Module sidebar (TickTick plan §2.7).
+//
+// The section order is fixed by the plan and is not a layout preference:
+// Smart Lists, then the List tree, then Tags, then Filters, then the two
+// system Scopes. It is §1.14's Presentation IA — what the user is shown is not
+// the domain's `Space > Project > Folder > List` ladder, which is the tree
+// this screen exists to replace.
+//
+// Every count comes from `queryScopeCount`, never from a local filter. §12.14
+// forbids a screen from inventing a count formula, and §6.94 asks the sidebar
+// and the thing it points at to run the same query — the two numbers
+// disagreeing is what v0.10.1 and v0.10.2 each fixed by hand.
+import type { Folder, List, Tag } from "../../types";
+import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
+import { queryScopeCount, type ScopeContext } from "../../domain/tasks/scopeQuery";
+import { activeTags } from "../../domain/tags/tags";
+import { isInboxList } from "../../domain/spaces/hierarchy";
+import { useT } from "../../i18n";
+
+interface TasksSidebarProps {
+  ctx: ScopeContext;
+  folders: Folder[];
+  tags: Tag[];
+  current: TaskScopeRef;
+  onNavigate: (scope: TaskScopeRef) => void;
+}
+
+function sameScope(a: TaskScopeRef, b: TaskScopeRef): boolean {
+  if (a.kind !== b.kind) return false;
+  return ("id" in a ? a.id : "") === ("id" in b ? b.id : "");
+}
+
+export function TasksSidebar({ ctx, folders, tags, current, onNavigate }: TasksSidebarProps) {
+  const { t } = useT();
+
+  function row(scope: TaskScopeRef, label: string, options: { indent?: boolean; dot?: string } = {}) {
+    const count = queryScopeCount(scope, ctx);
+    return (
+      <button
+        key={`${scope.kind}:${"id" in scope ? scope.id : ""}`}
+        type="button"
+        className={`tm-row${sameScope(scope, current) ? " is-current" : ""}${options.indent ? " is-indented" : ""}`}
+        aria-current={sameScope(scope, current) ? "page" : undefined}
+        onClick={() => onNavigate(scope)}
+      >
+        {options.dot ? <span className="tm-dot" style={{ background: options.dot }} aria-hidden /> : null}
+        <span className="tm-row-label">{label}</span>
+        {/* A zero is not shown. An empty Scope says so on its own screen; a
+            column of noughts in the tree is noise (§2.10). */}
+        {count > 0 ? <span className="tm-count">{count}</span> : null}
+      </button>
+    );
+  }
+
+  // The Inbox is a List, but it is shown among the Smart Lists and never in
+  // the tree — it belongs to no Project and has nowhere in the tree to hang.
+  const treeLists = ctx.lists.filter((list) => !isInboxList(list) && !list.archivedAt && list.projectId);
+  const byFolder = new Map<string, List[]>();
+  const loose: List[] = [];
+  for (const list of treeLists) {
+    if (list.folderId) {
+      const bucket = byFolder.get(list.folderId) ?? [];
+      bucket.push(list);
+      byFolder.set(list.folderId, bucket);
+    } else {
+      loose.push(list);
+    }
+  }
+
+  const visibleTags = activeTags(tags);
+
+  return (
+    <nav className="tm-sidebar" aria-label={t("tasks.navLabel")}>
+      <div className="tm-section">
+        {row({ kind: "today" }, t("tasks.today"))}
+        {row({ kind: "upcoming" }, t("tasks.upcoming"))}
+        {row({ kind: "inbox" }, t("tasks.inbox"))}
+      </div>
+
+      <div className="tm-section">
+        <h2 className="tm-section-title">{t("tasks.sectionLists")}</h2>
+        {folders
+          .filter((folder) => !folder.archivedAt)
+          .map((folder) => {
+            const inside = byFolder.get(folder.id) ?? [];
+            if (inside.length === 0) return null;
+            return (
+              <div key={folder.id} className="tm-group">
+                {row({ kind: "folder", id: folder.id }, folder.name)}
+                {inside.map((list) => row({ kind: "list", id: list.id }, list.name, { indent: true }))}
+              </div>
+            );
+          })}
+        {loose.map((list) => row({ kind: "list", id: list.id }, list.name))}
+        {treeLists.length === 0 ? <p className="tm-section-empty">{t("tasks.noLists")}</p> : null}
+      </div>
+
+      {visibleTags.length > 0 ? (
+        <div className="tm-section">
+          <h2 className="tm-section-title">{t("tasks.sectionTags")}</h2>
+          {visibleTags.map((tag) =>
+            row({ kind: "tag", id: tag.id }, tag.name, { dot: tag.color || "var(--tm-tag-dot)" }),
+          )}
+        </div>
+      ) : null}
+
+      {/* §2.23's Filters section is absent rather than empty: there are no
+          SavedFilter records yet, and a heading over nothing reads as a
+          feature that is broken instead of one that has not arrived. */}
+
+      <div className="tm-section">
+        {row({ kind: "completed" }, t("tasks.completed"))}
+        {row({ kind: "trash" }, t("tasks.trash"))}
+      </div>
+    </nav>
+  );
+}

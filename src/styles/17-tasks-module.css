@@ -1,0 +1,219 @@
+/* ============================================================================
+   17-tasks-module.css — Tasks Module shell (TickTick plan §2, §11)
+   Phase 3 is List rendering only; density and the full visual system are §11's
+   own step. These are the structural rules the screen cannot be read without.
+   ============================================================================ */
+
+.tm-shell {
+  display: grid;
+  grid-template-columns: var(--tm-sidebar-w, 240px) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  background: var(--bg, #fff);
+}
+
+/* --- sidebar (§2.6, §2.7) --- */
+
+.tm-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 8px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border, #e5e5e7);
+}
+
+.tm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* §2.10: the section header is quieter than the rows under it, so the eye
+   lands on destinations rather than on labels. */
+.tm-section-title {
+  margin: 0 0 4px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-section-empty {
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  /* §2.29 — a row you can hit without aiming. */
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-row:hover {
+  background: var(--hover, rgba(0, 0, 0, 0.04));
+}
+
+.tm-row.is-current {
+  background: var(--selected, rgba(0, 122, 255, 0.12));
+  font-weight: 600;
+}
+
+/* §2.16: one level of indent means one level of nesting. Lists sit under the
+   Folder that holds them and nothing else is indented. */
+.tm-row.is-indented {
+  padding-left: 26px;
+}
+
+.tm-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-count {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tm-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* --- main (§11.11, §11.13) --- */
+
+.tm-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 28px;
+}
+
+.tm-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tm-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text, #1c1c1e);
+}
+
+.tm-title-count {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-views {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--surface-2, rgba(0, 0, 0, 0.04));
+}
+
+.tm-view {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tm-view.is-current {
+  background: var(--bg, #fff);
+  color: var(--text, #1c1c1e);
+  font-weight: 600;
+}
+
+/* --- rows and states --- */
+
+.tm-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* §11.19 — one row height, so a list scans as a column and not as a stack
+     of differently sized cards. */
+  min-height: 36px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  font-size: 14px;
+}
+
+.tm-task-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-task-title.is-done {
+  color: var(--text-muted, #8e8e93);
+  text-decoration: line-through;
+}
+
+.tm-task-due {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-state {
+  margin: 8px 4px;
+  font-size: 13px;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-state.is-error {
+  color: var(--danger, #d70015);
+}
