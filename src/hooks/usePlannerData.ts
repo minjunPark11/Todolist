@@ -1827,7 +1827,17 @@ export function usePlannerData() {
   // Nothing calls these yet — the Spaces UI arrives in P6. They exist now so
   // the collections have a single owner from the start, the way every other
   // record type does, rather than being written from a component later.
-  function createList(projectId: string, name: string, folderId?: string): string {
+  /**
+   * What the caller may decide beyond name and place (Add List design §0.7
+   * R0-2). Both are optional because the design's whole point is that a List
+   * can be made from a name and nothing else.
+   */
+  function createList(
+    projectId: string,
+    name: string,
+    folderId?: string,
+    options: { color?: string; defaultViewKey?: string } = {},
+  ): string {
     const now = new Date().toISOString();
     const list: List = {
       id: createId("list"),
@@ -1837,6 +1847,10 @@ export function usePlannerData() {
       spaceId: projectId,
       folderId,
       name: name.trim(),
+      // Absent rather than "" when unset: the field means "the user chose
+      // this", and an empty string is a choice that reads as one.
+      ...(options.color?.trim() ? { color: options.color.trim() } : {}),
+      ...(options.defaultViewKey?.trim() ? { defaultViewKey: options.defaultViewKey.trim() } : {}),
       order: 0,
       isDefault: false,
       createdAt: now,

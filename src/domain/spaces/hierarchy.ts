@@ -191,6 +191,13 @@ export function sanitizeList(value: unknown): List | null {
     ...(kind ? { kind } : {}),
     folderId: asString(record.folderId).trim() || undefined,
     name: asString(record.name),
+    // Shape is normalized here; VOCABULARY is not. An unknown colour token or
+    // View key is kept exactly as written, because this build validating them
+    // against its own list is how a newer client's value would be stripped and
+    // saved back (M0). What is drawable, and what is openable, are answered
+    // where those things happen.
+    color: asString(record.color).trim() || undefined,
+    defaultViewKey: asString(record.defaultViewKey).trim() || undefined,
     order: asOrder(record.order),
     isDefault: record.isDefault === true,
     // An override that cannot express "done" is not an override worth keeping;

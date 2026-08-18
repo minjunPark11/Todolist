@@ -88,6 +88,29 @@ describe("sanitizeList", () => {
     expect(sanitizeList({ id: "l", spaceId: "s", futureField: 1 })).toMatchObject({ futureField: 1 });
   });
 
+  // Add List design §13.20-§13.22 and §13.3-§13.7. Both are stored as written.
+  it("keeps a colour and a default View key", () => {
+    expect(sanitizeList({ id: "l", spaceId: "s", color: "#ff8800", defaultViewKey: "board" })).toMatchObject({
+      color: "#ff8800",
+      defaultViewKey: "board",
+    });
+  });
+
+  it("treats an empty colour or View key as 'the user did not choose'", () => {
+    const list = sanitizeList({ id: "l", spaceId: "s", color: "  ", defaultViewKey: "" });
+    expect(list?.color).toBeUndefined();
+    expect(list?.defaultViewKey).toBeUndefined();
+  });
+
+  // §13.7's reason for a text key rather than an enum, and M0's reason for
+  // insisting on it: validating the VOCABULARY here is how this build would
+  // strip a View a newer build wrote and then save the record back without it.
+  // What this build can open is decided when the List is opened, not here.
+  it("keeps a View key it cannot open, and a colour it cannot draw", () => {
+    expect(sanitizeList({ id: "l", spaceId: "s", defaultViewKey: "timeline-3d" })?.defaultViewKey).toBe("timeline-3d");
+    expect(sanitizeList({ id: "l", spaceId: "s", color: "palette.sunrise" })?.color).toBe("palette.sunrise");
+  });
+
   // The rename's whole safety story. A record written before it carries only
   // `spaceId`; a client from before it DROPS any List without one. So the old
   // key is read as the owner and written straight back beside the new one.

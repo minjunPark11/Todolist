@@ -48,8 +48,8 @@
 | `ViewKey` | `TaskViewKind` | R.6 참조 |
 | 서버 Command / Transaction | 로컬 리듀서 + 디바운스 diff 저장 | R.4 참조 |
 | `creationRequestId` | 제출 락 + `createId("list")` | R.4 참조 |
-| `ListColorValue` | `List.color?: string` (신규) | Phase 1에서 추가 |
-| `defaultViewKey` | `List.defaultViewKey?: TaskViewKind` (신규) | Phase 1에서 추가 |
+| `ListColorValue` | `List.color?: string` | **Phase 1 완료.** 유니온이 아니라 자유 문자열 — R.6 |
+| `defaultViewKey` | `List.defaultViewKey?: string` | **Phase 1 완료.** 유니온이 아니라 자유 문자열 — R.6 |
 
 ---
 
@@ -105,6 +105,20 @@
 
 `TaskViewKind`를 넓히면 **Gate 11의 `unsupported URL state 0`** 을 고정한 `domain/tasks/hardening.test.ts`와 `scopeRegistry`의 `allowedViews`가 함께 바뀐다. 그건 부수 작업이 아니라 Phase 3의 본체다.
 
+### 저장 타입은 유니온이 아니라 문자열이다 — MUST (Phase 1에서 확정)
+
+`List.defaultViewKey`와 `List.color`는 **`string`으로 저장한다.** `TaskViewKind`도, 팔레트 토큰의 유니온도 아니다.
+
+본문 §13.7이 이미 그렇게 권한다 — *"View 종류가 향후 확장될 가능성이 높으므로 DB column은 TEXT를 권장한다. Application의 View Registry가 validity를 검증한다."* 이 저장소에서는 그게 **권장이 아니라 요구**다. 이 앱은 자동 업데이트되고 모든 기기가 같은 계정에 쓴다. 어떤 빌드가 자기가 아는 View 집합으로 저장 시점에 검증하면, 새 빌드가 쓴 `"calendar"`를 **떨어뜨린 다음 그 레코드를 계정에 다시 저장한다.** 그게 정확히 M0가 막으려는 사고이고, 이 저장소에는 그 이력이 있다.
+
+따라서 규칙은 하나다.
+
+> `sanitizeList`는 **모양(shape)을 정규화하고 어휘(vocabulary)는 정규화하지 않는다.**
+
+빈 문자열과 공백은 "사용자가 고르지 않았다"로 접어서 `undefined`가 되지만, `"timeline-3d"` 같은 모르는 값은 **그대로 남는다.** 이 빌드가 무엇을 열 수 있고 무엇을 그릴 수 있는지는 **여는 자리와 그리는 자리**에서 답한다(Phase 4).
+
+`ListViewKey = "list" | "board" | "calendar" | "gantt"`라는 도메인 유니온은 **Phase 4에서 resolve 함수와 함께** 생긴다. 저장 타입이 아니라 해석 타입이다.
+
 ---
 
 ## R.7 이 저장소가 이미 앞서 있는 것 — 다시 짓지 말 것
@@ -126,8 +140,8 @@
 
 | Phase | 범위 | 완료 기준 |
 |---|---|---|
-| **0** | 이 절 (매핑 확정) | 이 문서가 리포에 있고 R.2 표가 합의됨 |
-| **1** | §13 데이터 모델 | `List.color?` / `List.defaultViewKey?` 추가, `sanitizeList` 통과, **구버전 라운드트립 유지** (`forwardCompat.test.ts`) |
+| **0** ✅ | 이 절 (매핑 확정) | 이 문서가 리포에 있고 R.2 표가 합의됨 |
+| **1** ✅ | §13 데이터 모델 | `List.color?` / `List.defaultViewKey?` 추가, `sanitizeList` 통과, **구버전 라운드트립 유지** (`forwardCompat.test.ts`) |
 | **2** | §1~§3 Modal + Name | Name 하나로 Enter 생성 → Sidebar 반영 → 새 List 진입 → 첫 Task 입력 가능 |
 | **3** | Gantt View 배선 | `?view=gantt`가 아홉 Scope 중 허용된 곳에서 열리고, `hardening.test.ts`가 갱신됨 |
 | **4** | §4~§5 Color + Default View | 저장한 `defaultViewKey`가 실제로 그 View를 연다 |

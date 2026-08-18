@@ -267,6 +267,34 @@ export interface List {
   /** Manual order within the sidebar group (§6.34). Falls back to `order`. */
   sidebarSortKey?: number;
   name: string;
+  /**
+   * The List's colour, as the user picked it (Add List design §13.20-§13.22).
+   *
+   * A free string rather than a union of the palette's tokens, for the same
+   * reason `defaultViewKey` below is one: a build that only knows today's
+   * palette must not strip a value a newer build wrote. What is a valid colour
+   * is answered where it is drawn, not where it is stored.
+   *
+   * Absent means the List has no colour of its own. That is NOT the same as
+   * white or as the Project's colour — it is the Add List default (§0.7 R0-2),
+   * and rendering decides what "none" looks like.
+   */
+  color?: string;
+  /**
+   * Which View this List opens in (Add List design §13.3-§13.7).
+   *
+   * §13.7 asks for a text key rather than an enum, and M0 makes that a
+   * requirement rather than a preference here: the set of Views will grow, and
+   * a client that validated against its own narrow set would drop a key a
+   * newer client wrote and then save the record back without it. So this
+   * stores whatever was written and the View registry decides at OPEN time
+   * whether this build can honour it (`ListViewKey` in domain/tasks).
+   *
+   * This does not make the List a Board (§0.7 R0-1). The List is a container;
+   * `?view=` is the URL's, and this only says which one to reach for first.
+   * Absent means the Scope registry's own default answers, as it always has.
+   */
+  defaultViewKey?: string;
   order: number;
   /**
    * Created with the Space and not deletable, so an Item always has somewhere

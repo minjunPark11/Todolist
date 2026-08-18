@@ -84,6 +84,25 @@ describe("normalizeData carries fields it does not know", () => {
     expect(path.milestones[0]).toMatchObject(FUTURE);
   });
 
+  // Add List design Phase 1. These two ride in a record that ALREADY syncs, so
+  // they are in the same position `Project.spaceId` was: M0 is the only thing
+  // between them and a client one version behind writing the List back without
+  // them. The colour and the View a user chose would vanish on the next save
+  // from any device that had not updated yet.
+  it("keeps a list's colour and default View key — fields that ride in a synced record", () => {
+    const data = normalizeData({
+      lists: [{ id: "list-1", spaceId: "space-1", name: "Tasks", color: "#ff8800", defaultViewKey: "board" }],
+    });
+    expect(data.lists[0]).toMatchObject({ color: "#ff8800", defaultViewKey: "board" });
+  });
+
+  it("keeps a default View key this build cannot open", () => {
+    const data = normalizeData({
+      lists: [{ id: "list-1", spaceId: "space-1", name: "Tasks", defaultViewKey: "gantt" }],
+    });
+    expect(data.lists[0].defaultViewKey).toBe("gantt");
+  });
+
   it("keeps them on a folder and a list", () => {
     const data = normalizeData({
       folders: [withFuture({ id: "folder-1", spaceId: "space-1", name: "H1" })],
