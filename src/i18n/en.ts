@@ -236,6 +236,7 @@ export const en: Dictionary = {
   "app.toastProjectDeleted": "Project deleted. Tasks moved to Inbox.",
   "app.resetAllDataTitle": "Reset all data?",
   "app.resetAllDataBody": "This permanently deletes all user data on this device, including tasks, projects, goals, focus sessions, Space notes, and Space settings. This cannot be undone.",
+  "app.resetAllDataBodySignedIn": "This permanently deletes all user data in the account {{email}}, on every signed-in device — tasks, projects, goals, focus sessions, Space notes, and Space settings. This cannot be undone.",
   "app.resetAllDataConfirm": "Delete All User Data",
   "app.toastAllDataReset": "All user data has been deleted.",
   "app.undo": "Undo",

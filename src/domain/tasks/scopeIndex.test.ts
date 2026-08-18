@@ -50,8 +50,8 @@ describe("scopeIndex", () => {
 
   it("collects every date a task is planned for", () => {
     const plans: TaskDailyPlan[] = [
-      { id: "1", taskId: "t1", planDate: TODAY, order: 0, createdAt: NOW, updatedAt: NOW },
-      { id: "2", taskId: "t1", planDate: "2026-08-19", order: 0, createdAt: NOW, updatedAt: NOW },
+      { id: "1", taskId: "t1", planDate: TODAY, createdAt: NOW, updatedAt: NOW },
+      { id: "2", taskId: "t1", planDate: "2026-08-19", createdAt: NOW, updatedAt: NOW },
     ] as TaskDailyPlan[];
 
     expect(planDatesByTask(plans).get("t1")?.has(TODAY)).toBe(true);
@@ -68,7 +68,7 @@ describe("scopeIndex", () => {
     ];
     const taskTags = [{ id: "1", taskId: "t1", tagId: "tag-a", createdAt: NOW }] as TaskTag[];
     const dailyPlans = [
-      { id: "1", taskId: "t2", planDate: TODAY, order: 0, createdAt: NOW, updatedAt: NOW },
+      { id: "1", taskId: "t2", planDate: TODAY, createdAt: NOW, updatedAt: NOW },
     ] as TaskDailyPlan[];
     const ctx: ScopeContext = { tasks, lists, dailyPlans, taskTags, today: TODAY };
 

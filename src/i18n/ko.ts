@@ -234,6 +234,7 @@ export const ko: Dictionary = {
   "app.toastProjectDeleted": "프로젝트를 삭제했습니다. 할 일은 받은함으로 이동했습니다.",
   "app.resetAllDataTitle": "전체 데이터를 초기화할까요?",
   "app.resetAllDataBody": "이 기기의 모든 사용자 데이터가 영구적으로 삭제됩니다. 할 일, 프로젝트, 학습 주제, 노트, 집중 기록, Space 노트와 설정이 모두 삭제되며 되돌릴 수 없습니다.",
+  "app.resetAllDataBodySignedIn": "{{email}} 계정의 모든 사용자 데이터가 로그인된 모든 기기에서 영구적으로 삭제됩니다. 할 일, 프로젝트, 학습 주제, 노트, 집중 기록, Space 노트와 설정이 모두 삭제되며 되돌릴 수 없습니다.",
   "app.resetAllDataConfirm": "모든 사용자 데이터 삭제",
   "app.toastAllDataReset": "모든 사용자 데이터를 삭제했습니다.",
   "app.undo": "실행 취소",

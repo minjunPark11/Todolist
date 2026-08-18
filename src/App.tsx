@@ -1370,6 +1370,7 @@ export default function App() {
         pendingDeleteTaskId={pendingDeleteTaskId}
         pendingDeleteProjectId={pendingDeleteProjectId}
         pendingResetAllData={pendingResetAllData}
+        resetReachesAccount={planner.auth.isSignedIn ? planner.auth.userEmail : ""}
         toasts={toasts}
         onCancelDeleteTask={() => setPendingDeleteTaskId("")}
         onConfirmDeleteTask={confirmDeleteTask}

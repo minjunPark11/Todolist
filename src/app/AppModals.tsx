@@ -11,6 +11,15 @@ type AppModalsProps = {
   pendingDeleteTaskId: string;
   pendingDeleteProjectId: string;
   pendingResetAllData: boolean;
+  /**
+   * The signed-in account, or "" on a local-only device.
+   *
+   * Resetting is not a device-local act while signed in: the store empties,
+   * the next save diffs that against the account and deletes every row it
+   * holds. The dialog said "on this device" and meant "everywhere", which is
+   * the one sentence that has to be right on a screen with no undo.
+   */
+  resetReachesAccount: string;
   toasts: QueuedToast[];
   onCancelDeleteTask: () => void;
   onConfirmDeleteTask: () => void;
@@ -25,6 +34,7 @@ export function AppModals({
   pendingDeleteTaskId,
   pendingDeleteProjectId,
   pendingResetAllData,
+  resetReachesAccount,
   toasts,
   onCancelDeleteTask,
   onConfirmDeleteTask,
@@ -62,7 +72,11 @@ export function AppModals({
       {pendingResetAllData ? (
         <ConfirmModal
           title={t("app.resetAllDataTitle")}
-          body={t("app.resetAllDataBody")}
+          body={
+            resetReachesAccount
+              ? t("app.resetAllDataBodySignedIn", { email: resetReachesAccount })
+              : t("app.resetAllDataBody")
+          }
           confirmLabel={t("app.resetAllDataConfirm")}
           onCancel={onCancelResetAllData}
           onConfirm={onConfirmResetAllData}
