@@ -9,7 +9,7 @@
 // that, because the pure function was never wrong. These need an event loop.
 import { describe, expect, it, vi } from "vitest";
 import { afterEach } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { I18nProvider } from "../../i18n";
 import { CreateListModal } from "./CreateListModal";
 
@@ -150,6 +150,43 @@ describe("CreateListModal", () => {
     pressEnter(typeName(container, "학교"));
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ color: "" }));
+  });
+
+  // §8. The preview is an illustration of the draft, and §8.37's test of
+  // whether it is load-bearing: nothing above depends on it existing.
+  it("reflects the draft without becoming part of it (§8.7, §8.9, §8.29)", () => {
+    const { container } = open(vi.fn().mockResolvedValue(undefined));
+
+    // §8.7: its own fallback, not the input's placeholder — the placeholder
+    // says what to type, this names the thing being made.
+    expect(container.querySelector(".tm-preview-title")!.textContent).toBe("New list");
+    expect(container.querySelector<HTMLInputElement>(".tm-modal-input")!.placeholder).not.toBe("New list");
+
+    fireEvent.change(container.querySelector(".tm-modal-input")!, { target: { value: "학교" } });
+    expect(container.querySelector(".tm-preview-title")!.textContent).toBe("학교");
+  });
+
+  it("draws the shape of the View that is chosen (§8.10)", () => {
+    const { container } = open(vi.fn().mockResolvedValue(undefined));
+
+    expect(container.querySelectorAll(".tm-preview-row")).toHaveLength(4);
+
+    // fireEvent, not node.click(): it wraps in act, so the re-render has
+    // landed before the next line looks at what it produced.
+    fireEvent.click(container.querySelectorAll(".tm-modal .tm-view")[1]);
+    expect(container.querySelectorAll(".tm-preview-column")).toHaveLength(3);
+    // §8.14: not filled evenly — an even board looks like a diagram of one.
+    expect(container.querySelectorAll(".tm-preview-card")).toHaveLength(3);
+
+    fireEvent.click(container.querySelectorAll(".tm-modal .tm-view")[2]);
+    expect(container.querySelectorAll(".tm-preview-gantt-bar")).toHaveLength(3);
+  });
+
+  it("is kept out of the accessibility tree (§8.24)", () => {
+    const { container } = open(vi.fn().mockResolvedValue(undefined));
+
+    // Every value it draws is already announced by the field that set it.
+    expect(container.querySelector(".tm-preview")!.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("shows 'no colour' as a choice rather than as a missing swatch", () => {

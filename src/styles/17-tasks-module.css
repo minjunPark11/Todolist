@@ -1394,3 +1394,195 @@
     min-height: 44px;
   }
 }
+
+/* --- Add List: right preview (Add List design §8) --- */
+
+/*
+ * §2's two panels. The dialog only becomes wide once there is a preview beside
+ * the form; the single-column version above is still what narrow screens get.
+ */
+.tm-modal.has-preview {
+  display: grid;
+  width: min(880px, 100%);
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.tm-modal-settings {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px 20px;
+}
+
+.tm-preview {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: center;
+  /* §8.2: the illustration sits a little above centre. */
+  padding: 40px 24px 24px;
+  border-left: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  background: var(--surface-2, rgba(0, 0, 0, 0.03));
+  /* §8.22/§8.23: read-only, and it should not even look clickable. */
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+}
+
+.tm-preview-frame {
+  display: flex;
+  width: 100%;
+  max-width: 460px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+
+.tm-preview-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-preview-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+}
+
+/* "No colour" is still drawn, so the header does not jump when one is picked. */
+.tm-preview-dot.is-none {
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.18));
+}
+
+/* §8.8: one line, cut — never a second line that grows the dialog. */
+.tm-preview-title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text, #1c1c1e);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-preview-body {
+  min-height: 148px;
+}
+
+/* §8.33: skeletons. Bars, not sentences — a preview full of plausible task
+   titles reads as data the List already has. */
+.tm-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tm-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-preview-check {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 1.5px solid var(--border-subtle, rgba(0, 0, 0, 0.2));
+  border-radius: 50%;
+}
+
+.tm-preview-line,
+.tm-preview-card,
+.tm-preview-column-head,
+.tm-preview-gantt-label {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2, rgba(0, 0, 0, 0.08));
+}
+
+.tm-preview-board {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tm-preview-column {
+  display: flex;
+  min-height: 96px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--surface-2, rgba(0, 0, 0, 0.04));
+}
+
+.tm-preview-column-head {
+  width: 56%;
+}
+
+.tm-preview-card {
+  height: 22px;
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.tm-preview-gantt {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tm-preview-gantt-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tm-preview-gantt-label {
+  width: 52px;
+  flex: none;
+}
+
+.tm-preview-gantt-track {
+  display: flex;
+  height: 14px;
+  flex: 1;
+  align-items: center;
+  border-radius: 4px;
+  background: var(--surface-2, rgba(0, 0, 0, 0.04));
+}
+
+/* §8.18: neutral. The List's colour says something about the List, not about
+   how long a piece of work takes. */
+.tm-preview-gantt-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--border-subtle, rgba(0, 0, 0, 0.18));
+}
+
+/*
+ * §8.36: below this the preview goes rather than the form being squeezed. It
+ * is auxiliary — §8.37 says the form must work identically without it — so it
+ * is the half that yields.
+ */
+@media (max-width: 767px) {
+  .tm-modal.has-preview {
+    display: flex;
+    width: min(420px, 100%);
+    flex-direction: column;
+  }
+
+  .tm-preview {
+    display: none;
+  }
+}

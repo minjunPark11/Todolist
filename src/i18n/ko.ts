@@ -1261,6 +1261,7 @@ export const ko: Dictionary = {
   "tasks.createListColorCustom": "직접 지정",
   "tasks.createListViewLabel": "기본 보기",
   "tasks.folderLabel": "폴더",
+  "tasks.previewUntitled": "새 리스트",
   "tasks.folderNone": "없음",
   "tasks.folderSearch": "폴더 검색",
   "tasks.folderSearchEmpty": "일치하는 폴더가 없습니다.",

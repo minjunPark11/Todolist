@@ -21,6 +21,7 @@ import {
 import { LIST_COLOR_PRESETS, isCustomListColor, listColorHex } from "../../domain/tasks/listColor";
 import { CREATE_LIST_VIEW_CHOICES } from "../../domain/tasks/listView";
 import { FolderSelect } from "./FolderSelect";
+import { CreateListPreview } from "./CreateListPreview";
 import type { SidebarFolder } from "../../types";
 
 interface CreateListModalProps {
@@ -92,7 +93,7 @@ export function CreateListModal({
       role="presentation"
     >
       <div
-        className="tm-modal"
+        className="tm-modal has-preview"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -104,11 +105,12 @@ export function CreateListModal({
           }
         }}
       >
-        <header className="tm-modal-head">
-          <h2 id={titleId}>{t("tasks.createListTitle")}</h2>
-        </header>
+        <div className="tm-modal-settings">
+          <header className="tm-modal-head">
+            <h2 id={titleId}>{t("tasks.createListTitle")}</h2>
+          </header>
 
-        <form
+          <form
           className="tm-modal-body"
           onSubmit={(event) => {
             event.preventDefault();
@@ -249,7 +251,17 @@ export function CreateListModal({
               {status === "submitting" ? t("tasks.createListSubmitting") : t("tasks.createListSubmit")}
             </button>
           </div>
-        </form>
+          </form>
+        </div>
+
+        {/* §8.37: an optional presentation layer. Deleting this line leaves
+            every rule above working — which is the test of whether it was
+            ever load-bearing. */}
+        <CreateListPreview
+          name={draft.name}
+          color={draft.color}
+          view={(draft.defaultViewKey || "list") as never}
+        />
       </div>
     </div>
   );

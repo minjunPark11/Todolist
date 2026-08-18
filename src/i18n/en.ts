@@ -1267,6 +1267,7 @@ export const en: Dictionary = {
   "tasks.createListColorCustom": "Custom",
   "tasks.createListViewLabel": "Default view",
   "tasks.folderLabel": "Folder",
+  "tasks.previewUntitled": "New list",
   "tasks.folderNone": "None",
   "tasks.folderSearch": "Search folders",
   "tasks.folderSearchEmpty": "No matching folder.",
