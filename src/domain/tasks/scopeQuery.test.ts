@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { List, Task, TaskDailyPlan, TaskTag } from "../../types";
+import type { List, SavedFilter, Task, TaskDailyPlan, TaskTag } from "../../types";
 import type { TaskScopeRef } from "./scopeRegistry";
 import { scopeRegistry, TASK_SCOPE_KINDS } from "./scopeRegistry";
 import {
@@ -177,7 +177,32 @@ describe("the Scopes that name a container", () => {
     expect(grouped.folderId).toBe("f1");
     expect(matchesScope(task({ listId: "l1" }), { kind: "folder", id: "f1" }, moved)).toBe(false);
   });
+});
 
+describe("Filter membership", () => {
+  const saved: SavedFilter = {
+    id: "flt_1",
+    name: "High priority",
+    spec: { version: 1, all: [{ field: "priority", op: "eq", value: "high" }] },
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+  const scope: TaskScopeRef = { kind: "filter", id: "flt_1" };
+  const filtered = context({ savedFilters: [saved] });
+
+  it("selects what the spec selects", () => {
+    expect(matchesScope(task({ listId: "l1", priority: "high" }), scope, filtered)).toBe(true);
+    expect(matchesScope(task({ listId: "l1", priority: "low" }), scope, filtered)).toBe(false);
+  });
+
+  it("keeps §12.11's baseline: a Filter never shows completed or deleted work", () => {
+    expect(matchesScope(task({ listId: "l1", priority: "high", status: "done" }), scope, filtered)).toBe(false);
+    expect(matchesScope(task({ listId: "l1", priority: "high", deletedAt: NOW }), scope, filtered)).toBe(false);
+  });
+
+  it("shows nothing for a Filter that names no record", () => {
+    expect(matchesScope(task({ listId: "l1", priority: "high" }), scope, context())).toBe(false);
+  });
 });
 
 describe("Tag membership", () => {

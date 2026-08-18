@@ -18,6 +18,7 @@ import type {
   ProjectType,
   RawPlannerData,
   RepeatType,
+  SavedFilter,
   SidebarFolder,
   Space,
   Subtask,
@@ -49,6 +50,7 @@ import {
 import { backfillTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
 import { sanitizeListSection } from "../domain/tasks/sections";
 import { sanitizeSidebarFolder } from "../domain/tasks/sidebarFolders";
+import { sanitizeSavedFilter } from "../domain/tasks/filters";
 import { backfillTaskListId, defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
 import * as pathOps from "../domain/horizons/pathMutations";
 import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
@@ -394,6 +396,12 @@ export function normalizeData(data: RawPlannerData): PlannerData {
       ? data.sidebarFolders
           .map(sanitizeSidebarFolder)
           .filter((folder): folder is SidebarFolder => folder !== null)
+      : [],
+    // The user's own Filters (§6.49). A Query saved under a name, not a
+    // container: deleting one deletes no Task, and the built-in Smart Lists
+    // above them are never records (§6.48).
+    savedFilters: Array.isArray(data.savedFilters)
+      ? data.savedFilters.map(sanitizeSavedFilter).filter((filter): filter is SavedFilter => filter !== null)
       : [],
     // Board columns belonging to one List (§6.26). Empty until something
     // creates one — every Task starts in the unsectioned default column, and
@@ -1921,6 +1929,7 @@ export function usePlannerData() {
     lists: data.lists,
     sidebarFolders: data.sidebarFolders,
     listSections: data.listSections,
+    savedFilters: data.savedFilters,
     dailyPlans: data.dailyPlans,
     tags: data.tags,
     taskTags: data.taskTags,

@@ -76,6 +76,7 @@ function data(overrides: Partial<PlannerData> = {}): PlannerData {
     lists: [],
     sidebarFolders: [],
     listSections: [],
+    savedFilters: [],
     settings,
     appSettings,
     ...overrides,

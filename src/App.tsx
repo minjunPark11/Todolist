@@ -1052,6 +1052,7 @@ export default function App() {
           lists={planner.lists}
           folders={planner.folders}
           sidebarFolders={planner.sidebarFolders}
+          savedFilters={planner.savedFilters}
           dailyPlans={planner.dailyPlans}
           tags={planner.tags}
           taskTags={planner.taskTags}

@@ -1243,6 +1243,7 @@ export const ko: Dictionary = {
   "tasks.defaultList": "리스트",
   "tasks.sectionLists": "리스트",
   "tasks.sectionTags": "태그",
+  "tasks.sectionFilters": "필터",
   "tasks.noLists": "아직 리스트가 없습니다.",
   "tasks.viewLabel": "보기 전환",
   "tasks.viewList": "목록",

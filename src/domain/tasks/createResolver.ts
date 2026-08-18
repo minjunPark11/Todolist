@@ -11,9 +11,10 @@
 // what to patch onto the Task, and whether the day gets a plan record. The
 // caller commits; §12.16's last line is that `createTask()` must never be
 // handed `targetListId = null`.
-import type { Task } from "../../types";
+import type { SavedFilter, Task } from "../../types";
 import type { TaskScopeRef } from "./scopeRegistry";
 import { scopeRegistry } from "./scopeRegistry";
+import { resolveFilterCreatePatch } from "./filters";
 
 /** What still has to be chosen before this can be written (§12.16). */
 export type CreateRequirement = "list" | "date";
@@ -50,6 +51,8 @@ export interface CreateContext {
   chosenListId?: string;
   /** A date the user supplied to satisfy a requirement. */
   chosenDate?: string;
+  /** The user's saved Filters, for the Scope that is one (§12.11). */
+  savedFilters?: SavedFilter[];
 }
 
 const DISABLED: CreateResolution = {
@@ -128,17 +131,22 @@ export function resolveCreateContext(scope: TaskScopeRef, ctx: CreateContext): C
         enabled: true,
       };
 
-    // §12.4 wants the Filter's single owner List when it resolves to one, and
-    // its create-applicable conditions as a patch. Neither is knowable without
-    // a SavedFilter record, so the Inbox answers and the patch is empty until
-    // there is a spec to compile.
-    case "filter":
+    // §12.11. The Filter decides the owner only when its spec names exactly
+    // one List positively; anything else — none, or two — goes to the Inbox
+    // rather than being guessed at. What it filters by is applied to what it
+    // creates, through the allowlist in domain/tasks/filters and never by
+    // reading the spec here.
+    case "filter": {
+      const saved = ctx.savedFilters?.find((filter) => filter.id === scope.id);
+      const compiled = saved ? resolveFilterCreatePatch(saved.spec, ctx.today) : null;
       return {
-        targetListId: ctx.chosenListId || ctx.inboxListId,
+        targetListId: ctx.chosenListId || compiled?.targetListId || ctx.inboxListId,
         requiredBeforeCommit: [],
-        patch: {},
+        patch: compiled?.patch ?? {},
+        ...(compiled?.applyTagIds.length ? { applyTagIds: compiled.applyTagIds } : {}),
         enabled: true,
       };
+    }
 
     default:
       return DISABLED;

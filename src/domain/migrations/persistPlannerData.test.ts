@@ -50,6 +50,7 @@ function plannerData(path: LearningPath): PlannerData {
     lists: [],
     sidebarFolders: [],
     listSections: [],
+    savedFilters: [],
     settings: {} as PlannerData["settings"],
     appSettings: {} as PlannerData["appSettings"],
   };

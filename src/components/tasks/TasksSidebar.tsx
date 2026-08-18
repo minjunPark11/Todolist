@@ -10,11 +10,12 @@
 // forbids a screen from inventing a count formula, and §6.94 asks the sidebar
 // and the thing it points at to run the same query — the two numbers
 // disagreeing is what v0.10.1 and v0.10.2 each fixed by hand.
-import type { Folder, List, SidebarFolder, Tag } from "../../types";
+import type { Folder, List, SavedFilter, SidebarFolder, Tag } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, type ScopeContext } from "../../domain/tasks/scopeQuery";
 import { activeTags } from "../../domain/tags/tags";
 import { activeSidebarFolders, folderIdFor } from "../../domain/tasks/sidebarFolders";
+import { activeSavedFilters } from "../../domain/tasks/filters";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { useT } from "../../i18n";
 
@@ -23,6 +24,7 @@ interface TasksSidebarProps {
   folders: Folder[];
   sidebarFolders: SidebarFolder[];
   tags: Tag[];
+  savedFilters: SavedFilter[];
   current: TaskScopeRef;
   onNavigate: (scope: TaskScopeRef) => void;
 }
@@ -32,7 +34,15 @@ function sameScope(a: TaskScopeRef, b: TaskScopeRef): boolean {
   return ("id" in a ? a.id : "") === ("id" in b ? b.id : "");
 }
 
-export function TasksSidebar({ ctx, folders, sidebarFolders, tags, current, onNavigate }: TasksSidebarProps) {
+export function TasksSidebar({
+  ctx,
+  folders,
+  sidebarFolders,
+  tags,
+  savedFilters,
+  current,
+  onNavigate,
+}: TasksSidebarProps) {
   const { t } = useT();
 
   function row(scope: TaskScopeRef, label: string, options: { indent?: boolean; dot?: string } = {}) {
@@ -83,6 +93,7 @@ export function TasksSidebar({ ctx, folders, sidebarFolders, tags, current, onNa
   ];
 
   const visibleTags = activeTags(tags);
+  const visibleFilters = activeSavedFilters(savedFilters);
 
   return (
     <nav className="tm-sidebar" aria-label={t("tasks.navLabel")}>
@@ -117,9 +128,15 @@ export function TasksSidebar({ ctx, folders, sidebarFolders, tags, current, onNa
         </div>
       ) : null}
 
-      {/* §2.23's Filters section is absent rather than empty: there are no
-          SavedFilter records yet, and a heading over nothing reads as a
-          feature that is broken instead of one that has not arrived. */}
+      {/* §2.23. Absent rather than empty while the user has saved none — a
+          heading over nothing reads as a feature that is broken instead of
+          one nobody has used yet. */}
+      {visibleFilters.length > 0 ? (
+        <div className="tm-section">
+          <h2 className="tm-section-title">{t("tasks.sectionFilters")}</h2>
+          {visibleFilters.map((filter) => row({ kind: "filter", id: filter.id }, filter.name))}
+        </div>
+      ) : null}
 
       <div className="tm-section">
         {row({ kind: "completed" }, t("tasks.completed"))}

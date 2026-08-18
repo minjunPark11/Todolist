@@ -8,7 +8,7 @@
 //
 // List rendering only, per §16.26 — Board and the rich Drawer come later.
 import { useMemo, useState } from "react";
-import type { Folder, List, SidebarFolder, Tag, Task, TaskDailyPlan, TaskTag } from "../../types";
+import type { Folder, List, SavedFilter, SidebarFolder, Tag, Task, TaskDailyPlan, TaskTag } from "../../types";
 import type { TaskScopeRef, TaskViewKind } from "../../domain/tasks/scopeRegistry";
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, queryScopeTasks, type ScopeContext } from "../../domain/tasks/scopeQuery";
@@ -30,6 +30,7 @@ interface TasksModuleProps {
   lists: List[];
   folders: Folder[];
   sidebarFolders: SidebarFolder[];
+  savedFilters: SavedFilter[];
   dailyPlans: TaskDailyPlan[];
   tags: Tag[];
   taskTags: TaskTag[];
@@ -63,15 +64,16 @@ interface TasksModuleProps {
 
 export function TasksModule(props: TasksModuleProps) {
   const { t } = useT();
-  const { tasks, lists, folders, sidebarFolders, dailyPlans, tags, taskTags, today, url, onNavigate } = props;
+  const { tasks, lists, folders, sidebarFolders, savedFilters, dailyPlans, tags, taskTags, today, url, onNavigate } =
+    props;
 
   // One undo at a time, and it is the last thing that happened (§9.40 keeps
   // the stack out of the MVP).
   const [undo, setUndo] = useState<{ labelKey: string; run: () => void } | null>(null);
 
   const ctx: ScopeContext = useMemo(
-    () => ({ tasks, lists, dailyPlans, taskTags, today }),
-    [tasks, lists, dailyPlans, taskTags, today],
+    () => ({ tasks, lists, dailyPlans, taskTags, today, savedFilters }),
+    [tasks, lists, dailyPlans, taskTags, today, savedFilters],
   );
 
   // The URL is the state. Nothing mirrors it into a field here, so the back
@@ -125,8 +127,8 @@ export function TasksModule(props: TasksModuleProps) {
   // §5.28: an id that names nothing is a broken link, not an empty Scope. The
   // difference matters — "this List has no tasks" and "this List is gone" ask
   // the reader to do different things.
-  const missing = namedRecordMissing(scope, lists, folders, sidebarFolders, tags);
-  const title = missing ? t("tasks.missingTitle") : titleFor(scope, lists, folders, sidebarFolders, tags, t);
+  const missing = namedRecordMissing(scope, lists, folders, sidebarFolders, tags, savedFilters);
+  const title = missing ? t("tasks.missingTitle") : titleFor(scope, lists, folders, sidebarFolders, tags, savedFilters, t);
   const rows = missing ? [] : queryScopeTasks(scope, ctx);
   const count = missing ? 0 : queryScopeCount(scope, ctx);
 
@@ -137,6 +139,7 @@ export function TasksModule(props: TasksModuleProps) {
         folders={folders}
         sidebarFolders={sidebarFolders}
         tags={tags}
+        savedFilters={savedFilters}
         current={scope}
         onNavigate={go}
       />
@@ -177,6 +180,7 @@ export function TasksModule(props: TasksModuleProps) {
                 : []
             }
             tags={tags}
+            savedFilters={savedFilters}
             onCreate={props.onCreate}
           />
         ) : null}
@@ -275,6 +279,7 @@ function namedRecordMissing(
   folders: Folder[],
   sidebarFolders: SidebarFolder[],
   tags: Tag[],
+  savedFilters: SavedFilter[],
 ): boolean {
   switch (scope.kind) {
     case "list":
@@ -285,8 +290,8 @@ function namedRecordMissing(
       return !folders.some((folder) => folder.id === scope.id) && !sidebarFolders.some((folder) => folder.id === scope.id);
     case "tag":
       return !tags.some((tag) => tag.id === scope.id);
-    // A Filter names a record that cannot exist yet, so "missing" would be
-    // true for every one of them and say nothing. Its own empty state covers it.
+    case "filter":
+      return !savedFilters.some((filter) => filter.id === scope.id);
     default:
       return false;
   }
@@ -298,6 +303,7 @@ function titleFor(
   folders: Folder[],
   sidebarFolders: SidebarFolder[],
   tags: Tag[],
+  savedFilters: SavedFilter[],
   t: (key: string) => string,
 ): string {
   switch (scope.kind) {
@@ -315,8 +321,10 @@ function titleFor(
       );
     case "tag":
       return tags.find((entry) => entry.id === scope.id)?.name ?? scope.id;
+    // The Filter's own name, because that is what the user called this
+    // question — the generic word is only for one that names no record.
     case "filter":
-      return t("tasks.filter");
+      return savedFilters.find((entry) => entry.id === scope.id)?.name ?? t("tasks.filter");
     default:
       return t(`tasks.${scope.kind}`);
   }

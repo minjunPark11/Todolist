@@ -9,11 +9,12 @@
 // membership rule; `queryScopeTasks` filters by it and `queryScopeCount`
 // counts what that returns. Agreement is structural, and the test that pins it
 // is checking that nobody has since added a shortcut.
-import type { List, Task, TaskDailyPlan, TaskTag } from "../../types";
+import type { List, SavedFilter, Task, TaskDailyPlan, TaskTag } from "../../types";
 import type { TaskScopeRef } from "./scopeRegistry";
 import { listIdFor } from "../spaces/membership";
 import { tagIdFor, isUserTag } from "../tags/tags";
 import { folderIdFor } from "./sidebarFolders";
+import { matchesFilterSpec } from "./filters";
 // The horizon is counted in the user's own days. A local date walked through
 // `toISOString` lands a day early east of UTC, which is what the first run of
 // the §12.6 fixture caught here.
@@ -27,6 +28,14 @@ export interface ScopeContext {
   taskTags: TaskTag[];
   /** The user's own today, YYYY-MM-DD — not UTC's (§12.5.1). */
   today: string;
+  /**
+   * The user's saved Filters (§6.49).
+   *
+   * Optional because every Scope but one answers without them, and a caller
+   * that has none should not have to say so. The `filter` Scope reads this
+   * and answers empty when the record it names is absent.
+   */
+  savedFilters?: SavedFilter[];
 }
 
 /**
@@ -164,11 +173,15 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     case "tag":
       return isActive(task, ctx.lists) && hasTag(task, scope.id, ctx.taskTags);
 
-    // A Filter is a stored spec (§6.49) and there are no SavedFilter records
-    // yet. Answering "no rows" is the honest empty state; answering "every
-    // row" would look like a working screen showing the wrong thing.
-    case "filter":
-      return false;
+    // §12.11. A Filter's baseline is the Scope's, not the spec's: active and
+    // not finished, because Completed and Trash are the Scopes that show
+    // those. A Filter naming no record — deleted, or written by a client this
+    // one cannot read — matches nothing rather than everything.
+    case "filter": {
+      const saved = ctx.savedFilters?.find((filter) => filter.id === scope.id);
+      if (!saved || !isActive(task, ctx.lists)) return false;
+      return matchesFilterSpec(task, saved.spec, { lists: ctx.lists, taskTags: ctx.taskTags, today: ctx.today });
+    }
   }
 }
 

@@ -6,7 +6,7 @@
 // §12.16 exists because there are many `+ 작업` entry points and each one that
 // works the owner out for itself is a copy of the rule that can drift.
 import { useState } from "react";
-import type { List, Tag } from "../../types";
+import type { List, SavedFilter, Tag } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { canCommit, resolveCreateContext, type CreateResolution } from "../../domain/tasks/createResolver";
 import { useT } from "../../i18n";
@@ -18,6 +18,8 @@ interface TaskQuickAddProps {
   /** The Lists inside the current Folder — the only ones it may offer (§12.4). */
   folderLists: List[];
   tags: Tag[];
+  /** Read by the Filter Scope to decide the owner List and the patch (§12.11). */
+  savedFilters: SavedFilter[];
   onCreate: (title: string, resolution: CreateResolution) => void;
 }
 
@@ -27,6 +29,7 @@ export function TaskQuickAdd({
   today,
   folderLists,
   tags,
+  savedFilters,
   onCreate,
 }: TaskQuickAddProps) {
   const { t } = useT();
@@ -40,6 +43,7 @@ export function TaskQuickAdd({
     folderListIds: folderLists.map((list) => list.id),
     chosenListId,
     chosenDate,
+    savedFilters,
   });
 
   if (!resolution.enabled) return null;

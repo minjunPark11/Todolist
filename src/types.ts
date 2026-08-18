@@ -533,6 +533,58 @@ export interface TaskDailyPlan {
 }
 
 /**
+ * One condition inside a saved Filter (TickTick plan §6.50).
+ *
+ * Structured, never a query string. §6.50 forbids storing SQL or free text
+ * for a reason this repo has already met twice: a stored string can only be
+ * run, not read — and the Filter Scope has to be READ to answer §12.11's
+ * other question, which is where a Task created inside the Filter should go.
+ */
+export interface FilterCondition {
+  field: "list" | "tag" | "due" | "priority" | "title";
+  op: "eq" | "includes" | "on" | "before" | "after" | "contains";
+  value: string;
+  /** Negates this one condition. Never auto-applied on create (§12.11). */
+  not?: boolean;
+}
+
+/**
+ * What a saved Filter selects (§6.50/§6.51).
+ *
+ * `version` is required by §6.51 and is not ceremony: conditions will grow,
+ * and a spec written by a newer client has to be recognisable as one this
+ * build cannot evaluate rather than silently matching nothing.
+ *
+ * Conditions are ANDed. §6.50's example is `all`, OR groups are not in the
+ * MVP, and a Filter that quietly ORed what the user meant to AND would show
+ * more than they asked for.
+ */
+export interface FilterSpec {
+  version: 1;
+  all: FilterCondition[];
+  /** Overrides §12.11's default sort when the user has chosen one. */
+  sort?: "due" | "priority" | "created";
+}
+
+/**
+ * A Filter the user saved (§6.49).
+ *
+ * A Query, not a container (§12.11): nothing is stored IN a Filter, and
+ * deleting one deletes no Task. Only user-made Filters are records — the
+ * Smart Lists above them are built in, and §6.48 is explicit that Today must
+ * not become a row per user.
+ */
+export interface SavedFilter {
+  id: string;
+  name: string;
+  spec: FilterSpec;
+  /** Order in the sidebar's Filters section (§2.23). */
+  sortKey?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * A group of Lists in the Tasks sidebar (TickTick plan §6.33-§6.35, D18).
  *
  * Presentation, not hierarchy. The domain already has a `Folder` inside a
@@ -588,6 +640,7 @@ export interface PlannerData {
   lists: List[];
   sidebarFolders: SidebarFolder[];
   listSections: ListSection[];
+  savedFilters: SavedFilter[];
   dailyPlans: TaskDailyPlan[];
   tags: Tag[];
   taskTags: TaskTag[];

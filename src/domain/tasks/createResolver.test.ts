@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { SavedFilter } from "../../types";
 import type { TaskScopeRef } from "./scopeRegistry";
 import { scopeRegistry, TASK_SCOPE_KINDS } from "./scopeRegistry";
 import { canCommit, resolveCreateContext, type CreateContext } from "./createResolver";
@@ -72,10 +73,45 @@ describe("Gate 4 — the create matrix", () => {
     expect(result.patch.tags).toBeUndefined();
   });
 
-  it("Filter falls back to the Inbox while there is no spec to compile", () => {
+  it("Filter falls back to the Inbox when it names no record", () => {
     const result = resolveCreateContext({ kind: "filter", id: "flt_1" }, ctx());
     expect(result.targetListId).toBe(INBOX);
     expect(result.patch).toEqual({});
+  });
+
+  it("Filter takes the List its spec names, and applies what it filters by (§12.11)", () => {
+    const saved: SavedFilter = {
+      id: "flt_1",
+      name: "Work, due today",
+      spec: {
+        version: 1,
+        all: [
+          { field: "list", op: "eq", value: "l1" },
+          { field: "tag", op: "includes", value: "tag-work" },
+          { field: "due", op: "on", value: "today" },
+        ],
+      },
+      createdAt: `${TODAY}T00:00:00.000Z`,
+      updatedAt: `${TODAY}T00:00:00.000Z`,
+    };
+    const result = resolveCreateContext({ kind: "filter", id: "flt_1" }, ctx({ savedFilters: [saved] }));
+    expect(result.targetListId).toBe("l1");
+    expect(result.patch).toEqual({ dueDate: TODAY });
+    expect(result.applyTagIds).toEqual(["tag-work"]);
+    expect(canCommit(result)).toBe(true);
+  });
+
+  it("Filter falls back to the Inbox when its spec names no single List", () => {
+    const saved: SavedFilter = {
+      id: "flt_2",
+      name: "Anything high",
+      spec: { version: 1, all: [{ field: "priority", op: "eq", value: "high" }] },
+      createdAt: `${TODAY}T00:00:00.000Z`,
+      updatedAt: `${TODAY}T00:00:00.000Z`,
+    };
+    const result = resolveCreateContext({ kind: "filter", id: "flt_2" }, ctx({ savedFilters: [saved] }));
+    expect(result.targetListId).toBe(INBOX);
+    expect(result.patch).toEqual({ priority: "high" });
   });
 
   it("Completed and Trash cannot create at all", () => {

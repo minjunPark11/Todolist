@@ -1249,6 +1249,7 @@ export const en: Dictionary = {
   "tasks.defaultList": "List",
   "tasks.sectionLists": "Lists",
   "tasks.sectionTags": "Tags",
+  "tasks.sectionFilters": "Filters",
   "tasks.noLists": "No lists yet.",
   "tasks.viewLabel": "Switch view",
   "tasks.viewList": "List",
