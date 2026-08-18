@@ -21,6 +21,7 @@ import { TaskGanttView } from "../TaskGanttView";
 import { TaskCalendarView } from "../TaskCalendarView";
 import { GoalsSection } from "./GoalsSection";
 import { useT } from "../../i18n";
+import type { Schedule, ScheduleIssue } from "../../domain/schedule";
 
 interface SpaceScopedViewProps {
   tab: SpaceTab;
@@ -31,6 +32,7 @@ interface SpaceScopedViewProps {
   onOpenTask: (taskId: string) => void;
   onOpenGoal: (goalId: string, milestoneId?: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
+  onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   // The goal-writing callbacks — create, delete, milestones, schedule — went
   // with the Horizons branch. This view reads goals now; the Goals section's
   // own cards and the detail drawer are where one is changed.
@@ -45,6 +47,7 @@ export function SpaceScopedView({
   onOpenTask,
   onOpenGoal,
   onUpdateTask,
+  onUpdateTaskSchedule,
 }: SpaceScopedViewProps) {
   const { t } = useT();
   const today = todayValue();
@@ -134,6 +137,7 @@ export function SpaceScopedView({
         today={today}
         onOpenTask={onOpenTask}
         onUpdateTask={onUpdateTask}
+        onUpdateTaskSchedule={onUpdateTaskSchedule}
       />
     );
   }

@@ -51,6 +51,9 @@ export { isConfirmable, isValidSchedule, validateDraft, validateSchedule } from 
 
 export { isDirty, schedulesEqual } from "./scheduleEquality";
 
+export type { ScheduleUpdatePlan } from "./updateTaskSchedule";
+export { planScheduleUpdate } from "./updateTaskSchedule";
+
 export type { ScheduleShape, TaskScheduleSource } from "./taskSchedule";
 export {
   classifyTaskSchedule,

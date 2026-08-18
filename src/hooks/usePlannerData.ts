@@ -70,6 +70,7 @@ import { buildMigrationUpload } from "../domain/sync/buildMigrationUpload";
 import { createSaveQueue, type SaveQueue } from "../domain/sync/saveQueue";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
+import { planScheduleUpdate, type Schedule, type ScheduleIssue } from "../domain/schedule";
 
 const STORAGE_KEY = PLANNER_STORAGE_KEY;
 const LEGACY_STORAGE_KEY = "todo-planner-data";
@@ -1063,6 +1064,26 @@ export function usePlannerData() {
         };
       }),
     }));
+  }
+
+  /**
+   * The canonical way to change a Task's dates (design §13, audit §7 Phase 4).
+   *
+   * Callers pass the schedule they want rather than the fields to set, and get
+   * back whatever was wrong with it. `planScheduleUpdate` owns the three rules
+   * every schedule write needs — normalize, validate, skip a no-op — so that a
+   * new writer cannot arrive without them by simply calling `updateTask`.
+   *
+   * Returns the issues rather than throwing: an editor wants to show them
+   * beside the field that caused them, and a drag handler wants to ignore
+   * them and leave the task where it was.
+   */
+  function updateTaskSchedule(taskId: string, next: Schedule): ScheduleIssue[] {
+    const task = data.tasks.find((entry) => entry.id === taskId);
+    if (!task) return [];
+    const plan = planScheduleUpdate(task, next);
+    if (plan.patch) updateTask(taskId, plan.patch);
+    return plan.issues;
   }
 
   function deleteTask(taskId: string) {
@@ -2156,6 +2177,7 @@ export function usePlannerData() {
     addTask,
     createTask,
     updateTask,
+    updateTaskSchedule,
     completeTask,
     deleteTask,
     restoreDeletedTask,

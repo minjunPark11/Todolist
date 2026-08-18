@@ -19,7 +19,7 @@ import type { Project, Task } from "../types";
 import { buildCalendarItems, type CalendarItem, type CalendarLayerToggles } from "../utils/calendarItems";
 import { addMonths, todayValue } from "../utils/date";
 import { MonthView } from "./calendar/MonthView";
-import { scheduleFromTask, scheduleToTaskPatch } from "../domain/schedule";
+import { scheduleFromTask, type Schedule, type ScheduleIssue } from "../domain/schedule";
 import { useT } from "../i18n";
 
 /**
@@ -43,6 +43,8 @@ interface TaskCalendarViewProps {
   selectedTaskId?: string;
   onOpenTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
+  /** The canonical schedule write (design §13). */
+  onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
 }
 
 export function TaskCalendarView({
@@ -52,6 +54,7 @@ export function TaskCalendarView({
   selectedTaskId = "",
   onOpenTask,
   onUpdateTask,
+  onUpdateTaskSchedule,
 }: TaskCalendarViewProps) {
   const { t, lang } = useT();
   const [anchor, setAnchor] = useState(today);
@@ -100,7 +103,7 @@ export function TaskCalendarView({
     const taskId = event.dataTransfer.getData("text/plain");
     if (taskId) {
       const current = scheduleFromTask(tasks.find((item) => item.id === taskId) ?? {});
-      onUpdateTask(taskId, scheduleToTaskPatch({ ...current, startDate: null, dueDate: date }));
+      onUpdateTaskSchedule(taskId, { ...current, startDate: null, dueDate: date });
     }
     setDragOverId("");
   }
