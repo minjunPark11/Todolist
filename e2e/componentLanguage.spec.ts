@@ -124,6 +124,56 @@ test.describe("the component language (§V.3, V-6)", () => {
     }
   });
 
+  test("a screen can be built out of the canonical names alone", async ({ page }) => {
+    await openApp(page);
+
+    // V-6's acceptance sentence, as close to literal as a test can get: put a
+    // card, a row, a field and both buttons on the page using nothing but the
+    // `ff-` vocabulary, and check that each one actually drew something. A
+    // name that resolves to nothing would still pass the equality tests above
+    // if every legacy name resolved to nothing too.
+    const drawn = await page.evaluate(() => {
+      const host = document.createElement("div");
+      host.innerHTML = `
+        <section class="ff-card">
+          <div class="ff-row"><span>a row</span></div>
+          <input class="ff-field" />
+          <button class="ff-btn">secondary</button>
+          <button class="ff-btn ff-btn-primary">primary</button>
+        </section>`;
+      (document.querySelector("main") ?? document.body).appendChild(host);
+      const read = (selector: string) => {
+        const el = host.querySelector(selector) as HTMLElement;
+        const style = getComputedStyle(el);
+        const box = el.getBoundingClientRect();
+        return {
+          background: style.backgroundColor,
+          radius: style.borderTopLeftRadius,
+          height: Math.round(box.height),
+          padded: style.paddingLeft !== "0px",
+        };
+      };
+      const result = {
+        card: read(".ff-card"),
+        row: read(".ff-row"),
+        field: read(".ff-field"),
+        button: read(".ff-btn"),
+        primary: read(".ff-btn-primary"),
+      };
+      host.remove();
+      return result;
+    });
+
+    expect(drawn.card.radius).toBe("10px");
+    expect(drawn.card.padded).toBe(true);
+    expect(drawn.row.height).toBe(32);
+    expect(drawn.field.height).toBe(32);
+    expect(drawn.button.height).toBe(32);
+    // The primary is the only one of the five that is allowed to be loud.
+    expect(drawn.primary.background).toBe("rgb(0, 122, 255)");
+    expect(drawn.button.background).not.toBe(drawn.primary.background);
+  });
+
   test("every field name is the same field", async ({ page }) => {
     await openApp(page);
 
