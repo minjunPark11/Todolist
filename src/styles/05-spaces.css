@@ -160,13 +160,6 @@
   align-self: stretch;
 }
 
-.foc-card {
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-card);
-}
-
 .foc-queue,
 .foc-timer,
 .foc-insights {
@@ -174,10 +167,6 @@
   gap: 16px;
 }
 
-.foc-queue,
-.foc-timer {
-  padding: 18px;
-}
 
 .foc-insights {
   align-content: start;
@@ -186,7 +175,6 @@
 .foc-insights .foc-card {
   display: grid;
   gap: 14px;
-  padding: 18px;
 }
 
 .foc-card-head,

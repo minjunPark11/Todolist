@@ -207,11 +207,6 @@
   flex-direction: column;
   gap: 8px;
   min-height: 140px;
-  padding: 18px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  box-shadow: var(--shadow-card);
 }
 
 .sdv-metric-card h3 {
@@ -363,11 +358,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 18px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  box-shadow: var(--shadow-card);
   min-width: 0;
 }
 

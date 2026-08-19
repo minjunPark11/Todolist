@@ -1,0 +1,65 @@
+/* ============================================================================
+   21-components.css — the one card, the one button, the one field (plan V-6)
+   ============================================================================
+
+   Five component languages (tm- tdy- gcal- foc- spc-) each brought their own
+   card, button and input, and §V.3 records what that cost: a fix to one screen
+   left the other four alone. v0.15.0's density layer sat on top of all five and
+   matched their SIZES; the shapes stayed five sets.
+
+   This file is the one set. Two things live here and they are not the same:
+
+     1. The canonical names — `.ff-card`, `.ff-btn`, `.ff-field`. A new screen
+        is built out of these and needs no prefix at all. That sentence IS V-6's
+        acceptance test.
+
+     2. A compatibility list beside each one, naming the legacy classes that
+        already mean the same thing. They resolve to one definition rather than
+        five copies of it, which is what makes a change here reach every screen.
+
+   The list shrinks as call sites move to the canonical names; the definitions
+   do not change when it does.
+
+   Loaded after 20-density.css on purpose: these rules are written IN the
+   density tokens, so the layer that sets those tokens has to have run.
+   ========================================================================== */
+
+/* --- the card ------------------------------------------------------------
+   A surface that holds content, at the density the tokens set. Everything in
+   this list drew the same thing before, give or take: four paddings (0, 8, 14,
+   18) and two backgrounds — `--bg-surface` and a 92%-opaque `--ff-panel`,
+   which put a translucent card on some screens and an opaque one on others. */
+.ff-card,
+.tdy-card,
+.foc-card,
+.sdv-card,
+.sdv-metric-card,
+.summary-card,
+.settings-card,
+.panel-section,
+.focus-summary,
+.focus-timer-card,
+.topic-card,
+.project-tasks {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--density-radius);
+  padding: var(--density-card-pad);
+  box-shadow: var(--shadow-card);
+}
+
+/* The surfaces that are cards in appearance and containers in behaviour. A
+   Matrix quadrant and a calendar column own their own padding — the grid
+   inside them is what decides it — so they take the surface and nothing else.
+   Splitting the rule is the honest way to say that. */
+.quick-add,
+.detail-panel,
+.matrix-cell,
+.board-column,
+.calendar-main,
+.calendar-backlog {
+  background: var(--bg-surface);
+  border-color: var(--border-subtle);
+  border-radius: var(--density-radius);
+  box-shadow: var(--shadow-card);
+}

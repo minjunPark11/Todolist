@@ -592,10 +592,6 @@ main {
 }
 
 .summary-card {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-lg);
-  padding: 24px 20px;
-  background: var(--color-canvas);
   text-align: center;
 }
 
@@ -761,17 +757,6 @@ select {
 .panel-section,
 .settings-card,
 .detail-panel,
-.project-tasks {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-lg);
-  padding: 18px;
-  background: var(--color-canvas);
-}
-
-.panel-section {
-  padding: 14px 16px;
-}
-
 .template-tools {
   display: grid;
   grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 1fr) auto;

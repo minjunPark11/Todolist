@@ -23,3 +23,6 @@
 @import "./styles/19-app-shell.css";
 /* Last on purpose: it tunes the density of everything above it. */
 @import "./styles/20-density.css";
+/* After the density layer, because the shared components are written in its
+   tokens (V-6). */
+@import "./styles/21-components.css";

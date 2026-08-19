@@ -2052,10 +2052,6 @@
 .focus-summary {
   display: grid;
   gap: 18px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-lg);
-  padding: 18px;
-  background: var(--color-canvas);
 }
 
 .mode-tabs,
@@ -2953,24 +2949,6 @@ main {
   font-weight: 600;
 }
 
-.quick-add,
-.panel-section,
-.settings-card,
-.detail-panel,
-.project-tasks,
-.matrix-cell,
-.board-column,
-.calendar-main,
-.calendar-backlog,
-.summary-card,
-.topic-card,
-.focus-timer-card,
-.focus-summary {
-  border-color: var(--ff-border);
-  border-radius: 10px;
-  background: var(--ff-panel);
-  box-shadow: var(--ff-card-shadow);
-}
 
 .quick-add {
   grid-template-columns: minmax(220px, 1fr) 150px 150px 136px auto auto;
@@ -3042,7 +3020,6 @@ main {
   position: relative;
   display: grid;
   gap: 10px;
-  padding: 18px;
 }
 
 .topic-card small {

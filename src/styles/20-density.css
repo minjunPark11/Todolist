@@ -60,21 +60,6 @@ main {
   font-size: var(--density-font-sm);
 }
 
-/* --- cards and panels -----------------------------------------------------
-   §11.41: 16–24px card radius is a marketing page's idea of a card. A
-   productivity surface holds its rows closer together than that. */
-.tdy-card,
-.panel-section,
-.settings-card,
-.summary-card,
-.topic-card,
-.focus-timer-card,
-.focus-summary,
-.detail-panel,
-.project-tasks {
-  padding: var(--density-card-pad);
-  border-radius: var(--density-radius);
-}
 
 .tdy-card-head {
   font-size: var(--density-font);
