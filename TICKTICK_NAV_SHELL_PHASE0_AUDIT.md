@@ -278,9 +278,11 @@ type ContextSidebarMode = "tasks" | "space" | "none";
 
 fallback은 `TASKS_HOME = "/today"` — 레거시 `/app`의 Today가 아니라 **Tasks Module의 Today**다. D-02가 Context Sidebar 내용을 v16으로 정했으니, Rail의 Tasks가 여는 곳도 그쪽이어야 한다.
 
-**D-16 — P0-2는 Rail과 레거시 사이드바의 중복을 남긴다.** (의도됨)
+**D-16 — P0-2는 Rail과 레거시 사이드바의 중복을 남긴다.** (의도됨 → **P0-5에서 해소**)
 
-Rail에 캘린더·집중·설정이 생겼는데 레거시 사이드바에도 같은 항목이 그대로 있다. 설계서 §12.131의 마이그레이션 순서가 `3. Global Rail 추가` → `4. 기존 Sidebar content를 Context Sidebar로 이동`으로 두 단계를 나눠 놓았고, 중복은 그 사이의 상태다. P0-4에서 레거시 사이드바의 전역 항목을 걷어낼 때 사라진다. 이 중복을 P0-2에서 미리 지우면 아직 없는 Context Sidebar가 유일한 진입점이 되어 도달 불가 화면이 생긴다.
+Rail에 캘린더·집중·설정이 생겼는데 레거시 사이드바에도 같은 항목이 그대로 있다. 설계서 §12.131의 마이그레이션 순서가 `3. Global Rail 추가` → `4. 기존 Sidebar content를 Context Sidebar로 이동`으로 두 단계를 나눠 놓았고, 중복은 그 사이의 상태다. 이 중복을 P0-2에서 미리 지우면 아직 없는 Context Sidebar가 유일한 진입점이 되어 도달 불가 화면이 생긴다.
+
+**해소 (P0-5, 2026-08-19).** 단계적으로 걷혔다 — P0-4가 캘린더·집중·설정·보드 행을, P0-4b-4가 보관함 행을, P0-5가 남은 전부(브랜드·계정·검색창·`오늘`)를 가져갔다. `Sidebar.tsx`는 이제 없다. `space` 모드가 그리는 것은 [`SpaceSidebar`](src/components/shell/SpaceSidebar.tsx) — 헤더 하나와 트리뿐이다.
 
 **D-17 — P0-3은 프레임의 *계약*을 통합하고, DOM은 옮기지 않는다.**
 
@@ -469,7 +471,7 @@ const visibleTasks = planner.tasks.filter((task) => isTaskActive(task, planner.l
 | ~~P0-4b-3 Task Archive 폐기~~ | **완료** (2026-08-19). 로드 경로 마이그레이션(`archived` → `wontDoAt`, `previousStatus`로 워크플로 상태 복원), 사이드바 하단 = 완료·안 함·휴지통, ArchivePage는 프로젝트 전용 | P0-4b-2 |
 | ~~P0-4b-4 프로젝트 Archive~~ | **완료** (2026-08-19). Space의 `보관함` 탭(`/s/:id?view=archive`)으로 이동. `/archive` 라우트·ArchivePage·`PageId "archive"` 폐기, 옛 링크는 `/spaces`로 리다이렉트 | P0-4b-3 |
 | ~~P0-4b-5 컨테이너 축~~ | **완료** (2026-08-19). 14곳에 `lists`를 배선하는 대신 `App.tsx`가 `visibleTasks`를 한 번 파생해 화면에 넘긴다. `planner.tasks`는 조회용으로 남는다 | P0-4b-2 |
-| P0-5 Tree | **부활** (D-14). 새로 그리지 않고 기존 [`SpaceTree.tsx`](src/components/sidebar/SpaceTree.tsx)를 `mode="space"` 슬롯에 꽂는다 | P0-3 |
+| ~~P0-5 Tree~~ | **완료** (2026-08-19). [`SpaceSidebar`](src/components/shell/SpaceSidebar.tsx) = 헤더 + `SpaceTree`. 레거시 [`Sidebar.tsx`](src/components/Sidebar.tsx) 삭제, `/` 단축키는 전역 검색으로 | P0-3 |
 | P0-6 Main Header | `tm-header`를 새 셸 기준으로 정리. 뷰 전환은 현행 유지(D-09) | P0-2 |
 | P0-7 Create/Menu | **완료** (Add List v0.13.0) | — |
 | P0-8 Collapse/Resize | §10 상호작용 마무리 (키보드 resize, 더블클릭, 영속) | P0-3 |

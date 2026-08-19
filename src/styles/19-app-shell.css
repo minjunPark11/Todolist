@@ -56,9 +56,7 @@
      tab order and the accessibility tree, or the user tabs into a tree they
      cannot see. `display: none` is what does that — a 0px column would still
      be there. */
-  .app-frame.is-sidebar-collapsed .sidebar,
   .app-frame.is-sidebar-collapsed .tm-sidebar,
-  .app-frame[data-sidebar-mode="none"] .sidebar,
   .app-frame[data-sidebar-mode="none"] .tm-sidebar {
     display: none;
   }
@@ -452,4 +450,84 @@
 .tm-drawer-wontdo:focus-visible {
   outline: 2px solid var(--ff-blue);
   outline-offset: 2px;
+}
+
+/* --- §3.9/§3.10 the space-mode Context Sidebar (P0-5) -----------------------
+   `.sidebar` used to fill this slot and carried the brand, the account, a
+   search box and a Today row — all of which the Rail draws now. What is left
+   is a header and the tree. */
+.space-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100dvh;
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+  color: var(--ff-text);
+  background: var(--ff-sidebar);
+  border-right: 1px solid var(--ff-border);
+}
+
+/* §3.10: the same height as the Main header, so the two read as one line. */
+.space-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 48px;
+  height: 48px;
+  padding: 0 8px 0 14px;
+}
+
+.space-sidebar-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ff-muted);
+}
+
+.space-sidebar-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 14px;
+  color: var(--ff-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.space-sidebar-collapse:hover {
+  color: var(--ff-text);
+  background: var(--ff-hover);
+}
+
+.space-sidebar-collapse:focus-visible {
+  outline: 2px solid var(--ff-blue);
+  outline-offset: -2px;
+}
+
+/* §3.12/§3.13: the body scrolls, the frame does not, and a long name is
+   clipped rather than widening the column. */
+.space-sidebar-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 4px 8px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* The frame hides the whole column when collapsed or when the module has no
+   sidebar (§3.30/§3.31), the same way it does for the other two. */
+@media (min-width: 1024px) {
+  .app-frame.is-sidebar-collapsed .space-sidebar,
+  .app-frame[data-sidebar-mode="none"] .space-sidebar {
+    display: none;
+  }
 }

@@ -1,6 +1,6 @@
 ﻿import { FormEvent, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sidebar } from "./components/Sidebar";
+import { SpaceSidebar } from "./components/shell/SpaceSidebar";
 import { OllamaChat } from "./components/OllamaChat";
 import { TaskDetail } from "./components/TaskDetail";
 import { GlobalFocusBar } from "./components/GlobalFocusBar";
@@ -144,7 +144,6 @@ export default function App() {
       new URLSearchParams(window.location.search).get("triage") === "inbox";
     return hasInboxRedirect || appSettings.defaultView === "/inbox" ? "triage" : "";
   });
-  const [searchQuery, setSearchQuery] = useState("");
   // Where in the Space tree the user is standing. Derived from the path, never
   // mirrored into state: the two flat fields this replaces could not say which
   // List was open and did not survive a reload (SPACES_CLICKUP_UI_DESIGN §1).
@@ -221,7 +220,6 @@ export default function App() {
     [planner.tasks, planner.lists],
   );
   const isProjectDetailOpen = selection.kind !== "none";
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const originalTitleRef = useRef(document.title || "FocusFlow");
   const completedNotificationRef = useRef<Set<string>>(new Set());
   const syncingExternalCalendarsRef = useRef<Set<string>>(new Set());
@@ -282,24 +280,6 @@ export default function App() {
     void checkAppUpdate(appVersion);
   }, [appVersion]);
 
-  const searchResults = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      return { tasks: [], projects: [], topics: [], notes: [] };
-    }
-
-    return {
-      tasks: visibleTasks.filter((task) =>
-        [task.title, task.description, task.notes, task.tags.join(" ")]
-          .join(" ")
-          .toLowerCase()
-          .includes(query),
-      ),
-      projects: activeProjects.filter((project) =>
-        [project.name, project.description].join(" ").toLowerCase().includes(query),
-      ),
-    };
-  }, [activeProjects, visibleTasks, searchQuery]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -309,7 +289,6 @@ export default function App() {
 
       if (event.key === "Escape") {
         planner.selectTask("");
-        setSearchQuery("");
         return;
       }
 
@@ -326,8 +305,11 @@ export default function App() {
       // swallowed — otherwise the shortcut letter types itself into the input
       // it just focused.
       if (event.key === "/") {
+        // §2.28 advertises `/` on the Rail's Search tooltip, and P0-5 removed
+        // the sidebar box this used to focus — the Rail's search is the only
+        // one left, so the shortcut points at it.
         event.preventDefault();
-        searchInputRef.current?.focus();
+        openGlobalSearch();
       } else if (event.key.toLowerCase() === "t") {
         event.preventDefault();
         navigate(PAGE_ROUTES.today);
@@ -1065,7 +1047,6 @@ export default function App() {
     }
 
     planner.selectTask(taskId);
-    setSearchQuery("");
 
     if (task.status === "inbox") {
       navigate(PAGE_ROUTES.today);
@@ -1464,85 +1445,46 @@ export default function App() {
           onClick={() => setMobileMenuOpen(false)}
         />
       ) : null}
-      {/* D-21: the sidebar follows `mode`, not the shell. `space` keeps the
-          tree this component has always drawn; `tasks` gets the same sidebar
-          the Tasks Module shows, so crossing between the two shells no longer
-          swaps it; `none` draws nothing at all (§2.16). */}
+      {/* D-21: the sidebar follows `mode`, not the shell. `space` draws the
+          Space/Project tree (D-14); `tasks` gets the same sidebar the Tasks
+          Module shows, so crossing between the two shells no longer swaps it;
+          `none` draws nothing at all (§2.16). */}
       {contextSidebar.mode === "space" ? (
-      <Sidebar
-        activePage={activePage}
-        onNavigate={(page) => {
-          navigateSection(page);
-          setMobileMenuOpen(false);
-        }}
-        tasks={visibleTasks}
-        projects={activeProjects}
-        selectedProjectId={selectedProjectId}
-        userEmail={planner.auth.userEmail}
-        showCounts={appSettings.showSidebarCounts}
-        // §3.23: the button stays in the sidebar header and now drives the
-        // frame's state. `collapsed` is always false here because a collapsed
-        // sidebar is not rendered at all — the way back is the frame's own
-        // expand button (§3.24).
-        collapsed={false}
-        onToggleCollapse={contextSidebar.toggleCollapsed}
-        selection={selection}
-        folders={planner.folders}
-        lists={planner.lists}
-        onSelectProject={(projectId) => {
-          selectProject(projectId);
-          setMobileMenuOpen(false);
-        }}
-        onSelectList={(spaceId, listId) => {
-          selectList(spaceId, listId);
-          setMobileMenuOpen(false);
-        }}
-        onSelectFolder={(spaceId, folderId) => {
-          selectFolder(spaceId, folderId);
-          setMobileMenuOpen(false);
-        }}
-        onCreateList={planner.createList}
-        onCreateFolder={planner.createFolder}
-        onRenameList={(listId, name) => planner.updateList(listId, { name })}
-        onArchiveList={planner.archiveList}
-        onRenameFolder={(folderId, name) => planner.updateFolder(folderId, { name })}
-        onArchiveFolder={planner.archiveFolder}
-        onMoveItemToList={(itemKey, listId) => {
-          // `Item.key` is `source:id` — the projection's own encoding, so the
-          // tree never has to know which collection a card came from.
-          const [source, id] = itemKey.split(":");
-          if (source === "task") planner.moveTaskToList(id, listId);
-          else if (source === "goal") planner.moveGoalToList(id, listId);
-          // A milestone lives inside its goal and has no List of its own.
-        }}
-        onAddProject={(name) => planner.addProject(name, "#0066cc")}
-        onRenameSpace={(spaceId, name) => planner.updateSpace(spaceId, { name })}
-        onArchiveSpace={planner.archiveSpace}
-        onRenameProject={(projectId, name) => planner.updateProject(projectId, { name })}
-        onArchiveProject={handleArchiveProject}
-        onTogglePinProject={planner.toggleProjectPinned}
-        spaces={planner.spaces}
-        onSelectSpace={selectSpace}
-        onCreateSpace={planner.createSpace}
-        onCreateProject={(spaceId, name) => planner.addProject(name, "#0066cc", spaceId)}
-        onOpenSettings={() => {
-          navigateSection("settings");
-          setMobileMenuOpen(false);
-        }}
-        search={
-          <SearchBox
-            query={searchQuery}
-            inputRef={searchInputRef}
-            results={searchResults}
-            onChange={setSearchQuery}
-            onSelectTask={openTaskInOfficialPage}
-            onSelectProject={(projectId) => {
-              selectProject(projectId);
-              setSearchQuery("");
-            }}
-          />
-        }
-      />
+        <SpaceSidebar
+          spaces={planner.spaces}
+          projects={activeProjects}
+          folders={planner.folders}
+          lists={planner.lists}
+          tasks={visibleTasks}
+          selection={selection}
+          showCounts={appSettings.showSidebarCounts}
+          onCollapse={contextSidebar.toggleCollapsed}
+          onSelectSpace={selectSpace}
+          onSelectProject={selectProject}
+          onCreateSpace={planner.createSpace}
+          onCreateProject={(spaceId, name) => planner.addProject(name, "#0066cc", spaceId)}
+          onRenameSpace={(spaceId, name) => planner.updateSpace(spaceId, { name })}
+          onArchiveSpace={planner.archiveSpace}
+          onRenameProject={(projectId, name) => planner.updateProject(projectId, { name })}
+          onArchiveProject={handleArchiveProject}
+          onTogglePinProject={planner.toggleProjectPinned}
+          onSelectList={selectList}
+          onSelectFolder={selectFolder}
+          onCreateList={planner.createList}
+          onCreateFolder={planner.createFolder}
+          onRenameList={(listId, name) => planner.updateList(listId, { name })}
+          onArchiveList={planner.archiveList}
+          onRenameFolder={(folderId, name) => planner.updateFolder(folderId, { name })}
+          onArchiveFolder={planner.archiveFolder}
+          onMoveItemToList={(itemKey, listId) => {
+            // `Item.key` is `source:id` — the projection's own encoding, so the
+            // tree never has to know which collection a card came from.
+            const [source, id] = itemKey.split(":");
+            if (source === "task") planner.moveTaskToList(id, listId);
+            else if (source === "goal") planner.moveGoalToList(id, listId);
+            // A milestone lives inside its goal and has no List of its own.
+          }}
+        />
       ) : (
         renderLegacySidebar()
       )}
@@ -1948,53 +1890,4 @@ function AccountSection({
   );
 }
 
-function SearchBox({
-  query,
-  inputRef,
-  results,
-  onChange,
-  onSelectTask,
-  onSelectProject,
-}: {
-  query: string;
-  inputRef: RefObject<HTMLInputElement>;
-  results: { tasks: Task[]; projects: Project[] };
-  onChange: (value: string) => void;
-  onSelectTask: (taskId: string) => void;
-  onSelectProject: (projectId: string) => void;
-}) {
-  const { t } = useT();
-  const hasResults =
-    results.tasks.length > 0 ||
-    results.projects.length > 0;
-
-  return (
-    <div className="global-search">
-      <input
-        ref={inputRef}
-        aria-label={t("app.searchAria")}
-        placeholder={t("app.searchPlaceholder")}
-        value={query}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {query.trim() ? (
-        <div className="search-results">
-          {!hasResults ? <p className="empty-state">{t("app.searchNoResults")}</p> : null}
-          {results.tasks.slice(0, 6).map((task) => (
-            <button key={task.id} onClick={() => onSelectTask(task.id)}>
-              <strong>{task.title}</strong>
-              <small>{t("app.taskLabel")} - {task.status} - {task.tags.join(", ") || t("app.noTags")}</small>
-            </button>
-          ))}
-          {results.projects.slice(0, 4).map((project) => (
-            <button key={project.id} onClick={() => onSelectProject(project.id)}>
-              <strong>{project.name}</strong>
-              <small>{t("app.projectLabel")}</small>
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
