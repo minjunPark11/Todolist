@@ -222,6 +222,7 @@ export const ko: Dictionary = {
   "rail.account": "계정",
   "rail.accountSignedOut": "로그인하지 않음",
   "rail.signOut": "로그아웃",
+  "shell.resizeSidebar": "사이드바 너비 조절",
 
   // ---- App.tsx chrome ----
   // 사이드바는 전체 검색, Today 헤더는 그 페이지 목록 필터. en.ts 주석 참고.

@@ -14,9 +14,143 @@
 }
 
 .app-frame {
+  position: relative;
   display: flex;
   align-items: stretch;
   min-height: 100dvh;
+}
+
+/* --- §3.6 Context Sidebar width, in one place --------------------------------
+   Both inner shells read `--context-sidebar-w`, which the frame sets from the
+   effective width (§3.30 — 0 when collapsed or when the module has no
+   sidebar). Before this the two disagreed and neither matched the spec: the
+   legacy shell was 200px (02-calendar.css re-opened `.app-shell` and overrode
+   01-base's 248px) and the Tasks Module was 240px. */
+/* §3.33: all of this is the PERSISTENT sidebar, which exists at >=1024px only.
+   Below that both shells already have their own overlay behaviour — the Tasks
+   Module's off-canvas sheet and the legacy hamburger — and a frame that also
+   set widths and hid columns there would be fighting them. */
+@media (min-width: 1024px) {
+  .app-frame .app-shell {
+    grid-template-columns: var(--context-sidebar-w, 248px) minmax(0, 1fr);
+  }
+
+  .app-frame .tm-shell {
+    grid-template-columns: var(--context-sidebar-w, 248px) minmax(0, 1fr) auto;
+  }
+
+  /* §3.18: the width tweens when it changes for a reason of ours (collapse,
+     double-click reset, module switch) and never while the pointer is driving
+     it — a transition during a drag lags the cursor. */
+  .app-frame .app-shell,
+  .app-frame .tm-shell {
+    transition: grid-template-columns 0.16s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .app-frame.is-sidebar-resizing .app-shell,
+  .app-frame.is-sidebar-resizing .tm-shell {
+    transition: none;
+  }
+
+  /* §3.31: a collapsed sidebar is not a narrow one. Its rows must leave the
+     tab order and the accessibility tree, or the user tabs into a tree they
+     cannot see. `display: none` is what does that — a 0px column would still
+     be there. */
+  .app-frame.is-sidebar-collapsed .sidebar,
+  .app-frame.is-sidebar-collapsed .tm-sidebar,
+  .app-frame[data-sidebar-mode="none"] .sidebar,
+  .app-frame[data-sidebar-mode="none"] .tm-sidebar {
+    display: none;
+  }
+}
+
+/* The handle and the expand button are anchored to `--rail-w`, and the Rail is
+   not on screen below 768px. Both belong to the persistent sidebar anyway. */
+@media (max-width: 1023px) {
+  .context-sidebar-handle,
+  .context-sidebar-expand {
+    display: none;
+  }
+}
+
+[data-reduce-motion] .app-frame .app-shell,
+[data-reduce-motion] .app-frame .tm-shell {
+  transition: none;
+}
+
+/* --- §3.15 resize handle --- */
+
+.context-sidebar-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Sits ON the seam: the sidebar starts after the Rail, so its right edge is
+     the sum of the two. */
+  left: calc(var(--rail-w) + var(--context-sidebar-w, 248px));
+  z-index: 25;
+  /* §3.15: 1px of paint, but a hit target a person can actually land on. */
+  width: 10px;
+  margin-left: -5px;
+  cursor: col-resize;
+  background: transparent;
+  /* The drag is pointer-driven; letting the browser scroll on it instead
+     produces a handle that only works on a mouse. */
+  touch-action: none;
+}
+
+.context-sidebar-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 2px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.context-sidebar-handle:hover::after,
+.app-frame.is-sidebar-resizing .context-sidebar-handle::after {
+  background: var(--ff-blue);
+}
+
+.context-sidebar-handle:focus-visible {
+  outline: none;
+}
+
+.context-sidebar-handle:focus-visible::after {
+  background: var(--ff-blue);
+  box-shadow: 0 0 0 1px var(--ff-blue);
+}
+
+/* --- §3.24 expand affordance --- */
+
+.context-sidebar-expand {
+  position: absolute;
+  top: 12px;
+  left: calc(var(--rail-w) + 10px);
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--ff-muted);
+  background: var(--ff-surface);
+  border: 1px solid var(--ff-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.context-sidebar-expand:hover {
+  color: var(--ff-text);
+  background: var(--ff-hover);
+}
+
+.context-sidebar-expand:focus-visible {
+  outline: 2px solid var(--ff-blue);
+  outline-offset: 2px;
 }
 
 /* The Rail is sticky rather than fixed: fixed would take it out of flow and

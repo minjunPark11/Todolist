@@ -262,6 +262,18 @@ fallback은 `TASKS_HOME = "/today"` — 레거시 `/app`의 Today가 아니라 *
 
 Rail에 캘린더·집중·설정이 생겼는데 레거시 사이드바에도 같은 항목이 그대로 있다. 설계서 §12.131의 마이그레이션 순서가 `3. Global Rail 추가` → `4. 기존 Sidebar content를 Context Sidebar로 이동`으로 두 단계를 나눠 놓았고, 중복은 그 사이의 상태다. P0-4에서 레거시 사이드바의 전역 항목을 걷어낼 때 사라진다. 이 중복을 P0-2에서 미리 지우면 아직 없는 Context Sidebar가 유일한 진입점이 되어 도달 불가 화면이 생긴다.
 
+**D-17 — P0-3은 프레임의 *계약*을 통합하고, DOM은 옮기지 않는다.**
+
+설계서 §3.4는 Rail / Context Sidebar / Main을 App Shell의 형제 영역으로 두라고 한다. P0-3은 그중 **계약**만 가져왔다 — 폭·collapse·resize·mode를 [`app/contextSidebar.ts`](src/app/contextSidebar.ts) + [`hooks/useContextSidebar.ts`](src/hooks/useContextSidebar.ts) 한 곳이 소유하고, 두 셸의 그리드는 프레임이 발행하는 `--context-sidebar-w` 하나를 읽는다. 사이드바 DOM은 아직 각자의 그리드 안에 있다.
+
+DOM까지 끌어올리려면 `TasksSidebar`를 `TasksModule` 밖으로 빼야 하는데, 그러면 모듈의 내부 상태(`managing`, `creatingListIn`, `sidebarOpen`, `go`)를 함께 들어올리게 된다. 그건 사이드바 **내용**을 옮기는 P0-4의 일이고, 거기서 어차피 건드린다. 지금 하면 같은 코드를 두 번 옮긴다.
+
+**D-18 — 레거시 collapse는 "68px 아이콘 레일"에서 "폭 0"으로 바뀐다.**
+
+기존 `.sidebar-collapsed`는 사이드바를 68px 아이콘 열로 줄였다. §3.22/§3.30의 collapse는 **layout slot이 0**이다. 아이콘 수준의 탐색은 이제 Global Rail에 있으므로 축소판 사이드바는 같은 일을 두 번 하는 것이고, §3.31이 요구하는 "collapsed면 tab order와 접근성 트리에서 빠진다"도 68px 열로는 만족할 수 없다.
+
+`display: none`으로 처리한다. React unmount가 아니라 CSS인 이유는 §3.31이 실제로 막으려는 것(보이지 않는데 포커스 가능한 트리)이 그것으로 해결되고, 사이드바 내부 상태는 보존되기 때문이다.
+
 **D-14 — SpaceHub 진입 시 Context Sidebar를 SpaceTree로 전환한다.** (Q-02 해소, 2026-08-19)
 
 `SpaceTree`를 없애는 것이 아니라 **기본 Tasks 탐색 모델에서만** 뺀다. 같은 사이드바 자리를 mode로 바꾼다.
@@ -304,7 +316,7 @@ type ContextSidebarMode = "tasks" | "space" | "none";
 |---|---|---|
 | ~~P0-1 Route registry~~ | **완료** (2026-08-19). [`app/pageRoute.ts`](src/app/pageRoute.ts) + `activePage`가 `pageForPath(currentPath)`가 됐다 | — |
 | ~~P0-2 AppShell + Rail~~ | **완료** (2026-08-19). [`AppShell.tsx`](src/components/shell/AppShell.tsx)이 두 셸의 공통 프레임이 되고, [`GlobalRail.tsx`](src/components/shell/GlobalRail.tsx)이 그 첫 열. 안쪽 두 셸은 그대로 — 그건 P0-3 | P0-1, Q-04 |
-| P0-3 Context Sidebar frame | 폭 토큰 통일 + resize 핸들 + collapse 상태 모델(§3.29) + **mode registry**(D-14) | P0-2 |
+| ~~P0-3 Context Sidebar frame~~ | **완료** (2026-08-19). 폭 200·240 → **248 하나**, resize 핸들(드래그·키보드·더블클릭), collapse 상태 모델(§3.28~3.30), mode registry `tasks\|space\|none`. DOM 통합은 D-17 | P0-2 |
 | P0-4 Sidebar content | `TasksSidebar`를 새 프레임에 꽂는다(`mode="tasks"`) + 하단 시스템 섹션에 보관함 추가 | P0-3, Q-06, Q-07 |
 | P0-5 Tree | **부활** (D-14). 새로 그리지 않고 기존 [`SpaceTree.tsx`](src/components/sidebar/SpaceTree.tsx)를 `mode="space"` 슬롯에 꽂는다 | P0-3 |
 | P0-6 Main Header | `tm-header`를 새 셸 기준으로 정리. 뷰 전환은 현행 유지(D-09) | P0-2 |

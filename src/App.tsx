@@ -25,6 +25,7 @@ import { RAIL_DESTINATIONS, TASKS_HOME, isTasksLocation, railItemFor, type RailN
 import { AppShell } from "./components/shell/AppShell";
 import { GlobalRail } from "./components/shell/GlobalRail";
 import { SEARCH_PATH } from "./app/taskScopeUrl";
+import { useContextSidebar } from "./hooks/useContextSidebar";
 import { childrenOf } from "./domain/tasks/children";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
@@ -165,14 +166,6 @@ export default function App() {
   const [appVersion, setAppVersion] = useState(__APP_VERSION__);
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | { status: "checking" } | { status: "installing"; latestVersion?: string }>({ status: "checking" });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // Desktop-only sidebar rail collapse; ignored by the mobile overlay menu.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem("focusflow-sidebar-collapsed") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   // The Tasks Module reads path AND query — `?view=` and `?task=` are part of
   // where you are (§5.62), where every route above it is a path alone.
@@ -200,6 +193,10 @@ export default function App() {
   // start is an arrival and belongs to the start-page setting, not to
   // wherever the app happened to be when it was last closed.
   const lastTasksLocationRef = useRef("");
+  // §3.66: the sidebar's width and collapsed flag are App Shell state. They
+  // used to be a boolean the legacy shell kept to itself and the Tasks Module
+  // knew nothing about — which is why the two could not agree on a width.
+  const contextSidebar = useContextSidebar(currentPath);
   const isProjectDetailOpen = selection.kind !== "none";
   const searchInputRef = useRef<HTMLInputElement>(null);
   const originalTitleRef = useRef(document.title || "FocusFlow");
@@ -334,6 +331,15 @@ export default function App() {
     function handleModuleKeys(event: KeyboardEvent) {
       if (!event.ctrlKey && !event.metaKey) return;
       if (event.altKey || event.shiftKey) return;
+      // §3.26: Ctrl/Cmd + \ collapses, and only where there is a sidebar to
+      // collapse. Registered here with the module switches rather than per
+      // page, which §3.26 asks for in as many words.
+      if (event.key === "\\") {
+        if (contextSidebar.mode === "none") return;
+        event.preventDefault();
+        contextSidebar.toggleCollapsed();
+        return;
+      }
       const item: RailNavItem | undefined = { "1": "tasks", "2": "calendar", "3": "focus" }[
         event.key
       ] as RailNavItem | undefined;
@@ -1061,18 +1067,6 @@ export default function App() {
     navigate(PAGE_ROUTES.calendar);
   }
 
-  function toggleSidebarCollapsed() {
-    setSidebarCollapsed((current) => {
-      const next = !current;
-      try {
-        localStorage.setItem("focusflow-sidebar-collapsed", next ? "1" : "0");
-      } catch {
-        // Collapse still works for this session without persistence.
-      }
-      return next;
-    });
-  }
-
   /**
    * A Global Rail click (§2.11–§2.15).
    *
@@ -1165,7 +1159,7 @@ export default function App() {
       <I18nProvider lang={appSettings.language}>
         {/* Both shells hang off the same frame now (R.5.1). The Rail is built
             once, above the branch, so neither shell owns it. */}
-        <AppShell rail={renderRail()}>
+        <AppShell rail={renderRail()} sidebar={contextSidebar}>
         <TasksModule
           tasks={planner.tasks}
           lists={planner.lists}
@@ -1344,12 +1338,15 @@ export default function App() {
   return (
     <I18nProvider lang={appSettings.language}>
       <>
-        <AppShell rail={renderRail()}>
+        <AppShell rail={renderRail()} sidebar={contextSidebar}>
         <div
           className={[
             "app-shell",
             mobileMenuOpen ? "mobile-menu-open" : "",
-            sidebarCollapsed ? "sidebar-collapsed" : "",
+            // `sidebar-collapsed` used to sit here and narrow the column to a
+            // 68px icon rail. §3.22/§3.30 make collapse mean a layout slot of
+            // 0, and the Global Rail is where icon-level navigation lives now,
+            // so the frame hides the column instead (19-app-shell.css).
           ]
             .filter(Boolean)
             .join(" ")}
@@ -1384,8 +1381,12 @@ export default function App() {
         selectedProjectId={selectedProjectId}
         userEmail={planner.auth.userEmail}
         showCounts={appSettings.showSidebarCounts}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={toggleSidebarCollapsed}
+        // §3.23: the button stays in the sidebar header and now drives the
+        // frame's state. `collapsed` is always false here because a collapsed
+        // sidebar is not rendered at all — the way back is the frame's own
+        // expand button (§3.24).
+        collapsed={false}
+        onToggleCollapse={contextSidebar.toggleCollapsed}
         selection={selection}
         folders={planner.folders}
         lists={planner.lists}

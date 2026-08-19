@@ -223,6 +223,7 @@ export const en: Dictionary = {
   "rail.account": "Account",
   "rail.accountSignedOut": "Not signed in",
   "rail.signOut": "Log out",
+  "shell.resizeSidebar": "Resize sidebar",
 
   // ---- App.tsx chrome ----
   // The sidebar box searches everything; the Today header box only filters
