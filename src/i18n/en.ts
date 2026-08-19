@@ -1060,6 +1060,7 @@ export const en: Dictionary = {
   "spaceHub.noteType.reminder": "Reminder",
   "spaceHub.noteType.link": "Link",
   "spaceHub.tab.overview": "Overview",
+  "spaceHub.tab.archive": "Archive",
   "spaceHub.tab.list": "List",
   "spaceHub.tab.board": "Board",
   "spaceHub.tab.gantt": "Gantt",

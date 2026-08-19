@@ -10,7 +10,7 @@ import {
 import { parseTaskScope } from "./taskScopeUrl";
 import type { PageId } from "../types";
 
-const PAGES: PageId[] = ["today", "projects", "calendar", "board", "archive", "focus", "settings"];
+const PAGES: PageId[] = ["today", "projects", "calendar", "board", "focus", "settings"];
 
 describe("pageRoute", () => {
   it("round-trips every page through its address", () => {
@@ -91,6 +91,14 @@ describe("pageRoute", () => {
 
     it("leaves the auth screen alone", () => {
       expect(bootRedirectFor("/login", "/calendar")).toBe("");
+    });
+
+    // A retired address still names somewhere, so it must not be treated as
+    // "the user asked for nothing" and replaced by the start page.
+    it("respects a retired address", () => {
+      expect(bootRedirectFor("/archive", "/calendar")).toBe("");
+      expect(namesAPage("/archive")).toBe(true);
+      expect(pageForPath("/archive")).toBe("projects");
     });
 
     // Caught in the browser, not here, the first time: every one of these is a

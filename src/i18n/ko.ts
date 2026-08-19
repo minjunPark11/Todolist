@@ -1054,6 +1054,7 @@ export const ko: Dictionary = {
   "spaceHub.noteType.reminder": "리마인더",
   "spaceHub.noteType.link": "링크",
   "spaceHub.tab.overview": "개요",
+  "spaceHub.tab.archive": "보관함",
   "spaceHub.tab.list": "리스트",
   "spaceHub.tab.board": "보드",
   "spaceHub.tab.gantt": "간트",

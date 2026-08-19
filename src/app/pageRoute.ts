@@ -35,9 +35,21 @@ export const PAGE_ROUTES: Record<PageId, string> = {
   projects: "/spaces",
   calendar: "/calendar",
   board: "/board",
-  archive: "/archive",
   focus: "/focus",
   settings: "/settings",
+};
+
+/**
+ * Addresses that no longer name a page, and where they go instead.
+ *
+ * `/archive` was the standalone Archive screen. D-20 retired its task half
+ * into Won't Do and moved its project half into the Space that owns them, so
+ * the address has no screen of its own — but links to it exist, in bookmarks
+ * and in anyone's history, and dropping them on Today would be a lie about
+ * where the content went.
+ */
+export const RETIRED_ROUTES: Record<string, string> = {
+  "/archive": PAGE_ROUTES.projects,
 };
 
 const ROUTE_TO_PAGE = new Map<string, PageId>(
@@ -63,6 +75,8 @@ export function pathForPage(page: PageId): string {
  */
 export function pageForPath(path: string): PageId {
   const normalized = normalize(path);
+  const retired = RETIRED_ROUTES[normalized];
+  if (retired) return pageForPath(retired);
   // A tree selection is the Spaces page with a deeper address, and it must be
   // asked BEFORE the table: `/s/:id` is not in the table and would otherwise
   // fall through to `today`.
@@ -84,6 +98,7 @@ export function pageForPath(path: string): PageId {
  */
 export function namesAPage(path: string): boolean {
   const normalized = normalize(path);
+  if (RETIRED_ROUTES[normalized]) return true;
   if (parseTaskScope(normalized) || parseSearchUrl(normalized) !== null) return true;
   return parseSelection(normalized).kind !== "none" || ROUTE_TO_PAGE.has(normalized);
 }

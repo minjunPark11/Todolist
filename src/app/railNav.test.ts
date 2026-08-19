@@ -8,7 +8,6 @@ describe("railNav", () => {
     for (const path of [
       PAGE_ROUTES.today,
       PAGE_ROUTES.projects,
-      PAGE_ROUTES.archive,
       "/today",
       "/upcoming",
       "/inbox",

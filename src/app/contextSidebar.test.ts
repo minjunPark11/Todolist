@@ -48,7 +48,7 @@ describe("contextSidebar", () => {
     });
 
     it("keeps the Tasks sidebar everywhere else", () => {
-      for (const path of [PAGE_ROUTES.today, PAGE_ROUTES.archive, "/today", "/list/l1", "/search"]) {
+      for (const path of [PAGE_ROUTES.today, "/today", "/list/l1", "/search"]) {
         expect(contextSidebarModeFor(path)).toBe("tasks");
       }
     });

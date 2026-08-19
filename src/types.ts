@@ -737,7 +737,6 @@ export type PageId =
   | "projects"
   | "focus"
   | "board"
-  | "archive"
   | "settings"
   | "calendar";
 

@@ -20,7 +20,7 @@ import { spaceIdForProject } from "./domain/spaces/spaces";
 import type { TodayIntent } from "./components/TodayPage";
 import { TasksModule } from "./components/tasks/TasksModule";
 import { canonicalizeTaskUrl, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
-import { PAGE_ROUTES, bootRedirectFor, pageForPath, pathForDefaultView, pathForPage } from "./app/pageRoute";
+import { PAGE_ROUTES, RETIRED_ROUTES, bootRedirectFor, pageForPath, pathForDefaultView, pathForPage } from "./app/pageRoute";
 import { RAIL_DESTINATIONS, TASKS_HOME, isTasksLocation, railItemFor, type RailNavItem } from "./app/railNav";
 import { AppShell } from "./components/shell/AppShell";
 import { GlobalRail } from "./components/shell/GlobalRail";
@@ -567,6 +567,15 @@ export default function App() {
   useEffect(() => {
     if (isTasksLocation(currentUrl)) lastTasksLocationRef.current = currentUrl;
   }, [currentUrl]);
+
+  // A link to a screen that no longer exists lands where its content went, and
+  // the address bar says so rather than quietly showing something else
+  // (P0-4b-4). `replace`, because the retired address is not a place to go
+  // Back to.
+  useEffect(() => {
+    const moved = RETIRED_ROUTES[currentPath];
+    if (moved) navigate(moved, "replace");
+  }, [currentPath]);
 
   useEffect(() => {
     if (currentPath === "/login" && planner.auth.isSignedIn) {

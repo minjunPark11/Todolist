@@ -1,5 +1,4 @@
 ﻿import { ReactNode, useState } from "react";
-import { ArchivePage } from "../components/ArchivePage";
 import { BoardPage } from "../components/BoardPage";
 import { CalendarView } from "../components/CalendarView";
 import { FocusPage } from "../components/FocusPage";
@@ -226,25 +225,6 @@ export function AppPages({
     );
   }
 
-  if (activePage === "archive") {
-    return (
-      <section className={pageGridClass()}>
-        <ArchivePage
-          tasks={planner.tasks}
-          projects={planner.projects}
-          lists={planner.lists}
-          learningPaths={planner.learningPaths}
-          onOpenTask={planner.selectTask}
-          onRestoreTask={planner.restoreTask}
-          onRestoreProject={planner.restoreProject}
-          onDeleteTask={requestDeleteTask}
-          onDeleteProject={requestDeleteProject}
-        />
-        {renderTaskDetail()}
-      </section>
-    );
-  }
-
   if (activePage === "calendar") {
     return (
       <section className="gcal-page-shell">
@@ -295,6 +275,8 @@ export function AppPages({
     return (
       <>
       <SpacesPage
+        onRestoreProject={planner.restoreProject}
+        onDeleteProject={requestDeleteProject}
         projects={planner.projects}
         tasks={planner.tasks}
         lists={planner.lists}

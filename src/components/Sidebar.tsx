@@ -253,9 +253,9 @@ export function Sidebar({
   const primaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
     { id: "today", label: t("sidebar.today"), icon: "today", count: todayCount },
   ];
-  const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
-    { id: "archive", label: t("sidebar.archive"), icon: "archive", count: 0 },
-  ];
+  // The Archive row left with the page (D-20/P0-4b-4): archived Projects are
+  // a tab inside the Space that owns them now, and Task archiving is gone.
+  const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [];
 
   const signedInUserEmail = userEmail.trim();
   const initial = signedInUserEmail.charAt(0).toUpperCase();
