@@ -220,8 +220,12 @@ export function TasksSidebar({
       </div>
 
       <div className="tm-section">
-        <h2 className="tm-section-title">
-          {t("tasks.sectionLists")}
+        {/* The two buttons used to sit INSIDE the `<h2>`, which made the
+            heading's accessible name "Lists + Manage" — a screen reader read
+            the controls as part of the title. They are beside it now, in a
+            row the heading shares. */}
+        <div className="tm-section-head">
+          <h2 className="tm-section-title">{t("tasks.sectionLists")}</h2>
           {/* §1.1. `Lists +` opens the dialog with no Folder context; the
               current Scope and the URL are untouched (§0.7 R0-3). */}
           <button
@@ -232,10 +236,15 @@ export function TasksSidebar({
           >
             +
           </button>
-          <button type="button" className="tm-section-action" onClick={onManageLists}>
+          <button
+            type="button"
+            className="tm-section-action"
+            onClick={onManageLists}
+            aria-label={t("tasks.manageListsAria")}
+          >
             {t("tasks.manageLists")}
           </button>
-        </h2>
+        </div>
         {groups.map((folder) => {
           const inside = byFolder.get(folder.id) ?? [];
           if (inside.length === 0) return null;
@@ -261,6 +270,13 @@ export function TasksSidebar({
         })}
         {loose.map((list) => row({ kind: "list", id: list.id }, list.name, { dot: listColorHex(list.color) }))}
         {treeLists.length === 0 ? <p className="tm-section-empty">{t("tasks.noLists")}</p> : null}
+
+        {/* D-22's page row, moved in here from a section of its own.
+            Standing alone between two groups it read as a row someone had
+            dropped in the wrong place; Spaces is where Lists are organised,
+            so this is the group it belongs to. It is still not a Scope —
+            `pageRow` gives it no count, which is the difference that matters. */}
+        {pageRow("spaces", t("tree.section"))}
       </div>
 
       {visibleTags.length > 0 ? (
@@ -281,10 +297,6 @@ export function TasksSidebar({
           {visibleFilters.map((filter) => row({ kind: "filter", id: filter.id }, filter.name))}
         </div>
       ) : null}
-
-      <div className="tm-section">
-        {pageRow("spaces", t("tree.section"))}
-      </div>
 
       <div className="tm-section">
         {row({ kind: "completed" }, t("tasks.completed"))}

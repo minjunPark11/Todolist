@@ -223,6 +223,7 @@ export const ko: Dictionary = {
   "rail.account": "계정",
   "rail.accountSignedOut": "로그인하지 않음",
   "rail.signOut": "로그아웃",
+  "shell.chrome": "사이드바 컨트롤",
   "shell.resizeSidebar": "사이드바 너비 조절",
 
   // ---- App.tsx chrome ----
@@ -1402,6 +1403,9 @@ export const ko: Dictionary = {
   "tasks.filterAll": "전체",
   "tasks.searchPageEmpty": "“{{query}}”에 대한 결과가 없습니다. 다른 검색어를 사용해 보세요.",
   "tasks.resultCompleted": "완료됨",
+  "tasks.manageListsAria": "리스트 관리",
+  "tasks.searchPlaceholder": "작업 · 리스트 · 태그 · 필터 검색…",
+  "tasks.searchMenuHint": "작업이 아니라 이동할 곳을 찾고 있다면 — Ctrl/Cmd + K가 리스트로 바로 가고 명령을 실행합니다.",
   "tasks.searchTitle": "검색",
   "menu.label": "이동 및 명령",
   "menu.placeholder": "리스트로 이동하거나 명령을 입력하세요…",

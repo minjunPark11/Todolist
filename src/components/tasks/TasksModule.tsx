@@ -664,7 +664,7 @@ function SearchPage({
         type="search"
         autoFocus
         value={query}
-        placeholder={t("tasks.palettePlaceholder")}
+        placeholder={t("tasks.searchPlaceholder")}
         onChange={(event) => onQueryChange(event.target.value)}
       />
 
@@ -688,12 +688,19 @@ function SearchPage({
       ) : null}
 
       {/* §10.46: the full page names what was searched for and suggests the
-          next move, where the palette offers to create the thing instead. */}
+          next move, where the menu offers to create the thing instead. */}
       {query.trim() && total === 0 ? (
         <p className="tm-state" role="status">
           {t("tasks.searchPageEmpty", { query: query.trim() })}
         </p>
       ) : null}
+
+      {/* D-25 split searching from navigating, and left the second half with
+          no way to be discovered — Ctrl/Cmd+K is advertised nowhere. This is
+          where the person hunting for something already is, so it is where
+          the other tool gets mentioned. Only before they have typed: once a
+          query is running, a tip about a different surface is an interruption. */}
+      {!query.trim() ? <p className="tm-state">{t("tasks.searchMenuHint")}</p> : null}
 
       {groups.map((group) => (
         <section key={group.kind} className="tm-search-group">

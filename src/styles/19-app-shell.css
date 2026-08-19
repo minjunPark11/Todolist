@@ -81,6 +81,12 @@
   transition: none;
 }
 
+/* A grouping for the accessibility tree and nothing else: `display: contents`
+   leaves both children positioned against `.app-frame` exactly as before. */
+.app-frame-chrome {
+  display: contents;
+}
+
 /* --- §3.15 resize handle --- */
 
 .context-sidebar-handle {

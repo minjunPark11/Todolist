@@ -224,6 +224,7 @@ export const en: Dictionary = {
   "rail.account": "Account",
   "rail.accountSignedOut": "Not signed in",
   "rail.signOut": "Log out",
+  "shell.chrome": "Sidebar controls",
   "shell.resizeSidebar": "Resize sidebar",
 
   // ---- App.tsx chrome ----
@@ -1408,6 +1409,9 @@ export const en: Dictionary = {
   "tasks.filterAll": "All",
   "tasks.searchPageEmpty": "Nothing matches “{{query}}”. Try another search.",
   "tasks.resultCompleted": "Completed",
+  "tasks.manageListsAria": "Manage lists",
+  "tasks.searchPlaceholder": "Search tasks, lists, tags and filters…",
+  "tasks.searchMenuHint": "Looking for a place rather than a task? Ctrl/Cmd + K jumps to lists and runs commands.",
   "tasks.searchTitle": "Search",
   "menu.label": "Go to, or run",
   "menu.placeholder": "Jump to a list, or type a command…",

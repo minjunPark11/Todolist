@@ -52,6 +52,21 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
       {rail}
       <div className="app-frame-body">{children}</div>
 
+      {/* Both of the frame's own controls, in one named group.
+          They were bare children of `.app-frame` before, which put them
+          outside every landmark — axe's `region` rule on the running app,
+          and the one thing the shell's own axe test did not catch because it
+          only failed on serious and critical. These two controls belong to
+          the frame rather than to the Rail, the sidebar or the page, so they
+          get a named landmark of their own. Positioning is unchanged — both
+          are absolutely positioned against `.app-frame`, and this wrapper is
+          `display: contents`.
+
+          `region` and not `toolbar`: a toolbar is a widget, and the rule being
+          answered is "is every part of the page inside a LANDMARK". Measured
+          rather than assumed — `toolbar` was tried first and axe still flagged
+          the wrapper itself. */}
+      <div className="app-frame-chrome" role="region" aria-label={t("shell.chrome")}>
       {/* §3.15/§3.20. Absolutely positioned at the sidebar's right edge rather
           than rendered inside it, because the sidebar still belongs to the
           inner shell's grid — the handle has to reach across that boundary. */}
@@ -101,6 +116,7 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
           </svg>
         </button>
       ) : null}
+      </div>
     </div>
   );
 }

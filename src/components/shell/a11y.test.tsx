@@ -101,8 +101,13 @@ async function seriousViolations(container: HTMLElement) {
       region: { enabled: true },
     },
   });
+  // Serious and critical WOULD have been the bar here, and it let a real one
+  // through: the resize handle sat outside every landmark, which axe rates
+  // MODERATE, so this file passed while the running app failed. The landmark
+  // rules are the ones this file exists to check, so `region` counts too.
+  const counted = new Set(["serious", "critical"]);
   return results.violations
-    .filter((violation) => violation.impact === "serious" || violation.impact === "critical")
+    .filter((violation) => counted.has(violation.impact ?? "") || violation.id === "region")
     .map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.html).join(" | ")}`);
 }
 
@@ -234,5 +239,26 @@ describe("the Global Rail's ARIA (§2.33)", () => {
     expect(search.getAttribute("aria-expanded")).toBeNull();
     // And it is not a destination that takes the active state either (§2.14).
     expect(search.getAttribute("aria-current")).toBeNull();
+  });
+});
+
+// Measured in the browser before it was written: `role="toolbar"` was tried
+// first and axe still flagged the wrapper, because a toolbar is a widget and
+// the question is whether every part of the page is inside a LANDMARK.
+describe("the frame's own controls (P0-12 follow-up)", () => {
+  it("puts the resize handle inside a named landmark", () => {
+    renderShell();
+    const handle = screen.getByRole("separator");
+    const landmark = handle.closest("[role='region'], nav, main, aside, header, footer");
+
+    expect(landmark).not.toBeNull();
+    expect(landmark?.getAttribute("aria-label")).toBeTruthy();
+  });
+
+  it("puts the expand button in the same one", () => {
+    renderShell(sidebarState({ visibility: "collapsed", effectiveWidth: 0 }));
+    const expand = screen.getByRole("button", { name: /펼치기/ });
+
+    expect(expand.closest("[role='region']")).not.toBeNull();
   });
 });

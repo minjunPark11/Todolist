@@ -365,11 +365,45 @@ test.describe("below the desktop breakpoint", () => {
     await expect(page.locator(".tm-shell")).toHaveClass(/sidebar-open/);
     await expect(page.locator('[aria-modal="true"]')).toHaveCount(1);
 
-    await page.locator(".tm-section-action[aria-label]").click();
+    await page.getByRole("button", { name: "Add list", exact: true }).click();
 
     await expect(page.locator('[aria-modal="true"]')).toHaveCount(1);
     await expect(page.getByRole("dialog", { name: "New list" })).toBeVisible();
     await expect(page.locator(".tm-shell")).not.toHaveClass(/sidebar-open/);
+  });
+
+  /**
+   * A media query decides this, so only a real browser can answer it — and
+   * the query is about the POINTER, not the width. §15.4 is explicit: a
+   * narrow window with a mouse and a tablet are the same mode and want
+   * different targets, so the floor is read from `(pointer: coarse)` rather
+   * than from the viewport this describe block is guarded on.
+   *
+   * `.tm-section-action` was in neither list: every row beside it got 44px on
+   * touch, and it stayed 19x19 — the smallest target in the shell was the one
+   * a finger had to hit.
+   */
+  test("no control in the drawer is under the floor for this pointer (§15.12)", async ({ page }) => {
+    await openApp(page);
+    await page.locator(".tm-menu-open").click();
+    await expect(page.locator(".tm-shell")).toHaveClass(/sidebar-open/);
+
+    const coarse = await page.evaluate(() => window.matchMedia("(pointer: coarse)").matches);
+    // 44 for a finger (§15.12); 24 for a pointer that can be aimed, which is
+    // WCAG 2.2's own minimum.
+    const floor = coarse ? 44 : 24;
+
+    const tooSmall = await page.locator("#context-sidebar button").evaluateAll((nodes, min) =>
+      nodes
+        .map((node) => {
+          const box = node.getBoundingClientRect();
+          return { name: node.textContent?.trim().slice(0, 12) ?? "", w: Math.round(box.width), h: Math.round(box.height) };
+        })
+        .filter((box) => box.w > 0 && (box.w < min || box.h < min)),
+      floor,
+    );
+
+    expect({ floor, tooSmall }).toEqual({ floor, tooSmall: [] });
   });
 
   test("§3.50 — the open drawer is a modal, and Escape gives focus back", async ({ page }) => {

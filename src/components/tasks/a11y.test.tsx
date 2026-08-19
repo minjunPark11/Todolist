@@ -190,7 +190,7 @@ describe("Tasks Module accessibility (Gate 11)", () => {
     const { container } = renderModule("/today");
     // §0.7 R0-3 keeps the dialog out of the URL, so it is opened the way a
     // user opens it — from the Lists header.
-    await user.click(container.querySelector<HTMLElement>('.tm-section-action[aria-label]')!);
+    await user.click(screen.getByRole("button", { name: "리스트 추가" }));
 
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     expect(await seriousViolations(container)).toEqual([]);
@@ -222,6 +222,47 @@ describe("the sidebar's two presentations (§3.50)", () => {
     // mistake as claiming Search opens a dialog when it navigates (D-25).
     const { container } = renderModule("/today");
     expect(container.querySelector('[aria-modal="true"]')).toBeNull();
+  });
+});
+
+
+// What a usability pass over the running app turned up, pinned so it stays
+// fixed. Every one of these was measured in a browser first.
+describe("the Lists section header", () => {
+  it("names the heading without reading its buttons out (§2.33)", () => {
+    renderModule("/today");
+    const heading = screen.getByRole("heading", { name: "리스트" });
+
+    // The two controls used to sit INSIDE this `<h2>`, so its accessible name
+    // was "리스트 + 관리" — a screen reader announcing the title read the
+    // controls as part of it.
+    expect(heading.querySelector("button")).toBeNull();
+  });
+
+  it("gives every control a name of its own", () => {
+    renderModule("/today");
+
+    expect(screen.getByRole("button", { name: "리스트 추가" })).toBeTruthy();
+    // "관리" as bare text is a label, not a description of what it manages.
+    expect(screen.getByRole("button", { name: "리스트 관리" })).toBeTruthy();
+  });
+});
+
+describe("where the Spaces row lives", () => {
+  it("sits inside the Lists group rather than in a section of its own", () => {
+    const { container } = renderModule("/today");
+    const sections = [...container.querySelectorAll(".tm-sidebar > .tm-section")];
+
+    // It was a section containing exactly one row, between two other groups —
+    // which reads as a row someone dropped in the wrong place. Spaces is where
+    // Lists are organised, so that is the group it belongs to.
+    const alone = sections.filter(
+      (section) => section.querySelectorAll(".tm-row").length === 1 && !section.querySelector(".tm-section-title"),
+    );
+    expect(alone).toEqual([]);
+
+    const lists = sections.find((section) => section.querySelector(".tm-section-title"));
+    expect(lists?.textContent).toContain("공간");
   });
 });
 

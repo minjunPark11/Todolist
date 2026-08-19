@@ -124,7 +124,9 @@ async function revealSidebar(page: Page): Promise<void> {
 /** §1.1: the Lists header's entry. */
 export async function openFromHeader(page: Page): Promise<void> {
   await revealSidebar(page);
-  await page.locator(".tm-section-action[aria-label]").click();
+  // By its own name. `[aria-label]` alone used to be unique here; Manage has
+  // one now, so the selector has to say which button it means.
+  await page.getByRole("button", { name: "Add list", exact: true }).click();
   await expect(dialog(page)).toBeVisible();
 }
 
