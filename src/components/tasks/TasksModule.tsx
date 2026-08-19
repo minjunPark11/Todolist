@@ -27,7 +27,8 @@ import { queryScopeCount, queryScopeTasks, type ScopeContext } from "../../domai
 import { parseSearchUrl, searchUrlFor, taskUrlFor, urlForSearchResult, parseTaskUrl } from "../../app/taskScopeUrl";
 import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { useT } from "../../i18n";
-import { TasksSidebar } from "./TasksSidebar";
+import { TasksSidebarSlot } from "../shell/TasksSidebarSlot";
+import type { TasksSidebarPage } from "./TasksSidebar";
 import { TaskQuickAdd } from "./TaskQuickAdd";
 import { TaskDrawer } from "./TaskDrawer";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
@@ -42,8 +43,6 @@ import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
 import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
 import { CommandPalette } from "./CommandPalette";
-import { ListManager } from "./ListManager";
-import { CreateListModal } from "./CreateListModal";
 import { TaskGanttView } from "../TaskGanttView";
 import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
@@ -111,6 +110,13 @@ interface TasksModuleProps {
   }) => Promise<string> | string;
   /** Makes a sidebar group and answers its id (Add List design §6.32). */
   onCreateSidebarFolder: (name: string) => Promise<string> | string;
+  /**
+   * The sidebar rows that leave the module (audit D-21).
+   *
+   * Archive and SpaceHub are inside Tasks but outside the module's nine
+   * routes, so the module cannot answer them itself — it hands them up.
+   */
+  onOpenPage: (page: TasksSidebarPage) => void;
   /** §13.23/§6.56: restoring a List, and the one hard delete in the app. */
   lifecycle: {
     onArchiveList: (listId: string) => void;
@@ -153,13 +159,6 @@ export function TasksModule(props: TasksModuleProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   // §10.41's other half: the palette captures a title, Quick Add commits it.
   const [captured, setCaptured] = useState("");
-  // §13.25: a management surface, not a Scope — so it is state here and not a
-  // tenth route.
-  const [managing, setManaging] = useState(false);
-  // §0.7 R0-3: the dialog is UI state and nothing about it is in the URL, the
-  // same treatment §10.23 gives the palette. `null` is §1.5's S1 (CLOSED);
-  // a string is the Folder it was started from, "" for the Lists header.
-  const [creatingListIn, setCreatingListIn] = useState<string | null>(null);
   // §15.3. Presentation only: nothing below reads this to decide what a Scope
   // contains, which is what keeps §15.9 true — the URL means the same thing at
   // every width.
@@ -435,19 +434,28 @@ export function TasksModule(props: TasksModuleProps) {
         <div className="tm-scrim" onMouseDown={() => setSidebarOpen(false)} aria-hidden />
       ) : null}
 
-      <TasksSidebar
-        ctx={ctx}
+      {/* D-21: the same component the legacy shell renders when the mode is
+          `tasks`, so crossing between the two shells no longer swaps the
+          sidebar. Its dialogs and their state travel with it. */}
+      <TasksSidebarSlot
+        tasks={tasks}
+        lists={lists}
         folders={folders}
         sidebarFolders={sidebarFolders}
         tags={tags}
         savedFilters={savedFilters}
-        onManageLists={() => setManaging(true)}
-        onCreateList={(contextFolderId) => setCreatingListIn(contextFolderId)}
+        dailyPlans={dailyPlans}
+        taskTags={taskTags}
+        today={today}
         current={searchQuery === null ? scope : null}
-        onNavigate={(next) => {
-          setSidebarOpen(false);
-          go(next);
-        }}
+        currentPage={null}
+        onNavigateUrl={onNavigate}
+        onOpenPage={props.onOpenPage}
+        onBeforeNavigate={() => setSidebarOpen(false)}
+        onCreateList={props.onCreateList}
+        onCreateSidebarFolder={props.onCreateSidebarFolder}
+        onRestoreList={props.lifecycle.onRestoreList}
+        onPermanentlyDeleteList={props.lifecycle.onPermanentlyDeleteList}
       />
 
       <main className="tm-main">
@@ -613,47 +621,6 @@ export function TasksModule(props: TasksModuleProps) {
         </>
         )}
       </main>
-
-      {creatingListIn !== null ? (
-        <CreateListModal
-          contextFolderId={creatingListIn}
-          folders={sidebarFolders}
-          onCreateFolder={props.onCreateSidebarFolder}
-          onClose={() => setCreatingListIn(null)}
-          onSubmit={async (draft: CreateListDraft) => {
-            const payload = createListPayload(draft);
-            const listId = await props.onCreateList(payload);
-            // A creation that answers with no id has not produced a List to
-            // open; treating it as success would close the dialog over a draft
-            // that went nowhere (§1.12).
-            if (!listId) throw new Error("");
-            setCreatingListIn(null);
-            // §1.10, and §17.2's real finish line: the record is not the end,
-            // being in the new List ready to type is. The URL layer already
-            // knows how to say that, so no new routing rule is invented here.
-            // §1.10 ends in the View the user just chose, not in the default
-            // one — being sent somewhere other than what you picked, one second
-            // after picking it, reads as the choice not having been taken.
-            onNavigate(
-              taskUrlFor({
-                scope: { kind: "list", id: listId },
-                view: resolveListView(payload.defaultViewKey, scopeRegistry.list),
-                taskId: "",
-              }),
-            );
-          }}
-        />
-      ) : null}
-
-      {managing ? (
-        <ListManager
-          lists={lists}
-          tasks={tasks}
-          onRestore={props.lifecycle.onRestoreList}
-          onPermanentlyDelete={props.lifecycle.onPermanentlyDeleteList}
-          onClose={() => setManaging(false)}
-        />
-      ) : null}
 
       {paletteOpen ? (
         <CommandPalette

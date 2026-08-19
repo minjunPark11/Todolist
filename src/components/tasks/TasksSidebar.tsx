@@ -40,7 +40,19 @@ interface TasksSidebarProps {
   /** Null on the Search Page, which is not a Scope and highlights nothing. */
   current: TaskScopeRef | null;
   onNavigate: (scope: TaskScopeRef) => void;
+  /**
+   * The two rows that are addresses rather than Scopes (audit D-21, D-22).
+   *
+   * Archive and SpaceHub are both inside Tasks — §1.5 refuses either a Rail
+   * item — but neither is in `scopeRegistry`, so neither can go through `row`
+   * and neither carries a count. Archive becomes a real Scope in P0-4b; the
+   * Spaces row is a doorway and will not.
+   */
+  currentPage: TasksSidebarPage | null;
+  onOpenPage: (page: TasksSidebarPage) => void;
 }
+
+export type TasksSidebarPage = "spaces" | "archive";
 
 function sameScope(a: TaskScopeRef, b: TaskScopeRef | null): boolean {
   if (!b || a.kind !== b.kind) return false;
@@ -57,6 +69,8 @@ export function TasksSidebar({
   onCreateList,
   current,
   onNavigate,
+  currentPage,
+  onOpenPage,
 }: TasksSidebarProps) {
   const { t } = useT();
 
@@ -75,6 +89,27 @@ export function TasksSidebar({
         {/* A zero is not shown. An empty Scope says so on its own screen; a
             column of noughts in the tree is noise (§2.10). */}
         {count > 0 ? <span className="tm-count">{count}</span> : null}
+      </button>
+    );
+  }
+
+  /**
+   * A row for a destination that is not a Scope.
+   *
+   * No count, deliberately. The head of this file says every count comes from
+   * `queryScopeCount` and never from a local filter (§12.14) — and neither of
+   * these has a Scope to ask. Archive gets its number when it becomes one.
+   */
+  function pageRow(page: TasksSidebarPage, label: string) {
+    return (
+      <button
+        key={`page:${page}`}
+        type="button"
+        className={`tm-row${currentPage === page ? " is-current" : ""}`}
+        aria-current={currentPage === page ? "page" : undefined}
+        onClick={() => onOpenPage(page)}
+      >
+        <span className="tm-row-label">{label}</span>
       </button>
     );
   }
@@ -193,8 +228,13 @@ export function TasksSidebar({
       ) : null}
 
       <div className="tm-section">
+        {pageRow("spaces", t("tree.section"))}
+      </div>
+
+      <div className="tm-section">
         {row({ kind: "completed" }, t("tasks.completed"))}
         {row({ kind: "trash" }, t("tasks.trash"))}
+        {pageRow("archive", t("sidebar.archive"))}
       </div>
     </nav>
   );

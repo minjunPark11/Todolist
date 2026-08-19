@@ -132,6 +132,7 @@ function renderModule(url: string) {
           onPermanentlyDeleteList: () => {},
         }}
         onMutate={() => {}}
+        onOpenPage={() => {}}
       />
     </I18nProvider>,
   );

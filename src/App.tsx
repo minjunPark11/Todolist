@@ -26,6 +26,8 @@ import { AppShell } from "./components/shell/AppShell";
 import { GlobalRail } from "./components/shell/GlobalRail";
 import { SEARCH_PATH } from "./app/taskScopeUrl";
 import { useContextSidebar } from "./hooks/useContextSidebar";
+import { TasksSidebarSlot } from "./components/shell/TasksSidebarSlot";
+import type { TasksSidebarPage } from "./components/tasks/TasksSidebar";
 import { childrenOf } from "./domain/tasks/children";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
@@ -1098,6 +1100,62 @@ export default function App() {
     navigateUrl(SEARCH_PATH);
   }
 
+  /**
+   * The Tasks sidebar rows that are addresses, not Scopes (D-21, D-22).
+   *
+   * Both live inside Tasks and neither may become a Rail item (§1.5), so the
+   * sidebar is the only place they can be reached from — which is why the
+   * Spaces row exists at all: once the sidebar follows `mode`, SpaceHub is
+   * otherwise unreachable from a Tasks screen.
+   */
+  function openSidebarPage(page: TasksSidebarPage) {
+    navigate(page === "archive" ? PAGE_ROUTES.archive : PAGE_ROUTES.projects);
+  }
+
+  const sidebarPage: TasksSidebarPage | null =
+    activePage === "archive" ? "archive" : contextSidebar.mode === "space" ? "spaces" : null;
+
+  /**
+   * The Context Sidebar for the legacy shell, chosen by `mode` (D-21).
+   *
+   * This is the fix P0-4a exists for. The mode used to decide only how wide
+   * the sidebar was; the shell branch decided which one it was, so `/archive`
+   * said `tasks` and drew the Space tree. Now `tasks` means the Tasks sidebar
+   * wherever you are, and the tree belongs to `space`.
+   */
+  function renderLegacySidebar() {
+    if (contextSidebar.mode === "none") return null;
+    if (contextSidebar.mode === "tasks") {
+      return (
+        <TasksSidebarSlot
+          tasks={planner.tasks}
+          lists={planner.lists}
+          folders={planner.folders}
+          sidebarFolders={planner.sidebarFolders}
+          tags={planner.tags}
+          savedFilters={planner.savedFilters}
+          dailyPlans={planner.dailyPlans}
+          taskTags={planner.taskTags}
+          today={today}
+          current={null}
+          currentPage={sidebarPage}
+          onNavigateUrl={navigateUrl}
+          onOpenPage={openSidebarPage}
+          onCreateList={({ name, color, defaultViewKey, sidebarFolderId }) =>
+            // Same call the Tasks Module makes below: no domain Folder, because
+            // that one belongs to a Project and this List has none. The group
+            // the dialog offered is the sidebar's (§R.7).
+            planner.createList("", name, undefined, { color, defaultViewKey, sidebarFolderId })
+          }
+          onCreateSidebarFolder={planner.createSidebarFolder}
+          onRestoreList={planner.restoreList}
+          onPermanentlyDeleteList={planner.permanentlyDeleteList}
+        />
+      );
+    }
+    return null;
+  }
+
   function renderRail() {
     return (
       <GlobalRail
@@ -1178,6 +1236,7 @@ export default function App() {
           today={today}
           url={canonical ?? currentUrl}
           onNavigate={navigateUrl}
+          onOpenPage={openSidebarPage}
           error={planner.auth.syncError}
           onCreate={(title, resolution) => {
             if (!resolution.targetListId) return;
@@ -1373,6 +1432,11 @@ export default function App() {
           onClick={() => setMobileMenuOpen(false)}
         />
       ) : null}
+      {/* D-21: the sidebar follows `mode`, not the shell. `space` keeps the
+          tree this component has always drawn; `tasks` gets the same sidebar
+          the Tasks Module shows, so crossing between the two shells no longer
+          swaps it; `none` draws nothing at all (§2.16). */}
+      {contextSidebar.mode === "space" ? (
       <Sidebar
         activePage={activePage}
         onNavigate={(page) => {
@@ -1447,6 +1511,9 @@ export default function App() {
           />
         }
       />
+      ) : (
+        renderLegacySidebar()
+      )}
       {/* key={activePage} remounts <main> on navigation so the new page
           crossfades in; opacity-only per pageVariants. */}
       <motion.main

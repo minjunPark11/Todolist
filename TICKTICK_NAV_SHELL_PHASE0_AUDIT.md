@@ -341,6 +341,14 @@ P0-3이 `mode`를 만들었지만 **그 mode는 아직 아무것도 고르지 �
 
 **D-17이 "P0-4가 어차피 내용을 옮기니 그때 하자"고 미룬 바로 그 작업이다.** 크기가 P0-4 한 단계에 들어가지 않으므로 **P0-4a**로 세운다 (R.8). D-20의 Archive 승격은 그 뒤에 와야 한다 — 보관된 작업이 Scope가 되려면 Tasks Module 안에서 그려져야 하기 때문이다.
 
+**D-22 — Tasks Sidebar에 `공간` 행을 둔다.** (P0-4a에서 강제됨, 2026-08-19)
+
+D-21을 고치자 SpaceHub가 **도달 불가**가 됐다. 사이드바가 `mode`를 따르게 되는 순간, 트리는 이미 space mode일 때만 보인다. Rail에는 §1.5가 Space를 금지한다. 즉 Tasks 화면에서 SpaceHub로 들어갈 문이 사라진다.
+
+그래서 Tasks Sidebar에 `공간` 행 하나를 둔다. 트리를 가져오는 것이 아니라 **문만** 두는 것이다 — 누르면 `/spaces`로 가고, 거기서 mode가 `space`로 바뀌며 같은 자리를 트리가 차지한다. D-02(사이드바 내용은 v16)와 D-14(SpaceHub에서 트리로 전환)를 둘 다 지키는 최소 장치다.
+
+`보관함` 행도 같은 성격이다. 둘 다 Scope가 아니므로 `row()`가 아니라 `pageRow()`로 그리고, **카운트를 붙이지 않는다** — 이 파일의 머리 주석이 "모든 카운트는 `queryScopeCount`에서 오고 화면이 카운트 공식을 발명하지 않는다"(§12.14)고 못박아 두었고, 물어볼 Scope가 없기 때문이다. 보관함은 P0-4b에서 Scope가 될 때 숫자를 얻는다.
+
 **D-20 — 보관함을 쪼갠다: 작업은 Scope로, 프로젝트는 SpaceHub로.** (Q-07 해소, 2026-08-19)
 
 지금 [`ArchivePage.tsx:43`](src/components/ArchivePage.tsx:43)은 `작업` / `프로젝트` 두 탭이고, 프로젝트 탭은 뷰 엔진을 타지 않고 `projects`에서 직접 읽는다. 그 파일 주석이 이유를 이미 적어 두었다 — Space는 Item이 아니고, 그건 projection의 실제 한계다.
@@ -376,7 +384,7 @@ P0-3이 `mode`를 만들었지만 **그 mode는 아직 아무것도 고르지 �
 | ~~P0-2 AppShell + Rail~~ | **완료** (2026-08-19). [`AppShell.tsx`](src/components/shell/AppShell.tsx)이 두 셸의 공통 프레임이 되고, [`GlobalRail.tsx`](src/components/shell/GlobalRail.tsx)이 그 첫 열. 안쪽 두 셸은 그대로 — 그건 P0-3 | P0-1, Q-04 |
 | ~~P0-3 Context Sidebar frame~~ | **완료** (2026-08-19). 폭 200·240 → **248 하나**, resize 핸들(드래그·키보드·더블클릭), collapse 상태 모델(§3.28~3.30), mode registry `tasks\|space\|none`. DOM 통합은 D-17 | P0-2 |
 | ~~P0-4 Rail + 중복 제거~~ | **완료** (2026-08-19). Rail에 Matrix 추가(D-19), 레거시 사이드바에서 전역 항목 제거(D-16) — 남은 것은 `오늘`·`보관함`·트리 | P0-3 |
-| P0-4a 사이드바 소유권 | **D-21.** `App.tsx`가 `mode`로 사이드바를 고르게 한다. `TasksSidebar`를 `TasksModule` 밖으로(+`managing`/`creatingListIn`/모달). 이게 되어야 보관함 행도 `mode="space"`도 진짜가 된다 | P0-4 |
+| ~~P0-4a 사이드바 소유권~~ | **완료** (2026-08-19). [`TasksSidebarSlot`](src/components/shell/TasksSidebarSlot.tsx)이 사이드바+두 다이얼로그를 함께 들고, 레거시 셸이 `mode`로 고른다. DOM 통합은 여전히 D-17 | P0-4 |
 | P0-4b Archive 분리 | **D-20.** 보관된 작업을 10번째 Scope로 승격(`scopeRegistry`+`scopeQuery`+segment+view policy+count), 보관된 프로젝트는 SpaceHub로 | P0-4a, P0-5 |
 | P0-5 Tree | **부활** (D-14). 새로 그리지 않고 기존 [`SpaceTree.tsx`](src/components/sidebar/SpaceTree.tsx)를 `mode="space"` 슬롯에 꽂는다 | P0-3 |
 | P0-6 Main Header | `tm-header`를 새 셸 기준으로 정리. 뷰 전환은 현행 유지(D-09) | P0-2 |
