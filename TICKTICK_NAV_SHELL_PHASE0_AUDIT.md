@@ -451,7 +451,7 @@ wontDoAt?: string;
 | ~~P0-4a 사이드바 소유권~~ | **완료** (2026-08-19). [`TasksSidebarSlot`](src/components/shell/TasksSidebarSlot.tsx)이 사이드바+두 다이얼로그를 함께 들고, 레거시 셸이 `mode`로 고른다. DOM 통합은 여전히 D-17 | P0-4 |
 | ~~P0-4b-1 Won't Do~~ | **완료** (2026-08-19). `wontDoAt` + `wontDo` Scope(`/wont-do`) + Drawer 액션·undo. `isTaskOpen`도 export됨 | P0-4a |
 | ~~P0-4b-2 상태 술어 통합~~ | **완료** (2026-08-19). [`taskState.ts`](src/domain/tasks/taskState.ts)가 단일 출처, 17곳 채택, 경쟁 술어 셋 흡수 | P0-4b-1 |
-| P0-4b-3 Task Archive 폐기 | **D-20.** 기존 `archived` Task를 `wontDoAt`으로 이주, 사이드바 `보관함` 행 제거, 하단 = 완료·안 함·휴지통 | P0-4b-2 |
+| ~~P0-4b-3 Task Archive 폐기~~ | **완료** (2026-08-19). 로드 경로 마이그레이션(`archived` → `wontDoAt`, `previousStatus`로 워크플로 상태 복원), 사이드바 하단 = 완료·안 함·휴지통, ArchivePage는 프로젝트 전용 | P0-4b-2 |
 | P0-4b-4 프로젝트 Archive | **D-20의 남은 절반.** 보관된 프로젝트를 SpaceHub로 | P0-4b-3, P0-5 |
 | P0-4b-5 컨테이너 축 | P0-4b-2에서 분리. `lists`를 배선해 Focus·Calendar 등도 `isTaskActive`(소유 List 검사 포함)를 쓰게 한다 | P0-4b-2 |
 | P0-5 Tree | **부활** (D-14). 새로 그리지 않고 기존 [`SpaceTree.tsx`](src/components/sidebar/SpaceTree.tsx)를 `mode="space"` 슬롯에 꽂는다 | P0-3 |

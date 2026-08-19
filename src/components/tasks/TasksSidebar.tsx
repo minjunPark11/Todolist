@@ -52,7 +52,12 @@ interface TasksSidebarProps {
   onOpenPage: (page: TasksSidebarPage) => void;
 }
 
-export type TasksSidebarPage = "spaces" | "archive";
+/**
+ * D-20 retired the Archive row: Task archiving is gone and `안 함` took its
+ * place as a real Scope. Only the doorway to SpaceHub is left — archived
+ * PROJECTS live there, which is a different thing entirely.
+ */
+export type TasksSidebarPage = "spaces";
 
 function sameScope(a: TaskScopeRef, b: TaskScopeRef | null): boolean {
   if (!b || a.kind !== b.kind) return false;
@@ -236,7 +241,6 @@ export function TasksSidebar({
         {/* D-23. A real Scope, so unlike the two page rows it carries a count. */}
         {row({ kind: "wontDo" }, t("tasks.wontDo"))}
         {row({ kind: "trash" }, t("tasks.trash"))}
-        {pageRow("archive", t("sidebar.archive"))}
       </div>
     </nav>
   );

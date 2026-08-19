@@ -982,7 +982,7 @@ export const ko: Dictionary = {
 
   // ---- Archive page ----
   "archive.title": "보관함",
-  "archive.subtitle": "이곳의 항목은 주요 화면에서 숨겨집니다. 복원하거나 영구적으로 삭제할 수 있어요.",
+  "archive.subtitle": "보관한 프로젝트는 주요 화면에서 숨겨집니다. 복원하거나 영구적으로 삭제할 수 있어요.",
   "archive.tabTasks": "작업 ({{n}})",
   "archive.tabProjects": "프로젝트 ({{n}})",
   "archive.noArchivedTasks": "보관된 작업이 없어요",

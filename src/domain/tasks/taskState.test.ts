@@ -4,6 +4,7 @@ import { isActiveTask, isArchivedTask } from "../../utils/planner";
 import { selectActiveTasks, selectLiveTasks } from "./selectors";
 import { isTaskActive } from "./scopeQuery";
 import type { List, Task } from "../../types";
+import { normalizeData } from "../../hooks/usePlannerData";
 
 function task(over: Partial<Task> = {}): Task {
   return { id: "t1", title: "A task", status: "todo", projectId: "", listId: "l1", ...over } as Task;
@@ -74,6 +75,49 @@ describe("task state (audit D-24)", () => {
       expect(isTaskActive(OPEN, [archivedList])).toBe(false);
       // And still refuses everything the task's own state refuses.
       expect(isTaskActive(GIVEN_UP, [live])).toBe(false);
+    });
+  });
+
+  // D-20's migration runs on load, the way every migration in this app does.
+  describe("the archived migration", () => {
+    it("moves the status onto the marker and gives the workflow status back", () => {
+      const migrated = normalizeData({
+        tasks: [{ id: "a", title: "Filed away", status: "archived", previousStatus: "doing", archivedAt: NOW }],
+      } as never).tasks[0];
+
+      expect(migrated.wontDoAt).toBe(NOW);
+      expect(migrated.status).toBe("doing");
+      // The old fields are cleared, not left to be copied forward forever.
+      expect(migrated.archivedAt).toBe("");
+      expect(migrated.previousStatus).toBeUndefined();
+      expect(isWontDo(migrated)).toBe(true);
+    });
+
+    it("falls back to todo when nothing recorded the old status", () => {
+      const migrated = normalizeData({
+        tasks: [{ id: "b", title: "Filed away", status: "archived" }],
+      } as never).tasks[0];
+      expect(migrated.status).toBe("todo");
+      expect(migrated.wontDoAt).toBeTruthy();
+    });
+
+    // The load path IS the migration here, so it runs on every boot.
+    it("is idempotent", () => {
+      const once = normalizeData({
+        tasks: [{ id: "c", title: "Filed away", status: "archived", previousStatus: "doing", archivedAt: NOW }],
+      } as never).tasks[0];
+      const twice = normalizeData({ tasks: [once] } as never).tasks[0];
+      expect(twice.wontDoAt).toBe(once.wontDoAt);
+      expect(twice.status).toBe("doing");
+    });
+
+    it("leaves a task that was never archived alone", () => {
+      const untouched = normalizeData({
+        tasks: [{ id: "d", title: "Ordinary", status: "doing" }],
+      } as never).tasks[0];
+      expect(untouched.status).toBe("doing");
+      expect(untouched.wontDoAt).toBe("");
+      expect(isTaskOpen(untouched)).toBe(true);
     });
   });
 

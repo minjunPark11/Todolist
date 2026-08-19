@@ -988,7 +988,7 @@ export const en: Dictionary = {
 
   // ---- Archive page ----
   "archive.title": "Archive",
-  "archive.subtitle": "Items here are hidden from your main views. Restore or permanently delete them.",
+  "archive.subtitle": "Archived projects are hidden from your main views. Restore or permanently delete them.",
   "archive.tabTasks": "Tasks ({{n}})",
   "archive.tabProjects": "Projects ({{n}})",
   "archive.noArchivedTasks": "No archived tasks",

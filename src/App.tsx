@@ -1105,19 +1105,17 @@ export default function App() {
   }
 
   /**
-   * The Tasks sidebar rows that are addresses, not Scopes (D-21, D-22).
+   * The one Tasks sidebar row that is an address rather than a Scope (D-22).
    *
-   * Both live inside Tasks and neither may become a Rail item (§1.5), so the
-   * sidebar is the only place they can be reached from — which is why the
-   * Spaces row exists at all: once the sidebar follows `mode`, SpaceHub is
-   * otherwise unreachable from a Tasks screen.
+   * SpaceHub lives inside Tasks and §1.5 refuses it a Rail item, so once the
+   * sidebar follows `mode` the sidebar is the only place it can be reached
+   * from. The Archive row stood beside it until D-20 retired Task archiving.
    */
-  function openSidebarPage(page: TasksSidebarPage) {
-    navigate(page === "archive" ? PAGE_ROUTES.archive : PAGE_ROUTES.projects);
+  function openSidebarPage(_page: TasksSidebarPage) {
+    navigate(PAGE_ROUTES.projects);
   }
 
-  const sidebarPage: TasksSidebarPage | null =
-    activePage === "archive" ? "archive" : contextSidebar.mode === "space" ? "spaces" : null;
+  const sidebarPage: TasksSidebarPage | null = contextSidebar.mode === "space" ? "spaces" : null;
 
   /**
    * The Context Sidebar for the legacy shell, chosen by `mode` (D-21).
