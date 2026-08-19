@@ -111,6 +111,21 @@ export function TasksSidebarSlot({
     );
   }
 
+  /**
+   * A dialog opened FROM the drawer takes the drawer's place (P0-12).
+   *
+   * The drawer is a modal since §3.50, and so are these dialogs. Two surfaces
+   * claiming `aria-modal` at once is not a near-miss — it is a screen reader
+   * being told twice that everything else is inert, with no way to know which
+   * one meant it. The drawer was only ever the route to this button, and it
+   * already gets out of the way when a row NAVIGATES (§15.16); opening a
+   * dialog is the same event with a different destination.
+   */
+  function openFromSidebar(open: () => void) {
+    drawer?.onClose();
+    open();
+  }
+
   return (
     <>
       <TasksSidebar
@@ -120,8 +135,8 @@ export function TasksSidebarSlot({
         sidebarFolders={sidebarFolders}
         tags={tags}
         savedFilters={savedFilters}
-        onManageLists={() => setManaging(true)}
-        onCreateList={(contextFolderId) => setCreatingListIn(contextFolderId)}
+        onManageLists={() => openFromSidebar(() => setManaging(true))}
+        onCreateList={(contextFolderId) => openFromSidebar(() => setCreatingListIn(contextFolderId))}
         current={current}
         currentPage={currentPage}
         onNavigate={go}
