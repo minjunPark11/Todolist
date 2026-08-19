@@ -137,7 +137,7 @@
 .sdv-btn-sm {
   padding: 6px 11px;
   font-size: 12px;
-  border-radius: 9px;
+  border-radius: 8px;
 }
 
 .sdv-btn-icon {
@@ -210,7 +210,7 @@
   padding: 18px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 18px;
+  border-radius: 10px;
   box-shadow: var(--shadow-card);
 }
 
@@ -366,7 +366,7 @@
   padding: 18px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 18px;
+  border-radius: 10px;
   box-shadow: var(--shadow-card);
   min-width: 0;
 }
@@ -668,7 +668,7 @@
   place-items: center;
   width: 46px;
   height: 46px;
-  border-radius: 14px;
+  border-radius: 10px;
   color: var(--accent);
   background: var(--accent-soft);
   margin-bottom: 4px;
@@ -984,7 +984,7 @@
   max-height: min(84vh, 720px);
   overflow-y: auto;
   background: var(--bg-surface);
-  border-radius: 18px;
+  border-radius: 12px;
   padding: 20px;
   box-shadow: var(--shadow-raised);
   display: grid;
@@ -1349,7 +1349,7 @@
 
 .sdv-statuses-toggle {
   border: 1px solid var(--border, #e5e7eb);
-  border-radius: 7px;
+  border-radius: 8px;
   background: none;
   padding: 5px 10px;
   font-size: 0.8rem;

@@ -357,7 +357,7 @@
   font-size: 11px;
   color: var(--ff-muted);
   background: var(--ff-surface-muted);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 /* --- §2.9 account popover --- */
@@ -615,7 +615,7 @@
   max-height: 65vh;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--surface, #fff);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
 }

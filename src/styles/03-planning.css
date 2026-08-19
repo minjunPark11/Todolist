@@ -559,7 +559,7 @@
   height: min(620px, calc(100dvh - 116px));
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 18px;
+  border-radius: 12px;
   box-shadow: var(--shadow-raised);
   display: flex;
   flex-direction: column;

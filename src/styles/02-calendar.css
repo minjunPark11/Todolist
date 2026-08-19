@@ -1265,7 +1265,7 @@
   max-height: 340px;
   overflow-y: auto;
   border: 1px solid var(--color-hairline);
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 16px;
   background: var(--color-canvas);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
@@ -2301,7 +2301,7 @@
   border: 10px solid #69a4ff;
   border-bottom-color: transparent;
   border-left-color: transparent;
-  border-radius: 14px;
+  border-radius: 10px;
   transform: rotate(-45deg);
   filter: drop-shadow(0 8px 14px rgba(37, 99, 235, 0.28));
 }
@@ -2338,7 +2338,7 @@
   align-items: center;
   min-height: 58px;
   border: 1px solid #cdd8eb;
-  border-radius: 9px;
+  border-radius: 8px;
   padding: 0 16px;
   background: rgba(255, 255, 255, 0.76);
   transition: border-color var(--motion-fast), box-shadow var(--motion-fast), background var(--motion-fast);
@@ -2373,7 +2373,7 @@
 
 .auth-icon-button {
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   padding: 7px 8px;
   color: #7e8aa2;
   background: transparent;
@@ -2422,7 +2422,7 @@
 .auth-submit {
   min-height: 60px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   color: #ffffff;
   background: linear-gradient(135deg, #4677ff, #2761ff);
   box-shadow: 0 16px 28px rgba(39, 97, 255, 0.24);
@@ -2780,7 +2780,7 @@
     left: 0;
     top: auto;
     max-height: min(82vh, 720px);
-    border-radius: 18px 18px 0 0;
+    border-radius: 12px 12px 0 0;
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
@@ -3003,7 +3003,7 @@ main {
   align-self: start;
   gap: 4px;
   border: 1px solid var(--ff-border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 4px;
   background: var(--ff-surface-muted);
 }
@@ -3011,7 +3011,7 @@ main {
 .segmented-tabs button {
   min-height: 34px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   padding: 0 14px;
   color: var(--ff-muted);
   background: transparent;
@@ -3240,7 +3240,7 @@ main {
 .confirm-modal {
   width: min(420px, 100%);
   border: 1px solid var(--ff-border);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 22px;
   background: var(--bg-surface);
   color: var(--text-primary);

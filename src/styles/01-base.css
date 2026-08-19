@@ -19,11 +19,14 @@
   /* Tint of Action Blue for soft button fills */
   --color-primary-tint: rgba(0, 102, 204, 0.1);
 
-  /* Radius */
-  --rounded-xs: 5px;
+  /* Radius. The older names, kept because ~50 rules still ask for them —
+     but pointed AT THE SCALE (§11.39) rather than beside it. 5, 11 and 18
+     were three values the scale does not contain, and a rule written
+     against `--rounded-lg` had no way of knowing it was leaving it. */
+  --rounded-xs: 6px;
   --rounded-sm: 8px;
-  --rounded-md: 11px;
-  --rounded-lg: 18px;
+  --rounded-md: 10px;
+  --rounded-lg: 12px;
   /* Alias, not a second value. The repo spelled a pill three ways in CSS
      (`99px`, `999px`, `9999px`) and twice in tokens; they all render the same
      and that is exactly why the drift went unnoticed. One value, one name,
@@ -107,7 +110,9 @@
   --radius-sm: 8px;
   --radius-md: 10px;
   --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* §11.41: a 16–24px card is a marketing page's idea of one. The name is
+     kept for the one rule that uses it; the value comes back into range. */
+  --radius-xl: 12px;
   --radius-pill: 9999px;
 
   /* Shadows (reference scale xs/sm/md/lg) */
