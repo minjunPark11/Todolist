@@ -336,77 +336,10 @@
   font-size: 11px;
 }
 
-/* --- Global sidebar / app shell (reference: GlobalSidebar) --- */
-.side-item {
-  min-height: 30px;
-  border-radius: var(--radius-md);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.side-item:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.side-item.active {
-  color: var(--accent);
-  background: var(--accent-active);
-  font-weight: 600;
-}
-
-.side-item-badge {
-  display: inline-grid;
-  place-items: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: var(--radius-pill);
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.side-section-title {
-  font-size: var(--label-size);
-  font-weight: 700;
-  letter-spacing: var(--label-tracking);
-  color: var(--text-tertiary);
-}
-
-.brand-mark {
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  box-shadow: var(--shadow-accent);
-}
-
-.brand-mark.brand-mark-image {
-  width: 28px;
-  height: 28px;
-  overflow: hidden;
-  color: inherit;
-  background: transparent;
-  box-shadow: none;
-}
-
-.brand-mark-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  object-fit: cover;
-}
-
-.side-avatar {
-  background: linear-gradient(135deg, #a78bfa, #3b82f6);
-  color: #fff;
-  font-weight: 700;
-}
+/* The Global Sidebar's rules stood here — `.side-item`, `.side-item-badge`,
+   `.side-section-title`, `.brand-mark`, `.side-avatar`. That component was
+   deleted in P0-5 and this was the last layer still repainting it. Removed in
+   P0-10; none of these class names appears in any component. */
 
 /* --- Page titles: unified Display 22/700 (reference type scale) --- */
 .tdy-head-title h1,

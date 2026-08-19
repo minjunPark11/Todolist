@@ -18,7 +18,9 @@ import { tabText } from "../../lib/spaceHubI18n";
 import { useTabInUrl } from "../../lib/spaceTabUrl";
 import { isTaskDone } from "../../lib/spaceSelectors";
 import { OverviewSection, type OverviewChild } from "./OverviewSection";
+import { ArchiveSection } from "./ArchiveSection";
 import { useT } from "../../i18n";
+import { isTaskAlive } from "../../domain/tasks/taskState";
 
 interface SpaceScreenProps {
   space: Space;
@@ -29,8 +31,11 @@ interface SpaceScreenProps {
   onOpenProject: (projectId: string) => void;
   onOpenTask: (taskId: string) => void;
   onOpenGoal: (goalId: string) => void;
-  /** Rendered for every tab but `overview`, so the Space owns only its own. */
+  /** Rendered for every tab the Space answers itself. */
   renderView: (tab: SpaceTab, scoped: { tasks: Task[]; goals: LearningPath[] }) => React.ReactNode;
+  /** D-20: archived Projects are Space management, so the Space shows them. */
+  onRestoreProject: (projectId: string) => void;
+  onDeleteProject: (projectId: string) => void;
 }
 
 export function SpaceScreen({
@@ -42,6 +47,8 @@ export function SpaceScreen({
   onOpenProject,
   onOpenTask,
   onOpenGoal,
+  onRestoreProject,
+  onDeleteProject,
   renderView,
 }: SpaceScreenProps) {
   const { t } = useT();
@@ -60,7 +67,7 @@ export function SpaceScreen({
   const spaceTasks = useMemo(
     () =>
       tasks.filter(
-        (task) => task.status !== "archived" && !task.deletedAt && projectIds.has(task.projectId),
+        (task) => isTaskAlive(task) && projectIds.has(task.projectId),
       ),
     [tasks, projectIds],
   );
@@ -138,6 +145,13 @@ export function SpaceScreen({
           onOpenTask={onOpenTask}
           onOpenGoal={onOpenGoal}
           onOpenTab={onChangeTab}
+        />
+      ) : tab === "archive" ? (
+        <ArchiveSection
+          projects={projects}
+          tasks={spaceTasks}
+          onRestoreProject={onRestoreProject}
+          onDeleteProject={onDeleteProject}
         />
       ) : (
         renderView(tab, { tasks: spaceTasks, goals: spaceGoals })

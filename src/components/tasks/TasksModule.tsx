@@ -26,14 +26,16 @@ import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, queryScopeTasks, type ScopeContext } from "../../domain/tasks/scopeQuery";
 import { parseSearchUrl, searchUrlFor, taskUrlFor, urlForSearchResult, parseTaskUrl } from "../../app/taskScopeUrl";
 import { listDisplayName } from "../../domain/spaces/hierarchy";
+import { namedRecordMissing, titleFor } from "../../domain/tasks/scopeTitle";
 import { useT } from "../../i18n";
-import { TasksSidebar } from "./TasksSidebar";
+import { TasksSidebarSlot } from "../shell/TasksSidebarSlot";
+import type { TasksSidebarPage } from "./TasksSidebar";
 import { TaskQuickAdd } from "./TaskQuickAdd";
 import { TaskDrawer } from "./TaskDrawer";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
 import type { TaskChild } from "../../domain/tasks/children";
 import type { TaskMutation } from "../../domain/tasks/mutations";
-import { applyPatch, completeTask, leavesScope, moveTaskToSection, reopenTask, trashTask } from "../../domain/tasks/mutations";
+import { applyPatch, completeTask, leavesScope, markWontDo, moveTaskToSection, reopenTask, trashTask, unmarkWontDo } from "../../domain/tasks/mutations";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
 import { folderIdFor } from "../../domain/tasks/sidebarFolders";
@@ -41,9 +43,6 @@ import { INBOX_COLUMNS, inboxBucketOf, listBoardColumns, moveToInboxBucket, type
 import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
 import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
-import { CommandPalette } from "./CommandPalette";
-import { ListManager } from "./ListManager";
-import { CreateListModal } from "./CreateListModal";
 import { TaskGanttView } from "../TaskGanttView";
 import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
@@ -54,15 +53,8 @@ import { useResponsiveMode, useViewportHeightVar } from "./useResponsiveMode";
 import { detailIsFullScreen, sidebarPresentationFor, taskDetailPresentationFor } from "../../domain/tasks/responsive";
 import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
 import { flattenGroups, PAGE_LIMITS, searchAll } from "../../domain/tasks/search";
-import type { TaskCommand } from "../../domain/tasks/commands";
-import type { RecentEntry } from "./CommandPalette";
-import type { RecentState } from "../../domain/tasks/recents";
-import { NO_RECENTS, rememberScope, rememberTask, sanitizeRecents } from "../../domain/tasks/recents";
 import { platform } from "../../platform";
 import { SEARCH_KINDS, type SearchKind } from "../../domain/tasks/search";
-
-/** §10.44: local to this device, and not part of the account's data. */
-const RECENTS_KEY = "focusflow.tasks.recents.v1";
 
 interface TasksModuleProps {
   tasks: Task[];
@@ -87,6 +79,16 @@ interface TasksModuleProps {
   error?: string;
   /** Commits what `resolveCreateContext` decided (§12.16). */
   onCreate: (title: string, resolution: CreateResolution) => void;
+  /**
+   * §10.41/§10.42's other half, handed in rather than held here (D-25).
+   *
+   * The Command Menu captures a title and Quick Add commits it. The menu is
+   * above this Module now, so the title arrives as a prop and the Module says
+   * when it has been spent — otherwise the same text would be re-seeded into
+   * Quick Add every time the user came back to a Scope.
+   */
+  draftTitle: string;
+  onDraftConsumed: () => void;
   /** Everything the Drawer can change about the Task it has open (§16.28). */
   drawer: {
     childrenOf: (taskId: string) => TaskChild[];
@@ -111,6 +113,13 @@ interface TasksModuleProps {
   }) => Promise<string> | string;
   /** Makes a sidebar group and answers its id (Add List design §6.32). */
   onCreateSidebarFolder: (name: string) => Promise<string> | string;
+  /**
+   * The sidebar rows that leave the module (audit D-21).
+   *
+   * Archive and SpaceHub are inside Tasks but outside the module's nine
+   * routes, so the module cannot answer them itself — it hands them up.
+   */
+  onOpenPage: (page: TasksSidebarPage) => void;
   /** §13.23/§6.56: restoring a List, and the one hard delete in the app. */
   lifecycle: {
     onArchiveList: (listId: string) => void;
@@ -149,17 +158,6 @@ export function TasksModule(props: TasksModuleProps) {
   // One undo at a time, and it is the last thing that happened (§9.40 keeps
   // the stack out of the MVP).
   const [undo, setUndo] = useState<{ labelKey: string; run: () => void } | null>(null);
-  // §10.23: the palette is UI state and nothing about it is in the URL.
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  // §10.41's other half: the palette captures a title, Quick Add commits it.
-  const [captured, setCaptured] = useState("");
-  // §13.25: a management surface, not a Scope — so it is state here and not a
-  // tenth route.
-  const [managing, setManaging] = useState(false);
-  // §0.7 R0-3: the dialog is UI state and nothing about it is in the URL, the
-  // same treatment §10.23 gives the palette. `null` is §1.5's S1 (CLOSED);
-  // a string is the Folder it was started from, "" for the Lists header.
-  const [creatingListIn, setCreatingListIn] = useState<string | null>(null);
   // §15.3. Presentation only: nothing below reads this to decide what a Scope
   // contains, which is what keeps §15.9 true — the URL means the same thing at
   // every width.
@@ -167,35 +165,11 @@ export function TasksModule(props: TasksModuleProps) {
   useViewportHeightVar();
   const sidebar = sidebarPresentationFor(mode);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // §10.44: a device preference, not account data. Nothing here is worth
-  // syncing, and a list of what someone opened is worth less to them than it
-  // would be to anyone reading over their shoulder.
-  const [recents, setRecents] = useState<RecentState>(() => {
-    try {
-      return sanitizeRecents(JSON.parse(platform.storage.getSync(RECENTS_KEY) ?? "null"));
-    } catch {
-      return NO_RECENTS;
-    }
-  });
 
   const ctx: ScopeContext = useMemo(
     () => ({ tasks, lists, dailyPlans, taskTags, today, savedFilters }),
     [tasks, lists, dailyPlans, taskTags, today, savedFilters],
   );
-
-  // §10.6. The shortcut is caught here rather than on a button, because the
-  // palette is reachable from anywhere in the module and a focused input must
-  // not swallow it.
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setPaletteOpen(true);
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   // §10.19: the Search Page opens inside this shell. It is not a Scope — no
   // registry entry, no allowed views, nothing to count — so it is read from
@@ -240,23 +214,6 @@ export function TasksModule(props: TasksModuleProps) {
     onNavigate(taskUrlFor({ ...state, taskId: "" }));
   }
 
-  // §10.43. Recorded from the URL rather than from the click that caused it,
-  // so a place reached by Back or by a pasted link counts the same as one
-  // reached from the sidebar.
-  useEffect(() => {
-    if (searchQuery !== null) return;
-    setRecents((current) => rememberScope(current, scope));
-  }, [searchQuery, scope.kind, "id" in scope ? scope.id : ""]);
-
-  useEffect(() => {
-    if (!state.taskId) return;
-    setRecents((current) => rememberTask(current, state.taskId));
-  }, [state.taskId]);
-
-  useEffect(() => {
-    platform.storage.setSync(RECENTS_KEY, JSON.stringify(recents));
-  }, [recents]);
-
   // The open Task is read from the URL, so a reload reopens it. An id that
   // names nothing simply opens nothing — §5.30 refuses to make a dead link an
   // error the reader has to dismiss.
@@ -299,45 +256,9 @@ export function TasksModule(props: TasksModuleProps) {
     spaces,
   };
 
-  // §10.43's five and five, with anything whose record has gone left out —
-  // a recent row that opens a deleted Task is worse than one row fewer.
-  const recentEntries: RecentEntry[] = [
-    ...recents.scopes
-      .filter((entry) => !namedRecordMissing(entry, lists, folders, sidebarFolders, tags, savedFilters))
-      .map((entry) => ({
-        key: `scope:${entry.kind}:${"id" in entry ? entry.id : ""}`,
-        label: titleFor(entry, lists, folders, sidebarFolders, tags, savedFilters, t),
-        url: taskUrlFor({ scope: entry, view: "list", taskId: "" }),
-      })),
-    ...recents.taskIds
-      .map((taskId) => tasks.find((task) => task.id === taskId))
-      .filter((task): task is Task => Boolean(task) && !task!.deletedAt)
-      .map((task) => ({
-        key: `task:${task.id}`,
-        label: task.title,
-        sublabel: t("tasks.recentTask"),
-        url: urlForSearchResult(
-          { kind: "task", id: task.id, title: task.title, ownerListId: listIdFor(task, lists) },
-          lists,
-          projects,
-        ),
-      })),
-  ];
-
   /** §10.17/§10.18: a result opens at its OWN canonical place, Drawer and all. */
   function openResult(result: SearchResult) {
-    setPaletteOpen(false);
     onNavigate(urlForSearchResult(result, lists, projects));
-  }
-
-  function runCommand(command: TaskCommand) {
-    setPaletteOpen(false);
-    const target = command.target({ scope, view: state.view });
-    if ("search" in target) {
-      onNavigate(searchUrlFor(""));
-      return;
-    }
-    onNavigate(taskUrlFor({ scope: target.scope, view: target.view ?? "list", taskId: "" }));
   }
 
   // The Board's two adapters (§16.30). The component below knows about
@@ -435,19 +356,30 @@ export function TasksModule(props: TasksModuleProps) {
         <div className="tm-scrim" onMouseDown={() => setSidebarOpen(false)} aria-hidden />
       ) : null}
 
-      <TasksSidebar
-        ctx={ctx}
+      {/* D-21: the same component the legacy shell renders when the mode is
+          `tasks`, so crossing between the two shells no longer swaps the
+          sidebar. Its dialogs and their state travel with it. */}
+      {/* §3.50: over the content it is a drawer, beside it a landmark. */}
+      <TasksSidebarSlot
+        drawer={sidebar === "overlay" ? { open: sidebarOpen, onClose: () => setSidebarOpen(false) } : null}
+        tasks={tasks}
+        lists={lists}
         folders={folders}
         sidebarFolders={sidebarFolders}
         tags={tags}
         savedFilters={savedFilters}
-        onManageLists={() => setManaging(true)}
-        onCreateList={(contextFolderId) => setCreatingListIn(contextFolderId)}
+        dailyPlans={dailyPlans}
+        taskTags={taskTags}
+        today={today}
         current={searchQuery === null ? scope : null}
-        onNavigate={(next) => {
-          setSidebarOpen(false);
-          go(next);
-        }}
+        currentPage={null}
+        onNavigateUrl={onNavigate}
+        onOpenPage={props.onOpenPage}
+        onBeforeNavigate={() => setSidebarOpen(false)}
+        onCreateList={props.onCreateList}
+        onCreateSidebarFolder={props.onCreateSidebarFolder}
+        onRestoreList={props.lifecycle.onRestoreList}
+        onPermanentlyDeleteList={props.lifecycle.onPermanentlyDeleteList}
       />
 
       <main className="tm-main">
@@ -474,9 +406,11 @@ export function TasksModule(props: TasksModuleProps) {
               {t("tasks.openNav")}
             </button>
           ) : null}
-          <button type="button" className="tm-search-open" onClick={() => setPaletteOpen(true)}>
-            {t("tasks.openSearch")}
-          </button>
+          {/* A Search button stood here. The Global Rail carries the app's one
+              search entry point now (§2.14), and two of them a few centimetres
+              apart — opening different things — was the duplication P0-6 is
+              for. Ctrl/Cmd+K still opens the palette; P0-9 puts the two behind
+              one door. */}
           <h1 className="tm-title">{title}</h1>
           {!missing && count > 0 ? (
             <span className="tm-title-count" aria-label={t("tasks.countLabel", { count })}>
@@ -532,9 +466,9 @@ export function TasksModule(props: TasksModuleProps) {
             }
             tags={tags}
             savedFilters={savedFilters}
-            draftTitle={captured}
+            draftTitle={props.draftTitle}
             onCreate={(title, resolution) => {
-              setCaptured("");
+              props.onDraftConsumed();
               props.onCreate(title, resolution);
             }}
           />
@@ -614,73 +548,6 @@ export function TasksModule(props: TasksModuleProps) {
         )}
       </main>
 
-      {creatingListIn !== null ? (
-        <CreateListModal
-          contextFolderId={creatingListIn}
-          folders={sidebarFolders}
-          onCreateFolder={props.onCreateSidebarFolder}
-          onClose={() => setCreatingListIn(null)}
-          onSubmit={async (draft: CreateListDraft) => {
-            const payload = createListPayload(draft);
-            const listId = await props.onCreateList(payload);
-            // A creation that answers with no id has not produced a List to
-            // open; treating it as success would close the dialog over a draft
-            // that went nowhere (§1.12).
-            if (!listId) throw new Error("");
-            setCreatingListIn(null);
-            // §1.10, and §17.2's real finish line: the record is not the end,
-            // being in the new List ready to type is. The URL layer already
-            // knows how to say that, so no new routing rule is invented here.
-            // §1.10 ends in the View the user just chose, not in the default
-            // one — being sent somewhere other than what you picked, one second
-            // after picking it, reads as the choice not having been taken.
-            onNavigate(
-              taskUrlFor({
-                scope: { kind: "list", id: listId },
-                view: resolveListView(payload.defaultViewKey, scopeRegistry.list),
-                taskId: "",
-              }),
-            );
-          }}
-        />
-      ) : null}
-
-      {managing ? (
-        <ListManager
-          lists={lists}
-          tasks={tasks}
-          onRestore={props.lifecycle.onRestoreList}
-          onPermanentlyDelete={props.lifecycle.onPermanentlyDeleteList}
-          onClose={() => setManaging(false)}
-        />
-      ) : null}
-
-      {paletteOpen ? (
-        <CommandPalette
-          collections={searchCollections}
-          ctx={{ scope, view: state.view }}
-          recents={recentEntries}
-          onClose={() => setPaletteOpen(false)}
-          onPickResult={openResult}
-          onRunCommand={runCommand}
-          onOpenUrl={(next) => {
-            setPaletteOpen(false);
-            onNavigate(next);
-          }}
-          onSeeAll={(query) => {
-            setPaletteOpen(false);
-            onNavigate(searchUrlFor(query));
-          }}
-          onCapture={(title) => {
-            // §10.41: owner = Inbox, and the user lands where the task would
-            // go rather than being told after the fact.
-            setPaletteOpen(false);
-            setCaptured(title);
-            onNavigate(taskUrlFor({ scope: { kind: "inbox" }, view: "list", taskId: "" }));
-          }}
-        />
-      ) : null}
-
       {openedTask ? (
         <TaskDrawer
           presentation={taskDetailPresentationFor(mode)}
@@ -703,6 +570,14 @@ export function TasksModule(props: TasksModuleProps) {
             )
           }
           onTrash={() => mutate(openedTask, trashTask(openedTask, new Date().toISOString()))}
+          onToggleWontDo={() =>
+            mutate(
+              openedTask,
+              openedTask.wontDoAt
+                ? unmarkWontDo(openedTask)
+                : markWontDo(openedTask, new Date().toISOString()),
+            )
+          }
         />
       ) : null}
 
@@ -727,63 +602,6 @@ export function TasksModule(props: TasksModuleProps) {
       ) : null}
     </section>
   );
-}
-
-function namedRecordMissing(
-  scope: TaskScopeRef,
-  lists: List[],
-  folders: Folder[],
-  sidebarFolders: SidebarFolder[],
-  tags: Tag[],
-  savedFilters: SavedFilter[],
-): boolean {
-  switch (scope.kind) {
-    case "list":
-      return !lists.some((list) => list.id === scope.id);
-    // Either kind of group — the sidebar's own or the domain's — is a record
-    // the link can name, and the Scope reads both through `folderIdFor`.
-    case "folder":
-      return !folders.some((folder) => folder.id === scope.id) && !sidebarFolders.some((folder) => folder.id === scope.id);
-    case "tag":
-      return !tags.some((tag) => tag.id === scope.id);
-    case "filter":
-      return !savedFilters.some((filter) => filter.id === scope.id);
-    default:
-      return false;
-  }
-}
-
-function titleFor(
-  scope: TaskScopeRef,
-  lists: List[],
-  folders: Folder[],
-  sidebarFolders: SidebarFolder[],
-  tags: Tag[],
-  savedFilters: SavedFilter[],
-  t: (key: string) => string,
-): string {
-  switch (scope.kind) {
-    case "list": {
-      const list = lists.find((entry) => entry.id === scope.id);
-      // Through `listDisplayName`, so the Inbox reads in the user's language
-      // rather than under the name the app stored it with (§6.7).
-      return list ? listDisplayName(list, t("tasks.defaultList"), t("tasks.inbox")) : scope.id;
-    }
-    case "folder":
-      return (
-        sidebarFolders.find((entry) => entry.id === scope.id)?.name ??
-        folders.find((entry) => entry.id === scope.id)?.name ??
-        scope.id
-      );
-    case "tag":
-      return tags.find((entry) => entry.id === scope.id)?.name ?? scope.id;
-    // The Filter's own name, because that is what the user called this
-    // question — the generic word is only for one that names no record.
-    case "filter":
-      return savedFilters.find((entry) => entry.id === scope.id)?.name ?? t("tasks.filter");
-    default:
-      return t(`tasks.${scope.kind}`);
-  }
 }
 
 function emptyKeyFor(kind: TaskScopeRef["kind"]): string {

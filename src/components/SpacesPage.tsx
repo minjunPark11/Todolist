@@ -60,6 +60,9 @@ type SpacesPageProps = {
   // Passed straight through to the Horizons section, which is the Horizons
   // screen opened at a scope rather than a second implementation of it.
   onDeletePath: (pathId: string) => void;
+  /** D-20: a Space's archived Projects are restored from the Space itself. */
+  onRestoreProject: (projectId: string) => void;
+  onDeleteProject: (projectId: string) => void;
   onAddMilestone: (pathId: string, input: { title: string }) => void;
   onDeleteMilestone: (pathId: string, milestoneId: string) => void;
   onCreateTaskFromMilestone: (pathId: string, milestoneId: string, title: string) => void;
@@ -126,6 +129,8 @@ export function SpacesPage({
   onArchiveStatus,
   onMoveGoalToStatus,
   onDeletePath,
+  onRestoreProject,
+  onDeleteProject,
   onAddMilestone,
   onDeleteMilestone,
   onCreateTaskFromMilestone,
@@ -183,6 +188,8 @@ export function SpacesPage({
         onOpenProject={onOpenProject}
         onOpenTask={onOpenTask}
         onOpenGoal={onOpenGoal}
+        onRestoreProject={onRestoreProject}
+        onDeleteProject={onDeleteProject}
         renderView={(tab, scoped) => (
           <SpaceScopedView
             tab={tab}

@@ -18,6 +18,7 @@ import {
 } from "../../lib/calendarCategories";
 import { useT } from "../../i18n";
 import { Modal } from "../kit";
+import { isTaskAlive } from "../../domain/tasks/taskState";
 
 interface CalendarCategorySettingsProps {
   tasks: Task[];
@@ -67,7 +68,7 @@ export function CalendarCategorySettings({
   // Events keep working without a rewrite (display falls back to the default
   // category), but the spec (§8.2) asks the user where they should move.
   const pendingDeleteTaskCount = pendingDelete
-    ? tasks.filter((task) => task.categoryId === pendingDelete.id && task.status !== "archived" && !task.deletedAt).length
+    ? tasks.filter((task) => task.categoryId === pendingDelete.id && isTaskAlive(task)).length
     : 0;
 
   useEffect(() => {

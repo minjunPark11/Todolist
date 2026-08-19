@@ -73,7 +73,7 @@ export const en: Dictionary = {
   "tree.folder": "Folder",
   "tree.folderPlaceholder": "New folder name",
   "sidebar.focus": "Focus",
-  "sidebar.board": "Board",
+  "sidebar.board": "Matrix",
 
   // ---- timeline ----
   // `title`/`subtitle` and the axis labels belonged to the standalone
@@ -155,8 +155,8 @@ export const en: Dictionary = {
   "sidebar.planning": "Planning",
 
   // ---- board ----
-  "board.title": "Board",
-  "board.subtitle": "One view over your work — regroup it without moving anything.",
+  "board.title": "Matrix",
+  "board.subtitle": "Every Space in one view — regroup it without moving anything.",
   "board.scope": "Space",
   "board.allSpaces": "All spaces",
   "board.groupBy": "Group by",
@@ -214,6 +214,17 @@ export const en: Dictionary = {
   "sidebar.addProjectPlaceholder": "+ Add Project",
   "sidebar.collapse": "Collapse sidebar",
   "sidebar.expand": "Expand sidebar",
+
+  // Global Rail (§2.28's label table). The Rail shows icons only, so these
+  // are both the tooltip and the accessible name — not decoration.
+  "rail.label": "Global navigation",
+  "rail.tasks": "Tasks",
+  "rail.matrix": "Matrix",
+  "rail.search": "Search",
+  "rail.account": "Account",
+  "rail.accountSignedOut": "Not signed in",
+  "rail.signOut": "Log out",
+  "shell.resizeSidebar": "Resize sidebar",
 
   // ---- App.tsx chrome ----
   // The sidebar box searches everything; the Today header box only filters
@@ -977,7 +988,7 @@ export const en: Dictionary = {
 
   // ---- Archive page ----
   "archive.title": "Archive",
-  "archive.subtitle": "Items here are hidden from your main views. Restore or permanently delete them.",
+  "archive.subtitle": "Archived projects are hidden from your main views. Restore or permanently delete them.",
   "archive.tabTasks": "Tasks ({{n}})",
   "archive.tabProjects": "Projects ({{n}})",
   "archive.noArchivedTasks": "No archived tasks",
@@ -1049,6 +1060,7 @@ export const en: Dictionary = {
   "spaceHub.noteType.reminder": "Reminder",
   "spaceHub.noteType.link": "Link",
   "spaceHub.tab.overview": "Overview",
+  "spaceHub.tab.archive": "Archive",
   "spaceHub.tab.list": "List",
   "spaceHub.tab.board": "Board",
   "spaceHub.tab.gantt": "Gantt",
@@ -1274,6 +1286,7 @@ export const en: Dictionary = {
   "tasks.upcoming": "Next 7 days",
   "tasks.inbox": "Inbox",
   "tasks.completed": "Completed",
+  "tasks.wontDo": "Won't Do",
   "tasks.trash": "Trash",
   "tasks.filter": "Filter",
   "tasks.defaultList": "List",
@@ -1365,6 +1378,10 @@ export const en: Dictionary = {
   "tasks.subtasks": "Subtasks",
   "tasks.addSubtask": "Add a subtask",
   "tasks.moveToTrash": "Move to trash",
+  "tasks.markWontDo": "Mark won't do",
+  "tasks.unmarkWontDo": "Put back on the list",
+  "tasks.undoWontDo": "Marked won't do.",
+  "tasks.undoWontDoCleared": "Put back on the list.",
   "tasks.undoTrashed": "Moved to trash.",
   "tasks.undoRestored": "Restored.",
   "tasks.undoCompleted": "Marked complete.",
@@ -1377,9 +1394,6 @@ export const en: Dictionary = {
   "tasks.openTask": "Open {{title}}",
   "tasks.countLabel": "{{count}} tasks",
   "tasks.moveToColumn": "Move {{title}} to another column",
-  "tasks.paletteLabel": "Search and commands",
-  "tasks.palettePlaceholder": "Search, or type a command…",
-  "tasks.paletteHint": "Type to search tasks, lists, tags and filters.",
   "tasks.groupCommands": "Go",
   "tasks.group.task": "Tasks",
   "tasks.group.list": "Lists",
@@ -1394,9 +1408,11 @@ export const en: Dictionary = {
   "tasks.filterAll": "All",
   "tasks.searchPageEmpty": "Nothing matches “{{query}}”. Try another search.",
   "tasks.resultCompleted": "Completed",
-  "tasks.searchEmpty": "Nothing matches that.",
-  "tasks.seeAllResults": "See all results",
   "tasks.searchTitle": "Search",
+  "menu.label": "Go to, or run",
+  "menu.placeholder": "Jump to a list, or type a command…",
+  "menu.hint": "Type to jump to a list, tag or project — or to run a command. Tasks are on the Search page.",
+  "menu.empty": "Nothing here matches that. The Search page looks inside tasks.",
   "commands.goToday": "Go to Today",
   "commands.goUpcoming": "Go to Next 7 days",
   "commands.goInbox": "Go to Inbox",

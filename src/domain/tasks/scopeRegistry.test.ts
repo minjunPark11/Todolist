@@ -9,7 +9,9 @@ import {
 } from "./scopeRegistry";
 
 describe("the registry says what the matrix says", () => {
-  it("holds the nine canonical Scopes and no more", () => {
+  // Ten now, not the plan's nine: D-23 adds Won't Do as a third terminal
+  // state beside Completed and Trash, and D-20 retires Task Archive into it.
+  it("holds the canonical Scopes and no more", () => {
     expect([...TASK_SCOPE_KINDS].sort()).toEqual([
       "completed",
       "filter",
@@ -20,6 +22,7 @@ describe("the registry says what the matrix says", () => {
       "today",
       "trash",
       "upcoming",
+      "wontDo",
     ]);
   });
 
@@ -41,15 +44,16 @@ describe("the registry says what the matrix says", () => {
     }
   });
 
-  // 12.4: the two system Scopes are read-only. Creating into Completed or
-  // Trash has no meaning that would not immediately contradict the Scope.
-  it("refuses creation in Completed and Trash, and allows it everywhere else", () => {
+  // 12.4: the terminal Scopes are read-only. Creating into Completed, Won't Do
+  // or Trash has no meaning that would not immediately contradict the Scope.
+  it("refuses creation in the terminal Scopes, and allows it everywhere else", () => {
     const cannot = TASK_SCOPE_KINDS.filter((kind) => !scopeRegistry[kind].canCreate);
-    expect(cannot.sort()).toEqual(["completed", "trash"]);
+    expect(cannot.sort()).toEqual(["completed", "trash", "wontDo"]);
   });
 
-  it("gives the two system Scopes their own count semantics (12.14)", () => {
+  it("gives the terminal Scopes their own count semantics (12.14)", () => {
     expect(scopeRegistry.completed.countMode).toBe("completed");
+    expect(scopeRegistry.wontDo.countMode).toBe("wontDo");
     expect(scopeRegistry.trash.countMode).toBe("trash");
     const active = TASK_SCOPE_KINDS.filter((kind) => scopeRegistry[kind].countMode === "active");
     expect(active).toHaveLength(7);

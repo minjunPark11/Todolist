@@ -11,6 +11,7 @@ import { blockedTaskIds } from "../domain/tasks/dependencies";
 import { scheduleSpan } from "../domain/schedule/scheduleQueries";
 import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { todayValue } from "./date";
+import { isTaskAlive, isTaskOpen } from "../domain/tasks/taskState";
 
 // The stored bucket, under the name this page has always used for it.
 // The record it comes from is domain/today/dailyPlan (§6.18).
@@ -228,7 +229,7 @@ export function buildTimeRail(
   let laterCount = 0;
 
   for (const task of tasks) {
-    if (task.deletedAt || task.status === "archived") continue;
+    if (!isTaskAlive(task)) continue;
     // The rail shows blocks that START today. A range's start time belongs to
     // its first day (audit 1-b), so a multi-day task appears on that day only.
     const schedule = scheduleFromTask(task);
@@ -308,9 +309,7 @@ export function buildSpaceSignals(
     const overdue = tasks.filter(
       (task) =>
         task.projectId === project.id &&
-        !task.deletedAt &&
-        task.status !== "done" &&
-        task.status !== "archived" &&
+        isTaskOpen(task) &&
         Boolean(task.dueDate) &&
         task.dueDate < today,
     );

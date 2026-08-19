@@ -196,8 +196,8 @@ export function FolderSelect({
           </div>
 
           {/* §6.28: say the search found nothing rather than leaving a gap.
-              Outside the listbox, which may own only options (the palette
-              taught this one — see CommandPalette). */}
+              Outside the listbox, which may own only options (the Command
+              Menu taught this one — see shell/CommandMenu). */}
           {shown.length === 0 && query.trim() ? <p className="tm-state">{t("tasks.folderSearchEmpty")}</p> : null}
 
           {/* §6.29/§6.30: the footer becomes the editor. No second dialog — a

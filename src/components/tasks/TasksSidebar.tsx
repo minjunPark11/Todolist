@@ -10,6 +10,7 @@
 // forbids a screen from inventing a count formula, and §6.94 asks the sidebar
 // and the thing it points at to run the same query — the two numbers
 // disagreeing is what v0.10.1 and v0.10.2 each fixed by hand.
+import { useEffect, useRef } from "react";
 import type { Folder, List, SavedFilter, SidebarFolder, Tag } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, type ScopeContext } from "../../domain/tasks/scopeQuery";
@@ -18,9 +19,28 @@ import { activeSidebarFolders, folderIdFor } from "../../domain/tasks/sidebarFol
 import { activeSavedFilters } from "../../domain/tasks/filters";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { useT } from "../../i18n";
+// §3.52: whichever sidebar the mode renders is the region the expand button
+// names. They never co-exist, so the id stays unique.
+import { CONTEXT_SIDEBAR_ID } from "../../app/contextSidebar";
 import { listColorHex } from "../../domain/tasks/listColor";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
+
+/**
+ * §3.50: what this sidebar IS depends on how it is presented.
+ *
+ * Beside the content it is a navigation landmark. Over the content, behind a
+ * scrim, it is a drawer — a modal-like surface, which is a different promise:
+ * Tab stays inside it, Escape closes it, and focus goes back where it came
+ * from. Passing this is how the caller says which one it is asking for.
+ */
+export interface SidebarDrawer {
+  open: boolean;
+  onClose: () => void;
+}
 
 interface TasksSidebarProps {
+  /** Null when the sidebar is a persistent column (§15.15). */
+  drawer?: SidebarDrawer | null;
   ctx: ScopeContext;
   folders: Folder[];
   sidebarFolders: SidebarFolder[];
@@ -40,7 +60,24 @@ interface TasksSidebarProps {
   /** Null on the Search Page, which is not a Scope and highlights nothing. */
   current: TaskScopeRef | null;
   onNavigate: (scope: TaskScopeRef) => void;
+  /**
+   * The two rows that are addresses rather than Scopes (audit D-21, D-22).
+   *
+   * Archive and SpaceHub are both inside Tasks — §1.5 refuses either a Rail
+   * item — but neither is in `scopeRegistry`, so neither can go through `row`
+   * and neither carries a count. Archive becomes a real Scope in P0-4b; the
+   * Spaces row is a doorway and will not.
+   */
+  currentPage: TasksSidebarPage | null;
+  onOpenPage: (page: TasksSidebarPage) => void;
 }
+
+/**
+ * D-20 retired the Archive row: Task archiving is gone and `안 함` took its
+ * place as a real Scope. Only the doorway to SpaceHub is left — archived
+ * PROJECTS live there, which is a different thing entirely.
+ */
+export type TasksSidebarPage = "spaces";
 
 function sameScope(a: TaskScopeRef, b: TaskScopeRef | null): boolean {
   if (!b || a.kind !== b.kind) return false;
@@ -48,6 +85,7 @@ function sameScope(a: TaskScopeRef, b: TaskScopeRef | null): boolean {
 }
 
 export function TasksSidebar({
+  drawer = null,
   ctx,
   folders,
   sidebarFolders,
@@ -57,8 +95,27 @@ export function TasksSidebar({
   onCreateList,
   current,
   onNavigate,
+  currentPage,
+  onOpenPage,
 }: TasksSidebarProps) {
   const { t } = useT();
+  const root = useRef<HTMLElement>(null);
+  const isOpenDrawer = Boolean(drawer?.open);
+
+  // §3.50. Only while it is actually over the content: a persistent column
+  // that trapped Tab would be a column you cannot leave.
+  useFocusTrap(root, { enabled: isOpenDrawer });
+
+  useEffect(() => {
+    if (!isOpenDrawer) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      drawer?.onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpenDrawer, drawer]);
 
   function row(scope: TaskScopeRef, label: string, options: { indent?: boolean; dot?: string } = {}) {
     const count = queryScopeCount(scope, ctx);
@@ -75,6 +132,27 @@ export function TasksSidebar({
         {/* A zero is not shown. An empty Scope says so on its own screen; a
             column of noughts in the tree is noise (§2.10). */}
         {count > 0 ? <span className="tm-count">{count}</span> : null}
+      </button>
+    );
+  }
+
+  /**
+   * A row for a destination that is not a Scope.
+   *
+   * No count, deliberately. The head of this file says every count comes from
+   * `queryScopeCount` and never from a local filter (§12.14) — and neither of
+   * these has a Scope to ask. Archive gets its number when it becomes one.
+   */
+  function pageRow(page: TasksSidebarPage, label: string) {
+    return (
+      <button
+        key={`page:${page}`}
+        type="button"
+        className={`tm-row${currentPage === page ? " is-current" : ""}`}
+        aria-current={currentPage === page ? "page" : undefined}
+        onClick={() => onOpenPage(page)}
+      >
+        <span className="tm-row-label">{label}</span>
       </button>
     );
   }
@@ -122,7 +200,19 @@ export function TasksSidebar({
   const visibleFilters = activeSavedFilters(savedFilters);
 
   return (
-    <nav className="tm-sidebar" aria-label={t("tasks.navLabel")}>
+    <nav
+      ref={root}
+      id={CONTEXT_SIDEBAR_ID}
+      className="tm-sidebar"
+      aria-label={t("tasks.navLabel")}
+      // §3.50: a drawer over the content announces itself as one — while it
+      // is OPEN. A closed drawer claiming `aria-modal` would be telling a
+      // screen reader the page behind it is inert when nothing is covering
+      // it. The landmark role is given up only for as long as the modal is
+      // really there; on a phone, knowing you are inside one is worth more
+      // than having a second landmark to jump between.
+      {...(isOpenDrawer ? { role: "dialog" as const, "aria-modal": true } : {})}
+    >
       <div className="tm-section">
         {row({ kind: "today" }, t("tasks.today"))}
         {row({ kind: "upcoming" }, t("tasks.upcoming"))}
@@ -193,7 +283,13 @@ export function TasksSidebar({
       ) : null}
 
       <div className="tm-section">
+        {pageRow("spaces", t("tree.section"))}
+      </div>
+
+      <div className="tm-section">
         {row({ kind: "completed" }, t("tasks.completed"))}
+        {/* D-23. A real Scope, so unlike the two page rows it carries a count. */}
+        {row({ kind: "wontDo" }, t("tasks.wontDo"))}
         {row({ kind: "trash" }, t("tasks.trash"))}
       </div>
     </nav>

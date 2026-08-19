@@ -7,7 +7,7 @@
 //
 // What it deliberately does NOT do: close on an overlay click (§1.8 — this is a
 // wide dialog and a stray click must not take the draft with it), touch the URL
-// (§0.7 R0-3 — the dialog is UI state, the way the command palette is), or
+// (§0.7 R0-3 — the dialog is UI state, the way the Command Menu is), or
 // decide anything about the List beyond what the user typed.
 import { useCallback, useId, useRef, useState } from "react";
 import { useFocusTrap } from "../../hooks/useFocusTrap";

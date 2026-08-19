@@ -1,6 +1,6 @@
 ﻿import { FormEvent, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sidebar } from "./components/Sidebar";
+import { SpaceSidebar } from "./components/shell/SpaceSidebar";
 import { OllamaChat } from "./components/OllamaChat";
 import { TaskDetail } from "./components/TaskDetail";
 import { GlobalFocusBar } from "./components/GlobalFocusBar";
@@ -20,6 +20,20 @@ import { spaceIdForProject } from "./domain/spaces/spaces";
 import type { TodayIntent } from "./components/TodayPage";
 import { TasksModule } from "./components/tasks/TasksModule";
 import { canonicalizeTaskUrl, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
+import { PAGE_ROUTES, RETIRED_ROUTES, bootRedirectFor, pageForPath, pathForDefaultView, pathForPage } from "./app/pageRoute";
+import { RAIL_DESTINATIONS, TASKS_HOME, isTasksLocation, railItemFor, type RailNavItem } from "./app/railNav";
+import { AppShell } from "./components/shell/AppShell";
+import { GlobalRail } from "./components/shell/GlobalRail";
+import { SEARCH_PATH, taskUrlFor } from "./app/taskScopeUrl";
+import { useContextSidebar } from "./hooks/useContextSidebar";
+import { useRecents } from "./hooks/useRecents";
+import { CommandMenu } from "./components/shell/CommandMenu";
+import { recentEntriesFrom } from "./app/recentEntries";
+import type { SearchCollections, SearchResult } from "./domain/tasks/search";
+import type { CommandContext, TaskCommand } from "./domain/tasks/commands";
+import { parseTaskUrl, searchUrlFor, urlForSearchResult } from "./app/taskScopeUrl";
+import { TasksSidebarSlot } from "./components/shell/TasksSidebarSlot";
+import type { TasksSidebarPage } from "./components/tasks/TasksSidebar";
 import { childrenOf } from "./domain/tasks/children";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
@@ -66,6 +80,8 @@ import { useReminders } from "./hooks/useReminders";
 import { formatLocalTime } from "./domain/schedule";
 import { todayValue } from "./utils/date";
 import { I18nProvider, translate, useT } from "./i18n";
+import { isWontDo } from "./domain/tasks/taskState";
+import { isTaskActive } from "./domain/tasks/scopeQuery";
 
 function cloudExternalCalendarSnapshot(calendar: ExternalCalendar): ExternalCalendar {
   return {
@@ -116,28 +132,15 @@ export default function App() {
   // Renders before the <I18nProvider> below exists in the tree, so this can't
   // use the useT() context hook — call the plain translate() helper instead.
   const t = (key: string, vars?: Record<string, string | number>) => translate(appSettings.language, key, vars);
-  // Open the user's chosen default start page on boot. /inbox opens Today with
-  // the triage drawer (handled by todayIntent below), so it maps to "today".
-  const [activePage, setActivePage] = useState<PageId>(() => {
-    // A deep link into the tree outranks the default start page — arriving at
-    // /s/:spaceId and being shown Today would discard the link.
-    if (parseSelection(window.location.pathname).kind !== "none") return "projects";
-    switch (appSettings.defaultView) {
-      case "/calendar":
-        return "calendar";
-      case "/board":
-      // Legacy: Planning is now the Board grouped by quadrant.
-      case "/planning":
-        return "board";
-      // "/projects" fell here and opened the card grid. Anyone who had it
-      // stored now starts on Today (the default branch) — a Space is reached
-      // from the tree, and there is no screen to land on without one.
-      case "/focus":
-        return "focus";
-      default:
-        return "today";
-    }
-  });
+  // Open the user's chosen default start page on boot (Nav Shell audit D-04).
+  // The setting is applied by rewriting the address once, rather than by
+  // seeding a page variable the URL would then contradict — `activePage` is
+  // read from the path now. Computed here, at the first render the old
+  // `activePage` initializer used to run in, and applied by the effect below.
+  // /inbox opens Today with the triage drawer, which `todayIntent` handles.
+  const [bootRedirect] = useState(() =>
+    bootRedirectFor(window.location.pathname, appSettings.defaultView),
+  );
   // Inbox is folded into Today's triage drawer (no standalone page). This
   // covers the legacy /inbox route, a ?triage=inbox deep link, and the
   // "default start page" setting all landing on the same Today intent.
@@ -147,7 +150,6 @@ export default function App() {
       new URLSearchParams(window.location.search).get("triage") === "inbox";
     return hasInboxRedirect || appSettings.defaultView === "/inbox" ? "triage" : "";
   });
-  const [searchQuery, setSearchQuery] = useState("");
   // Where in the Space tree the user is standing. Derived from the path, never
   // mirrored into state: the two flat fields this replaces could not say which
   // List was open and did not survive a reload (SPACES_CLICKUP_UI_DESIGN §1).
@@ -173,14 +175,6 @@ export default function App() {
   const [appVersion, setAppVersion] = useState(__APP_VERSION__);
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | { status: "checking" } | { status: "installing"; latestVersion?: string }>({ status: "checking" });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // Desktop-only sidebar rail collapse; ignored by the mobile overlay menu.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem("focusflow-sidebar-collapsed") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   // The Tasks Module reads path AND query — `?view=` and `?task=` are part of
   // where you are (§5.62), where every route above it is a path alone.
@@ -195,8 +189,52 @@ export default function App() {
     [currentPath, planner.spaces, planner.projects],
   );
   const selectedProjectId = readSelectedProjectId(selection);
+  // D-04: which page is open is a reading of the address, not a state beside
+  // it. Everything that used to call `setActivePage` navigates instead, which
+  // is what lets a reload, Back, and (from P0-2) the Rail all agree.
+  const activePage = pageForPath(currentPath);
+  // §2.19: the Rail's active item is the same reading, one level coarser —
+  // four items over seven pages, because Board, Archive and the Spaces tree
+  // are places inside Tasks rather than siblings of it (§1.5).
+  const railItem = railItemFor(currentPath);
+  // §2.20. Session-scoped on purpose (audit D-15): coming back to Tasks from
+  // the Calendar should return you to the list you were reading, but a cold
+  // start is an arrival and belongs to the start-page setting, not to
+  // wherever the app happened to be when it was last closed.
+  const lastTasksLocationRef = useRef("");
+  // §3.66: the sidebar's width and collapsed flag are App Shell state. They
+  // used to be a boolean the legacy shell kept to itself and the Tasks Module
+  // knew nothing about — which is why the two could not agree on a width.
+  const contextSidebar = useContextSidebar(currentPath);
+  /**
+   * The Global Command Menu (D-25). §10.23: it is UI state, and nothing about
+   * it is in the URL — which is exactly what separates it from `/search`.
+   */
+  const [menuOpen, setMenuOpen] = useState(false);
+  // §10.41's other half: the menu captures a title, Quick Add commits it. Held
+  // here rather than in the Module because the menu is above the Module now.
+  const [capturedTitle, setCapturedTitle] = useState("");
+  const recents = useRecents(currentUrl);
+  /**
+   * The Tasks the user can actually see (audit D-24, axis 2 — P0-4b-5).
+   *
+   * A List that is archived or deleted takes its Tasks out of every Scope
+   * WITHOUT writing anything on them (§6.56/§13.19) — that is what makes
+   * restoring the List bring them all back, and why they never show up in the
+   * Task Trash. Inside the Tasks Module `isTaskActive` has always enforced it.
+   * Everywhere else did not: Focus still offered those Tasks, the Calendar
+   * still drew them, and the reminder queue still rang for them.
+   *
+   * Filtering once here rather than teaching fourteen modules to take a
+   * `lists` argument. `planner.tasks` stays the collection for LOOKUPS — a
+   * running focus session, a parent Task, an export — because a Task that is
+   * hidden is not a Task that stopped existing.
+   */
+  const visibleTasks = useMemo(
+    () => planner.tasks.filter((task) => isTaskActive(task, planner.lists)),
+    [planner.tasks, planner.lists],
+  );
   const isProjectDetailOpen = selection.kind !== "none";
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const originalTitleRef = useRef(document.title || "FocusFlow");
   const completedNotificationRef = useRef<Set<string>>(new Set());
   const syncingExternalCalendarsRef = useRef<Set<string>>(new Set());
@@ -257,24 +295,6 @@ export default function App() {
     void checkAppUpdate(appVersion);
   }, [appVersion]);
 
-  const searchResults = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      return { tasks: [], projects: [], topics: [], notes: [] };
-    }
-
-    return {
-      tasks: planner.tasks.filter((task) =>
-        [task.title, task.description, task.notes, task.tags.join(" ")]
-          .join(" ")
-          .toLowerCase()
-          .includes(query),
-      ),
-      projects: activeProjects.filter((project) =>
-        [project.name, project.description].join(" ").toLowerCase().includes(query),
-      ),
-    };
-  }, [activeProjects, planner.tasks, searchQuery]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -284,7 +304,6 @@ export default function App() {
 
       if (event.key === "Escape") {
         planner.selectTask("");
-        setSearchQuery("");
         return;
       }
 
@@ -301,18 +320,21 @@ export default function App() {
       // swallowed — otherwise the shortcut letter types itself into the input
       // it just focused.
       if (event.key === "/") {
+        // §2.28 advertises `/` on the Rail's Search tooltip, and P0-5 removed
+        // the sidebar box this used to focus — the Rail's search is the only
+        // one left, so the shortcut points at it.
         event.preventDefault();
-        searchInputRef.current?.focus();
+        openGlobalSearch();
       } else if (event.key.toLowerCase() === "t") {
         event.preventDefault();
-        setActivePage("today");
+        navigate(PAGE_ROUTES.today);
       } else if (event.key.toLowerCase() === "i") {
         event.preventDefault();
-        setActivePage("today");
+        navigate(PAGE_ROUTES.today);
         setTodayIntent("triage");
       } else if (event.key.toLowerCase() === "n") {
         event.preventDefault();
-        setActivePage("today");
+        navigate(PAGE_ROUTES.today);
         setTodayIntent("quickAdd");
       }
     }
@@ -320,6 +342,41 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [planner]);
+
+  // Module switching (§2.31). Deliberately NOT in the handler above: that one
+  // returns early on any modifier and while the user is typing, and a module
+  // switch is exactly the shortcut that should still work from inside a text
+  // field. The tooltips on the Rail advertise these, so they have to fire.
+  useEffect(() => {
+    function handleModuleKeys(event: KeyboardEvent) {
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (event.altKey || event.shiftKey) return;
+      // §3.26: Ctrl/Cmd + \ collapses, and only where there is a sidebar to
+      // collapse. Registered here with the module switches rather than per
+      // page, which §3.26 asks for in as many words.
+      if (event.key === "\\") {
+        if (contextSidebar.mode === "none") return;
+        event.preventDefault();
+        contextSidebar.toggleCollapsed();
+        return;
+      }
+      const item: RailNavItem | undefined = {
+        "1": "tasks",
+        "2": "matrix",
+        "3": "calendar",
+        "4": "focus",
+      }[event.key] as RailNavItem | undefined;
+      if (!item) return;
+      event.preventDefault();
+      navigateRail(item);
+    }
+
+    window.addEventListener("keydown", handleModuleKeys);
+    return () => window.removeEventListener("keydown", handleModuleKeys);
+    // No dependency array: `navigateRail` closes over `railItem` and the last
+    // Tasks location, and a stale closure here would send Ctrl+1 to the wrong
+    // place. One listener swapped per render is cheaper than getting that wrong.
+  });
 
   useEffect(() => {
     const root = document.documentElement;
@@ -449,32 +506,39 @@ export default function App() {
     return project ? spaceIdForProject(project) : "";
   }
 
+  // D-04: `/s/:spaceId/...` already reads as the Spaces page, so the paired
+  // `setActivePage("projects")` these four used to carry is gone — the path
+  // was always the real answer and the state was a copy that could disagree.
   function selectSpace(spaceId: string) {
     planner.selectTask("");
     navigate(pathForSelection({ kind: "space", spaceId }));
-    setActivePage("projects");
   }
 
   function selectProject(projectId: string) {
     planner.selectTask("");
     navigate(pathForSelection({ kind: "project", spaceId: spaceIdOf(projectId), projectId }));
-    setActivePage("projects");
   }
 
   function selectList(projectId: string, listId: string) {
     planner.selectTask("");
     navigate(pathForSelection({ kind: "list", spaceId: spaceIdOf(projectId), projectId, listId }));
-    setActivePage("projects");
   }
 
   function selectFolder(projectId: string, folderId: string) {
     planner.selectTask("");
     navigate(pathForSelection({ kind: "folder", spaceId: spaceIdOf(projectId), projectId, folderId }));
-    setActivePage("projects");
   }
 
+  /**
+   * Steps out of the tree to the Spaces overview.
+   *
+   * Lands on `/spaces`, not `/app`: leaving a Space used to keep the page on
+   * "projects" while the address said `/app`, and now that the address decides
+   * the page, `/app` would silently mean Today. Closing a Space is not a
+   * request for Today.
+   */
   function clearSelection() {
-    if (selection.kind !== "none") navigate("/app");
+    if (selection.kind !== "none") navigate(PAGE_ROUTES.projects);
   }
 
   /**
@@ -507,11 +571,36 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  // D-04: the "default start page" setting, applied once. `replace` so Back
+  // does not return to the address the app was launched with and bounce
+  // straight forward again.
+  useEffect(() => {
+    if (bootRedirect) navigate(bootRedirect, "replace");
+    // Boot means boot: re-running this on a later render would drag the user
+    // back to their start page mid-session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (isTasksLocation(currentUrl)) lastTasksLocationRef.current = currentUrl;
+  }, [currentUrl]);
+
+  // A link to a screen that no longer exists lands where its content went, and
+  // the address bar says so rather than quietly showing something else
+  // (P0-4b-4). `replace`, because the retired address is not a place to go
+  // Back to.
+  useEffect(() => {
+    const moved = RETIRED_ROUTES[currentPath];
+    if (moved) navigate(moved, "replace");
+  }, [currentPath]);
+
   useEffect(() => {
     if (currentPath === "/login" && planner.auth.isSignedIn) {
-      navigate("/app", "replace");
+      // Signing in is an arrival, so it honours the start-page setting the
+      // same way a cold boot does — `/app` would pin everyone to Today.
+      navigate(pathForDefaultView(appSettings.defaultView), "replace");
     }
-  }, [currentPath, planner.auth.isSignedIn]);
+  }, [currentPath, planner.auth.isSignedIn, appSettings.defaultView]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("focusflow:page-change", { detail: { page: activePage } }));
@@ -657,7 +746,7 @@ export default function App() {
   // hook because it needs the dictionary, and the hook has no business knowing
   // which language the app is in.
   useReminders({
-    tasks: planner.tasks,
+    tasks: visibleTasks,
     describe: ({ title, at }) => ({
       title,
       body: t("schedule.notificationBody", {
@@ -788,7 +877,7 @@ export default function App() {
 
   function buildCurrentShareSnapshot() {
     return buildCalendarShareSnapshot({
-      tasks: planner.tasks,
+      tasks: visibleTasks,
       projects: activeProjects,
     });
   }
@@ -973,16 +1062,18 @@ export default function App() {
     }
 
     planner.selectTask(taskId);
-    setSearchQuery("");
 
     if (task.status === "inbox") {
-      setActivePage("today");
+      navigate(PAGE_ROUTES.today);
       setTodayIntent("triage");
       return;
     }
 
-    if (task.status === "archived" || task.archivedAt) {
-      setActivePage("archive");
+    // D-23/D-24: a task that has been given up on lives in Won't Do now, so
+    // that is where opening it lands. Legacy `archived` records read as Won't
+    // Do too until D-20's migration moves them.
+    if (isWontDo(task)) {
+      navigateUrl(taskUrlFor({ scope: { kind: "wontDo" }, view: "list", taskId: task.id }));
       return;
     }
 
@@ -991,7 +1082,7 @@ export default function App() {
       return;
     }
 
-    setActivePage("board");
+    navigate(PAGE_ROUTES.board);
   }
 
   function openProjectFromCalendar(projectId: string) {
@@ -1001,33 +1092,202 @@ export default function App() {
   function viewTaskInCalendar(taskId: string) {
     planner.selectTask(taskId);
     setCalendarFocusProjectId("");
-    setActivePage("calendar");
+    navigate(PAGE_ROUTES.calendar);
   }
 
   function openCalendarForProject(projectId?: string) {
     planner.selectTask("");
     setCalendarFocusProjectId(projectId ?? "");
-    setActivePage("calendar");
+    navigate(PAGE_ROUTES.calendar);
   }
 
-  function toggleSidebarCollapsed() {
-    setSidebarCollapsed((current) => {
-      const next = !current;
-      try {
-        localStorage.setItem("focusflow-sidebar-collapsed", next ? "1" : "0");
-      } catch {
-        // Collapse still works for this session without persistence.
+  /**
+   * A Global Rail click (§2.11–§2.15).
+   *
+   * Tasks is the only item without a fixed address: §2.11 asks it to return
+   * the user to where they were, and §2.11's "현재 이미 Tasks인 경우" forbids
+   * the obvious shortcut of collapsing the sidebar instead — re-clicking the
+   * module you are already in does nothing rather than something surprising.
+   */
+  function navigateRail(item: RailNavItem) {
+    if (item === "tasks") {
+      if (railItem === "tasks") return;
+      navigateUrl(lastTasksLocationRef.current || TASKS_HOME);
+      return;
+    }
+    navigate(RAIL_DESTINATIONS[item]);
+  }
+
+  /**
+   * Search is a PAGE, and the Rail is its entry point (D-25, closing Q-03).
+   *
+   * The spec's §2.14 wanted one global overlay that never routes. This repo
+   * had already built the other half — a Search Page with `?q=` in the
+   * address (v16 §10.19) — and an overlay cannot be pasted into a message.
+   * So the two were split by what they are for rather than merged: searching
+   * has a page you can link to, and getting somewhere fast has a menu that
+   * writes nothing. Search does not take the Rail's active state either way.
+   */
+  function openGlobalSearch() {
+    navigateUrl(SEARCH_PATH);
+  }
+
+  /**
+   * The Command Menu, and everything it needs to be asked from ANY page.
+   *
+   * The four things below used to be read off the Tasks Module's own state.
+   * They are read off the URL here instead, which is what lets Ctrl/Cmd+K
+   * work on the Calendar: `menuContext` is simply null-scoped when the
+   * address is not a Tasks address, and `commands.ts` hides the commands that
+   * needed one (D-25).
+   */
+  const menuCollections: SearchCollections = {
+    // `visibleTasks`, not `planner.tasks` (D-24 axis 2) — though the menu no
+    // longer lists Tasks at all, the same collections feed the Search Page's
+    // idea of what exists, and the two must not disagree.
+    tasks: visibleTasks,
+    lists: planner.lists,
+    folders: planner.folders,
+    sidebarFolders: planner.sidebarFolders,
+    tags: planner.tags,
+    savedFilters: planner.savedFilters,
+    projects: planner.projects,
+    spaces: planner.spaces,
+  };
+
+  const menuTaskState = parseTaskUrl(currentUrl);
+  const menuContext: CommandContext = {
+    scope: menuTaskState?.scope ?? null,
+    view: menuTaskState?.view ?? null,
+  };
+
+  // §10.6. Caught on the window rather than on a button, because the menu is
+  // reachable from anywhere and a focused input must not swallow the shortcut.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setMenuOpen(true);
       }
-      return next;
-    });
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  function renderCommandMenu() {
+    if (!menuOpen) return null;
+    return (
+      <CommandMenu
+        collections={menuCollections}
+        ctx={menuContext}
+        recents={recentEntriesFrom(recents, menuCollections, t)}
+        onClose={() => setMenuOpen(false)}
+        /** §10.17/§10.18: a result opens at its OWN canonical place. */
+        onPickResult={(result: SearchResult) => {
+          setMenuOpen(false);
+          navigateUrl(urlForSearchResult(result, planner.lists, planner.projects));
+        }}
+        onRunCommand={(command: TaskCommand) => {
+          setMenuOpen(false);
+          const target = command.target(menuContext);
+          // `null` when the command needed a Scope and the page has none —
+          // `canRunCommand` should already have refused, so this is the second
+          // guard rather than the first (Gate 8).
+          if (!target) return;
+          if ("search" in target) {
+            navigateUrl(searchUrlFor(""));
+            return;
+          }
+          navigateUrl(taskUrlFor({ scope: target.scope, view: target.view ?? "list", taskId: "" }));
+        }}
+        onOpenUrl={(next) => {
+          setMenuOpen(false);
+          navigateUrl(next);
+        }}
+        onCapture={(title) => {
+          // §10.41: owner = Inbox, and the user lands where the task would go
+          // rather than being told after the fact.
+          setMenuOpen(false);
+          setCapturedTitle(title);
+          navigateUrl(taskUrlFor({ scope: { kind: "inbox" }, view: "list", taskId: "" }));
+        }}
+      />
+    );
+  }
+
+  /**
+   * The one Tasks sidebar row that is an address rather than a Scope (D-22).
+   *
+   * SpaceHub lives inside Tasks and §1.5 refuses it a Rail item, so once the
+   * sidebar follows `mode` the sidebar is the only place it can be reached
+   * from. The Archive row stood beside it until D-20 retired Task archiving.
+   */
+  function openSidebarPage(_page: TasksSidebarPage) {
+    navigate(PAGE_ROUTES.projects);
+  }
+
+  const sidebarPage: TasksSidebarPage | null = contextSidebar.mode === "space" ? "spaces" : null;
+
+  /**
+   * The Context Sidebar for the legacy shell, chosen by `mode` (D-21).
+   *
+   * This is the fix P0-4a exists for. The mode used to decide only how wide
+   * the sidebar was; the shell branch decided which one it was, so `/archive`
+   * said `tasks` and drew the Space tree. Now `tasks` means the Tasks sidebar
+   * wherever you are, and the tree belongs to `space`.
+   */
+  function renderLegacySidebar() {
+    if (contextSidebar.mode === "none") return null;
+    if (contextSidebar.mode === "tasks") {
+      return (
+        <TasksSidebarSlot
+          tasks={planner.tasks}
+          lists={planner.lists}
+          folders={planner.folders}
+          sidebarFolders={planner.sidebarFolders}
+          tags={planner.tags}
+          savedFilters={planner.savedFilters}
+          dailyPlans={planner.dailyPlans}
+          taskTags={planner.taskTags}
+          today={today}
+          current={null}
+          currentPage={sidebarPage}
+          onNavigateUrl={navigateUrl}
+          onOpenPage={openSidebarPage}
+          onCreateList={({ name, color, defaultViewKey, sidebarFolderId }) =>
+            // Same call the Tasks Module makes below: no domain Folder, because
+            // that one belongs to a Project and this List has none. The group
+            // the dialog offered is the sidebar's (§R.7).
+            planner.createList("", name, undefined, { color, defaultViewKey, sidebarFolderId })
+          }
+          onCreateSidebarFolder={planner.createSidebarFolder}
+          onRestoreList={planner.restoreList}
+          onPermanentlyDeleteList={planner.permanentlyDeleteList}
+        />
+      );
+    }
+    return null;
+  }
+
+  function renderRail() {
+    return (
+      <GlobalRail
+        active={railItem}
+        onNavigate={navigateRail}
+        onOpenSearch={openGlobalSearch}
+        accountEmail={planner.auth.isSignedIn ? planner.auth.userEmail : ""}
+        onSignOut={planner.signOut}
+      />
+    );
   }
 
   function navigateSection(page: PageId) {
-    setActivePage(page);
-    // Leaving the tree drops the selection with it. Keeping /s/:spaceId in the
-    // address bar while showing Today would make the URL describe a place the
-    // user is no longer standing.
-    clearSelection();
+    // Leaving the tree drops the selection with it, and one navigation now
+    // does both: `selection` is read from the path, so replacing /s/:spaceId
+    // with the page's own address IS clearing it. The separate
+    // `clearSelection()` this used to call would have pushed a second history
+    // entry for the same click.
+    navigate(pathForPage(page));
     // Plain navigation (sidebar etc.) always shows the unfiltered calendar.
     setCalendarFocusProjectId("");
     planner.selectTask("");
@@ -1054,7 +1314,7 @@ export default function App() {
           onSignIn={planner.signIn}
           onSignUp={planner.signUp}
           onResetPassword={planner.resetPassword}
-          onAuthenticated={() => navigate("/app", "replace")}
+          onAuthenticated={() => navigate(pathForDefaultView(appSettings.defaultView), "replace")}
         />
       </I18nProvider>
     );
@@ -1071,6 +1331,9 @@ export default function App() {
     const canonical = canonicalizeTaskUrl(currentUrl);
     return (
       <I18nProvider lang={appSettings.language}>
+        {/* Both shells hang off the same frame now (R.5.1). The Rail is built
+            once, above the branch, so neither shell owns it. */}
+        <AppShell rail={renderRail()} sidebar={contextSidebar}>
         <TasksModule
           tasks={planner.tasks}
           lists={planner.lists}
@@ -1086,7 +1349,10 @@ export default function App() {
           today={today}
           url={canonical ?? currentUrl}
           onNavigate={navigateUrl}
+          onOpenPage={openSidebarPage}
           error={planner.auth.syncError}
+          draftTitle={capturedTitle}
+          onDraftConsumed={() => setCapturedTitle("")}
           onCreate={(title, resolution) => {
             if (!resolution.targetListId) return;
             const owner = planner.lists.find((list) => list.id === resolution.targetListId);
@@ -1145,6 +1411,11 @@ export default function App() {
           }}
           onMutate={planner.updateTask}
         />
+        {/* Above both shells, drawn last so it sits over whichever answered
+            the route (D-25). It is `position: fixed`, so where it lands on
+            screen owes nothing to which grid it was rendered inside. */}
+        {renderCommandMenu()}
+        </AppShell>
       </I18nProvider>
     );
   }
@@ -1181,6 +1452,7 @@ export default function App() {
       <AppPages
         activePage={activePage}
         planner={planner}
+        visibleTasks={visibleTasks}
         appSettings={appSettings}
         activeProjects={activeProjects}
         selectedProjectId={selectedProjectId}
@@ -1248,11 +1520,15 @@ export default function App() {
   return (
     <I18nProvider lang={appSettings.language}>
       <>
+        <AppShell rail={renderRail()} sidebar={contextSidebar}>
         <div
           className={[
             "app-shell",
             mobileMenuOpen ? "mobile-menu-open" : "",
-            sidebarCollapsed ? "sidebar-collapsed" : "",
+            // `sidebar-collapsed` used to sit here and narrow the column to a
+            // 68px icon rail. §3.22/§3.30 make collapse mean a layout slot of
+            // 0, and the Global Rail is where icon-level navigation lives now,
+            // so the frame hides the column instead (19-app-shell.css).
           ]
             .filter(Boolean)
             .join(" ")}
@@ -1276,76 +1552,49 @@ export default function App() {
           onClick={() => setMobileMenuOpen(false)}
         />
       ) : null}
-      <Sidebar
-        activePage={activePage}
-        onNavigate={(page) => {
-          navigateSection(page);
-          setMobileMenuOpen(false);
-        }}
-        tasks={planner.tasks}
-        projects={activeProjects}
-        selectedProjectId={selectedProjectId}
-        userEmail={planner.auth.userEmail}
-        showCounts={appSettings.showSidebarCounts}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={toggleSidebarCollapsed}
-        selection={selection}
-        folders={planner.folders}
-        lists={planner.lists}
-        onSelectProject={(projectId) => {
-          selectProject(projectId);
-          setMobileMenuOpen(false);
-        }}
-        onSelectList={(spaceId, listId) => {
-          selectList(spaceId, listId);
-          setMobileMenuOpen(false);
-        }}
-        onSelectFolder={(spaceId, folderId) => {
-          selectFolder(spaceId, folderId);
-          setMobileMenuOpen(false);
-        }}
-        onCreateList={planner.createList}
-        onCreateFolder={planner.createFolder}
-        onRenameList={(listId, name) => planner.updateList(listId, { name })}
-        onArchiveList={planner.archiveList}
-        onRenameFolder={(folderId, name) => planner.updateFolder(folderId, { name })}
-        onArchiveFolder={planner.archiveFolder}
-        onMoveItemToList={(itemKey, listId) => {
-          // `Item.key` is `source:id` — the projection's own encoding, so the
-          // tree never has to know which collection a card came from.
-          const [source, id] = itemKey.split(":");
-          if (source === "task") planner.moveTaskToList(id, listId);
-          else if (source === "goal") planner.moveGoalToList(id, listId);
-          // A milestone lives inside its goal and has no List of its own.
-        }}
-        onAddProject={(name) => planner.addProject(name, "#0066cc")}
-        onRenameSpace={(spaceId, name) => planner.updateSpace(spaceId, { name })}
-        onArchiveSpace={planner.archiveSpace}
-        onRenameProject={(projectId, name) => planner.updateProject(projectId, { name })}
-        onArchiveProject={handleArchiveProject}
-        onTogglePinProject={planner.toggleProjectPinned}
-        spaces={planner.spaces}
-        onSelectSpace={selectSpace}
-        onCreateSpace={planner.createSpace}
-        onCreateProject={(spaceId, name) => planner.addProject(name, "#0066cc", spaceId)}
-        onOpenSettings={() => {
-          navigateSection("settings");
-          setMobileMenuOpen(false);
-        }}
-        search={
-          <SearchBox
-            query={searchQuery}
-            inputRef={searchInputRef}
-            results={searchResults}
-            onChange={setSearchQuery}
-            onSelectTask={openTaskInOfficialPage}
-            onSelectProject={(projectId) => {
-              selectProject(projectId);
-              setSearchQuery("");
-            }}
-          />
-        }
-      />
+      {/* D-21: the sidebar follows `mode`, not the shell. `space` draws the
+          Space/Project tree (D-14); `tasks` gets the same sidebar the Tasks
+          Module shows, so crossing between the two shells no longer swaps it;
+          `none` draws nothing at all (§2.16). */}
+      {contextSidebar.mode === "space" ? (
+        <SpaceSidebar
+          spaces={planner.spaces}
+          projects={activeProjects}
+          folders={planner.folders}
+          lists={planner.lists}
+          tasks={visibleTasks}
+          selection={selection}
+          showCounts={appSettings.showSidebarCounts}
+          onCollapse={contextSidebar.toggleCollapsed}
+          onSelectSpace={selectSpace}
+          onSelectProject={selectProject}
+          onCreateSpace={planner.createSpace}
+          onCreateProject={(spaceId, name) => planner.addProject(name, "#0066cc", spaceId)}
+          onRenameSpace={(spaceId, name) => planner.updateSpace(spaceId, { name })}
+          onArchiveSpace={planner.archiveSpace}
+          onRenameProject={(projectId, name) => planner.updateProject(projectId, { name })}
+          onArchiveProject={handleArchiveProject}
+          onTogglePinProject={planner.toggleProjectPinned}
+          onSelectList={selectList}
+          onSelectFolder={selectFolder}
+          onCreateList={planner.createList}
+          onCreateFolder={planner.createFolder}
+          onRenameList={(listId, name) => planner.updateList(listId, { name })}
+          onArchiveList={planner.archiveList}
+          onRenameFolder={(folderId, name) => planner.updateFolder(folderId, { name })}
+          onArchiveFolder={planner.archiveFolder}
+          onMoveItemToList={(itemKey, listId) => {
+            // `Item.key` is `source:id` — the projection's own encoding, so the
+            // tree never has to know which collection a card came from.
+            const [source, id] = itemKey.split(":");
+            if (source === "task") planner.moveTaskToList(id, listId);
+            else if (source === "goal") planner.moveGoalToList(id, listId);
+            // A milestone lives inside its goal and has no List of its own.
+          }}
+        />
+      ) : (
+        renderLegacySidebar()
+      )}
       {/* key={activePage} remounts <main> on navigation so the new page
           crossfades in; opacity-only per pageVariants. */}
       <motion.main
@@ -1383,7 +1632,7 @@ export default function App() {
         }}
         aiContext={buildAiContextInput({ planner, appSettings, currentPage: activePage })}
         calendarContext={{
-          tasks: planner.tasks,
+          tasks: visibleTasks,
           projects: planner.projects,
             }}
         onExecuteActions={(actions) =>
@@ -1411,6 +1660,8 @@ export default function App() {
         onDismissToast={handleDismissToast}
       />
         </div>
+        {renderCommandMenu()}
+        </AppShell>
         <UpdateChecker />
       </>
     </I18nProvider>
@@ -1747,53 +1998,4 @@ function AccountSection({
   );
 }
 
-function SearchBox({
-  query,
-  inputRef,
-  results,
-  onChange,
-  onSelectTask,
-  onSelectProject,
-}: {
-  query: string;
-  inputRef: RefObject<HTMLInputElement>;
-  results: { tasks: Task[]; projects: Project[] };
-  onChange: (value: string) => void;
-  onSelectTask: (taskId: string) => void;
-  onSelectProject: (projectId: string) => void;
-}) {
-  const { t } = useT();
-  const hasResults =
-    results.tasks.length > 0 ||
-    results.projects.length > 0;
-
-  return (
-    <div className="global-search">
-      <input
-        ref={inputRef}
-        aria-label={t("app.searchAria")}
-        placeholder={t("app.searchPlaceholder")}
-        value={query}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {query.trim() ? (
-        <div className="search-results">
-          {!hasResults ? <p className="empty-state">{t("app.searchNoResults")}</p> : null}
-          {results.tasks.slice(0, 6).map((task) => (
-            <button key={task.id} onClick={() => onSelectTask(task.id)}>
-              <strong>{task.title}</strong>
-              <small>{t("app.taskLabel")} - {task.status} - {task.tags.join(", ") || t("app.noTags")}</small>
-            </button>
-          ))}
-          {results.projects.slice(0, 4).map((project) => (
-            <button key={project.id} onClick={() => onSelectProject(project.id)}>
-              <strong>{project.name}</strong>
-              <small>{t("app.projectLabel")}</small>
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 

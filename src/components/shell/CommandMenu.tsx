@@ -1,17 +1,26 @@
-// The one global entry point (TickTick plan §10.2-§10.8, §10.36-§10.46).
+// The Global Command Menu — Ctrl/Cmd+K, from anywhere (D-25).
 //
-// One overlay, two kinds of answer. §10.1 keeps them apart in meaning even
-// though they share an input: a search result is somewhere to GO, a command is
-// something to DO. They are rendered as separate groups (§10.36) rather than
-// interleaved, because a row that navigates and a row that acts should not
-// look alike.
+// This box used to be the app's one "search and commands" overlay, and it
+// lived inside the Tasks Module. Q-03 split it in two:
 //
-// What the user types here never reaches the address bar (§10.23, Gate 8).
-// The palette's query is transient; only leaving for the Search Page writes a
-// URL, and that is the difference the Gate asks to be kept.
+//   - Finding something is SEARCHING, and search has a page with an address
+//     you can paste to someone (`/search`). The Rail's Search button goes
+//     there. It is not an overlay and never was in this repo.
+//   - Getting somewhere fast, and running something, is this menu. It opens
+//     over whatever you are looking at, writes nothing to the URL, and closes
+//     without disturbing what is behind it (§10.23, §10.40).
+//
+// The two do not hand off to each other. There is no "see all results" row
+// here, because a menu that ends by navigating to the Search Page is a search
+// box wearing a menu's clothes — and then typing in it means two different
+// things depending on which row you land on.
+//
+// What that leaves is the definition: rows are PLACES and COMMANDS. A List, a
+// Tag, a Project is a place. A Task is not — it is a record you search for,
+// and `MENU_LIMITS` is where that is enforced rather than here.
 import { useEffect, useMemo, useState } from "react";
 import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
-import { flattenGroups, PALETTE_LIMITS, searchAll } from "../../domain/tasks/search";
+import { flattenGroups, MENU_LIMITS, searchAll } from "../../domain/tasks/search";
 import type { CommandContext, TaskCommand } from "../../domain/tasks/commands";
 import { availableCommands, canRunCommand } from "../../domain/tasks/commands";
 import { useT } from "../../i18n";
@@ -24,7 +33,7 @@ export interface RecentEntry {
   url: string;
 }
 
-interface CommandPaletteProps {
+interface CommandMenuProps {
   collections: SearchCollections;
   ctx: CommandContext;
   recents: RecentEntry[];
@@ -32,12 +41,11 @@ interface CommandPaletteProps {
   onPickResult: (result: SearchResult) => void;
   onRunCommand: (command: TaskCommand) => void;
   onOpenUrl: (url: string) => void;
-  onSeeAll: (query: string) => void;
   /** §10.41/§10.42: hands the typed text to Quick Add — it does not create. */
   onCapture: (title: string) => void;
 }
 
-export function CommandPalette({
+export function CommandMenu({
   collections,
   ctx,
   recents,
@@ -45,16 +53,18 @@ export function CommandPalette({
   onPickResult,
   onRunCommand,
   onOpenUrl,
-  onSeeAll,
   onCapture,
-}: CommandPaletteProps) {
+}: CommandMenuProps) {
   const { t } = useT();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const typing = query.trim().length > 0;
 
+  // The same matcher the Search Page uses, asked a narrower question:
+  // `MENU_LIMITS` drops the Task group entirely, so what comes back is the
+  // set of destinations and nothing else (D-25).
   const groups = useMemo(
-    () => searchAll(query, collections, { inbox: t("tasks.inbox"), defaultList: t("tasks.defaultList") }, PALETTE_LIMITS),
+    () => searchAll(query, collections, { inbox: t("tasks.inbox"), defaultList: t("tasks.defaultList") }, MENU_LIMITS),
     [query, collections, t],
   );
   const commands = useMemo(() => availableCommands(query, ctx, t), [query, ctx, t]);
@@ -63,9 +73,9 @@ export function CommandPalette({
   /**
    * §10.37's navigation order, and §10.39: group headers are not in it.
    *
-   * The empty palette navigates recents and nothing else (§10.8); a palette
-   * with a query ends on the capture row, so a search that found nothing still
-   * has somewhere for Enter to go (§10.41).
+   * The empty menu navigates recents and nothing else (§10.8); a menu with a
+   * query ends on the capture row, so a query that matched nothing still has
+   * somewhere for Enter to go (§10.41).
    */
   const rows = useMemo(
     () =>
@@ -87,7 +97,7 @@ export function CommandPalette({
     const row = rows[index];
     if (!row) return;
     if (row.kind === "command") {
-      // Gate 8, asked again at the moment of execution: the palette may have
+      // Gate 8, asked again at the moment of execution: the menu may have
       // been open while the Scope changed under it.
       if (!canRunCommand(row.command.id, ctx)) return;
       onRunCommand(row.command);
@@ -111,7 +121,7 @@ export function CommandPalette({
       event.preventDefault();
       run(active);
     } else if (event.key === "Escape") {
-      // §10.40: closing the palette leaves the Scope behind it alone.
+      // §10.40: closing the menu leaves the page behind it alone.
       event.preventDefault();
       onClose();
     }
@@ -124,7 +134,7 @@ export function CommandPalette({
         type="button"
         role="option"
         aria-selected={index === active}
-        className={`tm-palette-row${index === active ? " is-active" : ""}`}
+        className={`cmd-menu-row${index === active ? " is-active" : ""}`}
         onMouseEnter={() => setActive(index)}
         onClick={() => run(index)}
       >
@@ -136,16 +146,16 @@ export function CommandPalette({
   let index = 0;
 
   return (
-    <div className="tm-palette-backdrop" onMouseDown={onClose}>
+    <div className="cmd-menu-backdrop" onMouseDown={onClose}>
       <div
-        className="tm-palette"
+        className="cmd-menu"
         role="dialog"
         aria-modal="true"
-        aria-label={t("tasks.paletteLabel")}
+        aria-label={t("menu.label")}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <input
-          className="tm-palette-input"
+          className="cmd-menu-input"
           type="text"
           autoFocus
           // §16.34: the input owns a list that changes as it is typed in, and
@@ -153,10 +163,10 @@ export function CommandPalette({
           // region and Enter appears to do nothing.
           role="combobox"
           aria-expanded={rows.length > 0}
-          aria-controls="tm-palette-results"
+          aria-controls="cmd-menu-results"
           aria-autocomplete="list"
           value={query}
-          placeholder={t("tasks.palettePlaceholder")}
+          placeholder={t("menu.placeholder")}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={onKeyDown}
         />
@@ -165,11 +175,11 @@ export function CommandPalette({
             §10.11 group carries its heading as its NAME and hides the visible
             copy from the tree — otherwise the heading is read as a broken
             choice. Found by axe (aria-required-children), not by eye. */}
-        <div className="tm-palette-results" id="tm-palette-results" role="listbox">
+        <div className="cmd-menu-results" id="cmd-menu-results" role="listbox">
           {/* §10.8: places, not predictions. The list is what the user did,
               which needs no explaining and cannot be wrong. */}
           {!typing && recents.length > 0 ? (
-            <section className="tm-palette-group" role="group" aria-label={t("tasks.groupRecent")}>
+            <section className="cmd-menu-group" role="group" aria-label={t("tasks.groupRecent")}>
               <h3 aria-hidden="true">{t("tasks.groupRecent")}</h3>
               {recents.map((entry) => {
                 const position = index;
@@ -179,7 +189,7 @@ export function CommandPalette({
                   entry.key,
                   <>
                     <span>{entry.label}</span>
-                    {entry.sublabel ? <span className="tm-palette-sub">{entry.sublabel}</span> : null}
+                    {entry.sublabel ? <span className="cmd-menu-sub">{entry.sublabel}</span> : null}
                   </>,
                 );
               })}
@@ -187,7 +197,7 @@ export function CommandPalette({
           ) : null}
 
           {commands.length > 0 ? (
-            <section className="tm-palette-group" role="group" aria-label={t("tasks.groupCommands")}>
+            <section className="cmd-menu-group" role="group" aria-label={t("tasks.groupCommands")}>
               <h3 aria-hidden="true">{t("tasks.groupCommands")}</h3>
               {commands.map((command) => {
                 const position = index;
@@ -200,7 +210,7 @@ export function CommandPalette({
           {groups.map((group) => (
             <section
               key={group.kind}
-              className="tm-palette-group"
+              className="cmd-menu-group"
               role="group"
               aria-label={t(`tasks.group.${group.kind}`)}
             >
@@ -212,38 +222,36 @@ export function CommandPalette({
                   position,
                   `${result.kind}:${result.id}`,
                   <>
-                    <span className={result.completed ? "is-done" : undefined}>{result.title}</span>
-                    {result.subtitle ? <span className="tm-palette-sub">{result.subtitle}</span> : null}
-                    {result.completed ? <span className="tm-palette-sub">{t("tasks.resultCompleted")}</span> : null}
+                    <span>{result.title}</span>
+                    {result.subtitle ? <span className="cmd-menu-sub">{result.subtitle}</span> : null}
                   </>,
                 );
               })}
             </section>
           ))}
 
-          {/* §10.41: search runs into capture. §10.42 is the constraint — the
-              title is handed to Quick Add, not written straight to a Task, so
-              the user still sees where it is going and can add a date. */}
+          {/* §10.41 used to read "search runs into capture". With search gone
+              to its own page, this is simply the menu's one command that does
+              not exist until you type — and §10.42 is still the constraint:
+              the title is handed to Quick Add, not written straight to a
+              Task, so the user sees where it is going and can add a date. */}
           {typing
             ? row(rows.length - 1, "capture", <span>{t("tasks.captureAs", { title: query.trim() })}</span>)
             : null}
         </div>
 
-        {/* Below the listbox rather than inside it: a message and a link out
-            are not choices in the list, and owning them broke the listbox. */}
+        {/* Below the listbox rather than inside it: a message is not a choice
+            in the list, and owning it broke the listbox. */}
         {typing && results.length === 0 && commands.length === 0 ? (
-          <p className="tm-state" role="status">
-            {t("tasks.searchEmpty")}
+          <p className="cmd-menu-state" role="status">
+            {t("menu.empty")}
           </p>
         ) : null}
 
-        {typing ? (
-          <button type="button" className="tm-palette-all" onClick={() => onSeeAll(query)}>
-            {t("tasks.seeAllResults")}
-          </button>
-        ) : recents.length === 0 ? (
-          <p className="tm-state">{t("tasks.paletteHint")}</p>
-        ) : null}
+        {/* Where "see all results" used to send the user to `/search`. It is a
+            hint now, not a row: the Search Page is reached from the Rail or by
+            its command, never as the tail of something typed here (D-25). */}
+        {!typing && recents.length === 0 ? <p className="cmd-menu-state">{t("menu.hint")}</p> : null}
       </div>
     </div>
   );

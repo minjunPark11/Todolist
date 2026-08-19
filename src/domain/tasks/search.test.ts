@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Folder, List, Project, SavedFilter, SidebarFolder, Space, Tag, Task } from "../../types";
-import { flattenGroups, matchRank, PALETTE_LIMITS, searchAll, type SearchCollections } from "./search";
+import { flattenGroups, matchRank, DEFAULT_LIMITS, MENU_LIMITS, searchAll, type SearchCollections } from "./search";
 
 const NOW = "2026-08-18T09:00:00.000Z";
 const LABELS = { inbox: "Inbox", defaultList: "List" };
@@ -193,9 +193,9 @@ describe("searchAll", () => {
 
   it("cuts each group at the limit (§10.49)", () => {
     const many = Array.from({ length: 12 }, (_, index) => task({ id: `t${index}`, title: `Report ${index}`, listId: "l1" }));
-    const groups = searchAll("report", collections({ tasks: many }), LABELS, PALETTE_LIMITS);
-    expect(groups[0].results).toHaveLength(PALETTE_LIMITS.task);
-    expect(flattenGroups(groups)).toHaveLength(PALETTE_LIMITS.task);
+    const groups = searchAll("report", collections({ tasks: many }), LABELS, DEFAULT_LIMITS);
+    expect(groups[0].results).toHaveLength(DEFAULT_LIMITS.task);
+    expect(flattenGroups(groups)).toHaveLength(DEFAULT_LIMITS.task);
   });
 });
 
@@ -224,6 +224,31 @@ describe("what lives above the Tasks Module (§10.16)", () => {
   });
 });
 
+// D-25 split the two callers apart: the Search Page looks for Tasks, and the
+// Command Menu goes to places. A limit of 0 is how that is said here.
+describe("MENU_LIMITS — the Command Menu asks for places, not Tasks", () => {
+  const tasks = [task({ id: "t1", title: "Report draft", listId: "l1" })];
+  const tags = [{ id: "tag-1", name: "report", createdAt: NOW, updatedAt: NOW }] as Tag[];
+
+  it("answers with the containers that matched", () => {
+    const groups = searchAll("report", collections({ tasks, tags }), LABELS, MENU_LIMITS);
+    expect(groups.map((group) => group.kind)).toEqual(["tag"]);
+  });
+
+  it("leaves out the Task group entirely rather than showing it empty", () => {
+    const groups = searchAll("report", collections({ tasks }), LABELS, MENU_LIMITS);
+    // Not `results: []` under a "Tasks" heading — a heading over nothing reads
+    // as "no tasks match", and the truth is that the menu never looked.
+    expect(groups.find((group) => group.kind === "task")).toBeUndefined();
+    expect(flattenGroups(groups)).toEqual([]);
+  });
+
+  it("still finds a Task for the Search Page, from the same collections", () => {
+    const groups = searchAll("report", collections({ tasks }), LABELS, DEFAULT_LIMITS);
+    expect(groups.map((group) => group.kind)).toEqual(["task"]);
+  });
+});
+
 describe("per-group limits (§10.49)", () => {
   it("caps each kind on its own rather than sharing one budget", () => {
     const tasks = Array.from({ length: 9 }, (_, index) => task({ id: `t${index}`, title: `Report ${index}`, listId: "l1" }));
@@ -233,8 +258,8 @@ describe("per-group limits (§10.49)", () => {
       createdAt: NOW,
       updatedAt: NOW,
     })) as Tag[];
-    const groups = searchAll("report", collections({ tasks, tags }), LABELS, PALETTE_LIMITS);
-    expect(groups.find((group) => group.kind === "task")?.results).toHaveLength(PALETTE_LIMITS.task);
-    expect(groups.find((group) => group.kind === "tag")?.results).toHaveLength(PALETTE_LIMITS.tag);
+    const groups = searchAll("report", collections({ tasks, tags }), LABELS, DEFAULT_LIMITS);
+    expect(groups.find((group) => group.kind === "task")?.results).toHaveLength(DEFAULT_LIMITS.task);
+    expect(groups.find((group) => group.kind === "tag")?.results).toHaveLength(DEFAULT_LIMITS.tag);
   });
 });

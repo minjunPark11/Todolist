@@ -13,6 +13,7 @@ import {
 import { scheduleSpan } from "../domain/schedule/scheduleQueries";
 import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { addDays, todayValue } from "./date";
+import { isTaskAlive } from "../domain/tasks/taskState";
 
 // "deadline" is gone: it named the marker a task drew from `dueDate`, and a
 // task draws one chip now (audit §6, 1-e). `project-deadline` stays — a
@@ -207,7 +208,7 @@ export function buildCalendarItems({
   for (const item of viewItems) {
     const task = taskById.get(item.sourceId);
     if (!task) continue;
-    if (item.statusId === "archived" || task.status === "archived") continue;
+    if (item.statusId === "archived" || !isTaskAlive(task)) continue;
     const done = item.done;
     // The calendar filters and colours by PROJECT. `Item.spaceId` named one
     // until STEP 7 and now names the Space above it, which would let one

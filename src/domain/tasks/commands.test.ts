@@ -68,6 +68,32 @@ describe("canRunCommand — the same question at execution time", () => {
   });
 });
 
+// D-25: the menu opens on the Calendar, on Focus, on the Spaces pages. None
+// of those is a Scope, and the honest answer is `null` rather than a Scope
+// invented to keep the shape.
+describe("outside a Scope entirely", () => {
+  const nowhere = ctx({ scope: null, view: null });
+
+  it("still offers every destination, because none of them is where you are", () => {
+    const offered = availableCommands("go to", nowhere, t).map((command) => command.id);
+    expect(offered).toEqual(["goToday", "goUpcoming", "goInbox", "goCompleted", "goTrash"]);
+  });
+
+  it("withholds the view commands, which had nothing to switch", () => {
+    expect(availableCommands("show as", nowhere, t)).toEqual([]);
+    expect(canRunCommand("viewBoard", nowhere)).toBe(false);
+    expect(canRunCommand("viewList", nowhere)).toBe(false);
+  });
+
+  it("keeps Search reachable, since it is a page and not a Scope", () => {
+    expect(availableCommands("search", nowhere, t).map((command) => command.id)).toEqual(["openSearch"]);
+  });
+
+  it("gives a view command no target to run, as the second guard (Gate 8)", () => {
+    expect(commandById("viewBoard")?.target(nowhere)).toBeNull();
+  });
+});
+
 describe("targets — §10.33's predictable results", () => {
   it("navigation commands name a Scope", () => {
     expect(commandById("goToday")?.target(ctx())).toEqual({ scope: { kind: "today" } });

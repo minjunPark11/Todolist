@@ -10,6 +10,7 @@
 // counts what that returns. Agreement is structural, and the test that pins it
 // is checking that nobody has since added a shortcut.
 import type { List, SavedFilter, Task, TaskDailyPlan, TaskTag } from "../../types";
+import { isCompleted, isTaskAlive, isWontDo } from "./taskState";
 import type { TaskScopeRef } from "./scopeRegistry";
 import { listIdFor } from "../spaces/membership";
 import { tagIdFor, isUserTag } from "../tags/tags";
@@ -56,17 +57,9 @@ export function effectiveDueDate(task: Task): string {
   return task.dueDate || "";
 }
 
-/**
- * Completion, from the one field the app actually reads.
- *
- * The audit's section A found this stored twice — `status === "done"` beside
- * `completedAt` — with `status` winning. §12.12 words its membership as
- * `completedAt != null`; that is the same set here, and unifying the two is
- * C-2's open item, not this module's to decide.
- */
-export function isCompleted(task: Task): boolean {
-  return task.status === "done";
-}
+// D-24: the Task's own state now has one home. Re-exported so the callers
+// that have always imported these from here keep working.
+export { isCompleted, isTaskAlive, isTaskOpen, isTrashed, isWontDo } from "./taskState";
 
 /**
  * §12.19's shared precondition, in one place so no Scope copies it.
@@ -77,8 +70,9 @@ export function isCompleted(task: Task): boolean {
  * would be a bug in nine places instead of one decision in this one.
  */
 export function isTaskActive(task: Task, lists: List[]): boolean {
-  if (task.deletedAt) return false;
-  if (task.status === "archived") return false;
+  // Axis 1: the Task's own state (D-24).
+  if (!isTaskAlive(task)) return false;
+  // Axis 2: its container's.
   const listId = listIdFor(task, lists);
   if (!listId) return true; // nothing owns it yet; the backfill has not run
   const owner = listsById(lists).get(listId);
@@ -89,7 +83,11 @@ export function isTaskActive(task: Task, lists: List[]): boolean {
   return !owner || (!owner.archivedAt && !owner.deletedAt);
 }
 
-/** §12.4's canonical `active`: alive, and not finished. */
+/**
+ * §12.4's canonical `active`: alive, in a live List, and not finished.
+ *
+ * The List-aware sibling of `isTaskOpen` — same question, one more condition.
+ */
 function isActive(task: Task, lists: List[]): boolean {
   return isTaskActive(task, lists) && !isCompleted(task);
 }
@@ -154,7 +152,11 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     case "trash":
       return Boolean(task.deletedAt);
     case "completed":
-      return !task.deletedAt && isCompleted(task);
+      // Won't Do is not a quiet kind of done. It never writes `completedAt`
+      // and it is excluded here too, so the two Scopes stay disjoint.
+      return !task.deletedAt && !isWontDo(task) && isCompleted(task);
+    case "wontDo":
+      return !task.deletedAt && isWontDo(task);
 
     // §12.5.1. Today is NOT `dueDate == today`: it is overdue, plus due today,
     // plus anything explicitly planned for today — and a future task with a

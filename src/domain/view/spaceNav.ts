@@ -16,7 +16,7 @@
 // decision to hand the reader.
 import { spaceViewDef, type SpaceViewDef, type SpaceViewId } from "./spaceViews";
 
-export type SpaceSectionId = "overview" | "goals";
+export type SpaceSectionId = "overview" | "goals" | "archive";
 /** Derived from the view table, so the two cannot drift apart. */
 export type BuiltInTaskViewId = SpaceViewId;
 export type SpaceNavId = SpaceSectionId | BuiltInTaskViewId;
@@ -36,6 +36,11 @@ export const SPACE_NAV: readonly SpaceNavItem[] = [
   { kind: "task-view", id: "gantt" },
   { kind: "task-view", id: "calendar" },
   { kind: "section", id: "goals" },
+  // Nav Shell audit D-20/P0-4b-4. Archived Projects were on a standalone page
+  // shared with archived Tasks; Task archiving is gone, and what was left is
+  // Space management — so it lives in the Space that owns them. A Project has
+  // no Projects of its own, so `navItemsForScope` keeps this off its bar.
+  { kind: "section", id: "archive" },
   // A "horizons" section stood here — five time columns, life to day, that a
   // Goal was dragged between. It is gone from the product: the perspective it
   // sold was a cross-Space one, and a scope shows only its own goals, so what
@@ -70,6 +75,8 @@ export function navItemsForScope(scope: NavScopeKind): SpaceNavItem[] {
       if (PENDING_TASK_VIEWS.has(item.id)) return false;
       if (scope === "space" && item.id === "board") return false;
     }
+    // Only a Space owns Projects, so only a Space can have archived ones.
+    if (item.kind === "section" && item.id === "archive") return scope === "space";
     return true;
   });
 }

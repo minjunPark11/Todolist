@@ -23,6 +23,7 @@ export type TaskScopeKind =
   | "tag"
   | "filter"
   | "completed"
+  | "wontDo"
   | "trash";
 
 /**
@@ -58,6 +59,7 @@ export type TaskScopeRef =
   | { kind: "upcoming" }
   | { kind: "inbox" }
   | { kind: "completed" }
+  | { kind: "wontDo" }
   | { kind: "trash" }
   | { kind: "list"; id: string }
   | { kind: "folder"; id: string }
@@ -89,7 +91,7 @@ export interface TaskScopePolicy {
    * `deletedAt == null AND completedAt == null` — the canonical meaning §12.4
    * fixes, so no screen invents a second one.
    */
-  countMode: "active" | "completed" | "trash";
+  countMode: "active" | "completed" | "wontDo" | "trash";
   createOwner: CreateOwner;
 }
 
@@ -185,6 +187,19 @@ export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
     canCreate: false,
     canManualReorder: false,
     countMode: "completed",
+    createOwner: "none",
+  },
+  // D-23. A terminal state beside completed and trashed, and the third of the
+  // three the sidebar's bottom section offers.
+  wontDo: {
+    kind: "wontDo",
+    segment: "wont-do",
+    hasId: false,
+    allowedViews: LIST_ONLY,
+    defaultView: "list",
+    canCreate: false,
+    canManualReorder: false,
+    countMode: "wontDo",
     createOwner: "none",
   },
   trash: {

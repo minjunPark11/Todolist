@@ -20,6 +20,10 @@
   gap: 18px;
   padding: 16px 8px;
   overflow-y: auto;
+  /* §11.6, and stated rather than inherited: this used to show `.tm-shell`
+     through a transparent column, which meant the Context Sidebar's colour
+     depended on which shell was drawing it. */
+  background: var(--bg-context-sidebar);
   border-right: 1px solid var(--border, #e5e5e7);
 }
 
@@ -70,9 +74,19 @@
   background: var(--hover, rgba(0, 0, 0, 0.04));
 }
 
+/* §11.20/§11.28: selected is NEUTRAL, and the label stays at 500.
+   The accent tint that used to be here made the current row the loudest thing
+   on screen — a sidebar shouting about where you already are, over content
+   that is the reason you came. Accent is kept for the Rail and the view
+   indicator, which are the signals one level up. */
 .tm-row.is-current {
-  background: var(--selected, rgba(0, 122, 255, 0.12));
-  font-weight: 600;
+  background: var(--selected);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.tm-row.is-current:hover {
+  background: var(--bg-selected-hover);
 }
 
 /* §2.16: one level of indent means one level of nesting. Lists sit under the
@@ -631,108 +645,7 @@
   white-space: nowrap;
 }
 
-/* --- search and the command palette (§10.4, §10.20) --- */
-
-.tm-search-open {
-  margin-right: auto;
-  padding: 4px 10px;
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-muted, #8e8e93);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.tm-palette-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  justify-content: center;
-  /* §10.5: a light palette near the top, not a modal covering the screen. */
-  align-items: flex-start;
-  padding-top: 12vh;
-  background: rgba(0, 0, 0, 0.25);
-}
-
-.tm-palette {
-  display: flex;
-  width: min(620px, 92vw);
-  max-height: 65vh;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: 14px;
-  background: var(--surface, #fff);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
-}
-
-.tm-palette-input {
-  padding: 14px 16px;
-  border: 0;
-  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
-  background: transparent;
-  color: var(--text, #1c1c1e);
-  font: inherit;
-  font-size: 15px;
-  outline: none;
-}
-
-.tm-palette-results {
-  overflow-y: auto;
-  padding: 6px;
-}
-
-.tm-palette-group h3 {
-  margin: 8px 8px 4px;
-  color: var(--text-muted, #8e8e93);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.tm-palette-row {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.tm-palette-row.is-active {
-  background: var(--accent-soft, rgba(10, 132, 255, 0.12));
-}
-
-.tm-palette-row .is-done {
-  color: var(--text-muted, #8e8e93);
-  text-decoration: line-through;
-}
-
-.tm-palette-sub {
-  color: var(--text-muted, #8e8e93);
-  font-size: 12px;
-}
-
-.tm-palette-all {
-  width: 100%;
-  padding: 10px;
-  border: 0;
-  border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
-  background: transparent;
-  color: var(--accent, #0a84ff);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
+/* --- the Search Page's own input (§10.20) --- */
 
 .tm-search-input {
   width: 100%;
@@ -799,6 +712,21 @@
   text-transform: none;
   letter-spacing: 0;
   cursor: pointer;
+}
+
+/* The List Manager borrowed the command palette's backdrop for as long as the
+   palette lived in this stylesheet. It moved to the shell with D-25, so the
+   Manager has its own now — same geometry, because nothing about this dialog
+   was meant to change. */
+.tm-manager-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .tm-manager {
@@ -912,15 +840,29 @@
   left: 0;
   width: min(280px, 82vw);
   /* Off-canvas rather than display:none, so opening it is a movement the eye
-     can follow and the tree keeps its scroll position. */
+     can follow and the tree keeps its scroll position.
+
+     `visibility: hidden` is the other half, and it was missing (P0-11).
+     Translating a panel off-screen moves it out of SIGHT and nothing else:
+     its nine rows stayed in the tab order and in the accessibility tree, so
+     tabbing through a phone screen walked into a sidebar that was not there.
+     19-app-shell.css says this in as many words for the desktop collapse —
+     "its rows must leave the tab order and the accessibility tree" — and the
+     overlay had simply never been held to it.
+
+     Delayed by the length of the slide so the panel is still visible while it
+     leaves, and instant on the way in. */
   transform: translateX(-100%);
-  transition: transform 160ms ease;
+  visibility: hidden;
+  transition: transform 160ms ease, visibility 0s linear 160ms;
   background: var(--bg, #fff);
   padding-left: max(8px, env(safe-area-inset-left));
 }
 
 .tm-shell.sidebar-open .tm-sidebar {
   transform: translateX(0);
+  visibility: visible;
+  transition: transform 160ms ease, visibility 0s;
 }
 
 .tm-scrim {
@@ -992,8 +934,7 @@
 
 /* §15.13: the full-screen detail owns the screen. What is behind it is not
    dimmed, it is out of the way — including the way back into navigation. */
-.tm-shell.detail-full .tm-menu-open,
-.tm-shell.detail-full .tm-search-open {
+.tm-shell.detail-full .tm-menu-open {
   display: none;
 }
 
@@ -1013,7 +954,6 @@
   .tm-row,
   .tm-task-open,
   .tm-card-open,
-  .tm-palette-row,
   .tm-view,
   .tm-chip {
     min-height: 44px;

@@ -85,7 +85,11 @@ export async function openApp(page: Page, seed: SeedOptions = {}): Promise<void>
     [STORAGE_KEY, JSON.stringify(data)] as const,
   );
   await page.goto("/today");
-  await expect(page.locator(".tm-sidebar")).toBeVisible();
+  // The shell, not the sidebar. Below 1024 the sidebar is a closed drawer, and
+  // since P0-11 a closed drawer is genuinely hidden rather than parked
+  // off-canvas — waiting for it to be visible would wait for a click nobody
+  // has made yet. `.tm-shell` is the module having rendered, in every mode.
+  await expect(page.locator(".tm-shell")).toBeVisible();
 }
 
 /** The stored account, as the app would read it back. */

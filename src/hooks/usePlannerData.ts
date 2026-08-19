@@ -166,6 +166,18 @@ function normalizeTask(task: Partial<Task>): Task {
   const { scheduledDate: _legacyWorkDay, ...carried } = task as Partial<Task> & { scheduledDate?: string };
   void _legacyWorkDay;
 
+  // Nav Shell audit D-20: Task archiving is retired. An archived Task was a
+  // Task nobody was going to do, which is what `wontDoAt` says — and saying it
+  // with a marker instead of a status is D-23's whole point.
+  //
+  // Same idiom as the schedule consolidation above: idempotent, and on the
+  // load path because there is no migration table. `previousStatus` is what
+  // `archiveTask` saved for exactly this moment, so the Task gets its real
+  // workflow status back rather than being parked on "todo".
+  const wasArchived = rawStatus === "archived";
+  const migratedStatus = wasArchived ? (rawPrevious ?? "todo") : rawStatus;
+  const wontDoAt = wasArchived ? task.wontDoAt || task.archivedAt || now : task.wontDoAt;
+
   return {
     // Forward compatibility (SPACES_CLICKUP_REDESIGN.md M0). Everything below
     // overwrites what it knows, so legacy repairs like the status migration
@@ -177,7 +189,7 @@ function normalizeTask(task: Partial<Task>): Task {
     id: task.id ?? createId("task"),
     title: task.title ?? "Untitled task",
     description: task.description ?? "",
-    status: oneOf(rawStatus, taskStatuses, "todo"),
+    status: oneOf(migratedStatus, taskStatuses, "todo"),
     priority: oneOf(task.priority, taskPriorities, "none"),
     dueDate,
     startDate: consolidated.startDate,
@@ -202,9 +214,11 @@ function normalizeTask(task: Partial<Task>): Task {
     createdAt: task.createdAt ?? now,
     updatedAt: task.updatedAt ?? now,
     completedAt: task.completedAt ?? "",
-    archivedAt: task.archivedAt ?? "",
+    // Cleared by the migration above, and never written again (D-20).
+    archivedAt: wasArchived ? "" : task.archivedAt ?? "",
+    wontDoAt: wontDoAt ?? "",
     deletedAt: task.deletedAt,
-    previousStatus: rawPrevious ? oneOf(rawPrevious, taskStatuses, "todo") : undefined,
+    previousStatus: wasArchived ? undefined : rawPrevious ? oneOf(rawPrevious, taskStatuses, "todo") : undefined,
     blockedByTaskId: task.blockedByTaskId ?? "",
     repeatType: oneOf(task.repeatType, repeatTypes, "none"),
     repeatInterval: task.repeatInterval ?? 1,
@@ -1118,6 +1132,14 @@ export function usePlannerData() {
     setSelectedTaskId("");
   }
 
+  /**
+   * Gives up on a Task (D-20/D-23).
+   *
+   * This used to archive: overwrite `status`, stash the old one in
+   * `previousStatus`, and stamp `archivedAt`. It writes one field now, and
+   * leaves `status` alone — so there is nothing to restore when the user
+   * changes their mind, and a repeating Task keeps its rule.
+   */
   function archiveTask(taskId: string) {
     const now = new Date().toISOString();
 
@@ -1127,9 +1149,7 @@ export function usePlannerData() {
         task.id === taskId
           ? {
               ...task,
-              previousStatus: task.status === "archived" ? task.previousStatus : task.status,
-              status: "archived",
-              archivedAt: now,
+              wontDoAt: now,
               updatedAt: now,
             }
           : task,
@@ -1171,6 +1191,13 @@ export function usePlannerData() {
     }));
   }
 
+  /**
+   * Puts a given-up Task back on the list (D-20/D-23).
+   *
+   * Clears the marker and nothing else. The old version had to guess a status
+   * out of `previousStatus` because archiving had overwritten the real one;
+   * there is nothing to guess at now.
+   */
   function restoreTask(taskId: string) {
     const now = new Date().toISOString();
 
@@ -1180,7 +1207,7 @@ export function usePlannerData() {
         task.id === taskId
           ? {
               ...task,
-              status: task.previousStatus && task.previousStatus !== "archived" ? task.previousStatus : "todo",
+              wontDoAt: "",
               archivedAt: "",
               updatedAt: now,
             }

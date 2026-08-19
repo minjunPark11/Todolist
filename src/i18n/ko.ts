@@ -73,7 +73,7 @@ export const ko: Dictionary = {
   "tree.folder": "폴더",
   "tree.folderPlaceholder": "새 폴더 이름",
   "sidebar.focus": "집중",
-  "sidebar.board": "보드",
+  "sidebar.board": "매트릭스",
 
   // ---- timeline ----
   // `title`/`subtitle`과 축 라벨은 독립 TimelinePage의 것이었다. 남은 것은
@@ -154,8 +154,8 @@ export const ko: Dictionary = {
   "sidebar.planning": "계획",
 
   // ---- board ----
-  "board.title": "보드",
-  "board.subtitle": "일을 한 화면에서 본다 — 아무것도 옮기지 않고 묶는 기준만 바꾼다.",
+  "board.title": "매트릭스",
+  "board.subtitle": "모든 스페이스의 일을 한 화면에서 본다 — 아무것도 옮기지 않고 묶는 기준만 바꾼다.",
   "board.scope": "스페이스",
   "board.allSpaces": "전체",
   "board.groupBy": "묶는 기준",
@@ -213,6 +213,17 @@ export const ko: Dictionary = {
   "sidebar.addProjectPlaceholder": "+ 프로젝트 추가",
   "sidebar.collapse": "사이드바 접기",
   "sidebar.expand": "사이드바 펼치기",
+
+  // Global Rail (Nav Shell 스펙 §2.28의 label 표). 아이콘만 보이는 레일이라
+  // 이 문자열들은 tooltip이자 aria-label이다 — 장식이 아니라 유일한 이름이다.
+  "rail.label": "전역 탐색",
+  "rail.tasks": "작업",
+  "rail.matrix": "매트릭스",
+  "rail.search": "검색",
+  "rail.account": "계정",
+  "rail.accountSignedOut": "로그인하지 않음",
+  "rail.signOut": "로그아웃",
+  "shell.resizeSidebar": "사이드바 너비 조절",
 
   // ---- App.tsx chrome ----
   // 사이드바는 전체 검색, Today 헤더는 그 페이지 목록 필터. en.ts 주석 참고.
@@ -971,7 +982,7 @@ export const ko: Dictionary = {
 
   // ---- Archive page ----
   "archive.title": "보관함",
-  "archive.subtitle": "이곳의 항목은 주요 화면에서 숨겨집니다. 복원하거나 영구적으로 삭제할 수 있어요.",
+  "archive.subtitle": "보관한 프로젝트는 주요 화면에서 숨겨집니다. 복원하거나 영구적으로 삭제할 수 있어요.",
   "archive.tabTasks": "작업 ({{n}})",
   "archive.tabProjects": "프로젝트 ({{n}})",
   "archive.noArchivedTasks": "보관된 작업이 없어요",
@@ -1043,6 +1054,7 @@ export const ko: Dictionary = {
   "spaceHub.noteType.reminder": "리마인더",
   "spaceHub.noteType.link": "링크",
   "spaceHub.tab.overview": "개요",
+  "spaceHub.tab.archive": "보관함",
   "spaceHub.tab.list": "리스트",
   "spaceHub.tab.board": "보드",
   "spaceHub.tab.gantt": "간트",
@@ -1268,6 +1280,7 @@ export const ko: Dictionary = {
   "tasks.upcoming": "다음 7일",
   "tasks.inbox": "기본함",
   "tasks.completed": "완료",
+  "tasks.wontDo": "안 함",
   "tasks.trash": "휴지통",
   "tasks.filter": "필터",
   "tasks.defaultList": "리스트",
@@ -1359,6 +1372,10 @@ export const ko: Dictionary = {
   "tasks.subtasks": "하위 작업",
   "tasks.addSubtask": "하위 작업 추가",
   "tasks.moveToTrash": "휴지통으로",
+  "tasks.markWontDo": "안 함으로 표시",
+  "tasks.unmarkWontDo": "다시 할 일로",
+  "tasks.undoWontDo": "안 함으로 표시했습니다.",
+  "tasks.undoWontDoCleared": "다시 할 일로 되돌렸습니다.",
   "tasks.undoTrashed": "휴지통으로 옮겼습니다.",
   "tasks.undoRestored": "복원했습니다.",
   "tasks.undoCompleted": "완료로 표시했습니다.",
@@ -1371,9 +1388,6 @@ export const ko: Dictionary = {
   "tasks.openTask": "{{title}} 열기",
   "tasks.countLabel": "작업 {{count}}개",
   "tasks.moveToColumn": "{{title}}을(를) 다른 칼럼으로 옮기기",
-  "tasks.paletteLabel": "검색 및 명령",
-  "tasks.palettePlaceholder": "검색하거나 명령을 입력하세요…",
-  "tasks.paletteHint": "작업 · 리스트 · 태그 · 필터를 검색합니다.",
   "tasks.groupCommands": "이동",
   "tasks.group.task": "작업",
   "tasks.group.list": "리스트",
@@ -1388,9 +1402,11 @@ export const ko: Dictionary = {
   "tasks.filterAll": "전체",
   "tasks.searchPageEmpty": "“{{query}}”에 대한 결과가 없습니다. 다른 검색어를 사용해 보세요.",
   "tasks.resultCompleted": "완료됨",
-  "tasks.searchEmpty": "일치하는 항목이 없습니다.",
-  "tasks.seeAllResults": "결과 전체 보기",
   "tasks.searchTitle": "검색",
+  "menu.label": "이동 및 명령",
+  "menu.placeholder": "리스트로 이동하거나 명령을 입력하세요…",
+  "menu.hint": "리스트 · 태그 · 프로젝트로 이동하거나 명령을 실행합니다. 작업 검색은 검색 페이지에 있습니다.",
+  "menu.empty": "여기에는 일치하는 항목이 없습니다. 작업 내용은 검색 페이지에서 찾습니다.",
   "commands.goToday": "오늘로 이동",
   "commands.goUpcoming": "다음 7일로 이동",
   "commands.goInbox": "기본함으로 이동",
