@@ -1463,3 +1463,62 @@ D1-2·D2-1·D7-1은 모두 **설계서 또는 최근 결정과 충돌**한다. �
 ## 9.4 남긴 것
 
 §8.2·§8.3은 그대로다. 특히 `button:active { transform: scale(0.97) }`(`01-base.css`)는 §6.13 T5·§6.17 B5의 결정 대상이므로 건드리지 않았다.
+
+---
+
+# 10. 구현 기록 — D1-1 (a) Detail 열 상시 확보
+
+결정: §8.3 Tier 0의 **D1-1을 (a)안**으로. 열은 이미 인라인 컬럼으로 존재했으므로 새로 만든 것이 아니라 **언제 확보하느냐**만 바꿨다.
+
+## 10.1 무엇을 바꿨나
+
+| 파일 | 변경 |
+|---|---|
+| `TasksModule.tsx` | 선택된 Task가 없고 presentation이 `inline-drawer`일 때 `aside.tm-drawer.is-inline-drawer.is-empty`를 렌더 |
+| `17-tasks-module.css` | `.tm-drawer.is-empty` — 같은 400px 폭, 가운데 정렬. `.tm-drawer-empty` 안내 문구 |
+| `en.ts` / `ko.ts` | `tasks.drawerEmpty` 추가 |
+
+**`inline-drawer`에서만이다.** 나머지 세 presentation(§15.17의 `overlay-drawer` / `right-sheet` / `full-screen`)에서 Detail은 그리드 트랙을 차지하지 않으므로 확보할 것이 없고, 빈 패널을 띄우면 페이지 위에 떠 있는 빈 면이 된다.
+
+## 10.2 검증 — 실측
+
+1440×900:
+
+| 상태 | 리스트 | main | Detail |
+|---|---|---|---|
+| 선택 없음 (이전) | **1136** | 1136 | 없음 |
+| 선택 없음 (이후) | **672** | 736 | **400** (빈 상태) |
+| 선택 있음 (이후) | **672** | 736 | 400 |
+
+**V1-1 통과: 선택 전후 리스트 폭 delta 0.**
+
+1200×800(compactDesktop)에서는 `.tm-drawer.is-empty`가 **렌더되지 않음**을 확인 — 그 모드의 Detail은 오버레이다.
+
+`npx tsc -b` 통과, `vitest run` 1512 passed.
+
+## 10.3 회귀 테스트
+
+`e2e/taskDetailColumn.spec.ts` 신규 3건. **jsdom은 레이아웃을 계산하지 않아 이 결함을 볼 수 없다** — `getBoundingClientRect()`가 0을 돌려주므로 유닛 층에서는 폭 변화가 애초에 관측되지 않는다. 리포가 `e2e/`를 두는 이유와 같다.
+
+| 테스트 | 내용 |
+|---|---|
+| is reserved before anything is selected | 빈 열이 보이고 폭이 **400** |
+| opening a Task does not resize the list | 선택 전후 `.tm-list` 폭이 **정확히 같음** |
+| Escape closes the Detail and the list still does not move | Escape가 `?task=`까지 지우고, 폭은 그대로 |
+
+`< 1280`에서는 skip한다(§15.17). desktop 3건 통과 / tablet·mobile 6건 skip.
+
+폭을 `672`로 못박지 않고 **"같다"로 단언**했다. 숫자를 박으면 Detail 폭을 조정할 때마다 깨지고, 두 숫자가 같이 변하면 통과해 버린다 — 그 하나가 일어나면 안 되는 경우다.
+
+## 10.4 함께 해결된 것
+
+| # | 항목 | 상태 |
+|---|---|---|
+| L-02 | 리스트 폭이 1136↔672로 흔들림 | **해소** |
+| M-05 | 그 폭 변화에 전환이 없어 한 프레임에 재배치 | **해소** — 변화 자체가 없어졌으므로 전환이 필요 없다 |
+
+§7.8.4 M3이 예고한 대로다. (b)·(c)안을 골랐다면 폭 변화에 전환을 따로 넣어야 했다.
+
+## 10.5 남은 D1
+
+D1-2(Rail 50) · D1-3(사이드바 기본 폭) · D1-4(Task row 40과 밀도 토큰 범위)는 그대로 미결이다.

@@ -548,6 +548,31 @@ export function TasksModule(props: TasksModuleProps) {
         )}
       </main>
 
+      {/* The Detail column is RESERVED, not conditional — audit D1-1(a).
+       *
+       * It was rendered only while a Task was open, and because it is a grid
+       * item in an `auto` track, opening one took 400px out of the list: the
+       * column measured 1136 with nothing selected and 672 with something,
+       * so every row re-laid-out on every click. The width change had no
+       * transition either, so it landed in a single frame.
+       *
+       * Reserving the track fixes both at once, and it is the shape the
+       * reference product has: the column is always there and draws an empty
+       * state when nothing is selected.
+       *
+       * Only for `inline-drawer`. In the other three presentations the Detail
+       * is an overlay, a sheet or the whole screen (§15.17) — it takes no
+       * track, so there is nothing to reserve and an empty panel would be a
+       * surface floating over the page. */}
+      {!openedTask && taskDetailPresentationFor(mode) === "inline-drawer" ? (
+        <aside
+          className="tm-drawer is-inline-drawer is-empty"
+          aria-label={t("tasks.drawerLabel")}
+        >
+          <p className="tm-drawer-empty">{t("tasks.drawerEmpty")}</p>
+        </aside>
+      ) : null}
+
       {openedTask ? (
         <TaskDrawer
           presentation={taskDetailPresentationFor(mode)}

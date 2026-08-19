@@ -1368,6 +1368,7 @@ export const en: Dictionary = {
   "tasks.needList": "Choose which list this goes in.",
   "tasks.willTag": "Will be tagged:",
   "tasks.drawerLabel": "Task detail",
+  "tasks.drawerEmpty": "Select a task to see its details.",
   "tasks.titleLabel": "Title",
   "tasks.markDone": "Done",
   "tasks.priority": "Priority",

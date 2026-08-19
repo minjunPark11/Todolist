@@ -939,6 +939,24 @@
   overflow-y: auto;
 }
 
+/* The reserved-but-empty column (audit D1-1). Same width as the real one —
+   that is the entire point, since a column that is only 400px wide while
+   something is selected is the thing that made the list jump. Centred and
+   quiet, because it is a placeholder and not a message worth reading twice. */
+.tm-drawer.is-empty {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.tm-drawer-empty {
+  margin: 0;
+  max-width: 22ch;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted, #8e8e93);
+}
+
 /* Compact desktop: 400px overlay, and deliberately no heavy scrim — §15.19
    keeps the Main context readable and clickable to the left of it. */
 .tm-drawer.is-overlay-drawer {

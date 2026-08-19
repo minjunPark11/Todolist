@@ -1362,6 +1362,7 @@ export const ko: Dictionary = {
   "tasks.needList": "어느 리스트에 넣을지 골라주세요.",
   "tasks.willTag": "태그가 함께 붙습니다:",
   "tasks.drawerLabel": "작업 상세",
+  "tasks.drawerEmpty": "작업을 선택하면 상세가 보입니다.",
   "tasks.titleLabel": "제목",
   "tasks.markDone": "완료",
   "tasks.priority": "우선순위",
