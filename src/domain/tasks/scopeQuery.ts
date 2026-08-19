@@ -69,6 +69,17 @@ export function isCompleted(task: Task): boolean {
 }
 
 /**
+ * Given up on (audit D-23).
+ *
+ * One field, read one way — which is the whole reason `wontDoAt` is a
+ * timestamp and not a `TaskStatus` value. Compare `isCompleted` above, which
+ * has to pick a winner between two places that both claim to know.
+ */
+export function isWontDo(task: Task): boolean {
+  return Boolean(task.wontDoAt);
+}
+
+/**
  * §12.19's shared precondition, in one place so no Scope copies it.
  *
  * `archived` has no equivalent in the plan — it is one of the audit's grade-4
@@ -78,6 +89,9 @@ export function isCompleted(task: Task): boolean {
  */
 export function isTaskActive(task: Task, lists: List[]): boolean {
   if (task.deletedAt) return false;
+  if (isWontDo(task)) return false;
+  // D-20 retires this one. Until the migration has run everywhere, a stored
+  // `archived` still has to stay out of every Scope.
   if (task.status === "archived") return false;
   const listId = listIdFor(task, lists);
   if (!listId) return true; // nothing owns it yet; the backfill has not run
@@ -89,10 +103,20 @@ export function isTaskActive(task: Task, lists: List[]): boolean {
   return !owner || (!owner.archivedAt && !owner.deletedAt);
 }
 
-/** §12.4's canonical `active`: alive, and not finished. */
-function isActive(task: Task, lists: List[]): boolean {
+/**
+ * §12.4's canonical `active`: alive, and not finished.
+ *
+ * Exported because D-24 asks the screens outside this module to stop writing
+ * their own version. The two questions they ask are different and this is the
+ * narrower one — `isTaskActive` is "does this task still exist for the user",
+ * `isTaskOpen` is "is it still something to do".
+ */
+export function isTaskOpen(task: Task, lists: List[]): boolean {
   return isTaskActive(task, lists) && !isCompleted(task);
 }
+
+/** @deprecated Internal alias kept so this module reads as it did. */
+const isActive = isTaskOpen;
 
 /**
  * §12.5.1: the user planned this task for that day, whatever its due date.
@@ -154,7 +178,11 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     case "trash":
       return Boolean(task.deletedAt);
     case "completed":
-      return !task.deletedAt && isCompleted(task);
+      // Won't Do is not a quiet kind of done. It never writes `completedAt`
+      // and it is excluded here too, so the two Scopes stay disjoint.
+      return !task.deletedAt && !isWontDo(task) && isCompleted(task);
+    case "wontDo":
+      return !task.deletedAt && isWontDo(task);
 
     // §12.5.1. Today is NOT `dueDate == today`: it is overdue, plus due today,
     // plus anything explicitly planned for today — and a future task with a

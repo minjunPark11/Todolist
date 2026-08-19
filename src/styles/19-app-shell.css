@@ -423,3 +423,33 @@
 [data-reduce-motion] .rail-item:active {
   transform: none;
 }
+
+/* --- Won't Do (audit D-23) -------------------------------------------------
+   The Drawer's two terminal actions sit together: both are ways of finishing
+   with a task you are not going to do, and the difference between them is
+   only whether you want to find it again. */
+.tm-drawer-terminal {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tm-drawer-wontdo {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--ff-muted);
+  background: transparent;
+  border: 1px solid var(--ff-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tm-drawer-wontdo:hover {
+  color: var(--ff-text);
+  background: var(--ff-hover);
+}
+
+.tm-drawer-wontdo:focus-visible {
+  outline: 2px solid var(--ff-blue);
+  outline-offset: 2px;
+}

@@ -84,6 +84,24 @@ export interface Task {
   updatedAt: string;
   completedAt: string; // set only when status becomes done
   archivedAt?: string; // set only when status becomes archived
+  /**
+   * Marked "won't do" — a terminal state beside completed and trashed
+   * (Nav Shell audit D-23).
+   *
+   * A timestamp and NOT a `TaskStatus` value, deliberately. `completedAt`
+   * shows what the other shape costs: the truth is stored twice, `status`
+   * wins, and unifying them is still open. This follows `deletedAt` instead,
+   * which stores it once.
+   *
+   * Being orthogonal to `status` is what makes the two P0 rules structural
+   * rather than enforced — a mark on one occurrence does not touch the
+   * `repeat*` fields,
+   * and a mark on a parent is not a mark on its children.
+   *
+   * Empty or absent means the task has not been given up on. The difference
+   * between the two matters to undo, the same way it does for `deletedAt`.
+   */
+  wontDoAt?: string;
   deletedAt?: string; // optional soft-delete marker
   previousStatus?: TaskStatus; // used for undo/restore
   blockedByTaskId: string;

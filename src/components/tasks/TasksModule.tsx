@@ -34,7 +34,7 @@ import { TaskDrawer } from "./TaskDrawer";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
 import type { TaskChild } from "../../domain/tasks/children";
 import type { TaskMutation } from "../../domain/tasks/mutations";
-import { applyPatch, completeTask, leavesScope, moveTaskToSection, reopenTask, trashTask } from "../../domain/tasks/mutations";
+import { applyPatch, completeTask, leavesScope, markWontDo, moveTaskToSection, reopenTask, trashTask, unmarkWontDo } from "../../domain/tasks/mutations";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
 import { folderIdFor } from "../../domain/tasks/sidebarFolders";
@@ -670,6 +670,14 @@ export function TasksModule(props: TasksModuleProps) {
             )
           }
           onTrash={() => mutate(openedTask, trashTask(openedTask, new Date().toISOString()))}
+          onToggleWontDo={() =>
+            mutate(
+              openedTask,
+              openedTask.wontDoAt
+                ? unmarkWontDo(openedTask)
+                : markWontDo(openedTask, new Date().toISOString()),
+            )
+          }
         />
       ) : null}
 

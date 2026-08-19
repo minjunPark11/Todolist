@@ -37,6 +37,39 @@ export function trashTask(task: Task, now: string): TaskMutation {
   };
 }
 
+/**
+ * Gives up on a Task without deleting it (audit D-23).
+ *
+ * Writes one field and nothing else. That is not minimalism — it is what
+ * makes the two P0 rules true by construction:
+ *
+ *   - a repeating Task keeps its `repeat`, so only this occurrence is given
+ *     up on and the rule still produces the next one;
+ *   - children are untouched, because a field on a parent is not a field on
+ *     its children.
+ *
+ * `status` is left alone too, which is why undoing needs nothing but the old
+ * value back — compare `reopenTask`, which has to dig `previousStatus` out
+ * because completing overwrote it.
+ */
+export function markWontDo(task: Task, now: string): TaskMutation {
+  return {
+    patch: { wontDoAt: now },
+    // Absent and "" are different values, the same way they are for
+    // `deletedAt` — undo restores the one that was there.
+    undo: { wontDoAt: task.wontDoAt },
+    labelKey: "tasks.undoWontDo",
+  };
+}
+
+export function unmarkWontDo(task: Task): TaskMutation {
+  return {
+    patch: { wontDoAt: "" },
+    undo: { wontDoAt: task.wontDoAt },
+    labelKey: "tasks.undoWontDoCleared",
+  };
+}
+
 export function restoreTask(task: Task): TaskMutation {
   return {
     patch: { deletedAt: "" },

@@ -37,6 +37,8 @@ export interface TaskDrawerProps {
   onToggleSubtask: (id: string) => void;
   onDeleteSubtask: (id: string) => void;
   onTrash: () => void;
+  /** Audit D-23. Toggles, because a mark you cannot take back is a delete. */
+  onToggleWontDo: () => void;
 }
 
 const PRIORITIES = ["none", "low", "medium", "high"] as const;
@@ -54,6 +56,7 @@ export function TaskDrawer({
   onToggleSubtask,
   onDeleteSubtask,
   onTrash,
+  onToggleWontDo,
 }: TaskDrawerProps) {
   const { t } = useT();
   const root = useRef<HTMLElement>(null);
@@ -191,11 +194,20 @@ export function TaskDrawer({
         </form>
       </section>
 
-      {/* §16.28's Trash action. Soft delete — §12.13 is the screen it moves to,
-          and §13.6 is where getting it back lives. */}
-      <button type="button" className="tm-drawer-trash" onClick={onTrash}>
-        {t("tasks.moveToTrash")}
-      </button>
+      <div className="tm-drawer-terminal">
+        {/* D-23. Beside Trash rather than beside Done: both are ways of
+            finishing with a task you are not going to do, and the difference
+            is whether you want to find it again. */}
+        <button type="button" className="tm-drawer-wontdo" onClick={onToggleWontDo}>
+          {t(task.wontDoAt ? "tasks.unmarkWontDo" : "tasks.markWontDo")}
+        </button>
+
+        {/* §16.28's Trash action. Soft delete — §12.13 is the screen it moves
+            to, and §13.6 is where getting it back lives. */}
+        <button type="button" className="tm-drawer-trash" onClick={onTrash}>
+          {t("tasks.moveToTrash")}
+        </button>
+      </div>
     </aside>
   );
 }

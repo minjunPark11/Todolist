@@ -432,7 +432,7 @@ wontDoAt?: string;
 | ~~P0-3 Context Sidebar frame~~ | **완료** (2026-08-19). 폭 200·240 → **248 하나**, resize 핸들(드래그·키보드·더블클릭), collapse 상태 모델(§3.28~3.30), mode registry `tasks\|space\|none`. DOM 통합은 D-17 | P0-2 |
 | ~~P0-4 Rail + 중복 제거~~ | **완료** (2026-08-19). Rail에 Matrix 추가(D-19), 레거시 사이드바에서 전역 항목 제거(D-16) — 남은 것은 `오늘`·`보관함`·트리 | P0-3 |
 | ~~P0-4a 사이드바 소유권~~ | **완료** (2026-08-19). [`TasksSidebarSlot`](src/components/shell/TasksSidebarSlot.tsx)이 사이드바+두 다이얼로그를 함께 들고, 레거시 셸이 `mode`로 고른다. DOM 통합은 여전히 D-17 | P0-4 |
-| P0-4b-1 Won't Do | **D-23.** `wontDoAt` 터미널 마커 + `wontDo` Scope + "안 함으로 표시" 액션·undo | P0-4a |
+| ~~P0-4b-1 Won't Do~~ | **완료** (2026-08-19). `wontDoAt` + `wontDo` Scope(`/wont-do`) + Drawer 액션·undo. `isTaskOpen`도 export됨 | P0-4a |
 | P0-4b-2 상태 술어 통합 | **D-24.** `isTaskActive`/`isTaskOpen`을 export하고 `status !== "archived"` 15곳이 그것을 쓰게 한다 | P0-4b-1 |
 | P0-4b-3 Task Archive 폐기 | **D-20.** 기존 `archived` Task를 `wontDoAt`으로 이주, 사이드바 `보관함` 행 제거, 하단 = 완료·안 함·휴지통 | P0-4b-2 |
 | P0-4b-4 프로젝트 Archive | **D-20의 남은 절반.** 보관된 프로젝트를 SpaceHub로 | P0-4b-3, P0-5 |

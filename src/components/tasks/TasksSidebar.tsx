@@ -233,6 +233,8 @@ export function TasksSidebar({
 
       <div className="tm-section">
         {row({ kind: "completed" }, t("tasks.completed"))}
+        {/* D-23. A real Scope, so unlike the two page rows it carries a count. */}
+        {row({ kind: "wontDo" }, t("tasks.wontDo"))}
         {row({ kind: "trash" }, t("tasks.trash"))}
         {pageRow("archive", t("sidebar.archive"))}
       </div>
