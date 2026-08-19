@@ -71,6 +71,33 @@ export function TaskDrawer({
    */
   useFocusTrap(root, { enabled: presentation !== "inline-drawer" });
 
+  /**
+   * Escape closes it — in every presentation, including the inline column.
+   *
+   * It did not before, in any of them. Measured: with the Drawer open, Escape
+   * left the surface, the `?task=` parameter and focus all exactly as they
+   * were, which made the 25×22 close button the only way out. Every other
+   * dismissable surface in the app already answers Escape, so this was the
+   * odd one rather than a deliberate exception.
+   *
+   * `defaultPrevented` is the whole guard: the Command Menu and any popover
+   * above this one call `preventDefault()` on their own Escape, and React
+   * dispatches those at its root before the event reaches this listener. So
+   * Escape peels one layer at a time instead of collapsing the stack.
+   *
+   * Closing cannot lose an edit — the title field commits on every keystroke
+   * (`onUpdate` below), so there is no draft here to discard.
+   */
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      onClose();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   const progress = childProgress(children);
 
   function submitSubtask(event: React.FormEvent<HTMLFormElement>) {

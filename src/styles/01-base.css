@@ -24,7 +24,11 @@
   --rounded-sm: 8px;
   --rounded-md: 11px;
   --rounded-lg: 18px;
-  --rounded-pill: 9999px;
+  /* Alias, not a second value. The repo spelled a pill three ways in CSS
+     (`99px`, `999px`, `9999px`) and twice in tokens; they all render the same
+     and that is exactly why the drift went unnoticed. One value, one name,
+     and this kept only so older rules referring to it keep resolving. */
+  --rounded-pill: var(--radius-pill);
 
   /* Spacing */
   --space-xxs: 4px;
@@ -51,6 +55,15 @@
 
   --border-subtle: rgba(0, 0, 0, 0.07);
   --border-strong: rgba(0, 0, 0, 0.12);
+
+  /* The Tasks Module's resting fill — secondary buttons, chips, inert wells.
+     It was used in nine places and DEFINED IN NONE, so every one of them fell
+     through to its own `rgba(0, 0, 0, .0x)` fallback. Black-on-dark is not a
+     fill; the audit measured the Add List dialog's Cancel button at
+     `#000000/0.05` over a `#1c1c1e` panel and could not tell it from the
+     panel. Same idiom as `--bg-hover`: an alpha, so it reads on any surface,
+     and it sits below `--bg-hover` so a hover can still lift off it. */
+  --surface-2: rgba(0, 0, 0, 0.05);
 
   /* Accent is overridable per [data-accent]; default blue. */
   --accent: #007aff;
@@ -305,6 +318,10 @@ body {
   --bg-surface: #1c1c1e;
   --bg-surface-muted: #232325;
   --bg-hover: rgba(255, 255, 255, 0.06);
+  /* The dark half of the token above. Above `--bg-hover` (.06) so a resting
+     fill is visible at all, below `--bg-selected` (.1) so selection still
+     wins. */
+  --surface-2: rgba(255, 255, 255, 0.08);
   --text-primary: #f5f5f7;
   --text-secondary: #d1d1d6;
   --text-tertiary: #8e8e93;
@@ -379,6 +396,22 @@ button {
 
 button:active {
   transform: scale(0.97);
+}
+
+/* One ring for every focus target, not just buttons.
+ *
+ * `button:focus-visible` alone left inputs, selects, textareas and links on
+ * the USER AGENT's ring — the audit measured the Quick Add field at
+ * `outline: 1px auto #e59700`, a Chrome default, sitting two components away
+ * from a Task row button drawing `2px solid #007aff`. Two focus languages in
+ * one screen, and one of them not ours.
+ *
+ * `:where()` keeps this at zero specificity, so every existing per-component
+ * focus rule still wins and nothing that already styled its own ring moves.
+ */
+:where(button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--ff-focus-ring);
+  outline-offset: 2px;
 }
 
 button:focus-visible {

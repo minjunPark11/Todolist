@@ -111,7 +111,7 @@
 .gls-bar {
   flex: 1;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--border-subtle, #f3f4f6);
   overflow: hidden;
 }
@@ -142,7 +142,7 @@
 
 .gls-chip {
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--border-subtle, #f3f4f6);
 }
 

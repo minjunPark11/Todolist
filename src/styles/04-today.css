@@ -164,7 +164,7 @@
   height: 36px;
   padding: 0 14px;
   border-radius: 12px;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 /* --- Layout --- */
@@ -267,7 +267,7 @@
 
 .tdy-brief-hint {
   margin: 0 0 14px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 
@@ -315,7 +315,7 @@
   background: none;
   padding: 4px 0;
   font: inherit;
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--text-primary);
 }
 
@@ -332,12 +332,12 @@
 .tdy-capture-toggle {
   flex-shrink: 0;
   border: 1px solid var(--border-subtle);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 5px 12px;
   background: var(--bg-surface-muted);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 650;
   cursor: pointer;
   transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
@@ -357,7 +357,7 @@
 }
 
 .tdy-capture-chip {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 10px;
   background: var(--bg-hover);
   color: var(--text-secondary);
@@ -411,7 +411,7 @@
   display: inline-grid;
   place-items: center;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg-hover);
   color: var(--text-secondary);
   font-size: 12px;
@@ -420,7 +420,7 @@
 
 .tdy-bucket-empty {
   margin: 4px 0 0;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--text-tertiary);
 }
 
@@ -516,10 +516,10 @@ button.tdy-row-title {
   flex-shrink: 0;
   max-width: 140px;
   padding: 4px 11px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--tdy-blue-soft);
   color: var(--accent);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -552,7 +552,7 @@ button.tdy-row-title {
   flex-shrink: 0;
   min-width: 38px;
   text-align: right;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
@@ -582,7 +582,7 @@ button.tdy-row-title {
 .tdy-queue-empty p {
   margin: 0 0 6px;
   color: var(--text-secondary);
-  font-size: 14.5px;
+  font-size: 15px;
 }
 
 /* --- Time Rail --- */
@@ -601,7 +601,7 @@ button.tdy-row-title {
 
 .tdy-rail-time {
   padding-top: 8px;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -633,7 +633,7 @@ button.tdy-row-title {
 }
 
 .tdy-rail-block span {
-  font-size: 12.5px;
+  font-size: 12px;
   opacity: 0.85;
 }
 
@@ -647,7 +647,7 @@ button.tdy-row-title {
 }
 
 .tdy-rail-free {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-tertiary);
   border-bottom: 1px dashed var(--border-subtle);
   padding-bottom: 4px;
@@ -661,7 +661,7 @@ button.tdy-row-title {
 
 .tdy-rail-overflow {
   margin: 6px 0;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-tertiary);
 }
 
@@ -717,7 +717,7 @@ button.tdy-row-title {
 }
 
 .tdy-signal-text strong {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 620;
   white-space: nowrap;
   overflow: hidden;
@@ -868,7 +868,7 @@ button.tdy-row-title {
 }
 
 .tdy-bulk-bar strong {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 650;
 }
 
@@ -890,7 +890,7 @@ button.tdy-row-title {
 
 .tdy-triage-info small {
   color: var(--text-tertiary);
-  font-size: 12.5px;
+  font-size: 12px;
 }
 
 .tdy-triage-badges {
@@ -931,7 +931,7 @@ button.tdy-row-title {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg-hover);
   color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
@@ -952,7 +952,7 @@ button.tdy-row-title {
   background: var(--bg-surface);
   color: var(--text-primary);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 /* --- Quick Add / Plan modal bits --- */
@@ -973,7 +973,7 @@ button.tdy-row-title {
   padding: 6px 14px;
   border-radius: 9px;
   font: inherit;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;

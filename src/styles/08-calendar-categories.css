@@ -403,7 +403,7 @@
   font-style: normal;
   font-size: 11px;
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent-soft, rgba(0, 102, 204, 0.1));
   color: var(--accent);
 }
@@ -754,7 +754,7 @@
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: #fff;
   font-size: 12px;
@@ -776,7 +776,7 @@
 }
 
 .gcal-taskpanel-head strong {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -845,7 +845,7 @@
 }
 
 .gcal-taskpanel-row-title {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 550;
   white-space: nowrap;
   overflow: hidden;

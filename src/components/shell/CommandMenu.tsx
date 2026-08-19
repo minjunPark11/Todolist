@@ -16,12 +16,13 @@
 // row hands the query to the Search Page — which stays exactly as it was, the
 // place where "all of them" lives at an address you can paste to someone.
 // That is the half of D-25 that was worth keeping.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
 import { flattenGroups, MENU_LIMITS, searchAll } from "../../domain/tasks/search";
 import type { CommandContext, TaskCommand } from "../../domain/tasks/commands";
 import { availableCommands, canRunCommand } from "../../domain/tasks/commands";
 import { useT } from "../../i18n";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 /** A place the user has been, already resolved to a label and a URL (§10.43). */
 export interface RecentEntry {
@@ -60,6 +61,25 @@ export function CommandMenu({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const typing = query.trim().length > 0;
+
+  /**
+   * The trap the other two dialogs already had.
+   *
+   * This one declared `role="dialog"` and `aria-modal="true"` and then let
+   * Tab walk out of it into the page it was covering, and put focus on
+   * <body> when it closed — measured: open with Ctrl+K from a Task row, press
+   * Escape, and the row you came from is not focused any more, so the next
+   * Tab starts again from the top of the document.
+   *
+   * `useFocusTrap` is the same hook the Add List dialog and the Task Drawer
+   * use, so all three now agree about what a modal surface does with focus.
+   * `initial` names the query field because the first focusable element in
+   * DOM order is the field only by accident of layout.
+   */
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const focusInput = useCallback(() => inputRef.current, []);
+  useFocusTrap(rootRef, { initial: focusInput });
 
   // The same matcher the Search Page uses, asked for less of it: `MENU_LIMITS`
   // caps each group at what stays scannable, and the Search Page is where the
@@ -149,6 +169,7 @@ export function CommandMenu({
   return (
     <div className="cmd-menu-backdrop" onMouseDown={onClose}>
       <div
+        ref={rootRef}
         className="cmd-menu"
         role="dialog"
         aria-modal="true"
@@ -156,9 +177,9 @@ export function CommandMenu({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <input
+          ref={inputRef}
           className="cmd-menu-input"
           type="text"
-          autoFocus
           // §16.34: the input owns a list that changes as it is typed in, and
           // `combobox` is what says so — otherwise the results are a silent
           // region and Enter appears to do nothing.

@@ -139,7 +139,7 @@
 
 .sched-cal-current {
   border: 1px solid var(--border-subtle);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 10px;
   background: transparent;
   color: var(--text-secondary);

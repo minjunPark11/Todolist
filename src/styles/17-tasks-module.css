@@ -349,6 +349,19 @@
   color: var(--text-muted, #8e8e93);
 }
 
+/* The one control in the Drawer that was never styled. It measured 13×13 with
+   `border-radius: 0` and no colour of ours — the browser's own checkbox,
+   drawn in the browser's own blue, on a dark panel. `accent-color` is enough:
+   it tints the native widget with the app's accent and follows the theme,
+   without replacing the control (which would cost its keyboard behaviour). */
+.tm-drawer-done input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .tm-drawer-close {
   border: 0;
   background: transparent;
@@ -680,7 +693,7 @@
 .tm-chip {
   padding: 4px 10px;
   border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted, #8e8e93);
   font: inherit;
@@ -1158,7 +1171,11 @@
   gap: 8px;
 }
 
+/* `min-width` because the pair was sized by its text: Cancel measured 77 and
+   Create 75, so the dialog's two buttons were 2px different and neither edge
+   lined up with anything. A floor makes the pair one shape. */
 .tm-modal-actions button {
+  min-width: 88px;
   padding: 8px 16px;
   border: 0;
   border-radius: 9px;
