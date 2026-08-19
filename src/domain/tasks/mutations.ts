@@ -109,6 +109,21 @@ export function setTaskDueDate(task: Task, dueDate: string): TaskMutation {
   };
 }
 
+/**
+ * Priority, as a mutation rather than a field write.
+ *
+ * The Detail panel has been writing `priority` straight through `onUpdate`
+ * since it was built, which is why changing it there cannot be undone. Coming
+ * through here gives the row's menu the undo every other change already has.
+ */
+export function setTaskPriority(task: Task, priority: Task["priority"]): TaskMutation {
+  return {
+    patch: { priority },
+    undo: { priority: task.priority },
+    labelKey: "tasks.undoPriorityChanged",
+  };
+}
+
 export function setTaskSomeday(task: Task, someday: boolean): TaskMutation {
   return {
     patch: { isSomeday: someday },

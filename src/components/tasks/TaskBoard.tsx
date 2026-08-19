@@ -33,9 +33,14 @@ interface TaskBoardProps {
   onDrop: (taskId: string, columnId: string, index: number, date?: string) => void;
   /** §12.4: false where the Scope's sort is derived, and the drop only moves columns. */
   canReorder: boolean;
+  /**
+   * A card was right-clicked. The Module answers with the menu, because the
+   * menu is a Task's and not a Board's — the same one a row opens.
+   */
+  onContextMenu?: (task: Task, x: number, y: number) => void;
 }
 
-export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onDrop, canReorder }: TaskBoardProps) {
+export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onDrop, canReorder, onContextMenu }: TaskBoardProps) {
   const { t } = useT();
   // Which card is being dragged, in a ref as well as in state. The state is
   // what dims the card; the ref is what the drop reads, because a handler
@@ -133,6 +138,11 @@ export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onDr
                     event.stopPropagation();
                     event.preventDefault();
                     drop(column, canReorder ? index : cards.length);
+                  }}
+                  onContextMenu={(event) => {
+                    if (!onContextMenu) return;
+                    event.preventDefault();
+                    onContextMenu(task, event.clientX, event.clientY);
                   }}
                 >
                   <button type="button" className="tm-card-open" onClick={() => onOpen(task.id)}>

@@ -35,7 +35,20 @@ import { TaskDrawer } from "./TaskDrawer";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
 import type { TaskChild } from "../../domain/tasks/children";
 import type { TaskMutation } from "../../domain/tasks/mutations";
-import { applyPatch, completeTask, leavesScope, markWontDo, moveTaskToSection, reopenTask, trashTask, unmarkWontDo } from "../../domain/tasks/mutations";
+import {
+  applyPatch,
+  completeTask,
+  leavesScope,
+  markWontDo,
+  moveTaskToSection,
+  reopenTask,
+  setTaskDueDate,
+  setTaskPriority,
+  trashTask,
+  unmarkWontDo,
+} from "../../domain/tasks/mutations";
+import { ContextMenu, type ContextMenuState } from "../common/ContextMenu";
+import { addDays } from "../../utils/date";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
 import { folderIdFor } from "../../domain/tasks/sidebarFolders";
@@ -160,6 +173,8 @@ export function TasksModule(props: TasksModuleProps) {
   const [undo, setUndo] = useState<{ labelKey: string; run: () => void } | null>(null);
   /** The row being dragged, so the ones under it know a drop is coming. */
   const [dragTaskId, setDragTaskId] = useState("");
+  /** The open context menu, or none. One at a time, like the undo above it. */
+  const [menu, setMenu] = useState<ContextMenuState | null>(null);
   // §15.3. Presentation only: nothing below reads this to decide what a Scope
   // contains, which is what keeps §15.9 true — the URL means the same thing at
   // every width.
@@ -260,6 +275,75 @@ export function TasksModule(props: TasksModuleProps) {
    * IS a manual order to change: a smart list sorted by date has none, and a
    * drag there would mean nothing to keep.
    */
+  /**
+   * What a Task can be told to do without opening it.
+   *
+   * The same list wherever it is opened from — a right-click on a row, the
+   * row's ⋯ button, a right-click on a Board card. Building it here rather
+   * than in the menu component is what makes that true: the menu knows how to
+   * be a menu, and this knows what a Task is.
+   *
+   * Everything on it goes through `mutate`, so everything on it can be undone.
+   */
+  function taskMenuAt(task: Task, x: number, y: number): ContextMenuState {
+    const done = task.status === "done";
+    const priorities: Array<Task["priority"]> = ["high", "medium", "low", "none"];
+    return {
+      x,
+      y,
+      label: t("tasks.rowMenu", { title: task.title }),
+      sections: [
+        {
+          id: "state",
+          items: [
+            {
+              id: "complete",
+              label: t(done ? "tasks.menu.reopen" : "tasks.menu.complete"),
+              run: () => toggleDone(task),
+            },
+          ],
+        },
+        {
+          id: "priority",
+          items: priorities.map((level) => ({
+            id: `priority-${level}`,
+            label: t(`priority.${level}`),
+            selected: task.priority === level,
+            icon: level === "none" ? null : <span className={`tm-menu-flag is-${level}`} />,
+            run: () => mutate(task, setTaskPriority(task, level)),
+          })),
+        },
+        {
+          id: "date",
+          items: [
+            { id: "date-today", label: t("tasks.menu.dueToday"), run: () => mutate(task, setTaskDueDate(task, today)) },
+            {
+              id: "date-tomorrow",
+              label: t("tasks.menu.dueTomorrow"),
+              run: () => mutate(task, setTaskDueDate(task, addDays(today, 1))),
+            },
+            // Only where there is one to clear: an item that does nothing is
+            // an item the reader has to rule out every time they open this.
+            ...(task.dueDate
+              ? [{ id: "date-clear", label: t("tasks.menu.clearDue"), run: () => mutate(task, setTaskDueDate(task, "")) }]
+              : []),
+          ],
+        },
+        {
+          id: "lifecycle",
+          items: [
+            {
+              id: "trash",
+              label: t("tasks.menu.trash"),
+              danger: true,
+              run: () => mutate(task, trashTask(task, new Date().toISOString())),
+            },
+          ],
+        },
+      ],
+    };
+  }
+
   function reorderOnto(ordered: Task[], draggedId: string, targetId: string) {
     if (draggedId === targetId) return;
     const targetIndex = ordered.findIndex((task) => task.id === targetId);
@@ -562,6 +646,7 @@ export function TasksModule(props: TasksModuleProps) {
             onOpen={openTask}
             onDrop={dropOnBoard}
             canReorder={policy.canManualReorder}
+            onContextMenu={(task, x, y) => setMenu(taskMenuAt(task, x, y))}
           />
         ) : (
           <ul className="tm-list" aria-label={title}>
@@ -592,6 +677,10 @@ export function TasksModule(props: TasksModuleProps) {
                     setDragTaskId("");
                   }}
                   onDragEnd={() => setDragTaskId("")}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setMenu(taskMenuAt(task, event.clientX, event.clientY));
+                  }}
                 >
                   {/* The handle is the affordance, not the mechanism — the whole
                       row is draggable, and this is what says so (audit L-17). */}
@@ -630,6 +719,23 @@ export function TasksModule(props: TasksModuleProps) {
                       </span>
                     ) : null}
                     {task.dueDate ? <span className="tm-task-due">{task.dueDate}</span> : null}
+                  </button>
+                  {/* The other half of L-17, and the reason the menu is a
+                      component: a right-click is not discoverable and does not
+                      exist on a touch screen, so the same menu needs a button
+                      to open it. Anchored to the button rather than the
+                      pointer, which is where the reader is looking. */}
+                  <button
+                    type="button"
+                    className="tm-task-menu"
+                    aria-haspopup="menu"
+                    aria-label={t("tasks.rowMenu", { title: task.title })}
+                    onClick={(event) => {
+                      const box = event.currentTarget.getBoundingClientRect();
+                      setMenu(taskMenuAt(task, box.left, box.bottom + 4));
+                    }}
+                  >
+                    ⋯
                   </button>
                 </li>
               );
@@ -697,6 +803,8 @@ export function TasksModule(props: TasksModuleProps) {
           }
         />
       ) : null}
+
+      {menu ? <ContextMenu state={menu} onClose={() => setMenu(null)} /> : null}
 
       {/* §9.36: the toast is where the way back lives, and it says what it
           would undo rather than just offering the word. */}

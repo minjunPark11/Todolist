@@ -1892,3 +1892,51 @@
 .tm-group-action:focus-visible {
   color: var(--accent, #0a84ff);
 }
+
+/* --- the row's own menu button (audit L-17) ------------------------------ */
+
+.tm-task-menu {
+  flex: none;
+  width: 24px;
+  /* 24 wide and the control height tall: the same idiom as the checkbox
+     beside it — a narrow target that still clears the grid vertically, so
+     it is not the one thing in the row on a different rhythm (V-5). */
+  min-height: var(--density-control-h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--motion-fast);
+}
+
+/* Same rule as the drag handle: at rest a list of rows is a list of titles.
+   `focus-within` is what keeps it reachable by keyboard, where there is no
+   hover to reveal it with. */
+.tm-task:hover .tm-task-menu,
+.tm-task:focus-within .tm-task-menu {
+  opacity: 1;
+}
+
+.tm-task-menu:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* The priority swatch inside the menu, which is the same colour language the
+   row's flag uses — a menu that named the levels in grey would make the reader
+   map the words onto the colours themselves. */
+.tm-menu-flag {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.tm-menu-flag.is-high { background: var(--danger); }
+.tm-menu-flag.is-medium { background: var(--warning); }
+.tm-menu-flag.is-low { background: var(--accent); }
