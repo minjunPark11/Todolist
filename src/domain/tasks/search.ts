@@ -19,16 +19,33 @@ export const SEARCH_KINDS = ["task", "list", "tag", "filter", "folder", "project
 export type SearchKind = (typeof SEARCH_KINDS)[number];
 
 /**
- * §10.49's per-group caps.
+ * §10.49's per-group caps — the shape a caller gets if it asks for none.
  *
- * Not one number for everything: the palette exists to get somewhere fast, and
- * five tasks with three of each container is what fits before the list stops
- * being scannable. The Search Page is where "all of them" lives, which is why
- * the cap here is not a loss.
+ * Not one number for everything: five tasks with three of each container is
+ * what fits before a list stops being scannable. The Search Page is where
+ * "all of them" lives, which is why the cap here is not a loss.
  */
-export const PALETTE_LIMITS: Record<SearchKind, number> = {
+export const DEFAULT_LIMITS: Record<SearchKind, number> = {
   task: 5,
   list: 3,
+  tag: 3,
+  filter: 3,
+  folder: 3,
+  project: 3,
+  space: 3,
+};
+
+/**
+ * What the Command Menu asks for: places, not Tasks (D-25).
+ *
+ * Q-03 split the two halves this module used to serve at once. Finding a Task
+ * is searching, and searching has a page with a shareable address. Jumping to
+ * a List is navigating, and that is what Ctrl/Cmd+K is for. A cap of 0 is not
+ * "show none of many" — it says this kind is not a destination.
+ */
+export const MENU_LIMITS: Record<SearchKind, number> = {
+  task: 0,
+  list: 5,
   tag: 3,
   filter: 3,
   folder: 3,
@@ -125,7 +142,7 @@ export function searchAll(
   query: string,
   collections: SearchCollections,
   labels: { inbox: string; defaultList: string },
-  limits: Record<SearchKind, number> = PALETTE_LIMITS,
+  limits: Record<SearchKind, number> = DEFAULT_LIMITS,
 ): SearchGroup[] {
   const trimmed = query.trim();
   if (!trimmed) return [];
@@ -221,7 +238,10 @@ function push(
   results: Array<SearchResult & { rank: number }>,
   limits: Record<SearchKind, number>,
 ): void {
-  if (results.length === 0) return;
+  // A limit of 0 means the caller does not want this kind at all (D-25), and
+  // that is different from finding nothing — an empty group would still draw
+  // its heading.
+  if (results.length === 0 || limits[kind] === 0) return;
   const ordered = results
     .sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title))
     // §10.49: a long list is cut rather than scrolled forever. The Search Page

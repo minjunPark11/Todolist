@@ -86,7 +86,7 @@ export function TasksSidebarSlot({
   // tenth route.
   const [managing, setManaging] = useState(false);
   // §0.7 R0-3: the dialog is UI state and nothing about it is in the URL, the
-  // same treatment §10.23 gives the palette. `null` is §1.5's S1 (CLOSED);
+  // same treatment §10.23 gives the Command Menu. `null` is §1.5's S1 (CLOSED);
   // a string is the Folder it was started from, "" for the Lists header.
   const [creatingListIn, setCreatingListIn] = useState<string | null>(null);
 

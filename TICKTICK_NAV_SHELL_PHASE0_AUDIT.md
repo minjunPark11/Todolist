@@ -10,7 +10,7 @@
 ## R.0 이어받는 사람에게 — 2026-08-19 기준
 
 - **브랜치:** `feat/nav-shell-p0` (main 기준 커밋 13개). 트리 깨끗.
-- **읽는 순서:** R.1.1 채택 결정 → R.6 확정 결정(D-01~D-24) → R.8 구현 순서. 설계서 본문은 필요할 때만 펼친다.
+- **읽는 순서:** R.1.1 채택 결정 → R.6 확정 결정(D-01~D-25) → R.8 구현 순서. 설계서 본문은 필요할 때만 펼친다.
 - **원칙 하나만 기억하면 된다:** 설계서는 이 저장소를 보지 않고 쓰였다. 본문과 이 문서가 다르면 **이 문서가 이긴다.** 본문은 절대 고치지 않는다.
 
 ### 지금 어디까지 왔나
@@ -22,20 +22,23 @@ P0-3  ✅ Context Sidebar 프레임   P0-4b-5 ✅ 컨테이너 축(visibleTasks)
 P0-4  ✅ Matrix + 중복 제거       P0-5    ✅ Space 사이드바 = 트리
 P0-4a ✅ 사이드바 소유권          P0-6    ✅ Main 헤더
 P0-4b-1 ✅ Won't Do              ─────────────────────────────
-P0-4b-2 ✅ 상태 술어 통합         P0-9 ~ P0-12 남음
+P0-4b-2 ✅ 상태 술어 통합         P0-9    ✅ Command Menu 전역화
+                                 ─────────────────────────────
+                                 P0-10 ~ P0-12 남음
 ```
 
 ### 다음 작업과 그 전에 필요한 것
 
-**P0-9 (Search 전역화)는 Q-03의 답이 있어야 시작할 수 있다.** 설계서 §2.14는 Search가 라우팅하지 않는다고 하는데, 이 리포엔 이미 `/search` 라우트와 Search Page가 있다(v16 §10.19). 선택지는 셋이고 R.7에 적혀 있다 — 오버레이만 / 둘 다(빠른 팔레트 + 전체 결과 페이지) / 라우트만.
+**다음은 P0-10 (Visual tokens)이고, 막는 결정은 없다.** §11 토큰 적용 + `09-calendar-redesign.css` 오버라이드 층 정리. `09-...`가 늦은 층이라는 점을 R.5.3의 정정(폭은 선언이 아니라 `getComputedStyle`로 확인)과 함께 읽을 것.
 
-**P0-10 (Visual tokens)은 Q-03과 무관하므로 먼저 해도 된다.** 다만 `09-calendar-redesign.css`가 늦은 오버라이드 층이라는 점을 R.5.3의 정정과 함께 읽을 것.
+**P0-9는 닫혔다.** Q-03이 D-25로 해소됐고 — Search는 페이지, Ctrl/Cmd+K는 메뉴, 둘 사이에 다리 없음 — 그 결정으로 **설계서 §2.14는 개정 대상**이 된다. 남은 미결은 Q-05(Horizons/Goals/LearningPath) 하나뿐이고 어느 P0도 막지 않는다.
 
 ### 이 작업에서 배운 것 (반복하지 말 것)
 
 - **폭·크기 판단은 `getComputedStyle`로 확인한다.** 스타일시트가 19개고 뒤쪽이 앞쪽을 다시 여는 게 관행이다. 선언만 읽고 "248px 이미 맞다"고 적었다가 실제 값이 200px이었다 (R.5.3).
 - **브라우저에서 한 번은 돌려본다.** 단위 테스트는 내가 세운 전제 안에서만 돈다. `/list/:id` 딥링크가 시작 페이지로 튕기던 버그는 테스트가 아니라 브라우저에서 잡혔다.
 - **같은 이름이 다른 뜻인지 의심한다.** "Board"가 두 물건이었고(D-19), "active"가 세 뜻이었다(D-24). 둘 다 그 발견이 곧 해법이었다.
+- **CSS 클래스를 옮기기 전에 그 클래스를 누가 빌려 쓰는지 본다.** `ListManager`가 팔레트의 backdrop을 쓰고 있었고, 옮기자 배경이 조용히 사라졌다. 타입체커도 테스트도 못 잡는다 (D-25).
 
 ---
 
@@ -256,6 +259,8 @@ Rail 컴포넌트는 위 어느 것도 로컬 state로 갖지 않는다.
 
 **D-08 — Search는 전역으로 올린다.** `paletteOpen`을 `TasksModule`에서 AppShell로 이동. `/` 단축키와 Rail 아이콘이 같은 오버레이를 연다. 설계서 §2.14는 **라우팅을 금지**하는데 리포에는 `/search` 라우트가 이미 있다 → Q-03.
 
+> **D-25가 뒷문장을 뒤집었다 (2026-08-19).** 전역으로 올린다는 결정은 그대로지만, 올라간 것은 "같은 오버레이"가 아니다. Rail과 `/`는 **Search Page**로 가고, Ctrl/Cmd+K가 **Command Menu** 오버레이를 연다. 하나가 아니라 둘이다.
+
 **D-09 — Overview 뷰를 Project에 도입하지 않는다.** 설계서 §1.12는 `Overview/List/Board/Gantt/Calendar`를 요구하지만, 이 리포에서 "개요"는 SpaceHub 탭(`spaceHub.tab.overview`)이고 Scope의 뷰는 `scopeRegistry.allowedViews`가 정한다. 사이드바 내용을 v16으로 유지하면서 뷰 목록만 설계서로 뒤집으면 둘이 어긋난다.
 
 **D-10 — `zoom`은 Rail/Sidebar에 적용되지 않는다.** (R.5.6)
@@ -473,19 +478,51 @@ const visibleTasks = planner.tasks.filter((task) => isTaskActive(task, planner.l
 
 이 구분이 이 단계의 진짜 산출물이다. 인자를 배선했다면 각 모듈이 "어느 질문을 하는 중인지" 매번 다시 판단해야 했다.
 
+
+**D-25 — Search와 Command Menu는 한 상자가 아니라 두 기능이다. (Q-03 해소, 2026-08-19)**
+
+설계서 §2.14는 "Search는 라우팅하지 않는다 — 어디에 있든 그 위에 전역 오버레이가 열린다"고 한다. 이 리포엔 이미 `/search` 라우트와 Search Page가 있었고(v16 §10.19), 오버레이 하나가 그 둘을 대신하려면 **주소로 공유할 수 있는 검색 결과**를 버려야 했다.
+
+그래서 합치지 않고 **용도로 갈랐다.**
+
+| | 무엇을 위한 것인가 | 주소 | 어떻게 연다 |
+|---|---|---|---|
+| **Search Page** (`/search?q=`) | 찾는다 — Task·List·Tag·Filter 전체 | URL에 남는다. 딥링크·공유 가능 | Rail의 Search, `/` 단축키, `openSearch` 명령 |
+| **Command Menu** (오버레이) | 간다·실행한다 — 빠른 화면 이동과 명령 | 아무것도 쓰지 않는다 (§10.23) | Ctrl/Cmd+K |
+
+**둘 사이에 다리를 놓지 않는다.** 옛 팔레트 하단의 "결과 전체 보기"는 타이핑한 질의를 `/search`로 넘겼다. 그 한 줄이 팔레트를 검색창으로 되돌린다 — 어느 행에 착지하느냐에 따라 입력의 의미가 달라지기 때문이다. 그래서 그 버튼은 없앴고, Search Page로 가는 길은 Rail·`/`·명령 셋뿐이다.
+
+**Menu에서 Task를 뺀 것도 같은 규칙이다.** List·Tag·Filter·그룹·Project·Space는 *장소*라서 "이동"에 속한다. Task는 장소가 아니라 찾는 대상이고, 그건 Search Page의 일이다. 이 경계는 컴포넌트가 아니라 [`search.ts`](src/domain/tasks/search.ts)의 `MENU_LIMITS`(`task: 0`)가 지킨다 — 한 matcher를 두 질문이 공유하되, 무엇을 묻는지는 호출부가 정한다.
+
+**전역화가 실제로 요구한 것은 Scope 없는 컨텍스트였다.** 메뉴가 Calendar·Focus·Spaces 위에서도 열리므로 `CommandContext.scope`는 `null`을 가진다. 없는 Scope를 지어내지 않는다 — Scope가 필요했던 명령(`viewBoard`/`viewList`)은 그냥 제시되지 않고, 이는 §10.33이 Module 안에서 이미 쓰던 규칙과 같다.
+
+**옮겨간 것들.** 팔레트가 Tasks Module의 상태를 읽던 네 가지는 이제 URL에서 읽거나 App이 들고 있다.
+
+| 무엇 | 어디로 | 왜 |
+|---|---|---|
+| `CommandPalette.tsx` | [`shell/CommandMenu.tsx`](src/components/shell/CommandMenu.tsx) | 두 셸 위에 그려진다 |
+| `tm-palette-*` CSS | `19-app-shell.css`의 `cmd-menu-*` | 한 페이지의 스타일시트에 살 수 없다 |
+| recents 상태·영속 | [`hooks/useRecents.ts`](src/hooks/useRecents.ts) | 저장 키는 그대로 — 기존 설치본의 기록이 유지된다 |
+| `titleFor` / `namedRecordMissing` | [`domain/tasks/scopeTitle.ts`](src/domain/tasks/scopeTitle.ts) | Module 밖에서도 Scope 이름을 물어야 한다 |
+| capture 초안 | App의 `capturedTitle` → `draftTitle` prop | 메뉴가 Module 위에 있으므로 |
+
+**놓칠 뻔한 것 하나.** `ListManager`가 팔레트의 backdrop 클래스를 빌려 쓰고 있었다. CSS를 셸로 옮기자 그 다이얼로그의 배경이 조용히 사라진다 — 테스트도 타입체커도 잡지 못하는 종류다. `tm-manager-scrim`을 같은 형상으로 만들어 붙였다.
+
+---
+
 ## R.7 미결 — 다음 결정이 필요한 것
 
 | # | 질문 | 상태 |
 |---|---|---|
 | ~~Q-01~~ | `board` / `archive` / `projects`(SpaceHub)의 행선지 | **해소 → D-13** (2026-08-19). 단 보드 진입점이 Q-06으로 갈라져 나왔다 |
 | ~~Q-02~~ | `SpaceTree`의 진입 경로 | **해소 → D-14** (2026-08-19) |
-| **Q-03** | `/search` 라우트 vs 설계서 §2.14 "Search는 라우팅하지 않는다" | 리포에 Search Page가 이미 있고 `TasksModule`이 그 라우트를 claim한다 ([`App.tsx:1070`](src/App.tsx:1070)) |
+| ~~Q-03~~ | `/search` 라우트 vs 설계서 §2.14 "Search는 라우팅하지 않는다" | **해소 → D-25** (2026-08-19). 둘 다 유지하되 용도로 가른다 — Search는 페이지, Ctrl/Cmd+K는 메뉴. 설계서 §2.14는 이로써 개정된다 |
 | ~~Q-04~~ | Rail의 Tasks 재클릭 동작 | **해소 → D-15** (2026-08-19). 세션 범위, fallback은 `/today` |
 | **Q-05** | Horizons / Goals / LearningPath | v16 Phase 0 감사 §B에서도 미결로 남았던 항목. 이번에도 Rail 밖이다 |
 | ~~Q-06~~ | 전역 보드(사분면 축)의 진입점 | **해소 → D-19** (2026-08-19). Matrix로 재분류하고 Rail에 올린다. §1.5에 명시적 예외 |
 | ~~Q-07~~ | `보관함`을 10번째 Scope로 승격할 것인가 | **해소 → D-20** (2026-08-19), 그 뒤 **개정 2**로 뒤집힘: 승격이 아니라 **폐기**다. Task Archive는 Won't Do(D-23)로 대체되고, 프로젝트 Archive만 SpaceHub로 간다 |
 
-**남은 것은 Q-03(P0-9)과 Q-05뿐이다.** 둘 다 P0-4를 막지 않는다.
+**남은 것은 Q-05뿐이다.** 어느 P0도 막지 않는다.
 
 ---
 
@@ -507,7 +544,7 @@ const visibleTasks = planner.tasks.filter((task) => isTaskActive(task, planner.l
 | ~~P0-6 Main Header~~ | **완료** (2026-08-19). 헤더 56px·뷰 전환 40px(A.4)을 사이드바 헤더와 같은 토큰으로, 중복 Search 진입점 제거. 뷰 전환은 현행 유지(D-09) | P0-2 |
 | P0-7 Create/Menu | **완료** (Add List v0.13.0) | — |
 | P0-8 Collapse/Resize | §10 상호작용 마무리 (키보드 resize, 더블클릭, 영속) | P0-3 |
-| P0-9 Search | **D-08.** 팔레트를 전역으로 승격 | P0-2, Q-03 |
+| ~~P0-9 Search~~ | **완료** (2026-08-19). 팔레트가 아니라 **Command Menu**가 전역으로 올라갔다(D-25). Search는 페이지로 남고 둘 사이에 다리는 없다. `MENU_LIMITS`·nullable `CommandContext`·[`useRecents`](src/hooks/useRecents.ts)가 그 경계 | P0-2, Q-03 |
 | P0-10 Visual tokens | §11 적용. `09-calendar-redesign.css` 오버라이드 층 정리 포함 | P0-6 |
 | P0-11 A11y | §2.33 / §3.49~§3.52 ARIA | P0-10 |
 | P0-12 E2E | §2.48 / §3.85 케이스를 `e2e/`에 | 전부 |
@@ -524,3 +561,5 @@ const visibleTasks = planner.tasks.filter((task) => isTaskActive(task, planner.l
 - 착수 전 결정 둘(Q-01·Q-02)을 D-13·D-14로 닫았다. 그 과정에서 "전역 보드는 Scope 뷰와 중복"이라는 통념이 **틀렸음**을 확인했다 — 사분면 축은 거기에만 있다 (D-13).
 
 다음 산출물은 **P0-1의 라우트 레지스트리**다. 남은 미결(Q-03~Q-07)은 P0-1을 막지 않는다.
+
+*(위 문단은 착수 시점의 기록이다. 2026-08-19 현재 P0-1~P0-9는 끝났고 Q-03도 D-25로 닫혔다 — 현재 상태는 R.0을 볼 것.)*

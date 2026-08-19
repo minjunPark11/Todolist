@@ -39,7 +39,7 @@ export function ListManager({ lists, tasks, onRestore, onPermanentlyDelete, onCl
   }
 
   return (
-    <div className="tm-palette-backdrop" onMouseDown={onClose}>
+    <div className="tm-manager-scrim" onMouseDown={onClose}>
       <div
         className="tm-manager"
         role="dialog"

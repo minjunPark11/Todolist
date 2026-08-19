@@ -125,7 +125,7 @@ describe("taskUrlFor", () => {
 });
 
 // Gate 8, first and fourth lines: a result opens where the record lives, and
-// the Search Page's query is in the URL while the palette's never is.
+// the Search Page's query is in the URL while the Command Menu's never is.
 describe("the Search Page URL (§10.19-§10.23)", () => {
   it("round-trips the query", () => {
     expect(parseSearchUrl(searchUrlFor("ABM 연구"))).toBe("ABM 연구");

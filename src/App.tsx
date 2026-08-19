@@ -26,6 +26,12 @@ import { AppShell } from "./components/shell/AppShell";
 import { GlobalRail } from "./components/shell/GlobalRail";
 import { SEARCH_PATH, taskUrlFor } from "./app/taskScopeUrl";
 import { useContextSidebar } from "./hooks/useContextSidebar";
+import { useRecents } from "./hooks/useRecents";
+import { CommandMenu } from "./components/shell/CommandMenu";
+import { recentEntriesFrom } from "./app/recentEntries";
+import type { SearchCollections, SearchResult } from "./domain/tasks/search";
+import type { CommandContext, TaskCommand } from "./domain/tasks/commands";
+import { parseTaskUrl, searchUrlFor, urlForSearchResult } from "./app/taskScopeUrl";
 import { TasksSidebarSlot } from "./components/shell/TasksSidebarSlot";
 import type { TasksSidebarPage } from "./components/tasks/TasksSidebar";
 import { childrenOf } from "./domain/tasks/children";
@@ -200,6 +206,15 @@ export default function App() {
   // used to be a boolean the legacy shell kept to itself and the Tasks Module
   // knew nothing about — which is why the two could not agree on a width.
   const contextSidebar = useContextSidebar(currentPath);
+  /**
+   * The Global Command Menu (D-25). §10.23: it is UI state, and nothing about
+   * it is in the URL — which is exactly what separates it from `/search`.
+   */
+  const [menuOpen, setMenuOpen] = useState(false);
+  // §10.41's other half: the menu captures a title, Quick Add commits it. Held
+  // here rather than in the Module because the menu is above the Module now.
+  const [capturedTitle, setCapturedTitle] = useState("");
+  const recents = useRecents(currentUrl);
   /**
    * The Tasks the user can actually see (audit D-24, axis 2 — P0-4b-5).
    *
@@ -1104,14 +1119,100 @@ export default function App() {
   }
 
   /**
-   * §2.14: Search does not take the active state and, in the finished shell,
-   * does not route either — it opens a global overlay over wherever you are.
-   * That overlay is still inside the Tasks Module (`CommandPalette`), so for
-   * now this opens the Search Page it already has. Promoting the palette to
-   * the shell is P0-9, and Q-03 has to settle the `/search` route first.
+   * Search is a PAGE, and the Rail is its entry point (D-25, closing Q-03).
+   *
+   * The spec's §2.14 wanted one global overlay that never routes. This repo
+   * had already built the other half — a Search Page with `?q=` in the
+   * address (v16 §10.19) — and an overlay cannot be pasted into a message.
+   * So the two were split by what they are for rather than merged: searching
+   * has a page you can link to, and getting somewhere fast has a menu that
+   * writes nothing. Search does not take the Rail's active state either way.
    */
   function openGlobalSearch() {
     navigateUrl(SEARCH_PATH);
+  }
+
+  /**
+   * The Command Menu, and everything it needs to be asked from ANY page.
+   *
+   * The four things below used to be read off the Tasks Module's own state.
+   * They are read off the URL here instead, which is what lets Ctrl/Cmd+K
+   * work on the Calendar: `menuContext` is simply null-scoped when the
+   * address is not a Tasks address, and `commands.ts` hides the commands that
+   * needed one (D-25).
+   */
+  const menuCollections: SearchCollections = {
+    // `visibleTasks`, not `planner.tasks` (D-24 axis 2) — though the menu no
+    // longer lists Tasks at all, the same collections feed the Search Page's
+    // idea of what exists, and the two must not disagree.
+    tasks: visibleTasks,
+    lists: planner.lists,
+    folders: planner.folders,
+    sidebarFolders: planner.sidebarFolders,
+    tags: planner.tags,
+    savedFilters: planner.savedFilters,
+    projects: planner.projects,
+    spaces: planner.spaces,
+  };
+
+  const menuTaskState = parseTaskUrl(currentUrl);
+  const menuContext: CommandContext = {
+    scope: menuTaskState?.scope ?? null,
+    view: menuTaskState?.view ?? null,
+  };
+
+  // §10.6. Caught on the window rather than on a button, because the menu is
+  // reachable from anywhere and a focused input must not swallow the shortcut.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setMenuOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  function renderCommandMenu() {
+    if (!menuOpen) return null;
+    return (
+      <CommandMenu
+        collections={menuCollections}
+        ctx={menuContext}
+        recents={recentEntriesFrom(recents, menuCollections, t)}
+        onClose={() => setMenuOpen(false)}
+        /** §10.17/§10.18: a result opens at its OWN canonical place. */
+        onPickResult={(result: SearchResult) => {
+          setMenuOpen(false);
+          navigateUrl(urlForSearchResult(result, planner.lists, planner.projects));
+        }}
+        onRunCommand={(command: TaskCommand) => {
+          setMenuOpen(false);
+          const target = command.target(menuContext);
+          // `null` when the command needed a Scope and the page has none —
+          // `canRunCommand` should already have refused, so this is the second
+          // guard rather than the first (Gate 8).
+          if (!target) return;
+          if ("search" in target) {
+            navigateUrl(searchUrlFor(""));
+            return;
+          }
+          navigateUrl(taskUrlFor({ scope: target.scope, view: target.view ?? "list", taskId: "" }));
+        }}
+        onOpenUrl={(next) => {
+          setMenuOpen(false);
+          navigateUrl(next);
+        }}
+        onCapture={(title) => {
+          // §10.41: owner = Inbox, and the user lands where the task would go
+          // rather than being told after the fact.
+          setMenuOpen(false);
+          setCapturedTitle(title);
+          navigateUrl(taskUrlFor({ scope: { kind: "inbox" }, view: "list", taskId: "" }));
+        }}
+      />
+    );
   }
 
   /**
@@ -1250,6 +1351,8 @@ export default function App() {
           onNavigate={navigateUrl}
           onOpenPage={openSidebarPage}
           error={planner.auth.syncError}
+          draftTitle={capturedTitle}
+          onDraftConsumed={() => setCapturedTitle("")}
           onCreate={(title, resolution) => {
             if (!resolution.targetListId) return;
             const owner = planner.lists.find((list) => list.id === resolution.targetListId);
@@ -1308,6 +1411,10 @@ export default function App() {
           }}
           onMutate={planner.updateTask}
         />
+        {/* Above both shells, drawn last so it sits over whichever answered
+            the route (D-25). It is `position: fixed`, so where it lands on
+            screen owes nothing to which grid it was rendered inside. */}
+        {renderCommandMenu()}
         </AppShell>
       </I18nProvider>
     );
@@ -1553,6 +1660,7 @@ export default function App() {
         onDismissToast={handleDismissToast}
       />
         </div>
+        {renderCommandMenu()}
         </AppShell>
         <UpdateChecker />
       </>

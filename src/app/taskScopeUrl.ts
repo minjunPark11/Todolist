@@ -142,9 +142,10 @@ export function canonicalizeTaskUrl(url: string): string | null {
  * refreshing, sharing and going back to a search are all worth being able to
  * do (§10.21).
  *
- * The palette's own typing is NOT this (§10.23, Gate 8). That query is
- * transient UI state and never touches the address bar; only leaving the
- * palette for the full page writes one of these.
+ * The Command Menu's own typing is NOT this (§10.23, Gate 8). That query is
+ * transient UI state and never touches the address bar — and since D-25 the
+ * menu has no way to hand it over either. These addresses are written by the
+ * Rail, by the `/` shortcut, and by the `openSearch` command.
  */
 export const SEARCH_PATH = "/search";
 

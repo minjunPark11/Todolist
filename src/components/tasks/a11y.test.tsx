@@ -3,8 +3,8 @@
 // Gate 11's "critical accessibility violation 0", measured rather than asserted.
 //
 // Phase 11's first pass fixed accessibility by reading the code — names on the
-// list and board columns, a combobox over a listbox in the palette, labels on
-// the column-move selects. Reading finds what you think to look for. This runs
+// list and board columns, labels on the column-move selects. Reading finds
+// what you think to look for. This runs
 // axe over the Tasks Module's real surfaces instead, and fails the suite on any
 // violation axe rates serious or critical.
 //
@@ -115,6 +115,8 @@ function renderModule(url: string) {
         url={url}
         onNavigate={() => {}}
         onCreate={() => {}}
+        draftTitle=""
+        onDraftConsumed={() => {}}
         onCreateList={() => "list-new"}
         onCreateSidebarFolder={() => "sf-new"}
         drawer={{
@@ -194,16 +196,6 @@ describe("Tasks Module accessibility (Gate 11)", () => {
     expect(await seriousViolations(container)).toEqual([]);
   });
 
-  it("has no serious or critical violation with the Command Palette open", async () => {
-    const user = userEvent.setup();
-    const { container } = renderModule("/list/l1");
-    // §10.23: the palette is UI state, so there is no URL that renders it —
-    // it has to be opened the way a user opens it.
-    await user.keyboard("{Control>}k{/Control}");
-
-    expect(container.querySelector('[role="combobox"]')).not.toBeNull();
-    expect(await seriousViolations(container)).toEqual([]);
-  });
 });
 
 // Two guards on the tests above, because a screen that renders nothing and a

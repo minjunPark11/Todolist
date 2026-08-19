@@ -25,16 +25,27 @@ export type CommandId =
   | "openSearch";
 
 export interface CommandContext {
-  /** Where the user is standing — §10.34's context-aware commands. */
-  scope: TaskScopeRef;
-  view: TaskViewKind;
+  /**
+   * Where the user is standing — §10.34's context-aware commands.
+   *
+   * `null` since D-25: the menu is global now, so it is opened from Calendar,
+   * Focus and the Spaces pages too, and none of those is a Scope. Nothing is
+   * invented to fill the gap — a command that needs a Scope is simply not
+   * offered there, which is the same rule §10.33 already applies inside the
+   * Module.
+   */
+  scope: TaskScopeRef | null;
+  view: TaskViewKind | null;
 }
+
+/** Where a command lands. `null` when the context it needed has gone (D-25). */
+export type CommandTarget = { scope: TaskScopeRef; view?: TaskViewKind } | { search: true };
 
 export interface TaskCommand {
   id: CommandId;
   labelKey: string;
   /** §10.33: the result has to be predictable, so every command is a destination. */
-  target: (ctx: CommandContext) => { scope: TaskScopeRef; view?: TaskViewKind } | { search: true };
+  target: (ctx: CommandContext) => CommandTarget | null;
   /** §10.33: a command that cannot do anything here is not shown. */
   enabled: (ctx: CommandContext) => boolean;
 }
@@ -51,46 +62,47 @@ const COMMANDS: TaskCommand[] = [
     target: () => ({ scope: { kind: "today" } }),
     // Already there is not a destination. §10.33 asks for a predictable
     // result, and "nothing happens" is predictable in the wrong way.
-    enabled: (ctx) => ctx.scope.kind !== "today",
+    enabled: (ctx) => ctx.scope?.kind !== "today",
   },
   {
     id: "goUpcoming",
     labelKey: "commands.goUpcoming",
     target: () => ({ scope: { kind: "upcoming" } }),
-    enabled: (ctx) => ctx.scope.kind !== "upcoming",
+    enabled: (ctx) => ctx.scope?.kind !== "upcoming",
   },
   {
     id: "goInbox",
     labelKey: "commands.goInbox",
     target: () => ({ scope: { kind: "inbox" } }),
-    enabled: (ctx) => ctx.scope.kind !== "inbox",
+    enabled: (ctx) => ctx.scope?.kind !== "inbox",
   },
   {
     id: "goCompleted",
     labelKey: "commands.goCompleted",
     target: () => ({ scope: { kind: "completed" } }),
-    enabled: (ctx) => ctx.scope.kind !== "completed",
+    enabled: (ctx) => ctx.scope?.kind !== "completed",
   },
   {
     id: "goTrash",
     labelKey: "commands.goTrash",
     target: () => ({ scope: { kind: "trash" } }),
-    enabled: (ctx) => ctx.scope.kind !== "trash",
+    enabled: (ctx) => ctx.scope?.kind !== "trash",
   },
   {
     id: "viewBoard",
     labelKey: "commands.viewBoard",
-    target: (ctx) => ({ scope: ctx.scope, view: "board" }),
+    target: (ctx) => (ctx.scope ? { scope: ctx.scope, view: "board" } : null),
     // §10.33's own example: offered only where the current Scope supports a
     // Board. Today has no Board, so the command is absent there rather than
-    // present and inert.
-    enabled: (ctx) => ctx.view !== "board" && allows(ctx.scope, "board"),
+    // present and inert. Outside a Scope entirely there is nothing to switch
+    // the View of, so the same rule hides it (D-25).
+    enabled: (ctx) => ctx.scope !== null && ctx.view !== "board" && allows(ctx.scope, "board"),
   },
   {
     id: "viewList",
     labelKey: "commands.viewList",
-    target: (ctx) => ({ scope: ctx.scope, view: "list" }),
-    enabled: (ctx) => ctx.view !== "list" && allows(ctx.scope, "list"),
+    target: (ctx) => (ctx.scope ? { scope: ctx.scope, view: "list" } : null),
+    enabled: (ctx) => ctx.scope !== null && ctx.view !== "list" && allows(ctx.scope, "list"),
   },
   {
     id: "openSearch",
