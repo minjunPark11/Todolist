@@ -56,8 +56,6 @@ import { flattenGroups, PAGE_LIMITS, searchAll } from "../../domain/tasks/search
 import { platform } from "../../platform";
 import { SEARCH_KINDS, type SearchKind } from "../../domain/tasks/search";
 
-/** §10.44: local to this device, and not part of the account's data. */
-
 interface TasksModuleProps {
   tasks: Task[];
   lists: List[];
@@ -361,7 +359,9 @@ export function TasksModule(props: TasksModuleProps) {
       {/* D-21: the same component the legacy shell renders when the mode is
           `tasks`, so crossing between the two shells no longer swaps the
           sidebar. Its dialogs and their state travel with it. */}
+      {/* §3.50: over the content it is a drawer, beside it a landmark. */}
       <TasksSidebarSlot
+        drawer={sidebar === "overlay" ? { open: sidebarOpen, onClose: () => setSidebarOpen(false) } : null}
         tasks={tasks}
         lists={lists}
         folders={folders}

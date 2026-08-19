@@ -10,7 +10,7 @@
 ## R.0 이어받는 사람에게 — 2026-08-19 기준
 
 - **브랜치:** `feat/nav-shell-p0` (main 기준 커밋 13개). 트리 깨끗.
-- **읽는 순서:** R.1.1 채택 결정 → R.6 확정 결정(D-01~D-26) → R.8 구현 순서. 설계서 본문은 필요할 때만 펼친다.
+- **읽는 순서:** R.1.1 채택 결정 → R.6 확정 결정(D-01~D-27) → R.8 구현 순서. 설계서 본문은 필요할 때만 펼친다.
 - **원칙 하나만 기억하면 된다:** 설계서는 이 저장소를 보지 않고 쓰였다. 본문과 이 문서가 다르면 **이 문서가 이긴다.** 본문은 절대 고치지 않는다.
 
 ### 지금 어디까지 왔나
@@ -24,13 +24,14 @@ P0-4a ✅ 사이드바 소유권          P0-6    ✅ Main 헤더
 P0-4b-1 ✅ Won't Do              ─────────────────────────────
 P0-4b-2 ✅ 상태 술어 통합         P0-9    ✅ Command Menu 전역화
                                  P0-10   ✅ Visual tokens
+                                 P0-11   ✅ A11y
                                  ─────────────────────────────
-                                 P0-11 · P0-12 남음
+                                 P0-12 남음
 ```
 
 ### 다음 작업과 그 전에 필요한 것
 
-**다음은 P0-11 (A11y)이고, 막는 결정은 없다.** 설계서 §2.33 / §3.49~§3.52의 ARIA. 셸에는 이미 axe 검사가 둘 있다 — [`tasks/a11y.test.tsx`](src/components/tasks/a11y.test.tsx)와 [`shell/CommandMenu.test.tsx`](src/components/shell/CommandMenu.test.tsx). P0-11은 그 그물을 Rail·Context Sidebar·resize 핸들까지 넓히는 일이다.
+**마지막은 P0-12 (E2E)이고, 막는 결정은 없다.** 설계서 §2.48 / §3.85의 케이스를 `e2e/`로. 단위 검사는 이미 촘촘하다 — 셸 axe 검사 셋([`shell/a11y.test.tsx`](src/components/shell/a11y.test.tsx), [`shell/CommandMenu.test.tsx`](src/components/shell/CommandMenu.test.tsx), [`tasks/a11y.test.tsx`](src/components/tasks/a11y.test.tsx))이 있으므로, E2E가 값을 더하는 곳은 **jsdom이 답할 수 없는 것**이다: 실제 폭에 따른 반응형 전환, resize 드래그, 새로고침 뒤 폭·collapse 영속, 딥링크.
 
 **남은 미결은 Q-05(Horizons/Goals/LearningPath) 하나뿐이고 어느 P0도 막지 않는다.** Q-03은 D-25로, 그에 따라 **설계서 §2.14는 개정 대상**이 됐다.
 
@@ -41,6 +42,8 @@ P0-4b-2 ✅ 상태 술어 통합         P0-9    ✅ Command Menu 전역화
 - **같은 이름이 다른 뜻인지 의심한다.** "Board"가 두 물건이었고(D-19), "active"가 세 뜻이었다(D-24). 둘 다 그 발견이 곧 해법이었다.
 - **CSS 클래스를 옮기기 전에 그 클래스를 누가 빌려 쓰는지 본다.** `ListManager`가 팔레트의 backdrop을 쓰고 있었고, 옮기자 배경이 조용히 사라졌다. 타입체커도 테스트도 못 잡는다 (D-25).
 - **`var(--x, fallback)`을 보면 `--x`가 실재하는지 확인한다.** 다섯 스타일시트가 없는 이름을 참조하며 fallback으로만 그려지고 있었다. 문법이 맞고 화면도 (라이트에서는) 멀쩡해서 6개월을 살아남았다 (D-26).
+- **`transform`으로 밀어낸 것은 숨긴 것이 아니다.** 화면 밖으로 옮긴 패널은 탭 순서와 접근성 트리에 그대로 남는다. `visibility`/`display`/`inert` 중 하나가 있어야 진짜로 빠진다 (D-27).
+- **브라우저 pane이 표시되지 않으면 CSS 트랜지션이 진행되지 않는다.** 프레임을 그리지 않으므로 지연된 `visibility` 전환이 영영 끝나지 않아 "안 고쳐졌다"로 보였다. 트랜지션을 끄고 재면 된다.
 - **`git checkout <file>`은 그 파일의 내 작업도 되돌린다.** P0-10 중간에 CSS 정리 스크립트를 다시 돌리려고 파일을 되돌렸다가 같은 파일에 있던 토큰 블록을 날렸다. 브라우저 실측이 아니었으면 모르고 커밋했다.
 
 ---
@@ -563,6 +566,37 @@ getComputedStyle(root) → --text, --surface, --bg, --hover,
 
 ---
 
+
+**D-27 — A11y는 속성을 채우는 일이 아니었다. 모바일에서 탭이 보이지 않는 사이드바로 들어가고 있었다. (P0-11, 2026-08-19)**
+
+P0-11의 지시는 "§2.33 / §3.49~§3.52의 ARIA"였다. 셸 전체를 렌더해 axe를 돌리는 검사부터 새로 만들었고([`shell/a11y.test.tsx`](src/components/shell/a11y.test.tsx)), 거기서 **landmark 구조는 이미 통과했다** — Rail·Context Sidebar·Main이 각각 landmark고 두 `<nav>`의 이름도 서로 다르다. 기존 모듈 검사가 `region` 규칙을 끄면서 "이건 셸의 질문"이라고 적어둔 그 질문에 이제 답이 있다.
+
+진짜 결함은 그 옆에 있었다. **모바일 오버레이 사이드바가 닫혀 있을 때 실측:**
+
+```
+transform: matrix(1,0,0,1,-280,0)   ← 화면 밖
+visibility: visible                  ← 트리 안
+포커스 가능한 요소: 9개              ← 탭 순서 안
+```
+
+`transform`으로 밀어낸 패널은 **보이지 않게 될 뿐 사라지지 않는다.** 폰에서 Tab을 누르면 없는 사이드바 안을 아홉 번 도는 상태였다. `19-app-shell.css`는 데스크톱 collapse에 대해 이걸 정확히 적어두고 있었다 — *"its rows must leave the tab order and the accessibility tree"* — 오버레이만 그 기준에 걸린 적이 없었다.
+
+**고친 것 셋.**
+
+| § | 무엇 | 실측 확인 |
+|---|---|---|
+| §3.31 | 닫힌 드로어에 `visibility: hidden` (슬라이드 길이만큼 지연) | `hidden`, 탭 순서에서 빠짐 |
+| §3.50 | 열린 드로어만 `role="dialog"` + `aria-modal` + 포커스 트랩 + Escape | 열면 포커스가 안으로, Escape로 닫고 **포커스가 열었던 버튼으로 복귀** |
+| §3.52 | collapse/expand가 같은 region을 지목 — `CONTEXT_SIDEBAR_ID` 상수 | 두 버튼이 같은 `aria-controls`, `aria-expanded`가 서로 반대 |
+
+**§3.50에서 갈린 판단 하나.** 오버레이일 때 `<nav>`는 landmark 역할을 내주고 dialog가 된다. 폰에서는 "지금 모달 안에 있고 뒤쪽은 비활성"이라는 정보가 landmark 하나보다 값이 크다. 다만 **열려 있는 동안만**이다 — 닫힌 드로어가 `aria-modal`을 달고 있으면 덮은 것도 없이 뒤쪽이 비활성이라고 말하는 셈이고, 그건 지키지 못할 약속이다.
+
+**§2.33에서 일부러 따르지 않은 줄 하나.** 설계서는 Search 버튼에 `aria-haspopup="dialog"`와 `aria-expanded`를 요구한다. D-25 이후 Search는 **페이지로 이동한다.** 열지 않을 dialog를 열겠다고 선언하면 스크린리더가 그 약속을 사용자에게 전달하고 앱이 그걸 깬다. 그래서 **이 줄의 올바른 구현은 그 속성의 부재**이고, §2.33을 읽은 다음 사람이 "빠졌네" 하고 채워 넣지 않도록 테스트로 못박았다.
+
+**남긴 것.** Tasks 사이드바에는 collapse 버튼이 없다(v16 §1.14에 헤더가 없다). 접기는 Ctrl/Cmd+`\`와, 접힌 뒤 나타나는 expand 버튼으로만 가능하다. 버튼 자체를 다는 것은 §3.23이고 P0-3/P0-8의 영역이라 여기서 만들지 않았다 — **알려진 공백으로 남긴다.**
+
+---
+
 ## R.7 미결 — 다음 결정이 필요한 것
 
 | # | 질문 | 상태 |
@@ -599,7 +633,7 @@ getComputedStyle(root) → --text, --surface, --bg, --hover,
 | P0-8 Collapse/Resize | §10 상호작용 마무리 (키보드 resize, 더블클릭, 영속) | P0-3 |
 | ~~P0-9 Search~~ | **완료** (2026-08-19). 팔레트가 아니라 **Command Menu**가 전역으로 올라갔다(D-25). Search는 페이지로 남고 둘 사이에 다리는 없다. `MENU_LIMITS`·nullable `CommandContext`·[`useRecents`](src/hooks/useRecents.ts)가 그 경계 | P0-2, Q-03 |
 | ~~P0-10 Visual tokens~~ | **완료** (2026-08-19). **D-26.** 진짜 문제는 색이 아니라 정의되지 않은 토큰 이름이었다 — 다섯 스타일시트가 없는 변수를 참조해 다크 모드가 라이트로 그려지고 있었다. §11.6 surface hierarchy·§11.28 quiet selection 적용, 삭제된 레거시 사이드바의 CSS 3개 층 제거 | P0-6 |
-| P0-11 A11y | §2.33 / §3.49~§3.52 ARIA | P0-10 |
+| ~~P0-11 A11y~~ | **완료** (2026-08-19). **D-27.** 셸 전체 axe 검사 신설(`region` 켠 채로) — landmark는 이미 통과했고, 진짜 결함은 닫힌 모바일 드로어가 탭 순서에 남아 있던 것이었다. §3.50 모달 계약·§3.52 공유 region id 적용 | P0-10 |
 | P0-12 E2E | §2.48 / §3.85 케이스를 `e2e/`에 | 전부 |
 
 ---

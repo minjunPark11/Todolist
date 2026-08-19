@@ -17,6 +17,21 @@ export const CONTEXT_SIDEBAR_DEFAULT_WIDTH = 248;
 export const CONTEXT_SIDEBAR_MIN_WIDTH = 216;
 export const CONTEXT_SIDEBAR_MAX_WIDTH = 360;
 
+/**
+ * The Context Sidebar's element id (§3.52, P0-11).
+ *
+ * Collapse and expand are ONE control that happens to be drawn in two places:
+ * the collapse button lives inside the sidebar, and the expand button has to
+ * live outside it because a collapsed sidebar takes its own button away with
+ * it (§3.24). A screen reader can only be told they are the same control by
+ * both naming the same region — hence a constant rather than `useId`, which
+ * would hand the two components different strings.
+ *
+ * Whichever sidebar the current mode renders carries this id. They never
+ * co-exist, so it stays unique.
+ */
+export const CONTEXT_SIDEBAR_ID = "context-sidebar";
+
 /** §3.20's arrow-key step, and its Shift multiplier. */
 export const CONTEXT_SIDEBAR_STEP = 16;
 export const CONTEXT_SIDEBAR_BIG_STEP = 32;

@@ -17,6 +17,7 @@
 // grids read it, so there is one number and one place that changes it.
 import type { ReactNode } from "react";
 import {
+  CONTEXT_SIDEBAR_ID,
   CONTEXT_SIDEBAR_MAX_WIDTH,
   CONTEXT_SIDEBAR_MIN_WIDTH,
 } from "../../app/contextSidebar";
@@ -87,6 +88,11 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
           type="button"
           className="context-sidebar-expand"
           aria-label={t("sidebar.expand")}
+          /* §3.52. The sidebar is still in the tree when collapsed — the frame
+             hides it with `display: none` rather than unmounting it — so this
+             names a region that exists, and `false` is the truth about it. */
+          aria-expanded={false}
+          aria-controls={CONTEXT_SIDEBAR_ID}
           onClick={sidebar.toggleCollapsed}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

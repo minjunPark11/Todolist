@@ -10,6 +10,7 @@
 // forbids a screen from inventing a count formula, and §6.94 asks the sidebar
 // and the thing it points at to run the same query — the two numbers
 // disagreeing is what v0.10.1 and v0.10.2 each fixed by hand.
+import { useEffect, useRef } from "react";
 import type { Folder, List, SavedFilter, SidebarFolder, Tag } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, type ScopeContext } from "../../domain/tasks/scopeQuery";
@@ -18,9 +19,28 @@ import { activeSidebarFolders, folderIdFor } from "../../domain/tasks/sidebarFol
 import { activeSavedFilters } from "../../domain/tasks/filters";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { useT } from "../../i18n";
+// §3.52: whichever sidebar the mode renders is the region the expand button
+// names. They never co-exist, so the id stays unique.
+import { CONTEXT_SIDEBAR_ID } from "../../app/contextSidebar";
 import { listColorHex } from "../../domain/tasks/listColor";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
+
+/**
+ * §3.50: what this sidebar IS depends on how it is presented.
+ *
+ * Beside the content it is a navigation landmark. Over the content, behind a
+ * scrim, it is a drawer — a modal-like surface, which is a different promise:
+ * Tab stays inside it, Escape closes it, and focus goes back where it came
+ * from. Passing this is how the caller says which one it is asking for.
+ */
+export interface SidebarDrawer {
+  open: boolean;
+  onClose: () => void;
+}
 
 interface TasksSidebarProps {
+  /** Null when the sidebar is a persistent column (§15.15). */
+  drawer?: SidebarDrawer | null;
   ctx: ScopeContext;
   folders: Folder[];
   sidebarFolders: SidebarFolder[];
@@ -65,6 +85,7 @@ function sameScope(a: TaskScopeRef, b: TaskScopeRef | null): boolean {
 }
 
 export function TasksSidebar({
+  drawer = null,
   ctx,
   folders,
   sidebarFolders,
@@ -78,6 +99,23 @@ export function TasksSidebar({
   onOpenPage,
 }: TasksSidebarProps) {
   const { t } = useT();
+  const root = useRef<HTMLElement>(null);
+  const isOpenDrawer = Boolean(drawer?.open);
+
+  // §3.50. Only while it is actually over the content: a persistent column
+  // that trapped Tab would be a column you cannot leave.
+  useFocusTrap(root, { enabled: isOpenDrawer });
+
+  useEffect(() => {
+    if (!isOpenDrawer) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      drawer?.onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpenDrawer, drawer]);
 
   function row(scope: TaskScopeRef, label: string, options: { indent?: boolean; dot?: string } = {}) {
     const count = queryScopeCount(scope, ctx);
@@ -162,7 +200,19 @@ export function TasksSidebar({
   const visibleFilters = activeSavedFilters(savedFilters);
 
   return (
-    <nav className="tm-sidebar" aria-label={t("tasks.navLabel")}>
+    <nav
+      ref={root}
+      id={CONTEXT_SIDEBAR_ID}
+      className="tm-sidebar"
+      aria-label={t("tasks.navLabel")}
+      // §3.50: a drawer over the content announces itself as one — while it
+      // is OPEN. A closed drawer claiming `aria-modal` would be telling a
+      // screen reader the page behind it is inert when nothing is covering
+      // it. The landmark role is given up only for as long as the modal is
+      // really there; on a phone, knowing you are inside one is worth more
+      // than having a second landmark to jump between.
+      {...(isOpenDrawer ? { role: "dialog" as const, "aria-modal": true } : {})}
+    >
       <div className="tm-section">
         {row({ kind: "today" }, t("tasks.today"))}
         {row({ kind: "upcoming" }, t("tasks.upcoming"))}

@@ -14,7 +14,7 @@
 // The rules that remain — names, roles, relationships, duplicate ids, list and
 // heading structure — are the ones that were checked by eye before.
 import { describe, expect, it } from "vitest";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach } from "vitest";
 import axe from "axe-core";
@@ -196,6 +196,33 @@ describe("Tasks Module accessibility (Gate 11)", () => {
     expect(await seriousViolations(container)).toEqual([]);
   });
 
+});
+
+
+// §3.50: the same panel is two different things depending on where it is drawn.
+//
+// The bug this pins down was not an attribute — it was that a drawer slid
+// off-canvas with `transform` alone keeps every row in the tab order, so on a
+// phone Tab walked into a sidebar the user could not see. The CSS half of the
+// fix (`visibility: hidden`) cannot be asserted in jsdom, which computes no
+// styles; what CAN be asserted is the half that decides whether the panel
+// claims to be modal at all.
+describe("the sidebar's two presentations (§3.50)", () => {
+  it("is a navigation landmark when it stands beside the content", () => {
+    renderModule("/today");
+    const sidebar = screen.getByRole("navigation", { name: "작업 탐색" });
+
+    expect(sidebar.getAttribute("role")).toBeNull();
+    expect(sidebar.getAttribute("aria-modal")).toBeNull();
+  });
+
+  it("does not promise modality it cannot keep", () => {
+    // A persistent column that announced `aria-modal` would tell a screen
+    // reader the rest of the page is inert while it plainly is not — the same
+    // mistake as claiming Search opens a dialog when it navigates (D-25).
+    const { container } = renderModule("/today");
+    expect(container.querySelector('[aria-modal="true"]')).toBeNull();
+  });
 });
 
 // Two guards on the tests above, because a screen that renders nothing and a

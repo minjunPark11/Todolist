@@ -840,15 +840,29 @@
   left: 0;
   width: min(280px, 82vw);
   /* Off-canvas rather than display:none, so opening it is a movement the eye
-     can follow and the tree keeps its scroll position. */
+     can follow and the tree keeps its scroll position.
+
+     `visibility: hidden` is the other half, and it was missing (P0-11).
+     Translating a panel off-screen moves it out of SIGHT and nothing else:
+     its nine rows stayed in the tab order and in the accessibility tree, so
+     tabbing through a phone screen walked into a sidebar that was not there.
+     19-app-shell.css says this in as many words for the desktop collapse —
+     "its rows must leave the tab order and the accessibility tree" — and the
+     overlay had simply never been held to it.
+
+     Delayed by the length of the slide so the panel is still visible while it
+     leaves, and instant on the way in. */
   transform: translateX(-100%);
-  transition: transform 160ms ease;
+  visibility: hidden;
+  transition: transform 160ms ease, visibility 0s linear 160ms;
   background: var(--bg, #fff);
   padding-left: max(8px, env(safe-area-inset-left));
 }
 
 .tm-shell.sidebar-open .tm-sidebar {
   transform: translateX(0);
+  visibility: visible;
+  transition: transform 160ms ease, visibility 0s;
 }
 
 .tm-scrim {

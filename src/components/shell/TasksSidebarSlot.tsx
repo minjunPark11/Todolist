@@ -28,11 +28,13 @@ import type { ScopeContext } from "../../domain/tasks/scopeQuery";
 import { resolveListView } from "../../domain/tasks/listView";
 import { taskUrlFor } from "../../app/taskScopeUrl";
 import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
-import { TasksSidebar, type TasksSidebarPage } from "../tasks/TasksSidebar";
+import { TasksSidebar, type SidebarDrawer, type TasksSidebarPage } from "../tasks/TasksSidebar";
 import { ListManager } from "../tasks/ListManager";
 import { CreateListModal } from "../tasks/CreateListModal";
 
 export interface TasksSidebarSlotProps {
+  /** §3.50: set only where the sidebar is drawn OVER the content. */
+  drawer?: SidebarDrawer | null;
   tasks: Task[];
   lists: List[];
   folders: Folder[];
@@ -63,6 +65,7 @@ export interface TasksSidebarSlotProps {
 }
 
 export function TasksSidebarSlot({
+  drawer = null,
   tasks,
   lists,
   folders,
@@ -111,6 +114,7 @@ export function TasksSidebarSlot({
   return (
     <>
       <TasksSidebar
+        drawer={drawer}
         ctx={ctx}
         folders={folders}
         sidebarFolders={sidebarFolders}

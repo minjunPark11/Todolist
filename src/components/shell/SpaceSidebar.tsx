@@ -14,6 +14,7 @@
 // getting a Rail item is exactly why the tree needs a home of its own.
 import type { Folder, List, Project, Space, Task } from "../../types";
 import type { Selection } from "../../app/spaceSelection";
+import { CONTEXT_SIDEBAR_ID } from "../../app/contextSidebar";
 import { SpaceTree } from "../sidebar/SpaceTree";
 import { listIdFor } from "../../domain/spaces/membership";
 import { isTaskOpen } from "../../domain/tasks/taskState";
@@ -76,7 +77,7 @@ export function SpaceSidebar({
   }
 
   return (
-    <nav className="space-sidebar" aria-label={t("tree.section")}>
+    <nav id={CONTEXT_SIDEBAR_ID} className="space-sidebar" aria-label={t("tree.section")}>
       {/* §3.10: a header of the same height as the Main one, carrying the
           scope's name and the collapse button (§3.23) — and nothing that the
           Rail already offers. */}
@@ -86,6 +87,10 @@ export function SpaceSidebar({
           type="button"
           className="space-sidebar-collapse"
           aria-label={t("sidebar.collapse")}
+          /* §3.52: the same region the expand button names, so the two read as
+             one control rather than as two unrelated buttons. */
+          aria-expanded
+          aria-controls={CONTEXT_SIDEBAR_ID}
           title={t("sidebar.collapse")}
           onClick={onCollapse}
         >
