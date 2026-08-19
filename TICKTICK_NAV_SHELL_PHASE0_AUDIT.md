@@ -472,7 +472,7 @@ const visibleTasks = planner.tasks.filter((task) => isTaskActive(task, planner.l
 | ~~P0-4b-4 프로젝트 Archive~~ | **완료** (2026-08-19). Space의 `보관함` 탭(`/s/:id?view=archive`)으로 이동. `/archive` 라우트·ArchivePage·`PageId "archive"` 폐기, 옛 링크는 `/spaces`로 리다이렉트 | P0-4b-3 |
 | ~~P0-4b-5 컨테이너 축~~ | **완료** (2026-08-19). 14곳에 `lists`를 배선하는 대신 `App.tsx`가 `visibleTasks`를 한 번 파생해 화면에 넘긴다. `planner.tasks`는 조회용으로 남는다 | P0-4b-2 |
 | ~~P0-5 Tree~~ | **완료** (2026-08-19). [`SpaceSidebar`](src/components/shell/SpaceSidebar.tsx) = 헤더 + `SpaceTree`. 레거시 [`Sidebar.tsx`](src/components/Sidebar.tsx) 삭제, `/` 단축키는 전역 검색으로 | P0-3 |
-| P0-6 Main Header | `tm-header`를 새 셸 기준으로 정리. 뷰 전환은 현행 유지(D-09) | P0-2 |
+| ~~P0-6 Main Header~~ | **완료** (2026-08-19). 헤더 56px·뷰 전환 40px(A.4)을 사이드바 헤더와 같은 토큰으로, 중복 Search 진입점 제거. 뷰 전환은 현행 유지(D-09) | P0-2 |
 | P0-7 Create/Menu | **완료** (Add List v0.13.0) | — |
 | P0-8 Collapse/Resize | §10 상호작용 마무리 (키보드 resize, 더블클릭, 영속) | P0-3 |
 | P0-9 Search | **D-08.** 팔레트를 전역으로 승격 | P0-2, Q-03 |

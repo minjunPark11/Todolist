@@ -11,6 +11,11 @@
      sidebar is shown, hidden, collapsed, or replaced by another module. */
   --rail-w: 56px;
   --rail-item: 40px;
+  /* Appendix A.4. One number for both headers so the Context Sidebar's title
+     row and the Main title sit on the same line — the seam between the two
+     columns is only invisible if they agree. */
+  --shell-header-h: 56px;
+  --shell-view-switcher-h: 40px;
 }
 
 .app-frame {
@@ -474,8 +479,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex: 0 0 48px;
-  height: 48px;
+  flex: 0 0 var(--shell-header-h);
+  height: var(--shell-header-h);
   padding: 0 8px 0 14px;
 }
 
@@ -530,4 +535,21 @@
   .app-frame[data-sidebar-mode="none"] .space-sidebar {
     display: none;
   }
+}
+
+/* --- §7 / Appendix A.4 the Main header (P0-6) ------------------------------
+   The Tasks Module's header is the one piece of Main the shell has an opinion
+   about: it shares a top edge with the Context Sidebar's header, so the two
+   are one row or they are a visible step. Everything below it is the page's
+   own business (§7's boundary, and D-09 keeps the view switcher as it was). */
+.app-frame .tm-header {
+  box-sizing: border-box;
+  min-height: var(--shell-header-h);
+  margin-bottom: 8px;
+}
+
+.app-frame .tm-views {
+  box-sizing: border-box;
+  height: var(--shell-view-switcher-h);
+  align-items: center;
 }

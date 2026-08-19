@@ -633,18 +633,6 @@
 
 /* --- search and the command palette (§10.4, §10.20) --- */
 
-.tm-search-open {
-  margin-right: auto;
-  padding: 4px 10px;
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-muted, #8e8e93);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
 .tm-palette-backdrop {
   position: fixed;
   inset: 0;
@@ -992,8 +980,7 @@
 
 /* §15.13: the full-screen detail owns the screen. What is behind it is not
    dimmed, it is out of the way — including the way back into navigation. */
-.tm-shell.detail-full .tm-menu-open,
-.tm-shell.detail-full .tm-search-open {
+.tm-shell.detail-full .tm-menu-open {
   display: none;
 }
 

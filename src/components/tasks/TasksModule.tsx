@@ -482,9 +482,11 @@ export function TasksModule(props: TasksModuleProps) {
               {t("tasks.openNav")}
             </button>
           ) : null}
-          <button type="button" className="tm-search-open" onClick={() => setPaletteOpen(true)}>
-            {t("tasks.openSearch")}
-          </button>
+          {/* A Search button stood here. The Global Rail carries the app's one
+              search entry point now (§2.14), and two of them a few centimetres
+              apart — opening different things — was the duplication P0-6 is
+              for. Ctrl/Cmd+K still opens the palette; P0-9 puts the two behind
+              one door. */}
           <h1 className="tm-title">{title}</h1>
           {!missing && count > 0 ? (
             <span className="tm-title-count" aria-label={t("tasks.countLabel", { count })}>
