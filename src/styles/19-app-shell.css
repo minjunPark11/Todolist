@@ -1,0 +1,291 @@
+/* ============================================================================
+   19-app-shell.css — Global Rail + the frame both shells sit in
+   Nav Shell spec §2 (Rail), §3.4 (layout ownership). Audit D-01, D-05, D-10.
+
+   Imported last so it wins over 01-base's `.app-shell` and 02-calendar's
+   override of it. Nothing here restyles either inner shell — that is P0-3.
+   ============================================================================ */
+
+:root {
+  /* §2.3.3: an invariant, not a preference. The Rail is 56px whether the
+     sidebar is shown, hidden, collapsed, or replaced by another module. */
+  --rail-w: 56px;
+  --rail-item: 40px;
+}
+
+.app-frame {
+  display: flex;
+  align-items: stretch;
+  min-height: 100dvh;
+}
+
+/* The Rail is sticky rather than fixed: fixed would take it out of flow and
+   leave the body to be pushed by a margin that then has to be kept in sync
+   with --rail-w in three media queries. Sticky keeps the column in the flex
+   row, so the body's width is simply what is left. */
+.global-rail {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex: 0 0 var(--rail-w);
+  width: var(--rail-w);
+  min-width: var(--rail-w);
+  max-width: var(--rail-w);
+  height: 100dvh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  overflow: hidden;
+  color: var(--ff-text);
+  background: var(--ff-sidebar);
+  /* §2.3.2: a 1px divider, and no drop shadow. */
+  border-right: 1px solid var(--ff-border);
+}
+
+.app-frame-body {
+  flex: 1 1 auto;
+  /* Without this a wide table inside Main stretches the flex item and the
+     Rail gets squeezed off the left edge. */
+  min-width: 0;
+}
+
+/* D-10: the density `zoom` on `.app-shell > main` must not reach the Rail, or
+   56px renders as 50.4px and §2.3.3 is broken on the first paint. The Rail is
+   a sibling of `.app-shell`, so it is outside that scope by construction —
+   this rule only stops a future `zoom` on an ancestor from leaking in. */
+.app-frame > .global-rail {
+  zoom: 1;
+}
+
+/* --- §2.5 exact spacing --- */
+
+.rail-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rail-item);
+  height: var(--rail-item);
+  margin-bottom: 8px;
+}
+
+.rail-brand-img {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.rail-account {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.rail-primary,
+.rail-utilities {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rail-spacer {
+  flex: 1;
+}
+
+/* --- §2.21–2.27 item states --- */
+
+.rail-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rail-item);
+  height: var(--rail-item);
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  color: var(--ff-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.rail-item:hover {
+  color: var(--ff-text);
+  background: var(--ff-hover);
+}
+
+.rail-item:active {
+  transform: scale(0.94);
+}
+
+/* §2.22: active outranks hover, and §2.25 wants it readable without colour
+   alone — the tinted plate carries it as much as the hue does. */
+.rail-item.is-active {
+  color: var(--ff-blue);
+  background: var(--ff-blue-soft);
+}
+
+/* §2.26: the Account popover's open state is its own thing, not `active`. */
+.rail-item.is-open {
+  color: var(--ff-text);
+  background: var(--ff-hover);
+}
+
+.rail-item:focus-visible {
+  outline: 2px solid var(--ff-blue);
+  outline-offset: 2px;
+}
+
+.rail-avatar-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ff-text);
+  border-radius: 50%;
+  background: var(--ff-surface-muted);
+}
+
+/* --- §2.28 tooltip contract --- */
+
+.rail-tip {
+  position: absolute;
+  /* placement: right, 8px offset */
+  left: calc(100% + 8px);
+  top: 50%;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateY(-50%);
+  padding: 5px 9px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--ff-text);
+  background: var(--ff-surface);
+  border: 1px solid var(--ff-border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.14));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+/* show delay 450ms on hover, hide 0ms — the delay lives on the transition so
+   that sweeping the pointer down the Rail does not flash five tooltips. */
+.rail-item:hover .rail-tip {
+  opacity: 1;
+  transition-delay: 450ms;
+}
+
+/* keyboard focus shows immediately (§2.28). */
+.rail-item:focus-visible .rail-tip {
+  opacity: 1;
+  transition-delay: 0ms;
+}
+
+.rail-tip-key {
+  padding: 2px 5px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--ff-muted);
+  background: var(--ff-surface-muted);
+  border-radius: 4px;
+}
+
+/* --- §2.9 account popover --- */
+
+.rail-popover {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  z-index: 60;
+  width: 240px;
+  padding: 8px;
+  color: var(--ff-text);
+  background: var(--ff-surface);
+  border: 1px solid var(--ff-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.18));
+}
+
+.rail-popover-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+}
+
+.rail-popover-avatar {
+  display: flex;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 50%;
+  background: var(--ff-surface-muted);
+}
+
+.rail-popover-email {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--ff-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-popover-divider {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--ff-border);
+}
+
+.rail-popover-item {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--ff-text);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.rail-popover-item:hover {
+  background: var(--ff-hover);
+}
+
+.rail-popover-item:focus-visible {
+  outline: 2px solid var(--ff-blue);
+  outline-offset: -2px;
+}
+
+/* §2.39: below the mobile breakpoint the Rail would eat a sixth of the width.
+   The legacy shell already has its own hamburger menu there, and the Tasks
+   Module has an overlay sidebar — both still reach every destination, so the
+   Rail steps aside rather than competing with them. Restoring it as a bottom
+   bar is §2.39's mobile shell, and belongs with the rest of P0-3. */
+@media (max-width: 767px) {
+  .global-rail {
+    display: none;
+  }
+}
+
+[data-reduce-motion] .rail-item,
+[data-reduce-motion] .rail-tip {
+  transition: none;
+}
+
+[data-reduce-motion] .rail-item:active {
+  transform: none;
+}

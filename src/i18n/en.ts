@@ -215,6 +215,15 @@ export const en: Dictionary = {
   "sidebar.collapse": "Collapse sidebar",
   "sidebar.expand": "Expand sidebar",
 
+  // Global Rail (§2.28's label table). The Rail shows icons only, so these
+  // are both the tooltip and the accessible name — not decoration.
+  "rail.label": "Global navigation",
+  "rail.tasks": "Tasks",
+  "rail.search": "Search",
+  "rail.account": "Account",
+  "rail.accountSignedOut": "Not signed in",
+  "rail.signOut": "Log out",
+
   // ---- App.tsx chrome ----
   // The sidebar box searches everything; the Today header box only filters
   // the lists on that page. The two placeholders have to say which is which.

@@ -20,6 +20,11 @@ import { spaceIdForProject } from "./domain/spaces/spaces";
 import type { TodayIntent } from "./components/TodayPage";
 import { TasksModule } from "./components/tasks/TasksModule";
 import { canonicalizeTaskUrl, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
+import { PAGE_ROUTES, bootRedirectFor, pageForPath, pathForDefaultView, pathForPage } from "./app/pageRoute";
+import { RAIL_DESTINATIONS, TASKS_HOME, isTasksLocation, railItemFor, type RailNavItem } from "./app/railNav";
+import { AppShell } from "./components/shell/AppShell";
+import { GlobalRail } from "./components/shell/GlobalRail";
+import { SEARCH_PATH } from "./app/taskScopeUrl";
 import { childrenOf } from "./domain/tasks/children";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
@@ -116,28 +121,15 @@ export default function App() {
   // Renders before the <I18nProvider> below exists in the tree, so this can't
   // use the useT() context hook — call the plain translate() helper instead.
   const t = (key: string, vars?: Record<string, string | number>) => translate(appSettings.language, key, vars);
-  // Open the user's chosen default start page on boot. /inbox opens Today with
-  // the triage drawer (handled by todayIntent below), so it maps to "today".
-  const [activePage, setActivePage] = useState<PageId>(() => {
-    // A deep link into the tree outranks the default start page — arriving at
-    // /s/:spaceId and being shown Today would discard the link.
-    if (parseSelection(window.location.pathname).kind !== "none") return "projects";
-    switch (appSettings.defaultView) {
-      case "/calendar":
-        return "calendar";
-      case "/board":
-      // Legacy: Planning is now the Board grouped by quadrant.
-      case "/planning":
-        return "board";
-      // "/projects" fell here and opened the card grid. Anyone who had it
-      // stored now starts on Today (the default branch) — a Space is reached
-      // from the tree, and there is no screen to land on without one.
-      case "/focus":
-        return "focus";
-      default:
-        return "today";
-    }
-  });
+  // Open the user's chosen default start page on boot (Nav Shell audit D-04).
+  // The setting is applied by rewriting the address once, rather than by
+  // seeding a page variable the URL would then contradict — `activePage` is
+  // read from the path now. Computed here, at the first render the old
+  // `activePage` initializer used to run in, and applied by the effect below.
+  // /inbox opens Today with the triage drawer, which `todayIntent` handles.
+  const [bootRedirect] = useState(() =>
+    bootRedirectFor(window.location.pathname, appSettings.defaultView),
+  );
   // Inbox is folded into Today's triage drawer (no standalone page). This
   // covers the legacy /inbox route, a ?triage=inbox deep link, and the
   // "default start page" setting all landing on the same Today intent.
@@ -195,6 +187,19 @@ export default function App() {
     [currentPath, planner.spaces, planner.projects],
   );
   const selectedProjectId = readSelectedProjectId(selection);
+  // D-04: which page is open is a reading of the address, not a state beside
+  // it. Everything that used to call `setActivePage` navigates instead, which
+  // is what lets a reload, Back, and (from P0-2) the Rail all agree.
+  const activePage = pageForPath(currentPath);
+  // §2.19: the Rail's active item is the same reading, one level coarser —
+  // four items over seven pages, because Board, Archive and the Spaces tree
+  // are places inside Tasks rather than siblings of it (§1.5).
+  const railItem = railItemFor(currentPath);
+  // §2.20. Session-scoped on purpose (audit D-15): coming back to Tasks from
+  // the Calendar should return you to the list you were reading, but a cold
+  // start is an arrival and belongs to the start-page setting, not to
+  // wherever the app happened to be when it was last closed.
+  const lastTasksLocationRef = useRef("");
   const isProjectDetailOpen = selection.kind !== "none";
   const searchInputRef = useRef<HTMLInputElement>(null);
   const originalTitleRef = useRef(document.title || "FocusFlow");
@@ -305,14 +310,14 @@ export default function App() {
         searchInputRef.current?.focus();
       } else if (event.key.toLowerCase() === "t") {
         event.preventDefault();
-        setActivePage("today");
+        navigate(PAGE_ROUTES.today);
       } else if (event.key.toLowerCase() === "i") {
         event.preventDefault();
-        setActivePage("today");
+        navigate(PAGE_ROUTES.today);
         setTodayIntent("triage");
       } else if (event.key.toLowerCase() === "n") {
         event.preventDefault();
-        setActivePage("today");
+        navigate(PAGE_ROUTES.today);
         setTodayIntent("quickAdd");
       }
     }
@@ -320,6 +325,29 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [planner]);
+
+  // Module switching (§2.31). Deliberately NOT in the handler above: that one
+  // returns early on any modifier and while the user is typing, and a module
+  // switch is exactly the shortcut that should still work from inside a text
+  // field. The tooltips on the Rail advertise these, so they have to fire.
+  useEffect(() => {
+    function handleModuleKeys(event: KeyboardEvent) {
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (event.altKey || event.shiftKey) return;
+      const item: RailNavItem | undefined = { "1": "tasks", "2": "calendar", "3": "focus" }[
+        event.key
+      ] as RailNavItem | undefined;
+      if (!item) return;
+      event.preventDefault();
+      navigateRail(item);
+    }
+
+    window.addEventListener("keydown", handleModuleKeys);
+    return () => window.removeEventListener("keydown", handleModuleKeys);
+    // No dependency array: `navigateRail` closes over `railItem` and the last
+    // Tasks location, and a stale closure here would send Ctrl+1 to the wrong
+    // place. One listener swapped per render is cheaper than getting that wrong.
+  });
 
   useEffect(() => {
     const root = document.documentElement;
@@ -449,32 +477,39 @@ export default function App() {
     return project ? spaceIdForProject(project) : "";
   }
 
+  // D-04: `/s/:spaceId/...` already reads as the Spaces page, so the paired
+  // `setActivePage("projects")` these four used to carry is gone — the path
+  // was always the real answer and the state was a copy that could disagree.
   function selectSpace(spaceId: string) {
     planner.selectTask("");
     navigate(pathForSelection({ kind: "space", spaceId }));
-    setActivePage("projects");
   }
 
   function selectProject(projectId: string) {
     planner.selectTask("");
     navigate(pathForSelection({ kind: "project", spaceId: spaceIdOf(projectId), projectId }));
-    setActivePage("projects");
   }
 
   function selectList(projectId: string, listId: string) {
     planner.selectTask("");
     navigate(pathForSelection({ kind: "list", spaceId: spaceIdOf(projectId), projectId, listId }));
-    setActivePage("projects");
   }
 
   function selectFolder(projectId: string, folderId: string) {
     planner.selectTask("");
     navigate(pathForSelection({ kind: "folder", spaceId: spaceIdOf(projectId), projectId, folderId }));
-    setActivePage("projects");
   }
 
+  /**
+   * Steps out of the tree to the Spaces overview.
+   *
+   * Lands on `/spaces`, not `/app`: leaving a Space used to keep the page on
+   * "projects" while the address said `/app`, and now that the address decides
+   * the page, `/app` would silently mean Today. Closing a Space is not a
+   * request for Today.
+   */
   function clearSelection() {
-    if (selection.kind !== "none") navigate("/app");
+    if (selection.kind !== "none") navigate(PAGE_ROUTES.projects);
   }
 
   /**
@@ -507,11 +542,27 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  // D-04: the "default start page" setting, applied once. `replace` so Back
+  // does not return to the address the app was launched with and bounce
+  // straight forward again.
+  useEffect(() => {
+    if (bootRedirect) navigate(bootRedirect, "replace");
+    // Boot means boot: re-running this on a later render would drag the user
+    // back to their start page mid-session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (isTasksLocation(currentUrl)) lastTasksLocationRef.current = currentUrl;
+  }, [currentUrl]);
+
   useEffect(() => {
     if (currentPath === "/login" && planner.auth.isSignedIn) {
-      navigate("/app", "replace");
+      // Signing in is an arrival, so it honours the start-page setting the
+      // same way a cold boot does — `/app` would pin everyone to Today.
+      navigate(pathForDefaultView(appSettings.defaultView), "replace");
     }
-  }, [currentPath, planner.auth.isSignedIn]);
+  }, [currentPath, planner.auth.isSignedIn, appSettings.defaultView]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("focusflow:page-change", { detail: { page: activePage } }));
@@ -976,13 +1027,13 @@ export default function App() {
     setSearchQuery("");
 
     if (task.status === "inbox") {
-      setActivePage("today");
+      navigate(PAGE_ROUTES.today);
       setTodayIntent("triage");
       return;
     }
 
     if (task.status === "archived" || task.archivedAt) {
-      setActivePage("archive");
+      navigate(PAGE_ROUTES.archive);
       return;
     }
 
@@ -991,7 +1042,7 @@ export default function App() {
       return;
     }
 
-    setActivePage("board");
+    navigate(PAGE_ROUTES.board);
   }
 
   function openProjectFromCalendar(projectId: string) {
@@ -1001,13 +1052,13 @@ export default function App() {
   function viewTaskInCalendar(taskId: string) {
     planner.selectTask(taskId);
     setCalendarFocusProjectId("");
-    setActivePage("calendar");
+    navigate(PAGE_ROUTES.calendar);
   }
 
   function openCalendarForProject(projectId?: string) {
     planner.selectTask("");
     setCalendarFocusProjectId(projectId ?? "");
-    setActivePage("calendar");
+    navigate(PAGE_ROUTES.calendar);
   }
 
   function toggleSidebarCollapsed() {
@@ -1022,12 +1073,53 @@ export default function App() {
     });
   }
 
+  /**
+   * A Global Rail click (§2.11–§2.15).
+   *
+   * Tasks is the only item without a fixed address: §2.11 asks it to return
+   * the user to where they were, and §2.11's "현재 이미 Tasks인 경우" forbids
+   * the obvious shortcut of collapsing the sidebar instead — re-clicking the
+   * module you are already in does nothing rather than something surprising.
+   */
+  function navigateRail(item: RailNavItem) {
+    if (item === "tasks") {
+      if (railItem === "tasks") return;
+      navigateUrl(lastTasksLocationRef.current || TASKS_HOME);
+      return;
+    }
+    navigate(RAIL_DESTINATIONS[item]);
+  }
+
+  /**
+   * §2.14: Search does not take the active state and, in the finished shell,
+   * does not route either — it opens a global overlay over wherever you are.
+   * That overlay is still inside the Tasks Module (`CommandPalette`), so for
+   * now this opens the Search Page it already has. Promoting the palette to
+   * the shell is P0-9, and Q-03 has to settle the `/search` route first.
+   */
+  function openGlobalSearch() {
+    navigateUrl(SEARCH_PATH);
+  }
+
+  function renderRail() {
+    return (
+      <GlobalRail
+        active={railItem}
+        onNavigate={navigateRail}
+        onOpenSearch={openGlobalSearch}
+        accountEmail={planner.auth.isSignedIn ? planner.auth.userEmail : ""}
+        onSignOut={planner.signOut}
+      />
+    );
+  }
+
   function navigateSection(page: PageId) {
-    setActivePage(page);
-    // Leaving the tree drops the selection with it. Keeping /s/:spaceId in the
-    // address bar while showing Today would make the URL describe a place the
-    // user is no longer standing.
-    clearSelection();
+    // Leaving the tree drops the selection with it, and one navigation now
+    // does both: `selection` is read from the path, so replacing /s/:spaceId
+    // with the page's own address IS clearing it. The separate
+    // `clearSelection()` this used to call would have pushed a second history
+    // entry for the same click.
+    navigate(pathForPage(page));
     // Plain navigation (sidebar etc.) always shows the unfiltered calendar.
     setCalendarFocusProjectId("");
     planner.selectTask("");
@@ -1054,7 +1146,7 @@ export default function App() {
           onSignIn={planner.signIn}
           onSignUp={planner.signUp}
           onResetPassword={planner.resetPassword}
-          onAuthenticated={() => navigate("/app", "replace")}
+          onAuthenticated={() => navigate(pathForDefaultView(appSettings.defaultView), "replace")}
         />
       </I18nProvider>
     );
@@ -1071,6 +1163,9 @@ export default function App() {
     const canonical = canonicalizeTaskUrl(currentUrl);
     return (
       <I18nProvider lang={appSettings.language}>
+        {/* Both shells hang off the same frame now (R.5.1). The Rail is built
+            once, above the branch, so neither shell owns it. */}
+        <AppShell rail={renderRail()}>
         <TasksModule
           tasks={planner.tasks}
           lists={planner.lists}
@@ -1145,6 +1240,7 @@ export default function App() {
           }}
           onMutate={planner.updateTask}
         />
+        </AppShell>
       </I18nProvider>
     );
   }
@@ -1248,6 +1344,7 @@ export default function App() {
   return (
     <I18nProvider lang={appSettings.language}>
       <>
+        <AppShell rail={renderRail()}>
         <div
           className={[
             "app-shell",
@@ -1411,6 +1508,7 @@ export default function App() {
         onDismissToast={handleDismissToast}
       />
         </div>
+        </AppShell>
         <UpdateChecker />
       </>
     </I18nProvider>

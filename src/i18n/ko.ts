@@ -214,6 +214,15 @@ export const ko: Dictionary = {
   "sidebar.collapse": "사이드바 접기",
   "sidebar.expand": "사이드바 펼치기",
 
+  // Global Rail (Nav Shell 스펙 §2.28의 label 표). 아이콘만 보이는 레일이라
+  // 이 문자열들은 tooltip이자 aria-label이다 — 장식이 아니라 유일한 이름이다.
+  "rail.label": "전역 탐색",
+  "rail.tasks": "작업",
+  "rail.search": "검색",
+  "rail.account": "계정",
+  "rail.accountSignedOut": "로그인하지 않음",
+  "rail.signOut": "로그아웃",
+
   // ---- App.tsx chrome ----
   // 사이드바는 전체 검색, Today 헤더는 그 페이지 목록 필터. en.ts 주석 참고.
   "app.searchPlaceholder": "전체 검색  /",
