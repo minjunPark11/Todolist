@@ -68,6 +68,27 @@ export function isTasksLocation(url: string): boolean {
 }
 
 /**
+ * Whether an address is SpaceHub — the one Tasks address you cannot leave on
+ * your own.
+ *
+ * SpaceHub lights the Tasks item because §1.5 refuses it one of its own, and
+ * that is right. But it is also the only Tasks address whose sidebar slot
+ * holds the Space tree instead of the Tasks sidebar, and the tree has no row
+ * back into the module: D-14 gave the `오늘` row up on the grounds that the
+ * Rail's Tasks item answers it better. It cannot answer anything while
+ * §2.11's "already here" guard reads the Rail's own highlight, because by
+ * that reading SpaceHub IS Tasks — so the click did nothing, and the browser's
+ * Back button was the only way out of a screen the sidebar invites you into.
+ *
+ * The same reading keeps SpaceHub out of `lastTasksLocation`: remembering it
+ * as the place to come back to would make the fixed click navigate to the
+ * screen it is trying to leave.
+ */
+export function isSpaceHubLocation(url: string): boolean {
+  return pageForPath(url.split("?")[0]) === "projects";
+}
+
+/**
  * A fixed destination per nav item.
  *
  * Tasks is absent on purpose: it is the one item whose destination depends on

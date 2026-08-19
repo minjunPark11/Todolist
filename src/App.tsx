@@ -19,9 +19,16 @@ import {
 import { spaceIdForProject } from "./domain/spaces/spaces";
 import type { TodayIntent } from "./components/TodayPage";
 import { TasksModule } from "./components/tasks/TasksModule";
-import { canonicalizeTaskUrl, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
+import { canonicalizeTaskUrl, listUrlFor, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
 import { PAGE_ROUTES, RETIRED_ROUTES, bootRedirectFor, pageForPath, pathForDefaultView, pathForPage } from "./app/pageRoute";
-import { RAIL_DESTINATIONS, TASKS_HOME, isTasksLocation, railItemFor, type RailNavItem } from "./app/railNav";
+import {
+  RAIL_DESTINATIONS,
+  TASKS_HOME,
+  isSpaceHubLocation,
+  isTasksLocation,
+  railItemFor,
+  type RailNavItem,
+} from "./app/railNav";
 import { AppShell } from "./components/shell/AppShell";
 import { GlobalRail } from "./components/shell/GlobalRail";
 import { taskUrlFor } from "./app/taskScopeUrl";
@@ -526,9 +533,22 @@ export default function App() {
     navigate(pathForSelection({ kind: "project", spaceId: spaceIdOf(projectId), projectId }));
   }
 
-  function selectList(projectId: string, listId: string) {
+  /**
+   * A List, from the Space tree or from a Project Overview row (§50.8).
+   *
+   * Both used to land on `/s/:sp/p/:pj/l/:id` — the Space shell's own drawing
+   * of a List, beside the Tasks Module's `/list/:id` drawing of the same one.
+   * One record with two screens is two records as far as anyone using it is
+   * concerned, and the Space one was the half you could not get back out of.
+   * So a List opens in the module that owns Lists, and the tree stops being a
+   * place rather than a route.
+   *
+   * The Project it hangs under is no longer part of the address, which is the
+   * point: a List belongs to a Project, but reading one is not a Project view.
+   */
+  function selectList(_projectId: string, listId: string) {
     planner.selectTask("");
-    navigate(pathForSelection({ kind: "list", spaceId: spaceIdOf(projectId), projectId, listId }));
+    navigateUrl(listUrlFor(listId, planner.lists));
   }
 
   function selectFolder(projectId: string, folderId: string) {
@@ -589,7 +609,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isTasksLocation(currentUrl)) lastTasksLocationRef.current = currentUrl;
+    // SpaceHub is a Tasks address that the Tasks item has to be able to LEAVE,
+    // so it is not one it may be sent back to (`isSpaceHubLocation`).
+    if (isTasksLocation(currentUrl) && !isSpaceHubLocation(currentUrl)) {
+      lastTasksLocationRef.current = currentUrl;
+    }
   }, [currentUrl]);
 
   // A link to a screen that no longer exists lands where its content went, and
@@ -1118,7 +1142,11 @@ export default function App() {
    */
   function navigateRail(item: RailNavItem) {
     if (item === "tasks") {
-      if (railItem === "tasks") return;
+      // "Already Tasks" is asked of the SCREEN, not of the Rail's highlight.
+      // SpaceHub lights this item too, and it is the one Tasks address whose
+      // sidebar cannot get you back into the module — so there, the item is
+      // the way out rather than a no-op (`isSpaceHubLocation`).
+      if (railItem === "tasks" && !isSpaceHubLocation(currentPath)) return;
       navigateUrl(lastTasksLocationRef.current || TASKS_HOME);
       return;
     }

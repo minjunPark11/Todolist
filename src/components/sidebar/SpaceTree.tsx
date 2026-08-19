@@ -11,7 +11,7 @@
 import { useState } from "react";
 import type { Folder, List, Project, Space } from "../../types";
 import { activeFolders, folderlessLists, listDisplayName, listsInFolder, shouldRevealLists } from "../../domain/spaces/hierarchy";
-import { projectsInSpace, spaceIdForProject } from "../../domain/spaces/spaces";
+import { activeSpaces, projectsInSpace, shouldRevealSpaces, spaceIdForProject } from "../../domain/spaces/spaces";
 import { isSelected, selectedProjectId, selectedSpaceId, type Selection } from "../../app/spaceSelection";
 import { useT } from "../../i18n";
 
@@ -261,6 +261,13 @@ export function SpaceTree({
   });
   const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
 
+  // An archived work area is not a place to file work in, so it is not in the
+  // tree — and it is not in the count that decides whether the level is drawn
+  // either. Both questions read the same list, or an archived second Space
+  // would hide the level while still drawing a row on it.
+  const areas = activeSpaces(workAreas);
+  const revealAreas = shouldRevealSpaces(workAreas);
+
   function toggle(set: Set<string>, id: string, apply: (next: Set<string>) => void) {
     const next = new Set(set);
     if (next.has(id)) next.delete(id);
@@ -270,14 +277,18 @@ export function SpaceTree({
 
   return (
     <div className="spt-tree">
-      {workAreas.map((area) => {
-        const areaOpen = openAreas.has(area.id);
+      {areas.map((area) => {
+        // The only work area is drawn as no work area at all: its Projects
+        // ARE the top of the tree, and there is no row to expand past.
+        const flat = !revealAreas;
+        const areaOpen = flat || openAreas.has(area.id);
         const areaProjects = projectsInSpace(projects, area.id);
         const areaCount = areaProjects.reduce((sum, project) => sum + (counts?.get(project.id) ?? 0), 0);
         const areaSelected = isSelected(selection, { kind: "space", spaceId: area.id });
 
         return (
           <div key={area.id} className="spt-area">
+            {flat ? null : (
             <div className={`spt-row spt-area-row${areaSelected ? " is-selected" : ""}`}>
               <button
                 type="button"
@@ -311,8 +322,9 @@ export function SpaceTree({
                 ]}
               />
             </div>
+            )}
             {!areaOpen ? null : (
-      <div className="spt-children">
+      <div className={flat ? "spt-area-flat" : "spt-children"}>
       {areaProjects.map((space) => {
         // Project rows. `spaceIdForProject` rather than `area.id` so the path
         // is built from the record, not from where it happens to be drawn.
@@ -490,6 +502,9 @@ export function SpaceTree({
           </div>
         );
       })}
+      {/* Offered even while the level is hidden — the same bargain U2 makes
+          for Lists: this is how the second work area, and with it the level
+          itself, comes to be. */}
       <InlineAdd
         label={t("tree.space")}
         placeholder={t("tree.spacePlaceholder")}

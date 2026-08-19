@@ -26,7 +26,7 @@ import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
 import type { ScopeContext } from "../../domain/tasks/scopeQuery";
 import { resolveListView } from "../../domain/tasks/listView";
-import { taskUrlFor } from "../../app/taskScopeUrl";
+import { listUrlFor, taskUrlFor } from "../../app/taskScopeUrl";
 import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
 import { TasksSidebar, type SidebarDrawer, type TasksSidebarPage } from "../tasks/TasksSidebar";
 import { ListManager } from "../tasks/ListManager";
@@ -103,11 +103,13 @@ export function TasksSidebarSlot({
    * to consult a preference the URL does not mention.
    */
   function go(next: TaskScopeRef) {
-    const policy = scopeRegistry[next.kind];
-    const owner = next.kind === "list" ? lists.find((list) => list.id === next.id) : undefined;
     onBeforeNavigate?.();
+    // A List goes through `listUrlFor`, which the Space tree calls too — the
+    // View a List opens in is one rule, not one per door (§13.9).
     onNavigateUrl(
-      taskUrlFor({ scope: next, view: resolveListView(owner?.defaultViewKey, policy), taskId: "" }),
+      next.kind === "list"
+        ? listUrlFor(next.id, lists)
+        : taskUrlFor({ scope: next, view: scopeRegistry[next.kind].defaultView, taskId: "" }),
     );
   }
 

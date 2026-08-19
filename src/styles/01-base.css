@@ -1649,6 +1649,13 @@ textarea {
   color: #fff;
 }
 
+/* The sole work area, drawn without its own row: the Projects stand where
+ * the area would have, so they take none of the level's indent or rule. */
+.spt-area-flat {
+  display: grid;
+  gap: 1px;
+}
+
 .spt-children {
   display: grid;
   gap: 1px;
