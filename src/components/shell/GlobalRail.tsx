@@ -13,7 +13,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { RailNavItem } from "../../app/railNav";
 import { useT } from "../../i18n";
 
-type RailIconName = RailNavItem | "search";
+type RailIconName = RailNavItem | "search" | "ai";
 
 function RailIcon({ name }: { name: RailIconName }) {
   const common = {
@@ -62,6 +62,15 @@ function RailIcon({ name }: { name: RailIconName }) {
       <>
         <circle cx="11" cy="11" r="6.5" />
         <line x1="15.8" y1="15.8" x2="20" y2="20" />
+      </>
+    ),
+    // A speech bubble, drawn in the same 1.7px stroke as the rest. The FAB
+    // it replaces was a filled 56px circle of pure accent — the loudest
+    // thing on every screen, for the app's least central feature (V-4).
+    ai: (
+      <>
+        <path d="M20 12a7 7 0 01-7 7H8.6L5 21.5V12a7 7 0 017-7h1a7 7 0 017 7z" />
+        <line x1="9.5" y1="12" x2="15.5" y2="12" />
       </>
     ),
     settings: (
@@ -116,6 +125,9 @@ interface GlobalRailProps {
   onOpenSearch: () => void;
   /** §11.24's open-utility state: the button that opened the menu says so. */
   searchOpen: boolean;
+  onOpenAi: () => void;
+  /** The same open-utility state, for the panel the FAB used to open. */
+  aiOpen: boolean;
   /** "" when signed out — the Rail still shows the slot, with no identity. */
   accountEmail: string;
   onSignOut: () => void;
@@ -126,6 +138,8 @@ export function GlobalRail({
   onNavigate,
   onOpenSearch,
   searchOpen,
+  onOpenAi,
+  aiOpen,
   accountEmail,
   onSignOut,
 }: GlobalRailProps) {
@@ -270,6 +284,20 @@ export function GlobalRail({
           open={searchOpen}
           haspopup="dialog"
           onClick={onOpenSearch}
+        />
+        {/* V-4: the AI entry point, moved off the canvas and into the
+            utilities. §1.5 lists what the Rail holds and this is not on it —
+            the exception is D-19's reasoning applied again: the list bars
+            SCREENS from being promoted into the Rail, and this is not a
+            screen. It is a utility that opens a panel over wherever you are,
+            which is exactly what Search above it does. Settings stays last,
+            because §1.5 anchors it there. */}
+        <RailButton
+          icon="ai"
+          label={t("rail.ai")}
+          open={aiOpen}
+          haspopup="dialog"
+          onClick={onOpenAi}
         />
         <RailButton
           icon="settings"

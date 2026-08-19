@@ -48,6 +48,8 @@ function renderShell(sidebar: ContextSidebarState = sidebarState()) {
             onNavigate={() => {}}
             onOpenSearch={() => {}}
             searchOpen={false}
+            onOpenAi={() => {}}
+            aiOpen={false}
             accountEmail="someone@example.com"
             onSignOut={() => {}}
           />

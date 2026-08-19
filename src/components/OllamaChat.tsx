@@ -1,5 +1,5 @@
 import { FormEvent, Fragment, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { AgentActionPreview } from "./ai/AgentActionPreview";
 import { AssistantTurnCards } from "./ai/AssistantTurnCards";
 import { AI_SAFE_ACTION_DEFAULT_RISK } from "../lib/ai/actions/types";
@@ -58,6 +58,13 @@ interface OllamaChatProps {
   onExecuteActions?: (actions: AgentAction[]) => ToolExecutionResult[];
   knowledgeSettings?: KnowledgeSettings;
   pathStore?: LearningPathStore;
+  /**
+   * Controlled by the shell since V-4: the entry point is a Rail utility,
+   * and the Rail has to be able to show that the panel is open (§11.24).
+   * A panel that owned this state could not tell it.
+   */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 function getProviderLabel(t: (key: string) => string, provider?: AiProviderName) {
@@ -72,11 +79,17 @@ export function OllamaChat({
   aiContext,
   onExecuteActions,
   knowledgeSettings = DEFAULT_KNOWLEDGE_SETTINGS,
+  open,
+  onOpenChange,
   pathStore,
-}: OllamaChatProps = {}) {
+}: OllamaChatProps) {
   const { t } = useT();
   const motionEnabled = useMotionEnabled();
-  const [open, setOpen] = useState(false);
+  // Kept call-compatible with the local state it replaces, so every
+  // `setOpen(false)` inside the panel still reads the same.
+  const setOpen = (value: boolean | ((previous: boolean) => boolean)) => {
+    onOpenChange(typeof value === "function" ? value(open) : value);
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([
     createMessage("assistant", t("ai.greeting")),
   ]);
@@ -103,17 +116,28 @@ export function OllamaChat({
   const breadcrumb = useMemo(() => (activePath ? formatBreadcrumb(activePath, loadContextCards()) : null), [activePath]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Opening now happens somewhere else — the Rail button, or the event
+  // below — so the focus that used to live in the FAB's click handler has
+  // to follow the state instead of the click.
+  useEffect(() => {
+    if (!open) return;
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => window.clearTimeout(focusTimer);
+  }, [open]);
+
   useEffect(() => {
     function openChat(event: Event) {
       const detail = (event as CustomEvent<{ draft?: string }>).detail;
-      setOpen(true);
+      // Straight to the callback rather than through `setOpen`: this closure
+      // outlives the render it was made in, and the focus is the effect
+      // above's job now either way.
+      onOpenChange(true);
       if (detail?.draft) setDraft(detail.draft);
-      window.setTimeout(() => inputRef.current?.focus(), 0);
     }
 
     window.addEventListener("focusflow:open-ai-chat", openChat);
     return () => window.removeEventListener("focusflow:open-ai-chat", openChat);
-  }, []);
+  }, [onOpenChange]);
 
   const canAttachFiles = Boolean(knowledgeSettings.vaultPath) && platform.files.supported();
   const attachMatches = attachCandidates
@@ -154,15 +178,6 @@ export function OllamaChat({
     [messages],
   );
 
-  function toggleOpen() {
-    setOpen((currentOpen) => {
-      const nextOpen = !currentOpen;
-      if (nextOpen) {
-        window.setTimeout(() => inputRef.current?.focus(), 0);
-      }
-      return nextOpen;
-    });
-  }
 
   async function submit(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -338,7 +353,15 @@ export function OllamaChat({
 
   return (
     <div className={open ? "ollama-chat open" : "ollama-chat"}>
-      <AnimatePresence>
+      {/* No AnimatePresence around this one. Under it the panel animated out
+          and then STAYED in the tree: `open` was false, the container had
+          re-rendered without the class, and a 412x592 element at opacity 0
+          with `pointer-events: auto` sat over the bottom-right corner of
+          every screen, eating clicks. Measured through the fiber, which said
+          `OllamaChat [open=false]` with the section still parked under a
+          PresenceChild. It predates V-4 — the FAB toggled the same state —
+          and the exit animation is not worth an invisible click target, so
+          the panel mounts and unmounts with `open`. Entry still animates. */}
       {open ? (
         <motion.section
           className="ollama-chat-panel"
@@ -347,7 +370,6 @@ export function OllamaChat({
           variants={motionEnabled ? modalVariants : undefined}
           initial={motionEnabled ? "initial" : false}
           animate={motionEnabled ? "animate" : undefined}
-          exit={motionEnabled ? "exit" : undefined}
           transition={motionEnabled ? transitions.soft : reducedTransition}
         >
           <header className="ollama-chat-head">
@@ -504,17 +526,22 @@ export function OllamaChat({
           </div>
         </motion.section>
       ) : null}
-      </AnimatePresence>
 
+      {/* Below 767px the Rail is `display: none` (§2.39's mobile shell is
+          still to come), so the utility that now owns this panel is not on
+          screen at all. This is that entry point for those widths only —
+          and deliberately NOT the FAB again: a 40px surface-coloured button
+          with a border, rather than 56px of full-saturation accent. */}
       <button
         type="button"
-        className="ollama-chat-fab"
+        className="ollama-chat-launcher"
         aria-label={open ? t("ai.closeChat") : t("ai.openChat")}
         aria-expanded={open}
-        onClick={toggleOpen}
+        onClick={() => onOpenChange(!open)}
       >
         {open ? "x" : t("ai.aiLabel")}
       </button>
+
     </div>
   );
 }

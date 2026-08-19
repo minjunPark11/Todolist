@@ -529,30 +529,41 @@
   pointer-events: none;
   transition: bottom 0.2s ease;
 }
-/* When the global focus bar is on screen, lift the AI launcher above it
-   so the two no longer overlap. The bar renders as a preceding sibling
-   only while a focus session is active. */
+/* When the global focus bar is on screen, lift the panel above it so the two
+   no longer overlap. The bar renders as a preceding sibling only while a
+   focus session is active. */
 .foc-global-bar ~ .ollama-chat {
   bottom: 112px;
 }
+/* The container is click-through (`pointer-events: none`) so it does not take
+   the bottom-right corner of every screen from the app underneath. Only what
+   is actually drawn takes events back — which used to include the FAB, and
+   since V-4 is the panel alone. */
 .ollama-chat-panel,
-.ollama-chat-fab {
+.ollama-chat-launcher {
   pointer-events: auto;
 }
-.ollama-chat-fab {
-  width: 56px;
-  height: 56px;
-  border: none;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  box-shadow: var(--shadow-raised);
-  font-size: 15px;
-  font-weight: 800;
+/* The Rail carries this entry point wherever the Rail exists. Under 768px
+   it does not (19-app-shell.css), and this takes over — at the control
+   size and on the radius scale, not as the accent circle V-4 removed. */
+.ollama-chat-launcher {
+  display: none;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--density-radius, 10px);
+  background: var(--bg-surface);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
 }
-.ollama-chat-fab:hover {
-  filter: brightness(0.96);
+@media (max-width: 767px) {
+  .ollama-chat-launcher {
+    display: inline-flex;
+  }
 }
 .ollama-chat-panel {
   width: min(420px, calc(100vw - 48px));
@@ -985,7 +996,9 @@
   .ollama-chat-panel {
     width: calc(100vw - 28px);
     height: min(560px, calc(100dvh - 92px));
-    border-radius: 16px;
+    /* 16 was outside §11.39's scale and V-2 missed it: the guard measures
+       the desktop presentation, and this rule only exists under 900px. */
+    border-radius: 12px;
   }
 
   .ollama-chat-message {

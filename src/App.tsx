@@ -211,6 +211,12 @@ export default function App() {
    * it is in the URL — which is exactly what separates it from `/search`.
    */
   const [menuOpen, setMenuOpen] = useState(false);
+  /**
+   * V-4: the AI panel's open state lives here rather than inside the panel,
+   * because the Rail button that opens it has to be able to say that it is
+   * open (§11.24) — the same thing Search does one row above it.
+   */
+  const [aiChatOpen, setAiChatOpen] = useState(false);
   // §10.41's other half: the menu captures a title, Quick Add commits it. Held
   // here rather than in the Module because the menu is above the Module now.
   const [capturedTitle, setCapturedTitle] = useState("");
@@ -1179,6 +1185,50 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  /**
+   * V-4 moved the entry point into the Rail, and the Rail is above both
+   * shells — so the panel it opens has to be too. It used to be rendered
+   * inside the legacy branch alone, which meant the FAB simply did not exist
+   * on the Tasks Module's ten routes. A Rail button that opened nothing on
+   * half the app is the version of this bug that would have shipped.
+   */
+  function renderAiChat() {
+    return (
+      <OllamaChat
+        open={aiChatOpen}
+        onOpenChange={setAiChatOpen}
+        activePage={activePage}
+        knowledgeSettings={knowledge.settings}
+        pathStore={{
+          paths: planner.learningPaths,
+          savePath: (draft, source) =>
+            planner.createLearningPath({
+              goal: draft.goal,
+              milestones: draft.milestones,
+              targetDate: draft.targetDate,
+              projectId: draft.projectId,
+              source: source ?? "assistant",
+            }),
+          linkCard: planner.linkCardToMilestone,
+        }}
+        aiContext={buildAiContextInput({ planner, appSettings, currentPage: activePage })}
+        calendarContext={{
+          tasks: visibleTasks,
+          projects: planner.projects,
+        }}
+        onExecuteActions={(actions) =>
+          executeAgentActions(actions, {
+            tasks: planner.tasks,
+            projects: planner.projects,
+            createTask: planner.createTask,
+            addSubtask: planner.addSubtask,
+            updateTask: planner.updateTask,
+          })
+        }
+      />
+    );
+  }
+
   function renderCommandMenu() {
     if (!menuOpen) return null;
     return (
@@ -1287,6 +1337,8 @@ export default function App() {
         onNavigate={navigateRail}
         onOpenSearch={openGlobalSearch}
         searchOpen={menuOpen}
+        onOpenAi={() => setAiChatOpen((open) => !open)}
+        aiOpen={aiChatOpen}
         accountEmail={planner.auth.isSignedIn ? planner.auth.userEmail : ""}
         onSignOut={planner.signOut}
       />
@@ -1427,6 +1479,7 @@ export default function App() {
             the route (D-25). It is `position: fixed`, so where it lands on
             screen owes nothing to which grid it was rendered inside. */}
         {renderCommandMenu()}
+        {renderAiChat()}
         </AppShell>
       </I18nProvider>
     );
@@ -1627,36 +1680,7 @@ export default function App() {
         onStop={(sessionId) => stopFocusWithNotification(sessionId, false)}
         settings={focusSettings}
       />
-      <OllamaChat
-        activePage={activePage}
-        knowledgeSettings={knowledge.settings}
-        pathStore={{
-          paths: planner.learningPaths,
-          savePath: (draft, source) =>
-            planner.createLearningPath({
-              goal: draft.goal,
-              milestones: draft.milestones,
-              targetDate: draft.targetDate,
-              projectId: draft.projectId,
-              source: source ?? "assistant",
-            }),
-          linkCard: planner.linkCardToMilestone,
-        }}
-        aiContext={buildAiContextInput({ planner, appSettings, currentPage: activePage })}
-        calendarContext={{
-          tasks: visibleTasks,
-          projects: planner.projects,
-            }}
-        onExecuteActions={(actions) =>
-          executeAgentActions(actions, {
-            tasks: planner.tasks,
-            projects: planner.projects,
-            createTask: planner.createTask,
-            addSubtask: planner.addSubtask,
-            updateTask: planner.updateTask,
-          })
-        }
-      />
+      {renderAiChat()}
       <AppModals
         pendingDeleteTaskId={pendingDeleteTaskId}
         pendingDeleteProjectId={pendingDeleteProjectId}

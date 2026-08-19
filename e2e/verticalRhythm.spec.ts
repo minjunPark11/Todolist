@@ -20,8 +20,8 @@ const LIST = { id: "list-rhythm", name: "Rhythm" };
 /**
  * Heights that stay off the grid, each with the reason §11 or §2 gives.
  *
- * `.ollama-chat-fab` is V-4's and blocked on V-Q1, like the entry it has in
- * the radius spec — when the FAB is settled, both lines go.
+ * The FAB was listed here and in the radius spec while V-4 was open. It is
+ * gone as of V-4, and so are both lines.
  */
 const ALLOWED_OFF_GRID = [
   ".rail-item", // §2.5 sets the Rail at 40: an icon-only column may hold its own rhythm
@@ -31,7 +31,6 @@ const ALLOWED_OFF_GRID = [
   ".foc-task-main", // a task row carrying a title AND a meta line: the grid is for single-line rows
   ".motion-task-row", // the same two-line row, on the Matrix
   ".tm-task-open", // a Task row is content: its hit target is as tall as the row, not as the grid
-  ".ollama-chat-fab", // V-4, blocked on V-Q1
 ];
 
 interface Offender {

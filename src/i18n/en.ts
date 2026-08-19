@@ -221,6 +221,7 @@ export const en: Dictionary = {
   "rail.tasks": "Tasks",
   "rail.matrix": "Matrix",
   "rail.search": "Search",
+  "rail.ai": "AI assistant",
   "rail.account": "Account",
   "rail.accountSignedOut": "Not signed in",
   "rail.signOut": "Log out",

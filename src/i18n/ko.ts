@@ -220,6 +220,7 @@ export const ko: Dictionary = {
   "rail.tasks": "작업",
   "rail.matrix": "매트릭스",
   "rail.search": "검색",
+  "rail.ai": "AI 어시스턴트",
   "rail.account": "계정",
   "rail.accountSignedOut": "로그인하지 않음",
   "rail.signOut": "로그아웃",

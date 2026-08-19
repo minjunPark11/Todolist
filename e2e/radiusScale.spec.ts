@@ -21,9 +21,9 @@ const LIST = { id: "list-radius", name: "Radius" };
 /**
  * Shapes that stay off the scale, each for a reason §11 gives.
  *
- * `.ollama-chat-fab` is the one entry that is not a decision: V-4 is where the
- * FAB is settled, and it is blocked on V-Q1 (whether the AI entry point moves
- * into the Rail). When that lands, this line goes with it.
+ * The FAB used to be listed here as the one entry that was not a decision.
+ * V-4 made it one: the 56px accent circle is gone and the AI panel opens from
+ * a Rail utility, so there is nothing to exempt.
  */
 // Matched with `closest` rather than against the element’s own class list:
 // several of these paint their shape onto an unclassed child, and a check that
@@ -40,7 +40,6 @@ const ALLOWED_OFF_SCALE = [
   ".ff-color-swatch", // a colour is a dot, not a control
   ".tm-swatch", // the same dot, in the Add List dialog
   '[class*="tm-preview-"]', // a thumbnail of a layout, drawn at a fraction of the size
-  ".ollama-chat-fab", // V-4, blocked on V-Q1
 ];
 
 const SCALE = [6, 8, 10, 12];
