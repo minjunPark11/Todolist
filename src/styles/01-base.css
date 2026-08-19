@@ -698,6 +698,18 @@ textarea {
   resize: vertical;
 }
 
+/* V-5: the one grid, applied where a control gets no component rule of its
+   own. The 10px block padding above put a bare `select` at 33px — one pixel
+   off a grid it was never told about, which is how three grids happen. The
+   coarse-pointer floor below still raises this to 44. */
+/* A checkbox and a radio are sized by their own box, not by the control
+   grid — giving them a 32px floor makes every row that holds one 42px. */
+input:not([type="checkbox"]):not([type="radio"]),
+select {
+  min-height: var(--density-control-h, 32px);
+  padding-block: 0;
+}
+
 .quick-add button,
 .project-form button,
 .settings-actions button,
@@ -1696,6 +1708,7 @@ textarea {
   border: 0;
   background: none;
   padding: 4px 0 4px 22px;
+  min-height: 32px;
   color: rgba(255, 255, 255, 0.42);
   font-size: 0.76rem;
   text-align: left;

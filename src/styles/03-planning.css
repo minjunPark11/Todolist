@@ -420,7 +420,7 @@
   border: none;
   background: transparent;
   padding: 0 12px;
-  height: 24px;
+  height: 32px;
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 500;
@@ -1343,7 +1343,7 @@
 }
 .ff-board-control { display: flex; flex-direction: column; gap: 4px; }
 .ff-board-control > span { font-size: 12px; font-weight: 600; color: var(--text-tertiary); }
-.ff-board-control select { min-width: 160px; padding: 6px 10px; font-size: 13px; }
+.ff-board-control select { min-width: 160px; padding: 0 10px; height: 32px; font-size: 13px; }
 .ff-board-col-head strong { display: flex; align-items: center; gap: 6px; }
 .ff-board-chip {
   background: var(--bg-hover);

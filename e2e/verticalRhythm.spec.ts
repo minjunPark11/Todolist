@@ -1,0 +1,112 @@
+// The vertical rhythm, measured in a real browser (plan V-5).
+//
+// Three grids used to overlap that are not multiples of each other: sidebar
+// rows at 30, the Rail at 40, and legacy controls anywhere from 24 to 42. This
+// asserts the two the design has clauses for, and names the Rail as the third.
+//
+// The value is 36 for navigation rows rather than the 32 the plan first
+// proposed. §4.86 sets the nav row and the tree rhythm at 36 and the create
+// row at 32, and §11.2 — the definition the whole scorecard is written against
+// — says "36px navigation rhythm" in as many words. The 30px it replaces cited
+// §2.29, which is Pointer Behavior and says nothing about heights.
+//
+// Controls keep 32: `--density-control-h` is 32, a button is not a navigation
+// row, and §4.86 puts the create row at 32 alongside the 36 ones.
+import { expect, test, type Page } from "@playwright/test";
+import { openApp } from "./addList.helpers";
+
+const LIST = { id: "list-rhythm", name: "Rhythm" };
+
+/**
+ * Heights that stay off the grid, each with the reason §11 or §2 gives.
+ *
+ * `.ollama-chat-fab` is V-4's and blocked on V-Q1, like the entry it has in
+ * the radius spec — when the FAB is settled, both lines go.
+ */
+const ALLOWED_OFF_GRID = [
+  ".rail-item", // §2.5 sets the Rail at 40: an icon-only column may hold its own rhythm
+  ".gcal-mini-day", // a day cell in the mini month, sized by the grid it sits in
+  ".ff-color-swatch", // a colour is a dot, not a control
+  ".gcal-taskpanel-rail-btn", // a vertical tab, read top to bottom rather than along a row
+  ".foc-task-main", // a task row carrying a title AND a meta line: the grid is for single-line rows
+  ".motion-task-row", // the same two-line row, on the Matrix
+  ".tm-task-open", // a Task row is content: its hit target is as tall as the row, not as the grid
+  ".ollama-chat-fab", // V-4, blocked on V-Q1
+];
+
+interface Offender {
+  cls: string;
+  height: number;
+  where: "navigation" | "control";
+}
+
+/**
+ * Every control on screen, bucketed by which grid it belongs to.
+ *
+ * A control inside the Context Sidebar is a navigation row; the same element
+ * in Main is a control. That is the whole distinction §4.86 draws, so the
+ * measurement has to draw it too rather than collecting one flat set.
+ */
+async function offGrid(page: Page, allowed: string[]): Promise<Offender[]> {
+  return page.evaluate((allowList) => {
+    const NAV = 36;
+    const CONTROL = 32;
+    const CREATE = 32;
+    const SECTION_ACTION = 28;
+    const found = new Map<string, { cls: string; height: number; where: "navigation" | "control" }>();
+    const selector = 'button, input:not([type="checkbox"]):not([type="radio"]), select, [role="button"]';
+    for (const el of Array.from(document.querySelectorAll(selector))) {
+      const box = el.getBoundingClientRect();
+      if (box.height < 12 || box.width < 24) continue;
+      if ((allowList as string[]).some((sel) => el.closest(sel))) continue;
+      const height = Math.round(box.height);
+      const inSidebar = !!el.closest(".tm-sidebar, .space-sidebar");
+      const allowedHeights = inSidebar ? [NAV, CREATE, SECTION_ACTION] : [CONTROL];
+      if (allowedHeights.includes(height)) continue;
+      const cls = String((el as HTMLElement).className ?? "").trim().split(/\s+/)[0] || el.tagName.toLowerCase();
+      found.set(`${cls}|${height}`, { cls, height, where: inSidebar ? "navigation" : "control" });
+    }
+    return Array.from(found.values());
+  }, allowed);
+}
+
+test.describe("the vertical rhythm (§4.86, §11.2)", () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 1024, "the coarse-pointer floor is §15.12's, and navShell already holds it");
+
+  test("navigation rows are 36 and controls are 32, on both shells", async ({ page }) => {
+    await openApp(page, { lists: [LIST] });
+    await page.goto(`/list/${LIST.id}`);
+    const field = page.getByRole("textbox", { name: "Add a task" });
+    await field.fill("Measure the rows");
+    await field.press("Enter");
+    await expect(page.getByRole("button", { name: "Open Measure the rows" })).toBeVisible();
+
+    for (const route of ["/today", "/calendar", "/focus", "/board", "/spaces", "/planning", "/settings", `/list/${LIST.id}`]) {
+      await page.goto(route);
+      await expect(page.locator(".global-rail")).toBeVisible();
+
+      expect(await offGrid(page, ALLOWED_OFF_GRID), `${route} draws a control off the grid`).toEqual([]);
+    }
+  });
+
+  test("40px belongs to the Rail and to nothing else", async ({ page }) => {
+    await openApp(page, { lists: [LIST] });
+
+    for (const route of ["/today", "/calendar", `/list/${LIST.id}`]) {
+      await page.goto(route);
+      await expect(page.locator(".global-rail")).toBeVisible();
+
+      const strays = await page.evaluate(() => {
+        const out: string[] = [];
+        for (const el of Array.from(document.querySelectorAll("button, [role='button'], a"))) {
+          const box = el.getBoundingClientRect();
+          if (Math.round(box.height) !== 40 || box.width < 24) continue;
+          if (el.closest(".rail-item")) continue;
+          out.push(String((el as HTMLElement).className ?? "").trim() || el.tagName.toLowerCase());
+        }
+        return out;
+      });
+      expect(strays, `${route} has a 40px control outside the Rail`).toEqual([]);
+    }
+  });
+});

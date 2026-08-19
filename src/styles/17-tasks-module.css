@@ -57,8 +57,10 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  /* §2.29 — a row you can hit without aiming. */
-  min-height: 30px;
+  /* §4.86's 36px nav-row rhythm — the value §11.2 means when it asks for a
+     consistent one. The 30px this replaces cited §2.29, which is Pointer
+     Behavior and says nothing about the height of a row (V-5). */
+  min-height: 36px;
   padding: 0 10px;
   border: 0;
   border-radius: 6px;
@@ -178,6 +180,7 @@
 
 .tm-view {
   padding: 4px 12px;
+  min-height: 32px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -258,7 +261,7 @@
 .tm-quickadd-title {
   flex: 1;
   min-width: 200px;
-  height: 34px;
+  height: 32px;
   padding: 0 10px;
   border: 1px solid var(--border, #e5e5e7);
   border-radius: 8px;
@@ -280,7 +283,7 @@
 }
 
 .tm-quickadd-submit {
-  height: 34px;
+  height: 32px;
   padding: 0 14px;
   border: 0;
   border-radius: 8px;
@@ -741,7 +744,7 @@
      shell under the minimum. A pointer that has to be aimed at an 11px glyph
      is not a smaller version of a button, it is a different experience. */
   min-width: 24px;
-  min-height: 24px;
+  min-height: 28px;
   padding: 0 6px;
   border: 0;
   border-radius: 6px;
@@ -848,7 +851,8 @@
 }
 
 .tm-scope-actions button {
-  padding: 3px 8px;
+  padding: 0 8px;
+  min-height: 32px;
   border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
   border-radius: 8px;
   background: transparent;
