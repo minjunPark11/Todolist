@@ -10,7 +10,7 @@
 ## R.0 이어받는 사람에게 — 2026-08-19 기준
 
 - **브랜치:** `feat/nav-shell-p0` (main 기준 커밋 13개). 트리 깨끗.
-- **읽는 순서:** R.1.1 채택 결정 → R.6 확정 결정(D-01~D-25) → R.8 구현 순서. 설계서 본문은 필요할 때만 펼친다.
+- **읽는 순서:** R.1.1 채택 결정 → R.6 확정 결정(D-01~D-26) → R.8 구현 순서. 설계서 본문은 필요할 때만 펼친다.
 - **원칙 하나만 기억하면 된다:** 설계서는 이 저장소를 보지 않고 쓰였다. 본문과 이 문서가 다르면 **이 문서가 이긴다.** 본문은 절대 고치지 않는다.
 
 ### 지금 어디까지 왔나
@@ -23,15 +23,16 @@ P0-4  ✅ Matrix + 중복 제거       P0-5    ✅ Space 사이드바 = 트리
 P0-4a ✅ 사이드바 소유권          P0-6    ✅ Main 헤더
 P0-4b-1 ✅ Won't Do              ─────────────────────────────
 P0-4b-2 ✅ 상태 술어 통합         P0-9    ✅ Command Menu 전역화
+                                 P0-10   ✅ Visual tokens
                                  ─────────────────────────────
-                                 P0-10 ~ P0-12 남음
+                                 P0-11 · P0-12 남음
 ```
 
 ### 다음 작업과 그 전에 필요한 것
 
-**다음은 P0-10 (Visual tokens)이고, 막는 결정은 없다.** §11 토큰 적용 + `09-calendar-redesign.css` 오버라이드 층 정리. `09-...`가 늦은 층이라는 점을 R.5.3의 정정(폭은 선언이 아니라 `getComputedStyle`로 확인)과 함께 읽을 것.
+**다음은 P0-11 (A11y)이고, 막는 결정은 없다.** 설계서 §2.33 / §3.49~§3.52의 ARIA. 셸에는 이미 axe 검사가 둘 있다 — [`tasks/a11y.test.tsx`](src/components/tasks/a11y.test.tsx)와 [`shell/CommandMenu.test.tsx`](src/components/shell/CommandMenu.test.tsx). P0-11은 그 그물을 Rail·Context Sidebar·resize 핸들까지 넓히는 일이다.
 
-**P0-9는 닫혔다.** Q-03이 D-25로 해소됐고 — Search는 페이지, Ctrl/Cmd+K는 메뉴, 둘 사이에 다리 없음 — 그 결정으로 **설계서 §2.14는 개정 대상**이 된다. 남은 미결은 Q-05(Horizons/Goals/LearningPath) 하나뿐이고 어느 P0도 막지 않는다.
+**남은 미결은 Q-05(Horizons/Goals/LearningPath) 하나뿐이고 어느 P0도 막지 않는다.** Q-03은 D-25로, 그에 따라 **설계서 §2.14는 개정 대상**이 됐다.
 
 ### 이 작업에서 배운 것 (반복하지 말 것)
 
@@ -39,6 +40,8 @@ P0-4b-2 ✅ 상태 술어 통합         P0-9    ✅ Command Menu 전역화
 - **브라우저에서 한 번은 돌려본다.** 단위 테스트는 내가 세운 전제 안에서만 돈다. `/list/:id` 딥링크가 시작 페이지로 튕기던 버그는 테스트가 아니라 브라우저에서 잡혔다.
 - **같은 이름이 다른 뜻인지 의심한다.** "Board"가 두 물건이었고(D-19), "active"가 세 뜻이었다(D-24). 둘 다 그 발견이 곧 해법이었다.
 - **CSS 클래스를 옮기기 전에 그 클래스를 누가 빌려 쓰는지 본다.** `ListManager`가 팔레트의 backdrop을 쓰고 있었고, 옮기자 배경이 조용히 사라졌다. 타입체커도 테스트도 못 잡는다 (D-25).
+- **`var(--x, fallback)`을 보면 `--x`가 실재하는지 확인한다.** 다섯 스타일시트가 없는 이름을 참조하며 fallback으로만 그려지고 있었다. 문법이 맞고 화면도 (라이트에서는) 멀쩡해서 6개월을 살아남았다 (D-26).
+- **`git checkout <file>`은 그 파일의 내 작업도 되돌린다.** P0-10 중간에 CSS 정리 스크립트를 다시 돌리려고 파일을 되돌렸다가 같은 파일에 있던 토큰 블록을 날렸다. 브라우저 실측이 아니었으면 모르고 커밋했다.
 
 ---
 
@@ -510,6 +513,56 @@ const visibleTasks = planner.tasks.filter((task) => isTaskActive(task, planner.l
 
 ---
 
+
+**D-26 — §11은 "예쁜 색을 칠하는 단계"가 아니었다. 토큰이 없어서 다크 모드가 없었다. (P0-10, 2026-08-19)**
+
+착수 전 R.5.3의 규칙대로 **선언이 아니라 계산된 값**을 쟀고, 예상과 다른 것이 나왔다.
+
+```js
+getComputedStyle(root) → --text, --surface, --bg, --hover,
+                         --selected, --border, --text-muted,
+                         --surface-muted  ... 전부 (UNDEFINED)
+```
+
+`17-tasks-module.css`, `19-app-shell.css`, `13-list-view.css`, `15-goals-section.css`, `16-overview-section.css` — 다섯 장이 `var(--text, #1c1c1e)` 꼴로 **없는 이름**을 참조하고 있었다. 즉 전부 하드코딩된 라이트 모드 fallback으로 그려지고 있었다.
+
+**증상은 다크 모드에서 눈에 보인다.** 실측:
+
+| | 이전 (dark) | 이후 (dark) |
+|---|---|---|
+| `.tm-shell` 배경 | `rgb(255,255,255)` — 흰 패널 | `rgb(28,28,30)` |
+| 상속된 `color` | `rgb(245,245,247)` — 흰 글씨 | 그대로 |
+| `.tm-row` 글자색 | `rgb(28,28,30)` | `rgb(245,245,247)` |
+
+**흰 패널 위의 흰 헤더 글씨**다. 모듈이 잘못 물어본 게 아니라 **아무도 답을 정의하지 않았다.** 그래서 이 단계의 핵심 산출물은 색 팔레트가 아니라 **이름의 정의**다 — 별칭 한 블록이 다섯 스타일시트를 동시에 고친다.
+
+**§11에서 실제로 가져온 것.**
+
+| §11 | 적용 | 실측 (light → dark) |
+|---|---|---|
+| §11.6 surface hierarchy | Rail·Sidebar·Main이 서로 다른 면 | Rail `#f7f7f8`→`#161618`, Sidebar `#fafafb`→`#1c1c1e`, canvas `#f2f2f7`→`#101012` |
+| §11.20/§11.28 quiet selection | 사이드바 현재 행 = 중립 배경 + weight 500 | `rgba(0,122,255,.12)`/600 → `#eceef3`/500 |
+| §11.42 focus ring | `--ff-focus-ring` 신설 | 셸의 5곳이 `--ff-blue`라고 적으며 "포커스 링"을 뜻하고 있었다 |
+| §11.7 divider | 현행 유지 | 이미 1px `--border-subtle` |
+
+**가져오지 않은 것과 그 이유.**
+
+- **§11.4/§11.5의 팔레트 전체.** 이 리포는 이미 완성된 토큰 체계(Apple 계열 중립 그레이 + `[data-accent]` 5색 사용자 설정)를 가지고 있다. §11의 단일 accent `#5B6EF5`를 강제하면 **출시된 사용자 설정 하나가 죽는다.** 규칙(R.1.1)대로 골격은 가져오고 값은 리포가 이긴다 — 새 역할(selected/rail/sidebar)에만 §11의 값을 쓰고, 이미 정해진 역할은 건드리지 않았다.
+- **다크의 §11.5 값.** `#14161A`/`#17191E`는 푸른기가 있고 이 리포의 다크는 순중립이다. 두 면만 다른 팔레트에서 가져오면 테마가 두 개로 보인다. **관계**(Rail < Sidebar < canvas 위)만 가져오고 값은 리포의 그레이 계단에서 뽑았다.
+- **Main을 흰색으로.** §11.6은 Main `#FFFFFF`를 말하지만 이 앱의 Main은 **캔버스**이고 그 위의 카드가 흰색이다. 캔버스를 희게 하면 모든 카드가 평평해진다. chrome이 캔버스와 카드 사이에 앉는 것으로 §11.71(content-first)은 이미 성립한다.
+
+**오버라이드 층 정리 — 실제로 무엇이 있었나.**
+
+| 어디 | 무엇 | 처리 |
+|---|---|---|
+| `01-base.css` | 삭제된 `Sidebar.tsx`의 규칙 46개 (`.sidebar`, `.side-*`, `.sidebar-collapsed`, `.global-search`, `.search-results`, collapse 트랜지션 전부) | 삭제. JSX에 클래스명이 하나도 없음을 먼저 확인 |
+| `02-calendar.css` | 같은 컴포넌트의 재도색 블록 + `--ff-*` 토큰 선언 | 도색은 삭제, 토큰은 `01-base.css`로 이동 |
+| `09-calendar-redesign.css` | 같은 컴포넌트의 **세 번째** 도색 층 | 삭제 |
+
+**`--ff-*`가 캘린더 스타일시트 2,900번째 줄에 선언돼 있었다는 게 이 감사가 P0-2에서 200px에 속은 이유와 같은 종류의 문제다.** 셸이 자기 색을 칠하는 이름을 찾으려면 캘린더를 grep해야 했다. 토큰은 토큰 있는 곳으로 옮겼다.
+
+---
+
 ## R.7 미결 — 다음 결정이 필요한 것
 
 | # | 질문 | 상태 |
@@ -545,7 +598,7 @@ const visibleTasks = planner.tasks.filter((task) => isTaskActive(task, planner.l
 | P0-7 Create/Menu | **완료** (Add List v0.13.0) | — |
 | P0-8 Collapse/Resize | §10 상호작용 마무리 (키보드 resize, 더블클릭, 영속) | P0-3 |
 | ~~P0-9 Search~~ | **완료** (2026-08-19). 팔레트가 아니라 **Command Menu**가 전역으로 올라갔다(D-25). Search는 페이지로 남고 둘 사이에 다리는 없다. `MENU_LIMITS`·nullable `CommandContext`·[`useRecents`](src/hooks/useRecents.ts)가 그 경계 | P0-2, Q-03 |
-| P0-10 Visual tokens | §11 적용. `09-calendar-redesign.css` 오버라이드 층 정리 포함 | P0-6 |
+| ~~P0-10 Visual tokens~~ | **완료** (2026-08-19). **D-26.** 진짜 문제는 색이 아니라 정의되지 않은 토큰 이름이었다 — 다섯 스타일시트가 없는 변수를 참조해 다크 모드가 라이트로 그려지고 있었다. §11.6 surface hierarchy·§11.28 quiet selection 적용, 삭제된 레거시 사이드바의 CSS 3개 층 제거 | P0-6 |
 | P0-11 A11y | §2.33 / §3.49~§3.52 ARIA | P0-10 |
 | P0-12 E2E | §2.48 / §3.85 케이스를 `e2e/`에 | 전부 |
 

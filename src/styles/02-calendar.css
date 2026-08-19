@@ -2815,12 +2815,6 @@
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
-    position: static;
-    height: auto;
-    padding: 18px;
-  }
-
   main {
     padding: 20px;
   }
@@ -2864,11 +2858,6 @@
     justify-content: flex-start;
   }
 
-  .sidebar {
-    height: auto;
-    overflow: visible;
-  }
-
   .board-grid {
     grid-template-columns: 1fr;
     overflow: visible;
@@ -2885,24 +2874,9 @@
   }
 }
 
-/* === FocusFlow IA refresh === */
-:root {
-  --ff-page: var(--bg-app);
-  --ff-sidebar: var(--bg-sidebar);
-  --ff-surface: var(--bg-surface);
-  --ff-surface-muted: var(--bg-surface-muted);
-  --ff-hover: var(--bg-hover);
-  --ff-blue: var(--accent);
-  --ff-blue-soft: var(--accent-soft);
-  --ff-text: var(--text-primary);
-  --ff-muted: var(--text-secondary);
-  --ff-subtle: var(--text-tertiary);
-  --ff-border: var(--border-subtle);
-  --ff-heading: var(--text-primary);
-  --ff-input: var(--bg-surface);
-  --ff-panel: color-mix(in srgb, var(--bg-surface) 92%, transparent);
-  --ff-card-shadow: var(--shadow-xs);
-}
+/* The `--ff-*` alias layer used to be declared here, 2,900 lines into the
+   calendar's stylesheet. The App Shell reads those names, so they moved to
+   01-base.css with the rest of the tokens in P0-10. */
 
 body {
   background: var(--ff-page);
@@ -2914,83 +2888,11 @@ body {
   background: var(--ff-page);
 }
 
-.sidebar {
-  color: var(--ff-text);
-  background: var(--ff-sidebar);
-  border-right: 1px solid var(--ff-border);
-  box-shadow: none;
-}
-
-.brand-lockup {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 0 8px;
-  font-size: 0.85rem;
-}
-
-.brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  color: #fff;
-  background: linear-gradient(135deg, #60a5fa, #2563eb);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.side-avatar {
-  color: #fff;
-  background: #111827;
-}
-
-.side-name,
-.side-item,
-.side-icon-btn {
-  color: var(--ff-text);
-}
-
-.side-icon-btn:hover,
-.side-item:hover {
-  color: var(--ff-text);
-  background: var(--ff-hover);
-}
-
-.side-item {
-  min-height: 42px;
-  border-radius: 8px;
-}
-
-.side-item.active {
-  color: var(--ff-blue);
-  background: var(--ff-blue-soft);
-}
-
-.side-item-icon,
-.side-item.active .side-item-icon {
-  color: currentColor;
-}
-
-.side-item-badge,
-.side-section-title {
-  color: var(--ff-muted);
-}
-
-.side-add input,
-.global-search input {
-  color: var(--ff-text);
-  border: 1px solid var(--ff-border);
-  background: var(--ff-input);
-}
-
-.side-add input::placeholder,
-.global-search input::placeholder {
-  color: #94a3b8;
-}
+/* The legacy global Sidebar was styled here — `.sidebar`, `.brand-mark`,
+   `.side-item`, `.side-avatar`, `.side-section-title` and the rest. P0-5
+   deleted `Sidebar.tsx` and the Space tree took its place; the rules outlived
+   the markup by five commits. Removed in P0-10, checked against the JSX
+   first: none of those class names appears in any component. */
 
 main {
   padding: 42px 48px;

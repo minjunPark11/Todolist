@@ -20,6 +20,10 @@
   gap: 18px;
   padding: 16px 8px;
   overflow-y: auto;
+  /* §11.6, and stated rather than inherited: this used to show `.tm-shell`
+     through a transparent column, which meant the Context Sidebar's colour
+     depended on which shell was drawing it. */
+  background: var(--bg-context-sidebar);
   border-right: 1px solid var(--border, #e5e5e7);
 }
 
@@ -70,9 +74,19 @@
   background: var(--hover, rgba(0, 0, 0, 0.04));
 }
 
+/* §11.20/§11.28: selected is NEUTRAL, and the label stays at 500.
+   The accent tint that used to be here made the current row the loudest thing
+   on screen — a sidebar shouting about where you already are, over content
+   that is the reason you came. Accent is kept for the Rail and the view
+   indicator, which are the signals one level up. */
 .tm-row.is-current {
-  background: var(--selected, rgba(0, 122, 255, 0.12));
-  font-weight: 600;
+  background: var(--selected);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.tm-row.is-current:hover {
+  background: var(--bg-selected-hover);
 }
 
 /* §2.16: one level of indent means one level of nesting. Lists sit under the

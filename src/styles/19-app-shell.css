@@ -152,7 +152,7 @@
 }
 
 .context-sidebar-expand:focus-visible {
-  outline: 2px solid var(--ff-blue);
+  outline: 2px solid var(--ff-focus-ring);
   outline-offset: 2px;
 }
 
@@ -176,8 +176,12 @@
   padding: 8px;
   overflow: hidden;
   color: var(--ff-text);
-  background: var(--ff-sidebar);
-  /* §2.3.2: a 1px divider, and no drop shadow. */
+  /* §11.6: Rail, Sidebar and Main are three surfaces, not one. They were all
+     the same white before P0-10, which left the three-column structure to be
+     inferred from the dividers alone. The steps are small on purpose — big
+     contrast between them makes the app look assembled from parts. */
+  background: var(--bg-rail);
+  /* §2.3.2/§11.38: a 1px divider, and no drop shadow. */
   border-right: 1px solid var(--ff-border);
 }
 
@@ -270,7 +274,7 @@
 }
 
 .rail-item:focus-visible {
-  outline: 2px solid var(--ff-blue);
+  outline: 2px solid var(--ff-focus-ring);
   outline-offset: 2px;
 }
 
@@ -403,7 +407,7 @@
 }
 
 .rail-popover-item:focus-visible {
-  outline: 2px solid var(--ff-blue);
+  outline: 2px solid var(--ff-focus-ring);
   outline-offset: -2px;
 }
 
@@ -453,7 +457,7 @@
 }
 
 .tm-drawer-wontdo:focus-visible {
-  outline: 2px solid var(--ff-blue);
+  outline: 2px solid var(--ff-focus-ring);
   outline-offset: 2px;
 }
 
@@ -470,7 +474,9 @@
   top: 0;
   overflow: hidden;
   color: var(--ff-text);
-  background: var(--ff-sidebar);
+  /* The same surface the Tasks sidebar uses. These two fill the same slot in
+     the same frame, and before P0-10 they did not agree on its colour. */
+  background: var(--bg-context-sidebar);
   border-right: 1px solid var(--ff-border);
 }
 
@@ -514,7 +520,7 @@
 }
 
 .space-sidebar-collapse:focus-visible {
-  outline: 2px solid var(--ff-blue);
+  outline: 2px solid var(--ff-focus-ring);
   outline-offset: -2px;
 }
 
