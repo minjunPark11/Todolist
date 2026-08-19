@@ -93,53 +93,6 @@
 }
 
 /* Buttons (§35.5) */
-.sdv-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border-radius: 11px;
-  padding: 9px 14px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.sdv-btn:hover {
-  background: var(--bg-hover);
-}
-
-.sdv-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.sdv-btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.sdv-btn-primary:hover {
-  background: var(--accent);
-  filter: brightness(1.06);
-}
-
-.sdv-btn-danger {
-  color: #e5484d;
-  border-color: rgba(229, 72, 77, 0.35);
-}
-
-.sdv-btn-sm {
-  padding: 6px 11px;
-  font-size: 12px;
-  border-radius: 8px;
-}
-
 .sdv-btn-icon {
   width: 44px;
   min-height: 38px;

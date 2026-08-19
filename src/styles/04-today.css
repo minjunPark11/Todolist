@@ -114,56 +114,9 @@
 
 /* --- Buttons --- */
 
-.tdy-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 18px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast);
-}
-
-.tdy-btn:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
 .tdy-btn:focus-visible {
   outline: 3px solid var(--accent-soft);
   outline-offset: 1px;
-}
-
-.tdy-btn-navy {
-  background: var(--tdy-navy);
-  color: #fff;
-}
-
-.tdy-btn-navy:not(:disabled):hover {
-  background: var(--tdy-navy-hover);
-}
-
-.tdy-btn-light {
-  background: var(--bg-surface);
-  border-color: var(--border-subtle);
-  color: var(--text-primary);
-}
-
-.tdy-btn-light:not(:disabled):hover {
-  background: var(--bg-hover);
-}
-
-.tdy-btn-sm {
-  height: 36px;
-  padding: 0 14px;
-  border-radius: 12px;
-  font-size: 14px;
 }
 
 /* --- Layout --- */

@@ -69,8 +69,6 @@ main {
    Height comes down; the tap floor does not. `min-height` is stated after
    `height` deliberately: if a future token ever drops below the floor, the
    floor wins rather than the token. */
-.tdy-btn,
-.primary-action,
 .gcal-toolbar button,
 .segmented-tabs button {
   height: var(--density-control-h);
@@ -114,8 +112,6 @@ main {
    §15.12. Everything above may be tuned down; none of it may take a target
    under 44px where the pointer is a finger. */
 @media (pointer: coarse) {
-  .tdy-btn,
-  .primary-action,
   .gcal-toolbar button,
   .segmented-tabs button,
   .tdy-capture-input,

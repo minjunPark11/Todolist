@@ -678,32 +678,11 @@ main {
   grid-template-columns: minmax(180px, 1fr) 150px auto;
 }
 
-input,
-select,
-textarea {
-  width: 100%;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-sm);
-  padding: 10px 12px;
-  color: var(--color-ink);
-  background: var(--color-canvas);
-}
-
+/* The field itself is in 21-components.css with the card and the button
+   (V-6). This is the one thing that is only true of a textarea. */
 textarea {
   min-height: 90px;
   resize: vertical;
-}
-
-/* V-5: the one grid, applied where a control gets no component rule of its
-   own. The 10px block padding above put a bare `select` at 33px — one pixel
-   off a grid it was never told about, which is how three grids happen. The
-   coarse-pointer floor below still raises this to 44. */
-/* A checkbox and a radio are sized by their own box, not by the control
-   grid — giving them a 32px floor makes every row that holds one 42px. */
-input:not([type="checkbox"]):not([type="radio"]),
-select {
-  min-height: var(--density-control-h, 32px);
-  padding-block: 0;
 }
 
 .quick-add button,

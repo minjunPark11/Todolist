@@ -28,6 +28,11 @@ const ALLOWED_OFF_GRID = [
   ".gcal-mini-day", // a day cell in the mini month, sized by the grid it sits in
   ".ff-color-swatch", // a colour is a dot, not a control
   ".gcal-taskpanel-rail-btn", // a vertical tab, read top to bottom rather than along a row
+  // The small size, 28px. Not a stray: §4.87 gives a section action exactly
+  // that number, and V-6 made one `-sm` out of the three the families had.
+  ".ff-btn-sm",
+  ".tdy-btn-sm",
+  ".sdv-btn-sm",
   ".foc-task-main", // a task row carrying a title AND a meta line: the grid is for single-line rows
   ".motion-task-row", // the same two-line row, on the Matrix
   ".tm-task-open", // a Task row is content: its hit target is as tall as the row, not as the grid

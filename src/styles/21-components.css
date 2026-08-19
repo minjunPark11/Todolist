@@ -63,3 +63,198 @@
   border-radius: var(--density-radius);
   box-shadow: var(--shadow-card);
 }
+
+/* --- the button ----------------------------------------------------------
+   Three languages met here: `.ff-btn` (36px, radius 10, muted text),
+   `.tdy-btn` (40px, radius 12, transparent border, its own navy fill) and
+   `.sdv-btn` (radius 11, 9px/14px padding). Same control, three shapes and
+   two primaries — Today's was navy, everything else's was the accent.
+
+   One base, and the variants the plan asks for: primary, secondary, ghost.
+   Danger is the fourth because destructive is not a shade of secondary, and
+   `-sm` is a size rather than a variant. */
+.ff-btn,
+.tdy-btn,
+.sdv-btn,
+.primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--density-control-h);
+  min-height: var(--density-tap);
+  padding-inline: var(--density-control-pad-x);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--density-radius);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.ff-btn:not(:disabled):hover,
+.tdy-btn:not(:disabled):hover,
+.sdv-btn:not(:disabled):hover {
+  background: var(--bg-hover);
+}
+
+.ff-btn:disabled,
+.tdy-btn:disabled,
+.sdv-btn:disabled,
+.primary-action:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Primary — the accent, filled. `.tdy-btn-navy` is on this list rather than
+   keeping `--tdy-navy`: two primaries in two colours is the thing V-6 exists
+   to end, and §11.3's accent is the one the user can change. */
+.ff-btn-primary,
+.tdy-btn-navy,
+.sdv-btn-primary,
+.primary-action {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.ff-btn-primary:not(:disabled):hover,
+.tdy-btn-navy:not(:disabled):hover,
+.sdv-btn-primary:not(:disabled):hover,
+.primary-action:not(:disabled):hover {
+  background: var(--accent);
+  filter: brightness(0.95);
+}
+
+/* Secondary — the accent at reading weight, for the second-most-likely action
+   on a screen that already has a primary. */
+.ff-btn-secondary {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ff-btn-secondary:not(:disabled):hover {
+  background: var(--accent-active);
+}
+
+/* Ghost — no surface until you touch it. */
+.ff-btn-ghost {
+  border-color: transparent;
+  background: transparent;
+}
+
+.ff-btn-ghost:not(:disabled):hover {
+  background: var(--bg-hover);
+}
+
+/* Danger. Outlined rather than filled: a red fill on a list of buttons reads
+   as the primary action, which is the opposite of what it is. */
+.ff-btn-danger,
+.sdv-btn-danger {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: transparent;
+  color: var(--danger);
+}
+
+.ff-btn-danger:not(:disabled):hover,
+.sdv-btn-danger:not(:disabled):hover {
+  background: var(--danger-soft);
+}
+
+/* The small size. `--density-control-h` minus one step, and the tap floor
+   still applies underneath it. */
+.ff-btn-sm,
+.tdy-btn-sm,
+.sdv-btn-sm {
+  height: 28px;
+  padding-inline: 12px;
+  font-size: 12px;
+}
+
+/* --- the field -----------------------------------------------------------
+   Inputs came in at 32, 33, 34, 38 and 58px, with three paddings and two
+   border tokens, because most of them were styled by where they sat rather
+   than by what they are: `.gcal-schedule-search input`, `.gcal-quick-add-row
+   input`, `.board-inline-add input`, `.detail-field-list select` all said the
+   same thing in their own words.
+
+   One field. It is the control height, so a field and a button beside it line
+   up — which is the whole reason §4.86 gives both the same number. `textarea`
+   takes the surface and keeps its own height. */
+.ff-field,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea,
+.tdy-capture-input,
+.tm-quickadd-title,
+.tm-modal-input {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.ff-field,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+.tdy-capture-input,
+.tm-quickadd-title,
+.tm-modal-input {
+  height: var(--density-control-h);
+  min-height: var(--density-tap);
+  padding: 0 var(--density-control-pad-x);
+}
+
+textarea {
+  padding: 8px var(--density-control-pad-x);
+}
+
+/* --- the row -------------------------------------------------------------
+   Three kinds of row exist in this app and only one of them is this one. The
+   distinction is worth stating, because collapsing it is how a Task row ends
+   up as tall as a menu item:
+
+     navigation row   `.tm-row`, 36px, §4.86's rhythm (V-5)
+     content row      `.task-row`, `.tdy-triage-row`, `.foc-task-main` — as
+                      tall as what is in them, one line or three
+     list row         this one: a single line you point at and choose
+
+   What the list rows share is not a height but a hit surface — the corner
+   radius, the hover, the selected fill, and the gap between an icon and its
+   label. */
+.ff-row,
+.gcal-cat-row,
+.list-view-row,
+.side-list li,
+.spc-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--density-control-h);
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.ff-row:hover,
+.gcal-cat-row:hover,
+.list-view-row:hover,
+.side-list li:hover,
+.spc-list-row:hover {
+  background: var(--bg-hover);
+}
+
+.ff-row.is-selected,
+.gcal-cat-row.is-selected,
+.list-view-row.is-selected,
+.side-list li.is-selected,
+.spc-list-row.is-selected {
+  background: var(--bg-selected);
+}
