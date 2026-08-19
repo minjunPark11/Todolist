@@ -75,6 +75,7 @@ import { formatLocalTime } from "./domain/schedule";
 import { todayValue } from "./utils/date";
 import { I18nProvider, translate, useT } from "./i18n";
 import { isWontDo } from "./domain/tasks/taskState";
+import { isTaskActive } from "./domain/tasks/scopeQuery";
 
 function cloudExternalCalendarSnapshot(calendar: ExternalCalendar): ExternalCalendar {
   return {
@@ -200,6 +201,25 @@ export default function App() {
   // used to be a boolean the legacy shell kept to itself and the Tasks Module
   // knew nothing about — which is why the two could not agree on a width.
   const contextSidebar = useContextSidebar(currentPath);
+  /**
+   * The Tasks the user can actually see (audit D-24, axis 2 — P0-4b-5).
+   *
+   * A List that is archived or deleted takes its Tasks out of every Scope
+   * WITHOUT writing anything on them (§6.56/§13.19) — that is what makes
+   * restoring the List bring them all back, and why they never show up in the
+   * Task Trash. Inside the Tasks Module `isTaskActive` has always enforced it.
+   * Everywhere else did not: Focus still offered those Tasks, the Calendar
+   * still drew them, and the reminder queue still rang for them.
+   *
+   * Filtering once here rather than teaching fourteen modules to take a
+   * `lists` argument. `planner.tasks` stays the collection for LOOKUPS — a
+   * running focus session, a parent Task, an export — because a Task that is
+   * hidden is not a Task that stopped existing.
+   */
+  const visibleTasks = useMemo(
+    () => planner.tasks.filter((task) => isTaskActive(task, planner.lists)),
+    [planner.tasks, planner.lists],
+  );
   const isProjectDetailOpen = selection.kind !== "none";
   const searchInputRef = useRef<HTMLInputElement>(null);
   const originalTitleRef = useRef(document.title || "FocusFlow");
@@ -269,7 +289,7 @@ export default function App() {
     }
 
     return {
-      tasks: planner.tasks.filter((task) =>
+      tasks: visibleTasks.filter((task) =>
         [task.title, task.description, task.notes, task.tags.join(" ")]
           .join(" ")
           .toLowerCase()
@@ -279,7 +299,7 @@ export default function App() {
         [project.name, project.description].join(" ").toLowerCase().includes(query),
       ),
     };
-  }, [activeProjects, planner.tasks, searchQuery]);
+  }, [activeProjects, visibleTasks, searchQuery]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -729,7 +749,7 @@ export default function App() {
   // hook because it needs the dictionary, and the hook has no business knowing
   // which language the app is in.
   useReminders({
-    tasks: planner.tasks,
+    tasks: visibleTasks,
     describe: ({ title, at }) => ({
       title,
       body: t("schedule.notificationBody", {
@@ -860,7 +880,7 @@ export default function App() {
 
   function buildCurrentShareSnapshot() {
     return buildCalendarShareSnapshot({
-      tasks: planner.tasks,
+      tasks: visibleTasks,
       projects: activeProjects,
     });
   }
@@ -1344,6 +1364,7 @@ export default function App() {
       <AppPages
         activePage={activePage}
         planner={planner}
+        visibleTasks={visibleTasks}
         appSettings={appSettings}
         activeProjects={activeProjects}
         selectedProjectId={selectedProjectId}
@@ -1454,7 +1475,7 @@ export default function App() {
           navigateSection(page);
           setMobileMenuOpen(false);
         }}
-        tasks={planner.tasks}
+        tasks={visibleTasks}
         projects={activeProjects}
         selectedProjectId={selectedProjectId}
         userEmail={planner.auth.userEmail}
@@ -1562,7 +1583,7 @@ export default function App() {
         }}
         aiContext={buildAiContextInput({ planner, appSettings, currentPage: activePage })}
         calendarContext={{
-          tasks: planner.tasks,
+          tasks: visibleTasks,
           projects: planner.projects,
             }}
         onExecuteActions={(actions) =>

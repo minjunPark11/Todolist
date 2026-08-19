@@ -422,7 +422,22 @@ wontDoAt?: string;
 
 **축을 가른 이유는 타협이 아니라 사실이다.** 채택 대상 17곳 중 `lists`가 스코프에 있는 곳이 **하나도 없었다** — `reminderQueue`와 `calendarShare`는 React 밖 모듈이라 컬렉션을 넘길 경로 자체가 없다. 술어를 구조적 타입(`TaskStateFields`)으로 만든 것도 같은 이유다: `ReminderTaskSource`처럼 `Task`보다 좁은 모양도 같은 질문을 물을 수 있어야, 규칙의 두 번째 사본이 안 생긴다.
 
-**앞서 예고한 행동 변화는 이번에 일어나지 않는다.** "보관된 List의 Task가 Focus·Calendar에서도 사라진다"고 적었는데, 그러려면 `lists`를 8개 모듈에 배선해야 하고 그건 술어 통합보다 큰 작업이다. **별도 단계로 분리한다** (P0-4b-5). 이번 단계가 준 것은 "Task 자신의 상태에 대한 답이 앱 전체에서 하나"이고, 그것만으로도 15곳의 손코딩이 사라진다.
+**앞서 예고한 행동 변화는 이 단계가 아니라 P0-4b-5에서 일어났다.** "보관된 List의 Task가 Focus·Calendar에서도 사라진다"고 적었는데, 그러려면 `lists`를 8개 모듈에 배선해야 하고 그건 술어 통합보다 큰 작업이라 분리했다. 이 단계가 준 것은 "Task 자신의 상태에 대한 답이 앱 전체에서 하나"다.
+
+**P0-4b-5의 해법 (2026-08-19).** 결국 `lists`를 아무 데도 배선하지 않았다. 14개 모듈에 인자를 하나씩 늘리는 대신, `App.tsx`가 **한 번** 거른다.
+
+```ts
+const visibleTasks = planner.tasks.filter((task) => isTaskActive(task, planner.lists));
+```
+
+그리고 **두 컬렉션의 역할을 갈랐다.**
+
+| | 무엇 | 어디에 |
+|---|---|---|
+| `visibleTasks` | 사용자가 볼 수 있는 것 | 그리거나 제안하는 화면 — Today·Calendar·Focus·Matrix·SpaceHub·사이드바 카운트·검색·리마인더·캘린더 공유·AI 컨텍스트 |
+| `planner.tasks` | 전부 | **조회** — 실행 중인 집중 세션의 Task, 부모 Task, 내보내기. 숨겨진 Task가 존재를 그만둔 것은 아니다 |
+
+이 구분이 이 단계의 진짜 산출물이다. 인자를 배선했다면 각 모듈이 "어느 질문을 하는 중인지" 매번 다시 판단해야 했다.
 
 ## R.7 미결 — 다음 결정이 필요한 것
 
@@ -453,7 +468,7 @@ wontDoAt?: string;
 | ~~P0-4b-2 상태 술어 통합~~ | **완료** (2026-08-19). [`taskState.ts`](src/domain/tasks/taskState.ts)가 단일 출처, 17곳 채택, 경쟁 술어 셋 흡수 | P0-4b-1 |
 | ~~P0-4b-3 Task Archive 폐기~~ | **완료** (2026-08-19). 로드 경로 마이그레이션(`archived` → `wontDoAt`, `previousStatus`로 워크플로 상태 복원), 사이드바 하단 = 완료·안 함·휴지통, ArchivePage는 프로젝트 전용 | P0-4b-2 |
 | ~~P0-4b-4 프로젝트 Archive~~ | **완료** (2026-08-19). Space의 `보관함` 탭(`/s/:id?view=archive`)으로 이동. `/archive` 라우트·ArchivePage·`PageId "archive"` 폐기, 옛 링크는 `/spaces`로 리다이렉트 | P0-4b-3 |
-| P0-4b-5 컨테이너 축 | P0-4b-2에서 분리. `lists`를 배선해 Focus·Calendar 등도 `isTaskActive`(소유 List 검사 포함)를 쓰게 한다 | P0-4b-2 |
+| ~~P0-4b-5 컨테이너 축~~ | **완료** (2026-08-19). 14곳에 `lists`를 배선하는 대신 `App.tsx`가 `visibleTasks`를 한 번 파생해 화면에 넘긴다. `planner.tasks`는 조회용으로 남는다 | P0-4b-2 |
 | P0-5 Tree | **부활** (D-14). 새로 그리지 않고 기존 [`SpaceTree.tsx`](src/components/sidebar/SpaceTree.tsx)를 `mode="space"` 슬롯에 꽂는다 | P0-3 |
 | P0-6 Main Header | `tm-header`를 새 셸 기준으로 정리. 뷰 전환은 현행 유지(D-09) | P0-2 |
 | P0-7 Create/Menu | **완료** (Add List v0.13.0) | — |

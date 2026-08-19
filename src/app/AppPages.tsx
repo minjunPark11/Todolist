@@ -12,12 +12,22 @@ import type { CalendarShareState } from "../lib/calendarShare";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import type { KnowledgeSettings } from "../lib/knowledge/types";
 import type { AppUpdateStatus } from "../platform";
-import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Project } from "../types";
+import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Project, Task } from "../types";
 
 type Planner = ReturnType<typeof usePlannerData>;
 
 type AppPagesProps = {
   activePage: PageId;
+  /**
+   * The Tasks the user can see (audit D-24 axis 2, P0-4b-5).
+   *
+   * `planner.tasks` is still here and still the whole set. The difference is
+   * the question being asked: this one is for screens that DRAW or OFFER
+   * tasks, and it has already dropped the ones whose owning List was archived
+   * or deleted. Lookups — a goal's linked task, an export — want the full set,
+   * because a hidden Task has not stopped existing.
+   */
+  visibleTasks: Task[];
   planner: Planner;
   appSettings: AppSettings;
   activeProjects: Project[];
@@ -77,6 +87,7 @@ type AppPagesProps = {
 export function AppPages({
   activePage,
   planner,
+  visibleTasks,
   appSettings,
   activeProjects,
   selectedProjectId,
@@ -173,7 +184,7 @@ export function AppPages({
     return (
       <section className="page-grid no-detail tdy-grid">
         <TodayPage
-          tasks={planner.tasks}
+          tasks={visibleTasks}
           projects={activeProjects}
           dailyPlans={planner.dailyPlans}
           lists={planner.lists}
@@ -208,7 +219,7 @@ export function AppPages({
     return (
       <section className={pageGridClass()}>
         <BoardPage
-          tasks={planner.tasks}
+          tasks={visibleTasks}
           projects={planner.projects}
           lists={planner.lists}
           learningPaths={planner.learningPaths}
@@ -229,7 +240,7 @@ export function AppPages({
     return (
       <section className="gcal-page-shell">
         <CalendarView
-          tasks={planner.tasks}
+          tasks={visibleTasks}
           projects={activeProjects}
               externalCalendars={externalCalendars}
           externalCalendarEvents={externalCalendarEvents}
@@ -252,7 +263,7 @@ export function AppPages({
   if (activePage === "focus") {
     return (
       <FocusPage
-        tasks={planner.tasks}
+        tasks={visibleTasks}
         projects={activeProjects}
         focusSessions={planner.focusSessions}
         activeSession={planner.activeFocusSession}
@@ -278,7 +289,7 @@ export function AppPages({
         onRestoreProject={planner.restoreProject}
         onDeleteProject={requestDeleteProject}
         projects={planner.projects}
-        tasks={planner.tasks}
+        tasks={visibleTasks}
         lists={planner.lists}
         paths={planner.learningPaths}
         onUpdatePath={planner.updateLearningPath}
