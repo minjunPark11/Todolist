@@ -6,14 +6,17 @@ import type {
 import { scheduleSpan } from "../domain/schedule/scheduleQueries";
 import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { addDays, addMonths, daysBetween, todayValue } from "./date";
+import { isTaskAlive, isTaskOpen, isWontDo } from "../domain/tasks/taskState";
 
 // === Task filters (spec §4.1.1) ===
+// D-24: these keep their names so their callers do not churn, but the rule
+// itself lives in one place now.
 export function isActiveTask(task: Task): boolean {
-  return task.status !== "archived" && !task.deletedAt;
+  return isTaskAlive(task);
 }
 
 export function isArchivedTask(task: Task): boolean {
-  return task.status === "archived";
+  return isWontDo(task);
 }
 
 export function isCompletedTask(task: Task): boolean {
@@ -57,7 +60,7 @@ export function getTodayBuckets(tasks: Task[], today = todayValue()): TodayBucke
       buckets.doneToday.push(task);
       continue;
     }
-    if (task.status === "done" || task.status === "archived") {
+    if (!isTaskOpen(task)) {
       continue;
     }
     if (task.status === "waiting") {

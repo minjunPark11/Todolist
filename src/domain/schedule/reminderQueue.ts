@@ -13,6 +13,7 @@
 import { reminderInstant } from "./reminder";
 import { scheduleFromTask, type TaskScheduleSource } from "./taskSchedule";
 import type { LocalDate, LocalTime } from "./types";
+import { isTaskOpen } from "../tasks/taskState";
 
 /** A wall-clock moment, in the same terms the rest of this folder uses. */
 export interface LocalMoment {
@@ -27,6 +28,7 @@ export interface ReminderTaskSource extends TaskScheduleSource {
   status?: string;
   archivedAt?: string;
   deletedAt?: string;
+  wontDoAt?: string;
 }
 
 export interface DueReminder {
@@ -100,8 +102,10 @@ function toMinutes(time: LocalTime): number {
  * reopened.
  */
 function isLive(task: ReminderTaskSource): boolean {
-  if (task.status === "done" || task.status === "archived") return false;
-  return !task.archivedAt && !task.deletedAt;
+  // `archivedAt` stays beside the shared predicate until D-20's migration has
+  // moved these records: the predicate reads the `archived` status, and a row
+  // carrying only the timestamp would otherwise still ring.
+  return isTaskOpen(task) && !task.archivedAt;
 }
 
 /**

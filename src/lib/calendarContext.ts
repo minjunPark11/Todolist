@@ -5,6 +5,7 @@ import type { Project, Task } from "../types";
 import { getWeekDays, todayValue } from "../utils/date";
 import { buildCalendarItems, defaultCalendarLayers } from "../utils/calendarItems";
 import { hasSchedule, scheduleFromTask } from "../domain/schedule";
+import { isTaskOpen } from "../domain/tasks/taskState";
 
 export interface CalendarContextInput {
   tasks: Task[];
@@ -41,7 +42,7 @@ export function buildCalendarContextText({ tasks, projects }: CalendarContextInp
     .filter((item) => item.layer === "project-deadline")
     .map((item) => ({ title: item.title, date: item.date }));
   const unscheduledTasks = tasks
-    .filter((task) => !hasSchedule(scheduleFromTask(task)) && task.status !== "done" && task.status !== "archived")
+    .filter((task) => !hasSchedule(scheduleFromTask(task)) && isTaskOpen(task))
     .slice(0, 20)
     .map((task) => ({ title: task.title, dueDate: task.dueDate || null }));
 

@@ -6,6 +6,7 @@ import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../li
 import { platform } from "../platform";
 import { useT } from "../i18n";
 import { DeferredTextarea } from "./kit";
+import { isTaskOpen } from "../domain/tasks/taskState";
 
 interface FocusPageProps {
   tasks: Task[];
@@ -97,7 +98,7 @@ export function FocusPage({
   const optionsRef = useRef<HTMLDivElement>(null);
 
   const openTasks = useMemo(
-    () => tasks.filter((task) => task.status !== "done" && task.status !== "archived" && !task.deletedAt),
+    () => tasks.filter(isTaskOpen),
     [tasks],
   );
   const groups = useMemo<FocusGroup[]>(() => {

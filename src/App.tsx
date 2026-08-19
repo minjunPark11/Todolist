@@ -24,7 +24,7 @@ import { PAGE_ROUTES, bootRedirectFor, pageForPath, pathForDefaultView, pathForP
 import { RAIL_DESTINATIONS, TASKS_HOME, isTasksLocation, railItemFor, type RailNavItem } from "./app/railNav";
 import { AppShell } from "./components/shell/AppShell";
 import { GlobalRail } from "./components/shell/GlobalRail";
-import { SEARCH_PATH } from "./app/taskScopeUrl";
+import { SEARCH_PATH, taskUrlFor } from "./app/taskScopeUrl";
 import { useContextSidebar } from "./hooks/useContextSidebar";
 import { TasksSidebarSlot } from "./components/shell/TasksSidebarSlot";
 import type { TasksSidebarPage } from "./components/tasks/TasksSidebar";
@@ -74,6 +74,7 @@ import { useReminders } from "./hooks/useReminders";
 import { formatLocalTime } from "./domain/schedule";
 import { todayValue } from "./utils/date";
 import { I18nProvider, translate, useT } from "./i18n";
+import { isWontDo } from "./domain/tasks/taskState";
 
 function cloudExternalCalendarSnapshot(calendar: ExternalCalendar): ExternalCalendar {
   return {
@@ -1043,8 +1044,11 @@ export default function App() {
       return;
     }
 
-    if (task.status === "archived" || task.archivedAt) {
-      navigate(PAGE_ROUTES.archive);
+    // D-23/D-24: a task that has been given up on lives in Won't Do now, so
+    // that is where opening it lands. Legacy `archived` records read as Won't
+    // Do too until D-20's migration moves them.
+    if (isWontDo(task)) {
+      navigateUrl(taskUrlFor({ scope: { kind: "wontDo" }, view: "list", taskId: task.id }));
       return;
     }
 

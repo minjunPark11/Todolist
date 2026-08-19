@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 import type { Project, Task } from "../types";
+import { isTaskAlive } from "../domain/tasks/taskState";
 
 export type CalendarShareStatus = "unavailable" | "idle" | "loading" | "saving" | "ready" | "error";
 
@@ -59,7 +60,7 @@ export function buildCalendarShareSnapshot(input: {
   const events: SharedCalendarEvent[] = [];
 
   input.tasks.forEach((task) => {
-    if (!task.title || task.status === "archived") return;
+    if (!task.title || !isTaskAlive(task)) return;
     // One event per task. This used to emit two — a timed block on the work
     // day and a separate all-day deadline marker — because the record carried
     // both dates. It carries one now (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7

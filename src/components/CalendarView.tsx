@@ -52,6 +52,7 @@ import {
   type ScheduleIssue,
 } from "../domain/schedule";
 import { useT } from "../i18n";
+import { isTaskOpen } from "../domain/tasks/taskState";
 
 type CalendarMode = "month" | "week" | "day" | "year";
 
@@ -258,7 +259,7 @@ export function CalendarView({
     () =>
       tasks.filter(
         (task) =>
-          !(hasSchedule(scheduleFromTask(task)) || task.status === "done" || task.status === "archived"),
+          !hasSchedule(scheduleFromTask(task)) && isTaskOpen(task),
       ),
     [tasks],
   );

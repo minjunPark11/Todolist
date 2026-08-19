@@ -10,6 +10,7 @@ import { useT } from "../i18n";
 import { MotionCollapse } from "./motion/MotionCollapse";
 import { reducedTransition, transitions } from "../motion/transitions";
 import { useMotionEnabled } from "../motion/reducedMotion";
+import { isTaskOpen } from "../domain/tasks/taskState";
 
 // The rail collapse only applies on desktop (the mobile overlay menu ignores
 // it), so the JS-driven pieces need the same breakpoint the CSS uses.
@@ -206,7 +207,7 @@ export function Sidebar({
   const [projectsOpen, setProjectsOpen] = useState(() => projects.length > 0);
   const [newProject, setNewProject] = useState("");
   const today = todayValue();
-  const isOpen = (task: Task) => task.status !== "done" && task.status !== "archived";
+  const isOpen = isTaskOpen;
 
   const buckets = getTodayBuckets(tasks, today);
   const todayCount =

@@ -39,7 +39,7 @@ describe("Won't Do (audit D-23)", () => {
   it("takes the task out of every active Scope", () => {
     const given = task({ wontDoAt: NOW });
     expect(isTaskActive(given, [LIST])).toBe(false);
-    expect(isTaskOpen(given, [LIST])).toBe(false);
+    expect(isTaskOpen(given)).toBe(false);
     expect(matchesScope(given, { kind: "today" }, ctx)).toBe(false);
     expect(matchesScope(given, { kind: "list", id: "l1" }, ctx)).toBe(false);
   });
@@ -106,7 +106,7 @@ describe("Won't Do (audit D-23)", () => {
       const after = applyPatch(given, unmarkWontDo(given).patch);
       expect(after.wontDoAt).toBe("");
       expect(after.status).toBe("doing");
-      expect(isTaskOpen(after, [LIST])).toBe(true);
+      expect(isTaskOpen(after)).toBe(true);
     });
   });
 

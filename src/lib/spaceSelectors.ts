@@ -1,6 +1,7 @@
 import type { FocusSession, Task } from "../types";
 import type { SpaceCustomConfig, SpaceSignalStatus } from "./spaceHubTypes";
 import { addDays, todayValue } from "../utils/date";
+import { isTaskAlive } from "../domain/tasks/taskState";
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -23,7 +24,7 @@ type TFn = (key: string, vars?: Record<string, string | number>) => string;
 export function getSpaceTasks(tasks: Task[], projectId: string): Task[] {
   if (!projectId) return [];
   return tasks.filter(
-    (task) => task.status !== "archived" && !task.deletedAt && task.projectId === projectId,
+    (task) => isTaskAlive(task) && task.projectId === projectId,
   );
 }
 

@@ -19,6 +19,7 @@ import { useTabInUrl } from "../../lib/spaceTabUrl";
 import { isTaskDone } from "../../lib/spaceSelectors";
 import { OverviewSection, type OverviewChild } from "./OverviewSection";
 import { useT } from "../../i18n";
+import { isTaskAlive } from "../../domain/tasks/taskState";
 
 interface SpaceScreenProps {
   space: Space;
@@ -60,7 +61,7 @@ export function SpaceScreen({
   const spaceTasks = useMemo(
     () =>
       tasks.filter(
-        (task) => task.status !== "archived" && !task.deletedAt && projectIds.has(task.projectId),
+        (task) => isTaskAlive(task) && projectIds.has(task.projectId),
       ),
     [tasks, projectIds],
   );

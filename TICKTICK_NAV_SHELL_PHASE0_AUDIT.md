@@ -405,7 +405,24 @@ wontDoAt?: string;
 | 살아 있는가 | 휴지통도 Won't Do도 아니고, 소유 List도 살아 있다 | `isTaskActive` |
 | 아직 할 일인가 | 살아 있고 + 완료도 아니다 | `isActive` (현재 private) |
 
-두 번째를 export하고 이름을 분명히 한다. **주의할 행동 변화**: `isTaskActive`는 *소유 List가 archive/삭제된 Task도* 제외한다. 지금 15곳은 그걸 보지 않으므로, 채택하면 보관된 리스트의 작업이 Focus·Calendar에서도 사라진다. 더 옳은 동작이지만 조용한 변화가 아니므로 채택 PR에서 명시한다.
+**구현하며 밝혀진 것 (P0-4b-2, 2026-08-19).**
+
+경쟁하는 술어가 하나가 아니라 **셋**이었고, 그중 둘이 "active"라는 같은 이름을 쓰면서 다른 답을 냈다.
+
+| 모듈 | 이름 | 실제 뜻 |
+|---|---|---|
+| `scopeQuery` | `isTaskActive` | 살아 있고 **+ 소유 List도 살아 있다** |
+| `utils/planner` | `isActiveTask` | 살아 있다 |
+| `domain/tasks/selectors` | `selectActiveTasks` | 살아 있고 **+ 완료가 아니다** |
+
+즉 화면이 이름만 보고 고르면 어느 모듈에서 import했느냐에 따라 다른 답을 받았다. 그래서 [`domain/tasks/taskState.ts`](src/domain/tasks/taskState.ts)를 만들어 **축을 둘로 갈랐다.**
+
+1. **Task 자신의 상태** — `isTrashed` / `isWontDo` / `isCompleted`, 그리고 그 위의 `isTaskAlive`(존재하는가) / `isTaskOpen`(아직 할 일인가). Task 말고는 아무것도 필요 없다.
+2. **컨테이너의 상태** — `scopeQuery.isTaskActive`가 1번을 합성하고 소유 List 검사를 더한다. Lists가 필요하므로 거기 남는다.
+
+**축을 가른 이유는 타협이 아니라 사실이다.** 채택 대상 17곳 중 `lists`가 스코프에 있는 곳이 **하나도 없었다** — `reminderQueue`와 `calendarShare`는 React 밖 모듈이라 컬렉션을 넘길 경로 자체가 없다. 술어를 구조적 타입(`TaskStateFields`)으로 만든 것도 같은 이유다: `ReminderTaskSource`처럼 `Task`보다 좁은 모양도 같은 질문을 물을 수 있어야, 규칙의 두 번째 사본이 안 생긴다.
+
+**앞서 예고한 행동 변화는 이번에 일어나지 않는다.** "보관된 List의 Task가 Focus·Calendar에서도 사라진다"고 적었는데, 그러려면 `lists`를 8개 모듈에 배선해야 하고 그건 술어 통합보다 큰 작업이다. **별도 단계로 분리한다** (P0-4b-5). 이번 단계가 준 것은 "Task 자신의 상태에 대한 답이 앱 전체에서 하나"이고, 그것만으로도 15곳의 손코딩이 사라진다.
 
 ## R.7 미결 — 다음 결정이 필요한 것
 
@@ -433,9 +450,10 @@ wontDoAt?: string;
 | ~~P0-4 Rail + 중복 제거~~ | **완료** (2026-08-19). Rail에 Matrix 추가(D-19), 레거시 사이드바에서 전역 항목 제거(D-16) — 남은 것은 `오늘`·`보관함`·트리 | P0-3 |
 | ~~P0-4a 사이드바 소유권~~ | **완료** (2026-08-19). [`TasksSidebarSlot`](src/components/shell/TasksSidebarSlot.tsx)이 사이드바+두 다이얼로그를 함께 들고, 레거시 셸이 `mode`로 고른다. DOM 통합은 여전히 D-17 | P0-4 |
 | ~~P0-4b-1 Won't Do~~ | **완료** (2026-08-19). `wontDoAt` + `wontDo` Scope(`/wont-do`) + Drawer 액션·undo. `isTaskOpen`도 export됨 | P0-4a |
-| P0-4b-2 상태 술어 통합 | **D-24.** `isTaskActive`/`isTaskOpen`을 export하고 `status !== "archived"` 15곳이 그것을 쓰게 한다 | P0-4b-1 |
+| ~~P0-4b-2 상태 술어 통합~~ | **완료** (2026-08-19). [`taskState.ts`](src/domain/tasks/taskState.ts)가 단일 출처, 17곳 채택, 경쟁 술어 셋 흡수 | P0-4b-1 |
 | P0-4b-3 Task Archive 폐기 | **D-20.** 기존 `archived` Task를 `wontDoAt`으로 이주, 사이드바 `보관함` 행 제거, 하단 = 완료·안 함·휴지통 | P0-4b-2 |
 | P0-4b-4 프로젝트 Archive | **D-20의 남은 절반.** 보관된 프로젝트를 SpaceHub로 | P0-4b-3, P0-5 |
+| P0-4b-5 컨테이너 축 | P0-4b-2에서 분리. `lists`를 배선해 Focus·Calendar 등도 `isTaskActive`(소유 List 검사 포함)를 쓰게 한다 | P0-4b-2 |
 | P0-5 Tree | **부활** (D-14). 새로 그리지 않고 기존 [`SpaceTree.tsx`](src/components/sidebar/SpaceTree.tsx)를 `mode="space"` 슬롯에 꽂는다 | P0-3 |
 | P0-6 Main Header | `tm-header`를 새 셸 기준으로 정리. 뷰 전환은 현행 유지(D-09) | P0-2 |
 | P0-7 Create/Menu | **완료** (Add List v0.13.0) | — |

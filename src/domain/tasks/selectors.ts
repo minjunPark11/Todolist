@@ -3,15 +3,16 @@
 // re-derive liveness/relevance rules inline. Keep these free of React and IO.
 import type { Task } from "../../types";
 import { addDays } from "../../utils/date";
+import { isTaskAlive, isTaskOpen } from "./taskState";
 
 // Tasks that still exist from the user's point of view.
 export function selectLiveTasks(tasks: Task[]): Task[] {
-  return tasks.filter((task) => !task.deletedAt && task.status !== "archived");
+  return tasks.filter(isTaskAlive);
 }
 
 // Live tasks that still need doing.
 export function selectActiveTasks(tasks: Task[]): Task[] {
-  return selectLiveTasks(tasks).filter((task) => task.status !== "done");
+  return tasks.filter(isTaskOpen);
 }
 
 // Nearest future date the task is actionable on, "" if none. A range's first
