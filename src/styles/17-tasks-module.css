@@ -209,13 +209,85 @@
 .tm-task {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
   /* §11.19 — one row height, so a list scans as a column and not as a stack
      of differently sized cards. */
   min-height: 36px;
   padding: 0 4px;
   border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
   font-size: 14px;
+}
+
+.tm-task:hover {
+  background: var(--bg-hover);
+}
+
+.tm-task.is-dragging {
+  opacity: 0.5;
+}
+
+/* The drag affordance. Invisible until the row is under the pointer, which is
+   how the reference does it — a handle on every row at rest turns a list into
+   a settings screen. It does not carry the drag: the whole row does, and a
+   handle that took the gesture would make the other 600px of the row inert. */
+.tm-task-handle {
+  flex: none;
+  width: 12px;
+  height: 16px;
+  opacity: 0;
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 4px 5px;
+  background-position: 1px 2px;
+  color: var(--text-tertiary);
+  cursor: grab;
+  transition: opacity var(--motion-fast);
+}
+
+.tm-task:hover .tm-task-handle,
+.tm-task:focus-within .tm-task-handle {
+  opacity: 1;
+}
+
+/* 17px of checkbox, the row's full height of hit area (audit §3.1). The label
+   is the target; the input inside it is only what the target looks like. */
+.tm-task-check {
+  display: flex;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.tm-task-check input {
+  width: 17px;
+  height: 17px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Stored since the beginning, drawn since V-P1: a flag at the end of the title
+   rather than a coloured row, so a list of High tasks still reads as a list. */
+.tm-task-priority {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--text-tertiary);
+}
+
+.tm-task-priority.is-high {
+  color: var(--danger);
+}
+
+.tm-task-priority.is-medium {
+  color: var(--warning, #ff9f0a);
+}
+
+.tm-task-priority.is-low {
+  color: var(--accent);
 }
 
 .tm-task-title {
@@ -313,7 +385,10 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 100%;
+  /* `flex: 1` rather than `width: 100%`: the row holds a handle and a checkbox
+     beside this now, and 100% of the row would push them out of it. */
+  flex: 1;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1027,6 +1102,23 @@
   .tm-view,
   .tm-chip {
     min-height: 44px;
+  }
+
+  /* The checkbox stretches to the row, so the row is what has to clear the
+     floor — and the box itself grows, because 17px of visible target is a
+     desktop measurement. The handle goes: a finger has no hover to reveal it
+     with, and drag-to-reorder on touch needs its own gesture (not this one). */
+  .tm-task {
+    min-height: 44px;
+  }
+
+  .tm-task-check input {
+    width: 22px;
+    height: 22px;
+  }
+
+  .tm-task-handle {
+    display: none;
   }
 
   /* These were left out of the list, so a finger got 19px while every row

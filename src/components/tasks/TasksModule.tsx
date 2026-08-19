@@ -158,6 +158,8 @@ export function TasksModule(props: TasksModuleProps) {
   // One undo at a time, and it is the last thing that happened (§9.40 keeps
   // the stack out of the MVP).
   const [undo, setUndo] = useState<{ labelKey: string; run: () => void } | null>(null);
+  /** The row being dragged, so the ones under it know a drop is coming. */
+  const [dragTaskId, setDragTaskId] = useState("");
   // §15.3. Presentation only: nothing below reads this to decide what a Scope
   // contains, which is what keeps §15.9 true — the URL means the same thing at
   // every width.
@@ -237,6 +239,36 @@ export function TasksModule(props: TasksModuleProps) {
     });
   }
 
+  /**
+   * Completion from the row, which is where it belongs (audit L-13).
+   *
+   * The reference finishes a Task from the list; this app could only do it
+   * from the Detail, so the most common thing anyone does here cost opening a
+   * panel first. It is the Drawer's own mutation rather than a second one, so
+   * the two cannot come to disagree about what `done` writes (§12.12) — and
+   * the undo arrives with it.
+   */
+  function toggleDone(task: Task) {
+    mutate(task, task.status === "done" ? reopenTask(task) : completeTask(task, new Date().toISOString()));
+  }
+
+  /**
+   * Dropping a row onto another puts it in that one's place.
+   *
+   * `placeTask` renumbers between neighbours instead of rewriting the list, so
+   * a reorder writes two or three rows rather than the Scope. Only where there
+   * IS a manual order to change: a smart list sorted by date has none, and a
+   * drag there would mean nothing to keep.
+   */
+  function reorderOnto(ordered: Task[], draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+    const targetIndex = ordered.findIndex((task) => task.id === targetId);
+    if (targetIndex < 0) return;
+    for (const row of placeTask(ordered, draggedId, targetIndex)) {
+      props.onMutate(row.id, { order: row.order });
+    }
+  }
+
   // §5.28: an id that names nothing is a broken link, not an empty Scope. The
   // difference matters — "this List has no tasks" and "this List is gone" ask
   // the reader to do different things.
@@ -244,6 +276,14 @@ export function TasksModule(props: TasksModuleProps) {
   const title = missing ? t("tasks.missingTitle") : titleFor(scope, lists, folders, sidebarFolders, tags, savedFilters, t);
   const rows = missing ? [] : queryScopeTasks(scope, ctx);
   const count = missing ? 0 : queryScopeCount(scope, ctx);
+  /**
+   * The list in the order the user arranged it, where the Scope has one.
+   *
+   * The Board has read `sortKey` since it was built; the list view showed
+   * whatever order the store handed back, so dragging a card in one view and
+   * looking at the other showed two different lists of the same Tasks.
+   */
+  const listRows = policy.canManualReorder ? sortByManualOrder(rows) : rows;
 
   const searchCollections: SearchCollections = {
     tasks,
@@ -525,23 +565,75 @@ export function TasksModule(props: TasksModuleProps) {
           />
         ) : (
           <ul className="tm-list" aria-label={title}>
-            {rows.map((task) => (
-              <li key={task.id} className={`tm-task${task.id === state.taskId ? " is-open" : ""}`}>
-                <button
-                  type="button"
-                  className="tm-task-open"
-                  // §16.34: a row opens a Task, and a screen reader should say
-                  // so rather than reading the title as if it were a heading.
-                  aria-label={t("tasks.openTask", { title: task.title })}
-                  onClick={() => openTask(task.id)}
+            {listRows.map((task) => {
+              const done = task.status === "done";
+              return (
+                <li
+                  key={task.id}
+                  className={["tm-task", task.id === state.taskId ? "is-open" : "", dragTaskId === task.id ? "is-dragging" : ""]
+                    .filter(Boolean)
+                    .join(" ")}
+                  draggable={policy.canManualReorder}
+                  onDragStart={(event) => {
+                    setDragTaskId(task.id);
+                    event.dataTransfer.effectAllowed = "move";
+                    // The Calendar and the Matrix both listen for this type, so
+                    // a row dragged out of the list still lands on them.
+                    event.dataTransfer.setData("text/task", task.id);
+                  }}
+                  onDragOver={(event) => {
+                    if (!policy.canManualReorder || !dragTaskId) return;
+                    event.preventDefault();
+                  }}
+                  onDrop={(event) => {
+                    if (!policy.canManualReorder || !dragTaskId) return;
+                    event.preventDefault();
+                    reorderOnto(listRows, dragTaskId, task.id);
+                    setDragTaskId("");
+                  }}
+                  onDragEnd={() => setDragTaskId("")}
                 >
-                  <span className={`tm-task-title${task.status === "done" ? " is-done" : ""}`}>
-                    {task.title}
-                  </span>
-                  {task.dueDate ? <span className="tm-task-due">{task.dueDate}</span> : null}
-                </button>
-              </li>
-            ))}
+                  {/* The handle is the affordance, not the mechanism — the whole
+                      row is draggable, and this is what says so (audit L-17). */}
+                  {policy.canManualReorder ? <span className="tm-task-handle" aria-hidden="true" /> : null}
+                  {/* A 17px box with the row's full height as its hit area. That
+                      is the reference's own design (audit §3.1), and the reason
+                      this is a label around the input rather than a bare input. */}
+                  <label className="tm-task-check">
+                    <input
+                      type="checkbox"
+                      checked={done}
+                      aria-label={t(done ? "tasks.reopenTask" : "tasks.completeTask", { title: task.title })}
+                      onChange={() => toggleDone(task)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="tm-task-open"
+                    // §16.34: a row opens a Task, and a screen reader should say
+                    // so rather than reading the title as if it were a heading.
+                    aria-label={t("tasks.openTask", { title: task.title })}
+                    onClick={() => openTask(task.id)}
+                  >
+                    <span className={`tm-task-title${done ? " is-done" : ""}`}>{task.title}</span>
+                    {/* Priority was stored and never drawn (audit §3.1): a Task
+                        could be High and look like every other row. */}
+                    {task.priority !== "none" ? (
+                      <span
+                        className={`tm-task-priority is-${task.priority}`}
+                        aria-label={t(`priority.${task.priority}`)}
+                        title={t(`priority.${task.priority}`)}
+                      >
+                        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+                          <path d="M6 21V4h11l-2.2 4L17 12H6" fill="currentColor" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                    ) : null}
+                    {task.dueDate ? <span className="tm-task-due">{task.dueDate}</span> : null}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
         </>

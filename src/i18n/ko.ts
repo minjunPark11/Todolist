@@ -1389,6 +1389,8 @@ export const ko: Dictionary = {
   "tasks.openSearch": "검색",
   "tasks.openNav": "메뉴",
   "tasks.openTask": "{{title}} 열기",
+  "tasks.completeTask": "{{title}} 완료",
+  "tasks.reopenTask": "{{title}} 완료 취소",
   "tasks.countLabel": "작업 {{count}}개",
   "tasks.moveToColumn": "{{title}}을(를) 다른 칼럼으로 옮기기",
   "tasks.groupCommands": "이동",

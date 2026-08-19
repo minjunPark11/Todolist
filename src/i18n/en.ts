@@ -1395,6 +1395,8 @@ export const en: Dictionary = {
   "tasks.openSearch": "Search",
   "tasks.openNav": "Menu",
   "tasks.openTask": "Open {{title}}",
+  "tasks.completeTask": "Complete {{title}}",
+  "tasks.reopenTask": "Reopen {{title}}",
   "tasks.countLabel": "{{count}} tasks",
   "tasks.moveToColumn": "Move {{title}} to another column",
   "tasks.groupCommands": "Go",
