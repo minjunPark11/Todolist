@@ -1,0 +1,145 @@
+/* ============================================================================
+   20-density.css — one density for both shells
+
+   `.app-shell > main` carried `zoom: 0.9` for a "tighter, cleaner look". Two
+   things were wrong with it. It reached only the legacy shell, so the same
+   Context Sidebar stood beside content at 90% on one set of pages and 100% on
+   the other, and crossing between them jumped the content by 11%. And a zoom
+   shrinks EVERYTHING at once — type, padding, borders, hit targets, and the
+   56px header P0-6 had just aligned with the sidebar's — which is the opposite
+   of a density decision. It also made every §11 token nominal: a 13px label
+   rendered at 11.7px, so the numbers in the stylesheets stopped being true.
+
+   This file replaces it. Both shells render at 100% and the density comes from
+   the tokens in 01-base.css, applied here to the legacy pages' shared
+   primitives. Type shrinks a little, padding shrinks more, and hit targets do
+   not shrink at all.
+
+   Loaded last on purpose (see styles.css). These are deliberate overrides of
+   rules spread across a dozen page stylesheets, and collecting them in one
+   place is what makes the density adjustable — the thing the zoom was
+   pretending to offer.
+   ============================================================================ */
+
+/* --- the content column ---------------------------------------------------
+   40/44 was sized for a column that was then scaled to 90%. At 100% it is a
+   lot of empty edge, and it is the single biggest source of the "too big"
+   reading.
+
+   PADDING is the legacy shell's only: `.tm-main` sets its own per mode
+   (§15.22), and its top edge is what P0-6 aligned with the Context Sidebar's
+   header — a bare `main` selector reaches it and pushes that header 8px down,
+   which is how this rule was first written and what measuring caught.
+
+   FONT SIZE is both, because that is a density decision rather than a layout
+   one, and the two columns should read at one size. */
+.app-shell > main {
+  padding: var(--density-page-y) var(--density-page-x);
+}
+
+main {
+  font-size: var(--density-font);
+}
+
+/* --- page titles ---------------------------------------------------------- */
+
+.tdy-head-title h1,
+.foc-header h1,
+.spc-header h1,
+.spc-detail h1,
+.today-list-header h1,
+.page-header h1,
+.ff-page-title {
+  font-size: var(--density-title);
+  line-height: 1.3;
+}
+
+.tdy-head-title p,
+.today-list-header p,
+.page-subtitle {
+  font-size: var(--density-font-sm);
+}
+
+/* --- cards and panels -----------------------------------------------------
+   §11.41: 16–24px card radius is a marketing page's idea of a card. A
+   productivity surface holds its rows closer together than that. */
+.tdy-card,
+.panel-section,
+.settings-card,
+.summary-card,
+.topic-card,
+.focus-timer-card,
+.focus-summary,
+.detail-panel,
+.project-tasks {
+  padding: var(--density-card-pad);
+  border-radius: var(--density-radius);
+}
+
+.tdy-card-head {
+  font-size: var(--density-font);
+}
+
+/* --- controls -------------------------------------------------------------
+   Height comes down; the tap floor does not. `min-height` is stated after
+   `height` deliberately: if a future token ever drops below the floor, the
+   floor wins rather than the token. */
+.tdy-btn,
+.primary-action,
+.gcal-toolbar button,
+.segmented-tabs button {
+  height: var(--density-control-h);
+  min-height: var(--density-tap);
+  padding-inline: var(--density-control-pad-x);
+  border-radius: var(--density-radius);
+  font-size: var(--density-font);
+}
+
+.tdy-capture-input,
+.tdy-search input,
+.quick-add input {
+  height: var(--density-control-h);
+  min-height: var(--density-tap);
+  font-size: var(--density-font);
+}
+
+/* Icons may be smaller than the control that holds them — that is the whole
+   point of keeping the two numbers apart. The button stays hittable; the
+   glyph inside it stops shouting. */
+.tdy-btn svg,
+.gcal-toolbar button svg,
+.tdy-card-head-icon svg,
+.tdy-capture-icon svg {
+  width: var(--density-icon);
+  height: var(--density-icon);
+}
+
+/* --- rows -----------------------------------------------------------------
+   §11.2's "일정한 36px navigation rhythm", which the Tasks Module already
+   keeps at 30px for a row that carries one line. */
+.task-row,
+.side-list li,
+.spc-list-row,
+.list-view-row {
+  min-height: var(--density-control-h);
+  font-size: var(--density-font);
+}
+
+/* --- the floor, restated for a finger ------------------------------------
+   §15.12. Everything above may be tuned down; none of it may take a target
+   under 44px where the pointer is a finger. */
+@media (pointer: coarse) {
+  .tdy-btn,
+  .primary-action,
+  .gcal-toolbar button,
+  .segmented-tabs button,
+  .tdy-capture-input,
+  .tdy-search input,
+  .quick-add input,
+  .task-row,
+  .side-list li,
+  .spc-list-row,
+  .list-view-row {
+    min-height: 44px;
+  }
+}

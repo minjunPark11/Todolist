@@ -191,6 +191,51 @@ test.describe("the Context Sidebar frame", () => {
     expect(await page.evaluate((key) => localStorage.getItem(key), WIDTH_KEY)).toBe("288");
   });
 
+  /**
+   * The two shells at one scale, and the header line actually straight.
+   *
+   * `.app-shell > main` carried `zoom: 0.9` and the Tasks Module's grid did
+   * not, so the same sidebar stood beside content at two sizes and crossing
+   * between them jumped it by 11%. Only a browser can answer this — jsdom
+   * computes no layout, so a zoom is invisible to it, which is why it lasted.
+   */
+  test("both shells render their content at the same scale", async ({ page }) => {
+    await openApp(page);
+
+    const scaleOf = async () =>
+      page.evaluate(() => {
+        const main = document.querySelector(".tm-main") ?? document.querySelector(".app-shell > main");
+        const probe = document.createElement("div");
+        probe.style.cssText = "width:100px;height:10px;position:absolute;visibility:hidden";
+        main!.appendChild(probe);
+        const width = probe.getBoundingClientRect().width;
+        probe.remove();
+        return Math.round(width);
+      });
+
+    const tasks = await scaleOf();
+    await rail(page, "Calendar").click();
+    await expect(page).toHaveURL(/\/calendar$/);
+    const legacy = await scaleOf();
+
+    // A 100px box is 100px on both, or one of them is being scaled.
+    expect({ tasks, legacy }).toEqual({ tasks: 100, legacy: 100 });
+  });
+
+  test("the Main header starts on the same line as the sidebar (§7, P0-6)", async ({ page }) => {
+    await openApp(page);
+
+    const offset = await page.evaluate(() => {
+      const header = document.querySelector(".tm-header")!.getBoundingClientRect();
+      const firstRow = document.querySelector("#context-sidebar .tm-row")!.getBoundingClientRect();
+      return Math.round(header.top - firstRow.top);
+    });
+
+    // P0-6 matched the two heights and left the top edges to chance; they were
+    // eight pixels out of true, which reads as a design choice until measured.
+    expect(offset).toBe(0);
+  });
+
   test("a stored width the app never wrote recovers to the default (§3.58)", async ({ page }) => {
     await page.addInitScript((key) => localStorage.setItem(key as string, "4"), WIDTH_KEY);
     await openApp(page);

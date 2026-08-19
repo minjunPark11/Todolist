@@ -21,3 +21,5 @@
 @import "./styles/17-tasks-module.css";
 @import "./styles/18-schedule-editor.css";
 @import "./styles/19-app-shell.css";
+/* Last on purpose: it tunes the density of everything above it. */
+@import "./styles/20-density.css";

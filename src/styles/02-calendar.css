@@ -12,12 +12,12 @@
   gap: 12px;
   /* Bound the calendar to the viewport so the week/day time grid scrolls
      internally instead of the whole page (spec §6.4: rows are never compressed
-     to fit the screen). main has zoom:0.9 and 42px vertical padding, so this
-     must divide by the zoom (vh is unscaled) and subtract both paddings (84px);
-     otherwise the grid renders ~110px short of the window and the fit differs
-     between the browser (short viewport) and the desktop app (tall window).
-     Keep the 0.9 in sync with the `main` zoom in 01-base.css. */
-  height: calc(100vh / 0.9 - 84px);
+     to fit the screen). `main` has 42px of vertical padding, so this subtracts
+     both (84px); otherwise the grid renders short of the window and the fit
+     differs between the browser (short viewport) and the desktop app (tall
+     window). The `/ 0.9` that used to be here was undoing `main`'s zoom, which
+     is gone. */
+  height: calc(100vh - 84px);
   min-height: 480px;
 }
 

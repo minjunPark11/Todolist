@@ -122,6 +122,44 @@
   --bp-lg: 1120px;
   --bp-xl: 1240px;
 
+  /* === Content density (§11.2), as tokens rather than as a zoom ============
+     `.app-shell > main` used to carry `zoom: 0.9`. It shrank a whole column
+     uniformly — text, padding, borders, hit targets and the header the shell
+     had just been taught to align — and it only ever reached one of the two
+     shells, so the same sidebar stood beside content at two scales.
+
+     Density is a set of decisions, not a multiplier. Each of these is chosen
+     for what it is: type that stays legible, padding that gets tighter than
+     type does, and a hit target that does NOT shrink with either. §11.2's
+     "compact productivity density" is the target, and the Tasks Module's own
+     numbers (30px rows, 13px labels) are the reference the legacy pages are
+     being brought to. */
+  --density-font: 13px;
+  --density-font-sm: 12px;
+  --density-font-lg: 15px;
+  /* §11.11's page title, down from 22 — a heading has the whole width to
+     itself, so it can lose two pixels without losing its rank. */
+  --density-title: 20px;
+  --density-section-title: 15px;
+
+  /* Padding is where most of the room goes, so it gives up the most. */
+  --density-page-y: 24px;
+  --density-page-x: 32px;
+  --density-card-pad: 14px;
+  --density-card-gap: 12px;
+
+  /* Controls. `--density-control-h` is the drawn height; `--density-tap` is
+     the floor it may never go under, and the two are kept apart on purpose —
+     an icon may get smaller (the user asked for that), the thing you have to
+     hit may not. WCAG 2.2 SC 2.5.8 is the 24; touch raises it to 44 in the
+     coarse-pointer block below. */
+  --density-control-h: 32px;
+  --density-control-pad-x: 12px;
+  --density-tap: 24px;
+  --density-icon: 16px;
+  --density-icon-lg: 18px;
+  --density-radius: 10px;
+
   /* === §11 Visual System — the shell's role tokens (P0-10) ==================
      Two things live here, and they are not the same thing.
 
@@ -354,18 +392,25 @@ button:focus-visible {
   min-height: 100vh;
 }
 
-/* Global content density: shrink the whole content area (all views) a touch
-   for a tighter, cleaner look. Sidebar stays 100% so proportions read right.
-   Tune this single value (1 = off) to make everything larger/smaller. */
+/* This carried `zoom: 0.9` — "shrink the whole content area a touch for a
+   tighter, cleaner look", with the sidebar left at 100% "so proportions read
+   right". That was written when there was one shell. There are two, and the
+   Tasks Module's grid is not `.app-shell > main`, so the same sidebar sat
+   beside content at 100% on one set of pages and 90% on the other, and moving
+   between them jumped the content by 11%.
+
+   Scaling was the wrong tool anyway. P0-10 gave the app a real density system
+   (§11), and a global zoom on top of it makes every token nominal — a 56px
+   header renders at 50.4, a 13px label at 11.7. Density is now expressed in
+   the tokens themselves (see the density block at the top of this file), so
+   both shells render at 100% and a number means what it says. */
 .app-shell > main {
-  zoom: 0.9;
   /* Every view fills at least the viewport so short pages (Archive, Calendar,
      Settings) don't collapse to their content height — this keeps the content
      region the same height across pages instead of jumping on navigation.
      The sidebar is position:fixed, so it can't stretch the grid row; main must
-     force its own height. Divide by the zoom above so the rendered height lands
-     on exactly 100vh (keep this in sync with the zoom value). */
-  min-height: calc(100vh / 0.9);
+     force its own height. */
+  min-height: 100vh;
 }
 
 .mobile-menu-button,

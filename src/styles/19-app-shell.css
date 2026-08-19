@@ -553,7 +553,18 @@
    The Tasks Module's header is the one piece of Main the shell has an opinion
    about: it shares a top edge with the Context Sidebar's header, so the two
    are one row or they are a visible step. Everything below it is the page's
-   own business (§7's boundary, and D-09 keeps the view switcher as it was). */
+   own business (§7's boundary, and D-09 keeps the view switcher as it was).
+
+   P0-6 matched the two HEIGHTS and left the top edges to chance: `.tm-main`
+   pads 24px and the sidebar 16px, so the "one row" was eight pixels out of
+   true in the running app the whole time. Measured, not noticed — the step is
+   small enough to read as a design choice until you put a ruler on it. The
+   sidebar's padding is the one to match, because it is the column whose rows
+   start at the top edge. */
+.app-frame .tm-main {
+  padding-top: 16px;
+}
+
 .app-frame .tm-header {
   box-sizing: border-box;
   min-height: var(--shell-header-h);
