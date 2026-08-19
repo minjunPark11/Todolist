@@ -35,6 +35,14 @@ function RailIcon({ name }: { name: RailIconName }) {
         <path d="M8.5 12.2l2.4 2.4 4.6-4.9" />
       </>
     ),
+    // Four quadrants — the axis that only this screen offers (D-19).
+    matrix: (
+      <>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <line x1="12" y1="4" x2="12" y2="20" />
+        <line x1="4" y1="12" x2="20" y2="12" />
+      </>
+    ),
     calendar: (
       <>
         <rect x="4" y="5" width="16" height="15" rx="2" />
@@ -218,16 +226,23 @@ export function GlobalRail({
           onClick={() => onNavigate("tasks")}
         />
         <RailButton
+          icon="matrix"
+          label={t("rail.matrix")}
+          shortcut="Ctrl+2"
+          active={active === "matrix"}
+          onClick={() => onNavigate("matrix")}
+        />
+        <RailButton
           icon="calendar"
           label={t("sidebar.calendar")}
-          shortcut="Ctrl+2"
+          shortcut="Ctrl+3"
           active={active === "calendar"}
           onClick={() => onNavigate("calendar")}
         />
         <RailButton
           icon="focus"
           label={t("sidebar.focus")}
-          shortcut="Ctrl+3"
+          shortcut="Ctrl+4"
           active={active === "focus"}
           onClick={() => onNavigate("focus")}
         />

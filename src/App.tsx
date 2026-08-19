@@ -340,9 +340,12 @@ export default function App() {
         contextSidebar.toggleCollapsed();
         return;
       }
-      const item: RailNavItem | undefined = { "1": "tasks", "2": "calendar", "3": "focus" }[
-        event.key
-      ] as RailNavItem | undefined;
+      const item: RailNavItem | undefined = {
+        "1": "tasks",
+        "2": "matrix",
+        "3": "calendar",
+        "4": "focus",
+      }[event.key] as RailNavItem | undefined;
       if (!item) return;
       event.preventDefault();
       navigateRail(item);

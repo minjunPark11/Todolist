@@ -55,7 +55,10 @@ export function clampContextSidebarWidth(width: number): number {
  */
 export function contextSidebarModeFor(path: string): ContextSidebarMode {
   switch (pageForPath(path)) {
-    // §2.16: the three Global Modules own their whole width.
+    // §2.16: a Global Module owns its whole width. Matrix joins them under
+    // D-19 — it crosses every Space, so no one Scope's sidebar describes it,
+    // and it carries its own scope selector in the page instead.
+    case "board":
     case "calendar":
     case "focus":
     case "settings":

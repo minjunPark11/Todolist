@@ -31,7 +31,10 @@ describe("contextSidebar", () => {
   });
 
   describe("mode (§3.3, D-14)", () => {
-    it("gives the three Global Modules no sidebar", () => {
+    it("gives the Global Modules no sidebar", () => {
+      // D-19: Matrix joins them — it crosses every Space, so no one Scope's
+      // sidebar describes it.
+      expect(contextSidebarModeFor(PAGE_ROUTES.board)).toBe("none");
       expect(contextSidebarModeFor(PAGE_ROUTES.calendar)).toBe("none");
       expect(contextSidebarModeFor(PAGE_ROUTES.focus)).toBe("none");
       expect(contextSidebarModeFor(PAGE_ROUTES.settings)).toBe("none");
@@ -45,7 +48,7 @@ describe("contextSidebar", () => {
     });
 
     it("keeps the Tasks sidebar everywhere else", () => {
-      for (const path of [PAGE_ROUTES.today, PAGE_ROUTES.board, PAGE_ROUTES.archive, "/today", "/list/l1", "/search"]) {
+      for (const path of [PAGE_ROUTES.today, PAGE_ROUTES.archive, "/today", "/list/l1", "/search"]) {
         expect(contextSidebarModeFor(path)).toBe("tasks");
       }
     });

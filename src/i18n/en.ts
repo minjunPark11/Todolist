@@ -73,7 +73,7 @@ export const en: Dictionary = {
   "tree.folder": "Folder",
   "tree.folderPlaceholder": "New folder name",
   "sidebar.focus": "Focus",
-  "sidebar.board": "Board",
+  "sidebar.board": "Matrix",
 
   // ---- timeline ----
   // `title`/`subtitle` and the axis labels belonged to the standalone
@@ -155,8 +155,8 @@ export const en: Dictionary = {
   "sidebar.planning": "Planning",
 
   // ---- board ----
-  "board.title": "Board",
-  "board.subtitle": "One view over your work — regroup it without moving anything.",
+  "board.title": "Matrix",
+  "board.subtitle": "Every Space in one view — regroup it without moving anything.",
   "board.scope": "Space",
   "board.allSpaces": "All spaces",
   "board.groupBy": "Group by",
@@ -219,6 +219,7 @@ export const en: Dictionary = {
   // are both the tooltip and the accessible name — not decoration.
   "rail.label": "Global navigation",
   "rail.tasks": "Tasks",
+  "rail.matrix": "Matrix",
   "rail.search": "Search",
   "rail.account": "Account",
   "rail.accountSignedOut": "Not signed in",

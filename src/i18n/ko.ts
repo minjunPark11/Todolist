@@ -73,7 +73,7 @@ export const ko: Dictionary = {
   "tree.folder": "폴더",
   "tree.folderPlaceholder": "새 폴더 이름",
   "sidebar.focus": "집중",
-  "sidebar.board": "보드",
+  "sidebar.board": "매트릭스",
 
   // ---- timeline ----
   // `title`/`subtitle`과 축 라벨은 독립 TimelinePage의 것이었다. 남은 것은
@@ -154,8 +154,8 @@ export const ko: Dictionary = {
   "sidebar.planning": "계획",
 
   // ---- board ----
-  "board.title": "보드",
-  "board.subtitle": "일을 한 화면에서 본다 — 아무것도 옮기지 않고 묶는 기준만 바꾼다.",
+  "board.title": "매트릭스",
+  "board.subtitle": "모든 스페이스의 일을 한 화면에서 본다 — 아무것도 옮기지 않고 묶는 기준만 바꾼다.",
   "board.scope": "스페이스",
   "board.allSpaces": "전체",
   "board.groupBy": "묶는 기준",
@@ -218,6 +218,7 @@ export const ko: Dictionary = {
   // 이 문자열들은 tooltip이자 aria-label이다 — 장식이 아니라 유일한 이름이다.
   "rail.label": "전역 탐색",
   "rail.tasks": "작업",
+  "rail.matrix": "매트릭스",
   "rail.search": "검색",
   "rail.account": "계정",
   "rail.accountSignedOut": "로그인하지 않음",

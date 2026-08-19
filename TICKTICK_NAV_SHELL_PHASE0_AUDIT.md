@@ -32,7 +32,7 @@
 
 | § | 제목 | 판정 | 근거 |
 |---|---|---|---|
-| §1 | Navigation Architecture | **부분** | 3계층 분리(§1.2)·상태 모델(§1.23)·불변식(§1.24)은 채택. §1.4 Navigation Tree의 **내용**과 §1.5 Rail 항목표는 R.3/R.6에서 다시 쓴다 |
+| §1 | Navigation Architecture | **부분** | 3계층 분리(§1.2)·상태 모델(§1.23)·불변식(§1.24)은 채택. §1.4 Navigation Tree의 **내용**은 R.3에서, §1.5 Rail 항목표는 D-01/**D-19**에서 다시 쓴다 (§1.5의 Board 금지는 Scope Board 한정, Global Matrix는 예외) |
 | §2 | Global Rail | **채택** | 리포에 대응물이 아예 없다. 충돌할 것도 없음 |
 | §3 | Context Sidebar Frame | **채택** | 폭·collapse·resize·persistence 계약 전부. 리포에는 collapse만 있고 resize가 없다 |
 | §4 | Tasks Sidebar | **거부** | v16 §1.14가 이긴다. 프레임(§3)만 쓰고 내용은 현행 `TasksSidebar` 유지 |
@@ -179,8 +179,8 @@ Rail과 Context Sidebar는 **zoom 바깥**에 있어야 한다. 안에 두면 56
 
 구현 PR에서 `D-01`처럼 인용한다.
 
-**D-01 — Rail 항목은 설계서 §1.5를 그대로 쓴다.**
-`App mark / Account / Tasks / Calendar / Focus / (spacer) / Search / Settings`. 항목을 늘리지 않는다.
+**D-01 — Rail 항목은 설계서 §1.5를 그대로 쓴다.** *(→ D-19가 Matrix 하나를 더한다)*
+`App mark / Account / Tasks / Calendar / Focus / (spacer) / Search / Settings`. 항목을 함부로 늘리지 않는다 — 예외는 D-19에 근거를 적었다.
 
 **D-02 — Context Sidebar의 내용은 현행 `TasksSidebar`다.** (R.3)
 
@@ -234,9 +234,9 @@ Rail 컴포넌트는 위 어느 것도 로컬 state로 갖지 않는다.
 
 **D-13 — 세 페이지를 Rail 밖에서 흡수한다.** (Q-01 해소, 2026-08-19)
 
-- **보관함** → Tasks Sidebar 최하단 시스템 섹션(`완료`·`휴지통`) 옆으로 이동. Rail 항목이 아니다. 승격 형태는 Q-07.
+- **보관함** → Tasks Sidebar 최하단 시스템 섹션(`완료`·`휴지통`) 옆으로 이동. Rail 항목이 아니다. **최종 형태는 D-20이 쪼갠다.**
 - **공간(SpaceHub)** → D-14가 받는다.
-- **보드** → **"전역 보드 페이지 제거"는 철회한다.**
+- **보드** → **"전역 보드 페이지 제거"는 철회한다.** 이 철회가 세 화면 중 유일하게 "흡수"로 끝나지 않았고, **D-19가 Matrix로 재분류해 매듭짓는다.**
 
 철회 근거를 남긴다. 이 판단은 코드를 열기 전 "보드는 이미 Scope의 뷰로 있으니 중복"이라는 전제 위에 있었고, **그 전제가 틀렸다.**
 
@@ -249,6 +249,26 @@ Rail 컴포넌트는 위 어느 것도 로컬 state로 갖지 않는다.
 즉 둘은 같은 것의 두 벌이 아니다. 전역 보드를 지우면 **사분면 축이 앱에서 통째로 사라진다.** [`Sidebar.tsx:239`](src/components/Sidebar.tsx:239) 주석이 이미 그 이유로 이 항목을 남겨 두었다 — 타임라인과 Horizons는 스코프 안에서 도달 가능해져서 지웠지만 Board는 남겼다고 적혀 있다.
 
 따라서 화면과 라우트는 유지하고, **진입점만** Q-06으로 넘긴다. "Rail에 두지 않는다"는 Q-01의 답은 그대로 지킨다.
+
+**D-14 — SpaceHub 진입 시 Context Sidebar를 SpaceTree로 전환한다.** (Q-02 해소, 2026-08-19)
+
+`SpaceTree`를 없애는 것이 아니라 **기본 Tasks 탐색 모델에서만** 뺀다. 같은 사이드바 자리를 mode로 바꾼다.
+
+```ts
+type ContextSidebarMode = "tasks" | "space" | "none";
+```
+
+설계서 §3.3은 P0 mode를 `"tasks" | "none"` 둘로 제한하지만, 같은 절이 **"향후 새로운 mode를 추가할 수 있다. 단 같은 컴포넌트에 `if calendar... if focus...`를 쌓기보다 mode registry로 확장한다"**고 확장 지점을 미리 열어 두었다. 그 지점을 P0에서 바로 쓴다. `if`가 아니라 레지스트리여야 한다는 조건도 그대로 지킨다.
+
+계약:
+
+- mode는 라우트에서 derive한다 (§3.29 — `mode`는 상태가 아니라 파생값).
+- **mode 전환은 Rail active를 바꾸지 않는다** (D-03). SpaceHub에서도 Rail은 Tasks다.
+- **폭·collapse·resize는 mode와 무관하게 공유한다.** mode가 바뀌었다고 폭이 튀거나 collapse가 풀리면 §3.28을 어긴다.
+- 전환 시 이전 mode의 content는 unmount하고(§3.31), 펼침 상태는 external store에 남긴다(D-06).
+- `mode="space"`에서는 §1.24 INV-02가 원문 그대로 유효해진다 (R.3).
+
+---
 
 **D-15 — `lastTasksLocation`은 세션 범위다.** (Q-04 해소, 2026-08-19)
 
@@ -274,25 +294,63 @@ DOM까지 끌어올리려면 `TasksSidebar`를 `TasksModule` 밖으로 빼야 �
 
 `display: none`으로 처리한다. React unmount가 아니라 CSS인 이유는 §3.31이 실제로 막으려는 것(보이지 않는데 포커스 가능한 트리)이 그것으로 해결되고, 사이드바 내부 상태는 보존되기 때문이다.
 
-**D-14 — SpaceHub 진입 시 Context Sidebar를 SpaceTree로 전환한다.** (Q-02 해소, 2026-08-19)
+**D-19 — 전역 Board를 `Matrix`로 재분류하고, Rail에 올린다.** (Q-06 해소, 2026-08-19)
 
-`SpaceTree`를 없애는 것이 아니라 **기본 Tasks 탐색 모델에서만** 뺀다. 같은 사이드바 자리를 mode로 바꾼다.
+**Matrix ≠ Board.** 지금까지 한 이름이 두 물건을 가리키고 있었고, 그게 Q-06이 답을 못 찾던 이유였다.
 
-```ts
-type ContextSidebarMode = "tasks" | "space" | "none";
+| | **Matrix** (전역) | **Board View** (Scope) |
+|---|---|---|
+| 파일 | [`BoardPage.tsx`](src/components/BoardPage.tsx) | [`TaskBoard.tsx`](src/components/tasks/TaskBoard.tsx) |
+| 범위 | 전 Space 가로지르기 (`All spaces`) | 한 Scope 안 |
+| 컬럼 | Space가 소유·상속하는 status | `domain/tasks/board.ts` |
+| 축 | Status ↔ **Quadrant** | 축 개념 없음 |
+| 분류 | **Global Feature** | Scope의 View |
+
+유지하는 것: 전 Space 가로지르기, Status/Quadrant 축, `/board` 라우트.
+바뀌는 것: **이름과 navigation semantics.** Matrix는 Scope의 View가 아니라 Tasks·Calendar·Focus와 같은 층위의 독립 기능이다. TickTick도 Eisenhower Matrix를 좌측 레일의 독립 진입점으로 둔다.
+
+**§1.5 개정.** 설계서 §1.5는 `Board`를 Rail 금지 목록에 올려 두었다. 그 금지는 **Scope Board에만** 적용한다. Global Matrix는 명시적 예외다 — 금지의 취지가 "Scope의 View 하나가 Rail 항목으로 승격되면 Rail이 화면 목록이 된다"인데, Matrix는 애초에 어느 Scope의 View도 아니다.
+
+**D-01 개정.** Rail 항목이 5 → 6이 된다.
+
+```text
+App mark / Account / Tasks / Matrix / Calendar / Focus / (spacer) / Search / Settings
 ```
 
-설계서 §3.3은 P0 mode를 `"tasks" | "none"` 둘로 제한하지만, 같은 절이 **"향후 새로운 mode를 추가할 수 있다. 단 같은 컴포넌트에 `if calendar... if focus...`를 쌓기보다 mode registry로 확장한다"**고 확장 지점을 미리 열어 두었다. 그 지점을 P0에서 바로 쓴다. `if`가 아니라 레지스트리여야 한다는 조건도 그대로 지킨다.
+구현 시 딸려오는 것 (P0-4):
+- `railNav.ts`의 매핑이 4갈래 → 5갈래. `/board`가 `tasks`가 아니라 `matrix`를 켠다
+- `PageId`의 `board`와 그 라벨이 Matrix로. **라우트는 `/board`를 유지한다**(위 결정) — 이름과 주소가 어긋나는 건 알고 두는 것이고, 개명하려면 리다이렉트를 붙이는 별도 작업이다
+- Matrix의 Context Sidebar mode는 `none` `추정` — 전역 기능이고 Scope가 아니다. P0-4에서 확정
 
-계약:
+**D-21 — 어느 사이드바가 그려지는지를 `mode`가 정하게 해야 한다.** (P0-4에서 드러남, 2026-08-19)
 
-- mode는 라우트에서 derive한다 (§3.29 — `mode`는 상태가 아니라 파생값).
-- **mode 전환은 Rail active를 바꾸지 않는다** (D-03). SpaceHub에서도 Rail은 Tasks다.
-- **폭·collapse·resize는 mode와 무관하게 공유한다.** mode가 바뀌었다고 폭이 튀거나 collapse가 풀리면 §3.28을 어긴다.
-- 전환 시 이전 mode의 content는 unmount하고(§3.31), 펼침 상태는 external store에 남긴다(D-06).
-- `mode="space"`에서는 §1.24 INV-02가 원문 그대로 유효해진다 (R.3).
+P0-3이 `mode`를 만들었지만 **그 mode는 아직 아무것도 고르지 않는다.** 폭과 표시 여부만 정할 뿐, 실제로 어떤 컴포넌트가 그려지는지는 여전히 [`App.tsx`](src/App.tsx)의 `parseTaskScope` 분기가 정한다. 둘이 어긋난다.
 
----
+| 주소 | `mode` | 실제로 그려지는 것 |
+|---|---|---|
+| `/today` `/list/:id` | `tasks` | `TasksSidebar` ✅ |
+| `/app` `/archive` | `tasks` | **`Sidebar.tsx`** ❌ |
+| `/spaces` `/s/:sp` | `space` | `Sidebar.tsx` (트리 포함 — 우연히 맞다) |
+
+이게 P0-4에서 두 가지를 막았다.
+
+1. **TasksSidebar 하단에 보관함 행을 넣을 수 없다.** `/archive`는 Task Scope가 아니라 레거시 셸이 답하므로, 그 행을 누르는 순간 셸이 갈리며 사이드바가 통째로 교체된다. 같은 자리에 있어야 할 행이 자기를 지우는 버튼이 된다.
+2. **D-14의 `mode="space"`가 아직 진짜가 아니다.** 지금 맞아 보이는 건 레거시 사이드바가 트리를 이미 품고 있어서지, mode가 골라서가 아니다.
+
+해소는 `App.tsx`가 mode로 사이드바를 고르는 것이다. 그러려면 `TasksSidebar`를 `TasksModule` 밖으로 꺼내야 하고, 딸려 나오는 것이 있다 — `managing`, `creatingListIn`, `sidebarOpen`, `go`, 그리고 그 상태가 여는 `ListManager`·`CreateListModal`.
+
+**D-17이 "P0-4가 어차피 내용을 옮기니 그때 하자"고 미룬 바로 그 작업이다.** 크기가 P0-4 한 단계에 들어가지 않으므로 **P0-4a**로 세운다 (R.8). D-20의 Archive 승격은 그 뒤에 와야 한다 — 보관된 작업이 Scope가 되려면 Tasks Module 안에서 그려져야 하기 때문이다.
+
+**D-20 — 보관함을 쪼갠다: 작업은 Scope로, 프로젝트는 SpaceHub로.** (Q-07 해소, 2026-08-19)
+
+지금 [`ArchivePage.tsx:43`](src/components/ArchivePage.tsx:43)은 `작업` / `프로젝트` 두 탭이고, 프로젝트 탭은 뷰 엔진을 타지 않고 `projects`에서 직접 읽는다. 그 파일 주석이 이유를 이미 적어 두었다 — Space는 Item이 아니고, 그건 projection의 실제 한계다.
+
+그래서 한 화면이 소유자가 다른 두 목록을 이고 있다. 쪼갠다.
+
+- **보관된 작업** → 10번째 Task Scope. `완료`·`휴지통`과 같은 `scopeRegistry` 항목이 되어 카운트·정렬·생성 규칙을 그들과 공유한다
+- **보관된 프로젝트** → SpaceHub (`mode="space"`, D-14). Space 관리의 일부지 할 일 목록이 아니다
+
+**이건 P0-4에 끼워 넣을 크기가 아니다.** `scopeRegistry` + `scopeQuery` + URL segment + view policy + count가 한 벌로 움직이고, 그 다음에 두 화면을 나눠야 한다. **P0-4b**로 따로 세운다 (R.8). P0-4는 그동안 현행 `/archive` 페이지를 사이드바 하단 행에서 열어 두고, 승격은 그 뒤에 한다.
 
 ## R.7 미결 — 다음 결정이 필요한 것
 
@@ -303,10 +361,10 @@ type ContextSidebarMode = "tasks" | "space" | "none";
 | **Q-03** | `/search` 라우트 vs 설계서 §2.14 "Search는 라우팅하지 않는다" | 리포에 Search Page가 이미 있고 `TasksModule`이 그 라우트를 claim한다 ([`App.tsx:1070`](src/App.tsx:1070)) |
 | ~~Q-04~~ | Rail의 Tasks 재클릭 동작 | **해소 → D-15** (2026-08-19). 세션 범위, fallback은 `/today` |
 | **Q-05** | Horizons / Goals / LearningPath | v16 Phase 0 감사 §B에서도 미결로 남았던 항목. 이번에도 Rail 밖이다 |
-| **Q-06** | 전역 보드(사분면 축)의 진입점 | D-13이 화면과 라우트를 살렸다. Rail도 아니고 사이드바 기본 섹션도 아니면 **어디서 여는가.** 후보: 사이드바 하단 시스템 섹션 / Scope의 뷰로 사분면 축 이식 / SpaceHub 안 |
-| **Q-07** | `보관함`을 10번째 Scope로 승격할 것인가 | `완료`·`휴지통` 옆에 나란히 두면 시각과 동작이 같아 보이는데, 진짜로 같게 하려면 [`scopeRegistry.ts`](src/domain/tasks/scopeRegistry.ts)를 건드려야 한다. 라우트만 가진 페이지로 두면 그 줄만 다르게 동작한다 |
+| ~~Q-06~~ | 전역 보드(사분면 축)의 진입점 | **해소 → D-19** (2026-08-19). Matrix로 재분류하고 Rail에 올린다. §1.5에 명시적 예외 |
+| ~~Q-07~~ | `보관함`을 10번째 Scope로 승격할 것인가 | **해소 → D-20** (2026-08-19). 쪼갠다 — 작업은 Scope, 프로젝트는 SpaceHub. 별도 단계(P0-4b) |
 
-**막힌 것과 안 막힌 것.** Q-06·Q-07은 **P0-1을 막지 않는다** — D-04가 다섯 페이지 전부에 라우트를 주기로 했고, 두 질문 모두 "그 주소를 어디서 여는가"이지 "주소가 있는가"가 아니다. 답이 필요한 시점은 P0-4(사이드바 내용)다. Q-03은 P0-9, Q-04는 P0-2, Q-05는 여전히 열려 있다.
+**남은 것은 Q-03(P0-9)과 Q-05뿐이다.** 둘 다 P0-4를 막지 않는다.
 
 ---
 
@@ -317,7 +375,9 @@ type ContextSidebarMode = "tasks" | "space" | "none";
 | ~~P0-1 Route registry~~ | **완료** (2026-08-19). [`app/pageRoute.ts`](src/app/pageRoute.ts) + `activePage`가 `pageForPath(currentPath)`가 됐다 | — |
 | ~~P0-2 AppShell + Rail~~ | **완료** (2026-08-19). [`AppShell.tsx`](src/components/shell/AppShell.tsx)이 두 셸의 공통 프레임이 되고, [`GlobalRail.tsx`](src/components/shell/GlobalRail.tsx)이 그 첫 열. 안쪽 두 셸은 그대로 — 그건 P0-3 | P0-1, Q-04 |
 | ~~P0-3 Context Sidebar frame~~ | **완료** (2026-08-19). 폭 200·240 → **248 하나**, resize 핸들(드래그·키보드·더블클릭), collapse 상태 모델(§3.28~3.30), mode registry `tasks\|space\|none`. DOM 통합은 D-17 | P0-2 |
-| P0-4 Sidebar content | `TasksSidebar`를 새 프레임에 꽂는다(`mode="tasks"`) + 하단 시스템 섹션에 보관함 추가 | P0-3, Q-06, Q-07 |
+| ~~P0-4 Rail + 중복 제거~~ | **완료** (2026-08-19). Rail에 Matrix 추가(D-19), 레거시 사이드바에서 전역 항목 제거(D-16) — 남은 것은 `오늘`·`보관함`·트리 | P0-3 |
+| P0-4a 사이드바 소유권 | **D-21.** `App.tsx`가 `mode`로 사이드바를 고르게 한다. `TasksSidebar`를 `TasksModule` 밖으로(+`managing`/`creatingListIn`/모달). 이게 되어야 보관함 행도 `mode="space"`도 진짜가 된다 | P0-4 |
+| P0-4b Archive 분리 | **D-20.** 보관된 작업을 10번째 Scope로 승격(`scopeRegistry`+`scopeQuery`+segment+view policy+count), 보관된 프로젝트는 SpaceHub로 | P0-4a, P0-5 |
 | P0-5 Tree | **부활** (D-14). 새로 그리지 않고 기존 [`SpaceTree.tsx`](src/components/sidebar/SpaceTree.tsx)를 `mode="space"` 슬롯에 꽂는다 | P0-3 |
 | P0-6 Main Header | `tm-header`를 새 셸 기준으로 정리. 뷰 전환은 현행 유지(D-09) | P0-2 |
 | P0-7 Create/Menu | **완료** (Add List v0.13.0) | — |

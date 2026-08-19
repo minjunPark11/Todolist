@@ -4,11 +4,10 @@ import { PAGE_ROUTES } from "./pageRoute";
 
 describe("railNav", () => {
   // §2.47's Route-to-Rail matrix, rewritten for this repo's routes (audit D-03).
-  it("lights Tasks for everything that is not one of the three Global Modules", () => {
+  it("lights Tasks for everything that is not a Global Module", () => {
     for (const path of [
       PAGE_ROUTES.today,
       PAGE_ROUTES.projects,
-      PAGE_ROUTES.board,
       PAGE_ROUTES.archive,
       "/today",
       "/upcoming",
@@ -25,6 +24,9 @@ describe("railNav", () => {
   });
 
   it("lights each Global Module on its own route", () => {
+    // D-19: Matrix is a Global Feature, not a Scope's Board view. The route
+    // keeps its old name on purpose — the rename is of the feature.
+    expect(railItemFor(PAGE_ROUTES.board)).toBe("matrix");
     expect(railItemFor(PAGE_ROUTES.calendar)).toBe("calendar");
     expect(railItemFor(PAGE_ROUTES.focus)).toBe("focus");
     expect(railItemFor(PAGE_ROUTES.settings)).toBe("settings");
@@ -39,13 +41,15 @@ describe("railNav", () => {
 
   it("remembers Tasks addresses and nothing else", () => {
     expect(isTasksLocation("/list/list-1?view=board&task=t1")).toBe(true);
-    expect(isTasksLocation(PAGE_ROUTES.board)).toBe(true);
+    // Matrix is its own module now, so returning to Tasks must not land there.
+    expect(isTasksLocation(PAGE_ROUTES.board)).toBe(false);
     expect(isTasksLocation(PAGE_ROUTES.calendar)).toBe(false);
     expect(isTasksLocation(PAGE_ROUTES.focus)).toBe(false);
     expect(isTasksLocation(PAGE_ROUTES.settings)).toBe(false);
   });
 
   it("sends the fixed items to their own page", () => {
+    expect(railItemFor(RAIL_DESTINATIONS.matrix)).toBe("matrix");
     expect(railItemFor(RAIL_DESTINATIONS.calendar)).toBe("calendar");
     expect(railItemFor(RAIL_DESTINATIONS.focus)).toBe("focus");
     expect(railItemFor(RAIL_DESTINATIONS.settings)).toBe("settings");

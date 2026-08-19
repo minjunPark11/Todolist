@@ -6,15 +6,20 @@
 // P0-1 made that possible by giving every page an address; this file is the
 // reading.
 //
-// The Rail has four navigable items and the app has more pages than that, so
-// the mapping is deliberately lossy: Calendar, Focus and Settings are the
-// three Global Modules, and **everything else is Tasks**. Board, Archive, the
-// Spaces tree and all nine Tasks Scopes are places inside Tasks, not siblings
-// of it — §1.5 is explicit that none of them may become a Rail item of their
-// own.
+// The mapping is deliberately lossy: the Global Modules get an item each and
+// **everything else is Tasks**. Archive, the Spaces tree and all nine Tasks
+// Scopes are places inside Tasks, not siblings of it — §1.5 is explicit that
+// none of them may become a Rail item of its own.
+//
+// Matrix is the one documented exception (D-19). §1.5's list bans `Board`, and
+// that ban holds for a Scope's Board VIEW — promoting one Scope's view to the
+// Rail is exactly how a Rail turns into a list of screens. The global Matrix
+// is not any Scope's view: it crosses every Space, groups by Space-owned
+// statuses, and carries the Quadrant axis that lives nowhere else. It is a
+// Global Feature, and it sits with the modules.
 import { PAGE_ROUTES, pageForPath } from "./pageRoute";
 
-export const RAIL_ITEMS = ["tasks", "calendar", "focus", "search", "settings"] as const;
+export const RAIL_ITEMS = ["tasks", "matrix", "calendar", "focus", "search", "settings"] as const;
 export type RailItem = (typeof RAIL_ITEMS)[number];
 
 /** The items that light up from the address. Search never does (§2.14). */
@@ -32,13 +37,18 @@ export const TASKS_HOME = "/today";
 
 export function railItemFor(path: string): RailNavItem {
   switch (pageForPath(path)) {
+    // D-19. The address stays `/board` — the rename is of the feature, not of
+    // the route, and moving both at once would break every stored link for a
+    // cosmetic gain.
+    case "board":
+      return "matrix";
     case "calendar":
       return "calendar";
     case "focus":
       return "focus";
     case "settings":
       return "settings";
-    // `today`, `projects`, `board`, `archive` — and every Tasks Scope, which
+    // `today`, `projects`, `archive` — and every Tasks Scope, which
     // `pageForPath` reports as its `today` fallback because the Tasks Module
     // routes itself.
     default:
@@ -65,6 +75,7 @@ export function isTasksLocation(url: string): boolean {
  * `lastTasksLocation` and falls back to `TASKS_HOME`.
  */
 export const RAIL_DESTINATIONS: Record<Exclude<RailNavItem, "tasks">, string> = {
+  matrix: PAGE_ROUTES.board,
   calendar: PAGE_ROUTES.calendar,
   focus: PAGE_ROUTES.focus,
   settings: PAGE_ROUTES.settings,

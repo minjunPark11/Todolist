@@ -231,25 +231,29 @@ export function Sidebar({
   // The two screens the day actually runs on stay at the top. Everything else
   // is reached occasionally, so it moves below the project list rather than
   // competing for the same glance — nothing is removed, only reordered.
+  // Nav Shell audit D-16: the Global Rail owns the modules now, so the rows
+  // that named one are gone from here — Calendar, Focus, Settings, and the
+  // board that D-19 reclassified as Matrix. Keeping both would have given
+  // every module two doors a centimetre apart, and §12.131 splits "add the
+  // Rail" and "move the sidebar's content" into two steps for exactly this.
+  //
+  // Timeline and Horizons left earlier for the same kind of reason: both are
+  // reached inside a scope now — the Gantt view and the Horizons section of
+  // the View Bar (domain/view/spaceNav.ts).
+  //
+  // A "공간" entry stood here too and opened a card grid of Projects labelled
+  // as spaces. SPACES_CLICKUP_UI_DESIGN U1 decided to remove it — the tree IS
+  // the space explorer — and the decision went unexecuted. Adding a real Space
+  // above Project turned the leftover into a contradiction: one word naming
+  // two levels, with a badge counting the other one.
+  //
+  // What is left is places, not modules: Today and Archive both live inside
+  // Tasks, and §1.5 forbids either from becoming a Rail item.
   const primaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
     { id: "today", label: t("sidebar.today"), icon: "today", count: todayCount },
-    { id: "calendar", label: t("sidebar.calendar"), icon: "calendar", count: 0 },
   ];
   const secondaryNav: Array<{ id: PageId; label: string; icon: IconName; count: number }> = [
-    { id: "board", label: t("sidebar.board"), icon: "planning", count: 0 },
-    // Timeline and Horizons stood here as top-level destinations. Both are
-    // reached inside a scope now — the Gantt view and the Horizons section of
-    // the View Bar (domain/view/spaceNav.ts) — so a second door to the same
-    // room is all they were. Board stays: a Space offers no board at all
-    // (§0.3.3), and the quadrant axis lives nowhere else.
-    // A "공간" entry stood here and opened a card grid of Projects labelled as
-    // spaces. SPACES_CLICKUP_UI_DESIGN U1 decided to remove it — the tree IS
-    // the space explorer — and the decision went unexecuted. Adding a real
-    // Space above Project turned the leftover into a contradiction: one word
-    // naming two levels, with a badge counting the other one.
-    { id: "focus", label: t("sidebar.focus"), icon: "focus", count: tasks.filter((task) => task.activeSessionId).length },
     { id: "archive", label: t("sidebar.archive"), icon: "archive", count: 0 },
-    { id: "settings", label: t("sidebar.settings"), icon: "settings", count: 0 },
   ];
 
   const signedInUserEmail = userEmail.trim();
