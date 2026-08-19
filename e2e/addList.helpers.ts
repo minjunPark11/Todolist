@@ -14,6 +14,12 @@ export interface SeedOptions {
   /** Sidebar groups to start with (Add List calls these Folders — §R.7). */
   folders?: Array<{ id: string; name: string }>;
   lists?: Array<{ id: string; name: string; sidebarFolderId?: string }>;
+  /**
+   * The stored theme. Seeded rather than emulated because the app resolves
+   * `system` from `prefers-color-scheme` ONCE, at mount — a spec that flipped
+   * the media afterwards would be asserting against the palette it started in.
+   */
+  theme?: "light" | "dark";
 }
 
 /**
@@ -69,7 +75,7 @@ export async function openApp(page: Page, seed: SeedOptions = {}): Promise<void>
     tags: [],
     taskTags: [],
     settings: {},
-    appSettings: { language: "en" },
+    appSettings: { language: "en", ...(seed.theme ? { theme: seed.theme } : {}) },
   };
 
   // Seeded ONCE, not on every navigation. An init script runs before each

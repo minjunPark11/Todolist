@@ -115,7 +115,6 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.13);
-  --shadow-accent: 0 2px 6px color-mix(in srgb, var(--accent) 28%, transparent);
   --shadow-card: var(--shadow-xs);
   --shadow-raised: var(--shadow-md);
   --shadow-panel: var(--shadow-lg);
@@ -193,8 +192,8 @@
      declarations): `getComputedStyle(root)` resolved --text, --surface, --bg,
      --hover, --selected, --border, --text-muted and --surface-muted to
      nothing at all. */
-  --bg-rail: #f7f7f8;
-  --bg-context-sidebar: #fafafb;
+  --bg-rail: #eceef1;
+  --bg-context-sidebar: #f0f1f4;
   --bg-selected: #eceef3;
   --bg-selected-hover: #e5e8ee;
   --bg-pressed: #e9ebef;
@@ -304,12 +303,12 @@ body {
      blue-tinted ones — the rest of dark mode is neutral, and importing a
      second dark palette for two surfaces is how a theme starts looking like
      two themes. The RELATIONSHIP is what §11 asks for: Rail below Sidebar,
-     both above the canvas.
+     both below the canvas (V-1 — they used to sit above it).
 
      Selection is an alpha here, matching `--bg-hover`'s idiom, so it reads
      the same on the Rail, the Sidebar and an elevated menu. */
-  --bg-rail: #161618;
-  --bg-context-sidebar: #1c1c1e;
+  --bg-rail: #0a0a0c;
+  --bg-context-sidebar: #0d0d0f;
   --bg-selected: rgba(255, 255, 255, 0.1);
   --bg-selected-hover: rgba(255, 255, 255, 0.14);
   --bg-pressed: rgba(255, 255, 255, 0.12);
@@ -347,7 +346,6 @@ body {
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.34);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.38);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.42);
-  --shadow-accent: 0 2px 6px rgba(10, 132, 255, 0.32);
   color: var(--text-primary);
   background: var(--bg-app);
   color-scheme: dark;

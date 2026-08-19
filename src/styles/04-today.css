@@ -143,7 +143,6 @@
 .tdy-btn-navy {
   background: var(--tdy-navy);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(23, 28, 48, 0.18);
 }
 
 .tdy-btn-navy:not(:disabled):hover {
@@ -245,7 +244,6 @@
   border-radius: 14px;
   background: linear-gradient(135deg, #4d94ff, #2f6fe0);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(47, 111, 224, 0.28);
 }
 
 .tdy-brief-body {
