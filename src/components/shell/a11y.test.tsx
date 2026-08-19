@@ -47,6 +47,7 @@ function renderShell(sidebar: ContextSidebarState = sidebarState()) {
             active="tasks"
             onNavigate={() => {}}
             onOpenSearch={() => {}}
+            searchOpen={false}
             accountEmail="someone@example.com"
             onSignOut={() => {}}
           />
@@ -225,19 +226,21 @@ describe("the Global Rail's ARIA (§2.33)", () => {
 
   /**
    * §2.33 asks Search for `aria-haspopup="dialog"` and `aria-expanded`.
-   * D-25 took that away from it: Search is a page now, and the button
-   * navigates. Claiming a dialog it does not open would be a promise the
-   * screen reader passes on and the app then breaks — so the correct
-   * implementation of this line is its absence, and that is worth pinning
-   * down rather than leaving to be "fixed" by someone reading §2.33.
+   *
+   * D-25 took that away — the button navigated, so claiming a dialog would
+   * have been a promise the screen reader passes on and the app then breaks.
+   * D-29 gave it back by making the promise true. The pair of assertions has
+   * flipped twice now, which is the point of having it: the attribute and the
+   * behaviour are checked against each other rather than against the spec.
    */
-  it("does not claim Search opens a dialog, because since D-25 it does not", () => {
+  it("says Search opens a dialog, and whether it is open (§2.33)", () => {
     renderShell();
     const search = screen.getByRole("button", { name: "검색" });
 
-    expect(search.getAttribute("aria-haspopup")).toBeNull();
-    expect(search.getAttribute("aria-expanded")).toBeNull();
-    // And it is not a destination that takes the active state either (§2.14).
+    expect(search.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(search.getAttribute("aria-expanded")).toBe("false");
+    // Still not a destination that takes the active state (§2.14) — that part
+    // of the contract never changed.
     expect(search.getAttribute("aria-current")).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Folder, List, Project, SavedFilter, SidebarFolder, Space, Tag, Task } from "../../types";
-import { flattenGroups, matchRank, DEFAULT_LIMITS, MENU_LIMITS, searchAll, type SearchCollections } from "./search";
+import { flattenGroups, matchRank, DEFAULT_LIMITS, MENU_LIMITS, PAGE_LIMITS, searchAll, type SearchCollections } from "./search";
 
 const NOW = "2026-08-18T09:00:00.000Z";
 const LABELS = { inbox: "Inbox", defaultList: "List" };
@@ -224,28 +224,37 @@ describe("what lives above the Tasks Module (§10.16)", () => {
   });
 });
 
-// D-25 split the two callers apart: the Search Page looks for Tasks, and the
-// Command Menu goes to places. A limit of 0 is how that is said here.
-describe("MENU_LIMITS — the Command Menu asks for places, not Tasks", () => {
-  const tasks = [task({ id: "t1", title: "Report draft", listId: "l1" })];
+// D-25 gave the menu `task: 0`; D-29 took it back. What the two callers differ by
+// now is HOW MUCH, not what — which is the difference a cap expresses and a
+// zero does not.
+describe("MENU_LIMITS — the menu shows what fits, the page shows all of it", () => {
   const tags = [{ id: "tag-1", name: "report", createdAt: NOW, updatedAt: NOW }] as Tag[];
 
-  it("answers with the containers that matched", () => {
+  it("answers with tasks and containers together", () => {
+    const tasks = [task({ id: "t1", title: "Report draft", listId: "l1" })];
     const groups = searchAll("report", collections({ tasks, tags }), LABELS, MENU_LIMITS);
-    expect(groups.map((group) => group.kind)).toEqual(["tag"]);
+    expect(groups.map((group) => group.kind)).toEqual(["task", "tag"]);
   });
 
-  it("leaves out the Task group entirely rather than showing it empty", () => {
-    const groups = searchAll("report", collections({ tasks }), LABELS, MENU_LIMITS);
-    // Not `results: []` under a "Tasks" heading — a heading over nothing reads
-    // as "no tasks match", and the truth is that the menu never looked.
+  it("caps the tasks where the list stops being scannable", () => {
+    const many = Array.from({ length: 12 }, (_, index) =>
+      task({ id: `t${index}`, title: `Report ${index}`, listId: "l1" }),
+    );
+    const menu = searchAll("report", collections({ tasks: many }), LABELS, MENU_LIMITS);
+    const page = searchAll("report", collections({ tasks: many }), LABELS, PAGE_LIMITS);
+
+    expect(menu[0].results).toHaveLength(MENU_LIMITS.task);
+    // The cap is not a loss, because the page it hands off to has them all.
+    expect(page[0].results).toHaveLength(12);
+  });
+
+  // The zero path stays reachable — a caller CAN still say "not this kind" —
+  // even though no caller says it today.
+  it("still omits a kind whose cap is zero, rather than drawing an empty group", () => {
+    const tasks = [task({ id: "t1", title: "Report draft", listId: "l1" })];
+    const groups = searchAll("report", collections({ tasks }), LABELS, { ...MENU_LIMITS, task: 0 });
     expect(groups.find((group) => group.kind === "task")).toBeUndefined();
     expect(flattenGroups(groups)).toEqual([]);
-  });
-
-  it("still finds a Task for the Search Page, from the same collections", () => {
-    const groups = searchAll("report", collections({ tasks }), LABELS, DEFAULT_LIMITS);
-    expect(groups.map((group) => group.kind)).toEqual(["task"]);
   });
 });
 

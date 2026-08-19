@@ -83,10 +83,12 @@ interface RailButtonProps {
   active?: boolean;
   /** The Account popover's own state, which is not `active` (§2.9). */
   open?: boolean;
+  /** What `open` refers to, for the items that open one (§2.33). */
+  haspopup?: "menu" | "dialog";
   onClick: () => void;
 }
 
-function RailButton({ label, shortcut, icon, active, open, onClick }: RailButtonProps) {
+function RailButton({ label, shortcut, icon, active, open, haspopup, onClick }: RailButtonProps) {
   return (
     <button
       type="button"
@@ -96,6 +98,7 @@ function RailButton({ label, shortcut, icon, active, open, onClick }: RailButton
       aria-label={label}
       aria-current={active ? "page" : undefined}
       aria-expanded={open === undefined ? undefined : open}
+      aria-haspopup={haspopup}
       onClick={onClick}
     >
       <RailIcon name={icon} />
@@ -111,6 +114,8 @@ interface GlobalRailProps {
   active: RailNavItem;
   onNavigate: (item: RailNavItem) => void;
   onOpenSearch: () => void;
+  /** §11.24's open-utility state: the button that opened the menu says so. */
+  searchOpen: boolean;
   /** "" when signed out — the Rail still shows the slot, with no identity. */
   accountEmail: string;
   onSignOut: () => void;
@@ -120,6 +125,7 @@ export function GlobalRail({
   active,
   onNavigate,
   onOpenSearch,
+  searchOpen,
   accountEmail,
   onSignOut,
 }: GlobalRailProps) {
@@ -252,8 +258,19 @@ export function GlobalRail({
 
       <div className="rail-utilities">
         {/* §2.14: Search is a utility, not a module — it never takes the
-            active state away from where the user actually is. */}
-        <RailButton icon="search" label={t("rail.search")} shortcut="/" onClick={onOpenSearch} />
+            active state away from where the user actually is.
+            §2.33/§11.24: but it does OPEN something, and D-29 is what makes
+            that true again. Under D-25 this button navigated, so it could
+            claim neither `haspopup` nor an open state — and pressing it lit a
+            different icon while this one sat there. It says what it does now. */}
+        <RailButton
+          icon="search"
+          label={t("rail.search")}
+          shortcut="/"
+          open={searchOpen}
+          haspopup="dialog"
+          onClick={onOpenSearch}
+        />
         <RailButton
           icon="settings"
           label={t("sidebar.settings")}

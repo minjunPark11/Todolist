@@ -1,12 +1,17 @@
 // @vitest-environment jsdom
 //
-// What the Command Menu is, now that it is not the search box (D-25).
+// What the Command Menu is (D-25, revised by D-29).
 //
-// The tests below are mostly about a boundary rather than a behaviour: the
-// menu and `/search` are two features that happen to share a matcher, and the
-// way that goes wrong is not a crash — it is the menu quietly growing back
-// into a search box, one row at a time. So the first three cases assert what
-// is NOT there.
+// D-25 made this a menu that could not find a Task, and the Rail's magnifier
+// a page navigation. Using it settled the question: the menu is where someone
+// types when they are looking for something, and refusing to answer sent them
+// to a page that lost their place. Tasks are back, capped, and the last row
+// hands the query to the Search Page.
+//
+// The tests below are about the boundary that remains, and it is a different
+// one: the menu shows what FITS, the page shows all of it, and getting from
+// one to the other is a row the user presses rather than something typing
+// does on its own.
 //
 // The axe case at the bottom used to live in `tasks/a11y.test.tsx` and moved
 // with the component. It is the same check: a combobox over a listbox, with
@@ -70,6 +75,7 @@ function renderMenu(ctx: CommandContext = inAList, props: Partial<Parameters<typ
     onPickResult: vi.fn(),
     onRunCommand: vi.fn(),
     onOpenUrl: vi.fn(),
+    onSeeAll: vi.fn(),
     onCapture: vi.fn(),
   };
   const view = render(
@@ -83,28 +89,33 @@ function renderMenu(ctx: CommandContext = inAList, props: Partial<Parameters<typ
 afterEach(cleanup);
 
 describe("the menu goes to places and runs commands", () => {
-  it("offers the containers that match, and never a Task", async () => {
+  it("offers tasks and containers together, each in its own group", async () => {
     const user = userEvent.setup();
     renderMenu();
     await user.type(screen.getByRole("combobox"), "report");
 
-    // "Reporting" the List, "reports" the Tag, "Reporting cycle" the Project.
-    expect(screen.getByRole("option", { name: /Reporting$/ })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /reports/ })).toBeTruthy();
-    // "Quarterly report" is a Task. It matches the query and is deliberately
-    // absent: finding it is what `/search` is for.
-    expect(screen.queryByRole("option", { name: /Quarterly report/ })).toBeNull();
+    // The Task D-25 refused to show, back where someone typing "report" is
+    // most likely to be looking for it.
+    expect(screen.getByRole("option", { name: /Quarterly report/ })).toBeTruthy();
+    // Exact names, because a Task row now carries its owner List as a
+    // subtitle — "Quarterly report Reporting" also ends in "Reporting".
+    expect(screen.getByRole("option", { name: "Reporting" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "reports" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Reporting cycle" })).toBeTruthy();
   });
 
-  it("has no way out to the Search Page hanging off what was typed", async () => {
+  it("hands the query to the Search Page from a row, not from typing", async () => {
     const user = userEvent.setup();
-    renderMenu();
+    const { onSeeAll } = renderMenu();
     await user.type(screen.getByRole("combobox"), "report");
 
-    // The "See all results" button used to sit under the list and carry the
-    // query to `/search`. That bridge is what made the menu a search box.
-    expect(screen.queryByText(/결과 전체 보기/)).toBeNull();
-    expect(screen.queryByRole("button", { name: /전체/ })).toBeNull();
+    // Below the listbox: a way OUT of the menu rather than one of the choices
+    // in it, so arrowing through results never lands on a navigation.
+    const seeAll = screen.getByRole("button", { name: "전체 결과 보기" });
+    expect(seeAll.closest('[role="listbox"]')).toBeNull();
+
+    await user.click(seeAll);
+    expect(onSeeAll).toHaveBeenCalledWith("report");
   });
 
   it("lists recent places before anything is typed (§10.8)", () => {

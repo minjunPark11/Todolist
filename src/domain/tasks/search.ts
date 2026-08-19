@@ -36,15 +36,19 @@ export const DEFAULT_LIMITS: Record<SearchKind, number> = {
 };
 
 /**
- * What the Command Menu asks for: places, not Tasks (D-25).
+ * What the Command Menu asks for (D-25, revised by D-29).
  *
- * Q-03 split the two halves this module used to serve at once. Finding a Task
- * is searching, and searching has a page with a shareable address. Jumping to
- * a List is navigating, and that is what Ctrl/Cmd+K is for. A cap of 0 is not
- * "show none of many" — it says this kind is not a destination.
+ * D-25 set `task: 0` here: finding a Task was to be searching, and searching
+ * had its own page. Using it settled the question the other way — the menu is
+ * where someone types when they are looking for something, and a menu that
+ * refuses to find Tasks sends them to a page that loses their place.
+ *
+ * So Tasks are back, capped: five of them and three of each container is what
+ * fits before the list stops being scannable. "All of them" is what the
+ * Search Page is for, and the menu's last row is the way there.
  */
 export const MENU_LIMITS: Record<SearchKind, number> = {
-  task: 0,
+  task: 5,
   list: 5,
   tag: 3,
   filter: 3,

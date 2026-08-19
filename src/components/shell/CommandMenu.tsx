@@ -1,23 +1,21 @@
-// The Global Command Menu — Ctrl/Cmd+K, from anywhere (D-25).
+// The Global Command Menu — Ctrl/Cmd+K and the Rail's Search, from anywhere
+// (D-25, revised by D-29).
 //
-// This box used to be the app's one "search and commands" overlay, and it
-// lived inside the Tasks Module. Q-03 split it in two:
+// One overlay, opened two ways, over whatever you are looking at. It writes
+// nothing to the URL and closes without disturbing what is behind it (§10.23,
+// §10.40) — which is the property that makes it usable from the Calendar, and
+// the one D-25 gave up when it made the Rail's Search a page navigation.
 //
-//   - Finding something is SEARCHING, and search has a page with an address
-//     you can paste to someone (`/search`). The Rail's Search button goes
-//     there. It is not an overlay and never was in this repo.
-//   - Getting somewhere fast, and running something, is this menu. It opens
-//     over whatever you are looking at, writes nothing to the URL, and closes
-//     without disturbing what is behind it (§10.23, §10.40).
+// D-25's reasoning for splitting was that a single input whose meaning depends
+// on which row you land on is ambiguous. Using it said otherwise: what the
+// split actually produced was a magnifier that swapped the shell, moved the
+// Rail's active item to a different module and left no way back but the
+// browser's. The ambiguity was theoretical; the context loss was not.
 //
-// The two do not hand off to each other. There is no "see all results" row
-// here, because a menu that ends by navigating to the Search Page is a search
-// box wearing a menu's clothes — and then typing in it means two different
-// things depending on which row you land on.
-//
-// What that leaves is the definition: rows are PLACES and COMMANDS. A List, a
-// Tag, a Project is a place. A Task is not — it is a record you search for,
-// and `MENU_LIMITS` is where that is enforced rather than here.
+// So the rows are places, commands AND tasks again, each capped, and the last
+// row hands the query to the Search Page — which stays exactly as it was, the
+// place where "all of them" lives at an address you can paste to someone.
+// That is the half of D-25 that was worth keeping.
 import { useEffect, useMemo, useState } from "react";
 import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
 import { flattenGroups, MENU_LIMITS, searchAll } from "../../domain/tasks/search";
@@ -41,6 +39,8 @@ interface CommandMenuProps {
   onPickResult: (result: SearchResult) => void;
   onRunCommand: (command: TaskCommand) => void;
   onOpenUrl: (url: string) => void;
+  /** §10.45: the same query, on the page that shows all of it (D-29). */
+  onSeeAll: (query: string) => void;
   /** §10.41/§10.42: hands the typed text to Quick Add — it does not create. */
   onCapture: (title: string) => void;
 }
@@ -53,6 +53,7 @@ export function CommandMenu({
   onPickResult,
   onRunCommand,
   onOpenUrl,
+  onSeeAll,
   onCapture,
 }: CommandMenuProps) {
   const { t } = useT();
@@ -60,9 +61,9 @@ export function CommandMenu({
   const [active, setActive] = useState(0);
   const typing = query.trim().length > 0;
 
-  // The same matcher the Search Page uses, asked a narrower question:
-  // `MENU_LIMITS` drops the Task group entirely, so what comes back is the
-  // set of destinations and nothing else (D-25).
+  // The same matcher the Search Page uses, asked for less of it: `MENU_LIMITS`
+  // caps each group at what stays scannable, and the Search Page is where the
+  // rest lives (§10.49).
   const groups = useMemo(
     () => searchAll(query, collections, { inbox: t("tasks.inbox"), defaultList: t("tasks.defaultList") }, MENU_LIMITS),
     [query, collections, t],
@@ -222,8 +223,12 @@ export function CommandMenu({
                   position,
                   `${result.kind}:${result.id}`,
                   <>
-                    <span>{result.title}</span>
+                    <span className={result.completed ? "is-done" : undefined}>{result.title}</span>
                     {result.subtitle ? <span className="cmd-menu-sub">{result.subtitle}</span> : null}
+                    {/* §10.29: finished work is shown as finished rather than
+                        hidden — searching for something you completed last
+                        week is a normal thing to do. */}
+                    {result.completed ? <span className="cmd-menu-sub">{t("tasks.resultCompleted")}</span> : null}
                   </>,
                 );
               })}
@@ -248,10 +253,17 @@ export function CommandMenu({
           </p>
         ) : null}
 
-        {/* Where "see all results" used to send the user to `/search`. It is a
-            hint now, not a row: the Search Page is reached from the Rail or by
-            its command, never as the tail of something typed here (D-25). */}
-        {!typing && recents.length === 0 ? <p className="cmd-menu-state">{t("menu.hint")}</p> : null}
+        {/* §10.45. Below the listbox rather than in it: this is a way OUT of
+            the menu, not one of the choices in it. D-25 removed this row and
+            D-29 put it back — the menu shows what fits, and the page shows the
+            rest without the user having to find it a second way. */}
+        {typing ? (
+          <button type="button" className="cmd-menu-all" onClick={() => onSeeAll(query)}>
+            {t("tasks.seeAllResults")}
+          </button>
+        ) : recents.length === 0 ? (
+          <p className="cmd-menu-state">{t("menu.hint")}</p>
+        ) : null}
       </div>
     </div>
   );

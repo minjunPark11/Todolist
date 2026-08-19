@@ -13,10 +13,12 @@
 //               next morning does
 //   NAVIGATION  history the browser owns, not a mocked URL string
 //
-// Two of the spec's own cases are asserted BACKWARDS from how §2 states them,
-// and both are D-25: Search is a page now, so it does navigate (RAIL-02), and
-// there is no Search overlay left for Escape to close (RAIL-07). The Command
-// Menu inherited the second one and is tested in its place.
+// RAIL-02 and RAIL-07 are asserted as §2.48 states them — but only since
+// D-29. D-25 had made the Rail's Search a page navigation, and both cases had
+// to be written backwards; using the app settled it the other way. The one
+// difference that remains is which surface answers: it is the Command Menu,
+// reached from the magnifier and from Ctrl/Cmd+K, rather than a Search
+// overlay of its own.
 import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./addList.helpers";
 
@@ -217,22 +219,39 @@ test.describe("the Global Rail", () => {
   });
 
   /**
-   * RAIL-02, inverted by D-25.
+   * RAIL-02, as §2.48 wrote it.
    *
-   * §2.48 asserts the pathname does NOT change when Search opens, because the
-   * spec's Search is an overlay. In this repo Search is a page with a
-   * shareable address, so the half of RAIL-02 that survives is the half that
-   * was always the point: Search is a utility, and utilities do not take the
-   * Rail's active state (§2.14).
+   * This is the case D-29 exists for. Under D-25 the magnifier changed four
+   * things at once — the URL, the Rail's active item, the sidebar and the
+   * whole shell — none of which the user asked for by wanting to search.
    */
-  test("RAIL-02 — Search navigates, and still does not become the active module", async ({ page }) => {
+  test("RAIL-02 — Search opens over where you are and does not navigate", async ({ page }) => {
     await openApp(page);
+    await rail(page, "Calendar").click();
+    await expect(page).toHaveURL(/\/calendar$/);
 
     await rail(page, "Search").click();
 
-    await expect(page).toHaveURL(/\/search/);
-    await expect(page.locator(".global-rail [aria-current='page']")).toHaveAttribute("aria-label", "Tasks");
+    await expect(page.locator(".cmd-menu")).toBeVisible();
+    // Nothing behind it moved.
+    await expect(page).toHaveURL(/\/calendar$/);
+    await expect(page.locator(".global-rail [aria-current='page']")).toHaveAttribute("aria-label", "Calendar");
+    // §2.14 still holds: opening it does not make Search the active module.
     await expect(rail(page, "Search")).not.toHaveAttribute("aria-current", "page");
+    // §2.33/§11.24: the button that was pressed is the one that reacts.
+    await expect(rail(page, "Search")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("the menu still hands the query to the Search Page, from its last row", async ({ page }) => {
+    await openApp(page);
+    await rail(page, "Search").click();
+    await page.locator(".cmd-menu-input").fill("inbox");
+
+    await page.getByRole("button", { name: "See all results" }).click();
+
+    // The one place the menu routes, and the user chose it (§10.45).
+    await expect(page).toHaveURL(/\/search\?q=inbox/);
+    await expect(page.locator(".cmd-menu")).toHaveCount(0);
   });
 
   test("RAIL-03 — the Account popover does not move you", async ({ page }) => {

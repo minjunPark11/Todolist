@@ -24,7 +24,7 @@ import { PAGE_ROUTES, RETIRED_ROUTES, bootRedirectFor, pageForPath, pathForDefau
 import { RAIL_DESTINATIONS, TASKS_HOME, isTasksLocation, railItemFor, type RailNavItem } from "./app/railNav";
 import { AppShell } from "./components/shell/AppShell";
 import { GlobalRail } from "./components/shell/GlobalRail";
-import { SEARCH_PATH, taskUrlFor } from "./app/taskScopeUrl";
+import { taskUrlFor } from "./app/taskScopeUrl";
 import { useContextSidebar } from "./hooks/useContextSidebar";
 import { useRecents } from "./hooks/useRecents";
 import { CommandMenu } from "./components/shell/CommandMenu";
@@ -322,7 +322,8 @@ export default function App() {
       if (event.key === "/") {
         // §2.28 advertises `/` on the Rail's Search tooltip, and P0-5 removed
         // the sidebar box this used to focus — the Rail's search is the only
-        // one left, so the shortcut points at it.
+        // one left, so the shortcut points at it. Since D-29 that means the
+        // menu, which is what `/` opening a box over the page always implied.
         event.preventDefault();
         openGlobalSearch();
       } else if (event.key.toLowerCase() === "t") {
@@ -1119,17 +1120,21 @@ export default function App() {
   }
 
   /**
-   * Search is a PAGE, and the Rail is its entry point (D-25, closing Q-03).
+   * The Rail's Search opens the menu, over wherever you are (D-29).
    *
-   * The spec's §2.14 wanted one global overlay that never routes. This repo
-   * had already built the other half — a Search Page with `?q=` in the
-   * address (v16 §10.19) — and an overlay cannot be pasted into a message.
-   * So the two were split by what they are for rather than merged: searching
-   * has a page you can link to, and getting somewhere fast has a menu that
-   * writes nothing. Search does not take the Rail's active state either way.
+   * D-25 made this a navigation to `/search`, and the cost only showed up in
+   * use: pressing the magnifier on the Calendar swapped the shell, moved the
+   * Rail's active item to Tasks, brought in a sidebar that had not been there
+   * and left the browser's Back button as the only way home. Four changes
+   * from a button whose own icon does not even light up (§2.14).
+   *
+   * The overlay was already doing the right thing for Ctrl/Cmd+K, so this is
+   * the same surface with a second way in rather than a new one. `/search`
+   * keeps its job: the query in the address, all of the results, and the menu
+   * hands off to it from its last row.
    */
   function openGlobalSearch() {
-    navigateUrl(SEARCH_PATH);
+    setMenuOpen(true);
   }
 
   /**
@@ -1204,6 +1209,12 @@ export default function App() {
           setMenuOpen(false);
           navigateUrl(next);
         }}
+        onSeeAll={(query) => {
+          // §10.45. The one place the menu still routes, and it is a choice
+          // the user makes on the last row rather than something typing does.
+          setMenuOpen(false);
+          navigateUrl(searchUrlFor(query));
+        }}
         onCapture={(title) => {
           // §10.41: owner = Inbox, and the user lands where the task would go
           // rather than being told after the fact.
@@ -1275,6 +1286,7 @@ export default function App() {
         active={railItem}
         onNavigate={navigateRail}
         onOpenSearch={openGlobalSearch}
+        searchOpen={menuOpen}
         accountEmail={planner.auth.isSignedIn ? planner.auth.userEmail : ""}
         onSignOut={planner.signOut}
       />
