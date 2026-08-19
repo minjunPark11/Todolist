@@ -322,6 +322,16 @@ App mark / Account / Tasks / Matrix / Calendar / Focus / (spacer) / Search / Set
 - `PageId`의 `board`와 그 라벨이 Matrix로. **라우트는 `/board`를 유지한다**(위 결정) — 이름과 주소가 어긋나는 건 알고 두는 것이고, 개명하려면 리다이렉트를 붙이는 별도 작업이다
 - Matrix의 Context Sidebar mode는 `none` `추정` — 전역 기능이고 Scope가 아니다. P0-4에서 확정
 
+**D-20 — Task의 Archive를 폐기한다. 프로젝트 Archive만 남는다.** (개정 2, 2026-08-19)
+
+> **개정 이력.** ① Q-07 답: "쪼갠다 — 작업은 Scope, 프로젝트는 SpaceHub". ② 이 개정: **작업 쪽은 만들 것이 아니라 지울 것**이다.
+
+Task의 `archived`가 하는 일은 **모든 화면에서 숨기기**뿐이다. `TaskStatus`의 값 하나([`types.ts:21`](src/types.ts:21))와 `archivedAt`이 있지만, 그것을 읽는 15곳은 전부 `status !== "archived"`라는 제외 필터다. 완료도 삭제도 아닌 세 번째 축을 사용자에게 이해시킬 값어치가 없다.
+
+따라서 사이드바 하단 시스템 섹션은 **완료 · 안 함 · 휴지통** 셋이 된다. TickTick이 실제로 그렇고, `보관함`은 Task 쪽에서 사라진다.
+
+**사라지지 않는 것 — List/Project의 Archive는 별개다.** `List.archivedAt`은 Add List 설계 §13.21/§13.22가 쓰고(리스트를 치우면 트리에서 빠지고 Manage에서 복원), `Project.status === "archived"`도 살아 있다. 보관된 **프로젝트**는 원래 계획대로 SpaceHub로 간다. 폐기 대상은 **Task의 archive뿐**이다.
+
 **D-21 — 어느 사이드바가 그려지는지를 `mode`가 정하게 해야 한다.** (P0-4에서 드러남, 2026-08-19)
 
 P0-3이 `mode`를 만들었지만 **그 mode는 아직 아무것도 고르지 않는다.** 폭과 표시 여부만 정할 뿐, 실제로 어떤 컴포넌트가 그려지는지는 여전히 [`App.tsx`](src/App.tsx)의 `parseTaskScope` 분기가 정한다. 둘이 어긋난다.
@@ -347,18 +357,55 @@ D-21을 고치자 SpaceHub가 **도달 불가**가 됐다. 사이드바가 `mode
 
 그래서 Tasks Sidebar에 `공간` 행 하나를 둔다. 트리를 가져오는 것이 아니라 **문만** 두는 것이다 — 누르면 `/spaces`로 가고, 거기서 mode가 `space`로 바뀌며 같은 자리를 트리가 차지한다. D-02(사이드바 내용은 v16)와 D-14(SpaceHub에서 트리로 전환)를 둘 다 지키는 최소 장치다.
 
-`보관함` 행도 같은 성격이다. 둘 다 Scope가 아니므로 `row()`가 아니라 `pageRow()`로 그리고, **카운트를 붙이지 않는다** — 이 파일의 머리 주석이 "모든 카운트는 `queryScopeCount`에서 오고 화면이 카운트 공식을 발명하지 않는다"(§12.14)고 못박아 두었고, 물어볼 Scope가 없기 때문이다. 보관함은 P0-4b에서 Scope가 될 때 숫자를 얻는다.
+`보관함` 행도 같은 성격이다. 둘 다 Scope가 아니므로 `row()`가 아니라 `pageRow()`로 그리고, **카운트를 붙이지 않는다** — 이 파일의 머리 주석이 "모든 카운트는 `queryScopeCount`에서 오고 화면이 카운트 공식을 발명하지 않는다"(§12.14)고 못박아 두었고, 물어볼 Scope가 없기 때문이다.
 
-**D-20 — 보관함을 쪼갠다: 작업은 Scope로, 프로젝트는 SpaceHub로.** (Q-07 해소, 2026-08-19)
+> **후속 (D-20 개정 2).** `보관함` 행은 숫자를 얻지 못하고 **없어진다.** Task Archive 자체가 폐기되고 그 자리에 `안 함`(Won't Do) Scope가 들어간다 — 그건 진짜 Scope이므로 카운트를 갖는다. `공간` 행은 문이므로 계속 카운트가 없다.
 
-지금 [`ArchivePage.tsx:43`](src/components/ArchivePage.tsx:43)은 `작업` / `프로젝트` 두 탭이고, 프로젝트 탭은 뷰 엔진을 타지 않고 `projects`에서 직접 읽는다. 그 파일 주석이 이유를 이미 적어 두었다 — Space는 Item이 아니고, 그건 projection의 실제 한계다.
+**D-23 — Won't Do는 `TaskStatus` 값이 아니라 `wontDoAt` 터미널 마커로 만든다.**
 
-그래서 한 화면이 소유자가 다른 두 목록을 이고 있다. 쪼갠다.
+`TaskStatus`에 값을 하나 더 얹기 전에 세 터미널 상태의 현재 모양을 나란히 놓으면 답이 나온다.
 
-- **보관된 작업** → 10번째 Task Scope. `완료`·`휴지통`과 같은 `scopeRegistry` 항목이 되어 카운트·정렬·생성 규칙을 그들과 공유한다
-- **보관된 프로젝트** → SpaceHub (`mode="space"`, D-14). Space 관리의 일부지 할 일 목록이 아니다
+| | `status` 값 | timestamp | 실제 판정 |
+|---|---|---|---|
+| Completed | `"done"` | `completedAt` | `isCompleted` = `status === "done"` — **timestamp를 안 읽는다** |
+| Trash | 없음 | `deletedAt` | `Boolean(task.deletedAt)` |
+| Archived | `"archived"` | `archivedAt` | `status === "archived"` — **timestamp를 안 읽는다** |
 
-**이건 P0-4에 끼워 넣을 크기가 아니다.** `scopeRegistry` + `scopeQuery` + URL segment + view policy + count가 한 벌로 움직이고, 그 다음에 두 화면을 나눠야 한다. **P0-4b**로 따로 세운다 (R.8). P0-4는 그동안 현행 `/archive` 페이지를 사이드바 하단 행에서 열어 두고, 승격은 그 뒤에 한다.
+같은 개념이 세 가지 모양으로 있고, **둘은 진실을 두 곳에 두었다.** `completedAt`은 그 대가를 이미 치르고 있다 — [`scopeQuery.ts:67`](src/domain/tasks/scopeQuery.ts:67)의 주석이 "감사 A절이 두 곳에 저장된 것을 발견했고 `status`가 이긴다"고 적고 있으며, 둘을 합치는 일은 v16 감사 C-2의 미결로 남아 있다. **`wontDo`를 status 값으로 추가하면 그 버그를 의도적으로 한 번 더 만드는 것이다.**
+
+그래서 **`deletedAt`의 모양을 본뜬다.**
+
+```ts
+/** 안 하기로 한 시각. 비어 있으면 안 한다고 하지 않은 것이다. */
+wontDoAt?: string;
+```
+
+`TaskStatus`를 넓히지 않는 것 자체가 이득이다 — 그 유니온은 이미 마이그레이션으로 걷어내는 중인 레거시 값을 넷(`doing`/`waiting`/`in_progress`/`blocked`) 이고 있다.
+
+이 모델이 공짜로 주는 것 셋:
+
+1. **`status`를 덮어쓰지 않는다.** `completeTask`는 `status`를 `"done"`으로 밀어버리기 때문에 `reopenTask`가 `previousStatus`를 뒤져 원래 값을 복원해야 한다([`mutations.ts:61`](src/domain/tasks/mutations.ts:61)). Won't Do 취소는 필드를 비우면 끝이고, 되돌릴 `status`가 애초에 없다.
+2. **반복이 저절로 맞는다.** occurrence에 timestamp가 붙을 뿐 `repeat`은 건드리지 않는다 — **P0 확정: 반복 Task의 Won't Do는 현재 occurrence에만 적용하고 recurrence rule은 유지한다.**
+3. **하위 Task에 전파되지 않는다.** 부모의 필드는 자식의 필드가 아니다. **P0 확정: 자동 전파하지 않는다.**
+
+`undo`는 `deletedAt`이 이미 확립한 규약을 따른다 — 없음과 `""`는 다른 값이고, undo는 있던 값을 그대로 되돌린다([`mutations.ts:31`](src/domain/tasks/mutations.ts:31)).
+
+**마이그레이션:** 기존 `status === "archived"` / `archivedAt`을 가진 Task는 `wontDoAt`으로 옮긴다. 의미가 맞는다 — "보관했다 = 안 할 건데 지우긴 아깝다". Completed로 보내면 완료 통계가 오염된다. Won't Do는 `completedAt`을 쓰지 않으므로 Completed Scope(`completedAt != null`)에 새지 않는다.
+
+**D-24 — 15곳을 개별 치환하지 않는다. canonical predicate로 통합한다.**
+
+**그 predicate는 이미 있다.** [`scopeQuery.ts:79`](src/domain/tasks/scopeQuery.ts:79)의 `isTaskActive(task, lists)`이고, 주석이 존재 이유까지 적어 두었다 — *"보관된 task가 Today에 뜨는 것은 아홉 곳의 버그가 아니라 이 한 곳의 결정이어야 한다."*
+
+문제는 **아무도 안 쓴다는 것**이다. 리포 전체에서 호출부가 같은 파일 안에 하나뿐이다. Tasks Module의 쿼리 층은 이걸 통과하지만, 밖의 15곳(Focus, Calendar, Matrix, Space 뷰 셋, TaskDetail, 카테고리 설정)은 각자 `status !== "archived"`를 손으로 쓴다.
+
+그러니 할 일은 predicate를 **발명**하는 것이 아니라 **채택**하는 것이다. 다만 15곳이 묻는 질문이 하나가 아니라 둘이라는 점을 먼저 갈라야 한다.
+
+| 질문 | 뜻 | 함수 |
+|---|---|---|
+| 살아 있는가 | 휴지통도 Won't Do도 아니고, 소유 List도 살아 있다 | `isTaskActive` |
+| 아직 할 일인가 | 살아 있고 + 완료도 아니다 | `isActive` (현재 private) |
+
+두 번째를 export하고 이름을 분명히 한다. **주의할 행동 변화**: `isTaskActive`는 *소유 List가 archive/삭제된 Task도* 제외한다. 지금 15곳은 그걸 보지 않으므로, 채택하면 보관된 리스트의 작업이 Focus·Calendar에서도 사라진다. 더 옳은 동작이지만 조용한 변화가 아니므로 채택 PR에서 명시한다.
 
 ## R.7 미결 — 다음 결정이 필요한 것
 
@@ -370,7 +417,7 @@ D-21을 고치자 SpaceHub가 **도달 불가**가 됐다. 사이드바가 `mode
 | ~~Q-04~~ | Rail의 Tasks 재클릭 동작 | **해소 → D-15** (2026-08-19). 세션 범위, fallback은 `/today` |
 | **Q-05** | Horizons / Goals / LearningPath | v16 Phase 0 감사 §B에서도 미결로 남았던 항목. 이번에도 Rail 밖이다 |
 | ~~Q-06~~ | 전역 보드(사분면 축)의 진입점 | **해소 → D-19** (2026-08-19). Matrix로 재분류하고 Rail에 올린다. §1.5에 명시적 예외 |
-| ~~Q-07~~ | `보관함`을 10번째 Scope로 승격할 것인가 | **해소 → D-20** (2026-08-19). 쪼갠다 — 작업은 Scope, 프로젝트는 SpaceHub. 별도 단계(P0-4b) |
+| ~~Q-07~~ | `보관함`을 10번째 Scope로 승격할 것인가 | **해소 → D-20** (2026-08-19), 그 뒤 **개정 2**로 뒤집힘: 승격이 아니라 **폐기**다. Task Archive는 Won't Do(D-23)로 대체되고, 프로젝트 Archive만 SpaceHub로 간다 |
 
 **남은 것은 Q-03(P0-9)과 Q-05뿐이다.** 둘 다 P0-4를 막지 않는다.
 
@@ -385,7 +432,10 @@ D-21을 고치자 SpaceHub가 **도달 불가**가 됐다. 사이드바가 `mode
 | ~~P0-3 Context Sidebar frame~~ | **완료** (2026-08-19). 폭 200·240 → **248 하나**, resize 핸들(드래그·키보드·더블클릭), collapse 상태 모델(§3.28~3.30), mode registry `tasks\|space\|none`. DOM 통합은 D-17 | P0-2 |
 | ~~P0-4 Rail + 중복 제거~~ | **완료** (2026-08-19). Rail에 Matrix 추가(D-19), 레거시 사이드바에서 전역 항목 제거(D-16) — 남은 것은 `오늘`·`보관함`·트리 | P0-3 |
 | ~~P0-4a 사이드바 소유권~~ | **완료** (2026-08-19). [`TasksSidebarSlot`](src/components/shell/TasksSidebarSlot.tsx)이 사이드바+두 다이얼로그를 함께 들고, 레거시 셸이 `mode`로 고른다. DOM 통합은 여전히 D-17 | P0-4 |
-| P0-4b Archive 분리 | **D-20.** 보관된 작업을 10번째 Scope로 승격(`scopeRegistry`+`scopeQuery`+segment+view policy+count), 보관된 프로젝트는 SpaceHub로 | P0-4a, P0-5 |
+| P0-4b-1 Won't Do | **D-23.** `wontDoAt` 터미널 마커 + `wontDo` Scope + "안 함으로 표시" 액션·undo | P0-4a |
+| P0-4b-2 상태 술어 통합 | **D-24.** `isTaskActive`/`isTaskOpen`을 export하고 `status !== "archived"` 15곳이 그것을 쓰게 한다 | P0-4b-1 |
+| P0-4b-3 Task Archive 폐기 | **D-20.** 기존 `archived` Task를 `wontDoAt`으로 이주, 사이드바 `보관함` 행 제거, 하단 = 완료·안 함·휴지통 | P0-4b-2 |
+| P0-4b-4 프로젝트 Archive | **D-20의 남은 절반.** 보관된 프로젝트를 SpaceHub로 | P0-4b-3, P0-5 |
 | P0-5 Tree | **부활** (D-14). 새로 그리지 않고 기존 [`SpaceTree.tsx`](src/components/sidebar/SpaceTree.tsx)를 `mode="space"` 슬롯에 꽂는다 | P0-3 |
 | P0-6 Main Header | `tm-header`를 새 셸 기준으로 정리. 뷰 전환은 현행 유지(D-09) | P0-2 |
 | P0-7 Create/Menu | **완료** (Add List v0.13.0) | — |
