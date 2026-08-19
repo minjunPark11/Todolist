@@ -40,6 +40,21 @@
     grid-template-columns: var(--context-sidebar-w, 248px) minmax(0, 1fr);
   }
 
+  /* Main is pinned to the content column, and this is not tidiness.
+     `.app-shell`'s other children do not occupy grid tracks: the mobile menu
+     button is `display: none` above 1024, and the AI chat and the toast stack
+     are `position: fixed`. So on a page whose module has NO sidebar (§3.3's
+     `none` — Calendar, Focus, Matrix, Settings) `main` was the only grid item
+     left, auto-placement put it in the FIRST column, and that column is 0px
+     wide by §3.30. The content rendered 64px wide against the Rail.
+
+     Auto-placement was doing the right thing only while a sidebar happened to
+     be sitting in front of it. Saying which column Main is in removes the
+     coincidence. */
+  .app-frame .app-shell > main {
+    grid-column: 2;
+  }
+
   .app-frame .tm-shell {
     grid-template-columns: var(--context-sidebar-w, 248px) minmax(0, 1fr) auto;
   }

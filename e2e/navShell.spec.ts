@@ -222,6 +222,32 @@ test.describe("the Context Sidebar frame", () => {
     expect({ tasks, legacy }).toEqual({ tasks: 100, legacy: 100 });
   });
 
+  /**
+   * The bug this catches shipped in two releases.
+   *
+   * `.app-shell`'s other children take no grid track — the mobile menu button
+   * is `display: none` above 1024, and the AI chat and toast stack are
+   * `position: fixed`. So on a module with no sidebar (§3.3's `none`) `main`
+   * was the only grid item, auto-placement dropped it into the first column,
+   * and §3.30 makes that column 0px. Calendar, Focus, Matrix and Settings all
+   * rendered their content 64px wide against the Rail.
+   *
+   * Every unit test passed the whole time: jsdom computes no grid.
+   */
+  test("Main fills the content column on a module with no sidebar", async ({ page }) => {
+    await openApp(page);
+
+    for (const item of ["Calendar", "Focus", "Matrix", "Settings"]) {
+      await rail(page, item).click();
+      await expect(page.locator('.app-frame[data-sidebar-mode="none"]')).toHaveCount(1);
+
+      const width = await page.locator(".app-shell > main").evaluate((el) => Math.round(el.getBoundingClientRect().width));
+      const viewport = page.viewportSize()!.width;
+      // Everything but the 56px Rail, give or take a scrollbar.
+      expect({ item, wide: width > viewport - 100 }).toEqual({ item, wide: true });
+    }
+  });
+
   test("the Main header starts on the same line as the sidebar (§7, P0-6)", async ({ page }) => {
     await openApp(page);
 
