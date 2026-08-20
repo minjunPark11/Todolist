@@ -711,38 +711,32 @@
   list-style: none;
 }
 
-.tm-card {
-  display: flex;
-  align-items: center;
+/* A card is this same row wearing a different surface (TICKTICK_COMPONENT_13
+   §3): the reference draws one component for both and changes only what is
+   painted under it. Here that is the border, the radius and an opaque fill
+   replacing the row's separator — the markup above is untouched, which is what
+   lets the Board finish a Task and show its priority without a second row
+   implementation. */
+.tm-task.is-card {
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
   border-radius: 10px;
   background: var(--surface, #fff);
-  font-size: 14px;
   cursor: grab;
 }
 
-.tm-card.is-dragging {
-  opacity: 0.5;
+/* The card does not answer hover, and that is measured, not an oversight
+   (TICKTICK_COMPONENT_13 §7): the reference's card is a drag target, and a
+   surface that lights up every time the pointer crosses it makes a column of
+   twenty cards restless. Stated at .tm-task.is-card:hover rather than left to
+   source order, so moving this block cannot hand the card a hover by accident. */
+.tm-task.is-card:hover {
+  background: var(--surface, #fff);
 }
 
-.tm-card.is-open {
+.tm-task.is-card.is-open {
   border-color: var(--accent, #0a84ff);
-}
-
-.tm-card-open {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .tm-card-move select {
@@ -1126,7 +1120,6 @@
   /* §15.12's floor, applied wherever a finger has to land. */
   .tm-row,
   .tm-task-open,
-  .tm-card-open,
   .tm-view,
   .tm-chip {
     min-height: 44px;
@@ -1178,7 +1171,7 @@
    dropped without changing what anything means. */
 @media (prefers-reduced-motion: reduce) {
   .tm-sidebar,
-  .tm-card,
+  .tm-task,
   .tm-column {
     transition: none !important;
   }

@@ -56,6 +56,7 @@ import { INBOX_COLUMNS, inboxBucketOf, listBoardColumns, moveToInboxBucket, type
 import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
 import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
+import { TaskRowContent } from "./TaskRowContent";
 import { TaskGanttView } from "../TaskGanttView";
 import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
@@ -645,6 +646,7 @@ export function TasksModule(props: TasksModuleProps) {
             openTaskId={state.taskId}
             onOpen={openTask}
             onDrop={dropOnBoard}
+            onToggleDone={toggleDone}
             canReorder={policy.canManualReorder}
             onContextMenu={(task, x, y) => setMenu(taskMenuAt(task, x, y))}
           />
@@ -685,41 +687,7 @@ export function TasksModule(props: TasksModuleProps) {
                   {/* The handle is the affordance, not the mechanism — the whole
                       row is draggable, and this is what says so (audit L-17). */}
                   {policy.canManualReorder ? <span className="tm-task-handle" aria-hidden="true" /> : null}
-                  {/* A 17px box with the row's full height as its hit area. That
-                      is the reference's own design (audit §3.1), and the reason
-                      this is a label around the input rather than a bare input. */}
-                  <label className="tm-task-check">
-                    <input
-                      type="checkbox"
-                      checked={done}
-                      aria-label={t(done ? "tasks.reopenTask" : "tasks.completeTask", { title: task.title })}
-                      onChange={() => toggleDone(task)}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="tm-task-open"
-                    // §16.34: a row opens a Task, and a screen reader should say
-                    // so rather than reading the title as if it were a heading.
-                    aria-label={t("tasks.openTask", { title: task.title })}
-                    onClick={() => openTask(task.id)}
-                  >
-                    <span className={`tm-task-title${done ? " is-done" : ""}`}>{task.title}</span>
-                    {/* Priority was stored and never drawn (audit §3.1): a Task
-                        could be High and look like every other row. */}
-                    {task.priority !== "none" ? (
-                      <span
-                        className={`tm-task-priority is-${task.priority}`}
-                        aria-label={t(`priority.${task.priority}`)}
-                        title={t(`priority.${task.priority}`)}
-                      >
-                        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-                          <path d="M6 21V4h11l-2.2 4L17 12H6" fill="currentColor" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-                        </svg>
-                      </span>
-                    ) : null}
-                    {task.dueDate ? <span className="tm-task-due">{task.dueDate}</span> : null}
-                  </button>
+                  <TaskRowContent task={task} onOpen={openTask} onToggleDone={toggleDone} />
                   {/* The other half of L-17, and the reason the menu is a
                       component: a right-click is not discoverable and does not
                       exist on a touch screen, so the same menu needs a button

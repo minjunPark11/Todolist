@@ -15,6 +15,7 @@ import { useRef, useState } from "react";
 import type { Task } from "../../types";
 import type { BoardColumn } from "../../domain/tasks/board";
 import { useT } from "../../i18n";
+import { TaskRowContent } from "./TaskRowContent";
 
 interface TaskBoardProps {
   columns: BoardColumn[];
@@ -24,6 +25,8 @@ interface TaskBoardProps {
   columnOf: (task: Task) => string;
   openTaskId: string;
   onOpen: (taskId: string) => void;
+  /** The Board finishes a Task the same way the List does (TICKTICK_COMPONENT_13 §3). */
+  onToggleDone: (task: Task) => void;
   /**
    * A card was dropped. `index` is its place among the column's other cards.
    *
@@ -40,7 +43,7 @@ interface TaskBoardProps {
   onContextMenu?: (task: Task, x: number, y: number) => void;
 }
 
-export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onDrop, canReorder, onContextMenu }: TaskBoardProps) {
+export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onToggleDone, onDrop, canReorder, onContextMenu }: TaskBoardProps) {
   const { t } = useT();
   // Which card is being dragged, in a ref as well as in state. The state is
   // what dims the card; the ref is what the drop reads, because a handler
@@ -125,7 +128,7 @@ export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onDr
               {cards.map((task, index) => (
                 <li
                   key={task.id}
-                  className={`tm-card${task.id === openTaskId ? " is-open" : ""}${dragging === task.id ? " is-dragging" : ""}`}
+                  className={`tm-task is-card${task.id === openTaskId ? " is-open" : ""}${dragging === task.id ? " is-dragging" : ""}`}
                   draggable
                   onDragStart={() => startDrag(task.id)}
                   onDragEnd={endDrag}
@@ -145,10 +148,7 @@ export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onDr
                     onContextMenu(task, event.clientX, event.clientY);
                   }}
                 >
-                  <button type="button" className="tm-card-open" onClick={() => onOpen(task.id)}>
-                    <span className={`tm-task-title${task.status === "done" ? " is-done" : ""}`}>{task.title}</span>
-                    {task.dueDate ? <span className="tm-task-due">{task.dueDate}</span> : null}
-                  </button>
+                  <TaskRowContent task={task} onOpen={onOpen} onToggleDone={onToggleDone} />
 
                   {/* The non-drag path (§16.30). Same command, no gesture. */}
                   <label className="tm-card-move">
