@@ -104,7 +104,7 @@
 .sdv-status-needs_attention { background: #fff3e0; color: #c2570a; }
 .sdv-status-deadline_risk { background: #fdebec; color: #d32f2f; }
 .sdv-status-blocked { background: #fdebec; color: #b3261e; }
-.sdv-status-inactive { background: var(--bg-hover); color: var(--text-secondary); }
+.sdv-status-inactive { background: var(--surface-2); color: var(--text-secondary); }
 .sdv-status-review_due { background: #f1edff; color: #6d4aff; }
 .sdv-status-pending_items { background: #fff3e0; color: #c2570a; }
 
@@ -161,7 +161,7 @@
 .sdv-progress {
   height: 6px;
   border-radius: var(--radius-pill);
-  background: var(--bg-hover);
+  background: var(--surface-2);
   overflow: hidden;
   margin-top: auto;
 }
@@ -343,7 +343,7 @@
 }
 
 .sdv-record-list li button:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
 }
 
 .sdv-record-list li {
@@ -445,7 +445,7 @@
 .sdv-modal-head button,
 .sdv-drawer-head button {
   border: 0;
-  background: var(--bg-hover);
+  background: var(--surface-2);
   border-radius: var(--radius-pill);
   width: 30px;
   height: 30px;

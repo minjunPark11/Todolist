@@ -238,7 +238,7 @@
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  background: var(--bg-hover);
+  background: var(--surface-2);
   color: var(--text-secondary);
 }
 
@@ -294,7 +294,7 @@
 .tdy-capture-chip {
   border-radius: var(--radius-pill);
   padding: 3px 10px;
-  background: var(--bg-hover);
+  background: var(--surface-2);
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
@@ -347,7 +347,7 @@
   place-items: center;
   padding: 0 6px;
   border-radius: var(--radius-pill);
-  background: var(--bg-hover);
+  background: var(--surface-2);
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
@@ -624,7 +624,7 @@ button.tdy-row-title {
 
 .tdy-chip:hover {
   border-color: var(--border-strong);
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
 }
 
 .tdy-chip-more {
@@ -774,7 +774,7 @@ button.tdy-row-title {
   font-weight: 600;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
-  background: var(--bg-hover);
+  background: var(--surface-2);
   color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
 }

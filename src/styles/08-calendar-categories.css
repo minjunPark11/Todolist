@@ -99,7 +99,7 @@
 
 .gcal-cat-menu-btn:hover {
   color: var(--text-primary);
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
 }
 
 @media (hover: none) {
@@ -445,7 +445,7 @@
 }
 
 .ff-cat-menu button:hover:not(:disabled) {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
 }
 
 .ff-cat-menu button:disabled {
@@ -588,7 +588,7 @@
 }
 
 .expandable-add > button:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
 }
 
 .expandable-add-input-row {
@@ -745,7 +745,7 @@
 }
 
 .gcal-taskpanel-rail-btn:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
   color: var(--text-primary);
 }
 
@@ -838,7 +838,7 @@
 }
 
 .gcal-taskpanel-row:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
   border-color: var(--border-strong);
 }
 

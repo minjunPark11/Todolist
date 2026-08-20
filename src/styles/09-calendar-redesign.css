@@ -28,7 +28,7 @@
 }
 
 .gcal-nav button:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
   color: var(--text-primary);
 }
 
@@ -41,7 +41,7 @@
 }
 
 .gcal-icon-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
   color: var(--text-primary);
 }
 
@@ -64,7 +64,7 @@
   gap: 2px;
   padding: 3px;
   border-radius: var(--radius-md);
-  background: var(--bg-hover);
+  background: var(--surface-2);
 }
 
 .gcal-modes button {
@@ -103,7 +103,7 @@
 }
 
 .gcal-mini-day:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-nav);
 }
 
 .gcal-mini-day.is-today {
@@ -215,7 +215,7 @@
 }
 
 .gcal-time-slot:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
 }
 
 .gcal-timegrid-head {

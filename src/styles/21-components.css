@@ -94,7 +94,7 @@
 .ff-btn:not(:disabled):hover,
 .tdy-btn:not(:disabled):hover,
 .sdv-btn:not(:disabled):hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
 }
 
 .ff-btn:disabled,
@@ -141,7 +141,7 @@
 }
 
 .ff-btn-ghost:not(:disabled):hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
 }
 
 /* Danger. Outlined rather than filled: a red fill on a list of buttons reads
@@ -233,9 +233,12 @@ textarea {
   cursor: pointer;
 }
 
-.ff-row:hover,
+.ff-row:hover {
+  background: var(--bg-hover-content);
+}
+
 .gcal-cat-row:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-nav);
 }
 
 .ff-row.is-selected,
@@ -278,7 +281,7 @@ textarea {
 
 .ff-context-menu-item:hover,
 .ff-context-menu-item:focus-visible {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
 }
 
 .ff-context-menu-item.is-selected {
@@ -441,7 +444,7 @@ textarea {
 
 .pjh-menu:hover,
 .pjh-menu:focus-visible {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
   color: var(--text-primary);
 }
 

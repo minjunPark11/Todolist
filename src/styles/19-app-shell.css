@@ -187,7 +187,7 @@
 .context-sidebar-collapse:hover,
 .context-sidebar-expand:hover {
   color: var(--ff-text);
-  background: var(--ff-hover);
+  background: var(--bg-hover-nav);
 }
 
 .context-sidebar-collapse:focus-visible,
@@ -292,7 +292,7 @@
 
 .rail-item:hover {
   color: var(--ff-text);
-  background: var(--ff-hover);
+  background: var(--bg-hover-nav);
 }
 
 .rail-item:active {
@@ -309,7 +309,7 @@
 /* §2.26: the Account popover's open state is its own thing, not `active`. */
 .rail-item.is-open {
   color: var(--ff-text);
-  background: var(--ff-hover);
+  background: var(--bg-hover-nav);
 }
 
 .rail-item:focus-visible {
@@ -407,7 +407,7 @@
 
 .tm-drawer-wontdo:hover {
   color: var(--ff-text);
-  background: var(--ff-hover);
+  background: var(--bg-hover-content);
 }
 
 .tm-drawer-wontdo:focus-visible {

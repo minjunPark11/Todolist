@@ -859,7 +859,7 @@
    weight, same muted colour, no background. Nothing said "press me". */
 .tm-section-action:hover {
   color: var(--text, #1c1c1e);
-  background: var(--hover, rgba(0, 0, 0, 0.04));
+  background: var(--bg-hover-nav);
 }
 
 /* The List Manager borrowed the command palette's backdrop for as long as the
@@ -1935,7 +1935,7 @@
 }
 
 .tm-task-menu:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
   color: var(--text-primary);
 }
 

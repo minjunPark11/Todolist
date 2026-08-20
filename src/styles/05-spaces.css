@@ -125,7 +125,7 @@
 }
 
 .foc-option-row[aria-checked="false"] i {
-  background: var(--bg-hover);
+  background: var(--surface-2);
   color: var(--text-secondary);
 }
 
@@ -222,7 +222,7 @@
   min-width: 24px;
   height: 22px;
   border-radius: var(--radius-pill);
-  background: var(--bg-hover);
+  background: var(--surface-2);
   color: var(--text-secondary);
 }
 
@@ -492,7 +492,7 @@
   height: 8px;
   border-radius: var(--radius-pill);
   overflow: hidden;
-  background: var(--bg-hover);
+  background: var(--surface-2);
 }
 
 .foc-project-bars b {

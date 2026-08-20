@@ -101,7 +101,7 @@
   border-top: 1px solid var(--border-subtle, #f3f4f6);
 }
 
-.tlv-row:hover { background: var(--surface-hover, #f9fafb); }
+.tlv-row:hover { background: var(--bg-hover-content); }
 .tlv-row.is-selected { background: var(--surface-selected, #eff6ff); }
 .tlv-row.is-done .tlv-link { color: var(--text-muted, #6b7280); text-decoration: line-through; }
 
