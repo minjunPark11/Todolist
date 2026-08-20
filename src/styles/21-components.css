@@ -513,20 +513,16 @@ textarea {
    §4 notes was the only transition anywhere in that shell. There is no track
    and there are no arrows; the reference's bar has zero child elements.
 
-   `fixed` rather than `absolute` because what scrolls in this app is the page.
    `pointer-events: none` because there is nothing to grab: §4.1 measured the
    bar staying invisible even with the pointer directly on it, so dragging was
    never something a reader could aim at, and inventing it here would be
-   inventing behaviour rather than matching it.
-
-   z-index sits above the app's own bands (the 180–240 group) and below the
-   floating tier that starts at 1200. A bar drawn over an open modal would be
-   reporting the page's scroll on top of something that is not the page. */
-.page-scrollbar {
-  position: fixed;
+   inventing behaviour rather than matching it. */
+.overlay-scrollbar {
+  position: absolute;
   top: 0;
   right: 2px;
-  z-index: 300;
+  /* Over the calendar's sticky header band, which sits at 30. */
+  z-index: 40;
   width: 6px;
   border-radius: 7px;
   background: var(--scrollbar-thumb);
@@ -535,6 +531,16 @@ textarea {
   transition: opacity 0.3s;
 }
 
-.page-scrollbar.is-visible {
+/* The page's own bar. `fixed` because its scroller is the window rather than
+   a box inside the layout, and a z-index above the app's bands (the 180–240
+   group) but below the floating tier that starts at 1200 — a bar drawn over an
+   open modal would be reporting the page's scroll on top of something that is
+   not the page. */
+.overlay-scrollbar.is-page {
+  position: fixed;
+  z-index: 300;
+}
+
+.overlay-scrollbar.is-visible {
   opacity: 1;
 }

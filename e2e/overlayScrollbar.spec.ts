@@ -13,17 +13,19 @@
 import { expect, test } from "@playwright/test";
 import { openApp } from "./addList.helpers";
 
-const BAR = ".page-scrollbar";
+const BAR = ".overlay-scrollbar.is-page";
 
 /** Short enough that the shell's own 720px minimum overflows it. */
 const SHORT = { width: 1440, height: 320 };
 
-async function opacityOf(page: import("@playwright/test").Page): Promise<number> {
+async function opacityIn(page: import("@playwright/test").Page, selector: string): Promise<number> {
   return page.evaluate((sel) => {
     const el = document.querySelector(sel as string);
     return el ? parseFloat(getComputedStyle(el).opacity) : -1;
-  }, BAR);
+  }, selector);
 }
+
+const opacityOf = (page: import("@playwright/test").Page) => opacityIn(page, BAR);
 
 test.describe("the page scrollbar", () => {
   test.skip(({ viewport }) => (viewport?.width ?? 0) < 1024, "one shell width is enough for a scroll rule");
@@ -108,5 +110,100 @@ test.describe("the page scrollbar", () => {
       return { bottom: box.bottom, viewport: window.innerHeight };
     }, BAR);
     expect(atEnd.bottom).toBeCloseTo(atEnd.viewport, 0);
+  });
+});
+
+// The calendar's time grid scrolls inside itself, and an element — unlike the
+// page — has an outside. So this is where §4.1's rule can be kept literally:
+// after a scroll the bar stays for as long as the pointer is in the grid, and
+// only starts fading once it leaves. The page's bar had to approximate that
+// with "when scrolling stops", because a window has no outside to leave.
+test.describe("the calendar's own scrollbar", () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 1024, "the time grid needs a desktop column");
+
+  const GRID = ".gcal-timegrid .overlay-scrollbar";
+
+  /**
+   * On the calendar, with the arrival scroll finished and the bar back down.
+   *
+   * The view scrolls itself to the current hour when it mounts. That is a real
+   * scroll, so it shows the bar — and waiting only for the bar to read 0 is
+   * not enough, because "0" is also what it reads in the moment BEFORE that
+   * scroll happens. On a cold start, where the first compile pushed the
+   * arrival scroll out by seconds, a test could pass that wait, hover the
+   * grid, and then watch the auto-scroll reveal the bar underneath it. So the
+   * scroll position has to stop moving first, and only then the opacity.
+   */
+  async function openCalendar(page: import("@playwright/test").Page) {
+    await openApp(page);
+    await page.locator(".global-rail").getByRole("button", { name: "Calendar", exact: true }).click();
+    await expect(page.locator(".gcal-time-scroll")).toBeVisible();
+
+    const scrollTop = () =>
+      page.evaluate(() => document.querySelector(".gcal-time-scroll")?.scrollTop ?? -1);
+    await expect
+      .poll(
+        async () => {
+          const first = await scrollTop();
+          await page.waitForTimeout(150);
+          return first === (await scrollTop());
+        },
+        { timeout: 10000 },
+      )
+      .toBe(true);
+
+    await expect.poll(() => opacityIn(page, GRID), { timeout: 6000 }).toBe(0);
+  }
+
+  test("stays hidden until the grid is actually scrolled", async ({ page }) => {
+    await openCalendar(page);
+
+    const box = (await page.locator(".gcal-time-scroll").boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(600);
+    expect(await opacityIn(page, GRID), "hovering the grid revealed it").toBe(0);
+
+    await page.mouse.wheel(0, 240);
+    await expect.poll(() => opacityIn(page, GRID), { timeout: 2000 }).toBe(1);
+  });
+
+  test("stays while the pointer is in the grid, and leaves when it leaves", async ({ page }) => {
+    await openCalendar(page);
+
+    const box = (await page.locator(".gcal-time-scroll").boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, 240);
+    await expect.poll(() => opacityIn(page, GRID), { timeout: 2000 }).toBe(1);
+
+    // §4.1 watched it hold for 3.5 seconds with the pointer inside. The page's
+    // bar would be long gone by now.
+    await page.waitForTimeout(3000);
+    expect(await opacityIn(page, GRID), "it faded while the pointer was still inside").toBe(1);
+
+    await page.mouse.move(box.x - 40, box.y + box.height / 2);
+    await expect.poll(() => opacityIn(page, GRID), { timeout: 5000 }).toBe(0);
+  });
+
+  test("is drawn against the grid, not against the window", async ({ page }) => {
+    await openCalendar(page);
+
+    const geometry = await page.evaluate((sel) => {
+      const bar = document.querySelector(sel as string) as HTMLElement;
+      const scroller = document.querySelector(".gcal-time-scroll") as HTMLElement;
+      const b = bar.getBoundingClientRect();
+      const s = scroller.getBoundingClientRect();
+      return {
+        position: getComputedStyle(bar).position,
+        width: b.width,
+        fromScrollerRight: s.right - b.right,
+        height: b.height,
+        expected: (scroller.clientHeight * scroller.clientHeight) / scroller.scrollHeight,
+      };
+    }, GRID);
+
+    expect(geometry.position).toBe("absolute");
+    expect(geometry.width).toBe(6);
+    expect(geometry.fromScrollerRight).toBe(2);
+    expect(geometry.height).toBeCloseTo(geometry.expected, 1);
   });
 });

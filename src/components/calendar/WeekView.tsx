@@ -18,6 +18,7 @@ import {
 } from "../../utils/calendarTime";
 import { getDayNumber, todayValue } from "../../utils/date";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
+import { OverlayScrollbar } from "../common/OverlayScrollbar";
 import { useT } from "../../i18n";
 import { MotionDropZone } from "../motion/MotionDropZone";
 import { reducedTransition, transitions } from "../../motion/transitions";
@@ -956,6 +957,11 @@ export function WeekView({
           })}
         </div>
       </div>
+
+      {/* The time grid scrolls inside itself, so the app-wide bar in AppShell
+          reports the page and not this. Positioned against `.gcal-timegrid`,
+          which the scroller fills. */}
+      <OverlayScrollbar scrollerRef={scrollRef} />
     </div>
   );
 }

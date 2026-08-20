@@ -481,6 +481,12 @@
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
+  /* The containing block for this view's own overlay scrollbar: the time grid
+     scrolls inside itself, so the page's bar cannot report it. Safe to add —
+     every absolutely positioned descendant here already resolves against
+     `.gcal-timegrid-body` or `.gcal-now-indicator`, both nearer than this,
+     which was checked in the browser before adding it. */
+  position: relative;
 }
 
 /* Spec §6.4/§7.5: only the time-grid body scrolls; the weekday header and
