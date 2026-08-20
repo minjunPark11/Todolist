@@ -7,9 +7,16 @@
    ============================================================================ */
 
 :root {
-  /* §2.3.3: an invariant, not a preference. The Rail is 56px whether the
-     sidebar is shown, hidden, collapsed, or replaced by another module. */
-  --rail-w: 56px;
+  /* §2.3.3: an invariant, not a preference — the Rail is the same width
+     whether the sidebar is shown, hidden, collapsed, or replaced by another
+     module. The number is 50 because that is what TICKTICK_COMPONENT_08 §2.1
+     measured, right border included.
+     It moved from 56 together with the icon, and only together: §7 worked out
+     that narrowing alone makes the Rail worse. The hit area is 40 either way,
+     so at 56 the icon had 8px of air on each side and at 50 it would have 5 —
+     a 20px glyph in a tighter box, which is smaller AND more cramped. Paired
+     with the icon going to 28 it lands on the reference's density instead. */
+  --rail-w: 50px;
   --rail-item: 40px;
   /* Appendix A.4. One number for both headers so the Context Sidebar's title
      row and the Main title sit on the same line — the seam between the two
@@ -213,12 +220,16 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* 16 at the top, 8 everywhere else. The first thing in the Rail used to be
-     the brand mark — decoration, and fine hard against the window edge. It is
-     the Tasks button now, and 8px from an edge that is also a window resize
-     target is not enough room for it. 16 is what
-     TICKTICK_COMPONENT_08 §2.2 measured above the reference's first element. */
-  padding: 16px 8px 8px;
+  /* 16 at the top, 4 at the sides, 8 at the bottom. The first thing in the
+     Rail used to be the brand mark — decoration, and fine hard against the
+     window edge. It is the Tasks button now, and 8px from an edge that is also
+     a window resize target is not enough room for it. 16 is what
+     TICKTICK_COMPONENT_08 §2.2 measured above the reference's first element.
+     The sides are 4 rather than 8 because the Rail is 50 now: 50 − 1 border −
+     8 would leave 41px of content for a 40px hit area, which fits but with
+     nothing to spare on either side. 4 puts the hit area where §2.1 measured
+     it, at x 5–45 of 50. */
+  padding: 16px 4px 8px;
   overflow: hidden;
   color: var(--ff-text);
   /* §11.6: Rail, Sidebar and Main are three surfaces, not one. They were all
@@ -247,11 +258,14 @@
 
 /* --- §2.5 exact spacing --- */
 
+/* §2.2 measured a 50px step for every item, top group and bottom group alike:
+   a 40px hit area with 10 between, not the 4 this had. The rhythm is what
+   makes a column of icons read as a list rather than as a stack. */
 .rail-primary,
 .rail-utilities {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
 }
 
 .rail-spacer {

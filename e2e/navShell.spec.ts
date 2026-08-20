@@ -91,7 +91,7 @@ test.describe("the Context Sidebar frame", () => {
     expect(Math.round(mainBefore - mainAfter)).toBe(40);
     // §2.3.3, the invariant the whole frame rests on.
     expect((await page.locator(".global-rail").boundingBox())?.width).toBe(railBefore);
-    expect(railBefore).toBe(56);
+    expect(railBefore).toBe(50);
   });
 
   test("CS-02 — dragging far left stops at the minimum and does not collapse", async ({ page }) => {
@@ -178,7 +178,7 @@ test.describe("the Context Sidebar frame", () => {
     await expect(page).toHaveURL(/\/calendar$/);
     // §2.16: a Global Module owns its whole width.
     await expect(page.locator("#context-sidebar")).toHaveCount(0);
-    expect((await page.locator(".global-rail").boundingBox())?.width).toBe(56);
+    expect((await page.locator(".global-rail").boundingBox())?.width).toBe(50);
 
     await rail(page, "Tasks").click();
     await expect(page.locator("#context-sidebar")).toBeVisible();

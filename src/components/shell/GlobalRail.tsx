@@ -37,8 +37,11 @@ type RailIconName = RailNavItem | "search" | "ai";
 
 function RailIcon({ name }: { name: RailIconName }) {
   const common = {
-    width: 20,
-    height: 20,
+    // 28, from §7: the reference's icon fills 70% of its 40px hit area and
+    // ours filled 50%, which is what made the Rail read as empty rather than
+    // as quiet.
+    width: 28,
+    height: 28,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
