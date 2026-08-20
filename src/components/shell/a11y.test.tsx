@@ -50,8 +50,6 @@ function renderShell(sidebar: ContextSidebarState = sidebarState()) {
             searchOpen={false}
             onOpenAi={() => {}}
             aiOpen={false}
-            accountEmail="someone@example.com"
-            onSignOut={() => {}}
           />
         }
         sidebar={sidebar}
@@ -97,15 +95,6 @@ describe("the App Shell's landmarks", () => {
 
   it("has no serious or critical violation collapsed, where the expand button lives", async () => {
     const { container } = renderShell(sidebarState({ visibility: "collapsed", effectiveWidth: 0 }));
-    expect(await seriousViolations(container)).toEqual([]);
-  });
-
-  it("has no serious or critical violation with the account popover open", async () => {
-    const user = userEvent.setup();
-    const { container } = renderShell();
-    await user.click(screen.getByRole("button", { name: "계정" }));
-
-    expect(container.querySelector('[role="menu"]')).not.toBeNull();
     expect(await seriousViolations(container)).toEqual([]);
   });
 
@@ -188,15 +177,30 @@ describe("the Global Rail's ARIA (§2.33)", () => {
     expect(current[0].getAttribute("aria-label")).toBe("작업");
   });
 
-  it("says the account button opens a menu, and whether it is open", async () => {
-    const user = userEvent.setup();
-    renderShell();
-    const account = screen.getByRole("button", { name: "계정" });
+  /**
+   * What the Rail holds, in order.
+   *
+   * Two icons used to sit above Tasks and neither could be used: a brand mark
+   * that was `aria-hidden` and not a button, and an account avatar whose only
+   * two actions — Settings and Sign out — the Settings page already renders.
+   * Search was below them all, past a 300px gap, which put the most-reached-
+   * for item furthest away; it sits with the destinations now, as
+   * TICKTICK_COMPONENT_08 §1 measured in the reference.
+   *
+   * Asserted as the whole list rather than as absences, because "no avatar"
+   * would still pass if the order silently changed underneath it.
+   */
+  it("holds the five destinations, then Search, then the two utilities", () => {
+    const { container } = renderShell();
+    const labels = [...container.querySelectorAll(".global-rail .rail-item")].map((item) =>
+      item.getAttribute("aria-label"),
+    );
 
-    expect(account.getAttribute("aria-haspopup")).toBe("menu");
-    expect(account.getAttribute("aria-expanded")).toBe("false");
-    await user.click(account);
-    expect(account.getAttribute("aria-expanded")).toBe("true");
+    expect(labels).toEqual(["작업", "매트릭스", "캘린더", "집중", "검색", "AI 어시스턴트", "설정"]);
+    // Settings had two doors while the account popover also offered it.
+    expect(labels.filter((label) => label === "설정")).toHaveLength(1);
+    expect(container.querySelector(".rail-brand")).toBeNull();
+    expect(container.querySelector(".rail-avatar")).toBeNull();
   });
 
   /**

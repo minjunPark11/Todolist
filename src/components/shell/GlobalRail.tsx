@@ -5,6 +5,26 @@
 // grows one entry per screen is the flat sidebar this replaces, drawn
 // vertically. Those are all places inside Tasks.
 //
+// Two things that used to sit above the first item are gone, and both were
+// occupying the most reachable space in the app to do nothing.
+//
+// The brand mark was `aria-hidden` and not a button: 40px at the very top
+// that could not be clicked, read or navigated to. TICKTICK_COMPONENT_08 §1
+// measured the reference's Rail starting straight at the avatar with no mark
+// at all.
+//
+// The account avatar offered exactly two actions, Settings and Sign out, and
+// the Settings page already renders both through `AccountSection` — so it was
+// a second door to a room that has one, drawn as a "·" whenever nobody is
+// signed in. Removing it also ends the duplication of Settings, which was
+// reachable from the popover AND from the Rail item at the bottom.
+//
+// Search moved up to sit with the destinations, which is where §1 measured it
+// in the reference — fourth of six, not exiled below a 300px gap. It still
+// opens a dialog rather than navigating, so it still never takes the active
+// state (§2.14); what changed is where the pointer has to travel, not what
+// the button does.
+//
 // Labels are hidden (§2.2) and every item carries a tooltip instead (§2.28,
 // which calls tooltips P0-required for icon-only navigation, not a nicety).
 // The tooltip is CSS rather than a library: right placement, 8px offset, 450ms
@@ -128,9 +148,6 @@ interface GlobalRailProps {
   onOpenAi: () => void;
   /** The same open-utility state, for the panel the FAB used to open. */
   aiOpen: boolean;
-  /** "" when signed out — the Rail still shows the slot, with no identity. */
-  accountEmail: string;
-  onSignOut: () => void;
 }
 
 export function GlobalRail({
@@ -140,103 +157,11 @@ export function GlobalRail({
   searchOpen,
   onOpenAi,
   aiOpen,
-  accountEmail,
-  onSignOut,
 }: GlobalRailProps) {
   const { t } = useT();
-  const [accountOpen, setAccountOpen] = useState(false);
-  const accountRef = useRef<HTMLDivElement>(null);
-  const accountButtonRef = useRef<HTMLButtonElement>(null);
-  const popoverId = useId();
-
-  // §2.9's close conditions: outside click and Escape. Navigation closes it
-  // too, which falls out of the popover unmounting with the shell.
-  useEffect(() => {
-    if (!accountOpen) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false);
-    }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setAccountOpen(false);
-      // Escape returns the focus it took, or the user is left tabbing from
-      // the top of the document (§2.32).
-      accountButtonRef.current?.focus();
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [accountOpen]);
-
-  const initial = accountEmail.trim().charAt(0).toUpperCase();
 
   return (
     <nav className="global-rail" aria-label={t("rail.label")}>
-      {/* §2.8: a mark, never a text logo — 56px has no room for one. */}
-      <div className="rail-brand" aria-hidden="true">
-        <img className="rail-brand-img" src="/icon_focustodo.png" alt="" />
-      </div>
-
-      <div className="rail-account" ref={accountRef}>
-        <button
-          type="button"
-          ref={accountButtonRef}
-          className={`rail-item rail-avatar${accountOpen ? " is-open" : ""}`}
-          aria-label={t("rail.account")}
-          aria-expanded={accountOpen}
-          aria-haspopup="menu"
-          aria-controls={accountOpen ? popoverId : undefined}
-          onClick={() => setAccountOpen((open) => !open)}
-        >
-          <span className="rail-avatar-initial">{initial || "·"}</span>
-          <span className="rail-tip" role="tooltip">
-            {t("rail.account")}
-          </span>
-        </button>
-        {accountOpen ? (
-          <div className="rail-popover" id={popoverId} role="menu">
-            <div className="rail-popover-identity">
-              <span className="rail-popover-avatar">{initial || "·"}</span>
-              <span className="rail-popover-email">
-                {accountEmail || t("rail.accountSignedOut")}
-              </span>
-            </div>
-            <div className="rail-popover-divider" />
-            {/* §2.9: keep the account actions the product already has, and do
-                not invent new ones for the Rail's sake. */}
-            <button
-              type="button"
-              role="menuitem"
-              className="rail-popover-item"
-              onClick={() => {
-                setAccountOpen(false);
-                onNavigate("settings");
-              }}
-            >
-              {t("sidebar.settings")}
-            </button>
-            {accountEmail ? (
-              <button
-                type="button"
-                role="menuitem"
-                className="rail-popover-item"
-                onClick={() => {
-                  setAccountOpen(false);
-                  onSignOut();
-                }}
-              >
-                {t("rail.signOut")}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
       <div className="rail-primary">
         <RailButton
           icon="tasks"
@@ -266,17 +191,11 @@ export function GlobalRail({
           active={active === "focus"}
           onClick={() => onNavigate("focus")}
         />
-      </div>
-
-      <div className="rail-spacer" />
-
-      <div className="rail-utilities">
-        {/* §2.14: Search is a utility, not a module — it never takes the
-            active state away from where the user actually is.
-            §2.33/§11.24: but it does OPEN something, and D-29 is what makes
-            that true again. Under D-25 this button navigated, so it could
-            claim neither `haspopup` nor an open state — and pressing it lit a
-            different icon while this one sat there. It says what it does now. */}
+        {/* Placed with the destinations because that is where the reference
+            puts it (§1: fourth of six) and because it is the item people reach
+            for most — it was the furthest one to travel to. It is still a
+            utility underneath: no `active`, so it never lights, and
+            `haspopup="dialog"` says what it actually opens (§2.14, §2.33). */}
         <RailButton
           icon="search"
           label={t("rail.search")}
@@ -285,6 +204,11 @@ export function GlobalRail({
           haspopup="dialog"
           onClick={onOpenSearch}
         />
+      </div>
+
+      <div className="rail-spacer" />
+
+      <div className="rail-utilities">
         {/* V-4: the AI entry point, moved off the canvas and into the
             utilities. §1.5 lists what the Rail holds and this is not on it —
             the exception is D-19's reasoning applied again: the list bars

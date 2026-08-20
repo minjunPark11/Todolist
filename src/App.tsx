@@ -1358,8 +1358,6 @@ export default function App() {
         searchOpen={menuOpen}
         onOpenAi={() => setAiChatOpen((open) => !open)}
         aiOpen={aiChatOpen}
-        accountEmail={planner.auth.isSignedIn ? planner.auth.userEmail : ""}
-        onSignOut={planner.signOut}
       />
     );
   }

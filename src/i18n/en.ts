@@ -222,9 +222,6 @@ export const en: Dictionary = {
   "rail.matrix": "Matrix",
   "rail.search": "Search",
   "rail.ai": "AI assistant",
-  "rail.account": "Account",
-  "rail.accountSignedOut": "Not signed in",
-  "rail.signOut": "Log out",
   "shell.chrome": "Sidebar controls",
   "shell.resizeSidebar": "Resize sidebar",
 

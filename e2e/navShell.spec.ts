@@ -395,17 +395,11 @@ test.describe("the Global Rail", () => {
     await expect(page.locator(".cmd-menu")).toHaveCount(0);
   });
 
-  test("RAIL-03 — the Account popover does not move you", async ({ page }) => {
-    await openApp(page);
-    await rail(page, "Calendar").click();
-    await expect(page).toHaveURL(/\/calendar$/);
-
-    await rail(page, "Account").click();
-    await expect(page.locator('.global-rail [role="menu"]')).toBeVisible();
-
-    await expect(page).toHaveURL(/\/calendar$/);
-    await expect(page.locator(".global-rail [aria-current='page']")).toHaveAttribute("aria-label", "Calendar");
-  });
+  // RAIL-03 was here: the Account popover opening without moving you. The
+  // avatar is gone — its only two actions, Settings and Sign out, are both on
+  // the Settings page — so the case has no subject. The property it protected
+  // still holds for the two utilities that remain, and is asserted for each:
+  // RAIL-02 above for Search, and aiEntryPoint.spec.ts for the AI panel.
 
   test("RAIL-05 — the global Calendar is the Calendar item, and Tasks goes quiet", async ({ page }) => {
     await openApp(page);

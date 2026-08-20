@@ -36,7 +36,6 @@ const ALLOWED_OFF_SCALE = [
   ".gcal-taskpanel-rail-badge",
   ".foc-group-title small", // the count beside a Focus group, same pill
   ".ff-board-count", // and the one on a Matrix quadrant
-  ".rail-avatar-initial", // §11.40: Avatar round
   ".ff-color-swatch", // a colour is a dot, not a control
   ".tm-swatch", // the same dot, in the Add List dialog
   '[class*="tm-preview-"]', // a thumbnail of a layout, drawn at a fraction of the size

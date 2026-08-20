@@ -213,7 +213,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px;
+  /* 16 at the top, 8 everywhere else. The first thing in the Rail used to be
+     the brand mark — decoration, and fine hard against the window edge. It is
+     the Tasks button now, and 8px from an edge that is also a window resize
+     target is not enough room for it. 16 is what
+     TICKTICK_COMPONENT_08 §2.2 measured above the reference's first element. */
+  padding: 16px 8px 8px;
   overflow: hidden;
   color: var(--ff-text);
   /* §11.6: Rail, Sidebar and Main are three surfaces, not one. They were all
@@ -241,26 +246,6 @@
 }
 
 /* --- §2.5 exact spacing --- */
-
-.rail-brand {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--rail-item);
-  height: var(--rail-item);
-  margin-bottom: 8px;
-}
-
-.rail-brand-img {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-}
-
-.rail-account {
-  position: relative;
-  margin-bottom: 16px;
-}
 
 .rail-primary,
 .rail-utilities {
@@ -318,19 +303,6 @@
   outline-offset: 2px;
 }
 
-.rail-avatar-initial {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ff-text);
-  border-radius: 50%;
-  background: var(--ff-surface-muted);
-}
-
 /* --- §2.28 tooltip contract --- */
 
 .rail-tip {
@@ -377,78 +349,6 @@
   color: var(--ff-muted);
   background: var(--ff-surface-muted);
   border-radius: 6px;
-}
-
-/* --- §2.9 account popover --- */
-
-.rail-popover {
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 0;
-  z-index: 60;
-  width: 240px;
-  padding: 8px;
-  color: var(--ff-text);
-  background: var(--ff-surface);
-  border: 1px solid var(--ff-border);
-  border-radius: 10px;
-  box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.18));
-}
-
-.rail-popover-identity {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px;
-}
-
-.rail-popover-avatar {
-  display: flex;
-  flex: 0 0 28px;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 50%;
-  background: var(--ff-surface-muted);
-}
-
-.rail-popover-email {
-  overflow: hidden;
-  font-size: 12px;
-  color: var(--ff-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rail-popover-divider {
-  height: 1px;
-  margin: 6px 0;
-  background: var(--ff-border);
-}
-
-.rail-popover-item {
-  display: block;
-  width: 100%;
-  padding: 7px 8px;
-  font-size: 13px;
-  text-align: left;
-  color: var(--ff-text);
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.rail-popover-item:hover {
-  background: var(--ff-hover);
-}
-
-.rail-popover-item:focus-visible {
-  outline: 2px solid var(--ff-focus-ring);
-  outline-offset: -2px;
 }
 
 /* §2.39: below the mobile breakpoint the Rail would eat a sixth of the width.

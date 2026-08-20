@@ -221,9 +221,6 @@ export const ko: Dictionary = {
   "rail.matrix": "매트릭스",
   "rail.search": "검색",
   "rail.ai": "AI 어시스턴트",
-  "rail.account": "계정",
-  "rail.accountSignedOut": "로그인하지 않음",
-  "rail.signOut": "로그아웃",
   "shell.chrome": "사이드바 컨트롤",
   "shell.resizeSidebar": "사이드바 너비 조절",
 
