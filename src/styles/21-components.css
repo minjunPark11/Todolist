@@ -506,3 +506,35 @@ textarea {
 .ovs-card-head h3 {
   margin: 0;
 }
+
+/* --- the overlay scrollbar -----------------------------------------------
+   Every value here is measured (TICKTICK_COMPONENT_02 §4): 6px wide, radius 7,
+   the foreground at 30%, `right: 2px`, and `transition: opacity 0.3s` — which
+   §4 notes was the only transition anywhere in that shell. There is no track
+   and there are no arrows; the reference's bar has zero child elements.
+
+   `fixed` rather than `absolute` because what scrolls in this app is the page.
+   `pointer-events: none` because there is nothing to grab: §4.1 measured the
+   bar staying invisible even with the pointer directly on it, so dragging was
+   never something a reader could aim at, and inventing it here would be
+   inventing behaviour rather than matching it.
+
+   z-index sits above the app's own bands (the 180–240 group) and below the
+   floating tier that starts at 1200. A bar drawn over an open modal would be
+   reporting the page's scroll on top of something that is not the page. */
+.page-scrollbar {
+  position: fixed;
+  top: 0;
+  right: 2px;
+  z-index: 300;
+  width: 6px;
+  border-radius: 7px;
+  background: var(--scrollbar-thumb);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.page-scrollbar.is-visible {
+  opacity: 1;
+}

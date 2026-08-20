@@ -10,5 +10,8 @@ export default defineConfig({
     // `npm run test:e2e`. Vitest picking them up would try to execute
     // @playwright/test's runner inside the unit run.
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    // Shims for what jsdom leaves out. Guarded so the node-environment files,
+    // which are most of them, are unaffected.
+    setupFiles: ["./src/test/setup.ts"],
   },
 });

@@ -56,6 +56,10 @@
      extrapolation of the same alphas, not a measurement. */
   --bg-hover-nav: rgba(0, 0, 0, 0.03);
   --bg-hover-content: rgba(0, 0, 0, 0.05);
+  /* The overlay scrollbar's thumb — foreground at 30%, which is what
+     TICKTICK_COMPONENT_02 §4 measured (`rgba(255,255,255,0.3)` on a dark
+     ground). Light is the same alpha on the other foreground. */
+  --scrollbar-thumb: rgba(0, 0, 0, 0.3);
 
   --text-primary: #1c1c1e;
   --text-secondary: #3c3c43;
@@ -343,6 +347,7 @@ body {
      places, and moving it would move all of them. */
   --bg-hover-nav: rgba(255, 255, 255, 0.03);
   --bg-hover-content: rgba(255, 255, 255, 0.05);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.3);
   /* The dark half of the token above. Above `--bg-hover` (.06) so a resting
      fill is visible at all, below `--bg-selected` (.1) so selection still
      wins. */

@@ -23,6 +23,7 @@ import {
 } from "../../app/contextSidebar";
 import type { ContextSidebarState } from "../../hooks/useContextSidebar";
 import { useT } from "../../i18n";
+import { PageScrollbar } from "../common/PageScrollbar";
 
 interface AppShellProps {
   /** The Global Rail. Always the first region, always 56px (§2.3.3). */
@@ -51,6 +52,11 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
     >
       {rail}
       <div className="app-frame-body">{children}</div>
+
+      {/* Drawn once for the whole app, because the thing that scrolls is the
+          page — every screen inherits it, and none of them has to ask. It
+          renders nothing at all until the content is taller than the window. */}
+      <PageScrollbar />
 
       {/* Both of the frame's own controls, in one named group.
           They were bare children of `.app-frame` before, which put them
