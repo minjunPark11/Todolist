@@ -832,6 +832,3 @@ button.tdy-row-title {
   }
 }
 
-[data-reduce-motion="true"] .tdy-page * {
-  transition: none !important;
-}

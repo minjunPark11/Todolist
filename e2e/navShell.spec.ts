@@ -34,6 +34,24 @@ async function sidebarWidth(page: Page): Promise<number> {
   return Math.round(box?.width ?? 0);
 }
 
+/**
+ * The width once it has stopped moving.
+ *
+ * §3.18 tweens the column when the width changes for a reason of ours — a
+ * double-click reset, an arrow key, an expand — so a single read taken right
+ * after the click catches the sidebar mid-flight. These assertions used to be
+ * one-shot reads and passed anyway, because `[data-reduce-motion]` matched on
+ * the attribute's presence and App.tsx always writes it: the tween was dead
+ * for everyone. Fixing that switch is what made the wait necessary.
+ *
+ * A drag needs no poll — `.is-sidebar-resizing` turns the transition off so
+ * the column tracks the pointer — so the reads that follow `dragHandle` are
+ * left as they are.
+ */
+async function expectSidebarWidth(page: Page, width: number): Promise<void> {
+  await expect.poll(() => sidebarWidth(page), { timeout: 2000 }).toBe(width);
+}
+
 function rail(page: Page, name: string) {
   return page.locator(".global-rail").getByRole("button", { name, exact: true });
 }
@@ -102,7 +120,7 @@ test.describe("the Context Sidebar frame", () => {
     await page.getByRole("separator", { name: "Resize sidebar" }).dblclick();
 
     // §3.19: back to the DEFAULT, not to the width before the last drag.
-    expect(await sidebarWidth(page)).toBe(DEFAULT_WIDTH);
+    await expectSidebarWidth(page, DEFAULT_WIDTH);
   });
 
   test("CS-11 — the separator resizes from the keyboard", async ({ page }) => {
@@ -111,14 +129,14 @@ test.describe("the Context Sidebar frame", () => {
     await handle.focus();
 
     await handle.press("ArrowRight");
-    expect(await sidebarWidth(page)).toBe(264);
+    await expectSidebarWidth(page, 264);
     await handle.press("ArrowLeft");
-    expect(await sidebarWidth(page)).toBe(DEFAULT_WIDTH);
+    await expectSidebarWidth(page, DEFAULT_WIDTH);
     // §3.20's ends, which a drag can only approach.
     await handle.press("End");
-    expect(await sidebarWidth(page)).toBe(MAX_WIDTH);
+    await expectSidebarWidth(page, MAX_WIDTH);
     await handle.press("Home");
-    expect(await sidebarWidth(page)).toBe(MIN_WIDTH);
+    await expectSidebarWidth(page, MIN_WIDTH);
   });
 
   test("CS-05 — collapsing keeps the width it had", async ({ page }) => {
@@ -148,7 +166,7 @@ test.describe("the Context Sidebar frame", () => {
 
     await expand.click();
     await expect(page.locator(".app-frame")).not.toHaveClass(/is-sidebar-collapsed/);
-    expect(await sidebarWidth(page)).toBe(DEFAULT_WIDTH);
+    await expectSidebarWidth(page, DEFAULT_WIDTH);
   });
 
   test("CS-07 — a module without a sidebar hides it, and Tasks gets its width back", async ({ page }) => {

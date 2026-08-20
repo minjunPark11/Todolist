@@ -381,11 +381,31 @@ body {
 [data-font="small"] { font-size: 13px; }
 [data-font="large"] { font-size: 15px; }
 
+/* Motion is off when the app's own setting says so, and when the operating
+   system says so — the second half was missing, so someone who had already
+   told Windows or macOS to reduce motion got every transition anyway unless
+   they found this app's toggle and set it a second time.
+   The OS preference is not overridable here on purpose. The setting is a
+   boolean whose default is false, so an off toggle cannot tell "I want
+   motion" apart from "I never opened Settings", and guessing the first would
+   be guessing against an explicit accessibility request. It can add
+   suppression; it cannot take it away.
+   Two blocks rather than one because a media query and a selector cannot be
+   OR'd into a single rule. */
 [data-reduce-motion="true"] *,
 [data-reduce-motion="true"] *::before,
 [data-reduce-motion="true"] *::after {
   transition: none !important;
   animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 h1,

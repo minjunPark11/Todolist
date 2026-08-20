@@ -663,9 +663,15 @@
 }
 
 /* Structural rail collapse/expand: animate the track/width change itself.
-   Values mirror transitions.soft (0.28s, [0.2, 0, 0, 1]); the global
-   [data-reduce-motion] block above disables these along with everything
-   else. */
+   01-base.css turns these off along with everything else when the setting or
+   the OS asks for reduced motion.
+   Two things about the 0.28s below, both found once this stopped being dead
+   code. It did not animate at all until the reduced-motion switch was fixed:
+   19-app-shell.css suppressed it through `[data-reduce-motion]`, which matched
+   whether the value was "true" or "false". And now that it runs, `.app-shell`
+   tweens at 0.16s, not this — §3.18 states the same property on
+   `.app-frame .app-shell`, which wins, and the shell is never outside
+   `.app-frame`. This declaration survives for `.sidebar`. */
 .app-shell {
   transition: grid-template-columns 0.28s cubic-bezier(0.2, 0, 0, 1);
 }

@@ -92,8 +92,14 @@
   }
 }
 
-[data-reduce-motion] .app-frame .app-shell,
-[data-reduce-motion] .app-frame .tm-shell {
+/* `="true"`, not bare presence. App.tsx writes this attribute on every render
+   as either "true" or "false", so `[data-reduce-motion]` matched always — and
+   this rule, being more specific than the declaration in
+   08-calendar-categories.css, meant the sidebar's collapse never animated for
+   anyone. Verified in the browser: with the attribute at "false", .app-shell
+   still computed `transition: none`. */
+[data-reduce-motion="true"] .app-frame .app-shell,
+[data-reduce-motion="true"] .app-frame .tm-shell {
   transition: none;
 }
 
