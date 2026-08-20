@@ -10,7 +10,7 @@ import {
 import { parseTaskScope } from "./taskScopeUrl";
 import type { PageId } from "../types";
 
-const PAGES: PageId[] = ["today", "projects", "calendar", "board", "focus", "settings"];
+const PAGES: PageId[] = ["today", "projects", "goals", "calendar", "board", "focus", "settings"];
 
 describe("pageRoute", () => {
   it("round-trips every page through its address", () => {
@@ -99,6 +99,17 @@ describe("pageRoute", () => {
       expect(bootRedirectFor("/archive", "/calendar")).toBe("");
       expect(namesAPage("/archive")).toBe(true);
       expect(pageForPath("/archive")).toBe("projects");
+    });
+
+    // SPACE_REMOVAL_IA D-1. `/spaces` was this page's address for as long as
+    // the work area was a level; the page kept the name `projects` throughout,
+    // so what changed is the value and not what it points at. Bookmarks and
+    // history hold the old one.
+    it("keeps the old Projects address working", () => {
+      expect(PAGE_ROUTES.projects).toBe("/projects");
+      expect(pageForPath("/spaces")).toBe("projects");
+      expect(namesAPage("/spaces")).toBe(true);
+      expect(bootRedirectFor("/spaces", "/calendar")).toBe("");
     });
 
     // Caught in the browser, not here, the first time: every one of these is a

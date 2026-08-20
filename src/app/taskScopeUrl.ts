@@ -16,6 +16,7 @@
 import type { List, Project } from "../types";
 import type { TaskScopeRef, TaskViewKind } from "../domain/tasks/scopeRegistry";
 import { policyFor, scopeRegistry, TASK_SCOPE_KINDS } from "../domain/tasks/scopeRegistry";
+import { resolveListView } from "../domain/tasks/listView";
 import type { SearchResult } from "../domain/tasks/search";
 import { isInboxList } from "../domain/spaces/hierarchy";
 import { spaceIdForProject } from "../domain/spaces/spaces";
@@ -115,6 +116,26 @@ export function taskUrlFor(state: TaskNavigationState): string {
   if (view !== policy.defaultView) query.push(`view=${view}`);
   if (state.taskId) query.push(`task=${encodeURIComponent(state.taskId)}`);
   return query.length > 0 ? `${path}?${query.join("&")}` : path;
+}
+
+/**
+ * Where a List opens — the one answer, for every door into it.
+ *
+ * A List had two addresses: `/list/:id` from the Tasks sidebar, and
+ * `/s/:sp/p/:pj/l/:id` from the Space tree, which drew a different screen with
+ * a different sidebar. Two screens for one record is how the two start
+ * disagreeing, and it is what made the tree a place you could get stuck in —
+ * so the tree comes here now, and `/s/.../l/:id` is left as an address old
+ * links can still resolve rather than one anything navigates to.
+ *
+ * The stored `defaultViewKey` is resolved HERE rather than at each call site
+ * (§13.9). A List that opens on its Board from the sidebar and on its list
+ * from the tree is, to the person using it, two Lists.
+ */
+export function listUrlFor(listId: string, lists: Array<Pick<List, "id" | "defaultViewKey">>): string {
+  const scope: TaskScopeRef = { kind: "list", id: listId };
+  const owner = lists.find((list) => list.id === listId);
+  return taskUrlFor({ scope, view: resolveListView(owner?.defaultViewKey, policyFor(scope)), taskId: "" });
 }
 
 /**

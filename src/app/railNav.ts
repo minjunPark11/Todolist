@@ -68,6 +68,32 @@ export function isTasksLocation(url: string): boolean {
 }
 
 /**
+ * Whether an address is a page the Tasks sidebar's doors lead to.
+ *
+ * Projects and Goals are inside Tasks — §1.5 refuses each of them a Rail item
+ * — so both light the Tasks item, and neither is a Scope of the Tasks Module.
+ * That combination is what this answers, and two things read it.
+ *
+ * §2.11's "already Tasks" guard, which otherwise reads the Rail's own
+ * HIGHLIGHT: by that reading these pages ARE Tasks, so the one item that
+ * leads back to what you were reading would do nothing on them. (When the
+ * tree still stood in the sidebar on `/projects` that was a trap with no way
+ * out but the browser's Back button, which the packaged app does not draw.)
+ *
+ * And `lastTasksLocation`, which must not remember them: coming back to Tasks
+ * from the Calendar should land on the list you were reading, and returning
+ * to the doorway you left through is not that.
+ *
+ * It was `isSpaceHubLocation`, naming a screen that no longer exists — and
+ * knowing only `/projects`, so `/goals` was left with a dead Rail item and a
+ * place in `lastTasksLocation` when D-4 added it.
+ */
+export function isTasksDoorway(url: string): boolean {
+  const page = pageForPath(url.split("?")[0]);
+  return page === "projects" || page === "goals";
+}
+
+/**
  * A fixed destination per nav item.
  *
  * Tasks is absent on purpose: it is the one item whose destination depends on

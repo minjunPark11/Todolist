@@ -21,6 +21,7 @@ import { todayValue } from "../utils/date";
 import { BoardView, type BoardColumn } from "./BoardView";
 import { EmptyState, type ToastState } from "./kit";
 import { ExpandableAdd } from "./motion/ExpandableAdd";
+import { StatusesDrawer } from "./spaces/SpaceDrawers";
 import { useT } from "../i18n";
 
 const ALL_PROJECTS = "";
@@ -41,6 +42,10 @@ interface BoardPageProps {
   onCreateTask: (draft: TaskDraft) => string;
   onUpdatePath: (id: string, patch: Partial<Omit<LearningPath, "id">>) => void;
   onMoveGoalToStatus: (pathId: string, listId?: string) => void;
+  // D-3: status editing, second entry point (scope ≠ All).
+  onCreateStatus: (projectId: string, name: string) => void;
+  onUpdateStatus: (projectId: string, statusId: string, patch: { name?: string; order?: number }) => void;
+  onArchiveStatus: (projectId: string, statusId: string) => void;
   showToast: (toast: ToastState) => void;
 }
 
@@ -55,12 +60,16 @@ export function BoardPage({
   onCreateTask,
   onUpdatePath,
   onMoveGoalToStatus,
+  onCreateStatus,
+  onUpdateStatus,
+  onArchiveStatus,
   showToast,
 }: BoardPageProps) {
   const { t } = useT();
   const today = todayValue();
   const [projectId, setProjectId] = useState<string>(ALL_PROJECTS);
   const [axis, setAxis] = useState<GroupAxis>("status");
+  const [statusDrawerOpen, setStatusDrawerOpen] = useState(false);
 
   const activeProjects = useMemo(
     () => projects.filter((project) => project.status !== "archived" && !project.archivedAt),
@@ -203,6 +212,17 @@ export function BoardPage({
               ))}
             </select>
           </label>
+          {/* D-3: status editing available only when a Project is in scope —
+              "All" has no owner and therefore no status set to edit. */}
+          {scope !== ALL_PROJECTS && axis === "status" ? (
+            <button
+              type="button"
+              className="ff-btn"
+              onClick={() => setStatusDrawerOpen(true)}
+            >
+              {t("board.manageStatuses")}
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -224,6 +244,16 @@ export function BoardPage({
           onDropItem={handleDrop}
         />
       )}
+      {statusDrawerOpen && space ? (
+        <StatusesDrawer
+          project={space}
+          onCreate={(name) => onCreateStatus(scope, name)}
+          onRename={(statusId, name) => onUpdateStatus(scope, statusId, { name })}
+          onReorder={(statusId, order) => onUpdateStatus(scope, statusId, { order })}
+          onArchive={(statusId) => onArchiveStatus(scope, statusId)}
+          onClose={() => setStatusDrawerOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

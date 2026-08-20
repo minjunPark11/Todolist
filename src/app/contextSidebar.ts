@@ -10,7 +10,6 @@
 // the bug this separation exists to prevent — it loses the number the user
 // picked, and every expand lands on the default instead of on their choice.
 import { pageForPath } from "./pageRoute";
-import { parseSelection } from "./spaceSelection";
 
 /** §3.6, verbatim. */
 export const CONTEXT_SIDEBAR_DEFAULT_WIDTH = 248;
@@ -44,7 +43,13 @@ export const CONTEXT_SIDEBAR_BIG_STEP = 32;
 export const COLLAPSED_STORAGE_KEY = "focusflow-sidebar-collapsed";
 export const WIDTH_STORAGE_KEY = "focusflow-sidebar-width";
 
-export type ContextSidebarMode = "tasks" | "space" | "none";
+/**
+ * D-14 added a third, `space`, for the Space/Project tree that stood in this
+ * slot on SpaceHub. SPACE_REMOVAL_IA stage 6 removed the tree, and the member
+ * went with it: a mode nothing returns is a branch every reader has to check
+ * and no screen can reach.
+ */
+export type ContextSidebarMode = "tasks" | "none";
 export type ContextSidebarVisibility = "expanded" | "collapsed";
 
 export interface ContextSidebarRuntime {
@@ -60,13 +65,13 @@ export function clampContextSidebarWidth(width: number): number {
 }
 
 /**
- * Which sidebar the current address wants (§3.3, extended by D-14).
+ * Which sidebar the current address wants (§3.3).
  *
- * The spec limits P0 to `tasks | none` and then says, in the same section,
- * that new modes are added through a registry rather than by stacking
- * `if calendar… if focus…` inside one component. D-14 takes it up at once:
- * SpaceHub keeps the Space/Project tree that the Tasks sidebar gave up, in
- * the same slot, by being its own mode.
+ * Back to the two the spec asked for. D-14 made this a three-way choice so
+ * SpaceHub could put the Space/Project tree in the same slot; stage 6 removed
+ * the tree, and Projects and Goals are pages behind the Tasks sidebar's own
+ * doors — so they show the sidebar they were opened from. The question left
+ * is only whether a page has a sidebar at all.
  */
 export function contextSidebarModeFor(path: string): ContextSidebarMode {
   switch (pageForPath(path)) {
@@ -78,12 +83,8 @@ export function contextSidebarModeFor(path: string): ContextSidebarMode {
     case "focus":
     case "settings":
       return "none";
-    case "projects":
-      return "space";
     default:
-      // Belt and braces: `pageForPath` already reports `/s/:id` as `projects`,
-      // but a future route that carries a selection should follow it here too.
-      return parseSelection(path).kind === "none" ? "tasks" : "space";
+      return "tasks";
   }
 }
 

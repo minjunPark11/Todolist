@@ -53,7 +53,7 @@ export const en: Dictionary = {
   "tree.renameProject": "Rename project",
   "tree.pin": "Pin",
   "tree.unpin": "Unpin",
-  "tree.section": "Spaces",
+  "tree.section": "Projects",
   "scope.clear": "Show all",
   "tree.expand": "Expand",
   "tree.collapse": "Collapse",
@@ -991,6 +991,18 @@ export const en: Dictionary = {
   // ---- Archive page ----
   "archive.title": "Archive",
   "archive.subtitle": "Archived projects are hidden from your main views. Restore or permanently delete them.",
+  // The Projects home (SPACE_REMOVAL_IA D-1). The row's own words — Rename,
+  // Pin, Archive, Restore — are `tree.*` and `common.*`: it is the same action
+  // on the same record, and a second wording would be a second action.
+  "projects.rowMenu": "Actions for {{name}}",
+  "projects.empty": "No projects yet",
+  "projects.emptyHint": "A project groups the lists and goals that belong to one piece of work.",
+  "folders.manage": "Folders",
+  "folders.empty": "A folder groups the lists inside this project. Make one when there are enough to sort.",
+  // Two keys rather than a plural engine: `translate` interpolates and
+  // nothing more, and "1 lists" is the kind of wart that survives for years.
+  "folders.listCount": "{{n}} lists",
+  "folders.listCountOne": "1 list",
   "archive.tabTasks": "Tasks ({{n}})",
   "archive.tabProjects": "Projects ({{n}})",
   "archive.noArchivedTasks": "No archived tasks",
@@ -1256,6 +1268,11 @@ export const en: Dictionary = {
   "spaceHub.drawer.session": "Focus session",
   "spaceHub.drawer.aiTitle": "{{name}} AI",
   "spaceHub.drawer.settings": "Space settings",
+  // D-2. The Folders of a Project, managed from the Project.
+  "spaceHub.drawer.folders": "Folders",
+  // D-3. The custom statuses of a Project, one panel, two entry points.
+  "spaceHub.drawer.statuses": "Statuses",
+  "board.manageStatuses": "Manage statuses",
   "spaceHub.error.titleRequired": "Title is required.",
   "spaceHub.cmd.summarize": "Summarize this Space",
   "spaceHub.cmd.summarizeReply": "{{name}}: {{label}} ({{detail}}). {{open}} open tasks, {{unscheduled}} unscheduled, {{overdue}} overdue. {{focus}} focused this week.",
@@ -1292,6 +1309,8 @@ export const en: Dictionary = {
   "tasks.trash": "Trash",
   "tasks.filter": "Filter",
   "tasks.defaultList": "List",
+  // D-4: door alongside Projects in the Lists section.
+  "tasks.goals": "Goals",
   "tasks.sectionLists": "Lists",
   "tasks.sectionTags": "Tags",
   "tasks.sectionFilters": "Filters",
@@ -1395,6 +1414,16 @@ export const en: Dictionary = {
   "tasks.openSearch": "Search",
   "tasks.openNav": "Menu",
   "tasks.openTask": "Open {{title}}",
+  "tasks.completeTask": "Complete {{title}}",
+  "tasks.reopenTask": "Reopen {{title}}",
+  "tasks.rowMenu": "Actions for {{title}}",
+  "tasks.menu.complete": "Complete",
+  "tasks.menu.reopen": "Reopen",
+  "tasks.menu.dueToday": "Due today",
+  "tasks.menu.dueTomorrow": "Due tomorrow",
+  "tasks.menu.clearDue": "Clear the date",
+  "tasks.menu.trash": "Move to trash",
+  "tasks.undoPriorityChanged": "Priority changed.",
   "tasks.countLabel": "{{count}} tasks",
   "tasks.moveToColumn": "Move {{title}} to another column",
   "tasks.groupCommands": "Go",

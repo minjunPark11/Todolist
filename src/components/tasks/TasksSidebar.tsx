@@ -74,10 +74,16 @@ interface TasksSidebarProps {
 
 /**
  * D-20 retired the Archive row: Task archiving is gone and `안 함` took its
- * place as a real Scope. Only the doorway to SpaceHub is left — archived
+ * place as a real Scope. Only the doorway to Projects is left — archived
  * PROJECTS live there, which is a different thing entirely.
+ *
+ * SPACE_REMOVAL_IA D-1 renamed it. It was `spaces` while the work area was a
+ * level the reader could see; the level is not drawn any more, so the door
+ * says what is behind it.
+ *
+ * D-4 adds Goals alongside it — two doors, same section.
  */
-export type TasksSidebarPage = "spaces";
+export type TasksSidebarPage = "projects" | "goals";
 
 function sameScope(a: TaskScopeRef, b: TaskScopeRef | null): boolean {
   if (!b || a.kind !== b.kind) return false;
@@ -270,13 +276,14 @@ export function TasksSidebar({
         })}
         {loose.map((list) => row({ kind: "list", id: list.id }, list.name, { dot: listColorHex(list.color) }))}
         {treeLists.length === 0 ? <p className="tm-section-empty">{t("tasks.noLists")}</p> : null}
+      </div>
 
-        {/* D-22's page row, moved in here from a section of its own.
-            Standing alone between two groups it read as a row someone had
-            dropped in the wrong place; Spaces is where Lists are organised,
-            so this is the group it belongs to. It is still not a Scope —
-            `pageRow` gives it no count, which is the difference that matters. */}
-        {pageRow("spaces", t("tree.section"))}
+      {/* D-1 / D-4: page doors — navigation to a full screen, not a scope
+          filter. Separate section so they read differently from scope rows:
+          a door takes you somewhere, a row narrows what you see. */}
+      <div className="tm-section tm-section-doors">
+        {pageRow("projects", t("tree.section"))}
+        {pageRow("goals", t("tasks.goals"))}
       </div>
 
       {visibleTags.length > 0 ? (

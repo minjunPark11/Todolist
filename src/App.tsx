@@ -1,6 +1,5 @@
 ﻿import { FormEvent, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { SpaceSidebar } from "./components/shell/SpaceSidebar";
 import { OllamaChat } from "./components/OllamaChat";
 import { TaskDetail } from "./components/TaskDetail";
 import { GlobalFocusBar } from "./components/GlobalFocusBar";
@@ -19,9 +18,16 @@ import {
 import { spaceIdForProject } from "./domain/spaces/spaces";
 import type { TodayIntent } from "./components/TodayPage";
 import { TasksModule } from "./components/tasks/TasksModule";
-import { canonicalizeTaskUrl, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
+import { canonicalizeTaskUrl, listUrlFor, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
 import { PAGE_ROUTES, RETIRED_ROUTES, bootRedirectFor, pageForPath, pathForDefaultView, pathForPage } from "./app/pageRoute";
-import { RAIL_DESTINATIONS, TASKS_HOME, isTasksLocation, railItemFor, type RailNavItem } from "./app/railNav";
+import {
+  RAIL_DESTINATIONS,
+  TASKS_HOME,
+  isTasksDoorway,
+  isTasksLocation,
+  railItemFor,
+  type RailNavItem,
+} from "./app/railNav";
 import { AppShell } from "./components/shell/AppShell";
 import { GlobalRail } from "./components/shell/GlobalRail";
 import { taskUrlFor } from "./app/taskScopeUrl";
@@ -516,33 +522,36 @@ export default function App() {
   // D-04: `/s/:spaceId/...` already reads as the Spaces page, so the paired
   // `setActivePage("projects")` these four used to carry is gone — the path
   // was always the real answer and the state was a copy that could disagree.
-  function selectSpace(spaceId: string) {
-    planner.selectTask("");
-    navigate(pathForSelection({ kind: "space", spaceId }));
-  }
-
   function selectProject(projectId: string) {
     planner.selectTask("");
     navigate(pathForSelection({ kind: "project", spaceId: spaceIdOf(projectId), projectId }));
   }
 
-  function selectList(projectId: string, listId: string) {
+  /**
+   * A List, from the Space tree or from a Project Overview row (§50.8).
+   *
+   * Both used to land on `/s/:sp/p/:pj/l/:id` — the Space shell's own drawing
+   * of a List, beside the Tasks Module's `/list/:id` drawing of the same one.
+   * One record with two screens is two records as far as anyone using it is
+   * concerned, and the Space one was the half you could not get back out of.
+   * So a List opens in the module that owns Lists, and the tree stops being a
+   * place rather than a route.
+   *
+   * The Project it hangs under is no longer part of the address, which is the
+   * point: a List belongs to a Project, but reading one is not a Project view.
+   */
+  function selectList(_projectId: string, listId: string) {
     planner.selectTask("");
-    navigate(pathForSelection({ kind: "list", spaceId: spaceIdOf(projectId), projectId, listId }));
-  }
-
-  function selectFolder(projectId: string, folderId: string) {
-    planner.selectTask("");
-    navigate(pathForSelection({ kind: "folder", spaceId: spaceIdOf(projectId), projectId, folderId }));
+    navigateUrl(listUrlFor(listId, planner.lists));
   }
 
   /**
-   * Steps out of the tree to the Spaces overview.
+   * Steps out of the tree to the Projects overview.
    *
-   * Lands on `/spaces`, not `/app`: leaving a Space used to keep the page on
-   * "projects" while the address said `/app`, and now that the address decides
-   * the page, `/app` would silently mean Today. Closing a Space is not a
-   * request for Today.
+   * Lands on `/projects`, not `/app`: leaving a Project used to keep the page
+   * on "projects" while the address said `/app`, and now that the address
+   * decides the page, `/app` would silently mean Today. Closing a Project is
+   * not a request for Today.
    */
   function clearSelection() {
     if (selection.kind !== "none") navigate(PAGE_ROUTES.projects);
@@ -589,7 +598,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isTasksLocation(currentUrl)) lastTasksLocationRef.current = currentUrl;
+    // A doorway is a Tasks address the Tasks item has to be able to LEAVE, so
+    // it is not one it may be sent back to (`isTasksDoorway`).
+    if (isTasksLocation(currentUrl) && !isTasksDoorway(currentUrl)) {
+      lastTasksLocationRef.current = currentUrl;
+    }
   }, [currentUrl]);
 
   // A link to a screen that no longer exists lands where its content went, and
@@ -1118,7 +1131,10 @@ export default function App() {
    */
   function navigateRail(item: RailNavItem) {
     if (item === "tasks") {
-      if (railItem === "tasks") return;
+      // "Already Tasks" is asked of the SCREEN, not of the Rail's highlight.
+      // Projects and Goals light this item too without being the Module, so
+      // there the item leads back rather than doing nothing (`isTasksDoorway`).
+      if (railItem === "tasks" && !isTasksDoorway(currentPath)) return;
       navigateUrl(lastTasksLocationRef.current || TASKS_HOME);
       return;
     }
@@ -1283,11 +1299,14 @@ export default function App() {
    * sidebar follows `mode` the sidebar is the only place it can be reached
    * from. The Archive row stood beside it until D-20 retired Task archiving.
    */
-  function openSidebarPage(_page: TasksSidebarPage) {
-    navigate(PAGE_ROUTES.projects);
+  function openSidebarPage(page: TasksSidebarPage) {
+    navigate(PAGE_ROUTES[page]);
   }
 
-  const sidebarPage: TasksSidebarPage | null = contextSidebar.mode === "space" ? "spaces" : null;
+  const sidebarPage: TasksSidebarPage | null =
+    activePage === "goals" ? "goals" :
+    activePage === "projects" ? "projects" :
+    null;
 
   /**
    * The Context Sidebar for the legacy shell, chosen by `mode` (D-21).
@@ -1617,49 +1636,9 @@ export default function App() {
           onClick={() => setMobileMenuOpen(false)}
         />
       ) : null}
-      {/* D-21: the sidebar follows `mode`, not the shell. `space` draws the
-          Space/Project tree (D-14); `tasks` gets the same sidebar the Tasks
-          Module shows, so crossing between the two shells no longer swaps it;
-          `none` draws nothing at all (§2.16). */}
-      {contextSidebar.mode === "space" ? (
-        <SpaceSidebar
-          spaces={planner.spaces}
-          projects={activeProjects}
-          folders={planner.folders}
-          lists={planner.lists}
-          tasks={visibleTasks}
-          selection={selection}
-          showCounts={appSettings.showSidebarCounts}
-          onCollapse={contextSidebar.toggleCollapsed}
-          onSelectSpace={selectSpace}
-          onSelectProject={selectProject}
-          onCreateSpace={planner.createSpace}
-          onCreateProject={(spaceId, name) => planner.addProject(name, "#0066cc", spaceId)}
-          onRenameSpace={(spaceId, name) => planner.updateSpace(spaceId, { name })}
-          onArchiveSpace={planner.archiveSpace}
-          onRenameProject={(projectId, name) => planner.updateProject(projectId, { name })}
-          onArchiveProject={handleArchiveProject}
-          onTogglePinProject={planner.toggleProjectPinned}
-          onSelectList={selectList}
-          onSelectFolder={selectFolder}
-          onCreateList={planner.createList}
-          onCreateFolder={planner.createFolder}
-          onRenameList={(listId, name) => planner.updateList(listId, { name })}
-          onArchiveList={planner.archiveList}
-          onRenameFolder={(folderId, name) => planner.updateFolder(folderId, { name })}
-          onArchiveFolder={planner.archiveFolder}
-          onMoveItemToList={(itemKey, listId) => {
-            // `Item.key` is `source:id` — the projection's own encoding, so the
-            // tree never has to know which collection a card came from.
-            const [source, id] = itemKey.split(":");
-            if (source === "task") planner.moveTaskToList(id, listId);
-            else if (source === "goal") planner.moveGoalToList(id, listId);
-            // A milestone lives inside its goal and has no List of its own.
-          }}
-        />
-      ) : (
-        renderLegacySidebar()
-      )}
+      {/* D-21: the sidebar follows `mode`. `tasks` gets the Tasks sidebar;
+          `none` draws nothing (§2.16). Stage 6 retired the `space` mode. */}
+      {renderLegacySidebar()}
       {/* key={activePage} remounts <main> on navigation so the new page
           crossfades in; opacity-only per pageVariants. */}
       <motion.main

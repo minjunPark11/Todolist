@@ -24,7 +24,7 @@ import {
 import { useSpaceHubData } from "../../hooks/useSpaceHubData";
 import { formatDate, getWeekStart, todayValue } from "../../utils/date";
 import { OverviewSection, type OverviewChild } from "./OverviewSection";
-import { GoalQuickAdd, StatusManager } from "./SpaceViewTools";
+import { GoalQuickAdd } from "./SpaceViewTools";
 import { BoardView, type BoardColumn } from "../BoardView";
 import { TaskListView } from "../TaskListView";
 import { TaskGanttView } from "../TaskGanttView";
@@ -45,8 +45,10 @@ import {
   type SpaceTaskInput,
 } from "./SpaceModals";
 import {
+  FoldersDrawer,
   SessionDetailDrawer,
   SpaceSettingsDrawer,
+  StatusesDrawer,
   TaskDetailDrawer,
 } from "./SpaceDrawers";
 import type { Schedule, ScheduleIssue } from "../../domain/schedule";
@@ -67,6 +69,10 @@ export type SpaceDetailViewProps = {
   onUpdateMilestone: (pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) => void;
   onCreateGoal: (input: { goal: string; projectId: string; boardListId?: string; schedule?: GoalSchedule }) => void;
   onOpenGoal: (pathId: string, milestoneId?: string) => void;
+  /** D-2's three, threaded from the tree's row menu to the Project itself. */
+  onCreateFolder: (projectId: string, name: string) => void;
+  onRenameFolder: (folderId: string, name: string) => void;
+  onArchiveFolder: (folderId: string) => void;
   onCreateStatus: (projectId: string, name: string) => void;
   onUpdateStatus: (projectId: string, listId: string, patch: { name?: string; order?: number }) => void;
   onArchiveStatus: (projectId: string, listId: string) => void;
@@ -106,7 +112,11 @@ type DrawerState =
   | { kind: "none" }
   | { kind: "task"; taskId: string }
   | { kind: "session"; sessionId: string }
-  | { kind: "settings" };
+  | { kind: "settings" }
+  // D-2: the Folders of this Project, managed where the Project is.
+  | { kind: "folders" }
+  // D-3: the custom statuses of this Project, one panel, two entry points.
+  | { kind: "statuses" };
 
 
 export function SpaceDetailView({
@@ -122,6 +132,9 @@ export function SpaceDetailView({
   onUpdateMilestone,
   onCreateGoal,
   onOpenGoal,
+  onCreateFolder,
+  onRenameFolder,
+  onArchiveFolder,
   onCreateStatus,
   onUpdateStatus,
   onArchiveStatus,
@@ -626,6 +639,7 @@ export function SpaceDetailView({
           childLabel={t("overview.lists")}
           children={overviewChildren}
           onOpenChild={openListRow}
+          onManageGroups={() => setDrawer({ kind: "folders" })}
           onOpenTask={openTaskDrawer}
           onOpenGoal={onOpenGoal}
           onOpenTab={setTab}
@@ -648,20 +662,22 @@ export function SpaceDetailView({
               </p>
             ) : null}
             {showsGoals(activeView) && projectId ? (
-              <>
-                <GoalQuickAdd
-                  onCreate={(goal) =>
-                    onCreateGoal({ goal, projectId, schedule: { unit: "unscheduled" } })
-                  }
-                />
-                <StatusManager
-                  statuses={sourceProject?.boardLists ?? []}
-                  onCreate={(name) => onCreateStatus(projectId, name)}
-                  onRename={(statusId, name) => onUpdateStatus(projectId, statusId, { name })}
-                  onReorder={(statusId, order) => onUpdateStatus(projectId, statusId, { order })}
-                  onArchive={(statusId) => onArchiveStatus(projectId, statusId)}
-                />
-              </>
+              <GoalQuickAdd
+                onCreate={(goal) =>
+                  onCreateGoal({ goal, projectId, schedule: { unit: "unscheduled" } })
+                }
+              />
+            ) : null}
+            {/* D-3: the Board tab is where columns live, so it is where you
+                edit them. "All" has no owner, so it has no editor. */}
+            {activeView === "board" && sourceProject ? (
+              <button
+                type="button"
+                className="ff-btn"
+                onClick={() => setDrawer({ kind: "statuses" })}
+              >
+                {t("board.manageStatuses")}
+              </button>
             ) : null}
           </div>
           {tab === "goals" ? (
@@ -798,6 +814,27 @@ export function SpaceDetailView({
         <SessionDetailDrawer
           session={drawerSession}
           task={spaceTasks.find((task) => task.id === drawerSession.taskId) ?? null}
+          onClose={() => setDrawer({ kind: "none" })}
+        />
+      ) : null}
+      {drawer.kind === "folders" ? (
+        <FoldersDrawer
+          projectId={space.id}
+          folders={folders}
+          lists={lists}
+          onCreate={onCreateFolder}
+          onRename={onRenameFolder}
+          onArchive={onArchiveFolder}
+          onClose={() => setDrawer({ kind: "none" })}
+        />
+      ) : null}
+      {drawer.kind === "statuses" && sourceProject ? (
+        <StatusesDrawer
+          project={sourceProject}
+          onCreate={(name) => onCreateStatus(projectId, name)}
+          onRename={(statusId, name) => onUpdateStatus(projectId, statusId, { name })}
+          onReorder={(statusId, order) => onUpdateStatus(projectId, statusId, { order })}
+          onArchive={(statusId) => onArchiveStatus(projectId, statusId)}
           onClose={() => setDrawer({ kind: "none" })}
         />
       ) : null}

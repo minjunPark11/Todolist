@@ -11,6 +11,7 @@ import {
   reopenTask,
   restoreTask,
   setTaskDueDate,
+  setTaskPriority,
   setTaskSomeday,
   trashTask,
 } from "./mutations";
@@ -118,6 +119,15 @@ describe("every mutation carries the way back", () => {
   it("restores out of the trash", () => {
     const gone = task({ deletedAt: NOW });
     expect(applyPatch(gone, restoreTask(gone).patch).deletedAt).toBe("");
+  });
+
+  it("changes priority and can put it back", () => {
+    const original = task({ priority: "medium" });
+    const raised = setTaskPriority(original, "high");
+    expect(applyPatch(original, raised.patch).priority).toBe("high");
+    // The undo carries the value that WAS there — not "none", which is what an
+    // inverted patch would guess at.
+    expect(applyPatch(applyPatch(original, raised.patch), raised.undo)).toEqual(original);
   });
 });
 

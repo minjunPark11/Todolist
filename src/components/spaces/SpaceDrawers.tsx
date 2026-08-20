@@ -1,10 +1,11 @@
 import { ReactNode, useState } from "react";
-import type { FocusSession, Project, Task } from "../../types";
+import type { CustomStatus, FocusSession, Folder, List, Project, Task } from "../../types";
 import type { SpaceCustomConfig } from "../../lib/spaceHubTypes";
 import {
   formatSeconds,
   sessionSeconds,
 } from "../../lib/spaceSelectors";
+import { FolderManager } from "../projects/FolderManager";
 import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
 
@@ -22,6 +23,114 @@ function DrawerShell({ title, onClose, children }: { title: string; onClose: () 
         <div className="sdv-drawer-body">{children}</div>
       </aside>
     </div>
+  );
+}
+
+/**
+ * Folder management for one Project (SPACE_REMOVAL_IA D-2).
+ *
+ * A drawer of its own rather than a section of `SpaceSettingsDrawer`: that one
+ * drafts its fields behind a Save and offers a Cancel, and the actions here
+ * land the moment they are made.
+ */
+export function FoldersDrawer({
+  projectId,
+  folders,
+  lists,
+  onCreate,
+  onRename,
+  onArchive,
+  onClose,
+}: {
+  projectId: string;
+  folders: Folder[];
+  lists: List[];
+  onCreate: (projectId: string, name: string) => void;
+  onRename: (folderId: string, name: string) => void;
+  onArchive: (folderId: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useT();
+  return (
+    <DrawerShell title={t("spaceHub.drawer.folders")} onClose={onClose}>
+      <FolderManager
+        projectId={projectId}
+        folders={folders}
+        lists={lists}
+        onCreate={onCreate}
+        onRename={onRename}
+        onArchive={onArchive}
+      />
+    </DrawerShell>
+  );
+}
+
+/**
+ * The custom statuses of one Project (SPACE_REMOVAL_IA D-3).
+ *
+ * One panel, opened from two entry points: the Board tab of the Project screen,
+ * and the global Matrix when its scope selector names a Project. The drawer
+ * handles its own visibility — no toggle button inside.
+ */
+export function StatusesDrawer({
+  project,
+  onCreate,
+  onRename,
+  onReorder,
+  onArchive,
+  onClose,
+}: {
+  project: Project;
+  onCreate: (name: string) => void;
+  onRename: (statusId: string, name: string) => void;
+  onReorder: (statusId: string, order: number) => void;
+  onArchive: (statusId: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useT();
+  const [draft, setDraft] = useState("");
+  const active: CustomStatus[] = (project.boardLists ?? [])
+    .filter((status) => !status.archivedAt)
+    .sort((a, b) => a.order - b.order);
+
+  return (
+    <DrawerShell title={t("spaceHub.drawer.statuses")} onClose={onClose}>
+      <div className="sdv-statuses-body">
+        {active.map((status, index) => (
+          <div key={status.id} className="sdv-status-row">
+            <input
+              defaultValue={status.name}
+              aria-label={t("spaceGoals.statusName")}
+              onBlur={(event) => {
+                const name = event.target.value.trim();
+                if (name && name !== status.name) onRename(status.id, name);
+              }}
+            />
+            <button type="button" disabled={index === 0} onClick={() => onReorder(status.id, status.order - 1)}>↑</button>
+            <button type="button" disabled={index === active.length - 1} onClick={() => onReorder(status.id, status.order + 1)}>↓</button>
+            <button type="button" onClick={() => onArchive(status.id)}>{t("common.archive")}</button>
+          </div>
+        ))}
+        <form
+          className="sdv-status-add"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const name = draft.trim();
+            if (!name) return;
+            onCreate(name);
+            setDraft("");
+          }}
+        >
+          <input
+            value={draft}
+            placeholder={t("spaceGoals.statusPlaceholder")}
+            aria-label={t("spaceGoals.statusPlaceholder")}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          <button type="submit">+ {t("spaceGoals.addStatus")}</button>
+        </form>
+      </div>
+    </DrawerShell>
   );
 }
 

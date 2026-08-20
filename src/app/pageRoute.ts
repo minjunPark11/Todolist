@@ -26,13 +26,15 @@ import { parseSearchUrl, parseTaskScope } from "./taskScopeUrl";
  * `/today` and shows its own Today there. Which of the two Todays survives is
  * a P0-2 question — this file only has to stop them fighting over an address.
  *
- * `projects` covers the Spaces overview. A selection inside the tree
+ * `projects` covers the Projects overview. A selection inside the tree
  * (`/s/:spaceId/...`) is the same page with a deeper address, which is why
  * `pageForPath` asks `parseSelection` first.
  */
 export const PAGE_ROUTES: Record<PageId, string> = {
   today: "/app",
-  projects: "/spaces",
+  projects: "/projects",
+  // SPACE_REMOVAL_IA D-4. Goals live here now, not inside a Project tab.
+  goals: "/goals",
   calendar: "/calendar",
   board: "/board",
   focus: "/focus",
@@ -50,6 +52,11 @@ export const PAGE_ROUTES: Record<PageId, string> = {
  */
 export const RETIRED_ROUTES: Record<string, string> = {
   "/archive": PAGE_ROUTES.projects,
+  // SPACE_REMOVAL_IA D-1. `projects` is what this page has always been called
+  // in code — only its value said `/spaces`, after the STEP 11 work area that
+  // is no longer drawn. Changing the value is the address catching up with the
+  // name, and every link written to the old one still opens.
+  "/spaces": PAGE_ROUTES.projects,
 };
 
 const ROUTE_TO_PAGE = new Map<string, PageId>(

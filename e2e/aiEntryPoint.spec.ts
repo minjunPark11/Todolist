@@ -56,7 +56,7 @@ test.describe("the AI entry point (§2.14, §11.67)", () => {
   test("no page carries a large saturated fill fixed to it", async ({ page }) => {
     await openApp(page, { lists: [LIST] });
 
-    for (const route of ["/today", "/calendar", "/focus", "/board", "/spaces", `/list/${LIST.id}`]) {
+    for (const route of ["/today", "/calendar", "/focus", "/board", "/projects", `/list/${LIST.id}`]) {
       await page.goto(route);
       await expect(page.locator(".global-rail")).toBeVisible();
 

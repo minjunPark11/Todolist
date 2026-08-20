@@ -13,7 +13,15 @@ const NOW = "2026-08-18T00:00:00.000Z";
 export interface SeedOptions {
   /** Sidebar groups to start with (Add List calls these Folders — §R.7). */
   folders?: Array<{ id: string; name: string }>;
-  lists?: Array<{ id: string; name: string; sidebarFolderId?: string }>;
+  lists?: Array<{ id: string; name: string; sidebarFolderId?: string; projectId?: string }>;
+  /** The work areas at the top of the Space tree (§51). */
+  spaces?: Array<{ id: string; name: string }>;
+  /**
+   * The level under a Space. `projectId` on a List files it under one of
+   * these, which is what puts a row in the tree — the Tasks sidebar reaches
+   * the same List without any of this.
+   */
+  projects?: Array<{ id: string; name: string; spaceId: string; archived?: boolean }>;
   /**
    * The stored theme. Seeded rather than emulated because the app resolves
    * `system` from `prefers-color-scheme` ONCE, at mount — a spec that flipped
@@ -31,12 +39,35 @@ export interface SeedOptions {
 export async function openApp(page: Page, seed: SeedOptions = {}): Promise<void> {
   const data = {
     tasks: [],
-    projects: [],
+    projects: (seed.projects ?? []).map((project, index) => ({
+      id: project.id,
+      name: project.name,
+      description: "",
+      color: "#0066cc",
+      order: index,
+      spaceId: project.spaceId,
+      // U2: a Space with one List hides the List level entirely. A spec about
+      // clicking a List row needs the row to exist.
+      listsRevealed: true,
+      // Both halves, because the two disagreeing is what `isArchived` on the
+      // Projects home exists to survive.
+      ...(project.archived ? { status: "archived", archivedAt: NOW } : { status: "active" }),
+      createdAt: NOW,
+      updatedAt: NOW,
+    })),
     subtasks: [],
     focusSessions: [],
     activeSessionId: "",
     learningPaths: [],
-    spaces: [],
+    spaces: (seed.spaces ?? []).map((space, index) => ({
+      id: space.id,
+      name: space.name,
+      description: "",
+      color: "#0066cc",
+      order: index,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })),
     folders: [],
     lists: [
       {
@@ -52,7 +83,7 @@ export async function openApp(page: Page, seed: SeedOptions = {}): Promise<void>
       },
       ...(seed.lists ?? []).map((list, index) => ({
         id: list.id,
-        projectId: "",
+        projectId: list.projectId ?? "",
         kind: "regular",
         name: list.name,
         order: index,

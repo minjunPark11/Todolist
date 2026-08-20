@@ -99,7 +99,7 @@ test.describe("the radius scale (§11.39)", () => {
     await page.goto(`/list/${LIST.id}`);
     await addTask(page, "Measure the corners");
 
-    for (const route of ["/today", "/calendar", "/focus", "/board", "/spaces", "/planning", "/settings", `/list/${LIST.id}`]) {
+    for (const route of ["/today", "/calendar", "/focus", "/board", "/projects", "/planning", "/settings", `/list/${LIST.id}`]) {
       await page.goto(route);
       await expect(page.locator(".global-rail")).toBeVisible();
 

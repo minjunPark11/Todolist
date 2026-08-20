@@ -33,6 +33,16 @@ interface OverviewSectionProps {
   childLabel: string;
   children: OverviewChild[];
   onOpenChild: (id: string) => void;
+  /**
+   * Manage what groups those children (SPACE_REMOVAL_IA D-2).
+   *
+   * Absent at a Space, whose children are Projects and are not grouped by
+   * anything this card could open. Present at a Project, where the children
+   * are Lists and a Folder is what gathers them — so the way to manage them
+   * is on the card that lists them, rather than in a settings screen a level
+   * away from what it is about.
+   */
+  onManageGroups?: () => void;
   onOpenTask: (taskId: string) => void;
   onOpenGoal: (goalId: string) => void;
   onOpenTab: (tab: SpaceTab) => void;
@@ -45,6 +55,7 @@ export function OverviewSection({
   childLabel,
   children,
   onOpenChild,
+  onManageGroups,
   onOpenTask,
   onOpenGoal,
   onOpenTab,
@@ -89,7 +100,14 @@ export function OverviewSection({
       <div className="ovs-body">
         <div className="ovs-main">
           <section className="ovs-card">
-            <h3>{childLabel}</h3>
+            <div className="ovs-card-head">
+              <h3>{childLabel}</h3>
+              {onManageGroups ? (
+                <button type="button" className="ff-btn ff-btn-sm" onClick={onManageGroups}>
+                  {t("folders.manage")}
+                </button>
+              ) : null}
+            </div>
             {children.length === 0 ? (
               <p className="ovs-none">{t("overview.noChildren")}</p>
             ) : (

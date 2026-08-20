@@ -290,6 +290,58 @@ test.describe("the Global Rail", () => {
   });
 
   /**
+   * RAIL-01b — Tasks does something on an address that lights it.
+   *
+   * This began as the fix for a trap: the Tasks sidebar had a door into
+   * SpaceHub, SpaceHub replaced that sidebar with the Space tree, and §2.11's
+   * "already Tasks" guard read the Rail's HIGHLIGHT — which SpaceHub lights —
+   * so the one item that could have led out did nothing. The browser's Back
+   * button was the only door, and the packaged app does not draw one.
+   *
+   * SPACE_REMOVAL_IA stage 6 took the tree away, so the trap is gone by
+   * construction: the Tasks sidebar is on `/projects` now, and every row on it
+   * leads out. What is left to guard is the smaller half — the Rail item is
+   * still not a no-op there, and still returns the reader to the Scope they
+   * were reading rather than to a home page. Both halves are asserted, because
+   * the second is only worth having while the first is true.
+   */
+  test("RAIL-01b — Tasks returns from Projects rather than doing nothing there", async ({ page }) => {
+    await openApp(page);
+    await page.goto("/completed");
+    await expect(page.locator(".tm-shell")).toBeVisible();
+
+    // The doorway as the user meets it: a row in the Tasks sidebar.
+    await page.locator("#context-sidebar").getByRole("button", { name: "Projects", exact: true }).click();
+    await expect(page).toHaveURL(/\/projects$/);
+    // The sidebar it came from is still there — that is the way out this test
+    // used to prove the absence of.
+    await expect(page.locator(".tm-sidebar")).toBeVisible();
+
+    await rail(page, "Tasks").click();
+    await expect(page).toHaveURL(/\/completed/);
+  });
+
+  /**
+   * The same, for the doorway D-4 added.
+   *
+   * Written because the predicate behind RAIL-01b named one page by hand and
+   * Goals arrived later: on `/goals` the Rail's Tasks item did nothing at all,
+   * and `/goals` was remembered as the place to come back to — so a trip to
+   * the Calendar and back landed on Goals rather than on the list being read.
+   */
+  test("RAIL-01c — Goals is a doorway too, and Tasks leads back out of it", async ({ page }) => {
+    await openApp(page);
+    await page.goto("/completed");
+    await expect(page.locator(".tm-shell")).toBeVisible();
+
+    await page.locator("#context-sidebar").getByRole("button", { name: "Goals", exact: true }).click();
+    await expect(page).toHaveURL(/\/goals$/);
+
+    await rail(page, "Tasks").click();
+    await expect(page).toHaveURL(/\/completed/);
+  });
+
+  /**
    * RAIL-02, as §2.48 wrote it.
    *
    * This is the case D-29 exists for. Under D-25 the magnifier changed four

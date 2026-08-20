@@ -3,7 +3,9 @@ import { BoardPage } from "../components/BoardPage";
 import { CalendarView } from "../components/CalendarView";
 import { FocusPage } from "../components/FocusPage";
 import { GoalDetailDrawer } from "../components/horizons/GoalDetailDrawer";
+import { GoalsPage } from "../components/goals/GoalsPage";
 import { SpacesPage } from "../components/SpacesPage";
+import { activeSpaces, DEFAULT_SPACE_NAME } from "../domain/spaces/spaces";
 import { SettingsPage } from "../components/SettingsPage";
 import { TodayPage, type TodayIntent } from "../components/TodayPage";
 import type { ToastState } from "../components/kit";
@@ -15,6 +17,9 @@ import type { AppUpdateStatus } from "../platform";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Project, Task } from "../types";
 
 type Planner = ReturnType<typeof usePlannerData>;
+
+/** The colour a Project made without being asked for one gets, as the tree's own `+ Project` uses. */
+const DEFAULT_PROJECT_COLOR = "#0066cc";
 
 type AppPagesProps = {
   activePage: PageId;
@@ -215,6 +220,21 @@ export function AppPages({
     );
   }
 
+  if (activePage === "goals") {
+    return (
+      <section className="page-grid no-detail">
+        <GoalsPage
+          goals={planner.learningPaths}
+          tasks={visibleTasks}
+          projects={activeProjects}
+          onOpenGoal={openGoal}
+          onCreateGoal={(goal) => planner.createLearningPath({ goal, schedule: { unit: "unscheduled" } })}
+        />
+        {goalDrawer}
+      </section>
+    );
+  }
+
   if (activePage === "board") {
     return (
       <section className={pageGridClass()}>
@@ -229,6 +249,9 @@ export function AppPages({
           onCreateTask={planner.createTask}
           onUpdatePath={planner.updateLearningPath}
           onMoveGoalToStatus={planner.moveGoalToStatus}
+          onCreateStatus={planner.createStatus}
+          onUpdateStatus={planner.updateStatus}
+          onArchiveStatus={planner.archiveStatus}
           showToast={showToast}
         />
         {renderTaskDetail()}
@@ -288,6 +311,21 @@ export function AppPages({
       <SpacesPage
         onRestoreProject={planner.restoreProject}
         onDeleteProject={requestDeleteProject}
+        onArchiveProject={handleArchiveProject}
+        onTogglePinProject={planner.toggleProjectPinned}
+        onCreateFolder={planner.createFolder}
+        onRenameFolder={(folderId, name) => planner.updateFolder(folderId, { name })}
+        onArchiveFolder={planner.archiveFolder}
+        onCreateProject={(name) => {
+          // D-6: the work area is hidden, not gone, and a Project still
+          // belongs to one. The sole area when there is one — and a real
+          // record when there is none, because a Project pointing at a Space
+          // that was never written is a Project the tree cannot draw. The
+          // name is the one `ensureDefaultSpace` would have used, so the
+          // invisible container has one name rather than two.
+          const area = activeSpaces(planner.spaces)[0];
+          planner.addProject(name, DEFAULT_PROJECT_COLOR, area?.id ?? planner.createSpace(DEFAULT_SPACE_NAME));
+        }}
         projects={planner.projects}
         tasks={visibleTasks}
         lists={planner.lists}
@@ -299,7 +337,6 @@ export function AppPages({
         onCreateStatus={planner.createStatus}
         onUpdateStatus={planner.updateStatus}
         onArchiveStatus={planner.archiveStatus}
-        spaces={planner.spaces}
         onMoveGoalToStatus={planner.moveGoalToStatus}
         onDeletePath={planner.deleteLearningPath}
         onAddMilestone={planner.addMilestone}

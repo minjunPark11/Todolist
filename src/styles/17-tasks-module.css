@@ -6,7 +6,9 @@
 
 .tm-shell {
   display: grid;
-  grid-template-columns: var(--tm-sidebar-w, 240px) minmax(0, 1fr) auto;
+  /* --tm-sidebar-w (240px) was a local override before P0-3 unified sidebar
+     width under --context-sidebar-w. The local variable is now unused. */
+  grid-template-columns: var(--context-sidebar-w, 248px) minmax(0, 1fr) auto;
   height: 100%;
   min-height: 0;
   background: var(--bg, #fff);
@@ -50,6 +52,24 @@
   padding: 4px 10px;
   font-size: 12px;
   color: var(--text-muted, #8e8e93);
+}
+
+/* Page-navigation doors (Projects, Goals). Visually separated from scope
+ * rows by a top border — a door takes you to a different screen, a scope
+ * row narrows what is already on this one. */
+.tm-section-doors {
+  border-top: 1px solid var(--border, #e5e7eb);
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.tm-section-doors .tm-row {
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-section-doors .tm-row:hover,
+.tm-section-doors .tm-row.is-current {
+  color: var(--ff-text, #111);
 }
 
 .tm-row {
@@ -209,13 +229,85 @@
 .tm-task {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
   /* §11.19 — one row height, so a list scans as a column and not as a stack
      of differently sized cards. */
   min-height: 36px;
   padding: 0 4px;
   border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
   font-size: 14px;
+}
+
+.tm-task:hover {
+  background: var(--bg-hover);
+}
+
+.tm-task.is-dragging {
+  opacity: 0.5;
+}
+
+/* The drag affordance. Invisible until the row is under the pointer, which is
+   how the reference does it — a handle on every row at rest turns a list into
+   a settings screen. It does not carry the drag: the whole row does, and a
+   handle that took the gesture would make the other 600px of the row inert. */
+.tm-task-handle {
+  flex: none;
+  width: 12px;
+  height: 16px;
+  opacity: 0;
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 4px 5px;
+  background-position: 1px 2px;
+  color: var(--text-tertiary);
+  cursor: grab;
+  transition: opacity var(--motion-fast);
+}
+
+.tm-task:hover .tm-task-handle,
+.tm-task:focus-within .tm-task-handle {
+  opacity: 1;
+}
+
+/* 17px of checkbox, the row's full height of hit area (audit §3.1). The label
+   is the target; the input inside it is only what the target looks like. */
+.tm-task-check {
+  display: flex;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.tm-task-check input {
+  width: 17px;
+  height: 17px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Stored since the beginning, drawn since V-P1: a flag at the end of the title
+   rather than a coloured row, so a list of High tasks still reads as a list. */
+.tm-task-priority {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--text-tertiary);
+}
+
+.tm-task-priority.is-high {
+  color: var(--danger);
+}
+
+.tm-task-priority.is-medium {
+  color: var(--warning, #ff9f0a);
+}
+
+.tm-task-priority.is-low {
+  color: var(--accent);
 }
 
 .tm-task-title {
@@ -313,7 +405,10 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 100%;
+  /* `flex: 1` rather than `width: 100%`: the row holds a handle and a checkbox
+     beside this now, and 100% of the row would push them out of it. */
+  flex: 1;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1027,6 +1122,23 @@
   .tm-view,
   .tm-chip {
     min-height: 44px;
+  }
+
+  /* The checkbox stretches to the row, so the row is what has to clear the
+     floor — and the box itself grows, because 17px of visible target is a
+     desktop measurement. The handle goes: a finger has no hover to reveal it
+     with, and drag-to-reorder on touch needs its own gesture (not this one). */
+  .tm-task {
+    min-height: 44px;
+  }
+
+  .tm-task-check input {
+    width: 22px;
+    height: 22px;
+  }
+
+  .tm-task-handle {
+    display: none;
   }
 
   /* These were left out of the list, so a finger got 19px while every row
@@ -1800,3 +1912,51 @@
 .tm-group-action:focus-visible {
   color: var(--accent, #0a84ff);
 }
+
+/* --- the row's own menu button (audit L-17) ------------------------------ */
+
+.tm-task-menu {
+  flex: none;
+  width: 24px;
+  /* 24 wide and the control height tall: the same idiom as the checkbox
+     beside it — a narrow target that still clears the grid vertically, so
+     it is not the one thing in the row on a different rhythm (V-5). */
+  min-height: var(--density-control-h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--motion-fast);
+}
+
+/* Same rule as the drag handle: at rest a list of rows is a list of titles.
+   `focus-within` is what keeps it reachable by keyboard, where there is no
+   hover to reveal it with. */
+.tm-task:hover .tm-task-menu,
+.tm-task:focus-within .tm-task-menu {
+  opacity: 1;
+}
+
+.tm-task-menu:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* The priority swatch inside the menu, which is the same colour language the
+   row's flag uses — a menu that named the levels in grey would make the reader
+   map the words onto the colours themselves. */
+.tm-menu-flag {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.tm-menu-flag.is-high { background: var(--danger); }
+.tm-menu-flag.is-medium { background: var(--warning); }
+.tm-menu-flag.is-low { background: var(--accent); }

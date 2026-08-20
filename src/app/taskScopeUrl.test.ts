@@ -5,6 +5,7 @@ import type { List } from "../types";
 import type { SearchResult } from "../domain/tasks/search";
 import {
   canonicalizeTaskUrl,
+  listUrlFor,
   parseSearchUrl,
   parseTaskScope,
   parseTaskUrl,
@@ -121,6 +122,39 @@ describe("taskUrlFor", () => {
 
   it("refuses to write a view the Scope does not allow", () => {
     expect(taskUrlFor({ scope: { kind: "today" }, view: "board", taskId: "" })).toBe("/today");
+  });
+});
+
+/**
+ * The Space tree and the Tasks sidebar are two doors into one List, and both
+ * come through here — which is the whole reason it exists. A List that opened
+ * on its Board from one door and on its list from the other would be two
+ * Lists to the person reading it (§13.9).
+ */
+describe("listUrlFor", () => {
+  const lists = [
+    { id: "l-plain" },
+    { id: "l-board", defaultViewKey: "board" },
+    { id: "l-calendar", defaultViewKey: "calendar" },
+  ];
+
+  it("opens a List in the View it stores", () => {
+    expect(listUrlFor("l-board", lists)).toBe("/list/l-board?view=board");
+  });
+
+  it("leaves the default View out of the address", () => {
+    expect(listUrlFor("l-plain", lists)).toBe("/list/l-plain");
+  });
+
+  it("falls back rather than failing on a View this build cannot draw", () => {
+    // `calendar` is a real stored key with no Tasks Module renderer (§13.9).
+    expect(listUrlFor("l-calendar", lists)).toBe("/list/l-calendar");
+  });
+
+  it("still addresses a List it has no record for", () => {
+    // A tree row for a List the store has not caught up with is a row that
+    // must still go somewhere; the Scope's own default is that somewhere.
+    expect(listUrlFor("l-unknown", lists)).toBe("/list/l-unknown");
   });
 });
 
