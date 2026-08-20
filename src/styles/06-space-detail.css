@@ -8,24 +8,6 @@
   padding-bottom: 90px;
 }
 
-.sdv-back {
-  justify-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 4px 0;
-}
-
-.sdv-back:hover {
-  text-decoration: underline;
-}
-
 /* Header card (§7) */
 .sdv-header-card {
   display: flex;
@@ -108,20 +90,6 @@
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0;
-}
-
-.sdv-link {
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 2px 0;
-}
-
-.sdv-link:hover {
-  text-decoration: underline;
 }
 
 /* Status pill (§7.5) */
@@ -282,31 +250,6 @@
   border-bottom-color: var(--accent);
 }
 
-/* Overview content grid (§14): tasks + AI summary on top,
-   activity / focus / notes in a row below. */
-.sdv-overview-layout {
-  display: grid;
-  gap: 16px;
-}
-
-.sdv-overview-top {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.sdv-overview-bottom {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  align-items: stretch;
-}
-
-.sdv-overview-bottom > .sdv-card {
-  height: 100%;
-}
-
 .sdv-card {
   display: flex;
   flex-direction: column;
@@ -314,186 +257,11 @@
   min-width: 0;
 }
 
-.sdv-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.sdv-card-head h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 680;
-}
-
-.sdv-card-head-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sdv-card h3,
-.sdv-tab-panel h3 {
+.sdv-card h3 {
   margin: 6px 0 0;
   font-size: 14px;
   font-weight: 650;
   color: var(--text-secondary);
-}
-
-/* Task rows (§15) */
-.sdv-task-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.sdv-task-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: 12px;
-  min-width: 0;
-}
-
-.sdv-task-row:hover {
-  background: var(--bg-hover);
-}
-
-.sdv-task-row.done .sdv-task-title {
-  text-decoration: line-through;
-  color: var(--text-tertiary);
-}
-
-.sdv-task-row input[type="checkbox"] {
-  flex: none;
-  width: 17px;
-  height: 17px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.sdv-task-title {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  font-size: 14px;
-  font-weight: 550;
-  color: var(--text-primary);
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0;
-}
-
-.sdv-task-title:hover {
-  color: var(--accent);
-}
-
-.sdv-task-meta {
-  flex: none;
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.sdv-task-est {
-  flex: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  min-width: 34px;
-  text-align: right;
-}
-
-.sdv-task-done-label {
-  font-size: 12px;
-  font-weight: 650;
-  color: #15803d;
-}
-
-.sdv-row-actions {
-  display: flex;
-  gap: 6px;
-  flex: none;
-}
-
-/* Tasks tab: count header + compact toolbar + flat thin list + empty state */
-.sdv-tasks-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.sdv-tasks-head h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.sdv-toolbar-compact {
-  gap: 8px;
-}
-
-.sdv-toolbar-compact input[type="search"] {
-  height: 30px;
-  max-width: 260px;
-  min-width: 140px;
-  border-radius: 8px;
-  font-size: 12px;
-  padding: 0 10px;
-}
-
-/* The global `select { width: 100% }` rule is what used to stack the filters
-   into full-width rows — the compact toolbar sizes them to their content. */
-.sdv-toolbar-compact select {
-  width: auto;
-  flex: none;
-  height: 30px;
-  border-radius: 8px;
-  font-size: 12px;
-  padding: 0 8px;
-  color: var(--text-secondary);
-}
-
-.sdv-task-list-flat {
-  gap: 0;
-}
-
-.sdv-task-list-flat .sdv-task-row {
-  padding: 7px 8px;
-  border-radius: 8px;
-}
-
-.sdv-task-list-flat > li + li {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.sdv-task-group-chip {
-  flex: none;
-  font-size: 11px;
-  font-weight: 650;
-  color: var(--text-secondary);
-  background: var(--bg-surface-muted);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  padding: 2px 8px;
-  white-space: nowrap;
-}
-
-/* Sub-task rows: indented under their parent with a subtle left guide. */
-.sdv-task-row-child {
-  margin-left: 22px;
-  border-left: 2px solid var(--border-subtle);
-  padding-left: 10px;
 }
 
 .sdv-subtask-progress {
@@ -564,195 +332,6 @@
   color: var(--accent);
 }
 
-.sdv-task-date-chip {
-  flex: none;
-  font-size: 11px;
-  font-weight: 650;
-  color: var(--text-secondary);
-  background: var(--bg-surface-muted);
-  border-radius: var(--radius-pill);
-  padding: 2px 8px;
-  white-space: nowrap;
-}
-
-.sdv-task-date-chip.due {
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-/* Row actions stay hidden until the row is hovered or focused, keeping the
-   list visually thin; touch devices (no hover) always show them. */
-.sdv-task-list-flat .sdv-row-actions {
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-
-.sdv-task-list-flat .sdv-task-row:hover .sdv-row-actions,
-.sdv-task-list-flat .sdv-task-row:focus-within .sdv-row-actions {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .sdv-task-list-flat .sdv-row-actions {
-    opacity: 1;
-  }
-}
-
-.sdv-tasks-empty {
-  display: grid;
-  justify-items: center;
-  text-align: center;
-  gap: 6px;
-  padding: 46px 20px 40px;
-}
-
-.sdv-tasks-empty-icon {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 10px;
-  color: var(--accent);
-  background: var(--accent-soft);
-  margin-bottom: 4px;
-}
-
-.sdv-tasks-empty strong {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.sdv-tasks-empty p {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.sdv-tasks-empty .sdv-btn {
-  margin-top: 8px;
-}
-
-.sdv-tasks-empty small {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.sdv-tasks-nomatch {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: 30px 20px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.sdv-tasks-nomatch p {
-  margin: 0;
-}
-
-.sdv-task-group h3 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 10px 0 6px;
-}
-
-.sdv-task-group h3 span {
-  font-size: 11px;
-  font-weight: 650;
-  color: var(--text-tertiary);
-  background: var(--bg-hover);
-  border-radius: var(--radius-pill);
-  padding: 1px 8px;
-}
-
-/* Activity timeline (§16) */
-.sdv-activity-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.sdv-activity-list li button {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  padding: 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  color: var(--text-primary);
-}
-
-.sdv-activity-list li button:hover {
-  background: var(--bg-hover);
-}
-
-.sdv-activity-icon {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
-}
-
-.sdv-activity-body {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.sdv-activity-body strong {
-  font-size: 13px;
-  font-weight: 570;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sdv-activity-body em {
-  font-style: normal;
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.sdv-activity-list li small {
-  flex: none;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  padding-top: 2px;
-}
-
-.sdv-record-type {
-  flex: none;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  padding: 3px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-hover);
-  color: var(--text-secondary);
-}
-
-.sdv-record-ai_suggestion_applied,
-.sdv-record-manual_record { background: var(--accent-soft); color: var(--accent); }
-.sdv-record-task_completed { background: #e5f6ec; color: #15803d; }
-.sdv-record-focus_completed,
-.sdv-record-focus_started { background: #f1edff; color: #6d4aff; }
 
 /* Record lists */
 .sdv-record-list {
@@ -805,81 +384,10 @@
   color: var(--text-tertiary);
 }
 
-/* AI card (§18) */
-/* Empty states (§33) */
-.sdv-empty {
-  display: grid;
-  justify-items: start;
-  gap: 10px;
-  padding: 16px 8px;
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-.sdv-empty p {
-  margin: 0;
-}
-
 .sdv-empty-inline {
   margin: 0;
   color: var(--text-tertiary);
   font-size: 13px;
-}
-
-/* Toolbars, chips */
-.sdv-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.sdv-toolbar input[type="search"] {
-  flex: 1;
-  min-width: 160px;
-  height: 36px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 0 12px;
-  background: var(--bg-surface-muted);
-  color: var(--text-primary);
-}
-
-.sdv-toolbar select {
-  height: 36px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 0 10px;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.sdv-chip-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.sdv-chip {
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  border-radius: var(--radius-pill);
-  padding: 6px 13px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.sdv-chip:hover {
-  background: var(--bg-hover);
-}
-
-.sdv-chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
 }
 
 /* Focus tab (§23) */
@@ -1031,35 +539,6 @@
   overflow-y: auto;
 }
 
-.sdv-suggestion-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  min-width: 0;
-}
-
-.sdv-suggestion-row:hover {
-  background: var(--bg-hover);
-}
-
-.sdv-suggestion-row strong {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sdv-suggestion-row small {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
 /* Drawers */
 .sdv-drawer-backdrop {
   justify-content: flex-end;
@@ -1160,25 +639,9 @@
   accent-color: var(--accent);
 }
 
-.sdv-full-timeline li button {
-  align-items: center;
-}
-
 /* Responsive (§34) */
-@media (max-width: 1240px) {
-  .sdv-overview-top {
-    grid-template-columns: 1fr;
-  }
-
-  .sdv-overview-bottom {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 
 @media (max-width: 768px) {
-  .sdv-overview-bottom {
-    grid-template-columns: 1fr;
-  }
 
   .sdv-header-card {
     flex-direction: column;
@@ -1189,51 +652,12 @@
     justify-content: flex-start;
   }
 
-  .sdv-task-row {
-    flex-wrap: wrap;
-  }
-
-  .sdv-row-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
-
   .sdv-drawer {
     width: 100vw;
   }
 
 }
 
-.sdv-goals { display: grid; gap: 18px; }
-.sdv-goals-head h2 { margin: 0; font-size: 20px; }
-.sdv-goals-head p { margin: 5px 0 0; color: var(--text-tertiary); font-size: 13px; }
-.sdv-goals-create { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
-.sdv-goals-create form { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px; }
-.sdv-goals-create form:last-child { grid-template-columns: minmax(0, 1fr) auto; }
-.sdv-goals input, .sdv-goals select { min-width: 0; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg-surface); color: var(--text-primary); padding: 8px 9px; font: inherit; }
-.sdv-goals button { border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg-surface); color: var(--text-primary); padding: 7px 9px; cursor: pointer; }
-.sdv-goals button:hover { background: var(--bg-hover); }
-.sdv-goal-lists { display: grid; gap: 14px; }
-.sdv-goal-list { border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--bg-surface); overflow: hidden; }
-.sdv-goal-list > header { min-height: 45px; display: flex; align-items: center; gap: 8px; padding: 8px 11px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface-muted); }
-.sdv-goal-list > header > input { max-width: 250px; font-weight: 700; }
-.sdv-goal-list > header > span { color: var(--text-tertiary); font-size: 12px; }
-.sdv-goal-list > header > div { display: flex; gap: 4px; margin-left: auto; }
-.sdv-goal-list > header button { padding: 4px 7px; font-size: 11px; }
-.sdv-goal-list-items { display: grid; }
-.sdv-goal-item { display: grid; grid-template-columns: auto minmax(150px, 1fr) minmax(110px, .4fr) minmax(150px, .7fr); align-items: center; gap: 9px; padding: 10px 11px; border-bottom: 1px solid var(--border-subtle); }
-.sdv-goal-item:last-child { border-bottom: 0; }
-.sdv-goal-item[draggable="true"] { cursor: grab; }
-.sdv-goal-title { border: 0 !important; padding: 3px !important; text-align: left; font-weight: 650; }
-.sdv-goal-item.is-done .sdv-goal-title { color: var(--text-tertiary); text-decoration: line-through; }
-.sdv-goal-plan { display: flex; gap: 5px; }
-.sdv-goal-plan input { width: 132px; }
-.sdv-goal-list-empty { margin: 0; padding: 15px 11px; color: var(--text-tertiary); font-size: 12px; }
-@media (max-width: 800px) {
-  .sdv-goals-create { grid-template-columns: 1fr; }
-  .sdv-goal-item { grid-template-columns: auto minmax(0, 1fr); }
-  .sdv-goal-item > select, .sdv-goal-plan { grid-column: 2; }
-}
 
 .sdv-form input[type="color"] {
   width: 64px;
@@ -1241,7 +665,6 @@
   padding: 3px;
   cursor: pointer;
 }
-
 
 /* Says which level the board is opened at, because the tree that decided it
    may be collapsed or off screen. */
@@ -1284,19 +707,6 @@
 
 .sdv-view-add input {
   min-width: 180px;
-}
-
-.sdv-statuses {
-  position: relative;
-}
-
-.sdv-statuses-toggle {
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
-  background: none;
-  padding: 5px 10px;
-  font-size: 0.8rem;
-  cursor: pointer;
 }
 
 .sdv-statuses-body {

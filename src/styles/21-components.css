@@ -48,16 +48,14 @@
   box-shadow: var(--shadow-card);
 }
 
-/* The surfaces that are cards in appearance and containers in behaviour. A
-   Matrix quadrant and a calendar column own their own padding — the grid
-   inside them is what decides it — so they take the surface and nothing else.
-   Splitting the rule is the honest way to say that. */
-.quick-add,
+/* The surfaces that are cards in appearance and containers in behaviour: what
+   they hold owns its own padding — the grid or the list inside is what decides
+   it — so they take the surface and nothing else. Splitting the rule is the
+   honest way to say that. (The Matrix quadrant and the calendar columns that
+   used to be named here were removed with the rest of the dead CSS; the two
+   that remain are the ones any screen actually renders.) */
 .detail-panel,
-.matrix-cell,
-.board-column,
-.calendar-main,
-.calendar-backlog {
+.board-column {
   background: var(--bg-surface);
   border-color: var(--border-subtle);
   border-radius: var(--density-radius);
@@ -222,7 +220,7 @@ textarea {
    up as tall as a menu item:
 
      navigation row   `.tm-row`, 36px, §4.86's rhythm (V-5)
-     content row      `.task-row`, `.tdy-triage-row`, `.foc-task-main` — as
+     content row      `.tm-task`, `.tdy-triage-row`, `.foc-task-main` — as
                       tall as what is in them, one line or three
      list row         this one: a single line you point at and choose
 
@@ -230,10 +228,7 @@ textarea {
    radius, the hover, the selected fill, and the gap between an icon and its
    label. */
 .ff-row,
-.gcal-cat-row,
-.list-view-row,
-.side-list li,
-.spc-list-row {
+.gcal-cat-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -244,18 +239,12 @@ textarea {
 }
 
 .ff-row:hover,
-.gcal-cat-row:hover,
-.list-view-row:hover,
-.side-list li:hover,
-.spc-list-row:hover {
+.gcal-cat-row:hover {
   background: var(--bg-hover);
 }
 
 .ff-row.is-selected,
-.gcal-cat-row.is-selected,
-.list-view-row.is-selected,
-.side-list li.is-selected,
-.spc-list-row.is-selected {
+.gcal-cat-row.is-selected {
   background: var(--bg-selected);
 }
 
