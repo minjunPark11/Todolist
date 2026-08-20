@@ -68,24 +68,29 @@ export function isTasksLocation(url: string): boolean {
 }
 
 /**
- * Whether an address is SpaceHub — the one Tasks address you cannot leave on
- * your own.
+ * Whether an address is a page the Tasks sidebar's doors lead to.
  *
- * SpaceHub lights the Tasks item because §1.5 refuses it one of its own, and
- * that is right. But it is also the only Tasks address whose sidebar slot
- * holds the Space tree instead of the Tasks sidebar, and the tree has no row
- * back into the module: D-14 gave the `오늘` row up on the grounds that the
- * Rail's Tasks item answers it better. It cannot answer anything while
- * §2.11's "already here" guard reads the Rail's own highlight, because by
- * that reading SpaceHub IS Tasks — so the click did nothing, and the browser's
- * Back button was the only way out of a screen the sidebar invites you into.
+ * Projects and Goals are inside Tasks — §1.5 refuses each of them a Rail item
+ * — so both light the Tasks item, and neither is a Scope of the Tasks Module.
+ * That combination is what this answers, and two things read it.
  *
- * The same reading keeps SpaceHub out of `lastTasksLocation`: remembering it
- * as the place to come back to would make the fixed click navigate to the
- * screen it is trying to leave.
+ * §2.11's "already Tasks" guard, which otherwise reads the Rail's own
+ * HIGHLIGHT: by that reading these pages ARE Tasks, so the one item that
+ * leads back to what you were reading would do nothing on them. (When the
+ * tree still stood in the sidebar on `/projects` that was a trap with no way
+ * out but the browser's Back button, which the packaged app does not draw.)
+ *
+ * And `lastTasksLocation`, which must not remember them: coming back to Tasks
+ * from the Calendar should land on the list you were reading, and returning
+ * to the doorway you left through is not that.
+ *
+ * It was `isSpaceHubLocation`, naming a screen that no longer exists — and
+ * knowing only `/projects`, so `/goals` was left with a dead Rail item and a
+ * place in `lastTasksLocation` when D-4 added it.
  */
-export function isSpaceHubLocation(url: string): boolean {
-  return pageForPath(url.split("?")[0]) === "projects";
+export function isTasksDoorway(url: string): boolean {
+  const page = pageForPath(url.split("?")[0]);
+  return page === "projects" || page === "goals";
 }
 
 /**

@@ -23,7 +23,7 @@ import { PAGE_ROUTES, RETIRED_ROUTES, bootRedirectFor, pageForPath, pathForDefau
 import {
   RAIL_DESTINATIONS,
   TASKS_HOME,
-  isSpaceHubLocation,
+  isTasksDoorway,
   isTasksLocation,
   railItemFor,
   type RailNavItem,
@@ -598,9 +598,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // SpaceHub is a Tasks address that the Tasks item has to be able to LEAVE,
-    // so it is not one it may be sent back to (`isSpaceHubLocation`).
-    if (isTasksLocation(currentUrl) && !isSpaceHubLocation(currentUrl)) {
+    // A doorway is a Tasks address the Tasks item has to be able to LEAVE, so
+    // it is not one it may be sent back to (`isTasksDoorway`).
+    if (isTasksLocation(currentUrl) && !isTasksDoorway(currentUrl)) {
       lastTasksLocationRef.current = currentUrl;
     }
   }, [currentUrl]);
@@ -1132,10 +1132,9 @@ export default function App() {
   function navigateRail(item: RailNavItem) {
     if (item === "tasks") {
       // "Already Tasks" is asked of the SCREEN, not of the Rail's highlight.
-      // SpaceHub lights this item too, and it is the one Tasks address whose
-      // sidebar cannot get you back into the module — so there, the item is
-      // the way out rather than a no-op (`isSpaceHubLocation`).
-      if (railItem === "tasks" && !isSpaceHubLocation(currentPath)) return;
+      // Projects and Goals light this item too without being the Module, so
+      // there the item leads back rather than doing nothing (`isTasksDoorway`).
+      if (railItem === "tasks" && !isTasksDoorway(currentPath)) return;
       navigateUrl(lastTasksLocationRef.current || TASKS_HOME);
       return;
     }

@@ -322,6 +322,26 @@ test.describe("the Global Rail", () => {
   });
 
   /**
+   * The same, for the doorway D-4 added.
+   *
+   * Written because the predicate behind RAIL-01b named one page by hand and
+   * Goals arrived later: on `/goals` the Rail's Tasks item did nothing at all,
+   * and `/goals` was remembered as the place to come back to — so a trip to
+   * the Calendar and back landed on Goals rather than on the list being read.
+   */
+  test("RAIL-01c — Goals is a doorway too, and Tasks leads back out of it", async ({ page }) => {
+    await openApp(page);
+    await page.goto("/completed");
+    await expect(page.locator(".tm-shell")).toBeVisible();
+
+    await page.locator("#context-sidebar").getByRole("button", { name: "Goals", exact: true }).click();
+    await expect(page).toHaveURL(/\/goals$/);
+
+    await rail(page, "Tasks").click();
+    await expect(page).toHaveURL(/\/completed/);
+  });
+
+  /**
    * RAIL-02, as §2.48 wrote it.
    *
    * This is the case D-29 exists for. Under D-25 the magnifier changed four

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RAIL_DESTINATIONS, TASKS_HOME, isSpaceHubLocation, isTasksLocation, railItemFor } from "./railNav";
+import { RAIL_DESTINATIONS, TASKS_HOME, isTasksDoorway, isTasksLocation, railItemFor } from "./railNav";
 import { PAGE_ROUTES } from "./pageRoute";
 
 describe("railNav", () => {
@@ -60,22 +60,27 @@ describe("railNav", () => {
   });
 
   /**
-   * The trap this predicate was written for: the Tasks sidebar has a row into
-   * SpaceHub, SpaceHub draws the Space tree instead of that sidebar, and the
-   * tree has no row back. Both readings below have to hold at once for the
-   * Rail's Tasks item to be the way out — it lights up there (so §1.5 is
-   * kept), and it is not "already here" (so the click still goes somewhere).
+   * Both readings have to hold at once for the Rail's Tasks item to lead back
+   * out of a doorway: it lights up there (so §1.5 is kept — neither Projects
+   * nor Goals may have a Rail item of its own), and it is not "already here"
+   * (so the click still goes somewhere).
    */
-  it("knows SpaceHub is inside Tasks and still a place to be let out of", () => {
-    for (const path of [PAGE_ROUTES.projects, "/s/space-1", "/s/space-1/p/project-1", "/s/space-1/l/list-1"]) {
+  it("knows the doorways are inside Tasks and still places to be let out of", () => {
+    for (const path of [
+      PAGE_ROUTES.projects,
+      PAGE_ROUTES.goals,
+      "/s/space-1",
+      "/s/space-1/p/project-1",
+      "/s/space-1/l/list-1",
+    ]) {
       expect(railItemFor(path)).toBe("tasks");
-      expect(isSpaceHubLocation(path)).toBe(true);
+      expect(isTasksDoorway(path)).toBe(true);
     }
   });
 
-  it("counts no other Tasks address as SpaceHub", () => {
+  it("counts no Scope of the Module as a doorway", () => {
     for (const url of [PAGE_ROUTES.today, "/today", "/list/list-1?view=board", "/search?q=x", "/trash"]) {
-      expect(isSpaceHubLocation(url)).toBe(false);
+      expect(isTasksDoorway(url)).toBe(false);
     }
   });
 });
