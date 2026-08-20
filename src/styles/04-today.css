@@ -808,7 +808,7 @@ button.tdy-row-title {
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   background: var(--bg-surface);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-panel);
 }
 
 .tdy-bulk-bar strong {

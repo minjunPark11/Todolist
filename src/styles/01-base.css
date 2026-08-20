@@ -51,6 +51,11 @@
   --bg-surface: #ffffff;
   --bg-surface-muted: #f5f5f7;
   --bg-hover: rgba(0, 0, 0, 0.04);
+  /* See the dark block for why these are separate from `--bg-hover`.
+     NOTE: the reference was measured in dark only, so the light values are an
+     extrapolation of the same alphas, not a measurement. */
+  --bg-hover-nav: rgba(0, 0, 0, 0.03);
+  --bg-hover-content: rgba(0, 0, 0, 0.05);
 
   --text-primary: #1c1c1e;
   --text-secondary: #3c3c43;
@@ -122,7 +127,12 @@
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.13);
   --shadow-card: var(--shadow-xs);
   --shadow-raised: var(--shadow-md);
-  --shadow-panel: var(--shadow-lg);
+  /* Floating layers — measured, not derived. TickTick draws the context menu
+     and the modal with exactly the same shadow (Component 11 §3, 12 §2), and it
+     is the one value those two share. The geometry is taken from that; the dark
+     alpha is the measured 0.2, the light alpha stays this scale's own 0.13
+     because the reference's light theme was never measured. */
+  --shadow-panel: 0 16px 40px rgba(0, 0, 0, 0.13);
 
   /* Motion (§6.7) */
   --motion-fast: 120ms ease-out;
@@ -199,7 +209,11 @@
      nothing at all. */
   --bg-rail: #eceef1;
   --bg-context-sidebar: #f0f1f4;
-  --bg-selected: #eceef3;
+  /* V-P2: selected is an alpha, not a fixed grey. TickTick draws selection at
+     8% of the foreground in both themes (Component 01 §4, 04 §11, 06 §8), which
+     is why the same value reads on the Rail, the sidebar and an elevated menu.
+     `#eceef3` was that same 8% baked against one background and no other. */
+  --bg-selected: rgba(0, 0, 0, 0.08);
   --bg-selected-hover: #e5e8ee;
   --bg-pressed: #e9ebef;
 
@@ -322,6 +336,13 @@ body {
   --bg-surface: #1c1c1e;
   --bg-surface-muted: #232325;
   --bg-hover: rgba(255, 255, 255, 0.06);
+  /* Row hover, split by area (Component 06 §11, R-9). The reference draws a
+     navigation row at 3% and a content row at 5% — the wider the row, the more
+     alpha it needs to read at all. `--bg-hover` stays as it is: it is not only
+     a hover, it is the resting fill under badges, pills and tracks in 65 other
+     places, and moving it would move all of them. */
+  --bg-hover-nav: rgba(255, 255, 255, 0.03);
+  --bg-hover-content: rgba(255, 255, 255, 0.05);
   /* The dark half of the token above. Above `--bg-hover` (.06) so a resting
      fill is visible at all, below `--bg-selected` (.1) so selection still
      wins. */
@@ -351,6 +372,7 @@ body {
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.34);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.38);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.42);
+  --shadow-panel: 0 16px 40px rgba(0, 0, 0, 0.2);
   color: var(--text-primary);
   background: var(--bg-app);
   color-scheme: dark;

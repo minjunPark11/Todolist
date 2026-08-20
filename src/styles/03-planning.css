@@ -413,7 +413,7 @@
 .ff-modal {
   background: var(--bg-surface);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-panel);
   width: 100%;
   max-width: 460px;
   max-height: 86vh;

@@ -1,0 +1,269 @@
+# TickTick 역설계 #10 — Quick Add (본문 상단 태스크 입력)
+
+대상: TickTick Web (ticktick.com/webapp), 사용자 실제 계정
+분석 컴포넌트: **리스트 뷰 상단의 퀵애드 입력(`.tl-quick`)**
+작성일: 2026-08-20
+
+Component 01~09에서 다룬 내용은 다시 분석하지 않고, 비교가 필요한 지점에서만 인용한다.
+
+**대상 선정 이유**: 할 일 앱의 주 생성 경로이고, 우리 앱의 `TaskQuickAdd.tsx` / `.tm-quickadd`와 1:1로 대응한다.
+
+## 0. 측정 조건 · 안전 조치 · 복구
+
+| 항목 | 값 |
+|---|---|
+| viewport | **1387 × 713 CSS px** (dpr 2) |
+| 테마 / 로케일 | dark / ko |
+| 측정 화면 | `오늘`(`#q/today/tasks`) — 리스트 뷰 |
+| 측정 방법 | `getBoundingClientRect()` · `getComputedStyle()` · 실제 마우스 클릭/hover · CodeMirror API |
+
+**안전 조치**: 이 컴포넌트는 **누르면 실제 태스크가 생성되는** 화면이다. 따라서
+
+- **텍스트를 한 글자도 입력하지 않았다.**
+- Enter를 누르지 않았다.
+- 측정 후 에디터 값이 빈 문자열(`""`)임을 확인했다.
+
+**복구**: 화면을 기본함(`#p/inbox/kanban`)으로 되돌렸다. 뷰포트 1387×713, Rail 50, 사이드바 240(`leftListWidth = "240"`), `isLeftListHide = "false"`, Component 04 테스트 데이터 4개 전부 유지. 데이터 변경 없음.
+
+**판정 규칙**: 수치는 전부 실측. 해석은 `[Inference]`로 분리. 못 잰 것은 §8에 적는다.
+
+---
+
+## 1. 셸에서의 위치
+
+본문(`.tasklist`)의 세로 구성은 **3단**이다.
+
+| 영역 | y | height |
+|---|---|---|
+| 헤더 (`.tl-bar`) | 0 – 64 | 64 (Component 09) |
+| **퀵애드 (`.tl-quick`)** | **64 – 119** | **55** |
+| 리스트 본문 (`.tl-body`) | 119 – 713 | 594 |
+
+**[Observed] 세 영역이 간격 0으로 맞물린다.** 헤더 하단과 퀵애드 상단, 퀵애드 하단과 본문 상단 모두 gap 0이다.
+
+**[Observed] 퀵애드는 스크롤 영역 밖에 있다.** `.tl-body`가 자체 스크롤을 갖는 별도 형제이므로(Component 06), 퀵애드는 리스트를 스크롤해도 **항상 상단에 남는다** — sticky 없이 구조로 해결한 것이다.
+
+---
+
+## 2. DOM 구조
+
+```
+DIV.tl-quick.quickAddView_1nOS7.px-[20px].pb-[16px].relative      616 × 55 @290,64
+└ DIV.border-[1px].border-solid.rounded-[10px].border-transparent.bg-grey-3
+  │                                                               576 × 39 @310,64
+  └ DIV.task-input.text-s.overflow-x-hidden.with-no-scroll.flex    574 × 32 @311,70
+    │   padding: 3px 12px 0
+    ├ DIV.task-title.overflow-hidden.relative.leading-[40px].flex-auto   550 × 29 @323,73
+    │   └ DIV.relative
+    │       ├ DIV.pointer-events-none.absolute.opacity-0      ← 폭 측정용 프록시
+    │       │   └ DIV.MDEditor.notranslate                       3 × 30
+    │       ├ DIV.MDEditor.notranslate                         550 × 30
+    │       │   ├ TEXTAREA.pastable                            (display: none)
+    │       │   └ DIV.CodeMirror.cm-s-default.CodeMirror-wrap  ← 실제 에디터
+    │       └ DIV.fake-placeholder.absolute.inset-0.z-0.text-grey-20.flex.items-center
+    │           │                                              554 × 21 @319,73
+    │           ├ svg.icon-add-kanban-task.w-[24px].h-[24px]   24 × 24 @319,72
+    │           └ SPAN.text-s.text-grey-20.flex-auto.truncate  "…(에) 작업 추가하기"
+    └ DIV.flex-none.flex.flex-row-reverse.clear-both             0 × 29 @873   ← 액션 자리(빈 상태)
+```
+
+**[Observed] 에디터는 `<input>`이나 `<textarea>`가 아니라 CodeMirror다.** 실제 `<textarea class="pastable">`가 있긴 하지만 `display: none`이고 붙여넣기 처리용으로 보인다.
+
+**[Observed] 플레이스홀더가 진짜 placeholder 속성이 아니라 겹쳐 놓은 레이어(`fake-placeholder`)다.** 아이콘과 텍스트를 함께 담기 위해서로 보인다 — 네이티브 placeholder로는 아이콘을 넣을 수 없다.
+
+**[Observed] 폭 측정용 숨은 프록시가 있다.** `pointer-events-none absolute opacity-0`인 두 번째 MDEditor가 3px 폭으로 존재한다.
+**[Inference]** 입력 텍스트의 렌더 폭을 재서 커서 위치나 자동 확장을 계산하는 용도로 보인다. 확인하지는 못했다.
+
+---
+
+## 3. Geometry
+
+| 요소 | x | y | w | h |
+|---|---|---|---|---|
+| `.tl-quick` (컨테이너) | 290 | 64 | 616 | **55** |
+| 입력 박스 | **310** | 64 | **576** | **39** |
+| `.task-input` | 311 | 70 | 574 | 32 |
+| `.task-title` | 323 | 73 | 550 | 29 |
+| CodeMirror | 323 | 73 | (내용에 따라) | 30 |
+| 플레이스홀더 | 319 | 73 | 554 | 21 |
+| 플레이스홀더 아이콘 | 319 | 72 | **24** | **24** |
+| 액션 슬롯 | 873 | 73 | **0** | 29 |
+
+### 3.1 인셋 분해
+
+```
+본문 좌측 290
+ +20   .tl-quick 의 px-[20px]        → 입력 박스 310
+ + 1   박스의 1px 보더                → .task-input 311
+ +12   .task-input 의 padding-left    → 텍스트/아이콘 영역 323
+```
+
+우측도 대칭이다: 박스 우측 886 = 906 − 20.
+
+세로:
+```
+y 64   박스 상단
+ +39   박스 높이
+y 103  박스 하단
+ +16   .tl-quick 의 pb-[16px]
+y 119  리스트 본문 시작
+```
+
+**[Observed] 좌우 20px 인셋이 Component 07(detail)·09(헤더)와 같다.** 본문 계열 전체가 20px로 통일돼 있다.
+
+---
+
+## 4. Typography / Color
+
+| 항목 | 값 |
+|---|---|
+| 에디터 텍스트 | **14px / line-height 21 / `rgb(255,255,255)`** |
+| 플레이스홀더 텍스트 | **14px / `rgba(255,255,255,0.2)`** (`text-grey-20`), line-height 40 |
+| 플레이스홀더 아이콘 | **24 × 24**, 같은 `rgba(255,255,255,0.2)` |
+| 박스 배경 | **`rgba(255,255,255,0.03)`** (`bg-grey-3`) |
+| 박스 보더 | **1px `solid` `transparent`** |
+| 박스 radius | **10px** |
+
+**[Observed] 플레이스홀더가 전경색 20%다.** 이 시리즈에서 처음 나온 알파 단계다(기존: 3 · 5 · 6 · 8 · 10 · 30 · 40 · 100%).
+
+**[Observed] 배경 3%는 사이드바 행의 hover 알파와 같은 값이다**(Component 01). 여기서는 **휴지 상태의 채움**으로 쓰인다.
+
+**[Inference]** 같은 3%가 한쪽에서는 "지금 가리키는 중"을, 다른 쪽에서는 "여기 입력할 수 있음"을 뜻한다. 알파 값 자체에 의미가 고정돼 있지 않다는 증거다 — Component 09 §8.1에서 본 "영역마다 규칙이 다르다"의 연장선.
+
+---
+
+## 5. States — 아무 것도 변하지 않는다
+
+| Property | 휴지 | **hover** | **focus (에디터 포커스)** |
+|---|---|---|---|
+| 박스 배경 | `rgba(255,255,255,0.03)` | **변화 없음** | **변화 없음** |
+| 박스 보더 색 | `transparent` | **변화 없음** | **변화 없음** |
+| 박스 radius | 10px | 10px | 10px |
+| 플레이스홀더 색 | 20% | **변화 없음** | **변화 없음** (계속 표시) |
+| 컨테이너 높이 | 55 | 55 | **55 (확장 없음)** |
+| cursor | **`auto`** | `auto` | — |
+| transition | `all / 0s` | — | — |
+| box-shadow / outline | none | none | none |
+
+**[Observed] hover에도 focus에도 시각 변화가 전혀 없다.** 1px 투명 보더가 자리만 잡고 있을 뿐, 어떤 상태에서도 색이 들어가지 않았다.
+
+**[Observed] 클래스에도 상태 변형이 없다.** 박스의 전체 클래스는 `border-[1px] border-solid rounded-[10px] border-transparent bg-grey-3`뿐 — `hover:` · `focus:` · `focus-within:` 변형이 하나도 없다.
+
+**[Inference]** 투명 1px 보더는 **텍스트가 입력됐을 때** 색이 들어가도록 예약된 자리로 보인다. 다만 **입력을 하지 않았으므로 확인하지 못했다.**
+
+### 5.1 클릭으로 포커스되지 않았다 — 판단 유보
+
+입력 영역 안 두 지점(가운데, 좌측)을 **실제 마우스로 클릭했으나 두 번 모두 포커스가 이동하지 않았다**(`document.activeElement`가 `BODY` 유지, `CodeMirror-focused` 클래스 없음). CodeMirror API(`cm.focus()`)로는 정상 포커스됐다.
+
+휴지 상태에서 CodeMirror 요소의 실제 폭이 **3px**(x 323–326)이고 그 위를 `fake-placeholder`가 덮고 있다는 점이 관련돼 보이지만, **이것이 실제 사용자에게도 일어나는 일인지 자동화의 산물인지 구분하지 못했다.** 실제 TickTick 사용자는 이 영역을 눌러 입력하므로, 자동화 클릭이 CodeMirror의 mousedown 처리와 맞지 않았을 가능성이 높다. **판단을 유보한다.**
+
+---
+
+## 6. Fidelity Specification
+
+```
+QUICK ADD (리스트 뷰 상단)
+
+위치
+  본문 3단 구조       : 헤더 / 퀵애드 / 리스트 본문, 서로 gap 0
+  스크롤              : 리스트 본문만 스크롤한다 → 퀵애드는 sticky 없이 항상 상단
+  컨테이너 padding    : 좌우 20, 하단 16 (상단 0)
+  컨테이너 높이       : 55 = 박스 39 + 하단 16
+
+입력 박스
+  width               : 본문 폭 − 40 (좌우 20 인셋)
+  height              : 39
+  background          : 전경색 3% 알파
+  border              : 1px solid transparent  ← 자리만 예약, 어느 상태에서도 색이 안 들어감
+  radius              : 10px
+  내부 padding        : 3px 12px 0
+
+Placeholder (네이티브 아님 — 겹쳐 놓은 레이어)
+  구성                : 아이콘 24 × 24 + 텍스트
+  색                  : 둘 다 전경색 20% 알파
+  텍스트              : 14px, truncate
+  문구                : "<리스트 이름>(에) 작업 추가하기" — 대상 리스트를 문구에 넣는다
+
+Editor
+  구현                : CodeMirror (input/textarea 아님)
+  텍스트              : 14px / line-height 21 / 전경색 100%
+
+Trailing action slot
+  flex-none, flex-row-reverse, 휴지 상태에서 폭 0
+
+States
+  hover               : 변화 없음
+  focus               : 변화 없음 (높이 확장도 없음)
+  cursor              : auto (텍스트 커서로 바뀌지 않는다)
+  transition          : 없음 (0s)
+  입력 중 상태        : 미측정 (텍스트를 넣지 않았다)
+```
+
+---
+
+## 7. Component 01~10 갱신
+
+### 7.1 알파 스케일 실측 집계
+
+이 시리즈에서 실제로 관찰된 전경색 알파 단계:
+
+| 알파 | 쓰인 곳 |
+|---|---|
+| **3%** | 사이드바 행 hover(C01) · 섹션 헤더 hover(C03) · 폴더 행 hover(C04) · **퀵애드 배경(C10)** |
+| **5%** | rail→사이드바 경계(C02) · 태스크 행 구분선(C06) · 본문 헤더 아이콘 hover 배경(C09) |
+| **6%** | 사이드바→본문 경계(C02) |
+| **8%** | 행 selected(C01·C04·C06) |
+| **10%** | 사이드바 내부 구분선(C02) · detail 경계·헤더선(C07) |
+| **20%** | **퀵애드 플레이스홀더(C10)** |
+| **30%** | 섹션 헤더 제목(C03) · 오버레이 스크롤바(C02·C07) |
+| **40%** | 카운트·more·chevron(C01·C03·C04) · rail 아이콘 기본(C08) |
+| **60%** | rail 아이콘 hover(C08) |
+| **100%** | 본문 텍스트 전반 |
+
+**[Observed] 3 · 5 · 6 · 8 · 10 · 20 · 30 · 40 · 60 · 100 — 열 단계가 쓰인다.** Component 01에서 확인한 `--opacity-variant-*` 토큰군(22단)의 절반 가까이가 실제로 사용된다.
+
+**[Inference]** 알파 단계는 넉넉히 정의해 두고 필요할 때 꺼내 쓰는 방식으로 보인다. **다만 같은 값이 여러 의미로 쓰이므로**(3%가 hover이자 입력 필드 배경) **"알파 = 의미"의 매핑은 존재하지 않는다.**
+
+### 7.2 Conflict / Revision Candidate (R-18)
+
+| # | 기존 서술 | 10의 관찰 | 성격 |
+|---|---|---|---|
+| **R-18** | **C01 §5 / C03 §9** — "hover 배경 = 전경색 3%"를 사이드바 계열의 규칙으로 정리 | 같은 3%가 **퀵애드에서는 휴지 상태의 입력 필드 배경**으로 쓰인다 | **보강.** 3%는 "hover"의 값이 아니라 "가장 약한 채움"의 값이다. 의미는 문맥이 정한다 |
+
+---
+
+## 8. 이 분석이 확인하지 않은 것
+
+- **입력 중 / 입력 후 상태 전부.** 텍스트를 넣지 않았으므로 보더 색 변화, 높이 확장, 액션 슬롯(날짜·우선순위·리스트 버튼) 등장, 스마트 파싱(`오늘`·`!1` 같은 토큰) 표시가 전부 미측정이다. **이 컴포넌트에서 가장 흥미로운 부분이 여기인데, 태스크를 만들지 않고는 볼 수 없다.**
+- **Enter / Escape 동작.**
+- **칸반 뷰의 퀵애드** — 칸반은 컬럼마다 `+` 버튼을 쓰는 다른 구조로 보이나 확인하지 않았다.
+- **클릭 포커스 실패의 원인**(§5.1) — 자동화 산물인지 실제 동작인지 미확정.
+- **`fake-placeholder`가 사라지는 조건** — 포커스만으로는 사라지지 않았다.
+- **폭 측정 프록시(`opacity-0` MDEditor)의 용도** — 추론만 했다.
+- **라이트 테마**, **원본 CSS 규칙**(CORS) — 01~09와 동일.
+
+---
+
+## Appendix A — 우리 앱에 적용할 때 다르게 할 것 (관찰이 아닌 제안)
+
+**아래는 TickTick 동작이 아니다.**
+
+1. **focus 상태를 반드시 그린다.** TickTick은 hover·focus 모두 아무 변화가 없다. 1px 투명 보더가 이미 자리를 잡고 있으니, **focus에서 accent 색을 넣는 것**만으로 해결된다(레이아웃 이동 없음).
+2. **cursor를 `text`로.** 입력 필드인데 `cursor: auto`다.
+3. **플레이스홀더 20%는 너무 흐리다.** 다크 배경 3% 위의 흰색 20%는 대비가 매우 낮다. 40% 정도를 권한다.
+4. **"리스트 이름을 문구에 넣는 것"은 채택할 만하다.** `"기본함"(에) 작업 추가하기` — 어디에 추가되는지가 입력 직전에 보인다.
+5. **아이콘 + 텍스트 플레이스홀더 구조도 채택할 만하다.** 네이티브 placeholder로는 못 하는 일이고, 겹침 레이어 방식이 간단하다.
+6. **CodeMirror까지 갈 필요는 없다.** TickTick이 CodeMirror를 쓰는 이유는 스마트 파싱 하이라이팅으로 보이는데, 우리 규모에서는 `<input>` + 파싱 결과를 칩으로 보여주는 편이 가볍다.
+7. **퀵애드를 스크롤 밖에 두는 구조는 그대로 채택한다.** sticky 없이 3단 flex로 해결하는 방식이 단순하다.
+
+---
+
+## 9. 이 문서가 남긴 상태
+
+| 항목 | 상태 |
+|---|---|
+| Component 01~09 문서 | **수정하지 않음.** 보강 후보는 §7.2에만 기록 |
+| 우리 앱 코드 | **수정하지 않음** |
+| TickTick 데이터 | **변경 없음.** 텍스트 미입력, Enter 미사용, 에디터 값 `""` 확인 |
+| 화면 / 셸 | 기본함 · Rail 50 · 사이드바 240 expanded · viewport 1387×713 |
+| Component 04 테스트 데이터 | `ZZ Folder` + 리스트 3개 유지 |

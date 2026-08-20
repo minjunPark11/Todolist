@@ -89,7 +89,7 @@
   border-radius: 10px;
   padding: 16px;
   background: var(--bg-surface);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-panel);
 }
 
 .foc-options-popover h2 {
@@ -568,7 +568,7 @@
   border-radius: 12px;
   padding: 22px;
   background: var(--bg-surface);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-panel);
 }
 
 .foc-modal h2,
@@ -597,7 +597,7 @@
   border-radius: 22px;
   padding: 12px 18px;
   background: rgba(255, 255, 255, 0.92);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-panel);
   backdrop-filter: blur(18px);
 }
 

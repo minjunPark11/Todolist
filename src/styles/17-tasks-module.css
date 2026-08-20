@@ -83,17 +83,17 @@
   min-height: 36px;
   padding: 0 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: transparent;
   color: var(--text, #1c1c1e);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   text-align: left;
   cursor: pointer;
 }
 
 .tm-row:hover {
-  background: var(--hover, rgba(0, 0, 0, 0.04));
+  background: var(--bg-hover-nav);
 }
 
 /* §11.20/§11.28: selected is NEUTRAL, and the label stays at 500.
@@ -104,7 +104,10 @@
 .tm-row.is-current {
   background: var(--selected);
   color: var(--text);
-  font-weight: 500;
+  /* Component 01 §4 measured the reference at 400 in every state — the weight
+     does not move when a row is selected. 500 made the current row heavier than
+     its neighbours on top of the background it already has. */
+  font-weight: 400;
 }
 
 .tm-row.is-current:hover {
@@ -239,7 +242,7 @@
 }
 
 .tm-task:hover {
-  background: var(--bg-hover);
+  background: var(--bg-hover-content);
 }
 
 .tm-task.is-dragging {
@@ -654,9 +657,14 @@
   gap: 8px;
   width: 260px;
   padding: 10px;
-  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  /* Component 13 §2: the reference draws the column itself completely
+     transparent and lets the cards do the grouping. Ours painted the column
+     `--surface-muted`, which in DARK is lighter (lum 35) than the card on it
+     (lum 28) — the card sank into its own column. The border stays at 1px and
+     transparent so `.is-over` still has somewhere to put its colour. */
+  border: 1px solid transparent;
   border-radius: 12px;
-  background: var(--surface-muted, rgba(0, 0, 0, 0.02));
+  background: transparent;
 }
 
 /* The column being dragged over says so. Without it the only feedback is the
@@ -694,7 +702,7 @@
 .tm-column-cards {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;  /* Component 13 §3.1: cards sit 8 apart (the reference's py-4 on each) */
   margin: 0;
   /* A column with nothing in it is still a drop target, so it keeps a height
      rather than collapsing to its header. */
