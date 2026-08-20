@@ -1457,20 +1457,6 @@
   padding: 8px 10px;
 }
 
-.focus-timer-card,
-.focus-summary {
-  display: grid;
-  gap: 18px;
-}
-
-.focus-timer-card label {
-  display: grid;
-  gap: 6px;
-  color: var(--color-ink-muted-80);
-  font-size: 0.83rem;
-  font-weight: 600;
-}
-
 .settings-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1882,29 +1868,6 @@ main {
 
 .priority {
   background: var(--ff-surface-muted);
-}
-
-.topic-card {
-  position: relative;
-  display: grid;
-  gap: 10px;
-}
-
-.topic-card small {
-  color: var(--ff-muted);
-  font-size: 0.78rem;
-}
-
-.topic-card p:not(.empty-state) {
-  margin: 0;
-  color: var(--ff-muted);
-  font-size: 0.86rem;
-}
-
-.topic-card span {
-  color: var(--ff-blue);
-  font-size: 0.86rem;
-  font-weight: 600;
 }
 
 .task-actions-section {

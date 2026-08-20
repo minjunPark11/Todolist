@@ -3,9 +3,13 @@
 // V-6's acceptance test is a sentence about the future — "a new screen can be
 // built without reaching for tdy-, foc- or gcal- classes" — which nothing can
 // assert directly. What CAN be asserted is the half that makes it true: every
-// legacy name and the canonical one resolve to the same computed style. If they
-// do, `.ff-card` is a complete substitute for all of them, and the sentence
-// follows.
+// legacy name still in use and the canonical one resolve to the same computed
+// style. If they do, `.ff-card` is a complete substitute for all of them, and
+// the sentence follows.
+//
+// "Still in use" is doing real work in that sentence. The lists below once
+// held names no screen rendered, and equality between two names that never
+// reach the DOM proves nothing about either of them.
 //
 // The probes are injected rather than found on a page. A card's appearance is
 // a property of the stylesheet, not of whether today's account happens to have
@@ -14,26 +18,27 @@
 import { expect, test } from "@playwright/test";
 import { openApp } from "./addList.helpers";
 
-/** What 21-components.css claims are the same thing. */
-const CARDS = [
-  "ff-card",
-  "tdy-card",
-  "foc-card",
-  "sdv-card",
-  "sdv-metric-card",
-  "summary-card",
-  "settings-card",
-  "panel-section",
-  "focus-summary",
-  "focus-timer-card",
-  "topic-card",
-  "project-tasks",
-];
+/**
+ * What 21-components.css claims are the same thing.
+ *
+ * This list used to be twelve. Seven of the names on it — `.summary-card`,
+ * `.panel-section`, `.focus-summary`, `.focus-timer-card`, `.topic-card`,
+ * `.project-tasks`, `.sdv-card` — turned out to have no call site anywhere in
+ * the app, so the equality this file was proving about them was an equality
+ * between two things nobody drew. They were deleted from the stylesheet and
+ * from here together; an alias earns its line by being said somewhere.
+ *
+ * `.ff-card` has no call site either and stays anyway, because it is the name
+ * a new card is supposed to reach for. What keeps it honest is the last test
+ * in this file, which builds a screen out of the canonical names and checks
+ * that each one draws something.
+ */
+const CARDS = ["ff-card", "tdy-card", "foc-card", "sdv-metric-card", "settings-card"];
 
 /** Same claim, for the button — base, primary and the small size. */
 const BUTTONS = {
   base: ["ff-btn", "tdy-btn", "sdv-btn"],
-  primary: ["ff-btn ff-btn-primary", "tdy-btn tdy-btn-navy", "sdv-btn sdv-btn-primary", "primary-action"],
+  primary: ["ff-btn ff-btn-primary", "tdy-btn tdy-btn-navy", "sdv-btn sdv-btn-primary"],
   small: ["ff-btn ff-btn-sm", "tdy-btn tdy-btn-sm", "sdv-btn sdv-btn-sm"],
 };
 

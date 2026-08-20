@@ -250,20 +250,6 @@
   border-bottom-color: var(--accent);
 }
 
-.sdv-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-.sdv-card h3 {
-  margin: 6px 0 0;
-  font-size: 14px;
-  font-weight: 650;
-  color: var(--text-secondary);
-}
-
 .sdv-subtask-progress {
   flex: none;
   font-size: 11px;
@@ -331,7 +317,6 @@
 .sdv-parent-link:hover {
   color: var(--accent);
 }
-
 
 /* Record lists */
 .sdv-record-list {
@@ -657,7 +642,6 @@
   }
 
 }
-
 
 .sdv-form input[type="color"] {
   width: 64px;

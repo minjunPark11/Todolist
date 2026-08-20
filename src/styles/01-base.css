@@ -524,23 +524,6 @@ main {
   font-weight: 600;
 }
 
-.summary-card {
-  text-align: center;
-}
-
-.summary-card span {
-  display: block;
-  color: var(--color-ink-muted-48);
-  font-size: 0.84rem;
-  font-weight: 600;
-}
-
-.summary-card strong {
-  display: block;
-  margin-top: 10px;
-  font-size: 1.8rem;
-}
-
 .legend {
   display: flex;
   flex-wrap: wrap;
@@ -582,7 +565,6 @@ textarea {
   color: var(--color-ink-muted-80);
 }
 
-.panel-section,
 .settings-card,
 .detail-panel {
   display: grid;
@@ -603,8 +585,7 @@ textarea {
 
 .section-title h2,
 .detail-panel h2,
-.settings-card h2,
-.project-tasks h2 {
+.settings-card h2 {
   margin: 0;
   font-size: 1rem;
 }

@@ -28,19 +28,18 @@
    A surface that holds content, at the density the tokens set. Everything in
    this list drew the same thing before, give or take: four paddings (0, 8, 14,
    18) and two backgrounds — `--bg-surface` and a 92%-opaque `--ff-panel`,
-   which put a translucent card on some screens and an opaque one on others. */
+   which put a translucent card on some screens and an opaque one on others.
+
+   Seven more names were on this list until it turned out no screen rendered
+   any of them. An alias is only worth its line while something still says the
+   old word; these were kept alive by nothing but the spec that checked them.
+   `.ff-card` stays without a call site of its own on purpose — it is the name
+   a new card is meant to reach for. */
 .ff-card,
 .tdy-card,
 .foc-card,
-.sdv-card,
 .sdv-metric-card,
-.summary-card,
-.settings-card,
-.panel-section,
-.focus-summary,
-.focus-timer-card,
-.topic-card,
-.project-tasks {
+.settings-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--density-radius);
@@ -73,8 +72,7 @@
    `-sm` is a size rather than a variant. */
 .ff-btn,
 .tdy-btn,
-.sdv-btn,
-.primary-action {
+.sdv-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -101,8 +99,7 @@
 
 .ff-btn:disabled,
 .tdy-btn:disabled,
-.sdv-btn:disabled,
-.primary-action:disabled {
+.sdv-btn:disabled {
   opacity: 0.55;
   cursor: default;
 }
@@ -112,8 +109,7 @@
    to end, and §11.3's accent is the one the user can change. */
 .ff-btn-primary,
 .tdy-btn-navy,
-.sdv-btn-primary,
-.primary-action {
+.sdv-btn-primary {
   border-color: var(--accent);
   background: var(--accent);
   color: #fff;
@@ -121,8 +117,7 @@
 
 .ff-btn-primary:not(:disabled):hover,
 .tdy-btn-navy:not(:disabled):hover,
-.sdv-btn-primary:not(:disabled):hover,
-.primary-action:not(:disabled):hover {
+.sdv-btn-primary:not(:disabled):hover {
   background: var(--accent);
   filter: brightness(0.95);
 }
