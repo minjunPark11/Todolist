@@ -68,19 +68,24 @@
      8 while a fill sat at 8 and a hover at 6 underneath it. Each use now names
      what it is, and the token is gone.
 
-     Light is extrapolated from the dark measurement; only dark was measured. */
-  --bg-hover-nav: rgba(0, 0, 0, 0.03);
-  --bg-hover-content: rgba(0, 0, 0, 0.05);
+     Light is no longer an extrapolation. Component 14 put the reference into
+     its light theme and found the alphas unchanged — selection .08, navigation
+     hover .03, section header .3, the Rail's right border .05, all identical to
+     dark. What changes is the colour they are an alpha OF: white becomes
+     rgb(25,25,25), which is not pure black. On white that is about two levels
+     lighter than rgba(0,0,0,a), which is why these read 25 rather than 0. */
+  --bg-hover-nav: rgba(25, 25, 25, 0.03);
+  --bg-hover-content: rgba(25, 25, 25, 0.05);
   /* The overlay scrollbar's thumb — foreground at 30%, which is what
      TICKTICK_COMPONENT_02 §4 measured (`rgba(255,255,255,0.3)` on a dark
      ground). Light is the same alpha on the other foreground. */
-  --scrollbar-thumb: rgba(0, 0, 0, 0.3);
+  --scrollbar-thumb: rgba(25, 25, 25, 0.3);
 
   --text-primary: #1c1c1e;
   --text-secondary: #3c3c43;
   --text-tertiary: #8e8e93;
 
-  --border-subtle: rgba(0, 0, 0, 0.07);
+  --border-subtle: rgba(25, 25, 25, 0.08);
   --border-strong: rgba(0, 0, 0, 0.12);
 
   /* The ladder's resting step, and the one token a badge, a pill, a count or
@@ -91,7 +96,7 @@
      It now also carries the twenty fills that used to read `--bg-hover`, at
      the .06 they were already drawn at. An alpha, so it reads on any surface,
      and below selection so selection still wins. */
-  --surface-2: rgba(0, 0, 0, 0.06);
+  --surface-2: rgba(25, 25, 25, 0.06);
 
   /* Accent is overridable per [data-accent]; default blue. */
   --accent: #007aff;
@@ -149,10 +154,15 @@
   --shadow-raised: var(--shadow-md);
   /* Floating layers — measured, not derived. TickTick draws the context menu
      and the modal with exactly the same shadow (Component 11 §3, 12 §2), and it
-     is the one value those two share. The geometry is taken from that; the dark
-     alpha is the measured 0.2, the light alpha stays this scale's own 0.13
-     because the reference's light theme was never measured. */
-  --shadow-panel: 0 16px 40px rgba(0, 0, 0, 0.13);
+     is the one value those two share.
+     The light half used to say the reference's light theme had never been
+     measured, and kept this scale's own 0.13 on the dark geometry. Component 14
+     measured it, and the guess had it backwards in both halves: the alpha does
+     NOT come down — it stays 0.2 — and the geometry comes in instead, from
+     16/40 to 5/18. Shadows are also the one thing still drawn from pure black
+     in the light theme, while every fill, border and text colour there is an
+     alpha of rgb(25,25,25). */
+  --shadow-panel: 0 5px 18px rgba(0, 0, 0, 0.2);
 
   /* Motion (§6.7) */
   --motion-fast: 120ms ease-out;
@@ -233,13 +243,13 @@
      8% of the foreground in both themes (Component 01 §4, 04 §11, 06 §8), which
      is why the same value reads on the Rail, the sidebar and an elevated menu.
      `#eceef3` was that same 8% baked against one background and no other. */
-  --bg-selected: rgba(0, 0, 0, 0.08);
+  --bg-selected: rgba(25, 25, 25, 0.08);
   /* Alphas rather than the flat #e5e8ee / #e9ebef these were. A fixed colour
      is tuned to one background and this one lands on three — the Rail, the
      sidebar and an elevated menu are all different greys under it. Same
      reasoning that moved `--bg-selected` off `#eceef3`. */
-  --bg-selected-hover: rgba(0, 0, 0, 0.1);
-  --bg-pressed: rgba(0, 0, 0, 0.12);
+  --bg-selected-hover: rgba(25, 25, 25, 0.1);
+  --bg-pressed: rgba(25, 25, 25, 0.12);
 
   /* The aliases. Each one points at a token that is already themed, so the
      dark block below does not have to repeat them — only the raw values above
