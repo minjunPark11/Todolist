@@ -1,20 +1,9 @@
-// What `/s/...` draws: the Space screen, or the Project screen inside it.
+// What `/projects` and `/s/...` draws: the Projects home or the Project screen.
 //
-// This file used to be a screen of its own — a searchable grid of cards, one
-// per Project, labelled as spaces, under an AI briefing that ranked them.
-// SPACES_CLICKUP_UI_DESIGN U1 decided the tree IS the space explorer, and
-// v0.9.1 took the grid's nav item away; what was left could only be reached by
-// the "back" button on the two screens below, which is to say by leaving the
-// place you were looking at to arrive somewhere that listed it again.
-//
-// The grid is gone, and with it the briefing, the signal list, the card menu
-// and the multi-step add dialog. The dialog is worth a line of its own: it
-// collected an objective, a deadline, milestones, first tasks, a learning
-// goal, topics, a tracking style and custom sections, and `submitAdd` passed
-// four of them to `onCreateProject` and dropped the rest on the floor.
-//
-// What routes to the two screens is all that remains, so this file no longer
-// derives anything a Project does not already say.
+// SPACE_REMOVAL_IA Stage 6: the Space-level screen and its tree are gone.
+// `/s/:spaceId` (legacy deep links) now fall through to the Projects home the
+// same way an unknown selection does; `/s/:id/p/:pid` still opens the Project
+// it names. `SpaceScreen` and `SpaceScopedView` are deleted.
 import { useMemo } from "react";
 import type {
   FocusSession,
@@ -28,23 +17,15 @@ import type {
   Task,
   TaskDraft,
 } from "../types";
-// The stored work area. Aliased because `SpaceLike` below is the shape the
-// Project screen wants — a different thing that had the name first.
-import type { Space as SpaceRecord } from "../types";
 import { SpaceDetailView } from "./spaces/SpaceDetailView";
-import { SpaceScreen } from "./spaces/SpaceScreen";
-import { SpaceScopedView } from "./spaces/SpaceScopedView";
+import { ProjectsHome } from "./projects/ProjectsHome";
 import type { SpaceLike } from "../lib/spaceHubTypes";
-import { projectsInSpace } from "../domain/spaces/spaces";
-import { EmptyState, type ToastState } from "./kit";
-import { todayValue } from "../utils/date";
+import type { ToastState } from "./kit";
 import { useT } from "../i18n";
 import type { Schedule, ScheduleIssue } from "../domain/schedule";
 
 type SpacesPageProps = {
   projects: Project[];
-  /** The work areas above them, for the Space level (§51). */
-  spaces: SpaceRecord[];
   tasks: Task[];
   // The board's time axis (SPACES_BOARD_DESIGN.md D2).
   paths: LearningPath[];
@@ -88,6 +69,18 @@ type SpacesPageProps = {
   onOpenCalendar: (projectId?: string) => void;
   onUpdateProject: (id: string, patch: Partial<Project>) => void;
   onRequestDeleteProject: (id: string) => void;
+  /**
+   * The three the Projects home needs and the two screens above it did not
+   * (D-1). They were the tree's row menu, which is why they had never been
+   * passed to this file: managing a Project meant opening the sidebar.
+   */
+  onCreateProject: (name: string) => void;
+  onArchiveProject: (projectId: string) => void;
+  onTogglePinProject: (projectId: string) => void;
+  /** D-2. Straight through to the Project screen, which is where they belong. */
+  onCreateFolder: (projectId: string, name: string) => void;
+  onRenameFolder: (folderId: string, name: string) => void;
+  onArchiveFolder: (folderId: string) => void;
   showToast: (toast: ToastState) => void;
 };
 
@@ -116,7 +109,6 @@ function spaceCardFor(project: Project): SpaceLike {
 
 export function SpacesPage({
   projects,
-  spaces,
   lists,
   onOpenTask,
   paths,
@@ -155,6 +147,12 @@ export function SpacesPage({
   onOpenCalendar,
   onUpdateProject,
   onRequestDeleteProject,
+  onCreateProject,
+  onArchiveProject,
+  onTogglePinProject,
+  onCreateFolder,
+  onRenameFolder,
+  onArchiveFolder,
   showToast,
 }: SpacesPageProps) {
   const { t } = useT();
@@ -169,48 +167,6 @@ export function SpacesPage({
     );
     return project ? spaceCardFor(project) : undefined;
   }, [projects, selectedProjectId]);
-
-  // The Space the URL names, when it names one. `viewScope.spaceId` is filled
-  // only by a Space selection — a Project selection fills `projectId`.
-  const selectedSpaceRecord = viewScope.spaceId
-    ? spaces.find((space) => space.id === viewScope.spaceId && !space.archivedAt)
-    : undefined;
-
-  // The Space level (§51). `/s/:spaceId` has been routable since STEP 6.
-  if (selectedSpaceRecord) {
-    return (
-      <SpaceScreen
-        space={selectedSpaceRecord}
-        projects={projects}
-        tasks={tasks}
-        goals={paths}
-        today={todayValue()}
-        onOpenProject={onOpenProject}
-        onOpenTask={onOpenTask}
-        onOpenGoal={onOpenGoal}
-        onRestoreProject={onRestoreProject}
-        onDeleteProject={onDeleteProject}
-        renderView={(tab, scoped) => (
-          <SpaceScopedView
-            tab={tab}
-            scoped={scoped}
-            // Scoped, not the whole collection. `scoped` already holds only
-            // this Space's Items, but the views also OFFER Projects — the goal
-            // card's board picker most visibly — and an unscoped list let a
-            // goal be filed into another Space's Project, after which it
-            // vanished from the view that moved it.
-            projects={projectsInSpace(projects, selectedSpaceRecord.id)}
-            lists={lists}
-            folders={folders}
-            onOpenTask={onOpenTask}
-            onOpenGoal={onOpenGoal}
-            onUpdateTask={onUpdateTask}
-            onUpdateTaskSchedule={onUpdateTaskSchedule}
-          />
-        )}
-      />
-    );
-  }
 
   if (detailOpen && selectedSpace) {
     return (
@@ -228,6 +184,9 @@ export function SpacesPage({
         onUpdateMilestone={onUpdateMilestone}
         onCreateGoal={onCreateGoal}
         onOpenGoal={onOpenGoal}
+        onCreateFolder={onCreateFolder}
+        onRenameFolder={onRenameFolder}
+        onArchiveFolder={onArchiveFolder}
         onCreateStatus={onCreateStatus}
         onUpdateStatus={onUpdateStatus}
         onArchiveStatus={onArchiveStatus}
@@ -254,12 +213,24 @@ export function SpacesPage({
     );
   }
 
-  // Nothing named, which the tree cannot ask for — every row it offers selects
-  // something. It is reachable anyway: archive the Space you are standing in,
-  // or follow a link to one that is gone. Saying so beats a blank panel.
+  // Nothing named — which used to be an accident (archive the Space you are
+  // standing in, or follow a link to one that is gone) answered with "Pick
+  // something on the left". SPACE_REMOVAL_IA D-1 makes it the address's own
+  // screen: this is where Projects are made and managed, so arriving with
+  // nothing selected is arriving, not failing.
   return (
     <div className="ff-page">
-      <EmptyState icon="🗂" title={t("spaces.noSelection")} text={t("spaces.noSelectionHint")} />
+      <ProjectsHome
+        projects={projects}
+        tasks={tasks}
+        onOpen={onOpenProject}
+        onCreate={onCreateProject}
+        onRename={(projectId, name) => onUpdateProject(projectId, { name })}
+        onTogglePin={onTogglePinProject}
+        onArchive={onArchiveProject}
+        onRestore={onRestoreProject}
+        onDelete={onDeleteProject}
+      />
     </div>
   );
 }

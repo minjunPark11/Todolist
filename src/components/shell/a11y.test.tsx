@@ -18,14 +18,14 @@ import { render, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { I18nProvider } from "../../i18n";
+import { CONTEXT_SIDEBAR_ID } from "../../app/contextSidebar";
 import { AppShell } from "./AppShell";
 import { GlobalRail } from "./GlobalRail";
-import { SpaceSidebar } from "./SpaceSidebar";
 import type { ContextSidebarState } from "../../hooks/useContextSidebar";
 
 function sidebarState(overrides: Partial<ContextSidebarState> = {}): ContextSidebarState {
   return {
-    mode: "space",
+    mode: "tasks",
     width: 248,
     effectiveWidth: 248,
     visibility: "expanded",
@@ -56,35 +56,8 @@ function renderShell(sidebar: ContextSidebarState = sidebarState()) {
         }
         sidebar={sidebar}
       >
-        {sidebar.mode === "space" ? (
-          <SpaceSidebar
-            spaces={[]}
-            projects={[]}
-            folders={[]}
-            lists={[]}
-            tasks={[]}
-            selection={{ kind: "none" }}
-            showCounts={false}
-            onCollapse={sidebar.toggleCollapsed}
-            onSelectSpace={() => {}}
-            onSelectProject={() => {}}
-            onCreateSpace={() => {}}
-            onCreateProject={() => {}}
-            onRenameSpace={() => {}}
-            onArchiveSpace={() => {}}
-            onRenameProject={() => {}}
-            onArchiveProject={() => {}}
-            onTogglePinProject={() => {}}
-            onSelectList={() => {}}
-            onSelectFolder={() => {}}
-            onCreateList={() => {}}
-            onCreateFolder={() => {}}
-            onRenameList={() => {}}
-            onArchiveList={() => {}}
-            onRenameFolder={() => {}}
-            onArchiveFolder={() => {}}
-            onMoveItemToList={() => {}}
-          />
+        {sidebar.mode !== "none" ? (
+          <nav id={CONTEXT_SIDEBAR_ID} aria-label="탐색" />
         ) : null}
         <main>
           <h1>페이지</h1>

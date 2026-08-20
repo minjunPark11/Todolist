@@ -21,7 +21,7 @@ export interface SeedOptions {
    * these, which is what puts a row in the tree — the Tasks sidebar reaches
    * the same List without any of this.
    */
-  projects?: Array<{ id: string; name: string; spaceId: string }>;
+  projects?: Array<{ id: string; name: string; spaceId: string; archived?: boolean }>;
   /**
    * The stored theme. Seeded rather than emulated because the app resolves
    * `system` from `prefers-color-scheme` ONCE, at mount — a spec that flipped
@@ -49,6 +49,9 @@ export async function openApp(page: Page, seed: SeedOptions = {}): Promise<void>
       // U2: a Space with one List hides the List level entirely. A spec about
       // clicking a List row needs the row to exist.
       listsRevealed: true,
+      // Both halves, because the two disagreeing is what `isArchived` on the
+      // Projects home exists to survive.
+      ...(project.archived ? { status: "archived", archivedAt: NOW } : { status: "active" }),
       createdAt: NOW,
       updatedAt: NOW,
     })),

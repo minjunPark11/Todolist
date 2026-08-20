@@ -1,7 +1,7 @@
 # Space 제거 후의 IA
 
 - 작성일: 2026-08-20
-- 상태: **결정 확정. 이관은 착수 전.**
+- 상태: **결정 확정. 이관 전 단계 완료 (2026-08-20).**
 - 선행 문서: `SPACES_REDESIGN_II.md`(Space 도입), `TICKTICK_NAV_SHELL_PHASE0_AUDIT.md`(D-14 SpaceHub 모드), `TICKTICK_STYLE_..._v16_E2E_IMPLEMENTATION_PLAN.md` §1.5 · §1.14
 
 ---
@@ -10,15 +10,17 @@
 
 Space를 없애자는 이야기가 나왔을 때 첫 반응은 "Gantt만 빼면 나머지는 원래 있으니까"였다. 코드를 재보니 **정반대였다.** Gantt는 이미 Tasks Module에 있고([`TasksModule.tsx:619`](src/components/tasks/TasksModule.tsx:619)가 Space 화면과 **같은** `TaskGanttView`를 렌더한다), 갈 곳이 없는 것은 Goals·Overview·Archive와 — 화면 항목이 아니라서 눈에 띄지 않던 — **Project 관리·Folder 관리·status 편집** 셋이었다.
 
-그래서 순서를 뒤집는다. 화면을 지우고 남은 것을 수습하는 게 아니라, **집 없는 것들에게 집을 정해준 뒤 빈 화면을 지운다.** 이 문서는 그 "집"을 확정한다. 코드는 아직 한 줄도 옮기지 않았다.
+그래서 순서를 뒤집는다. 화면을 지우고 남은 것을 수습하는 게 아니라, **집 없는 것들에게 집을 정해준 뒤 빈 화면을 지운다.** 이 문서는 그 "집"을 확정하고, §5가 어디까지 왔는지를 기록한다. 결정(§3)이 먼저 닫혔고 이관은 그 뒤에 시작했다 — 문서가 코드를 따라가는 것이 아니라 그 반대다.
 
-## 1. 지금 상태
+## 1. 지금 상태 (6단계 완료 후)
 
-Space는 **감춰졌고 지워지지 않았다.**
+Space는 **화면에서 사라졌고 계정에서는 지워지지 않았다.**
 
-- [`shouldRevealSpaces`](src/domain/spaces/spaces.ts)가 활성 작업영역이 하나뿐이면 트리에서 그 단계를 그리지 않는다. U2(`shouldRevealLists`)를 한 단계 위에 적용한 것이다.
-- 레코드·`supabase/migrations/008_spaces.sql`·`Project.spaceId`는 전부 그대로다. **M0 계약**(이 빌드가 모르는 것을 지우지 않는다) 때문이며, 이 문서의 어떤 단계도 이 계약을 깨지 않는다.
-- 같은 작업에서 List의 주소가 하나로 합쳐졌다: 트리의 List 행도 [`listUrlFor`](src/app/taskScopeUrl.ts)를 거쳐 `/list/:id`를 연다. `/s/:sp/p/:pj/l/:id`는 옛 링크가 열리는 주소로만 남았다.
+- 트리·`SpaceSidebar`·`SpaceScreen`·`SpaceScopedView`·`ArchiveSection`이 없다. Context Sidebar의 `space` 모드도 함께 사라져서 `ContextSidebarMode`는 다시 `tasks | none` 둘이다 — 아무것도 반환하지 않는 모드는 모든 독자가 확인해야 하고 어떤 화면도 도달할 수 없는 분기다.
+- 작업영역 단계를 감추던 `shouldRevealSpaces`도 유일한 호출자였던 트리와 함께 없앴다. 드러낼 계층 자체가 없다.
+- 남은 것: `Space` 레코드, `supabase/migrations/008_spaces.sql`, `Project.spaceId`, 그리고 `/s/...` 주소(옛 링크). **M0 계약**(이 빌드가 모르는 것을 지우지 않는다) 때문이며 D-6이 정한 그대로다. 새 Project가 어느 작업영역에 들어갈지는 `AppPages`가 대신 고른다.
+- List의 주소는 하나다. [`listUrlFor`](src/app/taskScopeUrl.ts)가 그 답이고, 남은 두 번째 문 — Project 화면 Overview의 Lists 카드 — 도 그리로 간다. `/s/:sp/p/:pj/l/:id`는 옛 링크가 열리는 주소로만 남았다.
+- Projects와 Goals는 Tasks 사이드바의 **문**이다(§1.5가 둘 다 Rail 항목을 거부한다). 그래서 둘 다 Rail의 Tasks에 불을 켜면서 Tasks Module의 Scope는 아니고, `isTasksDoorway`가 그 조합을 답한다 — §2.11의 "이미 Tasks" 가드가 그 위에서 no-op이 되지 않도록, 그리고 `lastTasksLocation`이 문간을 기억하지 않도록.
 
 ## 2. 제약 — 이미 정해져 있어서 다시 정할 수 없는 것
 
@@ -100,14 +102,28 @@ Goals      /goals     ←────────────┘   (D-4)
 
 각 단계는 **그 단계만으로 앱이 온전해야** 한다. 중간 상태에서 갈 곳 없는 기능이 생기면 순서가 틀린 것이다.
 
-| 단계 | 하는 일 | 완료 조건 |
-|---|---|---|
-| 1 | `/spaces` → `/projects`, 도어 행 이름 변경, 리다이렉트 | 옛 주소가 새 주소로 열리고, 사이드바가 `Projects`라 부른다 |
-| 2 | Project 만들기·이름·보관·핀을 `/projects` 화면으로 | 트리 없이도 Project를 만들 수 있다 |
-| 3 | Folder 관리를 Project 화면 안으로 (D-2) | 트리 없이도 Folder를 만들고 이름을 바꿀 수 있다 |
-| 4 | status 편집 패널을 분리하고 두 입구를 붙인다 (D-3) | Matrix가 `All`이 아닐 때 자기 컬럼을 고칠 수 있다 |
-| 5 | Goals를 `/goals`로 (D-4) | Project 없이 목표를 적을 수 있다 |
-| 6 | 남은 Space 화면·트리 철거 | `components/spaces`·`SpaceTree`·`SpaceSidebar`·`mode="space"`가 사라지고, 아무 화면도 잃지 않았다 |
+| 단계 | 하는 일 | 완료 조건 | 상태 |
+|---|---|---|---|
+| 1 | `/spaces` → `/projects`, 도어 행 이름 변경, 리다이렉트 | 옛 주소가 새 주소로 열리고, 사이드바가 `Projects`라 부른다 | **완료** |
+| 2 | Project 만들기·이름·보관·핀을 `/projects` 화면으로 | 트리 없이도 Project를 만들 수 있다 | **완료** |
+| 3 | Folder 관리를 Project 화면 안으로 (D-2) | 트리 없이도 Folder를 만들고 이름을 바꿀 수 있다 | **완료** |
+| 4 | status 편집 패널을 분리하고 두 입구를 붙인다 (D-3) | Matrix가 `All`이 아닐 때 자기 컬럼을 고칠 수 있다 | **완료** |
+| 5 | Goals를 `/goals`로 (D-4) | Project 없이 목표를 적을 수 있다 | **완료** |
+| 6 | 남은 Space 화면·트리 철거 | `components/spaces`·`SpaceTree`·`SpaceSidebar`·`mode="space"`가 사라지고, 아무 화면도 잃지 않았다 | **완료** |
+
+**1·2단계에서 알게 된 것.** `/projects`는 D-04 이래로 주소만 있고 화면이 없었다 — 아무것도 선택하지 않고 도착하면 "왼쪽에서 고르세요"가 나왔고, 그 말이 가리키는 트리가 곧 유일한 관리 수단이었다. 그래서 2단계는 "옮기기"가 아니라 **처음으로 화면을 만드는 일**이었다. 트리의 행 메뉴는 아직 그대로 있고, 6단계까지 두 입구가 공존한다. 하나가 사라질 때까지 둘 다 같은 레코드에 같은 일을 한다.
+
+새 프로젝트가 들어갈 작업영역은 화면이 감춘 계층이라 `AppPages`가 대신 고른다 — 활성 작업영역이 있으면 그것, 없으면 `My Space` 레코드를 **실제로 만든다**. 존재하지 않는 Space를 가리키는 Project는 트리가 그리지 못하기 때문이고, 이것이 컴포넌트 테스트로는 잡히지 않아서 e2e에 남겼다.
+
+**3단계에서 정한 것.** Folder 관리는 Project 설정 드로어가 아니라 **자기 드로어**로 갔다. 설정 드로어는 이름·색·카드를 초안으로 잡아 두고 Save/Cancel로 마무리하는 폼인데, 폴더 만들기는 누른 즉시 기록된다 — 이름은 되돌리고 방금 만든 폴더는 못 되돌리는 Cancel은 거짓말이다.
+
+입구는 Overview의 **Lists 카드 머리**다. 폴더가 묶는 대상이 거기 나열돼 있으니, 관리 버튼도 거기 있는 게 맞다. Space 스코프에서는 자식이 Project라 묶는 것이 없으므로 그 버튼은 아예 없다(`onManageGroups`가 optional인 이유).
+
+행 자체가 입력란이다. 이름을 고치는 것이 목적인 화면에서 연필을 한 번 더 누르게 할 이유가 없다 — Enter와 blur가 커밋하고, Escape는 저장된 이름으로 되돌린다. 빈 이름과 "원래 이름 그대로"는 쓰지 않는다.
+
+**4·5·6단계는 별도 세션에서 진행됐고, 근거가 여기 기록되지 않았다.** 결과는 코드에 있다 — status 편집은 `SpaceDrawers.StatusesDrawer` 하나이고 Project 화면과 전역 Matrix 둘이 그것을 연다(D-3), Goals는 `/goals`의 `GoalsPage`다(D-4), 그리고 Space 화면 다섯 개가 삭제됐다. 왜 그렇게 갈랐는지는 남아 있지 않으니, 다음에 이 근처를 고치는 사람은 코드에서 다시 읽어내야 한다.
+
+철거가 남긴 것 셋은 그 뒤에 정리했다: 죽은 `space` 모드와 `shouldRevealSpaces`, 그리고 `isSpaceHubLocation` — 이름이 없어진 화면을 가리켰을 뿐 아니라 `/projects`만 알고 있어서, D-4가 더한 `/goals`에서는 Rail의 Tasks가 아무 일도 하지 않고 `lastTasksLocation`이 문간을 기억하고 있었다. `isTasksDoorway`가 둘 다 안다.
 
 1~4는 서로 독립이라 순서를 바꿔도 된다. **5는 6보다 반드시 먼저**다 — 그 반대로 하면 목표가 갈 곳 없이 사라지는 창이 열린다.
 

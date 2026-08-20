@@ -336,3 +336,189 @@ textarea {
   height: auto;
   clip-path: none;
 }
+
+/* --- the Projects home (SPACE_REMOVAL_IA D-1) -----------------------------
+   Layout only. Every shape on this screen — the row, the field, the buttons,
+   the menu — is one of the ones above, because a new screen is exactly where
+   a fourth button language starts. What is left is a column, a gap, and the
+   two spans that hang off a row's ends. */
+.pjh {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  max-width: 720px;
+  /* padding removed: <main> already provides --density-page-y/x (24px 32px).
+     The old 24px here doubled the top gap to 48px vs GoalsPage's 24px. */
+}
+
+.pjh-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.pjh-create {
+  display: flex;
+  gap: 8px;
+}
+
+.pjh-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The row and its ⋯ share a line: the button is not IN the row, because a
+   button inside a button is not a thing the browser will draw. */
+.pjh-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pjh-row {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.pjh-row.is-archived {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.pjh-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.pjh-pin {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.pjh-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Inline rename input — replaces .pjh-name while editing.
+   Matches the row's font exactly so the layout does not shift. */
+.pjh-name-input {
+  flex: 1;
+  min-width: 0;
+  height: var(--density-control-h);
+  padding: 0 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ff-text);
+  background: var(--ff-input-bg, var(--surface));
+  border: 1px solid var(--ff-focus-ring);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.pjh-count {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 24 wide, the control height tall — the shape the Task row's ⋯ was put on
+   when the rhythm guard caught it at 24 square. */
+.pjh-menu {
+  flex: none;
+  width: 24px;
+  height: var(--density-control-h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pjh-menu:hover,
+.pjh-menu:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.pjh-section-title {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* --- Folder management (SPACE_REMOVAL_IA D-2) -----------------------------
+   A drawer's worth of rows, each one a field: the name IS the control, so
+   there is nothing here but the spacing between them. */
+.fdm {
+  display: grid;
+  gap: 12px;
+}
+
+.fdm-create,
+.fdm-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fdm-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fdm-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.fdm-count {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fdm-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* The card heading and the one action that belongs to it, on a line. */
+.ovs-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ovs-card-head h3 {
+  margin: 0;
+}

@@ -93,28 +93,6 @@ export function projectsInSpace(projects: Project[], spaceId: string): Project[]
 }
 
 /**
- * Whether the tree should show the work-area level at all.
- *
- * U2, applied one level up. `shouldRevealLists` hides the List level for a
- * Project that has only one, on the grounds that simple use should not pay
- * for a hierarchy it is not using; a single work area is the same row with
- * the same nothing in it — every Project is under it, so the row tells the
- * reader nothing and still costs them a twisty to get past. `ensureDefaultSpace`
- * means almost every account has exactly one.
- *
- * Unlike U2 this needs no one-way flag. U2 keeps its level once a second List
- * has EXISTED, because deleting a List is an ordinary thing to do and a level
- * that vanished under you would be startling. A Space cannot go the same way:
- * H-INV-06 refuses to delete one that holds Projects, and the tree offers
- * Archive only to an empty one — so the count falls back to one only after
- * someone has deliberately emptied a work area, and at that point the level
- * really is telling two things apart that are no longer two.
- */
-export function shouldRevealSpaces(spaces: Space[]): boolean {
-  return activeSpaces(spaces).length > 1;
-}
-
-/**
  * H-INV-06: deleting a Space must not silently delete the work inside it.
  * Archived Projects still count — they are recoverable, and a delete that
  * stranded them would not be.

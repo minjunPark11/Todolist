@@ -735,6 +735,7 @@ export interface PlannerData {
 export type PageId =
   | "today"
   | "projects"
+  | "goals"
   | "focus"
   | "board"
   | "settings"

@@ -6,7 +6,9 @@
 
 .tm-shell {
   display: grid;
-  grid-template-columns: var(--tm-sidebar-w, 240px) minmax(0, 1fr) auto;
+  /* --tm-sidebar-w (240px) was a local override before P0-3 unified sidebar
+     width under --context-sidebar-w. The local variable is now unused. */
+  grid-template-columns: var(--context-sidebar-w, 248px) minmax(0, 1fr) auto;
   height: 100%;
   min-height: 0;
   background: var(--bg, #fff);
@@ -50,6 +52,24 @@
   padding: 4px 10px;
   font-size: 12px;
   color: var(--text-muted, #8e8e93);
+}
+
+/* Page-navigation doors (Projects, Goals). Visually separated from scope
+ * rows by a top border — a door takes you to a different screen, a scope
+ * row narrows what is already on this one. */
+.tm-section-doors {
+  border-top: 1px solid var(--border, #e5e7eb);
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.tm-section-doors .tm-row {
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-section-doors .tm-row:hover,
+.tm-section-doors .tm-row.is-current {
+  color: var(--ff-text, #111);
 }
 
 .tm-row {

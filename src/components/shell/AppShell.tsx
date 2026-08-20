@@ -93,20 +93,16 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
         />
       ) : null}
 
-      {/* §3.24: with the sidebar gone, its own collapse button went with it,
-          so the way back has to live outside it. The spec puts this in the
-          Main Header's left utility slot; the headers here belong to two
-          different shells, so the App Shell draws it at the same spot instead
-          — which keeps the ownership §3.24 actually cares about. */}
-      {hasSidebar && collapsed ? (
+      {/* §3.52 / §3.24. Both halves of the one-control-in-two-places invariant
+          live here now that SpaceSidebar (which used to own the collapse button)
+          is gone. AppShell already owns sidebar.toggleCollapsed, so both
+          buttons belong here rather than inside each sidebar component. */}
+      {hasSidebar && !collapsed ? (
         <button
           type="button"
-          className="context-sidebar-expand"
-          aria-label={t("sidebar.expand")}
-          /* §3.52. The sidebar is still in the tree when collapsed — the frame
-             hides it with `display: none` rather than unmounting it — so this
-             names a region that exists, and `false` is the truth about it. */
-          aria-expanded={false}
+          className="context-sidebar-collapse"
+          aria-label={t("sidebar.collapse")}
+          aria-expanded={true}
           aria-controls={CONTEXT_SIDEBAR_ID}
           onClick={sidebar.toggleCollapsed}
         >
@@ -115,7 +111,23 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
             <line x1="9" y1="4" x2="9" y2="20" />
           </svg>
         </button>
-      ) : null}
+      ) : (
+        hasSidebar ? (
+          <button
+            type="button"
+            className="context-sidebar-expand"
+            aria-label={t("sidebar.expand")}
+            aria-expanded={false}
+            aria-controls={CONTEXT_SIDEBAR_ID}
+            onClick={sidebar.toggleCollapsed}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <line x1="9" y1="4" x2="9" y2="20" />
+            </svg>
+          </button>
+        ) : null
+      )}
       </div>
     </div>
   );

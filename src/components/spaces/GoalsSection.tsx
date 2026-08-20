@@ -24,6 +24,9 @@ interface GoalsSectionProps {
   showProjectContext: boolean;
   onOpenGoal: (goalId: string) => void;
   onCreateGoal?: (goal: string) => void;
+  /** Heading level for the section title. Defaults to h2; use h1 when this is
+   *  the page's top-level content (e.g. the global /goals screen). */
+  headingAs?: "h1" | "h2";
 }
 
 export function GoalsSection({
@@ -33,7 +36,9 @@ export function GoalsSection({
   showProjectContext,
   onOpenGoal,
   onCreateGoal,
+  headingAs = "h2",
 }: GoalsSectionProps) {
+  const Title = headingAs;
   const { t } = useT();
   const [draft, setDraft] = useState("");
 
@@ -59,7 +64,7 @@ export function GoalsSection({
     <div className="gls">
       <header className="gls-head">
         <div>
-          <h2>{t("goals.title")}</h2>
+          <Title>{t("goals.title")}</Title>
           <p>{t("goals.subtitle")}</p>
         </div>
         {onCreateGoal ? (

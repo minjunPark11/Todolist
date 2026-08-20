@@ -248,21 +248,22 @@ describe("the Lists section header", () => {
   });
 });
 
-describe("where the Spaces row lives", () => {
-  it("sits inside the Lists group rather than in a section of its own", () => {
+describe("where the Projects and Goals doors live", () => {
+  it("has its own doors section, separate from the Lists group", () => {
     const { container } = renderModule("/today");
+
+    // SPACE_REMOVAL_IA design S4: doors (Projects, Goals) are page navigators,
+    // not scope filters — they belong in a dedicated section so they read
+    // differently from the rows that narrow what is visible on this screen.
+    const doorsSection = container.querySelector(".tm-section-doors");
+    expect(doorsSection).not.toBeNull();
+    expect(doorsSection?.textContent).toContain("프로젝트");
+    expect(doorsSection?.textContent).toContain("목표");
+
+    // The Lists section (the one with a heading) must NOT contain the doors.
     const sections = [...container.querySelectorAll(".tm-sidebar > .tm-section")];
-
-    // It was a section containing exactly one row, between two other groups —
-    // which reads as a row someone dropped in the wrong place. Spaces is where
-    // Lists are organised, so that is the group it belongs to.
-    const alone = sections.filter(
-      (section) => section.querySelectorAll(".tm-row").length === 1 && !section.querySelector(".tm-section-title"),
-    );
-    expect(alone).toEqual([]);
-
-    const lists = sections.find((section) => section.querySelector(".tm-section-title"));
-    expect(lists?.textContent).toContain("공간");
+    const listsSection = sections.find((s) => s.querySelector(".tm-section-title"));
+    expect(listsSection?.classList.contains("tm-section-doors")).toBe(false);
   });
 });
 

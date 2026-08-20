@@ -85,7 +85,7 @@ test.describe("the vertical rhythm (§4.86, §11.2)", () => {
     await field.press("Enter");
     await expect(page.getByRole("button", { name: "Open Measure the rows" })).toBeVisible();
 
-    for (const route of ["/today", "/calendar", "/focus", "/board", "/spaces", "/planning", "/settings", `/list/${LIST.id}`]) {
+    for (const route of ["/today", "/calendar", "/focus", "/board", "/projects", "/planning", "/settings", `/list/${LIST.id}`]) {
       await page.goto(route);
       await expect(page.locator(".global-rail")).toBeVisible();
 

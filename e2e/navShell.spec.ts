@@ -290,63 +290,35 @@ test.describe("the Global Rail", () => {
   });
 
   /**
-   * RAIL-01b — the way out of SpaceHub.
+   * RAIL-01b — Tasks does something on an address that lights it.
    *
-   * The Tasks sidebar has a row into SpaceHub; SpaceHub replaces that sidebar
-   * with the Space tree, and D-14 took the tree's own `오늘` row away on the
-   * grounds that the Rail's Tasks item answers it better. It did not: §2.11's
-   * "already Tasks" guard read the Rail's highlight, SpaceHub lights Tasks,
-   * and so the only door out of a screen the sidebar invites you into was the
-   * browser's Back button — which the packaged desktop app does not draw.
+   * This began as the fix for a trap: the Tasks sidebar had a door into
+   * SpaceHub, SpaceHub replaced that sidebar with the Space tree, and §2.11's
+   * "already Tasks" guard read the Rail's HIGHLIGHT — which SpaceHub lights —
+   * so the one item that could have led out did nothing. The browser's Back
+   * button was the only door, and the packaged app does not draw one.
    *
-   * A browser case rather than a unit one: what makes it a trap is the real
-   * history and the real sidebar swap, and both are NAVIGATION.
+   * SPACE_REMOVAL_IA stage 6 took the tree away, so the trap is gone by
+   * construction: the Tasks sidebar is on `/projects` now, and every row on it
+   * leads out. What is left to guard is the smaller half — the Rail item is
+   * still not a no-op there, and still returns the reader to the Scope they
+   * were reading rather than to a home page. Both halves are asserted, because
+   * the second is only worth having while the first is true.
    */
-  test("RAIL-01b — Tasks leads back out of Spaces, which has no way of its own", async ({ page }) => {
+  test("RAIL-01b — Tasks returns from Projects rather than doing nothing there", async ({ page }) => {
     await openApp(page);
     await page.goto("/completed");
     await expect(page.locator(".tm-shell")).toBeVisible();
 
     // The doorway as the user meets it: a row in the Tasks sidebar.
-    await page.locator("#context-sidebar").getByRole("button", { name: "Spaces", exact: true }).click();
-    await expect(page).toHaveURL(/\/spaces$/);
-    // The sidebar is the tree now, and nothing on it goes back to the module.
-    await expect(page.locator(".space-sidebar")).toBeVisible();
+    await page.locator("#context-sidebar").getByRole("button", { name: "Projects", exact: true }).click();
+    await expect(page).toHaveURL(/\/projects$/);
+    // The sidebar it came from is still there — that is the way out this test
+    // used to prove the absence of.
+    await expect(page.locator(".tm-sidebar")).toBeVisible();
 
     await rail(page, "Tasks").click();
     await expect(page).toHaveURL(/\/completed/);
-  });
-
-  /**
-   * One List, one address.
-   *
-   * A List used to have two: `/list/:id` in the Tasks Module, and
-   * `/s/:sp/p/:pj/l/:id` in the Space shell, which drew the same record on a
-   * different screen behind a different sidebar. Which one you got depended on
-   * which door you came through, and the Space one was the half with no way
-   * back. The tree is a route to the List now, not a second place to read it.
-   */
-  test("a List in the Space tree opens the List, not a second screen of it", async ({ page }) => {
-    await openApp(page, {
-      spaces: [{ id: "sp-1", name: "School" }],
-      projects: [{ id: "pj-1", name: "ABM", spaceId: "sp-1" }],
-      lists: [
-        { id: "l-1", name: "Reading", projectId: "pj-1" },
-        { id: "l-2", name: "Writing", projectId: "pj-1" },
-      ],
-    });
-
-    await page.locator("#context-sidebar").getByRole("button", { name: "Spaces", exact: true }).click();
-    await expect(page.locator(".space-sidebar")).toBeVisible();
-
-    // One work area, so the tree starts at the Project (U2 one level up) —
-    // opening it is the only step between the sidebar and a List.
-    await page.locator(".spt-space-row").filter({ hasText: "ABM" }).getByRole("button", { name: "Expand" }).click();
-    await page.locator(".space-sidebar").getByRole("button", { name: "Reading" }).click();
-
-    await expect(page).toHaveURL(/\/list\/l-1$/);
-    // And the sidebar came back with it, which is what makes it a route.
-    await expect(page.locator(".tm-sidebar")).toBeVisible();
   });
 
   /**

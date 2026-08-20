@@ -13,7 +13,6 @@ import {
   patchSpace,
   projectsInSpace,
   sanitizeSpace,
-  shouldRevealSpaces,
   spaceIdForProject,
 } from "./spaces";
 
@@ -134,24 +133,6 @@ describe("reads", () => {
     ];
     expect(projectsInSpace(projects, "s1").map((p) => p.id)).toEqual(["p1"]);
     expect(projectsInSpace(projects, DEFAULT_SPACE_ID).map((p) => p.id)).toEqual(["p2"]);
-  });
-});
-
-describe("shouldRevealSpaces", () => {
-  it("hides the level while there is only one work area to be under", () => {
-    expect(shouldRevealSpaces([])).toBe(false);
-    expect(shouldRevealSpaces([space()])).toBe(false);
-  });
-
-  it("shows it as soon as there are two to tell apart", () => {
-    expect(shouldRevealSpaces([space({ id: "a" }), space({ id: "b" })])).toBe(true);
-  });
-
-  it("counts what the tree draws, not what the account stores", () => {
-    // An archived work area has no row, so it cannot be the second thing the
-    // level exists to distinguish.
-    expect(shouldRevealSpaces([space({ id: "a" }), space({ id: "b", archivedAt: NOW })])).toBe(false);
-    expect(shouldRevealSpaces([space({ id: "a" }), space({ id: "b", deletedAt: NOW })])).toBe(false);
   });
 });
 

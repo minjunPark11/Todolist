@@ -40,11 +40,14 @@ describe("contextSidebar", () => {
       expect(contextSidebarModeFor(PAGE_ROUTES.settings)).toBe("none");
     });
 
-    it("swaps to the tree inside SpaceHub", () => {
-      expect(contextSidebarModeFor(PAGE_ROUTES.projects)).toBe("space");
-      expect(contextSidebarModeFor("/s/space-1")).toBe("space");
-      expect(contextSidebarModeFor("/s/space-1/p/project-1")).toBe("space");
-      expect(contextSidebarModeFor("/s/space-1/p/project-1/l/list-1")).toBe("space");
+    // SPACE_REMOVAL_IA Stage 6: the Space tree is gone. Projects and Goals
+    // both show the Tasks sidebar, and /s/... addresses (legacy deep links)
+    // resolve to the projects page which does the same.
+    it("keeps the Tasks sidebar on Projects and Goals", () => {
+      expect(contextSidebarModeFor(PAGE_ROUTES.projects)).toBe("tasks");
+      expect(contextSidebarModeFor(PAGE_ROUTES.goals)).toBe("tasks");
+      expect(contextSidebarModeFor("/s/space-1")).toBe("tasks");
+      expect(contextSidebarModeFor("/s/space-1/p/project-1")).toBe("tasks");
     });
 
     it("keeps the Tasks sidebar everywhere else", () => {
@@ -62,7 +65,6 @@ describe("contextSidebar", () => {
 
     it("is the chosen width when shown", () => {
       expect(effectiveContextSidebarWidth({ mode: "tasks", width: 300, visibility: "expanded" })).toBe(300);
-      expect(effectiveContextSidebarWidth({ mode: "space", width: 300, visibility: "expanded" })).toBe(300);
     });
 
     // §3.28: collapsing must not eat the number the user picked.
