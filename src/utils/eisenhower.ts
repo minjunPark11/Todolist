@@ -111,3 +111,31 @@ export function patchForQuadrant(task: Task, quadrant: MatrixQuadrant, today: st
 
   return patch;
 }
+
+// The four quadrants in reading order, so a screen that draws all of them
+// does not keep its own copy of the union's members.
+export const MATRIX_QUADRANTS: readonly MatrixQuadrant[] = ["I", "II", "III", "IV"];
+
+/**
+ * The fields a task typed straight INTO a quadrant is born with.
+ *
+ * `patchForQuadrant` is the same rule for a task that already exists, and it
+ * cannot be reused here: it reads the record it is moving. A draft has no
+ * record yet, so the two-field answer is written out once, and stays the
+ * inverse of `getMatrixPosition` — otherwise a task added to Q2 would appear
+ * in Q4 the moment it was saved.
+ */
+export function draftForQuadrant(
+  quadrant: MatrixQuadrant,
+  today: string,
+): { priority: Task["priority"]; dueDate: string } {
+  const important = quadrant === "I" || quadrant === "II";
+  const urgent = quadrant === "I" || quadrant === "III";
+  return {
+    // "low" rather than "none" for the two unimportant quadrants: dropping a
+    // task there is a judgement, and `none` is the absence of one — a task
+    // born `none` in Q3 reads back as unjudged.
+    priority: important ? "high" : "low",
+    dueDate: urgent ? today : "",
+  };
+}

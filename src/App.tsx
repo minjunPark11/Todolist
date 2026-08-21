@@ -39,7 +39,6 @@ import type { SearchCollections, SearchResult } from "./domain/tasks/search";
 import type { CommandContext, TaskCommand } from "./domain/tasks/commands";
 import { parseTaskUrl, searchUrlFor, urlForSearchResult } from "./app/taskScopeUrl";
 import { TasksSidebarSlot } from "./components/shell/TasksSidebarSlot";
-import type { TasksSidebarPage } from "./components/tasks/TasksSidebar";
 import { childrenOf } from "./domain/tasks/children";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
@@ -1293,22 +1292,6 @@ export default function App() {
   }
 
   /**
-   * The one Tasks sidebar row that is an address rather than a Scope (D-22).
-   *
-   * SpaceHub lives inside Tasks and §1.5 refuses it a Rail item, so once the
-   * sidebar follows `mode` the sidebar is the only place it can be reached
-   * from. The Archive row stood beside it until D-20 retired Task archiving.
-   */
-  function openSidebarPage(page: TasksSidebarPage) {
-    navigate(PAGE_ROUTES[page]);
-  }
-
-  const sidebarPage: TasksSidebarPage | null =
-    activePage === "goals" ? "goals" :
-    activePage === "projects" ? "projects" :
-    null;
-
-  /**
    * The Context Sidebar for the legacy shell, chosen by `mode` (D-21).
    *
    * This is the fix P0-4a exists for. The mode used to decide only how wide
@@ -1331,9 +1314,7 @@ export default function App() {
           taskTags={planner.taskTags}
           today={today}
           current={null}
-          currentPage={sidebarPage}
           onNavigateUrl={navigateUrl}
-          onOpenPage={openSidebarPage}
           onCreateList={({ name, color, defaultViewKey, sidebarFolderId }) =>
             // Same call the Tasks Module makes below: no domain Folder, because
             // that one belongs to a Project and this List has none. The group
@@ -1430,7 +1411,6 @@ export default function App() {
           today={today}
           url={canonical ?? currentUrl}
           onNavigate={navigateUrl}
-          onOpenPage={openSidebarPage}
           error={planner.auth.syncError}
           draftTitle={capturedTitle}
           onDraftConsumed={() => setCapturedTitle("")}

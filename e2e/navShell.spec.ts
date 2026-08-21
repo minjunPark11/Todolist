@@ -28,6 +28,22 @@ const DEFAULT_WIDTH = 248;
 const MIN_WIDTH = 216;
 const MAX_WIDTH = 360;
 
+/**
+ * A navigation the APP performs, not the browser.
+ *
+ * `page.goto` reloads the document, which throws away everything the running
+ * session was holding — §2.20's `lastTasksLocation` among it. The two pages
+ * this is used for are reached by address since the Tasks sidebar dropped its
+ * doors to them, and reaching an address without leaving the session is
+ * exactly what the app's own router does with `pushState` + `popstate`.
+ */
+async function gotoInApp(page: Page, path: string): Promise<void> {
+  await page.evaluate((target) => {
+    window.history.pushState(null, "", target);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, path);
+}
+
 /** The width the layout is actually using, read off the frame (not declared). */
 async function sidebarWidth(page: Page): Promise<number> {
   const box = await page.locator("#context-sidebar").boundingBox();
@@ -328,8 +344,12 @@ test.describe("the Global Rail", () => {
     await page.goto("/completed");
     await expect(page.locator(".tm-shell")).toBeVisible();
 
-    // The doorway as the user meets it: a row in the Tasks sidebar.
-    await page.locator("#context-sidebar").getByRole("button", { name: "Projects", exact: true }).click();
+    // The sidebar's door to Projects is gone — the row was a screen rather
+    // than a Scope — so the page is reached by its address now. In-app
+    // rather than through `page.goto`, which reloads the document: §2.20's
+    // "where you were in Tasks" is session memory, and a reload is a
+    // different question (a cold start belongs to the start-page setting).
+    await gotoInApp(page, "/projects");
     await expect(page).toHaveURL(/\/projects$/);
     // The sidebar it came from is still there — that is the way out this test
     // used to prove the absence of.
@@ -352,7 +372,7 @@ test.describe("the Global Rail", () => {
     await page.goto("/completed");
     await expect(page.locator(".tm-shell")).toBeVisible();
 
-    await page.locator("#context-sidebar").getByRole("button", { name: "Goals", exact: true }).click();
+    await gotoInApp(page, "/goals");
     await expect(page).toHaveURL(/\/goals$/);
 
     await rail(page, "Tasks").click();

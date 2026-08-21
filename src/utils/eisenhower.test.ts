@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Task, TaskPriority, TaskStatus } from "../types";
-import { getMatrixPosition, isMatrixImportant, isMatrixUrgent, patchForQuadrant } from "./eisenhower";
+import {
+  MATRIX_QUADRANTS,
+  draftForQuadrant,
+  getMatrixPosition,
+  isMatrixImportant,
+  isMatrixUrgent,
+  patchForQuadrant,
+} from "./eisenhower";
 
 const TODAY = "2026-08-14";
 const YESTERDAY = "2026-08-13";
@@ -140,5 +147,28 @@ describe("patchForQuadrant", () => {
         expect(getMatrixPosition(next, TODAY).quadrant).toBe(quadrant);
       }
     }
+  });
+});
+
+// A task typed into a box on the matrix page (MatrixPage). Same requirement as
+// the drag above, one step earlier: the box the user typed in is the box the
+// card has to appear in, or the screen argues with itself the moment the task
+// is saved.
+describe("draftForQuadrant", () => {
+  it("births the task in the quadrant it was typed into", () => {
+    for (const quadrant of MATRIX_QUADRANTS) {
+      const draft = draftForQuadrant(quadrant, TODAY);
+      const born = task({ status: "todo", ...draft });
+      expect(getMatrixPosition(born, TODAY).quadrant).toBe(quadrant);
+    }
+  });
+
+  it("dates only the urgent halves, and judges rather than leaving unjudged", () => {
+    expect(draftForQuadrant("I", TODAY)).toEqual({ priority: "high", dueDate: TODAY });
+    expect(draftForQuadrant("II", TODAY)).toEqual({ priority: "high", dueDate: "" });
+    expect(draftForQuadrant("III", TODAY)).toEqual({ priority: "low", dueDate: TODAY });
+    // "low", not "none": choosing the box IS the judgement, and a task born
+    // `none` reads back as one nobody has looked at yet.
+    expect(draftForQuadrant("IV", TODAY)).toEqual({ priority: "low", dueDate: "" });
   });
 });

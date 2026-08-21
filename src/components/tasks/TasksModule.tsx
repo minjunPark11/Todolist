@@ -29,7 +29,6 @@ import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { namedRecordMissing, titleFor } from "../../domain/tasks/scopeTitle";
 import { useT } from "../../i18n";
 import { TasksSidebarSlot } from "../shell/TasksSidebarSlot";
-import type { TasksSidebarPage } from "./TasksSidebar";
 import { TaskQuickAdd } from "./TaskQuickAdd";
 import { TaskDrawer } from "./TaskDrawer";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
@@ -127,13 +126,6 @@ interface TasksModuleProps {
   }) => Promise<string> | string;
   /** Makes a sidebar group and answers its id (Add List design §6.32). */
   onCreateSidebarFolder: (name: string) => Promise<string> | string;
-  /**
-   * The sidebar rows that leave the module (audit D-21).
-   *
-   * Archive and SpaceHub are inside Tasks but outside the module's nine
-   * routes, so the module cannot answer them itself — it hands them up.
-   */
-  onOpenPage: (page: TasksSidebarPage) => void;
   /** §13.23/§6.56: restoring a List, and the one hard delete in the app. */
   lifecycle: {
     onArchiveList: (listId: string) => void;
@@ -497,9 +489,7 @@ export function TasksModule(props: TasksModuleProps) {
         taskTags={taskTags}
         today={today}
         current={searchQuery === null ? scope : null}
-        currentPage={null}
         onNavigateUrl={onNavigate}
-        onOpenPage={props.onOpenPage}
         onBeforeNavigate={() => setSidebarOpen(false)}
         onCreateList={props.onCreateList}
         onCreateSidebarFolder={props.onCreateSidebarFolder}

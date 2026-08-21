@@ -152,9 +152,19 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     case "trash":
       return Boolean(task.deletedAt);
     case "completed":
-      // Won't Do is not a quiet kind of done. It never writes `completedAt`
-      // and it is excluded here too, so the two Scopes stay disjoint.
-      return !task.deletedAt && !isWontDo(task) && isCompleted(task);
+      // Won't Do is gathered here now, not held apart.
+      //
+      // It used to be excluded so that the two Scopes stayed disjoint, which
+      // was the right rule while `안 함` had a row of its own in the sidebar.
+      // That row is gone (TasksSidebar): a task given up on is finished work,
+      // and the IA this module follows files it with the rest of the finished
+      // work rather than in a third terminal list. Disjoint Scopes with only
+      // one of them reachable would simply have hidden those tasks.
+      //
+      // The distinction is not lost — `isWontDo` still tells the two apart,
+      // which is what lets a row show it — and `/wont-do` still answers with
+      // exactly the given-up half for anyone holding a link to it.
+      return !task.deletedAt && (isCompleted(task) || isWontDo(task));
     case "wontDo":
       return !task.deletedAt && isWontDo(task);
 

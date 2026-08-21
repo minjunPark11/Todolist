@@ -60,30 +60,7 @@ interface TasksSidebarProps {
   /** Null on the Search Page, which is not a Scope and highlights nothing. */
   current: TaskScopeRef | null;
   onNavigate: (scope: TaskScopeRef) => void;
-  /**
-   * The two rows that are addresses rather than Scopes (audit D-21, D-22).
-   *
-   * Archive and SpaceHub are both inside Tasks — §1.5 refuses either a Rail
-   * item — but neither is in `scopeRegistry`, so neither can go through `row`
-   * and neither carries a count. Archive becomes a real Scope in P0-4b; the
-   * Spaces row is a doorway and will not.
-   */
-  currentPage: TasksSidebarPage | null;
-  onOpenPage: (page: TasksSidebarPage) => void;
 }
-
-/**
- * D-20 retired the Archive row: Task archiving is gone and `안 함` took its
- * place as a real Scope. Only the doorway to Projects is left — archived
- * PROJECTS live there, which is a different thing entirely.
- *
- * SPACE_REMOVAL_IA D-1 renamed it. It was `spaces` while the work area was a
- * level the reader could see; the level is not drawn any more, so the door
- * says what is behind it.
- *
- * D-4 adds Goals alongside it — two doors, same section.
- */
-export type TasksSidebarPage = "projects" | "goals";
 
 function sameScope(a: TaskScopeRef, b: TaskScopeRef | null): boolean {
   if (!b || a.kind !== b.kind) return false;
@@ -101,8 +78,6 @@ export function TasksSidebar({
   onCreateList,
   current,
   onNavigate,
-  currentPage,
-  onOpenPage,
 }: TasksSidebarProps) {
   const { t } = useT();
   const root = useRef<HTMLElement>(null);
@@ -138,27 +113,6 @@ export function TasksSidebar({
         {/* A zero is not shown. An empty Scope says so on its own screen; a
             column of noughts in the tree is noise (§2.10). */}
         {count > 0 ? <span className="tm-count">{count}</span> : null}
-      </button>
-    );
-  }
-
-  /**
-   * A row for a destination that is not a Scope.
-   *
-   * No count, deliberately. The head of this file says every count comes from
-   * `queryScopeCount` and never from a local filter (§12.14) — and neither of
-   * these has a Scope to ask. Archive gets its number when it becomes one.
-   */
-  function pageRow(page: TasksSidebarPage, label: string) {
-    return (
-      <button
-        key={`page:${page}`}
-        type="button"
-        className={`tm-row${currentPage === page ? " is-current" : ""}`}
-        aria-current={currentPage === page ? "page" : undefined}
-        onClick={() => onOpenPage(page)}
-      >
-        <span className="tm-row-label">{label}</span>
       </button>
     );
   }
@@ -278,14 +232,6 @@ export function TasksSidebar({
         {treeLists.length === 0 ? <p className="tm-section-empty">{t("tasks.noLists")}</p> : null}
       </div>
 
-      {/* D-1 / D-4: page doors — navigation to a full screen, not a scope
-          filter. Separate section so they read differently from scope rows:
-          a door takes you somewhere, a row narrows what you see. */}
-      <div className="tm-section tm-section-doors">
-        {pageRow("projects", t("tree.section"))}
-        {pageRow("goals", t("tasks.goals"))}
-      </div>
-
       {visibleTags.length > 0 ? (
         <div className="tm-section">
           <h2 className="tm-section-title">{t("tasks.sectionTags")}</h2>
@@ -305,10 +251,19 @@ export function TasksSidebar({
         </div>
       ) : null}
 
+      {/* Two system Scopes, not three. `안 함` had a row of its own here and
+          does not any more: a task given up on is finished work, and TickTick
+          — the IA this module follows — files it under Completed rather than
+          in a third terminal list nobody visits. The Scope itself is intact
+          (`/wont-do` still opens, so old links do), and `completed` gathers
+          both, so nothing became unreachable by losing the row.
+
+          The doors to Projects and Goals went with it. Both are screens, not
+          Scopes: they carried no count, they narrowed nothing, and a sidebar
+          of places to filter by is easier to read without two rows that jump
+          somewhere else instead. Both pages keep their addresses. */}
       <div className="tm-section">
         {row({ kind: "completed" }, t("tasks.completed"))}
-        {/* D-23. A real Scope, so unlike the two page rows it carries a count. */}
-        {row({ kind: "wontDo" }, t("tasks.wontDo"))}
         {row({ kind: "trash" }, t("tasks.trash"))}
       </div>
     </nav>

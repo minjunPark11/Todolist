@@ -1471,3 +1471,125 @@
   word-break: break-word;
   font-family: inherit;
 }
+
+/* ===== Planning: Eisenhower matrix (MatrixPage) =====
+   A 2x2 grid, not four columns. The axis labels sit in the grid's own first
+   row and first column, so the boxes cannot drift out of alignment with the
+   words that name them — which is the whole claim the layout makes. */
+.ff-matrix {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    ".          urgent    notUrgent"
+    "important  qI        qII"
+    "notImp     qIII      qIV";
+  /* The header row hugs its text; the two content rows share what is left and
+     never fall below a card or two of height. */
+  grid-template-rows: auto minmax(240px, 1fr) minmax(240px, 1fr);
+  gap: 8px 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ff-matrix-axis {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  align-self: center;
+}
+.ff-matrix-axis.is-col { text-align: center; padding-bottom: 2px; }
+/* Read bottom-to-top so the row labels run along the axis they describe. */
+.ff-matrix-axis.is-row {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  justify-self: center;
+  text-align: center;
+}
+.ff-matrix-urgent { grid-area: urgent; }
+.ff-matrix-not-urgent { grid-area: notUrgent; }
+.ff-matrix-important { grid-area: important; }
+.ff-matrix-not-important { grid-area: notImp; }
+
+.ff-matrix-cell {
+  --q-color: var(--text-tertiary);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-top: 3px solid var(--q-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-muted);
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+.ff-matrix-cell.is-over {
+  border-color: var(--q-color);
+  background: color-mix(in srgb, var(--q-color) 10%, var(--bg-surface-muted));
+}
+.ff-matrix-cell-I { --q-color: var(--danger); grid-area: qI; }
+.ff-matrix-cell-II { --q-color: var(--accent); grid-area: qII; }
+.ff-matrix-cell-III { --q-color: var(--warning); grid-area: qIII; }
+.ff-matrix-cell-IV { --q-color: var(--text-tertiary); grid-area: qIV; }
+
+.ff-matrix-cell-head { display: flex; align-items: flex-start; gap: 8px; }
+.ff-matrix-roman {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--q-color) 16%, transparent);
+  color: var(--q-color);
+  font-size: 11px;
+  font-weight: 700;
+}
+.ff-matrix-cell-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.ff-matrix-cell-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.ff-matrix-cell-hint { font-size: 11px; color: var(--text-tertiary); }
+
+/* The cards scroll, the box does not: a full quadrant must not push the grid
+   taller than the screen and take the other three with it. */
+.ff-matrix-cell-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ff-matrix-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  cursor: grab;
+}
+.ff-matrix-card:active { cursor: grabbing; }
+.ff-matrix-card.is-selected { border-color: var(--accent); }
+.ff-matrix-card .ff-check { flex: none; margin-top: 1px; }
+.ff-matrix-card-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.ff-matrix-card-title { font-size: 13px; line-height: 1.4; color: var(--text-primary); word-break: break-word; }
+.ff-matrix-card-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.ff-matrix-add { margin-top: auto; }
+
+/* One column per box on a phone: two 240px rows plus their labels do not fit
+   side by side, and a squeezed matrix is a matrix nobody can read. */
+@media (max-width: 900px) {
+  .ff-matrix {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "qI" "qII" "qIII" "qIV";
+    grid-template-rows: none;
+    grid-auto-rows: minmax(200px, auto);
+  }
+  /* The labels belong to the grid; without it they name nothing. Each box
+     still carries its own "important, not urgent" line. */
+  .ff-matrix-axis { display: none; }
+}

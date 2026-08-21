@@ -44,20 +44,25 @@ describe("Won't Do (audit D-23)", () => {
     expect(matchesScope(given, { kind: "list", id: "l1" }, ctx)).toBe(false);
   });
 
-  it("lands in its own Scope and not in Completed", () => {
+  // The two Scopes overlap on purpose since the sidebar lost the `안 함` row:
+  // Completed is where a given-up task is now READ, and `wontDo` stays exact
+  // so an old `/wont-do` link still answers with the given-up half alone.
+  it("lands in its own Scope and is gathered by Completed", () => {
     const given = task({ wontDoAt: NOW });
     expect(matchesScope(given, { kind: "wontDo" }, ctx)).toBe(true);
-    expect(matchesScope(given, { kind: "completed" }, ctx)).toBe(false);
-    // It never writes completedAt, so completion statistics stay clean.
+    expect(matchesScope(given, { kind: "completed" }, ctx)).toBe(true);
+    // Still not COMPLETION: it never writes completedAt, so the focus and
+    // completion statistics stay clean.
     expect(isCompleted(given)).toBe(false);
   });
 
-  // A task can be finished and then given up on only by a bug, but the two
-  // Scopes must still be disjoint if it happens.
-  it("keeps Completed and Won't Do disjoint even for a task marked both", () => {
+  // A task can be finished and then given up on only by a bug. It must not
+  // fall out of both Scopes when it happens, and it does not appear twice on
+  // one screen either — the two are different screens.
+  it("shows a task marked both in each Scope rather than in neither", () => {
     const both = task({ status: "done", completedAt: NOW, wontDoAt: NOW });
     expect(matchesScope(both, { kind: "wontDo" }, ctx)).toBe(true);
-    expect(matchesScope(both, { kind: "completed" }, ctx)).toBe(false);
+    expect(matchesScope(both, { kind: "completed" }, ctx)).toBe(true);
   });
 
   it("loses to Trash, which outranks it", () => {

@@ -28,7 +28,7 @@ import type { ScopeContext } from "../../domain/tasks/scopeQuery";
 import { resolveListView } from "../../domain/tasks/listView";
 import { listUrlFor, taskUrlFor } from "../../app/taskScopeUrl";
 import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
-import { TasksSidebar, type SidebarDrawer, type TasksSidebarPage } from "../tasks/TasksSidebar";
+import { TasksSidebar, type SidebarDrawer } from "../tasks/TasksSidebar";
 import { ListManager } from "../tasks/ListManager";
 import { CreateListModal } from "../tasks/CreateListModal";
 
@@ -46,11 +46,8 @@ export interface TasksSidebarSlotProps {
   today: string;
   /** The Scope the sidebar should mark, or null off any Scope (Search, Archive). */
   current: TaskScopeRef | null;
-  /** A row that is an address rather than a Scope, or null. */
-  currentPage: TasksSidebarPage | null;
   /** Navigates to a full Tasks URL — path and query both (§5.62). */
   onNavigateUrl: (url: string) => void;
-  onOpenPage: (page: TasksSidebarPage) => void;
   /** Called before navigating, so an overlay sidebar can close itself. */
   onBeforeNavigate?: () => void;
   onCreateList: (payload: {
@@ -76,9 +73,7 @@ export function TasksSidebarSlot({
   taskTags,
   today,
   current,
-  currentPage,
   onNavigateUrl,
-  onOpenPage,
   onBeforeNavigate,
   onCreateList,
   onCreateSidebarFolder,
@@ -140,12 +135,7 @@ export function TasksSidebarSlot({
         onManageLists={() => openFromSidebar(() => setManaging(true))}
         onCreateList={(contextFolderId) => openFromSidebar(() => setCreatingListIn(contextFolderId))}
         current={current}
-        currentPage={currentPage}
         onNavigate={go}
-        onOpenPage={(page) => {
-          onBeforeNavigate?.();
-          onOpenPage(page);
-        }}
       />
 
       {creatingListIn !== null ? (

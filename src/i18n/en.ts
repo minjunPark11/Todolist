@@ -155,23 +155,10 @@ export const en: Dictionary = {
   "sidebar.planning": "Planning",
 
   // ---- board ----
-  "board.title": "Matrix",
-  "board.subtitle": "Every Project in one view — regroup it without moving anything.",
-  "board.scope": "Project",
-  "board.allSpaces": "All projects",
-  "board.groupBy": "Group by",
-  "board.axis.status": "Status",
-  "board.axis.quadrant": "Quadrant",
-  "board.quickAdd": "Quick add",
-  "board.quickAddPlaceholder": "Type it now, sort it later",
-  "board.toastAdded": "Added to the board.",
-  "board.toastConfigure": "Set it up",
   "board.other": "Unsorted",
   "board.blocked": "Blocked",
   "board.source.goal": "Goal",
   "board.source.milestone": "Milestone",
-  "board.empty": "Nothing on the board",
-  "board.emptyHint": "Tasks and goals appear here as soon as you create them.",
 
   // ---- Horizons ----
   "goalDetail.materialise": "Make a task for today",
@@ -947,6 +934,29 @@ export const en: Dictionary = {
   "caltasks.qIV": "Unsorted",
   "caltasks.empty": "Nothing to place.",
   "caltasks.dragHint": "Drag onto the calendar to schedule",
+  // The Eisenhower matrix screen (MatrixPage). Its own vocabulary rather than
+  // the shared `eis.*` one: those labels are also read by the task detail's
+  // quadrant picker and by the calendar panel, where Q4 still gathers parked
+  // and finished work. On this screen it cannot — done and parked tasks are
+  // filtered out — so here the four boxes can say what Eisenhower says.
+  "matrix.title": "Eisenhower Matrix",
+  "matrix.subtitle": "Two questions, one grid — is it important, and is it urgent? Drag a card to answer differently.",
+  "matrix.list": "List",
+  "matrix.allLists": "All lists",
+  "matrix.urgent": "Urgent",
+  "matrix.notUrgent": "Not urgent",
+  "matrix.important": "Important",
+  "matrix.notImportant": "Not important",
+  "matrix.qI": "Do first",
+  "matrix.qIHint": "Important and urgent",
+  "matrix.qII": "Schedule",
+  "matrix.qIIHint": "Important, not urgent",
+  "matrix.qIII": "Get it over with",
+  "matrix.qIIIHint": "Urgent, not important",
+  "matrix.qIV": "Later, or never",
+  "matrix.qIVHint": "Neither — and anything not judged yet",
+  "matrix.add": "+ Add task",
+  "matrix.addPlaceholder": "What belongs in this box?",
   "eis.qI": "Important & Urgent",
   "eis.qIHint": "Core work that needs attention now",
   "eis.qII": "Important, Not Urgent",

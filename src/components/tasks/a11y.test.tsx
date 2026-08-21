@@ -134,7 +134,6 @@ function renderModule(url: string) {
           onPermanentlyDeleteList: () => {},
         }}
         onMutate={() => {}}
-        onOpenPage={() => {}}
       />
     </I18nProvider>,
   );
@@ -248,22 +247,22 @@ describe("the Lists section header", () => {
   });
 });
 
-describe("where the Projects and Goals doors live", () => {
-  it("has its own doors section, separate from the Lists group", () => {
+describe("the sidebar's bottom section", () => {
+  it("offers Completed and Trash, and no third terminal row", () => {
     const { container } = renderModule("/today");
 
-    // SPACE_REMOVAL_IA design S4: doors (Projects, Goals) are page navigators,
-    // not scope filters — they belong in a dedicated section so they read
-    // differently from the rows that narrow what is visible on this screen.
-    const doorsSection = container.querySelector(".tm-section-doors");
-    expect(doorsSection).not.toBeNull();
-    expect(doorsSection?.textContent).toContain("프로젝트");
-    expect(doorsSection?.textContent).toContain("목표");
+    // The doors to Projects and Goals used to sit in a section of their own
+    // here, and `안 함` had a row beside Completed. All three are gone: the
+    // doors were screens rather than Scopes, and a task given up on is read
+    // under Completed now (scopeQuery). What is left is what the sidebar is
+    // for — places to narrow the view to.
+    expect(container.querySelector(".tm-section-doors")).toBeNull();
 
-    // The Lists section (the one with a heading) must NOT contain the doors.
-    const sections = [...container.querySelectorAll(".tm-sidebar > .tm-section")];
-    const listsSection = sections.find((s) => s.querySelector(".tm-section-title"));
-    expect(listsSection?.classList.contains("tm-section-doors")).toBe(false);
+    const rows = [...container.querySelectorAll(".tm-row")].map((row) => row.textContent ?? "");
+    expect(rows.some((row) => row.includes("완료"))).toBe(true);
+    expect(rows.some((row) => row.includes("휴지통"))).toBe(true);
+    expect(rows.some((row) => row.includes("안 함"))).toBe(false);
+    expect(rows.some((row) => row === "목표")).toBe(false);
   });
 });
 

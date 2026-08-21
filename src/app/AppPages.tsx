@@ -1,5 +1,5 @@
 ﻿import { ReactNode, useState } from "react";
-import { BoardPage } from "../components/BoardPage";
+import { MatrixPage } from "../components/MatrixPage";
 import { CalendarView } from "../components/CalendarView";
 import { FocusPage } from "../components/FocusPage";
 import { GoalDetailDrawer } from "../components/horizons/GoalDetailDrawer";
@@ -238,21 +238,14 @@ export function AppPages({
   if (activePage === "board") {
     return (
       <section className={pageGridClass()}>
-        <BoardPage
+        <MatrixPage
           tasks={visibleTasks}
-          projects={planner.projects}
           lists={planner.lists}
-          learningPaths={planner.learningPaths}
           selectedTaskId={planner.selectedTask?.id ?? ""}
           onOpenTask={planner.selectTask}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
-          onUpdatePath={planner.updateLearningPath}
-          onMoveGoalToStatus={planner.moveGoalToStatus}
-          onCreateStatus={planner.createStatus}
-          onUpdateStatus={planner.updateStatus}
-          onArchiveStatus={planner.archiveStatus}
-          showToast={showToast}
+          onToggleDone={planner.toggleTaskDone}
         />
         {renderTaskDetail()}
       </section>
