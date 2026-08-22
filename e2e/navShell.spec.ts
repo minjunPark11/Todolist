@@ -23,7 +23,6 @@ import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./addList.helpers";
 
 const WIDTH_KEY = "focusflow-sidebar-width";
-const COLLAPSED_KEY = "focusflow-sidebar-collapsed";
 const DEFAULT_WIDTH = 248;
 const MIN_WIDTH = 216;
 const MAX_WIDTH = 360;
@@ -94,14 +93,12 @@ test.describe("the Context Sidebar frame", () => {
     expect(railBefore).toBe(50);
   });
 
-  test("CS-02 — dragging far left stops at the minimum and does not collapse", async ({ page }) => {
+  test("CS-02 — dragging far left stops at the minimum, leaving the sidebar there", async ({ page }) => {
     await openApp(page);
     await dragHandle(page, -600);
 
+    // §3.7: a slip of the hand must not be able to make the sidebar go away.
     expect(await sidebarWidth(page)).toBe(MIN_WIDTH);
-    // §3.7/§3.22: passing the minimum is not a way to collapse. Collapsing is
-    // a decision the user makes with a button, not one a slip of the hand makes.
-    await expect(page.locator(".app-frame")).not.toHaveClass(/is-sidebar-collapsed/);
     await expect(page.locator("#context-sidebar")).toBeVisible();
   });
 
@@ -139,35 +136,11 @@ test.describe("the Context Sidebar frame", () => {
     await expectSidebarWidth(page, MIN_WIDTH);
   });
 
-  test("CS-05 — collapsing keeps the width it had", async ({ page }) => {
-    await openApp(page);
-    await dragHandle(page, 72);
-    expect(await sidebarWidth(page)).toBe(320);
-
-    await page.keyboard.press("Control+\\");
-    await expect(page.locator(".app-frame")).toHaveClass(/is-sidebar-collapsed/);
-    await page.keyboard.press("Control+\\");
-
-    // §3.28: width and visibility are independent. Storing "collapsed" as a
-    // width of 0 is the bug this separation exists to prevent.
-    expect(await sidebarWidth(page)).toBe(320);
-  });
-
-  test("CS-12 — Ctrl/Cmd+\\ toggles, and the expand button is the way back", async ({ page }) => {
-    await openApp(page);
-
-    await page.keyboard.press("Control+\\");
-    await expect(page.locator(".app-frame")).toHaveClass(/is-sidebar-collapsed/);
-    // §3.24: the sidebar's own collapse control went with it, so the way back
-    // has to live outside it.
-    const expand = page.getByRole("button", { name: "Expand sidebar" });
-    await expect(expand).toBeVisible();
-    await expect(expand).toHaveAttribute("aria-expanded", "false");
-
-    await expand.click();
-    await expect(page.locator(".app-frame")).not.toHaveClass(/is-sidebar-collapsed/);
-    await expectSidebarWidth(page, DEFAULT_WIDTH);
-  });
+  // CS-05 and CS-12 asserted the collapse: that it kept the width underneath,
+  // and that Ctrl/Cmd+\ toggled it with an expand button as the way back. The
+  // control is gone — it sat on top of the sidebar's first row — so what is
+  // left of §3.30's "zero width" case is CS-07 below, where the module has no
+  // sidebar at all.
 
   test("CS-07 — a module without a sidebar hides it, and Tasks gets its width back", async ({ page }) => {
     await openApp(page);
@@ -189,7 +162,7 @@ test.describe("the Context Sidebar frame", () => {
   // to localStorage, and a reload is the only way to find out whether the app
   // reads back what it wrote. Every assertion above would pass on an app that
   // forgot everything the moment the tab closed.
-  test("the width and the collapse survive a reload", async ({ page }) => {
+  test("the width survives a reload", async ({ page }) => {
     await openApp(page);
     await dragHandle(page, 40);
     expect(await sidebarWidth(page)).toBe(288);
@@ -197,15 +170,6 @@ test.describe("the Context Sidebar frame", () => {
     await page.reload();
     await expect(page.locator("#context-sidebar")).toBeVisible();
     expect(await sidebarWidth(page)).toBe(288);
-    expect(await page.evaluate((key) => localStorage.getItem(key), WIDTH_KEY)).toBe("288");
-
-    await page.keyboard.press("Control+\\");
-    await expect(page.locator(".app-frame")).toHaveClass(/is-sidebar-collapsed/);
-    await page.reload();
-
-    await expect(page.locator(".app-frame")).toHaveClass(/is-sidebar-collapsed/);
-    expect(await page.evaluate((key) => localStorage.getItem(key), COLLAPSED_KEY)).toBe("1");
-    // And the width is still remembered underneath the collapse (§3.28).
     expect(await page.evaluate((key) => localStorage.getItem(key), WIDTH_KEY)).toBe("288");
   });
 
@@ -373,10 +337,10 @@ test.describe("the Global Rail", () => {
 
     await rail(page, "Tasks").click();
 
-    // D-15's second half: re-clicking the module you are in must not toggle
+    // D-15's second half: re-clicking the module you are in must not touch
     // the sidebar and must not throw you back to a home Scope.
     await expect(page).toHaveURL(/\/completed/);
-    await expect(page.locator(".app-frame")).not.toHaveClass(/is-sidebar-collapsed/);
+    await expect(page.locator("#context-sidebar")).toBeVisible();
     expect(await sidebarWidth(page)).toBe(before);
   });
 

@@ -124,8 +124,6 @@ export const en: Dictionary = {
   "sidebar.settings": "Settings",
   "sidebar.projectShortcuts": "Project Shortcuts",
   "sidebar.addProjectPlaceholder": "+ Add Project",
-  "sidebar.collapse": "Collapse sidebar",
-  "sidebar.expand": "Expand sidebar",
 
   // Global Rail (§2.28's label table). The Rail shows icons only, so these
   // are both the tooltip and the accessible name — not decoration.
@@ -528,17 +526,7 @@ export const en: Dictionary = {
   "todayv.add": "Add",
   "todayv.addTask": "Add Task",
   "todayv.addTaskAria": "Add task",
-  "todayv.briefTitle": "Today Brief",
-  "todayv.briefCounts": "You have {{tasks}} focus task(s) and {{blocks}} time block(s) today.",
-  "todayv.briefHigh": "Start with your highest priority work.",
-  "todayv.briefOverdue": "You have {{n}} overdue task(s) that need attention today.",
-  "todayv.briefOpenDay": "Your day is open. Use this time for deep work or schedule a task.",
-  "todayv.briefInbox": "{{n}} inbox item(s) still need sorting.",
-  "todayv.briefNoTasks": "Nothing planned for today yet.",
   "todayv.planToday": "Plan Today",
-  "todayv.planTodayAria": "Plan today manually",
-  "todayv.viewCalendar": "View Calendar",
-  "todayv.viewCalendarAria": "View calendar",
   "todayv.focusQueue": "Today's To-dos",
   "todayv.queueMenuAria": "Open today's to-do menu",
   "todayv.rowMenuAria": "Open task menu",

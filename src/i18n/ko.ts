@@ -123,8 +123,6 @@ export const ko: Dictionary = {
   "sidebar.settings": "설정",
   "sidebar.projectShortcuts": "프로젝트 바로가기",
   "sidebar.addProjectPlaceholder": "+ 프로젝트 추가",
-  "sidebar.collapse": "사이드바 접기",
-  "sidebar.expand": "사이드바 펼치기",
 
   // Global Rail (Nav Shell 스펙 §2.28의 label 표). 아이콘만 보이는 레일이라
   // 이 문자열들은 tooltip이자 aria-label이다 — 장식이 아니라 유일한 이름이다.
@@ -526,17 +524,7 @@ export const ko: Dictionary = {
   "todayv.add": "추가",
   "todayv.addTask": "할 일 추가",
   "todayv.addTaskAria": "할 일 추가",
-  "todayv.briefTitle": "오늘 브리핑",
-  "todayv.briefCounts": "오늘 포커스 할 일 {{tasks}}개, 시간 블록 {{blocks}}개가 있습니다.",
-  "todayv.briefHigh": "우선순위가 가장 높은 일부터 시작해보세요.",
-  "todayv.briefOverdue": "오늘 처리해야 할 기한 초과 할 일이 {{n}}개 있습니다.",
-  "todayv.briefOpenDay": "오늘 일정이 비어 있습니다. 딥워크에 쓰거나 할 일을 배치해보세요.",
-  "todayv.briefInbox": "정리가 필요한 받은함 항목이 {{n}}개 있습니다.",
-  "todayv.briefNoTasks": "아직 오늘 할 일이 없습니다.",
   "todayv.planToday": "오늘 계획하기",
-  "todayv.planTodayAria": "오늘 계획 수동 실행",
-  "todayv.viewCalendar": "캘린더 보기",
-  "todayv.viewCalendarAria": "캘린더 보기",
   "todayv.focusQueue": "오늘 할 일",
   "todayv.queueMenuAria": "오늘 할 일 메뉴 열기",
   "todayv.rowMenuAria": "할 일 메뉴 열기",

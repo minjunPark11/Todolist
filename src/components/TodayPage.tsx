@@ -12,7 +12,6 @@ import {
 } from "../utils/todayView";
 import { bucketOverridesFor } from "../domain/today/dailyPlan";
 import type { ToastState } from "./kit";
-import { TodayBriefCard } from "./today/TodayBriefCard";
 import { FocusQueue } from "./today/FocusQueue";
 import { TimeRail } from "./today/TimeRail";
 import {
@@ -176,8 +175,6 @@ export function TodayPage({
     return { ...rail, blocks, scheduledCount: blocks.length };
   }, [rail, hasQuery, query]);
 
-  const openEntries = entries.filter((entry) => !entry.completed);
-  const overdueCount = openEntries.filter((entry) => entry.reason === "overdue").length;
 
   // The full form is the "I already know the details" path, so it always
   // files a Today task. Bare capture goes through handleCapture below.
@@ -395,15 +392,6 @@ export function TodayPage({
 
       <div className="tdy-body">
         <div className="tdy-main">
-          <TodayBriefCard
-            focusCount={openEntries.length}
-            blockCount={rail.scheduledCount}
-            overdueCount={overdueCount}
-            inboxCount={triageItems.length}
-            onPlanToday={handlePlanToday}
-            onViewCalendar={() => onNavigate("calendar")}
-          />
-
           <InlineCapture
               today={today}
             addToToday={addToToday}
@@ -425,6 +413,7 @@ export function TodayPage({
             onToggleDone={onToggleDone}
             onOpenTask={onOpenTask}
             onMoveBucket={handleMoveBucket}
+            onPlanToday={handlePlanToday}
             onMoveAllLater={handleMoveAllLater}
             onClearPlan={handleClearPlan}
             onAddTask={() => setQuickAddOpen(true)}

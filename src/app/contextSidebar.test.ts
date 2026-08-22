@@ -58,20 +58,19 @@ describe("contextSidebar", () => {
   });
 
   describe("effective width (§3.30)", () => {
-    it("is zero with no sidebar and zero when collapsed", () => {
-      expect(effectiveContextSidebarWidth({ mode: "none", width: 300, visibility: "expanded" })).toBe(0);
-      expect(effectiveContextSidebarWidth({ mode: "tasks", width: 300, visibility: "collapsed" })).toBe(0);
+    // A `visibility` argument sat beside these and answered 0 when the sidebar
+    // was collapsed. Collapsing is gone (AppShell), so the mode is the only
+    // thing that can zero the column.
+    it("is zero with no sidebar", () => {
+      expect(effectiveContextSidebarWidth({ mode: "none", width: 300 })).toBe(0);
     });
 
     it("is the chosen width when shown", () => {
-      expect(effectiveContextSidebarWidth({ mode: "tasks", width: 300, visibility: "expanded" })).toBe(300);
+      expect(effectiveContextSidebarWidth({ mode: "tasks", width: 300 })).toBe(300);
     });
 
-    // §3.28: collapsing must not eat the number the user picked.
-    it("returns the remembered width after a collapse and expand", () => {
-      const collapsed = { mode: "tasks", width: 304, visibility: "collapsed" } as const;
-      expect(effectiveContextSidebarWidth(collapsed)).toBe(0);
-      expect(effectiveContextSidebarWidth({ ...collapsed, visibility: "expanded" })).toBe(304);
+    it("clamps a width outside the range rather than using it", () => {
+      expect(effectiveContextSidebarWidth({ mode: "tasks", width: 4000 })).toBe(CONTEXT_SIDEBAR_MAX_WIDTH);
     });
   });
 

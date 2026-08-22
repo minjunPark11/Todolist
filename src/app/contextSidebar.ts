@@ -4,11 +4,10 @@
 // Everything here is pure so the rules can be tested without a DOM. The React
 // state that uses them is `hooks/useContextSidebar.ts`.
 //
-// The one idea worth stating up front is §3.28: **width and visibility are
-// independent.** A collapsed sidebar still remembers it was 304px wide, and
-// collapsing never writes 0 as the width. Storing "collapsed" as width 0 is
-// the bug this separation exists to prevent — it loses the number the user
-// picked, and every expand lands on the default instead of on their choice.
+// The sidebar could also be COLLAPSED, and the rule then was that width and
+// visibility stayed independent — storing "collapsed" as width 0 would have
+// lost the number the user picked. The collapse control is gone (AppShell), so
+// only the width is left, and the rule has nothing left to separate.
 import { pageForPath } from "./pageRoute";
 
 /** §3.6, verbatim. */
@@ -35,12 +34,6 @@ export const CONTEXT_SIDEBAR_ID = "context-sidebar";
 export const CONTEXT_SIDEBAR_STEP = 16;
 export const CONTEXT_SIDEBAR_BIG_STEP = 32;
 
-/**
- * D-07: the collapse key predates this file and keeps its name. A rename
- * would silently expand every sidebar that is currently collapsed, which is
- * a worse first impression than an inconsistent key.
- */
-export const COLLAPSED_STORAGE_KEY = "focusflow-sidebar-collapsed";
 export const WIDTH_STORAGE_KEY = "focusflow-sidebar-width";
 
 /**
@@ -50,15 +43,13 @@ export const WIDTH_STORAGE_KEY = "focusflow-sidebar-width";
  * and no screen can reach.
  */
 export type ContextSidebarMode = "tasks" | "none";
-export type ContextSidebarVisibility = "expanded" | "collapsed";
 
 export interface ContextSidebarRuntime {
   mode: ContextSidebarMode;
   width: number;
-  visibility: ContextSidebarVisibility;
 }
 
-/** §3.7. Dragging past the minimum does NOT collapse — that is §3.22's job. */
+/** §3.7. Dragging past the minimum stops there; it is not a way to hide it. */
 export function clampContextSidebarWidth(width: number): number {
   if (!Number.isFinite(width)) return CONTEXT_SIDEBAR_DEFAULT_WIDTH;
   return Math.min(CONTEXT_SIDEBAR_MAX_WIDTH, Math.max(CONTEXT_SIDEBAR_MIN_WIDTH, Math.round(width)));
@@ -89,9 +80,8 @@ export function contextSidebarModeFor(path: string): ContextSidebarMode {
 }
 
 /** §3.30. The number the layout actually uses. */
-export function effectiveContextSidebarWidth({ mode, width, visibility }: ContextSidebarRuntime): number {
+export function effectiveContextSidebarWidth({ mode, width }: ContextSidebarRuntime): number {
   if (mode === "none") return 0;
-  if (visibility === "collapsed") return 0;
   return clampContextSidebarWidth(width);
 }
 

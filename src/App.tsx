@@ -330,15 +330,8 @@ export default function App() {
     function handleModuleKeys(event: KeyboardEvent) {
       if (!event.ctrlKey && !event.metaKey) return;
       if (event.altKey || event.shiftKey) return;
-      // §3.26: Ctrl/Cmd + \ collapses, and only where there is a sidebar to
-      // collapse. Registered here with the module switches rather than per
-      // page, which §3.26 asks for in as many words.
-      if (event.key === "\\") {
-        if (contextSidebar.mode === "none") return;
-        event.preventDefault();
-        contextSidebar.toggleCollapsed();
-        return;
-      }
+      // §3.26's Ctrl/Cmd + \ was here, collapsing the sidebar. The collapse
+      // control is gone (AppShell), so the chord has nothing to toggle.
       const item: RailNavItem | undefined = {
         "1": "tasks",
         "2": "matrix",
@@ -1384,9 +1377,8 @@ export default function App() {
             "app-shell",
             mobileMenuOpen ? "mobile-menu-open" : "",
             // `sidebar-collapsed` used to sit here and narrow the column to a
-            // 68px icon rail. §3.22/§3.30 make collapse mean a layout slot of
-            // 0, and the Global Rail is where icon-level navigation lives now,
-            // so the frame hides the column instead (19-app-shell.css).
+            // 68px icon rail. The Global Rail is where icon-level navigation
+            // lives now, and collapsing is gone entirely (AppShell).
           ]
             .filter(Boolean)
             .join(" ")}

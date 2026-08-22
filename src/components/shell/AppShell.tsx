@@ -11,10 +11,17 @@
 // inside the Rail, or the Rail inside Main, is what makes a 56px column start
 // inheriting a page's scroll, zoom and stacking context.
 //
-// P0-3 added the Context Sidebar's FRAME — its width, its collapse, its
-// resize handle and its mode — without moving either shell's sidebar out of
-// its own grid (D-17). The frame publishes `--context-sidebar-w` and both
-// grids read it, so there is one number and one place that changes it.
+// P0-3 added the Context Sidebar's FRAME — its width, its resize handle and
+// its mode — without moving either shell's sidebar out of its own grid (D-17).
+// The frame publishes `--context-sidebar-w` and both grids read it, so there is
+// one number and one place that changes it.
+//
+// The frame used to collapse, too, through a button pinned over the sidebar's
+// top-left corner. It sat on top of the first row of whatever sidebar was
+// underneath — on the Tasks sidebar, squarely on "오늘" — and a control that
+// covers a row to save a column the user can already drag to any width was not
+// worth the overlap. Below the desktop breakpoint the sidebar is still a drawer
+// with a menu button of its own; that is a different control and it stays.
 import type { ReactNode } from "react";
 import {
   CONTEXT_SIDEBAR_ID,
@@ -35,16 +42,11 @@ interface AppShellProps {
 
 export function AppShell({ rail, sidebar, children }: AppShellProps) {
   const { t } = useT();
-  const collapsed = sidebar.visibility === "collapsed";
   const hasSidebar = sidebar.mode !== "none";
 
   return (
     <div
-      className={[
-        "app-frame",
-        hasSidebar && collapsed ? "is-sidebar-collapsed" : "",
-        sidebar.isResizing ? "is-sidebar-resizing" : "",
-      ]
+      className={["app-frame", sidebar.isResizing ? "is-sidebar-resizing" : ""]
         .filter(Boolean)
         .join(" ")}
       data-sidebar-mode={sidebar.mode}
@@ -60,15 +62,14 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
           element that does it. */}
       <OverlayScrollbar />
 
-      {/* Both of the frame's own controls, in one named group.
-          They were bare children of `.app-frame` before, which put them
-          outside every landmark — axe's `region` rule on the running app,
-          and the one thing the shell's own axe test did not catch because it
-          only failed on serious and critical. These two controls belong to
-          the frame rather than to the Rail, the sidebar or the page, so they
-          get a named landmark of their own. Positioning is unchanged — both
-          are absolutely positioned against `.app-frame`, and this wrapper is
-          `display: contents`.
+      {/* The frame's own control, in a named group.
+          It was a bare child of `.app-frame` before, which put it outside
+          every landmark — axe's `region` rule on the running app, and the one
+          thing the shell's own axe test did not catch because it only failed
+          on serious and critical. The handle belongs to the frame rather than
+          to the Rail, the sidebar or the page, so it gets a named landmark of
+          its own. Positioning is unchanged — it is absolutely positioned
+          against `.app-frame`, and this wrapper is `display: contents`.
 
           `region` and not `toolbar`: a toolbar is a widget, and the rule being
           answered is "is every part of the page inside a LANDMARK". Measured
@@ -78,7 +79,7 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
       {/* §3.15/§3.20. Absolutely positioned at the sidebar's right edge rather
           than rendered inside it, because the sidebar still belongs to the
           inner shell's grid — the handle has to reach across that boundary. */}
-      {hasSidebar && !collapsed ? (
+      {hasSidebar ? (
         <div
           className="context-sidebar-handle"
           role="separator"
@@ -101,41 +102,6 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
         />
       ) : null}
 
-      {/* §3.52 / §3.24. Both halves of the one-control-in-two-places invariant
-          live here now that SpaceSidebar (which used to own the collapse button)
-          is gone. AppShell already owns sidebar.toggleCollapsed, so both
-          buttons belong here rather than inside each sidebar component. */}
-      {hasSidebar && !collapsed ? (
-        <button
-          type="button"
-          className="context-sidebar-collapse"
-          aria-label={t("sidebar.collapse")}
-          aria-expanded={true}
-          aria-controls={CONTEXT_SIDEBAR_ID}
-          onClick={sidebar.toggleCollapsed}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <line x1="9" y1="4" x2="9" y2="20" />
-          </svg>
-        </button>
-      ) : (
-        hasSidebar ? (
-          <button
-            type="button"
-            className="context-sidebar-expand"
-            aria-label={t("sidebar.expand")}
-            aria-expanded={false}
-            aria-controls={CONTEXT_SIDEBAR_ID}
-            onClick={sidebar.toggleCollapsed}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <line x1="9" y1="4" x2="9" y2="20" />
-            </svg>
-          </button>
-        ) : null
-      )}
       </div>
     </div>
   );

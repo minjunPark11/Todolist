@@ -28,9 +28,7 @@ function sidebarState(overrides: Partial<ContextSidebarState> = {}): ContextSide
     mode: "tasks",
     width: 248,
     effectiveWidth: 248,
-    visibility: "expanded",
     isResizing: false,
-    toggleCollapsed: vi.fn(),
     beginResize: vi.fn(),
     resizeByKey: vi.fn(() => false),
     resetWidth: vi.fn(),
@@ -93,8 +91,8 @@ describe("the App Shell's landmarks", () => {
     expect(await seriousViolations(container)).toEqual([]);
   });
 
-  it("has no serious or critical violation collapsed, where the expand button lives", async () => {
-    const { container } = renderShell(sidebarState({ visibility: "collapsed", effectiveWidth: 0 }));
+  it("has no serious or critical violation on a module with no sidebar", async () => {
+    const { container } = renderShell(sidebarState({ mode: "none", effectiveWidth: 0 }));
     expect(await seriousViolations(container)).toEqual([]);
   });
 
@@ -122,33 +120,19 @@ describe("the resize handle (§3.51)", () => {
   });
 
   it("is gone when there is nothing to resize, rather than reporting a stale width", () => {
-    renderShell(sidebarState({ visibility: "collapsed", effectiveWidth: 0 }));
+    renderShell(sidebarState({ mode: "none", effectiveWidth: 0 }));
     expect(screen.queryByRole("separator")).toBeNull();
   });
 });
 
-describe("collapse and expand are one control in two places (§3.52)", () => {
-  it("says which state it is in, from either side", () => {
-    const { unmount } = renderShell();
-    const collapse = screen.getByRole("button", { name: /접기/ });
-    expect(collapse.getAttribute("aria-expanded")).toBe("true");
-    unmount();
-
-    renderShell(sidebarState({ visibility: "collapsed", effectiveWidth: 0 }));
-    const expand = screen.getByRole("button", { name: /펼치기/ });
-    expect(expand.getAttribute("aria-expanded")).toBe("false");
-  });
-
-  it("names the region it opens and closes, so the two are one control", () => {
-    const { unmount } = renderShell();
-    const collapsedTarget = screen.getByRole("button", { name: /접기/ }).getAttribute("aria-controls");
-    expect(collapsedTarget).toBeTruthy();
-    unmount();
-
-    renderShell(sidebarState({ visibility: "collapsed", effectiveWidth: 0 }));
-    expect(screen.getByRole("button", { name: /펼치기/ }).getAttribute("aria-controls")).toBe(
-      collapsedTarget,
-    );
+// §3.52's "collapse and expand are one control in two places" was asserted
+// here. Neither button exists any more: the collapse control sat on top of the
+// sidebar's first row, and a column the user can already drag to any width did
+// not need one (AppShell).
+describe("the frame draws no collapse control", () => {
+  it("leaves the sidebar's first row unobstructed", () => {
+    renderShell();
+    expect(screen.queryByRole("button", { name: /접기|펼치기/ })).toBeNull();
   });
 });
 
@@ -237,10 +221,6 @@ describe("the frame's own controls (P0-12 follow-up)", () => {
     expect(landmark?.getAttribute("aria-label")).toBeTruthy();
   });
 
-  it("puts the expand button in the same one", () => {
-    renderShell(sidebarState({ visibility: "collapsed", effectiveWidth: 0 }));
-    const expand = screen.getByRole("button", { name: /펼치기/ });
-
-    expect(expand.closest("[role='region']")).not.toBeNull();
-  });
+  // The expand button shared that landmark and was asserted here too. The
+  // handle is the frame's only control now.
 });

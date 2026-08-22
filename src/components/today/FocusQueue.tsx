@@ -20,6 +20,15 @@ interface FocusQueueProps {
   onToggleDone: (taskId: string) => void;
   onOpenTask: (taskId: string) => void;
   onMoveBucket: (taskId: string, bucket: TodayBucketId) => void;
+  /**
+   * "Plan today" — the rule-based sort into now/next/later.
+   *
+   * It was a button on the Today brief card, which is gone. The queue is what
+   * it rearranges, so its own menu is where it belongs: the action and the
+   * thing it acts on are one control apart, and "계획 지우기" — its inverse —
+   * was already here.
+   */
+  onPlanToday: () => void;
   onMoveAllLater: () => void;
   onClearPlan: () => void;
   onAddTask: () => void;
@@ -34,6 +43,7 @@ export function FocusQueue({
   onToggleDone,
   onOpenTask,
   onMoveBucket,
+  onPlanToday,
   onMoveAllLater,
   onClearPlan,
   onAddTask,
@@ -48,6 +58,7 @@ export function FocusQueue({
   const byBucket = (bucket: TodayBucketId) => open.filter((entry) => entry.bucket === bucket);
 
   const menuItems: MoreMenuItem[] = [
+    { label: t("todayv.planToday"), onClick: onPlanToday },
     {
       label: showCompleted ? t("todayv.hideCompleted") : t("todayv.showCompleted"),
       onClick: onToggleShowCompleted,
