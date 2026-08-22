@@ -13,6 +13,7 @@ import type { List, Task } from "../../types";
 import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
 import { childProgress } from "../../domain/tasks/children";
+import { isCompleted } from "../../domain/tasks/taskState";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 
@@ -117,7 +118,7 @@ export function TaskDrawer({
         <label className="tm-drawer-done">
           <input
             type="checkbox"
-            checked={task.status === "done"}
+            checked={isCompleted(task)}
             onChange={onComplete}
           />
           <span>{t("tasks.markDone")}</span>

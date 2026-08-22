@@ -919,29 +919,6 @@ export default function App() {
     showToast({ message: t("app.toastAllDataReset") });
   }
 
-  function openTaskInOfficialPage(taskId: string) {
-    const task = planner.tasks.find((item) => item.id === taskId);
-    if (!task) {
-      return;
-    }
-
-    planner.selectTask(taskId);
-
-    if (task.status === "inbox") {
-      navigate(PAGE_ROUTES.today);
-      setTodayIntent("triage");
-      return;
-    }
-
-    // D-23/D-24: a task that has been given up on is read under Completed
-    // now (domain/tasks/scopeQuery), so that is where opening it lands.
-    if (isWontDo(task)) {
-      navigateUrl(taskUrlFor({ scope: { kind: "completed" }, view: "list", taskId: task.id }));
-      return;
-    }
-
-    navigate(PAGE_ROUTES.board);
-  }
 
   function viewTaskInCalendar(taskId: string) {
     planner.selectTask(taskId);

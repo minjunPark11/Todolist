@@ -19,6 +19,7 @@
 // storage never is".
 import type { List, Task, TaskPriority } from "../../types";
 import { blockedTaskIds } from "../tasks/dependencies";
+import { isCompleted } from "../tasks/taskState";
 import { listIdFor, statusIdFor, statusesForSpace } from "../spaces/membership";
 
 /**
@@ -118,7 +119,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
       endTime: task.endTime,
       statusId: statusIdFor(task, statuses),
       priority: task.priority,
-      done: task.status === "done",
+      done: isCompleted(task),
       blocked: blocked.has(task.id),
       tags: task.tags,
       estimatedMinutes: task.estimatedMinutes,

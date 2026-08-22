@@ -6,7 +6,7 @@ import type {
 import { scheduleSpan } from "../domain/schedule/scheduleQueries";
 import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { addDays, addMonths, daysBetween, todayValue } from "./date";
-import { isTaskAlive, isTaskOpen, isWontDo } from "../domain/tasks/taskState";
+import { isCompleted, isInProgress, isTaskAlive, isTaskOpen, isWaiting, isWontDo } from "../domain/tasks/taskState";
 
 // === Task filters (spec §4.1.1) ===
 // D-24: these keep their names so their callers do not churn, but the rule
@@ -20,11 +20,11 @@ export function isArchivedTask(task: Task): boolean {
 }
 
 export function isCompletedTask(task: Task): boolean {
-  return task.status === "done" && Boolean(task.completedAt);
+  return isCompleted(task) && Boolean(task.completedAt);
 }
 
 export function isOpenTask(task: Task): boolean {
-  return isActiveTask(task) && task.status !== "done";
+  return isActiveTask(task) && !isCompleted(task);
 }
 
 export type TodayBuckets = {
@@ -63,11 +63,11 @@ export function getTodayBuckets(tasks: Task[], today = todayValue()): TodayBucke
     if (!isTaskOpen(task)) {
       continue;
     }
-    if (task.status === "waiting") {
+    if (isWaiting(task)) {
       buckets.waiting.push(task);
       continue;
     }
-    if (task.status === "doing") {
+    if (isInProgress(task)) {
       buckets.inProgress.push(task);
       continue;
     }
@@ -99,7 +99,7 @@ export function getProjectProgress(tasks: Task[], projectId: string): {
 } {
   const projectTasks = getProjectTasks(tasks, projectId);
   const total = projectTasks.length;
-  const completed = projectTasks.filter((task) => task.status === "done").length;
+  const completed = projectTasks.filter(isCompleted).length;
   const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
   return { total, completed, percent };
 }

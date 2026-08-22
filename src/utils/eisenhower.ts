@@ -10,6 +10,7 @@
 // Quadrant IV carries the unsorted / on-hold / completed sub-groups, mapped
 // onto the existing statuses (inbox / waiting / done).
 import type { Task, TaskDraft } from "../types";
+import { isCompleted, isUnsorted, isWaiting } from "../domain/tasks/taskState";
 
 export type MatrixQuadrant = "I" | "II" | "III" | "IV";
 // Q4 does two jobs: the classic "neither important nor urgent" quadrant and
@@ -43,8 +44,8 @@ export function getMatrixPosition(
   today: string,
 ): MatrixPosition {
   // Finished / parked work always lives in IV, regardless of its fields.
-  if (task.status === "done") return { quadrant: "IV", group: "completed" };
-  if (task.status === "waiting") return { quadrant: "IV", group: "onHold" };
+  if (isCompleted(task)) return { quadrant: "IV", group: "completed" };
+  if (isWaiting(task)) return { quadrant: "IV", group: "onHold" };
 
   const important = isMatrixImportant(task);
   const urgent = isMatrixUrgent(task, today);
@@ -78,7 +79,7 @@ export function patchForQuadrant(task: Task, quadrant: MatrixQuadrant, today: st
   const urgent = isMatrixUrgent(task, today);
 
   // Leaving IV's parked groups re-activates the task.
-  if ((task.status === "waiting" || task.status === "inbox") && quadrant !== "IV") {
+  if ((isWaiting(task) || isUnsorted(task)) && quadrant !== "IV") {
     patch.status = "todo";
   }
 

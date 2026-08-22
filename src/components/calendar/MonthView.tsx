@@ -107,7 +107,7 @@ export function MonthView({
                 item.allDay ? "" : "is-timed",
                 item.key === selectedKey ? "is-picked" : "",
                 item.repeating ? "is-repeating" : "",
-                item.status === "done" ? "is-done" : "",
+                item.done ? "is-done" : "",
               ].filter(Boolean).join(" ")}
               draggable={item.draggable}
               onDragStartCapture={

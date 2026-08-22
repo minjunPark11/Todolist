@@ -16,6 +16,7 @@
 // repository has removed twice (see domain/spaces/membership.ts). Legacy rows
 // are read where they are, and promoted only when the user touches one.
 import type { Subtask, Task, TaskDraft } from "../../types";
+import { isCompleted } from "./taskState";
 
 export type TaskChild =
   | { kind: "task"; id: string; title: string; done: boolean; task: Task }
@@ -37,7 +38,7 @@ export function childrenOf(taskId: string, tasks: Task[], subtasks: Subtask[]): 
       kind: "task",
       id: task.id,
       title: task.title,
-      done: task.status === "done",
+      done: isCompleted(task),
       task,
     });
   }

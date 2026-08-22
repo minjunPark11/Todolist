@@ -667,7 +667,7 @@ export function WeekView({
                       `gcal-chip-${item.layer}`,
                       item.key === selectedKey ? "is-picked" : "",
                       item.repeating ? "is-repeating" : "",
-                      item.status === "done" ? "is-done" : "",
+                      item.done ? "is-done" : "",
                     ].filter(Boolean).join(" ")}
                     onPointerDown={
                       item.draggable ? (event) => startMove(event, item, 0, 0, true) : undefined
@@ -890,7 +890,7 @@ export function WeekView({
                         resize?.key === item.key ? "is-resizing" : "",
                         item.layer === "external" ? "is-external" : "",
                         item.layer === "focus-actual" ? "is-focus-actual" : "",
-                        item.status === "done" ? "is-done" : "",
+                        item.done ? "is-done" : "",
                       ].filter(Boolean).join(" ")}
                       onPointerDown={item.draggable ? (event) => startMove(event, item, startMin, endMin) : undefined}
                       onClick={(event) => {

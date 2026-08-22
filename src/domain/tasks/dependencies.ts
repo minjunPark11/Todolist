@@ -15,11 +15,18 @@
 // The reverse direction is derived, never stored (`dependentsOf`), so there is
 // no second copy of the same fact to fall out of step.
 import type { Task } from "../../types";
+import { isTaskOpen } from "./taskState";
 
-/** A task that is finished, filed away, or gone cannot block anything. */
+/**
+ * A task that is finished, given up on, or gone cannot block anything.
+ *
+ * `isTaskOpen` is that sentence exactly, which is why it replaced the three
+ * hand-written arms this used to carry. The arms also missed one: a blocker
+ * marked Won't Do through `wontDoAt` — rather than the legacy `archived`
+ * status — went on blocking, because nothing here looked at that field.
+ */
 export function isBlockerResolved(blocker: Task | undefined): boolean {
-  if (!blocker) return true;
-  return blocker.status === "done" || blocker.status === "archived" || Boolean(blocker.deletedAt);
+  return !blocker || !isTaskOpen(blocker);
 }
 
 export function blockerFor(task: Task, taskById: Map<string, Task>): Task | undefined {
@@ -90,7 +97,7 @@ export function wouldCycle(tasks: Task[], taskId: string, blockerId: string): bo
 export function eligibleBlockers(tasks: Task[], taskId: string): Task[] {
   return tasks.filter((candidate) => {
     if (candidate.id === taskId) return false;
-    if (candidate.deletedAt || candidate.status === "archived" || candidate.status === "done") return false;
+    if (!isTaskOpen(candidate)) return false;
     return !wouldCycle(tasks, taskId, candidate.id);
   });
 }

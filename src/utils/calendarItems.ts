@@ -1,6 +1,6 @@
 // Calendar derived-item model (CALENDAR_DESIGN.md §1.3/§1.4).
 // Shared by CalendarView rendering and the Ollama calendar context builder.
-import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Task, TaskPriority, TaskStatus } from "../types";
+import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Task, TaskPriority } from "../types";
 import { projectItems } from "../domain/view/item";
 import { externalEventDate, externalEventEndDate, externalEventEndTime, externalEventStartTime } from "../lib/externalCalendars";
 import {
@@ -50,7 +50,15 @@ export interface CalendarItem {
   // (AI context builder path).
   categoryId: string;
   priority?: TaskPriority;
-  status?: TaskStatus;
+  /**
+   * Finished, as an answer rather than as a status value.
+   *
+   * This carried `task.status` and every view compared it to `"done"` — four
+   * screens each naming a `TaskStatus` member to ask one question. Chapter 26
+   * (§26.3) moves that value out of the lifecycle axis, so the projection
+   * answers the question here instead and the views read a boolean.
+   */
+  done?: boolean;
   draggable: boolean;
   repeating?: boolean;
 }
@@ -238,7 +246,7 @@ export function buildCalendarItems({
         color: taskCategory?.color ?? LAYER_COLOR.task,
         categoryId: taskCategoryId,
         priority: item.priority,
-        status: task.status,
+        done,
         // Dragging one day of a range would have to mean either "move the
         // whole thing" or "resize this end", and the calendar has no gesture
         // that says which. Ranges are edited in the editor until it does.

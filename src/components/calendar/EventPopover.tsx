@@ -249,7 +249,7 @@ export function EventPopover({
       <p className="gcal-popover-when">
         {formatDate(item.date, lang)}
         {timeLabel ? ` · ${timeLabel}` : ""}
-        {item.status === "done" ? ` · ${t("status.done")}` : ""}
+        {item.done ? ` · ${t("status.done")}` : ""}
       </p>
       {item.sourceType === "external" ? (
         <p className="gcal-popover-when">

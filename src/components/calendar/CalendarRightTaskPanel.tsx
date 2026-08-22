@@ -8,7 +8,7 @@ import { getMatrixPosition, type MatrixQuadrant } from "../../utils/eisenhower";
 import { useT } from "../../i18n";
 import { MotionCollapse } from "../motion/MotionCollapse";
 import { MotionTaskRow } from "../motion/MotionTaskRow";
-import { isTaskOpen } from "../../domain/tasks/taskState";
+import { isTaskOpen, isWaiting } from "../../domain/tasks/taskState";
 
 const SECTIONS: Array<{ quadrant: MatrixQuadrant; defaultOpen: boolean }> = [
   { quadrant: "I", defaultOpen: true },
@@ -42,7 +42,7 @@ export function CalendarRightTaskPanel({
   // and not finished/parked. Quadrant IV shows just the unsorted group.
   // Computed before the collapsed branch so the rail can show the count.
   const candidates = tasks.filter(
-    (task) => isTaskOpen(task) && task.status !== "waiting" && !task.startTime,
+    (task) => isTaskOpen(task) && !isWaiting(task) && !task.startTime,
   );
 
   if (collapsed) {

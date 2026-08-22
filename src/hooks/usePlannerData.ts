@@ -49,6 +49,7 @@ import { addSidebarFolder, sanitizeSidebarFolder } from "../domain/tasks/sidebar
 import { sanitizeSavedFilter } from "../domain/tasks/filters";
 import { backfillTaskListId, defaultListIdFor, patchForListMove } from "../domain/spaces/membership";
 import { childDraft, promoteDraft } from "../domain/tasks/children";
+import { isCompleted, isTaskOpen } from "../domain/tasks/taskState";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
@@ -1187,9 +1188,15 @@ export function usePlannerData() {
       ...source,
       id: newTaskId,
       title: `${source.title} Copy`,
-      status: source.status === "done" || source.status === "archived" ? "todo" : source.status,
+      // A copy starts fresh. `isTaskOpen` is the one question that decides
+      // it: anything finished, given up on or trashed reopens as `todo`,
+      // where the two hand-written arms this replaces missed a source marked
+      // Won't Do through `wontDoAt` — that copy arrived already given up on.
+      status: isTaskOpen(source) ? source.status : "todo",
       completedAt: "",
       archivedAt: "",
+      wontDoAt: "",
+      deletedAt: "",
       previousStatus: "todo",
       createdAt: now,
       updatedAt: now,
@@ -1222,7 +1229,7 @@ export function usePlannerData() {
       const target = current.tasks.find((task) => task.id === taskId);
       if (!target) return current;
 
-      const isDone = target.status === "done";
+      const isDone = isCompleted(target);
       const isRecurring = !isDone && target.repeatType !== "none";
 
       const setOnTarget = (patch: Partial<Task>) => ({

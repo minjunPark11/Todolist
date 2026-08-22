@@ -65,6 +65,15 @@ describe("isTaskBlocked", () => {
     expect(isTaskBlocked(deleted[0], taskMap(deleted))).toBe(false);
   });
 
+  // The arms this used to be written as read `status` directly and knew
+  // nothing about `wontDoAt`, so a blocker given up on through the field —
+  // rather than through the legacy `archived` status — went on blocking work
+  // nobody was waiting for any more.
+  it("is free when the blocker was given up on through wontDoAt", () => {
+    const tasks = [task({ id: "a", blockedByTaskId: "b" }), task({ id: "b", wontDoAt: "2026-08-02" })];
+    expect(isTaskBlocked(tasks[0], taskMap(tasks))).toBe(false);
+  });
+
   it("treats a dangling reference as unblocked, not as permanently stuck", () => {
     const tasks = [task({ id: "a", blockedByTaskId: "gone" })];
     expect(isTaskBlocked(tasks[0], taskMap(tasks))).toBe(false);
@@ -135,6 +144,11 @@ describe("wouldCycle", () => {
 });
 
 describe("eligibleBlockers", () => {
+  it("omits one given up on through wontDoAt, not just an archived one", () => {
+    const tasks = [task({ id: "a" }), task({ id: "b", wontDoAt: "2026-08-02" })];
+    expect(eligibleBlockers(tasks, "a").map((entry) => entry.id)).toEqual([]);
+  });
+
   it("omits the task itself", () => {
     const tasks = [task({ id: "a" }), task({ id: "b" })];
     expect(eligibleBlockers(tasks, "a").map((item) => item.id)).toEqual(["b"]);

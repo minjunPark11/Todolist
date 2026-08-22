@@ -90,3 +90,37 @@ export function isTaskAlive(task: TaskStateFields): boolean {
 export function isTaskOpen(task: TaskStateFields): boolean {
   return isTaskAlive(task) && !isCompleted(task);
 }
+
+// === The workflow axis, as it is stored today ===
+//
+// `doing`, `waiting` and `inbox` are not lifecycle states — they answer
+// "where in the flow" and "which container", which is why Chapter 26 (D1)
+// splits them off `status` entirely: the flow becomes the List's Section
+// (`sectionId`) and the container is List membership.
+//
+// Neither move has happened yet. These three predicates exist so that no
+// screen has to name a `TaskStatus` value to ask the question in the
+// meantime — when the fields move, this file changes and nothing else does.
+// That is the whole point of reading a predicate instead of a string.
+
+/** In flight. Becomes a Section the user named (Ch. 26 §26.3.4). */
+export function isInProgress(task: TaskStateFields): boolean {
+  return task.status === "doing";
+}
+
+/** Parked on something else. Becomes a Section too. */
+export function isWaiting(task: TaskStateFields): boolean {
+  return task.status === "waiting";
+}
+
+/**
+ * Not filed yet.
+ *
+ * The canonical answer to this is List membership — `scopeQuery` already
+ * asks it that way, through the owning List's `kind`. This reads the status
+ * because the callers here have a Task and no Lists, and answering the two
+ * differently is exactly what §26.3.4 retires the value for.
+ */
+export function isUnsorted(task: TaskStateFields): boolean {
+  return task.status === "inbox";
+}

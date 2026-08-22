@@ -15,6 +15,7 @@
 // views — the List's drag handle and its ⋯ menu, the Board's move-to-column
 // select. Those are not a row; they are what the view does with a row.
 import type { Task } from "../../types";
+import { isCompleted } from "../../domain/tasks/taskState";
 import { useT } from "../../i18n";
 
 interface TaskRowContentProps {
@@ -25,7 +26,7 @@ interface TaskRowContentProps {
 
 export function TaskRowContent({ task, onOpen, onToggleDone }: TaskRowContentProps) {
   const { t } = useT();
-  const done = task.status === "done";
+  const done = isCompleted(task);
   return (
     <>
       {/* A 17px box with the row's full height as its hit area. That is the

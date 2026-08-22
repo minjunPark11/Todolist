@@ -28,6 +28,7 @@ import {
   type MatrixQuadrant,
 } from "../utils/eisenhower";
 import { listIdFor } from "../domain/spaces/membership";
+import { isCompleted } from "../domain/tasks/taskState";
 import { listColorHex } from "../domain/tasks/listColor";
 import { todayValue } from "../utils/date";
 import { ExpandableAdd } from "./motion/ExpandableAdd";
@@ -83,7 +84,7 @@ export function MatrixPage({
       // Finished work has no place on a matrix of what to do next. It is not
       // hidden anywhere else: Completed is its Scope, and the card can still
       // be ticked off from here, which is what makes it leave.
-      if (task.status === "done") continue;
+      if (isCompleted(task)) continue;
       if (scope && listIdFor(task, lists) !== scope) continue;
       groups.get(getMatrixPosition(task, today).quadrant)?.push(task);
     }

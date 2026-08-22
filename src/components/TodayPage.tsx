@@ -11,6 +11,7 @@ import {
   type TodayBucketId,
 } from "../utils/todayView";
 import { bucketOverridesFor } from "../domain/today/dailyPlan";
+import { isTaskAlive, isUnsorted } from "../domain/tasks/taskState";
 import type { ToastState } from "./kit";
 import { FocusQueue } from "./today/FocusQueue";
 import { TimeRail } from "./today/TimeRail";
@@ -143,7 +144,7 @@ export function TodayPage({
   // "todo" tasks already appear in the Focus Queue above, so including them
   // here too would duplicate the same task in both lists (spec §11).
   const triageItems = useMemo(
-    () => tasks.filter((task) => task.status === "inbox" && !task.deletedAt && !task.archivedAt),
+    () => tasks.filter((task) => isUnsorted(task) && isTaskAlive(task)),
     [tasks],
   );
 

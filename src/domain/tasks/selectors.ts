@@ -3,7 +3,7 @@
 // re-derive liveness/relevance rules inline. Keep these free of React and IO.
 import type { Task } from "../../types";
 import { addDays } from "../../utils/date";
-import { isTaskAlive, isTaskOpen } from "./taskState";
+import { isCompleted, isTaskAlive, isTaskOpen } from "./taskState";
 
 // Tasks that still exist from the user's point of view.
 export function selectLiveTasks(tasks: Task[]): Task[] {
@@ -41,7 +41,7 @@ export type RelevantTaskLimits = {
 // model's context window as soon as real data accumulated.
 export function selectRelevantTasks(tasks: Task[], today: string, limits: RelevantTaskLimits): Task[] {
   const live = selectLiveTasks(tasks);
-  const active = live.filter((task) => task.status !== "done");
+  const active = live.filter((task) => !isCompleted(task));
 
   const overdue = active
     .filter((task) => task.dueDate && task.dueDate < today)
@@ -55,7 +55,7 @@ export function selectRelevantTasks(tasks: Task[], today: string, limits: Releva
     .sort((a, b) => nextActionableDateOf(a, today).localeCompare(nextActionableDateOf(b, today)))
     .slice(0, limits.upcomingTasks);
   const recentDone = live
-    .filter((task) => task.status === "done" && task.completedAt.slice(0, 10) >= addDays(today, -6))
+    .filter((task) => isCompleted(task) && task.completedAt.slice(0, 10) >= addDays(today, -6))
     .sort((a, b) => b.completedAt.localeCompare(a.completedAt))
     .slice(0, limits.recentDoneTasks);
 

@@ -11,7 +11,7 @@ import { blockedTaskIds } from "../domain/tasks/dependencies";
 import { scheduleSpan } from "../domain/schedule/scheduleQueries";
 import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { todayValue } from "./date";
-import { isTaskAlive, isTaskOpen } from "../domain/tasks/taskState";
+import { isCompleted, isInProgress, isTaskAlive, isTaskOpen, isWaiting } from "../domain/tasks/taskState";
 
 // The stored bucket, under the name this page has always used for it.
 // The record it comes from is domain/today/dailyPlan (§6.18).
@@ -82,7 +82,7 @@ export function completedOn(tasks: Task[], date: string): Task[] {
     (task) =>
       !task.deletedAt &&
       !task.parentTaskId &&
-      task.status === "done" &&
+      isCompleted(task) &&
       task.completedAt.slice(0, 10) === date,
   );
 }
@@ -101,9 +101,9 @@ export function completedOn(tasks: Task[], date: string): Task[] {
 export function defaultBucketFor(task: Task, today: string, blocked = false): TodayBucketId {
   if (task.dueDate && task.dueDate < today) return "now";
   if (blocked) return "later";
-  if (task.status === "doing") return "now";
+  if (isInProgress(task)) return "now";
   if (task.priority === "high" && task.dueDate === today) return "now";
-  if (task.status === "waiting") return "later";
+  if (isWaiting(task)) return "later";
   if ((task.priority === "low" || task.priority === "none") && task.dueDate !== today) {
     return "later";
   }
@@ -111,10 +111,10 @@ export function defaultBucketFor(task: Task, today: string, blocked = false): To
 }
 
 function reasonFor(task: Task, today: string, blocked = false): TodayReason {
-  if (task.dueDate && task.dueDate < today && task.status !== "done") return "overdue";
+  if (task.dueDate && task.dueDate < today && !isCompleted(task)) return "overdue";
   if (blocked) return "blocked";
-  if (task.status === "doing") return "progress";
-  if (task.status === "waiting") return "waiting";
+  if (isInProgress(task)) return "progress";
+  if (isWaiting(task)) return "waiting";
   if (task.priority === "high") return "high";
   if (task.priority === "medium") return "medium";
   if (task.priority === "low") return "low";
@@ -176,7 +176,7 @@ export function collectTodayEntries(
       defaultBucket,
       bucket: overrides[task.id] ?? defaultBucket,
       reason: reasonFor(task, today, blocked),
-      completed: task.status === "done",
+      completed: isCompleted(task),
     });
   }
   // §12.12's Scope holds finished work; this screen shows the day's own
@@ -293,11 +293,11 @@ export function buildTodayPlan(entries: TodayEntry[], today = todayValue()): Tod
   for (const entry of entries) {
     if (entry.completed) continue;
     const { task } = entry;
-    if (entry.reason === "overdue" || task.status === "doing" || task.priority === "high") {
+    if (entry.reason === "overdue" || isInProgress(task) || task.priority === "high") {
       now.push(task.id);
     } else if (task.dueDate === today) {
       next.push(task.id);
-    } else if (task.status === "waiting" || task.priority === "low" || task.priority === "none") {
+    } else if (isWaiting(task) || task.priority === "low" || task.priority === "none") {
       later.push(task.id);
     } else {
       next.push(task.id);

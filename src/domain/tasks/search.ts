@@ -13,6 +13,7 @@
 import type { Folder, List, SavedFilter, SidebarFolder, Tag, Task } from "../../types";
 import { listIdFor } from "../spaces/membership";
 import { isInboxList } from "../spaces/hierarchy";
+import { isCompleted } from "./taskState";
 
 /** §10.11's group order. Fixed rather than adaptive — MVP predictability. */
 // `project` and `space` were two more groups here. Both records are gone
@@ -155,7 +156,7 @@ export function searchAll(
     const rank = matchRank(task.title, trimmed);
     if (rank === null) continue;
     const owner = byId.get(listIdFor(task, collections.lists));
-    const completed = task.status === "done";
+    const completed = isCompleted(task);
     tasks.push({
       kind: "task",
       id: task.id,

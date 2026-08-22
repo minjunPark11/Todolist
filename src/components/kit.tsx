@@ -10,6 +10,7 @@ import {
 import { motion } from "framer-motion";
 import type { Project, Task, TaskPriority, TaskStatus } from "../types";
 import { formatDate, todayValue } from "../utils/date";
+import { isCompleted } from "../domain/tasks/taskState";
 import { useDeferredTextField } from "../hooks/useDeferredTextField";
 import { useT } from "../i18n";
 import { reducedTransition, transitions } from "../motion/transitions";
@@ -439,7 +440,7 @@ export function TaskRow({
   metaSlot,
 }: TaskRowProps) {
   const { t } = useT();
-  const done = task.status === "done";
+  const done = isCompleted(task);
   const update = onUpdate ? (patch: Partial<Task>) => onUpdate(task.id, patch) : undefined;
 
   return (

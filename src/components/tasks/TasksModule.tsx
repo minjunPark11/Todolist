@@ -49,6 +49,7 @@ import { ContextMenu, type ContextMenuState } from "../common/ContextMenu";
 import { addDays } from "../../utils/date";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
+import { isCompleted } from "../../domain/tasks/taskState";
 import { folderIdFor } from "../../domain/tasks/sidebarFolders";
 import { INBOX_COLUMNS, inboxBucketOf, listBoardColumns, moveToInboxBucket, type InboxBucket } from "../../domain/tasks/board";
 import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
@@ -252,7 +253,7 @@ export function TasksModule(props: TasksModuleProps) {
    * the undo arrives with it.
    */
   function toggleDone(task: Task) {
-    mutate(task, task.status === "done" ? reopenTask(task) : completeTask(task, new Date().toISOString()));
+    mutate(task, isCompleted(task) ? reopenTask(task) : completeTask(task, new Date().toISOString()));
   }
 
   /**
@@ -274,7 +275,7 @@ export function TasksModule(props: TasksModuleProps) {
    * Everything on it goes through `mutate`, so everything on it can be undone.
    */
   function taskMenuAt(task: Task, x: number, y: number): ContextMenuState {
-    const done = task.status === "done";
+    const done = isCompleted(task);
     const priorities: Array<Task["priority"]> = ["high", "medium", "low", "none"];
     return {
       x,
@@ -633,7 +634,7 @@ export function TasksModule(props: TasksModuleProps) {
         ) : (
           <ul className="tm-list" aria-label={title}>
             {listRows.map((task) => {
-              const done = task.status === "done";
+              const done = isCompleted(task);
               return (
                 <li
                   key={task.id}
@@ -735,7 +736,7 @@ export function TasksModule(props: TasksModuleProps) {
           onComplete={() =>
             mutate(
               openedTask,
-              openedTask.status === "done"
+              isCompleted(openedTask)
                 ? reopenTask(openedTask)
                 : completeTask(openedTask, new Date().toISOString()),
             )
