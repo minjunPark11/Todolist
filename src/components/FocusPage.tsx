@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FocusSession, PageId, Project, Task } from "../types";
+import type { FocusSession, PageId, Task } from "../types";
 import { formatDate, isOverdue, todayValue } from "../utils/date";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../lib/focusTimer";
@@ -10,7 +10,6 @@ import { isTaskOpen } from "../domain/tasks/taskState";
 
 interface FocusPageProps {
   tasks: Task[];
-  projects: Project[];
   focusSessions: FocusSession[];
   activeSession: FocusSession | null;
   settings: FocusUserSettings;
@@ -33,12 +32,8 @@ type FocusGroup = {
   tasks: Task[];
 };
 
-function projectFor(task: Task, projects: Project[]) {
-  return projects.find((project) => project.id === task.projectId);
-}
-
-function isStudyTask(task: Task, project?: Project) {
-  const haystack = `${task.title} ${task.tags.join(" ")} ${project?.name ?? ""}`.toLowerCase();
+function isStudyTask(task: Task) {
+  const haystack = `${task.title} ${task.tags.join(" ")}`.toLowerCase();
   return ["study", "review", "복습", "leetcode", "algorithm"].some((token) => haystack.includes(token));
 }
 
@@ -72,7 +67,6 @@ function FocusOptionToggle({
 
 export function FocusPage({
   tasks,
-  projects,
   focusSessions,
   activeSession,
   settings,
@@ -111,7 +105,7 @@ export function FocusPage({
       (task) => task.startDate && task.startDate <= today && task.dueDate >= today,
     );
     const deadline = openTasks.filter((task) => task.dueDate && (task.dueDate === today || isOverdue(task.dueDate)));
-    const study = openTasks.filter((task) => isStudyTask(task, projectFor(task, projects)));
+    const study = openTasks.filter((task) => isStudyTask(task));
     const quickStart = openTasks
       .filter((task) => !scheduled.includes(task) && !deadline.includes(task) && !study.includes(task))
       .slice(0, 8);
@@ -122,23 +116,12 @@ export function FocusPage({
       { id: "study", title: t("focus.groupStudy"), tone: "purple" as const, tasks: study },
       { id: "quick", title: t("focus.groupQuick"), tone: "green" as const, tasks: quickStart },
     ].filter((group) => group.tasks.length > 0);
-  }, [openTasks, projects, t, today]);
+  }, [openTasks, t, today]);
 
   const todaySessions = focusSessions.filter((session) => todaySessionFilter(session, today));
   const todaySeconds = todaySessions.reduce((sum, session) => sum + session.accumulatedSeconds, 0);
   const avgSeconds = todaySessions.length ? Math.round(todaySeconds / todaySessions.length) : 0;
   const longestSeconds = todaySessions.reduce((max, session) => Math.max(max, session.accumulatedSeconds), 0);
-  const byProject = projects
-    .map((project) => ({
-      project,
-      seconds: todaySessions
-        .filter((session) => session.projectId === project.id)
-        .reduce((sum, session) => sum + session.accumulatedSeconds, 0),
-    }))
-    .filter((entry) => entry.seconds > 0)
-    .sort((a, b) => b.seconds - a.seconds)
-    .slice(0, 4);
-
   const canOpenMiniTimer = Boolean(activeSession && activeTask && settings.showMiniTimerButton && platform.miniFocusTimer.supported());
 
   useEffect(() => {
@@ -273,7 +256,6 @@ export function FocusPage({
                 </div>
                 <div className="foc-task-list">
                   {group.tasks.map((task) => {
-                    const project = projectFor(task, projects);
                     const isActive = activeSession?.taskId === task.id;
                     return (
                       <article key={`${group.id}-${task.id}`} className={isActive ? "foc-task is-active" : "foc-task"}>
@@ -295,12 +277,11 @@ export function FocusPage({
                         <button type="button" className="foc-task-main" onClick={() => onOpenTask(task.id)}>
                           <strong>{task.title}</strong>
                           <span>
-                            {project?.name ?? t("status.inbox")}
                             {task.dueDate === today && task.startTime ? ` · ${t("common.today")} ${task.startTime}` : ""}
                           </span>
                           <small>{t("focus.actualTime", { time: formatFocusDuration(task.actualSeconds, true) })}</small>
                         </button>
-                        <span className="foc-tag">{project?.name ?? (isStudyTask(task, project) ? "Study" : "Task")}</span>
+                        <span className="foc-tag">{isStudyTask(task) ? "Study" : "Task"}</span>
                       </article>
                     );
                   })}
@@ -318,8 +299,7 @@ export function FocusPage({
                 {activeSession.status === "paused" ? t("focus.paused") : t("focus.running")}
               </div>
               <div className="foc-task-pills">
-                {projectFor(activeTask, projects) ? <span>{projectFor(activeTask, projects)?.name}</span> : null}
-                {isStudyTask(activeTask, projectFor(activeTask, projects)) ? <span>Study</span> : null}
+                {isStudyTask(activeTask) ? <span>Study</span> : null}
               </div>
               <h2>{activeTask.title}</h2>
               <div className="foc-clock">{formatFocusDuration(elapsed)}</div>
@@ -367,19 +347,6 @@ export function FocusPage({
           </div>
         </section>
         <aside className="foc-insights">
-          <section className="foc-card">
-            <h2>{t("focus.byProjectTitle")}</h2>
-            <div className="foc-project-bars">
-              {byProject.length === 0 ? <p>{t("focus.noProjectRecords")}</p> : null}
-              {byProject.map(({ project, seconds }) => (
-                <div key={project.id}>
-                  <span>{project.name}</span>
-                  <i><b style={{ width: `${Math.max(8, (seconds / Math.max(todaySeconds, 1)) * 100)}%`, background: project.color }} /></i>
-                  <strong>{formatFocusDuration(seconds, true)}</strong>
-                </div>
-              ))}
-            </div>
-          </section>
           <section className="foc-card">
             <h2>{t("focus.recentSessions")}</h2>
             <div className="foc-recent">

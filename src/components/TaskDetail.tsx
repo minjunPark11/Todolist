@@ -1,4 +1,4 @@
-import type { List, Project, Subtask, Task, TaskPriority } from "../types";
+import type { List, Subtask, Task, TaskPriority } from "../types";
 import { activeLists, listDisplayName } from "../domain/spaces/hierarchy";
 import { listIdFor } from "../domain/spaces/membership";
 import { childProgress, childrenOf } from "../domain/tasks/children";
@@ -20,7 +20,6 @@ import { MotionPanelShell } from "./motion/MotionPanelShell";
 interface TaskDetailProps {
   task: Task | null;
   tasks: Task[];
-  projects: Project[];
   lists: List[];
   /** The keyboard-reachable half of U9 — the tree's drop target is the other. */
   onMoveToList: (taskId: string, listId: string) => void;
@@ -48,7 +47,6 @@ const matrixQuadrants: Array<{ key: MatrixQuadrant; labelKey: string; hintKey: s
 export function TaskDetail({
   task,
   tasks,
-  projects,
   lists,
   onMoveToList,
   onUpdateTask,
@@ -162,10 +160,7 @@ export function TaskDetail({
               cannot disagree: setting Low here immediately reads as Unsorted
               below. */}
           {/* Where the task LIVES. The panel had no such control at all, so a
-              task could only ever be filed by dragging it. One picker rather
-              than a Space picker plus a List picker: the List determines the
-              Space (membership.resolveListMove), and two controls that can
-              contradict each other is one more state to reconcile. */}
+              task could only ever be filed by dragging it. */}
           <label>
             <span>{t("taskDetail.list")}</span>
             <select
@@ -175,16 +170,14 @@ export function TaskDetail({
               {/* A task with no Space has no List either; the placeholder keeps
                   the control from showing someone else's list as its value. */}
               {listIdFor(task, lists) ? null : <option value="">{t("taskDetail.noList")}</option>}
-              {projects
-                .filter((project) => project.status !== "archived" && !project.archivedAt)
-                .map((project) => (
-                  <optgroup key={project.id} label={project.name}>
-                    {activeLists(lists, project.id).map((list) => (
-                      <option key={list.id} value={list.id}>
-                        {listDisplayName(list, t("list.defaultName"))}
-                      </option>
-                    ))}
-                  </optgroup>
+              {/* Flat: the Project level that used to group these is gone,
+                  and a List is the top of the tree now. */}
+              {lists
+                .filter((list) => !list.archivedAt && !list.deletedAt)
+                .map((list) => (
+                  <option key={list.id} value={list.id}>
+                    {listDisplayName(list, t("list.defaultName"))}
+                  </option>
                 ))}
             </select>
           </label>

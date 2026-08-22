@@ -28,22 +28,6 @@ const DEFAULT_WIDTH = 248;
 const MIN_WIDTH = 216;
 const MAX_WIDTH = 360;
 
-/**
- * A navigation the APP performs, not the browser.
- *
- * `page.goto` reloads the document, which throws away everything the running
- * session was holding — §2.20's `lastTasksLocation` among it. The two pages
- * this is used for are reached by address since the Tasks sidebar dropped its
- * doors to them, and reaching an address without leaving the session is
- * exactly what the app's own router does with `pushState` + `popstate`.
- */
-async function gotoInApp(page: Page, path: string): Promise<void> {
-  await page.evaluate((target) => {
-    window.history.pushState(null, "", target);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }, path);
-}
-
 /** The width the layout is actually using, read off the frame (not declared). */
 async function sidebarWidth(page: Page): Promise<number> {
   const box = await page.locator("#context-sidebar").boundingBox();
@@ -324,60 +308,11 @@ test.describe("the Global Rail", () => {
   });
 
   /**
-   * RAIL-01b — Tasks does something on an address that lights it.
-   *
-   * This began as the fix for a trap: the Tasks sidebar had a door into
-   * SpaceHub, SpaceHub replaced that sidebar with the Space tree, and §2.11's
-   * "already Tasks" guard read the Rail's HIGHLIGHT — which SpaceHub lights —
-   * so the one item that could have led out did nothing. The browser's Back
-   * button was the only door, and the packaged app does not draw one.
-   *
-   * SPACE_REMOVAL_IA stage 6 took the tree away, so the trap is gone by
-   * construction: the Tasks sidebar is on `/projects` now, and every row on it
-   * leads out. What is left to guard is the smaller half — the Rail item is
-   * still not a no-op there, and still returns the reader to the Scope they
-   * were reading rather than to a home page. Both halves are asserted, because
-   * the second is only worth having while the first is true.
+   * RAIL-01b and RAIL-01c were the same assertion for the Projects and Goals
+   * pages: the Rail's Tasks item lit up there without being the Module, so it
+   * had to lead BACK rather than do nothing. Both pages are gone — every Tasks
+   * address is a Scope now — and with them the doorway case they guarded.
    */
-  test("RAIL-01b — Tasks returns from Projects rather than doing nothing there", async ({ page }) => {
-    await openApp(page);
-    await page.goto("/completed");
-    await expect(page.locator(".tm-shell")).toBeVisible();
-
-    // The sidebar's door to Projects is gone — the row was a screen rather
-    // than a Scope — so the page is reached by its address now. In-app
-    // rather than through `page.goto`, which reloads the document: §2.20's
-    // "where you were in Tasks" is session memory, and a reload is a
-    // different question (a cold start belongs to the start-page setting).
-    await gotoInApp(page, "/projects");
-    await expect(page).toHaveURL(/\/projects$/);
-    // The sidebar it came from is still there — that is the way out this test
-    // used to prove the absence of.
-    await expect(page.locator(".tm-sidebar")).toBeVisible();
-
-    await rail(page, "Tasks").click();
-    await expect(page).toHaveURL(/\/completed/);
-  });
-
-  /**
-   * The same, for the doorway D-4 added.
-   *
-   * Written because the predicate behind RAIL-01b named one page by hand and
-   * Goals arrived later: on `/goals` the Rail's Tasks item did nothing at all,
-   * and `/goals` was remembered as the place to come back to — so a trip to
-   * the Calendar and back landed on Goals rather than on the list being read.
-   */
-  test("RAIL-01c — Goals is a doorway too, and Tasks leads back out of it", async ({ page }) => {
-    await openApp(page);
-    await page.goto("/completed");
-    await expect(page.locator(".tm-shell")).toBeVisible();
-
-    await gotoInApp(page, "/goals");
-    await expect(page).toHaveURL(/\/goals$/);
-
-    await rail(page, "Tasks").click();
-    await expect(page).toHaveURL(/\/completed/);
-  });
 
   /**
    * RAIL-02, as §2.48 wrote it.

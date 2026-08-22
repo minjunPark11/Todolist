@@ -18,7 +18,7 @@
 // authoritative when present, the old one answers when it is absent, and both
 // are true at once for as long as needed. Nothing is rewritten in bulk, and no
 // device is required to agree about when the switch happened.
-import type { LearningPath, List, Project, Status, Task, TaskStatus } from "../../types";
+import type { List, Project, Status, Task, TaskStatus } from "../../types";
 import { DEFAULT_STATUSES, defaultListFor } from "./hierarchy";
 
 /** A Space stores a status set only once the user edits one (D7). */
@@ -105,12 +105,6 @@ export function backfillTaskListId(tasks: Task[], lists: List[], now: string): T
   return touched ? next : tasks;
 }
 
-export function goalListIdFor(path: Pick<LearningPath, "listId" | "projectId">, lists: List[]): string {
-  if (path.listId) return path.listId;
-  if (!path.projectId) return "";
-  return defaultListFor(lists, path.projectId)?.id ?? "";
-}
-
 // === moving an Item into a List ===
 
 /**
@@ -166,24 +160,6 @@ export function patchForListMove(
 }
 
 /**
- * The same move for a goal. Its Space-scoped column is dropped by `patchPath`
- * whenever `projectId` changes, so this does not restate that rule.
- */
-export function patchForGoalListMove(
-  path: Pick<LearningPath, "projectId" | "listId">,
-  targetListId: string,
-  lists: List[],
-): Partial<LearningPath> {
-  const move = resolveListMove(targetListId, lists);
-  if (!move) return {};
-  const spaceChanged = (path.projectId ?? "") !== move.spaceId;
-  if (!spaceChanged && (path.listId ?? "") === move.listId) return {};
-  return spaceChanged
-    ? { projectId: move.spaceId, listId: move.listId }
-    : { listId: move.listId };
-}
-
-/**
  * The stored id wins; otherwise the task's own status is the id, which holds
  * exactly because DEFAULT_STATUSES is keyed by TaskStatus. A stored id that no
  * longer exists in the set — the status was deleted on another device — falls
@@ -207,44 +183,6 @@ export function isDoneStatus(task: Pick<Task, "statusId" | "status">, statuses: 
 export function itemsInList(tasks: Task[], lists: List[], listId: string): Task[] {
   if (!listId) return [];
   return tasks.filter((task) => !task.deletedAt && listIdFor(task, lists) === listId);
-}
-
-/**
- * The Space's full status set: the base set plus every column the user added.
- *
- * The two are stored apart on purpose. `statuses` REPLACES the base set, so it
- * is written only when the user edits the defaults themselves; the columns they
- * add ride in `boardLists`, where adding one costs one small record instead of
- * rewriting all seven. They are read together rather than merged in storage —
- * converting in place would mean rewriting every Project for a value that can
- * simply be computed (M4).
- *
- * The stored field is still called `boardLists` because renaming a key inside a
- * synced record is how an older client comes to erase it (M0). It holds
- * statuses; only the wire remembers the old word.
- */
-export function statusesWithCustom(space: Project): Status[] {
-  const base = statusesForSpace(space);
-  const custom = (space.boardLists ?? []).filter((status) => !status.archivedAt);
-  if (custom.length === 0) return base;
-
-  const known = new Set(base.map((status) => status.id));
-  const extra: Status[] = [];
-  // Inserted after the last `active` default so an added column reads as work
-  // in progress, which is what they have always been used for.
-  let order = base.reduce((max, status) => Math.max(max, status.order), 0);
-  for (const added of custom) {
-    if (known.has(added.id)) continue;
-    order += 1;
-    extra.push({
-      id: added.id,
-      label: added.name,
-      color: space.color || "#8e8e93",
-      order,
-      group: "active",
-    });
-  }
-  return extra.length > 0 ? [...base, ...extra] : base;
 }
 
 /** Kept honest by a test: every TaskStatus must exist in the default set. */

@@ -20,7 +20,7 @@ import { describe, expect, it, afterEach, vi } from "vitest";
 import { render, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import type { List, Project, Space, Tag, Task } from "../../types";
+import type { List, Tag, Task } from "../../types";
 import type { SearchCollections } from "../../domain/tasks/search";
 import type { CommandContext } from "../../domain/tasks/commands";
 import { I18nProvider } from "../../i18n";
@@ -57,8 +57,6 @@ const collections: SearchCollections = {
   sidebarFolders: [],
   tags: [{ id: "tag-1", name: "reports", createdAt: NOW, updatedAt: NOW }] as Tag[],
   savedFilters: [],
-  projects: [{ id: "p1", name: "Reporting cycle", createdAt: NOW, updatedAt: NOW }] as Project[],
-  spaces: [] as Space[],
 };
 
 const recents: RecentEntry[] = [
@@ -101,7 +99,8 @@ describe("the menu goes to places and runs commands", () => {
     // subtitle — "Quarterly report Reporting" also ends in "Reporting".
     expect(screen.getByRole("option", { name: "Reporting" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "reports" })).toBeTruthy();
-    expect(screen.getByRole("option", { name: "Reporting cycle" })).toBeTruthy();
+    // A Project row ("Reporting cycle") sat here too. Projects are gone from
+    // the app's surface, and so from what the menu can find.
   });
 
   it("hands the query to the Search Page from a row, not from typing", async () => {

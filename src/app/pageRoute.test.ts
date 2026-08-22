@@ -10,7 +10,7 @@ import {
 import { parseTaskScope } from "./taskScopeUrl";
 import type { PageId } from "../types";
 
-const PAGES: PageId[] = ["today", "projects", "goals", "calendar", "board", "focus", "settings"];
+const PAGES: PageId[] = ["today", "calendar", "board", "focus", "settings"];
 
 describe("pageRoute", () => {
   it("round-trips every page through its address", () => {
@@ -33,10 +33,12 @@ describe("pageRoute", () => {
     }
   });
 
-  it("reads a tree selection as the Spaces page", () => {
-    expect(pageForPath("/s/space-1")).toBe("projects");
-    expect(pageForPath("/s/space-1/p/project-1")).toBe("projects");
-    expect(pageForPath("/s/space-1/p/project-1/l/list-1")).toBe("projects");
+  // The Space tree's own addresses went with the Projects feature. They are
+  // not in RETIRED_ROUTES — those are exact paths and these carry ids — so
+  // they take the same fallback as any unknown address.
+  it("lands an old tree selection on Today", () => {
+    expect(pageForPath("/s/space-1")).toBe("today");
+    expect(pageForPath("/s/space-1/p/project-1/l/list-1")).toBe("today");
   });
 
   it("falls back to Today for an address it does not know", () => {
@@ -54,7 +56,7 @@ describe("pageRoute", () => {
     expect(namesAPage(PAGE_ROUTES.today)).toBe(true);
     expect(namesAPage("/")).toBe(false);
     expect(namesAPage("/index.html")).toBe(false);
-    expect(namesAPage("/s/space-1")).toBe(true);
+    expect(namesAPage("/s/space-1")).toBe(false);
   });
 
   describe("default start page", () => {
@@ -84,7 +86,6 @@ describe("pageRoute", () => {
     });
 
     it("lets a deep link outrank the setting", () => {
-      expect(bootRedirectFor("/s/space-1/p/project-1", "/calendar")).toBe("");
       expect(bootRedirectFor("/board", "/calendar")).toBe("");
       expect(bootRedirectFor(PAGE_ROUTES.today, "/calendar")).toBe("");
     });
@@ -98,18 +99,18 @@ describe("pageRoute", () => {
     it("respects a retired address", () => {
       expect(bootRedirectFor("/archive", "/calendar")).toBe("");
       expect(namesAPage("/archive")).toBe(true);
-      expect(pageForPath("/archive")).toBe("projects");
+      expect(pageForPath("/archive")).toBe("today");
     });
 
-    // SPACE_REMOVAL_IA D-1. `/spaces` was this page's address for as long as
-    // the work area was a level; the page kept the name `projects` throughout,
-    // so what changed is the value and not what it points at. Bookmarks and
-    // history hold the old one.
-    it("keeps the old Projects address working", () => {
-      expect(PAGE_ROUTES.projects).toBe("/projects");
-      expect(pageForPath("/spaces")).toBe("projects");
-      expect(namesAPage("/spaces")).toBe(true);
-      expect(bootRedirectFor("/spaces", "/calendar")).toBe("");
+    // Every address the Projects and Goals feature owned still names
+    // somewhere, so a bookmark opens Today rather than being swept to the
+    // start page as if the user had asked for nothing.
+    it("lands the retired Projects and Goals addresses on Today", () => {
+      for (const retired of ["/projects", "/goals", "/spaces", "/archive"]) {
+        expect(pageForPath(retired)).toBe("today");
+        expect(namesAPage(retired)).toBe(true);
+        expect(bootRedirectFor(retired, "/calendar")).toBe("");
+      }
     });
 
     // Caught in the browser, not here, the first time: every one of these is a

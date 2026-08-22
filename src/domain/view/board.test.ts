@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Status, Task } from "../../types";
 import { DEFAULT_STATUSES } from "../spaces/hierarchy";
 import { getMatrixPosition } from "../../utils/eisenhower";
-import { goalDropFor, isDroppableAxis, patchForColumn, patchForSpanDrag, statusPatch } from "./board";
+import { isDroppableAxis, patchForColumn, patchForSpanDrag, statusPatch } from "./board";
 
 const TODAY = "2026-08-15";
 const NOW = `${TODAY}T00:00:00.000Z`;
@@ -171,64 +171,7 @@ describe("patchForColumn", () => {
     // never picked.
     expect(patchForColumn("bucket", task(), "now", context)).toEqual({});
     expect(patchForColumn("dueDate", task(), TODAY, context)).toEqual({});
-    expect(patchForColumn("space", task(), "space-2", context)).toEqual({});
     expect(isDroppableAxis("bucket")).toBe(false);
     expect(isDroppableAxis("status")).toBe(true);
-  });
-});
-
-describe("goalDropFor", () => {
-  const goal = (overrides: Partial<{ boardListId: string; completedAt: string }> = {}) => overrides;
-
-  it("files a goal into a column the user named", () => {
-    expect(goalDropFor(goal(), REVIEW.id, CUSTOM)).toEqual({ kind: "file", listId: REVIEW.id });
-  });
-
-  it("unsorts a goal dropped back on To Do", () => {
-    // `todo` is what the projection answers for a goal filed nowhere, so that
-    // is what the column has to write — no list, and not complete.
-    expect(goalDropFor(goal({ boardListId: REVIEW.id }), "todo", CUSTOM)).toEqual({ kind: "file" });
-  });
-
-  it("completes a goal dropped on Done", () => {
-    expect(goalDropFor(goal(), "done", CUSTOM)).toEqual({ kind: "complete" });
-  });
-
-  it("reopens a completed goal filed into a column", () => {
-    // Left completed it would project straight back to Done, and the card
-    // would appear to refuse the drag.
-    expect(goalDropFor(goal({ completedAt: NOW }), REVIEW.id, CUSTOM)).toEqual({
-      kind: "file",
-      listId: REVIEW.id,
-    });
-  });
-
-  it("refuses workflow a goal does not have", () => {
-    // The projection can never answer with these for a goal, so a write here
-    // would be undone by the next render.
-    for (const columnId of ["inbox", "doing", "waiting", "archived"]) {
-      expect(goalDropFor(goal({ boardListId: REVIEW.id }), columnId, CUSTOM)).toEqual({ kind: "none" });
-    }
-  });
-
-  it("treats a Space's own done-group column as a filing slot, not completion", () => {
-    // `goalStatusId` answers with any id in the set regardless of its group, so
-    // filing here shows the card exactly where it was dropped. It does leave a
-    // goal sitting in a done-group column without `completedAt` — an ambiguity
-    // that belongs to the Space owning two ways to say finished, and that only
-    // becomes reachable once the status set is editable. Deciding it here would
-    // be deciding it early.
-    expect(goalDropFor(goal(), SHIPPED.id, CUSTOM)).toEqual({ kind: "file", listId: SHIPPED.id });
-  });
-
-  it("refuses a column the Space does not have", () => {
-    expect(goalDropFor(goal(), "col-gone", CUSTOM)).toEqual({ kind: "none" });
-    expect(goalDropFor(goal(), "", CUSTOM)).toEqual({ kind: "none" });
-  });
-
-  it("says nothing when the goal is already there", () => {
-    expect(goalDropFor(goal({ boardListId: REVIEW.id }), REVIEW.id, CUSTOM)).toEqual({ kind: "none" });
-    expect(goalDropFor(goal(), "todo", CUSTOM)).toEqual({ kind: "none" });
-    expect(goalDropFor(goal({ completedAt: NOW }), "done", CUSTOM)).toEqual({ kind: "none" });
   });
 });

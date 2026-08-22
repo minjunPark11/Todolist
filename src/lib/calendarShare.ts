@@ -1,5 +1,5 @@
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
-import type { Project, Task } from "../types";
+import type { Task } from "../types";
 import { isTaskAlive } from "../domain/tasks/taskState";
 
 export type CalendarShareStatus = "unavailable" | "idle" | "loading" | "saving" | "ready" | "error";
@@ -53,10 +53,7 @@ export function getCalendarShareUrl(token: string) {
   return `${window.location.origin}/api/calendar/${token}.ics`;
 }
 
-export function buildCalendarShareSnapshot(input: {
-  tasks: Task[];
-  projects: Project[];
-}): CalendarShareSnapshot {
+export function buildCalendarShareSnapshot(input: { tasks: Task[] }): CalendarShareSnapshot {
   const events: SharedCalendarEvent[] = [];
 
   input.tasks.forEach((task) => {
@@ -75,16 +72,6 @@ export function buildCalendarShareSnapshot(input: {
         endTime: isTime(task.endTime) ? task.endTime : undefined,
       });
     }
-  });
-
-  input.projects.forEach((project) => {
-    if (!project.name || !isDate(project.dueDate)) return;
-    const dueDate = project.dueDate;
-    events.push({
-      uid: `project-due-${project.id}`,
-      title: `프로젝트 마감: ${project.name}`,
-      date: dueDate,
-    });
   });
 
   return {

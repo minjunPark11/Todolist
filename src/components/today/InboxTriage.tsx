@@ -1,6 +1,6 @@
 import { RefObject, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { Project, Task } from "../../types";
+import type { Task } from "../../types";
 import { Modal, MoreMenu, Popover, type MoreMenuItem } from "../kit";
 import { useSelection, selectionModifiers } from "../../hooks/useSelection";
 import { useT } from "../../i18n";
@@ -67,7 +67,6 @@ export function InboxTriageCard({ items, onSortNow, sortNowRef }: InboxTriageCar
 }
 
 export type TriageAction =
-  | { type: "assign"; projectId: string }
   | { type: "addToToday" }
   | { type: "scheduleCalendar" }
   | { type: "archive" }
@@ -75,13 +74,11 @@ export type TriageAction =
 
 /** A triage decision applied to a whole selection at once. */
 export type BulkTriageAction =
-  | { type: "assign"; projectId: string }
   | { type: "addToToday" }
   | { type: "archive" };
 
 interface InboxTriageDrawerProps {
   items: Task[];
-  projects: Project[];
   onTriage: (taskId: string, action: TriageAction) => void;
   onBulkTriage: (taskIds: string[], action: BulkTriageAction) => void;
   onClose: () => void;
@@ -89,7 +86,6 @@ interface InboxTriageDrawerProps {
 
 export function InboxTriageDrawer({
   items,
-  projects,
   onTriage,
   onBulkTriage,
   onClose,
@@ -214,7 +210,6 @@ export function InboxTriageDrawer({
                 <TriageRow
                   key={item.id}
                   item={item}
-                  projects={projects}
                   lang={lang}
                   active={item.id === activeId}
                   selected={selection.isSelected(item.id)}
@@ -232,7 +227,6 @@ export function InboxTriageDrawer({
           {selection.count > 0 ? (
             <BulkTriageBar
               count={selection.count}
-              projects={projects}
               onAction={(action) => onBulkTriage(selection.selectedIds, action)}
               onClear={selection.clear}
             />
@@ -245,12 +239,10 @@ export function InboxTriageDrawer({
 
 function BulkTriageBar({
   count,
-  projects,
   onAction,
   onClear,
 }: {
   count: number;
-  projects: Project[];
   onAction: (action: BulkTriageAction) => void;
   onClear: () => void;
 }) {
@@ -266,10 +258,6 @@ function BulkTriageBar({
       >
         {t("todayv.addToToday")}
       </button>
-      <SpacePickerButton
-        projects={projects}
-        onPick={(projectId) => onAction({ type: "assign", projectId })}
-      />
       <button
         type="button"
         className="tdy-btn tdy-btn-light tdy-btn-sm"
@@ -284,61 +272,8 @@ function BulkTriageBar({
   );
 }
 
-/** "Assign to space" button plus its project list — used by a row and by the
- *  bulk bar, which had drifted into two near-identical copies. */
-function SpacePickerButton({
-  projects,
-  align,
-  ariaLabel,
-  onFocus,
-  onPick,
-}: {
-  projects: Project[];
-  align?: "start" | "end";
-  ariaLabel?: string;
-  onFocus?: () => void;
-  onPick: (projectId: string) => void;
-}) {
-  const { t } = useT();
-  const [open, setOpen] = useState(false);
-  const hasProjects = projects.length > 0;
-
-  return (
-    <div className="ff-anchor">
-      <button
-        type="button"
-        className="tdy-btn tdy-btn-light tdy-btn-sm"
-        aria-label={ariaLabel}
-        title={hasProjects ? undefined : t("todayv.needsSpaceFirst")}
-        disabled={!hasProjects}
-        onFocus={onFocus}
-        onClick={() => setOpen((current) => !current)}
-      >
-        {t("todayv.assignSpace")}
-      </button>
-      <Popover open={open} onClose={() => setOpen(false)} align={align}>
-        {projects.map((project) => (
-          <button
-            key={project.id}
-            type="button"
-            className="ff-menu-item"
-            onClick={() => {
-              setOpen(false);
-              onPick(project.id);
-            }}
-          >
-            <span className="ff-dot" style={{ backgroundColor: project.color }} />
-            {project.name}
-          </button>
-        ))}
-      </Popover>
-    </div>
-  );
-}
-
 function TriageRow({
   item,
-  projects,
   lang,
   active,
   selected,
@@ -347,7 +282,6 @@ function TriageRow({
   onTriage,
 }: {
   item: Task;
-  projects: Project[];
   lang: "ko" | "en";
   active: boolean;
   selected: boolean;
@@ -362,7 +296,6 @@ function TriageRow({
     day: "numeric",
   }).format(new Date(item.createdAt));
   const hasNoDate = !item.dueDate;
-  const hasNoSpace = !item.projectId;
   const hasNoPriority = item.priority === "none";
 
   // Only the two decisions people actually make on most items stay on the row.
@@ -405,7 +338,6 @@ function TriageRow({
         </small>
         <div className="tdy-triage-badges">
           {hasNoDate ? <span className="tdy-badge">{t("todayv.badgeNoDate")}</span> : null}
-          {hasNoSpace ? <span className="tdy-badge">{t("todayv.badgeNoSpace")}</span> : null}
           {hasNoPriority ? <span className="tdy-badge">{t("todayv.badgeNoPriority")}</span> : null}
         </div>
       </div>
@@ -419,13 +351,6 @@ function TriageRow({
         >
           {t("todayv.addToToday")}
         </button>
-        <SpacePickerButton
-          projects={projects}
-          align="end"
-          ariaLabel={t("todayv.assignSpaceAria", { title: item.title })}
-          onFocus={onFocusRow}
-          onPick={(projectId) => onTriage(item.id, { type: "assign", projectId })}
-        />
         <MoreMenu items={menuItems} label={t("todayv.rowMenuAria")} />
       </div>
     </motion.div>

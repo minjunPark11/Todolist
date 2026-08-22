@@ -32,7 +32,6 @@ interface TaskGanttViewProps {
   spec: ViewSpec;
   context: GroupContext;
   today: string;
-  projects: Project[];
   /** Every task, so a dependency leaving the window can still be reported. */
   tasks: Task[];
   groupLabel: (groupId: string) => string;
@@ -47,7 +46,6 @@ export function TaskGanttView({
   spec,
   context,
   today,
-  projects,
   tasks,
   groupLabel,
   selectedTaskId = "",
@@ -145,7 +143,6 @@ export function TaskGanttView({
           context={context}
           window={window}
           today={today}
-          projects={projects}
           tasks={tasks}
           groupLabel={groupLabel}
           columnLabels={columnLabels}
@@ -166,7 +163,6 @@ export function TaskGanttView({
             {undated.map((item) => (
               <li key={item.key}>
                 <button type="button" onClick={() => onOpenItem(item)}>
-                  <span className="ff-dot" style={{ background: item.color }} />
                   {item.title}
                 </button>
               </li>

@@ -35,7 +35,6 @@ function analysis(overrides: Partial<AssistantAnalysis> = {}): AssistantAnalysis
     followUpQuestions: [],
     recommendedNextAction: { title: "졸업논문: 초안 3장", reason: "가장 급함", completionCriteria: "초안 3장이 남아있으면 완료", estimatedDifficulty: "low" },
     safeActionProposals: [],
-    learningPathProposal: null,
     userFacingResponse: "여러 일이 섞여 있어 보이네요. 졸업논문의 초안 3장 작성부터 시작해보세요.",
     ...overrides,
   };

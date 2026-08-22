@@ -1,5 +1,4 @@
 import { AnimatePresence } from "framer-motion";
-import type { Project } from "../../types";
 import {
   formatMinuteOfDay,
   parseTimeToMinutes,
@@ -14,7 +13,6 @@ const BUCKETS: TodayBucketId[] = ["now", "next", "later"];
 
 interface FocusQueueProps {
   entries: TodayEntry[];
-  projects: Project[];
   hasQuery: boolean;
   query: string;
   showCompleted: boolean;
@@ -29,7 +27,6 @@ interface FocusQueueProps {
 
 export function FocusQueue({
   entries,
-  projects,
   hasQuery,
   query,
   showCompleted,
@@ -111,7 +108,6 @@ export function FocusQueue({
                       <FocusQueueRow
                         key={entry.task.id}
                         entry={entry}
-                        projects={projects}
                         onToggleDone={onToggleDone}
                         onOpenTask={onOpenTask}
                         onMoveBucket={onMoveBucket}
@@ -136,7 +132,6 @@ export function FocusQueue({
                     <FocusQueueRow
                       key={entry.task.id}
                       entry={entry}
-                      projects={projects}
                       onToggleDone={onToggleDone}
                       onOpenTask={onOpenTask}
                       onMoveBucket={onMoveBucket}
@@ -152,28 +147,19 @@ export function FocusQueue({
   );
 }
 
-function hexToSoft(color: string | undefined): { bg: string; fg: string } | undefined {
-  if (!color || !/^#[0-9a-fA-F]{6}$/.test(color)) return undefined;
-  return { bg: `${color}1c`, fg: color };
-}
-
 function FocusQueueRow({
   entry,
-  projects,
   onToggleDone,
   onOpenTask,
   onMoveBucket,
 }: {
   entry: TodayEntry;
-  projects: Project[];
   onToggleDone: (taskId: string) => void;
   onOpenTask: (taskId: string) => void;
   onMoveBucket: (taskId: string, bucket: TodayBucketId) => void;
 }) {
   const { t, lang } = useT();
   const { task, bucket, reason, completed } = entry;
-  const project = projects.find((candidate) => candidate.id === task.projectId);
-  const pill = hexToSoft(project?.color);
   const startMin = parseTimeToMinutes(task.startTime);
 
   const menuItems: MoreMenuItem[] = [
@@ -236,14 +222,6 @@ function FocusQueueRow({
         ) : null}
         {startMin !== undefined ? (
           <span className="tdy-row-time">{formatMinuteOfDay(startMin, lang)}</span>
-        ) : null}
-        {project ? (
-          <span
-            className="tdy-space-pill"
-            style={pill ? { background: pill.bg, color: pill.fg } : undefined}
-          >
-            {project.name}
-          </span>
         ) : null}
         <MoreMenu items={menuItems} label={t("todayv.rowMenuAria")} />
       </div>

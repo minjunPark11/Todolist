@@ -209,17 +209,9 @@ describe("urlForSearchResult (§10.17/§10.18)", () => {
     expect(urlForSearchResult(result({ kind: "folder", id: "sf1" }), lists)).toBe("/folder/sf1");
   });
 
-  it("sends a Project and a Space to the Spaces routes, not to a Scope (§10.16)", () => {
-    const projects = [{ id: "p1", name: "Drone", spaceId: "s1", createdAt: NOW, updatedAt: NOW }] as never as Parameters<
-      typeof urlForSearchResult
-    >[2];
-    expect(urlForSearchResult(result({ kind: "project", id: "p1" }), lists, projects)).toBe("/s/s1/p/p1");
-    expect(urlForSearchResult(result({ kind: "space", id: "s1" }), lists)).toBe("/s/s1");
-  });
-
-  it("lands a Project whose record is gone somewhere real", () => {
-    expect(urlForSearchResult(result({ kind: "project", id: "gone" }), lists)).toBe("/app");
-  });
+  // A Project and a Space used to be two more search kinds, sent to the
+  // Spaces routes rather than to a Scope. Both records left the app's surface
+  // with the Projects feature, so `SearchKind` no longer has an arm for them.
 
   it("produces URLs the parser accepts, which is what makes the Drawer open", () => {
     const url = urlForSearchResult(result({ ownerListId: "l1" }), lists);

@@ -2,10 +2,6 @@
 import { MatrixPage } from "../components/MatrixPage";
 import { CalendarView } from "../components/CalendarView";
 import { FocusPage } from "../components/FocusPage";
-import { GoalDetailDrawer } from "../components/horizons/GoalDetailDrawer";
-import { GoalsPage } from "../components/goals/GoalsPage";
-import { SpacesPage } from "../components/SpacesPage";
-import { activeSpaces, DEFAULT_SPACE_NAME } from "../domain/spaces/spaces";
 import { SettingsPage } from "../components/SettingsPage";
 import { TodayPage, type TodayIntent } from "../components/TodayPage";
 import type { ToastState } from "../components/kit";
@@ -14,12 +10,9 @@ import type { CalendarShareState } from "../lib/calendarShare";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import type { KnowledgeSettings } from "../lib/knowledge/types";
 import type { AppUpdateStatus } from "../platform";
-import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Project, Task } from "../types";
+import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Task } from "../types";
 
 type Planner = ReturnType<typeof usePlannerData>;
-
-/** The colour a Project made without being asked for one gets, as the tree's own `+ Project` uses. */
-const DEFAULT_PROJECT_COLOR = "#0066cc";
 
 type AppPagesProps = {
   activePage: PageId;
@@ -29,36 +22,19 @@ type AppPagesProps = {
    * `planner.tasks` is still here and still the whole set. The difference is
    * the question being asked: this one is for screens that DRAW or OFFER
    * tasks, and it has already dropped the ones whose owning List was archived
-   * or deleted. Lookups — a goal's linked task, an export — want the full set,
-   * because a hidden Task has not stopped existing.
+   * or deleted. Lookups — an export, a reminder — want the full set, because
+   * a hidden Task has not stopped existing.
    */
   visibleTasks: Task[];
   planner: Planner;
   appSettings: AppSettings;
-  activeProjects: Project[];
-  selectedProjectId: string;
-  /** What the tree selected, as a view scope (§16). */
-  viewScope: { spaceId?: string; projectId?: string; folderId?: string; listId?: string };
-  onClearScope: () => void;
-  onSelectList: (listId: string) => void;
-  onSelectSpace: (spaceId: string) => void;
-  isProjectDetailOpen: boolean;
-  onCloseSpace: () => void;
   todayIntent: TodayIntent;
   onTodayIntentHandled: () => void;
   renderTaskDetail: () => ReactNode;
   showToast: (toast: ToastState) => void;
-  handleArchiveTask: (taskId: string) => void;
   handleArchiveTasks: (taskIds: string[]) => void;
-  handleArchiveProject: (projectId: string) => void;
   requestDeleteTask: (taskId: string) => void;
-  requestDeleteProject: (projectId: string) => void;
-  // Immediate delete for flows that already confirmed (space delete modal).
-  deleteProjectNow: (projectId: string) => void;
-  openProjectFromCalendar: (projectId: string) => void;
   viewTaskInCalendar: (taskId: string) => void;
-  openCalendarForProject: (projectId?: string) => void;
-  calendarFocusProjectId: string;
   onNavigate: (page: PageId) => void;
   exportJson: () => void;
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -94,28 +70,13 @@ export function AppPages({
   planner,
   visibleTasks,
   appSettings,
-  activeProjects,
-  selectedProjectId,
-  viewScope,
-  onClearScope,
-  onSelectList,
-  onSelectSpace,
-  isProjectDetailOpen,
-  onCloseSpace,
   todayIntent,
   onTodayIntentHandled,
   renderTaskDetail,
   showToast,
-  handleArchiveTask,
   handleArchiveTasks,
-  handleArchiveProject,
   requestDeleteTask,
-  requestDeleteProject,
-  deleteProjectNow,
-  openProjectFromCalendar,
   viewTaskInCalendar,
-  openCalendarForProject,
-  calendarFocusProjectId,
   onNavigate,
   exportJson,
   handleImport,
@@ -145,38 +106,6 @@ export function AppPages({
   isKnowledgeDesktop,
   accountSlot,
 }: AppPagesProps) {
-  const [selectedGoal, setSelectedGoal] = useState<{ pathId: string; milestoneId?: string } | null>(null);
-  const selectedGoalPath = selectedGoal
-    ? planner.learningPaths.find((path) => path.id === selectedGoal.pathId) ?? null
-    : null;
-
-  function openGoal(pathId: string, milestoneId?: string) {
-    planner.selectTask("");
-    setSelectedGoal({ pathId, milestoneId });
-  }
-
-  function openTaskFromGoal(taskId: string) {
-    setSelectedGoal(null);
-    planner.selectTask(taskId);
-  }
-
-  const goalDrawer = selectedGoalPath ? (
-    <GoalDetailDrawer
-      path={selectedGoalPath}
-      initialMilestoneId={selectedGoal?.milestoneId}
-      projects={activeProjects}
-      tasks={planner.tasks}
-      onClose={() => setSelectedGoal(null)}
-      onUpdatePath={planner.updateLearningPath}
-      onDeletePath={planner.deleteLearningPath}
-      onAddMilestone={planner.addMilestone}
-      onUpdateMilestone={planner.updateMilestone}
-      onDeleteMilestone={planner.deleteMilestone}
-      onCreateTaskFromMilestone={planner.createTaskFromMilestone}
-      onOpenTask={openTaskFromGoal}
-    />
-  ) : null;
-
   function pageGridClass(extra = "") {
     const base = planner.selectedTask ? "page-grid" : "page-grid no-detail";
     return extra ? `${base} ${extra}` : base;
@@ -190,7 +119,6 @@ export function AppPages({
       <section className="page-grid no-detail tdy-grid">
         <TodayPage
           tasks={visibleTasks}
-          projects={activeProjects}
           dailyPlans={planner.dailyPlans}
           lists={planner.lists}
           onSetBuckets={planner.setTodayBuckets}
@@ -220,21 +148,6 @@ export function AppPages({
     );
   }
 
-  if (activePage === "goals") {
-    return (
-      <section className="page-grid no-detail">
-        <GoalsPage
-          goals={planner.learningPaths}
-          tasks={visibleTasks}
-          projects={activeProjects}
-          onOpenGoal={openGoal}
-          onCreateGoal={(goal) => planner.createLearningPath({ goal, schedule: { unit: "unscheduled" } })}
-        />
-        {goalDrawer}
-      </section>
-    );
-  }
-
   if (activePage === "board") {
     return (
       <section className={pageGridClass()}>
@@ -257,18 +170,14 @@ export function AppPages({
       <section className="gcal-page-shell">
         <CalendarView
           tasks={visibleTasks}
-          projects={activeProjects}
-              externalCalendars={externalCalendars}
+          externalCalendars={externalCalendars}
           externalCalendarEvents={externalCalendarEvents}
           focusSessions={planner.focusSessions}
           onUpdateExternalCalendar={onUpdateExternalCalendar}
-          onUpdateProject={planner.updateProject}
-            initialProjectId={calendarFocusProjectId}
           onUpdateTask={planner.updateTask}
           onUpdateTaskSchedule={planner.updateTaskSchedule}
           onCreateTask={planner.createTask}
           onDeleteTask={requestDeleteTask}
-          onOpenProject={openProjectFromCalendar}
           onClearTaskSelection={() => planner.selectTask("")}
           showToast={showToast}
         />
@@ -280,7 +189,6 @@ export function AppPages({
     return (
       <FocusPage
         tasks={visibleTasks}
-        projects={activeProjects}
         focusSessions={planner.focusSessions}
         activeSession={planner.activeFocusSession}
         settings={focusSettings}
@@ -295,76 +203,6 @@ export function AppPages({
         onOpenTask={planner.selectTask}
         onNavigate={onNavigate}
       />
-    );
-  }
-
-  if (activePage === "projects") {
-    return (
-      <>
-      <SpacesPage
-        onRestoreProject={planner.restoreProject}
-        onDeleteProject={requestDeleteProject}
-        onArchiveProject={handleArchiveProject}
-        onTogglePinProject={planner.toggleProjectPinned}
-        onCreateFolder={planner.createFolder}
-        onRenameFolder={(folderId, name) => planner.updateFolder(folderId, { name })}
-        onArchiveFolder={planner.archiveFolder}
-        onCreateProject={(name) => {
-          // D-6: the work area is hidden, not gone, and a Project still
-          // belongs to one. The sole area when there is one — and a real
-          // record when there is none, because a Project pointing at a Space
-          // that was never written is a Project the tree cannot draw. The
-          // name is the one `ensureDefaultSpace` would have used, so the
-          // invisible container has one name rather than two.
-          const area = activeSpaces(planner.spaces)[0];
-          planner.addProject(name, DEFAULT_PROJECT_COLOR, area?.id ?? planner.createSpace(DEFAULT_SPACE_NAME));
-        }}
-        projects={planner.projects}
-        tasks={visibleTasks}
-        lists={planner.lists}
-        paths={planner.learningPaths}
-        onUpdatePath={planner.updateLearningPath}
-        onUpdateMilestone={planner.updateMilestone}
-        onCreateGoal={planner.createLearningPath}
-        onOpenGoal={openGoal}
-        onCreateStatus={planner.createStatus}
-        onUpdateStatus={planner.updateStatus}
-        onArchiveStatus={planner.archiveStatus}
-        onMoveGoalToStatus={planner.moveGoalToStatus}
-        onDeletePath={planner.deleteLearningPath}
-        onAddMilestone={planner.addMilestone}
-        onDeleteMilestone={planner.deleteMilestone}
-        onCreateTaskFromMilestone={planner.createTaskFromMilestone}
-        focusSessions={planner.focusSessions}
-        activeFocusSession={planner.activeFocusSession}
-        onCompleteTask={planner.completeTask}
-        onArchiveTask={handleArchiveTask}
-        onStartFocus={planner.startFocusSession}
-        onNavigate={onNavigate}
-        onOpenCalendar={openCalendarForProject}
-        selectedProjectId={selectedProjectId}
-        detailOpen={isProjectDetailOpen}
-        viewScope={viewScope}
-        folders={planner.folders}
-        onClearScope={onClearScope}
-        onSelectList={onSelectList}
-        onOpenProject={onSelectSpace}
-        onOpenTask={planner.selectTask}
-        onToggleDone={planner.toggleTaskDone}
-        onUpdateTask={planner.updateTask}
-        onUpdateTaskSchedule={planner.updateTaskSchedule}
-        onCreateTask={planner.createTask}
-        onUpdateProject={planner.updateProject}
-        onRequestDeleteProject={deleteProjectNow}
-        showToast={showToast}
-      />
-      {goalDrawer}
-      {planner.selectedTask ? (
-        <div className="tdy-detail-overlay" onClick={() => planner.selectTask("")}>
-          <div className="tdy-detail-drawer" onClick={(event) => event.stopPropagation()}>{renderTaskDetail()}</div>
-        </div>
-      ) : null}
-      </>
     );
   }
 
@@ -383,8 +221,6 @@ export function AppPages({
       accountSlot={accountSlot}
       tasks={planner.tasks}
       onUpdateTask={planner.updateTask}
-      projects={planner.projects}
-      onUpdateProject={planner.updateProject}
       externalCalendars={externalCalendars}
       onAddExternalCalendar={onAddExternalCalendar}
       onUpdateExternalCalendar={onUpdateExternalCalendar}

@@ -24,7 +24,7 @@ export function recentEntriesFrom(
   collections: SearchCollections,
   t: (key: string) => string,
 ): RecentEntry[] {
-  const { tasks, lists, folders, sidebarFolders, tags, savedFilters, projects } = collections;
+  const { tasks, lists, folders, sidebarFolders, tags, savedFilters } = collections;
   return [
     ...recents.scopes
       .filter((entry) => !namedRecordMissing(entry, lists, folders, sidebarFolders, tags, savedFilters))
@@ -43,7 +43,6 @@ export function recentEntriesFrom(
         url: urlForSearchResult(
           { kind: "task", id: task.id, title: task.title, ownerListId: listIdFor(task, lists) },
           lists,
-          projects,
         ),
       })),
   ];

@@ -69,21 +69,18 @@ describe("normalizeData carries fields it does not know", () => {
     expect(session).toMatchObject(FUTURE);
   });
 
-  it("keeps them on a goal and on its milestones", () => {
-    const [path] = normalizeData({
-      learningPaths: [
-        withFuture({
-          id: "path-1",
-          goal: "Ship it",
-          source: "user",
-          createdAt: "2026-08-01T00:00:00.000Z",
-          updatedAt: "2026-08-01T00:00:00.000Z",
-          milestones: [withFuture({ id: "m-1", title: "First", doneCriteria: "", cardIds: [] })],
-        }),
-      ],
-    }).learningPaths;
-    expect(path).toMatchObject(FUTURE);
-    expect(path.milestones[0]).toMatchObject(FUTURE);
+  // A goal is preserved WHOLE now, not field by field (types.ts StoredGoal):
+  // the feature that read one is gone, so the load has no shape to normalize
+  // it against and simply carries the record through. That makes forward
+  // compatibility total here rather than a property of each sanitizer.
+  it("keeps a goal exactly as it was stored", () => {
+    const stored = {
+      id: "path-1",
+      goal: "Ship it",
+      milestones: [withFuture({ id: "m-1", title: "First", doneCriteria: "", cardIds: [] })],
+      ...FUTURE,
+    };
+    expect(normalizeData({ learningPaths: [stored] }).learningPaths[0]).toEqual(stored);
   });
 
   // Add List design Phase 1. These two ride in a record that ALREADY syncs, so
@@ -170,23 +167,10 @@ describe("normalizeData still repairs what it does know", () => {
     });
   });
 
-  it("never restores a milestone status from disk", () => {
-    // progress.ts derives this; a status a model once asserted must not come
-    // back through the passthrough spread.
-    const [path] = normalizeData({
-      learningPaths: [
-        {
-          id: "path-1",
-          goal: "Ship it",
-          source: "user",
-          createdAt: "2026-08-01T00:00:00.000Z",
-          updatedAt: "2026-08-01T00:00:00.000Z",
-          milestones: [{ id: "m-1", title: "First", cardIds: [], status: "done" }],
-        } as never,
-      ],
-    }).learningPaths;
-    expect(path.milestones[0].status).toBeUndefined();
-  });
+  // A companion test dropped a milestone status the sanitizer refused to
+  // restore. There is no goal sanitizer any more — the record is carried
+  // whole — so there is nothing left here to strip, and the test above
+  // asserts exactly that.
 });
 
 // The one exception to M0's "carry what you do not know".

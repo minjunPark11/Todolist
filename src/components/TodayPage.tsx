@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { List, PageId, Project, Task, TaskDailyPlan, TaskDraft } from "../types";
+import type { List, PageId, Task, TaskDailyPlan, TaskDraft } from "../types";
 import { formatDate, getDayLabel, todayValue } from "../utils/date";
 import {
   buildTimeRail,
@@ -32,7 +32,6 @@ export type TodayIntent = "" | "triage" | "quickAdd";
 
 interface TodayPageProps {
   tasks: Task[];
-  projects: Project[];
   /**
    * Membership needs them (§13.19): a Task whose owning List is archived or
    * deleted is not on Today, and that cannot be read from the Task alone.
@@ -60,7 +59,6 @@ interface TodayPageProps {
 
 export function TodayPage({
   tasks,
-  projects,
   dailyPlans,
   lists,
   onSetBuckets,
@@ -140,7 +138,7 @@ export function TodayPage({
     [tasks, lists, dailyPlans, today],
   );
   const entries = useMemo(() => collectTodayEntries(scopeCtx, overrides), [scopeCtx, overrides]);
-  const rail = useMemo(() => buildTimeRail(tasks, projects, today), [tasks, projects, today]);
+  const rail = useMemo(() => buildTimeRail(tasks, today), [tasks, today]);
 
   // Inbox Triage shows only unsorted (status === "inbox") items. Scheduled
   // "todo" tasks already appear in the Focus Queue above, so including them
@@ -153,17 +151,11 @@ export function TodayPage({
   // Search filters every visible Today collection (spec §25).
   const query = searchQuery.trim().toLowerCase();
   const hasQuery = query.length > 0;
-  const projectNameById = useMemo(
-    () => new Map(projects.map((project) => [project.id, project.name.toLowerCase()])),
-    [projects],
-  );
-
   const visibleEntries = useMemo(() => {
     if (!hasQuery) return entries;
     return entries.filter((entry) => {
       const haystack = [
         entry.task.title,
-        projectNameById.get(entry.task.projectId) ?? "",
         entry.task.priority,
         entry.bucket,
       ]
@@ -171,7 +163,7 @@ export function TodayPage({
         .toLowerCase();
       return haystack.includes(query);
     });
-  }, [entries, hasQuery, query, projectNameById]);
+  }, [entries, hasQuery, query]);
 
   const visibleTriageItems = hasQuery
     ? triageItems.filter((item) => item.title.toLowerCase().includes(query))
@@ -198,7 +190,6 @@ export function TodayPage({
       // what the user typed and today is only the default for its absence.
       dueDate: input.dueDate || today,
       priority: input.priority,
-      projectId: input.projectId || undefined,
       notes: input.notes || undefined,
     });
     showToast({ message: t("todayv.toastTaskAdded") });
@@ -219,7 +210,6 @@ export function TodayPage({
       dueDate: parsed.relativeDate || parsed.dueDate || (addToToday ? today : ""),
       startTime: parsed.startTime,
       priority: parsed.priority || undefined,
-      projectId: parsed.projectId || undefined,
     });
     // A parsed date can send a "Today" capture to another day, so the toast
     // names the day it actually landed on rather than always saying "Today".
@@ -312,25 +302,10 @@ export function TodayPage({
   // Shared by the single-row and bulk paths so the two can't drift. Assigning a
   // space only promotes an item that is still unsorted; "add to today" always
   // schedules, since that is the whole point of the action.
-  function triagePatch(
-    task: Task | undefined,
-    action: Exclude<BulkTriageAction, { type: "archive" }>,
-  ): Partial<Task> {
-    if (action.type === "addToToday") {
-      return { status: "todo", dueDate: today };
-    }
-    return {
-      projectId: action.projectId,
-      ...(task?.status === "inbox" ? { status: "todo" as const, dueDate: today } : {}),
-    };
-  }
-
   function handleTriage(taskId: string, action: TriageAction) {
-    if (action.type === "assign" || action.type === "addToToday") {
-      onUpdateTask(taskId, triagePatch(tasks.find((task) => task.id === taskId), action));
-      showToast({
-        message: action.type === "assign" ? t("todayv.toastAssigned") : t("todayv.toastTaskAdded"),
-      });
+    if (action.type === "addToToday") {
+      onUpdateTask(taskId, { status: "todo", dueDate: today });
+      showToast({ message: t("todayv.toastTaskAdded") });
     } else if (action.type === "scheduleCalendar") {
       closeTriage();
       onScheduleInCalendar(taskId);
@@ -353,30 +328,18 @@ export function TodayPage({
     const previous = taskIds
       .map((id) => tasks.find((task) => task.id === id))
       .filter((task): task is Task => Boolean(task))
-      .map((task) => ({
-        id: task.id,
-        status: task.status,
-        dueDate: task.dueDate,
-        projectId: task.projectId,
-      }));
+      .map((task) => ({ id: task.id, status: task.status, dueDate: task.dueDate }));
 
     for (const entry of previous) {
-      onUpdateTask(entry.id, triagePatch(tasks.find((task) => task.id === entry.id), action));
+      onUpdateTask(entry.id, { status: "todo", dueDate: today });
     }
 
     showToast({
-      message:
-        action.type === "assign"
-          ? t("todayv.toastBulkAssigned", { n: previous.length })
-          : t("todayv.toastBulkAddedToToday", { n: previous.length }),
+      message: t("todayv.toastBulkAddedToToday", { n: previous.length }),
       actionLabel: t("app.undo"),
       onAction: () => {
         for (const entry of previous) {
-          onUpdateTask(entry.id, {
-            status: entry.status,
-            dueDate: entry.dueDate,
-            projectId: entry.projectId,
-          });
+          onUpdateTask(entry.id, { status: entry.status, dueDate: entry.dueDate });
         }
       },
     });
@@ -442,8 +405,7 @@ export function TodayPage({
           />
 
           <InlineCapture
-            projects={projects}
-            today={today}
+              today={today}
             addToToday={addToToday}
             onToggleAddToToday={handleToggleCaptureTarget}
             onCapture={handleCapture}
@@ -456,8 +418,7 @@ export function TodayPage({
 
           <FocusQueue
             entries={visibleEntries}
-            projects={projects}
-            hasQuery={hasQuery}
+              hasQuery={hasQuery}
             query={searchQuery.trim()}
             showCompleted={showCompleted}
             onToggleShowCompleted={onToggleShowCompleted}
@@ -486,7 +447,6 @@ export function TodayPage({
 
       {quickAddOpen ? (
         <QuickAddTaskModal
-          projects={projects}
           initialTitle={quickAddTitle}
           onCreate={handleCreateTask}
           onClose={() => {
@@ -499,7 +459,6 @@ export function TodayPage({
       {triageOpen ? (
         <InboxTriageDrawer
           items={triageItems}
-          projects={projects}
           onTriage={handleTriage}
           onBulkTriage={handleBulkTriage}
           onClose={closeTriage}

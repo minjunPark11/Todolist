@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { List, Project, Task } from "../../types";
+import type { List, Task } from "../../types";
 import { makeDefaultList } from "../spaces/hierarchy";
 import { defaultListIdFor } from "../spaces/membership";
 import { projectItems } from "./item";
@@ -45,13 +45,10 @@ function task(overrides: Partial<Task> = {}): Task {
   };
 }
 
-const projects: Project[] = [
-  { id: "space-1", name: "Career", description: "", color: "#0066cc", createdAt: NOW, updatedAt: NOW },
-];
 const lists: List[] = [makeDefaultList(defaultListIdFor("space-1"), "space-1", NOW)];
 
 const itemsFor = (tasks: Task[]) =>
-  projectItems({ tasks, paths: [], projects, lists, today: TODAY, sources: ["task"] });
+  projectItems({ tasks, lists, today: TODAY });
 
 // A clean chain: "first" runs 10th-12th, "second" waits and runs 14th-16th.
 const first = task({ id: "first", startDate: "2026-08-10", dueDate: "2026-08-12" });

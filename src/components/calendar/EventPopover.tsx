@@ -130,7 +130,13 @@ export function EventPopover({
   categoryGroups?: CalendarCategoryGroup[];
   onChangeCategory?: (item: CalendarItem, categoryId: string) => void;
   onClose: () => void;
-  onOpenDetail: (item: CalendarItem) => void;
+  /**
+   * Where a non-task event's "add memo" led: the Project detail behind a
+   * project-deadline marker. Projects are gone, and the only non-task events
+   * left — external and focus — have no screen of their own, so the button is
+   * not drawn when no caller offers one.
+   */
+  onOpenDetail?: (item: CalendarItem) => void;
   onDelete?: (item: CalendarItem) => void;
   // Quick edit (start/end time + memo) inline in the popover, replacing the
   // jump to the day-view detail panel for task events.
@@ -288,11 +294,11 @@ export function EventPopover({
             {t("calendar.popoverAddMemo")}
           </button>
         )
-      ) : (
+      ) : onOpenDetail ? (
         <button type="button" className="gcal-popover-memo" onClick={() => onOpenDetail(item)}>
           {t("calendar.popoverAddMemo")}
         </button>
-      )}
+      ) : null}
     </CalendarPopover>
   );
 }

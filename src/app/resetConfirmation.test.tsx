@@ -19,14 +19,11 @@ function renderReset(resetReachesAccount: string, lang: Language = "en") {
     <I18nProvider lang={lang}>
       <AppModals
         pendingDeleteTaskId=""
-        pendingDeleteProjectId=""
         pendingResetAllData
         resetReachesAccount={resetReachesAccount}
         toasts={[]}
         onCancelDeleteTask={() => {}}
         onConfirmDeleteTask={() => {}}
-        onCancelDeleteProject={() => {}}
-        onConfirmDeleteProject={() => {}}
         onCancelResetAllData={() => {}}
         onConfirmResetAllData={() => {}}
         onDismissToast={() => {}}

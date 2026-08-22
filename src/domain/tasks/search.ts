@@ -10,12 +10,15 @@
 // Results are grouped by type and never flattened into one list (§10.10).
 // A user scanning results has to be able to tell a List from a Task without
 // reading the row twice, and one mixed list makes that impossible.
-import type { Folder, List, Project, SavedFilter, SidebarFolder, Space, Tag, Task } from "../../types";
+import type { Folder, List, SavedFilter, SidebarFolder, Tag, Task } from "../../types";
 import { listIdFor } from "../spaces/membership";
 import { isInboxList } from "../spaces/hierarchy";
 
 /** §10.11's group order. Fixed rather than adaptive — MVP predictability. */
-export const SEARCH_KINDS = ["task", "list", "tag", "filter", "folder", "project", "space"] as const;
+// `project` and `space` were two more groups here. Both records are gone
+// from the app's surface, and a hit that cannot be opened is worse than no
+// hit at all.
+export const SEARCH_KINDS = ["task", "list", "tag", "filter", "folder"] as const;
 export type SearchKind = (typeof SEARCH_KINDS)[number];
 
 /**
@@ -31,8 +34,6 @@ export const DEFAULT_LIMITS: Record<SearchKind, number> = {
   tag: 3,
   filter: 3,
   folder: 3,
-  project: 3,
-  space: 3,
 };
 
 /**
@@ -53,8 +54,6 @@ export const MENU_LIMITS: Record<SearchKind, number> = {
   tag: 3,
   filter: 3,
   folder: 3,
-  project: 3,
-  space: 3,
 };
 
 /** No cap worth the name — the Search Page shows what it found (§10.20). */
@@ -64,15 +63,13 @@ export const PAGE_LIMITS: Record<SearchKind, number> = {
   tag: 50,
   filter: 50,
   folder: 50,
-  project: 50,
-  space: 50,
 };
 
 export interface SearchResult {
   kind: SearchKind;
   id: string;
   title: string;
-  /** The List a Task is in, the Project a List belongs to, and so on (§10.12). */
+  /** The List a Task is in, and so on (§10.12). */
   subtitle?: string;
   /**
    * For a Task: the List that owns it, already resolved.
@@ -101,8 +98,6 @@ export interface SearchCollections {
   savedFilters: SavedFilter[];
   /** §10.16. Above the Tasks Module, and shown as their own kinds so they are
       not mistaken for its Lists. */
-  projects: Project[];
-  spaces: Space[];
 }
 
 /**
@@ -212,26 +207,6 @@ export function searchAll(
     if (rank !== null) folders.push({ kind: "folder", id: folder.id, title: folder.name, rank });
   }
   push(groups, "folder", folders, limits);
-
-  // §10.16: a Project and a Space are not Lists, and the groups they appear
-  // under are what keeps them from reading as one. Their destinations are in
-  // the Spaces routes, which is the caller's business — this only says which
-  // record matched.
-  const projects: Array<SearchResult & { rank: number }> = [];
-  for (const project of collections.projects) {
-    if (project.archivedAt || project.deletedAt) continue;
-    const rank = matchRank(project.name, trimmed);
-    if (rank !== null) projects.push({ kind: "project", id: project.id, title: project.name, rank });
-  }
-  push(groups, "project", projects, limits);
-
-  const spaces: Array<SearchResult & { rank: number }> = [];
-  for (const space of collections.spaces) {
-    if (space.archivedAt || space.deletedAt) continue;
-    const rank = matchRank(space.name, trimmed);
-    if (rank !== null) spaces.push({ kind: "space", id: space.id, title: space.name, rank });
-  }
-  push(groups, "space", spaces, limits);
 
   return groups;
 }

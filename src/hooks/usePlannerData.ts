@@ -29,11 +29,6 @@ import type {
   DailyPlanBucket,
   TaskDraft,
 } from "../types";
-import type { LearningPath, Milestone } from "../lib/ai/learningPaths/types";
-import {
-  readLegacyLearningPaths,
-  sanitizeLearningPath,
-} from "../lib/ai/learningPaths/store";
 import {
   readLegacyLocalSpaces,
 } from "../lib/spaces/legacyLocalSpaces";
@@ -52,13 +47,10 @@ import { backfillTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/t
 import { sanitizeListSection } from "../domain/tasks/sections";
 import { addSidebarFolder, sanitizeSidebarFolder } from "../domain/tasks/sidebarFolders";
 import { sanitizeSavedFilter } from "../domain/tasks/filters";
-import { backfillTaskListId, defaultListIdFor, patchForGoalListMove, patchForListMove } from "../domain/spaces/membership";
-import * as pathOps from "../domain/horizons/pathMutations";
-import { normalizeGoalTiming } from "../domain/horizons/goalSchedule";
+import { backfillTaskListId, defaultListIdFor, patchForListMove } from "../domain/spaces/membership";
 import { childDraft, promoteDraft } from "../domain/tasks/children";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
-import { addCustomStatus as addCustomStatusRecord, archiveCustomStatus as archiveCustomStatusRecord, moveGoalToStatus as moveGoalToStatusRecord, patchCustomStatus as patchCustomStatusRecord, reconcileGoalStatuses, sanitizeCustomStatuses } from "../domain/spaces/customStatuses";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
 import {
   buildSyncPlan,
@@ -256,7 +248,6 @@ function normalizeProject(project: Partial<Project>): Project {
     archivedAt: project.archivedAt ?? "",
     createdAt: project.createdAt ?? now,
     updatedAt: project.updatedAt ?? now,
-    boardLists: sanitizeCustomStatuses(project.boardLists),
   };
 }
 
@@ -410,14 +401,10 @@ export function normalizeData(data: RawPlannerData): PlannerData {
       ? data.focusSessions.map(normalizeFocusSession)
       : [],
     activeSessionId: typeof data.activeSessionId === "string" ? data.activeSessionId : "",
-    // One validator for both sources: the same sanitizer that read the old
-    // local blob now vets the synced rows.
-    learningPaths: Array.isArray(data.learningPaths)
-      ? data.learningPaths
-          .map((path) => sanitizeLearningPath(path))
-          .filter((path): path is LearningPath => path !== null)
-          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      : [],
+    // Goals are preserved, not read (types.ts StoredGoal): the feature that
+    // made and showed them is gone, so the records pass through the load
+    // untouched rather than being validated against a shape nothing uses.
+    learningPaths: Array.isArray(data.learningPaths) ? data.learningPaths : [],
     // The work area above Project (SPACES_REDESIGN_II §4). Stays empty until
     // there is a Project to file, so a fresh account creates nothing.
     spaces: Array.isArray(data.spaces)
@@ -467,7 +454,7 @@ export function normalizeData(data: RawPlannerData): PlannerData {
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
   };
-  return { ...normalized, learningPaths: reconcileGoalStatuses(normalized.projects, normalized.learningPaths) };
+  return normalized;
 }
 
 function emptyData(): PlannerData {
@@ -480,7 +467,6 @@ function emptyData(): PlannerData {
 function adoptLoadedData(data: PlannerData): PlannerData {
   const now = new Date().toISOString();
   const focusSessions = recoverStaleFocusSessions(data.focusSessions);
-  const learningPaths = adoptLegacyLearningPaths(data.learningPaths);
   const legacyAdopted = adoptLegacyLocalSpaces(data.projects);
   // STEP 5 (§40 M2/M4): one Space, and every Project filed under it. This is
   // the whole Space migration's write budget — Projects number in the tens,
@@ -516,7 +502,6 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   const tagged = backfillTaskTags(data.tasks, data.tags, data.taskTags, now);
   if (
     focusSessions === data.focusSessions &&
-    learningPaths === data.learningPaths &&
     projects === data.projects &&
     spaces === data.spaces &&
     lists === data.lists &&
@@ -530,7 +515,6 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   return {
     ...data,
     focusSessions,
-    learningPaths,
     projects,
     spaces,
     lists,
@@ -551,19 +535,6 @@ function adoptLegacyLocalSpaces(current: Project[]): Project[] {
   const added = legacy.filter((project) => !seen.has(project.id));
   if (added.length === 0) return current;
   return [...current, ...added];
-}
-
-// Phase 2 migration: goals written before they were synced sat in a local
-// blob. The read is pure and repeats until the marker is set after mount, and
-// what it yields is merged by id rather than replacing — if a synced copy has
-// already arrived, both survive and neither wins by accident.
-function adoptLegacyLearningPaths(current: LearningPath[]): LearningPath[] {
-  const legacy = readLegacyLearningPaths();
-  if (legacy.length === 0) return current;
-  const seen = new Set(current.map((path) => path.id));
-  const added = legacy.filter((path) => !seen.has(path.id));
-  if (added.length === 0) return current;
-  return pathOps.sortPaths([...current, ...added]).slice(0, pathOps.MAX_PATHS);
 }
 
 function readStorage(): PlannerData {
@@ -1178,18 +1149,6 @@ export function usePlannerData() {
     }));
   }
 
-  function restoreDeletedProject(project: Project, taskIds: string[] = []) {
-    setData((current) => ({
-      ...current,
-      projects: current.projects.some((item) => item.id === project.id)
-        ? current.projects
-        : [...current.projects, project],
-      // deleteProject unassigns its tasks rather than deleting them.
-      tasks: current.tasks.map((item) =>
-        taskIds.includes(item.id) ? { ...item, projectId: project.id } : item,
-      ),
-    }));
-  }
 
   /**
    * Puts a given-up Task back on the list (D-20/D-23).
@@ -1297,82 +1256,9 @@ export function usePlannerData() {
     });
   }
 
-  /**
-   * `spaceId` is optional and answered by `spaceIdForProject` when absent, so
-   * a caller with no Space in hand still creates a Project that appears in the
-   * tree. The sidebar passes one because it knows which row was clicked —
-   * writing it there beats creating the Project and moving it a moment later,
-   * which would put two rows on the wire for one action.
-   */
-  function addProject(name: string, color: string, spaceId?: string) {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      return;
-    }
 
-    const now = new Date().toISOString();
-    const project: Project = {
-      id: createId("project"),
-      name: trimmed,
-      description: "",
-      color,
-      status: "active",
-      archivedAt: "",
-      ...(spaceId ? { spaceId } : {}),
-      createdAt: now,
-      updatedAt: now,
-    };
 
-    setData((current) => ({
-      ...current,
-      projects: [...current.projects, project],
-    }));
-  }
 
-  function archiveProject(projectId: string) {
-    const now = new Date().toISOString();
-
-    setData((current) => ({
-      ...current,
-      projects: current.projects.map((project) =>
-        project.id === projectId
-          ? { ...project, status: "archived", archivedAt: now, updatedAt: now }
-          : project,
-      ),
-    }));
-  }
-
-  /** §13.28: back from either state, since a record is never in both. */
-  function restoreProject(projectId: string) {
-    const now = new Date().toISOString();
-
-    setData((current) => ({
-      ...current,
-      projects: current.projects.map((project) =>
-        project.id === projectId
-          ? { ...project, status: "active", archivedAt: "", deletedAt: undefined, updatedAt: now }
-          : project,
-      ),
-    }));
-  }
-
-  /**
-   * §13.28, and this used to be the opposite (Phase 9).
-   *
-   * It hard-deleted the row and stripped `projectId` from every Task under it
-   * — unrecoverable, and a write to every one of those Tasks. The plan is
-   * explicit that a Project's lifecycle does not reach the work beneath it:
-   * the row is marked deleted, its Lists keep pointing at it so restore needs
-   * no backfill, and nothing under it moves. `permanentlyDeleteProject` is
-   * where the row actually goes, and even there the Lists survive.
-   */
-  function deleteProject(projectId: string) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const projects = lifecycle.trashProject(current.projects, projectId, now);
-      return projects === current.projects ? current : { ...current, projects };
-    });
-  }
 
   /**
    * A child is a Task now (domain/tasks/children.ts). The `subtasks`
@@ -1618,282 +1504,15 @@ export function usePlannerData() {
 
 
 
-  // === Projects ===
-  function createProject(input: {
-    name: string;
-    color?: string;
-    type?: ProjectType;
-    description?: string;
-    dueDate?: string;
-    icon?: string;
-  }): string {
-    const name = input.name.trim();
-    if (!name) {
-      return "";
-    }
-    const project = normalizeProject({
-      id: createId("project"),
-      name,
-      color: input.color ?? "#007AFF",
-      type: input.type ?? "project",
-      description: input.description ?? "",
-      dueDate: input.dueDate ?? "",
-      icon: input.icon,
-    });
-    setData((current) => ({ ...current, projects: [...current.projects, project] }));
-    return project.id;
-  }
 
-  function updateProject(projectId: string, patch: Partial<Project>) {
-    const now = new Date().toISOString();
-    setData((current) => ({
-      ...current,
-      projects: current.projects.map((project) =>
-        project.id === projectId ? { ...project, ...patch, updatedAt: now } : project,
-      ),
-    }));
-  }
 
-  function createStatus(projectId: string, name: string) {
-    const title = name.trim();
-    if (!title) return;
-    const now = new Date().toISOString();
-    setData((current) => ({ ...current, projects: addCustomStatusRecord(current.projects, projectId, { id: createId("blist"), name: title, order: current.projects.find((project) => project.id === projectId)?.boardLists?.length ?? 0 }, now) }));
-  }
 
-  function updateStatus(projectId: string, listId: string, patch: { name?: string; order?: number }) {
-    const now = new Date().toISOString();
-    setData((current) => ({ ...current, projects: patchCustomStatusRecord(current.projects, projectId, listId, patch, now) }));
-  }
 
-  function archiveStatus(projectId: string, listId: string) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const next = archiveCustomStatusRecord(current.projects, current.learningPaths, projectId, listId, now);
-      return { ...current, projects: next.projects, learningPaths: next.paths };
-    });
-  }
 
-  function moveGoalToStatus(pathId: string, listId?: string) {
-    const now = new Date().toISOString();
-    setData((current) => ({ ...current, learningPaths: moveGoalToStatusRecord(current.learningPaths, current.projects, pathId, listId, now) }));
-  }
 
-  function toggleProjectPinned(projectId: string) {
-    setData((current) => ({
-      ...current,
-      projects: current.projects.map((project) =>
-        project.id === projectId ? { ...project, pinned: !project.pinned } : project,
-      ),
-    }));
-  }
 
-  // --- Learning Paths (Horizons) --------------------------------------------
-  // Thin wrappers over the pure operations in domain/horizons/pathMutations so
-  // the rules stay testable and this hook only owns the state transition.
 
-  function createLearningPath(input: {
-    goal: string;
-    schedule?: LearningPath["schedule"];
-    deadlineDate?: string;
-    targetDate?: string;
-    projectId?: string;
-    boardListId?: string;
-    milestones?: Milestone[];
-    source?: LearningPath["source"];
-  }): LearningPath | null {
-    const goal = input.goal.trim();
-    if (!goal) return null;
-    const now = new Date().toISOString();
-    const path: LearningPath = {
-      id: createId("lpath"),
-      goal,
-      milestones: input.milestones ?? [],
-      ...normalizeGoalTiming(input, todayValue()),
-      projectId: input.projectId,
-      boardListId: input.boardListId,
-      boardOrder: input.projectId
-        ? data.learningPaths
-            .filter((path) => path.projectId === input.projectId && path.boardListId === input.boardListId)
-            .reduce((max, path) => Math.max(max, path.boardOrder ?? -1), -1) + 1
-        : undefined,
-      source: input.source ?? "user",
-      createdAt: now,
-      updatedAt: now,
-    };
-    setData((current) => ({ ...current, learningPaths: pathOps.addPath(current.learningPaths, path) }));
-    // The whole record, not just its id: the assistant panel needs the saved
-    // path in hand to show the position line without waiting for a re-render.
-    return path;
-  }
 
-  function updateLearningPath(pathId: string, patch: Partial<Omit<LearningPath, "id">>) {
-    const now = new Date().toISOString();
-    setData((current) => ({
-      ...current,
-      learningPaths: pathOps.patchPath(current.learningPaths, pathId, patch, now),
-    }));
-  }
-
-  function deleteLearningPath(pathId: string) {
-    setData((current) => ({ ...current, learningPaths: pathOps.dropPath(current.learningPaths, pathId) }));
-  }
-
-  function addMilestone(pathId: string, input: {
-    title: string;
-    doneCriteria?: string;
-    schedule?: Milestone["schedule"];
-    deadlineDate?: string;
-    targetDate?: string;
-  }) {
-    const title = input.title.trim();
-    if (!title) return;
-    const now = new Date().toISOString();
-    const milestone: Milestone = {
-      id: createId("mstone"),
-      title,
-      doneCriteria: input.doneCriteria?.trim() ?? "",
-      cardIds: [],
-      ...("schedule" in input || "deadlineDate" in input || "targetDate" in input
-        ? normalizeGoalTiming(input, todayValue())
-        : {}),
-    };
-    setData((current) => ({
-      ...current,
-      learningPaths: pathOps.addMilestone(current.learningPaths, pathId, milestone, now),
-    }));
-  }
-
-  function updateMilestone(pathId: string, milestoneId: string, patch: Partial<Omit<Milestone, "id">>) {
-    const now = new Date().toISOString();
-    setData((current) => ({
-      ...current,
-      learningPaths: pathOps.patchMilestone(current.learningPaths, pathId, milestoneId, patch, now),
-    }));
-  }
-
-  function deleteMilestone(pathId: string, milestoneId: string) {
-    const now = new Date().toISOString();
-    setData((current) => ({
-      ...current,
-      learningPaths: pathOps.dropMilestone(current.learningPaths, pathId, milestoneId, now),
-    }));
-  }
-
-  // The Month → Day bridge (HORIZONS_DESIGN.md D6): one action, because a task
-  // created from a milestone but not linked back to it would leave the
-  // milestone unable to tell whether its own work is moving.
-  function createTaskFromMilestone(pathId: string, milestoneId: string, title: string): string {
-    const taskId = createTask({ title, status: "todo", dueDate: todayValue() });
-    if (!taskId) return "";
-    const now = new Date().toISOString();
-    setData((current) => ({
-      ...current,
-      learningPaths: pathOps.patchMilestone(
-        current.learningPaths,
-        pathId,
-        milestoneId,
-        {
-          taskIds: [
-            ...(current.learningPaths
-              .find((path) => path.id === pathId)
-              ?.milestones.find((milestone) => milestone.id === milestoneId)?.taskIds ?? []),
-            taskId,
-          ],
-        },
-        now,
-      ),
-    }));
-    return taskId;
-  }
-
-  function linkCardToMilestone(pathId: string, milestoneId: string, cardId: string): LearningPath | null {
-    const now = new Date().toISOString();
-    const next = pathOps.linkCardToMilestone(data.learningPaths, pathId, milestoneId, cardId, now);
-    setData((current) => ({
-      ...current,
-      learningPaths: pathOps.linkCardToMilestone(current.learningPaths, pathId, milestoneId, cardId, now),
-    }));
-    return next.find((path) => path.id === pathId) ?? null;
-  }
-
-  // === Spaces (SPACES_REDESIGN_II STEP 5) ===
-  // The tree and routing arrive in STEP 6/11; these exist now so the
-  // collection has one owner from the start, like every other record type.
-  function createSpace(name: string): string {
-    const now = new Date().toISOString();
-    const space = spaceTree.makeSpace(createId("space"), name.trim(), now);
-    setData((current) => ({ ...current, spaces: spaceTree.addSpace(current.spaces, space) }));
-    return space.id;
-  }
-
-  function updateSpace(spaceId: string, patch: Partial<Space>) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const spaces = spaceTree.patchSpace(current.spaces, spaceId, patch, now);
-      return spaces === current.spaces ? current : { ...current, spaces };
-    });
-  }
-
-  /**
-   * H-INV-06: a Space holding Projects is archived, never deleted — deleting
-   * it would strand every Project, Folder, List and Task under it. The caller
-   * checks `canDeleteSpace` to decide which it is offering; this refuses
-   * rather than cascading if it is asked to do the wrong one.
-   */
-  function archiveSpace(spaceId: string) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const spaces = spaceTree.archiveSpace(current.spaces, spaceId, now);
-      return spaces === current.spaces ? current : { ...current, spaces };
-    });
-  }
-
-  /**
-   * §13.29, and it is not a cascade: the Lists become standalone and every
-   * Task under them is untouched. Deleting the work is a separate action the
-   * user has to take on purpose.
-   */
-  function permanentlyDeleteProject(projectId: string) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const next = lifecycle.permanentlyDeleteProject(current.projects, current.lists, projectId, now);
-      return next.done ? { ...current, projects: next.projects, lists: next.lists } : current;
-    });
-  }
-
-  function trashSpace(spaceId: string) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const spaces = lifecycle.trashSpace(current.spaces, spaceId, now);
-      return spaces === current.spaces ? current : { ...current, spaces };
-    });
-  }
-
-  function restoreSpace(spaceId: string) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const spaces = lifecycle.restoreSpace(current.spaces, spaceId, now);
-      return spaces === current.spaces ? current : { ...current, spaces };
-    });
-  }
-
-  /** §13.32: blocked while any Project still names this Space. */
-  function permanentlyDeleteSpace(spaceId: string) {
-    setData((current) => {
-      const next = lifecycle.permanentlyDeleteSpace(current.spaces, current.projects, spaceId);
-      return next.done ? { ...current, spaces: next.spaces } : current;
-    });
-  }
-
-  /** H-INV-05: one row. Nothing under the Project is rewritten. */
-  function moveProjectToSpace(projectId: string, spaceId: string) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const projects = spaceTree.moveProjectToSpace(current.projects, projectId, spaceId, current.spaces, now);
-      return projects === current.projects ? current : { ...current, projects };
-    });
-  }
 
   // === Space hierarchy (P3) ===
   // Nothing calls these yet — the Spaces UI arrives in P6. They exist now so
@@ -1980,19 +1599,6 @@ export function usePlannerData() {
     return id;
   }
 
-  /** Created with a Space and never deletable, so an Item always has a home (D5). */
-  function createDefaultList(spaceId: string): string {
-    const now = new Date().toISOString();
-    // Same derived id the backfill uses, so creating a Space and loading one
-    // that predates Lists cannot end up with two different default Lists.
-    const list = hierarchy.makeDefaultList(defaultListIdFor(spaceId), spaceId, now);
-    setData((current) =>
-      hierarchy.defaultListFor(current.lists, spaceId)
-        ? current
-        : { ...current, lists: hierarchy.addList(current.lists, list) },
-    );
-    return list.id;
-  }
 
   function updateList(listId: string, patch: Partial<List>) {
     const now = new Date().toISOString();
@@ -2069,19 +1675,6 @@ export function usePlannerData() {
         ...current,
         tasks: current.tasks.map((item) => (item.id === taskId ? { ...item, ...patch, updatedAt: now } : item)),
       };
-    });
-  }
-
-  function moveGoalToList(pathId: string, listId: string) {
-    setData((current) => {
-      const path = current.learningPaths.find((item) => item.id === pathId);
-      if (!path) return current;
-      const patch = patchForGoalListMove(path, listId, current.lists);
-      if (Object.keys(patch).length === 0) return current;
-      // Through patchPath, which drops the goal's Space-scoped column when the
-      // Space changes — that rule stays in one place.
-      const now = new Date().toISOString();
-      return { ...current, learningPaths: pathOps.patchPath(current.learningPaths, pathId, patch, now) };
     });
   }
 
@@ -2227,52 +1820,22 @@ export function usePlannerData() {
     completeTask,
     deleteTask,
     restoreDeletedTask,
-    restoreDeletedProject,
     archiveTask,
     restoreTask,
     duplicateTask,
     toggleTaskDone,
-    addProject,
-    createProject,
-    updateProject,
-    createStatus,
-    updateStatus,
-    archiveStatus,
-    moveGoalToStatus,
-    toggleProjectPinned,
-    archiveProject,
-    restoreProject,
-    deleteProject,
     addSubtask,
     toggleSubtask,
     deleteSubtask,
-    createLearningPath,
-    updateLearningPath,
-    deleteLearningPath,
-    addMilestone,
-    updateMilestone,
-    deleteMilestone,
-    linkCardToMilestone,
-    createTaskFromMilestone,
-    createSpace,
-    updateSpace,
-    archiveSpace,
-    moveProjectToSpace,
     createList,
     createSidebarFolder,
-    createDefaultList,
     updateList,
     archiveList,
     trashList,
     restoreList,
     permanentlyDeleteList,
-    permanentlyDeleteProject,
-    trashSpace,
-    restoreSpace,
-    permanentlyDeleteSpace,
     moveListToFolder,
     moveTaskToList,
-    moveGoalToList,
     setTodayBuckets,
     planTaskForDay,
     createFolder,

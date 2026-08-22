@@ -48,7 +48,6 @@ interface TimelineViewProps {
   context: GroupContext;
   window: TimelineWindow;
   today: string;
-  projects: Project[];
   /** Every task, so a dependency leaving the window can still be reported. */
   tasks: Task[];
   /** Resolves a group id to its heading; "" is the ungrouped catch-all. */
@@ -67,7 +66,6 @@ export function TimelineView({
   context,
   window,
   today,
-  projects,
   tasks,
   groupLabel,
   columnLabels,
@@ -139,11 +137,10 @@ export function TimelineView({
               window={window}
               columns={columns}
               nowColumn={nowColumn}
-              projects={projects}
               selected={item.source === "task" && item.sourceId === selectedTaskId}
               onOpen={() => onOpenItem(item)}
               // Only tasks carry the date fields a drag writes; a goal's
-              // schedule and a milestone's deadline are edited where they live.
+              // schedule is edited where it lives.
               draggable={Boolean(onDragItem) && item.source === "task"}
               badges={badgeByKey.get(item.key) ?? []}
               isDragging={dragKey === item.key}
@@ -165,7 +162,6 @@ function TimelineRowView({
   window,
   columns,
   nowColumn,
-  projects,
   selected,
   onOpen,
   draggable,
@@ -179,7 +175,6 @@ function TimelineRowView({
   window: TimelineWindow;
   columns: number;
   nowColumn: number | null;
-  projects: Project[];
   selected: boolean;
   onOpen: () => void;
   draggable: boolean;
@@ -195,8 +190,6 @@ function TimelineRowView({
   // filters, so reaching here means the two disagreed — drop the row rather
   // than paint an empty one that reads as "this has no dates".
   if (!placement || !span) return null;
-
-  const project = projects.find((candidate) => candidate.id === item.spaceId);
 
   function handleDropOnColumn(index: number, kind: DragKind) {
     if (kind === "start") {
@@ -221,7 +214,7 @@ function TimelineRowView({
         type="button"
         className={`ff-timeline-label${indented ? " is-child" : ""}`}
         onClick={onOpen}
-        title={project ? `${project.name} · ${item.title}` : item.title}
+        title={item.title}
       >
         {indented ? <span className="ff-timeline-child-mark" aria-hidden="true">↳</span> : null}
         <span className="ff-timeline-label-text">{item.title}</span>
@@ -248,11 +241,8 @@ function TimelineRowView({
         ))}
 
         <div
-          // A milestone has one date and no width to speak of, so it reads as
-          // a marker rather than a bar — the usual timeline convention, and
-          // here it also happens to match the data exactly (D8).
           className={[
-            item.source === "milestone" ? "ff-timeline-marker" : "ff-timeline-bar",
+            "ff-timeline-bar",
             // The start was derived, not declared: draw it as a guess (D5).
             span.inferredStart ? "is-inferred" : "",
             item.done ? "is-done" : "",
@@ -266,9 +256,6 @@ function TimelineRowView({
             .join(" ")}
           style={{
             gridColumn: `${placement.columnStart} / ${placement.columnEnd}`,
-            // Space colour, so a row reads as belonging somewhere even when
-            // the view is not grouped by Space.
-            ["--bar-color" as string]: item.color,
           }}
           // How TimelineConnectors finds this bar to measure it.
           data-bar-key={item.key}

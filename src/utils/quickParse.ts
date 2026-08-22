@@ -6,7 +6,7 @@
 // fields — the capture bar renders those as chips before saving, so a wrong
 // read is visible and correctable rather than silently stored. Anything that
 // is not one of the patterns below is left in the title untouched.
-import type { Project, TaskPriority } from "../types";
+import type { TaskPriority } from "../types";
 import { platform } from "../platform";
 import { addDays, todayValue, toDateInputValue } from "./date";
 
@@ -51,12 +51,10 @@ export interface QuickParseResult {
   dueDate: string;
   /** 24h "HH:MM". "" when absent. */
   startTime: string;
-  projectId: string;
   priority: TaskPriority | "";
 }
 
 interface QuickParseOptions {
-  projects: Project[];
   today?: string;
 }
 
@@ -115,7 +113,6 @@ export function parseQuickCapture(input: string, options: QuickParseOptions): Qu
     relativeDate: "",
     dueDate: "",
     startTime: "",
-    projectId: "",
     priority: "",
   };
 
@@ -198,21 +195,6 @@ export function parseQuickCapture(input: string, options: QuickParseOptions): Qu
         if (meridiemTime[3].toLowerCase() === "am" && hour === 12) hour = 0;
         result.startTime = `${pad(hour)}:${pad(Number(meridiemTime[2] ?? 0))}`;
       }
-    }
-  }
-
-  // --- #space → projectId (only when exactly one project matches) ---
-  const spaceTag = rest.match(/#(\S+)/);
-  if (spaceTag) {
-    const needle = spaceTag[1].toLowerCase();
-    const exact = options.projects.filter((project) => project.name.toLowerCase() === needle);
-    const partial = options.projects.filter((project) =>
-      project.name.toLowerCase().startsWith(needle),
-    );
-    const matches = exact.length > 0 ? exact : partial;
-    if (matches.length === 1) {
-      result.projectId = matches[0].id;
-      rest = `${rest.slice(0, spaceTag.index)} ${rest.slice((spaceTag.index ?? 0) + spaceTag[0].length)}`;
     }
   }
 

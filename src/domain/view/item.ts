@@ -17,38 +17,31 @@
 // Nothing here owns a record — every Item points back at the store that does,
 // which is the rule HorizonItem already states: "the view is owned, the
 // storage never is".
-import type { LearningPath, List, Project, Status, Task, TaskPriority } from "../../types";
+import type { List, Task, TaskPriority } from "../../types";
 import { blockedTaskIds } from "../tasks/dependencies";
-import { listIdFor, goalListIdFor, projectIdFor, statusIdFor, statusesForSpace, statusesWithCustom } from "../spaces/membership";
-import { spaceIdForProject } from "../spaces/spaces";
-import { normalizeGoalSchedule } from "../horizons/goalSchedule";
+import { listIdFor, statusIdFor, statusesForSpace } from "../spaces/membership";
 
-export type ItemSource = "task" | "goal" | "milestone";
+/**
+ * One source, where there were three.
+ *
+ * Goals and milestones were the other two, and both went with the Goals
+ * feature. The union stays a union rather than collapsing into nothing: it is
+ * what `key` is namespaced by, and what a future source would join.
+ */
+export type ItemSource = "task";
 
 export interface Item {
-  /** Unique across sources, so one list can hold a task and a goal at once. */
+  /** Namespaced by source, so one list could hold more than one kind. */
   key: string;
   source: ItemSource;
   sourceId: string;
-  /** Milestone -> its goal; subtask -> its task. "" at the top level. */
+  /** Subtask -> its task. "" at the top level. */
   parentId: string;
   title: string;
 
-  // --- area axis
-  /**
-   * The Space its Project hangs in (H-INV-01).
-   *
-   * This field held a PROJECT id until STEP 7, because a Project was the top
-   * of the tree. Both are here now, and they are different records: a Space
-   * scope has to gather several Projects, which one id could not express.
-   *
-   * Derived, never stored. Space membership is computed through the Project
-   * relation rather than copied onto every Task (§43) — a denormalised copy is
-   * one more thing that can disagree, and moving a Project between Spaces
-   * would have to rewrite every item under it (H-INV-05).
-   */
-  spaceId: string;
-  projectId: string;
+  // --- area axis. `spaceId` and `projectId` sat here, the two levels above a
+  // List in the old tree. Both records left with the Projects feature, and a
+  // List is the top of the area axis now.
   listId: string;
   /**
    * The Folder the Item's List hangs in; "" for a Folderless List (D4).
@@ -59,7 +52,6 @@ export interface Item {
    * of it does not have.
    */
   folderId: string;
-  color: string;
 
   // --- time axis. `scheduledDate` — "the day actually blocked out" — used to
   // sit between these two, and folded into them when the Task record dropped
@@ -87,23 +79,8 @@ export interface Item {
 
 export interface ProjectItemsInput {
   tasks: Task[];
-  paths: LearningPath[];
-  projects: Project[];
   lists: List[];
   today: string;
-  /** Omit to include goals and milestones; the calendar wants tasks only. */
-  sources?: ItemSource[];
-}
-
-const DEFAULT_COLOR = "#0066cc";
-
-function colorMap(projects: Project[]): Map<string, string> {
-  return new Map(projects.map((project) => [project.id, project.color]));
-}
-
-/** Project id -> the Space it hangs in. The only place membership is joined. */
-function spaceMap(projects: Project[]): Map<string, string> {
-  return new Map(projects.map((project) => [project.id, spaceIdForProject(project)]));
 }
 
 /** List id -> the Folder it hangs in. Absent for a Folderless List (D4). */
@@ -115,151 +92,38 @@ function folderMap(lists: List[]): Map<string, string> {
   return map;
 }
 
-/**
- * The set an Item resolves its status against.
- *
- * It must be the SAME set a board draws its columns from, and that is
- * `statusesWithCustom` — defaults plus every column the user named. While
- * this used `statusesForSpace`, a named column existed on screen but not in
- * the set `statusIdFor` validates against, so every item on it fell back to
- * `task.status`: the column could never hold anything, and a card dropped on
- * it snapped back.
- */
-function statusMap(projects: Project[]): Map<string, Status[]> {
-  return new Map(projects.map((project) => [project.id, statusesWithCustom(project)]));
-}
-
-/**
- * A goal's column.
- *
- * Completion is the user's explicit assertion and outranks the column (D10),
- * so a finished goal reads `done` wherever it was filed. Otherwise the board
- * column it sits in IS its status: `boardListId` is the only field a goal has
- * ever had for this, and it is exactly what `statusesWithCustom` puts in
- * the set. Dropping it here is what let the Goals tab and the board give two
- * different answers about one goal.
- *
- * A dangling id falls back rather than rendering into a column that no longer
- * exists — the same rule `statusIdFor` follows for a task.
- */
-function goalStatusId(path: LearningPath, statuses: Status[]): string {
-  if (path.completedAt) return "done";
-  if (path.boardListId && statuses.some((status) => status.id === path.boardListId)) {
-    return path.boardListId;
-  }
-  return "todo";
-}
-
 export function projectItems(input: ProjectItemsInput): Item[] {
-  const { tasks, paths, projects, lists, today } = input;
-  const wanted = new Set<ItemSource>(input.sources ?? ["task", "goal", "milestone"]);
-  const colors = colorMap(projects);
-  const statuses = statusMap(projects);
-  const spaces = spaceMap(projects);
+  const { tasks, lists } = input;
   const folders = folderMap(lists);
   const blocked = blockedTaskIds(tasks);
+  // Custom per-Project status sets went with the Projects feature, so every
+  // Task now resolves against the one default set.
+  const statuses = statusesForSpace(undefined);
   const items: Item[] = [];
 
-  if (wanted.has("task")) {
-    for (const task of tasks) {
-      if (task.deletedAt) continue;
-      const taskListId = listIdFor(task, lists);
-      // The List is the owner and the Project is read through it (§6.77), so
-      // the chain here runs List -> Project -> Space rather than starting from
-      // a Project id stored on the Task. Moving a List between Projects moves
-      // its Tasks with it and rewrites none of them; an Inbox Task resolves to
-      // no Project and so to no Space, which is what §6.80 asks for.
-      const taskProjectId = projectIdFor(task, lists);
-      const spaceStatuses = statuses.get(taskProjectId) ?? statusesForSpace(undefined);
-      items.push({
-        key: `task:${task.id}`,
-        source: "task",
-        sourceId: task.id,
-        parentId: task.parentTaskId,
-        title: task.title,
-        spaceId: spaces.get(taskProjectId) ?? "",
-        projectId: taskProjectId,
-        listId: taskListId,
-        folderId: folders.get(taskListId) ?? "",
-        color: colors.get(taskProjectId) ?? DEFAULT_COLOR,
-        startDate: task.startDate,
-        dueDate: task.dueDate,
-        startTime: task.startTime,
-        endTime: task.endTime,
-        statusId: statusIdFor(task, spaceStatuses),
-        priority: task.priority,
-        done: task.status === "done",
-        blocked: blocked.has(task.id),
-        tags: task.tags,
-        estimatedMinutes: task.estimatedMinutes,
-        actualSeconds: task.actualSeconds,
-      });
-    }
-  }
-
-  for (const path of paths) {
-    const projectId = path.projectId ?? "";
-    const spaceId = spaces.get(projectId) ?? "";
-    const color = colors.get(projectId) ?? DEFAULT_COLOR;
-    const spaceStatuses = statuses.get(projectId) ?? statusesForSpace(undefined);
-    const listId = goalListIdFor(path, lists);
-    const folderId = folders.get(listId) ?? "";
-    const schedule = normalizeGoalSchedule(path.schedule, path.targetDate, today);
-
-    if (wanted.has("goal")) {
-      items.push({
-        key: `goal:${path.id}`,
-        source: "goal",
-        sourceId: path.id,
-        parentId: "",
-        title: path.goal,
-        spaceId,
-        projectId,
-        listId,
-        folderId,
-        color,
-        // "unscheduled" and "life" carry no start; both are periods without
-        // a first day, so the span resolver falls back to the deadline.
-        startDate: schedule && "startDate" in schedule ? schedule.startDate : "",
-        dueDate: path.deadlineDate ?? "",
-        startTime: "",
-        endTime: "",
-        statusId: goalStatusId(path, spaceStatuses),
-        priority: "none",
-        done: Boolean(path.completedAt),
-        blocked: false,
-        tags: path.tags ?? [],
-        estimatedMinutes: 0,
-        actualSeconds: 0,
-      });
-    }
-
-    if (!wanted.has("milestone")) continue;
-    for (const milestone of path.milestones) {
-      items.push({
-        key: `milestone:${path.id}:${milestone.id}`,
-        source: "milestone",
-        sourceId: milestone.id,
-        parentId: path.id,
-        title: milestone.title,
-        spaceId,
-        projectId,
-        listId,
-        folderId,
-        color,
-        startDate: "",
-        dueDate: milestone.deadlineDate ?? "",
-        startTime: "",
-        endTime: "",
-        statusId: milestone.completedAt ? "done" : "todo",
-        priority: "none",
-        done: Boolean(milestone.completedAt),
-        blocked: false,
-        tags: [],
-        estimatedMinutes: 0,
-        actualSeconds: 0,
-      });
-    }
+  for (const task of tasks) {
+    if (task.deletedAt) continue;
+    const taskListId = listIdFor(task, lists);
+    items.push({
+      key: `task:${task.id}`,
+      source: "task",
+      sourceId: task.id,
+      parentId: task.parentTaskId,
+      title: task.title,
+      listId: taskListId,
+      folderId: folders.get(taskListId) ?? "",
+      startDate: task.startDate,
+      dueDate: task.dueDate,
+      startTime: task.startTime,
+      endTime: task.endTime,
+      statusId: statusIdFor(task, statuses),
+      priority: task.priority,
+      done: task.status === "done",
+      blocked: blocked.has(task.id),
+      tags: task.tags,
+      estimatedMinutes: task.estimatedMinutes,
+      actualSeconds: task.actualSeconds,
+    });
   }
 
   return items;

@@ -1,7 +1,7 @@
 // CALENDAR_DESIGN.md §6 (D7): builds a "today's week" snapshot for the Ollama
 // chat when the user is on the Calendar page. MVP scope only — no live anchor
 // from the calendar's own view state (avoids lifting CalendarView state to App).
-import type { Project, Task } from "../types";
+import type { Task } from "../types";
 import { getWeekDays, todayValue } from "../utils/date";
 import { buildCalendarItems, defaultCalendarLayers } from "../utils/calendarItems";
 import { hasSchedule, scheduleFromTask } from "../domain/schedule";
@@ -9,7 +9,6 @@ import { isTaskOpen } from "../domain/tasks/taskState";
 
 export interface CalendarContextInput {
   tasks: Task[];
-  projects: Project[];
 }
 
 function minutesBetween(start: string, end: string): number {
@@ -18,16 +17,14 @@ function minutesBetween(start: string, end: string): number {
   return Math.max(0, endHour * 60 + endMinute - (startHour * 60 + startMinute));
 }
 
-export function buildCalendarContextText({ tasks, projects }: CalendarContextInput): string {
+export function buildCalendarContextText({ tasks }: CalendarContextInput): string {
   const days = getWeekDays(todayValue());
   const rangeStart = days[0];
   const rangeEnd = days[days.length - 1];
 
   const items = buildCalendarItems({
     tasks,
-    projects,
     layers: { ...defaultCalendarLayers, completed: false },
-    projectFilter: "all",
   }).filter((item) => item.date >= rangeStart && item.date <= rangeEnd);
 
   const scheduledTasks = items
@@ -38,9 +35,6 @@ export function buildCalendarContextText({ tasks, projects }: CalendarContextInp
       start: item.startTime ?? null,
       end: item.endTime ?? null,
     }));
-  const projectDeadlines = items
-    .filter((item) => item.layer === "project-deadline")
-    .map((item) => ({ title: item.title, date: item.date }));
   const unscheduledTasks = tasks
     .filter((task) => !hasSchedule(scheduleFromTask(task)) && isTaskOpen(task))
     .slice(0, 20)
@@ -61,7 +55,6 @@ export function buildCalendarContextText({ tasks, projects }: CalendarContextInp
     // date as the work now (audit §6, 1-d), so it arrives inside
     // `scheduledTasks` and a separate key would always be empty.
     scheduledTasks,
-    projectDeadlines,
     unscheduledTasks,
     workloadSummary,
   };

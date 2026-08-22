@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Folder, List, Project, SavedFilter, SidebarFolder, Space, Tag, Task } from "../../types";
+import type { Folder, List, SavedFilter, SidebarFolder, Tag, Task } from "../../types";
 import { flattenGroups, matchRank, DEFAULT_LIMITS, MENU_LIMITS, PAGE_LIMITS, searchAll, type SearchCollections } from "./search";
 
 const NOW = "2026-08-18T09:00:00.000Z";
@@ -69,8 +69,6 @@ function collections(overrides: Partial<SearchCollections> = {}): SearchCollecti
     sidebarFolders: [],
     tags: [],
     savedFilters: [],
-    projects: [],
-    spaces: [],
     ...overrides,
   };
 }
@@ -199,30 +197,9 @@ describe("searchAll", () => {
   });
 });
 
-describe("what lives above the Tasks Module (§10.16)", () => {
-  const project = { id: "p1", name: "Drone research", createdAt: NOW, updatedAt: NOW } as Project;
-  const space = { id: "s1", name: "Research", createdAt: NOW, updatedAt: NOW } as Space;
-
-  it("answers with Projects and Spaces as their own kinds, last in group order", () => {
-    const groups = searchAll(
-      "res",
-      collections({ projects: [project], spaces: [space] }),
-      LABELS,
-    );
-    expect(groups.map((group) => group.kind)).toEqual(["project", "space"]);
-    expect(groups[0].results[0].title).toBe("Drone research");
-    expect(groups[1].results[0].title).toBe("Research");
-  });
-
-  it("leaves out an archived one, the same as every other container", () => {
-    const groups = searchAll(
-      "res",
-      collections({ projects: [{ ...project, archivedAt: NOW }], spaces: [{ ...space, archivedAt: NOW }] }),
-      LABELS,
-    );
-    expect(groups).toEqual([]);
-  });
-});
+// A Project and a Space were two more search kinds here, answered last in
+// group order. Both records left the app's surface with the Projects feature,
+// and a hit nothing can open is worse than no hit.
 
 // D-25 gave the menu `task: 0`; D-29 took it back. What the two callers differ by
 // now is HOW MUCH, not what — which is the difference a cap expresses and a

@@ -12,7 +12,6 @@ import type {
   Folder,
   List,
   ListSection,
-  Project,
   SavedFilter,
   SidebarFolder,
   Space,
@@ -77,8 +76,6 @@ interface TasksModuleProps {
   savedFilters: SavedFilter[];
   listSections: ListSection[];
   /** Searched by §10.16, and navigated to through the Spaces routes. */
-  projects: Project[];
-  spaces: Space[];
   dailyPlans: TaskDailyPlan[];
   tags: Tag[];
   taskTags: TaskTag[];
@@ -151,8 +148,6 @@ export function TasksModule(props: TasksModuleProps) {
     sidebarFolders,
     savedFilters,
     listSections,
-    projects,
-    spaces,
     dailyPlans,
     tags,
     taskTags,
@@ -369,13 +364,11 @@ export function TasksModule(props: TasksModuleProps) {
     sidebarFolders,
     tags,
     savedFilters,
-    projects,
-    spaces,
   };
 
   /** §10.17/§10.18: a result opens at its OWN canonical place, Drawer and all. */
   function openResult(result: SearchResult) {
-    onNavigate(urlForSearchResult(result, lists, projects));
+    onNavigate(urlForSearchResult(result, lists));
   }
 
   // The Board's two adapters (§16.30). The component below knows about
@@ -385,12 +378,10 @@ export function TasksModule(props: TasksModuleProps) {
   const columns = scope.kind === "inbox" ? INBOX_COLUMNS : listBoardColumns(boardListId, listSections);
 
   // The timeline's three arguments, built from the rows the Scope already
-  // chose. `sources: ["task"]` because this module is about Tasks — a Goal or
-  // a milestone is not in any of the nine Scopes, so drawing one here would
-  // put work on screen that the count beside it does not know about.
+  // chose.
   const ganttItems = useMemo(
-    () => projectItems({ tasks: rows, paths: [], projects, lists, today, sources: ["task"] }),
-    [rows, projects, lists, today],
+    () => projectItems({ tasks: rows, lists, today }),
+    [rows, lists, today],
   );
   const ganttSpec: ViewSpec = useMemo(
     // The scope is passed empty on purpose: `queryScopeTasks` has already
@@ -405,9 +396,9 @@ export function TasksModule(props: TasksModuleProps) {
       taskById: new Map(rows.map((task) => [task.id, task])),
       // D10: the order the user arranged Lists in outranks the alphabet, and
       // the sidebar and this timeline have to agree about it.
-      groupRank: groupRank(ganttSpec.groupBy, { projects, lists, folders }),
+      groupRank: groupRank(ganttSpec.groupBy, { lists, folders }),
     }),
-    [today, rows, ganttSpec.groupBy, projects, lists, folders],
+    [today, rows, ganttSpec.groupBy, lists, folders],
   );
   const columnOf = (task: Task) =>
     scope.kind === "inbox" ? (inboxBucketOf(task) as string) : sectionIdFor(task, lists, listSections);
@@ -618,7 +609,6 @@ export function TasksModule(props: TasksModuleProps) {
             spec={ganttSpec}
             context={ganttContext}
             today={today}
-            projects={projects}
             tasks={tasks}
             groupLabel={(groupId) => {
               const owner = lists.find((list) => list.id === groupId);

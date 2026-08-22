@@ -5,27 +5,8 @@ import type { Project } from "../types";
 // 2026-03-10 is a Tuesday, which keeps the weekday cases easy to read.
 const TODAY = "2026-03-10";
 
-function project(id: string, name: string): Project {
-  return {
-    id,
-    name,
-    description: "",
-    notes: "",
-    color: "#0066cc",
-    status: "active",
-    type: "project",
-    dueDate: "",
-    pinned: false,
-    order: 0,
-    createdAt: "",
-    updatedAt: "",
-  } as Project;
-}
-
-const projects = [project("p1", "업무"), project("p2", "사이드"), project("p3", "Study")];
-
 function parse(input: string) {
-  return parseQuickCapture(input, { projects, today: TODAY });
+  return parseQuickCapture(input, { today: TODAY });
 }
 
 describe("parseQuickCapture", () => {
@@ -35,7 +16,6 @@ describe("parseQuickCapture", () => {
     expect(result.relativeDate).toBe("");
     expect(result.dueDate).toBe("");
     expect(result.startTime).toBe("");
-    expect(result.projectId).toBe("");
     expect(result.priority).toBe("");
   });
 
@@ -90,25 +70,11 @@ describe("parseQuickCapture", () => {
     expect(parse("lunch 12pm").startTime).toBe("12:00");
   });
 
-  it("resolves #space by exact then prefix match", () => {
-    expect(parse("리뷰 #업무").projectId).toBe("p1");
-    expect(parse("리뷰 #사이").projectId).toBe("p2");
-    expect(parse("review #study").projectId).toBe("p3");
-    expect(parse("리뷰 #업무").title).toBe("리뷰");
-  });
-
-  it("leaves an unmatched or ambiguous #tag in the title", () => {
-    const unknown = parse("리뷰 #없는스페이스");
-    expect(unknown.projectId).toBe("");
-    expect(unknown.title).toBe("리뷰 #없는스페이스");
-
-    // "ㅅ" prefixes nothing here, but a duplicate prefix must stay ambiguous.
-    const ambiguous = parseQuickCapture("리뷰 #프로", {
-      projects: [project("a", "프로젝트A"), project("b", "프로젝트B")],
-      today: TODAY,
-    });
-    expect(ambiguous.projectId).toBe("");
-    expect(ambiguous.title).toBe("리뷰 #프로");
+  // `#space` resolved a Project id and stripped the tag from the title. The
+  // Projects feature is gone, so a `#` word is left in the text where the
+  // user typed it.
+  it("leaves a #tag in the title", () => {
+    expect(parse("리뷰 #업무").title).toBe("리뷰 #업무");
   });
 
   it("reads priority markers", () => {
@@ -135,11 +101,10 @@ describe("parseQuickCapture", () => {
   });
 
   it("combines everything and cleans up whitespace", () => {
-    const result = parse("내일 오후 3시 #업무 팀 회의 준비 !!");
+    const result = parse("내일 오후 3시 팀 회의 준비 !!");
     expect(result.title).toBe("팀 회의 준비");
     expect(result.relativeDate).toBe("2026-03-11");
     expect(result.startTime).toBe("15:00");
-    expect(result.projectId).toBe("p1");
     expect(result.priority).toBe("high");
   });
 

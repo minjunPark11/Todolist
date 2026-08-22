@@ -45,21 +45,10 @@ function task(overrides: Partial<Task> = {}): Task {
   };
 }
 
-const project: Project = {
-  id: "p1",
-  name: "Research",
-  description: "",
-  color: "#34c759",
-  createdAt: NOW,
-  updatedAt: NOW,
-};
-
 function build(input: Partial<Parameters<typeof buildCalendarItems>[0]> = {}) {
   return buildCalendarItems({
     tasks: [],
-    projects: [],
     layers: defaultCalendarLayers,
-    projectFilter: "all",
     ...input,
   });
 }
@@ -177,53 +166,18 @@ describe("task chips", () => {
     expect(items.every((item) => item.repeating)).toBe(true);
   });
 
-  it("takes the project colour when there is no category map", () => {
-    const items = build({ tasks: [task({ projectId: "p1", dueDate: "2026-08-17" })], projects: [project] });
-    expect(items[0].color).toBe("#34c759");
+  // The colour came from the task's Project when no category map was given.
+  // Projects are gone; the layer's own tone is the fallback now.
+  it("falls back to the task layer's colour when there is no category map", () => {
+    const items = build({ tasks: [task({ dueDate: "2026-08-17" })] });
+    expect(items[0].color).toBe("#0066cc");
     expect(items[0].categoryId).toBe("");
   });
 });
 
-describe("project filter", () => {
-  it("hides only what belongs to an excluded project", () => {
-    // §9.6: a task with no project is never hidden by the filter.
-    const items = build({
-      tasks: [task({ id: "a", projectId: "p1", dueDate: "2026-08-17" }), task({ id: "b", dueDate: "2026-08-17" })],
-      projects: [project],
-      projectFilter: new Set<string>(),
-    });
-    expect(items.map((item) => item.sourceId)).toEqual(["b"]);
-  });
-});
-
-describe("project deadlines", () => {
-  it("draws one all-day marker per dated, live project", () => {
-    const items = build({ projects: [{ ...project, dueDate: "2026-09-01", status: "active" }] });
-    expect(keys(items)).toEqual(["proj:p1"]);
-    expect(items[0].sourceType).toBe("project");
-    expect(items[0].allDay).toBe(true);
-  });
-
-  it("requires an explicit live status, though the type does not", () => {
-    // `status` is optional on Project but the guard admits only active/paused,
-    // so a project built in memory without one is silently skipped. Stored
-    // data never hits this — normalizeProject defaults it to "active" on load
-    // — which is why it has gone unnoticed. Pinned as-is rather than changed:
-    // this refactor is meant to move the task half, not to decide this.
-    expect(build({ projects: [{ ...project, dueDate: "2026-09-01" }] })).toEqual([]);
-  });
-
-  it("skips projects that are undated, finished, or switched off", () => {
-    expect(build({ projects: [{ ...project, status: "active" }] })).toEqual([]);
-    expect(build({ projects: [{ ...project, dueDate: "2026-09-01", status: "completed" }] })).toEqual([]);
-    expect(
-      build({
-        projects: [{ ...project, dueDate: "2026-09-01", status: "active" }],
-        layers: { ...defaultCalendarLayers, projectDeadline: false },
-      }),
-    ).toEqual([]);
-  });
-});
+// A project filter and a project-deadline layer had their own blocks here.
+// Both went with the Projects feature: there is no Project record to exclude
+// from the calendar, and none with a due date to mark on it.
 
 describe("external events", () => {
   const calendar: ExternalCalendar = {

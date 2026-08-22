@@ -16,25 +16,13 @@ vi.mock("../../platform", () => ({
 }));
 
 import {
-  LEGACY_LEARNING_PATHS_KEY,
-  LEGACY_LEARNING_PATHS_MIGRATED_KEY,
-} from "../../lib/ai/learningPaths/store";
-import type { LearningPath } from "../../lib/ai/learningPaths/types";
+  LEGACY_LOCAL_SPACES_KEY,
+  LEGACY_LOCAL_SPACES_MIGRATED_KEY,
+} from "../../lib/spaces/legacyLocalSpaces";
 import type { PlannerData } from "../../types";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "./persistPlannerData";
 
-function goal(): LearningPath {
-  return {
-    id: "goal-1",
-    goal: "Learn Korean",
-    milestones: [],
-    source: "user",
-    createdAt: "2026-08-01T00:00:00.000Z",
-    updatedAt: "2026-08-01T00:00:00.000Z",
-  };
-}
-
-function plannerData(path: LearningPath): PlannerData {
+function plannerData(): PlannerData {
   return {
     tasks: [],
     projects: [],
@@ -45,7 +33,7 @@ function plannerData(path: LearningPath): PlannerData {
     taskTags: [],
     focusSessions: [],
     activeSessionId: "",
-    learningPaths: [path],
+    learningPaths: [],
     folders: [],
     lists: [],
     sidebarFolders: [],
@@ -62,20 +50,22 @@ describe("persistPlannerData", () => {
     failPlannerWrite = false;
   });
 
-  it("marks the legacy goal only after the planner snapshot is written", () => {
-    const path = goal();
-    storage.set(LEGACY_LEARNING_PATHS_KEY, JSON.stringify([path]));
-    persistPlannerData(plannerData(path));
+  // This was written for the legacy GOAL blob, which went with the Goals
+  // feature. The ordering it pins is not about which blob: a legacy source is
+  // marked migrated only once the snapshot that adopted it is safely written,
+  // so a failed write leaves the source available for the next launch.
+  it("marks the legacy source only after the planner snapshot is written", () => {
+    storage.set(LEGACY_LOCAL_SPACES_KEY, JSON.stringify([]));
+    persistPlannerData(plannerData());
     expect(storage.has(PLANNER_STORAGE_KEY)).toBe(true);
-    expect(storage.get(LEGACY_LEARNING_PATHS_MIGRATED_KEY)).toBe("1");
+    expect(storage.get(LEGACY_LOCAL_SPACES_MIGRATED_KEY)).toBe("1");
   });
 
   it("leaves the legacy source retryable when the planner write fails", () => {
-    const path = goal();
-    storage.set(LEGACY_LEARNING_PATHS_KEY, JSON.stringify([path]));
+    storage.set(LEGACY_LOCAL_SPACES_KEY, JSON.stringify([]));
     failPlannerWrite = true;
-    expect(() => persistPlannerData(plannerData(path))).toThrow("disk full");
-    expect(storage.has(LEGACY_LEARNING_PATHS_MIGRATED_KEY)).toBe(false);
-    expect(storage.has(LEGACY_LEARNING_PATHS_KEY)).toBe(true);
+    expect(() => persistPlannerData(plannerData())).toThrow("disk full");
+    expect(storage.has(LEGACY_LOCAL_SPACES_MIGRATED_KEY)).toBe(false);
+    expect(storage.has(LEGACY_LOCAL_SPACES_KEY)).toBe(true);
   });
 });

@@ -40,14 +40,14 @@ describe("contextSidebar", () => {
       expect(contextSidebarModeFor(PAGE_ROUTES.settings)).toBe("none");
     });
 
-    // SPACE_REMOVAL_IA Stage 6: the Space tree is gone. Projects and Goals
-    // both show the Tasks sidebar, and /s/... addresses (legacy deep links)
-    // resolve to the projects page which does the same.
-    it("keeps the Tasks sidebar on Projects and Goals", () => {
-      expect(contextSidebarModeFor(PAGE_ROUTES.projects)).toBe("tasks");
-      expect(contextSidebarModeFor(PAGE_ROUTES.goals)).toBe("tasks");
+    // The Projects and Goals pages are gone, and so is the Space tree their
+    // addresses named. Every one of those links now resolves to Today, which
+    // shows the Tasks sidebar — so an old bookmark lands somewhere whole
+    // rather than on a page with no navigation.
+    it("keeps the Tasks sidebar on the retired Projects and Goals addresses", () => {
+      expect(contextSidebarModeFor("/projects")).toBe("tasks");
+      expect(contextSidebarModeFor("/goals")).toBe("tasks");
       expect(contextSidebarModeFor("/s/space-1")).toBe("tasks");
-      expect(contextSidebarModeFor("/s/space-1/p/project-1")).toBe("tasks");
     });
 
     it("keeps the Tasks sidebar everywhere else", () => {

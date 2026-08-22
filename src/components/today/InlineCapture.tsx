@@ -1,12 +1,10 @@
 import { FormEvent, RefObject, useMemo, useState } from "react";
-import type { Project } from "../../types";
 import { formatDate } from "../../utils/date";
 import { parseQuickCapture, type QuickParseResult } from "../../utils/quickParse";
 import { formatMinuteOfDay, parseTimeToMinutes } from "../../utils/todayView";
 import { useT } from "../../i18n";
 
 interface InlineCaptureProps {
-  projects: Project[];
   today: string;
   /** Persisted: on = the capture becomes a Today task, off = an Inbox item. */
   addToToday: boolean;
@@ -17,7 +15,6 @@ interface InlineCaptureProps {
 }
 
 export function InlineCapture({
-  projects,
   today,
   addToToday,
   onToggleAddToToday,
@@ -31,8 +28,8 @@ export function InlineCapture({
   // Parsed live so the chips below show what the app understood before the
   // capture is stored — a misread is visible rather than silent.
   const parsed = useMemo(
-    () => parseQuickCapture(value, { projects, today }),
-    [value, projects, today],
+    () => parseQuickCapture(value, { today }),
+    [value, today],
   );
   const canSave = Boolean(parsed.title.trim() || value.trim());
 
@@ -43,9 +40,6 @@ export function InlineCapture({
     setValue("");
   }
 
-  const project = parsed.projectId
-    ? projects.find((candidate) => candidate.id === parsed.projectId)
-    : undefined;
   const startMin = parsed.startTime ? parseTimeToMinutes(parsed.startTime) : undefined;
   const chips = [
     parsed.relativeDate
@@ -53,7 +47,6 @@ export function InlineCapture({
       : null,
     parsed.dueDate ? { key: "due", label: `~ ${formatDate(parsed.dueDate, lang)}` } : null,
     startMin !== undefined ? { key: "time", label: formatMinuteOfDay(startMin, lang) } : null,
-    project ? { key: "project", label: project.name } : null,
     parsed.priority ? { key: "priority", label: t(`priority.${parsed.priority}`) } : null,
   ].filter((chip): chip is { key: string; label: string } => chip !== null);
 

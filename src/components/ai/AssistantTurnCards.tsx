@@ -1,9 +1,9 @@
 // Structured render of one AssistantTurn: card draft + next action + plan +
-// learning path + related cards, with the user-confirmed save/link buttons.
+// related cards, with the user-confirmed save buttons.
 // Extracted from AssistantPanel (Unified Chat slice 1) so the chat tab can
 // render the same cards inline instead of flattening the turn to text.
 //
-// Per-turn action state (saved card, saved task, rejection, path link) lives
+// Per-turn action state (saved card, saved task, rejection) lives
 // HERE — hosts must mount it with key={turn.id} so a new turn resets it.
 // Nothing in this component changes app data without a button click.
 import { useMemo, useState } from "react";
@@ -12,10 +12,6 @@ import type { AssistantTurn } from "../../lib/ai/assistant/types";
 import { loadContextCards, saveContextCard } from "../../lib/ai/contextCards/store";
 import { summarizeContextCardForPrompt } from "../../lib/ai/contextCards/searchContextCards";
 import type { ContextCard, RecommendedNextAction } from "../../lib/ai/contextCards/types";
-import { suggestMilestoneForCard } from "../../lib/ai/learningPaths/matchMilestone";
-import { currentMilestoneIndex, formatBreadcrumb, milestoneIndexForCard } from "../../lib/ai/learningPaths/progress";
-import type { LearningPathStore } from "./pathStore";
-import type { LearningPath, LearningPathDraft } from "../../lib/ai/learningPaths/types";
 import { updateOutcome } from "../../lib/ai/memory/outcomeLog";
 import type { ToolExecutionResult } from "../../lib/ai/tools/toolExecutor";
 import { useT } from "../../i18n";
@@ -31,15 +27,6 @@ interface AssistantTurnCardsProps {
   // them (the chat tab must force the assistant flow, not the free-text
   // agent). Buttons hidden when absent.
   onFollowUpRequest?: (text: string) => void;
-  // Fired after a path save/link so hosts with a breadcrumb can refresh it.
-  onPathsChanged?: () => void;
-  // Paths now come from planner state; absent means the host does not offer
-  // the path layer, and the panel simply renders no position line.
-  pathStore?: LearningPathStore;
-  // Render the deterministic position line ("지금 …의 N/M …") above the
-  // cards. The assistant panel keeps its own copy inside the reply bubble,
-  // so it passes false; the chat tab passes true.
-  showPositionLine?: boolean;
 }
 
 function Chips({ label, values }: { label: string; values: string[] }) {
@@ -64,9 +51,6 @@ export function AssistantTurnCards({
   loading,
   onExecuteActions,
   onFollowUpRequest,
-  onPathsChanged,
-  showPositionLine,
-  pathStore,
 }: AssistantTurnCardsProps) {
   const { t } = useT();
   // Per-proposal state — reset by the host remounting with key={turn.id}.
@@ -75,21 +59,6 @@ export function AssistantTurnCards({
   const [rejected, setRejected] = useState(false);
   const [notice, setNotice] = useState("");
   const [showRelatedCards, setShowRelatedCards] = useState(false);
-  const [savedPath, setSavedPath] = useState<LearningPath | null>(null);
-  // Milestone the saved card of THIS turn was linked to ("" = not linked).
-  const [linkedMilestoneTitle, setLinkedMilestoneTitle] = useState("");
-  // Most recently updated path — drives the link suggestion, rolling-wave
-  // render, and (in the chat tab) the position line. All position math lives
-  // in learningPaths/progress.
-  const [activePath, setActivePath] = useState<LearningPath | null>(() => pathStore?.paths[0] ?? null);
-  const pathView = useMemo(() => {
-    if (!activePath) return null;
-    const cards = loadContextCards();
-    return {
-      breadcrumb: formatBreadcrumb(activePath, cards),
-      currentIndex: currentMilestoneIndex(activePath, cards),
-    };
-  }, [activePath]);
 
   function handleSaveCard() {
     if (savedCard) return;
@@ -144,32 +113,6 @@ export function AssistantTurnCards({
     }
   }
 
-  function handleSavePath(pathDraft: LearningPathDraft) {
-    if (savedPath || !pathStore) return;
-    const path = pathStore.savePath(pathDraft, "assistant");
-    if (!path) return;
-    setSavedPath(path);
-    setActivePath(path);
-    onPathsChanged?.();
-  }
-
-  // Deterministic link suggestion (matchMilestone.ts) once the card is
-  // saved: one milestone, one confirm click — never auto-linked (decision
-  // 2026-07-09).
-  const linkSuggestion = useMemo(
-    () => (savedCard && activePath && !linkedMilestoneTitle ? suggestMilestoneForCard(activePath, savedCard, loadContextCards()) : null),
-    [savedCard, activePath, linkedMilestoneTitle],
-  );
-
-  function handleLinkCard() {
-    if (!savedCard || !activePath || !linkSuggestion || !pathStore) return;
-    const updated = pathStore.linkCard(activePath.id, linkSuggestion.milestone.id, savedCard.id);
-    if (updated) {
-      setActivePath(updated);
-      setLinkedMilestoneTitle(linkSuggestion.milestone.title);
-      onPathsChanged?.();
-    }
-  }
 
   function handleReject() {
     if (savedTaskTitle || rejected) return;
@@ -186,16 +129,6 @@ export function AssistantTurnCards({
 
   return (
     <div className="assistant-turn-cards">
-      {showPositionLine && pathView?.breadcrumb ? (
-        <p className="assistant-path-position">
-          {t("ai.assistant.path.position", {
-            goal: pathView.breadcrumb.goal,
-            position: pathView.breadcrumb.position,
-            milestone: pathView.breadcrumb.milestoneTitle,
-          })}
-        </p>
-      ) : null}
-
       {turn.followUpQuestions.length > 0 ? (
         <section className="assistant-section" aria-label={t("ai.assistant.followUps")}>
           <h3>{t("ai.assistant.needsMoreContext")}</h3>
@@ -239,13 +172,6 @@ export function AssistantTurnCards({
           <button type="button" className="assistant-primary" onClick={handleSaveCard} disabled={Boolean(savedCard)}>
             {savedCard ? t("ai.assistant.cardSaved") : t("ai.assistant.saveCard")}
           </button>
-          {savedCard && activePath && (linkSuggestion || linkedMilestoneTitle) ? (
-            <button type="button" onClick={handleLinkCard} disabled={Boolean(linkedMilestoneTitle)}>
-              {linkedMilestoneTitle
-                ? `✓ ${t("ai.assistant.path.linked", { milestone: linkedMilestoneTitle })}`
-                : `🧭 ${t("ai.assistant.path.linkSuggest", { milestone: linkSuggestion?.milestone.title ?? "" })}`}
-            </button>
-          ) : null}
         </div>
       </section>
 
@@ -323,34 +249,6 @@ export function AssistantTurnCards({
         </section>
       ) : null}
 
-      {turn.learningPathDraft ? (
-        <section className="assistant-section assistant-path" aria-label={t("ai.assistant.path.draftTitle")}>
-          <h3>{t("ai.assistant.path.draftTitle")}</h3>
-          <p className="assistant-hint">{t("ai.assistant.path.hint")}</p>
-          <p className="assistant-card-title">{turn.learningPathDraft.goal}</p>
-          <ol className="assistant-plan-steps">
-            {turn.learningPathDraft.milestones.map((milestone) => (
-              <li key={milestone.id} className="assistant-plan-step">
-                <p className="assistant-plan-step-title">{milestone.title}</p>
-                <p className="assistant-plan-step-meta">
-                  {t("ai.assistant.path.milestoneDone")}: {milestone.doneCriteria}
-                </p>
-              </li>
-            ))}
-          </ol>
-          <div className="assistant-actions">
-            <button
-              type="button"
-              className="assistant-primary"
-              onClick={() => turn.learningPathDraft && handleSavePath(turn.learningPathDraft)}
-              disabled={Boolean(savedPath)}
-            >
-              {savedPath ? t("ai.assistant.path.saved") : t("ai.assistant.path.save")}
-            </button>
-          </div>
-        </section>
-      ) : null}
-
       {turn.relatedCards.length > 0 ? (
         <section className="assistant-section" aria-label={t("ai.assistant.showRelatedCards", { n: turn.relatedCards.length })}>
           <button type="button" className="assistant-toggle" onClick={() => setShowRelatedCards((value) => !value)}>
@@ -358,25 +256,11 @@ export function AssistantTurnCards({
           </button>
           {showRelatedCards ? (
             <div className="assistant-related-cards">
-              {turn.relatedCards.map((card) => {
-                // Rolling wave (slice B): only cards on the path's current
-                // milestone expand to full detail — cards parked on later
-                // milestones render title-only.
-                const milestoneIndex = activePath ? milestoneIndexForCard(activePath, card.id) : null;
-                const parked = activePath && pathView && milestoneIndex !== null && milestoneIndex !== pathView.currentIndex;
-                if (parked) {
-                  return (
-                    <p key={card.id} className="assistant-related-card assistant-related-card-parked">
-                      {card.title} · {t("ai.assistant.path.laterMilestone", { milestone: activePath.milestones[milestoneIndex].title })}
-                    </p>
-                  );
-                }
-                return (
-                  <pre key={card.id} className="assistant-related-card">
-                    {summarizeContextCardForPrompt(card)}
-                  </pre>
-                );
-              })}
+              {turn.relatedCards.map((card) => (
+                <pre key={card.id} className="assistant-related-card">
+                  {summarizeContextCardForPrompt(card)}
+                </pre>
+              ))}
             </div>
           ) : null}
         </section>

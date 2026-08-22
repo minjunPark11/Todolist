@@ -106,8 +106,6 @@ function renderModule(url: string) {
         sidebarFolders={[]}
         savedFilters={[]}
         listSections={[doingSection]}
-        projects={[]}
-        spaces={[]}
         dailyPlans={[]}
         tags={[]}
         taskTags={[]}

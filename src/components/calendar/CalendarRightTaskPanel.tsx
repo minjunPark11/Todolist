@@ -3,7 +3,7 @@
 // matrix — collapsible priority sections, I/II expanded by default.
 import { DragEvent, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import type { Project, Task } from "../../types";
+import type { Task } from "../../types";
 import { getMatrixPosition, type MatrixQuadrant } from "../../utils/eisenhower";
 import { useT } from "../../i18n";
 import { MotionCollapse } from "../motion/MotionCollapse";
@@ -19,7 +19,6 @@ const SECTIONS: Array<{ quadrant: MatrixQuadrant; defaultOpen: boolean }> = [
 
 interface CalendarRightTaskPanelProps {
   tasks: Task[];
-  projects: Project[];
   today: string;
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -30,7 +29,6 @@ interface CalendarRightTaskPanelProps {
 
 export function CalendarRightTaskPanel({
   tasks,
-  projects,
   today,
   collapsed,
   onToggleCollapsed,
@@ -93,7 +91,6 @@ export function CalendarRightTaskPanel({
           quadrant={quadrant}
           defaultOpen={defaultOpen}
           tasks={candidates.filter((task) => getMatrixPosition(task, today).quadrant === quadrant)}
-          projects={projects}
           today={today}
           draggingTaskId={draggingTaskId}
           onDragStart={onDragStart}
@@ -112,7 +109,6 @@ function PanelSection({
   quadrant,
   defaultOpen,
   tasks,
-  projects,
   today,
   draggingTaskId,
   onDragStart,
@@ -122,7 +118,6 @@ function PanelSection({
   quadrant: MatrixQuadrant;
   defaultOpen: boolean;
   tasks: Task[];
-  projects: Project[];
   today: string;
   draggingTaskId: string;
   onDragStart: (event: DragEvent, taskId: string) => void;
@@ -146,7 +141,6 @@ function PanelSection({
         ) : (
           <AnimatePresence initial={false}>
           {tasks.map((task) => {
-            const project = projects.find((item) => item.id === task.projectId);
             // One date, so one label. This used to prefer the work day and
             // fall back to the deadline; the two are the same field now
             // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11).
@@ -171,9 +165,6 @@ function PanelSection({
               >
                 <span className="gcal-taskpanel-row-title">{task.title}</span>
                 <span className="gcal-taskpanel-row-meta">
-                  {project ? (
-                    <span className="ff-dot" style={{ background: project.color }} aria-hidden="true" />
-                  ) : null}
                   {dateLabel}
                   {dateLabel && task.estimatedMinutes > 0 ? " · " : ""}
                   {task.estimatedMinutes > 0 ? t("eis.minutes", { n: task.estimatedMinutes }) : ""}

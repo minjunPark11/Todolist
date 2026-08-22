@@ -7,15 +7,6 @@ import { UpdateChecker } from "./components/UpdateChecker";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
-import {
-  filterForSelection,
-  parseSelection,
-  pathForSelection,
-  resolveSelection,
-  selectedProjectId as readSelectedProjectId,
-  selectedSpaceId,
-} from "./app/spaceSelection";
-import { spaceIdForProject } from "./domain/spaces/spaces";
 import type { TodayIntent } from "./components/TodayPage";
 import { TasksModule } from "./components/tasks/TasksModule";
 import { canonicalizeTaskUrl, listUrlFor, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
@@ -23,7 +14,6 @@ import { PAGE_ROUTES, RETIRED_ROUTES, bootRedirectFor, pageForPath, pathForDefau
 import {
   RAIL_DESTINATIONS,
   TASKS_HOME,
-  isTasksDoorway,
   isTasksLocation,
   railItemFor,
   type RailNavItem,
@@ -155,16 +145,8 @@ export default function App() {
       new URLSearchParams(window.location.search).get("triage") === "inbox";
     return hasInboxRedirect || appSettings.defaultView === "/inbox" ? "triage" : "";
   });
-  // Where in the Space tree the user is standing. Derived from the path, never
-  // mirrored into state: the two flat fields this replaces could not say which
-  // List was open and did not survive a reload (SPACES_CLICKUP_UI_DESIGN §1).
-  // `selectProject` / `selectList` / `clearSelection` below are the only writers.
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
-  const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState("");
   const [pendingResetAllData, setPendingResetAllData] = useState(false);
-  // When set, the Calendar page opens pre-filtered to this project (space
-  // detail's "Open Calendar" — PROJECT_DETAIL_REMOVE_CALENDAR_TAB spec §8.2).
-  const [calendarFocusProjectId, setCalendarFocusProjectId] = useState("");
   const [toasts, setToasts] = useState<QueuedToast[]>([]);
   const toastIdRef = useRef(0);
   const motionEnabled = useMotionEnabled();
@@ -186,14 +168,6 @@ export default function App() {
   const [currentUrl, setCurrentUrl] = useState(
     () => `${window.location.pathname}${window.location.search}`,
   );
-  // Parsing is syntactic; resolving is what turns an old `/s/:projectId` link
-  // into a Project scope under its Space (§33). It re-runs when the records
-  // arrive, so a deep link followed before the first load still lands.
-  const selection = useMemo(
-    () => resolveSelection(parseSelection(currentPath), { spaces: planner.spaces, projects: planner.projects }),
-    [currentPath, planner.spaces, planner.projects],
-  );
-  const selectedProjectId = readSelectedProjectId(selection);
   // D-04: which page is open is a reading of the address, not a state beside
   // it. Everything that used to call `setActivePage` navigates instead, which
   // is what lets a reload, Back, and (from P0-2) the Rail all agree.
@@ -245,7 +219,6 @@ export default function App() {
     () => planner.tasks.filter((task) => isTaskActive(task, planner.lists)),
     [planner.tasks, planner.lists],
   );
-  const isProjectDetailOpen = selection.kind !== "none";
   const originalTitleRef = useRef(document.title || "FocusFlow");
   const completedNotificationRef = useRef<Set<string>>(new Set());
   const syncingExternalCalendarsRef = useRef<Set<string>>(new Set());
@@ -259,12 +232,6 @@ export default function App() {
     ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null
     : null;
   const activeFocusElapsed = getDisplayedFocusSeconds(planner.activeFocusSession, focusNow);
-  // §13.28: deleted Projects leave the active views the same way archived ones
-  // do. Their Lists and Tasks are untouched and stay usable in the Tasks
-  // Module — a Project is a List's context, not a Task's owner (§13.19).
-  const activeProjects = planner.projects.filter(
-    (project) => project.status !== "archived" && !project.deletedAt,
-  );
   const { importMessage, exportJson, handleImport } = useDataPortability({
     today,
     exportData: planner.exportData,
@@ -512,70 +479,6 @@ export default function App() {
     setCurrentUrl(url);
   }
 
-  /** The Space a Project hangs in, for building a full path to it. */
-  function spaceIdOf(projectId: string): string {
-    const project = planner.projects.find((item) => item.id === projectId);
-    return project ? spaceIdForProject(project) : "";
-  }
-
-  // D-04: `/s/:spaceId/...` already reads as the Spaces page, so the paired
-  // `setActivePage("projects")` these four used to carry is gone — the path
-  // was always the real answer and the state was a copy that could disagree.
-  function selectProject(projectId: string) {
-    planner.selectTask("");
-    navigate(pathForSelection({ kind: "project", spaceId: spaceIdOf(projectId), projectId }));
-  }
-
-  /**
-   * A List, from the Space tree or from a Project Overview row (§50.8).
-   *
-   * Both used to land on `/s/:sp/p/:pj/l/:id` — the Space shell's own drawing
-   * of a List, beside the Tasks Module's `/list/:id` drawing of the same one.
-   * One record with two screens is two records as far as anyone using it is
-   * concerned, and the Space one was the half you could not get back out of.
-   * So a List opens in the module that owns Lists, and the tree stops being a
-   * place rather than a route.
-   *
-   * The Project it hangs under is no longer part of the address, which is the
-   * point: a List belongs to a Project, but reading one is not a Project view.
-   */
-  function selectList(_projectId: string, listId: string) {
-    planner.selectTask("");
-    navigateUrl(listUrlFor(listId, planner.lists));
-  }
-
-  /**
-   * Steps out of the tree to the Projects overview.
-   *
-   * Lands on `/projects`, not `/app`: leaving a Project used to keep the page
-   * on "projects" while the address said `/app`, and now that the address
-   * decides the page, `/app` would silently mean Today. Closing a Project is
-   * not a request for Today.
-   */
-  function clearSelection() {
-    if (selection.kind !== "none") navigate(PAGE_ROUTES.projects);
-  }
-
-  /**
-   * Widens a Folder or List scope back to its whole Project. A Space selection
-   * has no narrower scope to clear, so this does nothing there.
-   */
-  function clearScope() {
-    if (selectedProjectId) selectProject(selectedProjectId);
-  }
-
-  // §33: once the records that can resolve an old `/s/:projectId` link have
-  // loaded, the address bar is rewritten to the new scheme — replace, not
-  // push, so Back still goes where the user came from rather than to the link
-  // they just followed. Skipped while `spaceId` is empty: that is the marker
-  // for a selection still waiting to resolve, and writing it would produce a
-  // path with a hole in it.
-  useEffect(() => {
-    if (selection.kind === "none" || !selectedSpaceId(selection)) return;
-    const canonical = pathForSelection(selection);
-    if (canonical !== currentPath) navigate(canonical, "replace");
-  }, [selection, currentPath]);
-
   useEffect(() => {
     function handlePopState() {
       setCurrentPath(window.location.pathname);
@@ -597,9 +500,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // A doorway is a Tasks address the Tasks item has to be able to LEAVE, so
-    // it is not one it may be sent back to (`isTasksDoorway`).
-    if (isTasksLocation(currentUrl) && !isTasksDoorway(currentUrl)) {
+    // Every Tasks address is now a Scope — the two doorway pages, Projects and
+    // Goals, are gone — so there is no longer a Tasks location the Tasks item
+    // must be able to leave rather than return to.
+    if (isTasksLocation(currentUrl)) {
       lastTasksLocationRef.current = currentUrl;
     }
   }, [currentUrl]);
@@ -895,10 +799,7 @@ export default function App() {
   }
 
   function buildCurrentShareSnapshot() {
-    return buildCalendarShareSnapshot({
-      tasks: visibleTasks,
-      projects: activeProjects,
-    });
+    return buildCalendarShareSnapshot({ tasks: visibleTasks });
   }
 
   async function publishCurrentCalendarShare(token = calendarShare.token || createShareToken(), enabled = true, options?: { silent?: boolean }) {
@@ -973,17 +874,6 @@ export default function App() {
     });
   }
 
-  function handleArchiveProject(projectId: string) {
-    planner.archiveProject(projectId);
-    clearSelection();
-    planner.selectTask("");
-    showToast({
-      message: t("app.toastProjectArchived"),
-      actionLabel: t("app.undo"),
-      onAction: () => planner.restoreProject(projectId),
-    });
-  }
-
   // Deletion is permanent in the store, so the rows are captured first and the
   // toast hands back a targeted restore — undoing one delete never rolls back
   // whatever else the user did while the toast was up.
@@ -1010,49 +900,12 @@ export default function App() {
     }
   }
 
-  // Deletes immediately, no app-level confirm — for callers that already
-  // showed their own confirmation (e.g. the space delete modal).
-  function deleteProjectNow(projectId: string) {
-    const project = planner.projects.find((item) => item.id === projectId);
-    const taskIds = planner.tasks
-      .filter((item) => item.projectId === projectId)
-      .map((item) => item.id);
-    planner.deleteProject(projectId);
-    clearSelection();
-    planner.selectTask("");
-    showToast({
-      message: t("app.toastProjectDeleted"),
-      ...(project
-        ? {
-            actionLabel: t("app.undo"),
-            onAction: () => planner.restoreDeletedProject(project, taskIds),
-          }
-        : {}),
-    });
-  }
-
-  function requestDeleteProject(projectId: string) {
-    if (appSettings.confirmBeforeDelete) {
-      setPendingDeleteProjectId(projectId);
-    } else {
-      deleteProjectNow(projectId);
-    }
-  }
-
   function confirmDeleteTask() {
     if (!pendingDeleteTaskId) {
       return;
     }
     deleteTaskWithUndo(pendingDeleteTaskId);
     setPendingDeleteTaskId("");
-  }
-
-  function confirmDeleteProject() {
-    if (!pendingDeleteProjectId) {
-      return;
-    }
-    deleteProjectNow(pendingDeleteProjectId);
-    setPendingDeleteProjectId("");
   }
 
   function requestResetAllData() {
@@ -1062,7 +915,6 @@ export default function App() {
   function confirmResetAllData() {
     planner.resetData();
     setPendingResetAllData(false);
-    clearSelection();
     planner.selectTask("");
     try {
       localStorage.removeItem("todo-planner-space-hub-v1");
@@ -1088,35 +940,18 @@ export default function App() {
       return;
     }
 
-    // D-23/D-24: a task that has been given up on lives in Won't Do now, so
-    // that is where opening it lands. Legacy `archived` records read as Won't
-    // Do too until D-20's migration moves them.
+    // D-23/D-24: a task that has been given up on is read under Completed
+    // now (domain/tasks/scopeQuery), so that is where opening it lands.
     if (isWontDo(task)) {
-      navigateUrl(taskUrlFor({ scope: { kind: "wontDo" }, view: "list", taskId: task.id }));
-      return;
-    }
-
-    if (task.projectId) {
-      selectProject(task.projectId);
+      navigateUrl(taskUrlFor({ scope: { kind: "completed" }, view: "list", taskId: task.id }));
       return;
     }
 
     navigate(PAGE_ROUTES.board);
   }
 
-  function openProjectFromCalendar(projectId: string) {
-    selectProject(projectId);
-  }
-
   function viewTaskInCalendar(taskId: string) {
     planner.selectTask(taskId);
-    setCalendarFocusProjectId("");
-    navigate(PAGE_ROUTES.calendar);
-  }
-
-  function openCalendarForProject(projectId?: string) {
-    planner.selectTask("");
-    setCalendarFocusProjectId(projectId ?? "");
     navigate(PAGE_ROUTES.calendar);
   }
 
@@ -1130,10 +965,8 @@ export default function App() {
    */
   function navigateRail(item: RailNavItem) {
     if (item === "tasks") {
-      // "Already Tasks" is asked of the SCREEN, not of the Rail's highlight.
-      // Projects and Goals light this item too without being the Module, so
-      // there the item leads back rather than doing nothing (`isTasksDoorway`).
-      if (railItem === "tasks" && !isTasksDoorway(currentPath)) return;
+      // Re-clicking the module you are already in does nothing.
+      if (railItem === "tasks") return;
       navigateUrl(lastTasksLocationRef.current || TASKS_HOME);
       return;
     }
@@ -1177,8 +1010,6 @@ export default function App() {
     sidebarFolders: planner.sidebarFolders,
     tags: planner.tags,
     savedFilters: planner.savedFilters,
-    projects: planner.projects,
-    spaces: planner.spaces,
   };
 
   const menuTaskState = parseTaskUrl(currentUrl);
@@ -1214,23 +1045,8 @@ export default function App() {
         onOpenChange={setAiChatOpen}
         activePage={activePage}
         knowledgeSettings={knowledge.settings}
-        pathStore={{
-          paths: planner.learningPaths,
-          savePath: (draft, source) =>
-            planner.createLearningPath({
-              goal: draft.goal,
-              milestones: draft.milestones,
-              targetDate: draft.targetDate,
-              projectId: draft.projectId,
-              source: source ?? "assistant",
-            }),
-          linkCard: planner.linkCardToMilestone,
-        }}
         aiContext={buildAiContextInput({ planner, appSettings, currentPage: activePage })}
-        calendarContext={{
-          tasks: visibleTasks,
-          projects: planner.projects,
-        }}
+        calendarContext={{ tasks: visibleTasks }}
         onExecuteActions={(actions) =>
           executeAgentActions(actions, {
             tasks: planner.tasks,
@@ -1255,7 +1071,7 @@ export default function App() {
         /** §10.17/§10.18: a result opens at its OWN canonical place. */
         onPickResult={(result: SearchResult) => {
           setMenuOpen(false);
-          navigateUrl(urlForSearchResult(result, planner.lists, planner.projects));
+          navigateUrl(urlForSearchResult(result, planner.lists));
         }}
         onRunCommand={(command: TaskCommand) => {
           setMenuOpen(false);
@@ -1350,8 +1166,6 @@ export default function App() {
     // `clearSelection()` this used to call would have pushed a second history
     // entry for the same click.
     navigate(pathForPage(page));
-    // Plain navigation (sidebar etc.) always shows the unfiltered calendar.
-    setCalendarFocusProjectId("");
     planner.selectTask("");
   }
 
@@ -1403,8 +1217,6 @@ export default function App() {
           sidebarFolders={planner.sidebarFolders}
           savedFilters={planner.savedFilters}
           listSections={planner.listSections}
-          projects={planner.projects}
-          spaces={planner.spaces}
           dailyPlans={planner.dailyPlans}
           tags={planner.tags}
           taskTags={planner.taskTags}
@@ -1490,7 +1302,6 @@ export default function App() {
             key={planner.selectedTask.id}
             task={planner.selectedTask}
             tasks={planner.tasks}
-            projects={activeProjects}
             lists={planner.lists}
             subtasks={planner.subtasks}
             onMoveToList={planner.moveTaskToList}
@@ -1516,28 +1327,13 @@ export default function App() {
         planner={planner}
         visibleTasks={visibleTasks}
         appSettings={appSettings}
-        activeProjects={activeProjects}
-        selectedProjectId={selectedProjectId}
-        viewScope={filterForSelection(selection)}
-        onClearScope={clearScope}
-        onSelectList={(listId) => selectList(selectedProjectId, listId)}
-        isProjectDetailOpen={isProjectDetailOpen}
-        onSelectSpace={selectProject}
-        onCloseSpace={clearSelection}
         todayIntent={todayIntent}
         onTodayIntentHandled={() => setTodayIntent("")}
         renderTaskDetail={renderTaskDetail}
         showToast={showToast}
-        handleArchiveTask={handleArchiveTask}
         handleArchiveTasks={handleArchiveTasks}
-        handleArchiveProject={handleArchiveProject}
         requestDeleteTask={requestDeleteTask}
-        requestDeleteProject={requestDeleteProject}
-        deleteProjectNow={deleteProjectNow}
-        openProjectFromCalendar={openProjectFromCalendar}
         viewTaskInCalendar={viewTaskInCalendar}
-        openCalendarForProject={openCalendarForProject}
-        calendarFocusProjectId={calendarFocusProjectId}
         onNavigate={navigateSection}
         exportJson={exportJson}
         handleImport={handleImport}
@@ -1640,14 +1436,11 @@ export default function App() {
       {renderAiChat()}
       <AppModals
         pendingDeleteTaskId={pendingDeleteTaskId}
-        pendingDeleteProjectId={pendingDeleteProjectId}
         pendingResetAllData={pendingResetAllData}
         resetReachesAccount={planner.auth.isSignedIn ? planner.auth.userEmail : ""}
         toasts={toasts}
         onCancelDeleteTask={() => setPendingDeleteTaskId("")}
         onConfirmDeleteTask={confirmDeleteTask}
-        onCancelDeleteProject={() => setPendingDeleteProjectId("")}
-        onConfirmDeleteProject={confirmDeleteProject}
         onCancelResetAllData={() => setPendingResetAllData(false)}
         onConfirmResetAllData={confirmResetAllData}
         onDismissToast={handleDismissToast}

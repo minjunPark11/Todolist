@@ -1,7 +1,7 @@
 // Derivations for the redesigned Today page (TODAY_PAGE_IMPLEMENTATION_SPEC).
-// Maps the existing Task/Project model onto the spec's
+// Maps the existing Task model onto the spec's
 // TodayTask / TimeBlock / SpaceSignal concepts without changing stored data.
-import type { DailyPlanBucket, Project, Task } from "../types";
+import type { DailyPlanBucket, Task } from "../types";
 import type { ScopeContext } from "../domain/tasks/scopeQuery";
 import { matchesScope } from "../domain/tasks/scopeQuery";
 import type { TaskScopeRef } from "../domain/tasks/scopeRegistry";
@@ -218,12 +218,7 @@ export interface TodayTimeRail {
   scheduledCount: number;
 }
 
-export function buildTimeRail(
-  tasks: Task[],
-  projects: Project[],
-  today = todayValue(),
-): TodayTimeRail {
-  const projectById = new Map(projects.map((project) => [project.id, project]));
+export function buildTimeRail(tasks: Task[], today = todayValue()): TodayTimeRail {
   const scheduled: TodayTimeBlock[] = [];
   let earlierCount = 0;
   let laterCount = 0;
@@ -254,7 +249,6 @@ export function buildTimeRail(
       title: task.title,
       startMin: Math.max(startMin, TIME_RAIL_START),
       endMin: Math.min(endMin, TIME_RAIL_END),
-      color: projectById.get(task.projectId)?.color,
     });
   }
 
@@ -280,75 +274,6 @@ export function buildTimeRail(
   }
 
   return { blocks, earlierCount, laterCount, scheduledCount: scheduled.length };
-}
-
-// === Attention from Spaces (spec §32) ===
-
-export type SignalSeverity = "low" | "medium" | "high";
-
-export interface TodaySpaceSignal {
-  id: string;
-  kind: "project";
-  refId: string;
-  name: string;
-  color?: string;
-  severity: SignalSeverity;
-  messageKey: string;
-  messageVars?: Record<string, string | number>;
-}
-
-export function buildSpaceSignals(
-  tasks: Task[],
-  projects: Project[],
-  today = todayValue(),
-): TodaySpaceSignal[] {
-  const signals: TodaySpaceSignal[] = [];
-
-  for (const project of projects) {
-    if (project.status === "archived" || project.status === "completed") continue;
-    const overdue = tasks.filter(
-      (task) =>
-        task.projectId === project.id &&
-        isTaskOpen(task) &&
-        Boolean(task.dueDate) &&
-        task.dueDate < today,
-    );
-    if (overdue.length > 0) {
-      signals.push({
-        id: `overdue:${project.id}`,
-        kind: "project",
-        refId: project.id,
-        name: project.name,
-        color: project.color,
-        severity: "high",
-        messageKey: "todayv.signalOverdue",
-        messageVars: { n: overdue.length },
-      });
-    }
-    if (project.dueDate && project.dueDate >= today) {
-      const msPerDay = 24 * 60 * 60 * 1000;
-      const daysLeft = Math.round(
-        (new Date(`${project.dueDate}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) /
-          msPerDay,
-      );
-      if (daysLeft <= 2) {
-        signals.push({
-          id: `deadline:${project.id}`,
-          kind: "project",
-          refId: project.id,
-          name: project.name,
-          color: project.color,
-          severity: "high",
-          messageKey: daysLeft === 0 ? "todayv.signalDeadlineToday" : "todayv.signalDeadline",
-          messageVars: { n: daysLeft },
-        });
-      }
-    }
-  }
-
-  const severityRank: Record<SignalSeverity, number> = { high: 0, medium: 1, low: 2 };
-  signals.sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
-  return signals;
 }
 
 // === Plan Today (spec §30, rule-based mock planner) ===

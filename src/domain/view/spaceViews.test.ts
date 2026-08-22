@@ -1,23 +1,14 @@
 import { describe, expect, it } from "vitest";
-import {
-  isSpaceViewId,
-  showsGoals,
-  SPACE_VIEWS,
-  spaceViewDef,
-  specForSpaceView,
-} from "./spaceViews";
+import { isSpaceViewId, SPACE_VIEWS, spaceViewDef, specForSpaceView } from "./spaceViews";
 
 describe("SPACE_VIEWS", () => {
-  it("separates tasks from goals by filter, not by place", () => {
-    // U5: the two mix in a List. Which one you are looking at is a view
-    // setting, so the difference has to live in `sources` and nowhere else.
-    expect(spaceViewDef("board").sources).toEqual(["task"]);
-    expect(showsGoals("list")).toBe(true);
-    expect(showsGoals("board")).toBe(false);
-  });
-
-  it("asks the time question of every kind of work", () => {
-    expect(spaceViewDef("gantt").sources).toEqual(["task", "goal", "milestone"]);
+  // `list` and `gantt` also took goals and milestones, and `showsGoals` said
+  // which views did. Both records went with the Goals feature, so every view
+  // asks for the one source there is.
+  it("names its one source on every view", () => {
+    for (const view of SPACE_VIEWS) {
+      expect(view.sources).toEqual(["task"]);
+    }
   });
 
   it("holds no Domain Section", () => {
@@ -43,33 +34,25 @@ describe("specForSpaceView", () => {
   it("opens the same view at any scope", () => {
     // The definition never mentions a scope; only the caller does. That is
     // what makes one view usable at four depths (§16/§18).
-    const atSpace = specForSpaceView("board", { spaceId: "space-1" }, "Board");
+    const atFolder = specForSpaceView("board", { folderId: "folder-1" }, "Board");
     const atList = specForSpaceView("board", { listId: "list-2" }, "Board");
-    expect(atSpace.groupBy).toBe(atList.groupBy);
-    expect(atSpace.layout).toBe(atList.layout);
-    expect(atSpace.filter.spaceId).toBe("space-1");
+    expect(atFolder.groupBy).toBe(atList.groupBy);
+    expect(atFolder.layout).toBe(atList.layout);
+    expect(atFolder.filter.folderId).toBe("folder-1");
     expect(atList.filter.listId).toBe("list-2");
-  });
-
-  it("carries a Project scope, which is a level of its own now", () => {
-    const atProject = specForSpaceView("board", { projectId: "p-1" }, "Board");
-    expect(atProject.filter.projectId).toBe("p-1");
-    expect(atProject.filter.spaceId).toBeUndefined();
   });
 
   it("does not carry a scope the caller dropped", () => {
     // Widening from a List back up must not leave the old listId behind, or
     // the board would stay narrowed with nothing saying why.
-    const widened = specForSpaceView("board", { spaceId: "space-1" }, "Board");
+    const widened = specForSpaceView("board", { folderId: "folder-1" }, "Board");
     expect(widened.filter.listId).toBeUndefined();
-    expect(widened.filter.folderId).toBeUndefined();
-    expect(widened.filter.projectId).toBeUndefined();
   });
 
   it("gives each view+scope pair its own id", () => {
     const ids = new Set([
-      specForSpaceView("board", { spaceId: "s" }, "").id,
-      specForSpaceView("list", { spaceId: "s" }, "").id,
+      specForSpaceView("board", { folderId: "f" }, "").id,
+      specForSpaceView("list", { folderId: "f" }, "").id,
       specForSpaceView("board", { listId: "l" }, "").id,
     ]);
     expect(ids.size).toBe(3);
@@ -77,7 +60,7 @@ describe("specForSpaceView", () => {
 
   it("always names its sources, so nothing leaks between views", () => {
     for (const view of SPACE_VIEWS) {
-      const spec = specForSpaceView(view.id, { spaceId: "s" }, "");
+      const spec = specForSpaceView(view.id, { folderId: "f" }, "");
       expect(spec.filter.sources).toEqual(view.sources);
     }
   });

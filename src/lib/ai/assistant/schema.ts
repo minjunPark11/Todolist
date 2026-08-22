@@ -16,7 +16,7 @@ import type {
   RecommendedNextAction,
 } from "../contextCards/types";
 import { dedupeDetectedItems, extractLikelyItemLabels, resolveResponseMode } from "./overwhelmHeuristics";
-import type { AssistantAnalysis, AssistantMode, AssistantSafeActionProposal, InputSignals, LearningPathProposal, SignalStrength } from "./types";
+import type { AssistantAnalysis, AssistantMode, AssistantSafeActionProposal, InputSignals, SignalStrength } from "./types";
 
 const MAX_LIST_ITEMS = 10;
 const MAX_ITEM_CHARS = 300;
@@ -219,27 +219,6 @@ function parseSafeActionProposals(value: unknown): AssistantSafeActionProposal[]
     .slice(0, 3);
 }
 
-// learning_path block. Shape cleaning only — whether a path may surface at
-// all is decided in runAssistantTurn by the deterministic explicit-request
-// gate + resolveLearningPathDraft (pathDraft.ts), never here.
-const MAX_RAW_MILESTONES = 8;
-
-function parseLearningPath(value: unknown): LearningPathProposal | null {
-  if (!isRecord(value)) return null;
-  const goal = cleanString(value.goal, 160);
-  if (!goal) return null;
-  if (!Array.isArray(value.milestones)) return null;
-  const milestones = value.milestones
-    .filter(isRecord)
-    .map((entry) => ({
-      title: cleanString(entry.title, 120),
-      doneCriteria: cleanString(entry.done_criteria, 200),
-    }))
-    .filter((milestone) => milestone.title)
-    .slice(0, MAX_RAW_MILESTONES);
-  if (milestones.length === 0) return null;
-  return { goal, milestones };
-}
 
 // Small local models frequently drop or garble a single enum field while
 // still following the rest of the schema (e.g. they emit follow_up_questions
@@ -283,7 +262,6 @@ export function parseAssistantResponse(content: string, rawInput: string): Assis
     followUpQuestions,
     recommendedNextAction,
     safeActionProposals: parseSafeActionProposals(json.safe_action_proposals),
-    learningPathProposal: parseLearningPath(json.learning_path),
     userFacingResponse: cleanString(json.user_facing_response, 2000),
   };
 }

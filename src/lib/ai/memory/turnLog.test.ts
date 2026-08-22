@@ -64,7 +64,6 @@ function fakeTurn(id: string): AssistantTurn {
     validation: { ok: true, failures: [] },
     followUpQuestions: [],
     recommendedNextAction: null,
-    learningPathDraft: null,
     relatedCards: [],
     knowledgeSources: [],
   };

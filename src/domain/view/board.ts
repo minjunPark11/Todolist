@@ -10,7 +10,7 @@
 // Only axes with an inverse appear here. Dropping onto a Today bucket or a due
 // date would have to invent a date the user did not choose, so those axes
 // return no patch instead of guessing.
-import type { LearningPath, Status, StatusGroup, Task, TaskStatus } from "../../types";
+import type { Status, StatusGroup, Task, TaskStatus } from "../../types";
 import { statusFor } from "../spaces/membership";
 import { patchForQuadrant, type MatrixQuadrant } from "../../utils/eisenhower";
 import { addDays, addMonths } from "../../utils/date";
@@ -105,52 +105,6 @@ export function patchForColumn(
 /** Whether a board grouped on this axis can accept a drop at all. */
 export function isDroppableAxis(axis: GroupAxis): boolean {
   return axis === "status" || axis === "quadrant" || axis === "priority";
-}
-
-// === Goal drops ===
-
-/**
- * What dropping a GOAL on a status column means.
- *
- * A goal has no `status` field. Its column is `boardListId`, with completion
- * overriding it — `item.goalStatusId` is the whole rule — so this is that
- * function read backwards, and it has to stay exactly its inverse. A drop that
- * writes a state the projection would not answer with sends the card straight
- * back, which reads as the app silently refusing the move.
- *
- * That leaves only the three columns a goal can actually occupy: `done`,
- * `todo` (filed nowhere), and a column the user named. `inbox`, `doing` and
- * `waiting` are workflow a goal does not have, so a drop there means nothing
- * rather than something invented — the same restraint the axes without an
- * inverse show above.
- */
-export type GoalDrop =
-  | { kind: "none" }
-  | { kind: "complete" }
-  | { kind: "file"; listId?: string };
-
-export function goalDropFor(
-  goal: Pick<LearningPath, "boardListId" | "completedAt">,
-  columnId: string,
-  statuses: Status[],
-): GoalDrop {
-  if (!columnId || !statuses.some((status) => status.id === columnId)) return { kind: "none" };
-
-  if (columnId === "done") {
-    return goal.completedAt ? { kind: "none" } : { kind: "complete" };
-  }
-
-  // Filing reopens. The column dropped on is not "done", and a goal left
-  // completed projects back to "done" no matter where it is filed.
-  const reopening = Boolean(goal.completedAt);
-
-  if (columnId === "todo") {
-    return goal.boardListId || reopening ? { kind: "file" } : { kind: "none" };
-  }
-  if (STATUS_VALUES[columnId]) return { kind: "none" };
-  return goal.boardListId === columnId && !reopening
-    ? { kind: "none" }
-    : { kind: "file", listId: columnId };
 }
 
 // === Timeline drags (GANTT_TIMELINE_DESIGN D6) ===

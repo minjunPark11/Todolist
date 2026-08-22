@@ -7,9 +7,9 @@
 // reading.
 //
 // The mapping is deliberately lossy: the Global Modules get an item each and
-// **everything else is Tasks**. Archive, the Spaces tree and all nine Tasks
-// Scopes are places inside Tasks, not siblings of it — §1.5 is explicit that
-// none of them may become a Rail item of its own.
+// **everything else is Tasks**. All nine Tasks Scopes are places inside Tasks,
+// not siblings of it — §1.5 is explicit that none of them may become a Rail
+// item of its own.
 //
 // Matrix is the one documented exception (D-19). §1.5's list bans `Board`, and
 // that ban holds for a Scope's Board VIEW — promoting one Scope's view to the
@@ -48,9 +48,8 @@ export function railItemFor(path: string): RailNavItem {
       return "focus";
     case "settings":
       return "settings";
-    // `today`, `projects`, `archive` — and every Tasks Scope, which
-    // `pageForPath` reports as its `today` fallback because the Tasks Module
-    // routes itself.
+    // `today` — and every Tasks Scope, which `pageForPath` reports as its
+    // `today` fallback because the Tasks Module routes itself.
     default:
       return "tasks";
   }
@@ -65,32 +64,6 @@ export function railItemFor(path: string): RailNavItem {
  */
 export function isTasksLocation(url: string): boolean {
   return railItemFor(url.split("?")[0]) === "tasks";
-}
-
-/**
- * Whether an address is a page the Tasks sidebar's doors lead to.
- *
- * Projects and Goals are inside Tasks — §1.5 refuses each of them a Rail item
- * — so both light the Tasks item, and neither is a Scope of the Tasks Module.
- * That combination is what this answers, and two things read it.
- *
- * §2.11's "already Tasks" guard, which otherwise reads the Rail's own
- * HIGHLIGHT: by that reading these pages ARE Tasks, so the one item that
- * leads back to what you were reading would do nothing on them. (When the
- * tree still stood in the sidebar on `/projects` that was a trap with no way
- * out but the browser's Back button, which the packaged app does not draw.)
- *
- * And `lastTasksLocation`, which must not remember them: coming back to Tasks
- * from the Calendar should land on the list you were reading, and returning
- * to the doorway you left through is not that.
- *
- * It was `isSpaceHubLocation`, naming a screen that no longer exists — and
- * knowing only `/projects`, so `/goals` was left with a dead Rail item and a
- * place in `lastTasksLocation` when D-4 added it.
- */
-export function isTasksDoorway(url: string): boolean {
-  const page = pageForPath(url.split("?")[0]);
-  return page === "projects" || page === "goals";
 }
 
 /**

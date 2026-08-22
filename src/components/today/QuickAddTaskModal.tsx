@@ -1,11 +1,10 @@
 import { useState } from "react";
-import type { Project, TaskPriority } from "../../types";
+import type { TaskPriority } from "../../types";
 import { Modal, useAutoFocus } from "../kit";
 import { useT } from "../../i18n";
 
 export interface QuickAddInput {
   title: string;
-  projectId: string;
   priority: TaskPriority;
   dueDate: string;
   notes: string;
@@ -14,7 +13,6 @@ export interface QuickAddInput {
 }
 
 interface QuickAddTaskModalProps {
-  projects: Project[];
   /** Prefilled when the capture bar hands its text over (Alt+Enter). */
   initialTitle?: string;
   onCreate: (input: QuickAddInput) => void;
@@ -22,7 +20,6 @@ interface QuickAddTaskModalProps {
 }
 
 export function QuickAddTaskModal({
-  projects,
   initialTitle = "",
   onCreate,
   onClose,
@@ -30,7 +27,6 @@ export function QuickAddTaskModal({
   const { t } = useT();
   const titleRef = useAutoFocus<HTMLInputElement>();
   const [title, setTitle] = useState(initialTitle);
-  const [projectId, setProjectId] = useState("");
   // "none", matching the capture bar. Defaulting to "medium" meant every task
   // saved through this form claimed a priority the user never picked, and the
   // two entry points disagreed about the same field.
@@ -49,7 +45,6 @@ export function QuickAddTaskModal({
     }
     onCreate({
       title: trimmed,
-      projectId,
       priority,
       dueDate,
       notes: notes.trim(),
@@ -89,18 +84,6 @@ export function QuickAddTaskModal({
           />
         </label>
         {error ? <p className="tdy-form-error">{error}</p> : null}
-
-        <label>
-          {t("todayv.fieldSpace")}
-          <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-            <option value="">{t("todayv.noSpace")}</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </label>
 
         <label>
           {t("todayv.fieldPriority")}

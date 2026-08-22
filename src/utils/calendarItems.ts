@@ -1,11 +1,10 @@
 // Calendar derived-item model (CALENDAR_DESIGN.md §1.3/§1.4).
 // Shared by CalendarView rendering and the Ollama calendar context builder.
-import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Project, Task, TaskPriority, TaskStatus } from "../types";
+import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Task, TaskPriority, TaskStatus } from "../types";
 import { projectItems } from "../domain/view/item";
 import { externalEventDate, externalEventEndDate, externalEventEndTime, externalEventStartTime } from "../lib/externalCalendars";
 import {
   externalCategoryId,
-  projectCategoryId,
   FOCUS_ACTUAL_CATEGORY_ID,
   FOCUS_ACTUAL_COLOR,
   type CalendarCategory,
@@ -16,20 +15,18 @@ import { addDays, todayValue } from "./date";
 import { isTaskAlive } from "../domain/tasks/taskState";
 
 // "deadline" is gone: it named the marker a task drew from `dueDate`, and a
-// task draws one chip now (audit §6, 1-e). `project-deadline` stays — a
-// Project's own due date is still a separate thing from work inside it.
-export type CalendarLayer = "task" | "project-deadline" | "external" | "focus-actual";
+// task draws one chip now (audit §6, 1-e). `project-deadline` went with the
+// Projects feature — there is no Project record with a due date to mark.
+export type CalendarLayer = "task" | "external" | "focus-actual";
 
 export interface CalendarLayerToggles {
   task: boolean;
-  projectDeadline: boolean;
   completed: boolean;
   focusActual: boolean;
 }
 
 export const defaultCalendarLayers: CalendarLayerToggles = {
   task: true,
-  projectDeadline: true,
   completed: false,
   focusActual: true,
 };
@@ -37,7 +34,7 @@ export const defaultCalendarLayers: CalendarLayerToggles = {
 export interface CalendarItem {
   key: string;
   layer: CalendarLayer;
-  sourceType: "task" | "project" | "external" | "focus";
+  sourceType: "task" | "external" | "focus";
   sourceId: string;
   externalCalendarId?: string;
   externalCalendarName?: string;
@@ -49,8 +46,8 @@ export interface CalendarItem {
   allDay: boolean;
   color: string;
   // Resolved calendar category (category spec §2): explicit task.categoryId,
-  // else the project category, else the default personal category. "" when
-  // no category map was supplied (AI context builder path).
+  // else the default personal category. "" when no category map was supplied
+  // (AI context builder path).
   categoryId: string;
   priority?: TaskPriority;
   status?: TaskStatus;
@@ -62,10 +59,9 @@ export interface CalendarItem {
 // fallback for items whose category has none (CALENDAR_APPLE_DESIGN.md D1).
 // Hue answers "which calendar is this?" and nothing else — the layer is read
 // from the item's *shape* instead, so recolouring a category can no longer
-// make a task chip and a project deadline collide on the same orange.
+// make two chips of different kinds collide on the same orange.
 const LAYER_COLOR: Record<CalendarLayer, string> = {
   task: "#0066cc",
-  "project-deadline": "#ff2d55",
   external: "#4f73ff",
   "focus-actual": FOCUS_ACTUAL_COLOR,
 };
@@ -111,19 +107,8 @@ export function splitFocusSegmentByDay(startAt: string, endAt: string): FocusSeg
   return parts;
 }
 
-export type ProjectFilter = "all" | Set<string>;
-
-// §9.6: tasks/projects with no project id always show; filter only hides
-// items that belong to a project the user explicitly excluded.
-function projectAllowed(projectId: string, projectFilter: ProjectFilter): boolean {
-  if (!projectId) return true;
-  if (projectFilter === "all") return true;
-  return projectFilter.has(projectId);
-}
-
 export interface BuildCalendarItemsInput {
   tasks: Task[];
-  projects: Project[];
   /**
    * Resolves each Item's List and Folder. Optional, and no caller passes it
    * yet, because nothing the calendar draws reads them — it is the input a
@@ -137,7 +122,6 @@ export interface BuildCalendarItemsInput {
   // Completed sessions become read-only "actual focus time" blocks.
   focusSessions?: FocusSession[];
   layers: CalendarLayerToggles;
-  projectFilter: ProjectFilter;
   // Category resolution (calendar category spec). When supplied, every item
   // gets a categoryId and task blocks take the category color; items whose
   // category is not in visibleCategoryIds are dropped.
@@ -148,27 +132,23 @@ export interface BuildCalendarItemsInput {
 
 export function buildCalendarItems({
   tasks,
-  projects,
   lists = [],
   externalCalendars = [],
   externalCalendarEvents = [],
   focusSessions = [],
   layers,
-  projectFilter,
   categories,
   defaultCategoryId = "",
   visibleCategoryIds,
 }: BuildCalendarItemsInput): CalendarItem[] {
-  const projectById = new Map(projects.map((project) => [project.id, project]));
   const items: CalendarItem[] = [];
 
-  // Explicit categoryId wins; a project task falls back to its project
-  // category; everything else lands in the default personal category (§15.6
-  // migration applied at display time so legacy data needs no rewrite).
+  // Explicit categoryId wins; everything else lands in the default personal
+  // category (§15.6 migration applied at display time so legacy data needs no
+  // rewrite).
   function resolveTaskCategoryId(task: Task): string {
     if (!categories) return "";
     if (task.categoryId && categories.has(task.categoryId)) return task.categoryId;
-    if (task.projectId && categories.has(projectCategoryId(task.projectId))) return projectCategoryId(task.projectId);
     return defaultCategoryId;
   }
 
@@ -194,15 +174,8 @@ export function buildCalendarItems({
   const taskById = new Map(tasks.map((entry) => [entry.id, entry]));
   const viewItems = projectItems({
     tasks,
-    paths: [],
-    projects,
     lists,
     today: todayValue(),
-    // Goals and milestones have deadlines too, and adding them here is now a
-    // one-word change. It is not this refactor's to make: the calendar has
-    // never shown them, and quietly starting to would be a new feature
-    // arriving disguised as a cleanup.
-    sources: ["task"],
   });
 
   for (const item of viewItems) {
@@ -210,12 +183,6 @@ export function buildCalendarItems({
     if (!task) continue;
     if (item.statusId === "archived" || !isTaskAlive(task)) continue;
     const done = item.done;
-    // The calendar filters and colours by PROJECT. `Item.spaceId` named one
-    // until STEP 7 and now names the Space above it, which would let one
-    // project's filter match every project beside it.
-    if (!projectAllowed(item.projectId, projectFilter)) continue;
-
-    const project = projectById.get(item.projectId);
     const repeating = task.repeatType !== "none";
     const taskCategoryId = resolveTaskCategoryId(task);
     if (!categoryAllowed(taskCategoryId)) continue;
@@ -268,7 +235,7 @@ export function buildCalendarItems({
         startTime: startTime ?? undefined,
         endTime: endTime ?? undefined,
         allDay: startTime === null,
-        color: taskCategory?.color ?? project?.color ?? LAYER_COLOR.task,
+        color: taskCategory?.color ?? LAYER_COLOR.task,
         categoryId: taskCategoryId,
         priority: item.priority,
         status: task.status,
@@ -277,28 +244,6 @@ export function buildCalendarItems({
         // that says which. Ranges are edited in the editor until it does.
         draggable: !done && dates.length === 1,
         repeating,
-      });
-    }
-  }
-
-  if (layers.projectDeadline) {
-    for (const project of projects) {
-      if (!project.dueDate) continue;
-      if (project.status !== "active" && project.status !== "paused") continue;
-      if (!projectAllowed(project.id, projectFilter)) continue;
-      const categoryId = resolveCategoryId(projectCategoryId(project.id));
-      if (!categoryAllowed(categoryId)) continue;
-      items.push({
-        key: `proj:${project.id}`,
-        layer: "project-deadline",
-        sourceType: "project",
-        sourceId: project.id,
-        title: project.name,
-        date: project.dueDate,
-        allDay: true,
-        color: project.color || LAYER_COLOR["project-deadline"],
-        categoryId,
-        draggable: false,
       });
     }
   }

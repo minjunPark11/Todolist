@@ -1,9 +1,12 @@
 // Calendar category model (FOCUSFLOW_CALENDAR_CATEGORY_MANAGEMENT_SPEC).
 //
 // Three-level structure: Group > Category > Event. Personal categories are
-// user-managed and stored here; project / external categories are
-// derived live from projects and external calendars so their
-// names and colors never drift from the source entities.
+// user-managed and stored here; external categories are derived live from the
+// subscribed calendars so their names and colors never drift from the source.
+//
+// A `project` group sat beside them, one category per Project. Projects are
+// gone from the app, and a category nothing can be filed under is a filter
+// row that only ever hides things.
 //
 // Visibility: the spec models visibility as `visibleCategoryIds` on calendar
 // state. Because derived categories appear over time (new project = new
@@ -12,9 +15,9 @@
 // from it. Categories themselves never store an isVisible flag (§15.2).
 import { useSyncExternalStore } from "react";
 import { platform } from "../platform";
-import type { ExternalCalendar, Project } from "../types";
+import type { ExternalCalendar } from "../types";
 
-export type CalendarGroupType = "personal" | "project" | "external" | "focus";
+export type CalendarGroupType = "personal" | "external" | "focus";
 
 export interface CalendarCategory {
   id: string;
@@ -24,7 +27,7 @@ export interface CalendarCategory {
   order: number;
   isDefault?: boolean;
   isReadOnly?: boolean;
-  // Backing entity id for derived categories (topic / project / calendar id).
+  // Backing entity id for derived categories (external calendar id).
   sourceId?: string;
 }
 
@@ -62,10 +65,6 @@ export const DEFAULT_PERSONAL_CATEGORY_ID = "cat-personal-default";
 // from completed FocusSession segments, never user-editable events).
 export const FOCUS_ACTUAL_CATEGORY_ID = "cat-focus-actual";
 export const FOCUS_ACTUAL_COLOR = "#0d9488";
-
-export function projectCategoryId(projectId: string) {
-  return `cat-project:${projectId}`;
-}
 
 export function externalCategoryId(calendarId: string) {
   return `cat-external:${calendarId}`;
@@ -236,7 +235,6 @@ export function deletePersonalCategory(categoryId: string): boolean {
 
 export function buildCalendarCategories(input: {
   state: CalendarCategoryState;
-  projects: Project[];
   externalCalendars: ExternalCalendar[];
   // Display name for the focus-time category (i18n lives with the caller).
   focusCategoryName: string;
@@ -250,17 +248,6 @@ export function buildCalendarCategories(input: {
       color: category.color,
       order,
       isDefault: category.id === input.state.defaultCategoryId,
-    }));
-
-  const project: CalendarCategory[] = input.projects
-    .filter((item) => item.status !== "archived")
-    .map((item, order) => ({
-      id: projectCategoryId(item.id),
-      group: "project" as const,
-      name: item.name,
-      color: item.color,
-      order,
-      sourceId: item.id,
     }));
 
   const external: CalendarCategory[] = input.externalCalendars
@@ -288,7 +275,6 @@ export function buildCalendarCategories(input: {
 
   return [
     { type: "personal", categories: personal },
-    { type: "project", categories: project },
     { type: "external", categories: external },
     { type: "focus", categories: focus },
   ];

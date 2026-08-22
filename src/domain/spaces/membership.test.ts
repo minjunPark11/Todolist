@@ -8,12 +8,10 @@ import {
   itemsInList,
   listIdFor,
   MIGRATED_TASK_STATUSES,
-  patchForGoalListMove,
   patchForListMove,
   projectIdFor,
   resolveListMove,
   statusesForSpace,
-  statusesWithCustom,
   statusFor,
   statusIdFor,
 } from "./membership";
@@ -198,33 +196,6 @@ describe("statusesForSpace", () => {
   });
 });
 
-describe("statusesWithCustom", () => {
-  it("reads board lists as extra active statuses instead of rewriting them", () => {
-    const space = project({
-      boardLists: [{ id: "bl-1", name: "In review", order: 0 }],
-    });
-    const statuses = statusesWithCustom(space);
-    const added = statuses.find((status) => status.id === "bl-1");
-    expect(added).toMatchObject({ label: "In review", group: "active" });
-    // Appended after the defaults, not interleaved with them.
-    expect(statuses.slice(0, DEFAULT_STATUSES.length)).toEqual(DEFAULT_STATUSES);
-  });
-
-  it("ignores archived board lists", () => {
-    const space = project({ boardLists: [{ id: "bl-1", name: "Old", order: 0, archivedAt: NOW }] });
-    expect(statusesWithCustom(space)).toBe(DEFAULT_STATUSES);
-  });
-
-  it("returns the base set unchanged when there are no board lists", () => {
-    expect(statusesWithCustom(project())).toBe(DEFAULT_STATUSES);
-  });
-
-  it("does not shadow a default status with a board list of the same id", () => {
-    const space = project({ boardLists: [{ id: "done", name: "Done column", order: 0 }] });
-    expect(statusesWithCustom(space)).toBe(DEFAULT_STATUSES);
-  });
-});
-
 describe("itemsInList", () => {
   it("collects tasks that resolve to the list, stored or derived", () => {
     const other: List = { ...defaultList, id: "list-2", isDefault: false };
@@ -350,13 +321,4 @@ describe("moving an Item into a List", () => {
     expect(patchForListMove(task(), "list-missing", lists)).toEqual({});
   });
 
-  it("moves a goal the same way", () => {
-    const goal = { projectId: "space-1" };
-    expect(patchForGoalListMove(goal, reading.id, lists)).toEqual({ listId: reading.id });
-    expect(patchForGoalListMove(goal, otherDefault.id, lists)).toEqual({
-      listId: "",
-      projectId: "space-2",
-    });
-    expect(patchForGoalListMove(goal, defaultList.id, lists)).toEqual({});
-  });
 });

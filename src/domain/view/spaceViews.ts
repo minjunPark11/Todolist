@@ -37,11 +37,11 @@ export interface SpaceViewDef {
  *
  * `board` carries tasks only, which is U5 read the other way round: tasks and
  * goals mix in a List, and separating them is a filter rather than a place.
- * `list` and `gantt` take both, because "what is here" and "when is this
- * happening" are questions about all the work, not one kind of it.
+ * Every view is Tasks now: `list` and `gantt` also took goals and milestones
+ * until the Goals feature was removed.
  */
 export const SPACE_VIEWS: readonly SpaceViewDef[] = [
-  { id: "list", groupBy: "none", layout: "list", sources: ["task", "goal"], sort: { key: "dueDate" } },
+  { id: "list", groupBy: "none", layout: "list", sources: ["task"], sort: { key: "dueDate" } },
   { id: "board", groupBy: "status", layout: "board", sources: ["task"], sort: { key: "dueDate" } },
   {
     // Grouped by List, not flat. §50C.20 asks that a row identify its List and
@@ -52,7 +52,7 @@ export const SPACE_VIEWS: readonly SpaceViewDef[] = [
     id: "gantt",
     groupBy: "list",
     layout: "timeline",
-    sources: ["task", "goal", "milestone"],
+    sources: ["task"],
     sort: { key: "dueDate" },
   },
   { id: "calendar", groupBy: "none", layout: "timegrid", sources: ["task"], sort: { key: "dueDate" } },
@@ -66,26 +66,21 @@ export function spaceViewDef(id: SpaceViewId): SpaceViewDef {
   return SPACE_VIEWS.find((view) => view.id === id) ?? SPACE_VIEWS[0];
 }
 
-/** Which views can show a goal, and so need somewhere to add one. */
-export function showsGoals(id: SpaceViewId): boolean {
-  return spaceViewDef(id).sources.includes("goal");
-}
-
 /**
  * The spec for one view at one scope.
  *
  * The scope is spread in rather than merged field by field, so a Folder scope
- * cannot silently keep a stale `listId` from the level before it — the caller
+ * cannot silently keep a stale `listId` from the level below it — the caller
  * owns "where", this owns "how".
  */
 export function specForSpaceView(
   id: SpaceViewId,
-  scope: Pick<ViewFilter, "spaceId" | "projectId" | "folderId" | "listId">,
+  scope: Pick<ViewFilter, "folderId" | "listId">,
   name: string,
 ): ViewSpec {
   const def = spaceViewDef(id);
   // Narrowest first: the tightest scope is what names the view.
-  const at = scope.listId ?? scope.folderId ?? scope.projectId ?? scope.spaceId ?? "all";
+  const at = scope.listId ?? scope.folderId ?? "all";
   return {
     id: `space-view-${def.id}-${at}`,
     name,

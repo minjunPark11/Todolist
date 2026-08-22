@@ -1,12 +1,14 @@
-// Learning Paths started as an AI-side concept and still live next to their
-// drafting siblings, but since the Horizons page they are ordinary user data
-// that has to sync. This file is otherwise import-free on purpose; the two
-// type-only references below are the exceptions, and neither introduces a
-// cycle (learningPaths/types.ts reaches only contextCards/types.ts, which
-// imports nothing; spaceHubTypes.ts imports nothing at all).
-import type { GoalLink, GoalSchedule, LearningPath, Milestone } from "./lib/ai/learningPaths/types";
-
-export type { GoalLink, GoalSchedule, LearningPath, Milestone };
+/**
+ * A Goal, as it sits in storage.
+ *
+ * The Goals feature is gone — its screens, its drafting, its mutations — but
+ * the records are not deleted with it: an account that planned goals keeps
+ * them in `PlannerData`, round-tripping untouched through load and save, so
+ * nothing is destroyed by a feature being taken away. Nothing reads inside
+ * one any more, which is why the shape is opaque rather than the eight
+ * interfaces it used to be.
+ */
+export type StoredGoal = Record<string, unknown>;
 
 // === Task lifecycle (spec §4.1) ===
 // Canonical MVP statuses: inbox -> todo -> doing -> waiting -> done -> archived.
@@ -402,9 +404,8 @@ export interface Project {
    */
   boardLists?: CustomStatus[];
   // === Space fields (P4, SPACES_CLICKUP_REDESIGN D1/D7) ===
-  // A Project IS the Space; the record keeps its id so Task.projectId,
-  // LearningPath.projectId, calendar categories and space:<id> tags all keep
-  // pointing at the same thing.
+  // A Project IS the Space; the record keeps its id so Task.projectId and
+  // space:<id> tags keep pointing at the same thing.
   //
   // All optional, and none is backfilled. A Space that has never been edited
   // stores nothing new, so this migration rewrites no records at all — see
@@ -718,7 +719,8 @@ export interface PlannerData {
   subtasks: Subtask[];
   focusSessions: FocusSession[];
   activeSessionId: string;
-  learningPaths: LearningPath[];
+  /** Preserved, never read — see StoredGoal. */
+  learningPaths: StoredGoal[];
   spaces: Space[];
   folders: Folder[];
   lists: List[];
@@ -734,8 +736,6 @@ export interface PlannerData {
 
 export type PageId =
   | "today"
-  | "projects"
-  | "goals"
   | "focus"
   | "board"
   | "settings"

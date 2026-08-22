@@ -9,7 +9,6 @@ import { useMotionEnabled } from "../motion/reducedMotion";
 
 type AppModalsProps = {
   pendingDeleteTaskId: string;
-  pendingDeleteProjectId: string;
   pendingResetAllData: boolean;
   /**
    * The signed-in account, or "" on a local-only device.
@@ -23,8 +22,6 @@ type AppModalsProps = {
   toasts: QueuedToast[];
   onCancelDeleteTask: () => void;
   onConfirmDeleteTask: () => void;
-  onCancelDeleteProject: () => void;
-  onConfirmDeleteProject: () => void;
   onCancelResetAllData: () => void;
   onConfirmResetAllData: () => void;
   onDismissToast: (id: number) => void;
@@ -32,14 +29,11 @@ type AppModalsProps = {
 
 export function AppModals({
   pendingDeleteTaskId,
-  pendingDeleteProjectId,
   pendingResetAllData,
   resetReachesAccount,
   toasts,
   onCancelDeleteTask,
   onConfirmDeleteTask,
-  onCancelDeleteProject,
-  onConfirmDeleteProject,
   onCancelResetAllData,
   onConfirmResetAllData,
   onDismissToast,
@@ -59,15 +53,6 @@ export function AppModals({
         />
       ) : null}
 
-      {pendingDeleteProjectId ? (
-        <ConfirmModal
-          title={t("app.deleteProjectTitle")}
-          body={t("app.deleteProjectBody")}
-          confirmLabel={t("app.deleteProjectConfirm")}
-          onCancel={onCancelDeleteProject}
-          onConfirm={onConfirmDeleteProject}
-        />
-      ) : null}
 
       {pendingResetAllData ? (
         <ConfirmModal

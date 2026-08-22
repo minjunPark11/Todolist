@@ -11,7 +11,7 @@
 // still driving the live screens. The equivalence tests assert that a view
 // and its screen answer identically, so this cannot quietly drift while the
 // two exist side by side.
-import type { Folder, List, Project, Space, Task, TaskPriority } from "../../types";
+import type { Folder, List, Task, TaskPriority } from "../../types";
 import { getMatrixPosition } from "../../utils/eisenhower";
 import { defaultBucketFor } from "../../utils/todayView";
 import type { Item, ItemSource } from "./item";
@@ -21,8 +21,6 @@ export type GroupAxis =
   | "none"
   | "bucket"
   | "quadrant"
-  | "space"
-  | "project"
   | "folder"
   | "list"
   | "priority"
@@ -48,15 +46,9 @@ export function normalizeSortKey(key: unknown): SortKey {
 }
 
 export interface ViewFilter {
-  // The four scopes a view can be opened at (SPACES_REDESIGN_II §16-§18).
-  // They are not exclusive and they do not need to be: a Folder is inside a
-  // Project, so naming both narrows to the same set rather than contradicting.
-  //
-  // `spaceId` held a PROJECT id until STEP 7. The two are separate records
-  // now, and the distinction is the point of the level: a Space scope gathers
-  // every Project under it, which one id could not express.
-  spaceId?: string;
-  projectId?: string;
+  // The two scopes a view can be opened at. They are not exclusive and they
+  // do not need to be: a List is inside a Folder, so naming both narrows to
+  // the same set rather than contradicting.
   /** "" matches the Folderless Lists — a real scope, not "any folder". */
   folderId?: string;
   listId?: string;
@@ -124,8 +116,6 @@ function matchesDateWindow(item: Item, from?: string, to?: string): boolean {
 }
 
 export function matchesFilter(item: Item, filter: ViewFilter): boolean {
-  if (filter.spaceId !== undefined && item.spaceId !== filter.spaceId) return false;
-  if (filter.projectId !== undefined && item.projectId !== filter.projectId) return false;
   if (filter.folderId !== undefined && item.folderId !== filter.folderId) return false;
   if (filter.listId !== undefined && item.listId !== filter.listId) return false;
   if (filter.parentId !== undefined && item.parentId !== filter.parentId) return false;
@@ -165,28 +155,23 @@ export interface GroupContext {
 }
 
 /**
- * Ranks the Spaces or Lists an axis groups by, honouring the order the user
+ * Ranks the Folders or Lists an axis groups by, honouring the order the user
  * arranged them in and falling back to name only where they never said.
  *
- * `order` is optional on a Project and absent on anything the user has not
- * reordered, so records without one sort after those with one — otherwise a
- * single reordered Space would jump ahead of every untouched one for no
- * reason the user could see.
+ * `order` is absent on anything the user has not reordered, so records
+ * without one sort after those with one — otherwise a single reordered List
+ * would jump ahead of every untouched one for no reason the user could see.
  */
 export function groupRank(
   axis: GroupAxis,
-  records: { spaces?: Space[]; projects?: Project[]; lists?: List[]; folders?: Folder[] },
+  records: { lists?: List[]; folders?: Folder[] },
 ): ReadonlyMap<string, number> | undefined {
   const source =
-    axis === "space"
-      ? records.spaces?.map((s) => ({ id: s.id, order: s.order, name: s.name }))
-      : axis === "project"
-        ? records.projects?.map((p) => ({ id: p.id, order: p.order, name: p.name }))
-        : axis === "folder"
-          ? records.folders?.map((f) => ({ id: f.id, order: f.order, name: f.name }))
-          : axis === "list"
-            ? records.lists?.map((l) => ({ id: l.id, order: l.order, name: l.name }))
-            : undefined;
+    axis === "folder"
+      ? records.folders?.map((f) => ({ id: f.id, order: f.order, name: f.name }))
+      : axis === "list"
+        ? records.lists?.map((l) => ({ id: l.id, order: l.order, name: l.name }))
+        : undefined;
   if (!source || source.length === 0) return undefined;
 
   const ordered = [...source].sort((a, b) => {
@@ -202,10 +187,6 @@ export function groupKeyFor(item: Item, axis: GroupAxis, context: GroupContext):
   switch (axis) {
     case "none":
       return "";
-    case "space":
-      return item.spaceId;
-    case "project":
-      return item.projectId;
     case "folder":
       return item.folderId;
     case "list":

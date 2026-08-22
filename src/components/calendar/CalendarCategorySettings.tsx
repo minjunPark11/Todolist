@@ -1,10 +1,10 @@
 // Settings > 캘린더 > 카테고리 관리 (category spec §4–§9).
-// Personal categories are fully managed here. Project / external /
+// Personal categories are fully managed here. External /
 // focus categories are derived from their source entities, so recoloring one
-// writes the color back to the source (topic / project / calendar) — the
+// writes the color back to the source calendar — the
 // calendar and the entity's own screens never disagree.
 import { useEffect, useState, type DragEvent } from "react";
-import type { ExternalCalendar, Project, Task } from "../../types";
+import type { ExternalCalendar, Task } from "../../types";
 import {
   addPersonalCategory,
   deletePersonalCategory,
@@ -23,9 +23,7 @@ import { isTaskAlive } from "../../domain/tasks/taskState";
 interface CalendarCategorySettingsProps {
   tasks: Task[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
-  projects: Project[];
   externalCalendars: ExternalCalendar[];
-  onUpdateProject: (projectId: string, patch: Partial<Project>) => void;
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
 }
 
@@ -33,7 +31,7 @@ const CATEGORY_COLORS = CATEGORY_COLOR_PALETTE;
 
 // Personal categories rename+recolor here; derived ones recolor only (their
 // name belongs to the source entity).
-type EditorTarget = "personal" | "project" | "external" | "focus";
+type EditorTarget = "personal" | "external" | "focus";
 
 type EditorState = {
   mode: "add" | "edit";
@@ -48,9 +46,7 @@ type EditorState = {
 export function CalendarCategorySettings({
   tasks,
   onUpdateTask,
-  projects,
   externalCalendars,
-  onUpdateProject,
   onUpdateExternalCalendar,
 }: CalendarCategorySettingsProps) {
   const { t } = useT();
@@ -101,8 +97,7 @@ export function CalendarCategorySettings({
   function submitEditor() {
     if (!editor) return;
     if (editor.target !== "personal") {
-      if (editor.target === "project") onUpdateProject(editor.categoryId, { color: editor.color });
-      else if (editor.target === "external") onUpdateExternalCalendar(editor.categoryId, { color: editor.color });
+      if (editor.target === "external") onUpdateExternalCalendar(editor.categoryId, { color: editor.color });
       else setFocusColor(editor.color);
       setEditor(null);
       return;
@@ -253,13 +248,6 @@ export function CalendarCategorySettings({
           source entity; names / lifecycle stay with the entity's own screen. */}
       {(
         [
-          {
-            target: "project" as const,
-            label: t("calendar.group.project"),
-            rows: projects
-              .filter((project) => project.status !== "archived")
-              .map((project) => ({ id: project.id, name: project.name, color: project.color })),
-          },
           {
             target: "external" as const,
             label: t("calendar.group.external"),
