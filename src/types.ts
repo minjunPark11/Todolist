@@ -109,11 +109,21 @@ export interface Task {
   blockedByTaskId: string;
   // === Space hierarchy (P4) ===
   // Written only when the answer stops being derivable — when the task is
-  // moved into a List other than its Space's default, or onto a status the
-  // user invented. Resolve through membership.listIdFor / statusIdFor rather
-  // than reading these directly; `projectId` and `status` still answer when
-  // they are absent, which is the normal case.
+  // moved into a List other than its Space's default. Resolve through
+  // membership.listIdFor rather than reading it directly; `projectId` still
+  // answers when it is absent, which is the normal case.
   listId?: string;
+  /**
+   * Dormant (Chapter 26 §26.3.3).
+   *
+   * This named a column in the owning Project's own status set. Both the set
+   * and the axis are gone: a List's board columns are its Sections
+   * (`sectionId`), and lifecycle is a predicate. Nothing reads this field.
+   *
+   * It stays on the type because accounts have it stored, and the load's M0
+   * passthrough carries it — dropping it from the type would not delete the
+   * data, only hide it from anyone looking for it.
+   */
   statusId?: string;
   /**
    * The Board column this Task sits in, within its owner List (§6.26).
@@ -166,13 +176,13 @@ export interface Subtask {
 // client that has never heard of it simply leaves it alone.
 
 /**
- * A workflow stage. The label is the user's, but `group` is the app's: it is
- * how "does this count as finished" stays answerable no matter what someone
- * names their columns (D7).
+ * A workflow stage, as accounts have it STORED.
  *
- * Four groups, always on. ClickUp ships three and puts Not Started behind a
- * toggle; a per-user toggle for a status group would just be one more decision
- * to make in an app with one user, and `inbox` already occupies that slot.
+ * Dormant (Chapter 26 §26.3.3), like `Task.statusId`. Nothing constructs,
+ * reads or validates one of these any more — a List's board columns are its
+ * Sections, and lifecycle is a predicate. The shape stays described because
+ * `List.statuses` and `Project.statuses` still carry it through load and
+ * save, and a stored field with no type is a field nobody can find.
  */
 export type StatusGroup = "notStarted" | "active" | "done" | "closed";
 

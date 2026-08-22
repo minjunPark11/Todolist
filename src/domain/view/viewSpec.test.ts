@@ -2,9 +2,8 @@
 import type { List, Task } from "../../types";
 import { getMatrixPosition } from "../../utils/eisenhower";
 import { collectTodayEntries } from "../../utils/todayView";
-import { DEFAULT_STATUSES, makeDefaultList } from "../spaces/hierarchy";
+import { makeDefaultList } from "../spaces/hierarchy";
 import { defaultListIdFor } from "../spaces/membership";
-import { statusPatch } from "./board";
 import { projectItems } from "./item";
 import {
   applyView,
@@ -12,7 +11,6 @@ import {
   compareItems,
   groupRank,
   matchesFilter,
-  PRESET_ARCHIVE,
   PRESET_PLANNING,
   presetTodayQueue,
   type GroupContext,
@@ -101,11 +99,10 @@ describe("projectItems", () => {
 describe("matchesFilter", () => {
   const [item] = build([task({ tags: ["deep", "writing"], priority: "high" })]).items;
 
-  it("matches on list, source, status and priority", () => {
+  it("matches on list, source and priority", () => {
     expect(matchesFilter(item, { listId: defaultListIdFor("space-1") })).toBe(true);
     expect(matchesFilter(item, { listId: "list-other" })).toBe(false);
     expect(matchesFilter(item, { sources: ["task"] })).toBe(true);
-    expect(matchesFilter(item, { statusIds: ["todo"] })).toBe(true);
     expect(matchesFilter(item, { priorities: ["high"] })).toBe(true);
     expect(matchesFilter(item, { priorities: ["low"] })).toBe(false);
   });
@@ -180,7 +177,7 @@ describe("applyView grouping", () => {
   });
 
   it("has no rank to give for an axis the user does not own", () => {
-    expect(groupRank("status", { lists })).toBeUndefined();
+    expect(groupRank("dueDate", { lists })).toBeUndefined();
     expect(groupRank("list", { lists: [] })).toBeUndefined();
   });
 
@@ -237,30 +234,10 @@ describe("equivalence with the screens it replaces", () => {
     expect(compared).toBeGreaterThan(3);
   });
 
-  it("filters the archive exactly as the Archive page did", () => {
-    const archive = [
-      task({ id: "archived", status: "archived", archivedAt: NOW }),
-      task({ id: "done", status: "done", completedAt: NOW }),
-      task({ id: "open" }),
-    ];
-    const { items, context } = build(archive);
-    const fromView = applyView(items, PRESET_ARCHIVE, context).flatMap((group) =>
-      group.items.map((item) => item.sourceId),
-    );
-    // The screen's own filter, verbatim.
-    const fromScreen = archive.filter((t) => t.status === "archived" || t.archivedAt).map((t) => t.id);
-    expect(fromView).toEqual(fromScreen);
-  });
-
-  it("drops a tombstoned task the Archive page used to show", () => {
-    // The one place the two deliberately disagree. `planner.tasks` carries
-    // soft-deleted rows that arrived from another device, and the screen's
-    // filter never looked at deletedAt; projectItems does.
-    const { items, context } = build([
-      task({ id: "gone", status: "archived", archivedAt: NOW, deletedAt: NOW }),
-    ]);
-    expect(applyView(items, PRESET_ARCHIVE, context)).toEqual([]);
-  });
+  // Two tests pinned `PRESET_ARCHIVE` against the Archive screen's own
+  // filter. The screen went first and the preset followed it (Ch. 26
+  // §26.3.3): "given up on" is `isWontDo`, a predicate, and the status axis
+  // the preset filtered on no longer exists.
 
   // This asserted the same narrowing through `presetSpaceHorizons`, which
   // went with Horizons, and then through a Project scope, which went with
@@ -277,22 +254,9 @@ describe("equivalence with the screens it replaces", () => {
   });
 });
 
-// The seam this covered — a board drawing columns from `statusesWithCustom`
-// while the projection resolved against `statusesForSpace` — closed when
-// per-Project custom statuses went with the Projects feature. There is one
-// status set now, so the two sides cannot name different columns. What is
-// left worth pinning is the round trip through it.
-describe("columns", () => {
-  it("survives the drop that put a task on one", () => {
-    const dragged = task({ status: "inbox" });
-    const patch = statusPatch(dragged, "doing", DEFAULT_STATUSES);
-    expect(projectItems({ tasks: [{ ...dragged, ...patch }], lists, today: TODAY })[0].statusId).toBe("doing");
-  });
-
-  it("falls back to the task's own status when a stored id names nothing", () => {
-    expect(projectItems({ tasks: [task({ statusId: "bl-deleted" })], lists, today: TODAY })[0].statusId).toBe("todo");
-  });
-});
+// A `columns` block sat here, pinning the round trip through `statusPatch`
+// and `Item.statusId`. Both are gone (Ch. 26 §26.3.3) — a List's board groups
+// by its Sections, which `domain/tasks/board.ts` answers for.
 
 // §16-§18: the same view opened at four depths.
 // Space -> Project -> Folder -> List, and the filter language says which by

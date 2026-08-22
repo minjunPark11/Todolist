@@ -6,10 +6,8 @@ import {
   addList,
   archiveFolder,
   archiveList,
-  DEFAULT_STATUSES,
   defaultListFor,
   folderlessLists,
-  hasDoneStatus,
   INBOX_LIST_ID,
   listDisplayName,
   listsInFolder,
@@ -20,8 +18,6 @@ import {
   sanitizeList,
   shouldRevealLists,
   standaloneLists,
-  statusDisplayLabel,
-  statusesFor,
 } from "./hierarchy";
 
 const NOW = "2026-08-15T00:00:00.000Z";
@@ -64,24 +60,12 @@ describe("sanitizeList", () => {
     expect(sanitizeList({ id: "l", spaceId: "s", folderId: "" })?.folderId).toBeUndefined();
   });
 
-  it("keeps a status override only when it can still express done", () => {
-    const usable = sanitizeList({
-      id: "l",
-      projectId: "s",
-      spaceId: "s",
-      statuses: [{ id: "a", group: "active" }, { id: "d", group: "done" }],
-    });
-    expect(usable?.statuses).toHaveLength(2);
-
-    // Without a done status the app could not tell when work finished, so the
-    // override is discarded and the Space's set is inherited instead.
-    const unusable = sanitizeList({
-      id: "l",
-      projectId: "s",
-      spaceId: "s",
-      statuses: [{ id: "a", group: "active" }],
-    });
-    expect(unusable?.statuses).toBeUndefined();
+  // A test that a stored `statuses` override was validated on load sat here.
+  // `sanitizeList` does not name the field any more (Ch. 26 §26.3.3) — the M0
+  // passthrough carries it untouched, which is what the next test asserts.
+  it("carries a stored statuses override through untouched", () => {
+    const stored = [{ id: "a", group: "active" }] as unknown as Status[];
+    expect(sanitizeList(list({ statuses: stored }))?.statuses).toBe(stored);
   });
 
   it("carries fields it does not know (M0)", () => {
@@ -175,22 +159,6 @@ describe("shouldRevealLists", () => {
   });
 });
 
-describe("statusesFor", () => {
-  const override: Status[] = [{ id: "x", label: "X", color: "#000", order: 0, group: "done" }];
-
-  it("uses the list's own set when it has one", () => {
-    expect(statusesFor(list({ statuses: override }), DEFAULT_STATUSES)).toBe(override);
-  });
-
-  it("inherits the space's set otherwise", () => {
-    expect(statusesFor(list(), DEFAULT_STATUSES)).toBe(DEFAULT_STATUSES);
-    expect(statusesFor(undefined, DEFAULT_STATUSES)).toBe(DEFAULT_STATUSES);
-  });
-
-  it("ships a default set that can express completion", () => {
-    expect(hasDoneStatus(DEFAULT_STATUSES)).toBe(true);
-  });
-});
 
 describe("listDisplayName", () => {
   const LABEL = "작업";
@@ -214,25 +182,6 @@ describe("listDisplayName", () => {
   });
 });
 
-describe("statusDisplayLabel", () => {
-  const t = (key: string) => `t:${key}`;
-
-  it("translates a default status by its id", () => {
-    expect(statusDisplayLabel(DEFAULT_STATUSES[0], t)).toBe("t:status.inbox");
-    expect(statusDisplayLabel({ id: "done", label: "Done" }, t)).toBe("t:status.done");
-  });
-
-  it("leaves a column the user named alone", () => {
-    // Their words already — a translation would overwrite them.
-    expect(statusDisplayLabel({ id: "bl-review", label: "In review" }, t)).toBe("In review");
-  });
-
-  it("gives every default an answer, so no column falls back to English", () => {
-    for (const status of DEFAULT_STATUSES) {
-      expect(statusDisplayLabel(status, t)).toBe(`t:status.${status.id}`);
-    }
-  });
-});
 
 describe("writes preserve identity", () => {
   it("returns the SAME array when the id is unknown", () => {

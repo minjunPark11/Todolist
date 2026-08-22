@@ -8,28 +8,13 @@
 // waits on M0 reaching users — a new field on an existing synced record is
 // erased by any client that predates it, while these brand-new collections
 // are invisible to one.
-import type { Folder, List, Status, StatusGroup } from "../../types";
+import type { Folder, List } from "../../types";
 
-export const STATUS_GROUPS: StatusGroup[] = ["notStarted", "active", "done", "closed"];
-
-/**
- * The set a Space starts with (§5 M2).
- *
- * Every id is exactly a `TaskStatus` value, and that is load-bearing rather
- * than tidy: while a Space still uses these defaults, a task's status id IS
- * its status, so nothing has to be written to every task to migrate it. Only
- * a task moved onto a status the user invented needs a stored `statusId`.
- * `statusIdFor` in ./membership depends on this holding, and a test asserts
- * the two lists stay in step.
- */
-export const DEFAULT_STATUSES: Status[] = [
-  { id: "inbox", label: "Inbox", color: "#8e8e93", order: 0, group: "notStarted" },
-  { id: "todo", label: "To Do", color: "#0066cc", order: 1, group: "active" },
-  { id: "doing", label: "Doing", color: "#5856d6", order: 2, group: "active" },
-  { id: "waiting", label: "Waiting", color: "#ff9500", order: 3, group: "active" },
-  { id: "done", label: "Done", color: "#34c759", order: 4, group: "done" },
-  { id: "archived", label: "Archived", color: "#8e8e93", order: 5, group: "closed" },
-];
+// DEFAULT_STATUSES sat here — the six-column set a Space started with, one
+// per `TaskStatus` value. The status AXIS is gone (Ch. 26 §26.3.3): a List's
+// board columns are its Sections and lifecycle is a predicate, so nothing
+// needs a default column set any more. `sanitizeStatus` below stays, because
+// a List that stored one still has to round-trip through load and save.
 
 export const DEFAULT_LIST_NAME = "Tasks";
 
@@ -65,32 +50,6 @@ export function listDisplayName(
   return list.isDefault && list.name === DEFAULT_LIST_NAME ? defaultLabel : list.name;
 }
 
-const DEFAULT_STATUS_IDS = new Set(DEFAULT_STATUSES.map((status) => status.id));
-
-/**
- * The label to SHOW for a status.
- *
- * Same rule as `listDisplayName`, one axis over: the six defaults carry an
- * English `label` because that is what the app named them, and a column the
- * user added is already in their own words. Translating the first and leaving
- * the second alone is the whole of it.
- *
- * It lives here rather than at each call site because it had already been
- * written twice — the Board and the Project screen's columns each spelled the
- * ternary out — while the List view rendered `status.label` raw. The result
- * was two tabs of one screen disagreeing: a Korean board beside an English
- * "Inbox / To Do / Doing" dropdown.
- *
- * `translate` is passed in so the domain does not reach for the i18n context;
- * the caller holds `t`.
- */
-export function statusDisplayLabel(
-  status: Pick<Status, "id" | "label">,
-  translate: (key: string) => string,
-): string {
-  return DEFAULT_STATUS_IDS.has(status.id) ? translate(`status.${status.id}`) : status.label;
-}
-
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -99,41 +58,7 @@ function asOrder(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-export function sanitizeStatus(value: unknown): Status | null {
-  if (!value || typeof value !== "object") return null;
-  const record = value as Record<string, unknown>;
-  const id = asString(record.id).trim();
-  if (!id) return null;
-  const group = STATUS_GROUPS.includes(record.group as StatusGroup)
-    ? (record.group as StatusGroup)
-    : "active";
-  return {
-    ...(record as Partial<Status>), // M0 passthrough
-    id,
-    label: asString(record.label) || id,
-    color: asString(record.color) || "#8e8e93",
-    order: asOrder(record.order),
-    group,
-  };
-}
 
-function sanitizeStatuses(value: unknown): Status[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const statuses = value
-    .map(sanitizeStatus)
-    .filter((status): status is Status => status !== null)
-    .sort((a, b) => a.order - b.order);
-  return statuses.length > 0 ? statuses : undefined;
-}
-
-/**
- * A status set is only usable if the app can still tell what "finished" means.
- * Dropping the last `done` status would make completion unrepresentable, so a
- * set without one is refused and the caller falls back to inheritance.
- */
-export function hasDoneStatus(statuses: Status[]): boolean {
-  return statuses.some((status) => status.group === "done");
-}
 
 export function sanitizeFolder(value: unknown): Folder | null {
   if (!value || typeof value !== "object") return null;
@@ -180,7 +105,6 @@ export function sanitizeList(value: unknown): List | null {
   // constraint, and this is where the relaxing happens.
   const kind = record.kind === "inbox" ? "inbox" : record.kind === "regular" ? "regular" : undefined;
   if (!id || (!projectId && !kind)) return null;
-  const statuses = sanitizeStatuses(record.statuses);
   const createdAt = asString(record.createdAt);
   const updatedAt = asString(record.updatedAt);
   return {
@@ -200,9 +124,11 @@ export function sanitizeList(value: unknown): List | null {
     defaultViewKey: asString(record.defaultViewKey).trim() || undefined,
     order: asOrder(record.order),
     isDefault: record.isDefault === true,
-    // An override that cannot express "done" is not an override worth keeping;
-    // undefined means inherit from the Space, which always has a full set.
-    statuses: statuses && hasDoneStatus(statuses) ? statuses : undefined,
+    // `statuses` is not named here any more. It was validated and rewritten
+    // on every load, back when a List could override its Space's columns; the
+    // axis is gone (Ch. 26 §26.3.3) and nothing reads the field. The M0
+    // passthrough above carries whatever is stored, untouched — which
+    // preserves it better than a sanitiser that could drop it.
     archivedAt: asString(record.archivedAt) || undefined,
     deletedAt: asString(record.deletedAt) || undefined,
     createdAt: createdAt || updatedAt,
@@ -271,12 +197,6 @@ export function defaultListFor(lists: List[], spaceId: string): List | undefined
  */
 export function shouldRevealLists(lists: List[], spaceId: string, revealed?: boolean): boolean {
   return revealed === true || activeLists(lists, spaceId).length > 1;
-}
-
-/** Resolved per D7: the List's own set when it has one, else the Space's. */
-export function statusesFor(list: List | undefined, spaceStatuses: Status[]): Status[] {
-  if (list?.statuses && list.statuses.length > 0) return list.statuses;
-  return spaceStatuses;
 }
 
 // === writes ===

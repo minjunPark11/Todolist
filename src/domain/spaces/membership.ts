@@ -18,13 +18,8 @@
 // authoritative when present, the old one answers when it is absent, and both
 // are true at once for as long as needed. Nothing is rewritten in bulk, and no
 // device is required to agree about when the switch happened.
-import type { List, Project, Status, Task, TaskStatus } from "../../types";
-import { DEFAULT_STATUSES, defaultListFor } from "./hierarchy";
-
-/** A Space stores a status set only once the user edits one (D7). */
-export function statusesForSpace(space: Pick<Project, "statuses"> | undefined): Status[] {
-  return space?.statuses && space.statuses.length > 0 ? space.statuses : DEFAULT_STATUSES;
-}
+import type { List, Task, TaskStatus } from "../../types";
+import { defaultListFor } from "./hierarchy";
 
 /**
  * Deterministic, so running the backfill twice cannot produce two default
@@ -139,7 +134,7 @@ export function resolveListMove(targetListId: string, lists: List[]): ListMove |
 
 /** Empty when the move changes nothing, so a no-op drop writes no row. */
 export function patchForListMove(
-  task: Pick<Task, "projectId" | "listId" | "statusId">,
+  task: Pick<Task, "projectId" | "listId">,
   targetListId: string,
   lists: List[],
 ): Partial<Task> {
@@ -149,35 +144,11 @@ export function patchForListMove(
   if (!spaceChanged && (task.listId ?? "") === move.listId) return {};
 
   const patch: Partial<Task> = { listId: move.listId };
-  if (spaceChanged) {
-    patch.projectId = move.spaceId;
-    // A status the user invented belongs to the Space that defined it.
-    // `statusIdFor` would fall back anyway, so carrying the id across would
-    // leave dead weight that still looks meaningful.
-    if (task.statusId) patch.statusId = "";
-  }
+  // The move used to clear `statusId` too, because a status the user invented
+  // belonged to the Space that defined it. There are no invented statuses any
+  // more (Ch. 26 §26.3.3), so there is nothing to carry across.
+  if (spaceChanged) patch.projectId = move.spaceId;
   return patch;
-}
-
-/**
- * The stored id wins; otherwise the task's own status is the id, which holds
- * exactly because DEFAULT_STATUSES is keyed by TaskStatus. A stored id that no
- * longer exists in the set — the status was deleted on another device — falls
- * back the same way rather than leaving the task in a state nothing can render.
- */
-export function statusIdFor(task: Pick<Task, "statusId" | "status">, statuses: Status[]): string {
-  if (task.statusId && statuses.some((status) => status.id === task.statusId)) return task.statusId;
-  return task.status;
-}
-
-export function statusFor(task: Pick<Task, "statusId" | "status">, statuses: Status[]): Status | undefined {
-  const id = statusIdFor(task, statuses);
-  return statuses.find((status) => status.id === id);
-}
-
-/** True when the resolved status counts as finished, whatever it is called. */
-export function isDoneStatus(task: Pick<Task, "statusId" | "status">, statuses: Status[]): boolean {
-  return statusFor(task, statuses)?.group === "done";
 }
 
 export function itemsInList(tasks: Task[], lists: List[], listId: string): Task[] {

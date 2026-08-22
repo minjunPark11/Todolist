@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Status, Task } from "../../types";
-import { DEFAULT_STATUSES } from "../spaces/hierarchy";
+import type { Task } from "../../types";
 import { getMatrixPosition } from "../../utils/eisenhower";
-import { isDroppableAxis, patchForColumn, patchForSpanDrag, statusPatch } from "./board";
+import { patchForSpanDrag } from "./board";
 
 const TODAY = "2026-08-15";
 const NOW = `${TODAY}T00:00:00.000Z`;
@@ -44,54 +43,11 @@ function task(overrides: Partial<Task> = {}): Task {
   };
 }
 
-// A Space that invented two columns of its own, one of them a second `active`
-// column — the case where a naive group->status mapping does damage.
-const REVIEW: Status = { id: "col-review", label: "In Review", color: "#af52de", order: 6, group: "active" };
-const SHIPPED: Status = { id: "col-shipped", label: "Shipped", color: "#34c759", order: 7, group: "done" };
-const CUSTOM: Status[] = [...DEFAULT_STATUSES, REVIEW, SHIPPED];
-
-describe("statusPatch", () => {
-  it("writes the status a default column stands for", () => {
-    expect(statusPatch(task({ status: "todo" }), "doing", DEFAULT_STATUSES)).toEqual({
-      status: "doing",
-      statusId: "",
-    });
-  });
-
-  it("clears a stored statusId when moving back to a default column", () => {
-    // Otherwise statusIdFor keeps answering with the custom column and the
-    // card snaps straight back to where it was dragged from.
-    const moved = task({ status: "todo", statusId: "col-review" });
-    expect(statusPatch(moved, "done", CUSTOM)).toEqual({ status: "done", statusId: "" });
-  });
-
-  it("writes statusId for a column the Space invented", () => {
-    expect(statusPatch(task({ status: "todo" }), "col-review", CUSTOM)).toEqual({ statusId: "col-review" });
-  });
-
-  it("does not demote a task moved between two columns of the same group", () => {
-    // "doing" and "In Review" are both active; rewriting status here would
-    // silently knock the task back to "todo".
-    expect(statusPatch(task({ status: "doing" }), "col-review", CUSTOM)).toEqual({ statusId: "col-review" });
-  });
-
-  it("rewrites status when the column belongs to a different group", () => {
-    expect(statusPatch(task({ status: "todo" }), "col-shipped", CUSTOM)).toEqual({
-      statusId: "col-shipped",
-      status: "done",
-    });
-  });
-
-  it("returns nothing when the card is already in that column", () => {
-    expect(statusPatch(task({ status: "doing" }), "doing", DEFAULT_STATUSES)).toEqual({});
-    expect(statusPatch(task({ statusId: "col-review" }), "col-review", CUSTOM)).toEqual({});
-  });
-
-  it("ignores a column the Space does not have", () => {
-    expect(statusPatch(task(), "col-ghost", DEFAULT_STATUSES)).toEqual({});
-    expect(statusPatch(task(), "", DEFAULT_STATUSES)).toEqual({});
-  });
-});
+// `statusPatch` and `patchForColumn` were tested here, across the status,
+// quadrant and priority axes. All three went with the screens that drew board
+// columns (Ch. 26 §26.3.3): the Matrix calls `patchForQuadrant` directly and a
+// List's board groups by its Sections. What is left in this file is the one
+// drag whose meaning still lives in board.ts.
 
 describe("patchForSpanDrag", () => {
   it("writes the start when the left edge is dragged, even if it had none", () => {
@@ -148,30 +104,5 @@ describe("patchForSpanDrag", () => {
   it("leaves an undated task alone — it is not on the timeline to drag", () => {
     const undated = task({ startDate: "", dueDate: "" });
     expect(patchForSpanDrag(undated, { kind: "move", zoom: "day", steps: 5 })).toEqual({});
-  });
-});
-
-describe("patchForColumn", () => {
-  const context = { today: TODAY, statuses: DEFAULT_STATUSES };
-
-  it("lands a task in the quadrant it was dropped on", () => {
-    // The rule is eisenhower.ts's; this only has to reach it. Proving the
-    // result by re-deriving the quadrant catches a wrong delegation.
-    const dragged = task({ priority: "none", dueDate: "" });
-    const patch = patchForColumn("quadrant", dragged, "I", context);
-    expect(getMatrixPosition({ ...dragged, ...patch }, TODAY).quadrant).toBe("I");
-  });
-
-  it("sets the priority a priority column stands for", () => {
-    expect(patchForColumn("priority", task({ priority: "none" }), "high", context)).toEqual({ priority: "high" });
-  });
-
-  it("refuses axes with no inverse rather than inventing a value", () => {
-    // A Today bucket or a due-date column would have to choose a date the user
-    // never picked.
-    expect(patchForColumn("bucket", task(), "now", context)).toEqual({});
-    expect(patchForColumn("dueDate", task(), TODAY, context)).toEqual({});
-    expect(isDroppableAxis("bucket")).toBe(false);
-    expect(isDroppableAxis("status")).toBe(true);
   });
 });

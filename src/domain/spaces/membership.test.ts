@@ -1,19 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { List, Project, Status, Task } from "../../types";
-import { DEFAULT_STATUSES, ensureDefaultLists, ensureInboxList, makeDefaultList } from "./hierarchy";
+import type { List, Project, Task } from "../../types";
+import { ensureDefaultLists, ensureInboxList, makeDefaultList } from "./hierarchy";
 import {
   backfillTaskListId,
   defaultListIdFor,
-  isDoneStatus,
   itemsInList,
   listIdFor,
-  MIGRATED_TASK_STATUSES,
   patchForListMove,
   projectIdFor,
   resolveListMove,
-  statusesForSpace,
-  statusFor,
-  statusIdFor,
 } from "./membership";
 
 const NOW = "2026-08-15T00:00:00.000Z";
@@ -124,22 +119,6 @@ describe("projectIdFor — membership read through the List (§6.77)", () => {
   });
 });
 
-// The migration writes nothing to tasks, which only works if every status the
-// app can store already exists in the default set. If TaskStatus ever gains a
-// value, this fails before any task can end up in a state nothing renders.
-describe("default statuses cover every TaskStatus", () => {
-  it("has an id for each one", () => {
-    const ids = DEFAULT_STATUSES.map((status) => status.id);
-    for (const status of MIGRATED_TASK_STATUSES) {
-      expect(ids).toContain(status);
-    }
-  });
-
-  it("agrees on the count, so a stale extra cannot hide a missing one", () => {
-    expect(DEFAULT_STATUSES).toHaveLength(MIGRATED_TASK_STATUSES.length);
-  });
-});
-
 describe("listIdFor", () => {
   it("falls back to the Space's default List, so no task needed rewriting", () => {
     expect(listIdFor(task(), [defaultList])).toBe(defaultList.id);
@@ -159,42 +138,7 @@ describe("listIdFor", () => {
   });
 });
 
-describe("statusIdFor", () => {
-  it("uses the task's own status while the Space runs the defaults", () => {
-    expect(statusIdFor(task({ status: "doing" }), DEFAULT_STATUSES)).toBe("doing");
-  });
 
-  it("prefers a stored id once the task sits on a custom status", () => {
-    const custom: Status[] = [
-      ...DEFAULT_STATUSES,
-      { id: "review", label: "In review", color: "#000", order: 9, group: "active" },
-    ];
-    expect(statusIdFor(task({ statusId: "review" }), custom)).toBe("review");
-  });
-
-  it("falls back when the stored id no longer exists — a status deleted elsewhere", () => {
-    // Otherwise the task would sit in a state nothing in the set can render.
-    expect(statusIdFor(task({ statusId: "deleted", status: "todo" }), DEFAULT_STATUSES)).toBe("todo");
-  });
-
-  it("resolves the status object and its done-ness", () => {
-    expect(statusFor(task({ status: "done" }), DEFAULT_STATUSES)?.label).toBe("Done");
-    expect(isDoneStatus(task({ status: "done" }), DEFAULT_STATUSES)).toBe(true);
-    expect(isDoneStatus(task({ status: "doing" }), DEFAULT_STATUSES)).toBe(false);
-  });
-});
-
-describe("statusesForSpace", () => {
-  it("returns the defaults for a Space that has never been edited", () => {
-    expect(statusesForSpace(project())).toBe(DEFAULT_STATUSES);
-    expect(statusesForSpace(undefined)).toBe(DEFAULT_STATUSES);
-  });
-
-  it("returns the Space's own set once it has one", () => {
-    const own: Status[] = [{ id: "x", label: "X", color: "#000", order: 0, group: "done" }];
-    expect(statusesForSpace(project({ statuses: own }))).toBe(own);
-  });
-});
 
 describe("itemsInList", () => {
   it("collects tasks that resolve to the list, stored or derived", () => {
@@ -299,19 +243,14 @@ describe("moving an Item into a List", () => {
     });
   });
 
-  it("drops a custom status when the Space changes", () => {
-    // The column belongs to the Space that defined it; the new one has no
-    // such id, so keeping it stores something that only looks meaningful.
-    expect(patchForListMove(task({ statusId: "col-review" }), otherDefault.id, lists)).toEqual({
+  // This asserted that the move cleared `statusId`, because a status the user
+  // invented belonged to the Space that defined it. There are no invented
+  // statuses any more (Ch. 26 §26.3.3), so the move writes the List and the
+  // Space and nothing else.
+  it("writes the List and the Space, and nothing else", () => {
+    expect(patchForListMove(task(), otherDefault.id, lists)).toEqual({
       listId: "",
       projectId: "space-2",
-      statusId: "",
-    });
-  });
-
-  it("keeps the status when the task stays in its Space", () => {
-    expect(patchForListMove(task({ statusId: "col-review" }), reading.id, lists)).toEqual({
-      listId: reading.id,
     });
   });
 

@@ -2,7 +2,7 @@
 //
 // The four screens this replaces are four hardcoded instances of the same
 // thing: Horizons groups by period, Planning by quadrant, Today by bucket,
-// Archive filters by status. Expressed here they become presets, and the
+// Archive filtered by status. Expressed here they become presets, and the
 // filter language they share becomes the same language automations will use
 // for their conditions (W4) — one vocabulary instead of two.
 //
@@ -24,8 +24,7 @@ export type GroupAxis =
   | "folder"
   | "list"
   | "priority"
-  | "dueDate"
-  | "status";
+  | "dueDate";
 
 // "scheduledDate" was a sixth key here, sorting by the work day. It went with
 // the field (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11); `normalizeSortKey`
@@ -69,7 +68,6 @@ export interface ViewFilter {
   query?: string;
   /** An item matches when it carries every tag named. */
   tags?: string[];
-  statusIds?: string[];
   priorities?: TaskPriority[];
   sources?: ItemSource[];
   /** Inclusive. An item matches when its span overlaps the window. */
@@ -120,7 +118,6 @@ export function matchesFilter(item: Item, filter: ViewFilter): boolean {
   if (filter.listId !== undefined && item.listId !== filter.listId) return false;
   if (filter.parentId !== undefined && item.parentId !== filter.parentId) return false;
   if (filter.sources && !filter.sources.includes(item.source)) return false;
-  if (filter.statusIds && !filter.statusIds.includes(item.statusId)) return false;
   if (filter.priorities && !filter.priorities.includes(item.priority)) return false;
   if (filter.blocked !== undefined && item.blocked !== filter.blocked) return false;
   if (filter.done !== undefined && item.done !== filter.done) return false;
@@ -193,8 +190,6 @@ export function groupKeyFor(item: Item, axis: GroupAxis, context: GroupContext):
       return item.listId;
     case "priority":
       return item.priority;
-    case "status":
-      return item.statusId;
     case "dueDate":
       return item.dueDate || "";
     case "quadrant": {
@@ -313,14 +308,10 @@ export const PRESET_PLANNING: ViewSpec = {
   layout: "columns",
 };
 
-export const PRESET_ARCHIVE: ViewSpec = {
-  id: "preset-archive",
-  name: "Archive",
-  filter: { statusIds: ["archived"] },
-  groupBy: "none",
-  sort: { key: "title" },
-  layout: "list",
-};
+// PRESET_ARCHIVE stood here, filtering on `statusIds: ["archived"]`. The
+// Archive screen went first, then the status axis it filtered on (Ch. 26
+// §26.3.3) — "given up on" is `isWontDo`, and that is a predicate rather than
+// a column value.
 
 export function presetTodayQueue(today: string): ViewSpec {
   return {

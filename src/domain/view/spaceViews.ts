@@ -42,7 +42,12 @@ export interface SpaceViewDef {
  */
 export const SPACE_VIEWS: readonly SpaceViewDef[] = [
   { id: "list", groupBy: "none", layout: "list", sources: ["task"], sort: { key: "dueDate" } },
-  { id: "board", groupBy: "status", layout: "board", sources: ["task"], sort: { key: "dueDate" } },
+  // `groupBy: "none"`, and not because a board has no columns. A List's board
+  // columns are its SECTIONS, which `domain/tasks/board.ts` builds directly —
+  // they were never a group axis, and the `status` axis this used to name is
+  // gone (Ch. 26 §26.3.3). Nothing calls `specForSpaceView("board")`; the day
+  // something does, its columns come from the Sections, not from here.
+  { id: "board", groupBy: "none", layout: "board", sources: ["task"], sort: { key: "dueDate" } },
   {
     // Grouped by List, not flat. §50C.20 asks that a row identify its List and
     // prefers a flat table with a List column; the timeline row has no column

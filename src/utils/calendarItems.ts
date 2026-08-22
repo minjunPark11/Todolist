@@ -189,7 +189,9 @@ export function buildCalendarItems({
   for (const item of viewItems) {
     const task = taskById.get(item.sourceId);
     if (!task) continue;
-    if (item.statusId === "archived" || !isTaskAlive(task)) continue;
+    // One question, where there were two: `statusId === "archived"` was the
+    // legacy spelling of Won't Do, which `isTaskAlive` already excludes.
+    if (!isTaskAlive(task)) continue;
     const done = item.done;
     const repeating = task.repeatType !== "none";
     const taskCategoryId = resolveTaskCategoryId(task);

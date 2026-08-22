@@ -21,7 +21,7 @@ import type { List, Tag, Task, TaskPriority, TaskTag } from "../../types";
 import { blockedTaskIds } from "../tasks/dependencies";
 import { isCompleted } from "../tasks/taskState";
 import { tagNamesForTask } from "../tags/tags";
-import { listIdFor, statusIdFor, statusesForSpace } from "../spaces/membership";
+import { listIdFor } from "../spaces/membership";
 
 /**
  * One source, where there were three.
@@ -69,8 +69,9 @@ export interface Item {
   startTime: string;
   endTime: string;
 
-  // --- judgement axis
-  statusId: string;
+  // --- judgement axis. `statusId` sat here, resolved against a Project's own
+  // status set. Both went with the Projects feature (Ch. 26 §26.3.3): a
+  // List's board columns are its Sections, and lifecycle is a predicate.
   priority: TaskPriority;
   done: boolean;
   blocked: boolean;
@@ -108,9 +109,6 @@ export function projectItems(input: ProjectItemsInput): Item[] {
   const { tasks, lists, tags = [], taskTags = [] } = input;
   const folders = folderMap(lists);
   const blocked = blockedTaskIds(tasks);
-  // Custom per-Project status sets went with the Projects feature, so every
-  // Task now resolves against the one default set.
-  const statuses = statusesForSpace(undefined);
   const items: Item[] = [];
 
   for (const task of tasks) {
@@ -128,7 +126,6 @@ export function projectItems(input: ProjectItemsInput): Item[] {
       dueDate: task.dueDate,
       startTime: task.startTime,
       endTime: task.endTime,
-      statusId: statusIdFor(task, statuses),
       priority: task.priority,
       done: isCompleted(task),
       blocked: blocked.has(task.id),
