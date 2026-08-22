@@ -11,11 +11,14 @@ import type {
   PlannerSettings,
   Project,
   Subtask,
+  Tag,
   Task,
+  TaskTag,
 } from "../../../types";
 import { selectRecentFocusSessions } from "../../../domain/focus/selectors";
 import { selectActiveProjects } from "../../../domain/projects/selectors";
 import { selectRelevantTasks } from "../../../domain/tasks/selectors";
+import { tagNamesForTask } from "../../../domain/tags/tags";
 import { addDays, todayValue } from "../../../utils/date";
 import { buildPlanVsActual } from "../../../utils/planVsActual";
 import type { AgentIntent } from "../agent/intent";
@@ -33,6 +36,13 @@ export type AiContextInput = {
   settings: PlannerSettings;
   appSettings: AppSettings;
   calendarContextText?: string;
+  /**
+   * The tag relation (§26.9). Optional, and absent it falls back to the
+   * strings on the Task — so a caller that has not been updated still sends
+   * the tags it always did, just not the renamed ones.
+   */
+  tags?: Tag[];
+  taskTags?: TaskTag[];
 };
 
 // Compact, JSON-serializable slice of app data selected for one AI request.
@@ -79,7 +89,7 @@ function omitEmpty(record: Record<string, unknown>): Record<string, unknown> {
   );
 }
 
-function slimTask(task: Task) {
+function slimTask(task: Task, tags: Tag[], taskTags: TaskTag[]) {
   return omitEmpty({
     id: task.id,
     title: task.title,
@@ -90,7 +100,7 @@ function slimTask(task: Task) {
     startTime: task.startTime,
     endTime: task.endTime,
     projectId: task.projectId,
-    tags: task.tags,
+    tags: tagNamesForTask(task, tags, taskTags),
     notes: trimField(task.notes),
     estimatedMinutes: task.estimatedMinutes,
     // isSomeday was here and is not any more: no UI has ever set it, so it was
@@ -134,7 +144,7 @@ export function selectRelevantAppContext(input: AiContextInput): RelevantAppCont
       today,
     ),
     data: {
-      tasks: tasks.map(slimTask),
+      tasks: tasks.map((task) => slimTask(task, input.tags ?? [], input.taskTags ?? [])),
       projects: selectActiveProjects(input.projects)
         .slice(0, AI_CONTEXT_LIMITS.projects)
         .map((project) =>

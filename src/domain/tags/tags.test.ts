@@ -4,10 +4,12 @@ import {
   activeTags,
   backfillTaskTags,
   isUserTag,
+  linkTaskTags,
   removeTag,
   sanitizeTag,
   sanitizeTaskTag,
   tagIdFor,
+  tagNamesForTask,
   tagsForTask,
   taskIdsWithTag,
   taskTagIdFor,
@@ -178,5 +180,67 @@ describe("removeTag", () => {
     const next = removeTag("tag-missing", tags, links);
     expect(next.tags).toBe(tags);
     expect(next.taskTags).toBe(links);
+  });
+});
+
+// §26.9: the relation is the canonical answer, so creation writes it rather
+// than leaving the next load's backfill to infer it from the strings.
+describe("linkTaskTags", () => {
+  it("creates the tag and the link for a name nothing holds yet", () => {
+    const next = linkTaskTags("t1", ["Deep work"], [], [], NOW);
+    expect(next.tags.map((tag) => tag.name)).toEqual(["Deep work"]);
+    expect(next.taskTags).toEqual([
+      { id: taskTagIdFor("t1", tagIdFor("Deep work")), taskId: "t1", tagId: tagIdFor("Deep work"), createdAt: NOW },
+    ]);
+  });
+
+  // The id was derived from the name a tag was BORN with. Deriving it again
+  // from the name it carries now would answer with an id nothing holds, and
+  // the one tag would become two.
+  it("resolves to an existing tag by name rather than re-deriving its id", () => {
+    const renamed: Tag[] = [{ id: "tag-work", name: "Job", createdAt: NOW, updatedAt: NOW }];
+    const next = linkTaskTags("t1", ["job"], renamed, [], NOW);
+    expect(next.tags).toBe(renamed);
+    expect(next.taskTags.map((link) => link.tagId)).toEqual(["tag-work"]);
+  });
+
+  it("is idempotent — the pair can only ever produce one row", () => {
+    const first = linkTaskTags("t1", ["Work"], [], [], NOW);
+    const second = linkTaskTags("t1", ["Work"], first.tags, first.taskTags, NOW);
+    expect(second.taskTags).toBe(first.taskTags);
+    expect(second.tags).toBe(first.tags);
+  });
+
+  it("skips legacy membership markers, which are not the user's tags", () => {
+    const next = linkTaskTags("t1", ["space:8f2a", "Work"], [], [], NOW);
+    expect(next.tags.map((tag) => tag.name)).toEqual(["Work"]);
+  });
+
+  it("returns the same arrays when there is nothing to write", () => {
+    const tags: Tag[] = [];
+    const links: TaskTag[] = [];
+    expect(linkTaskTags("t1", [], tags, links, NOW).tags).toBe(tags);
+    expect(linkTaskTags("", ["Work"], tags, links, NOW).taskTags).toBe(links);
+  });
+});
+
+describe("tagNamesForTask", () => {
+  const tags: Tag[] = [{ id: "tag-work", name: "Job", createdAt: NOW, updatedAt: NOW }];
+  const links: TaskTag[] = [
+    { id: taskTagIdFor("t1", "tag-work"), taskId: "t1", tagId: "tag-work", createdAt: NOW },
+  ];
+
+  // The whole point of making the relation canonical: a renamed tag reads as
+  // its current name, where the strings on the Task still say the old one.
+  it("answers with the record's name, not the string left on the task", () => {
+    expect(tagNamesForTask(task({ id: "t1", tags: ["Work"] }), tags, links)).toEqual(["Job"]);
+  });
+
+  it("falls back to the strings for a task the relation does not know", () => {
+    expect(tagNamesForTask(task({ id: "t9", tags: ["Work"] }), tags, links)).toEqual(["Work"]);
+  });
+
+  it("leaves legacy markers out of the fallback", () => {
+    expect(tagNamesForTask(task({ id: "t9", tags: ["space:8f2a", "Work"] }), tags, links)).toEqual(["Work"]);
   });
 });

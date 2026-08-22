@@ -118,10 +118,11 @@ function ownerList(task: Task, lists: List[]): List | undefined {
 /**
  * Does this task carry this tag?
  *
- * Reads the record first and the string second, the way `listIdFor` reads the
- * stored owner before the derived one. The strings are still what creation
- * writes, so a task tagged since the last load has no link yet; §6.74 retires
- * this second leg once creation writes links itself (Phase 4).
+ * The relation answers; the strings are the fallback. Creation writes links
+ * now (`linkTaskTags`), so the second leg no longer covers "tagged since the
+ * last load" — it covers a Task written by a build that predates that change,
+ * until the next load's backfill reaches it. §26.9 keeps it for exactly that,
+ * and for nothing else.
  */
 function hasTag(task: Task, tagId: string, links: TaskTag[]): boolean {
   if (tagIdsByTask(links).get(task.id)?.has(tagId)) return true;

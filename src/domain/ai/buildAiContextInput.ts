@@ -10,7 +10,9 @@ import type {
   PlannerSettings,
   Project,
   Subtask,
+  Tag,
   Task,
+  TaskTag,
 } from "../../types";
 
 // Structural subset of usePlannerData's return value — only the data the AI
@@ -22,6 +24,9 @@ export type AiReadablePlannerData = {
   focusSessions: FocusSession[];
   activeSessionId: string;
   settings: PlannerSettings;
+  /** The tag relation, which is where a Task's tags are read from (§26.9). */
+  tags: Tag[];
+  taskTags: TaskTag[];
   auth: { userEmail: string };
 };
 
@@ -37,6 +42,8 @@ export function buildAiContextInput(args: {
     tasks: planner.tasks,
     projects: planner.projects,
     subtasks: planner.subtasks,
+    tags: planner.tags,
+    taskTags: planner.taskTags,
     focusSessions: planner.focusSessions,
     activeSessionId: planner.activeSessionId,
     settings: planner.settings,

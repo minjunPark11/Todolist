@@ -189,6 +189,8 @@ export function AppPages({
     return (
       <FocusPage
         tasks={visibleTasks}
+        tags={planner.tags}
+        taskTags={planner.taskTags}
         focusSessions={planner.focusSessions}
         activeSession={planner.activeFocusSession}
         settings={focusSettings}

@@ -106,6 +106,29 @@ export function tagsForTask(taskId: string, tags: Tag[], links: TaskTag[]): Tag[
   return found.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/**
+ * The names a Task's tags read as — the relation first, the strings second.
+ *
+ * This is the one read that Chapter 26 makes canonical. `Task.tags` is still
+ * written, so an older client keeps finding tags on a Task it did not create,
+ * but it is no longer where anything LOOKS: the records answer, and the
+ * strings only cover a Task created in this session on a build that predates
+ * `linkTaskTags` — which the next load's backfill closes.
+ *
+ * Free-text readers (a focus haystack, an AI context payload) want names, not
+ * records, and were reading the array directly. One function so they cannot
+ * each answer differently.
+ */
+export function tagNamesForTask(
+  task: Pick<Task, "id" | "tags">,
+  tags: Tag[],
+  links: TaskTag[],
+): string[] {
+  const linked = tagsForTask(task.id, tags, links);
+  if (linked.length > 0) return linked.map((tag) => tag.name);
+  return task.tags.filter(isUserTag).map((name) => name.trim());
+}
+
 export function taskIdsWithTag(tagId: string, links: TaskTag[]): Set<string> {
   const ids = new Set<string>();
   for (const link of links) {
@@ -178,5 +201,55 @@ export function removeTag(tagId: string, tags: Tag[], links: TaskTag[]): TagColl
   return {
     tags: nextTags.length === tags.length ? tags : nextTags,
     taskTags: nextLinks.length === links.length ? links : nextLinks,
+  };
+}
+
+/**
+ * The records a newly tagged Task needs, so creation writes the relation.
+ *
+ * Before this, creation wrote names into `Task.tags` and nothing else — the
+ * links appeared on the NEXT load, when `backfillTaskTags` ran. Between the
+ * two, the relation was missing rows the strings already implied, which is
+ * exactly the disagreement §26.9 unifies the source to prevent.
+ *
+ * A name resolves to an EXISTING Tag by key before it makes one. That matters
+ * for a renamed tag: its id was derived from the name it was born with, so
+ * `tagIdFor` would answer with an id nothing holds and split one tag in two.
+ *
+ * Returns the same arrays when there is nothing to add, like the backfill.
+ */
+export function linkTaskTags(
+  taskId: string,
+  names: string[],
+  tags: Tag[],
+  taskTags: TaskTag[],
+  now: string,
+): TagCollections {
+  if (!taskId || names.length === 0) return { tags, taskTags };
+
+  const byKey = new Map(tags.map((tag) => [tagKeyFor(tag.name), tag]));
+  const knownLinkIds = new Set(taskTags.map((link) => link.id));
+  const addedTags: Tag[] = [];
+  const addedLinks: TaskTag[] = [];
+
+  for (const raw of names) {
+    if (!isUserTag(raw)) continue;
+    const name = raw.trim();
+    const existing = byKey.get(tagKeyFor(name));
+    const tagId = existing?.id ?? tagIdFor(name);
+    if (!existing) {
+      const created: Tag = { id: tagId, name, createdAt: now, updatedAt: now };
+      byKey.set(tagKeyFor(name), created);
+      addedTags.push(created);
+    }
+    const linkId = taskTagIdFor(taskId, tagId);
+    if (knownLinkIds.has(linkId)) continue;
+    knownLinkIds.add(linkId);
+    addedLinks.push({ id: linkId, taskId, tagId, createdAt: now });
+  }
+
+  return {
+    tags: addedTags.length > 0 ? [...tags, ...addedTags] : tags,
+    taskTags: addedLinks.length > 0 ? [...taskTags, ...addedLinks] : taskTags,
   };
 }

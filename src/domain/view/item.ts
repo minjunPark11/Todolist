@@ -17,9 +17,10 @@
 // Nothing here owns a record — every Item points back at the store that does,
 // which is the rule HorizonItem already states: "the view is owned, the
 // storage never is".
-import type { List, Task, TaskPriority } from "../../types";
+import type { List, Tag, Task, TaskPriority, TaskTag } from "../../types";
 import { blockedTaskIds } from "../tasks/dependencies";
 import { isCompleted } from "../tasks/taskState";
+import { tagNamesForTask } from "../tags/tags";
 import { listIdFor, statusIdFor, statusesForSpace } from "../spaces/membership";
 
 /**
@@ -82,6 +83,16 @@ export interface ProjectItemsInput {
   tasks: Task[];
   lists: List[];
   today: string;
+  /**
+   * The tag relation, which is where an Item's tags come from (§26.9).
+   *
+   * Optional because a caller that draws no tags and filters on none does not
+   * have to carry them. Absent, `tagNamesForTask` falls back to the strings
+   * on the Task — the same answer the projection gave before the relation
+   * existed, so no view loses tags by not passing these yet.
+   */
+  tags?: Tag[];
+  taskTags?: TaskTag[];
 }
 
 /** List id -> the Folder it hangs in. Absent for a Folderless List (D4). */
@@ -94,7 +105,7 @@ function folderMap(lists: List[]): Map<string, string> {
 }
 
 export function projectItems(input: ProjectItemsInput): Item[] {
-  const { tasks, lists } = input;
+  const { tasks, lists, tags = [], taskTags = [] } = input;
   const folders = folderMap(lists);
   const blocked = blockedTaskIds(tasks);
   // Custom per-Project status sets went with the Projects feature, so every
@@ -121,7 +132,7 @@ export function projectItems(input: ProjectItemsInput): Item[] {
       priority: task.priority,
       done: isCompleted(task),
       blocked: blocked.has(task.id),
-      tags: task.tags,
+      tags: tagNamesForTask(task, tags, taskTags),
       estimatedMinutes: task.estimatedMinutes,
       actualSeconds: task.actualSeconds,
     });

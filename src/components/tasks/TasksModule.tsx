@@ -381,8 +381,8 @@ export function TasksModule(props: TasksModuleProps) {
   // The timeline's three arguments, built from the rows the Scope already
   // chose.
   const ganttItems = useMemo(
-    () => projectItems({ tasks: rows, lists, today }),
-    [rows, lists, today],
+    () => projectItems({ tasks: rows, lists, today, tags, taskTags }),
+    [rows, lists, today, tags, taskTags],
   );
   const ganttSpec: ViewSpec = useMemo(
     // The scope is passed empty on purpose: `queryScopeTasks` has already

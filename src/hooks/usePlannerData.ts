@@ -43,7 +43,7 @@ import {
   prunePlansBefore,
   sanitizeDailyPlan,
 } from "../domain/today/dailyPlan";
-import { backfillTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
+import { backfillTaskTags, linkTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
 import { sanitizeListSection } from "../domain/tasks/sections";
 import { addSidebarFolder, sanitizeSidebarFolder } from "../domain/tasks/sidebarFolders";
 import { sanitizeSavedFilter } from "../domain/tasks/filters";
@@ -1022,10 +1022,19 @@ export function usePlannerData() {
       updatedAt: now,
     });
 
-    setData((current) => ({
-      ...current,
-      tasks: [task, ...current.tasks],
-    }));
+    setData((current) => {
+      // §26.9: the relation is the canonical answer, so it is written HERE
+      // rather than waiting for the next load's backfill to notice the
+      // strings. `task.tags` is still written beside it — an older client
+      // reads nothing else — but nothing looks there first any more.
+      const tagged = linkTaskTags(task.id, task.tags, current.tags, current.taskTags, now);
+      return {
+        ...current,
+        tasks: [task, ...current.tasks],
+        tags: tagged.tags,
+        taskTags: tagged.taskTags,
+      };
+    });
     return task.id;
   }
 

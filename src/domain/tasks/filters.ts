@@ -93,6 +93,7 @@ function resolveDate(value: string, today: string): string {
   return value === TODAY_TOKEN ? today : value;
 }
 
+// Same two legs, same reason as `scopeQuery.hasTag` — see the note there.
 function taskHasTag(task: Task, tagId: string, links: TaskTag[]): boolean {
   if (links.some((link) => link.taskId === task.id && link.tagId === tagId)) return true;
   return task.tags.some((name) => isUserTag(name) && tagIdFor(name) === tagId);

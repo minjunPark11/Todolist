@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FocusSession, PageId, Task } from "../types";
+import type { FocusSession, PageId, Tag, Task, TaskTag } from "../types";
+import { tagNamesForTask } from "../domain/tags/tags";
 import { formatDate, isOverdue, todayValue } from "../utils/date";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../lib/focusTimer";
@@ -10,6 +11,8 @@ import { isTaskOpen } from "../domain/tasks/taskState";
 
 interface FocusPageProps {
   tasks: Task[];
+  tags: Tag[];
+  taskTags: TaskTag[];
   focusSessions: FocusSession[];
   activeSession: FocusSession | null;
   settings: FocusUserSettings;
@@ -32,8 +35,11 @@ type FocusGroup = {
   tasks: Task[];
 };
 
-function isStudyTask(task: Task) {
-  const haystack = `${task.title} ${task.tags.join(" ")}`.toLowerCase();
+function isStudyTask(task: Task, tags: Tag[], taskTags: TaskTag[]) {
+  // Tag NAMES come from the relation (§26.9), not from the strings on the
+  // Task: a tag the user renamed still reads as its old word there, so the
+  // heuristic would keep matching a label nobody uses any more.
+  const haystack = `${task.title} ${tagNamesForTask(task, tags, taskTags).join(" ")}`.toLowerCase();
   return ["study", "review", "복습", "leetcode", "algorithm"].some((token) => haystack.includes(token));
 }
 
@@ -67,6 +73,8 @@ function FocusOptionToggle({
 
 export function FocusPage({
   tasks,
+  tags,
+  taskTags,
   focusSessions,
   activeSession,
   settings,
@@ -105,7 +113,7 @@ export function FocusPage({
       (task) => task.startDate && task.startDate <= today && task.dueDate >= today,
     );
     const deadline = openTasks.filter((task) => task.dueDate && (task.dueDate === today || isOverdue(task.dueDate)));
-    const study = openTasks.filter((task) => isStudyTask(task));
+    const study = openTasks.filter((task) => isStudyTask(task, tags, taskTags));
     const quickStart = openTasks
       .filter((task) => !scheduled.includes(task) && !deadline.includes(task) && !study.includes(task))
       .slice(0, 8);
@@ -281,7 +289,7 @@ export function FocusPage({
                           </span>
                           <small>{t("focus.actualTime", { time: formatFocusDuration(task.actualSeconds, true) })}</small>
                         </button>
-                        <span className="foc-tag">{isStudyTask(task) ? "Study" : "Task"}</span>
+                        <span className="foc-tag">{isStudyTask(task, tags, taskTags) ? "Study" : "Task"}</span>
                       </article>
                     );
                   })}
@@ -299,7 +307,7 @@ export function FocusPage({
                 {activeSession.status === "paused" ? t("focus.paused") : t("focus.running")}
               </div>
               <div className="foc-task-pills">
-                {isStudyTask(activeTask) ? <span>Study</span> : null}
+                {isStudyTask(activeTask, tags, taskTags) ? <span>Study</span> : null}
               </div>
               <h2>{activeTask.title}</h2>
               <div className="foc-clock">{formatFocusDuration(elapsed)}</div>

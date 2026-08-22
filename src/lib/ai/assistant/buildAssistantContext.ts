@@ -8,7 +8,8 @@ import { selectActiveProjects } from "../../../domain/projects/selectors";
 import { selectActiveTasks, selectRelevantTasks } from "../../../domain/tasks/selectors";
 import { createKnowledgeRetriever } from "../../knowledge/retrieval/searchKnowledge";
 import type { KnowledgeSettings, RetrievedChunk } from "../../knowledge/types";
-import type { Project, Task } from "../../../types";
+import type { Project, Tag, Task, TaskTag } from "../../../types";
+import { tagNamesForTask } from "../../../domain/tags/tags";
 import { addDays, todayValue } from "../../../utils/date";
 import { extractKeywords, findRelatedContextCards, summarizeContextCardForPrompt } from "../contextCards/searchContextCards";
 import type { ContextCard } from "../contextCards/types";
@@ -58,12 +59,21 @@ function matchScore(haystack: string, keywords: string[]): number {
   return keywords.reduce((total, keyword) => (haystack.includes(keyword) ? total + 1 : total), 0);
 }
 
-function pickTasks(tasks: Task[], keywords: string[], today: string): Task[] {
+function pickTasks(
+  tasks: Task[],
+  keywords: string[],
+  today: string,
+  tags: Tag[],
+  taskTags: TaskTag[],
+): Task[] {
   const active = selectActiveTasks(tasks);
   const matched = active
     .map((task) => ({
       task,
-      score: matchScore(`${task.title} ${task.description} ${task.notes} ${task.tags.join(" ")}`.toLowerCase(), keywords),
+      score: matchScore(
+        `${task.title} ${task.description} ${task.notes} ${tagNamesForTask(task, tags, taskTags).join(" ")}`.toLowerCase(),
+        keywords,
+      ),
     }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || b.task.updatedAt.localeCompare(a.task.updatedAt))
@@ -125,7 +135,7 @@ export async function buildAssistantContextPack(args: {
   const today = todayValue();
   const keywords = extractKeywords(anchor);
 
-  const tasks = pickTasks(appData.tasks, keywords, today);
+  const tasks = pickTasks(appData.tasks, keywords, today, appData.tags ?? [], appData.taskTags ?? []);
   const projects = pickProjects(appData.projects, keywords);
   const focusSessions = selectRecentFocusSessions(appData.focusSessions, addDays(today, -6)).slice(
     0,
@@ -166,7 +176,7 @@ export async function buildAssistantContextPack(args: {
         priority: task.priority === "none" ? "" : task.priority,
         dueDate: task.dueDate,
         projectId: task.projectId,
-        tags: task.tags,
+        tags: tagNamesForTask(task, appData.tags ?? [], appData.taskTags ?? []),
         estimatedMinutes: task.estimatedMinutes,
       }),
     ),
