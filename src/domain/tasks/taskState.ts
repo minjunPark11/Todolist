@@ -23,7 +23,7 @@
 // Splitting them is what lets the modules with no access to Lists — the
 // reminder queue, calendar sharing, the AI context builder — ask the first
 // question without being handed a collection they have no other use for.
-import type { Task } from "../../types";
+import type { Task, TaskLifecycle } from "../../types";
 
 /**
  * The four fields these predicates read, and nothing else.
@@ -48,14 +48,14 @@ export function isTrashed(task: TaskStateFields): boolean {
 /**
  * Given up on (D-23).
  *
- * The legacy `archived` status reads as Won't Do here, which is what D-20
- * decides it becomes. Doing it in the predicate rather than only in a
- * migration means every screen agrees from the moment this ships, and the
- * migration is then a data cleanup rather than a change in behaviour. The
- * `status` arm goes when P0-4b-3 has moved the records.
+ * Three spellings, one question. `wontDoAt` is the field D-20 introduced,
+ * `wont_do` is the lifecycle value written since Chapter 26 §26.3.2, and
+ * `archived` is what accounts written before either still carry. Reading all
+ * three here is what lets a legacy record answer correctly without being
+ * rewritten — the same expand/migrate/contract the List membership follows.
  */
 export function isWontDo(task: TaskStateFields): boolean {
-  return Boolean(task.wontDoAt) || task.status === "archived";
+  return Boolean(task.wontDoAt) || task.status === "wont_do" || task.status === "archived";
 }
 
 /**
@@ -64,9 +64,12 @@ export function isWontDo(task: TaskStateFields): boolean {
  * Reads `status` and not `completedAt`, because those two disagree and
  * `status` is the one the app has always believed — see D-23's table. This is
  * the shape `wontDoAt` was deliberately not given.
+ *
+ * Two spellings: `completed` since Chapter 26 §26.3.2, `done` for everything
+ * written before it.
  */
 export function isCompleted(task: TaskStateFields): boolean {
-  return task.status === "done";
+  return task.status === "completed" || task.status === "done";
 }
 
 /**
@@ -91,36 +94,46 @@ export function isTaskOpen(task: TaskStateFields): boolean {
   return isTaskAlive(task) && !isCompleted(task);
 }
 
-// === The workflow axis, as it is stored today ===
+// === What the legacy values still answer ===
 //
-// `doing`, `waiting` and `inbox` are not lifecycle states — they answer
-// "where in the flow" and "which container", which is why Chapter 26 (D1)
-// splits them off `status` entirely: the flow becomes the List's Section
-// (`sectionId`) and the container is List membership.
+// `doing`, `waiting` and `inbox` were never lifecycle. Chapter 26 §26.3.2
+// split them off: the first two are a List's Section (`Task.sectionId`) and
+// the third is List membership. Nothing writes them any more.
 //
-// Neither move has happened yet. These three predicates exist so that no
-// screen has to name a `TaskStatus` value to ask the question in the
-// meantime — when the fields move, this file changes and nothing else does.
-// That is the whole point of reading a predicate instead of a string.
+// They are still READ, because accounts have them stored. `migrateWorkflowStatus`
+// (hooks/usePlannerData) moves the first two into real Sections on load,
+// which is what eventually makes these two answer false for everyone.
 
-/** In flight. Becomes a Section the user named (Ch. 26 §26.3.4). */
+/** In flight, as a record written before §26.3.4 spells it. */
 export function isInProgress(task: TaskStateFields): boolean {
   return task.status === "doing";
 }
 
-/** Parked on something else. Becomes a Section too. */
+/** Parked, as a record written before §26.3.4 spells it. */
 export function isWaiting(task: TaskStateFields): boolean {
   return task.status === "waiting";
 }
 
 /**
- * Not filed yet.
+ * Not filed yet, as a record written before §26.3.4 spells it.
  *
- * The canonical answer to this is List membership — `scopeQuery` already
- * asks it that way, through the owning List's `kind`. This reads the status
- * because the callers here have a Task and no Lists, and answering the two
- * differently is exactly what §26.3.4 retires the value for.
+ * The canonical answer is List membership — the owning List's `kind`, which
+ * is how `scopeQuery` has always asked it. Callers that hold the Lists should
+ * ask that instead; this covers the ones that hold a Task and nothing else.
  */
 export function isUnsorted(task: TaskStateFields): boolean {
   return task.status === "inbox";
 }
+
+/**
+ * The lifecycle value to WRITE. Never a legacy spelling.
+ *
+ * A constant rather than a literal at each call site: the point of §26.3.2 is
+ * that three values exist, and a screen typing `"open"` inline is a screen
+ * that could just as easily type `"todo"`.
+ */
+export const LIFECYCLE = {
+  open: "open",
+  completed: "completed",
+  wontDo: "wont_do",
+} as const satisfies Record<string, TaskLifecycle>;

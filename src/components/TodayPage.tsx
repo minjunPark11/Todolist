@@ -11,7 +11,8 @@ import {
   type TodayBucketId,
 } from "../utils/todayView";
 import { bucketOverridesFor } from "../domain/today/dailyPlan";
-import { isTaskAlive, isUnsorted } from "../domain/tasks/taskState";
+import { isTaskAlive, isUnsorted, LIFECYCLE } from "../domain/tasks/taskState";
+import { ownerList } from "../domain/tasks/scopeQuery";
 import type { ToastState } from "./kit";
 import { FocusQueue } from "./today/FocusQueue";
 import { TimeRail } from "./today/TimeRail";
@@ -144,8 +145,17 @@ export function TodayPage({
   // "todo" tasks already appear in the Focus Queue above, so including them
   // here too would duplicate the same task in both lists (spec §11).
   const triageItems = useMemo(
-    () => tasks.filter((task) => isUnsorted(task) && isTaskAlive(task)),
-    [tasks],
+    // "Unsorted" is which List a Task is in (Ch. 26 §26.3.4), which is the
+    // answer `scopeQuery` has always given. The legacy `inbox` status is read
+    // too, for records written before the split that the Inbox backfill has
+    // not reached.
+    () =>
+      tasks.filter(
+        (task) =>
+          isTaskAlive(task) &&
+          (ownerList(task, lists)?.kind === "inbox" || isUnsorted(task)),
+      ),
+    [tasks, lists],
   );
 
   // Search filters every visible Today collection (spec §25).
@@ -182,7 +192,7 @@ export function TodayPage({
   function handleCreateTask(input: QuickAddInput) {
     onCreateTask({
       title: input.title,
-      status: "todo",
+      status: LIFECYCLE.open,
       // Was `scheduledDate: today` plus a separate `dueDate`. With one date
       // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11) an explicit deadline is
       // what the user typed and today is only the default for its absence.
@@ -302,7 +312,7 @@ export function TodayPage({
   // schedules, since that is the whole point of the action.
   function handleTriage(taskId: string, action: TriageAction) {
     if (action.type === "addToToday") {
-      onUpdateTask(taskId, { status: "todo", dueDate: today });
+      onUpdateTask(taskId, { status: LIFECYCLE.open, dueDate: today });
       showToast({ message: t("todayv.toastTaskAdded") });
     } else if (action.type === "scheduleCalendar") {
       closeTriage();
@@ -329,7 +339,7 @@ export function TodayPage({
       .map((task) => ({ id: task.id, status: task.status, dueDate: task.dueDate }));
 
     for (const entry of previous) {
-      onUpdateTask(entry.id, { status: "todo", dueDate: today });
+      onUpdateTask(entry.id, { status: LIFECYCLE.open, dueDate: today });
     }
 
     showToast({

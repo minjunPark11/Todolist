@@ -7,17 +7,18 @@
 // a task into Q2 did not wipe today's plan. It folded into `dueDate`
 // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 11), so urgency now reads the only
 // date there is.
-// Quadrant IV carries the unsorted / on-hold / completed sub-groups, mapped
-// onto the existing statuses (inbox / waiting / done).
+// Quadrant IV carries the unsorted / completed sub-groups. An `onHold` one
+// sat beside them, fed by the `waiting` status — that was workflow, and it is
+// a List's Section now (Ch. 26 §26.3.4).
 import type { Task, TaskDraft } from "../types";
-import { isCompleted, isUnsorted, isWaiting } from "../domain/tasks/taskState";
+import { isCompleted, LIFECYCLE } from "../domain/tasks/taskState";
 
 export type MatrixQuadrant = "I" | "II" | "III" | "IV";
 // Q4 does two jobs: the classic "neither important nor urgent" quadrant and
 // this app's inbox for work nobody has judged. Keeping both under one group
 // filed a task the user had deliberately marked Low next to tasks they had
 // never opened (PLANNING_PRIORITY_DESIGN.md D3).
-export type MatrixGroup = "neither" | "unclassified" | "onHold" | "completed";
+export type MatrixGroup = "neither" | "unclassified" | "completed";
 
 export interface MatrixPosition {
   quadrant: MatrixQuadrant;
@@ -43,9 +44,13 @@ export function getMatrixPosition(
   task: Pick<Task, "status" | "priority" | "dueDate">,
   today: string,
 ): MatrixPosition {
-  // Finished / parked work always lives in IV, regardless of its fields.
+  // Finished work always lives in IV, regardless of its fields.
+  //
+  // `waiting` used to land here too, as an "on hold" group. That was a
+  // workflow status reading as a judgement about importance and urgency —
+  // it is a List's Section now (Ch. 26 §26.3.4), and a Section is not
+  // something the matrix can or should read.
   if (isCompleted(task)) return { quadrant: "IV", group: "completed" };
-  if (isWaiting(task)) return { quadrant: "IV", group: "onHold" };
 
   const important = isMatrixImportant(task);
   const urgent = isMatrixUrgent(task, today);
@@ -63,7 +68,7 @@ export function getDraftMatrixPosition(
 ): MatrixPosition {
   return getMatrixPosition(
     {
-      status: "todo",
+      status: LIFECYCLE.open,
       priority: draft.priority ?? "none",
       dueDate: draft.dueDate ?? "",
     },
@@ -78,10 +83,10 @@ export function patchForQuadrant(task: Task, quadrant: MatrixQuadrant, today: st
   const patch: Partial<Task> = {};
   const urgent = isMatrixUrgent(task, today);
 
-  // Leaving IV's parked groups re-activates the task.
-  if ((isWaiting(task) || isUnsorted(task)) && quadrant !== "IV") {
-    patch.status = "todo";
-  }
+  // Leaving IV used to re-activate the task, because `waiting` and `inbox`
+  // were what put it there. Neither is lifecycle any more (Ch. 26 §26.3.2),
+  // so a task dragged between boxes is already open and the drag writes only
+  // the two fields the box is read from.
 
   if (quadrant === "I" || quadrant === "II") {
     if (task.priority !== "high") patch.priority = "high";

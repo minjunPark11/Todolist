@@ -1,6 +1,7 @@
 import type { AgentAction } from "../lib/ai/agent/actions";
 import { validateAgentAction, type ToolExecutionResult } from "../lib/ai/tools/toolExecutor";
 import type { Project, Task, TaskDraft } from "../types";
+import { LIFECYCLE } from "../domain/tasks/taskState";
 
 type AgentActionPlanner = {
   tasks: Task[];
@@ -36,7 +37,7 @@ export function executeAgentActions(
           priority: action.payload.priority,
           notes: action.payload.notes,
           tags: action.payload.tags,
-          status: "todo",
+          status: LIFECYCLE.open,
         });
         return {
           actionId: action.id,
@@ -52,7 +53,7 @@ export function executeAgentActions(
           dueDate: action.payload.dueDate,
           startTime: action.payload.startTime,
           endTime: action.payload.endTime,
-          status: "todo",
+          status: LIFECYCLE.open,
         });
         return {
           actionId: action.id,

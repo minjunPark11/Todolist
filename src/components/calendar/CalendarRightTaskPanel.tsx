@@ -8,7 +8,7 @@ import { getMatrixPosition, type MatrixQuadrant } from "../../utils/eisenhower";
 import { useT } from "../../i18n";
 import { MotionCollapse } from "../motion/MotionCollapse";
 import { MotionTaskRow } from "../motion/MotionTaskRow";
-import { isTaskOpen, isWaiting } from "../../domain/tasks/taskState";
+import { isTaskOpen } from "../../domain/tasks/taskState";
 
 const SECTIONS: Array<{ quadrant: MatrixQuadrant; defaultOpen: boolean }> = [
   { quadrant: "I", defaultOpen: true },
@@ -38,12 +38,13 @@ export function CalendarRightTaskPanel({
   const { t } = useT();
   const [draggingTaskId, setDraggingTaskId] = useState("");
 
-  // Only unblocked work that still needs a time slot: no start time yet,
-  // and not finished/parked. Quadrant IV shows just the unsorted group.
-  // Computed before the collapsed branch so the rail can show the count.
-  const candidates = tasks.filter(
-    (task) => isTaskOpen(task) && !isWaiting(task) && !task.startTime,
-  );
+  // Work that still needs a time slot: open, and with no start time yet.
+  //
+  // It also excluded `waiting`, which was a workflow status standing in for
+  // "not ready to schedule". That is a List's Section now (Ch. 26 §26.3.4),
+  // and the panel cannot read one — nor should it decide that a column the
+  // user named means a Task is unschedulable.
+  const candidates = tasks.filter((task) => isTaskOpen(task) && !task.startTime);
 
   if (collapsed) {
     return (

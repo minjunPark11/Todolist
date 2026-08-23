@@ -21,11 +21,7 @@ export const en: Dictionary = {
 
   // ---- status labels ----
   "status.inbox": "Inbox",
-  "status.todo": "To Do",
-  "status.doing": "In Progress",
-  "status.waiting": "Waiting",
   "status.done": "Done",
-  "status.archived": "Archived",
 
   // ---- priority labels ----
   "priority.high": "High",

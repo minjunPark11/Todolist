@@ -110,7 +110,14 @@ export function hasTodayPlan(task: Task, dailyPlans: TaskDailyPlan[], date: stri
   return planDatesByTask(dailyPlans).get(task.id)?.has(date) ?? false;
 }
 
-function ownerList(task: Task, lists: List[]): List | undefined {
+/**
+ * The List a Task belongs to.
+ *
+ * Exported since Ch. 26 §26.3.4: "which container" is List membership now,
+ * not the `inbox` status, and a screen asking that question should ask it
+ * the same way the Scopes do rather than reading a value off the Task.
+ */
+export function ownerList(task: Task, lists: List[]): List | undefined {
   const listId = listIdFor(task, lists);
   return listId ? listsById(lists).get(listId) : undefined;
 }

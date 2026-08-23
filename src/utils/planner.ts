@@ -6,7 +6,7 @@ import type {
 import { scheduleSpan } from "../domain/schedule/scheduleQueries";
 import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { addDays, addMonths, daysBetween, todayValue } from "./date";
-import { isCompleted, isInProgress, isTaskAlive, isTaskOpen, isWaiting, isWontDo } from "../domain/tasks/taskState";
+import { isCompleted, isInProgress, isTaskAlive, isTaskOpen, isWaiting, isWontDo, LIFECYCLE } from "../domain/tasks/taskState";
 
 // === Task filters (spec §4.1.1) ===
 // D-24: these keep their names so their callers do not churn, but the rule
@@ -192,8 +192,7 @@ export function planRecurringCompletion(
   const occurrence: Task = {
     ...task,
     id: occurrenceId,
-    status: "done",
-    previousStatus: task.status,
+    status: LIFECYCLE.completed,
     completedAt: now,
     archivedAt: "",
     // A snapshot of one finished occurrence: it must never repeat again on its
@@ -215,7 +214,7 @@ export function planRecurringCompletion(
     kind: "rolled",
     occurrence,
     patch: {
-      status: "todo",
+      status: LIFECYCLE.open,
       dueDate: nextDueDate,
       startDate: task.startDate ? addDays(task.startDate, shiftDays) : task.startDate,
       completedAt: "",

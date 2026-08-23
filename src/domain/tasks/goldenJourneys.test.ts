@@ -203,18 +203,20 @@ describe("G7 — the Drawer is in the URL, so reload and Back both work", () => 
 });
 
 describe("G8 — complete, find it in Completed, reopen", () => {
-  it("moves between the two Scopes and comes back to the status it had", () => {
-    const doing = task({ id: "t1", listId: "l1", status: "doing", dueDate: TODAY });
-    const context = ctx({ tasks: [doing] });
+  it("moves between the two Scopes and comes back open", () => {
+    const open = task({ id: "t1", listId: "l1", status: "open", dueDate: TODAY });
+    const context = ctx({ tasks: [open] });
 
-    const done = applyPatch(doing, completeTask(doing, NOW).patch);
-    expect(leavesScope(doing, done, { kind: "today" }, context)).toBe(true);
+    const done = applyPatch(open, completeTask(open, NOW).patch);
+    expect(leavesScope(open, done, { kind: "today" }, context)).toBe(true);
     expect(matchesScope(done, { kind: "completed" }, ctx({ tasks: [done] }))).toBe(true);
     expect(queryScopeCount({ kind: "completed" }, ctx({ tasks: [done] }))).toBe(1);
 
-    // `previousStatus` is what makes reopen exact rather than "todo".
-    const reopened = applyPatch({ ...done, previousStatus: "doing" }, reopenTask({ ...done, previousStatus: "doing" }).patch);
-    expect(reopened.status).toBe("doing");
+    // The journey used to end on the workflow status `previousStatus` held.
+    // Lifecycle has one non-terminal value now (Ch. 26 §26.3.2), and the
+    // Section a Task sits in was never touched by completing it.
+    const reopened = applyPatch(done, reopenTask(done).patch);
+    expect(reopened.status).toBe("open");
     expect(reopened.completedAt).toBe("");
     expect(matchesScope(reopened, { kind: "today" }, ctx({ tasks: [reopened] }))).toBe(true);
   });

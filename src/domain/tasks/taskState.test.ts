@@ -80,24 +80,27 @@ describe("task state (audit D-24)", () => {
 
   // D-20's migration runs on load, the way every migration in this app does.
   describe("the archived migration", () => {
-    it("moves the status onto the marker and gives the workflow status back", () => {
+    // It used to hand back the workflow status `previousStatus` held. There is
+    // one non-terminal lifecycle value now (Ch. 26 §26.3.2), so an unarchived
+    // task lands on it and `previousStatus` has nothing left to say.
+    it("moves the status onto the marker and reopens the task", () => {
       const migrated = normalizeData({
         tasks: [{ id: "a", title: "Filed away", status: "archived", previousStatus: "doing", archivedAt: NOW }],
       } as never).tasks[0];
 
       expect(migrated.wontDoAt).toBe(NOW);
-      expect(migrated.status).toBe("doing");
+      expect(migrated.status).toBe("open");
       // The old fields are cleared, not left to be copied forward forever.
       expect(migrated.archivedAt).toBe("");
       expect(migrated.previousStatus).toBeUndefined();
       expect(isWontDo(migrated)).toBe(true);
     });
 
-    it("falls back to todo when nothing recorded the old status", () => {
+    it("reopens one that recorded no old status either", () => {
       const migrated = normalizeData({
         tasks: [{ id: "b", title: "Filed away", status: "archived" }],
       } as never).tasks[0];
-      expect(migrated.status).toBe("todo");
+      expect(migrated.status).toBe("open");
       expect(migrated.wontDoAt).toBeTruthy();
     });
 
@@ -108,7 +111,7 @@ describe("task state (audit D-24)", () => {
       } as never).tasks[0];
       const twice = normalizeData({ tasks: [once] } as never).tasks[0];
       expect(twice.wontDoAt).toBe(once.wontDoAt);
-      expect(twice.status).toBe("doing");
+      expect(twice.status).toBe("open");
     });
 
     it("leaves a task that was never archived alone", () => {

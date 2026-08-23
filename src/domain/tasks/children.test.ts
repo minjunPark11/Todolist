@@ -84,7 +84,7 @@ describe("childDraft", () => {
     const draft = childDraft(task({ listId: "list-2" }), "  Read the paper  ");
     expect(draft).toEqual({
       title: "Read the paper",
-      status: "todo",
+      status: "open",
       projectId: "space-1",
       parentTaskId: "task-1",
       listId: "list-2",
@@ -102,13 +102,13 @@ describe("promoteDraft", () => {
   it("keeps a finished Subtask finished", () => {
     expect(promoteDraft(task(), subtask({ title: "Done thing", completed: true }))).toMatchObject({
       title: "Done thing",
-      status: "done",
+      status: "completed",
       parentTaskId: "task-1",
     });
   });
 
   it("lands an open one as open", () => {
-    expect(promoteDraft(task(), subtask()).status).toBe("todo");
+    expect(promoteDraft(task(), subtask()).status).toBe("open");
   });
 
   it("promotes into the same place as a fresh child", () => {

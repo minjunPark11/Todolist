@@ -45,11 +45,12 @@ import {
 } from "../domain/today/dailyPlan";
 import { backfillTaskTags, linkTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
 import { sanitizeListSection } from "../domain/tasks/sections";
+import { migrateLegacyWorkflowStatus } from "../domain/migrations/legacyWorkflowStatus";
 import { addSidebarFolder, sanitizeSidebarFolder } from "../domain/tasks/sidebarFolders";
 import { sanitizeSavedFilter } from "../domain/tasks/filters";
 import { backfillTaskListId, defaultListIdFor, patchForListMove } from "../domain/spaces/membership";
 import { childDraft, promoteDraft } from "../domain/tasks/children";
-import { isCompleted, isTaskOpen } from "../domain/tasks/taskState";
+import { LIFECYCLE, isCompleted, isTaskOpen } from "../domain/tasks/taskState";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
@@ -73,7 +74,21 @@ import {
 
 const STORAGE_KEY = PLANNER_STORAGE_KEY;
 const LEGACY_STORAGE_KEY = "todo-planner-data";
-const taskStatuses = ["inbox", "todo", "doing", "waiting", "done", "archived"] as const;
+// Every value `status` may hold on disk: the three lifecycle values written
+// since Ch. 26 §26.3.2, and the legacy six that accounts still carry. A value
+// outside this set falls back to `open`, which is what an unrecognised
+// non-terminal state means.
+const taskStatuses = [
+  "open",
+  "completed",
+  "wont_do",
+  "inbox",
+  "todo",
+  "doing",
+  "waiting",
+  "done",
+  "archived",
+] as const;
 const taskPriorities = ["none", "low", "medium", "high"] as const;
 const projectTypes = ["project", "area"] as const;
 const projectStatuses = ["active", "paused", "completed", "archived"] as const;
@@ -130,7 +145,6 @@ function normalizeTask(task: Partial<Task>): Task {
 
   // Migrate legacy statuses to the canonical lifecycle (spec §0.1.2).
   const rawStatus = migrateStatus(task.status);
-  const rawPrevious = task.previousStatus ? migrateStatus(task.previousStatus) : undefined;
 
   // The three date fields collapse to two, here, on every load
   // (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7 Phase 10, rule 1-d).
@@ -164,11 +178,13 @@ function normalizeTask(task: Partial<Task>): Task {
   // with a marker instead of a status is D-23's whole point.
   //
   // Same idiom as the schedule consolidation above: idempotent, and on the
-  // load path because there is no migration table. `previousStatus` is what
-  // `archiveTask` saved for exactly this moment, so the Task gets its real
-  // workflow status back rather than being parked on "todo".
+  // load path because there is no migration table.
+  //
+  // It used to put the Task back on the workflow status `previousStatus` held.
+  // Lifecycle has one non-terminal value now (Ch. 26 §26.3.2), so there is one
+  // place to come back to and nothing to look up.
   const wasArchived = rawStatus === "archived";
-  const migratedStatus = wasArchived ? (rawPrevious ?? "todo") : rawStatus;
+  const migratedStatus = wasArchived ? "open" : rawStatus;
   const wontDoAt = wasArchived ? task.wontDoAt || task.archivedAt || now : task.wontDoAt;
 
   return {
@@ -182,7 +198,7 @@ function normalizeTask(task: Partial<Task>): Task {
     id: task.id ?? createId("task"),
     title: task.title ?? "Untitled task",
     description: task.description ?? "",
-    status: oneOf(migratedStatus, taskStatuses, "todo"),
+    status: oneOf(migratedStatus, taskStatuses, "open"),
     priority: oneOf(task.priority, taskPriorities, "none"),
     dueDate,
     startDate: consolidated.startDate,
@@ -211,7 +227,9 @@ function normalizeTask(task: Partial<Task>): Task {
     archivedAt: wasArchived ? "" : task.archivedAt ?? "",
     wontDoAt: wontDoAt ?? "",
     deletedAt: task.deletedAt,
-    previousStatus: wasArchived ? undefined : rawPrevious ? oneOf(rawPrevious, taskStatuses, "todo") : undefined,
+    // `previousStatus` is dormant (Ch. 26 §26.3.2). It is neither read nor
+    // written now; the M0 spread above carries whatever a record still holds.
+    previousStatus: undefined,
     blockedByTaskId: task.blockedByTaskId ?? "",
     repeatType: oneOf(task.repeatType, repeatTypes, "none"),
     repeatInterval: task.repeatInterval ?? 1,
@@ -227,7 +245,7 @@ function normalizeTask(task: Partial<Task>): Task {
 function migrateStatus(status: unknown): string {
   if (status === "in_progress") return "doing";
   if (status === "blocked") return "waiting";
-  return typeof status === "string" ? status : "todo";
+  return typeof status === "string" ? status : "open";
 }
 
 function normalizeProject(project: Partial<Project>): Project {
@@ -490,7 +508,13 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   // List owns each Task, so `listIdFor`'s derivation stops being the answer
   // and becomes a fallback for records neither phase has reached.
   const lists = hierarchy.ensureInboxList(withDefaults, now);
-  const tasks = backfillTaskListId(data.tasks, lists, now);
+  const listed = backfillTaskListId(data.tasks, lists, now);
+  // Ch. 26 §26.3.4: `doing` and `waiting` were workflow wearing a lifecycle
+  // field's clothes. They become real Sections here, in the Lists that
+  // actually have them — after the List backfill above, because a Section
+  // hangs off a List and this needs to know which one.
+  const workflow = migrateLegacyWorkflowStatus(listed, lists, data.listSections, now);
+  const tasks = workflow.tasks;
   // §6.18. The plan made on another device arrives with the account; the blob
   // this replaces arrives from this one. Days already past are dropped — no
   // screen reads them, and a table that only grows would carry decisions
@@ -502,6 +526,7 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   // the wire.
   const tagged = backfillTaskTags(data.tasks, data.tags, data.taskTags, now);
   if (
+    workflow.listSections === data.listSections &&
     focusSessions === data.focusSessions &&
     projects === data.projects &&
     spaces === data.spaces &&
@@ -515,6 +540,7 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   }
   return {
     ...data,
+    listSections: workflow.listSections,
     focusSessions,
     projects,
     spaces,
@@ -1040,7 +1066,10 @@ export function usePlannerData() {
 
   // Spec §0.1.1 alias: capture goes to Inbox by default unless context overrides.
   function createTask(draft: TaskDraft, context?: Partial<TaskDraft>): string {
-    return addTask({ status: "inbox", ...context, ...draft });
+    // The default was `inbox`, which mirrored "this Task is unfiled" into the
+    // lifecycle field. Which List a Task is in answers that (Ch. 26 §26.3.4),
+    // so a new Task is simply open.
+    return addTask({ status: LIFECYCLE.open, ...context, ...draft });
   }
 
 
@@ -1061,7 +1090,6 @@ export function usePlannerData() {
           ...task,
           ...patch,
           status: nextStatus,
-          previousStatus: statusChanged ? task.status : task.previousStatus,
           completedAt:
             nextStatus === "done"
               ? task.completedAt || now
@@ -1206,7 +1234,6 @@ export function usePlannerData() {
       archivedAt: "",
       wontDoAt: "",
       deletedAt: "",
-      previousStatus: "todo",
       createdAt: now,
       updatedAt: now,
     };
@@ -1250,14 +1277,14 @@ export function usePlannerData() {
 
       if (!isRecurring) {
         return setOnTarget({
-          status: isDone ? "todo" : "done",
+          status: isDone ? LIFECYCLE.open : LIFECYCLE.completed,
           completedAt: isDone ? "" : now,
         });
       }
 
       const rolled = planRecurringCompletion(target, createId("task"), now, today);
       if (rolled.kind === "final") {
-        return setOnTarget({ status: "done", completedAt: now });
+        return setOnTarget({ status: LIFECYCLE.completed, completedAt: now });
       }
 
       return {
@@ -1487,7 +1514,13 @@ export function usePlannerData() {
     }
     const parent = data.tasks.find((task) => task.id === subtask.taskId);
     if (!parent) return;
-    createTask({ ...promoteDraft(parent, subtask), status: subtask.completed ? "todo" : "done" });
+    // `subtask.completed` is the state BEFORE this toggle, so the promoted
+    // Task takes the opposite one — `promoteDraft` carries the current state
+    // and this is the toggle riding along with the conversion.
+    createTask({
+      ...promoteDraft(parent, subtask),
+      status: subtask.completed ? LIFECYCLE.open : LIFECYCLE.completed,
+    });
     setData((current) => ({
       ...current,
       subtasks: current.subtasks.filter((item) => item.id !== subtaskId),
@@ -1513,7 +1546,7 @@ export function usePlannerData() {
   // === Shared task lifecycle (spec §0.1.1) ===
 
   function completeTask(taskId: string) {
-    updateTask(taskId, { status: "done" });
+    updateTask(taskId, { status: LIFECYCLE.completed });
   }
 
   // Snooze moves the planned work date only — never the deadline (spec §0.5.9).

@@ -14,7 +14,28 @@ export type StoredGoal = Record<string, unknown>;
 // Canonical MVP statuses: inbox -> todo -> doing -> waiting -> done -> archived.
 // `in_progress` and `blocked` are LEGACY values kept in the union so non-MVP
 // (hidden) screens still compile; stored data is migrated away from them on load.
-export type TaskStatus =
+/**
+ * Where a Task is in its life: the three states it can END in, plus the one
+ * it is in until then (Chapter 26 §26.3.2).
+ *
+ * Three, and not the six `TaskStatus` used to hold, because the other three
+ * were answering different questions. `doing` and `waiting` were WORKFLOW —
+ * a place in a flow the user defines, which is a List's Section now
+ * (`Task.sectionId`). `inbox` was a CONTAINER — which List a Task is in,
+ * which List membership already answers. One field, one question.
+ */
+export type TaskLifecycle = "open" | "completed" | "wont_do";
+
+/**
+ * The six values `status` used to hold, plus two the migration retired.
+ *
+ * Still in the union because accounts have them STORED: this app writes one
+ * jsonb per record and cannot rewrite a column, so a value written years ago
+ * arrives exactly as it was. Nothing outside `domain/tasks/taskState` should
+ * name one — the predicates there read both spellings, which is what lets a
+ * legacy record answer correctly without being rewritten.
+ */
+export type LegacyTaskStatus =
   | "inbox"
   | "todo"
   | "doing"
@@ -23,6 +44,8 @@ export type TaskStatus =
   | "archived"
   | "in_progress"
   | "blocked";
+
+export type TaskStatus = TaskLifecycle | LegacyTaskStatus;
 export type TaskPriority = "none" | "low" | "medium" | "high";
 // "yearly" joined the set with the schedule editor's 반복 panel, which
 // offers it alongside the four that already existed.
@@ -105,7 +128,15 @@ export interface Task {
    */
   wontDoAt?: string;
   deletedAt?: string; // optional soft-delete marker
-  previousStatus?: TaskStatus; // used for undo/restore
+  /**
+   * Dormant (Chapter 26 §26.3.2).
+   *
+   * This remembered which workflow status to put a Task back into when it was
+   * reopened — `doing` rather than `todo`, say. Lifecycle has one non-terminal
+   * state now, so reopening has one destination and there is nothing to
+   * remember. Kept on the type because accounts have it stored.
+   */
+  previousStatus?: TaskStatus;
   blockedByTaskId: string;
   // === Space hierarchy (P4) ===
   // Written only when the answer stops being derivable — when the task is

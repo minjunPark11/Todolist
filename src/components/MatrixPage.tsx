@@ -28,7 +28,7 @@ import {
   type MatrixQuadrant,
 } from "../utils/eisenhower";
 import { listIdFor } from "../domain/spaces/membership";
-import { isCompleted } from "../domain/tasks/taskState";
+import { isCompleted, LIFECYCLE } from "../domain/tasks/taskState";
 import { listColorHex } from "../domain/tasks/listColor";
 import { todayValue } from "../utils/date";
 import { ExpandableAdd } from "./motion/ExpandableAdd";
@@ -108,7 +108,7 @@ export function MatrixPage({
     // typed on.
     onCreateTask({
       title,
-      status: "todo",
+      status: LIFECYCLE.open,
       ...(scope ? { listId: scope } : {}),
       ...draftForQuadrant(quadrant, today),
     });

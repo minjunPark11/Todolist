@@ -75,7 +75,7 @@ describe("planRecurringCompletion", () => {
     if (result.kind !== "rolled") throw new Error("expected the repeat to roll forward");
 
     expect(result.occurrence.id).toBe("task-copy");
-    expect(result.occurrence.status).toBe("done");
+    expect(result.occurrence.status).toBe("completed");
     expect(result.occurrence.completedAt).toBe(NOW);
     // The snapshot must not go on repeating by itself.
     expect(result.occurrence.repeatType).toBe("none");
@@ -87,7 +87,7 @@ describe("planRecurringCompletion", () => {
     const result = planRecurringCompletion(task({ dueDate: TODAY }), "task-copy", NOW, TODAY);
     if (result.kind !== "rolled") throw new Error("expected the repeat to roll forward");
 
-    expect(result.patch.status).toBe("todo");
+    expect(result.patch.status).toBe("open");
     expect(result.patch.dueDate).toBe("2026-08-14");
     expect(result.patch.completedAt).toBe("");
   });

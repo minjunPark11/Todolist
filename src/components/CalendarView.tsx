@@ -51,7 +51,7 @@ import {
   type ScheduleIssue,
 } from "../domain/schedule";
 import { useT } from "../i18n";
-import { isTaskOpen } from "../domain/tasks/taskState";
+import { isTaskOpen, LIFECYCLE } from "../domain/tasks/taskState";
 
 type CalendarMode = "month" | "week" | "day" | "year";
 
@@ -653,7 +653,7 @@ export function CalendarView({
     // the calendar (audit §6, 1-e).
     onCreateTask({
       title: result.title,
-      status: "todo",
+      status: LIFECYCLE.open,
       ...scheduleToTaskPatch(scheduleFor(result.date, result.startTime, result.endTime)),
       categoryId: result.categoryId,
     });
@@ -694,7 +694,7 @@ export function CalendarView({
     // rather than writing two fields and letting the reader infer it.
     const taskId = onCreateTask({
       title: result.title,
-      status: "todo",
+      status: LIFECYCLE.open,
       ...scheduleToTaskPatch({
         startDate: result.dueDate && result.dueDate > draft.date ? draft.date : null,
         dueDate: result.dueDate && result.dueDate > draft.date ? result.dueDate : draft.date,

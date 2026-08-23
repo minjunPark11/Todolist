@@ -73,15 +73,20 @@ describe("getMatrixPosition", () => {
     expect(getMatrixPosition(task({ priority: "low" }), TODAY)).toEqual({ quadrant: "IV", group: "neither" });
   });
 
-  it("parks finished and waiting work in IV whatever its fields say", () => {
+  it("parks finished work in IV whatever its fields say", () => {
     const urgentAndImportant = { priority: "high" as TaskPriority, dueDate: TODAY };
-    expect(getMatrixPosition(task({ ...urgentAndImportant, status: "done" }), TODAY)).toEqual({
+    expect(getMatrixPosition(task({ ...urgentAndImportant, status: "completed" }), TODAY)).toEqual({
       quadrant: "IV",
       group: "completed",
     });
-    expect(getMatrixPosition(task({ ...urgentAndImportant, status: "waiting" }), TODAY)).toEqual({
-      quadrant: "IV",
-      group: "onHold",
+  });
+
+  // `waiting` used to park a task in IV as an "on hold" group, overriding its
+  // priority and date. It is a List's Section now (Ch. 26 §26.3.4), and the
+  // matrix reads the two fields its axes are made of and nothing else.
+  it("reads a legacy waiting task by its fields, not by its status", () => {
+    expect(getMatrixPosition(task({ status: "waiting", priority: "high", dueDate: TODAY }), TODAY)).toEqual({
+      quadrant: "I",
     });
   });
 });
@@ -111,10 +116,15 @@ describe("patchForQuadrant", () => {
     expect(patchForQuadrant(task({ priority: "none" }), "III", TODAY).priority).toBeUndefined();
   });
 
-  it("reactivates parked work that leaves IV", () => {
-    expect(patchForQuadrant(task({ status: "waiting" }), "II", TODAY).status).toBe("todo");
-    expect(patchForQuadrant(task({ status: "inbox" }), "II", TODAY).status).toBe("todo");
-    expect(patchForQuadrant(task({ status: "waiting" }), "IV", TODAY).status).toBeUndefined();
+  // Dragging between boxes used to also write `status`, to re-activate a task
+  // that `waiting` or `inbox` had parked in IV. Neither is lifecycle any more
+  // (Ch. 26 §26.3.2), so a drag writes only the fields the box is read from.
+  it("never writes the lifecycle, whatever box the task came from", () => {
+    for (const status of ["open", "waiting", "inbox"] as const) {
+      for (const quadrant of MATRIX_QUADRANTS) {
+        expect(patchForQuadrant(task({ status }), quadrant, TODAY).status).toBeUndefined();
+      }
+    }
   });
 
   // WAS: the patch also pinned the task to today through the second date

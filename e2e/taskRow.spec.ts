@@ -8,7 +8,7 @@
 // stored on every Task and drawn nowhere.
 //
 // The assertions go to STORAGE rather than to a class name where they can.
-// A line through a title is a style; `status: "done"` is what the account
+// A line through a title is a style; `status: "completed"` is what the account
 // holds, and it is what has to survive a reload.
 import { expect, test, type Page } from "@playwright/test";
 import { openApp, STORAGE_KEY } from "./addList.helpers";
@@ -48,7 +48,7 @@ test.describe("what a Task row can do", () => {
     // The write, not the strikethrough.
     await expect
       .poll(async () => (await storedTasks(page)).find((task) => task.title === "Finish from the list")?.status)
-      .toBe("done");
+      .toBe("completed");
 
     // And the row leaves, because a List does not keep finished Tasks in it.
     // That is why `check()` is the wrong call here: it waits for a checkbox
@@ -90,10 +90,10 @@ test.describe("what a Task row can do", () => {
     await addTask(page, "Changed my mind");
 
     await page.getByRole("checkbox", { name: "Complete Changed my mind" }).click();
-    await expect.poll(async () => (await storedTasks(page))[0]?.status).toBe("done");
+    await expect.poll(async () => (await storedTasks(page))[0]?.status).toBe("completed");
 
     await page.locator(".tm-undo").getByRole("button", { name: "Undo" }).click();
-    await expect.poll(async () => (await storedTasks(page))[0]?.status).not.toBe("done");
+    await expect.poll(async () => (await storedTasks(page))[0]?.status).not.toBe("completed");
 
     // The row comes back with it — an undo that restored the record and left
     // the list empty would be worse than none.

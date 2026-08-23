@@ -15,6 +15,7 @@ import type { List, ListSection, Task } from "../../types";
 import type { TaskScopeRef } from "./scopeRegistry";
 import { matchesScope, type ScopeContext } from "./scopeQuery";
 import { sectionIdFor } from "./sections";
+import { LIFECYCLE } from "./taskState";
 
 export interface TaskMutation {
   patch: Partial<Task>;
@@ -49,8 +50,7 @@ export function trashTask(task: Task, now: string): TaskMutation {
  *     its children.
  *
  * `status` is left alone too, which is why undoing needs nothing but the old
- * value back — compare `reopenTask`, which has to dig `previousStatus` out
- * because completing overwrote it.
+ * value back.
  */
 export function markWontDo(task: Task, now: string): TaskMutation {
   return {
@@ -85,7 +85,7 @@ export function restoreTask(task: Task): TaskMutation {
  */
 export function completeTask(task: Task, now: string): TaskMutation {
   return {
-    patch: { status: "done", completedAt: task.completedAt || now },
+    patch: { status: LIFECYCLE.completed, completedAt: task.completedAt || now },
     undo: { status: task.status, completedAt: task.completedAt },
     labelKey: "tasks.undoCompleted",
   };
@@ -94,8 +94,11 @@ export function completeTask(task: Task, now: string): TaskMutation {
 export function reopenTask(task: Task): TaskMutation {
   return {
     // Back to what it was before it was finished, when that is known —
-    // `previousStatus` is what the store keeps for exactly this.
-    patch: { status: task.previousStatus && task.previousStatus !== "done" ? task.previousStatus : "todo", completedAt: "" },
+    // One destination, so nothing has to be remembered to get back to it.
+    // This used to dig `previousStatus` out, because reopening a task that
+    // had been `doing` and parking it on `todo` lost where it was — workflow
+    // is a Section now (Ch. 26 §26.3.2) and completion never touched it.
+    patch: { status: LIFECYCLE.open, completedAt: "" },
     undo: { status: task.status, completedAt: task.completedAt },
     labelKey: "tasks.undoReopened",
   };

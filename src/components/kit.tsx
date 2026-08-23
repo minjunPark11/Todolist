@@ -234,58 +234,11 @@ export function PriorityBadge({
   );
 }
 
-function useStatusMeta(): Record<string, { label: string; tone: string }> {
-  const { t } = useT();
-  return {
-    inbox: { label: t("status.inbox"), tone: "muted" },
-    todo: { label: t("status.todo"), tone: "muted" },
-    doing: { label: t("status.doing"), tone: "accent" },
-    waiting: { label: t("status.waiting"), tone: "purple" },
-    done: { label: t("status.done"), tone: "success" },
-    archived: { label: t("status.archived"), tone: "muted" },
-  };
-}
-const STATUS_OPTIONS: TaskStatus[] = ["inbox", "todo", "doing", "waiting", "done"];
+// `StatusBadge` and its six-value picker stood here — the only UI that could
+// ever set `doing`, `waiting` or `inbox`. Nothing rendered it, and the values
+// it offered are not lifecycle any more (Ch. 26 §26.3.2): a workflow column
+// is chosen on the board, and a container is chosen by moving Lists.
 
-export function StatusBadge({
-  status,
-  onChange,
-}: {
-  status: TaskStatus;
-  onChange?: (next: TaskStatus) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const STATUS_META = useStatusMeta();
-  const meta = STATUS_META[status] ?? STATUS_META.todo;
-  return (
-    <div className="ff-anchor" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        className={`ff-badge ff-badge-${meta.tone}`}
-        onClick={() => onChange && setOpen((v) => !v)}
-      >
-        {meta.label}
-      </button>
-      {onChange ? (
-        <Popover open={open} onClose={() => setOpen(false)}>
-          {STATUS_OPTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className="ff-menu-item"
-              onClick={() => {
-                setOpen(false);
-                onChange(s);
-              }}
-            >
-              {STATUS_META[s].label}
-            </button>
-          ))}
-        </Popover>
-      ) : null}
-    </div>
-  );
-}
 
 export function DueDatePill({
   task,

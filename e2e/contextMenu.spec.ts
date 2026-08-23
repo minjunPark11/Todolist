@@ -149,6 +149,6 @@ test.describe("the context menu", () => {
     await page.locator(".tm-task.is-card").first().click({ button: "right" });
     await expect(menu(page)).toBeVisible();
     await menu(page).getByRole("menuitem", { name: "Complete" }).click();
-    await expect.poll(async () => (await storedTask(page, "On a card"))?.status).toBe("done");
+    await expect.poll(async () => (await storedTask(page, "On a card"))?.status).toBe("completed");
   });
 });

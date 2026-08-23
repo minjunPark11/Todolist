@@ -21,11 +21,7 @@ export const ko: Dictionary = {
 
   // ---- status labels ----
   "status.inbox": "받은함",
-  "status.todo": "할 일",
-  "status.doing": "진행 중",
-  "status.waiting": "대기 중",
   "status.done": "완료",
-  "status.archived": "보관됨",
 
   // ---- priority labels ----
   "priority.high": "높음",

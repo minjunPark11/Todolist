@@ -25,7 +25,7 @@ function task(overrides: Partial<Task> = {}): Task {
     id: "t1",
     title: "Task",
     description: "",
-    status: "todo",
+    status: "open",
     priority: "none",
     dueDate: "",
     startDate: "",
@@ -83,25 +83,27 @@ function context(overrides: Partial<ScopeContext> = {}): ScopeContext {
 // §9.35: Undo restores a state. The inverse of "complete" in general is not
 // "set to todo" — it is "set back to what THIS task was".
 describe("every mutation carries the way back", () => {
-  it("reopens to the status the task actually had", () => {
+  // UNDO still restores the exact value, including a legacy one: §9.35 asks
+  // for the state the task was in, not for the state it would be created in.
+  it("undoes to the value the task actually had, legacy spelling included", () => {
     const waiting = task({ status: "waiting" });
     const done = applyPatch(waiting, completeTask(waiting, NOW).patch);
-    expect(done.status).toBe("done");
+    expect(done.status).toBe("completed");
     expect(applyPatch(done, completeTask(waiting, NOW).undo).status).toBe("waiting");
   });
 
   it("writes both halves of completion, which are stored twice", () => {
     const result = completeTask(task(), NOW);
-    expect(result.patch).toEqual({ status: "done", completedAt: NOW });
-    expect(result.undo).toEqual({ status: "todo", completedAt: "" });
+    expect(result.patch).toEqual({ status: "completed", completedAt: NOW });
+    expect(result.undo).toEqual({ status: "open", completedAt: "" });
   });
 
-  it("reopening prefers the status the store remembered", () => {
-    const done = task({ status: "done", previousStatus: "doing", completedAt: NOW });
-    expect(reopenTask(done).patch.status).toBe("doing");
-    // A task whose remembered status was itself `done` falls back rather than
-    // reopening into completion.
-    expect(reopenTask(task({ status: "done", previousStatus: "done" })).patch.status).toBe("todo");
+  // Reopening used to dig `previousStatus` out, because completion had
+  // overwritten a workflow status it needed back. Lifecycle has one
+  // non-terminal value now (Ch. 26 §26.3.2), so there is one place to go.
+  it("reopens to open, whatever the task was completed from", () => {
+    expect(reopenTask(task({ status: "completed", completedAt: NOW })).patch.status).toBe("open");
+    expect(reopenTask(task({ status: "done", previousStatus: "doing" })).patch.status).toBe("open");
   });
 
   it("round-trips trash, dates and someday", () => {
