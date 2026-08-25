@@ -950,14 +950,34 @@ export function usePlannerData() {
         if (error) {
           if (optionalRemoteTables.has(table) && isMissingRemoteTableError(error)) {
             missingRemoteTablesRef.current.add(table);
-            partial[key] = data[key] as never;
+            partial[key] = localAtStart[key] as never;
             continue;
           }
           // Required tables should still fail loudly with the table name so a
           // broken base Supabase setup is obvious.
           throw new Error(`Failed to load '${table}' table: ${error.message}`);
         }
-        partial[key] = (rows ?? []).map((row: { data: unknown }) => row.data) as never;
+
+        const remote = (rows ?? []).map((row: { data: unknown }) => row.data);
+        // An OPTIONAL table that answers with nothing is one the project has
+        // only just been given. Until the migration ran, the branch above kept
+        // this collection on the device; the moment the table exists and is
+        // empty, taking its answer literally would replace those records with
+        // nothing — and the local snapshot is written back straight after, so
+        // they would be gone from the device too.
+        //
+        // The same fallback `appSettings` takes twenty lines below, for the
+        // same reason and with the same trade: an empty account collection is
+        // read as "never synced" rather than as "emptied elsewhere", so a
+        // collection cleared on another device can be resurrected by this one.
+        // It costs a visible, undoable resurrection to avoid a silent loss,
+        // and it can only happen while the collection is entirely empty on the
+        // account — one row on either side and this never fires again.
+        const keepLocal =
+          remote.length === 0 &&
+          optionalRemoteTables.has(table) &&
+          (localAtStart[key] as unknown[]).length > 0;
+        partial[key] = (keepLocal ? localAtStart[key] : remote) as never;
       }
 
       const { data: settingsRows, error: settingsError } = await supabase

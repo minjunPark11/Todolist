@@ -65,6 +65,7 @@ vi.mock("../services/supabaseClient", () => {
 });
 
 import { usePlannerData } from "./usePlannerData";
+import { specFromOffer, TIMED_OFFERS } from "../domain/schedule";
 import type { Task } from "../types";
 
 function remoteTask(id: string, title: string): Partial<Task> {
@@ -134,6 +135,93 @@ describe("an edit made while the account is loading", () => {
     });
 
     expect(titles(result.current.tasks)).toEqual(["One", "Two"]);
+  });
+});
+
+describe("a table the account has only just been given", () => {
+  // The window this covers: `reminders` and `task_templates` shipped with
+  // v0.19.0 and are optional client-side, so until the migration runs the load
+  // keeps them on the device. The moment the table exists and is empty, taking
+  // its answer literally would wipe them — and the local snapshot is written
+  // back straight after, so they would be gone from the device as well.
+  it("keeps the records this device already had", async () => {
+    const { result } = renderHook(() => usePlannerData());
+    const taskId = await act(async () => result.current.createTask({ title: "Ship it" }));
+
+    act(() => {
+      result.current.updateTaskSchedule(taskId, {
+        startDate: null,
+        dueDate: "2026-09-01",
+        startTime: "15:00",
+        endTime: null,
+        timezone: null,
+        reminders: [specFromOffer(TIMED_OFFERS[2])],
+        repeat: "none",
+      });
+    });
+    expect(result.current.reminders).toHaveLength(1);
+
+    // The table now exists and holds nothing, which is exactly what a
+    // freshly applied migration looks like.
+    remoteRows.set("reminders", []);
+    await act(async () => {
+      await result.current.refreshSupabaseData();
+    });
+
+    expect(result.current.reminders).toHaveLength(1);
+  });
+
+  it("still takes the account's answer once the table holds anything", async () => {
+    const { result } = renderHook(() => usePlannerData());
+    const taskId = await act(async () => result.current.createTask({ title: "Ship it" }));
+
+    act(() => {
+      result.current.updateTaskSchedule(taskId, {
+        startDate: null,
+        dueDate: "2026-09-01",
+        startTime: "15:00",
+        endTime: null,
+        timezone: null,
+        reminders: [specFromOffer(TIMED_OFFERS[2])],
+        repeat: "none",
+      });
+    });
+
+    // One row on the account is enough: the fallback is for a collection that
+    // has never synced, not for one this device happens to disagree with.
+    remoteRows.set("reminders", [
+      {
+        id: "reminder-remote",
+        taskId,
+        type: "relative",
+        offsetMinutes: 10,
+        absoluteAt: null,
+        allDayTime: null,
+        enabled: true,
+        createdAt: "2026-08-01T09:00:00.000Z",
+        updatedAt: "2026-08-01T09:00:00.000Z",
+      },
+    ]);
+    await act(async () => {
+      await result.current.refreshSupabaseData();
+    });
+
+    expect(result.current.reminders.map((row) => row.id)).toEqual(["reminder-remote"]);
+  });
+
+  it("leaves a required table's empty answer alone", async () => {
+    // `tasks` is not optional. An account with no tasks means no tasks, and
+    // treating that as "never synced" would resurrect everything a user had
+    // deliberately cleared.
+    const { result } = renderHook(() => usePlannerData());
+    await act(async () => result.current.createTask({ title: "Local only" }));
+
+    remoteRows.set("tasks", []);
+    await act(async () => {
+      await result.current.refreshSupabaseData();
+    });
+
+    expect(result.current.tasks).toEqual([]);
   });
 });
 
