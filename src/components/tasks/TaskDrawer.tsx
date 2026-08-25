@@ -16,6 +16,7 @@ import { childProgress } from "../../domain/tasks/children";
 import { isCompleted } from "../../domain/tasks/taskState";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { DeferredInput, DeferredTextarea } from "../kit";
 
 export interface TaskDrawerProps {
   task: Task;
@@ -81,13 +82,15 @@ export function TaskDrawer({
    * dismissable surface in the app already answers Escape, so this was the
    * odd one rather than a deliberate exception.
    *
-   * `defaultPrevented` is the whole guard: the Command Menu and any popover
-   * above this one call `preventDefault()` on their own Escape, and React
-   * dispatches those at its root before the event reaches this listener. So
-   * Escape peels one layer at a time instead of collapsing the stack.
+   * `defaultPrevented` is the whole guard: the Command Menu, any popover above
+   * this one, and now a text field with an uncommitted draft all call
+   * `preventDefault()` on their own Escape, and React dispatches those at its
+   * root before the event reaches this listener. So Escape peels one layer at
+   * a time instead of collapsing the stack — the first abandons the edit, the
+   * second closes the Drawer (spec §18.14).
    *
-   * Closing cannot lose an edit — the title field commits on every keystroke
-   * (`onUpdate` below), so there is no draft here to discard.
+   * Closing cannot lose an edit either way: the fields are drafts now (§9),
+   * and a draft flushes when its field unmounts.
    */
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -128,10 +131,21 @@ export function TaskDrawer({
         </button>
       </header>
 
-      <input
+      {/* §9: a draft, not a live write. It used to call `onUpdate` on every
+          keystroke, which made every character a store replacement and left
+          Enter, Escape and an IME's composition with nothing to do. `required`
+          because §9.21 refuses an empty Title — clearing it and leaving is
+          someone changing their mind, not asking for a nameless Task.
+
+          `resetKey` is the Task id: the same Drawer is reused across Tasks, so
+          an unflushed edit has to land on the one it was typed into before the
+          field shows the next. */}
+      <DeferredInput
         className="tm-drawer-title"
         value={task.title}
-        onChange={(event) => onUpdate({ title: event.target.value })}
+        onCommit={(title) => onUpdate({ title })}
+        resetKey={task.id}
+        required
         aria-label={t("tasks.titleLabel")}
       />
 
@@ -178,10 +192,12 @@ export function TaskDrawer({
 
       <label className="tm-drawer-field is-block">
         <span>{t("tasks.notes")}</span>
-        <textarea
+        {/* Not single-line: Enter here is a paragraph break (spec §10.4). */}
+        <DeferredTextarea
           value={task.description}
           rows={3}
-          onChange={(event) => onUpdate({ description: event.target.value })}
+          onCommit={(description) => onUpdate({ description })}
+          resetKey={task.id}
         />
       </label>
 

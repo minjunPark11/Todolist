@@ -31,6 +31,10 @@ type DeferredFieldProps = {
   onCommit: (next: string) => void;
   resetKey?: string;
   delayMs?: number;
+  /** Enter commits and pasted newlines flatten (spec §9.24). */
+  singleLine?: boolean;
+  /** Refuse to commit an empty value; revert instead (spec §9.21). */
+  required?: boolean;
 };
 
 export function DeferredInput({
@@ -38,15 +42,23 @@ export function DeferredInput({
   onCommit,
   resetKey,
   delayMs,
+  // An `<input>` is one line by construction, so Enter has nothing else to
+  // mean here — the caller opts out only for the rare field where it does.
+  singleLine = true,
+  required,
   ...rest
 }: DeferredFieldProps & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
-  const field = useDeferredTextField(value, onCommit, { resetKey, delayMs });
+  const field = useDeferredTextField(value, onCommit, { resetKey, delayMs, singleLine, required });
   return (
     <input
       {...rest}
       value={field.value}
       onChange={(event) => field.onChange(event.target.value)}
       onBlur={field.onBlur}
+      onKeyDown={field.onKeyDown}
+      onPaste={field.onPaste}
+      onCompositionStart={field.onCompositionStart}
+      onCompositionEnd={field.onCompositionEnd}
     />
   );
 }
@@ -56,15 +68,21 @@ export function DeferredTextarea({
   onCommit,
   resetKey,
   delayMs,
+  // Never single-line: Enter in a textarea is a paragraph break, and taking it
+  // for "commit" would make multi-line text unwritable (spec §10.4).
+  required,
   ...rest
 }: DeferredFieldProps & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange">) {
-  const field = useDeferredTextField(value, onCommit, { resetKey, delayMs });
+  const field = useDeferredTextField(value, onCommit, { resetKey, delayMs, required });
   return (
     <textarea
       {...rest}
       value={field.value}
       onChange={(event) => field.onChange(event.target.value)}
       onBlur={field.onBlur}
+      onKeyDown={field.onKeyDown}
+      onCompositionStart={field.onCompositionStart}
+      onCompositionEnd={field.onCompositionEnd}
     />
   );
 }
