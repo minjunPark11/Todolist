@@ -624,6 +624,134 @@
   color: var(--text-tertiary, #8e8e93);
 }
 
+/* List picker (spec §13.8–§13.11, §13.26). */
+.tm-list-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 60%;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary, #1c1c1e);
+  cursor: pointer;
+  /* A long List name truncates rather than pushing the row's label off the
+     side — the label is what tells the reader which property this is. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tm-list-trigger:hover,
+.tm-list-trigger[aria-expanded="true"] {
+  border-color: var(--border-subtle, rgba(25, 25, 25, 0.08));
+  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
+}
+
+.tm-list-trigger-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.tm-list-surface {
+  /* Wide enough for a folder heading plus an indented name; the layer system
+     caps the height against the viewport (§19.16), and the option list below
+     is what scrolls (§19.17). */
+  min-width: 240px;
+}
+
+.tm-list-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tm-list-search {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle, rgba(25, 25, 25, 0.08));
+  border-radius: 6px;
+  background: var(--bg-surface-muted, #f5f5f7);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary, #1c1c1e);
+}
+
+.tm-list-options {
+  /* The scroll lives here rather than on the surface, so the search field
+     stays put while the results move under it (§19.17's "header fixed"). */
+  overflow-y: auto;
+  max-height: 260px;
+}
+
+.tm-list-group-head {
+  padding: 6px 8px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-tertiary, #8e8e93);
+  text-transform: uppercase;
+}
+
+.tm-list-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary, #1c1c1e);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* One highlight, driven by the arrow keys and by the pointer alike. Focus
+   never leaves the search field (§13.27), so `:focus-visible` would never fire
+   here — the class is the only thing that can show where the keys are. */
+.tm-list-option.is-active {
+  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
+}
+
+.tm-list-option.is-selected {
+  font-weight: 600;
+}
+
+.tm-list-check {
+  width: 12px;
+  font-size: 11px;
+  color: var(--color-primary, #0066cc);
+}
+
+.tm-list-empty {
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 12px;
+  color: var(--text-tertiary, #8e8e93);
+}
+
+/* §13.15: a child Task's List is its parent's, so the row states it instead of
+   offering a control that would refuse (§16.28). */
+.tm-drawer-field-static {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-primary, #1c1c1e);
+}
+
+.tm-drawer-field-note {
+  font-size: 11px;
+  color: var(--text-tertiary, #8e8e93);
+}
+
 .tm-drawer-subtasks h3 {
   display: flex;
   align-items: center;

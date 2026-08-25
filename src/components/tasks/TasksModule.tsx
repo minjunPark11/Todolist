@@ -746,6 +746,7 @@ export function TasksModule(props: TasksModuleProps) {
           key={openedTask.id}
           task={openedTask}
           lists={lists}
+          folders={sidebarFolders}
           children={props.drawer.childrenOf(openedTask.id)}
           onClose={closeTask}
           onUpdate={(patch) => props.drawer.onUpdate(openedTask.id, patch)}

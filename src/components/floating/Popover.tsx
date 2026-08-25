@@ -245,9 +245,28 @@ export interface PopoverContentProps {
   label: string;
   className?: string;
   role?: "dialog" | "menu" | "listbox";
+  /**
+   * Who gets focus when the surface opens.
+   *
+   * `auto` is §19.31 as written: focus moves inside for a keyboard open and
+   * stays on the trigger for a mouse one, so clicking a flag does not take the
+   * caret out of a Title someone was editing.
+   *
+   * `always` is the escape hatch the same section allows for widget semantics.
+   * A picker whose first control is a search field needs it — §13.27 says
+   * typing filters, and a field that must be clicked before it will accept
+   * what someone is already typing is a search field in name only.
+   */
+  focusOnOpen?: "auto" | "always";
 }
 
-export function PopoverContent({ children, label, className, role = "dialog" }: PopoverContentProps) {
+export function PopoverContent({
+  children,
+  label,
+  className,
+  role = "dialog",
+  focusOnOpen = "auto",
+}: PopoverContentProps) {
   const context = usePopoverContext("PopoverContent");
   const { id, open, placement, offset, surfaceRef, triggerRef, openedByKeyboard, close } = context;
   const layers = useFloatingLayers();
@@ -262,10 +281,17 @@ export function PopoverContent({ children, label, className, role = "dialog" }: 
 
   const position = useFloatingPosition({ open, anchor, surface, placement, offset, onAnchorHidden });
 
-  // §19.31. Only for keyboard opens: moving focus on a mouse open would take
-  // the caret away from a Title someone was in the middle of editing.
+  // §19.31, and it waits for `position`.
+  //
+  // Not an optimisation — a correctness fix found in a browser. The surface is
+  // `visibility: hidden` until the first measurement lands, and focusing a
+  // hidden element is a no-op the DOM reports no error for. So the focus was
+  // silently dropped and the reader was left on the trigger, being told a
+  // dialog had opened. jsdom does not model visibility, so the unit tests
+  // could not see it.
   useEffect(() => {
-    if (!open || !openedByKeyboard.current) return;
+    if (!open || !position) return;
+    if (focusOnOpen === "auto" && !openedByKeyboard.current) return;
     const candidates = surfaceRef.current?.querySelectorAll<HTMLElement>(
       "button, [href], input, select, textarea, [tabindex]",
     );
@@ -282,7 +308,7 @@ export function PopoverContent({ children, label, className, role = "dialog" }: 
     // (§19.81, §19.82) does not leave focus behind on the trigger while the
     // reader is told a dialog opened.
     (first ?? surfaceRef.current)?.focus();
-  }, [open, openedByKeyboard, surfaceRef]);
+  }, [open, position, focusOnOpen, openedByKeyboard, surfaceRef]);
 
   // Rendered conditionally rather than kept mounted and hidden. kit's Popover
   // learned this the hard way: an exit-animated node stayed in the tree at

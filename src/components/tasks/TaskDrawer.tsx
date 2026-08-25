@@ -9,13 +9,14 @@
 // must not appear as a disabled placeholder before the model behind it exists.
 // So they are absent, not greyed out.
 import { useEffect, useRef } from "react";
-import type { CheckItem, List, Task, TaskContentMode, TaskPriority } from "../../types";
+import type { CheckItem, List, SidebarFolder, Task, TaskContentMode, TaskPriority } from "../../types";
 import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
 import { childProgress } from "../../domain/tasks/children";
 import { isCompleted } from "../../domain/tasks/taskState";
 import { checklistProgress, isChecklistMode } from "../../domain/tasks/checkItems";
 import { ChecklistEditor } from "./ChecklistEditor";
+import { ListPicker } from "./ListPicker";
 import { PriorityPicker } from "./PriorityPicker";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
@@ -32,6 +33,8 @@ export interface TaskDrawerProps {
    */
   presentation: TaskDetailPresentation;
   lists: List[];
+  /** The sidebar groups the picker draws as headings (§13.9, §13.10). */
+  folders: SidebarFolder[];
   children: TaskChild[];
   onClose: () => void;
   onUpdate: (patch: Partial<Task>) => void;
@@ -69,6 +72,7 @@ export function TaskDrawer({
   presentation,
   task,
   lists,
+  folders,
   children,
   onClose,
   onUpdate,
@@ -222,21 +226,24 @@ export function TaskDrawer({
           <PriorityPicker task={task} onChange={onSetPriority} restoreFocusTo={() => root.current} />
         </div>
 
-        {/* Moving between Lists goes through the domain command, not a field
-            write: the List decides the Project, and `patchForListMove` is
-            where that rule lives. */}
-        <label className="tm-drawer-field">
+        {/* §13.8, §13.9: the List is a property row that opens a picker, with
+            Folders as headings (§13.10) and a search (§13.26).
+
+            The `<select>` this replaces could show no grouping, had no search,
+            and — worse — moved only this Task. §13.14 and §2.24's invariant
+            say a subtree moves together, so a parent moved through that
+            control left its children behind in the old List. `listMovePlan`
+            is where that is decided now. */}
+        <div className="tm-drawer-field">
           <span>{t("tasks.addList")}</span>
-          <select value={task.listId ?? ""} onChange={(event) => onMoveToList(event.target.value)}>
-            {lists
-              .filter((list) => !list.archivedAt && !list.deletedAt)
-              .map((list) => (
-                <option key={list.id} value={list.id}>
-                  {list.name}
-                </option>
-              ))}
-          </select>
-        </label>
+          <ListPicker
+            task={task}
+            lists={lists}
+            folders={folders}
+            onMove={onMoveToList}
+            restoreFocusTo={() => root.current}
+          />
+        </div>
       </div>
 
       {/* §11.4: the mode toggle is the Content header's, and it is the only

@@ -66,9 +66,10 @@ import { ORDER_STEP } from "../domain/tasks/sortKey";
 import { migrateLegacyWorkflowStatus } from "../domain/migrations/legacyWorkflowStatus";
 import { addSidebarFolder, sanitizeSidebarFolder } from "../domain/tasks/sidebarFolders";
 import { sanitizeSavedFilter } from "../domain/tasks/filters";
-import { backfillTaskListId, defaultListIdFor, patchForListMove } from "../domain/spaces/membership";
+import { backfillTaskListId, defaultListIdFor } from "../domain/spaces/membership";
 import { childDraft, promoteDraft } from "../domain/tasks/children";
 import { canAddChild } from "../domain/tasks/hierarchy";
+import { listMovePlan } from "../domain/tasks/listPicker";
 import { LIFECYCLE, isCompleted, isTaskOpen } from "../domain/tasks/taskState";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
@@ -2056,19 +2057,31 @@ export function usePlannerData() {
   }
 
   /**
-   * Drop an Item onto a List. The patch is empty when the move changes
-   * nothing, so a drag that ends where it started puts no row on the wire.
+   * Drop an Item onto a List — the Item and everything under it (§13.14).
+   *
+   * The subtree is the unit, because §2.24 says a child lives in its parent's
+   * List. This used to write the one Task it was given, which meant a parent
+   * dragged to another List left its children behind in the old one: the
+   * invariant broken by the very operation that is supposed to preserve it,
+   * and invisibly, since neither List's own view shows the other's rows.
+   *
+   * `listMovePlan` answers null for a move that changes nothing, for a target
+   * that is not a List, and for a child asked to move on its own (§13.15) —
+   * so a drag that ends where it started still puts nothing on the wire.
    */
   function moveTaskToList(taskId: string, listId: string) {
     setData((current) => {
       const task = current.tasks.find((item) => item.id === taskId);
       if (!task) return current;
-      const patch = patchForListMove(task, listId, current.lists);
-      if (Object.keys(patch).length === 0) return current;
+      const plan = listMovePlan(task, listId, current.tasks, current.lists);
+      if (!plan) return current;
       const now = new Date().toISOString();
+      const moving = new Set(plan.taskIds);
       return {
         ...current,
-        tasks: current.tasks.map((item) => (item.id === taskId ? { ...item, ...patch, updatedAt: now } : item)),
+        tasks: current.tasks.map((item) =>
+          moving.has(item.id) ? { ...item, ...plan.patch, updatedAt: now } : item,
+        ),
       };
     });
   }

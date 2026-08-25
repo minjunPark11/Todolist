@@ -1033,6 +1033,14 @@ export const en: Dictionary = {
   "tasks.addPlaceholder": "Add a task",
   "tasks.addDate": "Date",
   "tasks.addList": "List",
+  // Spec §13.8–§13.11, §13.15, §13.26. "Move to" rather than "Lists" names the
+  // action the surface performs, which is what §13.9 titles it.
+  "tasks.listCurrent": "List, {{value}}",
+  "tasks.moveToList": "Move to",
+  "tasks.searchLists": "Search lists",
+  "tasks.noListsMatch": "No list matches that.",
+  "tasks.listUnknown": "No list",
+  "tasks.listFollowsParent": "Follows its parent task",
   "tasks.addPickList": "Pick a list…",
   "tasks.needDate": "Pick a date before saving.",
   "tasks.needList": "Choose which list this goes in.",

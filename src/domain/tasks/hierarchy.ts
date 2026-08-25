@@ -102,6 +102,43 @@ export function subtreeHeight(taskId: string, tasks: TaskLike[]): number {
   return height;
 }
 
+/**
+ * This Task and everything beneath it, the Task itself first (§13.14).
+ *
+ * The subtree as a unit, which is what a List move operates on: §2.24's
+ * invariant is that a child lives in its parent's List, so moving a parent and
+ * leaving its children behind would break it on the spot.
+ *
+ * Includes the Task itself, because every caller wants the whole set — asking
+ * for "the descendants" and then remembering to add the root back is the kind
+ * of thing one caller in four forgets.
+ *
+ * Breadth-first and cycle-safe, like `subtreeHeight` and for the same reason:
+ * a `parentTaskId` loop written by another client must not hang the walk.
+ */
+export function subtreeIds(taskId: string, tasks: TaskLike[]): string[] {
+  const childrenByParent = new Map<string, TaskLike[]>();
+  for (const task of tasks) {
+    const parent = task.parentTaskId ?? "";
+    if (!parent) continue;
+    const siblings = childrenByParent.get(parent);
+    if (siblings) siblings.push(task);
+    else childrenByParent.set(parent, [task]);
+  }
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const queue = [taskId];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    for (const child of childrenByParent.get(id) ?? []) queue.push(child.id);
+  }
+  return out;
+}
+
 /** Whether `taskId` is `ancestorId` or sits beneath it (§12.6). */
 export function isDescendantOf(taskId: string, ancestorId: string, tasks: TaskLike[]): boolean {
   if (taskId === ancestorId) return true;
