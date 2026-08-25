@@ -35567,14 +35567,26 @@ quota가 차면 effect에서 throw해서 렌더를 같이 죽였다.
 ### Phase 2 · Content
 
 ```text
-Title
-Description
-Checklist
-Description ↔ Checklist 전환 (transaction + undo)
-Subtask
-최대 5단계 hierarchy
-Parent navigation
+Title                              useDeferredTextField (Phase 1)
+Description                        useDeferredTextField (Phase 1)
+Checklist                          ChecklistEditor + domain/tasks/checkItems
+Description ↔ Checklist 전환        domain/tasks/contentMode + setTaskContentMode
+Subtask                            childrenOf · childDraft (기존)
+최대 5단계 hierarchy                domain/tasks/hierarchy
+Parent navigation                  Drawer breadcrumb + child Task 열기
 ```
+
+역방향 변환은 §11.18의 기본값이 아니라 §11.19의 확장안을 택했다.
+checked 상태를 버리는 것은 되돌릴 수 없고, 되돌릴 수 없는 것을 되돌리는 Undo는 Undo가 아니다.
+`- [x]` 문법이 사용자 텍스트에 남는 대신 왕복이 무손실이 되고, 그래야 §11.15가 성립한다.
+§11.20은 그대로다 — 체크박스처럼 보이는 텍스트를 자동으로 entity로 읽지 않는다.
+
+Checklist editor의 마지막 행은 entity가 아니라 draft다.
+§11.22가 권장하는 "첫 유효 text에서 생성"을 만족하면서,
+§11.23·§11.27·§11.30이 지우라고 말하는 빈 entity가 애초에 생기지 않는다.
+
+깊이 제한은 데이터가 아니라 제품 규칙이다(§12.5).
+그래서 §22.19가 성립한다 — 이미 5단계보다 깊은 데이터는 강제로 펴지 않고 그대로 보여준다.
 
 ### Phase 3 · Properties
 
