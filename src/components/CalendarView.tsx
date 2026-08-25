@@ -701,7 +701,7 @@ export function CalendarView({
         startTime: draft.startTime || null,
         endTime: draft.endTime || null,
         timezone: null,
-        reminder: "none",
+        reminders: [],
         repeat: "none",
       }),
       categoryId: result.categoryId,

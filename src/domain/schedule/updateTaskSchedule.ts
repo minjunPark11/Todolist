@@ -16,7 +16,8 @@
 import { schedulesEqual } from "./scheduleEquality";
 import { scheduleFromTask, scheduleToTaskPatch, type TaskScheduleSource } from "./taskSchedule";
 import { validateSchedule, type ScheduleIssue } from "./validateSchedule";
-import type { Schedule } from "./types";
+import { normalizeSchedule } from "./normalizeSchedule";
+import type { ReminderSpec, Schedule } from "./types";
 
 export interface ScheduleUpdatePlan {
   /**
@@ -26,11 +27,21 @@ export interface ScheduleUpdatePlan {
    * invalid" — `issues` is what tells those apart. Callers that only want to
    * know whether to write can check this alone.
    */
-  patch: Required<TaskScheduleSource> | null;
+  patch: Omit<Required<TaskScheduleSource>, "reminders"> | null;
   /** Empty when the request was accepted. */
   issues: ScheduleIssue[];
   /** True when the schedule was already what the caller asked for. */
   unchanged: boolean;
+  /**
+   * The reminders the Task should end up with (§6.3), already reconciled.
+   *
+   * Beside the patch rather than inside it, because they are rows and not
+   * fields — the store turns them into `Reminder` records with
+   * `planReminderRows`. Non-null exactly when `patch` is: a rejected or
+   * unchanged schedule writes neither, which is what keeps the two from
+   * disagreeing about whether the edit happened.
+   */
+  reminders: ReminderSpec[] | null;
 }
 
 /**
@@ -55,10 +66,21 @@ export interface ScheduleUpdatePlan {
  */
 export function planScheduleUpdate(task: TaskScheduleSource, next: Schedule): ScheduleUpdatePlan {
   const issues = validateSchedule(next);
-  if (issues.length > 0) return { patch: null, issues, unchanged: false };
+  if (issues.length > 0) return { patch: null, issues, unchanged: false, reminders: null };
 
   const current = scheduleFromTask(task);
-  if (schedulesEqual(current, next)) return { patch: null, issues: [], unchanged: true };
+  if (schedulesEqual(current, next)) {
+    return { patch: null, issues: [], unchanged: true, reminders: null };
+  }
 
-  return { patch: scheduleToTaskPatch(next), issues: [], unchanged: false };
+  // Normalized, so the reminders the caller gets back are the ones that
+  // survive the schedule they are being written with (§6.30–§6.33) — not the
+  // ones the editor was holding a moment before the dates changed.
+  const canonical = normalizeSchedule(next);
+  return {
+    patch: scheduleToTaskPatch(canonical),
+    issues: [],
+    unchanged: false,
+    reminders: canonical.reminders,
+  };
 }

@@ -119,6 +119,7 @@ function renderModule(
             onToggleCheckItem: () => {},
             onDeleteCheckItem: () => {},
             activityFor: extra.activityFor ?? (() => []),
+            remindersFor: () => [],
           }}
           lifecycle={{
             onArchiveList: () => {},

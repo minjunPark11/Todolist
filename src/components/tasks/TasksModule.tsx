@@ -57,7 +57,7 @@ import { ContextMenu, type ContextMenuState } from "../common/ContextMenu";
 import { useFloatingLayerOwner } from "../floating";
 import { useTaskDetailWidth } from "../../hooks/useTaskDetailWidth";
 import { priorityChange } from "../../domain/tasks/priority";
-import type { Schedule, ScheduleIssue } from "../../domain/schedule";
+import type { ReminderSpec, Schedule, ScheduleIssue } from "../../domain/schedule";
 import { addDays } from "../../utils/date";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
@@ -142,6 +142,8 @@ interface TasksModuleProps {
      * needs collections the Module does not hold (the focus sessions).
      */
     activityFor: (taskId: string) => TaskActivityEntry[];
+    /** This Task's reminders (§6.3), for the Schedule popover. */
+    remindersFor: (taskId: string) => ReminderSpec[];
   };
   /**
    * Creates the List and answers with its id (Add List design §1.10).
@@ -959,6 +961,7 @@ export function TasksModule(props: TasksModuleProps) {
           onToggleSubtask={props.drawer.onToggleSubtask}
           onDeleteSubtask={props.drawer.onDeleteSubtask}
           checkItems={props.drawer.checkItemsFor(openedTask.id)}
+          reminders={props.drawer.remindersFor(openedTask.id)}
           onSetContentMode={(mode) => props.drawer.onSetContentMode(openedTask.id, mode)}
           onAddCheckItem={(text) => props.drawer.onAddCheckItem(openedTask.id, text)}
           onAddCheckItems={(texts) => props.drawer.onAddCheckItems(openedTask.id, texts)}

@@ -682,6 +682,36 @@ export interface CheckItem {
  * has not moved, and the plan's Phase 6 (§6.74) is where one becomes the only
  * source of truth.
  */
+/**
+ * One stored reminder on one Task (spec §6.2, §6.3).
+ *
+ * A row rather than a field, because §6.3 forbids the field: a Task can be
+ * reminded about a day before AND an hour before, and `Task.reminder` — the
+ * single preset this replaces — could hold only one of them. That field is
+ * still on `Task` because accounts have it written; `migrateReminders` turns
+ * it into one of these on load and nothing writes a new one.
+ *
+ * The meaning of the four middle fields lives in `domain/schedule/reminders`
+ * as `ReminderSpec`, which this satisfies. Keeping the arithmetic there and
+ * the identity here is Chapter 26 §26.6's split at the level of the type: the
+ * domain says when this falls, and never whether it was delivered.
+ */
+export interface Reminder {
+  id: string;
+  taskId: string;
+  type: "relative" | "absolute";
+  /** Minutes before the Task's start. Null for an absolute reminder. */
+  offsetMinutes: number | null;
+  /** `YYYY-MM-DDTHH:mm` wall clock, for an absolute reminder. */
+  absoluteAt: string | null;
+  /** §6.12: the hour a day-based reminder lands on. */
+  allDayTime: string | null;
+  /** §6.40: a reminder that cannot be delivered is still stored. */
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TaskTag {
   id: string;
   taskId: string;
@@ -842,6 +872,8 @@ export interface PlannerData {
   dailyPlans: TaskDailyPlan[];
   tags: Tag[];
   taskTags: TaskTag[];
+  /** Reminders, keyed to their Task by `taskId` (spec §6.3). */
+  reminders: Reminder[];
   settings: PlannerSettings;
   appSettings: AppSettings;
 }

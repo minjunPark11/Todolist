@@ -1,6 +1,6 @@
 // Which reminders are due right now (design §8, audit D5).
 //
-// The pure half of delivery. `reminder.ts` says WHEN a reminder falls;
+// The pure half of delivery. `reminders.ts` says WHEN a reminder falls;
 // this says which of those moments have arrived, which have already been
 // handled, and which arrived so long ago that firing them now would be noise
 // rather than a reminder.
@@ -10,9 +10,9 @@
 // and not once per tick, and a task that has been rescheduled must be
 // reminded about at its NEW time and not its old one. Each of those is a rule
 // worth testing without a timer.
-import { reminderInstant } from "./reminder";
+import { reminderMoment } from "./reminders";
 import { scheduleFromTask, type TaskScheduleSource } from "./taskSchedule";
-import type { LocalDate, LocalTime } from "./types";
+import type { LocalDate, LocalTime, ReminderSpec } from "./types";
 import { isTaskOpen } from "../tasks/taskState";
 
 /** A wall-clock moment, in the same terms the rest of this folder uses. */
@@ -25,6 +25,8 @@ export interface LocalMoment {
 export interface ReminderTaskSource extends TaskScheduleSource {
   id: string;
   title: string;
+  /** This Task's reminders (§6.3), supplied by the caller that holds them. */
+  reminders?: ReminderSpec[];
   status?: string;
   archivedAt?: string;
   deletedAt?: string;
@@ -127,16 +129,25 @@ export function sweepReminders(
   for (const task of tasks) {
     if (!isLive(task)) continue;
 
-    const at = reminderInstant(scheduleFromTask(task));
-    if (at === null) continue;
+    // Several per Task now (§6.15), so this is a loop where it used to be one
+    // lookup. The key already carried the moment, which is what lets two
+    // reminders on one Task be two firings rather than one that wins.
+    const schedule = scheduleFromTask(task);
+    for (const reminder of task.reminders ?? []) {
+      // §6.40: a disabled reminder is stored and not sent.
+      if (reminder.enabled === false) continue;
 
-    const key = reminderKey(task.id, at);
-    if (seen.has(key)) continue;
+      const at = reminderMoment(reminder, schedule);
+      if (at === null) continue;
 
-    const lateBy = minutesBetween(at, now);
-    if (lateBy < 0) continue; // still in the future
-    if (lateBy > graceMinutes) expired.push(key);
-    else due.push({ taskId: task.id, title: task.title, at, key });
+      const key = reminderKey(task.id, at);
+      if (seen.has(key)) continue;
+
+      const lateBy = minutesBetween(at, now);
+      if (lateBy < 0) continue; // still in the future
+      if (lateBy > graceMinutes) expired.push(key);
+      else due.push({ taskId: task.id, title: task.title, at, key });
+    }
   }
 
   return { due, expired };

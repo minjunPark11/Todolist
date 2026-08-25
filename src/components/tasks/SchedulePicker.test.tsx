@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { Task } from "../../types";
-import type { Schedule } from "../../domain/schedule";
+import type { ReminderSpec, Schedule } from "../../domain/schedule";
 import { I18nProvider } from "../../i18n";
 import { FloatingLayerProvider } from "../floating";
 import { SchedulePicker } from "./SchedulePicker";
@@ -16,7 +16,7 @@ afterEach(cleanup);
 
 const TODAY = "2026-08-25";
 
-function setup(taskOverrides: Partial<Task> = {}, issues: string[] = []) {
+function setup(taskOverrides: Partial<Task> = {}, issues: string[] = [], reminders: ReminderSpec[] = []) {
   const onCommit = vi.fn(() => issues as never[]);
   const task = {
     id: "t1",
@@ -30,7 +30,7 @@ function setup(taskOverrides: Partial<Task> = {}, issues: string[] = []) {
   render(
     <I18nProvider lang="en">
       <FloatingLayerProvider>
-        <SchedulePicker task={task} today={TODAY} onCommit={onCommit} />
+        <SchedulePicker task={task} reminders={reminders} today={TODAY} onCommit={onCommit} />
       </FloatingLayerProvider>
     </I18nProvider>,
   );

@@ -12,7 +12,8 @@
 // `dueDate` are the same one-day schedule, and only one of them is canonical.
 // So both questions are asked about the NORMALIZED pair.
 import { normalizeSchedule } from "./normalizeSchedule";
-import type { Schedule, ScheduleDraft } from "./types";
+import { containsReminder } from "./reminders";
+import type { ReminderSpec, Schedule, ScheduleDraft } from "./types";
 
 /**
  * True when both describe the same schedule.
@@ -34,8 +35,23 @@ export function schedulesEqual(a: Schedule, b: Schedule): boolean {
     left.startTime === right.startTime &&
     left.endTime === right.endTime &&
     left.timezone === right.timezone &&
-    left.reminder === right.reminder &&
+    sameReminders(left.reminders, right.reminders) &&
     left.repeat === right.repeat
+  );
+}
+
+/**
+ * Two reminder lists that mean the same thing.
+ *
+ * Order-insensitive: §6.49 sorts them for display and `reconcileReminders` can
+ * rebuild the list in a different order, so comparing positions would report a
+ * draft as dirty for having been normalized.
+ */
+function sameReminders(a: readonly ReminderSpec[], b: readonly ReminderSpec[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((reminder) => containsReminder(b, reminder)) &&
+    b.every((reminder) => containsReminder(a, reminder))
   );
 }
 

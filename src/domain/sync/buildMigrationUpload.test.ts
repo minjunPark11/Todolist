@@ -9,6 +9,7 @@ function plannerData(overrides: Partial<PlannerData> = {}): PlannerData {
     projects: [],
     subtasks: [],
     checkItems: [],
+    reminders: [],
     focusSessions: [],
     learningPaths: [],
     spaces: [],

@@ -19,6 +19,7 @@ import type {
   Project,
   ProjectType,
   RawPlannerData,
+  Reminder,
   RepeatType,
   SavedFilter,
   SidebarFolder,
@@ -49,6 +50,14 @@ import { backfillTaskTags, linkTaskTags, sanitizeTag, sanitizeTaskTag } from "..
 import { toggleTaskTag as toggleTagOnTask } from "../domain/tags/tagPicker";
 import { sanitizeListSection } from "../domain/tasks/sections";
 import { duplicateTaskPlan, type DuplicatePlan } from "../domain/tasks/duplicate";
+import {
+  migrateReminders,
+  planReminderRows,
+  pruneOrphanReminders,
+  remindersForTask,
+  sanitizeReminder,
+  specOf,
+} from "../domain/schedule";
 import {
   checkItemsForTask,
   pruneOrphanCheckItems,
@@ -499,6 +508,9 @@ export function normalizeData(data: RawPlannerData): PlannerData {
     checkItems: Array.isArray(data.checkItems)
       ? data.checkItems.map(sanitizeCheckItem).filter((item): item is CheckItem => item !== null)
       : [],
+    reminders: Array.isArray(data.reminders)
+      ? data.reminders.map(sanitizeReminder).filter((row): row is Reminder => row !== null)
+      : [],
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
   };
@@ -554,6 +566,14 @@ function adoptLoadedData(data: PlannerData): PlannerData {
   // reader expects them, so this adds rows without putting the task table on
   // the wire.
   const tagged = backfillTaskTags(data.tasks, data.tags, data.taskTags, now);
+  // §6.3: the reminder each Task carries as a preset, written down as a row.
+  // Same shape as the tag backfill above and for the same reason — nothing
+  // rewrites a Task, so this adds rows without putting the task table on the
+  // wire, and a Task that already has rows is left alone because its preset is
+  // the stale copy rather than the truth.
+  const migratedReminders = migrateReminders(data.tasks, data.reminders, () => createId("reminder"), now);
+  const reminders =
+    migratedReminders.length > 0 ? [...data.reminders, ...migratedReminders] : data.reminders;
   if (
     workflow.listSections === data.listSections &&
     focusSessions === data.focusSessions &&
@@ -563,7 +583,8 @@ function adoptLoadedData(data: PlannerData): PlannerData {
     tasks === data.tasks &&
     dailyPlans === data.dailyPlans &&
     tagged.tags === data.tags &&
-    tagged.taskTags === data.taskTags
+    tagged.taskTags === data.taskTags &&
+    reminders === data.reminders
   ) {
     return data;
   }
@@ -578,6 +599,7 @@ function adoptLoadedData(data: PlannerData): PlannerData {
     dailyPlans,
     tags: tagged.tags,
     taskTags: tagged.taskTags,
+    reminders,
   };
 }
 // Phase S4 migration, and the same shape as the one below it: custom spaces
@@ -1269,9 +1291,46 @@ export function usePlannerData() {
   function updateTaskSchedule(taskId: string, next: Schedule): ScheduleIssue[] {
     const task = data.tasks.find((entry) => entry.id === taskId);
     if (!task) return [];
-    const plan = planScheduleUpdate(task, next);
-    if (plan.patch) updateTask(taskId, plan.patch);
+    const plan = planScheduleUpdate(reminderSourceFor(task, data.reminders), next);
+    if (!plan.patch) return plan.issues;
+
+    updateTask(taskId, plan.patch);
+
+    // §6.50: the reminder rows land in the same edit as the schedule that
+    // decides them. `planReminderRows` writes only the difference, so a
+    // reminder that survives keeps its id — and with it the `reminderKey` that
+    // stops an already-fired reminder from ringing a second time.
+    if (plan.reminders) {
+      const now = new Date().toISOString();
+      setData((current) => {
+        const rows = planReminderRows(
+          taskId,
+          plan.reminders ?? [],
+          current.reminders,
+          () => createId("reminder"),
+          now,
+        );
+        if (rows.added.length === 0 && rows.removed.length === 0) return current;
+        const dropped = new Set(rows.removed);
+        return {
+          ...current,
+          reminders: [...current.reminders.filter((row) => !dropped.has(row.id)), ...rows.added],
+        };
+      });
+    }
     return plan.issues;
+  }
+
+  /**
+   * A Task as the schedule domain wants to read it: its own fields, plus the
+   * reminder rows that are no longer on it (§6.3).
+   *
+   * The adapter takes a Task and nothing else, so whoever holds the rows has
+   * to bring them. That is the price of moving reminders out of the record,
+   * and it is the same price `checkItemsFor` already pays.
+   */
+  function reminderSourceFor(task: Task, rows: readonly Reminder[]) {
+    return { ...task, reminders: remindersForTask(task.id, rows).map(specOf) };
   }
 
   function deleteTask(taskId: string) {
@@ -1288,6 +1347,10 @@ export function usePlannerData() {
       // meaning apart from the Task it is a line of, so leaving it would be
       // leaving a row nothing can ever show.
       checkItems: removeCheckItemsForTask(taskId, current.checkItems),
+      // Reminders go with the Task for the same reason the checklist does: a
+      // reminder about a Task that no longer exists can never fire and can
+      // never be found to be removed.
+      reminders: current.reminders.filter((row) => row.taskId !== taskId),
     }));
     setSelectedTaskId("");
   }
@@ -1386,6 +1449,7 @@ export function usePlannerData() {
       subtasks: [...current.subtasks, ...plan.subtasks],
       checkItems: [...current.checkItems, ...plan.checkItems],
       taskTags: [...current.taskTags, ...plan.taskTags],
+      reminders: [...current.reminders, ...plan.reminders],
     }));
     setSelectedTaskId(plan.rootId);
     return plan;
@@ -1403,6 +1467,7 @@ export function usePlannerData() {
     const subtasks = new Set(plan.subtasks.map((row) => row.id));
     const checkItems = new Set(plan.checkItems.map((item) => item.id));
     const taskTags = new Set(plan.taskTags.map((link) => link.id));
+    const reminders = new Set(plan.reminders.map((row) => row.id));
 
     setData((current) => ({
       ...current,
@@ -1410,6 +1475,7 @@ export function usePlannerData() {
       subtasks: current.subtasks.filter((row) => !subtasks.has(row.id)),
       checkItems: current.checkItems.filter((item) => !checkItems.has(item.id)),
       taskTags: current.taskTags.filter((link) => !taskTags.has(link.id)),
+      reminders: current.reminders.filter((row) => !reminders.has(row.id)),
     }));
     setSelectedTaskId((open) => (tasks.has(open) ? "" : open));
   }
@@ -2234,6 +2300,7 @@ export function usePlannerData() {
     tags: data.tags,
     taskTags: data.taskTags,
     checkItems: data.checkItems,
+    reminders: data.reminders,
     focusSessions: data.focusSessions,
     activeSessionId: data.activeSessionId,
     activeFocusSession:

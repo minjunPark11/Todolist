@@ -21,7 +21,7 @@
 //   Focus history came across. `actualSeconds`, `lastFocusedAt` and
 //   `activeSessionId` rode the spread, so a fresh copy claimed hours of work
 //   and pointed at a session belonging to the original Task.
-import type { CheckItem, Subtask, Task, TaskTag } from "../../types";
+import type { CheckItem, Reminder, Subtask, Task, TaskTag } from "../../types";
 import { subtreeIds } from "./hierarchy";
 import { duplicateCheckItems } from "./checkItems";
 import { taskTagIdFor } from "../tags/tags";
@@ -33,6 +33,7 @@ export interface DuplicateSources {
   subtasks: Subtask[];
   checkItems: CheckItem[];
   taskTags: TaskTag[];
+  reminders: Reminder[];
 }
 
 export interface DuplicatePlan {
@@ -43,6 +44,7 @@ export interface DuplicatePlan {
   subtasks: Subtask[];
   checkItems: CheckItem[];
   taskTags: TaskTag[];
+  reminders: Reminder[];
 }
 
 /**
@@ -121,6 +123,7 @@ export function duplicateTaskPlan(
   const subtasks: Subtask[] = [];
   const checkItems: CheckItem[] = [];
   const taskTags: TaskTag[] = [];
+  const reminders: Reminder[] = [];
 
   for (const id of ids) {
     const original = sources.tasks.find((task) => task.id === id);
@@ -159,6 +162,14 @@ export function duplicateTaskPlan(
       ...duplicateCheckItems(id, copyId, sources.checkItems, () => createId("checkitem"), now),
     );
 
+    // §15.12: the schedule is copied, so the reminders that qualify it come
+    // with it — and each gets a NEW id, which that section states outright.
+    // Reusing the original's would give two Tasks one reminder, and removing
+    // it from either would silence both.
+    for (const reminder of sources.reminders.filter((row) => row.taskId === id)) {
+      reminders.push({ ...reminder, id: createId("reminder"), taskId: copyId, createdAt: now, updatedAt: now });
+    }
+
     for (const link of sources.taskTags.filter((row) => row.taskId === id)) {
       taskTags.push({
         // Derived from the pair, not generated: §6.46's uniqueness lives in
@@ -171,5 +182,5 @@ export function duplicateTaskPlan(
     }
   }
 
-  return { rootId, tasks, subtasks, checkItems, taskTags };
+  return { rootId, tasks, subtasks, checkItems, taskTags, reminders };
 }

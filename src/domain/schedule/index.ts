@@ -15,6 +15,7 @@ export type {
   LocalTime,
   RangeStage,
   ReminderPreset,
+  ReminderSpec,
   RepeatPreset,
   Schedule,
   ScheduleDraft,
@@ -24,16 +25,43 @@ export {
   EMPTY_SCHEDULE,
   isLocalDate,
   isLocalTime,
-  isReminderPreset,
   isRepeatPreset,
-  REMINDER_PRESETS,
   REPEAT_PRESETS,
 } from "./types";
 
 export type { QuickDateKey } from "./quickDate";
 export { applyQuickDate, QUICK_DATES, quickTargetDate, tonightTime } from "./quickDate";
 
-export { availableReminders, reconcileReminder, reminderInstant } from "./reminder";
+export { presetToSpec } from "./reminder";
+
+export type { ReminderRowPlan } from "./reminderRows";
+export {
+  migrateReminders,
+  planReminderRows,
+  pruneOrphanReminders,
+  remindersForTask,
+  sanitizeReminder,
+  specOf,
+} from "./reminderRows";
+
+export type { ReminderMoment, ReminderOffer } from "./reminders";
+export {
+  absoluteSpec,
+  addReminder,
+  ALL_DAY_OFFERS,
+  ALL_DAY_REMINDER_TIME,
+  containsReminder,
+  isReminderSpec,
+  offersFor,
+  reconcileReminders,
+  reminderMoment,
+  removeReminder,
+  sameReminder,
+  sortReminders,
+  specFromOffer,
+  TIMED_OFFERS,
+  toggleReminder,
+} from "./reminders";
 
 export type { DueReminder, LocalMoment, ReminderSweep, ReminderTaskSource } from "./reminderQueue";
 export { GRACE_MINUTES, keyMoment, pruneSeen, reminderKey, sweepReminders } from "./reminderQueue";

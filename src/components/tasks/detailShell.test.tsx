@@ -91,6 +91,7 @@ function Harness({ presentation }: { presentation: "inline-drawer" | "right-shee
           onAddSubtask={noop}
           onToggleSubtask={noop}
           onDeleteSubtask={noop}
+          reminders={[]}
           actions={taskActions({ task: task() })}
           onRunAction={noop}
           activity={null}

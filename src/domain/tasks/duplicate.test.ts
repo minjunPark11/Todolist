@@ -54,7 +54,7 @@ function counter() {
 }
 
 function sources(overrides: Partial<Parameters<typeof duplicateTaskPlan>[1]> = {}) {
-  return { tasks: [], subtasks: [], checkItems: [], taskTags: [], ...overrides };
+  return { tasks: [], subtasks: [], checkItems: [], taskTags: [], reminders: [], ...overrides };
 }
 
 describe("duplicateTaskPlan (§15.9–§15.18)", () => {

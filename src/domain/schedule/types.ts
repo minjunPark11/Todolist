@@ -88,17 +88,22 @@ export interface Schedule {
    */
   timezone: string | null;
   /**
-   * When to be told about this, as one of the offered choices.
+   * When to be told about this — all of the times, not one of them (§6.15).
    *
-   * A single preset rather than the design's `ReminderRule[]` (§1.3.3). The
-   * panel is a one-of list, and a list type whose UI can only ever hold one
-   * element is a type that lies about what the app can do — the array can
-   * arrive with the scheduler that would justify it (audit D5).
+   * This was a single `ReminderPreset`, which §6.3 names as the shape not to
+   * use. The comment that stood here argued that "a list type whose UI can
+   * only ever hold one element is a type that lies about what the app can
+   * do"; the answer turned out to be the other half of that trade — the UI is
+   * a multi-select now (§6.17), and the type says so.
    *
-   * `"none"` is the unset value, not `null`, so that every Schedule has an
-   * answer and no caller has to write `?? "none"`.
+   * Specs and not rows: the editor's draft is not committed until the reader
+   * confirms it, so a reminder added and then cancelled must never have been
+   * stored. The store turns these into `Reminder` entities on commit, which is
+   * where the ids and the timestamps come from.
+   *
+   * Empty is the unset value, so no caller has to write `?? []`.
    */
-  reminder: ReminderPreset;
+  reminders: ReminderSpec[];
   /**
    * How this repeats, as one of the offered choices.
    *
@@ -112,10 +117,39 @@ export interface Schedule {
 }
 
 /**
- * The choices the 알림 panel offers, in the order it shows them.
+ * One reminder on a schedule, without an identity (§6.2, §6.12).
  *
- * `at-time` needs a time to be meaningful and the rest do not, which is why
- * the offer is filtered by the draft rather than fixed (see `reminder.ts`).
+ * The behaviour lives in `reminders.ts`; the shape is here because a Schedule
+ * carries a list of them. `Reminder` in the root types is this plus an id, a
+ * Task and timestamps — the stored row. The difference matters: the editor
+ * holds specs in a draft that a cancel throws away, and only a confirm turns
+ * them into rows.
+ */
+export interface ReminderSpec {
+  type: "relative" | "absolute";
+  /** Minutes BEFORE the anchor. Null for an absolute reminder. */
+  offsetMinutes: number | null;
+  /** `YYYY-MM-DDTHH:mm`, wall clock like everything else in this folder. */
+  absoluteAt: string | null;
+  /**
+   * §6.12's field, and the reason `offsetMinutes` alone is not enough.
+   *
+   * "1 day before at 9 AM" is not an offset: subtracting 1440 minutes from a
+   * Task at 22:00 gives 22:00 the day before, which is not the morning. When
+   * this is set the offset chooses the DAY and this chooses the time on it.
+   */
+  allDayTime: LocalTime | null;
+  /** §6.40: a reminder that cannot currently be delivered is still stored. */
+  enabled: boolean;
+}
+
+/**
+ * The choices the 알림 panel used to offer, one of which a Task could hold.
+ *
+ * LEGACY. §6.3 retired this shape and `Schedule.reminders` replaced it; what
+ * keeps the union alive is that accounts have a preset STORED on the Task.
+ * `reminder.ts` converts one into a `ReminderSpec` on the way in, and nothing
+ * writes a new one.
  */
 export const REMINDER_PRESETS = ["none", "at-time", "10m", "1h", "1d-9am"] as const;
 export type ReminderPreset = (typeof REMINDER_PRESETS)[number];
@@ -165,7 +199,7 @@ export const EMPTY_SCHEDULE: Schedule = {
   startTime: null,
   endTime: null,
   timezone: null,
-  reminder: "none",
+  reminders: [],
   repeat: "none",
 };
 

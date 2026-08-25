@@ -9,6 +9,7 @@ import { dependentsOf, eligibleBlockers } from "../domain/tasks/dependencies";
 import { useT } from "../i18n";
 import { DeferredInput, DeferredTextarea } from "./kit";
 import { SchedulePicker } from "./tasks/SchedulePicker";
+import type { ReminderSpec } from "../domain/schedule";
 import {
   formatScheduleTrigger,
   scheduleFromTask,
@@ -19,6 +20,8 @@ import { MotionPanelShell } from "./motion/MotionPanelShell";
 
 interface TaskDetailProps {
   task: Task | null;
+  /** This Task's reminders (§6.3) — rows now, so they arrive beside it. */
+  reminders: ReminderSpec[];
   tasks: Task[];
   lists: List[];
   /** The keyboard-reachable half of U9 — the tree's drop target is the other. */
@@ -46,6 +49,7 @@ const matrixQuadrants: Array<{ key: MatrixQuadrant; labelKey: string; hintKey: s
 
 export function TaskDetail({
   task,
+  reminders,
   tasks,
   lists,
   onMoveToList,
@@ -131,7 +135,12 @@ export function TaskDetail({
                 which is two implementations of one control — and by Phase 3
                 they had already diverged, because only the Drawer's was on the
                 shared layer system. */}
-            <SchedulePicker task={task} today={today} onCommit={onUpdateTaskSchedule} />
+            <SchedulePicker
+              task={task}
+              reminders={reminders}
+              today={today}
+              onCommit={onUpdateTaskSchedule}
+            />
           </div>
         </div>
       </section>

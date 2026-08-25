@@ -31,6 +31,7 @@ export const collectionTables = [
   ["tags", "tags"],
   ["taskTags", "task_tags"],
   ["checkItems", "check_items"],
+  ["reminders", "reminders"],
 ] as const;
 
 // Tables added after the original schema: a client whose project predates them
@@ -47,6 +48,7 @@ export const optionalRemoteTables: ReadonlySet<string> = new Set([
   "tags",
   "task_tags",
   "check_items",
+  "reminders",
 ]);
 
 export type SyncCollectionKey = (typeof collectionTables)[number][0];

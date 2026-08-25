@@ -12,8 +12,8 @@
 //
 // Idempotent by construction: `normalize(normalize(x))` equals `normalize(x)`,
 // which is what lets it run on every load without drifting.
-import { reconcileReminder } from "./reminder";
-import { isLocalDate, isLocalTime, isRepeatPreset, isReminderPreset, type Schedule } from "./types";
+import { isReminderSpec, reconcileReminders } from "./reminders";
+import { isLocalDate, isLocalTime, isRepeatPreset, type Schedule } from "./types";
 
 /**
  * The canonical form of a Schedule.
@@ -78,10 +78,8 @@ export function normalizeSchedule(schedule: Schedule): Schedule {
 
   const dated = startDate !== null || dueDate !== null;
 
-  // INV-06 / INV-07 — a reminder or a repeat with no date to hang on. Both are
-  // relative to a day, so without one they name nothing; the design keeps them
-  // in the record only as long as the date they qualify (design §1.20).
-  const reminder = dated && isReminderPreset(schedule.reminder) ? schedule.reminder : "none";
+  // INV-07 — a repeat with no date to hang on names nothing; the design keeps
+  // it in the record only as long as the date it qualifies (design §1.20).
   const repeat = dated && isRepeatPreset(schedule.repeat) ? schedule.repeat : "none";
 
   const core = {
@@ -93,8 +91,11 @@ export function normalizeSchedule(schedule: Schedule): Schedule {
     repeat,
   };
 
-  // 정시 survives only while there is a time to be "at". Checked against the
-  // times AFTER they were repaired above, so a reminder is not kept alive by a
-  // startTime this very function just dropped.
-  return { ...core, reminder: reconcileReminder({ ...core, reminder }, reminder) };
+  // INV-06, and §6.30–§6.33 besides. Checked against the dates and times AFTER
+  // they were repaired above, so a reminder is not kept alive by a `startTime`
+  // this very function just dropped — which is what "at the time" would be
+  // without it. `reconcileReminders` also converts rather than only discards:
+  // a Task that has just lost its time keeps its day-based reminders.
+  const kept = (Array.isArray(schedule.reminders) ? schedule.reminders : []).filter(isReminderSpec);
+  return { ...core, reminders: reconcileReminders(kept, { ...core, reminders: [] }) };
 }

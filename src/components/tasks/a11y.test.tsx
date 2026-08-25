@@ -139,6 +139,7 @@ function renderModule(url: string) {
             onToggleCheckItem: () => {},
             onDeleteCheckItem: () => {},
             activityFor: () => [],
+            remindersFor: () => [],
           }}
           lifecycle={{
             onArchiveList: () => {},

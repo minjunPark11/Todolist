@@ -27,7 +27,7 @@ import { childProgress } from "../../domain/tasks/children";
 import { isCompleted, isPinned } from "../../domain/tasks/taskState";
 import { checklistProgress, isChecklistMode } from "../../domain/tasks/checkItems";
 import { ChecklistEditor } from "./ChecklistEditor";
-import type { Schedule, ScheduleIssue } from "../../domain/schedule";
+import type { ReminderSpec, Schedule, ScheduleIssue } from "../../domain/schedule";
 import { ListPicker } from "./ListPicker";
 import { PriorityPicker } from "./PriorityPicker";
 import { SchedulePicker } from "./SchedulePicker";
@@ -87,6 +87,8 @@ export interface TaskDrawerProps {
   actions: TaskActionGroup[];
   /** Runs one, after the Module has re-checked it is still allowed (§15.66). */
   onRunAction: (id: TaskActionId) => void;
+  /** This Task's reminders (§6.3), for the Schedule popover's panel. */
+  reminders: ReminderSpec[];
   /** §25.7's history, while it is open; null when it is not. */
   activity: TaskActivityEntry[] | null;
   onCloseActivity: () => void;
@@ -131,6 +133,7 @@ export function TaskDrawer({
   onDeleteSubtask,
   actions,
   onRunAction,
+  reminders,
   activity,
   onCloseActivity,
   checkItems,
@@ -271,6 +274,7 @@ export function TaskDrawer({
             the same component; only the trigger and the surface are new. */}
         <SchedulePicker
           task={task}
+          reminders={reminders}
           today={today}
           onCommit={onCommitSchedule}
           restoreFocusTo={() => root.current}

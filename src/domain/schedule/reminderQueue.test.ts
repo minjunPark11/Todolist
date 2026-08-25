@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { keyMoment, pruneSeen, reminderKey, sweepReminders, type ReminderTaskSource } from "./reminderQueue";
+import { specFromOffer, TIMED_OFFERS } from "./reminders";
 
 const NOW = { date: "2026-08-19", time: "18:00" };
+
+const AT_TIME = specFromOffer(TIMED_OFFERS[0]);
+const TEN_MINUTES = specFromOffer(TIMED_OFFERS[1]);
+const ONE_HOUR = specFromOffer(TIMED_OFFERS[2]);
 
 function task(overrides: Partial<ReminderTaskSource> = {}): ReminderTaskSource {
   return {
@@ -9,7 +14,7 @@ function task(overrides: Partial<ReminderTaskSource> = {}): ReminderTaskSource {
     title: "분기 보고서 정리",
     dueDate: "2026-08-19",
     startTime: "18:00",
-    reminder: "at-time",
+    reminders: [AT_TIME],
     ...overrides,
   };
 }
@@ -28,7 +33,26 @@ describe("sweepReminders", () => {
   });
 
   it("ignores a task with no reminder set", () => {
-    expect(sweepReminders([task({ reminder: "none" })], NOW, new Set()).due).toEqual([]);
+    expect(sweepReminders([task({ reminders: [] })], NOW, new Set()).due).toEqual([]);
+  });
+
+  it("fires every reminder a Task has, not just one (§6.15)", () => {
+    // The reason the sweep is a loop now. A Task reminded at the time AND ten
+    // minutes before is two firings, and the moment is in the key, so they do
+    // not collapse into each other.
+    const both = task({ startTime: "18:10", reminders: [AT_TIME, TEN_MINUTES] });
+    const { due } = sweepReminders([both], NOW, new Set());
+    expect(due.map((entry) => entry.at.time)).toEqual(["18:00"]);
+
+    const later = sweepReminders([both], { date: "2026-08-19", time: "18:10" }, new Set());
+    expect(later.due.map((entry) => entry.at.time).sort()).toEqual(["18:00", "18:10"]);
+  });
+
+  it("leaves a disabled reminder unsent and unrecorded (§6.40)", () => {
+    const off = task({ reminders: [{ ...AT_TIME, enabled: false }] });
+    const { due, expired } = sweepReminders([off], NOW, new Set());
+    expect(due).toEqual([]);
+    expect(expired).toEqual([]);
   });
 
   // The point of the `seen` set: a thirty-second tick must not re-announce the
@@ -72,8 +96,8 @@ describe("sweepReminders", () => {
     expect(sweepReminders([moved], NOW, seen).due).toHaveLength(1);
   });
 
-  it("resolves an offset preset rather than the schedule's own time", () => {
-    const { due } = sweepReminders([task({ startTime: "19:00", reminder: "1h" })], NOW, new Set());
+  it("resolves an offset rather than the schedule's own time", () => {
+    const { due } = sweepReminders([task({ startTime: "19:00", reminders: [ONE_HOUR] })], NOW, new Set());
     expect(due[0].at).toEqual({ date: "2026-08-19", time: "18:00" });
   });
 });

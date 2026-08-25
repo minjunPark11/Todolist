@@ -13,6 +13,7 @@ import { isDirty } from "./scheduleEquality";
 import { getRangeStage } from "./scheduleQueries";
 import { isConfirmable } from "./validateSchedule";
 import { EMPTY_SCHEDULE, type Schedule } from "./types";
+import { reconcileReminders, specFromOffer, TIMED_OFFERS } from "./reminders";
 
 const TODAY = "2026-08-18";
 
@@ -251,45 +252,92 @@ describe("QUICK_DATE (design §5)", () => {
   });
 });
 
-describe("SET_REMINDER / SET_REPEAT (design §8, §9)", () => {
+describe("TOGGLE_REMINDER / SET_REPEAT (spec §6.15, design §9)", () => {
+  const hourBefore = specFromOffer(TIMED_OFFERS[2]);
+  const atTime = specFromOffer(TIMED_OFFERS[0]);
+
   it("keeps a reminder the draft can carry", () => {
     const state = opened(
-      run(open(schedule({ dueDate: "2026-08-20" })), { type: "SET_REMINDER", reminder: "1h" }),
+      run(open(schedule({ dueDate: "2026-08-20", startTime: "09:00" })), {
+        type: "TOGGLE_REMINDER",
+        reminder: hourBefore,
+      }),
     );
-    expect(state.draft.reminder).toBe("1h");
+    expect(state.draft.reminders).toEqual([hourBefore]);
     expect(isDirty(state.draft, state.saved)).toBe(true);
   });
 
-  // The panel filters 정시 out without a time; the reducer is what makes that
-  // true even if something dispatches it anyway.
-  it("refuses a reminder the draft cannot carry", () => {
-    const state = opened(
-      run(open(schedule({ dueDate: "2026-08-20" })), { type: "SET_REMINDER", reminder: "at-time" }),
-    );
-    expect(state.draft.reminder).toBe("none");
-  });
-
-  it("drops the reminder when the time it referred to goes", () => {
+  it("holds several at once (§6.15)", () => {
+    // The whole reason the field became a list: choosing the second one used
+    // to drop the first.
     const state = opened(
       run(
         open(schedule({ dueDate: "2026-08-20", startTime: "09:00" })),
-        { type: "SET_REMINDER", reminder: "at-time" },
+        { type: "TOGGLE_REMINDER", reminder: hourBefore },
+        { type: "TOGGLE_REMINDER", reminder: atTime },
+      ),
+    );
+    expect(state.draft.reminders).toHaveLength(2);
+  });
+
+  it("toggles the same one back off (§6.19)", () => {
+    const state = opened(
+      run(
+        open(schedule({ dueDate: "2026-08-20", startTime: "09:00" })),
+        { type: "TOGGLE_REMINDER", reminder: hourBefore },
+        { type: "TOGGLE_REMINDER", reminder: hourBefore },
+      ),
+    );
+    expect(state.draft.reminders).toEqual([]);
+  });
+
+  it("never holds the same one twice (§6.16)", () => {
+    const state = opened(
+      run(open(schedule({ dueDate: "2026-08-20", startTime: "09:00" })), {
+        type: "TOGGLE_REMINDER",
+        reminder: hourBefore,
+      }),
+    );
+    // A second dispatch of the same spec is a remove, so duplication needs the
+    // list to be handed one directly — which `reconcileReminders` also refuses.
+    expect(reconcileReminders([hourBefore, { ...hourBefore }], draftSchedule(state.draft))).toHaveLength(1);
+  });
+
+  it("converts a minute reminder away when the time it referred to goes (§6.33)", () => {
+    const state = opened(
+      run(
+        open(schedule({ dueDate: "2026-08-20", startTime: "09:00" })),
+        { type: "TOGGLE_REMINDER", reminder: atTime },
         { type: "CLEAR_TIME" },
       ),
     );
-    expect(state.draft.reminder).toBe("none");
+    // "At the time" of an all-day Task names no moment, so it goes rather than
+    // silently resolving against an hour the Task does not have.
+    expect(state.draft.reminders).toEqual([]);
   });
 
-  it("drops both when the schedule is cleared (INV-06, INV-07)", () => {
+  it("keeps a day-based reminder when the Task becomes all-day (§6.33)", () => {
+    const dayBefore = specFromOffer(TIMED_OFFERS[3]);
     const state = opened(
       run(
-        open(schedule({ dueDate: "2026-08-20" })),
-        { type: "SET_REMINDER", reminder: "1h" },
+        open(schedule({ dueDate: "2026-08-20", startTime: "09:00" })),
+        { type: "TOGGLE_REMINDER", reminder: dayBefore },
+        { type: "CLEAR_TIME" },
+      ),
+    );
+    expect(state.draft.reminders).toHaveLength(1);
+  });
+
+  it("drops both when the schedule is cleared (INV-06, INV-07, §6.30)", () => {
+    const state = opened(
+      run(
+        open(schedule({ dueDate: "2026-08-20", startTime: "09:00" })),
+        { type: "TOGGLE_REMINDER", reminder: hourBefore },
         { type: "SET_REPEAT", repeat: "daily" },
         { type: "CLEAR_SCHEDULE" },
       ),
     );
-    expect(state.draft.reminder).toBe("none");
+    expect(state.draft.reminders).toEqual([]);
     expect(state.draft.repeat).toBe("none");
   });
 

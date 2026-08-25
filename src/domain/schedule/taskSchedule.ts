@@ -18,7 +18,8 @@
 // rewrite invisible rather than dangerous.
 import { normalizeSchedule } from "./normalizeSchedule";
 import { repeatPresetFromTask, repeatPresetToFields, type RepeatKind } from "./recurrence";
-import { isReminderPreset, type Schedule } from "./types";
+import { presetToSpec } from "./reminder";
+import type { ReminderSpec, Schedule } from "./types";
 
 /**
  * The fields this reads off a Task.
@@ -34,8 +35,10 @@ export interface TaskScheduleSource {
   dueDate?: string;
   startTime?: string;
   endTime?: string;
-  /** The reminder preset, `""` when unset — see `Schedule.reminder`. */
+  /** LEGACY: the retired reminder preset, `""` when unset (§6.3). */
   reminder?: string;
+  /** The Task's reminder rows, supplied by the caller that holds them (§6.3). */
+  reminders?: ReminderSpec[];
   /**
    * The legacy repeat trio, which the editor now reads and writes through
    * `recurrence.ts`. Left on the record in its original shape rather than
@@ -164,12 +167,18 @@ export function scheduleFromTask(task: TaskScheduleSource): Schedule {
   const startTime = value(task.startTime);
   const endTime = value(task.endTime);
 
-  // Reminder and repeat ride along untouched by the date consolidation below:
+  // Reminders and repeat ride along untouched by the date consolidation below:
   // they qualify whatever date survives it, and `normalizeSchedule` is what
   // drops them if none does (INV-06, INV-07).
+  //
+  // The reminders come from the caller — they are rows on the Task now (§6.3),
+  // and this adapter is handed a Task and nothing else. The legacy preset is
+  // the fallback for a record `migrateReminders` has not reached, so a client
+  // reading storage directly still sees the reminder that is written there.
+  const legacy = presetToSpec(task.reminder);
   const base = {
     timezone: null,
-    reminder: isReminderPreset(task.reminder) ? task.reminder : ("none" as const),
+    reminders: task.reminders ?? (legacy ? [legacy] : []),
     repeat: repeatPresetFromTask(task),
   };
 
@@ -221,7 +230,9 @@ export function scheduleFromTask(task: TaskScheduleSource): Schedule {
  * write here would make the block vanish. Nothing calls it yet; the editor
  * that will arrives in Phase 6, behind that migration.
  */
-export function scheduleToTaskPatch(schedule: Schedule): Required<TaskScheduleSource> {
+export function scheduleToTaskPatch(
+  schedule: Schedule,
+): Omit<Required<TaskScheduleSource>, "reminders"> {
   const canonical = normalizeSchedule(schedule);
   // 매주 needs a weekday, and the schedule's own start is the one that keeps
   // the task where it already is (see `repeatPresetToFields`).
@@ -232,7 +243,11 @@ export function scheduleToTaskPatch(schedule: Schedule): Required<TaskScheduleSo
     startTime: canonical.startTime ?? "",
     endTime: canonical.endTime ?? "",
     scheduledDate: "",
-    reminder: canonical.reminder,
+    // The legacy field is CLEARED on every write. `migrateReminders` has
+    // already turned it into rows by the time anything can edit a schedule,
+    // and leaving it populated would give the record two answers — exactly the
+    // failure `scheduledDate` above is emptied to avoid.
+    reminder: "none",
     ...repeatPresetToFields(canonical.repeat, anchor),
   };
 }

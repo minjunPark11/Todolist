@@ -11,7 +11,7 @@
 // reminder, no repeat — so the Task Detail and the legacy panel disagreed
 // about what a schedule was. One editor, one `updateTaskSchedule`, one answer.
 import type { Task } from "../../types";
-import type { Schedule, ScheduleIssue } from "../../domain/schedule";
+import type { ReminderSpec, Schedule, ScheduleIssue } from "../../domain/schedule";
 import { formatScheduleTrigger, scheduleFromTask } from "../../domain/schedule";
 import { ScheduleEditor } from "../schedule/ScheduleEditor";
 import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "../floating";
@@ -19,6 +19,14 @@ import { useT } from "../../i18n";
 
 export interface SchedulePickerProps {
   task: Task;
+  /**
+   * This Task's reminders (§6.3).
+   *
+   * Passed in rather than read off the Task, because they are rows now. The
+   * editor needs them in the draft it opens — a reminder the reader cannot see
+   * in the panel is a reminder they will remove by accident.
+   */
+  reminders: ReminderSpec[];
   /** Today as the domain's `YYYY-MM-DD`, for "is this overdue" and the like. */
   today: string;
   /** Returns whatever was wrong; empty means it was written (§5.51). */
@@ -26,10 +34,10 @@ export interface SchedulePickerProps {
   restoreFocusTo?: () => HTMLElement | null;
 }
 
-export function SchedulePicker({ task, today, onCommit, restoreFocusTo }: SchedulePickerProps) {
+export function SchedulePicker({ task, reminders, today, onCommit, restoreFocusTo }: SchedulePickerProps) {
   const { t, lang } = useT();
   const locale = lang === "ko" ? "ko-KR" : "en-US";
-  const schedule = scheduleFromTask(task);
+  const schedule = scheduleFromTask({ ...task, reminders });
   const label = formatScheduleTrigger(schedule, today, locale);
 
   return (

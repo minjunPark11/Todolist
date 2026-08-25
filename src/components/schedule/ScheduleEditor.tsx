@@ -7,7 +7,9 @@
 // giving it a different trigger and nothing else.
 import { useEffect, useReducer } from "react";
 import {
-  availableReminders,
+  ALL_DAY_OFFERS,
+  sortReminders,
+  TIMED_OFFERS,
   CLOSED,
   draftSchedule,
   formatTimeSummary,
@@ -22,7 +24,9 @@ import {
   type Schedule,
   type ScheduleIssue,
 } from "../../domain/schedule";
+import type { ReminderSpec } from "../../domain/schedule";
 import { ChoicePanel } from "./ChoicePanel";
+import { ReminderPanel } from "./ReminderPanel";
 import { MonthCalendar } from "./MonthCalendar";
 import { TimePanel } from "./TimePanel";
 import { useT } from "../../i18n";
@@ -114,14 +118,14 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
   if (panel === "reminder") {
     return (
       <div className="sched-editor">
-        <ChoicePanel
-          title={t("schedule.reminder")}
-          // Filtered by the draft: 정시 needs a time to be "at" (see
-          // `availableReminders`), so it is absent rather than inert.
-          options={availableReminders(draft)}
-          value={draft.reminder}
-          label={(option) => t(`schedule.reminder.${option}`)}
-          onChoose={(reminder) => dispatch({ type: "SET_REMINDER", reminder })}
+        {/* Not a `ChoicePanel` any more: §6.15 lets a Task hold several of
+            these, and a radiogroup would drop the previous one on every
+            choice. The offers themselves depend on the draft — §6.11 gives an
+            all-day Task different units, not the timed list with rows
+            removed. */}
+        <ReminderPanel
+          draft={draft}
+          onToggle={(reminder) => dispatch({ type: "TOGGLE_REMINDER", reminder })}
           onBack={() => dispatch({ type: "SET_PANEL", panel: "calendar" })}
         />
       </div>
@@ -203,7 +207,10 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
         <SummaryRow
           icon="🔔"
           label={t("schedule.reminder")}
-          value={t(`schedule.reminder.${draft.reminder}`)}
+          /* §6.34: a summary, because there may be more than one. The earliest
+             is named and the rest are counted — a row that listed all four
+             would be wider than the popover. */
+          value={reminderSummary(draft, t)}
           disabled={!dated}
           onClick={() => dispatch({ type: "SET_PANEL", panel: "reminder" })}
         />
@@ -246,6 +253,36 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
       </div>
     </div>
   );
+}
+
+/**
+ * §6.34's summary line: the earliest reminder, and how many more there are.
+ *
+ * The earliest rather than the first added, because §6.49 orders them that way
+ * everywhere else and a row that disagreed with the panel under it would read
+ * as a bug. An absolute reminder has no preset label, so it shows its own
+ * moment.
+ */
+function reminderSummary(draft: Schedule, t: (key: string, vars?: Record<string, string | number>) => string): string {
+  const sorted = sortReminders(draft.reminders, draft);
+  const first = sorted[0];
+  if (!first) return t("schedule.reminder.none");
+
+  const label =
+    first.type === "absolute"
+      ? (first.absoluteAt ?? "").replace("T", " ")
+      : t(`schedule.reminder.${offerIdOf(first)}`);
+  return sorted.length > 1 ? t("schedule.reminder.more", { label, n: sorted.length - 1 }) : label;
+}
+
+/** Which offer a relative reminder came from, for its label. */
+function offerIdOf(reminder: ReminderSpec): string {
+  const match = [...TIMED_OFFERS, ...ALL_DAY_OFFERS].find(
+    (offer) => offer.offsetMinutes === reminder.offsetMinutes && offer.allDayTime === reminder.allDayTime,
+  );
+  // A migrated or hand-written offset that matches no offer still has to say
+  // something; the minutes are the honest fallback.
+  return match?.id ?? "custom-offset";
 }
 
 interface SummaryRowProps {

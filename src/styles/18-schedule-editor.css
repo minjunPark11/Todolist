@@ -474,6 +474,53 @@
   border-bottom: 0;
 }
 
+/* §6.13's absolute reminder — the row that makes the `absolute` half of the
+   model reachable. Below the list rather than inside it, because it is a way
+   of making a new one and not another thing to tick. */
+.sched-reminder-custom {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sched-reminder-custom label {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sched-reminder-custom input {
+  padding: 7px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.sched-reminder-custom button {
+  flex: none;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sched-reminder-custom button:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
 .sched-choice:hover {
   background: var(--bg-surface-muted);
 }

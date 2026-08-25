@@ -20,14 +20,14 @@
 //   canConfirm            The queries in this folder answer them from the
 //                         draft, which is the only way they cannot drift.
 import { applyQuickDate, type QuickDateKey } from "./quickDate";
-import { reconcileReminder } from "./reminder";
+import { reconcileReminders, toggleReminder } from "./reminders";
 import { clearSchedule, clearTime, selectDate, setEndTime, setStartTime } from "./scheduleCommands";
 import { draftFromSchedule, setScheduleMode } from "./scheduleMode";
 import { getRangeStage } from "./scheduleQueries";
 import type {
   LocalDate,
   LocalTime,
-  ReminderPreset,
+  ReminderSpec,
   RepeatPreset,
   Schedule,
   ScheduleDraft,
@@ -81,7 +81,7 @@ export type ScheduleEditorAction =
    * 22:51 without owning the machine's time (design §5.40).
    */
   | { type: "QUICK_DATE"; key: QuickDateKey; today: LocalDate; now: LocalTime }
-  | { type: "SET_REMINDER"; reminder: ReminderPreset }
+  | { type: "TOGGLE_REMINDER"; reminder: ReminderSpec }
   | { type: "SET_REPEAT"; repeat: RepeatPreset }
   | { type: "REJECT"; issues: ScheduleIssue[] };
 
@@ -119,7 +119,7 @@ export function draftSchedule(draft: ScheduleDraft): Schedule {
     startTime: draft.startTime,
     endTime: draft.endTime,
     timezone: draft.timezone,
-    reminder: draft.reminder,
+    reminders: draft.reminders,
     repeat: draft.repeat,
   };
 }
@@ -132,13 +132,15 @@ export function draftSchedule(draft: ScheduleDraft): Schedule {
  * it (design §2.38).
  */
 function edited(state: Extract<ScheduleEditorState, { status: "open" }>, draft: ScheduleDraft) {
-  // Every edit re-checks the reminder, because most of them can invalidate it:
-  // clearing the time removes what 정시 refers to, clearing the dates removes
-  // what any reminder refers to (INV-06). Doing it here rather than in each
-  // case is what stops one new action from being the one that forgets.
-  const reminder = reconcileReminder(draft, draft.reminder);
+  // Every edit re-checks the reminders, because most of them can invalidate
+  // one: clearing the time removes what "at the time" refers to, clearing the
+  // dates removes what any relative reminder refers to (INV-06, §6.30), and
+  // gaining or losing a time converts between the two families (§6.32,
+  // §6.33). Doing it here rather than in each case is what stops one new
+  // action from being the one that forgets.
+  const reminders = reconcileReminders(draft.reminders, draft);
   const repeat = draft.dueDate === null && draft.startDate === null ? "none" : draft.repeat;
-  return { ...state, draft: { ...draft, reminder, repeat }, issues: [] };
+  return { ...state, draft: { ...draft, reminders, repeat }, issues: [] };
 }
 
 export function scheduleEditorReducer(
@@ -223,10 +225,15 @@ export function scheduleEditorReducer(
       return { ...next, hoverDate: null, visibleMonth: monthOf(landed) };
     }
 
-    case "SET_REMINDER":
+    case "TOGGLE_REMINDER":
       // Through `edited`, which is what rejects a reminder the current draft
-      // cannot carry — the panel filters the list, this enforces it.
-      return edited(state, { ...state.draft, reminder: action.reminder });
+      // cannot carry — the panel offers the list, this enforces it. A toggle
+      // rather than a set, because §6.17's panel is multi-select and §6.19's
+      // remove is the same gesture as §6.18's add.
+      return edited(state, {
+        ...state.draft,
+        reminders: toggleReminder(state.draft.reminders, action.reminder),
+      });
 
     case "SET_REPEAT":
       return edited(state, { ...state.draft, repeat: action.repeat });

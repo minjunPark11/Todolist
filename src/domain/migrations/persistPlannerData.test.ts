@@ -32,6 +32,7 @@ function plannerData(): PlannerData {
     dailyPlans: [],
     tags: [],
     taskTags: [],
+    reminders: [],
     focusSessions: [],
     activeSessionId: "",
     learningPaths: [],

@@ -74,7 +74,7 @@ import type {
   Task,
 } from "./types";
 import { useReminders } from "./hooks/useReminders";
-import { formatLocalTime } from "./domain/schedule";
+import { formatLocalTime, remindersForTask, specOf } from "./domain/schedule";
 import { todayValue } from "./utils/date";
 import { I18nProvider, translate, useT } from "./i18n";
 import { isWontDo } from "./domain/tasks/taskState";
@@ -660,11 +660,27 @@ export default function App() {
     });
   }
 
+  // Every Task with its own reminders attached, which is what the sweep reads.
+  // Recomputed only when either collection changes: the hook holds this in a
+  // ref and a new array on every render would be work with nothing to show
+  // for it.
+  const remindableTasks = useMemo(
+    () =>
+      visibleTasks.map((task) => ({
+        ...task,
+        reminders: remindersForTask(task.id, planner.reminders).map(specOf),
+      })),
+    [visibleTasks, planner.reminders],
+  );
+
   // Reminder delivery (design §8). The wording lives here rather than in the
   // hook because it needs the dictionary, and the hook has no business knowing
   // which language the app is in.
   useReminders({
-    tasks: visibleTasks,
+    // §6.3: the reminders are rows now, so the Tasks arrive carrying the ones
+    // that belong to them. The sweep reads several per Task where it used to
+    // read one field.
+    tasks: remindableTasks,
     describe: ({ title, at }) => ({
       title,
       body: t("schedule.notificationBody", {
@@ -1240,6 +1256,10 @@ export default function App() {
             childrenOf: (taskId) => childrenOf(taskId, planner.tasks, planner.subtasks),
             // Ordering is the domain's (spec §11), not the Drawer's.
             checkItemsFor: (taskId) => checkItemsForTask(taskId, planner.checkItems),
+            // §6.3: the Schedule popover edits these, and they are rows rather
+            // than a field on the Task, so the Module is handed them the same
+            // way it is handed the checklist.
+            remindersFor: (taskId) => remindersForTask(taskId, planner.reminders).map(specOf),
             onSetContentMode: planner.setTaskContentMode,
             onAddCheckItem: planner.addCheckItem,
             onAddCheckItems: planner.addCheckItems,
@@ -1308,6 +1328,7 @@ export default function App() {
           <TaskDetail
             key={planner.selectedTask.id}
             task={planner.selectedTask}
+            reminders={remindersForTask(planner.selectedTask.id, planner.reminders).map(specOf)}
             tasks={planner.tasks}
             lists={planner.lists}
             subtasks={planner.subtasks}
