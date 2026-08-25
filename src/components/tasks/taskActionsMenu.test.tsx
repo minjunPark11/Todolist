@@ -9,12 +9,13 @@
 // runs the matching mutation, and that the same registry is what the row's
 // right-click menu shows.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { List, Task } from "../../types";
 import { I18nProvider } from "../../i18n";
 import { FloatingLayerProvider } from "../floating";
 import { TasksModule } from "./TasksModule";
+import type { TaskActivityEntry } from "../../domain/tasks/activity";
 
 const TODAY = "2026-08-18";
 const NOW = `${TODAY}T09:00:00.000Z`;
@@ -73,6 +74,7 @@ function renderModule(
     focusBusy?: boolean;
     onStartFocus?: (taskId: string) => void;
     onDuplicate?: (taskId: string) => (() => void) | null;
+    activityFor?: (taskId: string) => TaskActivityEntry[];
   } = {},
 ) {
   const onMutate = vi.fn();
@@ -116,6 +118,7 @@ function renderModule(
             onRenameCheckItem: () => {},
             onToggleCheckItem: () => {},
             onDeleteCheckItem: () => {},
+            activityFor: extra.activityFor ?? (() => []),
           }}
           lifecycle={{
             onArchiveList: () => {},
@@ -153,6 +156,7 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
       "Duplicate",
       "Copy link",
       "Start focus",
+      "Task activities",
       "Mark won't do",
       "Move to trash",
     ]);
@@ -201,7 +205,7 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
 
     // The old panel drew "Move to trash" here, where its only effect was to
     // rewrite the timestamp that had put the Task there (§15.66).
-    expect(rows()).toEqual(["Copy link", "Restore"]);
+    expect(rows()).toEqual(["Copy link", "Task activities", "Restore"]);
     await user.click(screen.getByRole("menuitem", { name: "Restore" }));
     expect(onMutate.mock.calls[0][1]).toEqual({ deletedAt: "" });
   });
@@ -288,6 +292,29 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     expect(item.textContent).toContain("A focus session is already running");
     await user.click(item);
     expect(onStartFocus).not.toHaveBeenCalled();
+  });
+
+  it("opens the history in the Detail, and closes it again (§25.7)", async () => {
+    const user = userEvent.setup();
+    renderModule({}, {
+      activityFor: () => [
+        { id: "t1:created", kind: "created", at: "2026-08-18T09:00:00.000Z" },
+        { id: "f1:focus", kind: "focus", at: "2026-08-18T10:00:00.000Z", detail: "25" },
+      ],
+    });
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Task activities" }));
+
+    const panel = screen.getByRole("region", { name: "Task activities" });
+    expect(panel.textContent).toContain("Focused for 25 min");
+    expect(panel.textContent).toContain("Created");
+    // Focus goes to the heading: the row that opened this is gone, so the
+    // menu's own restoration puts focus on the ⋯, which is above the panel and
+    // says nothing about it.
+    expect(document.activeElement?.textContent).toBe("Task activities");
+
+    await user.click(within(panel).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("region", { name: "Task activities" })).toBeNull();
   });
 
   it("closes on Escape without closing the Detail under it (§15.48, §15.49)", async () => {

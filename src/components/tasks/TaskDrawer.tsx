@@ -22,6 +22,7 @@ import type {
 import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
 import type { TaskActionGroup, TaskActionId } from "../../domain/tasks/actions";
+import type { TaskActivityEntry } from "../../domain/tasks/activity";
 import { childProgress } from "../../domain/tasks/children";
 import { isCompleted, isPinned } from "../../domain/tasks/taskState";
 import { checklistProgress, isChecklistMode } from "../../domain/tasks/checkItems";
@@ -32,6 +33,7 @@ import { PriorityPicker } from "./PriorityPicker";
 import { SchedulePicker } from "./SchedulePicker";
 import { TagPicker } from "./TagPicker";
 import { TaskActionsMenu } from "./TaskActionsMenu";
+import { TaskActivityPanel } from "./TaskActivityPanel";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import type { TaskDetailWidthState } from "../../hooks/useTaskDetailWidth";
@@ -85,6 +87,9 @@ export interface TaskDrawerProps {
   actions: TaskActionGroup[];
   /** Runs one, after the Module has re-checked it is still allowed (§15.66). */
   onRunAction: (id: TaskActionId) => void;
+  /** §25.7's history, while it is open; null when it is not. */
+  activity: TaskActivityEntry[] | null;
+  onCloseActivity: () => void;
   /** This Task's checklist (spec §11), already in display order. */
   checkItems: CheckItem[];
   onSetContentMode: (mode: TaskContentMode) => void;
@@ -126,6 +131,8 @@ export function TaskDrawer({
   onDeleteSubtask,
   actions,
   onRunAction,
+  activity,
+  onCloseActivity,
   checkItems,
   onSetContentMode,
   onAddCheckItem,
@@ -311,6 +318,13 @@ export function TaskDrawer({
           the header above stay put (§1.7), and it is why the scroll bar runs
           beside the content rather than beside the whole panel. */}
       <div className="tm-drawer-scroll">
+
+      {/* §25.7. At the top of the scroll area rather than appended below the
+          subtasks: a history the reader has to scroll to find is a history
+          that looks like it did not open. */}
+      {activity ? (
+        <TaskActivityPanel entries={activity} onClose={onCloseActivity} taskId={task.id} />
+      ) : null}
 
       {/* Parent navigation (§12.7, §12.35). A child Task opened on its own is
           a Task with no visible context — this is where it came from, and it

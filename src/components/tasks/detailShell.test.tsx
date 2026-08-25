@@ -93,6 +93,8 @@ function Harness({ presentation }: { presentation: "inline-drawer" | "right-shee
           onDeleteSubtask={noop}
           actions={taskActions({ task: task() })}
           onRunAction={noop}
+          activity={null}
+          onCloseActivity={noop}
           onSetContentMode={noop}
           onAddCheckItem={noop}
           onAddCheckItems={noop}

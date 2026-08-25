@@ -1137,6 +1137,85 @@
    the ⋯ menu's own destructive group now (§15.29), and `.ff-context-menu-item.
    is-danger` already carries the colour this rule was for. */
 
+/* --- §25.7 the history surface ---------------------------------------------
+   A panel inside the Detail rather than a floating layer: the row that opens
+   it is gone by the time it appears, so there is no anchor for a popover to
+   hang from. Bordered rather than raised, because it sits in the flow. */
+.tm-drawer-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle, rgba(25, 25, 25, 0.08));
+  border-radius: 10px;
+  background: var(--bg-subtle, rgba(120, 120, 128, 0.06));
+}
+
+.tm-drawer-activity header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-drawer-activity h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+/* Focused on open so a keyboard reader is told the panel arrived; the ring is
+   the app's, not the browser's default on a heading. */
+.tm-drawer-activity h3:focus-visible {
+  outline: 2px solid var(--ff-focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+
+.tm-drawer-activity header button {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tm-drawer-activity ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-drawer-activity li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.tm-activity-what {
+  /* The event wins the space; the timestamp keeps its own and does not wrap
+     mid-date. */
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text, #1c1c1e);
+}
+
+.tm-drawer-activity time {
+  flex: none;
+  color: var(--text-muted, #8e8e93);
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-drawer-activity p {
+  margin: 0;
+  color: var(--text-muted, #8e8e93);
+  font-size: 12px;
+}
+
 /* --- undo (§9.36, §9.37) --- */
 
 .tm-undo {

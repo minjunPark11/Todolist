@@ -31,6 +31,7 @@ import { parseTaskUrl, searchUrlFor, urlForSearchResult } from "./app/taskScopeU
 import { TasksSidebarSlot } from "./components/shell/TasksSidebarSlot";
 import { childrenOf } from "./domain/tasks/children";
 import { checkItemsForTask } from "./domain/tasks/checkItems";
+import { taskActivity } from "./domain/tasks/activity";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
 import { useDataPortability } from "./app/useDataPortability";
@@ -1245,6 +1246,18 @@ export default function App() {
             onRenameCheckItem: planner.updateCheckItemText,
             onToggleCheckItem: planner.toggleCheckItem,
             onDeleteCheckItem: planner.deleteCheckItem,
+            // §25.7. Assembled here because the history spans collections the
+            // Tasks Module has no reason to hold — the focus sessions above
+            // all — and `taskActivity` is what decides what counts as one.
+            activityFor: (taskId) => {
+              const task = planner.tasks.find((row) => row.id === taskId);
+              return task
+                ? taskActivity(task, {
+                    checkItems: planner.checkItems,
+                    focusSessions: planner.focusSessions,
+                  })
+                : [];
+            },
             onUpdate: planner.updateTask,
             onMoveToList: planner.moveTaskToList,
             onCommitSchedule: planner.updateTaskSchedule,

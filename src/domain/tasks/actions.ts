@@ -31,6 +31,7 @@ export type TaskActionId =
   | "duplicate"
   | "copyLink"
   | "startFocus"
+  | "activities"
   | "complete"
   | "reopen"
   | "wontDo"
@@ -102,6 +103,7 @@ const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
   { id: "duplicate", labelKey: "tasks.menu.duplicate", group: "quick" },
   { id: "copyLink", labelKey: "tasks.menu.copyLink", group: "quick" },
   { id: "startFocus", labelKey: "tasks.menu.startFocus", group: "work" },
+  { id: "activities", labelKey: "tasks.menu.activities", group: "work" },
   { id: "complete", labelKey: "tasks.menu.complete", group: "status" },
   { id: "reopen", labelKey: "tasks.menu.reopen", group: "status" },
   { id: "wontDo", labelKey: "tasks.markWontDo", group: "status" },
@@ -120,11 +122,12 @@ const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
  * possible effect was to rewrite the timestamp that had put it there.
  *
  * Getting it back is the one thing left to do with it, so that is what is
- * offered — together with Copy Link, which survives because it changes
- * nothing (§15.58) and a link to a trashed Task is how one person shows
- * another what they are about to restore.
+ * offered — together with the two that change nothing. Copy Link survives
+ * because §15.58 says it is not a mutation, and a link to a trashed Task is
+ * how one person shows another what they are about to restore; Activities
+ * survives because it is the surface that says when the Task was thrown away.
  */
-const TRASHED_ACTIONS: readonly TaskActionId[] = ["copyLink", "restore"];
+const TRASHED_ACTIONS: readonly TaskActionId[] = ["copyLink", "activities", "restore"];
 
 function availabilityOf(id: TaskActionId, ctx: TaskActionContext): Availability {
   const { task } = ctx;

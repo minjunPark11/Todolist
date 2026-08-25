@@ -27,6 +27,7 @@ import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, queryScopeTasks, type ScopeContext } from "../../domain/tasks/scopeQuery";
 import { parseSearchUrl, searchUrlFor, taskUrlFor, urlForSearchResult, parseTaskUrl } from "../../app/taskScopeUrl";
 import { taskLinkFor } from "../../app/taskLink";
+import type { TaskActivityEntry } from "../../domain/tasks/activity";
 import { copyText } from "../../lib/copyText";
 import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { namedRecordMissing, titleFor } from "../../domain/tasks/scopeTitle";
@@ -135,6 +136,12 @@ interface TasksModuleProps {
     onRenameCheckItem: (itemId: string, text: string) => void;
     onToggleCheckItem: (itemId: string) => void;
     onDeleteCheckItem: (itemId: string) => void;
+    /**
+     * §25.7's history, already ordered — the same shape as `checkItemsFor`
+     * above and for the same reason: the ordering is the domain's, and this
+     * needs collections the Module does not hold (the focus sessions).
+     */
+    activityFor: (taskId: string) => TaskActivityEntry[];
   };
   /**
    * Creates the List and answers with its id (Add List design §1.10).
@@ -237,6 +244,8 @@ export function TasksModule(props: TasksModuleProps) {
   } | null>(null);
   /** The row being dragged, so the ones under it know a drop is coming. */
   const [dragTaskId, setDragTaskId] = useState("");
+  /** Whose history is open (§25.7), or "" for none. */
+  const [activityTaskId, setActivityTaskId] = useState("");
   /** The open context menu, or none. One at a time, like the notice above it. */
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   // §15.3. Presentation only: nothing below reads this to decide what a Scope
@@ -400,6 +409,11 @@ export function TasksModule(props: TasksModuleProps) {
       }
       case "copyLink":
         return copyTaskLink(task.id);
+      case "activities":
+        // Kept per Task rather than as a boolean: the Detail is reused across
+        // Tasks (§1.26), so a flag would leave the panel open on the next one
+        // showing the history of the one before it.
+        return setActivityTaskId(task.id);
       case "startFocus":
         return props.onStartFocus(task.id);
     }
@@ -975,6 +989,10 @@ export function TasksModule(props: TasksModuleProps) {
             focusBusy: props.focusBusy,
           })}
           onRunAction={(id) => runTaskAction(openedTask, id)}
+          activity={
+            activityTaskId === openedTask.id ? props.drawer.activityFor(openedTask.id) : null
+          }
+          onCloseActivity={() => setActivityTaskId("")}
         />
       ) : null}
 

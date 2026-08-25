@@ -15,6 +15,7 @@ describe("taskActions", () => {
       "duplicate",
       "copyLink",
       "startFocus",
+      "activities",
       "complete",
       "wontDo",
       "trash",
@@ -73,6 +74,7 @@ describe("taskActions", () => {
     // Trash, where its only effect was to rewrite the timestamp.
     expect(ids({ status: "open", deletedAt: "2026-08-25T10:00:00.000Z" })).toEqual([
       "copyLink",
+      "activities",
       "restore",
     ]);
   });

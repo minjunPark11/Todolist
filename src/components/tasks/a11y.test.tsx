@@ -138,6 +138,7 @@ function renderModule(url: string) {
             onRenameCheckItem: () => {},
             onToggleCheckItem: () => {},
             onDeleteCheckItem: () => {},
+            activityFor: () => [],
           }}
           lifecycle={{
             onArchiveList: () => {},
