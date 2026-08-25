@@ -3,6 +3,7 @@ import { pushUndo } from "../lib/undoStack";
 import { platform } from "../platform";
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 import type {
+  CheckItem,
   AppSettings,
   ExternalCalendar,
   FocusMode,
@@ -45,6 +46,12 @@ import {
 } from "../domain/today/dailyPlan";
 import { backfillTaskTags, linkTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
 import { sanitizeListSection } from "../domain/tasks/sections";
+import {
+  duplicateCheckItems,
+  pruneOrphanCheckItems,
+  removeCheckItemsForTask,
+  sanitizeCheckItem,
+} from "../domain/tasks/checkItems";
 import { migrateLegacyWorkflowStatus } from "../domain/migrations/legacyWorkflowStatus";
 import { addSidebarFolder, sanitizeSidebarFolder } from "../domain/tasks/sidebarFolders";
 import { sanitizeSavedFilter } from "../domain/tasks/filters";
@@ -469,6 +476,9 @@ export function normalizeData(data: RawPlannerData): PlannerData {
       : [],
     taskTags: Array.isArray(data.taskTags)
       ? data.taskTags.map(sanitizeTaskTag).filter((link): link is TaskTag => link !== null)
+      : [],
+    checkItems: Array.isArray(data.checkItems)
+      ? data.checkItems.map(sanitizeCheckItem).filter((item): item is CheckItem => item !== null)
       : [],
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
@@ -1137,6 +1147,11 @@ export function usePlannerData() {
         .filter((task) => task.id !== taskId)
         .map((task) => (task.parentTaskId === taskId ? { ...task, parentTaskId: "" } : task)),
       subtasks: current.subtasks.filter((subtask) => subtask.taskId !== taskId),
+      // Checklist lines go with the Task. Unlike a child Task — which is real
+      // work and gets promoted to top level above — a CheckItem has no
+      // meaning apart from the Task it is a line of, so leaving it would be
+      // leaving a row nothing can ever show.
+      checkItems: removeCheckItemsForTask(taskId, current.checkItems),
     }));
     setSelectedTaskId("");
   }
@@ -1229,7 +1244,7 @@ export function usePlannerData() {
       // it: anything finished, given up on or trashed reopens as `todo`,
       // where the two hand-written arms this replaces missed a source marked
       // Won't Do through `wontDoAt` — that copy arrived already given up on.
-      status: isTaskOpen(source) ? source.status : "todo",
+      status: isTaskOpen(source) ? source.status : LIFECYCLE.open,
       completedAt: "",
       archivedAt: "",
       wontDoAt: "",
@@ -1252,6 +1267,12 @@ export function usePlannerData() {
       ...current,
       tasks: [copy, ...current.tasks],
       subtasks: [...current.subtasks, ...copiedSubtasks],
+      // The copy gets the same checklist, unticked — a copy is work still to
+      // do, and ticks carried across would claim it was half finished.
+      checkItems: [
+        ...current.checkItems,
+        ...duplicateCheckItems(taskId, newTaskId, current.checkItems, () => createId("checkitem"), now),
+      ],
     }));
     setSelectedTaskId(newTaskId);
     return newTaskId;
@@ -1697,7 +1718,15 @@ export function usePlannerData() {
   function permanentlyDeleteList(listId: string) {
     setData((current) => {
       const next = lifecycle.permanentlyDeleteList(current.lists, current.tasks, listId);
-      return next.done ? { ...current, lists: next.lists, tasks: next.tasks } : current;
+      if (!next.done) return current;
+      return {
+        ...current,
+        lists: next.lists,
+        tasks: next.tasks,
+        // The Tasks went with the List, so their checklist lines go too —
+        // this is the one delete that removes Tasks in bulk.
+        checkItems: pruneOrphanCheckItems(next.tasks, current.checkItems),
+      };
     });
   }
 
@@ -1841,6 +1870,7 @@ export function usePlannerData() {
     dailyPlans: data.dailyPlans,
     tags: data.tags,
     taskTags: data.taskTags,
+    checkItems: data.checkItems,
     focusSessions: data.focusSessions,
     activeSessionId: data.activeSessionId,
     activeFocusSession:

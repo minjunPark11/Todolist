@@ -65,6 +65,7 @@ function data(overrides: Partial<PlannerData> = {}): PlannerData {
     projects: [],
     spaces: [],
     subtasks: [],
+    checkItems: [],
     dailyPlans: [],
     tags: [],
     taskTags: [],

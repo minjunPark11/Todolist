@@ -65,6 +65,22 @@ export function isTimed(schedule: Schedule): boolean {
 }
 
 /**
+ * A day with no time of its own (Chapter 26 §26.5.3).
+ *
+ * Derived, and deliberately not a stored `allDay` field — which is what the
+ * Task Detail spec's own model proposes. Storing it makes
+ * `allDay: true` beside `startTime: "14:00"` representable and meaningless;
+ * deriving it makes that contradiction impossible to write down. The same
+ * rule the schedule mode and the Eisenhower quadrant already follow.
+ *
+ * A schedule with no date at all is not all-day, it is unscheduled — so the
+ * date is asked for first rather than reading "no time" as a yes.
+ */
+export function isAllDay(schedule: Schedule): boolean {
+  return hasSchedule(schedule) && !isTimed(schedule);
+}
+
+/**
  * True when the schedule's last day is before `today` (design §4.60).
  *
  * A range is overdue on the day after its END, not its start — a task running

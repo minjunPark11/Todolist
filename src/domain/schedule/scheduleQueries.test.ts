@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  getRangeStage,
-  hasSchedule,
-  isOverdue,
-  isTimed,
-  scheduleSpan,
-  scheduleSpanDays,
-} from "./scheduleQueries";
+import { getRangeStage, hasSchedule, isAllDay, isOverdue, isTimed, scheduleSpan, scheduleSpanDays } from "./scheduleQueries";
 import { isDirty, schedulesEqual } from "./scheduleEquality";
 import { EMPTY_SCHEDULE, type Schedule, type ScheduleDraft, type ScheduleMode } from "./types";
 
@@ -158,5 +151,24 @@ describe("isDirty", () => {
 
   it("is true after clearing a schedule", () => {
     expect(isDirty(draft("date"), schedule({ dueDate: "2026-08-27" }))).toBe(true);
+  });
+});
+
+// Ch. 26 §26.5.3: derived, so `allDay: true` beside a start time cannot be
+// written down. The spec's own model stores it as a field, which is what makes
+// that contradiction representable.
+describe("isAllDay", () => {
+  it("is a day with no time of its own", () => {
+    expect(isAllDay({ ...EMPTY_SCHEDULE, dueDate: "2026-08-23" })).toBe(true);
+  });
+
+  it("is false once the day has a time", () => {
+    expect(isAllDay({ ...EMPTY_SCHEDULE, dueDate: "2026-08-23", startTime: "14:00" })).toBe(false);
+  });
+
+  // No date is unscheduled, not all-day — reading "no time" as a yes would
+  // put every undated task on the calendar's all-day row.
+  it("is false for a schedule with no date at all", () => {
+    expect(isAllDay(EMPTY_SCHEDULE)).toBe(false);
   });
 });

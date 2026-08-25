@@ -28,6 +28,7 @@ function plannerData(): PlannerData {
     projects: [],
     spaces: [],
     subtasks: [],
+    checkItems: [],
     dailyPlans: [],
     tags: [],
     taskTags: [],

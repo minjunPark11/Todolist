@@ -56,6 +56,12 @@ export interface Task {
   id: string;
   title: string;
   description: string;
+  /**
+   * Which body this Task has (spec §11). Absent means `description`, which is
+   * what every Task written before checklists existed is — so nothing has to
+   * be rewritten for the field to arrive.
+   */
+  contentMode?: TaskContentMode;
   status: TaskStatus;
   priority: TaskPriority;
   // Dates use "" as the "not set" sentinel (kept as string for legacy callers).
@@ -602,6 +608,54 @@ export interface Tag {
 }
 
 /**
+ * What a Task's body is: prose, or a list of small things to tick off.
+ *
+ * A mode and not two fields, because a Task has ONE body. Storing a
+ * description and a checklist side by side would make "which one is the
+ * content" a question every reader has to answer, and the two would drift.
+ * The conversion between them is a transaction (spec §11), which is why the
+ * description survives a switch rather than being thrown away.
+ *
+ * Absent means `description`, which is what every Task written before this
+ * field existed is.
+ */
+export type TaskContentMode = "description" | "checklist";
+
+/**
+ * One line of a Task's checklist (spec §11.2, Chapter 26 §26.4).
+ *
+ * NOT a Subtask. A Subtask is a Task — it has dates, a priority, tags, and
+ * subtasks of its own — and this is text plus a tick. The two look alike on
+ * screen and are different records on purpose: §26.4 keeps the legacy
+ * `Subtask` promoting to a child Task rather than to one of these, so that
+ * one kind of user data does not split into two destinations on a boundary
+ * the user never drew.
+ *
+ * Two divergences from the spec's own shape, both to match conventions this
+ * repository already has:
+ *
+ *   `sortKey` is a NUMBER, on the spaced-key scheme `domain/tasks/sortKey.ts`
+ *   already uses for Tasks and `ListSection` for board columns. A second,
+ *   string-based ordering would be a second answer to "what comes next".
+ *
+ *   `completedAt` is `""` when unset, like every other timestamp on a Task,
+ *   rather than `null`. One sentinel per repository.
+ */
+export interface CheckItem {
+  id: string;
+  /** The Task this line belongs to. A CheckItem is never shared. */
+  taskId: string;
+  text: string;
+  checked: boolean;
+  /** "" while unchecked. Set when it is ticked, cleared when it is unticked. */
+  completedAt: string;
+  /** Manual order within the Task — see domain/tasks/sortKey.ts. */
+  sortKey: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * One Task carrying one Tag (§6.45).
  *
  * §6.46 wants UNIQUE(taskId, tagId). The id is derived from both, so the pair
@@ -758,6 +812,8 @@ export interface PlannerData {
   tasks: Task[];
   projects: Project[];
   subtasks: Subtask[];
+  /** Checklist lines, keyed to their Task by `taskId` (spec §11.3). */
+  checkItems: CheckItem[];
   focusSessions: FocusSession[];
   activeSessionId: string;
   /** Preserved, never read — see StoredGoal. */

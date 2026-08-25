@@ -58,6 +58,7 @@ export {
   getRangeStage,
   hasSchedule,
   isOverdue,
+  isAllDay,
   isTimed,
   scheduleSpan,
   scheduleSpanDays,
