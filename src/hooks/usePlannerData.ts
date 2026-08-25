@@ -69,6 +69,7 @@ import {
 } from "../domain/sync/buildSyncPlan";
 import { buildMigrationUpload } from "../domain/sync/buildMigrationUpload";
 import { createSaveQueue, type SaveQueue } from "../domain/sync/saveQueue";
+import { reapplyLocalEdits } from "../domain/sync/reapplyLocalEdits";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
 import {
@@ -607,6 +608,11 @@ function readStorage(): PlannerData {
 
 export function usePlannerData() {
   const [data, setDataState] = useState<PlannerData>(() => readStorage());
+  // The latest state, readable from an async callback that closed over an
+  // older render. The remote load needs it to tell what the user changed
+  // while it was in flight (domain/sync/reapplyLocalEdits).
+  const dataRef = useRef(data);
+  dataRef.current = data;
   // Every user-facing mutation goes through this wrapper so Ctrl+Z can walk
   // edits back; system paths (remote load, migration) use setDataState so
   // they never land on the undo stack.
@@ -776,6 +782,11 @@ export function usePlannerData() {
     setSyncStatus("sync.syncing");
     setSyncError("");
 
+    // What the store held when this load began. Anything that differs from it
+    // when the load resolves is an edit the user made in between, and a load
+    // that replaced the store wholesale would throw it away (§24.24).
+    const localAtStart = dataRef.current;
+
     try {
       const partial: Partial<PlannerData> = {};
       missingRemoteTablesRef.current = new Set();
@@ -831,9 +842,10 @@ export function usePlannerData() {
       // A newer load has started since this one began; its answer is the one
       // that should win, and this one has nothing to add.
       if (isStale()) return;
-      setDataState(loaded);
-      // What we just read IS what the account holds, so the next save has
-      // nothing to push until the user actually changes something.
+      setDataState(reapplyLocalEdits(loaded, localAtStart, dataRef.current));
+      // The baseline is what the ACCOUNT holds, which is `loaded` and not the
+      // merged state: the difference between the two is exactly the edits put
+      // back above, so the next save pushes those and only those.
       syncedSnapshotRef.current = loaded;
       setRemoteLoaded(true);
       setSyncStatus("sync.synced");
