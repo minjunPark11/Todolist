@@ -68,6 +68,7 @@ import { addSidebarFolder, sanitizeSidebarFolder } from "../domain/tasks/sidebar
 import { sanitizeSavedFilter } from "../domain/tasks/filters";
 import { backfillTaskListId, defaultListIdFor, patchForListMove } from "../domain/spaces/membership";
 import { childDraft, promoteDraft } from "../domain/tasks/children";
+import { canAddChild } from "../domain/tasks/hierarchy";
 import { LIFECYCLE, isCompleted, isTaskOpen } from "../domain/tasks/taskState";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
@@ -1645,6 +1646,11 @@ export function usePlannerData() {
     if (!trimmed) return;
     const parent = data.tasks.find((task) => task.id === taskId);
     if (!parent) return;
+    // §12.49: five levels. The UI does not offer the control at the bottom
+    // level (§16.28 — a control must not appear and then refuse), so reaching
+    // this is a caller that got there another way; refusing beats writing a
+    // sixth level that nothing can show properly.
+    if (!canAddChild(taskId, data.tasks)) return;
     createTask(childDraft(parent, trimmed));
   }
 

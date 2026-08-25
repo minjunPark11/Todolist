@@ -1036,6 +1036,8 @@ export const ko: Dictionary = {
   "tasks.contentMode": "콘텐츠 유형",
   "tasks.contentMode.description": "메모",
   "tasks.contentMode.checklist": "체크리스트",
+  "tasks.parentTask": "상위 작업",
+  "tasks.maxDepthReached": "하위 작업은 여기까지만 만들 수 있습니다.",
   "tasks.subtasks": "하위 작업",
   "tasks.addSubtask": "하위 작업 추가",
   "tasks.moveToTrash": "휴지통으로",

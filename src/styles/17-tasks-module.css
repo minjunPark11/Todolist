@@ -549,11 +549,12 @@
   font-size: 13px;
 }
 
-.tm-drawer-subtasks li label {
-  display: flex;
+/* The row used to wrap its checkbox and title in one <label>, which made the
+   whole title a click target for the checkbox. The title is a link into the
+   child Task now, so the two are siblings and the checkbox carries its own
+   label. */
+.tm-drawer-subtasks li > span {
   flex: 1;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
 }
 
@@ -2083,4 +2084,79 @@
   padding-inline-start: 27px;
   font-size: 12px;
   color: var(--text-muted, #8e8e93);
+}
+
+/* Parent navigation (spec §12.7). Ancestors read root-first with a separator
+   drawn between them, so the chain is one line of context rather than a stack
+   of buttons. */
+.tm-drawer-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-drawer-breadcrumb button {
+  max-width: 180px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  /* One line each: a long ancestor title is context, not content, and wrapping
+     it would push the Task's own title down the panel. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.tm-drawer-breadcrumb button:hover {
+  color: var(--text, #1c1c1e);
+  text-decoration: underline;
+}
+
+/* Between the links, never before the first — the separator belongs to the
+   pair it sits between. */
+.tm-drawer-breadcrumb button + button::before {
+  content: "/";
+  margin-inline-end: 4px;
+  color: var(--text-muted, #8e8e93);
+  text-decoration: none;
+}
+
+/* Why the Add form is absent at level 5 (§12.49). Stated, because a control
+   that vanishes with no explanation reads as a bug. */
+.tm-drawer-depth-limit {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted, #8e8e93);
+}
+
+/* A child Task's title is a link into it. Styled as text rather than as a
+   button: it is the row's content, and a row of buttons would read as a
+   toolbar instead of a list of tasks. */
+.tm-drawer-subtask-open {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.tm-drawer-subtask-open:hover {
+  text-decoration: underline;
+}
+
+.tm-drawer-subtask-open.is-done {
+  color: var(--text-muted, #8e8e93);
+  text-decoration: line-through;
 }

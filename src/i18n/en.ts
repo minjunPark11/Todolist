@@ -1057,6 +1057,8 @@ export const en: Dictionary = {
   "tasks.contentMode": "Content type",
   "tasks.contentMode.description": "Notes",
   "tasks.contentMode.checklist": "Checklist",
+  "tasks.parentTask": "Parent task",
+  "tasks.maxDepthReached": "This is as deep as subtasks go.",
   "tasks.subtasks": "Subtasks",
   "tasks.addSubtask": "Add a subtask",
   "tasks.moveToTrash": "Move to trash",

@@ -51,6 +51,11 @@ export interface TaskDrawerProps {
   onRenameCheckItem: (itemId: string, text: string) => void;
   onToggleCheckItem: (itemId: string) => void;
   onDeleteCheckItem: (itemId: string) => void;
+  /** This Task's ancestors, root first — §12.7's way back up. */
+  ancestors: Array<{ id: string; title: string }>;
+  onOpenTask: (taskId: string) => void;
+  /** False at the deepest allowed level (§12.49). */
+  canAddSubtask: boolean;
 }
 
 const PRIORITIES = ["none", "low", "medium", "high"] as const;
@@ -76,6 +81,9 @@ export function TaskDrawer({
   onRenameCheckItem,
   onToggleCheckItem,
   onDeleteCheckItem,
+  ancestors,
+  onOpenTask,
+  canAddSubtask,
 }: TaskDrawerProps) {
   const { t } = useT();
   const root = useRef<HTMLElement>(null);
@@ -149,6 +157,22 @@ export function TaskDrawer({
           ×
         </button>
       </header>
+
+      {/* Parent navigation (§12.7, §12.35). A child Task opened on its own is
+          a Task with no visible context — this is where it came from, and it
+          is the way back up. Every ancestor is a link, not just the immediate
+          parent: on level 5 the useful jump is usually the root.
+
+          Absent for a root Task rather than drawn empty. */}
+      {ancestors.length > 0 ? (
+        <nav className="tm-drawer-breadcrumb" aria-label={t("tasks.parentTask")}>
+          {ancestors.map((ancestor) => (
+            <button key={ancestor.id} type="button" onClick={() => onOpenTask(ancestor.id)}>
+              {ancestor.title}
+            </button>
+          ))}
+        </nav>
+      ) : null}
 
       {/* §9: a draft, not a live write. It used to call `onUpdate` on every
           keystroke, which made every character a store replacement and left
@@ -264,6 +288,8 @@ export function TaskDrawer({
         )}
       </section>
 
+      {/* §12.7: below the content, and §12.8: no empty card when there is
+          nothing — just the way to add one. */}
       <section className="tm-drawer-subtasks">
         <h3>
           {t("tasks.subtasks")}
@@ -277,10 +303,27 @@ export function TaskDrawer({
         <ul>
           {children.map((child) => (
             <li key={child.id}>
-              <label>
-                <input type="checkbox" checked={child.done} onChange={() => onToggleSubtask(child.id)} />
+              <input
+                type="checkbox"
+                checked={child.done}
+                onChange={() => onToggleSubtask(child.id)}
+                aria-label={child.title}
+              />
+              {/* A child Task opens like any other Task — which is what makes
+                  the breadcrumb above a round trip rather than a one-way exit.
+                  A legacy Subtask is not a Task and has no Detail to open, so
+                  it stays plain text until something promotes it. */}
+              {child.kind === "task" ? (
+                <button
+                  type="button"
+                  className={`tm-drawer-subtask-open${child.done ? " is-done" : ""}`}
+                  onClick={() => onOpenTask(child.id)}
+                >
+                  {child.title}
+                </button>
+              ) : (
                 <span className={child.done ? "is-done" : ""}>{child.title}</span>
-              </label>
+              )}
               <button
                 type="button"
                 onClick={() => onDeleteSubtask(child.id)}
@@ -294,11 +337,19 @@ export function TaskDrawer({
 
         {/* Enter submits, and the button is not decoration: a form whose only
             commit is a keypress has no affordance on touch, where §15.40 wants
-            a target you can hit. */}
-        <form onSubmit={submitSubtask}>
-          <input name="subtask" placeholder={t("tasks.addSubtask")} aria-label={t("tasks.addSubtask")} />
-          <button type="submit">{t("common.add")}</button>
-        </form>
+            a target you can hit.
+
+            At the deepest allowed level the form is absent, not disabled:
+            §16.28 is explicit that a control must not appear and then refuse.
+            The line says why, so "the button is gone" is not a mystery. */}
+        {canAddSubtask ? (
+          <form onSubmit={submitSubtask}>
+            <input name="subtask" placeholder={t("tasks.addSubtask")} aria-label={t("tasks.addSubtask")} />
+            <button type="submit">{t("common.add")}</button>
+          </form>
+        ) : (
+          <p className="tm-drawer-depth-limit">{t("tasks.maxDepthReached")}</p>
+        )}
       </section>
 
       <div className="tm-drawer-terminal">

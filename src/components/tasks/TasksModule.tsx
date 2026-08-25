@@ -34,6 +34,7 @@ import { TaskQuickAdd } from "./TaskQuickAdd";
 import { TaskDrawer } from "./TaskDrawer";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
 import type { TaskChild } from "../../domain/tasks/children";
+import { ancestorsOf, canAddChild } from "../../domain/tasks/hierarchy";
 import type { TaskMutation } from "../../domain/tasks/mutations";
 import {
   applyPatch,
@@ -750,6 +751,12 @@ export function TasksModule(props: TasksModuleProps) {
           onRenameCheckItem={props.drawer.onRenameCheckItem}
           onToggleCheckItem={props.drawer.onToggleCheckItem}
           onDeleteCheckItem={props.drawer.onDeleteCheckItem}
+          // The breadcrumb is computed against every Task, not the Scope's
+          // visible rows: an ancestor filtered out of the current view is
+          // still where this Task came from.
+          ancestors={ancestorsOf(openedTask.id, tasks)}
+          onOpenTask={openTask}
+          canAddSubtask={canAddChild(openedTask.id, tasks)}
           onComplete={() =>
             mutate(
               openedTask,
