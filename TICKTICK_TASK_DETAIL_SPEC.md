@@ -35673,14 +35673,76 @@ Drawer의 `key={task.id}`는 §1.26이 피하라고 적은 "Pane close/reopen"�
 ### Phase 5 · Actions
 
 ```text
-Action Registry
-Duplicate
-Copy Link
-Pin
-Won't Do
-Start Focus
-Task Activities
+Action Registry                 domain/tasks/actions
+Duplicate                       domain/tasks/duplicate + usePlannerData
+Copy Link                       app/taskLink + lib/copyText
+Pin                             Task.pinnedAt + taskState.isPinned
+Won't Do                        기존 mutation을 More로 옮긴 것 (§15.3)
+Start Focus                     usePlannerData.startFocusSession 연결 (§25.6)
+Task Activities                 domain/tasks/activity — 파생이며 이벤트 로그가 아니다
 ```
+
+Phase 5의 실제 작업은 **하나로 모으는 것**이었다. §15.63이 요구하는 것은
+"Detail More / Row Context Menu / Board Card More가 서로 다른 business logic을
+갖지 않는다"이고, 이 저장소는 정확히 그 반대였다 — 행 메뉴는 `TasksModule`
+안에 손으로 적혀 있었고 Detail에는 메뉴가 아예 없어서, Won't Do와 Trash는
+패널 맨 아래 버튼 두 개였고 Pin·Duplicate·Copy Link·Start Focus는
+**어느 화면에서도 닿을 수 없었다.**
+
+`domain/tasks/actions`는 closure가 아니라 **데이터**를 돌려준다. 그래야
+§15.66이 성립한다 — `canRunTaskAction`이 클릭 시점에 같은 질문을 다시 하고,
+closure로 만든 registry에는 다시 물어볼 것이 남아 있지 않다.
+
+손으로 적힌 메뉴가 틀렸던 것 세 가지:
+
+휴지통에 있는 Task에 "휴지통으로"를 내주고 있었다. 그 동작의 유일한 효과는
+거기에 넣은 timestamp를 다시 쓰는 것이다. §15.5는 이 경우를 disabled가 아니라
+**hide**로 보내고, 남는 것은 복원 하나다.
+
+Start Focus는 다른 세션이 돌고 있으면 조용히 아무것도 하지 않았다
+(`startFocusSession`이 early return한다). §15.5의 다른 쪽 — 숨기는 것이 아니라
+"지금은 안 됨"이고, 그래서 이유와 함께 disabled다.
+
+Duplicate는 Phase 2 이후에 쓰인 부모를 자식 없이 복사했고(§15.13),
+Tag relation을 빠뜨렸으며(§13.32가 canonical로 정한 쪽), `actualSeconds`와
+`activeSessionId`를 spread로 함께 옮겼다 — 갓 만든 사본이 원본의 90분과
+원본의 세션을 자기 것이라고 주장했다.
+
+Phase 5에서 내린 판단 네 가지:
+
+**Pin은 `pinnedAt`이다.** §15.6은 `isPinned: boolean`이라고 이름을 적지만,
+§15.8이 실제로 요구하는 것은 canonical 값이 **하나**라는 것이고 timestamp도
+하나다. 그리고 §15.8이 각 View에 넘긴 질문 — pinned Task들 사이의 순서 —
+에는 boolean이 답할 수 없다. `wontDoAt`·`deletedAt`이 이미 쓰는 모양이다.
+
+**Complete는 More에 없다.** §15.4의 표에는 있지만 §15.3은 자주 쓰는 action을
+primary surface로 올리라고 말하고, Detail의 header에는 체크박스가 이미 있다.
+같은 화면에 두 개를 그리는 것은 §15.70의 "의미 없는 중복 노출"이다. 그래서
+registry에 `promoted`가 있다 — 화면이 "이건 내가 이미 그린다"라고 말하고,
+registry가 추측하지 않는다.
+
+**Copy Link의 origin은 실행 중인 앱의 것이다.** 데스크톱 빌드에서는 shell의
+origin이므로 동료가 따라올 수 있는 주소가 아니다. 공개 base URL이 설정되어
+있지 않은 동안에는 이것이 정직한 답이다 — 호스트를 지어내면 아무 데도
+resolve되지 않는 링크를 복사하게 된다.
+
+**Task Activities는 이벤트 로그가 아니다.** §25.7이 그리는
+`TaskActivityEvent`는 그 절 자신이 OUR DESIGN DECISION으로 표시한 것이고,
+이 앱은 스냅샷 전체를 diff해서 동기화한다(§26.8.1). 모든 mutation이 이벤트를
+쓰면 편집할 때마다 그 스냅샷이 커지는데, 보존 규칙도 없고 정리할 화면도 없다.
+Reminder와 같은 부류의 **모델 변경**이지 메뉴에 매달 수 있는 surface가 아니다.
+
+대신 store가 이미 들고 있는 것을 읽는다 — 만든 시각, 완료, 안 함, 휴지통,
+고정, 이 Task에 대한 모든 focus session, 체크된 checklist 줄. 전부 그 시점에
+기록된 것이지 재구성이 아니다. **못 하는 것을 적어둔다**: 필드 단위 변경
+("제목이 A에서 B로")은 없다. store는 필드의 현재 값만 갖고 있고, 그것은 로그가
+있어야 답할 수 있다.
+
+**`Save as Template`은 아직 없다.** §25.8은 VERIFIED TICKTICK이지만 26.9의
+Phase 5 목록에도 Deferred 목록에도 들어 있지 않다 — 스펙의 빈틈이다.
+Deferred의 다른 항목들과 달리 앱에 없는 개념에 의존하지도 않으므로
+(Template은 Task 하나로 만들 수 있다), 미룬 이유는 "어렵다"가 아니라
+"Phase 5가 요구하지 않았다"이다. 다음 단계에서 다시 연다.
 
 ### Deferred
 
