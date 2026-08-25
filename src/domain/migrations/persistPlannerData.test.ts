@@ -33,6 +33,7 @@ function plannerData(): PlannerData {
     tags: [],
     taskTags: [],
     reminders: [],
+    taskTemplates: [],
     focusSessions: [],
     activeSessionId: "",
     learningPaths: [],

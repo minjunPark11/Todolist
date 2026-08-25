@@ -147,6 +147,10 @@ function renderModule(url: string) {
             onRestoreList: () => {},
             onPermanentlyDeleteList: () => {},
           }}
+          onSaveAsTemplate={() => "tpl-1"}
+          onDeleteTemplate={() => {}}
+          templates={[]}
+          onUseTemplate={() => {}}
           onMutate={() => {}}
           onStartFocus={() => {}}
           onDuplicate={() => null}

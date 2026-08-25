@@ -1223,6 +1223,21 @@ export default function App() {
             const plan = planner.duplicateTask(taskId);
             return plan ? () => planner.discardDuplicate(plan) : null;
           }}
+          onSaveAsTemplate={(taskId) => planner.saveTaskAsTemplate(taskId)?.id ?? ""}
+          onDeleteTemplate={planner.deleteTaskTemplate}
+          templates={planner.taskTemplates}
+          // §25.8 through §12.16: the template says what to make and the
+          // resolver has already said where. Same owner, same status rule and
+          // same tag application as a Task typed into the field beside it.
+          onUseTemplate={(templateId, resolution) => {
+            if (!resolution.targetListId) return;
+            const owner = planner.lists.find((list) => list.id === resolution.targetListId);
+            planner.createTaskFromTemplate(templateId, {
+              listId: resolution.targetListId,
+              projectId: owner?.projectId ?? "",
+              status: owner?.kind === "inbox" ? "inbox" : "todo",
+            });
+          }}
           focusBusy={Boolean(planner.activeFocusSession)}
           error={planner.auth.syncError}
           draftTitle={capturedTitle}

@@ -21,6 +21,7 @@ import type {
   RawPlannerData,
   Reminder,
   RepeatType,
+  TaskTemplate,
   SavedFilter,
   SidebarFolder,
   Space,
@@ -50,6 +51,12 @@ import { backfillTaskTags, linkTaskTags, sanitizeTag, sanitizeTaskTag } from "..
 import { toggleTaskTag as toggleTagOnTask } from "../domain/tags/tagPicker";
 import { sanitizeListSection } from "../domain/tasks/sections";
 import { duplicateTaskPlan, type DuplicatePlan } from "../domain/tasks/duplicate";
+import {
+  buildFromTemplate,
+  sanitizeTaskTemplate,
+  templateFromTask,
+  type TemplateTarget,
+} from "../domain/tasks/templates";
 import {
   migrateReminders,
   planReminderRows,
@@ -510,6 +517,11 @@ export function normalizeData(data: RawPlannerData): PlannerData {
       : [],
     reminders: Array.isArray(data.reminders)
       ? data.reminders.map(sanitizeReminder).filter((row): row is Reminder => row !== null)
+      : [],
+    taskTemplates: Array.isArray(data.taskTemplates)
+      ? data.taskTemplates
+          .map(sanitizeTaskTemplate)
+          .filter((row): row is TaskTemplate => row !== null)
       : [],
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
@@ -1456,6 +1468,70 @@ export function usePlannerData() {
   }
 
   /**
+   * §25.8: save this Task's shape for later, and leave the Task alone.
+   *
+   * Named after the Task rather than through a dialog. A prompt asking for a
+   * name is a second decision at the moment someone is trying to make one, and
+   * the Task's own title is what they would type into it.
+   *
+   * Returns the template so the caller can offer to take it back — creating
+   * one is not a change to any Task, so there is no patch to undo.
+   */
+  function saveTaskAsTemplate(taskId: string): TaskTemplate | null {
+    const now = new Date().toISOString();
+    const template = templateFromTask(taskId, data, createId("template"), now);
+    if (!template) return null;
+    setData((current) => ({ ...current, taskTemplates: [...current.taskTemplates, template] }));
+    return template;
+  }
+
+  function deleteTaskTemplate(templateId: string) {
+    setData((current) => ({
+      ...current,
+      taskTemplates: current.taskTemplates.filter((row) => row.id !== templateId),
+    }));
+  }
+
+  /**
+   * §25.8's other half: a Task made from a saved shape.
+   *
+   * `target` comes from the create resolver, so a template used in the Inbox
+   * lands in the Inbox and one used in a List lands there — the template says
+   * WHAT to make and the Scope says where, which is §12.16's division and not
+   * a new one.
+   *
+   * Tags are linked by name through the same path Quick Add uses, so a
+   * template naming a Tag that has since been deleted recreates it rather than
+   * producing a Task with a tag nothing can find.
+   */
+  function createTaskFromTemplate(templateId: string, target: TemplateTarget): string {
+    const template = data.taskTemplates.find((row) => row.id === templateId);
+    if (!template) return "";
+
+    const now = new Date().toISOString();
+    const built = buildFromTemplate(template, target, createId, now);
+    if (!built) return "";
+
+    setData((current) => {
+      let tags = current.tags;
+      let taskTags = current.taskTags;
+      for (const task of built.tasks) {
+        const linked = linkTaskTags(task.id, task.tags, tags, taskTags, now);
+        tags = linked.tags;
+        taskTags = linked.taskTags;
+      }
+      return {
+        ...current,
+        tasks: [...built.tasks, ...current.tasks],
+        checkItems: [...current.checkItems, ...built.checkItems],
+        tags,
+        taskTags,
+      };
+    });
+    return built.rootId;
+  }
+
+  /**
    * Take a Duplicate back (§15.55, §15.57).
    *
    * By id and only by id: it removes what the plan created and nothing that
@@ -2301,6 +2377,7 @@ export function usePlannerData() {
     taskTags: data.taskTags,
     checkItems: data.checkItems,
     reminders: data.reminders,
+    taskTemplates: data.taskTemplates,
     focusSessions: data.focusSessions,
     activeSessionId: data.activeSessionId,
     activeFocusSession:
@@ -2335,6 +2412,9 @@ export function usePlannerData() {
     restoreTask,
     duplicateTask,
     discardDuplicate,
+    saveTaskAsTemplate,
+    deleteTaskTemplate,
+    createTaskFromTemplate,
     toggleTaskDone,
     addCheckItem,
     addCheckItems,

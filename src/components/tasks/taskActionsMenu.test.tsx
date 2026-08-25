@@ -75,6 +75,8 @@ function renderModule(
     onStartFocus?: (taskId: string) => void;
     onDuplicate?: (taskId: string) => (() => void) | null;
     activityFor?: (taskId: string) => TaskActivityEntry[];
+    onSaveAsTemplate?: (taskId: string) => string;
+    onDeleteTemplate?: (templateId: string) => void;
   } = {},
 ) {
   const onMutate = vi.fn();
@@ -127,6 +129,10 @@ function renderModule(
             onRestoreList: () => {},
             onPermanentlyDeleteList: () => {},
           }}
+          onSaveAsTemplate={extra.onSaveAsTemplate ?? (() => "tpl-1")}
+          onDeleteTemplate={extra.onDeleteTemplate ?? (() => {})}
+          templates={[]}
+          onUseTemplate={() => {}}
           onMutate={onMutate}
         />
       </FloatingLayerProvider>
@@ -155,6 +161,7 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     expect(rows()).toEqual([
       "Pin",
       "Duplicate",
+      "Save as template",
       "Copy link",
       "Start focus",
       "Task activities",
@@ -209,6 +216,22 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     expect(rows()).toEqual(["Copy link", "Task activities", "Restore"]);
     await user.click(screen.getByRole("menuitem", { name: "Restore" }));
     expect(onMutate.mock.calls[0][1]).toEqual({ deletedAt: "" });
+  });
+
+  it("saves a template without changing the Task, and offers to take it back (§25.8)", async () => {
+    const user = userEvent.setup();
+    const onSaveAsTemplate = vi.fn(() => "tpl-9");
+    const onDeleteTemplate = vi.fn();
+    const { onMutate } = renderModule({}, { onSaveAsTemplate, onDeleteTemplate });
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Save as template" }));
+
+    expect(onSaveAsTemplate).toHaveBeenCalledWith("t1");
+    // §25.8: "current Task 자체는 유지" — nothing about the Task changes, which
+    // is also why the way back deletes the template rather than patching.
+    expect(onMutate).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(onDeleteTemplate).toHaveBeenCalledWith("tpl-9");
   });
 
   it("duplicates, and offers the way to take the copy back (§15.55)", async () => {
@@ -344,6 +367,7 @@ describe("the row's menu (§15.63)", () => {
     expect(labels).toContain("Complete");
     expect(labels).toContain("Mark won't do");
     expect(labels).toContain("Move to trash");
+    expect(labels).toContain("Save as template");
     expect(labels.indexOf("Pin")).toBeLessThan(labels.indexOf("High"));
     expect(labels.indexOf("High")).toBeLessThan(labels.indexOf("Move to trash"));
   });

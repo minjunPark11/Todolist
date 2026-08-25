@@ -712,6 +712,44 @@ export interface Reminder {
   updatedAt: string;
 }
 
+/**
+ * One Task inside a template — what to make, not a record that exists.
+ *
+ * No ids, no List, no dates. A template is a shape to reuse, and every one of
+ * those three would tie it to the moment it was saved: an id would dangle, a
+ * List can be deleted, and a date is in the past by the second use. Where the
+ * new Task lands is the create resolver's answer (§12.16), the same as for
+ * anything typed into Quick Add.
+ */
+export interface TaskTemplateItem {
+  title: string;
+  description: string;
+  contentMode?: TaskContentMode;
+  priority: TaskPriority;
+  /** Tag NAMES, so a template survives a Tag being renamed away and back. */
+  tags: string[];
+  /** Checklist lines, unticked by definition — nothing here has happened yet. */
+  checkItems: string[];
+  /** Index into the template's own `items`, or -1 for the root (§15.13's shape). */
+  parentIndex: number;
+}
+
+/**
+ * A saved Task shape, reusable (spec §25.8).
+ *
+ * Distinct from Duplicate, and §25.8 says why in two lines: Duplicate makes a
+ * Task now, this makes a definition to make Tasks from later. The Task it was
+ * saved from is untouched and goes on existing.
+ */
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  /** Root first, then its descendants — the order `subtreeIds` walks. */
+  items: TaskTemplateItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TaskTag {
   id: string;
   taskId: string;
@@ -874,6 +912,8 @@ export interface PlannerData {
   taskTags: TaskTag[];
   /** Reminders, keyed to their Task by `taskId` (spec §6.3). */
   reminders: Reminder[];
+  /** Saved Task shapes, reusable (spec §25.8). */
+  taskTemplates: TaskTemplate[];
   settings: PlannerSettings;
   appSettings: AppSettings;
 }

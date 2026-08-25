@@ -29,6 +29,7 @@ export type TaskActionId =
   | "pin"
   | "unpin"
   | "duplicate"
+  | "saveAsTemplate"
   | "copyLink"
   | "startFocus"
   | "activities"
@@ -101,6 +102,7 @@ const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
   { id: "pin", labelKey: "tasks.menu.pin", group: "quick" },
   { id: "unpin", labelKey: "tasks.menu.unpin", group: "quick" },
   { id: "duplicate", labelKey: "tasks.menu.duplicate", group: "quick" },
+  { id: "saveAsTemplate", labelKey: "tasks.menu.saveAsTemplate", group: "quick" },
   { id: "copyLink", labelKey: "tasks.menu.copyLink", group: "quick" },
   { id: "startFocus", labelKey: "tasks.menu.startFocus", group: "work" },
   { id: "activities", labelKey: "tasks.menu.activities", group: "work" },

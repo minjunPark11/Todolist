@@ -408,6 +408,26 @@
   cursor: default;
 }
 
+/* §25.8's entry point, beside Add rather than in place of it. Quiet, because
+   typing a title is the common case and starting from a template is not. */
+.tm-quickadd-templates {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle, rgba(25, 25, 25, 0.08));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tm-quickadd-templates:hover,
+.tm-quickadd-templates[aria-expanded="true"] {
+  background: var(--bg-hover-content);
+  color: var(--text, #1c1c1e);
+}
+
 .tm-quickadd-hint {
   flex-basis: 100%;
   margin: 0;

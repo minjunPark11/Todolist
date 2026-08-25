@@ -21,6 +21,7 @@ import type {
   TaskContentMode,
   TaskDailyPlan,
   TaskTag,
+  TaskTemplate,
 } from "../../types";
 import type { TaskScopeRef, TaskViewKind } from "../../domain/tasks/scopeRegistry";
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
@@ -192,6 +193,17 @@ interface TasksModuleProps {
    * (§15.57). Null when there was nothing to copy.
    */
   onDuplicate: (taskId: string) => (() => void) | null;
+  /**
+   * §25.8. Saves the Task's shape and answers with the template's id.
+   *
+   * An id rather than a callback, unlike Duplicate above, because taking this
+   * back is one record by one id — there is no subtree to work out.
+   */
+  onSaveAsTemplate: (taskId: string) => string;
+  onDeleteTemplate: (templateId: string) => void;
+  /** §25.8's saved shapes, offered by Quick Add. */
+  templates: TaskTemplate[];
+  onUseTemplate: (templateId: string, resolution: CreateResolution) => void;
   /**
    * True while a focus session is already running or paused.
    *
@@ -401,6 +413,18 @@ export function TasksModule(props: TasksModuleProps) {
         return mutate(task, trashTask(task, now));
       case "restore":
         return mutate(task, restoreTask(task));
+      case "saveAsTemplate": {
+        // §25.8: the Task is not changed, so the way back is to delete the
+        // template rather than to patch anything.
+        const template = props.onSaveAsTemplate(task.id);
+        if (template) {
+          setNotice({
+            labelKey: "tasks.templateSaved",
+            run: () => props.onDeleteTemplate(template),
+          });
+        }
+        return;
+      }
       case "duplicate": {
         // §15.54's double-trigger cannot happen from here: the menu closes on
         // the click that chose the row, and the copy is one synchronous store
@@ -774,6 +798,8 @@ export function TasksModule(props: TasksModuleProps) {
             }
             tags={tags}
             savedFilters={savedFilters}
+            templates={props.templates}
+            onUseTemplate={props.onUseTemplate}
             draftTitle={props.draftTitle}
             onCreate={(title, resolution) => {
               props.onDraftConsumed();

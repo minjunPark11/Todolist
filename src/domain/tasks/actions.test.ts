@@ -13,6 +13,7 @@ describe("taskActions", () => {
     expect(ids(OPEN)).toEqual([
       "pin",
       "duplicate",
+      "saveAsTemplate",
       "copyLink",
       "startFocus",
       "activities",

@@ -6,9 +6,10 @@
 // §12.16 exists because there are many `+ 작업` entry points and each one that
 // works the owner out for itself is a copy of the rule that can drift.
 import { useEffect, useState } from "react";
-import type { List, SavedFilter, Tag } from "../../types";
+import type { List, SavedFilter, Tag, TaskTemplate } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { canCommit, resolveCreateContext, type CreateResolution } from "../../domain/tasks/createResolver";
+import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "../floating";
 import { useT } from "../../i18n";
 
 interface TaskQuickAddProps {
@@ -30,6 +31,10 @@ interface TaskQuickAddProps {
    */
   draftTitle?: string;
   onCreate: (title: string, resolution: CreateResolution) => void;
+  /** §25.8's saved shapes, for the ones that can be started from here. */
+  templates: TaskTemplate[];
+  /** Makes the template's Tasks in whatever List this Scope resolves to. */
+  onUseTemplate: (templateId: string, resolution: CreateResolution) => void;
 }
 
 export function TaskQuickAdd({
@@ -41,6 +46,8 @@ export function TaskQuickAdd({
   savedFilters,
   draftTitle,
   onCreate,
+  templates,
+  onUseTemplate,
 }: TaskQuickAddProps) {
   const { t } = useT();
   const [title, setTitle] = useState("");
@@ -120,6 +127,32 @@ export function TaskQuickAdd({
         {t("common.add")}
       </button>
 
+      {/* §25.8's other end. Absent until there is a template to offer: a
+          control that appears and then has nothing behind it is the shape
+          §16.28 refuses, and the first thing anyone would do with an empty
+          menu is wonder what they did wrong.
+
+          It does not use the title field. A template names its own Tasks, so
+          typing a title and then choosing a template would raise a question —
+          which one wins — that the reader should not have to think about. */}
+      {templates.length > 0 ? (
+        <Popover type="menu" placement="bottom-end">
+          <PopoverTrigger className="tm-quickadd-templates" aria-label={t("tasks.templateMenu")}>
+            {t("tasks.useTemplate")}
+          </PopoverTrigger>
+          <PopoverContent label={t("tasks.templateMenu")} role="menu" className="ff-context-menu">
+            <TemplateChoices
+              templates={templates}
+              // The same resolution the form would have committed, so a
+              // template used in a Folder asks the same question about which
+              // List as anything else typed here (§12.4).
+              disabled={needsList || needsDate}
+              onChoose={(templateId) => onUseTemplate(templateId, resolution)}
+            />
+          </PopoverContent>
+        </Popover>
+      ) : null}
+
       {title.trim() && (needsDate || needsList) ? (
         <p className="tm-quickadd-hint" role="status">
           {t(needsDate ? "tasks.needDate" : "tasks.needList")}
@@ -135,5 +168,45 @@ export function TaskQuickAdd({
         </p>
       ) : null}
     </form>
+  );
+}
+
+/** Separated so a chosen template can close the surface it is inside (§19.90). */
+function TemplateChoices({
+  templates,
+  disabled,
+  onChoose,
+}: {
+  templates: TaskTemplate[];
+  disabled: boolean;
+  onChoose: (templateId: string) => void;
+}) {
+  const { t } = useT();
+  const { close } = usePopoverSurface();
+
+  return (
+    <>
+      {templates.map((template) => (
+        <button
+          key={template.id}
+          type="button"
+          role="menuitem"
+          aria-disabled={disabled || undefined}
+          className={`ff-context-menu-item${disabled ? " is-disabled" : ""}`}
+          onClick={() => {
+            if (disabled) return;
+            close();
+            onChoose(template.id);
+          }}
+        >
+          <span className="ff-context-menu-label">
+            {template.name}
+            {/* The same explanation the form's own hint gives, in the place
+                the reader is looking when they meet the refusal (§15.5). */}
+            {disabled ? <small>{t("tasks.needList")}</small> : null}
+          </span>
+        </button>
+      ))}
+    </>
   );
 }
