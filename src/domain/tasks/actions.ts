@@ -28,6 +28,7 @@ import { isCompleted, isPinned, isTaskOpen, isTrashed, isWontDo } from "./taskSt
 export type TaskActionId =
   | "pin"
   | "unpin"
+  | "duplicate"
   | "startFocus"
   | "complete"
   | "reopen"
@@ -97,6 +98,7 @@ type Availability = "hidden" | "enabled" | { disabledReasonKey: string };
 const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
   { id: "pin", labelKey: "tasks.menu.pin", group: "quick" },
   { id: "unpin", labelKey: "tasks.menu.unpin", group: "quick" },
+  { id: "duplicate", labelKey: "tasks.menu.duplicate", group: "quick" },
   { id: "startFocus", labelKey: "tasks.menu.startFocus", group: "work" },
   { id: "complete", labelKey: "tasks.menu.complete", group: "status" },
   { id: "reopen", labelKey: "tasks.menu.reopen", group: "status" },

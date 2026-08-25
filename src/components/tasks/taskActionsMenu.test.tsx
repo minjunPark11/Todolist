@@ -69,7 +69,11 @@ const workList: List = {
 
 function renderModule(
   overrides: Partial<Task> = {},
-  extra: { focusBusy?: boolean; onStartFocus?: (taskId: string) => void } = {},
+  extra: {
+    focusBusy?: boolean;
+    onStartFocus?: (taskId: string) => void;
+    onDuplicate?: (taskId: string) => (() => void) | null;
+  } = {},
 ) {
   const onMutate = vi.fn();
   render(
@@ -89,6 +93,7 @@ function renderModule(
           url="/list/l1?task=t1"
           onNavigate={() => {}}
           onStartFocus={extra.onStartFocus ?? (() => {})}
+          onDuplicate={extra.onDuplicate ?? (() => null)}
           focusBusy={extra.focusBusy ?? false}
           onCreate={() => {}}
           draftTitle=""
@@ -143,7 +148,7 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     renderModule();
     await openMore(user);
 
-    expect(rows()).toEqual(["Pin", "Start focus", "Mark won't do", "Move to trash"]);
+    expect(rows()).toEqual(["Pin", "Duplicate", "Start focus", "Mark won't do", "Move to trash"]);
   });
 
   it("does not repeat the Complete the header already draws (§15.3)", async () => {
@@ -192,6 +197,30 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     expect(rows()).toEqual(["Restore"]);
     await user.click(screen.getByRole("menuitem", { name: "Restore" }));
     expect(onMutate.mock.calls[0][1]).toEqual({ deletedAt: "" });
+  });
+
+  it("duplicates, and offers the way to take the copy back (§15.55)", async () => {
+    const user = userEvent.setup();
+    const discard = vi.fn();
+    const onDuplicate = vi.fn(() => discard);
+    renderModule({}, { onDuplicate });
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+
+    expect(onDuplicate).toHaveBeenCalledWith("t1");
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(discard).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no Undo when there was nothing to copy (§15.67)", async () => {
+    const user = userEvent.setup();
+    renderModule({}, { onDuplicate: () => null });
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+
+    // A toast offering to undo something that did not happen is worse than no
+    // toast: pressing it would look like it had failed.
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
   });
 
   it("hands Start Focus the Task id and nothing else (§25.6)", async () => {

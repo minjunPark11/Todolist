@@ -48,9 +48,9 @@ import {
 import { backfillTaskTags, linkTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
 import { toggleTaskTag as toggleTagOnTask } from "../domain/tags/tagPicker";
 import { sanitizeListSection } from "../domain/tasks/sections";
+import { duplicateTaskPlan, type DuplicatePlan } from "../domain/tasks/duplicate";
 import {
   checkItemsForTask,
-  duplicateCheckItems,
   pruneOrphanCheckItems,
   removeCheckItemsForTask,
   sanitizeCheckItem,
@@ -1364,54 +1364,54 @@ export function usePlannerData() {
     }));
   }
 
-  function duplicateTask(taskId: string) {
-    const source = data.tasks.find((task) => task.id === taskId);
-    if (!source) {
-      return "";
-    }
-
+  /**
+   * §15.9's Duplicate, as one write (§15.18).
+   *
+   * The plan is computed before anything is stored, so a source that is no
+   * longer there leaves the store untouched and there is no partial copy to
+   * clean up (§15.57). What it produces is returned rather than just the id:
+   * undoing a Duplicate means removing exactly the records it created, and
+   * `deleteTask` cannot do that — it promotes a deleted parent's children to
+   * the top level, which for a copied subtree would leave the copies behind
+   * as loose root Tasks.
+   */
+  function duplicateTask(taskId: string): DuplicatePlan | null {
     const now = new Date().toISOString();
-    const newTaskId = createId("task");
-    const copy: Task = {
-      ...source,
-      id: newTaskId,
-      title: `${source.title} Copy`,
-      // A copy starts fresh. `isTaskOpen` is the one question that decides
-      // it: anything finished, given up on or trashed reopens as `todo`,
-      // where the two hand-written arms this replaces missed a source marked
-      // Won't Do through `wontDoAt` — that copy arrived already given up on.
-      status: isTaskOpen(source) ? source.status : LIFECYCLE.open,
-      completedAt: "",
-      archivedAt: "",
-      wontDoAt: "",
-      deletedAt: "",
-      createdAt: now,
-      updatedAt: now,
-    };
-    const copiedSubtasks = data.subtasks
-      .filter((subtask) => subtask.taskId === taskId)
-      .map((subtask) => ({
-        ...subtask,
-        id: createId("subtask"),
-        taskId: newTaskId,
-        completed: false,
-        createdAt: now,
-        updatedAt: now,
-      }));
+    const plan = duplicateTaskPlan(taskId, data, createId, now);
+    if (!plan) return null;
 
     setData((current) => ({
       ...current,
-      tasks: [copy, ...current.tasks],
-      subtasks: [...current.subtasks, ...copiedSubtasks],
-      // The copy gets the same checklist, unticked — a copy is work still to
-      // do, and ticks carried across would claim it was half finished.
-      checkItems: [
-        ...current.checkItems,
-        ...duplicateCheckItems(taskId, newTaskId, current.checkItems, () => createId("checkitem"), now),
-      ],
+      tasks: [...plan.tasks, ...current.tasks],
+      subtasks: [...current.subtasks, ...plan.subtasks],
+      checkItems: [...current.checkItems, ...plan.checkItems],
+      taskTags: [...current.taskTags, ...plan.taskTags],
     }));
-    setSelectedTaskId(newTaskId);
-    return newTaskId;
+    setSelectedTaskId(plan.rootId);
+    return plan;
+  }
+
+  /**
+   * Take a Duplicate back (§15.55, §15.57).
+   *
+   * By id and only by id: it removes what the plan created and nothing that
+   * looks like it. The original — and anything the user has done since — is
+   * not something this can reach.
+   */
+  function discardDuplicate(plan: DuplicatePlan) {
+    const tasks = new Set(plan.tasks.map((task) => task.id));
+    const subtasks = new Set(plan.subtasks.map((row) => row.id));
+    const checkItems = new Set(plan.checkItems.map((item) => item.id));
+    const taskTags = new Set(plan.taskTags.map((link) => link.id));
+
+    setData((current) => ({
+      ...current,
+      tasks: current.tasks.filter((task) => !tasks.has(task.id)),
+      subtasks: current.subtasks.filter((row) => !subtasks.has(row.id)),
+      checkItems: current.checkItems.filter((item) => !checkItems.has(item.id)),
+      taskTags: current.taskTags.filter((link) => !taskTags.has(link.id)),
+    }));
+    setSelectedTaskId((open) => (tasks.has(open) ? "" : open));
   }
 
   function toggleTaskDone(taskId: string) {
@@ -2267,6 +2267,7 @@ export function usePlannerData() {
     archiveTask,
     restoreTask,
     duplicateTask,
+    discardDuplicate,
     toggleTaskDone,
     addCheckItem,
     addCheckItems,

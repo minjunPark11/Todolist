@@ -173,6 +173,15 @@ interface TasksModuleProps {
    */
   onStartFocus: (taskId: string) => void;
   /**
+   * §15.9's Duplicate. Makes the copy and hands back the way to take it back.
+   *
+   * A callback rather than the new id, because undoing a Duplicate is not a
+   * patch to one Task: it removes a whole copied subtree with its checklist
+   * and its Tag relations, and only the store knows which records those were
+   * (§15.57). Null when there was nothing to copy.
+   */
+  onDuplicate: (taskId: string) => (() => void) | null;
+  /**
    * True while a focus session is already running or paused.
    *
    * `startFocusSession` returns without doing anything when one is, so the
@@ -366,6 +375,14 @@ export function TasksModule(props: TasksModuleProps) {
         return mutate(task, trashTask(task, now));
       case "restore":
         return mutate(task, restoreTask(task));
+      case "duplicate": {
+        // §15.54's double-trigger cannot happen from here: the menu closes on
+        // the click that chose the row, and the copy is one synchronous store
+        // write rather than a request that could still be in flight.
+        const discard = props.onDuplicate(task.id);
+        if (discard) setUndo({ labelKey: "tasks.undoDuplicated", run: discard });
+        return;
+      }
       case "startFocus":
         return props.onStartFocus(task.id);
     }

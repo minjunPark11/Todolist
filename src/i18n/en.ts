@@ -1117,6 +1117,8 @@ export const en: Dictionary = {
   "tasks.menu.clearDue": "Clear the date",
   "tasks.menu.trash": "Move to trash",
   "tasks.menu.restore": "Restore",
+  "tasks.menu.duplicate": "Duplicate",
+  "tasks.undoDuplicated": "Duplicated.",
   "tasks.menu.pin": "Pin",
   "tasks.menu.unpin": "Unpin",
   "tasks.menu.startFocus": "Start focus",

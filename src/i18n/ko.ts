@@ -1086,6 +1086,8 @@ export const ko: Dictionary = {
   "tasks.menu.clearDue": "날짜 지우기",
   "tasks.menu.trash": "휴지통으로",
   "tasks.menu.restore": "복원",
+  "tasks.menu.duplicate": "복제",
+  "tasks.undoDuplicated": "복제했습니다.",
   "tasks.menu.pin": "고정",
   "tasks.menu.unpin": "고정 해제",
   "tasks.menu.startFocus": "집중 시작",

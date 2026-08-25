@@ -859,11 +859,15 @@ export default function App() {
   }
 
   function handleDuplicateTask(taskId: string) {
-    const copyId = planner.duplicateTask(taskId);
+    const plan = planner.duplicateTask(taskId);
     showToast({
       message: t("app.toastTaskDuplicated"),
-      ...(copyId
-        ? { actionLabel: t("app.undo"), onAction: () => planner.deleteTask(copyId) }
+      // `discardDuplicate` and not `deleteTask`: the copy can be a subtree
+      // now (§15.13), and `deleteTask` promotes a deleted parent's children
+      // to the top level — which would leave the copies behind as loose root
+      // Tasks after an Undo that claimed to remove them.
+      ...(plan
+        ? { actionLabel: t("app.undo"), onAction: () => planner.discardDuplicate(plan) }
         : {}),
     });
   }
@@ -1198,6 +1202,10 @@ export default function App() {
           // rest. `source` says where the session was started from, which is
           // what the focus statistics group by.
           onStartFocus={(taskId) => planner.startFocusSession(taskId, "today_page")}
+          onDuplicate={(taskId) => {
+            const plan = planner.duplicateTask(taskId);
+            return plan ? () => planner.discardDuplicate(plan) : null;
+          }}
           focusBusy={Boolean(planner.activeFocusSession)}
           error={planner.auth.syncError}
           draftTitle={capturedTitle}

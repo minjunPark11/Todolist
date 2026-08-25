@@ -10,7 +10,7 @@ const OPEN: TaskStateFields = { status: "open" };
 
 describe("taskActions", () => {
   it("offers an open Task the actions §15.4 lists for one", () => {
-    expect(ids(OPEN)).toEqual(["pin", "startFocus", "complete", "wontDo", "trash"]);
+    expect(ids(OPEN)).toEqual(["pin", "duplicate", "startFocus", "complete", "wontDo", "trash"]);
   });
 
   it("keeps the groups in §15.42's order, with Delete alone at the end", () => {

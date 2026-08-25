@@ -147,6 +147,7 @@ function renderModule(url: string) {
           }}
           onMutate={() => {}}
           onStartFocus={() => {}}
+          onDuplicate={() => null}
           focusBusy={false}
         />
       </FloatingLayerProvider>
