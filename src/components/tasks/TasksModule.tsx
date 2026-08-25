@@ -26,6 +26,8 @@ import type { TaskScopeRef, TaskViewKind } from "../../domain/tasks/scopeRegistr
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, queryScopeTasks, type ScopeContext } from "../../domain/tasks/scopeQuery";
 import { parseSearchUrl, searchUrlFor, taskUrlFor, urlForSearchResult, parseTaskUrl } from "../../app/taskScopeUrl";
+import { taskLinkFor } from "../../app/taskLink";
+import { copyText } from "../../lib/copyText";
 import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { namedRecordMissing, titleFor } from "../../domain/tasks/scopeTitle";
 import { useT } from "../../i18n";
@@ -217,12 +219,25 @@ export function TasksModule(props: TasksModuleProps) {
     onNavigate,
   } = props;
 
-  // One undo at a time, and it is the last thing that happened (§9.40 keeps
-  // the stack out of the MVP).
-  const [undo, setUndo] = useState<{ labelKey: string; run: () => void } | null>(null);
+  /**
+   * What just happened, and the way back from it if there is one.
+   *
+   * One at a time, and it is the last thing that happened (§9.40 keeps the
+   * stack out of the MVP). It held only undos before; §15.21 needs the same
+   * strip to say "Link copied", which has nothing to undo, and §15.22 needs it
+   * to show a URL the reader can select when the clipboard refused. So `run`
+   * became optional and `text` arrived beside it — §15.69's point that a menu
+   * hands its result to one feedback layer rather than growing its own.
+   */
+  const [notice, setNotice] = useState<{
+    labelKey: string;
+    run?: () => void;
+    /** Shown verbatim, for a value that is not a translatable phrase. */
+    text?: string;
+  } | null>(null);
   /** The row being dragged, so the ones under it know a drop is coming. */
   const [dragTaskId, setDragTaskId] = useState("");
-  /** The open context menu, or none. One at a time, like the undo above it. */
+  /** The open context menu, or none. One at a time, like the notice above it. */
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   // §15.3. Presentation only: nothing below reads this to decide what a Scope
   // contains, which is what keeps §15.9 true — the URL means the same thing at
@@ -318,7 +333,7 @@ export function TasksModule(props: TasksModuleProps) {
    */
   function mutate(target: Task, mutation: TaskMutation) {
     props.onMutate(target.id, mutation.patch);
-    setUndo({
+    setNotice({
       labelKey: mutation.labelKey,
       run: () => props.onMutate(target.id, mutation.undo),
     });
@@ -380,12 +395,39 @@ export function TasksModule(props: TasksModuleProps) {
         // the click that chose the row, and the copy is one synchronous store
         // write rather than a request that could still be in flight.
         const discard = props.onDuplicate(task.id);
-        if (discard) setUndo({ labelKey: "tasks.undoDuplicated", run: discard });
+        if (discard) setNotice({ labelKey: "tasks.undoDuplicated", run: discard });
         return;
       }
+      case "copyLink":
+        return copyTaskLink(task.id);
       case "startFocus":
         return props.onStartFocus(task.id);
     }
+  }
+
+  /**
+   * §15.19: the Task's deep link, on the clipboard.
+   *
+   * Not a mutation (§15.58) — nothing about the Task changes, so there is no
+   * patch and nothing to undo, and the strip below says so by drawing no Undo
+   * button. §15.21 asks for both outcomes to be reported and §15.22 refuses to
+   * let a refusal end in silence, which is what the URL in the failure notice
+   * is for: it can still be selected and copied by hand.
+   *
+   * The origin is the running app's. On the desktop build that is the shell's
+   * own, so the link opens the Task here rather than anywhere a colleague
+   * could follow — the honest answer while there is no configured public base
+   * URL to build a shareable link from.
+   */
+  function copyTaskLink(taskId: string) {
+    const link = taskLinkFor(window.location.origin, state, taskId);
+    void copyText(link).then((copied) =>
+      setNotice(
+        copied
+          ? { labelKey: "tasks.linkCopied" }
+          : { labelKey: "tasks.linkCopyFailed", text: link },
+      ),
+    );
   }
 
   /** The registry's answer for this Task, as rows a menu can draw. */
@@ -938,21 +980,31 @@ export function TasksModule(props: TasksModuleProps) {
 
       {menu ? <ContextMenu state={menu} onClose={() => setMenu(null)} /> : null}
 
-      {/* §9.36: the toast is where the way back lives, and it says what it
-          would undo rather than just offering the word. */}
-      {undo ? (
+      {/* §9.36: the strip is where the way back lives, and it says what it
+          would undo rather than just offering the word.
+
+          The Undo button is drawn only when there IS one. Copy Link changes
+          no Task (§15.58), so offering to undo it would be offering to undo
+          nothing — and a button that does nothing reads as one that failed. */}
+      {notice ? (
         <div className="tm-undo" role="status">
-          <span>{t(undo.labelKey)}</span>
-          <button
-            type="button"
-            onClick={() => {
-              undo.run();
-              setUndo(null);
-            }}
-          >
-            {t("app.undo")}
-          </button>
-          <button type="button" onClick={() => setUndo(null)} aria-label={t("common.close")}>
+          <span>{t(notice.labelKey)}</span>
+          {/* §15.22's fallback: when the clipboard refused, the URL is put
+              where it can be selected and copied by hand, rather than the
+              action ending with an apology and nothing to act on. */}
+          {notice.text ? <input className="tm-undo-value" readOnly value={notice.text} /> : null}
+          {notice.run ? (
+            <button
+              type="button"
+              onClick={() => {
+                notice.run?.();
+                setNotice(null);
+              }}
+            >
+              {t("app.undo")}
+            </button>
+          ) : null}
+          <button type="button" onClick={() => setNotice(null)} aria-label={t("common.close")}>
             ×
           </button>
         </div>

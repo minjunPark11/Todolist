@@ -148,7 +148,14 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     renderModule();
     await openMore(user);
 
-    expect(rows()).toEqual(["Pin", "Duplicate", "Start focus", "Mark won't do", "Move to trash"]);
+    expect(rows()).toEqual([
+      "Pin",
+      "Duplicate",
+      "Copy link",
+      "Start focus",
+      "Mark won't do",
+      "Move to trash",
+    ]);
   });
 
   it("does not repeat the Complete the header already draws (§15.3)", async () => {
@@ -194,7 +201,7 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
 
     // The old panel drew "Move to trash" here, where its only effect was to
     // rewrite the timestamp that had put the Task there (§15.66).
-    expect(rows()).toEqual(["Restore"]);
+    expect(rows()).toEqual(["Copy link", "Restore"]);
     await user.click(screen.getByRole("menuitem", { name: "Restore" }));
     expect(onMutate.mock.calls[0][1]).toEqual({ deletedAt: "" });
   });
@@ -221,6 +228,40 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     // A toast offering to undo something that did not happen is worse than no
     // toast: pressing it would look like it had failed.
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+  });
+
+  it("copies the Task's link and says so, with nothing to undo (§15.21, §15.58)", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    const { onMutate } = renderModule();
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Copy link" }));
+
+    await screen.findByText("Link copied.");
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("/list/l1?task=t1"));
+    // §15.58: Copy Link is not a mutation, so there is no patch and no Undo.
+    expect(onMutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the URL to copy by hand when the clipboard refuses (§15.22)", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText: () => Promise.reject(new Error("denied")) },
+    });
+    // The `execCommand` fallback is not implemented in jsdom either, so this
+    // exercises both refusals at once — which is the case §15.22 is about.
+    renderModule();
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Copy link" }));
+
+    await screen.findByText("Couldn't copy the link.");
+    const field = document.querySelector(".tm-undo-value") as HTMLInputElement;
+    expect(field.value).toContain("/list/l1?task=t1");
+    vi.unstubAllGlobals();
   });
 
   it("hands Start Focus the Task id and nothing else (§25.6)", async () => {

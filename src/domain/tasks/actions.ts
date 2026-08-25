@@ -29,6 +29,7 @@ export type TaskActionId =
   | "pin"
   | "unpin"
   | "duplicate"
+  | "copyLink"
   | "startFocus"
   | "complete"
   | "reopen"
@@ -99,6 +100,7 @@ const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
   { id: "pin", labelKey: "tasks.menu.pin", group: "quick" },
   { id: "unpin", labelKey: "tasks.menu.unpin", group: "quick" },
   { id: "duplicate", labelKey: "tasks.menu.duplicate", group: "quick" },
+  { id: "copyLink", labelKey: "tasks.menu.copyLink", group: "quick" },
   { id: "startFocus", labelKey: "tasks.menu.startFocus", group: "work" },
   { id: "complete", labelKey: "tasks.menu.complete", group: "status" },
   { id: "reopen", labelKey: "tasks.menu.reopen", group: "status" },
@@ -117,11 +119,12 @@ const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
  * offered a trashed Task a "Move to trash" button — a control whose only
  * possible effect was to rewrite the timestamp that had put it there.
  *
- * Getting it back is the one thing left to do with it, so that is the one
- * thing offered. Actions that change nothing about the Task join this list as
- * they arrive.
+ * Getting it back is the one thing left to do with it, so that is what is
+ * offered — together with Copy Link, which survives because it changes
+ * nothing (§15.58) and a link to a trashed Task is how one person shows
+ * another what they are about to restore.
  */
-const TRASHED_ACTIONS: readonly TaskActionId[] = ["restore"];
+const TRASHED_ACTIONS: readonly TaskActionId[] = ["copyLink", "restore"];
 
 function availabilityOf(id: TaskActionId, ctx: TaskActionContext): Availability {
   const { task } = ctx;

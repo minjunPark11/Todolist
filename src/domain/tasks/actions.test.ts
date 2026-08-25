@@ -10,7 +10,15 @@ const OPEN: TaskStateFields = { status: "open" };
 
 describe("taskActions", () => {
   it("offers an open Task the actions §15.4 lists for one", () => {
-    expect(ids(OPEN)).toEqual(["pin", "duplicate", "startFocus", "complete", "wontDo", "trash"]);
+    expect(ids(OPEN)).toEqual([
+      "pin",
+      "duplicate",
+      "copyLink",
+      "startFocus",
+      "complete",
+      "wontDo",
+      "trash",
+    ]);
   });
 
   it("keeps the groups in §15.42's order, with Delete alone at the end", () => {
@@ -63,7 +71,10 @@ describe("taskActions", () => {
     // Not disabled rows: §15.5 hides an action that has no reason to exist
     // here. The Detail used to draw "Move to trash" for a Task already in the
     // Trash, where its only effect was to rewrite the timestamp.
-    expect(ids({ status: "open", deletedAt: "2026-08-25T10:00:00.000Z" })).toEqual(["restore"]);
+    expect(ids({ status: "open", deletedAt: "2026-08-25T10:00:00.000Z" })).toEqual([
+      "copyLink",
+      "restore",
+    ]);
   });
 
   it("hides Start Focus for work that is over, and disables it with a reason while a session runs", () => {

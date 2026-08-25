@@ -1164,6 +1164,20 @@
   cursor: pointer;
 }
 
+/* §15.22's fallback URL. A read-only input rather than text because the point
+   is that it can be selected — and `max-width` because a link is longer than
+   any message this strip otherwise carries. */
+.tm-undo-value {
+  max-width: 320px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+}
+
 /* --- board (§7.21, §7.34, §16.30) --- */
 
 .tm-board {
