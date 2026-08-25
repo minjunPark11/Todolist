@@ -35591,16 +35591,42 @@ Checklist editor의 마지막 행은 entity가 아니라 draft다.
 ### Phase 3 · Properties
 
 ```text
-Shared Popover primitive (portal / flip / shift / z-index token)
-ScheduleEditor 연결
-Priority
-List
-Tags
-Reminder
+Shared Popover primitive        domain/floating + components/floating
+ScheduleEditor 연결              SchedulePicker (기존 editor 그대로)
+Priority                        domain/tasks/priority + PriorityPicker
+List                            domain/tasks/listPicker + ListPicker
+Tags                            domain/tags/tagPicker + TagPicker
+Reminder                        Schedule Popover 내부 (§6.4)
 ```
 
 > `ScheduleEditor`는 이미 완성되어 있으나 레거시 화면에만 연결되어 있다.
 > Phase 3은 대부분 신규 구현이 아니라 연결 작업이다.
+
+Reminder는 별도 property row를 만들지 않았다.
+§6.4가 진입점을 Schedule Popover **안**으로 못박고,
+"Task Detail 상단에 별도의 항상 노출된 Reminder 아이콘"을 V1 기본값으로 하지 않는다고 명시한다.
+그래서 ScheduleEditor를 연결한 순간 이 줄은 성립한다 — 새 control을 만들었다면 §6.4를 어겼을 것이다.
+
+다만 §6.3과 §6.15는 아직이다. 지금 모델은 Schedule 위의 단일 `ReminderPreset`이고,
+§6.3이 요구하는 것은 별도 entity, §6.15가 요구하는 것은 Task 하나당 복수 Reminder다.
+전달 계층(§6.36–§6.40)도 없다 — `domain/schedule/index.ts`가 이미 그렇게 적어두었다(audit D5).
+둘 다 연결 작업이 아니라 **모델 변경**이므로, 26.10이 Phase 0에 요구한 규칙에 따라
+화면과 같이 움직이지 않는 별도 단계에 속한다.
+
+Phase 3에서 내린 판단 세 가지:
+
+Escape는 capture가 아니라 bubble에서 받는다.
+ScheduleEditor는 subpanel에서 뒤로 가기 위해 자기 capture listener를 이미 갖고 있었고,
+layer manager가 capture에 있으면 등록 순서상 항상 먼저 도달해 popover 전체를 닫았다.
+§19.25는 Escape가 한 겹만 벗긴다고 말하고, 그 한 겹이 늘 popover인 것은 아니다.
+
+List 이동은 subtree 단위다(§13.14). 기존 `moveTaskToList`는 받은 Task 하나만 썼고,
+그래서 자식이 있는 부모를 옮기면 자식들이 옛 List에 남았다 — §2.24가 금지하는 상태를,
+그것을 지켜야 할 연산이 만들고 있었다. 양쪽 List 어느 화면에도 보이지 않아 조용했다.
+
+Tag toggle은 relation만 지운다(§13.45). `removeTag`는 Tag 자체를 지우므로,
+picker가 이름이 비슷하다는 이유로 그것을 불렀다면 한 Task에서 체크를 푸는 동작이
+다른 마흔 개 Task에서도 태그를 떼었을 것이다.
 
 ### Phase 4 · Detail Shell Fidelity
 
