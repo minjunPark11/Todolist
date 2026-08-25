@@ -9,7 +9,16 @@
 // must not appear as a disabled placeholder before the model behind it exists.
 // So they are absent, not greyed out.
 import { useEffect, useRef } from "react";
-import type { CheckItem, List, SidebarFolder, Task, TaskContentMode, TaskPriority } from "../../types";
+import type {
+  CheckItem,
+  List,
+  SidebarFolder,
+  Tag,
+  Task,
+  TaskContentMode,
+  TaskPriority,
+  TaskTag,
+} from "../../types";
 import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
 import { childProgress } from "../../domain/tasks/children";
@@ -20,6 +29,7 @@ import type { Schedule, ScheduleIssue } from "../../domain/schedule";
 import { ListPicker } from "./ListPicker";
 import { PriorityPicker } from "./PriorityPicker";
 import { SchedulePicker } from "./SchedulePicker";
+import { TagPicker } from "./TagPicker";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { DeferredInput, DeferredTextarea } from "../kit";
@@ -35,8 +45,13 @@ export interface TaskDrawerProps {
    */
   presentation: TaskDetailPresentation;
   lists: List[];
-  /** The sidebar groups the picker draws as headings (§13.9, §13.10). */
+  /** The sidebar groups the List picker draws as headings (§13.9, §13.10). */
   folders: SidebarFolder[];
+  /** Every Tag, and the relation that says which are on this Task (§13.32). */
+  tags: Tag[];
+  taskTags: TaskTag[];
+  /** Adds, creates-then-adds, or unlinks — by name (§13.39, §13.41, §13.45). */
+  onToggleTag: (name: string) => void;
   children: TaskChild[];
   onClose: () => void;
   onUpdate: (patch: Partial<Task>) => void;
@@ -79,6 +94,9 @@ export function TaskDrawer({
   task,
   lists,
   folders,
+  tags,
+  taskTags,
+  onToggleTag,
   children,
   onClose,
   onUpdate,
@@ -256,6 +274,20 @@ export function TaskDrawer({
             lists={lists}
             folders={folders}
             onMove={onMoveToList}
+            restoreFocusTo={() => root.current}
+          />
+        </div>
+
+        {/* §13.36. The Detail had no tag control at all, so a Task could only
+            be tagged at capture time through Quick Add's `#` syntax and never
+            afterwards — the same shape of gap Priority had. */}
+        <div className="tm-drawer-field">
+          <span>{t("tasks.tags")}</span>
+          <TagPicker
+            task={task}
+            tags={tags}
+            taskTags={taskTags}
+            onToggle={onToggleTag}
             restoreFocusTo={() => root.current}
           />
         </div>

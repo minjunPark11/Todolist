@@ -117,6 +117,8 @@ interface TasksModuleProps {
      * array is the only thing that means "written".
      */
     onCommitSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
+    /** §13.39, by name — §13.41's inline create has no id yet. */
+    onToggleTag: (taskId: string, name: string) => void;
     onAddSubtask: (taskId: string, title: string) => void;
     onToggleSubtask: (id: string) => void;
     onDeleteSubtask: (id: string) => void;
@@ -754,6 +756,9 @@ export function TasksModule(props: TasksModuleProps) {
           task={openedTask}
           lists={lists}
           folders={sidebarFolders}
+          tags={tags}
+          taskTags={taskTags}
+          onToggleTag={(name) => props.drawer.onToggleTag(openedTask.id, name)}
           children={props.drawer.childrenOf(openedTask.id)}
           onClose={closeTask}
           onUpdate={(patch) => props.drawer.onUpdate(openedTask.id, patch)}

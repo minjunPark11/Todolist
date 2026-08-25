@@ -1235,6 +1235,7 @@ export default function App() {
             onUpdate: planner.updateTask,
             onMoveToList: planner.moveTaskToList,
             onCommitSchedule: planner.updateTaskSchedule,
+            onToggleTag: planner.toggleTaskTag,
             onAddSubtask: planner.addSubtask,
             onToggleSubtask: planner.toggleSubtask,
             onDeleteSubtask: planner.deleteSubtask,

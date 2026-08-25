@@ -1044,6 +1044,19 @@ export const en: Dictionary = {
   "tasks.noListsMatch": "No list matches that.",
   "tasks.listUnknown": "No list",
   "tasks.listFollowsParent": "Follows its parent task",
+  // Spec §13.36–§13.41, §13.55. The `#` is a display prefix and is never part
+  // of the stored name (§13.35), so it appears in the chips and the options
+  // and nowhere in these values.
+  "tasks.tags": "Tags",
+  "tasks.addTag": "Add a tag",
+  "tasks.removeTag": "Remove {{value}}",
+  "tasks.searchOrCreateTag": "Search or create a tag",
+  "tasks.createTag": "Create #{{value}}",
+  "tasks.noTagsYet": "No tags yet. Type to create one.",
+  "tasks.tagRefusal.empty": "A tag needs a name.",
+  "tasks.tagRefusal.too-long": "That name is too long for a tag.",
+  "tasks.tagRefusal.control-characters": "A tag name cannot contain control characters.",
+  "tasks.tagRefusal.reserved": "That name is reserved.",
   "tasks.addPickList": "Pick a list…",
   "tasks.needDate": "Pick a date before saving.",
   "tasks.needList": "Choose which list this goes in.",

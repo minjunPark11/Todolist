@@ -127,6 +127,7 @@ function renderModule(url: string) {
             onUpdate: () => {},
             onMoveToList: () => {},
             onCommitSchedule: () => [],
+            onToggleTag: () => {},
             onAddSubtask: () => {},
             onToggleSubtask: () => {},
             onDeleteSubtask: () => {},

@@ -46,6 +46,7 @@ import {
   sanitizeDailyPlan,
 } from "../domain/today/dailyPlan";
 import { backfillTaskTags, linkTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
+import { toggleTaskTag as toggleTagOnTask } from "../domain/tags/tagPicker";
 import { sanitizeListSection } from "../domain/tasks/sections";
 import {
   checkItemsForTask,
@@ -2087,6 +2088,38 @@ export function usePlannerData() {
   }
 
   /**
+   * Put a Tag on a Task or take it off (§13.39), by name.
+   *
+   * One `setData` for all three collections, which is what §13.42 asks for:
+   * the Tag record, the relation and `Task.tags` move together or not at all.
+   * Splitting them would let a failure leave a Tag nothing points at, or —
+   * worse, because it is silent — a relation and a mirror that disagree.
+   *
+   * By name rather than by id because §13.41 creates a Tag that has no id yet.
+   * `toggleTaskTag` derives one, and it derives the SAME one on every device,
+   * so two clients tagging the same word independently converge.
+   */
+  function toggleTaskTag(taskId: string, name: string) {
+    setData((current) => {
+      const task = current.tasks.find((item) => item.id === taskId);
+      if (!task) return current;
+      const now = new Date().toISOString();
+      const result = toggleTagOnTask(task, name, current.tags, current.taskTags, now);
+      // §13.35 refused the name. Writing nothing is the whole response — the
+      // picker has already said why.
+      if (!result) return current;
+      return {
+        ...current,
+        tags: result.tags,
+        taskTags: result.taskTags,
+        tasks: current.tasks.map((item) =>
+          item.id === taskId ? { ...item, tags: result.taskTagNames, updatedAt: now } : item,
+        ),
+      };
+    });
+  }
+
+  /**
    * Make one day's plan say exactly `overrides` (§6.18).
    *
    * The whole map, not one task, because every caller on the Today page —
@@ -2254,6 +2287,7 @@ export function usePlannerData() {
     permanentlyDeleteList,
     moveListToFolder,
     moveTaskToList,
+    toggleTaskTag,
     setTodayBuckets,
     planTaskForDay,
     createFolder,

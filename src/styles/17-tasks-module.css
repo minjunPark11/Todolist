@@ -736,6 +736,158 @@
   color: var(--text-tertiary, #8e8e93);
 }
 
+/* Tags (spec §13.36, §13.53, §13.55). */
+.tm-tags-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+  max-width: 70%;
+}
+
+.tm-tag-chips {
+  display: contents;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 8px;
+  border-radius: var(--rounded-pill, 999px);
+  background: var(--bg-surface-muted, #f5f5f7);
+  font-size: 12px;
+  color: var(--text-secondary, #3c3c43);
+}
+
+/* §13.55: removal lives on the chip, so taking a tag off does not mean
+   opening the picker and finding it again. */
+.tm-tag-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-tertiary, #8e8e93);
+  cursor: pointer;
+}
+
+.tm-tag-chip-remove:hover {
+  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
+  color: var(--text-primary, #1c1c1e);
+}
+
+.tm-tag-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px dashed var(--border-subtle, rgba(25, 25, 25, 0.08));
+  border-radius: 50%;
+  background: none;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-tertiary, #8e8e93);
+  cursor: pointer;
+}
+
+.tm-tag-add:hover,
+.tm-tag-add[aria-expanded="true"] {
+  border-style: solid;
+  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
+  color: var(--text-primary, #1c1c1e);
+}
+
+.tm-tag-surface {
+  min-width: 240px;
+}
+
+.tm-tag-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tm-tag-search {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle, rgba(25, 25, 25, 0.08));
+  border-radius: 6px;
+  background: var(--bg-surface-muted, #f5f5f7);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary, #1c1c1e);
+}
+
+/* §13.35's refusal, said rather than merely enforced — without it the Create
+   row just never appears and the reader is left guessing. */
+.tm-tag-refusal {
+  margin: 0;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--color-danger, #ff3b30);
+}
+
+.tm-tag-options {
+  overflow-y: auto;
+  max-height: 240px;
+}
+
+.tm-tag-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary, #1c1c1e);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Focus stays in the search field (§13.58), so this class is the only thing
+   that can show where the arrow keys are. */
+.tm-tag-option.is-active {
+  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
+}
+
+.tm-tag-option.is-selected {
+  font-weight: 600;
+}
+
+.tm-tag-option.is-create {
+  color: var(--color-primary, #0066cc);
+}
+
+.tm-tag-check {
+  width: 12px;
+  font-size: 11px;
+  color: var(--color-primary, #0066cc);
+}
+
+.tm-tag-empty {
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 12px;
+  color: var(--text-tertiary, #8e8e93);
+}
+
 /* §13.15: a child Task's List is its parent's, so the row states it instead of
    offering a control that would refuse (§16.28). */
 .tm-drawer-field-static {
