@@ -29,6 +29,17 @@ export interface ContextMenuItem {
   /** Shown as chosen (`aria-checked`), for the sets where one wins. */
   selected?: boolean;
   danger?: boolean;
+  /**
+   * Offered, but not right now (§15.5).
+   *
+   * Paired with `hint`, which is the half that matters: §15.5 asks for
+   * "disabled + explanation", and a grey row on its own tells the reader they
+   * did something wrong without saying what. The explanation is drawn inside
+   * the row rather than hung on `title`, so it does not need a hovering mouse
+   * to be read.
+   */
+  disabled?: boolean;
+  hint?: string;
   run: () => void;
 }
 
@@ -64,8 +75,14 @@ export function ContextMenu({ state, onClose }: { state: ContextMenuState; onClo
               type="button"
               role="menuitem"
               aria-checked={item.selected === undefined ? undefined : item.selected}
-              className={`ff-context-menu-item${item.danger ? " is-danger" : ""}${item.selected ? " is-selected" : ""}`}
+              /* `aria-disabled` and not the `disabled` attribute: §15.45 wants
+                 the arrow keys to walk the whole menu, and a disabled button
+                 is not focusable — skipping it would hide the very row whose
+                 explanation the reader needs to see. */
+              aria-disabled={item.disabled || undefined}
+              className={`ff-context-menu-item${item.danger ? " is-danger" : ""}${item.selected ? " is-selected" : ""}${item.disabled ? " is-disabled" : ""}`}
               onClick={() => {
+                if (item.disabled) return;
                 item.run();
                 onClose();
               }}
@@ -73,7 +90,10 @@ export function ContextMenu({ state, onClose }: { state: ContextMenuState; onClo
               <span className="ff-context-menu-icon" aria-hidden="true">
                 {item.icon ?? null}
               </span>
-              {item.label}
+              <span className="ff-context-menu-label">
+                {item.label}
+                {item.hint ? <small>{item.hint}</small> : null}
+              </span>
             </button>
           ))}
         </div>

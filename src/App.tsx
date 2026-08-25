@@ -1194,6 +1194,11 @@ export default function App() {
           today={today}
           url={canonical ?? currentUrl}
           onNavigate={navigateUrl}
+          // §25.6: the Detail hands over an id, the focus engine does the
+          // rest. `source` says where the session was started from, which is
+          // what the focus statistics group by.
+          onStartFocus={(taskId) => planner.startFocusSession(taskId, "today_page")}
+          focusBusy={Boolean(planner.activeFocusSession)}
           error={planner.auth.syncError}
           draftTitle={capturedTitle}
           onDraftConsumed={() => setCapturedTitle("")}

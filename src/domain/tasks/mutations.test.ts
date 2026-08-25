@@ -8,12 +8,14 @@ import {
   leavesScope,
   moveTaskToList,
   moveTaskToSection,
+  pinTask,
   reopenTask,
   restoreTask,
   setTaskDueDate,
   setTaskPriority,
   setTaskSomeday,
   trashTask,
+  unpinTask,
 } from "./mutations";
 import { taskTagIdFor } from "../tags/tags";
 
@@ -238,5 +240,32 @@ describe("moving between Lists and Sections", () => {
   it("always allows the default column", () => {
     const moving = task({ listId: "l1", sectionId: "s1" });
     expect(moveTaskToSection(moving, "", [projectList, otherList], [sectionOfL1])?.patch).toEqual({ sectionId: "" });
+  });
+});
+
+describe("pin (§15.6, §15.7)", () => {
+  it("writes the timestamp and nothing else", () => {
+    // §15.7 in the only form that cannot rot: a patch with one key in it
+    // cannot move a Task to another List or change its priority.
+    expect(pinTask(task(), NOW).patch).toEqual({ pinnedAt: NOW });
+    expect(unpinTask(task({ pinnedAt: NOW })).patch).toEqual({ pinnedAt: "" });
+  });
+
+  it("undoes to the value that was there, absent included", () => {
+    // Never pinned and pinned-then-unpinned are different stored values, and
+    // §9.35 asks Undo for the state rather than for something equivalent.
+    expect(pinTask(task(), NOW).undo).toEqual({ pinnedAt: undefined });
+    expect(pinTask(task({ pinnedAt: "" }), NOW).undo).toEqual({ pinnedAt: "" });
+    expect(unpinTask(task({ pinnedAt: NOW })).undo).toEqual({ pinnedAt: NOW });
+  });
+
+  it("leaves completion, List and priority exactly as they were", () => {
+    const pinned = applyPatch(
+      task({ status: "completed", listId: "l2", priority: "high" }),
+      pinTask(task(), NOW).patch,
+    );
+    expect(pinned.status).toBe("completed");
+    expect(pinned.listId).toBe("l2");
+    expect(pinned.priority).toBe("high");
   });
 });

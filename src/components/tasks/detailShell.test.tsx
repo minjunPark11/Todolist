@@ -11,6 +11,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { List, Task } from "../../types";
+import { taskActions } from "../../domain/tasks/actions";
 import {
   TASK_DETAIL_DEFAULT_WIDTH,
   TASK_DETAIL_MAX_WIDTH,
@@ -90,8 +91,8 @@ function Harness({ presentation }: { presentation: "inline-drawer" | "right-shee
           onAddSubtask={noop}
           onToggleSubtask={noop}
           onDeleteSubtask={noop}
-          onTrash={noop}
-          onToggleWontDo={noop}
+          actions={taskActions({ task: task() })}
+          onRunAction={noop}
           onSetContentMode={noop}
           onAddCheckItem={noop}
           onAddCheckItems={noop}

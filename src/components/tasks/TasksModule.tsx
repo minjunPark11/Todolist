@@ -40,12 +40,16 @@ import {
   completeTask,
   markWontDo,
   moveTaskToSection,
+  pinTask,
   reopenTask,
+  restoreTask,
   setTaskDueDate,
   setTaskPriority,
   trashTask,
   unmarkWontDo,
+  unpinTask,
 } from "../../domain/tasks/mutations";
+import { canRunTaskAction, taskActions, type TaskActionId } from "../../domain/tasks/actions";
 import { ContextMenu, type ContextMenuState } from "../common/ContextMenu";
 import { useFloatingLayerOwner } from "../floating";
 import { useTaskDetailWidth } from "../../hooks/useTaskDetailWidth";
@@ -159,7 +163,33 @@ interface TasksModuleProps {
    * the caller owns the store.
    */
   onMutate: (taskId: string, patch: Partial<Task>) => void;
+  /**
+   * §25.6's entry point, and only that.
+   *
+   * The Detail hands over a Task id and the focus engine owns everything
+   * after it — the timer, pause and resume, the statistics. That division is
+   * §25.6's prohibition written as a prop: a Detail that took a mode or a
+   * duration here would be the panel starting to implement the engine.
+   */
+  onStartFocus: (taskId: string) => void;
+  /**
+   * True while a focus session is already running or paused.
+   *
+   * `startFocusSession` returns without doing anything when one is, so the
+   * menu row would otherwise be a button that quietly did nothing. §15.5 asks
+   * for disabled with a reason instead.
+   */
+  focusBusy: boolean;
 }
+
+/**
+ * The actions the Detail draws as controls of its own (§15.3).
+ *
+ * Only completion: the schedule, Priority, the List and Tags are property rows
+ * rather than registry actions, so there is nothing there for the menu to
+ * repeat.
+ */
+const DETAIL_PROMOTED_ACTIONS: TaskActionId[] = ["complete", "reopen"];
 
 export function TasksModule(props: TasksModuleProps) {
   const { t } = useT();
@@ -299,6 +329,66 @@ export function TasksModule(props: TasksModuleProps) {
   }
 
   /**
+   * Run one registry action (§15.64), whoever asked for it.
+   *
+   * The Task is read from the store again rather than taken from the menu that
+   * was clicked. §15.67 is the reason: a menu is a picture of the state it
+   * opened in, and a sync landing while it hangs there can trash the Task,
+   * finish it, or start a focus session somewhere else. `canRunTaskAction`
+   * asks the registry the same question a second time, and an action that is
+   * no longer allowed is dropped rather than applied to a Task that no longer
+   * looks like the one the reader chose it for.
+   *
+   * Every arm that changes the Task goes through `mutate`, so every one of
+   * them arrives with the Undo §15.56 and §17 expect. Start Focus does not —
+   * it starts a session rather than editing the Task, and §15.55's list of
+   * optimistic, reversible actions does not include it.
+   */
+  function runTaskAction(target: Task, id: TaskActionId) {
+    const task = tasks.find((row) => row.id === target.id);
+    if (!task || !canRunTaskAction(id, task, { focusBusy: props.focusBusy })) return;
+    const now = new Date().toISOString();
+
+    switch (id) {
+      case "pin":
+        return mutate(task, pinTask(task, now));
+      case "unpin":
+        return mutate(task, unpinTask(task));
+      case "complete":
+        return mutate(task, completeTask(task, now));
+      case "reopen":
+        return mutate(task, reopenTask(task));
+      case "wontDo":
+        return mutate(task, markWontDo(task, now));
+      case "restart":
+        return mutate(task, unmarkWontDo(task));
+      case "trash":
+        return mutate(task, trashTask(task, now));
+      case "restore":
+        return mutate(task, restoreTask(task));
+      case "startFocus":
+        return props.onStartFocus(task.id);
+    }
+  }
+
+  /** The registry's answer for this Task, as rows a menu can draw. */
+  function actionItemsFor(task: Task, groupIds: readonly string[], promoted?: TaskActionId[]) {
+    return taskActions({ task, promoted, focusBusy: props.focusBusy })
+      .filter((group) => groupIds.includes(group.id))
+      .map((group) => ({
+        id: group.id,
+        items: group.items.map((item) => ({
+          id: item.id,
+          label: t(item.labelKey),
+          danger: item.danger,
+          disabled: Boolean(item.disabledReasonKey),
+          hint: item.disabledReasonKey ? t(item.disabledReasonKey) : undefined,
+          run: () => runTaskAction(task, item.id),
+        })),
+      }));
+  }
+
+  /**
    * Dropping a row onto another puts it in that one's place.
    *
    * `placeTask` renumbers between neighbours instead of rewriting the list, so
@@ -317,23 +407,17 @@ export function TasksModule(props: TasksModuleProps) {
    * Everything on it goes through `mutate`, so everything on it can be undone.
    */
   function taskMenuAt(task: Task, x: number, y: number): ContextMenuState {
-    const done = isCompleted(task);
     const priorities: Array<Task["priority"]> = ["high", "medium", "low", "none"];
     return {
       x,
       y,
       label: t("tasks.rowMenu", { title: task.title }),
+      // §15.42's order, with the registry's groups around the two choice sets
+      // this menu adds. Complete, Won't Do and Trash used to be written out
+      // here by hand — which is how the row menu came to offer a trashed Task
+      // "Move to trash" and never to offer Pin or Start Focus at all.
       sections: [
-        {
-          id: "state",
-          items: [
-            {
-              id: "complete",
-              label: t(done ? "tasks.menu.reopen" : "tasks.menu.complete"),
-              run: () => toggleDone(task),
-            },
-          ],
-        },
+        ...actionItemsFor(task, ["quick", "work"]),
         {
           id: "priority",
           items: priorities.map((level) => ({
@@ -360,17 +444,7 @@ export function TasksModule(props: TasksModuleProps) {
               : []),
           ],
         },
-        {
-          id: "lifecycle",
-          items: [
-            {
-              id: "trash",
-              label: t("tasks.menu.trash"),
-              danger: true,
-              run: () => mutate(task, trashTask(task, new Date().toISOString())),
-            },
-          ],
-        },
+        ...actionItemsFor(task, ["status", "danger"]),
       ],
     };
   }
@@ -833,15 +907,15 @@ export function TasksModule(props: TasksModuleProps) {
                 : completeTask(openedTask, new Date().toISOString()),
             )
           }
-          onTrash={() => mutate(openedTask, trashTask(openedTask, new Date().toISOString()))}
-          onToggleWontDo={() =>
-            mutate(
-              openedTask,
-              openedTask.wontDoAt
-                ? unmarkWontDo(openedTask)
-                : markWontDo(openedTask, new Date().toISOString()),
-            )
-          }
+          /* §15.3: Complete is drawn in the header as a checkbox, so it is
+             promoted out of the menu rather than repeated inside it. Reopen
+             goes with it — it is the same checkbox, unticked. */
+          actions={taskActions({
+            task: openedTask,
+            promoted: DETAIL_PROMOTED_ACTIONS,
+            focusBusy: props.focusBusy,
+          })}
+          onRunAction={(id) => runTaskAction(openedTask, id)}
         />
       ) : null}
 

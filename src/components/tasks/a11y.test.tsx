@@ -146,6 +146,8 @@ function renderModule(url: string) {
             onPermanentlyDeleteList: () => {},
           }}
           onMutate={() => {}}
+          onStartFocus={() => {}}
+          focusBusy={false}
         />
       </FloatingLayerProvider>
     </I18nProvider>,

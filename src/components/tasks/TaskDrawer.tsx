@@ -21,8 +21,9 @@ import type {
 } from "../../types";
 import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
+import type { TaskActionGroup, TaskActionId } from "../../domain/tasks/actions";
 import { childProgress } from "../../domain/tasks/children";
-import { isCompleted } from "../../domain/tasks/taskState";
+import { isCompleted, isPinned } from "../../domain/tasks/taskState";
 import { checklistProgress, isChecklistMode } from "../../domain/tasks/checkItems";
 import { ChecklistEditor } from "./ChecklistEditor";
 import type { Schedule, ScheduleIssue } from "../../domain/schedule";
@@ -30,6 +31,7 @@ import { ListPicker } from "./ListPicker";
 import { PriorityPicker } from "./PriorityPicker";
 import { SchedulePicker } from "./SchedulePicker";
 import { TagPicker } from "./TagPicker";
+import { TaskActionsMenu } from "./TaskActionsMenu";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import type { TaskDetailWidthState } from "../../hooks/useTaskDetailWidth";
@@ -73,9 +75,16 @@ export interface TaskDrawerProps {
   onAddSubtask: (title: string) => void;
   onToggleSubtask: (id: string) => void;
   onDeleteSubtask: (id: string) => void;
-  onTrash: () => void;
-  /** Audit D-23. Toggles, because a mark you cannot take back is a delete. */
-  onToggleWontDo: () => void;
+  /**
+   * What this Task can be told to do (§15.3), already filtered for its state.
+   *
+   * The Drawer is handed the list rather than deciding it: §15.63 gives that
+   * decision to `domain/tasks/actions`, so the ⋯ here and a right-click on the
+   * row cannot come to disagree about what a Won't Do Task may do.
+   */
+  actions: TaskActionGroup[];
+  /** Runs one, after the Module has re-checked it is still allowed (§15.66). */
+  onRunAction: (id: TaskActionId) => void;
   /** This Task's checklist (spec §11), already in display order. */
   checkItems: CheckItem[];
   onSetContentMode: (mode: TaskContentMode) => void;
@@ -115,8 +124,8 @@ export function TaskDrawer({
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
-  onTrash,
-  onToggleWontDo,
+  actions,
+  onRunAction,
   checkItems,
   onSetContentMode,
   onAddCheckItem,
@@ -270,6 +279,28 @@ export function TaskDrawer({
             across Tasks, so a Task switch can remove this trigger while its
             popover is open, and focus would otherwise land on the body. */}
         <PriorityPicker task={task} onChange={onSetPriority} restoreFocusTo={() => root.current} />
+
+        {/* §15.6, §15.8: the one canonical value, said out loud.
+            Without it Pin would be a state with no visible effect anywhere in
+            the Detail — the reader would have to open the menu again and read
+            which way the label had flipped. A word rather than a glyph, for
+            §15.44's reason. */}
+        {isPinned(task) ? <span className="tm-drawer-pinned">{t("tasks.pinned")}</span> : null}
+
+        {/* §15.2's entry point. Everything §15.3 calls secondary or structural
+            lives behind it — and until now the Detail had no such surface at
+            all, so Won't Do and Trash were two loose buttons at the bottom of
+            the panel and Pin and Start Focus were reachable from nowhere.
+
+            §15.62: opening it selects nothing. The Detail is already this
+            Task's, which is why the menu needs no target of its own. */}
+        <TaskActionsMenu
+          taskId={task.id}
+          title={task.title}
+          groups={actions}
+          onRun={onRunAction}
+          restoreFocusTo={() => root.current}
+        />
 
         <button type="button" className="tm-drawer-close" onClick={onClose} aria-label={t("common.close")}>
           ×
@@ -472,20 +503,13 @@ export function TaskDrawer({
         )}
       </section>
 
-      <div className="tm-drawer-terminal">
-        {/* D-23. Beside Trash rather than beside Done: both are ways of
-            finishing with a task you are not going to do, and the difference
-            is whether you want to find it again. */}
-        <button type="button" className="tm-drawer-wontdo" onClick={onToggleWontDo}>
-          {t(task.wontDoAt ? "tasks.unmarkWontDo" : "tasks.markWontDo")}
-        </button>
-
-        {/* §16.28's Trash action. Soft delete — §12.13 is the screen it moves
-            to, and §13.6 is where getting it back lives. */}
-        <button type="button" className="tm-drawer-trash" onClick={onTrash}>
-          {t("tasks.moveToTrash")}
-        </button>
-      </div>
+      {/* Won't Do and Move to trash used to sit here as two buttons at the
+          foot of the panel. §15.3 puts secondary and destructive work behind
+          the ⋯ in the header, and §15.29 asks for Delete to be in a group of
+          its own — which a pair of buttons under the subtasks cannot be. Both
+          are in the menu now, with Restore in the same slot for a Task that is
+          already in the Trash (§15.66) — a state in which the old panel drew
+          "Move to trash" and meant nothing by it. */}
       </div>
     </aside>
   );

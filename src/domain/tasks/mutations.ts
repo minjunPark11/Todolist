@@ -70,6 +70,35 @@ export function unmarkWontDo(task: Task): TaskMutation {
   };
 }
 
+/**
+ * Keep this Task at hand (§15.6).
+ *
+ * One field, like `markWontDo` above and for the same reason: §15.7 says Pin
+ * moves nothing and changes no priority, and the cheapest way to keep a rule
+ * like that true is to write a mutation that COULD not break it.
+ *
+ * `now` rather than `true` because the field is a timestamp (§15.8) — see the
+ * note on `Task.pinnedAt` for why the View, not the field, decides the order
+ * pinned Tasks appear in.
+ */
+export function pinTask(task: Task, now: string): TaskMutation {
+  return {
+    patch: { pinnedAt: now },
+    // Absent and "" differ here as they do for `deletedAt`: undo puts back
+    // the value that was there, not a value that means the same thing.
+    undo: { pinnedAt: task.pinnedAt },
+    labelKey: "tasks.undoPinned",
+  };
+}
+
+export function unpinTask(task: Task): TaskMutation {
+  return {
+    patch: { pinnedAt: "" },
+    undo: { pinnedAt: task.pinnedAt },
+    labelKey: "tasks.undoUnpinned",
+  };
+}
+
 export function restoreTask(task: Task): TaskMutation {
   return {
     patch: { deletedAt: "" },

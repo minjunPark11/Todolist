@@ -576,6 +576,52 @@
   cursor: pointer;
 }
 
+/* §15.2's ⋯, beside the close button and before it. Sized to §15.40's tap
+   target rather than to the glyph, which is 4px wide and would otherwise be
+   the whole hit area. */
+.tm-drawer-more {
+  /* The trailing group starts here. `.tm-drawer-close` carried this on its
+     own before the ⋯ existed; leaving it there as well would split the free
+     space between two auto margins and strand the ⋯ in the middle. */
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--density-control-h);
+  height: var(--density-control-h);
+  min-width: var(--density-tap);
+  min-height: var(--density-tap);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tm-drawer-more:hover,
+.tm-drawer-more[aria-expanded="true"] {
+  background: var(--bg-hover-content);
+  color: var(--text, #1c1c1e);
+}
+
+/* §15.6's state, said in a word (§15.44). In the property row rather than
+   beside the title, so that pinning a Task does not move its title. */
+.tm-drawer-pinned {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-selected, rgba(0, 122, 255, 0.12));
+  color: var(--accent, #007aff);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.tm-drawer-more ~ .tm-drawer-close {
+  margin-left: 0;
+}
+
 .tm-drawer-title {
   width: 100%;
   padding: 6px 8px;
@@ -1087,17 +1133,9 @@
   font-size: 13px;
 }
 
-.tm-drawer-trash {
-  margin-top: auto;
-  padding: 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--danger, #d70015);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
+/* `.tm-drawer-trash` stood here — see the note in 19-app-shell.css. Trash is
+   the ⋯ menu's own destructive group now (§15.29), and `.ff-context-menu-item.
+   is-danger` already carries the colour this rule was for. */
 
 /* --- undo (§9.36, §9.37) --- */
 

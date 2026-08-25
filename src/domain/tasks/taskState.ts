@@ -26,7 +26,7 @@
 import type { Task, TaskLifecycle } from "../../types";
 
 /**
- * The four fields these predicates read, and nothing else.
+ * The five fields these predicates read, and nothing else.
  *
  * Structural rather than `Task` so that callers holding a narrower shape —
  * the reminder queue's `ReminderTaskSource`, for one — can ask the same
@@ -38,6 +38,19 @@ export interface TaskStateFields {
   completedAt?: string;
   deletedAt?: string;
   wontDoAt?: string;
+  pinnedAt?: string;
+}
+
+/**
+ * Kept at hand (§15.6).
+ *
+ * Orthogonal to everything else here, which is §15.7 as a fact about the
+ * data rather than a rule to remember: nothing below reads `pinnedAt`, and
+ * this reads nothing but `pinnedAt`. A pinned Task can be completed, dated,
+ * in any List, and none of those answers changes because it is pinned.
+ */
+export function isPinned(task: TaskStateFields): boolean {
+  return Boolean(task.pinnedAt);
 }
 
 /** Thrown away and recoverable (§13.20). */

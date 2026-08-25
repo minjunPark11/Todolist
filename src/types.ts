@@ -135,6 +135,21 @@ export interface Task {
   wontDoAt?: string;
   deletedAt?: string; // optional soft-delete marker
   /**
+   * Kept at hand (§15.6), as a timestamp rather than a flag.
+   *
+   * §15.6 names the field `isPinned: boolean` and §15.8 asks for exactly one
+   * canonical value; this is that one value, in the shape `wontDoAt` and
+   * `deletedAt` already use. A boolean answers "is it pinned" and nothing
+   * else, and §15.8 hands the ORDER of pinned Tasks to each View — a question
+   * a boolean cannot be asked. Read it through `taskState.isPinned` rather
+   * than directly, so the predicate stays the one place that knows the shape.
+   *
+   * Independent of status, List and priority (§15.7): pinning writes this
+   * field and touches nothing else, which is what makes that rule structural
+   * instead of remembered.
+   */
+  pinnedAt?: string;
+  /**
    * Dormant (Chapter 26 §26.3.2).
    *
    * This remembered which workflow status to put a Task back into when it was
