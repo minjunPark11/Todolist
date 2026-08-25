@@ -35064,6 +35064,7 @@ Chapter 26  >  Chapter 1–25
 | D3a | `allDay` | 저장 필드 | derived state | 26.5.3 |
 | D4 | Reminder | 단일 관심사 | Reminder entity + Delivery Adapter 분리 | 26.6 |
 | D5 | Recurrence | Series/Occurrence/Exception 필수 | 1차 범위에서 제외 | 26.7 |
+| D6 | Mutation identity | mutation object + ID + per-entity sequence | state 기반 보장 (snapshot + queue + revision) | 26.8.1 |
 
 ---
 
@@ -35457,6 +35458,67 @@ Task Detail이 안정되기 전에 이것을 함께 열면, Detail의 결함과 
 
 ---
 
+### 26.8.1 D6 · Mutation identity 는 operation log 가 아니라 state 로 보장된다
+
+16장은 mutation 하나하나를 추적 가능한 object로 만들 것을 요구한다.
+
+```text
+16.17  Mutation Object
+16.18  Mutation ID (mut_<ulid>)
+16.19  Per-entity Sequence
+16.20  Stale Response Problem
+16.21  Stale Response Rule
+```
+
+이 코드베이스는 **operation 기반이 아니라 state 기반**이다.
+mutation은 요청/응답이 아니라 동기적인 로컬 state 전이이고,
+동기화는 delta가 아니라 스냅샷 전체를 diff해서 올린다.
+
+그래서 mutation ID를 새로 도입해도 막을 race가 남아 있지 않다.
+16.18이 열거한 목적은 이미 각각 다른 장치가 담당한다.
+
+| 16장이 요구하는 것 | 이 코드베이스의 대응 | 위치 |
+|---|---|---|
+| retry | 실패한 save를 backoff로 재시도 | `saveQueue.ts` |
+| deduplication | 실행 중 요청은 coalesce, 마지막 payload가 이김 | `saveQueue.ts` |
+| stale-response detection (save) | 한 번에 하나만 실행 + `generation` | `saveQueue.ts` |
+| stale-response detection (load) | `loadTicketRef` ticket 비교 | `usePlannerData.ts` |
+| latest user mutation wins | payload가 항상 최신 state 전체 | `saveQueue.ts` |
+| undo association | store `revision` + 스냅샷 undo | `usePlannerData.ts`, `undoStack.ts` |
+
+핵심은 16.19의 "sequence가 필요한 이유"가 여기서는 성립하지 않는다는 것이다.
+
+```text
+스펙의 전제:  #1 title="Meeting A" 와 #2 title="Meeting AB" 가
+              각각 서버로 나가고 응답 순서가 뒤집힐 수 있다.
+
+이 코드베이스: #1과 #2는 같은 state에 순서대로 적용되고,
+              나가는 것은 #2가 적용된 뒤의 state 하나뿐이다.
+```
+
+즉 늦은 응답이 UI를 되돌릴 경로가 없다. UI는 응답이 아니라 state를 그린다.
+
+**대신 같은 부류의 race가 두 곳에 실재했고, 둘 다 16.21의 규칙으로 닫았다.**
+
+```text
+로드가 로컬 편집 위에 착지  →  reapplyLocalEdits (24.24, 9.45)
+로드 이후의 undo 스냅샷      →  store revision (16.21)
+```
+
+두 번째가 특히 조용한 실패였다. undo 항목은 PlannerData 전체 스냅샷을 들고 있어서
+로드가 store를 교체한 뒤에 적용하면 편집 하나를 되돌리는 것이 아니라
+로드가 가져온 레코드 전부를 지운다. 그리고 sync baseline이 이미 `loaded`이므로
+다음 save가 그 부재를 "사용자가 지웠다"로 읽어 계정에서도 지운다.
+
+**금지**: mutation object / mutation ID / per-entity sequence를 새로 만드는 것.
+이미 있는 보장을 다른 모양으로 다시 구현하는 것이고, 26장이 존재하는 이유가 그것이다.
+
+**필요해지는 조건**: 서버가 delta를 받거나(전체 스냅샷이 아니라 operation),
+낙관적 업데이트가 응답을 기다리거나, 오프라인 operation을 큐에 쌓아 재생해야 할 때.
+그 셋 중 하나라도 사실이 되면 이 결정을 다시 연다.
+
+---
+
 ## 26.9 Implementation Phases
 
 각 단계는 앞 단계가 없으면 다시 써야 하는 순서다.
@@ -35483,17 +35545,24 @@ Domain invariant test
 이후 모든 편집 UI가 이 계층 위에 올라간다.
 
 ```text
-Draft state
-Enter commit / Esc cancel
-Blur · Task 전환 시 flush
-IME composition guard
-Mutation ID / sequence
-Stale response protection
-Save failure 시 draft 보존
+Draft state                        useDeferredTextField
+Enter commit / Esc cancel          useDeferredTextField
+Blur · Task 전환 시 flush           useDeferredTextField
+IME composition guard              useDeferredTextField
+Mutation ID / sequence             D6 — state 기반으로 대체 (26.8.1)
+Stale response protection          reapplyLocalEdits · loadTicket · store revision
+Save failure 시 draft 보존          usePlannerData 로컬 저장 실패 처리
 ```
 
 > 현재 Drawer의 제목은 키 입력마다 도메인에 직접 커밋된다(`TaskDrawer`).
 > 9장의 MUST를 정면으로 어기는 지점이며, Phase 1의 첫 대상이다.
+
+"Save failure 시 draft 보존"은 이 앱에서 두 층이다.
+원격 save 실패는 `saveQueue`가 이미 최신 state로 재시도한다.
+문제는 로컬 스냅샷 쓰기였다 — 계정은 선택이지만 로컬 저장은 아니고,
+quota가 차면 effect에서 throw해서 렌더를 같이 죽였다.
+9.45와 16.38이 요구하는 두 가지를 지킨다: draft를 되돌리지 않고, 실패를 숨기지 않는다.
+16.93에 따라 toast가 아니라 사라지지 않는 bar다.
 
 ### Phase 2 · Content
 
