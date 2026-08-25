@@ -35444,12 +35444,14 @@ Task Detail이 안정되기 전에 이것을 함께 열면, Detail의 결함과 
 | 영역 | 위치 | 대응 장 |
 |---|---|---|
 | Schedule domain | `src/domain/schedule/` | 5 |
+| Reminder 모델 + 발송 분리 | `src/domain/schedule/reminders.ts`, `platform.notificationAccess` | 6, 26.6 |
 | Mutation + Undo | `src/domain/tasks/mutations.ts` | 17 |
 | Detail presentation registry | `src/domain/tasks/responsive.ts` | 1, 25.4 |
 | Scope registry | `src/domain/tasks/scopeRegistry.ts` | 3 |
 | Task state 술어 | `src/domain/tasks/taskState.ts` | 4 |
 | Visual token + 회귀 e2e | `src/styles/`, `e2e/radiusScale` 외 | 20 |
 | Focus engine | `usePlannerData.startFocusSession` | 25.6 |
+| Action registry | `src/domain/tasks/actions.ts` | 15.63, 15.64 |
 | Section (보드 컬럼) | `src/domain/tasks/sections.ts` | 26.3.3 |
 
 `mutations.ts`의 `TaskMutation { patch, undo, labelKey }`는 17장의
@@ -35738,11 +35740,75 @@ Reminder와 같은 부류의 **모델 변경**이지 메뉴에 매달 수 있는
 ("제목이 A에서 B로")은 없다. store는 필드의 현재 값만 갖고 있고, 그것은 로그가
 있어야 답할 수 있다.
 
-**`Save as Template`은 아직 없다.** §25.8은 VERIFIED TICKTICK이지만 26.9의
-Phase 5 목록에도 Deferred 목록에도 들어 있지 않다 — 스펙의 빈틈이다.
-Deferred의 다른 항목들과 달리 앱에 없는 개념에 의존하지도 않으므로
-(Template은 Task 하나로 만들 수 있다), 미룬 이유는 "어렵다"가 아니라
-"Phase 5가 요구하지 않았다"이다. 다음 단계에서 다시 연다.
+**`Save as Template`은 Phase 5 목록의 빈틈이었다.** §25.8은 VERIFIED
+TICKTICK이지만 26.9의 Phase 5 목록에도 Deferred 목록에도 들어 있지 않았다.
+Deferred의 다른 항목들과 달리 앱에 없는 개념에 의존하지 않으므로
+(Template은 Task 하나로 만들 수 있다) 미룬 이유는 "어렵다"가 아니었고,
+Phase 6에서 닫았다.
+
+---
+
+### Phase 6 · Reminder 모델과 Template
+
+Phase 3이 §6.4를 만족시키면서 남겨둔 것, 그리고 §25.8.
+
+```text
+Reminder entity                 types.Reminder + domain/schedule/reminders
+Multiple per Task               Schedule.reminders: ReminderSpec[]
+relative / absolute             §6.13의 custom 입력까지 포함
+Preset 마이그레이션              domain/schedule/reminderRows.migrateReminders
+Delivery 분리                   platform.notificationAccess + useNotificationAccess
+Save as Template                domain/tasks/templates + Quick Add 진입점
+```
+
+Phase 3의 기록은 "둘 다 연결 작업이 아니라 **모델 변경**이므로 화면과 같이
+움직이지 않는 별도 단계에 속한다"였다. 그 단계가 이것이다.
+
+**`reminder` preset은 §6.3이 쓰지 말라고 이름까지 적은 모양이었다.** 이유는
+§6.15 한 줄이다 — "1일 전"과 "1시간 전"은 둘 다 답이고, 필드는 하나만 담는다.
+옛 필드의 주석은 "하나만 담을 수 있는 UI를 가진 list 타입은 앱이 할 수 있는
+일에 대해 거짓말하는 타입"이라고 주장했는데, 이제 그 거래의 반대쪽이 참이다 —
+panel이 multi-select가 됐다(§6.17).
+
+expand/migrate/contract다. preset은 Task에 남아 있고, load에서 row로 옮기고,
+그 Task의 schedule을 다음에 쓸 때 지워진다. **마이그레이션이 중요한 지점을
+테스트로 못박았다**: 22시 Task의 `1d-9am`은 여전히 전날 09:00에 울린다.
+옛 코드가 이것 하나를 special-case했던 이유가 §6.12의 `allDayTime`이고,
+이제는 모델에 있다.
+
+새 모델이 아니면 표현할 수 없던 것 셋:
+
+§6.11의 all-day 단위. 옛 panel은 all-day Task에 "10분 전"을 내주고 Task에
+없는 시각에 대해 계산했다 — 사용자는 본 적 없는 날의 08:50을 고른 것이 된다.
+이제 all-day Task는 다른 목록을 받는다. timed 목록을 걸러낸 것이 아니다.
+
+§6.12의 `allDayTime`. "1일 전 오전 9시"는 offset이 아니다.
+
+§6.13의 absolute. schedule 변경이 건드리지 않는 자기만의 시각(§6.27)이고,
+custom 입력이 없으면 그 분기는 아무것도 만들어낼 수 없는 죽은 코드가 된다.
+
+**§6.32는 유일하게 따르지 않은 곳이다.** all-day → timed 전환에서 고정 시각을
+버리고 offset만 남기라고 하지만, `1d-9am`은 §6.6의 **timed** 목록에도 있고
+저장 모양이 같다. 여기서 시각을 벗기면 방금 체크한 행을 다시 쓰게 된다 —
+브라우저에서 재현했다: summary가 "사용자 지정"으로 읽혔고 체크박스는 풀렸다.
+
+**§6.39는 지키는 게 아니라 어기고 있었다.** `useReminders`가 mount에서
+permission을 요청해서, 사용자가 아무것도 요청하지 않은 첫 로드에 브라우저
+prompt가 떴다. 맥락 없는 prompt는 사람들이 닫아버리고, 닫힌 prompt는 그 세션
+내내 답이다. 요청은 알림을 고르는 순간으로 옮겼다.
+
+§6.40과 §26.6.4: 저장은 어느 쪽이든 되고, panel이 그 말을 그대로 한다 —
+"저장했습니다. 알림이 꺼져 있어 전달되지 않습니다". 실패 보고가 아니다.
+`notificationAccess`가 boolean이 아니라 네 값인 이유도 이것이다. 아직 묻지
+않음 / 거절됨 / 플랫폼에 채널 없음은 서로 다른 말을 해야 하고, 첫 번째는
+아무 말도 하지 않아야 한다.
+
+**Template은 §25.8의 선이 곧 설계다.** Duplicate는 지금 Task를 만들고,
+이것은 나중에 Task를 만들 정의를 만든다. Template이 들고 있는 것은 다시
+타이핑할 것들뿐이고 — 그 Task 하나에 속한 것은 id도 List도 날짜도 없다.
+날짜가 가장 분명하다: 8월에 저장한 template을 3월에 쓰면 지난 8월 마감인
+Task가 나온다. 부모는 id가 아니라 **위치**로 가리키므로 레코드가 혼자 서고,
+아직 존재하지 않는 id로 다시 지어진다.
 
 ### Deferred
 
@@ -35757,6 +35823,26 @@ Convert to Note        Note 도메인 부재
 Deferred 항목은 난이도 때문이 아니라 **앱에 아직 없는 개념에 의존하기 때문에** 미뤄진다.
 `25.11`이 이미 "personal list면 Assign은 unavailable"이라고 적었으므로,
 가용성 규칙만 구현하고 기능을 비워두는 것은 스펙과 모순되지 않는다.
+
+Phase 6까지 끝난 시점에서 다섯 항목이 각각 무엇을 기다리는지 적어둔다.
+전부 **제품 결정이 코드보다 먼저** 필요한 것들이고, 그 결정 없이 구현하면
+되돌리기 어려운 모양을 먼저 못박게 된다.
+
+```text
+Recurrence Series   26.7이 1차 범위 밖으로 확정한 것. 재개 조건은 §7이
+                    요구하는 occurrence/exception을 저장할 이유가 생길 때다.
+
+Attachment          파일이 어디에 저장되는가 — Supabase Storage인지, 로컬
+                    인지, 둘 다인지. §14의 lifecycle 전체가 이 답 위에 선다.
+
+Comments            공유 List / 멤버. 혼자 쓰는 앱에서 댓글은 상대가 없다.
+Assign              같은 이유. §25.11이 이미 "personal list면 unavailable".
+
+Convert to Note     Note 도메인. Task가 아닌 것을 담을 곳이 아직 없다.
+```
+
+Reminder는 이 목록에 없었지만 같은 부류였고(모델 변경), Phase 6에서 닫혔다.
+Save as Template은 어느 목록에도 없던 빈틈이었고, 역시 Phase 6에서 닫혔다.
 
 ---
 
