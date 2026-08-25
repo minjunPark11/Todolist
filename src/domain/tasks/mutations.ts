@@ -183,13 +183,22 @@ export function moveTaskToSection(
 }
 
 /**
- * §12.21, and the reason mutations are described before they are applied.
+ * Whether this change takes the Task out of the Scope it is being made in.
  *
  * The question is asked against the Scope the user is standing in, with the
- * Task as it will be. A `true` here is what closes the Drawer and takes the
- * row out from under the cursor — so it is worth being exact: a Task that was
- * never in this Scope has not "left" it, and removing a row that was not
- * showing would be the list flickering for no reason.
+ * Task as it will be. Exactness matters: a Task that was never in this Scope
+ * has not "left" it.
+ *
+ * NO SCREEN ACTS ON THE ANSWER any more. It used to close the Drawer, and
+ * §1.28 reversed that — a Task that no longer matches a filter is still a
+ * Task, and its Detail stays open. The row does still leave the list, but
+ * `queryScopeTasks` decides that by re-querying rather than by being told.
+ *
+ * What is left is a statement about Scopes, and the golden-journey tests use
+ * it as one: completing a Task removes it from Today, moving it out of the
+ * Inbox removes it from the Inbox. Those facts are still worth pinning down —
+ * they are what the list depends on — even though nothing now branches on
+ * them at the moment of the edit.
  */
 export function leavesScope(
   before: Task,

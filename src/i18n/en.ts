@@ -1045,6 +1045,7 @@ export const en: Dictionary = {
   "tasks.noListsMatch": "No list matches that.",
   "tasks.listUnknown": "No list",
   "tasks.listFollowsParent": "Follows its parent task",
+  "tasks.resizeDetail": "Resize the task detail",
   // Spec §13.36–§13.41, §13.55. The `#` is a display prefix and is never part
   // of the stored name (§13.35), so it appears in the chips and the options
   // and nowhere in these values.

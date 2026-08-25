@@ -1022,6 +1022,7 @@ export const ko: Dictionary = {
   "tasks.noListsMatch": "일치하는 리스트가 없습니다.",
   "tasks.listUnknown": "리스트 없음",
   "tasks.listFollowsParent": "상위 작업을 따릅니다",
+  "tasks.resizeDetail": "작업 상세 너비 조절",
   "tasks.tags": "태그",
   "tasks.addTag": "태그 추가",
   "tasks.removeTag": "{{value}} 제거",

@@ -32,6 +32,8 @@ import { SchedulePicker } from "./SchedulePicker";
 import { TagPicker } from "./TagPicker";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import type { TaskDetailWidthState } from "../../hooks/useTaskDetailWidth";
+import { TASK_DETAIL_MAX_WIDTH, TASK_DETAIL_MIN_WIDTH } from "../../app/taskDetailWidth";
 import { DeferredInput, DeferredTextarea } from "../kit";
 
 export interface TaskDrawerProps {
@@ -85,6 +87,11 @@ export interface TaskDrawerProps {
   /** This Task's ancestors, root first — §12.7's way back up. */
   ancestors: Array<{ id: string; title: string }>;
   onOpenTask: (taskId: string) => void;
+  /**
+   * §1.12-§1.14, owned by the Module because the reserved empty column needs
+   * the same width — see the `--tm-detail-w` comment there.
+   */
+  resize: TaskDetailWidthState;
   /** False at the deepest allowed level (§12.49). */
   canAddSubtask: boolean;
 }
@@ -120,6 +127,7 @@ export function TaskDrawer({
   ancestors,
   onOpenTask,
   canAddSubtask,
+  resize,
 }: TaskDrawerProps) {
   const { t } = useT();
   const root = useRef<HTMLElement>(null);
@@ -176,8 +184,57 @@ export function TaskDrawer({
     if (field) field.value = "";
   }
 
+  /**
+   * §1.12: desktop only, and only where there is something to resize against.
+   *
+   * The other three presentations cover the list rather than sitting beside it
+   * (§1.15–§1.16), so their width is the screen's and a handle would offer a
+   * drag that could not change anything.
+   */
+  const resizable = presentation === "inline-drawer";
+
   return (
-    <aside ref={root} className={`tm-drawer is-${presentation}`} aria-label={t("tasks.drawerLabel")}>
+    <aside
+      ref={root}
+      className={`tm-drawer is-${presentation}${resize.isResizing ? " is-resizing" : ""}`}
+      aria-label={t("tasks.drawerLabel")}
+    >
+      {/* §1.13: a 1px divider with an 8px hit area, which is why the visible
+          line is a pseudo-element and this element is wider than it looks.
+
+          A `separator` with `aria-orientation="vertical"` and a value, because
+          §1.12's drag has to have a keyboard equivalent — the same shape the
+          Context Sidebar's handle already uses. */}
+      {resizable ? (
+        <div
+          className="tm-drawer-resize"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("tasks.resizeDetail")}
+          aria-valuenow={resize.width}
+          aria-valuemin={TASK_DETAIL_MIN_WIDTH}
+          aria-valuemax={TASK_DETAIL_MAX_WIDTH}
+          tabIndex={0}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            resize.beginResize(event.clientX);
+          }}
+          onDoubleClick={resize.resetWidth}
+          onKeyDown={(event) => {
+            if (resize.resizeByKey(event.key, event.shiftKey)) event.preventDefault();
+          }}
+        />
+      ) : null}
+
+      {/* §1.7's Property Header, and it does not scroll away.
+          `□ │ Apr 20, 9:30 PM - 10:30 PM │ ⚑` is the row the spec draws, so
+          Complete, the schedule and Priority sit here together rather than as
+          three stacked rows further down. Reminder and Repeat are in the
+          schedule popover (§6.4), which is why they are not separate controls.
+
+          Sticky rather than fixed: the pane is the scroll container's parent,
+          so this stays put as the content moves under it without being taken
+          out of the flow. */}
       <header className="tm-drawer-head">
         {/* §4: completion is one control and it is the first one. ST-I5 lets a
             parent finish with subtasks still open — they are not a gate. */}
@@ -189,10 +246,40 @@ export function TaskDrawer({
           />
           <span>{t("tasks.markDone")}</span>
         </label>
+
+        {/* The whole schedule, not a due date (§5, audit §6).
+            `<input type="date">` could write one field, so a Task's start,
+            its times, its reminder and its repeat were unreachable from here
+            — and the legacy panel, which has had the full editor all along,
+            disagreed with this one about what a schedule was. The editor is
+            the same component; only the trigger and the surface are new. */}
+        <SchedulePicker
+          task={task}
+          today={today}
+          onCommit={onCommitSchedule}
+          restoreFocusTo={() => root.current}
+        />
+
+        {/* §8.2, §8.5: a flag that opens a popover, not a dropdown. The
+            `<select>` this replaces could show no flag, could not be undone
+            (§8.36) and wrote a record when the same level was chosen twice
+            (§8.8) — the last two because it went through `onUpdate` rather
+            than the command every other surface uses (§8.31).
+
+            §19.32: the Drawer is the focus fallback. The Detail is reused
+            across Tasks, so a Task switch can remove this trigger while its
+            popover is open, and focus would otherwise land on the body. */}
+        <PriorityPicker task={task} onChange={onSetPriority} restoreFocusTo={() => root.current} />
+
         <button type="button" className="tm-drawer-close" onClick={onClose} aria-label={t("common.close")}>
           ×
         </button>
       </header>
+
+      {/* §1.17, §1.18: the pane does not scroll — this does. That is what lets
+          the header above stay put (§1.7), and it is why the scroll bar runs
+          beside the content rather than beside the whole panel. */}
+      <div className="tm-drawer-scroll">
 
       {/* Parent navigation (§12.7, §12.35). A child Task opened on its own is
           a Task with no visible context — this is where it came from, and it
@@ -229,36 +316,6 @@ export function TaskDrawer({
       />
 
       <div className="tm-drawer-fields">
-        {/* The whole schedule, not a due date (§5, audit §6).
-            `<input type="date">` could write one field, so a Task's start,
-            its times, its reminder and its repeat were unreachable from here
-            — and the legacy panel, which has had the full editor all along,
-            disagreed with this one about what a schedule was. The editor is
-            the same component; only the trigger and the surface are new. */}
-        <div className="tm-drawer-field">
-          <span>{t("tasks.addDate")}</span>
-          <SchedulePicker
-            task={task}
-            today={today}
-            onCommit={onCommitSchedule}
-            restoreFocusTo={() => root.current}
-          />
-        </div>
-
-        {/* §8.2, §8.5: a flag that opens a popover, not a dropdown. The
-            `<select>` this replaces could show no flag, could not be undone
-            (§8.36) and wrote a record when the same level was chosen twice
-            (§8.8) — the last two because it went through `onUpdate` rather
-            than the command every other surface uses (§8.31).
-
-            §19.32: the Drawer is the focus fallback. The Detail is reused
-            across Tasks, so a Task switch can remove this trigger while its
-            popover is open, and focus would otherwise land on the body. */}
-        <div className="tm-drawer-field">
-          <span>{t("tasks.priority")}</span>
-          <PriorityPicker task={task} onChange={onSetPriority} restoreFocusTo={() => root.current} />
-        </div>
-
         {/* §13.8, §13.9: the List is a property row that opens a picker, with
             Folders as headings (§13.10) and a search (§13.26).
 
@@ -329,6 +386,9 @@ export function TaskDrawer({
 
         {checklist ? (
           <ChecklistEditor
+            /* §1.26: the Drawer no longer remounts on a Task switch, so the
+               component holding a per-Task draft has to reset itself. */
+            key={task.id}
             items={checkItems}
             onAdd={onAddCheckItem}
             onAddMany={onAddCheckItems}
@@ -425,6 +485,7 @@ export function TaskDrawer({
         <button type="button" className="tm-drawer-trash" onClick={onTrash}>
           {t("tasks.moveToTrash")}
         </button>
+      </div>
       </div>
     </aside>
   );

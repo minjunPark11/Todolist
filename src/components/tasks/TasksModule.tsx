@@ -37,9 +37,7 @@ import type { TaskChild } from "../../domain/tasks/children";
 import { ancestorsOf, canAddChild } from "../../domain/tasks/hierarchy";
 import type { TaskMutation } from "../../domain/tasks/mutations";
 import {
-  applyPatch,
   completeTask,
-  leavesScope,
   markWontDo,
   moveTaskToSection,
   reopenTask,
@@ -50,6 +48,7 @@ import {
 } from "../../domain/tasks/mutations";
 import { ContextMenu, type ContextMenuState } from "../common/ContextMenu";
 import { useFloatingLayerOwner } from "../floating";
+import { useTaskDetailWidth } from "../../hooks/useTaskDetailWidth";
 import { priorityChange } from "../../domain/tasks/priority";
 import type { Schedule, ScheduleIssue } from "../../domain/schedule";
 import { addDays } from "../../utils/date";
@@ -254,18 +253,32 @@ export function TasksModule(props: TasksModuleProps) {
   // which is the same reading the Drawer takes one line above.
   useFloatingLayerOwner(openedTask?.id ?? null);
 
+  // §1.12–§1.14. Owned by the Module because the empty column needs the same
+  // number the pane uses; the Drawer gets the handle's behaviour passed in.
+  const detailWidth = useTaskDetailWidth();
+
   /**
-   * §12.21, in one place: apply, then ask whether the Task still belongs here.
+   * Apply a mutation, and offer the undo that goes with it.
    *
-   * A Task that has left the Scope takes the Drawer with it — leaving it open
-   * over a row that is no longer in the list is the state §4.64 refuses. The
-   * undo comes from the mutation rather than from inverting the patch, so
+   * It used to close the Drawer when the Task left the Scope, on the reading
+   * that a Detail hanging over a row no longer in the list is a broken state.
+   * §1.28 decides the opposite, and says so four more times — §3's acceptance
+   * list spells out "완료로 query에서 사라져도 Detail은 유지된다". The Detail is
+   * not a tooltip for a row; it is the Task, and the Task is still there.
+   *
+   * The case that settles it is the ordinary one: ticking Done on the Task you
+   * are reading, in Today. The old behaviour took the panel away at the exact
+   * moment you might want to add a note about what you just finished, and the
+   * way back was to find a row that had by then been filtered out.
+   *
+   * §1.27 is untouched and still closes — a DELETED Task has no Detail to
+   * show, which is a different thing from one that no longer matches a filter.
+   *
+   * The undo comes from the mutation rather than from inverting the patch, so
    * pressing it restores what was there and not an approximation (§9.35).
    */
   function mutate(target: Task, mutation: TaskMutation) {
     props.onMutate(target.id, mutation.patch);
-    const left = leavesScope(target, applyPatch(target, mutation.patch), scope, ctx);
-    if (left && target.id === state.taskId) closeTask();
     setUndo({
       labelKey: mutation.labelKey,
       run: () => props.onMutate(target.id, mutation.undo),
@@ -486,6 +499,16 @@ export function TasksModule(props: TasksModuleProps) {
       className={`tm-shell is-${mode} sidebar-${sidebar}${sidebarOpen ? " sidebar-open" : ""}${
         openedTask && detailIsFullScreen(mode) ? " detail-full" : ""
       }`}
+      /**
+       * §1.14's width, set HERE rather than on the Drawer.
+       *
+       * Two elements need it and only one of them is the Drawer: the reserved
+       * empty column (audit D1-1) has to be exactly as wide as the real pane,
+       * or opening a Task makes the list jump — which is the bug that column
+       * exists to prevent. Setting it on the shell is what lets both inherit
+       * one number.
+       */
+      style={{ ["--tm-detail-w" as string]: `${detailWidth.width}px` }}
     >
       {/* §15.15/§15.16: an overlay Sidebar is a layer the user opened, so it
           has something to dismiss it with. A persistent one has nothing to
@@ -752,7 +775,17 @@ export function TasksModule(props: TasksModuleProps) {
       {openedTask ? (
         <TaskDrawer
           presentation={taskDetailPresentationFor(mode)}
-          key={openedTask.id}
+          /* No `key` on the Drawer — §1.26 forbids exactly what one produces.
+             Keying the pane by Task id remounts the whole panel on every
+             switch, which is "Pane close/reopen" from that section's list of
+             things to avoid: the entrance animation replays, the scroll
+             position resets, and a fast walk down a list flickers.
+
+             Nothing is lost by dropping it. The text fields already take
+             `resetKey={task.id}` (§9), the schedule editor is keyed inside
+             `SchedulePicker`, and the one remaining piece of per-Task local
+             state — the checklist's draft row — is keyed on its own component.
+             Remount what holds the state, not the surface around it. */
           task={openedTask}
           lists={lists}
           folders={sidebarFolders}
@@ -791,6 +824,7 @@ export function TasksModule(props: TasksModuleProps) {
           ancestors={ancestorsOf(openedTask.id, tasks)}
           onOpenTask={openTask}
           canAddSubtask={canAddChild(openedTask.id, tasks)}
+          resize={detailWidth}
           onComplete={() =>
             mutate(
               openedTask,

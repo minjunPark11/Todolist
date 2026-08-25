@@ -35631,15 +35631,44 @@ picker가 이름이 비슷하다는 이유로 그것을 불렀다면 한 Task에
 ### Phase 4 · Detail Shell Fidelity
 
 ```text
-Resize
-Width persistence
-Sticky property header
-Loading
-Task switching
-Query에서 Task가 사라져도 Detail 유지
-Close / Esc
-Focus restoration
+Resize                          app/taskDetailWidth + useTaskDetailWidth
+Width persistence               localStorage (UI preference, §1.14)
+Sticky property header          tm-drawer-head + tm-drawer-scroll
+Loading                         이미 성립 — local store에서 동기적으로 읽음
+Task switching                  Drawer의 key 제거 (§1.26)
+Query에서 Task가 사라져도 Detail 유지   mutate()의 자동 close 제거 (§1.28)
+Close / Esc                     Phase 2에서 완료
+Focus restoration               Phase 3의 popover + useFocusTrap
 ```
+
+§1.28은 기존 동작을 **뒤집는다**. `mutate()`는 Task가 Scope를 벗어나면 Drawer를
+닫았고(TickTick plan §12.21/§4.64), 이 스펙은 반대를 말한다 — §1.28, §1.40,
+§3.x(2407·2453·2462·2493), 그리고 §3 acceptance가 "완료로 query에서 사라져도
+Detail은 유지된다"라고 직접 적는다. 다섯 번 반복되는 규칙이라 해석의 여지가 없다.
+
+결정적인 사례는 평범한 쪽이다: Today에서 읽고 있던 Task를 완료 처리하는 것.
+옛 동작은 방금 끝낸 일에 메모를 남기려는 바로 그 순간 패널을 치웠고,
+돌아가는 길은 이미 필터에서 빠진 row를 찾는 것이었다.
+§1.27(삭제)은 그대로 닫는다 — 삭제된 Task는 보여줄 Detail이 없고,
+그것은 필터에 맞지 않게 된 Task와 다른 문제다.
+
+Phase 4에서 드러난 것 세 가지:
+
+Detail이 독립적으로 scroll하지 않았다(§1.17). `.tm-sidebar`와 `.tm-main`은
+이미 `overflow-y: auto`를 갖고 있었지만 shell 높이를 묶는 것이 없었다 —
+`.app-frame`이 `min-height`만 설정하므로 grid row가 가장 큰 자식까지 자랐고
+**페이지 전체가** scroll했다. 520px 창에서 subtask 12개짜리 Detail을 열면
+shell이 766px이 된다. §1.17이 명시적으로 금지하는 "전체 앱을 하나의 scroll
+container로" 만드는 상태였다.
+
+`min-height: 0`이 두 군데 필요했다. grid item과 flex item 모두 기본값이
+`auto`라 내용보다 작아지기를 거부한다. 이것 없이는 안쪽 영역이 scroll할
+기준 높이를 못 가지고, sticky header도 붙을 곳이 없다.
+
+Drawer의 `key={task.id}`는 §1.26이 피하라고 적은 "Pane close/reopen"을
+그대로 만들고 있었다. 텍스트 필드는 이미 `resetKey`를 쓰고 schedule editor는
+자체 key가 있으므로, 남은 것은 checklist의 draft 행 하나뿐이었다 —
+상태를 가진 component를 key하고, 그것을 감싼 surface는 두었다.
 
 ### Phase 5 · Actions
 

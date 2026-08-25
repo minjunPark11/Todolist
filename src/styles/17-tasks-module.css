@@ -9,8 +9,21 @@
   /* --tm-sidebar-w (240px) was a local override before P0-3 unified sidebar
      width under --context-sidebar-w. The local variable is now unused. */
   grid-template-columns: var(--context-sidebar-w, 248px) minmax(0, 1fr) auto;
-  height: 100%;
+  /* §1.17: the sidebar, the list and the Detail each scroll on their own, and
+     the app is NOT one scroll container.
+     `.tm-sidebar` and `.tm-main` were already built that way — both carry
+     `overflow-y: auto` and `min-height: 0` — but the piece that makes those
+     mean anything was missing: nothing bounded the shell's height. `height:
+     100%` resolved against an `app-frame` that only sets `min-height`, so the
+     grid row grew to its tallest child and the whole PAGE scrolled instead.
+     Measured with a 12-subtask Detail in a 520px window: a 766px shell.
+     `100dvh` rather than `100%` because the shell is the full-height region
+     beside the Rail, and `dvh` is what the mobile presentation already uses
+     for the same reason. Scoped to this shell: the legacy `.app-shell` pages
+     still scroll as a document, which is what they are built for. */
+  height: 100dvh;
   min-height: 0;
+  overflow: hidden;
   background: var(--bg, #fff);
 }
 
@@ -426,20 +439,111 @@
 }
 
 .tm-drawer {
+  /* `position: relative` so the resize handle can hang off the left edge, and
+     no padding: the header and the scroll region below carry their own, which
+     is what lets the sticky header span the full width instead of floating
+     inside a padded box (§1.7, §1.19). */
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  width: 340px;
-  padding: 16px;
-  overflow-y: auto;
+  /* §1.12's stored width (§1.14), clamped in `taskDetailWidth.ts`. It was a
+     hardcoded 340px — below the 360px minimum the spec sets — and there was no
+     way to change it. `--tm-detail-w` is set inline by the Drawer; the
+     fallback is only for a presentation that renders before the hook has
+     read storage. */
+  width: var(--tm-detail-w, 480px);
+  flex: 0 0 auto;
+  /* NOT `overflow-y: auto`. The pane scrolling is what made the header scroll
+     away with it; `.tm-drawer-scroll` owns the scroll now (§1.17). */
+  overflow: hidden;
+  /* Both `min-height: 0`s are load-bearing, and neither is obvious.
+
+     A grid item defaults to `min-height: auto`, which refuses to shrink below
+     its content — so the pane grew to its content's full height inside a
+     shorter shell and the whole page scrolled instead. The inner region then
+     had no bound to scroll against, and the sticky header had nothing to stick
+     to. Measured: a 766px pane in a 520px viewport. */
+  min-height: 0;
   border-left: 1px solid var(--border, #e5e5e7);
   background: var(--bg, #fff);
 }
 
+/* Every other presentation covers the list rather than sitting beside it, so
+   the stored width does not apply and the surface takes what it is given
+   (§1.15, §1.16). */
+.tm-drawer.is-right-sheet,
+.tm-drawer.is-full-screen,
+.tm-drawer.is-right-overlay {
+  width: auto;
+}
+
+/* §1.13: a 1px divider inside an 8px hit area. The element IS the hit area and
+   the visible line is drawn by the pseudo-element, which is the only way to
+   have both without a target nobody can hit. */
+.tm-drawer-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Straddles the border so the grab area covers both sides of the line. */
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  z-index: var(--z-sticky, 20);
+  touch-action: none;
+}
+
+.tm-drawer-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+}
+
+.tm-drawer-resize:hover::after,
+.tm-drawer-resize:focus-visible::after,
+.tm-drawer.is-resizing .tm-drawer-resize::after {
+  background: var(--color-primary, #0066cc);
+}
+
+.tm-drawer-resize:focus-visible {
+  outline: none;
+}
+
+/* §1.7: the Property Header does not scroll away. */
 .tm-drawer-head {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky, 20);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+  padding: 16px 16px 10px;
+  background: var(--bg, #fff);
+  border-bottom: 1px solid var(--border-subtle, rgba(25, 25, 25, 0.08));
+}
+
+/* The close button goes to the trailing edge; everything before it is the
+   property row §1.7 draws as `□ │ date │ ⚑`. */
+.tm-drawer-close {
+  margin-left: auto;
+}
+
+.tm-drawer-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 16px;
+  overflow-y: auto;
+  /* Takes the height the header leaves, which is what makes the header sticky
+     against THIS box rather than against the viewport. `min-height: 0` for the
+     flex-item version of the same rule as above — without it a flex child will
+     not shrink below its content either. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .tm-drawer-done {
@@ -1418,14 +1522,21 @@
 
 /* --- Task Detail, one component in four presentations (§15.17) --- */
 
-/* Wide desktop: its own column beside the list, sharing no scroll with it. */
+/* Wide desktop: its own column beside the list, sharing no scroll with it.
+
+   The width is the stored preference now (§1.12–§1.14) rather than a fixed
+   400px — which was below the 360–600 range the spec sets only at its bottom
+   end, but was unchangeable at either. `--tm-detail-w` comes from the Module,
+   so this column and the empty one below always agree.
+
+   No `overflow-y` here: `.tm-drawer-scroll` owns the scroll, which is what
+   lets the property header stay put (§1.7, §1.17). */
 .tm-drawer.is-inline-drawer {
-  width: 400px;
-  overflow-y: auto;
+  width: var(--tm-detail-w, 480px);
 }
 
 /* The reserved-but-empty column (audit D1-1). Same width as the real one —
-   that is the entire point, since a column that is only 400px wide while
+   that is the entire point, since a column of a different width while
    something is selected is the thing that made the list jump. Centred and
    quiet, because it is a placeholder and not a message worth reading twice. */
 .tm-drawer.is-empty {
@@ -1451,7 +1562,6 @@
   right: 0;
   bottom: 0;
   width: 400px;
-  overflow-y: auto;
   background: var(--bg, #fff);
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
 }
@@ -1464,7 +1574,6 @@
   right: 0;
   bottom: 0;
   width: min(520px, calc(100vw - 84px));
-  overflow-y: auto;
   background: var(--bg, #fff);
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
 }
@@ -1477,10 +1586,13 @@
   z-index: 50;
   inset: 0;
   height: var(--tm-viewport-height, 100dvh);
-  overflow-y: auto;
   background: var(--bg, #fff);
-  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
-    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  /* The safe area only (§15.39). The 16px this used to add as well now comes
+     from the header and the scroll region, which carry their own padding so
+     the sticky header can span the full width — adding it here too would
+     double it. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
 }
 
 /* §15.13: the full-screen detail owns the screen. What is behind it is not
