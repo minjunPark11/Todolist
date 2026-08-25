@@ -1032,6 +1032,9 @@ export const en: Dictionary = {
   "tasks.emptyFilter": "No saved filters yet.",
   "tasks.addPlaceholder": "Add a task",
   "tasks.addDate": "Date",
+  // Spec §5.53: the trigger says what the schedule IS, so its accessible name
+  // carries the value the way the Priority flag's does (§8.28).
+  "tasks.scheduleCurrent": "Schedule, {{value}}",
   "tasks.addList": "List",
   // Spec §13.8–§13.11, §13.15, §13.26. "Move to" rather than "Lists" names the
   // action the surface performs, which is what §13.9 titles it.

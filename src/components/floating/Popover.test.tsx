@@ -181,6 +181,33 @@ describe("Escape (§19.25, §19.92, §19.93)", () => {
     expect(event.defaultPrevented).toBe(false);
   });
 
+  // §19.25 peels one layer, innermost first — and a layer is not always a
+  // popover. The Schedule editor's subpanels go back to the calendar on
+  // Escape, and a field with an uncommitted draft abandons the draft. Both sit
+  // inside the surface, and both must get the key before it does.
+  it("yields to a handler inside the surface that claims the key", () => {
+    const onDismiss = vi.fn();
+    mount(
+      <Popover onDismiss={onDismiss}>
+        <PopoverTrigger>open schedule</PopoverTrigger>
+        <PopoverContent label="schedule">
+          <input aria-label="a field" onKeyDown={(event) => event.preventDefault()} />
+        </PopoverContent>
+      </Popover>,
+    );
+    fireEvent.click(trigger("schedule"));
+    fireEvent.keyDown(screen.getByLabelText("a field"), { key: "Escape" });
+    expect(isOpen("schedule")).toBe(true);
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it("still closes for an Escape nothing inside claimed", () => {
+    mount(<Surface name="schedule" />);
+    fireEvent.click(trigger("schedule"));
+    fireEvent.keyDown(screen.getByRole("button", { name: "inside schedule" }), { key: "Escape" });
+    expect(isOpen("schedule")).toBe(false);
+  });
+
   it("marks the event when a layer did claim it, so nothing below also closes", () => {
     mount(<Surface name="priority" />);
     fireEvent.click(trigger("priority"));

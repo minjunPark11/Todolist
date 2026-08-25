@@ -16,8 +16,10 @@ import { childProgress } from "../../domain/tasks/children";
 import { isCompleted } from "../../domain/tasks/taskState";
 import { checklistProgress, isChecklistMode } from "../../domain/tasks/checkItems";
 import { ChecklistEditor } from "./ChecklistEditor";
+import type { Schedule, ScheduleIssue } from "../../domain/schedule";
 import { ListPicker } from "./ListPicker";
 import { PriorityPicker } from "./PriorityPicker";
+import { SchedulePicker } from "./SchedulePicker";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { DeferredInput, DeferredTextarea } from "../kit";
@@ -47,6 +49,10 @@ export interface TaskDrawerProps {
    * filters it above (§8.8).
    */
   onSetPriority: (level: TaskPriority) => void;
+  /** Today as `YYYY-MM-DD`, for the schedule trigger's wording. */
+  today: string;
+  /** Returns whatever was wrong; empty means it was written (§5.51). */
+  onCommitSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   onAddSubtask: (title: string) => void;
   onToggleSubtask: (id: string) => void;
   onDeleteSubtask: (id: string) => void;
@@ -79,6 +85,8 @@ export function TaskDrawer({
   onComplete,
   onMoveToList,
   onSetPriority,
+  today,
+  onCommitSchedule,
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
@@ -203,14 +211,21 @@ export function TaskDrawer({
       />
 
       <div className="tm-drawer-fields">
-        <label className="tm-drawer-field">
+        {/* The whole schedule, not a due date (§5, audit §6).
+            `<input type="date">` could write one field, so a Task's start,
+            its times, its reminder and its repeat were unreachable from here
+            — and the legacy panel, which has had the full editor all along,
+            disagreed with this one about what a schedule was. The editor is
+            the same component; only the trigger and the surface are new. */}
+        <div className="tm-drawer-field">
           <span>{t("tasks.addDate")}</span>
-          <input
-            type="date"
-            value={task.dueDate}
-            onChange={(event) => onUpdate({ dueDate: event.target.value })}
+          <SchedulePicker
+            task={task}
+            today={today}
+            onCommit={onCommitSchedule}
+            restoreFocusTo={() => root.current}
           />
-        </label>
+        </div>
 
         {/* §8.2, §8.5: a flag that opens a popover, not a dropdown. The
             `<select>` this replaces could show no flag, could not be undone

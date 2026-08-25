@@ -216,22 +216,29 @@ export function FloatingLayerProvider({ children }: { children: ReactNode }) {
 
   // §19.92, §19.93: one Escape, one layer, decided centrally.
   //
-  // Capture, so this runs before the Drawer's own listener, and
-  // `preventDefault` is how the Drawer then knows to stay open — it already
-  // checks `defaultPrevented` for exactly this. When no layer is open nothing
-  // is prevented and Escape falls through to whatever is underneath, which is
-  // what keeps the Drawer closable while no popover is up.
+  // Bubble, deliberately, and this is the one place the layer system yields
+  // priority. §19.25's rule is that Escape peels ONE layer, innermost first,
+  // and a layer is not always a popover: the Schedule editor's subpanels go
+  // back to the calendar on Escape, and a field with an uncommitted draft
+  // abandons the draft. Those handlers sit inside the surface. On the capture
+  // phase this listener would reach the key before any of them and close the
+  // whole popover instead, which is exactly the collapse §19.99 forbids.
+  //
+  // So anything nested gets first refusal by calling `preventDefault`, and
+  // what is left arrives here. `preventDefault` is then how the Drawer beneath
+  // knows to stay open — it already checks `defaultPrevented` for this. With
+  // no layer open nothing is prevented and Escape falls through, which is what
+  // keeps the Drawer closable while no popover is up.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       const top = topDismissable(stackRef.current);
       if (!top) return;
       event.preventDefault();
-      event.stopPropagation();
       closeLayer(top.id, "escape");
     }
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [closeLayer]);
 
   // §19.21. Not in the same effect as anything else: this fires on selection

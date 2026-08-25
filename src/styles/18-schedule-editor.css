@@ -44,6 +44,19 @@
   font-weight: 400;
 }
 
+/* The editor supplies its own padding below, so the shared floating surface
+   does not add a second ring of it around the calendar. Everything else the
+   surface brings — background, border, radius, shadow, the measured max-height
+   — is what makes this look like every other popover in the app rather than
+   like the one panel that was styled separately.
+
+   Compounded with `.ff-layer` on purpose: the floating stylesheet is imported
+   after this one, so a bare `.sched-surface` ties it on specificity and then
+   loses on order. */
+.ff-layer.sched-surface {
+  padding: 0;
+}
+
 .sched-editor {
   width: 320px;
   padding: 12px;

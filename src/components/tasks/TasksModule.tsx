@@ -51,6 +51,7 @@ import {
 import { ContextMenu, type ContextMenuState } from "../common/ContextMenu";
 import { useFloatingLayerOwner } from "../floating";
 import { priorityChange } from "../../domain/tasks/priority";
+import type { Schedule, ScheduleIssue } from "../../domain/schedule";
 import { addDays } from "../../utils/date";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
@@ -110,6 +111,12 @@ interface TasksModuleProps {
     childrenOf: (taskId: string) => TaskChild[];
     onUpdate: (taskId: string, patch: Partial<Task>) => void;
     onMoveToList: (taskId: string, listId: string) => void;
+    /**
+     * The whole schedule in one write (§5), returning whatever the domain
+     * refused. The editor keeps the draft open on a refusal, so an empty
+     * array is the only thing that means "written".
+     */
+    onCommitSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
     onAddSubtask: (taskId: string, title: string) => void;
     onToggleSubtask: (id: string) => void;
     onDeleteSubtask: (id: string) => void;
@@ -755,6 +762,10 @@ export function TasksModule(props: TasksModuleProps) {
           // compare the values itself. Through `mutate` like every other
           // change, which is what gives it the Undo §8.36 asks for and the
           // §12.21 check for a Task that has just left the Scope.
+          today={today}
+          // §5.51: the editor keeps the draft open when the domain refuses it,
+          // so the issues have to come back rather than being swallowed here.
+          onCommitSchedule={props.drawer.onCommitSchedule}
           onSetPriority={(level) => {
             const change = priorityChange(openedTask, level);
             if (change) mutate(openedTask, change);

@@ -1013,6 +1013,7 @@ export const ko: Dictionary = {
   "tasks.emptyFilter": "저장된 필터가 아직 없습니다.",
   "tasks.addPlaceholder": "할 일 추가",
   "tasks.addDate": "날짜",
+  "tasks.scheduleCurrent": "일정, {{value}}",
   "tasks.addList": "리스트",
   "tasks.listCurrent": "리스트, {{value}}",
   "tasks.moveToList": "이동",
