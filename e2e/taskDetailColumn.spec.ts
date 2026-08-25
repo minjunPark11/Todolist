@@ -45,8 +45,12 @@ test.describe("the Task Detail column", () => {
 
     // The empty column is the same width as a filled one — that is the whole
     // point of reserving it, so a narrower placeholder would defeat it.
+    // 400 until §1.12 made the column draggable; the width a fresh account
+    // starts at is `TASK_DETAIL_DEFAULT_WIDTH` in `src/app/taskDetailWidth`.
+    // Written out rather than imported because this project deliberately does
+    // not see `src` — it drives the running app, not the source.
     const box = await empty.boundingBox();
-    expect(Math.round(box?.width ?? 0)).toBe(400);
+    expect(Math.round(box?.width ?? 0)).toBe(480);
   });
 
   test("opening a Task does not resize the list", async ({ page }) => {

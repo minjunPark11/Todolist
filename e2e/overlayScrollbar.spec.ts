@@ -15,6 +15,19 @@ import { openApp } from "./addList.helpers";
 
 const BAR = ".overlay-scrollbar.is-page";
 
+/**
+ * A screen whose PAGE is still what scrolls.
+ *
+ * `/today` was this until §1.17 took the Tasks shell out of document
+ * scrolling: `.tm-shell` is `height: 100dvh; overflow: hidden` now, and its
+ * sidebar and main column scroll inside it. So the bar this spec is about
+ * never appears there any more — which is the rule working, not a regression.
+ *
+ * The legacy `.app-shell` pages still scroll as a document, which is what they
+ * are built for and what leaves this component a job.
+ */
+const SCROLLING_PAGE = "/settings";
+
 /** Short enough that the shell's own 720px minimum overflows it. */
 const SHORT = { width: 1440, height: 320 };
 
@@ -32,12 +45,14 @@ test.describe("the page scrollbar", () => {
 
   test("is not drawn at all when the page fits", async ({ page }) => {
     await openApp(page);
+    await page.goto(SCROLLING_PAGE);
     await page.setViewportSize({ width: 1440, height: 1200 });
     await expect(page.locator(BAR)).toHaveCount(0);
   });
 
   test("waits for a scroll — hovering the page is not enough", async ({ page }) => {
     await openApp(page);
+    await page.goto(SCROLLING_PAGE);
     await page.setViewportSize(SHORT);
     await expect(page.locator(BAR)).toHaveCount(1);
 
@@ -55,6 +70,7 @@ test.describe("the page scrollbar", () => {
 
   test("appears on a real scroll and goes away on its own", async ({ page }) => {
     await openApp(page);
+    await page.goto(SCROLLING_PAGE);
     await page.setViewportSize(SHORT);
 
     await page.mouse.move(700, 160);
@@ -67,6 +83,7 @@ test.describe("the page scrollbar", () => {
 
   test("is the shape §4 measured, and reports the position it should", async ({ page }) => {
     await openApp(page);
+    await page.goto(SCROLLING_PAGE);
     await page.setViewportSize(SHORT);
     // The bar is mounted by a measurement that runs after the resize, so it
     // is not on the page the instant the viewport changes.
@@ -136,6 +153,7 @@ test.describe("the calendar's own scrollbar", () => {
    */
   async function openCalendar(page: import("@playwright/test").Page) {
     await openApp(page);
+    await page.goto(SCROLLING_PAGE);
     await page.locator(".global-rail").getByRole("button", { name: "Calendar", exact: true }).click();
     await expect(page.locator(".gcal-time-scroll")).toBeVisible();
 

@@ -965,7 +965,10 @@
   height: 24px;
   padding: 0;
   border: 1px dashed var(--border-subtle, rgba(25, 25, 25, 0.08));
-  border-radius: 50%;
+  /* A circle here was off §11.39's scale, and this is a control rather than a
+     decoration — the allow list in `e2e/radiusScale` exempts dots and badges
+     for exactly the reason that does not apply to a button. */
+  border-radius: var(--radius-sm);
   background: none;
   font-size: 14px;
   line-height: 1;
@@ -2626,7 +2629,10 @@
   display: flex;
   margin-inline-start: auto;
   border: 1px solid var(--border, #e5e5e7);
-  border-radius: 7px;
+  /* 7px was a value off §11.39's scale, which `e2e/radiusScale` measures on
+     the running app rather than in the stylesheet. The token, not an 8, so
+     the next reader cannot mistake it for a considered exception. */
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 

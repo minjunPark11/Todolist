@@ -132,7 +132,11 @@ test.describe("what a Task row can do", () => {
     await expect(page.locator(".tm-task-priority")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Open Urgent thing" }).click();
-    await page.locator(".tm-drawer select").first().selectOption("high");
+    // Priority is a flag that opens a popover now, not a `<select>` (§8.2,
+    // §8.5). The old control could show no flag and could not be undone,
+    // which is why it went.
+    await page.getByRole("button", { name: "Set priority" }).click();
+    await page.getByRole("listbox", { name: "Priority" }).getByRole("option", { name: "High" }).click();
 
     const flag = page.locator(".tm-task-priority");
     await expect(flag).toHaveCount(1);

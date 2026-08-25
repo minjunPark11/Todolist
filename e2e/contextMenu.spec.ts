@@ -52,14 +52,29 @@ test.describe("the context menu", () => {
     // The date section offers "clear" only when there is a date to clear: an
     // item that does nothing is one the reader rules out every time.
     expect(await menuItems(page)).toEqual([
-      "Complete",
+      // §15.42's groups, with the two choice sets this menu adds between them.
+      // Everything but the priorities and the dates comes from the registry
+      // in `domain/tasks/actions`, which is also what fills the Detail's ⋯ —
+      // §15.63's point being that the two cannot drift apart.
+      "Pin",
+      "Duplicate",
+      "Save as template",
+      "Copy link",
+      "Start focus",
+      "Task activities",
       "High",
       "Medium",
       "Low",
       "No priority",
       "Due today",
       "Due tomorrow",
+      "Complete",
+      "Mark won't do",
       "Move to trash",
+      // The visually hidden way out for a pointer that opened this with a
+      // gesture and has no Escape key. It became a `menuitem` when the menu
+      // moved onto the layer system, so the arrow keys can reach it.
+      "Close",
     ]);
   });
 
