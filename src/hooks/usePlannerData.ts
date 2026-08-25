@@ -617,13 +617,30 @@ export function usePlannerData() {
   // while it was in flight (domain/sync/reapplyLocalEdits).
   const dataRef = useRef(data);
   dataRef.current = data;
+  // Bumped whenever a system path replaces the store wholesale — a remote load
+  // adopting the account's records, a migration. User edits do not bump it:
+  // they are what undo exists to walk back.
+  const storeRevisionRef = useRef(0);
   // Every user-facing mutation goes through this wrapper so Ctrl+Z can walk
   // edits back; system paths (remote load, migration) use setDataState so
   // they never land on the undo stack.
   function setData(updater: PlannerData | ((current: PlannerData) => PlannerData)) {
     setDataState((current) => {
       const next = typeof updater === "function" ? updater(current) : updater;
-      if (next !== current) pushUndo(() => setDataState(current));
+      if (next !== current) {
+        // Which store this snapshot belongs to (§16.19, §16.21). An undo entry
+        // holds a WHOLE PlannerData, so it is only an undo while the store is
+        // still the one it was taken from. Once a load or a migration has
+        // replaced the store, restoring it would not walk one edit back — it
+        // would drop everything the load brought in, and the save that
+        // followed would read those absent records as deletions and take them
+        // off the account too.
+        const revision = storeRevisionRef.current;
+        pushUndo(() => {
+          if (storeRevisionRef.current !== revision) return false;
+          setDataState(current);
+        });
+      }
       return next;
     });
   }
@@ -931,6 +948,9 @@ export function usePlannerData() {
       // A newer load has started since this one began; its answer is the one
       // that should win, and this one has nothing to add.
       if (isStale()) return;
+      // The store is now the account's, not the one every queued undo entry
+      // was taken from; those entries decline rather than restore (see setData).
+      storeRevisionRef.current += 1;
       setDataState(reapplyLocalEdits(loaded, localAtStart, dataRef.current));
       // The baseline is what the ACCOUNT holds, which is `loaded` and not the
       // merged state: the difference between the two is exactly the edits put
@@ -1136,6 +1156,7 @@ export function usePlannerData() {
     // directly diffed to "delete every record the account holds and this device
     // does not", which is not what a button labelled "upload" may do.
     const merged = buildMigrationUpload(localMigrationData, syncedSnapshotRef.current ?? data);
+    storeRevisionRef.current += 1;
     setDataState(merged);
     saveQueue.request({ data: merged, ownerEmail: userEmailRef.current });
     setLocalMigrationData(null);
