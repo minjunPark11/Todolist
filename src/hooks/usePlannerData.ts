@@ -4,6 +4,7 @@ import { platform } from "../platform";
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 import type {
   CheckItem,
+  TaskContentMode,
   AppSettings,
   ExternalCalendar,
   FocusMode,
@@ -47,11 +48,21 @@ import {
 import { backfillTaskTags, linkTaskTags, sanitizeTag, sanitizeTaskTag } from "../domain/tags/tags";
 import { sanitizeListSection } from "../domain/tasks/sections";
 import {
+  checkItemsForTask,
   duplicateCheckItems,
   pruneOrphanCheckItems,
   removeCheckItemsForTask,
   sanitizeCheckItem,
+  sortKeyForMovedCheckItem,
+  sortKeyForNewCheckItem,
+  toggleCheckItemPatch,
 } from "../domain/tasks/checkItems";
+import {
+  checkItemDraftsFromText,
+  checkItemsFromDrafts,
+  descriptionFromCheckItems,
+} from "../domain/tasks/contentMode";
+import { ORDER_STEP } from "../domain/tasks/sortKey";
 import { migrateLegacyWorkflowStatus } from "../domain/migrations/legacyWorkflowStatus";
 import { addSidebarFolder, sanitizeSidebarFolder } from "../domain/tasks/sidebarFolders";
 import { sanitizeSavedFilter } from "../domain/tasks/filters";
@@ -1451,6 +1462,184 @@ export function usePlannerData() {
    * collection is no longer written to — it is only read, so the rows already
    * there keep working until each is touched.
    */
+  // === Checklist (spec §11) ===
+  //
+  // Every one of these goes through `setData`, so a tick, a rename or a
+  // conversion is one entry on the undo stack — and one transaction, which is
+  // what §11.14 requires of the conversion in particular.
+
+  /** §11.22/§11.23: a line exists once it has text. Blank text writes nothing. */
+  function addCheckItem(taskId: string, text: string) {
+    const trimmed = text.trim();
+    // §11.31: whitespace-only is empty, and an empty line is a line the user
+    // is still typing rather than a record.
+    if (!taskId || !trimmed) return;
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      checkItems: [
+        ...current.checkItems,
+        {
+          id: createId("checkitem"),
+          taskId,
+          text: trimmed,
+          checked: false,
+          completedAt: "",
+          sortKey: sortKeyForNewCheckItem(taskId, current.checkItems),
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    }));
+  }
+
+  /**
+   * Several lines at once, as one transaction (§11.34).
+   *
+   * A multi-line paste is one user action, so it is one undo — not one per
+   * line, which would make Ctrl+Z walk back through a paste a line at a time.
+   */
+  function addCheckItems(taskId: string, texts: string[]) {
+    const drafts = texts.map((text) => text.trim()).filter((text) => text !== "");
+    if (!taskId || drafts.length === 0) return;
+    const now = new Date().toISOString();
+    setData((current) => {
+      const base = sortKeyForNewCheckItem(taskId, current.checkItems);
+      return {
+        ...current,
+        checkItems: [
+          ...current.checkItems,
+          ...drafts.map((text, index) => ({
+            id: createId("checkitem"),
+            taskId,
+            text,
+            checked: false,
+            completedAt: "",
+            sortKey: base + index * ORDER_STEP,
+            createdAt: now,
+            updatedAt: now,
+          })),
+        ],
+      };
+    });
+  }
+
+  /** §11.32: trimmed on commit, inner spacing left alone. */
+  function updateCheckItemText(itemId: string, text: string) {
+    const trimmed = text.trim();
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      checkItems: current.checkItems.map((item) =>
+        item.id === itemId && item.text !== trimmed ? { ...item, text: trimmed, updatedAt: now } : item,
+      ),
+    }));
+  }
+
+  function toggleCheckItem(itemId: string) {
+    const now = new Date().toISOString();
+    setData((current) => ({
+      ...current,
+      checkItems: current.checkItems.map((item) =>
+        item.id === itemId ? { ...item, ...toggleCheckItemPatch(item, now) } : item,
+      ),
+    }));
+  }
+
+  function deleteCheckItem(itemId: string) {
+    setData((current) => {
+      const kept = current.checkItems.filter((item) => item.id !== itemId);
+      // Nothing matched: return the same state so an undo entry is not pushed
+      // for an action that did nothing.
+      if (kept.length === current.checkItems.length) return current;
+      return { ...current, checkItems: kept };
+    });
+  }
+
+  /**
+   * A line dropped at `targetIndex` among its Task's lines.
+   *
+   * A null key means the neighbours have no room between them, which is the
+   * signal to renumber the Task's lines rather than write a tie — a tie is a
+   * list that reorders itself on the next render.
+   */
+  function moveCheckItem(itemId: string, targetIndex: number) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const moving = current.checkItems.find((item) => item.id === itemId);
+      if (!moving) return current;
+
+      const key = sortKeyForMovedCheckItem(moving.taskId, current.checkItems, itemId, targetIndex);
+      if (key !== null) {
+        if (key === moving.sortKey) return current;
+        return {
+          ...current,
+          checkItems: current.checkItems.map((item) =>
+            item.id === itemId ? { ...item, sortKey: key, updatedAt: now } : item,
+          ),
+        };
+      }
+
+      // Renumber: put the moving line where it was dropped and space the whole
+      // Task's list out again. Only this Task's lines are rewritten.
+      const own = checkItemsForTask(moving.taskId, current.checkItems).filter((item) => item.id !== itemId);
+      const clamped = Math.max(0, Math.min(targetIndex, own.length));
+      const ordered = [...own.slice(0, clamped), moving, ...own.slice(clamped)];
+      const keys = new Map(ordered.map((item, index) => [item.id, index * ORDER_STEP]));
+      return {
+        ...current,
+        checkItems: current.checkItems.map((item) => {
+          const next = keys.get(item.id);
+          return next === undefined || next === item.sortKey ? item : { ...item, sortKey: next, updatedAt: now };
+        }),
+      };
+    });
+  }
+
+  /**
+   * The mode toggle (§11.5): one transaction that moves the content, never a
+   * view switch that leaves two copies of it.
+   *
+   * §11.14 spells out the intermediate state this must never be observable in
+   * — items created, description still set, mode not yet switched — which is
+   * why all three land in a single `setData`. One Undo takes the whole thing
+   * back (§11.15), and because the conversion round-trips, taking it back
+   * restores the text and the ticks rather than an approximation of them.
+   */
+  function setTaskContentMode(taskId: string, mode: TaskContentMode) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const task = current.tasks.find((item) => item.id === taskId);
+      if (!task || (task.contentMode ?? "description") === mode) return current;
+
+      if (mode === "checklist") {
+        const drafts = checkItemDraftsFromText(task.description);
+        return {
+          ...current,
+          tasks: current.tasks.map((item) =>
+            item.id === taskId ? { ...item, contentMode: mode, description: "", updatedAt: now } : item,
+          ),
+          checkItems: [
+            ...current.checkItems,
+            ...checkItemsFromDrafts(taskId, drafts, () => createId("checkitem"), now, ORDER_STEP),
+          ],
+        };
+      }
+
+      // Back to prose. The lines become the text (§11.19) and the records go,
+      // because §11.13 keeps exactly one active content per Task — two copies
+      // is how they start disagreeing.
+      const description = descriptionFromCheckItems(checkItemsForTask(taskId, current.checkItems));
+      return {
+        ...current,
+        tasks: current.tasks.map((item) =>
+          item.id === taskId ? { ...item, contentMode: mode, description, updatedAt: now } : item,
+        ),
+        checkItems: removeCheckItemsForTask(taskId, current.checkItems),
+      };
+    });
+  }
+
   function addSubtask(taskId: string, title: string) {
     const trimmed = title.trim();
     if (!trimmed) return;
@@ -2027,6 +2216,13 @@ export function usePlannerData() {
     restoreTask,
     duplicateTask,
     toggleTaskDone,
+    addCheckItem,
+    addCheckItems,
+    updateCheckItemText,
+    toggleCheckItem,
+    deleteCheckItem,
+    moveCheckItem,
+    setTaskContentMode,
     addSubtask,
     toggleSubtask,
     deleteSubtask,
