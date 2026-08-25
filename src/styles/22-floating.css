@@ -1,0 +1,103 @@
+/* ============================================================================
+   22-floating.css — the shared floating surface (spec §19.57–§19.62)
+
+   One rule set for every anchored surface, so that a Priority picker and a Tag
+   picker cannot drift into looking like two different kinds of thing. What is
+   NOT here is as deliberate: no `position`, no `left/top`, no `z-index`. Those
+   come from the layer system as inline styles, because they are measured per
+   open (§19.10) and a stylesheet cannot know where the anchor was.
+   ============================================================================ */
+
+:root {
+  /* §19.5's scale, in the language stylesheets speak. The TypeScript copy in
+     domain/floating/zIndex.ts is the one components read; these exist so a
+     purely presentational layer — a sticky header that must sit under a
+     popover — can name the same level instead of inventing a number. */
+  --z-base: 0;
+  --z-sticky: 20;
+  --z-tooltip: 80;
+  --z-popover: 100;
+  --z-menu: 120;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+}
+
+.ff-layer {
+  /* §19.59: the same surface token as every other raised thing in the app, so
+     a popover reads as the app's rather than as a floating exception. */
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  /* §19.57. Matched to the app's medium radius rather than a larger one: a
+     surface this small with a large radius loses its corners to its own
+     padding. */
+  border-radius: var(--rounded-md);
+  border: 1px solid var(--border-subtle);
+  /* §19.58: enough separation to read as above the page, not so much that it
+     reads as a modal. */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  /* §19.17: the surface scrolls inside its own max-height, which the layer
+     system measures. Both axes, because a Tag picker with long names overflows
+     sideways too — and `auto`, so the bar appears only when it is needed. */
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-xxs);
+  min-width: 180px;
+}
+
+/* §19.60. Opacity and a small rise — deliberately nothing that depends on the
+   measured position (§19.61), so the entrance cannot disagree with where the
+   surface ended up. `transform` and `opacity` only: both are composited, and
+   neither can force the reflow that would move an anchor mid-animation. */
+@keyframes ff-layer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ff-layer.is-animated {
+  animation: ff-layer-in 120ms ease-out;
+}
+
+/* A surface that flipped rises from the other direction, so the motion always
+   reads as coming OUT of the trigger. */
+.ff-layer.is-animated[data-placement^="top"] {
+  animation-name: ff-layer-in-up;
+}
+
+@keyframes ff-layer-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* §19.62. The class is already withheld when the app's own motion setting is
+   off; this is the OS-level preference, which a user can change without the
+   app hearing about it. */
+@media (prefers-reduced-motion: reduce) {
+  .ff-layer.is-animated {
+    animation: none;
+  }
+}
+
+/* The surface takes focus itself when it has nothing focusable inside
+   (§19.81, §19.82), and a focus ring drawn around the whole panel in that
+   case is noise — the panel is the only thing on screen that just moved. */
+.ff-layer:focus {
+  outline: none;
+}
+
+.ff-layer:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: -2px;
+}

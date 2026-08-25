@@ -72,7 +72,12 @@ export type DismissReason =
   | "selection"
   | "trigger-toggle"
   | "owner-unmounted"
-  | "navigation";
+  | "navigation"
+  // Not in §19.94's list, which is written as an example. §19.23 makes this a
+  // real way for a surface to close — the Priority popover closing because the
+  // Date one opened — and a feature that discards a draft on dismissal needs
+  // to be able to tell it apart from the user pressing Escape.
+  | "superseded";
 
 /**
  * One open surface (§19.22).

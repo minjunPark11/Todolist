@@ -187,6 +187,13 @@ export function computePlacement({
  * under a sticky header is still the thing the surface belongs to.
  */
 export function isAnchorHidden(anchor: Rect, viewport: Size): boolean {
+  // An anchor with no size at all has not been laid out — the first frame
+  // after mount, an element inside a collapsed container, a test environment
+  // that does no layout. Geometry cannot tell that apart from "scrolled just
+  // past the top edge", and the two want opposite answers, so the unmeasured
+  // case is decided here instead of guessed at: not knowing where a trigger is
+  // is not evidence that it has gone.
+  if (anchor.width === 0 && anchor.height === 0) return false;
   return (
     anchor.y + anchor.height <= 0 ||
     anchor.y >= viewport.height ||

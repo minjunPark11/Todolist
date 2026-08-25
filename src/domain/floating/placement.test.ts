@@ -130,6 +130,13 @@ describe("isAnchorHidden (§19.19, §19.20)", () => {
     expect(isAnchorHidden(anchor(990, 400), VIEWPORT)).toBe(false);
   });
 
+  // Otherwise a popover closes itself on the frame it opens: before layout
+  // every rect is 0×0 at the origin, which is indistinguishable by geometry
+  // from a trigger that has just scrolled off the top.
+  it("is false for an anchor that has not been laid out", () => {
+    expect(isAnchorHidden({ x: 0, y: 0, width: 0, height: 0 }, VIEWPORT)).toBe(false);
+  });
+
   it("is true once it has scrolled out entirely", () => {
     expect(isAnchorHidden(anchor(120, -24), VIEWPORT)).toBe(true);
     expect(isAnchorHidden(anchor(120, 800), VIEWPORT)).toBe(true);

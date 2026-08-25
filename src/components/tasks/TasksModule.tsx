@@ -49,6 +49,7 @@ import {
   unmarkWontDo,
 } from "../../domain/tasks/mutations";
 import { ContextMenu, type ContextMenuState } from "../common/ContextMenu";
+import { useFloatingLayerOwner } from "../floating";
 import { addDays } from "../../utils/date";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
@@ -235,6 +236,13 @@ export function TasksModule(props: TasksModuleProps) {
   // names nothing simply opens nothing — §5.30 refuses to make a dead link an
   // error the reader has to dismiss.
   const openedTask = state.taskId ? tasks.find((task) => task.id === state.taskId) : undefined;
+
+  // §19.21, §19.74: a popover opened from a Task's Detail closes when the
+  // Detail moves on. Told from here because this is where the answer is — the
+  // layer system is deliberately given the id and nothing else. `openedTask`
+  // rather than `state.taskId` so an id that names nothing counts as no owner,
+  // which is the same reading the Drawer takes one line above.
+  useFloatingLayerOwner(openedTask?.id ?? null);
 
   /**
    * §12.21, in one place: apply, then ask whether the Task still belongs here.

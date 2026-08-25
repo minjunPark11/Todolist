@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { FloatingLayerProvider } from "./components/floating";
 import { MiniFocusTimerWindow } from "./components/MiniFocusTimerWindow";
 import "./styles.css";
 
@@ -20,7 +21,15 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     {isMiniFocusTimerWindow ? (
       <MiniFocusTimerWindow />
     ) : (
-      <App />
+      /* Above App rather than inside it (§19.6, §19.70): App returns from
+         several branches — the recovery gate, the login gate, the Tasks
+         module, the Spaces shell — and a provider mounted inside one of them
+         would be a provider that a popover in another cannot reach. The
+         mini-timer window is its own root with no floating UI, so it is
+         deliberately left out. */
+      <FloatingLayerProvider>
+        <App />
+      </FloatingLayerProvider>
     )}
   </React.StrictMode>,
 );
