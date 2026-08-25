@@ -9,13 +9,14 @@
 // must not appear as a disabled placeholder before the model behind it exists.
 // So they are absent, not greyed out.
 import { useEffect, useRef } from "react";
-import type { CheckItem, List, Task, TaskContentMode } from "../../types";
+import type { CheckItem, List, Task, TaskContentMode, TaskPriority } from "../../types";
 import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
 import { childProgress } from "../../domain/tasks/children";
 import { isCompleted } from "../../domain/tasks/taskState";
 import { checklistProgress, isChecklistMode } from "../../domain/tasks/checkItems";
 import { ChecklistEditor } from "./ChecklistEditor";
+import { PriorityPicker } from "./PriorityPicker";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { DeferredInput, DeferredTextarea } from "../kit";
@@ -37,6 +38,12 @@ export interface TaskDrawerProps {
   /** Completion goes through the mutation path so it can be undone (§16.29). */
   onComplete: () => void;
   onMoveToList: (listId: string) => void;
+  /**
+   * §8.31's command rather than a field write, which is what gives the change
+   * an Undo (§8.36). A no-op re-select never reaches here — `priorityChange`
+   * filters it above (§8.8).
+   */
+  onSetPriority: (level: TaskPriority) => void;
   onAddSubtask: (title: string) => void;
   onToggleSubtask: (id: string) => void;
   onDeleteSubtask: (id: string) => void;
@@ -58,8 +65,6 @@ export interface TaskDrawerProps {
   canAddSubtask: boolean;
 }
 
-const PRIORITIES = ["none", "low", "medium", "high"] as const;
-
 export function TaskDrawer({
   presentation,
   task,
@@ -69,6 +74,7 @@ export function TaskDrawer({
   onUpdate,
   onComplete,
   onMoveToList,
+  onSetPriority,
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
@@ -202,19 +208,19 @@ export function TaskDrawer({
           />
         </label>
 
-        <label className="tm-drawer-field">
+        {/* §8.2, §8.5: a flag that opens a popover, not a dropdown. The
+            `<select>` this replaces could show no flag, could not be undone
+            (§8.36) and wrote a record when the same level was chosen twice
+            (§8.8) — the last two because it went through `onUpdate` rather
+            than the command every other surface uses (§8.31).
+
+            §19.32: the Drawer is the focus fallback. The Detail is reused
+            across Tasks, so a Task switch can remove this trigger while its
+            popover is open, and focus would otherwise land on the body. */}
+        <div className="tm-drawer-field">
           <span>{t("tasks.priority")}</span>
-          <select
-            value={task.priority}
-            onChange={(event) => onUpdate({ priority: event.target.value as Task["priority"] })}
-          >
-            {PRIORITIES.map((level) => (
-              <option key={level} value={level}>
-                {t(`tasks.priority.${level}`)}
-              </option>
-            ))}
-          </select>
-        </label>
+          <PriorityPicker task={task} onChange={onSetPriority} restoreFocusTo={() => root.current} />
+        </div>
 
         {/* Moving between Lists goes through the domain command, not a field
             write: the List decides the Project, and `patchForListMove` is

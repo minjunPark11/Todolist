@@ -50,6 +50,7 @@ import {
 } from "../../domain/tasks/mutations";
 import { ContextMenu, type ContextMenuState } from "../common/ContextMenu";
 import { useFloatingLayerOwner } from "../floating";
+import { priorityChange } from "../../domain/tasks/priority";
 import { addDays } from "../../utils/date";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
@@ -749,6 +750,14 @@ export function TasksModule(props: TasksModuleProps) {
           onClose={closeTask}
           onUpdate={(patch) => props.drawer.onUpdate(openedTask.id, patch)}
           onMoveToList={(listId) => props.drawer.onMoveToList(openedTask.id, listId)}
+          // §8.8's no-op is decided in the domain, so the Drawer never has to
+          // compare the values itself. Through `mutate` like every other
+          // change, which is what gives it the Undo §8.36 asks for and the
+          // §12.21 check for a Task that has just left the Scope.
+          onSetPriority={(level) => {
+            const change = priorityChange(openedTask, level);
+            if (change) mutate(openedTask, change);
+          }}
           onAddSubtask={(title) => props.drawer.onAddSubtask(openedTask.id, title)}
           onToggleSubtask={props.drawer.onToggleSubtask}
           onDeleteSubtask={props.drawer.onDeleteSubtask}

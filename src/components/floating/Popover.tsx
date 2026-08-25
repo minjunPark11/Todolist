@@ -266,9 +266,18 @@ export function PopoverContent({ children, label, className, role = "dialog" }: 
   // the caret away from a Title someone was in the middle of editing.
   useEffect(() => {
     if (!open || !openedByKeyboard.current) return;
-    const first = surfaceRef.current?.querySelector<HTMLElement>(
-      "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
+    const candidates = surfaceRef.current?.querySelectorAll<HTMLElement>(
+      "button, [href], input, select, textarea, [tabindex]",
     );
+    // `tabindex="-1"` is excluded even on a `<button>`, which the plain
+    // selector would have matched. A single-select list built the ARIA way
+    // gives every option except the current one a -1, so taking the first
+    // element in document order would enter at the top of the list rather than
+    // at the value that is already chosen — and then the first arrow press
+    // would look like it had skipped one.
+    const first = candidates
+      ? Array.from(candidates).find((el) => el.getAttribute("tabindex") !== "-1")
+      : undefined;
     // The surface itself as the fallback, so an empty or loading popover
     // (§19.81, §19.82) does not leave focus behind on the trigger while the
     // reader is told a dialog opened.

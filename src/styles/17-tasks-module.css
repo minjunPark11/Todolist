@@ -521,6 +521,109 @@
   font-size: 13px;
 }
 
+/* Priority (spec §8.13, §8.29, §8.30). The trigger reflects the value it
+   holds, and does so with more than colour: `none` is an outlined flag, the
+   three levels are filled, and the popover repeats each one as text. That is
+   §8.29's rule, and it is why the glyphs differ in shape and not only in hue —
+   a reader who cannot separate red from amber still has the fill and the
+   label. */
+.tm-priority-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-tertiary, #8e8e93);
+}
+
+.tm-priority-trigger:hover {
+  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
+}
+
+.tm-priority-trigger[aria-expanded="true"] {
+  border-color: var(--border-subtle, rgba(25, 25, 25, 0.08));
+  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
+}
+
+.tm-priority-trigger.is-high {
+  color: var(--color-danger, #ff3b30);
+}
+
+.tm-priority-trigger.is-medium {
+  color: var(--color-warning, #ff9500);
+}
+
+.tm-priority-trigger.is-low {
+  color: var(--color-primary, #0066cc);
+}
+
+.tm-priority-surface {
+  min-width: 168px;
+}
+
+.tm-priority-options {
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-priority-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary, #1c1c1e);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-priority-option:hover,
+.tm-priority-option:focus-visible {
+  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
+}
+
+/* §8.5: the current level reads as chosen. A weight change as well as a
+   background, so the selected row survives a high-contrast theme that flattens
+   the tint away. */
+.tm-priority-option.is-selected {
+  font-weight: 600;
+}
+
+.tm-priority-glyph {
+  width: 16px;
+  font-size: 14px;
+  line-height: 1;
+  text-align: center;
+}
+
+.tm-priority-option.is-high .tm-priority-glyph {
+  color: var(--color-danger, #ff3b30);
+}
+
+.tm-priority-option.is-medium .tm-priority-glyph {
+  color: var(--color-warning, #ff9500);
+}
+
+.tm-priority-option.is-low .tm-priority-glyph {
+  color: var(--color-primary, #0066cc);
+}
+
+.tm-priority-option.is-none .tm-priority-glyph {
+  color: var(--text-tertiary, #8e8e93);
+}
+
 .tm-drawer-subtasks h3 {
   display: flex;
   align-items: center;

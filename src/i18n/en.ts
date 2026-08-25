@@ -1046,6 +1046,11 @@ export const en: Dictionary = {
   "tasks.priority.low": "Low",
   "tasks.priority.medium": "Medium",
   "tasks.priority.high": "High",
+  // Spec §8.28's accessible name for the flag. Two sentences rather than one
+  // with an empty slot: "Priority, none" describes a state nobody chose, and
+  // the useful thing to say about an unset flag is what pressing it does.
+  "tasks.priority.current": "Priority, {{value}}",
+  "tasks.priority.set": "Set priority",
   "tasks.notes": "Notes",
   // Spec §11. "Checklist" and "Notes" name the two contents; the toggle
   // labels are the short forms that fit beside them.

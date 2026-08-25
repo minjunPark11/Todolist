@@ -198,6 +198,27 @@ describe("focus (§19.31, §19.32, §19.33)", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "inside priority" }));
   });
 
+  // A single-select list built the ARIA way gives every option but the
+  // current one `tabindex="-1"`. Entering at the first element in document
+  // order would land at the top of the list instead of on the chosen value.
+  it("skips options taken out of the tab order", () => {
+    mount(
+      <Popover>
+        <PopoverTrigger>open priority</PopoverTrigger>
+        <PopoverContent label="priority" role="listbox">
+          <button type="button" role="option" tabIndex={-1}>
+            none
+          </button>
+          <button type="button" role="option" tabIndex={0}>
+            high
+          </button>
+        </PopoverContent>
+      </Popover>,
+    );
+    fireEvent.click(trigger("priority"), { detail: 0 });
+    expect(document.activeElement).toBe(screen.getByRole("option", { name: "high" }));
+  });
+
   it("leaves focus where it was when opened by mouse", () => {
     mount(<Surface name="priority" />);
     fireEvent.click(trigger("priority"), { detail: 1 });

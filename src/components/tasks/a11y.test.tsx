@@ -20,6 +20,7 @@ import { afterEach } from "vitest";
 import axe from "axe-core";
 import type { List, ListSection, Task } from "../../types";
 import { I18nProvider } from "../../i18n";
+import { FloatingLayerProvider } from "../floating";
 import { TasksModule } from "./TasksModule";
 
 const TODAY = "2026-08-18";
@@ -99,47 +100,52 @@ const tasks: Task[] = [
 function renderModule(url: string) {
   return render(
     <I18nProvider lang="ko">
-      <TasksModule
-        tasks={tasks}
-        lists={[inboxList, workList]}
-        folders={[]}
-        sidebarFolders={[]}
-        savedFilters={[]}
-        listSections={[doingSection]}
-        dailyPlans={[]}
-        tags={[]}
-        taskTags={[]}
-        today={TODAY}
-        url={url}
-        onNavigate={() => {}}
-        onCreate={() => {}}
-        draftTitle=""
-        onDraftConsumed={() => {}}
-        onCreateList={() => "list-new"}
-        onCreateSidebarFolder={() => "sf-new"}
-        drawer={{
-          childrenOf: () => [],
-          onUpdate: () => {},
-          onMoveToList: () => {},
-          onAddSubtask: () => {},
-          onToggleSubtask: () => {},
-          onDeleteSubtask: () => {},
-          checkItemsFor: () => [],
-          onSetContentMode: () => {},
-          onAddCheckItem: () => {},
-          onAddCheckItems: () => {},
-          onRenameCheckItem: () => {},
-          onToggleCheckItem: () => {},
-          onDeleteCheckItem: () => {},
-        }}
-        lifecycle={{
-          onArchiveList: () => {},
-          onTrashList: () => {},
-          onRestoreList: () => {},
-          onPermanentlyDeleteList: () => {},
-        }}
-        onMutate={() => {}}
-      />
+      {/* The Drawer's property controls are floating surfaces now (§19.6), and
+          a surface without a layer manager has nowhere to portal to. main.tsx
+          mounts this above <App/>; here it wraps the one module under test. */}
+      <FloatingLayerProvider>
+        <TasksModule
+          tasks={tasks}
+          lists={[inboxList, workList]}
+          folders={[]}
+          sidebarFolders={[]}
+          savedFilters={[]}
+          listSections={[doingSection]}
+          dailyPlans={[]}
+          tags={[]}
+          taskTags={[]}
+          today={TODAY}
+          url={url}
+          onNavigate={() => {}}
+          onCreate={() => {}}
+          draftTitle=""
+          onDraftConsumed={() => {}}
+          onCreateList={() => "list-new"}
+          onCreateSidebarFolder={() => "sf-new"}
+          drawer={{
+            childrenOf: () => [],
+            onUpdate: () => {},
+            onMoveToList: () => {},
+            onAddSubtask: () => {},
+            onToggleSubtask: () => {},
+            onDeleteSubtask: () => {},
+            checkItemsFor: () => [],
+            onSetContentMode: () => {},
+            onAddCheckItem: () => {},
+            onAddCheckItems: () => {},
+            onRenameCheckItem: () => {},
+            onToggleCheckItem: () => {},
+            onDeleteCheckItem: () => {},
+          }}
+          lifecycle={{
+            onArchiveList: () => {},
+            onTrashList: () => {},
+            onRestoreList: () => {},
+            onPermanentlyDeleteList: () => {},
+          }}
+          onMutate={() => {}}
+        />
+      </FloatingLayerProvider>
     </I18nProvider>,
   );
 }
