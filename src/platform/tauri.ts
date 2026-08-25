@@ -92,6 +92,17 @@ export function isTauriRuntime() {
   return Boolean(tauriWindow.__TAURI__ || tauriWindow.__TAURI_INTERNALS__);
 }
 
+/**
+ * A refusal seen in this session (§6.38).
+ *
+ * The Tauri notification plugin exposes `isPermissionGranted` and nothing that
+ * reports the opposite, so "not granted" covers both "never asked" and "said
+ * no". Remembering the answer to our own request is what lets §6.40's notice
+ * appear at all on the desktop; it is not persisted, because the OS setting is
+ * the truth and a stale copy of it would be worse than asking again.
+ */
+let deniedThisSession = false;
+
 export const tauriPlatform: PlatformAdapter = {
   ...webPlatform,
   kind: "desktop",
@@ -111,13 +122,26 @@ export const tauriPlatform: PlatformAdapter = {
     }
   },
 
+  async notificationAccess() {
+    try {
+      if (await isPermissionGranted()) return "granted";
+      // The plugin can say "granted" and nothing else — there is no check that
+      // reports a refusal — so a remembered "denied" from a request in this
+      // session is the only way this build knows about one.
+      return deniedThisSession ? "denied" : "unasked";
+    } catch {
+      return webPlatform.notificationAccess();
+    }
+  },
+
   async requestNotificationPermission() {
     try {
-      if (!(await isPermissionGranted())) {
-        await requestPermission();
-      }
+      if (await isPermissionGranted()) return "granted";
+      const permission = await requestPermission();
+      deniedThisSession = permission !== "granted";
+      return permission === "granted" ? "granted" : "denied";
     } catch {
-      await webPlatform.requestNotificationPermission();
+      return webPlatform.requestNotificationPermission();
     }
   },
 

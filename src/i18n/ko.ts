@@ -666,6 +666,8 @@ export const ko: Dictionary = {
   "schedule.reminder.1w": "1주 전 오전 9시",
   "schedule.reminder.custom-offset": "사용자 지정",
   "schedule.reminder.custom": "특정 시각에",
+  "schedule.reminder.denied": "저장했습니다. 알림이 꺼져 있어 허용하기 전까지는 전달되지 않습니다.",
+  "schedule.reminder.unsupported": "저장했습니다. 이 기기에서는 알림을 표시할 수 없습니다.",
   "schedule.reminder.more": "{{label}} 외 {{n}}개",
   "schedule.repeat": "반복",
   "schedule.repeat.none": "없음",

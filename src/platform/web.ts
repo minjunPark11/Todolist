@@ -58,9 +58,18 @@ export const webPlatform: PlatformAdapter = {
     }
   },
 
+  async notificationAccess() {
+    if (!("Notification" in window)) return "unsupported";
+    // `default` is the browser's word for "never asked"; §6.39 wants that told
+    // apart from a refusal, because only one of the two is worth asking about.
+    return window.Notification.permission === "default" ? "unasked" : window.Notification.permission;
+  },
+
   async requestNotificationPermission() {
-    if (!("Notification" in window) || window.Notification.permission !== "default") return;
-    await window.Notification.requestPermission().catch(() => undefined);
+    if (!("Notification" in window)) return "unsupported";
+    if (window.Notification.permission !== "default") return window.Notification.permission;
+    const result = await window.Notification.requestPermission().catch(() => "denied" as const);
+    return result === "granted" ? "granted" : "denied";
   },
 
   aiFetch(input, init) {

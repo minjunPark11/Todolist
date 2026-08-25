@@ -521,6 +521,18 @@
   cursor: default;
 }
 
+/* §6.40's state line. Not an error colour: the reminder WAS saved, and
+   painting this red would say the opposite of what it reads. */
+.sched-reminder-notice {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-subtle, rgba(120, 120, 128, 0.08));
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .sched-choice:hover {
   background: var(--bg-surface-muted);
 }

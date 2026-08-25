@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { offersFor, specFromOffer, absoluteSpec, containsReminder, sortReminders } from "../../domain/schedule";
 import type { ReminderSpec, Schedule } from "../../domain/schedule";
+import { useNotificationAccess } from "../../hooks/useNotificationAccess";
 import { useT } from "../../i18n";
 
 export interface ReminderPanelProps {
@@ -24,6 +25,19 @@ export function ReminderPanel({ draft, onToggle, onBack }: ReminderPanelProps) {
   const { t } = useT();
   /** §6.21's custom flow, closed until asked for. */
   const [custom, setCustom] = useState("");
+  const delivery = useNotificationAccess();
+
+  /**
+   * §6.39: ask at the moment of intent, and store either way (§6.40).
+   *
+   * The permission request rides along with the choice rather than gating it.
+   * §26.6.4 is explicit — a platform that cannot deliver must not stop a
+   * reminder being saved — so nothing here waits for the answer.
+   */
+  function choose(reminder: ReminderSpec) {
+    delivery.request();
+    onToggle(reminder);
+  }
 
   const offers = offersFor(draft);
   // §6.13's absolute reminders are not in the offers — they have no preset to
@@ -37,7 +51,7 @@ export function ReminderPanel({ draft, onToggle, onBack }: ReminderPanelProps) {
     // The browser hands back `YYYY-MM-DDTHH:mm`, which is the wall-clock shape
     // this domain stores. No zone conversion, deliberately (§26.5).
     if (!custom) return;
-    onToggle(absoluteSpec(custom));
+    choose(absoluteSpec(custom));
     setCustom("");
   }
 
@@ -65,7 +79,7 @@ export function ReminderPanel({ draft, onToggle, onBack }: ReminderPanelProps) {
               role="checkbox"
               aria-checked={on}
               className={on ? "sched-choice is-active" : "sched-choice"}
-              onClick={() => onToggle(spec)}
+              onClick={() => choose(spec)}
             >
               <span>{t(`schedule.reminder.${offer.id}`)}</span>
               {on ? (
@@ -84,7 +98,7 @@ export function ReminderPanel({ draft, onToggle, onBack }: ReminderPanelProps) {
             role="checkbox"
             aria-checked
             className="sched-choice is-active"
-            onClick={() => onToggle(reminder)}
+            onClick={() => choose(reminder)}
           >
             <span>{(reminder.absoluteAt ?? "").replace("T", " ")}</span>
             <span className="sched-check" aria-hidden="true">
@@ -115,6 +129,17 @@ export function ReminderPanel({ draft, onToggle, onBack }: ReminderPanelProps) {
           {t("common.add")}
         </button>
       </div>
+
+      {/* §6.40, and §26.6.2's whole point: the reminder above is SAVED. What
+          this says is that the OS will not carry it — a different failure,
+          with a different fix, and one the user can act on. Absent while the
+          answer is `granted` or still `unasked`, because §6.39 does not want
+          a warning about a prompt that has not been shown yet. */}
+      {delivery.access === "denied" || delivery.access === "unsupported" ? (
+        <p className="sched-reminder-notice" role="status">
+          {t(`schedule.reminder.${delivery.access}`)}
+        </p>
+      ) : null}
     </div>
   );
 }

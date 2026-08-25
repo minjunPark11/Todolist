@@ -78,12 +78,11 @@ export function useReminders({ tasks, describe, onFallback }: RemindersOptions) 
   const latest = useRef({ tasks, describe, onFallback });
   latest.current = { tasks, describe, onFallback };
 
-  useEffect(() => {
-    // Asked for once, at startup, rather than when a reminder is already due —
-    // a permission prompt at the moment of firing swallows that first
-    // notification behind a dialog.
-    platform.requestNotificationPermission().catch(() => undefined);
-  }, []);
+  // Nothing is requested here any more. This asked for notification permission
+  // on mount, which put the browser's prompt on first load before the user had
+  // asked for anything — the timing §6.39 refuses. The request lives in the
+  // reminder panel now, at the moment someone chooses a reminder, and this
+  // hook only delivers.
 
   useEffect(() => {
     if (seenRef.current === null) seenRef.current = readSeen();

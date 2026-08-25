@@ -671,6 +671,8 @@ export const en: Dictionary = {
   "schedule.reminder.1w": "1 week before, 9:00 AM",
   "schedule.reminder.custom-offset": "Custom",
   "schedule.reminder.custom": "At a specific time",
+  "schedule.reminder.denied": "Saved. Notifications are turned off, so this won't be delivered until you allow them.",
+  "schedule.reminder.unsupported": "Saved. This device has no way to show notifications.",
   "schedule.reminder.more": "{{label}} +{{n}}",
   "schedule.repeat": "Repeat",
   "schedule.repeat.none": "None",

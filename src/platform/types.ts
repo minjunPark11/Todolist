@@ -116,6 +116,17 @@ export interface PlatformLocalAi {
   installServer(url: string, expectedSha256: string, version: string): Promise<ModelDownloadOutcome>;
 }
 
+/**
+ * Where notification permission stands (§6.38, §6.40).
+ *
+ * Four values and not a boolean, because the three ways of "no" call for
+ * different words: `unasked` means the app has not asked yet and §6.39 says it
+ * should not until the user wants a reminder; `denied` means they said no and
+ * §6.40 says the reminder is stored anyway; `unsupported` means the platform
+ * has no channel at all, which is nobody's decision to reverse.
+ */
+export type NotificationAccess = "granted" | "denied" | "unasked" | "unsupported";
+
 export interface PlatformAdapter {
   kind: PlatformKind;
   storage: {
@@ -127,7 +138,24 @@ export interface PlatformAdapter {
     removeSync(key: string): void;
   };
   notify(options: { title: string; body?: string }): Promise<boolean>;
-  requestNotificationPermission(): Promise<void>;
+  /**
+   * Whether a reminder could be DELIVERED right now (spec §6.38).
+   *
+   * Deliberately a different question from whether one is stored. Chapter 26
+   * §26.6.2 is about being able to tell those two apart: "the reminder never
+   * saved" is a data bug and "there was no way to send it" is a platform fact,
+   * and a UI that cannot distinguish them tells the user the wrong thing about
+   * both.
+   */
+  notificationAccess(): Promise<NotificationAccess>;
+  /**
+   * Ask, and answer with what the user said.
+   *
+   * The result matters because §6.39 asks at the moment of intent rather than
+   * at startup — the caller has a reminder in hand and needs to know whether
+   * to say anything about it.
+   */
+  requestNotificationPermission(): Promise<NotificationAccess>;
   aiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
   getAppVersion(): Promise<string>;
   checkForUpdate(currentVersion: string): Promise<AppUpdateStatus>;
