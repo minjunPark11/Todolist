@@ -158,9 +158,13 @@ export function useDeferredTextField(
     (event: {
       clipboardData: { getData: (format: string) => string } | null;
       currentTarget: { value: string; selectionStart: number | null; selectionEnd: number | null };
+      defaultPrevented?: boolean;
       preventDefault: () => void;
     }) => {
-      if (!singleLine) return;
+      // Someone above already took this paste — the checklist splits a
+      // multi-line paste into items (§11.33), which is a different answer to
+      // the same event and it gets to give it.
+      if (!singleLine || event.defaultPrevented) return;
       const pasted = event.clipboardData?.getData("text") ?? "";
       if (!/[\r\n\u2028\u2029]/.test(pasted)) return;
 

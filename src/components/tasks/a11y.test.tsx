@@ -124,6 +124,13 @@ function renderModule(url: string) {
           onAddSubtask: () => {},
           onToggleSubtask: () => {},
           onDeleteSubtask: () => {},
+          checkItemsFor: () => [],
+          onSetContentMode: () => {},
+          onAddCheckItem: () => {},
+          onAddCheckItems: () => {},
+          onRenameCheckItem: () => {},
+          onToggleCheckItem: () => {},
+          onDeleteCheckItem: () => {},
         }}
         lifecycle={{
           onArchiveList: () => {},

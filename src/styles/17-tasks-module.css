@@ -1952,3 +1952,135 @@
 .tm-menu-flag.is-high { background: var(--danger); }
 .tm-menu-flag.is-medium { background: var(--warning); }
 .tm-menu-flag.is-low { background: var(--accent); }
+
+/* Task Content: prose or a checklist, one at a time (spec §11.4, §11.5).
+   The header carries the mode toggle, so the two contents share one place in
+   the Drawer rather than stacking as separate sections — which is the whole
+   point of a mode: only one of them is the Task's content. */
+.tm-drawer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tm-drawer-content-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8e8e93);
+}
+
+/* Pushed to the trailing edge, away from the label it belongs to. */
+.tm-drawer-mode {
+  display: flex;
+  margin-inline-start: auto;
+  border: 1px solid var(--border, #e5e5e7);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.tm-drawer-mode button {
+  padding: 3px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  font: inherit;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+/* `aria-pressed` is the state, so it is also the selector: the two cannot
+   drift apart the way a parallel `is-active` class would. */
+.tm-drawer-mode button[aria-pressed="true"] {
+  background: var(--surface-2, #f2f2f7);
+  color: var(--text, #1c1c1e);
+}
+
+.tm-drawer-content textarea {
+  padding: 5px 8px;
+  border: 1px solid var(--border, #e5e5e7);
+  border-radius: 6px;
+  background: var(--bg, #fff);
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.tm-checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-checklist-items li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The row's text field is the row: no border of its own, so a checklist reads
+   as a list rather than as a column of form controls. It takes a visible edge
+   on focus, which is the moment it IS a form control. */
+.tm-checklist-text,
+.tm-checklist-draft input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 13px;
+}
+
+.tm-checklist-text:focus,
+.tm-checklist-draft input:focus {
+  border-color: var(--border, #e5e5e7);
+  background: var(--bg, #fff);
+  outline: none;
+}
+
+.tm-checklist-items li.is-checked .tm-checklist-text {
+  color: var(--text-muted, #8e8e93);
+  text-decoration: line-through;
+}
+
+/* A ticked line that is being edited is not a finished line — striking through
+   the user's caret makes text hard to read while they fix it. */
+.tm-checklist-items li.is-checked .tm-checklist-text:focus {
+  color: var(--text, #1c1c1e);
+  text-decoration: none;
+}
+
+.tm-checklist-remove {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  cursor: pointer;
+}
+
+.tm-checklist-draft {
+  display: flex;
+  align-items: center;
+  /* Lines up with the rows above, whose checkbox occupies this space. */
+  padding-inline-start: 21px;
+}
+
+.tm-checklist-empty {
+  margin: 0;
+  padding-inline-start: 27px;
+  font-size: 12px;
+  color: var(--text-muted, #8e8e93);
+}

@@ -9,6 +9,7 @@
 // List rendering only, per §16.26 — Board and the rich Drawer come later.
 import { useEffect, useMemo, useState } from "react";
 import type {
+  CheckItem,
   Folder,
   List,
   ListSection,
@@ -17,6 +18,7 @@ import type {
   Space,
   Tag,
   Task,
+  TaskContentMode,
   TaskDailyPlan,
   TaskTag,
 } from "../../types";
@@ -108,6 +110,14 @@ interface TasksModuleProps {
     onAddSubtask: (taskId: string, title: string) => void;
     onToggleSubtask: (id: string) => void;
     onDeleteSubtask: (id: string) => void;
+    /** The Task's checklist and everything that edits it (spec §11). */
+    checkItemsFor: (taskId: string) => CheckItem[];
+    onSetContentMode: (taskId: string, mode: TaskContentMode) => void;
+    onAddCheckItem: (taskId: string, text: string) => void;
+    onAddCheckItems: (taskId: string, texts: string[]) => void;
+    onRenameCheckItem: (itemId: string, text: string) => void;
+    onToggleCheckItem: (itemId: string) => void;
+    onDeleteCheckItem: (itemId: string) => void;
   };
   /**
    * Creates the List and answers with its id (Add List design §1.10).
@@ -733,6 +743,13 @@ export function TasksModule(props: TasksModuleProps) {
           onAddSubtask={(title) => props.drawer.onAddSubtask(openedTask.id, title)}
           onToggleSubtask={props.drawer.onToggleSubtask}
           onDeleteSubtask={props.drawer.onDeleteSubtask}
+          checkItems={props.drawer.checkItemsFor(openedTask.id)}
+          onSetContentMode={(mode) => props.drawer.onSetContentMode(openedTask.id, mode)}
+          onAddCheckItem={(text) => props.drawer.onAddCheckItem(openedTask.id, text)}
+          onAddCheckItems={(texts) => props.drawer.onAddCheckItems(openedTask.id, texts)}
+          onRenameCheckItem={props.drawer.onRenameCheckItem}
+          onToggleCheckItem={props.drawer.onToggleCheckItem}
+          onDeleteCheckItem={props.drawer.onDeleteCheckItem}
           onComplete={() =>
             mutate(
               openedTask,

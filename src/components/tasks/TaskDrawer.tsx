@@ -9,11 +9,13 @@
 // must not appear as a disabled placeholder before the model behind it exists.
 // So they are absent, not greyed out.
 import { useEffect, useRef } from "react";
-import type { List, Task } from "../../types";
+import type { CheckItem, List, Task, TaskContentMode } from "../../types";
 import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
 import { childProgress } from "../../domain/tasks/children";
 import { isCompleted } from "../../domain/tasks/taskState";
+import { checklistProgress, isChecklistMode } from "../../domain/tasks/checkItems";
+import { ChecklistEditor } from "./ChecklistEditor";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { DeferredInput, DeferredTextarea } from "../kit";
@@ -41,6 +43,14 @@ export interface TaskDrawerProps {
   onTrash: () => void;
   /** Audit D-23. Toggles, because a mark you cannot take back is a delete. */
   onToggleWontDo: () => void;
+  /** This Task's checklist (spec §11), already in display order. */
+  checkItems: CheckItem[];
+  onSetContentMode: (mode: TaskContentMode) => void;
+  onAddCheckItem: (text: string) => void;
+  onAddCheckItems: (texts: string[]) => void;
+  onRenameCheckItem: (itemId: string, text: string) => void;
+  onToggleCheckItem: (itemId: string) => void;
+  onDeleteCheckItem: (itemId: string) => void;
 }
 
 const PRIORITIES = ["none", "low", "medium", "high"] as const;
@@ -59,6 +69,13 @@ export function TaskDrawer({
   onDeleteSubtask,
   onTrash,
   onToggleWontDo,
+  checkItems,
+  onSetContentMode,
+  onAddCheckItem,
+  onAddCheckItems,
+  onRenameCheckItem,
+  onToggleCheckItem,
+  onDeleteCheckItem,
 }: TaskDrawerProps) {
   const { t } = useT();
   const root = useRef<HTMLElement>(null);
@@ -103,6 +120,8 @@ export function TaskDrawer({
   }, [onClose]);
 
   const progress = childProgress(children);
+  const checklist = isChecklistMode(task);
+  const progressLines = checklistProgress(task.id, checkItems);
 
   function submitSubtask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -190,16 +209,60 @@ export function TaskDrawer({
         </label>
       </div>
 
-      <label className="tm-drawer-field is-block">
-        <span>{t("tasks.notes")}</span>
-        {/* Not single-line: Enter here is a paragraph break (spec §10.4). */}
-        <DeferredTextarea
-          value={task.description}
-          rows={3}
-          onCommit={(description) => onUpdate({ description })}
-          resetKey={task.id}
-        />
-      </label>
+      {/* §11.4: the mode toggle is the Content header's, and it is the only
+          way into a conversion — §11.20 is explicit that text which looks
+          like a checklist is not read as one until the user asks.
+
+          §11.5: this is not a view switch. Choosing the other mode MOVES the
+          content, in one transaction, and one Undo takes it back (§11.14,
+          §11.15) — which is why the toggle can be two plain buttons rather
+          than a dialog asking permission first. */}
+      <section className="tm-drawer-content">
+        <header className="tm-drawer-content-head">
+          <span>{t(checklist ? "tasks.checklist" : "tasks.notes")}</span>
+          {checklist ? (
+            <span className="tm-count">
+              {progressLines.done}/{progressLines.total}
+            </span>
+          ) : null}
+          <div className="tm-drawer-mode" role="group" aria-label={t("tasks.contentMode")}>
+            <button
+              type="button"
+              aria-pressed={!checklist}
+              onClick={() => onSetContentMode("description")}
+            >
+              {t("tasks.contentMode.description")}
+            </button>
+            <button
+              type="button"
+              aria-pressed={checklist}
+              onClick={() => onSetContentMode("checklist")}
+            >
+              {t("tasks.contentMode.checklist")}
+            </button>
+          </div>
+        </header>
+
+        {checklist ? (
+          <ChecklistEditor
+            items={checkItems}
+            onAdd={onAddCheckItem}
+            onAddMany={onAddCheckItems}
+            onRename={onRenameCheckItem}
+            onToggle={onToggleCheckItem}
+            onDelete={onDeleteCheckItem}
+          />
+        ) : (
+          /* Not single-line: Enter here is a paragraph break (spec §10.4). */
+          <DeferredTextarea
+            value={task.description}
+            rows={3}
+            onCommit={(description) => onUpdate({ description })}
+            resetKey={task.id}
+            aria-label={t("tasks.notes")}
+          />
+        )}
+      </section>
 
       <section className="tm-drawer-subtasks">
         <h3>

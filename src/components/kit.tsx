@@ -1,4 +1,5 @@
 import {
+  forwardRef,
   InputHTMLAttributes,
   ReactNode,
   TextareaHTMLAttributes,
@@ -37,7 +38,13 @@ type DeferredFieldProps = {
   required?: boolean;
 };
 
-export function DeferredInput({
+/**
+ * `forwardRef` because the checklist moves focus between rows (§11.26–§11.28):
+ * Enter goes to the next line, Backspace on an empty one goes back to the
+ * previous. That is the caller's decision to make, and it needs the element.
+ */
+export const DeferredInput = forwardRef<HTMLInputElement, DeferredFieldProps &
+  Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">>(function DeferredInput({
   value,
   onCommit,
   resetKey,
@@ -46,22 +53,44 @@ export function DeferredInput({
   // mean here — the caller opts out only for the rare field where it does.
   singleLine = true,
   required,
+  // Chained rather than replaced. A caller that needs to react to a key or a
+  // paste — the checklist does both — would otherwise have to choose between
+  // its own handler and the draft behaviour, and silently lose one.
+  onKeyDown,
+  onPaste,
+  onBlur,
   ...rest
-}: DeferredFieldProps & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
+}, ref) {
   const field = useDeferredTextField(value, onCommit, { resetKey, delayMs, singleLine, required });
   return (
     <input
       {...rest}
+      ref={ref}
       value={field.value}
       onChange={(event) => field.onChange(event.target.value)}
-      onBlur={field.onBlur}
-      onKeyDown={field.onKeyDown}
-      onPaste={field.onPaste}
+      // The draft commits first, so a caller reacting to Enter is acting on a
+      // field whose text is already saved.
+      onBlur={(event) => {
+        field.onBlur();
+        onBlur?.(event);
+      }}
+      onKeyDown={(event) => {
+        field.onKeyDown(event);
+        onKeyDown?.(event);
+      }}
+      // The caller goes first here: a multi-line paste has two possible
+      // answers (flatten to one line, or split into items) and only the
+      // caller knows which field it is looking at. `preventDefault` is how it
+      // says it handled it.
+      onPaste={(event) => {
+        onPaste?.(event);
+        field.onPaste(event);
+      }}
       onCompositionStart={field.onCompositionStart}
       onCompositionEnd={field.onCompositionEnd}
     />
   );
-}
+});
 
 export function DeferredTextarea({
   value,

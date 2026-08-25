@@ -1047,6 +1047,16 @@ export const en: Dictionary = {
   "tasks.priority.medium": "Medium",
   "tasks.priority.high": "High",
   "tasks.notes": "Notes",
+  // Spec §11. "Checklist" and "Notes" name the two contents; the toggle
+  // labels are the short forms that fit beside them.
+  "tasks.checklist": "Checklist",
+  "tasks.checklist.item": "Checklist item",
+  "tasks.checklist.toggle": "Toggle item",
+  "tasks.checklist.add": "Add an item",
+  "tasks.checklist.empty": "No items yet.",
+  "tasks.contentMode": "Content type",
+  "tasks.contentMode.description": "Notes",
+  "tasks.contentMode.checklist": "Checklist",
   "tasks.subtasks": "Subtasks",
   "tasks.addSubtask": "Add a subtask",
   "tasks.moveToTrash": "Move to trash",

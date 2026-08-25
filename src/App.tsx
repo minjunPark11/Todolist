@@ -30,6 +30,7 @@ import type { CommandContext, TaskCommand } from "./domain/tasks/commands";
 import { parseTaskUrl, searchUrlFor, urlForSearchResult } from "./app/taskScopeUrl";
 import { TasksSidebarSlot } from "./components/shell/TasksSidebarSlot";
 import { childrenOf } from "./domain/tasks/children";
+import { checkItemsForTask } from "./domain/tasks/checkItems";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
 import { useDataPortability } from "./app/useDataPortability";
@@ -1223,6 +1224,14 @@ export default function App() {
             // are two: legacy `Subtask` rows and the child Tasks `addSubtask`
             // has been writing since the promotion path landed.
             childrenOf: (taskId) => childrenOf(taskId, planner.tasks, planner.subtasks),
+            // Ordering is the domain's (spec §11), not the Drawer's.
+            checkItemsFor: (taskId) => checkItemsForTask(taskId, planner.checkItems),
+            onSetContentMode: planner.setTaskContentMode,
+            onAddCheckItem: planner.addCheckItem,
+            onAddCheckItems: planner.addCheckItems,
+            onRenameCheckItem: planner.updateCheckItemText,
+            onToggleCheckItem: planner.toggleCheckItem,
+            onDeleteCheckItem: planner.deleteCheckItem,
             onUpdate: planner.updateTask,
             onMoveToList: planner.moveTaskToList,
             onAddSubtask: planner.addSubtask,
