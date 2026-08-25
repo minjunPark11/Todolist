@@ -488,3 +488,42 @@
     min-height: 44px;
   }
 }
+
+/* The local snapshot could not be written (spec §16.38).
+   
+   Fixed rather than a row in the grid: `.app-shell` is a two-column layout and
+   a child of it would land in a column. Fixed also means the bar is on screen
+   whichever page is open and however far it is scrolled, which is the point —
+   the state lasts until the write succeeds, so it must not scroll away.
+   
+   Above the toast stack (1500). Losing the on-disk copy of a user's work
+   outranks any transient feedback, and this bar is small enough that it does
+   not hide one. */
+.storage-error-bar {
+  position: fixed;
+  z-index: 1600;
+  inset: 0 0 auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px;
+  color: #fff;
+  background: var(--danger);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  box-shadow: var(--shadow-panel);
+}
+
+.storage-error-bar button {
+  flex: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--danger);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}

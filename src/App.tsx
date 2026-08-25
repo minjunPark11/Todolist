@@ -1360,6 +1360,18 @@ export default function App() {
             .filter(Boolean)
             .join(" ")}
         >
+      {/* The local snapshot could not be written (spec §16.38, §16.93). A bar
+          and not a toast: the state lasts as long as the failure does, and a
+          message that expires would leave the user believing their work is
+          safely on disk. */}
+      {planner.storageError ? (
+        <div className="storage-error-bar" role="alert">
+          <span>{t("storage.saveFailed")}</span>
+          <button type="button" onClick={planner.retryLocalSave}>
+            {t("storage.retry")}
+          </button>
+        </div>
+      ) : null}
       <button
         type="button"
         className="mobile-menu-button"

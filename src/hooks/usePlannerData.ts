@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pushUndo } from "../lib/undoStack";
 import { platform } from "../platform";
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
@@ -82,6 +82,10 @@ import {
 
 const STORAGE_KEY = PLANNER_STORAGE_KEY;
 const LEGACY_STORAGE_KEY = "todo-planner-data";
+// Backoff for a failed local write. Slower than the network retry: a full
+// quota does not clear on its own the way a dropped connection does.
+const LOCAL_SAVE_RETRY_MS = 5000;
+const LOCAL_SAVE_RETRY_MAX_MS = 120000;
 // Every value `status` may hold on disk: the three lifecycle values written
 // since Ch. 26 §26.3.2, and the legacy six that accounts still carry. A value
 // outside this set falls back to `open`, which is what an unrecognised
@@ -673,9 +677,94 @@ export function usePlannerData() {
   }
   const saveQueue = saveQueueRef.current;
 
+  // The local snapshot could not be written and the app is running on memory
+  // alone. Held as state because the UI has to say so until it clears.
+  const [storageError, setStorageError] = useState(false);
+  const localSaveRetryRef = useRef<number | null>(null);
+  const localSaveDelayRef = useRef(LOCAL_SAVE_RETRY_MS);
+
+  // Writing the snapshot to local storage is the one save this app cannot do
+  // without: the account is optional, local storage is not. It fails for real
+  // reasons — the quota is full, the browser is in a mode that refuses to
+  // store, an extension blocked it — and it used to fail by throwing out of
+  // this effect, which takes the render down with it.
+  //
+  // Spec §9.45 and §16.38 say what to do instead, and both halves matter:
+  //
+  //   The draft is never rolled back. What the user typed stays in memory and
+  //   on screen; the only thing that failed is the copy on disk, and quietly
+  //   replacing their text with the last version that WAS written would lose
+  //   the edit to hide the error.
+  //
+  //   The failure is never hidden. It has to stay visible while it lasts
+  //   (§16.93 — not a toast that expires), because the user is the only one
+  //   who can act on it, and "saved locally" is what every other status in
+  //   this app promises.
+  //
+  // Retry uses the LATEST state and not the payload that failed (§16.39): by
+  // the time a retry runs the user has usually typed more, and re-writing the
+  // snapshot they had two minutes ago would undo it.
   useEffect(() => {
-    persistPlannerData(data);
+    // This run supersedes any scheduled retry — it carries newer data.
+    if (localSaveRetryRef.current !== null) {
+      window.clearTimeout(localSaveRetryRef.current);
+      localSaveRetryRef.current = null;
+    }
+
+    function attempt() {
+      try {
+        persistPlannerData(dataRef.current);
+        setStorageError(false);
+        localSaveDelayRef.current = LOCAL_SAVE_RETRY_MS;
+      } catch (error) {
+        console.error("[storage] local save failed:", error);
+        setStorageError(true);
+        // Backoff, because the usual cause (a full quota) does not clear in a
+        // second, and a tight retry loop would spend the main thread on
+        // re-serializing the whole store into a write that keeps failing.
+        const delay = localSaveDelayRef.current;
+        localSaveDelayRef.current = Math.min(delay * 2, LOCAL_SAVE_RETRY_MAX_MS);
+        localSaveRetryRef.current = window.setTimeout(attempt, delay);
+      }
+    }
+
+    attempt();
+
+    return () => {
+      if (localSaveRetryRef.current !== null) {
+        window.clearTimeout(localSaveRetryRef.current);
+        localSaveRetryRef.current = null;
+      }
+    };
   }, [data]);
+
+  /** Try the local write again now — what the banner's Retry button calls. */
+  const retryLocalSave = useCallback(() => {
+    // The user asked for it now; a timer waiting to do the same thing later is
+    // just a duplicate write.
+    if (localSaveRetryRef.current !== null) {
+      window.clearTimeout(localSaveRetryRef.current);
+      localSaveRetryRef.current = null;
+    }
+    localSaveDelayRef.current = LOCAL_SAVE_RETRY_MS;
+    try {
+      persistPlannerData(dataRef.current);
+      setStorageError(false);
+    } catch (error) {
+      console.error("[storage] local save retry failed:", error);
+      setStorageError(true);
+      // Hand it back to the automatic retry rather than leaving the only
+      // remaining attempt behind a button the user has to press again.
+      const delay = localSaveDelayRef.current;
+      localSaveDelayRef.current = Math.min(delay * 2, LOCAL_SAVE_RETRY_MAX_MS);
+      localSaveRetryRef.current = window.setTimeout(() => retryLocalSaveRef.current(), delay);
+    }
+  }, []);
+  // The retry reschedules itself, and a `useCallback` cannot name itself in
+  // its own body. The ref is written on every render so the timer always calls
+  // the current one.
+  const retryLocalSaveRef = useRef(retryLocalSave);
+  retryLocalSaveRef.current = retryLocalSave;
 
   useEffect(() => {
     if (!supabase) {
@@ -1893,6 +1982,8 @@ export function usePlannerData() {
     settings: data.settings,
     appSettings: data.appSettings,
     selectedTask,
+    storageError,
+    retryLocalSave,
     auth: {
       isConfigured: isSupabaseConfigured,
       isLoading: authLoading,

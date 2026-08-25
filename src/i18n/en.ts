@@ -220,6 +220,11 @@ export const en: Dictionary = {
   "sync.synced": "Synced",
   "sync.loadFailed": "Supabase load failed. Local data is still available.",
   "sync.syncFailed": "Supabase sync failed. Changes remain in localStorage.",
+  // The local write itself failed, so "remains in localStorage" above is no
+  // longer true. Says what is at risk and what to do, without telling the user
+  // their work is gone — it is still on screen and still editable.
+  "storage.saveFailed": "Couldn't save to this device. Your changes are still here, but they may be lost if you close the app.",
+  "storage.retry": "Retry",
   "sync.retrying": "Upload failed. Your changes are saved locally and will be retried.",
   "sync.verificationSent": "Verification email sent. Please check your inbox.",
   "sync.accountCreated": "Account created.",
