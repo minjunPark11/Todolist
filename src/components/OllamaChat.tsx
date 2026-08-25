@@ -15,7 +15,7 @@ import type { AiContextInput } from "../lib/ai/context/buildAiContext";
 import type { ToolExecutionResult, ToolValidationResult } from "../lib/ai/tools/toolExecutor";
 import type { AiMessage, AiProviderName } from "../lib/ai/types";
 import { buildCalendarContextText, type CalendarContextInput } from "../lib/calendarContext";
-import { Popover } from "./kit";
+import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "./floating";
 import { buildAttachedFilesContext, type AttachedFileRef } from "../lib/knowledge/attachedFilesContext";
 import { scanVault } from "../lib/knowledge/obsidianScanner";
 import { DEFAULT_KNOWLEDGE_SETTINGS, type KnowledgeSettings, type RetrievedChunk } from "../lib/knowledge/types";
@@ -99,7 +99,7 @@ export function OllamaChat({
   const [knowledgeSources, setKnowledgeSources] = useState<RetrievedChunk[]>([]);
   const [copiedSourcePath, setCopiedSourcePath] = useState("");
   const [attachedFiles, setAttachedFiles] = useState<AttachedFileRef[]>([]);
-  const [attachPopoverOpen, setAttachPopoverOpen] = useState(false);
+
   const [attachFilter, setAttachFilter] = useState("");
   const [attachCandidates, setAttachCandidates] = useState<PlatformFileEntry[]>([]);
   const [attachLoading, setAttachLoading] = useState(false);
@@ -134,7 +134,7 @@ export function OllamaChat({
     .slice(0, 20);
 
   async function openAttachPopover() {
-    setAttachPopoverOpen(true);
+
     setAttachLoading(true);
     try {
       setAttachCandidates(await scanVault(knowledgeSettings.vaultPath, knowledgeSettings.excludedFolders));
@@ -151,7 +151,7 @@ export function OllamaChat({
         ? current
         : [...current, { path: entry.path, relativePath: entry.relativePath }],
     );
-    setAttachPopoverOpen(false);
+
     setAttachFilter("");
   }
 
@@ -301,7 +301,7 @@ export function OllamaChat({
     setActionNotice("");
     setKnowledgeSources([]);
     setAttachedFiles([]);
-    setAttachPopoverOpen(false);
+
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }
 
@@ -452,44 +452,25 @@ export function OllamaChat({
           <form className="ollama-chat-form" onSubmit={submit}>
             {canAttachFiles ? (
               <div className="ff-anchor ollama-chat-attach-anchor">
-                <button
-                  type="button"
-                  className="ollama-chat-attach-button"
-                  aria-label={t("ai.attach.button")}
-                  onClick={() => (attachPopoverOpen ? setAttachPopoverOpen(false) : void openAttachPopover())}
-                >
-                  📎
-                </button>
-                <Popover open={attachPopoverOpen} onClose={() => setAttachPopoverOpen(false)}>
-                  <input
-                    type="text"
-                    className="ollama-chat-attach-filter"
-                    value={attachFilter}
-                    placeholder={t("ai.attach.filterPlaceholder")}
-                    onChange={(event) => setAttachFilter(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") event.preventDefault();
-                    }}
-                    autoFocus
-                  />
-                  <div className="ollama-chat-attach-list">
-                    {attachLoading ? (
-                      <div className="ollama-chat-attach-empty">{t("ai.attach.loading")}</div>
-                    ) : attachMatches.length ? (
-                      attachMatches.map((entry) => (
-                        <button
-                          key={entry.path}
-                          type="button"
-                          className="ff-menu-item"
-                          onClick={() => addAttachment(entry)}
-                        >
-                          {entry.relativePath}
-                        </button>
-                      ))
-                    ) : (
-                      <div className="ollama-chat-attach-empty">{t("ai.attach.empty")}</div>
-                    )}
-                  </div>
+                {/* The vault scan is started by the CONTENT mounting rather
+                    than by the trigger's click. Opening is the primitive's
+                    business now (§19.29), so the trigger no longer knows
+                    whether a click is opening or closing — and a scan kicked
+                    off on the closing click would be work nobody asked for. */}
+                <Popover onDismiss={() => setAttachFilter("")}>
+                  <PopoverTrigger className="ollama-chat-attach-button" aria-label={t("ai.attach.button")}>
+                    📎
+                  </PopoverTrigger>
+                  <PopoverContent label={t("ai.attach.button")} className="ollama-chat-attach-surface">
+                    <AttachPicker
+                      filter={attachFilter}
+                      onFilter={setAttachFilter}
+                      loading={attachLoading}
+                      matches={attachMatches}
+                      onScan={openAttachPopover}
+                      onPick={addAttachment}
+                    />
+                  </PopoverContent>
                 </Popover>
               </div>
             ) : null}
@@ -523,5 +504,76 @@ export function OllamaChat({
       </button>
 
     </div>
+  );
+}
+
+/**
+ * The attach popover's contents (spec §19.80, §19.81, §19.82).
+ *
+ * Separated so the scan can be tied to this being MOUNTED. §19.80 calls the
+ * options async and §19.81 says the surface opens before they arrive, which is
+ * exactly what an effect here gives: the loading line is drawn first and the
+ * list replaces it.
+ */
+function AttachPicker({
+  filter,
+  onFilter,
+  loading,
+  matches,
+  onScan,
+  onPick,
+}: {
+  filter: string;
+  onFilter: (next: string) => void;
+  loading: boolean;
+  matches: PlatformFileEntry[];
+  onScan: () => Promise<void>;
+  onPick: (entry: PlatformFileEntry) => void;
+}) {
+  const { t } = useT();
+  const { close } = usePopoverSurface();
+
+  useEffect(() => {
+    void onScan();
+    // Once per open. Re-scanning because the callback identity changed would
+    // restart the vault walk under the user mid-filter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <>
+      <input
+        type="text"
+        className="ollama-chat-attach-filter"
+        value={filter}
+        placeholder={t("ai.attach.filterPlaceholder")}
+        onChange={(event) => onFilter(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.preventDefault();
+        }}
+        autoFocus
+      />
+      <div className="ollama-chat-attach-list">
+        {loading ? (
+          <div className="ollama-chat-attach-empty">{t("ai.attach.loading")}</div>
+        ) : matches.length ? (
+          matches.map((entry) => (
+            <button
+              key={entry.path}
+              type="button"
+              className="ff-menu-item"
+              onClick={() => {
+                close();
+                onPick(entry);
+              }}
+            >
+              {entry.relativePath}
+            </button>
+          ))
+        ) : (
+          <div className="ollama-chat-attach-empty">{t("ai.attach.empty")}</div>
+        )}
+      </div>
+    </>
   );
 }

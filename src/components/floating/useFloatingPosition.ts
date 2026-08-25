@@ -4,17 +4,56 @@
 // is here is the part that has to touch one: reading the two rectangles, and
 // knowing when they have changed.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { computePlacement, isAnchorHidden, type Placement, type PlacementResult } from "../../domain/floating";
+import {
+  computePlacement,
+  isAnchorHidden,
+  type Placement,
+  type PlacementResult,
+  type Rect,
+} from "../../domain/floating";
 
 export interface FloatingPositionOptions {
   open: boolean;
-  anchor: () => HTMLElement | null;
+  /**
+   * Where the anchor is, as a rectangle — never as an element (§19.9).
+   *
+   * §19.9 lists four kinds of anchor: a DOM element, a caret rect, pointer
+   * coordinates, a selection range. Only the first is an element, and a hook
+   * that took an element could serve only that one. A context menu opens at
+   * the pointer and has no trigger at all.
+   */
+  anchorRect: () => Rect | null;
+  /**
+   * The element behind that rect, when there is one.
+   *
+   * Used for nothing but the ResizeObserver: a trigger that changes size moves
+   * the surface, and a virtual anchor has no size of its own to change.
+   */
+  anchorElement?: () => HTMLElement | null;
   surface: () => HTMLElement | null;
   placement: Placement;
   offset?: number;
   collisionPadding?: number;
   /** §19.19's optional policy, left to the caller as the spec leaves it. */
   onAnchorHidden?: () => void;
+}
+
+/** The rect of an element, or null when it is not there — §19.9's first kind. */
+export function rectOfElement(element: HTMLElement | null): Rect | null {
+  if (!element) return null;
+  const { x, y, width, height } = element.getBoundingClientRect();
+  return { x, y, width, height };
+}
+
+/**
+ * A rect for a point (§19.9's pointer coordinates).
+ *
+ * Zero-sized, which is what makes a context menu land ON the pointer rather
+ * than beside it: `computePlacement` offsets from the anchor's edge, and an
+ * anchor with no extent has one edge.
+ */
+export function rectOfPoint(x: number, y: number): Rect {
+  return { x, y, width: 0, height: 0 };
 }
 
 /**
@@ -27,7 +66,8 @@ export interface FloatingPositionOptions {
  */
 export function useFloatingPosition({
   open,
-  anchor,
+  anchorRect,
+  anchorElement,
   surface,
   placement,
   offset,
@@ -43,10 +83,9 @@ export function useFloatingPosition({
   hiddenCallback.current = onAnchorHidden;
 
   const measure = useCallback(() => {
-    const anchorEl = anchor();
+    const rect = anchorRect();
     const surfaceEl = surface();
-    if (!anchorEl || !surfaceEl) return;
-    const rect = anchorEl.getBoundingClientRect();
+    if (!rect || !surfaceEl) return;
     const viewport = { width: window.innerWidth, height: window.innerHeight };
 
     // `scrollWidth`/`scrollHeight` alongside the laid-out size, because by the
@@ -61,7 +100,7 @@ export function useFloatingPosition({
 
     setPosition(computePlacement({ anchor: rect, floating: natural, viewport, placement, offset, collisionPadding }));
     if (isAnchorHidden(rect, viewport)) hiddenCallback.current?.();
-  }, [anchor, surface, placement, offset, collisionPadding]);
+  }, [anchorRect, surface, placement, offset, collisionPadding]);
 
   // Layout effect: the first measurement happens before the browser paints, so
   // the surface is never seen in the wrong place.
@@ -92,7 +131,7 @@ export function useFloatingPosition({
     document.addEventListener("scroll", schedule, { capture: true, passive: true });
 
     const observer = new ResizeObserver(schedule);
-    const anchorEl = anchor();
+    const anchorEl = anchorElement?.() ?? null;
     const surfaceEl = surface();
     if (anchorEl) observer.observe(anchorEl);
     if (surfaceEl) observer.observe(surfaceEl);
@@ -103,7 +142,7 @@ export function useFloatingPosition({
       document.removeEventListener("scroll", schedule, { capture: true } as EventListenerOptions);
       observer.disconnect();
     };
-  }, [open, measure, anchor, surface]);
+  }, [open, measure, anchorElement, surface]);
 
   return position;
 }

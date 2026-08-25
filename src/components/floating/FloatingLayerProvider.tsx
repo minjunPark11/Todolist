@@ -77,6 +77,32 @@ export function useFloatingLayers(): FloatingLayerContextValue {
 const PORTAL_ID = "floating-layer-root";
 
 /**
+ * §19.6's root, created on FIRST RENDER rather than in an effect.
+ *
+ * The effect version had a real failure mode. A surface mounted in the same
+ * commit as the provider — a context menu rendered from the initial state, or
+ * anything in a test — saw `portalRoot === null`, rendered nothing, and so
+ * never gave the positioning hook a surface to measure. The portal arrived a
+ * tick later and the surface appeared, but nothing re-ran the measurement, so
+ * it stayed at `visibility: hidden` permanently: present in the DOM, absent
+ * from the screen and from the accessibility tree.
+ *
+ * Idempotent by id, so React calling this twice under StrictMode finds the
+ * node the first call made instead of appending a second one.
+ *
+ * One root, shared. A node per surface would make document order — and with it
+ * the tie-break between equal z-indexes — depend on mount order.
+ */
+function ensurePortalRoot(): HTMLElement {
+  const existing = document.getElementById(PORTAL_ID);
+  if (existing) return existing;
+  const root = document.createElement("div");
+  root.id = PORTAL_ID;
+  document.body.appendChild(root);
+  return root;
+}
+
+/**
  * Tell the layer system which Task's Detail is open (§19.21, §19.74).
  *
  * A hook rather than a prop on the provider, because the provider is mounted
@@ -113,25 +139,23 @@ export function FloatingLayerProvider({ children }: { children: ReactNode }) {
   const stackRef = useRef<Layer[]>([]);
   const [stack, setStack] = useState<Layer[]>([]);
   const registry = useRef(new Map<string, LayerRegistration>());
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+  const [portalRoot] = useState(ensurePortalRoot);
   const [ownerTaskId, setOwnerTaskId] = useState<string | null>(null);
 
-  // §19.6: one root outside the app tree, so a popover is not clipped by the
-  // Detail panel's `overflow: auto`. Shared rather than one per surface — a
-  // node per popover would make document order, and therefore the tie-break
-  // between equal z-indexes, depend on mount order.
+  // Created on first render (see `ensurePortalRoot`); attached and detached
+  // here.
+  //
+  // The re-attach is not defensive padding. StrictMode mounts, tears down and
+  // mounts again, so the cleanup below runs once before the app is really
+  // running — and without this line it left the root DETACHED while the state
+  // still pointed at it. Every surface then portalled into a node that was not
+  // in the document: present, laid out nowhere, invisible. It cost an
+  // afternoon in the browser, and no unit test could see it because Testing
+  // Library does not render through StrictMode.
   useEffect(() => {
-    const existing = document.getElementById(PORTAL_ID);
-    if (existing) {
-      setPortalRoot(existing);
-      return;
-    }
-    const root = document.createElement("div");
-    root.id = PORTAL_ID;
-    document.body.appendChild(root);
-    setPortalRoot(root);
-    return () => root.remove();
-  }, []);
+    if (!portalRoot.isConnected) document.body.appendChild(portalRoot);
+    return () => portalRoot.remove();
+  }, [portalRoot]);
 
   const commit = useCallback((next: Layer[]) => {
     stackRef.current = next;

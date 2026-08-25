@@ -1,7 +1,7 @@
 import { RefObject, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Task } from "../../types";
-import { Modal, MoreMenu, Popover, type MoreMenuItem } from "../kit";
+import { Modal, MoreMenu, type MoreMenuItem } from "../kit";
 import { useSelection, selectionModifiers } from "../../hooks/useSelection";
 import { useT } from "../../i18n";
 import { reducedTransition, transitions } from "../../motion/transitions";

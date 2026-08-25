@@ -31,6 +31,7 @@ export const en: Dictionary = {
 
   // ---- kit.tsx shared primitives ----
   "kit.needsDate": "Needs date",
+  "kit.dueDate": "Due date",
   "kit.notScheduled": "Not scheduled",
   "kit.plannedToday": "Planned Today",
   "kit.markDone": "Mark done",

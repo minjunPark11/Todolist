@@ -18,4 +18,11 @@ export {
   type PopoverProps,
   type PopoverTriggerProps,
 } from "./Popover";
-export { useFloatingPosition, type FloatingPositionOptions } from "./useFloatingPosition";
+export { FloatingMenu, type FloatingMenuProps } from "./FloatingMenu";
+export { moveMenuFocus } from "./menuNavigation";
+export {
+  rectOfElement,
+  rectOfPoint,
+  useFloatingPosition,
+  type FloatingPositionOptions,
+} from "./useFloatingPosition";

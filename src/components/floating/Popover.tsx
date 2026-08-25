@@ -26,7 +26,8 @@ import { createPortal } from "react-dom";
 import type { DismissReason, LayerType, Placement } from "../../domain/floating";
 import { useMotionEnabled } from "../../motion/reducedMotion";
 import { useFloatingLayers } from "./FloatingLayerProvider";
-import { useFloatingPosition } from "./useFloatingPosition";
+import { moveMenuFocus } from "./menuNavigation";
+import { rectOfElement, useFloatingPosition } from "./useFloatingPosition";
 
 interface PopoverContextValue {
   id: string;
@@ -272,14 +273,23 @@ export function PopoverContent({
   const layers = useFloatingLayers();
   const motionEnabled = useMotionEnabled();
 
-  const anchor = useCallback(() => triggerRef.current, [triggerRef]);
+  const anchorRect = useCallback(() => rectOfElement(triggerRef.current), [triggerRef]);
+  const anchorElement = useCallback(() => triggerRef.current, [triggerRef]);
   const surface = useCallback(() => surfaceRef.current, [surfaceRef]);
 
   // §19.19's optional policy, taken: a surface still hanging in mid-air after
   // its trigger has scrolled out of the Detail is §19.99's stale floating UI.
   const onAnchorHidden = useCallback(() => close("navigation"), [close]);
 
-  const position = useFloatingPosition({ open, anchor, surface, placement, offset, onAnchorHidden });
+  const position = useFloatingPosition({
+    open,
+    anchorRect,
+    anchorElement,
+    surface,
+    placement,
+    offset,
+    onAnchorHidden,
+  });
 
   // §19.31, and it waits for `position`.
   //
@@ -324,6 +334,11 @@ export function PopoverContent({
         role={role}
         aria-label={label}
         tabIndex={-1}
+        // §19.39, only when this actually is a menu. A listbox steers itself
+        // from its own search field (§13.27) and a dialog's arrows belong to
+        // whatever is inside it, so taking the keys unconditionally would be
+        // the surface overruling its own contents.
+        onKeyDown={role === "menu" ? (event) => moveMenuFocus(surfaceRef.current, event) : undefined}
         className={`ff-layer${className ? ` ${className}` : ""}${motionEnabled ? " is-animated" : ""}`}
         data-placement={position?.placement ?? placement}
         style={{

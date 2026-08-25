@@ -7,8 +7,8 @@ import { todayValue } from "../utils/date";
 import { getMatrixPosition, patchForQuadrant, type MatrixQuadrant } from "../utils/eisenhower";
 import { dependentsOf, eligibleBlockers } from "../domain/tasks/dependencies";
 import { useT } from "../i18n";
-import { DeferredInput, DeferredTextarea, Popover } from "./kit";
-import { ScheduleEditor } from "./schedule/ScheduleEditor";
+import { DeferredInput, DeferredTextarea } from "./kit";
+import { SchedulePicker } from "./tasks/SchedulePicker";
 import {
   formatScheduleTrigger,
   scheduleFromTask,
@@ -126,25 +126,12 @@ export function TaskDetail({
               `updateTaskSchedule`. */}
           <div className="detail-field-list-row">
             <span>{t("taskDetail.schedule")}</span>
-            <button
-              type="button"
-              className={scheduleLabel ? "sched-trigger" : "sched-trigger is-empty"}
-              aria-expanded={editingSchedule}
-              onClick={() => setEditingSchedule((open) => !open)}
-            >
-              {scheduleLabel || t("schedule.trigger")}
-            </button>
-            <Popover open={editingSchedule} onClose={() => setEditingSchedule(false)}>
-              <ScheduleEditor
-                key={task.id}
-                taskId={task.id}
-                locale={locale}
-                schedule={schedule}
-                today={today}
-                onCommit={onUpdateTaskSchedule}
-                onClose={() => setEditingSchedule(false)}
-              />
-            </Popover>
+            {/* The same component the Task Detail Drawer uses. This panel had
+                its own copy of the trigger, the open state and the popover,
+                which is two implementations of one control — and by Phase 3
+                they had already diverged, because only the Drawer's was on the
+                shared layer system. */}
+            <SchedulePicker task={task} today={today} onCommit={onUpdateTaskSchedule} />
           </div>
         </div>
       </section>

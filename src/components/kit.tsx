@@ -15,8 +15,9 @@ import { isCompleted } from "../domain/tasks/taskState";
 import { useDeferredTextField } from "../hooks/useDeferredTextField";
 import { useT } from "../i18n";
 import { reducedTransition, transitions } from "../motion/transitions";
-import { backdropVariants, modalVariants, popoverVariants } from "../motion/variants";
+import { backdropVariants, modalVariants } from "../motion/variants";
 import { useMotionEnabled } from "../motion/reducedMotion";
+import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "./floating";
 
 // ============================================================================
 // Primitives
@@ -116,6 +117,22 @@ export function DeferredTextarea({
   );
 }
 
+/**
+ * Outside click and Escape, for the two MODALS below and nothing else.
+ *
+ * Every popover and menu has left this hook for the layer system, which is
+ * what §19.92 asks for — one central listener rather than one per feature.
+ * `ConfirmModal` and `Modal` have not, and the reason is that §19.34 and
+ * §19.55 give a dialog different rules: it traps focus, it dims what is
+ * behind it, and whether its backdrop dismisses at all is the dialog's own
+ * decision rather than the manager's.
+ *
+ * They are still not on the layer STACK, so an Escape with a dialog above a
+ * popover is decided by registration order rather than by §19.93. Nothing in
+ * the app produces that pairing today; when something does, the fix is to
+ * register the dialog as a `modal` layer, which `topDismissable` already
+ * understands.
+ */
 export function useOutsideClose(onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -137,84 +154,64 @@ export function useOutsideClose(onClose: () => void) {
   return ref;
 }
 
-export function Popover({
-  open,
-  onClose,
-  children,
-  align = "start",
-}: {
-  open: boolean;
-  onClose: () => void;
-  children: ReactNode;
-  align?: "start" | "end";
-}) {
-  const ref = useOutsideClose(onClose);
-  const motionEnabled = useMotionEnabled();
 
-  // Rendered conditionally rather than through AnimatePresence.
-  //
-  // AnimatePresence ran the exit animation and then left the node mounted:
-  // opacity 0, `pointer-events: auto`, `z-index: 40`. It looked closed and was
-  // still the top element under the cursor, so a click aimed at whatever the
-  // popover had covered hit the popover instead — `elementFromPoint` in the
-  // middle of a "closed" schedule editor returned one of its calendar cells.
-  // Reproduced in a production build, so it was not StrictMode, and adding the
-  // `key` AnimatePresence documents as required did not change it.
-  //
-  // The cost is the close animation; it opens as before. A control that eats
-  // clicks it cannot be seen to eat is worse than one that disappears
-  // abruptly, and this primitive backs every popover in the app.
-  if (!open) return null;
-
-  return (
-    <motion.div
-      ref={ref}
-      className={`ff-popover ff-popover-${align}`}
-      role="menu"
-      variants={motionEnabled ? popoverVariants : undefined}
-      initial={motionEnabled ? "initial" : false}
-      animate={motionEnabled ? "animate" : undefined}
-      transition={motionEnabled ? transitions.fast : reducedTransition}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
+/**
+ * The ⋯ menu on a row (spec §19.30, §19.39).
+ *
+ * On the shared layer system now. What it gains by moving is everything the
+ * old one lacked: it is portalled, so a menu on the last row is no longer
+ * clipped by the list's own scroll container; it flips and shifts against the
+ * real viewport instead of always hanging below-right; Escape closes it and
+ * only it; and the arrow keys work, which they never did here — the same
+ * gesture used to do one thing in the context menu and nothing in this one.
+ *
+ * `stopPropagation` on the wrapper stays. The rows underneath open a Detail on
+ * click, and the menu sits inside the row.
+ */
 export function MoreMenu({ items, label }: { items: MoreMenuItem[]; label?: string }) {
   const { t } = useT();
-  const [open, setOpen] = useState(false);
   const resolvedLabel = label ?? t("common.more");
   return (
     <div className="ff-anchor" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        className="ff-icon-btn"
-        aria-label={resolvedLabel}
-        onClick={() => setOpen((v) => !v)}
-      >
-        ⋯
-      </button>
-      <Popover open={open} onClose={() => setOpen(false)} align="end">
-        {items.map((item, index) =>
-          item.separator ? (
-            <div key={index} className="ff-menu-sep" />
-          ) : (
-            <button
-              key={index}
-              type="button"
-              className={item.danger ? "ff-menu-item danger" : "ff-menu-item"}
-              onClick={() => {
-                setOpen(false);
-                item.onClick?.();
-              }}
-            >
-              {item.label}
-            </button>
-          ),
-        )}
+      <Popover type="menu" placement="bottom-end">
+        <PopoverTrigger className="ff-icon-btn" aria-label={resolvedLabel}>
+          ⋯
+        </PopoverTrigger>
+        <PopoverContent label={resolvedLabel} role="menu">
+          <MoreMenuItems items={items} />
+        </PopoverContent>
       </Popover>
     </div>
+  );
+}
+
+/** Separated so the items can close the surface they are inside (§19.90). */
+function MoreMenuItems({ items }: { items: MoreMenuItem[] }) {
+  const { close } = usePopoverSurface();
+  return (
+    <>
+      {items.map((item, index) =>
+        item.separator ? (
+          <div key={index} className="ff-menu-sep" role="separator" />
+        ) : (
+          <button
+            key={index}
+            type="button"
+            role="menuitem"
+            className={item.danger ? "ff-menu-item danger" : "ff-menu-item"}
+            onClick={() => {
+              // Closed first, so focus is back on the trigger before the action
+              // runs — several of these remove the row the menu was opened
+              // from, and restoring focus afterwards would have nowhere to go.
+              close();
+              item.onClick?.();
+            }}
+          >
+            {item.label}
+          </button>
+        ),
+      )}
+    </>
   );
 }
 
@@ -246,38 +243,64 @@ export function PriorityBadge({
   priority: TaskPriority;
   onChange?: (next: TaskPriority) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const PRIORITY_META = usePriorityMeta();
   const meta = PRIORITY_META[priority];
+  const badgeClass = `ff-badge ff-badge-${meta.tone}${priority === "none" ? " ff-badge-ghost" : ""}`;
+  const body = (
+    <>
+      {meta.arrow ? <span className="ff-badge-arrow">{meta.arrow}</span> : null}
+      {meta.label}
+    </>
+  );
+
+  // Read-only unless a caller supplies `onChange`. Drawn as plain text then,
+  // rather than as a button that opens nothing.
+  if (!onChange) {
+    return (
+      <div className="ff-anchor">
+        <span className={badgeClass}>{body}</span>
+      </div>
+    );
+  }
+
   return (
     <div className="ff-anchor" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        className={`ff-badge ff-badge-${meta.tone}${priority === "none" ? " ff-badge-ghost" : ""}`}
-        onClick={() => onChange && setOpen((v) => !v)}
-      >
-        {meta.arrow ? <span className="ff-badge-arrow">{meta.arrow}</span> : null}
-        {meta.label}
-      </button>
-      {onChange ? (
-        <Popover open={open} onClose={() => setOpen(false)}>
-          {(["high", "medium", "low", "none"] as TaskPriority[]).map((p) => (
-            <button
-              key={p}
-              type="button"
-              className="ff-menu-item"
-              onClick={() => {
-                setOpen(false);
-                onChange(p);
-              }}
-            >
-              <span className={`ff-dot ff-dot-${PRIORITY_META[p].tone}`} />
-              {PRIORITY_META[p].label}
-            </button>
-          ))}
-        </Popover>
-      ) : null}
+      <Popover type="menu">
+        <PopoverTrigger className={badgeClass}>{body}</PopoverTrigger>
+        <PopoverContent label={meta.label} role="menu">
+          <PriorityChoices meta={PRIORITY_META} onChange={onChange} />
+        </PopoverContent>
+      </Popover>
     </div>
+  );
+}
+
+function PriorityChoices({
+  meta,
+  onChange,
+}: {
+  meta: Record<TaskPriority, { label: string; tone: string; arrow: string }>;
+  onChange: (next: TaskPriority) => void;
+}) {
+  const { close } = usePopoverSurface();
+  return (
+    <>
+      {(["high", "medium", "low", "none"] as TaskPriority[]).map((p) => (
+        <button
+          key={p}
+          type="button"
+          role="menuitem"
+          className="ff-menu-item"
+          onClick={() => {
+            close();
+            onChange(p);
+          }}
+        >
+          <span className={`ff-dot ff-dot-${meta[p].tone}`} />
+          {meta[p].label}
+        </button>
+      ))}
+    </>
   );
 }
 
@@ -317,38 +340,62 @@ export function DueDatePill({
     tone = "muted";
   }
 
+  const body = (
+    <>
+      <span className="ff-pill-icon">📅</span>
+      {label}
+    </>
+  );
+
+  if (!onChange) {
+    return (
+      <div className="ff-anchor">
+        <span className={`ff-pill ff-pill-${tone}`}>{body}</span>
+      </div>
+    );
+  }
+
   return (
     <div className="ff-anchor" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        className={`ff-pill ff-pill-${tone}`}
-        onClick={() => onChange && setOpen((v) => !v)}
-      >
-        <span className="ff-pill-icon">📅</span>
-        {label}
-      </button>
-      {onChange ? (
-        <Popover open={open} onClose={() => setOpen(false)}>
-          <div className="ff-datepicker">
-            <input
-              type="date"
-              value={value || ""}
-              onChange={(e) => {
-                onChange(e.target.value);
-              }}
-            />
-            <div className="ff-datepicker-quick">
-              <button type="button" onClick={() => { onChange(today); setOpen(false); }}>{t("common.today")}</button>
-              <button type="button" onClick={() => { onChange(addDaysLocal(today, 1)); setOpen(false); }}>
-                {t("common.tomorrow")}
-              </button>
-              <button type="button" className="danger" onClick={() => { onChange(""); setOpen(false); }}>
-                {t("common.clear")}
-              </button>
-            </div>
-          </div>
-        </Popover>
-      ) : null}
+      <Popover>
+        <PopoverTrigger className={`ff-pill ff-pill-${tone}`}>{body}</PopoverTrigger>
+        <PopoverContent label={t("kit.dueDate")}>
+          <DueDateChoices value={value} today={today} onChange={onChange} />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+/** Separated so the quick choices can close the surface they sit in. */
+function DueDateChoices({
+  value,
+  today,
+  onChange,
+}: {
+  value: string;
+  today: string;
+  onChange: (next: string) => void;
+}) {
+  const { t } = useT();
+  const { close } = usePopoverSurface();
+  return (
+    <div className="ff-datepicker">
+      {/* The field itself does NOT close on change: a native date input fires
+          while the picker is still being used, and closing on the first
+          keystroke would take the control away mid-edit. */}
+      <input type="date" value={value || ""} onChange={(event) => onChange(event.target.value)} />
+      <div className="ff-datepicker-quick">
+        <button type="button" onClick={() => { close(); onChange(today); }}>
+          {t("common.today")}
+        </button>
+        <button type="button" onClick={() => { close(); onChange(addDaysLocal(today, 1)); }}>
+          {t("common.tomorrow")}
+        </button>
+        <button type="button" className="danger" onClick={() => { close(); onChange(""); }}>
+          {t("common.clear")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -363,41 +410,62 @@ export function ProjectBadge({
   onChange?: (projectId: string) => void;
 }) {
   const { t } = useT();
-  const [open, setOpen] = useState(false);
   const project = projects.find((p) => p.id === task.projectId);
+  const badgeClass = project ? "ff-projbadge" : "ff-projbadge ff-projbadge-empty";
+  const body = (
+    <>
+      {project ? <span className="ff-dot" style={{ backgroundColor: project.color }} /> : null}
+      {project ? project.name : t("common.noProject")}
+    </>
+  );
+
+  if (!onChange) {
+    return (
+      <div className="ff-anchor">
+        <span className={badgeClass}>{body}</span>
+      </div>
+    );
+  }
+
   return (
     <div className="ff-anchor" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        className={project ? "ff-projbadge" : "ff-projbadge ff-projbadge-empty"}
-        onClick={() => onChange && setOpen((v) => !v)}
-      >
-        {project ? <span className="ff-dot" style={{ backgroundColor: project.color }} /> : null}
-        {project ? project.name : t("common.noProject")}
-      </button>
-      {onChange ? (
-        <Popover open={open} onClose={() => setOpen(false)}>
-          <button
-            type="button"
-            className="ff-menu-item"
-            onClick={() => { setOpen(false); onChange(""); }}
-          >
-            {t("common.noProject")}
-          </button>
-          {projects.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className="ff-menu-item"
-              onClick={() => { setOpen(false); onChange(p.id); }}
-            >
-              <span className="ff-dot" style={{ backgroundColor: p.color }} />
-              {p.name}
-            </button>
-          ))}
-        </Popover>
-      ) : null}
+      <Popover type="menu">
+        <PopoverTrigger className={badgeClass}>{body}</PopoverTrigger>
+        <PopoverContent label={t("common.noProject")} role="menu">
+          <ProjectChoices projects={projects} onChange={onChange} />
+        </PopoverContent>
+      </Popover>
     </div>
+  );
+}
+
+function ProjectChoices({
+  projects,
+  onChange,
+}: {
+  projects: Project[];
+  onChange: (projectId: string) => void;
+}) {
+  const { t } = useT();
+  const { close } = usePopoverSurface();
+  return (
+    <>
+      <button type="button" role="menuitem" className="ff-menu-item" onClick={() => { close(); onChange(""); }}>
+        {t("common.noProject")}
+      </button>
+      {projects.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          role="menuitem"
+          className="ff-menu-item"
+          onClick={() => { close(); onChange(p.id); }}
+        >
+          <span className="ff-dot" style={{ backgroundColor: p.color }} />
+          {p.name}
+        </button>
+      ))}
+    </>
   );
 }
 

@@ -79,7 +79,20 @@ describe("opening and closing (§19.29, §19.89)", () => {
     mount(<Surface name="priority" />);
     fireEvent.click(trigger("priority"));
     const surface = screen.getByRole("dialog", { name: "priority" });
-    expect(surface.closest("#floating-layer-root")).not.toBeNull();
+    const root = surface.closest("#floating-layer-root");
+    expect(root).not.toBeNull();
+    // Attached, not merely existing. A detached root swallows every surface
+    // silently — they render, lay out nowhere, and are never seen. StrictMode's
+    // extra mount/unmount produced exactly that once.
+    expect(root?.isConnected).toBe(true);
+  });
+
+  it("survives the provider being torn down and mounted again", () => {
+    const { unmount } = mount(<Surface name="priority" />);
+    unmount();
+    mount(<Surface name="priority" />);
+    fireEvent.click(trigger("priority"));
+    expect(screen.getByRole("dialog", { name: "priority" }).closest("#floating-layer-root")?.isConnected).toBe(true);
   });
 });
 

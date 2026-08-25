@@ -31,6 +31,7 @@ export const ko: Dictionary = {
 
   // ---- kit.tsx shared primitives ----
   "kit.needsDate": "날짜 필요",
+  "kit.dueDate": "마감일",
   "kit.notScheduled": "예정 안 됨",
   "kit.plannedToday": "오늘 예정",
   "kit.markDone": "완료 표시",
