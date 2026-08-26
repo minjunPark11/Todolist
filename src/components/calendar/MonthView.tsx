@@ -1,7 +1,8 @@
-import { CSSProperties, DragEvent } from "react";
+import { CSSProperties, DragEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { CalendarItem } from "../../utils/calendarItems";
 import { getDayNumber, getMonthGrid, todayValue, type CalendarCell } from "../../utils/date";
+import { chipCapFor, MONTH_CELL_MIN_HEIGHT } from "../../utils/monthCell";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { useT } from "../../i18n";
 import { MotionDropZone } from "../motion/MotionDropZone";
@@ -12,8 +13,7 @@ import { useMotionEnabled } from "../../motion/reducedMotion";
 // Sunday-first order preserved to match the date grid logic (getMonthGrid).
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_KO = ["일", "월", "화", "수", "목", "금", "토"];
-// Spec §5.5: 128px cells fit at most 5 compact 18px chips before "+N".
-const CHIP_CAP = 5;
+
 
 function layerPrefix(layer: CalendarItem["layer"]) {
   if (layer === "external") return "• ";
@@ -58,6 +58,25 @@ export function MonthView({
   const anchorDate = new Date(`${anchor}T00:00:00`);
   const cells = getMonthGrid(anchorDate.getFullYear(), anchorDate.getMonth());
 
+  // The cell height is what decides how many chips fit, and D8 made it follow
+  // the window — so it is measured rather than assumed. One measurement covers
+  // every cell: the six rows are `1fr` and therefore equal.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [cellHeight, setCellHeight] = useState(MONTH_CELL_MIN_HEIGHT);
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const measure = () => {
+      const rows = getComputedStyle(el).gridTemplateRows.split(" ").filter(Boolean).length || 6;
+      setCellHeight(el.getBoundingClientRect().height / rows);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   function renderCell(cell: CalendarCell) {
     const dayItems = items.filter((item) => item.date === cell.date);
     const classes = ["gcal-month-cell"];
@@ -65,7 +84,8 @@ export function MonthView({
     if (cell.date === today) classes.push("is-today");
     else if (cell.date === anchor) classes.push("is-selected");
     if (cell.date === dragOverId) classes.push("is-drop");
-    const visible = dayItems.slice(0, CHIP_CAP);
+    const cap = chipCapFor(cellHeight, dayItems.length);
+    const visible = dayItems.slice(0, cap);
 
     return (
       <MotionDropZone
@@ -132,7 +152,7 @@ export function MonthView({
             </motion.button>
           ))}
           </AnimatePresence>
-          {dayItems.length > CHIP_CAP ? (
+          {dayItems.length > cap ? (
             <button
               type="button"
               className="gcal-month-more"
@@ -141,7 +161,7 @@ export function MonthView({
                 onShowAgenda(cell.date, anchorFromRect(event.currentTarget.getBoundingClientRect()));
               }}
             >
-              {t("calendar.moreCount", { n: dayItems.length - CHIP_CAP })}
+              {t("calendar.moreCount", { n: dayItems.length - cap })}
             </button>
           ) : null}
         </div>
@@ -156,7 +176,9 @@ export function MonthView({
           <span key={day}>{day}</span>
         ))}
       </div>
-      <div className="gcal-month-grid">{cells.map(renderCell)}</div>
+      <div className="gcal-month-grid" ref={gridRef}>
+        {cells.map(renderCell)}
+      </div>
     </>
   );
 }

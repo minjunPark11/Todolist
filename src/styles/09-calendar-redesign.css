@@ -409,6 +409,15 @@
   color: var(--text-tertiary);
 }
 
+/* A 15-minute event is 24px tall. With 5px of padding it has 10px for a 14px
+   title and shows a sliced one; with 1px it shows the title. The block gives up
+   the padding rather than the only thing it has to say. */
+.gcal-time-block.is-tight,
+.gcal-move-block.is-tight {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
 .gcal-now-badge span {
   font-size: 10px;
   font-weight: 600;

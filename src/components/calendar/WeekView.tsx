@@ -19,6 +19,7 @@ import {
 } from "../../utils/calendarTime";
 import { todayValue } from "../../utils/date";
 import { dayHeadFormatter, dayHeadParts } from "../../utils/calendarHeader";
+import { blockIsTight, blockShowsTime } from "../../utils/eventBlock";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { OverlayScrollbar } from "../common/OverlayScrollbar";
 import { useT } from "../../i18n";
@@ -861,7 +862,11 @@ export function WeekView({
                 {/* Live pointer-move overlay: the single visual for a block being moved. */}
                 {move?.moved && !move.allDay && move.day === day ? (
                   <div
-                    className="gcal-move-block"
+                    className={
+                      blockIsTight(heightFor(move.startMin, move.endMin))
+                        ? "gcal-move-block is-tight"
+                        : "gcal-move-block"
+                    }
                     style={{
                       top: topFor(move.startMin),
                       height: heightFor(move.startMin, move.endMin),
@@ -872,9 +877,11 @@ export function WeekView({
                       {move.repeating ? "↺ " : null}
                       {move.title}
                     </span>
-                    <span className="gcal-tb-time">
-                      {minutesToTime(move.startMin)} – {minutesToTime(move.endMin)}
-                    </span>
+                    {blockShowsTime(heightFor(move.startMin, move.endMin)) ? (
+                      <span className="gcal-tb-time">
+                        {minutesToTime(move.startMin)} – {minutesToTime(move.endMin)}
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
                 {/* Overlapping blocks split the column side-by-side instead of stacking. */}
@@ -922,6 +929,7 @@ export function WeekView({
                         item.layer === "external" ? "is-external" : "",
                         item.layer === "focus-actual" ? "is-focus-actual" : "",
                         item.done ? "is-done" : "",
+                        blockIsTight(height) ? "is-tight" : "",
                       ].filter(Boolean).join(" ")}
                       onPointerDown={item.draggable ? (event) => startMove(event, item, startMin, endMin) : undefined}
                       onClick={(event) => {
@@ -948,11 +956,17 @@ export function WeekView({
                         {item.repeating ? "↺ " : null}
                         {item.title}
                       </span>
-                      <span className="gcal-tb-time">
-                        {resize?.key === item.key
-                          ? `${minutesToTime(startMin)} – ${minutesToTime(endMin)}`
-                          : `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`}
-                      </span>
+                      {/* R1 made the row height follow the window, so a short
+                          event can be shorter than its own two lines. §2.4:
+                          Calendar.app draws the time "only when the block is
+                          tall enough". */}
+                      {blockShowsTime(height) ? (
+                        <span className="gcal-tb-time">
+                          {resize?.key === item.key
+                            ? `${minutesToTime(startMin)} – ${minutesToTime(endMin)}`
+                            : `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`}
+                        </span>
+                      ) : null}
                       {item.draggable ? (
                         <>
                           <span
