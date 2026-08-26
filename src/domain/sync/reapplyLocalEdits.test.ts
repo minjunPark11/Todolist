@@ -54,6 +54,8 @@ const appSettings: AppSettings = {
   defaultView: "/today",
   showCompletedInToday: true,
   confirmBeforeDelete: true,
+  timeFormat: "locale",
+  weekStart: "sunday",
   showSidebarCounts: true,
   sidebarCollapsed: false,
   reduceMotion: false,

@@ -535,6 +535,9 @@ export type ThemeMode = "light" | "dark" | "system";
 export type FontSize = "small" | "medium" | "large";
 export type Language = "ko" | "en";
 
+export type TimeFormat = "locale" | "12h" | "24h";
+export type WeekStart = "sunday" | "monday";
+
 export interface AppSettings {
   theme: ThemeMode;
   accentColor: AccentColor;
@@ -546,6 +549,21 @@ export interface AppSettings {
   defaultView: "/today" | "/inbox" | "/calendar" | "/board" | "/planning" | "/projects" | "/focus";
   showCompletedInToday: boolean;
   confirmBeforeDelete: boolean;
+  /**
+   * How a clock time is written (SETTINGS_REVIEW.md 4.2).
+   *
+   * `locale` is the default and means "whatever this language writes" — which
+   * is what the calendar should always have done. It was `Intl.DateTimeFormat("en", { hour12: false })`
+   * hard-coded, so a Korean reader got `13:00` where macOS writes `오후 1시`.
+   */
+  timeFormat: TimeFormat;
+  /**
+   * Which column a week begins in (SETTINGS_REVIEW.md 4.3).
+   *
+   * Sunday is the stored default because it is what every existing account has
+   * been showing; it was never a choice, just `getDay()` used unadjusted.
+   */
+  weekStart: WeekStart;
   showSidebarCounts: boolean;
   sidebarCollapsed: boolean;
   reduceMotion: boolean;

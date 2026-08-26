@@ -4,6 +4,8 @@ import type { CalendarDraftBlock } from "../../utils/calendarTime";
 import { formatDate } from "../../utils/date";
 import { useAutoFocus } from "../kit";
 import { useT } from "../../i18n";
+import { formatClockRange } from "../../utils/clock";
+import { useTimeFormat } from "../../utils/appPrefs";
 
 export interface NewTaskFormResult {
   title: string;
@@ -26,6 +28,8 @@ interface NewTaskFormProps {
 // to the default event title instead of blocking creation (§17.4).
 export function NewTaskForm({ draft, categoryGroups, initialCategoryId, onCancel, onCreate }: NewTaskFormProps) {
   const { t, lang } = useT();
+  const timeFormat = useTimeFormat();
+  const clockLocale = lang === "ko" ? "ko" : "en";
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState(initialCategoryId);
   const [dueDate, setDueDate] = useState("");
@@ -72,7 +76,7 @@ export function NewTaskForm({ draft, categoryGroups, initialCategoryId, onCancel
         <span className="gcal-newtask-when-label">{t("calendar.when")}</span>
         <strong>{formatDate(draft.date, lang)}</strong>
         <span>
-          {draft.startTime} – {draft.endTime}
+          {formatClockRange(draft.startTime, draft.endTime, timeFormat, clockLocale)}
         </span>
       </div>
 

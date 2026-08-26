@@ -1,7 +1,9 @@
 import { CSSProperties, DragEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { CalendarItem } from "../../utils/calendarItems";
-import { getDayNumber, getMonthGrid, todayValue, type CalendarCell } from "../../utils/date";
+import { getDayNumber, getMonthGrid, rotateWeekdays, todayValue, type CalendarCell } from "../../utils/date";
+import { formatClock } from "../../utils/clock";
+import { useTimeFormat, useWeekStart } from "../../utils/appPrefs";
 import { chipCapFor, MONTH_CELL_MIN_HEIGHT } from "../../utils/monthCell";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { useT } from "../../i18n";
@@ -10,7 +12,8 @@ import { reducedTransition, transitions } from "../../motion/transitions";
 import { calendarBlockVariants } from "../../motion/variants";
 import { useMotionEnabled } from "../../motion/reducedMotion";
 
-// Sunday-first order preserved to match the date grid logic (getMonthGrid).
+// Written Sunday-first; `rotateWeekdays` turns them to match the grid when the
+// week starts on Monday (SETTINGS_REVIEW.md 4.3).
 const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -53,10 +56,13 @@ export function MonthView({
 }: MonthViewProps) {
   const { t, lang } = useT();
   const motionEnabled = useMotionEnabled();
-  const weekdays = lang === "ko" ? WEEKDAYS_KO : WEEKDAYS_EN;
+  const weekStart = useWeekStart();
+  const timeFormat = useTimeFormat();
+  const clockLocale = lang === "ko" ? "ko" : "en";
+  const weekdays = rotateWeekdays(lang === "ko" ? WEEKDAYS_KO : WEEKDAYS_EN, weekStart);
   const today = todayValue();
   const anchorDate = new Date(`${anchor}T00:00:00`);
-  const cells = getMonthGrid(anchorDate.getFullYear(), anchorDate.getMonth());
+  const cells = getMonthGrid(anchorDate.getFullYear(), anchorDate.getMonth(), weekStart);
 
   // The cell height is what decides how many chips fit, and D8 made it follow
   // the window — so it is measured rather than assumed. One measurement covers
@@ -147,7 +153,7 @@ export function MonthView({
                 {item.title}
               </span>
               {!item.allDay && item.startTime ? (
-                <span className="gcal-chip-time">{item.startTime}</span>
+                <span className="gcal-chip-time">{formatClock(item.startTime ?? "", timeFormat, clockLocale)}</span>
               ) : null}
             </motion.button>
           ))}

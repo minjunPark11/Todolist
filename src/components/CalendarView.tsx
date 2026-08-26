@@ -39,6 +39,7 @@ import { CalendarTitleRow } from "./calendar/CalendarTitleRow";
 import { CalendarLeftSidebar } from "./calendar/CalendarLeftSidebar";
 import { CalendarRightTaskPanel } from "./calendar/CalendarRightTaskPanel";
 import { WeekView } from "./calendar/WeekView";
+import { useWeekStart } from "../utils/appPrefs";
 import { MonthView } from "./calendar/MonthView";
 import { YearView } from "./calendar/YearView";
 import { CalendarPopover, DayAgendaPopover, EventPopover, type PopoverAnchor } from "./calendar/EventPopover";
@@ -113,6 +114,7 @@ export function CalendarView({
   showToast,
 }: CalendarViewProps) {
   const { t, lang } = useT();
+  const weekStartPref = useWeekStart();
   const [mode, setMode] = useState<CalendarMode>("week");
   const [anchor, setAnchor] = useState(todayValue());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -245,7 +247,7 @@ export function CalendarView({
   if (mode === "month") {
     rangeLabel = getMonthLabel(anchorDate.getFullYear(), anchorDate.getMonth(), lang);
   } else if (mode === "week") {
-    rangeLabel = getWeekLabel(anchor, lang);
+    rangeLabel = getWeekLabel(anchor, lang, weekStartPref);
   } else if (mode === "year") {
     rangeLabel = t("calendar.yearTitle", { year: anchorDate.getFullYear() });
   } else {
@@ -562,7 +564,7 @@ export function CalendarView({
     }
     setAiStatus("loading");
     window.setTimeout(() => {
-      const weekDays = getWeekDays(anchor);
+      const weekDays = getWeekDays(anchor, weekStartPref);
       const placements: AiPlacement[] = [];
       let slot = 9 * 60;
       for (const task of unscheduled.slice(0, 4)) {
@@ -740,7 +742,7 @@ export function CalendarView({
     setMode("month");
   }
 
-  const days = mode === "day" ? [anchor] : getWeekDays(anchor);
+  const days = mode === "day" ? [anchor] : getWeekDays(anchor, weekStartPref);
   const isTimeGrid = mode === "week" || mode === "day";
 
   return (

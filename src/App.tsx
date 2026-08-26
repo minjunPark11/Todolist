@@ -365,6 +365,10 @@ export default function App() {
     root.dataset.accent = appSettings.accentColor;
     root.dataset.font = appSettings.fontSize;
     root.dataset.reduceMotion = appSettings.reduceMotion ? "true" : "false";
+    // Same channel the theme, accent and font size use: settings that deep
+    // components read without every layer between them carrying a prop.
+    root.dataset.timeFormat = appSettings.timeFormat;
+    root.dataset.weekStart = appSettings.weekStart;
     root.lang = appSettings.language;
   }, [appSettings.theme, appSettings.accentColor, appSettings.fontSize, appSettings.reduceMotion, appSettings.language]);
 

@@ -1,4 +1,4 @@
-import type { Language } from "../types";
+import type { Language, WeekStart } from "../types";
 
 // Intl locale tag per app language. Callers that already have `lang` from
 // useT() should pass it through; everything else defaults to English so this
@@ -63,19 +63,33 @@ export function getRecentDays(count: number): string[] {
   return Array.from({ length: count }, (_, index) => addDays(today, index - count + 1));
 }
 
-export function getWeekStart(dateValue = todayValue()): string {
+/**
+ * The first day of the week `dateValue` falls in.
+ *
+ * SETTINGS_REVIEW.md 4.3: this used to subtract `getDay()` unadjusted, which is
+ * Sunday and only Sunday. Sunday stays the default because it is what every
+ * existing account has been showing — it was never a choice, so changing it
+ * silently would move everyone's week.
+ */
+export function getWeekStart(dateValue = todayValue(), weekStart: WeekStart = "sunday"): string {
   const date = new Date(`${dateValue}T00:00:00`);
-  const day = date.getDay();
-  date.setDate(date.getDate() - day);
+  const first = weekStart === "monday" ? 1 : 0;
+  date.setDate(date.getDate() - ((date.getDay() - first + 7) % 7));
   return toDateInputValue(date);
 }
 
-export function isDateThisWeek(dateValue: string): boolean {
+/** Weekday labels rotated to start where the week does. */
+export function rotateWeekdays<T>(labels: readonly T[], weekStart: WeekStart): T[] {
+  if (weekStart !== "monday") return [...labels];
+  return [...labels.slice(1), labels[0]];
+}
+
+export function isDateThisWeek(dateValue: string, week: WeekStart = "sunday"): boolean {
   if (!dateValue) {
     return false;
   }
 
-  const weekStart = getWeekStart();
+  const weekStart = getWeekStart(todayValue(), week);
   const weekEnd = addDays(weekStart, 6);
   return dateValue >= weekStart && dateValue <= weekEnd;
 }
@@ -107,8 +121,9 @@ export interface CalendarCell {
   inMonth: boolean;
 }
 
-export function getMonthGrid(year: number, month: number): CalendarCell[] {
-  const startDay = new Date(year, month, 1).getDay();
+export function getMonthGrid(year: number, month: number, weekStart: WeekStart = "sunday"): CalendarCell[] {
+  const first = weekStart === "monday" ? 1 : 0;
+  const startDay = (new Date(year, month, 1).getDay() - first + 7) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const totalCells = Math.ceil((startDay + daysInMonth) / 7) * 7;
   const gridStart = new Date(year, month, 1 - startDay);
@@ -133,13 +148,13 @@ export function getDayNumber(dateValue: string): number {
   return Number(dateValue.slice(8, 10));
 }
 
-export function getWeekDays(anchor = todayValue()): string[] {
-  const start = getWeekStart(anchor);
+export function getWeekDays(anchor = todayValue(), weekStart: WeekStart = "sunday"): string[] {
+  const start = getWeekStart(anchor, weekStart);
   return Array.from({ length: 7 }, (_, index) => addDays(start, index));
 }
 
-export function getWeekLabel(anchor: string, locale: Language = "en"): string {
-  const start = getWeekStart(anchor);
+export function getWeekLabel(anchor: string, locale: Language = "en", weekStart: WeekStart = "sunday"): string {
+  const start = getWeekStart(anchor, weekStart);
   const end = addDays(start, 6);
   const formatter = new Intl.DateTimeFormat(toIntlLocale(locale), { month: "short", day: "numeric" });
   return `${formatter.format(new Date(`${start}T00:00:00`))} – ${formatter.format(

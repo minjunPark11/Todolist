@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { CATEGORY_COLOR_PALETTE, type CalendarCategory, type CalendarCategoryGroup } from "../../lib/calendarCategories";
-import { getDayNumber, getMonthGrid, getMonthLabel, todayValue } from "../../utils/date";
+import { getDayNumber, getMonthGrid, getMonthLabel, rotateWeekdays, todayValue } from "../../utils/date";
+import { useWeekStart } from "../../utils/appPrefs";
 import { useT } from "../../i18n";
 
 interface CalendarLeftSidebarProps {
@@ -36,6 +37,7 @@ export function CalendarLeftSidebar({
   onExpand,
 }: CalendarLeftSidebarProps) {
   const { t, lang } = useT();
+  const weekStart = useWeekStart();
   const today = todayValue();
   // Category id whose inline recolor palette is open ("" = none).
   const [paletteFor, setPaletteFor] = useState("");
@@ -60,7 +62,7 @@ export function CalendarLeftSidebar({
   const anchorDate = new Date(`${anchor}T00:00:00`);
   const year = anchorDate.getFullYear();
   const month = anchorDate.getMonth();
-  const cells = getMonthGrid(year, month);
+  const cells = getMonthGrid(year, month, weekStart);
 
   // Collapsed: a slim icon rail (expand only) instead of hiding the sidebar
   // entirely, so the calendar keeps its left anchor and stays quick to reopen.
@@ -177,7 +179,7 @@ export function CalendarLeftSidebar({
       <div className="gcal-mini-month">
         <div className="gcal-mini-month-head">{getMonthLabel(year, month, lang)}</div>
         <div className="gcal-mini-month-grid">
-          {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => (
+          {rotateWeekdays(["S", "M", "T", "W", "T", "F", "S"], weekStart).map((label, index) => (
             <span key={`${label}-${index}`} className="gcal-mini-weekday">
               {label}
             </span>

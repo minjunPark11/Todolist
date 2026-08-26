@@ -215,6 +215,29 @@ export function SettingsPage({
               onChange={(t) => onUpdate({ language: t as Language })}
             />
           </SettingsRow>
+          {/* SETTINGS_REVIEW.md 4.2 / 4.3. Beside Language because that is what
+              they follow — macOS files both under Language & Region. */}
+          <SettingsRow title={t("settings.timeFormat")} hint={t("settings.timeFormatHint")}>
+            <SegmentedTabs
+              tabs={[
+                ["locale", t("settings.timeFormatLocale")],
+                ["12h", t("settings.timeFormat12")],
+                ["24h", t("settings.timeFormat24")],
+              ]}
+              active={settings.timeFormat}
+              onChange={(value) => onUpdate({ timeFormat: value })}
+            />
+          </SettingsRow>
+          <SettingsRow title={t("settings.weekStart")} hint={t("settings.weekStartHint")}>
+            <SegmentedTabs
+              tabs={[
+                ["sunday", t("settings.weekStartSunday")],
+                ["monday", t("settings.weekStartMonday")],
+              ]}
+              active={settings.weekStart}
+              onChange={(value) => onUpdate({ weekStart: value })}
+            />
+          </SettingsRow>
         </div>
       ) : null}
 

@@ -19,6 +19,8 @@ import {
 } from "../../utils/calendarTime";
 import { todayValue } from "../../utils/date";
 import { dayHeadFormatter, dayHeadParts } from "../../utils/calendarHeader";
+import { formatClock, formatClockRange, formatHourLabel } from "../../utils/clock";
+import { useTimeFormat } from "../../utils/appPrefs";
 import { blockIsTight, blockShowsTime } from "../../utils/eventBlock";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { OverlayScrollbar } from "../common/OverlayScrollbar";
@@ -62,7 +64,6 @@ function computeOverlapLayout(entries: { key: string; start: number; end: number
   flush();
   return layout;
 }
-const timeLabelFormatter = new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 // V3 §2.1: only the live drag preview lives here; the confirmed draft is
 // owned by CalendarView (it must survive across pointer gestures / re-renders).
@@ -203,6 +204,8 @@ export function WeekView({
   onDraftCreate,
 }: WeekViewProps) {
   const { t, lang } = useT();
+  const timeFormat = useTimeFormat();
+  const clockLocale = lang === "ko" ? "ko" : "en";
   const motionEnabled = useMotionEnabled();
   // R3: the day header reads the way the OS writes it. Korean puts the number
   // first and decorates it — "26일 (수)" — and English does not, so the two parts
@@ -254,7 +257,7 @@ export function WeekView({
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const showNowLine = days.includes(today) && nowMinutes >= gridStartMin && nowMinutes <= DAY_END * 60;
   const nowTop = topFor(nowMinutes);
-  const nowLabel = timeLabelFormatter.format(now);
+  const nowLabel = formatClock(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`, timeFormat, clockLocale);
 
   // R1: fit HOURS_AT_A_TIME into the height the rows actually have, with a
   // floor below which the grid scrolls instead of compressing further. The
@@ -742,7 +745,9 @@ export function WeekView({
             {hours.map((hour) => (
               <div key={hour} className="gcal-time-label" style={{ height: slotHeight }}>
                 {/* The now badge replaces the nearest hour label instead of overlapping it. */}
-                {showNowLine && Math.abs(nowMinutes - hour * 60) < 15 ? "" : `${String(hour).padStart(2, "0")}:00`}
+                {showNowLine && Math.abs(nowMinutes - hour * 60) < 15
+                  ? ""
+                  : formatHourLabel(hour, timeFormat, clockLocale)}
               </div>
             ))}
           </div>
@@ -820,7 +825,7 @@ export function WeekView({
                   >
                     <span className="gcal-draft-label">{t("calendar.newTask")}</span>
                     <span className="gcal-draft-time">
-                      {draftHere.startTime}–{draftHere.endTime}
+                      {formatClockRange(draftHere.startTime, draftHere.endTime, timeFormat, clockLocale)}
                     </span>
                   </div>
                 ) : null}
@@ -837,7 +842,7 @@ export function WeekView({
                   >
                     <span>{draggingTaskTitle || "Task"}</span>
                     <small>
-                      {dragPreview.startTime}-{dragPreview.endTime}
+                      {formatClockRange(dragPreview.startTime, dragPreview.endTime, timeFormat, clockLocale)}
                     </small>
                   </div>
                 ) : null}
@@ -879,7 +884,7 @@ export function WeekView({
                     </span>
                     {blockShowsTime(heightFor(move.startMin, move.endMin)) ? (
                       <span className="gcal-tb-time">
-                        {minutesToTime(move.startMin)} – {minutesToTime(move.endMin)}
+                        {formatClockRange(minutesToTime(move.startMin), minutesToTime(move.endMin), timeFormat, clockLocale)}
                       </span>
                     ) : null}
                   </div>
@@ -963,8 +968,8 @@ export function WeekView({
                       {blockShowsTime(height) ? (
                         <span className="gcal-tb-time">
                           {resize?.key === item.key
-                            ? `${minutesToTime(startMin)} – ${minutesToTime(endMin)}`
-                            : `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`}
+                            ? formatClockRange(minutesToTime(startMin), minutesToTime(endMin), timeFormat, clockLocale)
+                            : formatClockRange(item.startTime, item.endTime, timeFormat, clockLocale)}
                         </span>
                       ) : null}
                       {item.draggable ? (

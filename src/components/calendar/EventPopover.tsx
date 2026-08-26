@@ -7,6 +7,8 @@ import type { CalendarCategoryGroup } from "../../lib/calendarCategories";
 import type { CalendarItem } from "../../utils/calendarItems";
 import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
+import { formatClockRange } from "../../utils/clock";
+import { useTimeFormat } from "../../utils/appPrefs";
 import { reducedTransition, transitions } from "../../motion/transitions";
 import { popoverVariants } from "../../motion/variants";
 import { useMotionEnabled } from "../../motion/reducedMotion";
@@ -144,6 +146,8 @@ export function EventPopover({
   onSaveQuickEdit?: (item: CalendarItem, input: { startTime: string; endTime: string; memo: string }) => void;
 }) {
   const { t, lang } = useT();
+  const timeFormat = useTimeFormat();
+  const clockLocale = lang === "ko" ? "ko" : "en";
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [startTime, setStartTime] = useState(item.startTime ?? "");
@@ -152,7 +156,7 @@ export function EventPopover({
   const timeLabel = item.allDay
     ? t("calendar.allDay")
     : item.startTime
-      ? `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`
+      ? formatClockRange(item.startTime, item.endTime, timeFormat, clockLocale)
       : "";
   const canChangeCategory = Boolean(
     categoryGroups && onChangeCategory && item.sourceType === "task" && !item.readOnly,
