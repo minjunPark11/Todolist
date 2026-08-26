@@ -16,6 +16,12 @@ import {
   subscribeLocalAiDownloadSession,
 } from "../lib/localAi/downloadSession";
 import { LOCAL_MODEL_CATALOG, findModelById } from "../lib/localAi/modelCatalog";
+import { useNotificationAccess } from "../hooks/useNotificationAccess";
+import {
+  canAskForNotifications,
+  canSendTestNotification,
+  notificationHintKey,
+} from "../utils/notificationCopy";
 import { installedFileMatchesModel } from "../lib/localAi/runtime";
 import type { ServerRuntimeAsset } from "../lib/localAi/serverRuntimeCatalog";
 import { recommendLocalModel } from "../lib/localAi/recommender";
@@ -107,7 +113,14 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const { t } = useT();
   const [tab, setTab] = useState<
-    "account" | "appearance" | "behavior" | "calendar" | "knowledge" | "localAi" | "data"
+    | "account"
+    | "appearance"
+    | "behavior"
+    | "notifications"
+    | "calendar"
+    | "knowledge"
+    | "localAi"
+    | "data"
   >("account");
   const [calendarDraft, setCalendarDraft] = useState({ name: "", icsUrl: "", color: "#4f73ff" });
   const [externalFormOpen, setExternalFormOpen] = useState(false);
@@ -144,6 +157,7 @@ export function SettingsPage({
           ["account", t("auth.accountTitle")],
           ["appearance", t("settings.tabAppearance")],
           ["behavior", t("settings.tabBehavior")],
+          ["notifications", t("settings.tabNotifications")],
           ["calendar", t("settings.tabCalendar")],
           ["knowledge", t("settings.tabKnowledge")],
           ["localAi", t("settings.tabLocalAi")],
@@ -246,6 +260,8 @@ export function SettingsPage({
           />
         </div>
       ) : null}
+
+      {tab === "notifications" ? <NotificationsTab /> : null}
 
       {tab === "calendar" ? (
         <div className="ff-cal-settings-stack">
@@ -1438,6 +1454,53 @@ function LocalAiModelItem({
         )}
       </div>
     </article>
+  );
+}
+
+/**
+ * Whether reminders can actually arrive, and a way to find out.
+ *
+ * SETTINGS_REVIEW.md 4.1: `notificationAccess` has four answers and the app had
+ * nowhere to show any of them. The one that mattered was `denied` — the hook
+ * will not ask twice (a second request is a no-op in every browser), so a user
+ * who dismissed the prompt once had no route back from inside the app.
+ *
+ * The test row exists because permission is not the whole path. A granted
+ * permission with notifications muted at the OS level looks identical from
+ * here, and `platform.notify` returning true while nothing appears is the only
+ * way to tell the two apart.
+ */
+function NotificationsTab() {
+  const { t } = useT();
+  const { access, request } = useNotificationAccess();
+  const [testResult, setTestResult] = useState("");
+
+  return (
+    <div className="ff-settings-card">
+      <SettingsRow title={t("settings.notif.permission")} hint={t(notificationHintKey(access))}>
+        {canAskForNotifications(access) ? (
+          <button type="button" className="ff-btn ff-btn-primary" onClick={request}>
+            {t("settings.notif.allow")}
+          </button>
+        ) : null}
+      </SettingsRow>
+      <SettingsRow title={t("settings.notif.testTitle")} hint={testResult || t("settings.notif.testHint")}>
+        <button
+          type="button"
+          className="ff-btn"
+          disabled={!canSendTestNotification(access)}
+          onClick={async () => {
+            const sent = await platform.notify({
+              title: t("settings.notif.testSample"),
+              body: t("settings.notif.testBody"),
+            });
+            setTestResult(t(sent ? "settings.notif.testSent" : "settings.notif.testFailed"));
+          }}
+        >
+          {t("settings.notif.send")}
+        </button>
+      </SettingsRow>
+    </div>
   );
 }
 
