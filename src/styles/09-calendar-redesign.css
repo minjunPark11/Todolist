@@ -250,15 +250,28 @@
   align-items: center;
   justify-content: center;
   padding: 3px 4px;
-  gap: 6px;
+  gap: 0;
 }
 
-.gcal-col-weekday {
-  font-size: 10px;
-  line-height: 13px;
+/* R3: §2.7 measured Calendar.app's weekday and day number at the same cap
+   height — one line, one size. Ours ran 10px against 15px, which reads as a
+   label above a number rather than a date, and in Korean ("26일 (수)") it broke
+   the string in half mid-word. Same size, same line, colour carries the
+   emphasis instead. The uppercase went with it: Apple writes "Wed", not "WED". */
+.gcal-col-weekday,
+.gcal-col-sep {
+  font-size: 15px;
+  line-height: 20px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--text-tertiary);
+}
+
+/* The gap between weekday and number is whatever the locale puts there — a
+   space in English, "일 (" in Korean — so the row itself adds none. */
+.gcal-col-sep {
+  white-space: pre;
 }
 
 .gcal-col-head.is-today .gcal-col-weekday {

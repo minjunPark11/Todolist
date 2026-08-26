@@ -17,7 +17,8 @@ import {
   TIME_SNAP_MINUTES,
   type CalendarDraftBlock,
 } from "../../utils/calendarTime";
-import { getDayNumber, todayValue } from "../../utils/date";
+import { todayValue } from "../../utils/date";
+import { dayHeadFormatter, dayHeadParts } from "../../utils/calendarHeader";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { OverlayScrollbar } from "../common/OverlayScrollbar";
 import { useT } from "../../i18n";
@@ -202,10 +203,15 @@ export function WeekView({
 }: WeekViewProps) {
   const { t, lang } = useT();
   const motionEnabled = useMotionEnabled();
-  const weekdayFormatter = useMemo(
-    () => new Intl.DateTimeFormat(lang === "ko" ? "ko" : "en", { weekday: "short" }),
-    [lang],
-  );
+  // R3: the day header reads the way the OS writes it. Korean puts the number
+  // first and decorates it — "26일 (수)" — and English does not, so the two parts
+  // and everything between them come from Intl rather than from a template here.
+  //
+  // The one place Apple does not follow CLDR is the English order: Calendar.app
+  // writes "Wed 26" where the `Ed` skeleton gives "26 Wed". So when the locale
+  // separates the two with nothing but a space, the weekday leads; when it
+  // actually decorates the number, that arrangement is the locale's and is kept.
+  const headFormatter = useMemo(() => dayHeadFormatter(lang === "ko" ? "ko" : "en"), [lang]);
   const longWeekdayFormatter = useMemo(
     () => new Intl.DateTimeFormat(lang === "ko" ? "ko" : "en", { weekday: "long" }),
     [lang],
@@ -619,8 +625,21 @@ export function WeekView({
               else if (day === anchor) headClasses.push("is-selected");
               return (
                 <div key={day} className={headClasses.join(" ")}>
-                  <span className="gcal-col-weekday">{weekdayFormatter.format(asDate(day))}</span>
-                  <span className="gcal-col-date">{getDayNumber(day)}</span>
+                  {dayHeadParts(headFormatter, asDate(day)).map((part, index) =>
+                    part.type === "day" ? (
+                      <span key={index} className="gcal-col-date">
+                        {part.value}
+                      </span>
+                    ) : part.type === "weekday" ? (
+                      <span key={index} className="gcal-col-weekday">
+                        {part.value}
+                      </span>
+                    ) : (
+                      <span key={index} className="gcal-col-sep">
+                        {part.value}
+                      </span>
+                    ),
+                  )}
                 </div>
               );
             })}
