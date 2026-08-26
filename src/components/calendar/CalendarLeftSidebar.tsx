@@ -194,7 +194,10 @@ export function CalendarLeftSidebar({
                 className={classes.join(" ")}
                 onClick={() => onSelectDate(cell.date)}
               >
-                {getDayNumber(cell.date)}
+                {/* R4/D7: the marker is a circle smaller than the cell, so the
+                    number carries it rather than the button's own background —
+                    a cell that lies down (24 x 21) cannot be a circle itself. */}
+                <span className="gcal-mini-num">{getDayNumber(cell.date)}</span>
                 {datesWithItems.has(cell.date) ? <span className="gcal-mini-dot" /> : null}
               </button>
             );

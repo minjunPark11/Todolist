@@ -186,25 +186,63 @@
   color: var(--text-tertiary);
 }
 
+/* D7: Calendar.app's mini month lies down — 24.2 x 20.6 per cell, 1.17:1 — and
+   its today marker is a 16px circle inside that, 0.78 of the row. Ours was a
+   31.7px square whose marker filled 0.94 of it: twice the area, and nothing
+   between the number and the edge. The cell is the hit target; the circle is
+   the marker; they are no longer the same box. */
+.gcal-mini-month-grid {
+  gap: 0;
+}
+
 .gcal-mini-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: auto;
+  min-height: 0;
+  height: 21px;
   font-size: 11px;
   line-height: 14px;
   color: var(--text-primary);
+  background: transparent;
+}
+
+.gcal-mini-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* `flex: none` because the cell is a flex container: without it the circle
+     shrinks to its text and stops being a circle. */
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
 }
 
 .gcal-mini-day:hover {
+  background: transparent;
+}
+
+.gcal-mini-day:hover .gcal-mini-num {
   background: var(--bg-hover-nav);
 }
 
-.gcal-mini-day.is-today {
+.gcal-mini-day.is-today .gcal-mini-num {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 700;
 }
 
-.gcal-mini-day.is-selected {
+.gcal-mini-day.is-selected .gcal-mini-num {
   background: var(--accent);
   color: #fff;
+}
+
+/* The sidebar's content is inset on both edges now, the way Calendar.app's is —
+   the mini grid was running the full width where Apple leaves it about 85%. */
+.gcal-sidebar {
+  padding-left: 12px;
 }
 
 .gcal-sidebar-section h3 {
@@ -396,6 +434,25 @@
 .gcal-year-month-title {
   font-size: 15px;
   line-height: 20px;
+}
+
+/* D8: six weeks at a fixed 128px came to 768px against a 752px viewport, so the
+   month a reader opens to see at once always scrolled. Rows share what is there
+   and stop at a floor instead — 72px is our own number (a date plus three 18px
+   chips plus padding), not Apple's: there is no Month capture to measure. */
+.gcal-main:has(> .gcal-month-grid) {
+  display: flex;
+  flex-direction: column;
+}
+
+.gcal-month-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: repeat(6, minmax(72px, 1fr));
+}
+
+.gcal-month-cell {
+  min-height: 0;
 }
 
 .gcal-month-grid,
