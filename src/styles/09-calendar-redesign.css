@@ -15,6 +15,7 @@
 
 .gcal-range-label {
   font-size: 15px;
+  line-height: 20px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -87,6 +88,7 @@
 /* --- Left sidebar: denser mini month, DS labels --- */
 .gcal-mini-month-head {
   font-size: 13px;
+  line-height: 16px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -99,6 +101,7 @@
 
 .gcal-mini-day {
   font-size: 11px;
+  line-height: 14px;
   color: var(--text-primary);
 }
 
@@ -151,13 +154,21 @@
   background: var(--bg-surface);
 }
 
+/* CALENDAR_GEOMETRY_DESIGN.md D6: one inline line — "SUN 23" — instead of a
+   two-row stack. Calendar.app spends 28px here; the stack spent 68px, half of it
+   structure and half the 1.5 line-height the grid text inherited. 22px circle
+   plus 3px above and below is the 28. */
 .gcal-col-head {
-  padding: 10px 4px 8px;
-  gap: 3px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 4px;
+  gap: 6px;
 }
 
 .gcal-col-weekday {
   font-size: 10px;
+  line-height: 13px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--text-tertiary);
@@ -171,29 +182,32 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 32px;
+  min-width: 22px;
+  height: 22px;
   border-radius: var(--radius-pill);
-  font-size: 16px;
+  /* 16px was not on the macOS ladder at all (it runs ...13, 15, 17...). */
+  font-size: 15px;
+  line-height: 20px;
   font-weight: 600;
 }
 
 .gcal-col-head.is-today .gcal-col-date {
-  min-width: 32px;
-  height: 32px;
+  min-width: 22px;
+  height: 22px;
   background: var(--accent);
   color: #fff;
 }
 
 .gcal-col-head.is-selected .gcal-col-date {
-  min-width: 32px;
-  height: 32px;
+  min-width: 22px;
+  height: 22px;
   border: 1.5px solid var(--accent);
   color: var(--accent);
 }
 
 .gcal-time-label {
   font-size: 10px;
+  line-height: 13px;
   font-weight: 500;
   color: var(--text-tertiary);
 }
@@ -263,6 +277,20 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--text-tertiary);
+}
+
+/* D5: 0.8rem read 11.2px at the default root, which is not a step on the macOS
+   ladder. The rest of this layer already sizes calendar text in px, so these two
+   join it rather than staying half-scaled. See the Phase 2 record for what that
+   costs. */
+.gcal-month-date {
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.gcal-year-month-title {
+  font-size: 15px;
+  line-height: 20px;
 }
 
 .gcal-month-grid,
