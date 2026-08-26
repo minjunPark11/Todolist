@@ -17,8 +17,31 @@
   --ev-tint-hover: 22%;
   --ev-ink: 74%;
   background: color-mix(in srgb, var(--ev-color, var(--accent)) var(--ev-tint), transparent);
-  border-left: 3px solid var(--ev-color, var(--accent));
   color: color-mix(in srgb, var(--ev-color, var(--accent)) var(--ev-ink), var(--text-primary));
+  /* CALENDAR_GEOMETRY_DESIGN.md R5 / METRICS §2.4: two blocks that touch in
+     time should not touch on screen — Calendar.app leaves 2px above and below
+     (a 30-minute event is a 17px block in a 21.25px slot). Transparent borders
+     take that out of the height the grid already computed, and `padding-box`
+     keeps the fill from painting over them. */
+  border-left: 0;
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  background-clip: padding-box;
+  padding-left: 10px;
+}
+
+/* The accent bar sits 2px inside the block rather than along its edge, which a
+   border cannot do — so it is drawn. 2px wide, not 3. */
+.gcal-time-block::before,
+.gcal-move-block::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ev-color, var(--accent));
 }
 
 [data-theme="dark"] .gcal-time-block,
