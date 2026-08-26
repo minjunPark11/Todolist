@@ -85,6 +85,49 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
+/* --- Left sidebar: Calendar.app's shape (CALENDAR_GEOMETRY_DESIGN.md R4) -----
+   One 200px sidebar sitting flush against the rail, its mini month pinned to the
+   foot, and no gutter between it and the grid — 318px of left chrome becomes
+   250px. Calendar.app spends about 200 and has no rail, but it *is* the whole
+   app; this one is a screen inside a larger one, so the rail stays and the 50px
+   is the difference we keep on purpose.
+   The task panel on the right is deliberately untouched.                     */
+
+/* `.app-shell > main` in 20-density.css owns the page padding and loads after
+   this file, so this has to out-specify it rather than out-order it. The left
+   edge is the one side the calendar opts out of: the sidebar is the page's edge
+   here, the way it is in Calendar.app. */
+.app-shell > main:has(.gcal-page-shell) {
+  padding-left: 0;
+}
+
+.gcal-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  padding-right: 12px;
+}
+
+.gcal-sidebar.is-rail {
+  width: 48px;
+  padding-right: 0;
+  align-items: center;
+}
+
+/* Calendar.app keeps the mini month at the foot of the sidebar rather than
+   floating directly under the last section. */
+.gcal-mini-month {
+  margin-top: auto;
+}
+
+.gcal-body {
+  column-gap: 0;
+}
+
+.gcal-taskpanel {
+  margin-left: 16px;
+}
+
 /* --- Left sidebar: denser mini month, DS labels --- */
 .gcal-mini-month-head {
   font-size: 13px;
