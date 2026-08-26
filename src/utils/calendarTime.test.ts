@@ -3,9 +3,11 @@ import {
   clickDefaultRange,
   DAY_END,
   DAY_START,
+  HOURS_AT_A_TIME,
+  MIN_SLOT_HEIGHT,
   minutesFromPointerY,
   minutesToTime,
-  SLOT_HEIGHT,
+  slotHeightFor,
   snapDownToStep,
   snappedDragRange,
   snapUpToStep,
@@ -13,26 +15,58 @@ import {
   timeToMinutes,
 } from "./calendarTime";
 
-// CALENDAR_GEOMETRY_DESIGN.md §4: nothing imported this module, and D1 changes
-// SLOT_HEIGHT — the one constant every pointer coordinate is derived from. These
-// are the invariants that have to survive that change, written before it.
+// CALENDAR_GEOMETRY_DESIGN.md §4: nothing imported this module, and the row
+// height is the one number every pointer coordinate is derived from. R1 turned
+// that number from a constant into a function of the measured viewport, so the
+// invariants below are stated for whatever the function returns rather than for
+// a literal.
 
-const pxPerMinute = SLOT_HEIGHT / 60;
-const yFor = (minutes: number) => (minutes - DAY_START * 60) * pxPerMinute;
+/** Viewport heights worth checking: two real windows, the floor, and the edges. */
+const VIEWPORTS = [862, 682, 482, 306, 1400, 120];
 
-describe("the grid's pixel scale", () => {
-  it("puts a snap step on a whole pixel", () => {
-    // 15 minutes at 48px/hour is 12px. At 42.8 it would be 10.7, and every
-    // pointer round-trip would carry a rounding error (D1).
-    const step = TIME_SNAP_MINUTES * pxPerMinute;
-    expect(Number.isInteger(step)).toBe(true);
+describe("slotHeightFor", () => {
+  it("fits HOURS_AT_A_TIME into the height when there is room", () => {
+    // 862px is the grid at 1920x1080 with the current chrome.
+    expect(862 / slotHeightFor(862)).toBeCloseTo(HOURS_AT_A_TIME, 0);
+    expect(682 / slotHeightFor(682)).toBeCloseTo(HOURS_AT_A_TIME, 0);
   });
 
-  it("puts the half-hour and the hour on whole pixels too", () => {
-    expect(Number.isInteger(SLOT_HEIGHT / 2)).toBe(true);
-    expect(Number.isInteger(SLOT_HEIGHT)).toBe(true);
+  it("stops at the floor instead of compressing further", () => {
+    // Below this the grid scrolls; Calendar.app does the same, which is why its
+    // own guide captures are scrolled to a fraction of a row.
+    expect(slotHeightFor(306)).toBe(MIN_SLOT_HEIGHT);
+    expect(slotHeightFor(1)).toBe(MIN_SLOT_HEIGHT);
+    expect(slotHeightFor(0)).toBe(MIN_SLOT_HEIGHT);
   });
 
+  it("survives a viewport that has not been measured yet", () => {
+    expect(slotHeightFor(NaN)).toBe(MIN_SLOT_HEIGHT);
+    expect(slotHeightFor(-40)).toBe(MIN_SLOT_HEIGHT);
+  });
+
+  it("always lands on a multiple of four, so a snap step is a whole pixel", () => {
+    for (const viewport of VIEWPORTS) {
+      const slot = slotHeightFor(viewport);
+      expect(slot % 4).toBe(0);
+      expect(Number.isInteger((TIME_SNAP_MINUTES * slot) / 60)).toBe(true);
+    }
+  });
+
+  it("never returns less than the floor, for any viewport", () => {
+    for (let viewport = 0; viewport <= 2000; viewport += 7) {
+      expect(slotHeightFor(viewport)).toBeGreaterThanOrEqual(MIN_SLOT_HEIGHT);
+    }
+  });
+
+  it("grows with the window rather than staying put", () => {
+    // The point of R1: a taller window means taller rows, which is what a real
+    // Mac shows and what a fixed constant could not reproduce.
+    expect(slotHeightFor(862)).toBeGreaterThan(slotHeightFor(682));
+    expect(slotHeightFor(682)).toBeGreaterThan(slotHeightFor(482));
+  });
+});
+
+describe("the grid's extent", () => {
   it("covers the whole day, so nothing is unrenderable", () => {
     // D2: the window used to start at 06:00, and WeekView carried a branch that
     // grew it downward whenever an item started earlier. A full day removes the
@@ -43,32 +77,42 @@ describe("the grid's pixel scale", () => {
 });
 
 describe("pointer Y to minutes", () => {
-  it("round-trips every snapped minute of the day without loss", () => {
-    for (let minutes = DAY_START * 60; minutes <= DAY_END * 60; minutes += TIME_SNAP_MINUTES) {
-      const back = minutesFromPointerY(yFor(minutes), 0);
-      expect(back).toBeCloseTo(minutes, 9);
-      expect(snapDownToStep(back)).toBe(minutes);
+  const cases = VIEWPORTS.map((viewport) => [viewport, slotHeightFor(viewport)] as const);
+
+  it("round-trips every snapped minute of the day without loss, at every row height", () => {
+    for (const [, slot] of cases) {
+      const yFor = (minutes: number) => ((minutes - DAY_START * 60) / 60) * slot;
+      for (let minutes = DAY_START * 60; minutes <= DAY_END * 60; minutes += TIME_SNAP_MINUTES) {
+        const back = minutesFromPointerY(yFor(minutes), 0, slot);
+        expect(back).toBeCloseTo(minutes, 9);
+        expect(snapDownToStep(back)).toBe(minutes);
+      }
     }
   });
 
   it("maps the top of the grid to the first minute of the day", () => {
-    expect(minutesFromPointerY(0, 0)).toBe(DAY_START * 60);
+    for (const [, slot] of cases) {
+      expect(minutesFromPointerY(0, 0, slot)).toBe(DAY_START * 60);
+    }
   });
 
   it("clamps above and below instead of running off the grid", () => {
-    expect(minutesFromPointerY(-500, 0)).toBe(DAY_START * 60);
-    expect(minutesFromPointerY(yFor(DAY_END * 60) + 500, 0)).toBe(DAY_END * 60);
+    const slot = slotHeightFor(682);
+    expect(minutesFromPointerY(-500, 0, slot)).toBe(DAY_START * 60);
+    expect(minutesFromPointerY((DAY_END - DAY_START) * slot + 500, 0, slot)).toBe(DAY_END * 60);
   });
 
   it("reads a container offset as the grid's origin", () => {
+    const slot = slotHeightFor(682);
     const containerTop = 137;
-    expect(minutesFromPointerY(containerTop + yFor(9 * 60), containerTop)).toBeCloseTo(9 * 60, 9);
+    expect(minutesFromPointerY(containerTop + 9 * slot, containerTop, slot)).toBeCloseTo(9 * 60, 9);
   });
 
   it("is monotonic — a lower pointer never means an earlier time", () => {
+    const slot = slotHeightFor(862);
     let previous = -Infinity;
-    for (let y = 0; y <= yFor(DAY_END * 60); y += 7) {
-      const minutes = minutesFromPointerY(y, 0);
+    for (let y = 0; y <= (DAY_END - DAY_START) * slot; y += 7) {
+      const minutes = minutesFromPointerY(y, 0, slot);
       expect(minutes).toBeGreaterThanOrEqual(previous);
       previous = minutes;
     }

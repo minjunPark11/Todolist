@@ -1,21 +1,40 @@
 // Pointer-time math for drag-to-create (CALENDAR_V3_DESIGN.md §2, §6).
 // DAY_START/DAY_END/SLOT_HEIGHT are the single source of truth for the
 // Day/Week time grid — WeekView and CalendarView both import from here.
-// CALENDAR_GEOMETRY_DESIGN.md D1/D2: 48px per hour, the whole day visible,
-// 15-minute snap. The hour row is never compressed to fit the viewport — the
-// grid body scrolls instead.
+// CALENDAR_GEOMETRY_DESIGN.md R1: the hour row is not a constant. Calendar.app
+// fits N hours into the height it has and only scrolls once that would push the
+// row below a floor — a screenshot of a real Mac at 1920x1080 shows ~77px rows
+// where Apple's own 522px-tall guide captures show 42.8, and one rule covers
+// both: max(floor, gridHeight / N).
 //
-// 48 rather than Calendar.app's measured 42.8 because every pointer coordinate
-// round-trips through this constant (px → minutes → px), and only a multiple of
-// four puts the 15-minute snap on a whole pixel: 15min = 12px, 30min = 24px.
+// Rounding to a multiple of four keeps what D1 was actually protecting: 15
+// minutes is a quarter of a row, so a multiple of four puts the snap on a whole
+// pixel whether the number is chosen or computed.
 //
-// The day is not cropped. A 06:00 start meant anything earlier had nowhere to
-// render, which WeekView compensated for by growing the window downward — a
+// The day is not cropped (D2). A 06:00 start meant anything earlier had nowhere
+// to render, which WeekView compensated for by growing the window downward — a
 // branch that existed only because of the crop.
 export const DAY_START = 0;
 export const DAY_END = 24;
-export const SLOT_HEIGHT = 48;
 export const TIME_SNAP_MINUTES = 15;
+
+/** Apple's default for "show __ hours at a time"; the setting's range is 6–24. */
+export const HOURS_AT_A_TIME = 12;
+
+/** Nearest multiple of four to Calendar.app's measured floor of 42.8px. */
+export const MIN_SLOT_HEIGHT = 44;
+
+/**
+ * Row height for a grid viewport of `viewportHeight` px.
+ *
+ * `viewportHeight` is the space the hour rows actually get — the scroller minus
+ * the sticky header above them — not the scroller's own height.
+ */
+export function slotHeightFor(viewportHeight: number): number {
+  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) return MIN_SLOT_HEIGHT;
+  const snapped = Math.round(viewportHeight / HOURS_AT_A_TIME / 4) * 4;
+  return Math.max(MIN_SLOT_HEIGHT, snapped);
+}
 
 export interface CalendarDraftBlock {
   date: string;
@@ -50,9 +69,9 @@ export function clampMinutes(minutes: number, min: number, max: number): number 
 // move/up time (not cache it from pointerdown) so a scrolled grid still maps
 // to the correct time — this already accounts for scroll since scrolling
 // moves the element's on-screen position.
-export function minutesFromPointerY(clientY: number, containerTop: number): number {
+export function minutesFromPointerY(clientY: number, containerTop: number, slotHeight: number): number {
   const offsetY = clientY - containerTop;
-  const minutes = DAY_START * 60 + (offsetY / SLOT_HEIGHT) * 60;
+  const minutes = DAY_START * 60 + (offsetY / slotHeight) * 60;
   return clampMinutes(minutes, DAY_START * 60, DAY_END * 60);
 }
 

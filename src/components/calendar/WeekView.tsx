@@ -12,7 +12,8 @@ import {
   snappedDragRange,
   DAY_END,
   DAY_START,
-  SLOT_HEIGHT,
+  MIN_SLOT_HEIGHT,
+  slotHeightFor,
   TIME_SNAP_MINUTES,
   type CalendarDraftBlock,
 } from "../../utils/calendarTime";
@@ -25,7 +26,7 @@ import { reducedTransition, transitions } from "../../motion/transitions";
 import { calendarBlockVariants } from "../../motion/variants";
 import { useMotionEnabled } from "../../motion/reducedMotion";
 
-export { DAY_END, DAY_START, SLOT_HEIGHT };
+export { DAY_END, DAY_START };
 
 // Overlapping blocks split the column side-by-side (Google Calendar style):
 // greedy column assignment inside each overlap cluster; every block in a
@@ -137,10 +138,6 @@ function timeToMinutesOrNull(value: string): number | null {
   return hour * 60 + minute;
 }
 
-function heightFor(startMin: number, endMin: number) {
-  return Math.max(((endMin - startMin) / 60) * SLOT_HEIGHT, 24);
-}
-
 interface WeekViewProps {
   days: string[];
   anchor: string;
@@ -229,12 +226,20 @@ export function WeekView({
   const suppressClickRef = useRef(false);
   // User-resizable all-day band height (null = automatic sizing).
   const [alldayHeight, setAlldayHeight] = useState<number | null>(loadAlldayHeight);
+  // R1: the row height is measured, not declared. The rows get the scroller
+  // minus the sticky header above them, and the all-day band inside that header
+  // is user-resizable — so this watches both rather than reading the window.
+  const [slotHeight, setSlotHeight] = useState(MIN_SLOT_HEIGHT);
   const isDay = days.length === 1;
 
   const dayKey = days.join(",");
 
   function topFor(minutes: number) {
-    return ((minutes - gridStartMin) / 60) * SLOT_HEIGHT;
+    return ((minutes - gridStartMin) / 60) * slotHeight;
+  }
+
+  function heightFor(startMin: number, endMin: number) {
+    return Math.max(((endMin - startMin) / 60) * slotHeight, 24);
   }
 
   const today = todayValue();
@@ -244,15 +249,36 @@ export function WeekView({
   const nowTop = topFor(nowMinutes);
   const nowLabel = timeLabelFormatter.format(now);
 
+  // R1: fit HOURS_AT_A_TIME into the height the rows actually have, with a
+  // floor below which the grid scrolls instead of compressing further. The
+  // sticky header is inside the scroller, so its height comes off the top; the
+  // all-day band inside it is draggable, which is why both are observed.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const sticky = el.querySelector<HTMLElement>(".gcal-timegrid-sticky");
+    const measure = () => setSlotHeight(slotHeightFor(el.clientHeight - (sticky?.offsetHeight ?? 0)));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    if (sticky) observer.observe(sticky);
+    return () => observer.disconnect();
+  }, [isDay]);
+
   // Spec §6.4: rows are never compressed — the body scrolls instead, opening
   // near the current time (or 08:00 when the view has no "today").
+  //
+  // `slotHeight` is a dependency because a scroll position is in pixels: once
+  // the row height changes those pixels point at a different hour, so the view
+  // is re-anchored to a time rather than left where the number happened to land.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const target = days.includes(today) ? Math.max(gridStartMin, nowMinutes - 60) : 8 * 60;
     el.scrollTop = Math.max(0, topFor(target));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayKey]);
+  }, [dayKey, slotHeight]);
 
   const hasAnyItemInView = items.some((item) => days.includes(item.date));
   const showEmptyHint = !hasAnyItemInView && !draft && !selection;
@@ -263,7 +289,7 @@ export function WeekView({
   // Deriving the effective scale from the measured height is correct under
   // any zoom/transform, so pointer math never assumes a fixed ratio.
   function timeGridScaleFromRect(rect: DOMRect): number {
-    const layoutHeight = (DAY_END - DAY_START) * SLOT_HEIGHT;
+    const layoutHeight = (DAY_END - DAY_START) * slotHeight;
     return rect.height > 0 ? rect.height / layoutHeight : 1;
   }
 
@@ -281,9 +307,9 @@ export function WeekView({
     if (rect) {
       const offsetY = clientY - rect.top;
       const scale = timeGridScaleFromRect(rect);
-      return clampMinutes(gridStartMin + (offsetY / (SLOT_HEIGHT * scale)) * 60, gridStartMin, DAY_END * 60);
+      return clampMinutes(gridStartMin + (offsetY / (slotHeight * scale)) * 60, gridStartMin, DAY_END * 60);
     }
-    return minutesFromPointerY(clientY, 0);
+    return minutesFromPointerY(clientY, 0, slotHeight);
   }
 
   // Now-indicator geometry: one grid-wide overlay (badge in the time gutter,
@@ -691,10 +717,10 @@ export function WeekView({
         </div>
       </div>
 
-        <div className="gcal-timegrid-body" style={{ height: hours.length * SLOT_HEIGHT }}>
+        <div className="gcal-timegrid-body" style={{ height: hours.length * slotHeight }}>
           <div className="gcal-time-gutter">
             {hours.map((hour) => (
-              <div key={hour} className="gcal-time-label" style={{ height: SLOT_HEIGHT }}>
+              <div key={hour} className="gcal-time-label" style={{ height: slotHeight }}>
                 {/* The now badge replaces the nearest hour label instead of overlapping it. */}
                 {showNowLine && Math.abs(nowMinutes - hour * 60) < 15 ? "" : `${String(hour).padStart(2, "0")}:00`}
               </div>
@@ -750,7 +776,7 @@ export function WeekView({
                 onPointerCancel={(event) => handlePointerCancel(event as ReactPointerEvent<HTMLDivElement>)}
               >
                 {hours.map((hour) => (
-                  <div key={hour} className="gcal-time-slot" style={{ height: SLOT_HEIGHT }} />
+                  <div key={hour} className="gcal-time-slot" style={{ height: slotHeight }} />
                 ))}
                 {liveRange ? (
                   <div
