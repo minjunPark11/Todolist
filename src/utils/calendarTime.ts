@@ -1,11 +1,20 @@
 // Pointer-time math for drag-to-create (CALENDAR_V3_DESIGN.md §2, §6).
 // DAY_START/DAY_END/SLOT_HEIGHT are the single source of truth for the
 // Day/Week time grid — WeekView and CalendarView both import from here.
-// Final spec: 96px per hour, 06:00–24:00 visible, 15-minute snap. The hour
-// row is never compressed to fit the viewport — the grid body scrolls instead.
-export const DAY_START = 6;
+// CALENDAR_GEOMETRY_DESIGN.md D1/D2: 48px per hour, the whole day visible,
+// 15-minute snap. The hour row is never compressed to fit the viewport — the
+// grid body scrolls instead.
+//
+// 48 rather than Calendar.app's measured 42.8 because every pointer coordinate
+// round-trips through this constant (px → minutes → px), and only a multiple of
+// four puts the 15-minute snap on a whole pixel: 15min = 12px, 30min = 24px.
+//
+// The day is not cropped. A 06:00 start meant anything earlier had nowhere to
+// render, which WeekView compensated for by growing the window downward — a
+// branch that existed only because of the crop.
+export const DAY_START = 0;
 export const DAY_END = 24;
-export const SLOT_HEIGHT = 96;
+export const SLOT_HEIGHT = 48;
 export const TIME_SNAP_MINUTES = 15;
 
 export interface CalendarDraftBlock {

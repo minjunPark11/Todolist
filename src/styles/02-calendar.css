@@ -684,13 +684,6 @@
   cursor: crosshair;
 }
 
-/* 30-minute sub-line inside the 96px hour row (spec §6.5). */
-.gcal-time-slot-half {
-  height: 50%;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-  pointer-events: none;
-}
-
 .gcal-time-col.is-weekend {
   background: rgba(0, 0, 0, 0.02);
 }

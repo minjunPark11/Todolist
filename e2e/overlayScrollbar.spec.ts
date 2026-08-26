@@ -141,6 +141,28 @@ test.describe("the calendar's own scrollbar", () => {
   const GRID = ".gcal-timegrid .overlay-scrollbar";
 
   /**
+   * Wheel the grid in whichever direction it can still move.
+   *
+   * These tests used to wheel down and assume that worked. That held only
+   * because the day was cropped to 06:00–24:00 at 96px per hour, leaving well
+   * over a thousand pixels of travel — so wherever the arrival scroll landed,
+   * there was room below it. CALENDAR_GEOMETRY_DESIGN.md D1/D2 opens the whole
+   * day at 48px, which is 1152px against a ~750px viewport: about 400px of
+   * travel. Arriving in the afternoon now pins the grid to the bottom, and a
+   * downward wheel scrolls nothing, so the bar never appears.
+   *
+   * The dependency on the wall clock was always there; it simply never bit.
+   * Asking the scroller which way it can go removes it.
+   */
+  async function wheelWhereThereIsRoom(page: import("@playwright/test").Page) {
+    const delta = await page.evaluate(() => {
+      const el = document.querySelector(".gcal-time-scroll") as HTMLElement;
+      return el.scrollTop >= el.scrollHeight - el.clientHeight - 1 ? -240 : 240;
+    });
+    await page.mouse.wheel(0, delta);
+  }
+
+  /**
    * On the calendar, with the arrival scroll finished and the bar back down.
    *
    * The view scrolls itself to the current hour when it mounts. That is a real
@@ -181,7 +203,7 @@ test.describe("the calendar's own scrollbar", () => {
     await page.waitForTimeout(600);
     expect(await opacityIn(page, GRID), "hovering the grid revealed it").toBe(0);
 
-    await page.mouse.wheel(0, 240);
+    await wheelWhereThereIsRoom(page);
     await expect.poll(() => opacityIn(page, GRID), { timeout: 2000 }).toBe(1);
   });
 
@@ -190,7 +212,7 @@ test.describe("the calendar's own scrollbar", () => {
 
     const box = (await page.locator(".gcal-time-scroll").boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.wheel(0, 240);
+    await wheelWhereThereIsRoom(page);
     await expect.poll(() => opacityIn(page, GRID), { timeout: 2000 }).toBe(1);
 
     // §4.1 watched it hold for 3.5 seconds with the pointer inside. The page's

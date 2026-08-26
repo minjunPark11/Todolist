@@ -122,6 +122,15 @@ function asDate(value: string) {
   return new Date(`${value}T00:00:00`);
 }
 
+// CALENDAR_GEOMETRY_DESIGN.md D2: the grid covers the whole day, so its origin
+// is fixed. This used to be derived per render — the window started at 06:00 and
+// grew downward to reach the earliest item on screen, because anything before
+// the start had nowhere to render and simply looked deleted. Opening the full
+// day removes the reason for that, so `topFor`, the now line and every pointer
+// coordinate share one origin that the content cannot move.
+const gridStartMin = DAY_START * 60;
+const hours = Array.from({ length: DAY_END - DAY_START }, (_, index) => DAY_START + index);
+
 function timeToMinutesOrNull(value: string): number | null {
   if (!value) return null;
   const [hour, minute] = value.split(":").map(Number);
@@ -222,28 +231,7 @@ export function WeekView({
   const [alldayHeight, setAlldayHeight] = useState<number | null>(loadAlldayHeight);
   const isDay = days.length === 1;
 
-  // The grid normally starts at DAY_START, but an item that ends before that
-  // has nowhere to render — it used to be dropped from the view with no trace,
-  // so an early-morning block simply looked deleted. Growing the window down
-  // to the earliest item on screen keeps the compact 06:00 start for ordinary
-  // weeks while making sure nothing is ever silently unrenderable.
   const dayKey = days.join(",");
-  const gridStartHour = useMemo(() => {
-    let earliestMin = DAY_START * 60;
-    for (const item of items) {
-      if (!days.includes(item.date)) continue;
-      const startMin = timeToMinutesOrNull(item.startTime ?? "");
-      if (startMin === null) continue;
-      if (startMin < earliestMin) earliestMin = startMin;
-    }
-    return Math.max(0, Math.floor(earliestMin / 60));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, dayKey]);
-  const gridStartMin = gridStartHour * 60;
-  const hours = useMemo(
-    () => Array.from({ length: DAY_END - gridStartHour }, (_, index) => gridStartHour + index),
-    [gridStartHour],
-  );
 
   function topFor(minutes: number) {
     return ((minutes - gridStartMin) / 60) * SLOT_HEIGHT;
@@ -264,7 +252,7 @@ export function WeekView({
     const target = days.includes(today) ? Math.max(gridStartMin, nowMinutes - 60) : 8 * 60;
     el.scrollTop = Math.max(0, topFor(target));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayKey, gridStartMin]);
+  }, [dayKey]);
 
   const hasAnyItemInView = items.some((item) => days.includes(item.date));
   const showEmptyHint = !hasAnyItemInView && !draft && !selection;
@@ -275,7 +263,7 @@ export function WeekView({
   // Deriving the effective scale from the measured height is correct under
   // any zoom/transform, so pointer math never assumes a fixed ratio.
   function timeGridScaleFromRect(rect: DOMRect): number {
-    const layoutHeight = (DAY_END - gridStartHour) * SLOT_HEIGHT;
+    const layoutHeight = (DAY_END - DAY_START) * SLOT_HEIGHT;
     return rect.height > 0 ? rect.height / layoutHeight : 1;
   }
 
@@ -762,9 +750,7 @@ export function WeekView({
                 onPointerCancel={(event) => handlePointerCancel(event as ReactPointerEvent<HTMLDivElement>)}
               >
                 {hours.map((hour) => (
-                  <div key={hour} className="gcal-time-slot" style={{ height: SLOT_HEIGHT }}>
-                    <div className="gcal-time-slot-half" />
-                  </div>
+                  <div key={hour} className="gcal-time-slot" style={{ height: SLOT_HEIGHT }} />
                 ))}
                 {liveRange ? (
                   <div
@@ -856,8 +842,8 @@ export function WeekView({
                     let startMin = timeToMinutesOrNull(item.startTime ?? "");
                     if (startMin === null) return [];
                     let endMin = timeToMinutesOrNull(item.endTime ?? "") ?? startMin + 60;
-                    // gridStartHour already grew to cover the earliest item, so
-                    // this only catches genuinely inverted data (end before start).
+                    // The grid covers the whole day, so this only catches
+                    // genuinely inverted data (end before start).
                     if (endMin <= gridStartMin) return [];
                     if (resize && resize.key === item.key) {
                       startMin = resize.startMin;

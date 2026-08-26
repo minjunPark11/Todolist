@@ -125,16 +125,21 @@
 }
 
 /* --- Time grid: hairlines, uppercase day header, today circle + tint --- */
+/* CALENDAR_GEOMETRY_DESIGN.md D3: Calendar.app draws the hour line and the day
+   divider at the same weight — measured at alpha 0.075 on both, pixel for pixel.
+   The hierarchy this file used to assume (a quieter hour line) is what made the
+   grid read as a table of weekdays rather than an axis of time. */
 .gcal-timegrid {
-  --grid-line: rgba(0, 0, 0, 0.05);
-  --grid-line-half: rgba(0, 0, 0, 0.04);
+  --grid-line: rgba(0, 0, 0, 0.075);
   --calendar-now-color: var(--accent);
   --calendar-now-line-muted: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
+/* D4: matched by perceived weight, not by the same number. White at 0.060 on
+   #1C1C1E and black at 0.075 on white are both ΔL* 6.6 against their own
+   background; the previous 0.07 read 1.74x heavier than the light theme. */
 [data-theme="dark"] .gcal-timegrid {
-  --grid-line: rgba(255, 255, 255, 0.07);
-  --grid-line-half: rgba(255, 255, 255, 0.05);
+  --grid-line: rgba(255, 255, 255, 0.06);
 }
 
 .gcal-main {
@@ -198,8 +203,13 @@
   border-right-color: transparent;
 }
 
+/* D3 says the two grid lines are the same weight, so they read from the same
+   token rather than from two that happen to agree. `--border-subtle` is a global
+   surface token: black 0.08 in light (ΔL* 6.4, close enough to the hour line)
+   but white 0.08 in dark, which is ΔL* 8.7 — the divider went back to
+   out-shouting the hour line as soon as the theme flipped. */
 .gcal-time-col {
-  border-left: 1px solid var(--border-subtle);
+  border-left: 1px solid var(--grid-line);
 }
 
 .gcal-time-col.is-today {
@@ -208,10 +218,6 @@
 
 .gcal-time-slot {
   border-bottom: 1px solid var(--grid-line);
-}
-
-.gcal-time-slot-half {
-  border-bottom: 1px dashed var(--grid-line-half);
 }
 
 .gcal-time-slot:hover {
