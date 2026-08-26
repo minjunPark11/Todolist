@@ -4,13 +4,9 @@ type CalendarMode = "month" | "week" | "day" | "year";
 
 interface CalendarToolbarProps {
   mode: CalendarMode;
-  rangeLabel: string;
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   onModeChange: (mode: CalendarMode) => void;
-  onToday: () => void;
-  onPrev: () => void;
-  onNext: () => void;
   /** Create lives in the toolbar, not as a block button atop the sidebar. */
   onCreate: () => void;
 }
@@ -24,13 +20,9 @@ const MODES: Array<{ id: CalendarMode; labelKey: string }> = [
 
 export function CalendarToolbar({
   mode,
-  rangeLabel,
   sidebarCollapsed,
   onToggleSidebar,
   onModeChange,
-  onToday,
-  onPrev,
-  onNext,
   onCreate,
 }: CalendarToolbarProps) {
   const { t } = useT();
@@ -56,18 +48,6 @@ export function CalendarToolbar({
         >
           +
         </button>
-        <div className="gcal-nav">
-          <button type="button" aria-label={t("calendar.previous")} onClick={onPrev}>
-            ‹
-          </button>
-          <button type="button" className="gcal-today-btn" onClick={onToday}>
-            {t("calendar.today")}
-          </button>
-          <button type="button" aria-label={t("calendar.next")} onClick={onNext}>
-            ›
-          </button>
-        </div>
-        <h2 className="gcal-range-label">{rangeLabel}</h2>
       </div>
       <div className="gcal-toolbar-right">
         <div className="gcal-modes">
@@ -83,6 +63,9 @@ export function CalendarToolbar({
           ))}
         </div>
       </div>
+      {/* R2: the segmented control is centred, and centring needs a matching
+          weight on the other side rather than a nudge. */}
+      <div className="gcal-toolbar-spacer" aria-hidden="true" />
     </div>
   );
 }

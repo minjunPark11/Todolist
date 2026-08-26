@@ -35,6 +35,7 @@ import {
 } from "../utils/calendarTime";
 import type { ToastState } from "./kit";
 import { CalendarToolbar } from "./calendar/CalendarToolbar";
+import { CalendarTitleRow } from "./calendar/CalendarTitleRow";
 import { CalendarLeftSidebar } from "./calendar/CalendarLeftSidebar";
 import { CalendarRightTaskPanel } from "./calendar/CalendarRightTaskPanel";
 import { WeekView } from "./calendar/WeekView";
@@ -746,16 +747,9 @@ export function CalendarView({
     <div className="gcal-shell" ref={shellRef}>
       <CalendarToolbar
         mode={mode}
-        rangeLabel={rangeLabel}
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={() => setSidebarCollapsed((collapsed) => !collapsed)}
         onModeChange={switchMode}
-        onToday={() => {
-          clearTransient();
-          setAnchor(today);
-        }}
-        onPrev={() => shift(-1)}
-        onNext={() => shift(1)}
         onCreate={() =>
           setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
         }
@@ -781,6 +775,15 @@ export function CalendarView({
         />
 
         <div className="gcal-main-column">
+          <CalendarTitleRow
+            rangeLabel={rangeLabel}
+            onToday={() => {
+              clearTransient();
+              setAnchor(today);
+            }}
+            onPrev={() => shift(-1)}
+            onNext={() => shift(1)}
+          />
           <section className={isTimeGrid ? "gcal-main is-timegrid" : "gcal-main"}>
             {aiStatus === "preview" ? (
               <div className="gcal-suggestion-bar">
