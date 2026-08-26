@@ -106,7 +106,9 @@ export function SettingsPage({
   isKnowledgeDesktop,
 }: SettingsPageProps) {
   const { t } = useT();
-  const [tab, setTab] = useState<"appearance" | "behavior" | "calendar" | "knowledge" | "localAi" | "data">("appearance");
+  const [tab, setTab] = useState<
+    "account" | "appearance" | "behavior" | "calendar" | "knowledge" | "localAi" | "data"
+  >("account");
   const [calendarDraft, setCalendarDraft] = useState({ name: "", icsUrl: "", color: "#4f73ff" });
   const [externalFormOpen, setExternalFormOpen] = useState(false);
   const [shareCopyKey, setShareCopyKey] = useState("settings.calendar.copy");
@@ -129,7 +131,7 @@ export function SettingsPage({
   }
 
   return (
-    <div className="ff-page">
+    <div className="ff-page ff-settings-page">
       <header className="ff-page-head">
         <div>
           <h1 className="ff-page-title">{t("settings.title")}</h1>
@@ -139,6 +141,7 @@ export function SettingsPage({
 
       <SegmentedTabs
         tabs={[
+          ["account", t("auth.accountTitle")],
           ["appearance", t("settings.tabAppearance")],
           ["behavior", t("settings.tabBehavior")],
           ["calendar", t("settings.tabCalendar")],
@@ -152,7 +155,7 @@ export function SettingsPage({
 
       {tab === "appearance" ? (
         <div className="ff-settings-card">
-          <Row title={t("settings.theme")} hint={t("settings.themeHint")}>
+          <SettingsRow title={t("settings.theme")} hint={t("settings.themeHint")}>
             <SegmentedTabs
               tabs={[
                 ["light", t("settings.themeLight")],
@@ -162,8 +165,8 @@ export function SettingsPage({
               active={settings.theme}
               onChange={(t) => onUpdate({ theme: t as ThemeMode })}
             />
-          </Row>
-          <Row title={t("settings.accentColor")} hint={t("settings.accentColorHint")}>
+          </SettingsRow>
+          <SettingsRow title={t("settings.accentColor")} hint={t("settings.accentColorHint")}>
             <div className="ff-color-row">
               {ACCENTS.map((a) => (
                 <button
@@ -176,8 +179,8 @@ export function SettingsPage({
                 />
               ))}
             </div>
-          </Row>
-          <Row title={t("settings.fontSize")} hint={t("settings.fontSizeHint")}>
+          </SettingsRow>
+          <SettingsRow title={t("settings.fontSize")} hint={t("settings.fontSizeHint")}>
             <SegmentedTabs
               tabs={[
                 ["small", t("settings.fontSmall")],
@@ -187,8 +190,8 @@ export function SettingsPage({
               active={settings.fontSize}
               onChange={(t) => onUpdate({ fontSize: t as FontSize })}
             />
-          </Row>
-          <Row title={t("settings.language")} hint={t("settings.languageHint")}>
+          </SettingsRow>
+          <SettingsRow title={t("settings.language")} hint={t("settings.languageHint")}>
             <SegmentedTabs
               tabs={[
                 ["ko", t("settings.languageKo")],
@@ -197,13 +200,13 @@ export function SettingsPage({
               active={settings.language}
               onChange={(t) => onUpdate({ language: t as Language })}
             />
-          </Row>
+          </SettingsRow>
         </div>
       ) : null}
 
       {tab === "behavior" ? (
         <div className="ff-settings-card">
-          <Row title={t("settings.defaultStartPage")} hint={t("settings.defaultStartPageHint")}>
+          <SettingsRow title={t("settings.defaultStartPage")} hint={t("settings.defaultStartPageHint")}>
             <select
               // A stored "/planning" has no option of its own any more; showing
               // it as the Board keeps the picker from reading as unset.
@@ -216,7 +219,7 @@ export function SettingsPage({
               <option value="/focus">{t("sidebar.focus")}</option>
               <option value="/inbox">{t("settings.defaultStartPageInboxOption")}</option>
             </select>
-          </Row>
+          </SettingsRow>
           <Toggle
             label={t("settings.showCompletedTasks")}
             hint={t("settings.showCompletedTasksHint")}
@@ -450,43 +453,50 @@ export function SettingsPage({
       {tab === "data" ? (
         <>
           <div className="ff-settings-card">
-            <Row title={t("settings.exportData")} hint={t("settings.exportDataHint")}>
+            <SettingsRow title={t("settings.exportData")} hint={t("settings.exportDataHint")}>
               <button type="button" className="ff-btn" onClick={onExport}>{t("settings.exportJson")}</button>
-            </Row>
-            <Row title={t("settings.importData")} hint={t("settings.importDataHint")}>
+            </SettingsRow>
+            <SettingsRow title={t("settings.importData")} hint={t("settings.importDataHint")}>
               <label className="ff-btn ff-import-btn">
                 {t("settings.importJson")}
                 <input type="file" accept="application/json" onChange={onImport} hidden />
               </label>
-            </Row>
-            <Row title={t("settings.resetAllData")} hint={t("settings.resetAllDataHint")}>
+            </SettingsRow>
+            <SettingsRow title={t("settings.resetAllData")} hint={t("settings.resetAllDataHint")}>
               <button type="button" className="ff-btn ff-btn-danger" onClick={onReset}>{t("settings.resetAllData")}</button>
-            </Row>
+            </SettingsRow>
             {importMessage ? <p className="ff-settings-msg">{importMessage}</p> : null}
           </div>
+        </>
+      ) : null}
+
+      {/* SETTINGS_REVIEW.md 3.2: signing in used to live under "delete
+          everything". It is the first tab now. */}
+      {tab === "account" ? (
+        <>
           {accountSlot}
-          <section className="settings-card account-card">
-            <div className="section-title">
-              <h2>{t("settings.appInfo")}</h2>
-              <span>FocusFlow</span>
-            </div>
-            <div className="account-stack">
-              <p>
-                {t("settings.appVersion")} <strong>{appVersion}</strong>
-              </p>
-              <p>{formatUpdateStatus(updateStatus, t)}</p>
-              <div className="settings-actions">
+          <div className="ff-settings-card">
+            <SettingsRow title={t("settings.appInfo")} hint="FocusFlow">
+              <strong>{appVersion}</strong>
+            </SettingsRow>
+            <SettingsRow title={t("settings.checkUpdates")} hint={formatUpdateStatus(updateStatus, t)}>
+              <div className="ff-settings-actions">
                 {updateStatus.status === "available" ? (
-                  <button type="button" onClick={onInstallUpdate}>
+                  <button type="button" className="ff-btn ff-btn-primary" onClick={onInstallUpdate}>
                     {t("settings.installUpdate")}
                   </button>
                 ) : null}
-                <button type="button" onClick={onCheckUpdate} disabled={updateStatus.status === "checking" || updateStatus.status === "installing"}>
+                <button
+                  type="button"
+                  className="ff-btn"
+                  onClick={onCheckUpdate}
+                  disabled={updateStatus.status === "checking" || updateStatus.status === "installing"}
+                >
                   {t("settings.checkUpdates")}
                 </button>
               </div>
-            </div>
-          </section>
+            </SettingsRow>
+          </div>
         </>
       ) : null}
     </div>
@@ -700,9 +710,9 @@ function KnowledgeSettingsTab({
   if (!isDesktop) {
     return (
       <div className="ff-settings-card ff-knowledge-locked">
-        <Row title={t("settings.knowledge.title")} hint={t("settings.knowledge.desktopOnly")}>
+        <SettingsRow title={t("settings.knowledge.title")} hint={t("settings.knowledge.desktopOnly")}>
           <span className="ff-knowledge-badge">{t("settings.knowledge.desktopOnlyBadge")}</span>
-        </Row>
+        </SettingsRow>
       </div>
     );
   }
@@ -710,7 +720,7 @@ function KnowledgeSettingsTab({
   return (
     <>
     <div className="ff-settings-card">
-      <Row title={t("settings.knowledge.vaultTitle")} hint={t("settings.knowledge.vaultHint")}>
+      <SettingsRow title={t("settings.knowledge.vaultTitle")} hint={t("settings.knowledge.vaultHint")}>
         <div className="ff-knowledge-vault-control">
           {settings.vaultPath ? (
             <>
@@ -730,7 +740,7 @@ function KnowledgeSettingsTab({
             </button>
           )}
         </div>
-      </Row>
+      </SettingsRow>
 
       {pickError ? <p className="ff-settings-error">{pickError}</p> : null}
 
@@ -743,7 +753,7 @@ function KnowledgeSettingsTab({
             onChange={(value) => updateSettings({ enabled: value })}
           />
           {settings.enabled ? (
-            <Row title={t("settings.knowledge.modeTitle")} hint={t("settings.knowledge.modeHint")}>
+            <SettingsRow title={t("settings.knowledge.modeTitle")} hint={t("settings.knowledge.modeHint")}>
               <SegmentedTabs
                 tabs={[
                   ["lite", t("settings.knowledge.modeLite")],
@@ -752,7 +762,7 @@ function KnowledgeSettingsTab({
                 active={settings.indexingMode}
                 onChange={(mode) => updateSettings({ indexingMode: mode })}
               />
-            </Row>
+            </SettingsRow>
           ) : null}
           {reindexNeeded ? <p className="ff-settings-error">{t("settings.knowledge.reindexNeeded")}</p> : null}
           <p className="ff-knowledge-privacy-note">{t("settings.knowledge.privacyNote")}</p>
@@ -787,7 +797,7 @@ function KnowledgeSettingsTab({
 
     {vaultReady ? (
       <div className="ff-settings-card">
-        <Row title={t("settings.knowledge.embeddingModel")} hint={t("settings.knowledge.embeddingModelHint")}>
+        <SettingsRow title={t("settings.knowledge.embeddingModel")} hint={t("settings.knowledge.embeddingModelHint")}>
           <div className="ff-knowledge-model-control">
             <select
               value={settings.embeddingModel}
@@ -825,9 +835,9 @@ function KnowledgeSettingsTab({
                 : t("settings.knowledge.embeddingFileMissingHint")}
             </small>
           ) : null}
-        </Row>
+        </SettingsRow>
 
-        <Row title={t("settings.knowledge.indexStatus")} hint="">
+        <SettingsRow title={t("settings.knowledge.indexStatus")} hint="">
           <div className="ff-knowledge-index-status">
             {statsLoading ? (
               <span>…</span>
@@ -844,7 +854,7 @@ function KnowledgeSettingsTab({
               </span>
             )}
           </div>
-        </Row>
+        </SettingsRow>
 
         <div className="ff-knowledge-index-actions">
           {indexing ? (
@@ -1038,32 +1048,32 @@ function LocalAiSettingsTab() {
 
       {profile && recommendation ? (
         <div className="ff-settings-card">
-          <Row title={t("settings.localAi.resultTitle")} hint="">
+          <SettingsRow title={t("settings.localAi.resultTitle")} hint="">
             <span />
-          </Row>
-          <Row title={t("settings.localAi.resultOs")} hint="">
+          </SettingsRow>
+          <SettingsRow title={t("settings.localAi.resultOs")} hint="">
             <span className="ff-knowledge-index-status">{`${profile.os} (${profile.arch})`}</span>
-          </Row>
-          <Row title={t("settings.localAi.resultCpu")} hint="">
+          </SettingsRow>
+          <SettingsRow title={t("settings.localAi.resultCpu")} hint="">
             <span className="ff-knowledge-index-status">{t("settings.localAi.resultCores", { cores: profile.cpuCoreCount })}</span>
-          </Row>
-          <Row title={t("settings.localAi.resultRam")} hint="">
+          </SettingsRow>
+          <SettingsRow title={t("settings.localAi.resultRam")} hint="">
             <span className="ff-knowledge-index-status">
               {profile.totalRamGb !== null
                 ? t("settings.localAi.sizeGb", { size: profile.totalRamGb })
                 : t("settings.localAi.unknown")}
             </span>
-          </Row>
-          <Row title={t("settings.localAi.resultDisk")} hint="">
+          </SettingsRow>
+          <SettingsRow title={t("settings.localAi.resultDisk")} hint="">
             <span className="ff-knowledge-index-status">
               {profile.availableDiskGb !== null
                 ? t("settings.localAi.sizeGb", { size: profile.availableDiskGb })
                 : t("settings.localAi.unknown")}
             </span>
-          </Row>
-          <Row title={t("settings.localAi.resultGpu")} hint="">
+          </SettingsRow>
+          <SettingsRow title={t("settings.localAi.resultGpu")} hint="">
             <span className="ff-knowledge-index-status">{profile.gpu?.name ?? t("settings.localAi.gpuNotDetected")}</span>
-          </Row>
+          </SettingsRow>
 
           <p className="ff-localai-reason">{recommendation.reason}</p>
           {recommendation.warnings.length > 0 ? (
@@ -1097,9 +1107,9 @@ function LocalAiSettingsTab() {
 
       {!profile ? (
         <div className="ff-settings-card">
-          <Row title={t("settings.localAi.catalogTitle")} hint={t("settings.localAi.catalogHint")}>
+          <SettingsRow title={t("settings.localAi.catalogTitle")} hint={t("settings.localAi.catalogHint")}>
             <span />
-          </Row>
+          </SettingsRow>
           <div className="ff-localai-model-list">
             {LOCAL_MODEL_CATALOG.map((model) => (
               <LocalAiModelItem
@@ -1116,7 +1126,7 @@ function LocalAiSettingsTab() {
 
       {selectedModel && (!isModelInstalled(selectedModel.id) || modelDownloadMessage || downloadError) ? (
         <div className="ff-settings-card">
-          <Row
+          <SettingsRow
             title={selectedModel.displayName}
             hint={
               isModelDownloadable(selectedModel)
@@ -1148,7 +1158,7 @@ function LocalAiSettingsTab() {
                 {downloadError ? t("settings.localAi.downloadRetry") : t("settings.localAi.downloadButton")}
               </button>
             )}
-          </Row>
+          </SettingsRow>
           {downloadingId === selectedModel.id && downloadProgress?.modelId === selectedModel.id ? (
             <div className="ff-knowledge-index-actions">
               <span className="ff-knowledge-index-progress">
@@ -1176,7 +1186,7 @@ function LocalAiSettingsTab() {
       ) : null}
 
       <div className="ff-settings-card">
-        <Row title={t("settings.localAi.launchTitle")} hint={t(launchHintKey[settings.launchMode])}>
+        <SettingsRow title={t("settings.localAi.launchTitle")} hint={t(launchHintKey[settings.launchMode])}>
           <SegmentedTabs
             tabs={[
               ["on-demand", t("settings.localAi.launchOnDemand")],
@@ -1186,19 +1196,19 @@ function LocalAiSettingsTab() {
             active={settings.launchMode}
             onChange={(mode) => updateSettings({ launchMode: mode })}
           />
-        </Row>
+        </SettingsRow>
         {settings.launchMode === "external" ? (
-          <Row title={t("settings.localAi.externalUrlLabel")} hint={t("settings.localAi.launchExternalHint")}>
+          <SettingsRow title={t("settings.localAi.externalUrlLabel")} hint={t("settings.localAi.launchExternalHint")}>
             <input
               className="ff-localai-url-input"
               value={settings.externalServerUrl}
               placeholder="http://localhost:11434"
               onChange={(event) => updateSettings({ externalServerUrl: event.target.value })}
             />
-          </Row>
+          </SettingsRow>
         ) : (
           <>
-            <Row title={t("settings.localAi.portLabel")} hint={t("settings.localAi.portHint")}>
+            <SettingsRow title={t("settings.localAi.portLabel")} hint={t("settings.localAi.portHint")}>
               <input
                 className="ff-localai-port-input"
                 type="number"
@@ -1212,16 +1222,16 @@ function LocalAiSettingsTab() {
                   }
                 }}
               />
-            </Row>
+            </SettingsRow>
             {isDesktop ? (
-              <Row title={t("settings.localAi.binaryPathLabel")} hint={t("settings.localAi.binaryPathHint")}>
+              <SettingsRow title={t("settings.localAi.binaryPathLabel")} hint={t("settings.localAi.binaryPathHint")}>
                 <input
                   className="ff-localai-url-input"
                   value={settings.serverBinaryPathOverride}
                   placeholder="llama-server"
                   onChange={(event) => updateSettings({ serverBinaryPathOverride: event.target.value })}
                 />
-              </Row>
+              </SettingsRow>
             ) : null}
           </>
         )}
@@ -1229,7 +1239,7 @@ function LocalAiSettingsTab() {
 
       {isDesktop && settings.launchMode !== "external" ? (
         <div className="ff-settings-card">
-          <Row
+          <SettingsRow
             title={t("settings.localAi.runtimeTitle")}
             hint={
               runtimeAsset
@@ -1257,7 +1267,7 @@ function LocalAiSettingsTab() {
                     : t("settings.localAi.runtimeInstallButton")}
               </button>
             )}
-          </Row>
+          </SettingsRow>
           {installingRuntime && downloadProgress?.modelId === SERVER_RUNTIME_DOWNLOAD_ID ? (
             <div className="ff-knowledge-index-actions">
               <span className="ff-knowledge-index-progress">
@@ -1288,18 +1298,18 @@ function LocalAiSettingsTab() {
 
       {isDesktop ? (
         <div className="ff-settings-card">
-          <Row title={t("settings.localAi.storageTitle")} hint={t("settings.localAi.storageHint")}>
+          <SettingsRow title={t("settings.localAi.storageTitle")} hint={t("settings.localAi.storageHint")}>
             <span className="ff-knowledge-path" title={modelsDir}>
               {modelsDir || "…"}
             </span>
-          </Row>
-          <Row title={t("settings.localAi.installedModelsTitle")} hint="">
+          </SettingsRow>
+          <SettingsRow title={t("settings.localAi.installedModelsTitle")} hint="">
             {installedModels.length === 0 ? (
               <span className="ff-knowledge-index-status">{t("settings.localAi.noInstalledModels")}</span>
             ) : (
               <span />
             )}
-          </Row>
+          </SettingsRow>
           {installedModels.length > 0 ? (
             <div className="ff-localai-model-list">
               {installedModels.map((file) => (
@@ -1363,14 +1373,14 @@ function TurnLogSettingsCard() {
         value={enabled}
         onChange={handleToggle}
       />
-      <Row title={t("settings.localAi.turnLog.storedTitle")} hint={t("settings.localAi.turnLog.storedHint")}>
+      <SettingsRow title={t("settings.localAi.turnLog.storedTitle")} hint={t("settings.localAi.turnLog.storedHint")}>
         <div className="ff-external-calendar-actions">
           <span className="ff-knowledge-index-status">{t("settings.localAi.turnLog.count", { n: count })}</span>
           <button type="button" className="ff-btn ff-btn-danger" onClick={() => setConfirmClear(true)} disabled={count === 0}>
             {t("settings.localAi.turnLog.clear")}
           </button>
         </div>
-      </Row>
+      </SettingsRow>
       <p className="ff-knowledge-privacy-note">{t("settings.localAi.turnLog.privacyNote")}</p>
 
       {confirmClear ? (
@@ -1431,7 +1441,7 @@ function LocalAiModelItem({
   );
 }
 
-function Row({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
+export function SettingsRow({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
   return (
     <div className="ff-settings-row">
       <div className="ff-settings-row-text">
@@ -1445,7 +1455,7 @@ function Row({ title, hint, children }: { title: string; hint: string; children:
 
 function Toggle({ label, hint, value, onChange }: { label: string; hint: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <Row title={label} hint={hint}>
+    <SettingsRow title={label} hint={hint}>
       <button
         type="button"
         role="switch"
@@ -1455,6 +1465,6 @@ function Toggle({ label, hint, value, onChange }: { label: string; hint: string;
       >
         <span className="ff-toggle-knob" />
       </button>
-    </Row>
+    </SettingsRow>
   );
 }

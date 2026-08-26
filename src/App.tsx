@@ -4,6 +4,7 @@ import { OllamaChat } from "./components/OllamaChat";
 import { TaskDetail } from "./components/TaskDetail";
 import { GlobalFocusBar } from "./components/GlobalFocusBar";
 import { UpdateChecker } from "./components/UpdateChecker";
+import { SettingsRow } from "./components/SettingsPage";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
@@ -1789,39 +1790,52 @@ function AccountSection({
   const [message, setMessage] = useState("");
 
   return (
-    <section className="settings-card account-card">
-      <div className="section-title">
-        <h2>{t("auth.accountTitle")}</h2>
-        <span>{auth.mode}</span>
-      </div>
-      {!auth.isConfigured ? (
-        <p className="empty-state">{t("auth.notConfigured")}</p>
-      ) : null}
-      {auth.isSignedIn ? (
-        <div className="account-stack">
-          <p>
-            {t("auth.signedInAs")} <strong>{auth.userEmail}</strong>
-          </p>
-          <div className="settings-actions">
-            <button onClick={onRefresh}>{t("auth.refreshCloud")}</button>
-            <button onClick={onSignOut}>{t("auth.logOut")}</button>
-          </div>
-        </div>
-      ) : (
-        <div className="account-stack">
-          <p className="empty-state">{t("auth.signInSubtitle")}</p>
-          <div className="settings-actions">
-            <button onClick={onOpenLogin} disabled={!auth.isConfigured || auth.isLoading}>
+    /* SETTINGS_REVIEW.md 3.1: this card kept the class names the rest of
+       Settings left behind — `settings-card`, `section-title`, `account-stack`
+       — so its five pieces spread across a 1326px row with nothing aligning
+       them, and the login screen's subtitle ("Your day starts here") was
+       showing as an empty state where it means nothing. */
+    <div className="ff-settings-card">
+      <SettingsRow
+        title={t("auth.accountTitle")}
+        hint={
+          auth.isSignedIn
+            ? `${t("auth.signedInAs")} ${auth.userEmail}`
+            : auth.isConfigured
+              ? auth.mode
+              : t("auth.notConfigured")
+        }
+      >
+        <div className="ff-settings-actions">
+          {auth.isSignedIn ? (
+            <>
+              <button type="button" className="ff-btn" onClick={onRefresh}>
+                {t("auth.refreshCloud")}
+              </button>
+              <button type="button" className="ff-btn" onClick={onSignOut}>
+                {t("auth.logOut")}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="ff-btn ff-btn-primary"
+              onClick={onOpenLogin}
+              disabled={!auth.isConfigured || auth.isLoading}
+            >
               {t("auth.logIn")} / {t("auth.signUp")}
             </button>
-          </div>
+          )}
         </div>
-      )}
+      </SettingsRow>
       {auth.migrationPreviewCount > 0 && auth.isSignedIn ? (
-        <div className="migration-box">
-          <strong>{t("auth.migrationCount", { n: auth.migrationPreviewCount })}</strong>
-          <p>{t("auth.migrationBody")}</p>
+        <SettingsRow
+          title={t("auth.migrationCount", { n: auth.migrationPreviewCount })}
+          hint={t("auth.migrationBody")}
+        >
           <button
+            type="button"
+            className="ff-btn"
             onClick={async () => {
               const success = await onUploadLocal();
               setMessage(success ? t("auth.uploadSuccess") : t("auth.uploadNoData"));
@@ -1829,12 +1843,12 @@ function AccountSection({
           >
             {t("auth.uploadLocal")}
           </button>
-        </div>
+        </SettingsRow>
       ) : null}
-      <p className="settings-message">{t(auth.syncStatus)}</p>
-      {auth.syncError ? <p className="settings-error">{auth.syncError}</p> : null}
-      {message ? <p className="settings-message">{message}</p> : null}
-    </section>
+      <p className="ff-settings-msg">{t(auth.syncStatus)}</p>
+      {auth.syncError ? <p className="ff-settings-msg is-error">{auth.syncError}</p> : null}
+      {message ? <p className="ff-settings-msg">{message}</p> : null}
+    </div>
   );
 }
 

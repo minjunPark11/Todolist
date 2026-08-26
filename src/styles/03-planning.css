@@ -1065,6 +1065,31 @@
 }
 .ff-import-btn { cursor: pointer; }
 .ff-settings-msg { color: var(--success); font-size: 13px; padding: 8px 0; }
+.ff-settings-msg.is-error { color: var(--danger, #d11); }
+
+/* SETTINGS_REVIEW.md Phase 2: a settings row is read left to right, and at
+   1326px the label and its control sat 1100px apart — the eye crossed an empty
+   field to connect them. macOS System Settings holds its column at about 700px
+   however wide the window is, for the same reason: this is a screen to read,
+   not one to fill. */
+.ff-settings-page {
+  max-width: 760px;
+  /* `.ff-page` centres itself with `margin: 0 auto`. Left-aligned here so the
+     column starts where Today, Spaces and Calendar start, rather than drifting
+     to the middle of a wide window while every other page hugs the rail. */
+  margin-right: auto;
+  margin-left: 0;
+}
+
+/* Buttons that share a row: the account card's Refresh + Log out, and Install +
+   Check for updates. */
+.ff-settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .ff-settings-error { color: var(--danger); font-size: 13px; margin: 0; }
 
 /* ===== Local AI settings ===== */
