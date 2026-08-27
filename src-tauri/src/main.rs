@@ -611,10 +611,51 @@ fn main() {
         ])
         .build(tauri::generate_context!())
         .expect("error while running FocusFlow desktop app")
-        .run(|app, event| {
+        .run(|app, event| match event {
+            // Closing the window hides it (see on_window_event), and only the
+            // tray's Quit really exits — that is what `force_quit` is for. On
+            // macOS there is a second way out that never reaches
+            // `CloseRequested`: Cmd+Q, the app menu's Quit and the Dock's Quit
+            // all raise `ExitRequested` instead. Without this arm the flag was
+            // never consulted on that path, so Cmd+Q killed a running focus
+            // session outright. Windows has no Cmd+Q, which is exactly why the
+            // hole only showed on a Mac.
+            //
+            // macOS only, deliberately. On Windows this event can also stand
+            // for the session ending — a shutdown or a sign-out — and
+            // preventing it there would mean an app that argues with the OS
+            // about logging off. The platform with the hole gets the patch.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::ExitRequested { api, code, .. } => {
+                let force_quit = app
+                    .state::<AppState>()
+                    .force_quit
+                    .lock()
+                    .map(|value| *value)
+                    .unwrap_or(false);
+                // `code` is `Some` when something asked to exit in code rather
+                // than a person asking — the tray's `app.exit(0)` and the
+                // updater's restart both arrive that way. Those are never
+                // second-guessed; only the keystroke is.
+                if force_quit || code.is_some() {
+                    return;
+                }
+                api.prevent_exit();
+                // Hidden as well, so Cmd+Q puts the app away the way the close
+                // button does. Preventing the exit and leaving the window on
+                // screen would read as a keystroke that did nothing.
+                //
+                // The mini timer is left alone: it is a second window the user
+                // opened on purpose to keep watching a session, and this
+                // gesture is about the main one.
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
             // The llama-server sidecar must never outlive the app.
-            if let tauri::RunEvent::Exit = event {
+            tauri::RunEvent::Exit => {
                 local_ai::shutdown_local_ai_server(app);
             }
+            _ => {}
         });
 }
