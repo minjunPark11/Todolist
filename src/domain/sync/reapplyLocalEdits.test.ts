@@ -62,6 +62,7 @@ const appSettings: AppSettings = {
   autoBackupKeep: 7,
   sidebarCollapsed: false,
   reduceMotion: false,
+  timezone: "Asia/Seoul",
   aiModel: "",
 };
 

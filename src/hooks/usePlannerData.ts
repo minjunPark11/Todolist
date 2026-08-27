@@ -142,6 +142,17 @@ const themeModes = ["light", "dark", "system"] as const;
 const fontSizes = ["small", "medium", "large"] as const;
 const languages = ["ko", "en"] as const;
 
+// Unlike the language default below, this is re-read on every start: it is
+// not a choice the user makes, and a stale one makes a reader outside the
+// browser wrong about what day it is. "" when the platform cannot say.
+function detectTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  } catch {
+    return "";
+  }
+}
+
 // First-run default only — the user's explicit choice always wins once saved.
 function detectDefaultLanguage(): Language {
   const browserLanguage = typeof navigator !== "undefined" ? navigator.language : "";
@@ -164,6 +175,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   autoBackupKeep: DEFAULT_BACKUP_KEEP,
   sidebarCollapsed: false,
   reduceMotion: false,
+  timezone: detectTimezone(),
   aiModel: "",
 };
 
@@ -459,6 +471,11 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
     // saved value survives untouched if sidebar counts are ever built.
     sidebarCollapsed: settings?.sidebarCollapsed ?? DEFAULT_APP_SETTINGS.sidebarCollapsed,
     reduceMotion: settings?.reduceMotion ?? DEFAULT_APP_SETTINGS.reduceMotion,
+    // A stored value wins here even when it disagrees with this device: the
+    // refresh effect owns correcting it, and doing it here instead would
+    // rewrite the field on every single load.
+    timezone:
+      typeof settings?.timezone === "string" && settings.timezone ? settings.timezone : DEFAULT_APP_SETTINGS.timezone,
     aiModel: typeof settings?.aiModel === "string" ? settings.aiModel : DEFAULT_APP_SETTINGS.aiModel,
   };
 }
@@ -921,6 +938,22 @@ export function usePlannerData() {
     };
   }, [data, remoteLoaded, userEmail]);
 
+  /**
+   * Keep `appSettings.timezone` honest.
+   *
+   * Runs after the remote load too, since that replaces appSettings with
+   * whatever the account holds — which may have been written by a device in
+   * another zone, or by a client that predates the field.
+   *
+   * Writes only on a real difference, so the usual case costs nothing: no
+   * state update, no save, no sync.
+   */
+  useEffect(() => {
+    const detected = detectTimezone();
+    if (!detected || detected === data.appSettings.timezone) return;
+    updateAppSettings({ timezone: detected });
+  }, [data.appSettings.timezone, remoteLoaded]);
+
   const selectedTask = useMemo(
     () => data.tasks.find((task) => task.id === selectedTaskId) ?? null,
     [data.tasks, selectedTaskId],
@@ -1045,6 +1078,12 @@ export function usePlannerData() {
       syncedSnapshotRef.current = loaded;
       setRemoteLoaded(true);
       setSyncStatus("sync.synced");
+      // "A device connected and agreed with the account at this moment."
+      // Deliberately not merged into the save path's stamp: this is the half
+      // that keeps a quiet week from reading as an offline week (see
+      // sync_state above). Fire-and-forget — the load has already succeeded
+      // and its result is on screen.
+      void stampLastSeen();
     } catch (error) {
       // A failure from a superseded load is not this load's failure to report:
       // showing it would put an error on screen while a good load is running.
@@ -1054,6 +1093,43 @@ export function usePlannerData() {
       setRemoteLoaded(false);
       setSyncError(message);
       setSyncStatus("sync.loadFailed");
+    }
+  }
+
+  /**
+   * Records that a device reached the account and agreed with it.
+   *
+   * Half of the `sync_state` row (see performSave, where the other half is
+   * written). Kept separate from the save path because it answers a different
+   * question: the save stamp says when the account last CHANGED, and this one
+   * says when a device last CHECKED — a week with no edits moves this and not
+   * that, which is the difference between a quiet week and an offline one.
+   *
+   * Merges rather than replaces, so it never clears `lastSyncedAt`. Any
+   * failure is dropped: the load it follows has already succeeded, and this
+   * going missing only makes the account look staler than it is.
+   */
+  async function stampLastSeen() {
+    if (!supabase) return;
+    try {
+      const userId = await getUserId();
+      if (!userId) return;
+      const { data: existing } = await supabase
+        .from("settings")
+        .select("data")
+        .eq("id", "sync_state")
+        .maybeSingle();
+      const previous = (existing?.data ?? {}) as Record<string, unknown>;
+      await supabase.from("settings").upsert(
+        {
+          id: "sync_state",
+          user_id: userId,
+          data: { ...previous, lastSeenAt: new Date().toISOString(), platform: platform.kind },
+        },
+        { onConflict: "id,user_id" },
+      );
+    } catch (error) {
+      console.warn("sync_state의 lastSeenAt을 기록하지 못했습니다.", error);
     }
   }
 
@@ -1147,6 +1223,49 @@ export function usePlannerData() {
       if (appSettingsError) {
         throw appSettingsError;
       }
+    }
+
+    /**
+     * When this account was last written to, and by what.
+     *
+     * A third row in `settings` beside "settings" and "app_settings", written
+     * only after every table above succeeded — so it says "the account is
+     * caught up as of this moment", not "a save was attempted".
+     *
+     * Two stamps, because one cannot answer the question on its own.
+     * `lastSyncedAt` moves when something is written; a user who changes
+     * nothing for a week leaves it a week old while the account is in fact
+     * current. `lastSeenAt` (written after a successful load, below) moves
+     * whenever a device connects and reconciles, which is what separates
+     * "nothing happened" from "this device has been offline".
+     *
+     * Whose question this answers: this app is local-first, and the account is
+     * a mirror that only runs while signed in. Anything reading the account
+     * without the device present cannot otherwise tell whether it is looking
+     * at today's data or at a snapshot from a week ago
+     * (FOCUSFLOW_EXTERNAL_AI_ACCESS_ARCHITECTURE.md M4, §11.2).
+     *
+     * A failure here is swallowed on purpose. The user's data is already
+     * safely written at this point, and metadata must never be the reason a
+     * save reports failure and retries. The cost of losing it is that the
+     * stamp reads older than it is, which errs toward "this may be stale" —
+     * the safe direction for anything acting on it.
+     */
+    const now = new Date().toISOString();
+    const { error: syncStateError } = await supabase.from("settings").upsert(
+      {
+        id: "sync_state",
+        user_id: userId,
+        data: {
+          lastSyncedAt: now,
+          lastSeenAt: now,
+          platform: platform.kind,
+        },
+      },
+      { onConflict: "id,user_id" },
+    );
+    if (syncStateError) {
+      console.warn("sync_state를 기록하지 못했습니다 (데이터 동기화 자체는 성공).", syncStateError);
     }
 
     // The account may have changed while the writes were in flight; the
