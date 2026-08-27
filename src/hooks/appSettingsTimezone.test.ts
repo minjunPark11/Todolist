@@ -21,7 +21,7 @@ vi.mock("../platform", () => ({
   },
 }));
 
-import { normalizeData } from "./usePlannerData";
+import { normalizeData } from "../domain/plannerData/normalize";
 
 beforeEach(() => store.clear());
 

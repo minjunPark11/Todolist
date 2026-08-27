@@ -23,7 +23,7 @@ vi.mock("../platform", () => ({
   },
 }));
 
-import { normalizeData } from "./usePlannerData";
+import { normalizeData } from "../domain/plannerData/normalize";
 import type { Task } from "../types";
 import { scheduleFromTask } from "../domain/schedule";
 

@@ -10,10 +10,11 @@
 // It used to live in localStorage under one blob per device, which meant a
 // plan made on the desktop was invisible on the laptop. These records sync
 // like every other collection.
+// Nothing here reads a device: the blob that used to be read inline is passed
+// in now, and the reading lives in ./legacyBucketOverrides. That keeps this
+// file runnable on a server, where the same planning rules answer an outside
+// AI (FOCUSFLOW_EXTERNAL_AI_ACCESS_ARCHITECTURE.md §7.2).
 import type { DailyPlanBucket, TaskDailyPlan } from "../../types";
-import { platform } from "../../platform";
-
-const LEGACY_OVERRIDES_KEY = "todayPage.bucketOverrides.v1";
 
 const BUCKETS: readonly DailyPlanBucket[] = ["now", "next", "later"];
 
@@ -158,19 +159,19 @@ export function prunePlansBefore(plans: TaskDailyPlan[], planDate: string): Task
   return kept.length === plans.length ? plans : kept;
 }
 
-interface LegacyOverrides {
+export interface LegacyOverrides {
   planDate: string;
   overrides: Record<string, DailyPlanBucket>;
 }
 
 /**
- * The device-local blob this replaces. Read, never written: once adopted the
- * records are the answer, and a client old enough to still write the blob is
- * one whose plan for that day is already in it.
+ * The device-local blob this replaces, read from wherever the caller found it.
+ * Read, never written: once adopted the records are the answer, and a client
+ * old enough to still write the blob is one whose plan for that day is already
+ * in it.
  */
-export function readLegacyBucketOverrides(): LegacyOverrides | null {
+export function parseLegacyBucketOverrides(raw: string | null): LegacyOverrides | null {
   try {
-    const raw = platform.storage.getSync(LEGACY_OVERRIDES_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { date?: unknown; overrides?: unknown };
     const planDate = typeof parsed.date === "string" ? parsed.date.trim() : "";
@@ -194,8 +195,8 @@ export function readLegacyBucketOverrides(): LegacyOverrides | null {
 export function adoptLegacyBucketOverrides(
   current: TaskDailyPlan[],
   now: string,
+  legacy: LegacyOverrides | null,
 ): TaskDailyPlan[] {
-  const legacy = readLegacyBucketOverrides();
   if (!legacy) return current;
   const known = new Set(current.map((plan) => plan.id));
   const added: TaskDailyPlan[] = [];

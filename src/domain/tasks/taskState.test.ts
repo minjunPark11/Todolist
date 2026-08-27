@@ -4,7 +4,7 @@ import { isActiveTask, isArchivedTask } from "../../utils/planner";
 import { selectActiveTasks, selectLiveTasks } from "./selectors";
 import { isTaskActive } from "./scopeQuery";
 import type { List, Task } from "../../types";
-import { normalizeData } from "../../hooks/usePlannerData";
+import { normalizeData } from "../plannerData/normalize";
 
 function task(over: Partial<Task> = {}): Task {
   return { id: "t1", title: "A task", status: "todo", projectId: "", listId: "l1", ...over } as Task;

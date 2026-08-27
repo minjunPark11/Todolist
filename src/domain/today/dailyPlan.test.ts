@@ -12,15 +12,17 @@ vi.mock("../../platform", () => ({
 
 import type { TaskDailyPlan } from "../../types";
 import {
-  adoptLegacyBucketOverrides,
   applyBucketOverrides,
   bucketOverridesFor,
   dailyPlanIdFor,
   planTaskForDate,
   prunePlansBefore,
-  readLegacyBucketOverrides,
   sanitizeDailyPlan,
 } from "./dailyPlan";
+import {
+  adoptStoredLegacyBucketOverrides,
+  readLegacyBucketOverrides,
+} from "./legacyBucketOverrides";
 
 const NOW = "2026-08-18T00:00:00.000Z";
 const LATER = "2026-08-18T09:00:00.000Z";
@@ -155,9 +157,9 @@ describe("the localStorage blob this replaces", () => {
   it("adopts what the account does not already hold", () => {
     storage.set(LEGACY_KEY, JSON.stringify({ date: TODAY, overrides: { t1: "later", t2: "now" } }));
     const synced = [plan()]; // t1 already arrived, saying "now"
-    const adopted = adoptLegacyBucketOverrides(synced, NOW);
+    const adopted = adoptStoredLegacyBucketOverrides(synced, NOW);
     expect(bucketOverridesFor(adopted, TODAY)).toEqual({ t1: "now", t2: "now" });
-    expect(adoptLegacyBucketOverrides(adopted, NOW)).toBe(adopted);
+    expect(adoptStoredLegacyBucketOverrides(adopted, NOW)).toBe(adopted);
   });
 });
 
