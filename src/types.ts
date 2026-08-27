@@ -1,3 +1,5 @@
+import type { FocusDefaultLength } from "./domain/focus/sessionLength";
+
 /**
  * A Goal, as it sits in storage.
  *
@@ -573,6 +575,16 @@ export interface AppSettings {
    * as a constant, so no existing account moves.
    */
   hoursAtATime: number;
+  /**
+   * How long a focus session runs when nothing more specific says
+   * (SETTINGS_REVIEW.md 4.5). See `domain/focus/sessionLength`.
+   *
+   * `"auto"` is the shipped value and keeps the inference the hook used to make
+   * inline — the task's own span, else 50 minutes for a high-priority task and
+   * 30 for the rest. It is the default so that an account which never opens the
+   * setting does not have its sessions quietly change length.
+   */
+  focusDefaultMinutes: FocusDefaultLength;
   showSidebarCounts: boolean;
   sidebarCollapsed: boolean;
   reduceMotion: boolean;

@@ -23,6 +23,8 @@ import {
   notificationHintKey,
 } from "../utils/notificationCopy";
 import { clampHoursAtATime, HOURS_AT_A_TIME_CHOICES } from "../utils/calendarTime";
+import { FOCUS_LENGTH_CHOICES, sanitizeFocusDefaultLength } from "../domain/focus/sessionLength";
+import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { installedFileMatchesModel } from "../lib/localAi/runtime";
 import type { ServerRuntimeAsset } from "../lib/localAi/serverRuntimeCatalog";
 import { recommendLocalModel } from "../lib/localAi/recommender";
@@ -73,6 +75,14 @@ interface SettingsPageProps {
   knowledgeSettings: KnowledgeSettings;
   onUpdateKnowledgeSettings: (patch: Partial<KnowledgeSettings>) => void;
   isKnowledgeDesktop: boolean;
+  /**
+   * The three that live in their own local store, not in `AppSettings`
+   * (SETTINGS_REVIEW.md 4.5). They are about this device — a browser tab title,
+   * an OS notification, a desktop-only window — so they stay unsynced. What
+   * moves here is where they are found, not where they are kept.
+   */
+  focusSettings: FocusUserSettings;
+  onUpdateFocusSettings: (patch: Partial<FocusUserSettings>) => void;
 }
 
 const ACCENTS: { id: AccentColor; color: string }[] = [
@@ -111,6 +121,8 @@ export function SettingsPage({
   knowledgeSettings,
   onUpdateKnowledgeSettings,
   isKnowledgeDesktop,
+  focusSettings,
+  onUpdateFocusSettings,
 }: SettingsPageProps) {
   const { t } = useT();
   const [tab, setTab] = useState<
@@ -119,6 +131,7 @@ export function SettingsPage({
     | "behavior"
     | "notifications"
     | "calendar"
+    | "focus"
     | "knowledge"
     | "localAi"
     | "data"
@@ -160,6 +173,7 @@ export function SettingsPage({
           ["behavior", t("settings.tabBehavior")],
           ["notifications", t("settings.tabNotifications")],
           ["calendar", t("settings.tabCalendar")],
+          ["focus", t("settings.tabFocus")],
           ["knowledge", t("settings.tabKnowledge")],
           ["localAi", t("settings.tabLocalAi")],
           ["data", t("settings.tabData")],
@@ -496,6 +510,46 @@ export function SettingsPage({
               </div>
             </div>
           </section>
+        </div>
+      ) : null}
+
+      {tab === "focus" ? (
+        <div className="ff-settings-card">
+          {/* The one row here that is an AppSettings value. The three below it
+              are per-device and stay in their own store; the reader is not
+              shown that seam because it is not theirs. */}
+          <SettingsRow title={t("settings.focus.defaultLength")} hint={t("settings.focus.defaultLengthHint")}>
+            <select
+              value={String(settings.focusDefaultMinutes)}
+              onChange={(e) => onUpdate({ focusDefaultMinutes: sanitizeFocusDefaultLength(e.target.value) })}
+            >
+              {FOCUS_LENGTH_CHOICES.map((choice) => (
+                <option key={String(choice)} value={String(choice)}>
+                  {choice === "auto"
+                    ? t("settings.focus.lengthAuto")
+                    : t("settings.focus.lengthMinutes", { count: choice })}
+                </option>
+              ))}
+            </select>
+          </SettingsRow>
+          <Toggle
+            label={t("focus.optionTabTitleTimer")}
+            hint={t("settings.focus.tabTitleTimerHint")}
+            value={focusSettings.showTabTitleTimer}
+            onChange={(v) => onUpdateFocusSettings({ showTabTitleTimer: v })}
+          />
+          <Toggle
+            label={t("focus.optionCompletionNotification")}
+            hint={t("settings.focus.completionNotificationHint")}
+            value={focusSettings.enableCompletionNotification}
+            onChange={(v) => onUpdateFocusSettings({ enableCompletionNotification: v })}
+          />
+          <Toggle
+            label={t("focus.optionMiniTimerButton")}
+            hint={t("settings.focus.miniTimerButtonHint")}
+            value={focusSettings.showMiniTimerButton}
+            onChange={(v) => onUpdateFocusSettings({ showMiniTimerButton: v })}
+          />
         </div>
       ) : null}
 

@@ -57,6 +57,7 @@ const appSettings: AppSettings = {
   timeFormat: "locale",
   weekStart: "sunday",
   hoursAtATime: 12,
+  focusDefaultMinutes: "auto",
   showSidebarCounts: true,
   sidebarCollapsed: false,
   reduceMotion: false,
