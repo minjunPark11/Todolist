@@ -1092,6 +1092,19 @@
 }
 .ff-settings-error { color: var(--danger); font-size: 13px; margin: 0; }
 
+/* SETTINGS_REVIEW.md 2: the tab bar is a flex item of `.ff-page`, and a flex
+   item's `display: inline-flex` is blockified — so `.ff-segmented` stretched to
+   the full column and its pill ran on past the last tab. The review saw 1326px
+   of it behind six tabs; Phase 2's column cap left 45px behind nine. A control
+   should end where its last segment does.
+
+   Not `width: fit-content`: below 680px the bar wraps, and fit-content would
+   then size it to the longest line rather than the column it wraps inside. */
+.ff-settings-page > .ff-segmented {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
 /* SETTINGS_REVIEW.md 6-1: the settings screen had only ever been measured at
    1440x900. Narrower, two things broke.
 

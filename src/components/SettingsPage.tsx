@@ -303,11 +303,27 @@ export function SettingsPage({
 
       {tab === "calendar" ? (
         <div className="ff-cal-settings-stack">
-          {/* SETTINGS_REVIEW.md 4.4. Here rather than beside the time format in
-              Appearance: that pair sits by Language because both follow it,
-              and this one follows nothing but the calendar. macOS files it the
-              same way — Calendar settings, not Language & Region. */}
-          <section className="ff-settings-card">
+          {/* SETTINGS_REVIEW.md 2 and 4.4. The row is here rather than beside
+              the time format in Appearance: that pair sits by Language because
+              both follow it, and this one follows nothing but the calendar.
+              macOS files it the same way — Calendar settings, not Language &
+              Region, where it is the General section this card stands in for.
+
+              The head is what §2 was actually about. Four cards in this column
+              carry one and this card did not, so a reader scanning titles down
+              the tab met them at two different left edges — x=20 here against
+              x=72 under an icon. Every card in a column that has any head needs
+              one. */}
+          <section className="ff-settings-card ff-cal-card">
+            <div className="ff-cal-card-head">
+              <span className="ff-cal-card-icon" aria-hidden="true">
+                <ClockIcon />
+              </span>
+              <div className="ff-cal-card-text">
+                <strong>{t("settings.calendar.generalTitle")}</strong>
+                <small>{t("settings.calendar.generalHint")}</small>
+              </div>
+            </div>
             <SettingsRow title={t("settings.calendar.hoursAtATime")} hint={t("settings.calendar.hoursAtATimeHint")}>
               <select
                 value={settings.hoursAtATime}
@@ -643,6 +659,15 @@ function GlobeIcon() {
     <svg viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="9" />
       <path d="M3 12h18M12 3c2.6 2.5 4 5.6 4 9s-1.4 6.5-4 9c-2.6-2.5-4-5.6-4-9s1.4-6.5 4-9z" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5.2l3.4 2" />
     </svg>
   );
 }

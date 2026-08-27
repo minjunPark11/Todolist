@@ -425,6 +425,8 @@ export const ko: Dictionary = {
   "localAi.warning.lowDisk": "저장공간이 부족할 수 있어요. 이 모델은 약 {{size}}GB가 필요해요 (여유 공간 {{free}}GB).",
   "localAi.warning.vram6": "VRAM 6GB 이상이 감지됐어요. 7B Q4 모델을 GPU 가속으로 실행할 수 있어요.",
   "localAi.warning.vram12": "VRAM 12GB 이상이 감지됐어요. 14B Q4 또는 고품질 8B 모델도 GPU 가속으로 쾌적하게 쓸 수 있어요.",
+  "settings.calendar.generalTitle": "일반",
+  "settings.calendar.generalHint": "캘린더가 하루를 그리는 방식.",
   "settings.calendar.hoursAtATime": "한 번에 표시할 시간",
   "settings.calendar.hoursAtATimeHint": "일간·주간 격자가 스크롤되기 전까지 담는 하루의 분량.",
   "settings.calendar.hoursOption": "{{count}}시간",

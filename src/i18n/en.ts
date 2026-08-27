@@ -430,6 +430,8 @@ export const en: Dictionary = {
   "localAi.warning.lowDisk": "Disk space may be tight. This model needs about {{size}}GB (you have {{free}}GB free).",
   "localAi.warning.vram6": "6GB+ VRAM detected. A 7B Q4 model can run GPU-accelerated.",
   "localAi.warning.vram12": "12GB+ VRAM detected. A 14B Q4 or high-quality 8B model will run smoothly on your GPU.",
+  "settings.calendar.generalTitle": "General",
+  "settings.calendar.generalHint": "How the calendar draws a day.",
   "settings.calendar.hoursAtATime": "Hours at a time",
   "settings.calendar.hoursAtATimeHint": "How much of the day the Day and Week grids fit before they scroll.",
   "settings.calendar.hoursOption": "{{count}} hours",
