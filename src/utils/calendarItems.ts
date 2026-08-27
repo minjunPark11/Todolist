@@ -2,14 +2,23 @@
 // Shared by the CalendarView renderers (month, week, popover).
 import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Task, TaskPriority } from "../types";
 import { projectItems } from "../domain/view/item";
-import { externalEventDate, externalEventEndDate, externalEventEndTime, externalEventStartTime } from "../lib/externalCalendars";
+// Straight from ./ics rather than through lib/externalCalendars, which
+// re-exports these but drags a platform (and so a browser) in behind them.
+// Calendar items are built on a server too now (§7.2 of the external-AI doc).
+import {
+  externalEventDate,
+  externalEventEndDate,
+  externalEventEndTime,
+  externalEventStartTime,
+  localDateTimeParts,
+} from "../lib/ics/parse";
 import { expandIcsOccurrences } from "../lib/ics/recurrence";
 import {
   externalCategoryId,
   FOCUS_ACTUAL_CATEGORY_ID,
   FOCUS_ACTUAL_COLOR,
   type CalendarCategory,
-} from "../lib/calendarCategories";
+} from "../lib/calendar/categoryModel";
 import { scheduleSpan } from "../domain/schedule/scheduleQueries";
 import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { addDays, todayValue } from "./date";
@@ -91,10 +100,22 @@ function localTimeOf(date: Date): string {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-export function splitFocusSegmentByDay(startAt: string, endAt: string): FocusSegmentPart[] {
+export function splitFocusSegmentByDay(
+  startAt: string,
+  endAt: string,
+  /**
+   * Whose midnight the segment is cut at. Absent means this device's, which is
+   * every existing caller. A server passes the viewer's zone: a session that
+   * ran 23:30–00:30 in Seoul is two days there and one day in London, and the
+   * machine happening to run in UTC is not an argument for either.
+   */
+  timezone?: string,
+): FocusSegmentPart[] {
   const start = new Date(startAt);
   const end = new Date(endAt);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return [];
+
+  if (timezone) return splitByZonedDay(startAt, endAt, timezone);
 
   const parts: FocusSegmentPart[] = [];
   let cursor = start;
@@ -114,6 +135,42 @@ export function splitFocusSegmentByDay(startAt: string, endAt: string): FocusSeg
     cursor = dayEnd;
   }
   return parts;
+}
+
+/**
+ * The same cut, made by walking DATES rather than instants.
+ *
+ * Advancing a day by adding 24 hours to a timestamp is what a zone breaks: on
+ * the two DST days a year that is 23 or 25 hours, and the parts drift by one.
+ * Reading both ends in the viewer's zone first and then stepping the calendar
+ * date has no such arithmetic in it.
+ */
+function splitByZonedDay(startAt: string, endAt: string, timezone: string): FocusSegmentPart[] {
+  const from = localDateTimeParts(startAt, undefined, timezone);
+  const to = localDateTimeParts(endAt, undefined, timezone);
+  const parts: FocusSegmentPart[] = [];
+
+  let date = from.date;
+  // 7-day cap as a runaway guard against corrupted timestamps, as above.
+  for (let i = 0; i < 7 && date <= to.date; i += 1) {
+    const startTime = date === from.date ? from.time ?? "00:00" : "00:00";
+    let endTime = date === to.date ? to.time ?? "24:00" : "24:00";
+    if (endTime <= startTime) {
+      // A sub-minute stretch still gets a visible sliver, and a segment ending
+      // exactly at midnight belongs to the day it ran in, not to the next one.
+      if (date === to.date && date !== from.date) break;
+      endTime = startTime >= "23:59" ? "24:00" : bumpMinute(startTime);
+    }
+    parts.push({ date, startTime, endTime });
+    date = addDays(date, 1);
+  }
+  return parts;
+}
+
+function bumpMinute(time: string): string {
+  const [hours, minutes] = time.split(":").map(Number);
+  const next = hours * 60 + minutes + 1;
+  return `${String(Math.floor(next / 60)).padStart(2, "0")}:${String(next % 60).padStart(2, "0")}`;
 }
 
 export interface BuildCalendarItemsInput {
@@ -138,6 +195,15 @@ export interface BuildCalendarItemsInput {
    * should pass one.
    */
   externalCalendarRange?: { from: string; to: string };
+  /**
+   * Whose "local" the external events are read in.
+   *
+   * On a device the answer is the device, which is what the absent case still
+   * means. A server has no meaningful local: reading a UTC-anchored meeting in
+   * the machine's zone puts a 9 a.m. call on the wrong day for anyone east of
+   * it, so the caller passes the viewer's zone (§7.2, M1).
+   */
+  viewerTimezone?: string;
   // Completed sessions become read-only "actual focus time" blocks.
   focusSessions?: FocusSession[];
   layers: CalendarLayerToggles;
@@ -155,6 +221,7 @@ export function buildCalendarItems({
   externalCalendars = [],
   externalCalendarEvents = [],
   externalCalendarRange,
+  viewerTimezone,
   focusSessions = [],
   layers,
   categories,
@@ -277,7 +344,7 @@ export function buildCalendarItems({
   );
 
   const externalOccurrences = externalCalendarRange
-    ? expandIcsOccurrences(externalCalendarEvents, externalCalendarRange)
+    ? expandIcsOccurrences(externalCalendarEvents, externalCalendarRange, { viewerTimezone })
     : externalCalendarEvents;
 
   for (const event of externalOccurrences) {
@@ -288,10 +355,10 @@ export function buildCalendarItems({
     // All-day events can span several days (DTEND is exclusive per RFC 5545):
     // emit one chip per covered day so the whole range shows in the all-day
     // band, capped at 62 days as a runaway guard.
-    const startDate = externalEventDate(event);
+    const startDate = externalEventDate(event, viewerTimezone);
     const dates = [startDate];
     if (event.allDay) {
-      const endDate = externalEventEndDate(event);
+      const endDate = externalEventEndDate(event, viewerTimezone);
       let cursor = startDate;
       while (endDate && dates.length < 62) {
         const next = addDays(cursor, 1);
@@ -310,8 +377,8 @@ export function buildCalendarItems({
         externalCalendarName: calendar.name,
         title: event.title,
         date,
-        startTime: externalEventStartTime(event),
-        endTime: externalEventEndTime(event),
+        startTime: externalEventStartTime(event, viewerTimezone),
+        endTime: externalEventEndTime(event, viewerTimezone),
         allDay: event.allDay,
         color: calendar.color,
         categoryId: eventCategoryId,
@@ -333,7 +400,7 @@ export function buildCalendarItems({
         // Breaks are rest, not executed plan time.
         if (session.mode !== "focus") continue;
         session.segments.forEach((segment, index) => {
-          for (const part of splitFocusSegmentByDay(segment.startAt, segment.endAt)) {
+          for (const part of splitFocusSegmentByDay(segment.startAt, segment.endAt, viewerTimezone)) {
             items.push({
               key: `focus:${session.id}:${index}:${part.date}`,
               layer: "focus-actual",

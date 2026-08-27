@@ -2,6 +2,14 @@
 // hosts) do not send CORS headers, so the browser cannot fetch them directly;
 // the client falls back to GET /api/ics?url=<encoded> which fetches
 // server-side and relays the calendar text.
+//
+// `isBlockedHost` below is duplicated in src/server/net/icsFetch.ts, which the
+// server data layer uses. Two copies of a security rule is one too many: this
+// file is plain JavaScript because Vercel runs it directly, so it cannot
+// import the TypeScript one until Phase 4 brings a build into api/. Until
+// then, src/server/net/icsFetch.test.ts asserts that both copies still block
+// the same host families — if you change one, that test tells you about the
+// other.
 
 const MAX_ICS_BYTES = 5_000_000;
 
