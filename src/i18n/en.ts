@@ -132,6 +132,13 @@ export const en: Dictionary = {
   "shell.chrome": "Sidebar controls",
   "shell.resizeSidebar": "Resize sidebar",
 
+  // The app-drawn window caption (WindowTitleBar.tsx). Icon-only buttons, so
+  // these are the accessible names as well as the tooltips.
+  "window.minimize": "Minimize",
+  "window.maximize": "Maximize",
+  "window.restore": "Restore down",
+  "window.close": "Close",
+
   // ---- App.tsx chrome ----
   // The sidebar box searches everything; the Today header box only filters
   // the lists on that page. The two placeholders have to say which is which.

@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { FloatingLayerProvider } from "./components/floating";
 import { MiniFocusTimerWindow } from "./components/MiniFocusTimerWindow";
+import { WindowTitleBar } from "./components/shell/WindowTitleBar";
+import { isTauriRuntime } from "./platform/tauri";
 import "./styles.css";
 
 // The desktop mini-timer window is flagged by an initialization script
@@ -28,6 +30,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
          mini-timer window is its own root with no floating UI, so it is
          deliberately left out. */
       <FloatingLayerProvider>
+        {/* Outside App and above every route it can return: the login and
+            recovery gates render before the shell exists, and the window has
+            to stay draggable and closable there too. The mini-timer window is
+            its own root below and keeps the system decorations, so it never
+            gets one. */}
+        {isTauriRuntime() ? <WindowTitleBar /> : null}
         <App />
       </FloatingLayerProvider>
     )}

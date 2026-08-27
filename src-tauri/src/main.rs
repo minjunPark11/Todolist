@@ -178,6 +178,10 @@ fn show_main_window(app: &tauri::AppHandle) {
         .title("FocusFlow")
         .inner_size(1280.0, 820.0)
         .min_inner_size(980.0, 680.0)
+        // Matches tauri.conf.json: the app draws its own caption row
+        // (WindowTitleBar.tsx), so a window rebuilt on this fallback path must
+        // not come back wearing the system one.
+        .decorations(false)
         .build()
     else {
         return;

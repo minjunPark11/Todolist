@@ -131,6 +131,13 @@ export const ko: Dictionary = {
   "shell.chrome": "사이드바 컨트롤",
   "shell.resizeSidebar": "사이드바 너비 조절",
 
+  // 앱이 직접 그리는 창 캡션(WindowTitleBar.tsx). 아이콘뿐이라 이 문자열이
+  // 툴팁이자 접근성 이름이다.
+  "window.minimize": "최소화",
+  "window.maximize": "최대화",
+  "window.restore": "이전 크기로",
+  "window.close": "닫기",
+
   // ---- App.tsx chrome ----
   // 사이드바는 전체 검색, Today 헤더는 그 페이지 목록 필터. en.ts 주석 참고.
   "app.searchPlaceholder": "전체 검색  /",
