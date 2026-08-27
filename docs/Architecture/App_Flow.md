@@ -8,7 +8,7 @@
 4. `App.tsx` 내부 `activePage` 상태가 현재 화면을 결정한다.
 5. `Sidebar`에서 `onNavigate(page)`가 호출되면 `activePage`가 변경된다.
 6. 각 페이지 컴포넌트는 `planner` hook에서 받은 데이터와 mutation 함수를 props로 받는다.
-7. `OllamaChat`은 모든 페이지 위에 floating assistant로 렌더링된다.
+7. (제거됨 2026-08-27) AI 어시스턴트 패널이 모든 페이지 위에 렌더링되던 자리.
 
 ## URL 경로와 인증 (2026-07-02 갱신)
 
@@ -39,7 +39,9 @@
 - legacy migration: `todo-planner-data`에서 읽어 canonical status로 변환
 - optional remote sync: `C:\Users\minju\Todolist\src\services\supabaseClient.ts`와 `C:\Users\minju\Todolist\supabase\migrations\` (001 기본 schema, 002 study 테이블)
 
-## AI 흐름
+## AI 흐름 (제거됨 — 2026-08-27, `LOCAL_AI_REMOVAL_DESIGN.md`)
+
+아래는 기록이다. 이 경로의 코드는 모두 삭제되었다.
 
 1. `C:\Users\minju\Todolist\src\components\OllamaChat.tsx`에서 사용자 입력 수신
 2. `detectAgentIntent()`로 intent 추정
@@ -66,7 +68,7 @@
 - 구현됨: AI action execution 로직은 `C:\Users\minju\Todolist\src\app\executeAgentActions.ts`로 분리했다.
 - 개선 필요: `AppPages.tsx`가 아직 모든 page switch를 한 파일에 모으고 있으므로, 다음 단계에서는 feature별 route group으로 더 나눌 수 있다.
 
-## 2차 AI Gateway 정리 결과
+## 2차 AI Gateway 정리 결과 (기록 — 기능 자체가 제거됨)
 
 - 구현됨: `C:\Users\minju\Todolist\src\components\OllamaChat.tsx`는 AI provider를 직접 호출하지 않는다.
 - 구현됨: `OllamaChat.tsx` -> `C:\Users\minju\Todolist\src\lib\ai\agent\personalAgent.ts` -> `C:\Users\minju\Todolist\src\lib\ai\gateway.ts` -> provider 순서로 호출한다.

@@ -1,11 +1,6 @@
 node_modules/
 dist/
 src-tauri/target/
-# Local AI: never commit GGUF models or llama-server sidecar binaries
-# (see LOCAL_AI_SYSTEM_DESIGN.md, src-tauri/binaries/README.md)
-*.gguf
-src-tauri/binaries/*
-!src-tauri/binaries/README.md
 .env
 .env.*
 !.env.example

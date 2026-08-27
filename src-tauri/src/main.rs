@@ -2,8 +2,6 @@
 // Debug builds keep the console so logs remain visible.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod local_ai;
-
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
@@ -13,7 +11,6 @@ use tauri::{
     tray::TrayIconBuilder,
     Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
-use tauri_plugin_fs::FsExt;
 
 const TRAY_ID: &str = "focusflow-tray";
 const MINI_TIMER_WINDOW: &str = "focus-mini-timer";
@@ -178,6 +175,10 @@ fn show_main_window(app: &tauri::AppHandle) {
         .title("FocusFlow")
         .inner_size(1280.0, 820.0)
         .min_inner_size(980.0, 680.0)
+        // Matches tauri.conf.json: the app draws its own caption row
+        // (WindowTitleBar.tsx), so a window rebuilt on this fallback path must
+        // not come back wearing the system one.
+        .decorations(false)
         .build()
     else {
         return;
@@ -329,28 +330,6 @@ fn close_focus_mini_timer(app: tauri::AppHandle) {
     close_mini_timer_window(&app);
 }
 
-// The fs plugin denies all paths by default (see capabilities/default.json,
-// which grants the read commands but no static scope). This command extends
-// the runtime scope to exactly the folder the user picked via the dialog
-// plugin, so the knowledge-base feature can only ever read a directory the
-// user explicitly chose — never an arbitrary filesystem path.
-#[tauri::command]
-fn grant_vault_read_access(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    app.fs_scope()
-        .allow_directory(&path, true)
-        .map_err(|error| error.to_string())
-}
-
-// Creates the app data directory that holds the knowledge-base sqlite index.
-// The fs plugin denies mkdir outside its static scope (the frontend can't
-// create $APPDATA), so directory creation for our own data dir happens here in
-// Rust — same trust model as models_dir/grant_vault_read_access.
-#[tauri::command]
-fn ensure_knowledge_db_dir(app: tauri::AppHandle) -> Result<(), String> {
-    let dir = app.path().app_data_dir().map_err(|error| error.to_string())?;
-    std::fs::create_dir_all(&dir).map_err(|error| error.to_string())
-}
-
 // ---------------------------------------------------------------------------
 // Automatic backups (SETTINGS_REVIEW.md 4.6)
 //
@@ -362,8 +341,7 @@ fn ensure_knowledge_db_dir(app: tauri::AppHandle) -> Result<(), String> {
 // purpose. The frontend never names a directory: it hands over the contents and
 // a retention count, and the only writable path this exposes is one fixed
 // folder holding files this code named itself. Widening it would take a code
-// change, not a settings change — the same trust model as models_dir and
-// ensure_knowledge_db_dir.
+// change, not a settings change.
 const BACKUP_DIR: &str = "backups";
 const BACKUP_PREFIX: &str = "focusflow-";
 const BACKUP_SUFFIX: &str = ".json";
@@ -493,8 +471,6 @@ fn write_backup(
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
-        .manage(local_ai::LocalAiDownloadState::default())
-        .manage(local_ai::LocalAiRuntimeState::default())
         // Must be registered first: a second launch (e.g. reopening from the
         // shortcut while an instance lingers in the tray) would otherwise spawn
         // a duplicate window whose WebView2 fails to init against the locked
@@ -503,14 +479,11 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_main_window(app);
         }))
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_sql::Builder::default().build())
         .setup(|app| {
             let menu = build_tray_menu(app.handle(), None)?;
             #[allow(unused_mut)]
@@ -586,32 +559,14 @@ fn main() {
             open_focus_mini_timer,
             dispatch_focus_tray_action,
             close_focus_mini_timer,
-            grant_vault_read_access,
-            ensure_knowledge_db_dir,
             get_backups_dir,
             list_backups,
             read_backup,
-            write_backup,
-            local_ai::get_local_ai_hardware_profile,
-            local_ai::get_local_ai_models_dir,
-            local_ai::list_local_ai_models,
-            local_ai::get_local_ai_runtime_status,
-            local_ai::download_local_ai_model,
-            local_ai::cancel_local_ai_download,
-            local_ai::delete_local_ai_model,
-            local_ai::start_local_ai_server,
-            local_ai::stop_local_ai_server,
-            local_ai::start_local_ai_embedding_server,
-            local_ai::stop_local_ai_embedding_server,
-            local_ai::get_local_ai_embedding_runtime_status,
-            local_ai::is_local_ai_server_installed,
-            local_ai::get_local_ai_server_runtime_version,
-            local_ai::install_local_ai_server,
-            local_ai::get_local_ai_platform
+            write_backup
         ])
         .build(tauri::generate_context!())
         .expect("error while running FocusFlow desktop app")
-        .run(|app, event| match event {
+        .run(|_app, event| match event {
             // Closing the window hides it (see on_window_event), and only the
             // tray's Quit really exits — that is what `force_quit` is for. On
             // macOS there is a second way out that never reaches
@@ -627,7 +582,7 @@ fn main() {
             // about logging off. The platform with the hole gets the patch.
             #[cfg(target_os = "macos")]
             tauri::RunEvent::ExitRequested { api, code, .. } => {
-                let force_quit = app
+                let force_quit = _app
                     .state::<AppState>()
                     .force_quit
                     .lock()
@@ -648,13 +603,9 @@ fn main() {
                 // The mini timer is left alone: it is a second window the user
                 // opened on purpose to keep watching a session, and this
                 // gesture is about the main one.
-                if let Some(window) = app.get_webview_window("main") {
+                if let Some(window) = _app.get_webview_window("main") {
                     let _ = window.hide();
                 }
-            }
-            // The llama-server sidecar must never outlive the app.
-            tauri::RunEvent::Exit => {
-                local_ai::shutdown_local_ai_server(app);
             }
             _ => {}
         });

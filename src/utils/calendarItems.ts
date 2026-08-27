@@ -1,8 +1,9 @@
 // Calendar derived-item model (CALENDAR_DESIGN.md §1.3/§1.4).
-// Shared by CalendarView rendering and the Ollama calendar context builder.
+// Shared by the CalendarView renderers (month, week, popover).
 import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Task, TaskPriority } from "../types";
 import { projectItems } from "../domain/view/item";
 import { externalEventDate, externalEventEndDate, externalEventEndTime, externalEventStartTime } from "../lib/externalCalendars";
+import { expandIcsOccurrences } from "../lib/ics/recurrence";
 import {
   externalCategoryId,
   FOCUS_ACTUAL_CATEGORY_ID,
@@ -127,6 +128,16 @@ export interface BuildCalendarItemsInput {
   lists?: List[];
   externalCalendars?: ExternalCalendar[];
   externalCalendarEvents?: ExternalCalendarEvent[];
+  /**
+   * The days worth drawing, so a repeating event can be expanded into the
+   * occurrences that fall inside them (`lib/ics/recurrence`).
+   *
+   * Optional, and its absence is not free: without a range there is nothing to
+   * expand within, so a weekly meeting draws once — on the day it was first
+   * created — and every other week reads as empty. Callers drawing a calendar
+   * should pass one.
+   */
+  externalCalendarRange?: { from: string; to: string };
   // Completed sessions become read-only "actual focus time" blocks.
   focusSessions?: FocusSession[];
   layers: CalendarLayerToggles;
@@ -143,6 +154,7 @@ export function buildCalendarItems({
   lists = [],
   externalCalendars = [],
   externalCalendarEvents = [],
+  externalCalendarRange,
   focusSessions = [],
   layers,
   categories,
@@ -264,7 +276,11 @@ export function buildCalendarItems({
       .map((calendar) => [calendar.id, calendar]),
   );
 
-  for (const event of externalCalendarEvents) {
+  const externalOccurrences = externalCalendarRange
+    ? expandIcsOccurrences(externalCalendarEvents, externalCalendarRange)
+    : externalCalendarEvents;
+
+  for (const event of externalOccurrences) {
     const calendar = externalCalendarById.get(event.externalCalendarId);
     if (!calendar) continue;
     const eventCategoryId = categories ? externalCategoryId(calendar.id) : "";

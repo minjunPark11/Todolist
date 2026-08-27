@@ -1,5 +1,8 @@
 # FocusFlow 현재 결과물 상세 명세
 
+> 📌 이 문서는 과거 커밋 시점의 스냅샷입니다. 여기 적힌 AI/Ollama 관련 내용은
+> 2026-08-27에 앱에서 모두 제거되었습니다 (`LOCAL_AI_REMOVAL_DESIGN.md`).
+
 검토 기준: `codex/new_design` 브랜치의 최신 커밋 `a554f80 designed` 기준.  
 앱 이름은 화면상 `FocusFlow`이며, React 18 + Vite + TypeScript로 만든 개인 생산성/학습 관리 앱이다. 기본 저장소는 `localStorage`이고, Supabase 환경변수가 있을 때 계정 기반 동기화가 활성화된다.
 

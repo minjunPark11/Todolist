@@ -1,5 +1,8 @@
 # User Patterns (대화 기록 → 패턴 분석 → 메모리)
 
+> ⛔ **폐기됨 (2026-08-27).** 이 문서가 설명하는 기능은 앱에서 제거되었습니다.
+> 제거 범위는 `LOCAL_AI_REMOVAL_DESIGN.md`를 보세요. 아래 내용은 기록입니다.
+
 > 상태: **슬라이스 A 구현됨** (2026-07-09). B/C는 설계만.
 > `memory/types.ts`의 `AiMemoryEntry`/`AiMemoryStore` seam(선행 선언)을 채우는 기능.
 > outcomeLog.ts 주석의 "future memory builder"가 바로 이 문서의 3층이다.

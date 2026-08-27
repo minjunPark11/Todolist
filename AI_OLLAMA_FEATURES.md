@@ -1,5 +1,9 @@
 # FocusFlow AI 기능 문서
 
+> ⛔ **폐기됨 (2026-08-27).** 이 문서가 설계한 기능은 앱에서 제거되었습니다.
+> 제거 범위와 이유는 `LOCAL_AI_REMOVAL_DESIGN.md`를 보세요. 아래 내용은 기록으로만 남깁니다.
+
+
 > 상태: **Phase 4 반영 완료** (2026-07-06)
 > 관련 설계: `LOCAL_AI_SYSTEM_DESIGN.md`, `KNOWLEDGE_BASE_DESIGN.md`
 

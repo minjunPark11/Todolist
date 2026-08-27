@@ -22,7 +22,7 @@
 // covers a row to save a column the user can already drag to any width was not
 // worth the overlap. Below the desktop breakpoint the sidebar is still a drawer
 // with a menu button of its own; that is a different control and it stays.
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   CONTEXT_SIDEBAR_ID,
   CONTEXT_SIDEBAR_MAX_WIDTH,
@@ -43,6 +43,19 @@ interface AppShellProps {
 export function AppShell({ rail, sidebar, children }: AppShellProps) {
   const { t } = useT();
   const hasSidebar = sidebar.mode !== "none";
+
+  // The width the grid tracks are built from, republished on the root element
+  // for the one part of the app drawn OUTSIDE this frame: the window caption
+  // (WindowTitleBar.tsx). It continues these columns across the top 32px of
+  // the window, so it has to know where the sidebar ends. Which page surface
+  // follows it is a CSS question and stays in CSS (`:root:has(.tm-shell)`).
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--frame-sidebar-w", `${sidebar.effectiveWidth}px`);
+    return () => {
+      root.style.removeProperty("--frame-sidebar-w");
+    };
+  }, [sidebar.effectiveWidth]);
 
   return (
     <div

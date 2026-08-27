@@ -502,3 +502,213 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ============================================================================
+   The app-drawn window caption (WindowTitleBar.tsx)
+   ============================================================================
+   `decorations: false` in tauri.conf.json took the system title bar off the
+   main window; these rules put the app in its place. Everything here is keyed
+   on `[data-window-chrome="custom"]`, which only the desktop bar sets, so the
+   browser build and the e2e suite lay out exactly as before.
+
+   The point of the whole block is that the caption row must not be a BAR. It
+   reserves 32px at the top and then lets the columns underneath paint it:
+   the Rail already does (it is `height: 100dvh` starting at y=0, so its own
+   background reaches the window edge), and `.window-titlebar-fill` continues
+   the other two.
+   ============================================================================ */
+
+:root {
+  /* 0 by default so every `calc()` below is a no-op wherever the app is not
+     drawing its own caption. The bar itself sets 32px on the element and the
+     root copy here is what the layout rules read. */
+  --titlebar-h: 0px;
+  /* The colour the caption row continues to the right of the Context Sidebar.
+     Two shells, two page surfaces: the Tasks Module's `.tm-shell` is
+     `var(--bg)` and the legacy `.app-shell > main` is `var(--bg-app)`.
+     The sidebar MODE does not answer which is on screen — measured in the
+     running app, /app renders the legacy shell with the Tasks sidebar in it —
+     so the rule below asks the document which shell it actually has. */
+  --titlebar-surface: var(--bg-app);
+}
+
+:root[data-window-chrome="custom"] {
+  --titlebar-h: 32px;
+}
+
+:root:has(.tm-shell) {
+  --titlebar-surface: var(--bg);
+}
+
+/* --- what the caption row costs the layout ------------------------------- */
+
+/* The Rail keeps its 16px of air ABOVE its first item, measured from the
+   window edge as before — the caption is added to it rather than replacing
+   it, or the first icon ends up under the drag region. */
+[data-window-chrome="custom"] .app-frame .global-rail {
+  padding-top: calc(16px + var(--titlebar-h));
+}
+
+/* Everything that is not the Rail starts below the caption. The body is the
+   one place to say it: both shells hang off it. */
+[data-window-chrome="custom"] .app-frame-body {
+  padding-top: var(--titlebar-h);
+}
+
+/* ...and both shells size themselves against the viewport, so both have to
+   give the same 32px back. Without this the Tasks Module is 100dvh tall
+   inside a body pushed 32px down and the whole page grows a scrollbar. */
+[data-window-chrome="custom"] .app-frame .tm-shell {
+  height: calc(100dvh - var(--titlebar-h));
+}
+
+[data-window-chrome="custom"] .app-frame .app-shell {
+  min-height: calc(100vh - var(--titlebar-h));
+}
+
+[data-window-chrome="custom"] .app-frame .app-shell > main {
+  min-height: calc(100vh - var(--titlebar-h));
+}
+
+/* --- the caption row itself ---------------------------------------------- */
+
+.window-titlebar {
+  /* `display: contents` and not a fixed box of its own: a positioned parent
+     would be a stacking context, and the fill and the buttons have to land on
+     OPPOSITE sides of the modal backdrop (z 60) — dimmed with the app, and
+     clickable above it. Boxed into one layer they cannot. The element is left
+     in the tree only to carry `--titlebar-h` down to the three children. */
+  display: contents;
+}
+
+/* The paint. Below the app's own layers, so a dialog dims it with everything
+   else; there is never any content up here for it to cover, because the rules
+   above moved it all down. */
+.window-titlebar-fill {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: var(--titlebar-h);
+  pointer-events: none;
+  /* Where the columns are, in the caption row's own terms. The Rail is off
+     screen below 768px (§2.39) and the persistent sidebar exists at >=1024px
+     only (§3.33), so the fill has to lose the same segments at the same
+     widths — a column it draws that is not there is exactly the seam this
+     whole block exists to remove. `--frame-sidebar-w` is published on the
+     root by AppShell, from the number the grid tracks use. */
+  --tb-rail-w: var(--rail-w);
+  --tb-sidebar-w: var(--frame-sidebar-w, 0px);
+  --tb-divider-w: 1px;
+  /* The seam that used to be a title bar, in one declaration: transparent
+     over the Rail (which paints itself, being 100dvh from y=0), the sidebar's
+     colour over the sidebar, its 1px divider exactly where the divider is,
+     and the page's surface over the page. Hard stops throughout, so nothing
+     fades between two column colours. */
+  background: linear-gradient(
+    to right,
+    transparent 0 var(--tb-rail-w),
+    var(--bg-context-sidebar) var(--tb-rail-w) calc(var(--tb-rail-w) + var(--tb-sidebar-w)),
+    var(--ff-border) calc(var(--tb-rail-w) + var(--tb-sidebar-w))
+      calc(var(--tb-rail-w) + var(--tb-sidebar-w) + var(--tb-divider-w)),
+    var(--titlebar-surface) calc(var(--tb-rail-w) + var(--tb-sidebar-w) + var(--tb-divider-w))
+      100%
+  );
+}
+
+/* Below 1024 the Tasks Module's sidebar is an overlay sheet, not a column
+   (sidebarPresentationFor: mobile and tablet), so there is nothing at the left
+   for the caption to continue. */
+@media (max-width: 1023px) {
+  .window-titlebar-fill {
+    --tb-sidebar-w: 0px;
+    /* No sidebar means no divider either — at 375px it was drawing a 1px
+       line down the left edge of the caption with nothing under it. */
+    --tb-divider-w: 0px;
+  }
+}
+
+/* ...except on the legacy shell, which keeps its column down to 900px, at the
+   200px 02-calendar.css narrows it to rather than the resizable width — the
+   `.app-frame .app-shell` track rule that reads `--context-sidebar-w` starts
+   at 1024. The desktop window's minimum is 980px wide, so this band is 44px of
+   window widths and reachable: a caption that drew no sidebar in it would put
+   the seam back exactly where a person is dragging the window edge. */
+@media (min-width: 901px) and (max-width: 1023px) {
+  :root:has(.app-shell) .window-titlebar-fill {
+    --tb-sidebar-w: 200px;
+    --tb-divider-w: 1px;
+  }
+}
+
+@media (max-width: 767px) {
+  .window-titlebar-fill {
+    --tb-rail-w: 0px;
+  }
+}
+
+.window-titlebar-drag {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--titlebar-h);
+  /* Above the content, below the buttons. Dragging is the only thing the row
+     does with the space the buttons do not use. */
+  z-index: 70;
+  /* A caption is chrome: dragging across it must not select the text of a
+     header that ends up beside it. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.window-titlebar-buttons {
+  position: fixed;
+  top: 0;
+  right: 0;
+  display: flex;
+  height: var(--titlebar-h);
+  /* Above every layer the app has (the highest in the stylesheets is 1600):
+     minimize, maximize and close are the OS's promise, and a popover or a
+     dialog that covered them would leave a window that can only be closed
+     from the taskbar. */
+  z-index: 2000;
+}
+
+.window-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 46x32 — Windows' own caption metrics, so the buttons sit where the hand
+     already goes and the pointer keeps the same travel it had. */
+  width: 46px;
+  height: var(--titlebar-h);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ff-text, #1c1c1e);
+  cursor: default;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.window-button:hover {
+  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
+}
+
+.window-button:active {
+  background: var(--bg-pressed, rgba(25, 25, 25, 0.12));
+}
+
+/* The one place the system colours win over ours: #e81123 on close is what
+   Windows itself draws, and a user checks that colour before clicking. */
+.window-button.is-close:hover,
+.window-button.is-close:active {
+  background: #e81123;
+  color: #ffffff;
+}
+
+.window-button:focus-visible {
+  outline: 2px solid var(--ff-blue);
+  outline-offset: -2px;
+}

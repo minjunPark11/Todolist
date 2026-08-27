@@ -1,6 +1,5 @@
 ﻿import { FormEvent, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { OllamaChat } from "./components/OllamaChat";
 import { TaskDetail } from "./components/TaskDetail";
 import { GlobalFocusBar } from "./components/GlobalFocusBar";
 import { UpdateChecker } from "./components/UpdateChecker";
@@ -33,15 +32,10 @@ import { TasksSidebarSlot } from "./components/shell/TasksSidebarSlot";
 import { childrenOf } from "./domain/tasks/children";
 import { checkItemsForTask } from "./domain/tasks/checkItems";
 import { taskActivity } from "./domain/tasks/activity";
-import { executeAgentActions } from "./app/executeAgentActions";
-import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
 import { useAutoBackup } from "./app/useAutoBackup";
 import { useDataPortability } from "./app/useDataPortability";
 import { dismissToast, enqueueToast, type QueuedToast } from "./lib/toastQueue";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
-import { useKnowledgeAutoIndex } from "./lib/knowledge/useKnowledgeAutoIndex";
-import { useKnowledgeSettings } from "./lib/knowledge/useKnowledgeSettings";
-import { useLocalAiAutostart } from "./lib/localAi/runtime";
 import { popUndo, pushUndo } from "./lib/undoStack";
 import { reducedTransition, transitions } from "./motion/transitions";
 import { pageVariants } from "./motion/variants";
@@ -118,16 +112,6 @@ function mergeExternalCalendars(local: ExternalCalendar[], remote: ExternalCalen
 export default function App() {
   const planner = usePlannerData();
   const appSettings = planner.appSettings;
-  // Single instance shared by the Settings "지식베이스" tab and OllamaChat so a
-  // vault connection made in Settings is immediately visible to the chat panel
-  // (both are mounted for the app's whole lifetime, not remounted on nav).
-  const knowledge = useKnowledgeSettings();
-  // Phase 4: auto-syncs the Full-mode index on app start and on vault file
-  // changes; no-ops entirely unless Full mode is enabled and connected.
-  useKnowledgeAutoIndex(knowledge.settings);
-  // Pre-warms the managed llama-server, but only when the user picked
-  // "앱 시작 시 미리 실행" in Local AI settings (default is on-demand).
-  useLocalAiAutostart();
   // Renders before the <I18nProvider> below exists in the tree, so this can't
   // use the useT() context hook — call the plain translate() helper instead.
   const t = (key: string, vars?: Record<string, string | number>) => translate(appSettings.language, key, vars);
@@ -194,12 +178,6 @@ export default function App() {
    * it is in the URL — which is exactly what separates it from `/search`.
    */
   const [menuOpen, setMenuOpen] = useState(false);
-  /**
-   * V-4: the AI panel's open state lives here rather than inside the panel,
-   * because the Rail button that opens it has to be able to say that it is
-   * open (§11.24) — the same thing Search does one row above it.
-   */
-  const [aiChatOpen, setAiChatOpen] = useState(false);
   // §10.41's other half: the menu captures a title, Quick Add commits it. Held
   // here rather than in the Module because the menu is above the Module now.
   const [capturedTitle, setCapturedTitle] = useState("");
@@ -1052,35 +1030,6 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  /**
-   * V-4 moved the entry point into the Rail, and the Rail is above both
-   * shells — so the panel it opens has to be too. It used to be rendered
-   * inside the legacy branch alone, which meant the FAB simply did not exist
-   * on the Tasks Module's ten routes. A Rail button that opened nothing on
-   * half the app is the version of this bug that would have shipped.
-   */
-  function renderAiChat() {
-    return (
-      <OllamaChat
-        open={aiChatOpen}
-        onOpenChange={setAiChatOpen}
-        activePage={activePage}
-        knowledgeSettings={knowledge.settings}
-        aiContext={buildAiContextInput({ planner, appSettings, currentPage: activePage })}
-        calendarContext={{ tasks: visibleTasks }}
-        onExecuteActions={(actions) =>
-          executeAgentActions(actions, {
-            tasks: planner.tasks,
-            projects: planner.projects,
-            createTask: planner.createTask,
-            addSubtask: planner.addSubtask,
-            updateTask: planner.updateTask,
-          })
-        }
-      />
-    );
-  }
-
   function renderCommandMenu() {
     if (!menuOpen) return null;
     return (
@@ -1174,8 +1123,6 @@ export default function App() {
         onNavigate={navigateRail}
         onOpenSearch={openGlobalSearch}
         searchOpen={menuOpen}
-        onOpenAi={() => setAiChatOpen((open) => !open)}
-        aiOpen={aiChatOpen}
       />
     );
   }
@@ -1359,7 +1306,6 @@ export default function App() {
             the route (D-25). It is `position: fixed`, so where it lands on
             screen owes nothing to which grid it was rendered inside. */}
         {renderCommandMenu()}
-        {renderAiChat()}
         </AppShell>
       </I18nProvider>
     );
@@ -1431,9 +1377,6 @@ export default function App() {
         onDisableCalendarShare={() => void disableCurrentCalendarShare()}
         onRegenerateCalendarShare={() => void regenerateCalendarShare()}
         onPublishCalendarShare={() => void publishCurrentCalendarShare()}
-        knowledgeSettings={knowledge.settings}
-        onUpdateKnowledgeSettings={knowledge.updateSettings}
-        isKnowledgeDesktop={knowledge.isDesktop}
         accountSlot={
           <AccountSection
             auth={planner.auth}
@@ -1517,7 +1460,6 @@ export default function App() {
         onStop={(sessionId) => stopFocusWithNotification(sessionId, false)}
         settings={focusSettings}
       />
-      {renderAiChat()}
       <AppModals
         pendingDeleteTaskId={pendingDeleteTaskId}
         pendingResetAllData={pendingResetAllData}

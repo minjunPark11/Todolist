@@ -601,9 +601,25 @@ export interface AppSettings {
   autoBackupKeep: number;
   sidebarCollapsed: boolean;
   reduceMotion: boolean;
-  // Legacy Ollama model preference. No UI sets it since the managed
-  // llama-server replaced Ollama chat (LOCAL_AI_SYSTEM_DESIGN.md Phase 4);
-  // kept so synced settings from older clients still normalize cleanly.
+  /**
+   * The device's IANA time zone, e.g. "Asia/Seoul". "" = not detected.
+   *
+   * Not a preference — a fact about where the app is running, refreshed on
+   * every start when it changes (usePlannerData). A person who flies keeps
+   * one time zone at a time, so the device used last is the best answer.
+   *
+   * Here rather than in device-local storage on purpose, and it is the one
+   * exception to the rule that path- and device-shaped values stay off the
+   * account: every date in this app is a bare "YYYY-MM-DD" in local wall
+   * time, so anything reading the account WITHOUT a browser attached cannot
+   * tell what "today" means. Nothing does yet; the external-AI design
+   * (FOCUSFLOW_EXTERNAL_AI_ACCESS_ARCHITECTURE.md M1) is what needs it.
+   */
+  timezone: string;
+  // Dead field from the removed AI assistant (LOCAL_AI_REMOVAL_DESIGN.md).
+  // No UI reads or writes it. Kept for one more release so settings synced
+  // from a client that still has the feature normalize cleanly instead of
+  // failing the shape check.
   aiModel: string;
 }
 
@@ -625,6 +641,26 @@ export interface ExternalCalendar {
   updatedAt: string;
 }
 
+/**
+ * An `RRULE`, reduced to the parts this app expands (§9.2.1 of
+ * FOCUSFLOW_EXTERNAL_AI_ACCESS_ARCHITECTURE.md).
+ *
+ * Not every part of RFC 5545 — a rule using one this cannot honour is refused
+ * whole by `parseRRule` rather than approximated, so a meeting shows once on
+ * the day it was created instead of on a dozen wrong days.
+ */
+export interface IcsRecurrence {
+  freq: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+  interval: number;
+  /** Total occurrences, the master included. Absent = unbounded. */
+  count?: number;
+  /** Last date the rule may produce, already normalised by `parseIcsDate`. */
+  until?: string;
+  /** `["MO","WE"]`. Ordinal forms like `2MO` are dropped, not guessed at. */
+  byDay?: string[];
+  byMonthDay?: number[];
+}
+
 export interface ExternalCalendarEvent {
   id: string;
   externalCalendarId: string;
@@ -640,6 +676,22 @@ export interface ExternalCalendarEvent {
   readOnly: true;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set on the ONE record that carries a repeating event's rule. Occurrences
+   * produced from it do not have it — the rule belongs to the series, not to a
+   * date the series produced (`lib/ics/recurrence`).
+   */
+  recurrence?: IcsRecurrence;
+  /** Occurrences the organiser cancelled, as `EXDATE` gave them. */
+  exdates?: string[];
+  /**
+   * Present when this record REPLACES one occurrence of a series — the
+   * meeting that moved to Thursday that week. Names the occurrence it stands
+   * in for, which is not necessarily the day it now falls on.
+   */
+  recurrenceId?: string;
+  /** Set on an expanded occurrence: the UID of the series it came from. */
+  occurrenceOf?: string;
 }
 
 // Loose shape for seed/imported/persisted data before normalization: every

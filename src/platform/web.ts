@@ -4,21 +4,13 @@ import {
   updateMiniFocusTimer,
   type MiniFocusTimerSnapshot,
 } from "../lib/miniFocusTimer";
-import type { PlatformAdapter, PlatformFileEntry } from "./types";
-
-function filesUnsupported(): never {
-  throw new Error("Local file access is only available in the desktop app.");
-}
+import type { PlatformAdapter } from "./types";
 
 function backupsUnsupported(): never {
   // Not a silent no-op: a backup that quietly did not happen is worse than one
   // that says it cannot. There is no honest web version either — a copy inside
   // the origin's own storage dies with the data it was meant to outlive.
   throw new Error("Automatic backups are only available in the desktop app.");
-}
-
-function localAiUnsupported(): never {
-  throw new Error("Local AI runtime is only available in the desktop app.");
 }
 
 function compareVersions(a: string, b: string) {
@@ -148,36 +140,6 @@ export const webPlatform: PlatformAdapter = {
     window.open(url, "_blank", "noopener,noreferrer");
   },
 
-  files: {
-    supported() {
-      return false;
-    },
-    async pickFolder() {
-      return null;
-    },
-    async grantAccess() {
-      filesUnsupported();
-    },
-    async scanMarkdownFiles(): Promise<PlatformFileEntry[]> {
-      filesUnsupported();
-    },
-    async readTextFile() {
-      filesUnsupported();
-    },
-    async getFileMetadata() {
-      filesUnsupported();
-    },
-    async getDefaultKnowledgeDbPath() {
-      filesUnsupported();
-    },
-    async ensureKnowledgeDbDir() {
-      filesUnsupported();
-    },
-    async watchVault() {
-      filesUnsupported();
-    },
-  },
-
   backups: {
     supported() {
       return false;
@@ -196,63 +158,6 @@ export const webPlatform: PlatformAdapter = {
     },
     async reveal() {
       return backupsUnsupported();
-    },
-  },
-
-  localAi: {
-    supported() {
-      return false;
-    },
-    async getHardwareProfile() {
-      localAiUnsupported();
-    },
-    async getModelsDir() {
-      localAiUnsupported();
-    },
-    async listInstalledModels() {
-      localAiUnsupported();
-    },
-    async getRuntimeStatus() {
-      localAiUnsupported();
-    },
-    async downloadModel() {
-      localAiUnsupported();
-    },
-    async cancelDownload() {
-      localAiUnsupported();
-    },
-    async deleteModel() {
-      localAiUnsupported();
-    },
-    async subscribeDownloadProgress() {
-      return () => undefined;
-    },
-    async startServer() {
-      localAiUnsupported();
-    },
-    async stopServer() {
-      localAiUnsupported();
-    },
-    async startEmbeddingServer() {
-      localAiUnsupported();
-    },
-    async stopEmbeddingServer() {
-      localAiUnsupported();
-    },
-    async getEmbeddingRuntimeStatus() {
-      localAiUnsupported();
-    },
-    async getPlatform() {
-      localAiUnsupported();
-    },
-    async isServerInstalled() {
-      return false;
-    },
-    async getServerRuntimeVersion() {
-      return null;
-    },
-    async installServer() {
-      localAiUnsupported();
     },
   },
 };

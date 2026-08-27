@@ -1,5 +1,9 @@
 # 공간(Spaces) AI 브리핑 재설계 (하이브리드)
 
+> ⛔ **폐기됨 (2026-08-27).** 이 문서가 설계한 기능은 앱에서 제거되었습니다.
+> 제거 범위와 이유는 `LOCAL_AI_REMOVAL_DESIGN.md`를 보세요. 아래 내용은 기록으로만 남깁니다.
+
+
 > 상태: **설계 확정** (2026-07-06) · 구현 전 문서
 > 대상: FocusFlow 데스크톱/웹 — Spaces 페이지의 "AI 브리핑" 영역
 > 관련 코드: `src/components/SpacesPage.tsx`, `src/lib/ai/*`, `src/utils/todayView.ts`

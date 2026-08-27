@@ -1,5 +1,8 @@
 # FocusFlow 전체 기능 & 플로우 문서
 
+> 📌 이 문서는 과거 커밋 시점의 스냅샷입니다. 여기 적힌 AI/Ollama 관련 내용은
+> 2026-08-27에 앱에서 모두 제거되었습니다 (`LOCAL_AI_REMOVAL_DESIGN.md`).
+
 기준: 브랜치 `claude/ollama-local-setup-6enkbr` (커밋 `babbcd3 add ai` 시점)의 현재 코드.
 
 이 문서는 지금 이 GitHub 저장소에 실제로 구현되어 있는 **모든 기능**이 어떤 파일에서, 어떤 흐름으로 동작하는지 하나씩 정리한다. `CURRENT_PRODUCT_SPEC.md`는 더 이전 커밋(`a554f80`) 기준의 "재구현용 명세서"이고, 이 문서는 **AI/Ollama, Calendar, Habits, Focus, Dashboard까지 포함한 현재 시점의 전체 그림**을 다룬다.

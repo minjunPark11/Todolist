@@ -1,5 +1,8 @@
 # AI Assistant
 
+> ⛔ **폐기됨 (2026-08-27).** 이 문서가 설명하는 기능은 앱에서 제거되었습니다.
+> 제거 범위는 `LOCAL_AI_REMOVAL_DESIGN.md`를 보세요. 아래 내용은 기록입니다.
+
 ## 관련 파일
 
 - `C:\Users\minju\Todolist\src\components\OllamaChat.tsx`
