@@ -351,6 +351,145 @@ fn ensure_knowledge_db_dir(app: tauri::AppHandle) -> Result<(), String> {
     std::fs::create_dir_all(&dir).map_err(|error| error.to_string())
 }
 
+// ---------------------------------------------------------------------------
+// Automatic backups (SETTINGS_REVIEW.md 4.6)
+//
+// The app is local-first and had only a manual "Export JSON", so an emptied
+// localStorage left nothing to go back to. These write real files under the app
+// data dir, which is what survives clearing site data.
+//
+// They live in Rust rather than behind an `fs:allow-write-*` capability on
+// purpose. The frontend never names a directory: it hands over the contents and
+// a retention count, and the only writable path this exposes is one fixed
+// folder holding files this code named itself. Widening it would take a code
+// change, not a settings change — the same trust model as models_dir and
+// ensure_knowledge_db_dir.
+const BACKUP_DIR: &str = "backups";
+const BACKUP_PREFIX: &str = "focusflow-";
+const BACKUP_SUFFIX: &str = ".json";
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BackupFile {
+    name: String,
+    path: String,
+    size: u64,
+    // Milliseconds since the epoch, to match Date.now() on the other side.
+    modified_at: u64,
+}
+
+fn backups_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join(BACKUP_DIR);
+    std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
+    Ok(dir)
+}
+
+// A name is only ever one this code generated. Anything else — a separator, a
+// parent hop, a different extension — is refused rather than sanitised, because
+// there is no legitimate caller that would send one.
+fn backup_file_path(app: &tauri::AppHandle, name: &str) -> Result<std::path::PathBuf, String> {
+    let looks_like_ours = name.starts_with(BACKUP_PREFIX)
+        && name.ends_with(BACKUP_SUFFIX)
+        && !name.contains('/')
+        && !name.contains('\\')
+        && !name.contains("..");
+    if !looks_like_ours {
+        return Err(format!("not a backup file name: {name}"));
+    }
+    Ok(backups_dir(app)?.join(name))
+}
+
+fn read_backup_entries(dir: &std::path::Path) -> Result<Vec<BackupFile>, String> {
+    let mut entries: Vec<BackupFile> = Vec::new();
+    for entry in std::fs::read_dir(dir).map_err(|error| error.to_string())? {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.starts_with(BACKUP_PREFIX) || !name.ends_with(BACKUP_SUFFIX) {
+            continue;
+        }
+        let metadata = match entry.metadata() {
+            Ok(metadata) if metadata.is_file() => metadata,
+            _ => continue,
+        };
+        let modified_at = metadata
+            .modified()
+            .ok()
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|delta| delta.as_millis() as u64)
+            .unwrap_or(0);
+        entries.push(BackupFile {
+            name,
+            path: entry.path().to_string_lossy().to_string(),
+            size: metadata.len(),
+            modified_at,
+        });
+    }
+    // Newest first. The name carries a sortable timestamp, so it is the tie
+    // break when two files share a modified time.
+    entries.sort_by(|a, b| b.modified_at.cmp(&a.modified_at).then(b.name.cmp(&a.name)));
+    Ok(entries)
+}
+
+#[tauri::command]
+fn get_backups_dir(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(backups_dir(&app)?.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn list_backups(app: tauri::AppHandle) -> Result<Vec<BackupFile>, String> {
+    read_backup_entries(&backups_dir(&app)?)
+}
+
+#[tauri::command]
+fn read_backup(app: tauri::AppHandle, name: String) -> Result<String, String> {
+    std::fs::read_to_string(backup_file_path(&app, &name)?).map_err(|error| error.to_string())
+}
+
+// `stamp` is formatted by the caller so the file name matches the reader's own
+// clock rather than whatever the OS reports here. `keep` is how many files
+// survive, newest first; 0 means keep them all.
+#[tauri::command]
+fn write_backup(
+    app: tauri::AppHandle,
+    contents: String,
+    stamp: String,
+    keep: usize,
+) -> Result<BackupFile, String> {
+    let dir = backups_dir(&app)?;
+    let name = format!("{BACKUP_PREFIX}{stamp}{BACKUP_SUFFIX}");
+    let path = backup_file_path(&app, &name)?;
+    std::fs::write(&path, contents.as_bytes()).map_err(|error| error.to_string())?;
+
+    // Prune after writing, never before: a failed write must not have already
+    // cost the oldest copy.
+    if keep > 0 {
+        let entries = read_backup_entries(&dir)?;
+        for stale in entries.iter().skip(keep) {
+            let _ = std::fs::remove_file(&stale.path);
+        }
+    }
+
+    let metadata = std::fs::metadata(&path).map_err(|error| error.to_string())?;
+    Ok(BackupFile {
+        name,
+        path: path.to_string_lossy().to_string(),
+        size: metadata.len(),
+        modified_at: metadata
+            .modified()
+            .ok()
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|delta| delta.as_millis() as u64)
+            .unwrap_or(0),
+    })
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(AppState::default())
@@ -449,6 +588,10 @@ fn main() {
             close_focus_mini_timer,
             grant_vault_read_access,
             ensure_knowledge_db_dir,
+            get_backups_dir,
+            list_backups,
+            read_backup,
+            write_backup,
             local_ai::get_local_ai_hardware_profile,
             local_ai::get_local_ai_models_dir,
             local_ai::list_local_ai_models,

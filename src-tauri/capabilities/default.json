@@ -11,6 +11,7 @@
     },
     "notification:default",
     "opener:default",
+    "opener:allow-reveal-item-in-dir",
     "updater:default",
     "process:default",
     "dialog:allow-open",

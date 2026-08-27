@@ -248,8 +248,14 @@
 }
 
 /* Settings > 캘린더 (card layout) */
+/* SETTINGS_REVIEW.md 2: `minmax(0, 1fr)` and not the implicit `auto` track.
+   A grid item's `min-width` is `auto`, so an `auto` track resolves to the
+   widest item's min-content and the whole stack blows past its column — 324px
+   of track inside a 311px column at 375px wide, which put all five cards 13px
+   outside the page. Nothing here needs to be wider than the column it sits in. */
 .ff-cal-settings-stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -868,3 +874,27 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* SETTINGS_REVIEW.md 2, at the breakpoint Phase 7 measured. The card head is
+   one flex line — icon, text, actions — and `flex-shrink: 0` on the actions
+   means a narrow column pushes the button out of the card rather than moving
+   it. On a stacked row the control already goes below its label and to the
+   left; a section head is the same shape one size up, so it does the same.
+
+   The basis is the column minus the icon and its gap, which is what forces the
+   line to break rather than letting the text shrink toward nothing under
+   `min-width: 0`. */
+@media (max-width: 680px) {
+  .ff-cal-card-head {
+    flex-wrap: wrap;
+  }
+
+  .ff-cal-card-text {
+    flex-basis: calc(100% - 52px);
+  }
+
+  .ff-cal-card-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}

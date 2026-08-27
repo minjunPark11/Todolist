@@ -59,6 +59,7 @@ import {
 } from "../domain/tasks/templates";
 import { clampHoursAtATime, HOURS_AT_A_TIME } from "../utils/calendarTime";
 import { focusSessionMinutes, sanitizeFocusDefaultLength } from "../domain/focus/sessionLength";
+import { DEFAULT_BACKUP_KEEP, sanitizeBackupInterval, sanitizeBackupKeep } from "../domain/backup/schedule";
 import {
   migrateReminders,
   planReminderRows,
@@ -159,7 +160,8 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   weekStart: "sunday",
   hoursAtATime: HOURS_AT_A_TIME,
   focusDefaultMinutes: "auto",
-  showSidebarCounts: true,
+  autoBackup: "off",
+  autoBackupKeep: DEFAULT_BACKUP_KEEP,
   sidebarCollapsed: false,
   reduceMotion: false,
   aiModel: "",
@@ -450,7 +452,11 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
     // nearest hour we can draw, not back at the default.
     hoursAtATime: clampHoursAtATime(settings?.hoursAtATime),
     focusDefaultMinutes: sanitizeFocusDefaultLength(settings?.focusDefaultMinutes),
-    showSidebarCounts: settings?.showSidebarCounts ?? DEFAULT_APP_SETTINGS.showSidebarCounts,
+    autoBackup: sanitizeBackupInterval(settings?.autoBackup),
+    autoBackupKeep: sanitizeBackupKeep(settings?.autoBackupKeep),
+    // `showSidebarCounts` was here (SETTINGS_REVIEW.md 3.4). It is not migrated
+    // away or deleted from stored records: the M0 spread above carries it, so a
+    // saved value survives untouched if sidebar counts are ever built.
     sidebarCollapsed: settings?.sidebarCollapsed ?? DEFAULT_APP_SETTINGS.sidebarCollapsed,
     reduceMotion: settings?.reduceMotion ?? DEFAULT_APP_SETTINGS.reduceMotion,
     aiModel: typeof settings?.aiModel === "string" ? settings.aiModel : DEFAULT_APP_SETTINGS.aiModel,

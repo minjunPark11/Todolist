@@ -15,7 +15,7 @@ import {
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { MiniFocusTimerSnapshot } from "../lib/miniFocusTimer";
 import type {
   HardwareProfile,
@@ -26,6 +26,7 @@ import type {
 } from "../lib/localAi/types";
 import { webPlatform } from "./web";
 import type {
+  BackupFile,
   FocusTrayActionPayload,
   PlatformAdapter,
   PlatformFileEntry,
@@ -272,6 +273,30 @@ export const tauriPlatform: PlatformAdapter = {
 
     async watchVault(path, onChange) {
       return watchFs([path], () => onChange(), { recursive: true, delayMs: 2000 });
+    },
+  },
+
+  // SETTINGS_REVIEW.md 4.6. Every call is a Rust command: the frontend never
+  // names a directory, so this surface cannot be pointed anywhere else.
+  backups: {
+    supported() {
+      return true;
+    },
+    async dir() {
+      return invoke<string>("get_backups_dir");
+    },
+    async list() {
+      return invoke<BackupFile[]>("list_backups");
+    },
+    async read(name) {
+      return invoke<string>("read_backup", { name });
+    },
+    async write(contents, stamp, keep) {
+      return invoke<BackupFile>("write_backup", { contents, stamp, keep });
+    },
+    async reveal() {
+      const dir = await invoke<string>("get_backups_dir");
+      await revealItemInDir(dir);
     },
   },
 

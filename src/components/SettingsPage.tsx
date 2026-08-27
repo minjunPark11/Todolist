@@ -24,6 +24,13 @@ import {
 } from "../utils/notificationCopy";
 import { clampHoursAtATime, HOURS_AT_A_TIME_CHOICES } from "../utils/calendarTime";
 import { FOCUS_LENGTH_CHOICES, sanitizeFocusDefaultLength } from "../domain/focus/sessionLength";
+import {
+  BACKUP_INTERVALS,
+  BACKUP_KEEP_CHOICES,
+  sanitizeBackupInterval,
+  sanitizeBackupKeep,
+} from "../domain/backup/schedule";
+import type { AutoBackupState } from "../app/useAutoBackup";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { installedFileMatchesModel } from "../lib/localAi/runtime";
 import type { ServerRuntimeAsset } from "../lib/localAi/serverRuntimeCatalog";
@@ -83,6 +90,8 @@ interface SettingsPageProps {
    */
   focusSettings: FocusUserSettings;
   onUpdateFocusSettings: (patch: Partial<FocusUserSettings>) => void;
+  /** SETTINGS_REVIEW.md 4.6 — the runner's state, so Data can report it. */
+  autoBackup: AutoBackupState;
 }
 
 const ACCENTS: { id: AccentColor; color: string }[] = [
@@ -123,8 +132,9 @@ export function SettingsPage({
   isKnowledgeDesktop,
   focusSettings,
   onUpdateFocusSettings,
+  autoBackup,
 }: SettingsPageProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [tab, setTab] = useState<
     | "account"
     | "appearance"
@@ -279,12 +289,6 @@ export function SettingsPage({
             onChange={(v) => onUpdate({ showCompletedInToday: v })}
           />
           <Toggle
-            label={t("settings.showSidebarCounts")}
-            hint={t("settings.showSidebarCountsHint")}
-            value={settings.showSidebarCounts}
-            onChange={(v) => onUpdate({ showSidebarCounts: v })}
-          />
-          <Toggle
             label={t("settings.confirmBeforeDelete")}
             hint={t("settings.confirmBeforeDeleteHint")}
             value={settings.confirmBeforeDelete}
@@ -303,11 +307,27 @@ export function SettingsPage({
 
       {tab === "calendar" ? (
         <div className="ff-cal-settings-stack">
-          {/* SETTINGS_REVIEW.md 4.4. Here rather than beside the time format in
-              Appearance: that pair sits by Language because both follow it,
-              and this one follows nothing but the calendar. macOS files it the
-              same way — Calendar settings, not Language & Region. */}
-          <section className="ff-settings-card">
+          {/* SETTINGS_REVIEW.md 2 and 4.4. The row is here rather than beside
+              the time format in Appearance: that pair sits by Language because
+              both follow it, and this one follows nothing but the calendar.
+              macOS files it the same way — Calendar settings, not Language &
+              Region, where it is the General section this card stands in for.
+
+              The head is what §2 was actually about. Four cards in this column
+              carry one and this card did not, so a reader scanning titles down
+              the tab met them at two different left edges — x=20 here against
+              x=72 under an icon. Every card in a column that has any head needs
+              one. */}
+          <section className="ff-settings-card ff-cal-card">
+            <div className="ff-cal-card-head">
+              <span className="ff-cal-card-icon" aria-hidden="true">
+                <ClockIcon />
+              </span>
+              <div className="ff-cal-card-text">
+                <strong>{t("settings.calendar.generalTitle")}</strong>
+                <small>{t("settings.calendar.generalHint")}</small>
+              </div>
+            </div>
             <SettingsRow title={t("settings.calendar.hoursAtATime")} hint={t("settings.calendar.hoursAtATimeHint")}>
               <select
                 value={settings.hoursAtATime}
@@ -565,6 +585,70 @@ export function SettingsPage({
 
       {tab === "data" ? (
         <>
+          {/* SETTINGS_REVIEW.md 4.6. Above export and import because those are
+              things the reader does, and this is the one that happens without
+              them. The file it writes IS the export format, so the restore path
+              is the Import row below — there is no second reader to keep
+              correct. */}
+          <div className="ff-settings-card">
+            <SettingsRow
+              title={t("settings.backup.auto")}
+              hint={autoBackup.supported ? t("settings.backup.autoHint") : t("settings.backup.desktopOnly")}
+            >
+              <select
+                value={settings.autoBackup}
+                disabled={!autoBackup.supported}
+                onChange={(e) => onUpdate({ autoBackup: sanitizeBackupInterval(e.target.value) })}
+              >
+                {BACKUP_INTERVALS.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`settings.backup.interval.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </SettingsRow>
+            {autoBackup.supported && settings.autoBackup !== "off" ? (
+              <SettingsRow title={t("settings.backup.keep")} hint={t("settings.backup.keepHint")}>
+                <select
+                  value={settings.autoBackupKeep}
+                  onChange={(e) => onUpdate({ autoBackupKeep: sanitizeBackupKeep(e.target.value) })}
+                >
+                  {BACKUP_KEEP_CHOICES.map((count) => (
+                    <option key={count} value={count}>
+                      {t("settings.backup.keepCount", { count })}
+                    </option>
+                  ))}
+                </select>
+              </SettingsRow>
+            ) : null}
+            {autoBackup.supported ? (
+              <SettingsRow
+                title={t("settings.backup.last")}
+                hint={
+                  autoBackup.error
+                    ? t("settings.backup.failed", { reason: autoBackup.error })
+                    : autoBackup.lastAt
+                      ? new Date(autoBackup.lastAt).toLocaleString(lang)
+                      : t("settings.backup.never")
+                }
+              >
+                <div className="ff-settings-actions">
+                  <button type="button" className="ff-btn" onClick={() => void platform.backups.reveal()}>
+                    {t("settings.backup.openFolder")}
+                  </button>
+                  <button
+                    type="button"
+                    className="ff-btn ff-btn-primary"
+                    disabled={autoBackup.running}
+                    onClick={() => void autoBackup.backupNow()}
+                  >
+                    {autoBackup.running ? t("settings.backup.running") : t("settings.backup.now")}
+                  </button>
+                </div>
+              </SettingsRow>
+            ) : null}
+          </div>
+
           <div className="ff-settings-card">
             <SettingsRow title={t("settings.exportData")} hint={t("settings.exportDataHint")}>
               <button type="button" className="ff-btn" onClick={onExport}>{t("settings.exportJson")}</button>
@@ -643,6 +727,15 @@ function GlobeIcon() {
     <svg viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="9" />
       <path d="M3 12h18M12 3c2.6 2.5 4 5.6 4 9s-1.4 6.5-4 9c-2.6-2.5-4-5.6-4-9s1.4-6.5 4-9z" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5.2l3.4 2" />
     </svg>
   );
 }

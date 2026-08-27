@@ -10,6 +10,13 @@ function filesUnsupported(): never {
   throw new Error("Local file access is only available in the desktop app.");
 }
 
+function backupsUnsupported(): never {
+  // Not a silent no-op: a backup that quietly did not happen is worse than one
+  // that says it cannot. There is no honest web version either — a copy inside
+  // the origin's own storage dies with the data it was meant to outlive.
+  throw new Error("Automatic backups are only available in the desktop app.");
+}
+
 function localAiUnsupported(): never {
   throw new Error("Local AI runtime is only available in the desktop app.");
 }
@@ -168,6 +175,27 @@ export const webPlatform: PlatformAdapter = {
     },
     async watchVault() {
       filesUnsupported();
+    },
+  },
+
+  backups: {
+    supported() {
+      return false;
+    },
+    async dir() {
+      return backupsUnsupported();
+    },
+    async list() {
+      return backupsUnsupported();
+    },
+    async read() {
+      return backupsUnsupported();
+    },
+    async write() {
+      return backupsUnsupported();
+    },
+    async reveal() {
+      return backupsUnsupported();
     },
   },
 

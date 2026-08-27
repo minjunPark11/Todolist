@@ -1,3 +1,4 @@
+import type { BackupInterval } from "./domain/backup/schedule";
 import type { FocusDefaultLength } from "./domain/focus/sessionLength";
 
 /**
@@ -585,7 +586,19 @@ export interface AppSettings {
    * setting does not have its sessions quietly change length.
    */
   focusDefaultMinutes: FocusDefaultLength;
-  showSidebarCounts: boolean;
+  /**
+   * How often a copy of everything is written to disk (SETTINGS_REVIEW.md 4.6).
+   *
+   * `off` ships, because writing files on a schedule is not something to start
+   * doing to someone's machine without being asked. Desktop only — the web
+   * adapter has nowhere to put a copy that would outlive the data.
+   *
+   * WHEN this device last managed one is deliberately NOT here: that is local
+   * state (`useAutoBackup`), since a backup on one machine is no use to another.
+   */
+  autoBackup: BackupInterval;
+  /** How many files survive a prune, newest first. */
+  autoBackupKeep: number;
   sidebarCollapsed: boolean;
   reduceMotion: boolean;
   // Legacy Ollama model preference. No UI sets it since the managed

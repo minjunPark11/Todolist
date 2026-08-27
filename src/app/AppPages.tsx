@@ -7,6 +7,7 @@ import { TodayPage, type TodayIntent } from "../components/TodayPage";
 import type { ToastState } from "../components/kit";
 import type { usePlannerData } from "../hooks/usePlannerData";
 import type { CalendarShareState } from "../lib/calendarShare";
+import type { AutoBackupState } from "./useAutoBackup";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import type { KnowledgeSettings } from "../lib/knowledge/types";
 import type { AppUpdateStatus } from "../platform";
@@ -46,6 +47,7 @@ type AppPagesProps = {
   requestResetAllData: () => void;
   focusSettings: FocusUserSettings;
   onUpdateFocusSettings: (patch: Partial<FocusUserSettings>) => void;
+  autoBackup: AutoBackupState;
   onStopFocus: (sessionId: string, completeTask?: boolean) => void;
   externalCalendars: ExternalCalendar[];
   externalCalendarEvents: ExternalCalendarEvent[];
@@ -88,6 +90,7 @@ export function AppPages({
   requestResetAllData,
   focusSettings,
   onUpdateFocusSettings,
+  autoBackup,
   onStopFocus,
   externalCalendars,
   externalCalendarEvents,
@@ -212,6 +215,7 @@ export function AppPages({
       settings={appSettings}
       focusSettings={focusSettings}
       onUpdateFocusSettings={onUpdateFocusSettings}
+      autoBackup={autoBackup}
       onUpdate={planner.updateAppSettings}
       onExport={exportJson}
       onImport={handleImport}
