@@ -286,8 +286,6 @@ export const ko: Dictionary = {
   "settings.showCompletedTasksHint": "오늘 페이지에 완료된 할 일을 표시합니다.",
   "settings.confirmBeforeDelete": "삭제 전 확인",
   "settings.confirmBeforeDeleteHint": "할 일이나 프로젝트를 삭제하기 전에 확인을 요청합니다.",
-  "settings.showSidebarCounts": "사이드바 개수 표시",
-  "settings.showSidebarCountsHint": "사이드바 항목 옆에 할 일 개수를 표시합니다.",
   "settings.reduceMotion": "애니메이션 줄이기",
   "settings.reduceMotionHint": "애니메이션과 전환 효과를 최소화합니다.",
   "settings.exportData": "데이터 내보내기",

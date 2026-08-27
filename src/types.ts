@@ -585,7 +585,6 @@ export interface AppSettings {
    * setting does not have its sessions quietly change length.
    */
   focusDefaultMinutes: FocusDefaultLength;
-  showSidebarCounts: boolean;
   sidebarCollapsed: boolean;
   reduceMotion: boolean;
   // Legacy Ollama model preference. No UI sets it since the managed

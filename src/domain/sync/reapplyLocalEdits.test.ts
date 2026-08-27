@@ -58,7 +58,6 @@ const appSettings: AppSettings = {
   weekStart: "sunday",
   hoursAtATime: 12,
   focusDefaultMinutes: "auto",
-  showSidebarCounts: true,
   sidebarCollapsed: false,
   reduceMotion: false,
   aiModel: "",

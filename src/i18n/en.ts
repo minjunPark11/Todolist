@@ -291,8 +291,6 @@ export const en: Dictionary = {
   "settings.showCompletedTasksHint": "Show completed tasks in Today.",
   "settings.confirmBeforeDelete": "Confirm Before Delete",
   "settings.confirmBeforeDeleteHint": "Ask for confirmation before deleting tasks or projects.",
-  "settings.showSidebarCounts": "Show Sidebar Counts",
-  "settings.showSidebarCountsHint": "Display task counts next to sidebar items.",
   "settings.reduceMotion": "Reduce Motion",
   "settings.reduceMotionHint": "Minimize animations and transitions.",
   "settings.exportData": "Export Data",

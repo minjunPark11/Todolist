@@ -279,12 +279,6 @@ export function SettingsPage({
             onChange={(v) => onUpdate({ showCompletedInToday: v })}
           />
           <Toggle
-            label={t("settings.showSidebarCounts")}
-            hint={t("settings.showSidebarCountsHint")}
-            value={settings.showSidebarCounts}
-            onChange={(v) => onUpdate({ showSidebarCounts: v })}
-          />
-          <Toggle
             label={t("settings.confirmBeforeDelete")}
             hint={t("settings.confirmBeforeDeleteHint")}
             value={settings.confirmBeforeDelete}
