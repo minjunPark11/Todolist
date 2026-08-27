@@ -127,6 +127,39 @@ export interface PlatformLocalAi {
  */
 export type NotificationAccess = "granted" | "denied" | "unasked" | "unsupported";
 
+/** One file in the app's backup folder (SETTINGS_REVIEW.md 4.6). */
+export interface BackupFile {
+  name: string;
+  path: string;
+  size: number;
+  /** Milliseconds since the epoch, so it compares with `Date.now()`. */
+  modifiedAt: number;
+}
+
+/**
+ * Automatic backups, desktop only.
+ *
+ * `PlatformFiles` above is deliberately read-only — the Obsidian vault is a
+ * source, not a destination — so this is a separate surface rather than a write
+ * method bolted onto it. It cannot write anywhere else either: no method takes
+ * a directory, and the one that takes a file name only accepts names this app
+ * generated. The whole path lives in Rust for that reason.
+ *
+ * On the web every method other than `supported()` rejects. There is no honest
+ * web implementation: a copy kept in the origin's own storage disappears with
+ * the data it was meant to outlive.
+ */
+export interface PlatformBackups {
+  supported(): boolean;
+  dir(): Promise<string>;
+  list(): Promise<BackupFile[]>;
+  read(name: string): Promise<string>;
+  /** `stamp` names the file; `keep` is how many survive, 0 for all. */
+  write(contents: string, stamp: string, keep: number): Promise<BackupFile>;
+  /** Shows the folder in the OS file manager. */
+  reveal(): Promise<void>;
+}
+
 export interface PlatformAdapter {
   kind: PlatformKind;
   storage: {
@@ -172,5 +205,6 @@ export interface PlatformAdapter {
   };
   openExternal(url: string): Promise<void>;
   files: PlatformFiles;
+  backups: PlatformBackups;
   localAi: PlatformLocalAi;
 }

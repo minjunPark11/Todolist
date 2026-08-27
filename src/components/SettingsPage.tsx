@@ -24,6 +24,13 @@ import {
 } from "../utils/notificationCopy";
 import { clampHoursAtATime, HOURS_AT_A_TIME_CHOICES } from "../utils/calendarTime";
 import { FOCUS_LENGTH_CHOICES, sanitizeFocusDefaultLength } from "../domain/focus/sessionLength";
+import {
+  BACKUP_INTERVALS,
+  BACKUP_KEEP_CHOICES,
+  sanitizeBackupInterval,
+  sanitizeBackupKeep,
+} from "../domain/backup/schedule";
+import type { AutoBackupState } from "../app/useAutoBackup";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { installedFileMatchesModel } from "../lib/localAi/runtime";
 import type { ServerRuntimeAsset } from "../lib/localAi/serverRuntimeCatalog";
@@ -83,6 +90,8 @@ interface SettingsPageProps {
    */
   focusSettings: FocusUserSettings;
   onUpdateFocusSettings: (patch: Partial<FocusUserSettings>) => void;
+  /** SETTINGS_REVIEW.md 4.6 — the runner's state, so Data can report it. */
+  autoBackup: AutoBackupState;
 }
 
 const ACCENTS: { id: AccentColor; color: string }[] = [
@@ -123,8 +132,9 @@ export function SettingsPage({
   isKnowledgeDesktop,
   focusSettings,
   onUpdateFocusSettings,
+  autoBackup,
 }: SettingsPageProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [tab, setTab] = useState<
     | "account"
     | "appearance"
@@ -575,6 +585,70 @@ export function SettingsPage({
 
       {tab === "data" ? (
         <>
+          {/* SETTINGS_REVIEW.md 4.6. Above export and import because those are
+              things the reader does, and this is the one that happens without
+              them. The file it writes IS the export format, so the restore path
+              is the Import row below — there is no second reader to keep
+              correct. */}
+          <div className="ff-settings-card">
+            <SettingsRow
+              title={t("settings.backup.auto")}
+              hint={autoBackup.supported ? t("settings.backup.autoHint") : t("settings.backup.desktopOnly")}
+            >
+              <select
+                value={settings.autoBackup}
+                disabled={!autoBackup.supported}
+                onChange={(e) => onUpdate({ autoBackup: sanitizeBackupInterval(e.target.value) })}
+              >
+                {BACKUP_INTERVALS.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`settings.backup.interval.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </SettingsRow>
+            {autoBackup.supported && settings.autoBackup !== "off" ? (
+              <SettingsRow title={t("settings.backup.keep")} hint={t("settings.backup.keepHint")}>
+                <select
+                  value={settings.autoBackupKeep}
+                  onChange={(e) => onUpdate({ autoBackupKeep: sanitizeBackupKeep(e.target.value) })}
+                >
+                  {BACKUP_KEEP_CHOICES.map((count) => (
+                    <option key={count} value={count}>
+                      {t("settings.backup.keepCount", { count })}
+                    </option>
+                  ))}
+                </select>
+              </SettingsRow>
+            ) : null}
+            {autoBackup.supported ? (
+              <SettingsRow
+                title={t("settings.backup.last")}
+                hint={
+                  autoBackup.error
+                    ? t("settings.backup.failed", { reason: autoBackup.error })
+                    : autoBackup.lastAt
+                      ? new Date(autoBackup.lastAt).toLocaleString(lang)
+                      : t("settings.backup.never")
+                }
+              >
+                <div className="ff-settings-actions">
+                  <button type="button" className="ff-btn" onClick={() => void platform.backups.reveal()}>
+                    {t("settings.backup.openFolder")}
+                  </button>
+                  <button
+                    type="button"
+                    className="ff-btn ff-btn-primary"
+                    disabled={autoBackup.running}
+                    onClick={() => void autoBackup.backupNow()}
+                  >
+                    {autoBackup.running ? t("settings.backup.running") : t("settings.backup.now")}
+                  </button>
+                </div>
+              </SettingsRow>
+            ) : null}
+          </div>
+
           <div className="ff-settings-card">
             <SettingsRow title={t("settings.exportData")} hint={t("settings.exportDataHint")}>
               <button type="button" className="ff-btn" onClick={onExport}>{t("settings.exportJson")}</button>

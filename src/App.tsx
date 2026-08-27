@@ -35,6 +35,7 @@ import { checkItemsForTask } from "./domain/tasks/checkItems";
 import { taskActivity } from "./domain/tasks/activity";
 import { executeAgentActions } from "./app/executeAgentActions";
 import { buildAiContextInput } from "./domain/ai/buildAiContextInput";
+import { useAutoBackup } from "./app/useAutoBackup";
 import { useDataPortability } from "./app/useDataPortability";
 import { dismissToast, enqueueToast, type QueuedToast } from "./lib/toastQueue";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
@@ -239,6 +240,14 @@ export default function App() {
     today,
     exportData: planner.exportData,
     importData: planner.importData,
+  });
+
+  // SETTINGS_REVIEW.md 4.6. Same payload the manual export writes, so a backup
+  // file restores through the existing Import.
+  const autoBackup = useAutoBackup({
+    interval: appSettings.autoBackup,
+    keep: appSettings.autoBackupKeep,
+    exportData: planner.exportData,
   });
 
   useEffect(() => {
@@ -1408,6 +1417,7 @@ export default function App() {
         requestResetAllData={requestResetAllData}
         focusSettings={focusSettings}
         onUpdateFocusSettings={updateFocusSettings}
+        autoBackup={autoBackup}
         onStopFocus={stopFocusWithNotification}
         externalCalendars={externalCalendarState.calendars}
         externalCalendarEvents={externalCalendarState.events}

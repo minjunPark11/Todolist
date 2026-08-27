@@ -57,6 +57,8 @@ const appSettings: AppSettings = {
   weekStart: "sunday",
   hoursAtATime: 12,
   focusDefaultMinutes: "auto",
+  autoBackup: "off",
+  autoBackupKeep: 7,
   sidebarCollapsed: false,
   reduceMotion: false,
   aiModel: "",
