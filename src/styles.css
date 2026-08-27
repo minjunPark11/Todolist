@@ -26,6 +26,10 @@
 /* After the density layer, because the shared components are written in its
    tokens (V-6). */
 @import "./styles/21-components.css";
+/* The consent screen and the Connected AI list. Its own file because it is the
+   only UI in the app that belongs to the external-AI feature, and the feature
+   may yet be dropped whole. */
+@import "./styles/23-oauth-consent.css";
 /* Last: a floating surface sits above everything above it, and the z-index
    scale it declares (§19.5) is what the layers below are measured against. */
 @import "./styles/22-floating.css";

@@ -1,5 +1,6 @@
 import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
+import { ConnectedAiCard } from "./oauth/ConnectedAiCard";
 import { useNotificationAccess } from "../hooks/useNotificationAccess";
 import {
   canAskForNotifications,
@@ -621,6 +622,10 @@ export function SettingsPage({
       {tab === "account" ? (
         <>
           {accountSlot}
+          {/* Who else can read this account (§6.4). Beside the account itself,
+              because that is what it is about — not a calendar setting and not
+              a data-export tool. */}
+          <ConnectedAiCard />
           <div className="ff-settings-card">
             <SettingsRow title={t("settings.appInfo")} hint="FocusFlow">
               <strong>{appVersion}</strong>

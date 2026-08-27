@@ -6,6 +6,7 @@ import {
   pageForPath,
   pathForDefaultView,
   pathForPage,
+  returnToFromSearch,
 } from "./pageRoute";
 import { parseTaskScope } from "./taskScopeUrl";
 import type { PageId } from "../types";
@@ -133,5 +134,27 @@ describe("pageRoute", () => {
         expect(namesAPage(path)).toBe(true);
       }
     });
+  });
+});
+
+describe("returnToFromSearch", () => {
+  it("carries a path back", () => {
+    expect(returnToFromSearch("?returnTo=%2Foauth%2Fconsent%3Fauthorization_id%3Dabc")).toBe(
+      "/oauth/consent?authorization_id=abc",
+    );
+  });
+
+  it("answers nothing when nobody asked", () => {
+    expect(returnToFromSearch("")).toBeNull();
+    expect(returnToFromSearch("?other=1")).toBeNull();
+  });
+
+  it("refuses to send a freshly signed-in user off-site", () => {
+    // An open redirect on a login page is how a link that looks like this
+    // app's own sign-in ends somewhere else, with the user believing they got
+    // there through us.
+    expect(returnToFromSearch("?returnTo=https%3A%2F%2Fevil.example%2Fx")).toBeNull();
+    expect(returnToFromSearch("?returnTo=%2F%2Fevil.example%2Fx")).toBeNull();
+    expect(returnToFromSearch("?returnTo=javascript%3Aalert(1)")).toBeNull();
   });
 });

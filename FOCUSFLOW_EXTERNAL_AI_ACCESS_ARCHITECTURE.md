@@ -1,6 +1,9 @@
 # FocusFlow External AI Access Architecture
 
-> 상태: **설계 · 감사 (구현 전)** · 2026-08-27
+> 상태: **Phase 5까지 구현됨 · 실제 클라이언트 연결(6·7) 미검증** · 2026-08-28
+> 개정 **rev.8** — Phase 5 구현 완료(§29). JWKS 토큰 검증·동의 화면·M2 게이트·연결 관리 UI·RFC 9728 메타데이터.
+> 개정 **rev.7** — Phase 4 구현 완료(§28). 읽기 전용 MCP 서버 13개 툴이 동작하고 dev 서버에서 검증된다. 토큰 서명 검증은 아직 없다(§28.3).
+> 개정 **rev.6** — Phase 3 구현 완료(§27). 데이터 접근 계층·서버 ICS·free time이 코드로 존재하고, §22의 인수 조건 3·4·5·6·10·18·20이 단위 테스트로 증명된다. 인증은 아직 없다.
 > 개정 **rev.5** — OAuth server 활성화 후 0단계 재실행: Q9·Q10·DCR 전부 해소(§26.4b). 검증 1~4는 자격증명 대기.
 > 개정 **rev.4** — Validation Spike 0단계 실행 결과 반영(§26.4). OAuth server가 꺼져 있어 검증 1~4는 대기.
 > 개정 **rev.3** — RRULE 확장을 V1 필수로 승격(§9.2.1), Validation Spike 추가(§26).
@@ -973,11 +976,11 @@ settings 테이블
 | **0** | 아키텍처·보안 감사 | **이 문서로 완료** |
 | **0.5** | **Validation Spike** — OAuth 토큰의 `client_id`, RLS 쓰기 차단, 세션 CRUD 회귀, 교차 사용자 격리 | `spike/oauth-rls/` (§26). Phase 5·5.5의 설계를 확정하거나 대안으로 전환시킨다 |
 | **1** | Local AI 제거 + 회귀 테스트 | **완료**. §18의 selector 4개 보존 표시만 남음 |
-| **2** | 데이터 선행조건 — M1(타임존) + M4(sync_state) | ★rev.1의 "RLS 정비"를 대체. RLS는 이미 완전하다(§4) |
-| **3** | AI-independent Data Access Layer + ICS 소스(§9.2) + **RRULE 확장(§9.2.1)** + 단위 테스트 | MCP 없이 순수 함수로 완결. §11의 계산값과 반복 일정 전개가 여기서 검증된다 |
-| **4** | Read-only MCP Core — **개발용 고정 토큰**으로 툴 12개 완성 | ★인증보다 툴을 먼저. `mcp-inspector`로 즉시 검증되고, 인증 문제와 데이터 문제가 뒤엉키지 않는다 |
-| **5** | Supabase OAuth 2.1 연결 — 대시보드 활성화, `/oauth/consent`, protected-resource 메타데이터, M2 게이트, 연결 관리 UI | rev.1보다 대폭 축소 |
-| **5.5** | M5(OAuth 쓰기 차단 RLS) — Q1 실측 후 적용 | 순서 주의: **연결이 되어야 실제 OAuth 토큰으로 검증할 수 있다** |
+| **2** | 데이터 선행조건 — M1(타임존) + M4(sync_state) | **완료** (`2708a3c`). `AppSettings.timezone`, `settings/sync_state` 행 |
+| **3** | AI-independent Data Access Layer + ICS 소스(§9.2) + **RRULE 확장(§9.2.1)** + 단위 테스트 | **완료**(§27). RRULE 확장은 `a7460bc`에서 선불로 끝나 있었다 |
+| **4** | Read-only MCP Core — 툴 12개 완성 | **완료**(§28). 툴 13개(12개 질문), dev 서버 `/api/mcp`로 검증. 토큰은 디코드만 하고 검증하지 않는다(§28.3) |
+| **5** | Supabase OAuth 2.1 연결 | **완료**(§29). 토큰 JWKS 검증 포함. 대시보드의 authorization URL path 설정만 남음(§29.6-2) |
+| **5.5** | M5(OAuth 쓰기 차단 RLS) — Q1 실측 후 적용 | **이제 측정 가능**(§29.6-3). 연결이 되면 실제 OAuth 토큰이 나온다 |
 | **6** | Claude 연결 검증 | |
 | **7** | ChatGPT 연결 검증 | 요구사항 차이 흡수 |
 | **8** | 보안 / 교차 사용자 격리 테스트(§22) | 두 계정 실제 시도 + 토큰 직접 PostgREST 호출 테스트 |
@@ -1238,3 +1241,280 @@ RFC 8414 문서는 OIDC discovery 문서와 내용이 같고 `registration_endpo
 ### 26.5 이 스파이크가 검증하지 않는 것
 
 MCP 프로토콜 자체(Phase 4), 동의 화면 UI(Phase 5), 토큰 만료·refresh(Phase 5), ChatGPT/Claude 실제 연결(Phase 6·7), RRULE 확장(§9.2.1 — 순수 함수라 픽스처 단위 테스트로 별도 검증).
+
+---
+
+## 27. Phase 3 구현 기록 (2026-08-28)
+
+설계가 예측한 대로 끝난 부분과, 실제로 해보고서야 드러난 부분을 나눠 적는다.
+
+### 27.1 만들어진 것
+
+```
+src/server/
+  errors.ts                       ServerError — NOT_FOUND / INVALID_ARGUMENT / UPSTREAM_UNAVAILABLE
+  purity.test.ts                  import 그래프를 걸어 platform·react·import.meta 도달을 차단
+  net/icsFetch.ts                 SSRF 호스트 차단 + 5MB·8초 상한 (api/ics.js의 규칙)
+  data/
+    context.ts                    RequestContext, resolveTimezone(추측 금지), todayIn/timeIn/zonedIsoString
+    repository.ts                 유일한 Supabase I/O. TableReader 이음매 + 요청 단위 캐시 + ROW_CAP
+    freshness.ts                  sync_state → live/recent/stale/unknown
+    projections.ts                TaskSummary / TaskDetail / CalendarEntry (화이트리스트)
+    calendar/icsSource.ts         구독 fetch·파싱·5분 캐시·부분 실패 보고
+    queries/                      15개 질의 (§7.3) + shared(메타·캘린더 조립·테이블 선언)
+  test/fixtures.ts                TableReader 픽스처
+src/domain/
+  plannerData/normalize.ts        usePlannerData에서 추출한 정규화 게이트 (아래 27.2)
+  schedule/freeTime.ts            신규 순수 계산 — 이 층에서 유일하게 새로 쓴 알고리즘
+  today/legacyBucketOverrides.ts  dailyPlan에서 분리한 device 절반
+src/lib/calendar/categoryModel.ts calendarCategories에서 분리한 순수 모델
+```
+
+테스트 81개 추가(총 1,825). 인수 조건 **3·4·5·6·10·18·20**이 네트워크·계정 없이 증명된다.
+
+### 27.2 설계가 놓쳤던 것 — 정규화 게이트
+
+§7.4는 `loadSlice`가 jsonb를 읽어 도메인 함수에 넘기면 된다고 적었다. 실제로는 그 사이에
+**`normalizeData`가 반드시 있어야 한다.** 저장된 레코드는 `tags`도 `status`도 없을 수 있고
+(M0 통과 필드), 앱은 로드할 때마다 이 게이트를 통과시킨다. 서버가 이걸 건너뛰면 같은 레코드를
+화면과 다르게 읽는다 — §24가 막으려던 "두 번째 진실" 그 자체다.
+
+문제는 이 함수가 `usePlannerData.ts`(React 훅, 2,500줄) 안에 있었다는 것이다. → 정규화 블록
+370줄을 `src/domain/plannerData/normalize.ts`로 추출했다. 훅은 그것을 import한다. 호출자 변경은
+테스트 3개의 import 경로뿐.
+
+### 27.3 §7.2가 예고한 추출 — 실제 비용
+
+| 대상 | 예고 | 실제 |
+|---|---|---|
+| `lib/externalCalendars` 파서 분리 | 필요 | **이미 끝나 있었다** — `a7460bc`가 `lib/ics/{parse,recurrence}`로 분리 |
+| `utils/calendarItems` | platform에 닿음 | import 경로 2개 교체로 해결 (`lib/ics/parse`, `lib/calendar/categoryModel`) |
+| `domain/today/dailyPlan` | platform 분리 | `parseLegacyBucketOverrides(raw)`(순수) + `legacyBucketOverrides.ts`(device)로 분할 |
+| `lib/calendarCategories` | (미예고) | **여기서 드러났다.** react + platform을 달고 있어 모델 절반을 `lib/calendar/categoryModel.ts`로 분리 |
+
+마지막 줄이 `purity.test.ts`를 먼저 쓴 이유다. 사람이 눈으로 훑어서는 3-hop 뒤의 `react` import를
+찾지 못한다.
+
+### 27.4 시간대가 실제로 문제가 된 곳
+
+M1은 "오늘이 며칠인가"만 이야기했지만, 기기 로컬을 가정한 계산이 두 군데 더 있었다.
+
+- `buildCalendarItems` — 외부 이벤트의 UTC 앵커를 기기 존으로 읽었다. → `viewerTimezone` 옵션 추가(생략 시 기존 동작).
+- `splitFocusSegmentByDay` — 자정 분할이 기기 존이었다. → 존을 받으면 **날짜를 걸어서** 자른다(24시간 덧셈은 DST에서 어긋난다).
+- 집중 세션의 날짜를 `startedAt.slice(0,10)`으로 읽으면 서울 기준 오전 9시 이후 세션이 전부 전날로 간다. → `queries/focus.ts`는 존 변환 후 비교한다.
+
+### 27.5 남긴 빚
+
+1. **`api/ics.js`는 아직 자기 사본을 쓴다.** Vercel 함수가 JS라 TS 모듈을 import할 수 없어서다.
+   `icsFetch.test.ts`가 두 사본의 호스트 패턴 일치를 검사해 발산을 막고 있고, `api/`에 TS가
+   들어오는 Phase 4에서 통합한다. **보안 규칙 사본이 둘인 상태이므로 우선순위가 있다.**
+2. `getFreeTimeBlocks`는 종일 이벤트를 busy로 치지 않는다(종일 일정은 시각을 말하지 않는다).
+   실제 사용에서 "종일 = 하루 종일 불가"로 쓰는 사용자가 있으면 재검토.
+3. `settings` 테이블을 모든 질의가 읽는다 — 3행짜리 테이블이고 요청당 1회지만, 프리네스를
+   모든 응답에 싣기 위한 선택이라는 점을 기록해 둔다.
+
+### 27.6 다음
+
+Phase 4는 이 15개 함수에 MCP 툴 12개를 얇게 씌우는 일이다. `QueryContext`가 이음매이고,
+`TableReader`를 실제 `supabaseTableReader`로 바꾸면 그대로 붙는다. **Q1(§23)은 여전히 미해결이며
+Phase 5.5의 전제다** — 계정 2개의 자격증명이 필요하다.
+
+---
+
+## 28. Phase 4 구현 기록 (2026-08-28)
+
+읽기 전용 MCP 서버가 동작한다. **인증은 아직 Phase 4용 임시 상태다**(§28.3).
+
+### 28.1 만들어진 것
+
+```
+src/server/mcp/
+  jsonRpc.ts        JSON-RPC 2.0 봉투 + 파싱 (배치·notification 포함)
+  args.ts           인자 파싱 — 어떤 필드가 왜 틀렸는지 말한다. 모르는 인자는 거절
+  registry.ts       ToolDefinition { name, mode, description, inputSchema, handler }
+  auth.ts           Bearer → VerifiedToken (§28.3)
+  logging.ts        §16.2 로그 레코드 + userHash
+  handler.ts        handleMcpHttp — 요청 객체 하나를 받는 순수 함수
+  index.ts          실제 배선 (supabaseTableReader, 실제 ICS 로더)
+  tools/read/       12개 질문 = 13개 툴
+  tools/write/      README만. V2
+api/mcp/index.ts    Vercel 어댑터 (얇음)
+vite.config.js      dev 서버에서 POST /api/mcp 제공 (§28.4)
+```
+
+테스트 29개 추가(총 1,862).
+
+### 28.2 SDK를 쓰지 않은 이유
+
+`@modelcontextprotocol/sdk`를 넣지 않고 프로토콜을 직접 구현했다. SDK의 값어치는 세션·SSE
+스트림·재개·서버발 알림인데, §8.3이 이 서버는 그중 **아무것도 쓰지 않는다**고 이미 결정했다.
+남는 것은 봉투 하나, 메서드 다섯 개, 오류 코드 표다.
+
+이득은 코드량이 아니라 **테스트 가능성**이다. `handleMcpHttp`가 요청 객체를 받는 순수 함수라
+소켓·클럭·계정 없이 프로토콜 전체를 검사할 수 있다 — Phase 3이 인증 없이 완결된 것과 같은 성질.
+**실제 클라이언트 연결(Phase 6·7)에서 프로토콜 세부가 문제가 되면 SDK로 교체한다.** 교체 지점은
+`handler.ts` 하나다.
+
+### 28.3 인증 — 미완성이라는 점을 분명히
+
+`auth.ts`는 토큰을 **디코드만 하고 검증하지 않는다.** 서명·`iss`·`aud`를 확인하지 않는다.
+
+이게 지금 견딜 수 있는 이유: 이 서버가 돌려주는 모든 행은 같은 토큰으로 PostgREST를 거쳐 오고,
+검증은 **거기서** 진짜로 일어난다. 위조 토큰은 아무 데이터도 읽지 못한다.
+
+견딜 수 없는 것: **confused deputy.** 다른 Supabase 프로젝트가 발급한 유효 토큰이 여기서
+받아들여지고 우리 사용자로 로그된 뒤 PostgREST에서 거절된다. 유출이 아니라 잡음이지만, 검사는
+요청 앞에 있어야 한다. §8.2 2단계(JWKS 서명 검증 + `iss`/`aud`)가 Phase 5의 일이며,
+**그전까지 이 엔드포인트를 공개 배포해서는 안 된다.**
+
+### 28.4 검증 방법
+
+`vercel dev`가 이 저장소에 없어서, Vite dev 서버가 `POST /api/mcp`를 직접 제공하도록 했다
+(`vite.config.js`, dev 전용 플러그인, `ssrLoadModule`로 TS를 그대로 로드).
+
+```bash
+npm run dev
+npx @modelcontextprotocol/inspector   # http://127.0.0.1:5173/api/mcp
+```
+
+Bearer에는 **실제 Supabase access token**을 넣는다(로그인한 브라우저의 세션에서 꺼낸다).
+가짜 토큰은 handshake는 통과하지만 툴 호출에서 PostgREST가 거절한다 — 그게 설계대로다.
+
+실측 확인(curl):
+
+| 요청 | 결과 |
+|---|---|
+| 토큰 없는 POST | `401` + `WWW-Authenticate: Bearer` |
+| `initialize` | `protocolVersion` 에코, `serverInfo`, `instructions` |
+| `notifications/initialized` | `202`, 본문 없음 |
+| `tools/list` | 툴 13개 |
+| 없는 툴 호출 | `-32600` "no tool called ..." |
+| 배치 2건 | 배열 응답 |
+
+### 28.5 이번에 잡힌 실제 버그 하나
+
+`normalizeAppSettings`는 타임존이 비면 `DEFAULT_APP_SETTINGS.timezone`으로 채우는데, 그 값은
+**실행 중인 기기의 존**이다. 기기에서는 옳고 서버에서는 M1이 금지한 바로 그 추측이다 — 타임존을
+기록한 적 없는 계정에 대해 서버가 조용히 "Vercel의 오늘"로 답하게 된다.
+
+`PlannerSlice.storedTimezone`(정규화 **전**의 원본 값)을 추가하고 handler가 그것만 읽는다.
+`resolveTimezone`은 (1) 계정 값, (2) 툴 인자 `timezone`, (3) 거절 순서 그대로다. 툴 인자는
+handler가 모든 스키마에 주입하고 호출 전에 떼어낸다 — 13개 툴이 각자 선언하지 않는다.
+
+### 28.6 남은 것 / 다음
+
+1. **Phase 5**: JWKS 검증 + `iss`/`aud`(§28.3), `/oauth/consent`, `/.well-known/oauth-protected-resource`,
+   M2 동기화 게이트, 연결 관리 UI. `handler.ts`의 `resourceMetadataUrl`은 이미 배선돼 있고 값만 없다.
+2. **Q1(§23)은 여전히 미해결** — Phase 5.5(M5)의 전제. 계정 2개 자격증명 필요.
+3. `api/ics.js`의 SSRF 규칙 사본 통합(§27.5-1) — `api/`에 TS가 들어왔으므로 이제 가능해졌다.
+
+---
+
+## 29. Phase 5 구현 기록 (2026-08-28)
+
+인증이 실제로 붙었다. §28.3의 "토큰을 검증하지 않는다"는 상태는 해소됐다.
+
+### 29.1 만들어진 것
+
+```
+src/server/mcp/
+  jwks.ts                       ES256/RS256 로컬 검증 — 서명·iss·aud·exp·nbf
+  protectedResource.ts          RFC 9728 문서 + APP_URL 해석
+api/well-known/
+  oauth-protected-resource.ts   /.well-known/... 로 rewrite (vercel.json)
+vercel.json                     rewrite 2개 (§29.4)
+src/components/oauth/
+  OAuthConsentPage.tsx          동의 화면 — 자체 root (§6.4)
+  accountReadiness.ts           M2 게이트
+  ConnectedAiCard.tsx           설정 > 연결된 AI (listGrants / revokeGrant)
+src/app/pageRoute.ts            returnToFromSearch — open redirect 차단
+src/styles/23-oauth-consent.css
+src/i18n/{ko,en}.ts             키 33개
+```
+
+테스트 42개 추가(총 1,904).
+
+### 29.2 토큰 검증 — 무엇을 어떻게
+
+`supabase.auth.getClaims()`를 서버에서 쓰지 않고 JWKS 로컬 검증을 직접 구현했다. §6.6이 말한
+두 경로 중 asymmetric 경로만 지원한다.
+
+| 검사 | 이유 |
+|---|---|
+| 서명 (ES256/RS256, WebCrypto) | 나머지 검사가 의미를 가지려면 먼저 |
+| `iss === https://<ref>.supabase.co/auth/v1` | **confused deputy.** 다른 프로젝트의 유효 토큰 차단 |
+| `aud` 포함 `authenticated` | |
+| `exp` / `nbf` (30초 skew) | 만료는 401 → 클라이언트가 refresh |
+| **HS256 거부** | 로컬 검증 불가. 원격 검증은 요청마다 왕복이 생긴다. 이 프로젝트는 ES256이다(§26.4) |
+
+키는 6시간 캐시. 모르는 `kid`가 오면 다시 받되 **60초 바닥**을 둔다 — 없으면 아무 쓰레기 토큰이나
+보내서 우리가 Supabase를 두드리게 만들 수 있다.
+
+`unverifiedClaimsVerifier`는 auth.ts에 남아 있지만 **테스트 전용**이고 `createMcpDeps`가 제공하지
+않는다. 배선하면 §28.3의 구멍이 그대로 돌아온다는 주석을 달았다.
+
+### 29.3 동의 화면 — 무엇을 보여주는가
+
+`main.tsx`에서 경로로 분기하는 **자체 root**다(미니 타이머와 같은 방식). App의 라우트 테이블을
+거치지 않으므로 플래너를 로드하지 않는다 — 데이터를 넘길지 묻는 화면 뒤에 그 데이터를 깔아 둘
+이유가 없다.
+
+R4 대응이 화면의 핵심이다. DCR이 켜져 있으면 **누구나 아무 이름으로 클라이언트를 등록할 수
+있으므로**, 클라이언트 이름과 **redirect_uri를 자르지 않고 그대로** 보여주고 "모르면 거부하라"고
+적는다. 사람이 "내가 온 곳이 아니다"라고 알아채는 것이 여기 있는 유일한 방어다.
+
+**M2 게이트**(`accountReadiness.ts`):
+
+| 상태 | 판정 |
+|---|---|
+| `empty` (계정에 Task 0건) | **차단.** 지금 연결하면 AI가 영원히 "오늘 할 일이 없다"고 자신 있게 답한다 |
+| `unknown` (확인 실패) | **차단.** "모름"이 "괜찮음"으로 읽히면 안 된다 |
+| `stale` (7일 이상 체크인 없음) | 경고만. 사용자가 이유를 알 수 있고, 막으면 빠져나갈 길이 없다 |
+| `ready` | 통과 |
+
+차단 지점은 **연결하는 순간 한 번**이고 그 뒤에는 `meta.freshness`가 대신한다(§19 M2). 툴 호출을
+막는 것은 낡은 계정을 고쳐주지 않고 사용자만 막는다.
+
+로그인이 안 돼 있으면 `/login?returnTo=…`로 보낸다. `returnToFromSearch`는 **같은 오리진의 경로만**
+받는다 — 로그인 페이지의 open redirect는 이 앱의 로그인처럼 보이는 링크가 남의 페이지로 끝나는
+경로다.
+
+### 29.4 배포 — 확인이 필요한 지점
+
+`vercel.json`을 **새로 만들었다.** 지금까지 없었고, framework preset이 SPA fallback을 자동으로
+넣어주고 있었다.
+
+```json
+{ "rewrites": [
+  { "source": "/.well-known/oauth-protected-resource", "destination": "/api/well-known/oauth-protected-resource" },
+  { "source": "/(.*)", "destination": "/index.html" }
+]}
+```
+
+두 번째 규칙은 preset이 하던 일을 명시적으로 쓴 것이다. rewrite는 파일시스템·함수 매칭 **이후**에
+적용되므로 `/api/*`와 정적 자산은 영향을 받지 않는다. **다만 이 저장소에서는 Vercel 배포를 테스트할
+수 없다.** 첫 배포 후 `/calendar`, `/settings` 같은 클라이언트 라우트가 새로고침에도 살아 있는지
+직접 확인해야 한다.
+
+### 29.5 Phase 5 체크리스트 대조
+
+| §20 Phase 5 항목 | 상태 |
+|---|---|
+| 대시보드 OAuth server 활성화 | 이미 완료(§26.4b) |
+| `/oauth/consent` | ✅ |
+| protected-resource 메타데이터 | ✅ (`APP_URL` 또는 `VERCEL_URL` 필요) |
+| M2 게이트 | ✅ |
+| 연결 관리 UI | ✅ 설정 > 계정 > 연결된 AI |
+| 토큰 검증(§8.2-2, §28.3) | ✅ |
+
+### 29.6 남은 것
+
+1. **환경변수**: 배포에 `APP_URL`(또는 Vercel의 `VERCEL_URL` 자동값), `SUPABASE_URL`,
+   `SUPABASE_ANON_KEY`가 필요하다. `APP_URL`이 없으면 메타데이터가 404를 준다 — 틀린 호스트를
+   광고하는 것보다 낫다.
+2. **Supabase 대시보드**: authorization URL path를 `/oauth/consent`로 지정해야 §6.3 6단계가
+   이 화면으로 온다. 코드로 할 수 있는 일이 아니다.
+3. **Phase 5.5 / Q1**: `auth.jwt() ->> 'client_id'`가 실제로 읽히는지. 여기까지 오면 실제 OAuth
+   토큰을 얻을 수 있으므로 **이제 측정 가능하다.** 결과에 따라 M5(쓰기 차단 RLS)를 적용하거나
+   대안으로 후퇴한다. `jwks.ts`는 이미 `client_id`를 읽어 `RequestContext`에 싣는다.
+4. Phase 6·7: Claude·ChatGPT 실제 연결.

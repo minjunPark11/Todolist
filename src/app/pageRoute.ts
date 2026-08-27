@@ -141,3 +141,22 @@ export function bootRedirectFor(path: string, defaultView: AppSettings["defaultV
   const target = pathForDefaultView(defaultView);
   return target === normalized ? "" : target;
 }
+
+/**
+ * Where to go after signing in, when something sent the user to `/login` from
+ * somewhere else.
+ *
+ * Only same-origin PATHS are honoured, and `//host` is rejected along with
+ * anything absolute: a `returnTo` is a value from the address bar, so an open
+ * redirect here would let a link that looks like FocusFlow's own login bounce
+ * a freshly-authenticated user to somebody else's page.
+ *
+ * The one caller today is the OAuth consent screen (§6.4), which sends people
+ * here when they are not signed in and needs them back afterwards.
+ */
+export function returnToFromSearch(search: string): string | null {
+  const raw = new URLSearchParams(search).get("returnTo");
+  if (!raw) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+}

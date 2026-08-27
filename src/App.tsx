@@ -10,7 +10,15 @@ import { AppPages } from "./app/AppPages";
 import type { TodayIntent } from "./components/TodayPage";
 import { TasksModule } from "./components/tasks/TasksModule";
 import { canonicalizeTaskUrl, listUrlFor, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
-import { PAGE_ROUTES, RETIRED_ROUTES, bootRedirectFor, pageForPath, pathForDefaultView, pathForPage } from "./app/pageRoute";
+import {
+  PAGE_ROUTES,
+  RETIRED_ROUTES,
+  bootRedirectFor,
+  pageForPath,
+  pathForDefaultView,
+  pathForPage,
+  returnToFromSearch,
+} from "./app/pageRoute";
 import {
   RAIL_DESTINATIONS,
   TASKS_HOME,
@@ -521,8 +529,17 @@ export default function App() {
 
   useEffect(() => {
     if (currentPath === "/login" && planner.auth.isSignedIn) {
-      // Signing in is an arrival, so it honours the start-page setting the
-      // same way a cold boot does — `/app` would pin everyone to Today.
+      // Somewhere else sent them here and wants them back — today that is the
+      // OAuth consent screen, which cannot ask who you are until you have
+      // signed in (§6.4).
+      const returnTo = returnToFromSearch(window.location.search);
+      if (returnTo) {
+        window.location.replace(returnTo);
+        return;
+      }
+      // Otherwise signing in is an arrival, so it honours the start-page
+      // setting the same way a cold boot does — `/app` would pin everyone to
+      // Today.
       navigate(pathForDefaultView(appSettings.defaultView), "replace");
     }
   }, [currentPath, planner.auth.isSignedIn, appSettings.defaultView]);
@@ -1158,7 +1175,18 @@ export default function App() {
           onSignIn={planner.signIn}
           onSignUp={planner.signUp}
           onResetPassword={planner.resetPassword}
-          onAuthenticated={() => navigate(pathForDefaultView(appSettings.defaultView), "replace")}
+          onAuthenticated={() => {
+            // Same rule as the effect above, and it has to be here too: this
+            // fires the moment the form succeeds, before the signed-in effect
+            // gets a turn, so without it a consent flow would land on Today
+            // and lose the authorization it came in with.
+            const returnTo = returnToFromSearch(window.location.search);
+            if (returnTo) {
+              window.location.replace(returnTo);
+              return;
+            }
+            navigate(pathForDefaultView(appSettings.defaultView), "replace");
+          }}
         />
       </I18nProvider>
     );

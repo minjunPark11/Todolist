@@ -1,0 +1,159 @@
+/* The consent screen (§6.4) and the Connected AI list in Settings.
+   Built on the auth screen's card so that the one moment a person is asked to
+   hand over their data looks like the app they are handing it over from — a
+   screen that looks unfamiliar is one they cannot judge. */
+
+.consent-card {
+  max-width: 30rem;
+  text-align: left;
+  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.consent-card h1 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.consent-lede {
+  margin: 0;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.55;
+}
+
+.consent-loading {
+  margin: 0;
+  text-align: center;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* The client's own words, shown as data rather than as design: no truncation,
+   no ellipsis, wrapping instead. A redirect address the user cannot read in
+   full is one they cannot check. */
+.consent-facts {
+  display: grid;
+  grid-template-columns: minmax(7rem, auto) 1fr;
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--surface-subtle, rgba(127, 127, 127, 0.08));
+  font-size: 0.875rem;
+}
+
+.consent-facts dt {
+  color: var(--text-secondary, #6b7280);
+}
+
+.consent-facts dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.consent-uri {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+}
+
+.consent-grants {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.consent-warning {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(234, 179, 8, 0.12);
+  color: var(--text-primary, #111827);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.consent-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.consent-actions .auth-submit {
+  flex: 1;
+  margin: 0;
+}
+
+.consent-deny {
+  flex: 1;
+  padding: 0.7rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.consent-deny:hover {
+  background: var(--surface-subtle, rgba(127, 127, 127, 0.08));
+}
+
+.consent-link {
+  align-self: center;
+  color: var(--accent, #2563eb);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.consent-link:hover {
+  text-decoration: underline;
+}
+
+a.auth-submit.consent-link {
+  align-self: stretch;
+  text-align: center;
+  color: inherit;
+}
+
+/* Settings > Connected AI */
+
+/* Small enough to live here rather than in the settings sheet: it is the one
+   note this card needs and nothing else has asked for one. */
+.ff-settings-note {
+  margin: 0;
+  padding: 0 16px 14px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.connected-ai-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0 16px 14px;
+  list-style: none;
+}
+
+.connected-ai-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+  border-radius: 0.5rem;
+}
+
+.connected-ai-row strong {
+  display: block;
+  font-weight: 600;
+}
+
+.connected-ai-row span {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.8125rem;
+}
