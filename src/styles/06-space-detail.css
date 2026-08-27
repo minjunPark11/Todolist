@@ -397,8 +397,6 @@
 }
 
 /* Note type badge (note detail drawer) */
-/* Floating AI button (§26). Sits above the global Ollama chat FAB, which
-   already occupies the bottom-right corner. */
 /* Modals (§32) */
 .sdv-modal-backdrop,
 .sdv-drawer-backdrop {

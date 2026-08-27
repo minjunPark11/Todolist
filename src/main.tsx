@@ -5,7 +5,12 @@ import { FloatingLayerProvider } from "./components/floating";
 import { MiniFocusTimerWindow } from "./components/MiniFocusTimerWindow";
 import { WindowTitleBar } from "./components/shell/WindowTitleBar";
 import { isTauriRuntime } from "./platform/tauri";
+import { dropAiStorage } from "./domain/migrations/dropAiStorage";
 import "./styles.css";
+
+// One-shot cleanup of the removed AI features' local storage. Runs before the
+// first render so nothing can read a key on its way out.
+dropAiStorage();
 
 // The desktop mini-timer window is flagged by an initialization script
 // (window.__IS_MINI_FOCUS_TIMER__) injected in src-tauri open_focus_mini_timer,

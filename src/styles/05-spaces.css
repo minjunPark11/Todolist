@@ -629,12 +629,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* The stacked focus bar is taller on small screens, so lift the AI
-     launcher further to keep it clear of the bar. */
-  .foc-global-bar ~ .ollama-chat {
-    bottom: 210px;
-  }
-
   .foc-stat-grid,
   .foc-controls {
     grid-template-columns: 1fr;

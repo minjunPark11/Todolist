@@ -1,5 +1,5 @@
 // Calendar derived-item model (CALENDAR_DESIGN.md §1.3/§1.4).
-// Shared by CalendarView rendering and the Ollama calendar context builder.
+// Shared by the CalendarView renderers (month, week, popover).
 import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Task, TaskPriority } from "../types";
 import { projectItems } from "../domain/view/item";
 import { externalEventDate, externalEventEndDate, externalEventEndTime, externalEventStartTime } from "../lib/externalCalendars";

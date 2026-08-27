@@ -208,7 +208,7 @@ test.describe("the Context Sidebar frame", () => {
    * The bug this catches shipped in two releases.
    *
    * `.app-shell`'s other children take no grid track — the mobile menu button
-   * is `display: none` above 1024, and the AI chat and toast stack are
+   * is `display: none` above 1024, and the toast stack is
    * `position: fixed`. So on a module with no sidebar (§3.3's `none`) `main`
    * was the only grid item, auto-placement dropped it into the first column,
    * and §3.30 makes that column 0px. Calendar, Focus, Matrix and Settings all

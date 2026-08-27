@@ -1,12 +1,4 @@
 import type { MiniFocusTimerSnapshot } from "../lib/miniFocusTimer";
-import type {
-  HardwareProfile,
-  InstalledModelFile,
-  LocalAiRuntimeStatus,
-  ModelDownloadOutcome,
-  ModelDownloadProgress,
-  ModelDownloadRequest,
-} from "../lib/localAi/types";
 
 export type PlatformKind = "web" | "desktop";
 export type FocusTrayAction = "pause" | "resume" | "finish";
@@ -18,103 +10,6 @@ export type AppUpdateStatus =
   | { status: "current"; latestVersion?: string }
   | { status: "available"; latestVersion: string }
   | { status: "unavailable"; message?: string };
-
-// A file discovered under a scanned root (e.g. an Obsidian vault). `relativePath`
-// is relative to the root passed to `scanMarkdownFiles`; when returned from
-// `getFileMetadata` (no root context) it falls back to the file's base name.
-export interface PlatformFileEntry {
-  path: string;
-  relativePath: string;
-  size: number;
-  modifiedAt: number;
-}
-
-export interface ScanMarkdownFilesOptions {
-  extensions: string[];
-  excludedFolders: string[];
-  maxFiles?: number;
-}
-
-// Read-only, desktop-only file access used by the local knowledge-base
-// feature (see KNOWLEDGE_BASE_DESIGN.md). Never exposes a write path — the
-// Obsidian vault is treated as a read-only source (design principles 7-8).
-export interface PlatformFiles {
-  supported(): boolean;
-  // Opens a native folder picker and grants this session read access to the
-  // chosen folder. Returns null if the user cancels.
-  pickFolder(): Promise<string | null>;
-  // Re-grants read access to a previously chosen folder. Needed because the
-  // OS-level scope granted by pickFolder() is not persisted across app
-  // restarts — call this on load whenever a saved vault path exists.
-  grantAccess(path: string): Promise<void>;
-  scanMarkdownFiles(root: string, options: ScanMarkdownFilesOptions): Promise<PlatformFileEntry[]>;
-  // Rejects if the file exceeds maxBytes (checked via metadata before reading).
-  readTextFile(path: string, maxBytes?: number): Promise<string>;
-  getFileMetadata(path: string): Promise<PlatformFileEntry | null>;
-  getDefaultKnowledgeDbPath(): Promise<string>;
-  // Creates the directory that getDefaultKnowledgeDbPath()'s file lives in,
-  // if it doesn't already exist. Must be called before opening the default
-  // knowledge DB — Tauri does not guarantee the app data dir pre-exists.
-  ensureKnowledgeDbDir(): Promise<void>;
-  // Watches the vault folder (recursively, debounced) and calls onChange
-  // after edits settle. Returns an unsubscribe function. Relies on the fs
-  // scope already granted by grantAccess()/pickFolder() for this same path.
-  watchVault(path: string, onChange: () => void): Promise<() => void>;
-}
-
-// Desktop-only bridge to the local AI Rust commands (src-tauri/src/local_ai.rs,
-// LOCAL_AI_SYSTEM_DESIGN.md). Hardware profiling is read-only and local — the
-// caller (Local AI Setup UI) must only invoke it after explicit user consent.
-export interface PlatformLocalAi {
-  supported(): boolean;
-  getHardwareProfile(): Promise<HardwareProfile>;
-  // Returns the app-local models directory, creating it if needed.
-  getModelsDir(): Promise<string>;
-  listInstalledModels(): Promise<InstalledModelFile[]>;
-  getRuntimeStatus(): Promise<LocalAiRuntimeStatus>;
-  // Streams a GGUF into the models dir with resume + sha256 verification.
-  // Resolves when the download finishes or was cancelled; rejects on failure
-  // (bad host, network error, checksum mismatch). Progress arrives via
-  // subscribeDownloadProgress.
-  downloadModel(request: ModelDownloadRequest): Promise<ModelDownloadOutcome>;
-  cancelDownload(modelId: string): Promise<void>;
-  // Removes an installed model file (and any leftover .partial download).
-  deleteModel(fileName: string): Promise<void>;
-  subscribeDownloadProgress(handler: (progress: ModelDownloadProgress) => void): Promise<() => void>;
-  // Spawns (or reuses) the managed llama-server for an installed model.
-  // Resolves as soon as the process is up — readiness is polled separately
-  // via GET /health, since model loading can take tens of seconds.
-  startServer(modelFileName: string, preferredPort: number, binaryPathOverride: string): Promise<LocalAiRuntimeStatus>;
-  stopServer(): Promise<void>;
-  // Second managed llama-server slot dedicated to Full-RAG embeddings, so a
-  // dedicated embedding GGUF can run beside the chat model instead of
-  // swapping it in and out per request. Same readiness contract as
-  // startServer (poll GET /health on the returned port).
-  startEmbeddingServer(
-    modelFileName: string,
-    preferredPort: number,
-    binaryPathOverride: string,
-  ): Promise<LocalAiRuntimeStatus>;
-  stopEmbeddingServer(): Promise<void>;
-  getEmbeddingRuntimeStatus(): Promise<LocalAiRuntimeStatus>;
-  // The running build's target (std::env::consts OS/ARCH), used to pick the
-  // matching runtime asset — e.g. macos-aarch64 vs macos-x86_64 on a universal
-  // app. Reveals nothing beyond the app binary itself, so it needs no consent.
-  getPlatform(): Promise<{ os: string; arch: string }>;
-  // True once the managed llama-server binary is present in the app-local bin
-  // dir. External launch mode and a path override don't need it.
-  isServerInstalled(): Promise<boolean>;
-  // The catalog version of the installed runtime (written on install), or
-  // null for none/pre-version-tracking installs — the settings UI treats a
-  // mismatch with the pinned catalog version as "update available".
-  getServerRuntimeVersion(): Promise<string | null>;
-  // Downloads and extracts an official llama.cpp release zip into the bin dir,
-  // replacing any previous build. Same allowlist + sha256 trust model as
-  // downloadModel; progress and cancellation reuse subscribeDownloadProgress /
-  // cancelDownload under the "llama-server-runtime" id. Resolves "completed"
-  // or "cancelled".
-  installServer(url: string, expectedSha256: string, version: string): Promise<ModelDownloadOutcome>;
-}
 
 /**
  * Where notification permission stands (§6.38, §6.40).
@@ -139,11 +34,10 @@ export interface BackupFile {
 /**
  * Automatic backups, desktop only.
  *
- * `PlatformFiles` above is deliberately read-only — the Obsidian vault is a
- * source, not a destination — so this is a separate surface rather than a write
- * method bolted onto it. It cannot write anywhere else either: no method takes
- * a directory, and the one that takes a file name only accepts names this app
- * generated. The whole path lives in Rust for that reason.
+ * Every method is a Rust command, so this surface cannot be pointed anywhere
+ * else: no method takes a directory, and the one that takes a file name only
+ * accepts names this app generated. The whole path lives in Rust for that
+ * reason.
  *
  * On the web every method other than `supported()` rejects. There is no honest
  * web implementation: a copy kept in the origin's own storage disappears with
@@ -204,7 +98,5 @@ export interface PlatformAdapter {
     subscribeAction(handler: (payload: FocusTrayActionPayload) => void): Promise<() => void>;
   };
   openExternal(url: string): Promise<void>;
-  files: PlatformFiles;
   backups: PlatformBackups;
-  localAi: PlatformLocalAi;
 }

@@ -43,7 +43,7 @@
 - `C:\Users\minju\Todolist\src\data\studySeed.ts`
 - `C:\Users\minju\Todolist\src\utils\planner.ts`
 
-## AI/Ollama 파일
+## AI/Ollama 파일 (전부 삭제됨 — 2026-08-27, `LOCAL_AI_REMOVAL_DESIGN.md`)
 
 - `C:\Users\minju\Todolist\src\components\OllamaChat.tsx`
 - `C:\Users\minju\Todolist\src\components\ai\AgentActionPreview.tsx`

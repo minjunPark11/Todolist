@@ -1,6 +1,17 @@
 # Architecture Decisions
 
-## 2026-07-02 - AI Gateway Provider Order
+## 2026-08-27 - AI 기능 전면 제거
+
+Decision: 로컬 AI 런타임, AI 채팅/어시스턴트, Obsidian 지식베이스를 모두 삭제한다.
+
+Why: 채팅이 실제로 응답할 수 있는 경로는 로컬 provider 하나뿐이었고, 서버 provider는
+`VITE_AI_SERVER_URL`이 비어 있어 동작한 적이 없다. 로컬 런타임을 빼면 남는 UI는
+오류만 내는 껍데기이므로, 부분 제거 대신 전면 제거를 택했다. 범위와 단계는
+`LOCAL_AI_REMOVAL_DESIGN.md`.
+
+---
+
+## 2026-07-02 - AI Gateway Provider Order (폐기됨 — 위 결정으로 대체)
 
 Decision: AI calls use a single gateway entry point at `C:\Users\minju\Todolist\src\lib\ai\gateway.ts`.
 

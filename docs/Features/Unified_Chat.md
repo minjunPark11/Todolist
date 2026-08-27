@@ -1,5 +1,8 @@
 # Unified Chat (Chat + Assistant 병합 → 단일 surface)
 
+> ⛔ **폐기됨 (2026-08-27).** 이 문서가 설명하는 기능은 앱에서 제거되었습니다.
+> 제거 범위는 `LOCAL_AI_REMOVAL_DESIGN.md`를 보세요. 아래 내용은 기록입니다.
+
 > 상태: **설계** (구현 전). 기존 두 AI 진입점(Chat 탭 / Assistant 탭)을
 > 하나의 Chat으로 합치는 기준 문서.
 > 관련 메모리: `ai-stuck-to-execution-vision.md`, `local-ai-perf-bottleneck.md`.

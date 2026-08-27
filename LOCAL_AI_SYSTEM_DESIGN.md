@@ -1,5 +1,9 @@
 # Local AI System 설계 (llama-server sidecar 기반)
 
+> ⛔ **폐기됨 (2026-08-27).** 이 문서가 설계한 기능은 앱에서 제거되었습니다.
+> 제거 범위와 이유는 `LOCAL_AI_REMOVAL_DESIGN.md`를 보세요. 아래 내용은 기록으로만 남깁니다.
+
+
 > 상태: **설계 확정 + 최소 스캐폴드** (2026-07-06) · 단계적 구현 전 문서
 > 대상: FocusFlow 데스크톱(Tauri) 앱
 > 관련 코드: `src/lib/localAi/*`, `src/lib/ai/*`, `src/platform/*`, `src-tauri/src/local_ai.rs`

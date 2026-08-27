@@ -46,8 +46,6 @@ function renderShell(sidebar: ContextSidebarState = sidebarState()) {
             onNavigate={() => {}}
             onOpenSearch={() => {}}
             searchOpen={false}
-            onOpenAi={() => {}}
-            aiOpen={false}
           />
         }
         sidebar={sidebar}
@@ -174,13 +172,13 @@ describe("the Global Rail's ARIA (§2.33)", () => {
    * Asserted as the whole list rather than as absences, because "no avatar"
    * would still pass if the order silently changed underneath it.
    */
-  it("holds the five destinations, then Search, then the two utilities", () => {
+  it("holds the five destinations, then Search, then Settings", () => {
     const { container } = renderShell();
     const labels = [...container.querySelectorAll(".global-rail .rail-item")].map((item) =>
       item.getAttribute("aria-label"),
     );
 
-    expect(labels).toEqual(["작업", "매트릭스", "캘린더", "집중", "검색", "AI 어시스턴트", "설정"]);
+    expect(labels).toEqual(["작업", "매트릭스", "캘린더", "집중", "검색", "설정"]);
     // Settings had two doors while the account popover also offered it.
     expect(labels.filter((label) => label === "설정")).toHaveLength(1);
     expect(container.querySelector(".rail-brand")).toBeNull();

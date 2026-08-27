@@ -9,7 +9,6 @@ import type { usePlannerData } from "../hooks/usePlannerData";
 import type { CalendarShareState } from "../lib/calendarShare";
 import type { AutoBackupState } from "./useAutoBackup";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
-import type { KnowledgeSettings } from "../lib/knowledge/types";
 import type { AppUpdateStatus } from "../platform";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Task } from "../types";
 
@@ -61,9 +60,6 @@ type AppPagesProps = {
   onDisableCalendarShare: () => void;
   onRegenerateCalendarShare: () => void;
   onPublishCalendarShare: () => void;
-  knowledgeSettings: KnowledgeSettings;
-  onUpdateKnowledgeSettings: (patch: Partial<KnowledgeSettings>) => void;
-  isKnowledgeDesktop: boolean;
   accountSlot: ReactNode;
 };
 
@@ -104,9 +100,6 @@ export function AppPages({
   onDisableCalendarShare,
   onRegenerateCalendarShare,
   onPublishCalendarShare,
-  knowledgeSettings,
-  onUpdateKnowledgeSettings,
-  isKnowledgeDesktop,
   accountSlot,
 }: AppPagesProps) {
   function pageGridClass(extra = "") {
@@ -239,9 +232,6 @@ export function AppPages({
       onDisableCalendarShare={onDisableCalendarShare}
       onRegenerateCalendarShare={onRegenerateCalendarShare}
       onPublishCalendarShare={onPublishCalendarShare}
-      knowledgeSettings={knowledgeSettings}
-      onUpdateKnowledgeSettings={onUpdateKnowledgeSettings}
-      isKnowledgeDesktop={isKnowledgeDesktop}
     />
   );
 }

@@ -601,9 +601,10 @@ export interface AppSettings {
   autoBackupKeep: number;
   sidebarCollapsed: boolean;
   reduceMotion: boolean;
-  // Legacy Ollama model preference. No UI sets it since the managed
-  // llama-server replaced Ollama chat (LOCAL_AI_SYSTEM_DESIGN.md Phase 4);
-  // kept so synced settings from older clients still normalize cleanly.
+  // Dead field from the removed AI assistant (LOCAL_AI_REMOVAL_DESIGN.md).
+  // No UI reads or writes it. Kept for one more release so settings synced
+  // from a client that still has the feature normalize cleanly instead of
+  // failing the shape check.
   aiModel: string;
 }
 

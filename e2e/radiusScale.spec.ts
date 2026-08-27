@@ -22,8 +22,8 @@ const LIST = { id: "list-radius", name: "Radius" };
  * Shapes that stay off the scale, each for a reason §11 gives.
  *
  * The FAB used to be listed here as the one entry that was not a decision.
- * V-4 made it one: the 56px accent circle is gone and the AI panel opens from
- * a Rail utility, so there is nothing to exempt.
+ * V-4 moved it into the Rail and the AI feature it opened has since been
+ * removed, so there is nothing to exempt.
  */
 // Matched with `closest` rather than against the element’s own class list:
 // several of these paint their shape onto an unclassed child, and a check that
