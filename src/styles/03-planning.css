@@ -1092,6 +1092,59 @@
 }
 .ff-settings-error { color: var(--danger); font-size: 13px; margin: 0; }
 
+/* SETTINGS_REVIEW.md 6-1: the settings screen had only ever been measured at
+   1440x900. Narrower, two things broke.
+
+   The tab bar held eight tabs in 614px and the shell's 900px rule gave it
+   `overflow-x: auto`, so once the column was narrower than that the tabs past
+   its edge sat behind a scroll with nothing on screen saying they were there —
+   614px of tabs in a 311px column at 375px wide. And `.ff-settings-row` stayed a
+   row at every width: label and control shared what was left and the control
+   wrapped inside itself, taking rows from 82px to as much as 121px.
+
+   680px is measured, not chosen: the column is `min(760px, viewport - 64px)`
+   below the shell's own 900px breakpoint, and the tab bar needs 614px of it. So
+   the tabs overflow below a 678px viewport, and 680 is the last width where
+   every tab fits and no row on any of the eight tabs is taller than 82px. Both
+   were checked — Account, Appearance and Data hold at 680 and wrap by 660.
+
+   A container query would be the truer trigger — what breaks is the column, not
+   the window, and the calendar already queries containers. It is not available
+   here: `ConfirmModal` renders inline inside `.ff-settings-page` rather than
+   through a portal, and `container-type` would make this element the containing
+   block for its `position: fixed` backdrop. */
+@media (max-width: 680px) {
+  /* Wrapping shows every tab. Scrolling hid them, and a segmented control has
+     no scrollbar or edge fade to say so. */
+  .ff-settings-page .ff-segmented {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  /* Label above, control below, both starting at the same left edge — which is
+     what the row was already doing badly by wrapping. */
+  .ff-settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  /* These three justify to the right so the control sits opposite its label.
+     Stacked there is nothing opposite, and right-aligned controls under
+     left-aligned labels read as a second column that is not there. */
+  .ff-settings-row-control,
+  .ff-settings-actions,
+  .ff-knowledge-vault-control {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
+  /* Its own max-width is wider than the column now. */
+  .ff-knowledge-path { max-width: 100%; }
+}
+
 /* ===== Local AI settings ===== */
 .ff-localai-intro {
   display: flex;
