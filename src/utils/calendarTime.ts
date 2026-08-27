@@ -18,8 +18,32 @@ export const DAY_START = 0;
 export const DAY_END = 24;
 export const TIME_SNAP_MINUTES = 15;
 
-/** Apple's default for "show __ hours at a time"; the setting's range is 6–24. */
+/** Apple's default for "show __ hours at a time" (SETTINGS_REVIEW.md 4.4). */
 export const HOURS_AT_A_TIME = 12;
+
+/** The setting's range, the same span Calendar.app's stepper offers. */
+export const MIN_HOURS_AT_A_TIME = 6;
+export const MAX_HOURS_AT_A_TIME = 24;
+
+/** Every value the picker offers: 6, 7, … 24. */
+export const HOURS_AT_A_TIME_CHOICES: readonly number[] = Array.from(
+  { length: MAX_HOURS_AT_A_TIME - MIN_HOURS_AT_A_TIME + 1 },
+  (_, index) => MIN_HOURS_AT_A_TIME + index,
+);
+
+/**
+ * A stored or typed value made usable as an hour count.
+ *
+ * Everything that is not a whole number inside the range becomes the default
+ * rather than the nearest legal value: a `0`, a `"twelve"` or an `undefined`
+ * is a value that never was, and the default is the honest answer for it. A
+ * number merely out of range is clamped, since that one has an intent to keep.
+ */
+export function clampHoursAtATime(value: unknown): number {
+  const hours = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(hours) || hours <= 0) return HOURS_AT_A_TIME;
+  return Math.min(MAX_HOURS_AT_A_TIME, Math.max(MIN_HOURS_AT_A_TIME, Math.round(hours)));
+}
 
 /** Nearest multiple of four to Calendar.app's measured floor of 42.8px. */
 export const MIN_SLOT_HEIGHT = 44;
@@ -29,10 +53,15 @@ export const MIN_SLOT_HEIGHT = 44;
  *
  * `viewportHeight` is the space the hour rows actually get — the scroller minus
  * the sticky header above them — not the scroller's own height.
+ *
+ * `hours` is how many of them the reader asked to see at once. R1 already made
+ * the row height a function of the viewport; this is the other half of the same
+ * rule — Apple's is `max(floor, gridHeight / N)` where N is a setting, and ours
+ * was that with N nailed to 12.
  */
-export function slotHeightFor(viewportHeight: number): number {
+export function slotHeightFor(viewportHeight: number, hours: number = HOURS_AT_A_TIME): number {
   if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) return MIN_SLOT_HEIGHT;
-  const snapped = Math.round(viewportHeight / HOURS_AT_A_TIME / 4) * 4;
+  const snapped = Math.round(viewportHeight / clampHoursAtATime(hours) / 4) * 4;
   return Math.max(MIN_SLOT_HEIGHT, snapped);
 }
 

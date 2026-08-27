@@ -22,6 +22,7 @@ import {
   canSendTestNotification,
   notificationHintKey,
 } from "../utils/notificationCopy";
+import { clampHoursAtATime, HOURS_AT_A_TIME_CHOICES } from "../utils/calendarTime";
 import { installedFileMatchesModel } from "../lib/localAi/runtime";
 import type { ServerRuntimeAsset } from "../lib/localAi/serverRuntimeCatalog";
 import { recommendLocalModel } from "../lib/localAi/recommender";
@@ -288,6 +289,25 @@ export function SettingsPage({
 
       {tab === "calendar" ? (
         <div className="ff-cal-settings-stack">
+          {/* SETTINGS_REVIEW.md 4.4. Here rather than beside the time format in
+              Appearance: that pair sits by Language because both follow it,
+              and this one follows nothing but the calendar. macOS files it the
+              same way — Calendar settings, not Language & Region. */}
+          <section className="ff-settings-card">
+            <SettingsRow title={t("settings.calendar.hoursAtATime")} hint={t("settings.calendar.hoursAtATimeHint")}>
+              <select
+                value={settings.hoursAtATime}
+                onChange={(e) => onUpdate({ hoursAtATime: clampHoursAtATime(e.target.value) })}
+              >
+                {HOURS_AT_A_TIME_CHOICES.map((hours) => (
+                  <option key={hours} value={hours}>
+                    {t("settings.calendar.hoursOption", { count: hours })}
+                  </option>
+                ))}
+              </select>
+            </SettingsRow>
+          </section>
+
           <section className="ff-settings-card ff-cal-card">
             <CalendarCategorySettings
               tasks={tasks}

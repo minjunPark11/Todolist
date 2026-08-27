@@ -3,7 +3,11 @@ import {
   clickDefaultRange,
   DAY_END,
   DAY_START,
+  clampHoursAtATime,
   HOURS_AT_A_TIME,
+  HOURS_AT_A_TIME_CHOICES,
+  MAX_HOURS_AT_A_TIME,
+  MIN_HOURS_AT_A_TIME,
   MIN_SLOT_HEIGHT,
   minutesFromPointerY,
   minutesToTime,
@@ -63,6 +67,73 @@ describe("slotHeightFor", () => {
     // Mac shows and what a fixed constant could not reproduce.
     expect(slotHeightFor(862)).toBeGreaterThan(slotHeightFor(682));
     expect(slotHeightFor(682)).toBeGreaterThan(slotHeightFor(482));
+  });
+
+  // SETTINGS_REVIEW.md 4.4: the divisor is the reader's, not a constant.
+  it("fits whatever hour count it is given", () => {
+    for (const hours of HOURS_AT_A_TIME_CHOICES) {
+      // 1400px is tall enough that even 24 rows clear the floor, so the
+      // division is what is under test rather than the clamp. The row lands
+      // within the snap of an exact fit — asking for 24 cannot also ask for a
+      // multiple of four to divide 1400 evenly.
+      expect(Math.abs(slotHeightFor(1400, hours) - 1400 / hours)).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("means shorter rows the more hours are asked for", () => {
+    expect(slotHeightFor(862, 6)).toBeGreaterThan(slotHeightFor(862, 12));
+    expect(slotHeightFor(862, 12)).toBeGreaterThan(slotHeightFor(862, 24));
+  });
+
+  it("keeps every invariant at every hour count", () => {
+    for (const hours of HOURS_AT_A_TIME_CHOICES) {
+      for (const viewport of VIEWPORTS) {
+        const slot = slotHeightFor(viewport, hours);
+        expect(slot % 4).toBe(0);
+        expect(slot).toBeGreaterThanOrEqual(MIN_SLOT_HEIGHT);
+        expect(Number.isInteger((TIME_SNAP_MINUTES * slot) / 60)).toBe(true);
+      }
+    }
+  });
+
+  it("answers the default when the count is unusable", () => {
+    // The dataset is a string channel and can hold anything, including nothing.
+    expect(slotHeightFor(862, NaN)).toBe(slotHeightFor(862, HOURS_AT_A_TIME));
+    expect(slotHeightFor(862, 0)).toBe(slotHeightFor(862, HOURS_AT_A_TIME));
+  });
+});
+
+describe("clampHoursAtATime", () => {
+  it("passes every value the picker can produce through unchanged", () => {
+    for (const hours of HOURS_AT_A_TIME_CHOICES) {
+      expect(clampHoursAtATime(hours)).toBe(hours);
+      // A <select> hands back a string, and so does the root dataset.
+      expect(clampHoursAtATime(String(hours))).toBe(hours);
+    }
+  });
+
+  it("offers the whole range Calendar.app does, and nothing outside it", () => {
+    expect(HOURS_AT_A_TIME_CHOICES[0]).toBe(MIN_HOURS_AT_A_TIME);
+    expect(HOURS_AT_A_TIME_CHOICES[HOURS_AT_A_TIME_CHOICES.length - 1]).toBe(MAX_HOURS_AT_A_TIME);
+    expect(HOURS_AT_A_TIME_CHOICES).toContain(HOURS_AT_A_TIME);
+  });
+
+  it("pulls an out-of-range number to the nearest hour it can draw", () => {
+    // A client with a wider range keeps its intent; it does not get reset.
+    expect(clampHoursAtATime(2)).toBe(MIN_HOURS_AT_A_TIME);
+    expect(clampHoursAtATime(48)).toBe(MAX_HOURS_AT_A_TIME);
+    expect(clampHoursAtATime(9.4)).toBe(9);
+  });
+
+  it("answers the default for a value that never was", () => {
+    // Not the floor: an absent or unreadable setting is not a request for six
+    // hours, and 12 is what every account was showing before this existed.
+    expect(clampHoursAtATime(undefined)).toBe(HOURS_AT_A_TIME);
+    expect(clampHoursAtATime("")).toBe(HOURS_AT_A_TIME);
+    expect(clampHoursAtATime("twelve")).toBe(HOURS_AT_A_TIME);
+    expect(clampHoursAtATime(null)).toBe(HOURS_AT_A_TIME);
+    expect(clampHoursAtATime(0)).toBe(HOURS_AT_A_TIME);
+    expect(clampHoursAtATime(-8)).toBe(HOURS_AT_A_TIME);
   });
 });
 

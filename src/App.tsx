@@ -369,8 +369,23 @@ export default function App() {
     // components read without every layer between them carrying a prop.
     root.dataset.timeFormat = appSettings.timeFormat;
     root.dataset.weekStart = appSettings.weekStart;
+    root.dataset.hoursAtATime = String(appSettings.hoursAtATime);
     root.lang = appSettings.language;
-  }, [appSettings.theme, appSettings.accentColor, appSettings.fontSize, appSettings.reduceMotion, appSettings.language]);
+    // Every setting written above is a dependency. The three added later were
+    // not, so this effect did not re-run when one of them changed alone and the
+    // dataset — the only copy the readers see — stayed on the old value until
+    // some other setting moved. Changing the language at the same time is what
+    // hid it.
+  }, [
+    appSettings.theme,
+    appSettings.accentColor,
+    appSettings.fontSize,
+    appSettings.reduceMotion,
+    appSettings.timeFormat,
+    appSettings.weekStart,
+    appSettings.hoursAtATime,
+    appSettings.language,
+  ]);
 
   useEffect(() => {
     const session = planner.activeFocusSession;

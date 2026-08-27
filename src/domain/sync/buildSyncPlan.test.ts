@@ -55,6 +55,7 @@ const appSettings: AppSettings = {
   confirmBeforeDelete: true,
   timeFormat: "locale",
   weekStart: "sunday",
+  hoursAtATime: 12,
   showSidebarCounts: true,
   sidebarCollapsed: false,
   reduceMotion: false,
