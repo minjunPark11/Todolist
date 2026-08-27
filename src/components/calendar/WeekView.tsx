@@ -20,7 +20,7 @@ import {
 import { todayValue } from "../../utils/date";
 import { dayHeadFormatter, dayHeadParts } from "../../utils/calendarHeader";
 import { formatClock, formatClockRange, formatHourLabel } from "../../utils/clock";
-import { useTimeFormat } from "../../utils/appPrefs";
+import { useHoursAtATime, useTimeFormat } from "../../utils/appPrefs";
 import { blockIsTight, blockShowsTime } from "../../utils/eventBlock";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { OverlayScrollbar } from "../common/OverlayScrollbar";
@@ -205,6 +205,7 @@ export function WeekView({
 }: WeekViewProps) {
   const { t, lang } = useT();
   const timeFormat = useTimeFormat();
+  const hoursAtATime = useHoursAtATime();
   const clockLocale = lang === "ko" ? "ko" : "en";
   const motionEnabled = useMotionEnabled();
   // R3: the day header reads the way the OS writes it. Korean puts the number
@@ -259,22 +260,24 @@ export function WeekView({
   const nowTop = topFor(nowMinutes);
   const nowLabel = formatClock(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`, timeFormat, clockLocale);
 
-  // R1: fit HOURS_AT_A_TIME into the height the rows actually have, with a
-  // floor below which the grid scrolls instead of compressing further. The
-  // sticky header is inside the scroller, so its height comes off the top; the
-  // all-day band inside it is draggable, which is why both are observed.
+  // R1: fit the reader's chosen number of hours into the height the rows
+  // actually have, with a floor below which the grid scrolls instead of
+  // compressing further. The sticky header is inside the scroller, so its
+  // height comes off the top; the all-day band inside it is draggable, which is
+  // why both are observed. The setting is a dependency because nothing about
+  // the element changes when it does — only the divisor.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const sticky = el.querySelector<HTMLElement>(".gcal-timegrid-sticky");
-    const measure = () => setSlotHeight(slotHeightFor(el.clientHeight - (sticky?.offsetHeight ?? 0)));
+    const measure = () => setSlotHeight(slotHeightFor(el.clientHeight - (sticky?.offsetHeight ?? 0), hoursAtATime));
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     if (sticky) observer.observe(sticky);
     return () => observer.disconnect();
-  }, [isDay]);
+  }, [isDay, hoursAtATime]);
 
   // Spec §6.4: rows are never compressed — the body scrolls instead, opening
   // near the current time (or 08:00 when the view has no "today").

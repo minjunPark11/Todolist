@@ -57,6 +57,7 @@ import {
   templateFromTask,
   type TemplateTarget,
 } from "../domain/tasks/templates";
+import { clampHoursAtATime, HOURS_AT_A_TIME } from "../utils/calendarTime";
 import {
   migrateReminders,
   planReminderRows,
@@ -155,6 +156,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   confirmBeforeDelete: true,
   timeFormat: "locale",
   weekStart: "sunday",
+  hoursAtATime: HOURS_AT_A_TIME,
   showSidebarCounts: true,
   sidebarCollapsed: false,
   reduceMotion: false,
@@ -441,6 +443,10 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
     confirmBeforeDelete: settings?.confirmBeforeDelete ?? DEFAULT_APP_SETTINGS.confirmBeforeDelete,
     timeFormat: oneOf(settings?.timeFormat, ["locale", "12h", "24h"] as const, DEFAULT_APP_SETTINGS.timeFormat),
     weekStart: oneOf(settings?.weekStart, ["sunday", "monday"] as const, DEFAULT_APP_SETTINGS.weekStart),
+    // The only numeric setting, so it gets a clamp rather than `oneOf`: a
+    // record written by a future client with a wider range should land at the
+    // nearest hour we can draw, not back at the default.
+    hoursAtATime: clampHoursAtATime(settings?.hoursAtATime),
     showSidebarCounts: settings?.showSidebarCounts ?? DEFAULT_APP_SETTINGS.showSidebarCounts,
     sidebarCollapsed: settings?.sidebarCollapsed ?? DEFAULT_APP_SETTINGS.sidebarCollapsed,
     reduceMotion: settings?.reduceMotion ?? DEFAULT_APP_SETTINGS.reduceMotion,

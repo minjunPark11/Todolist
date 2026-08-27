@@ -564,6 +564,15 @@ export interface AppSettings {
    * been showing; it was never a choice, just `getDay()` used unadjusted.
    */
   weekStart: WeekStart;
+  /**
+   * How many hour rows the Day/Week grid fits before it scrolls
+   * (SETTINGS_REVIEW.md 4.4, CALENDAR_GEOMETRY_DESIGN.md R1).
+   *
+   * A whole number from 6 to 24; `calendarTime.clampHoursAtATime` is what any
+   * value reaching this field has to pass. 12 is Apple's default and was ours
+   * as a constant, so no existing account moves.
+   */
+  hoursAtATime: number;
   showSidebarCounts: boolean;
   sidebarCollapsed: boolean;
   reduceMotion: boolean;
