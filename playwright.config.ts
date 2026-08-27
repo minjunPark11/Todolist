@@ -15,6 +15,9 @@ const PORT = 5199;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Warms the dev server's module graph before anything is timed. See the file
+  // for what it was costing to skip.
+  globalSetup: "./e2e/globalSetup.ts",
   // The app is local-first, so these drive real localStorage. Serial keeps two
   // specs from writing the same account state underneath each other.
   fullyParallel: false,
