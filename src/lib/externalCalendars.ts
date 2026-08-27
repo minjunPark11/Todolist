@@ -1,5 +1,18 @@
 import { platform } from "../platform";
 import type { ExternalCalendar, ExternalCalendarEvent } from "../types";
+// Parsing lives in ./ics, which has no platform under it and so can also run
+// on a server (FOCUSFLOW_EXTERNAL_AI_ACCESS_ARCHITECTURE.md §7.2). Re-exported
+// here because this module was the door to it and the call sites still knock.
+import { parseIcsEvents } from "./ics/parse";
+
+export {
+  parseIcsEvents,
+  externalEventDate,
+  externalEventEndDate,
+  externalEventStartTime,
+  externalEventEndTime,
+} from "./ics/parse";
+export { expandIcsOccurrences } from "./ics/recurrence";
 
 export const EXTERNAL_CALENDAR_STALE_MINUTES = 30;
 
@@ -12,159 +25,6 @@ const STORAGE_KEY = "focusflow.externalCalendars.v1";
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function unfoldIcsLines(text: string) {
-  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  const unfolded: string[] = [];
-  for (const line of lines) {
-    if ((line.startsWith(" ") || line.startsWith("\t")) && unfolded.length > 0) {
-      unfolded[unfolded.length - 1] += line.slice(1);
-    } else {
-      unfolded.push(line);
-    }
-  }
-  return unfolded;
-}
-
-function unescapeIcsText(value = "") {
-  return value
-    .replace(/\\n/gi, "\n")
-    .replace(/\\,/g, ",")
-    .replace(/\\;/g, ";")
-    .replace(/\\\\/g, "\\")
-    .trim();
-}
-
-function getIcsValue(lines: string[], name: string) {
-  const property = getIcsProperty(lines, name);
-  return property?.value ?? "";
-}
-
-function getIcsProperty(lines: string[], name: string) {
-  const prefix = name.toUpperCase();
-  const line = lines.find((item) => {
-    const upper = item.toUpperCase();
-    return upper.startsWith(`${prefix}:`) || upper.startsWith(`${prefix};`);
-  });
-  if (!line) return null;
-  const colon = line.indexOf(":");
-  if (colon < 0) return null;
-  const head = line.slice(0, colon);
-  const params = new Map<string, string>();
-  for (const part of head.split(";").slice(1)) {
-    const equals = part.indexOf("=");
-    if (equals < 0) continue;
-    params.set(part.slice(0, equals).toUpperCase(), part.slice(equals + 1).replace(/^"|"$/g, ""));
-  }
-  return { value: line.slice(colon + 1), params };
-}
-
-function parseIcsDate(value: string, timezone?: string) {
-  if (!value) return null;
-  if (/^\d{8}$/.test(value)) {
-    return { value: `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`, allDay: true, timezone: undefined };
-  }
-  const match = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/);
-  if (!match) return null;
-  const [, year, month, day, hour, minute, second = "00", z] = match;
-  const iso = z
-    ? new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`).toISOString()
-    : `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-  return { value: iso, allDay: false, timezone };
-}
-
-function pad2(value: number) {
-  return String(value).padStart(2, "0");
-}
-
-// UTC ("...Z") stamps are converted to the source calendar's timezone when
-// available, otherwise to the device's local date/time. Floating TZID values
-// are already in the source calendar's wall time, so they are taken as-is.
-function localDateTimeParts(value: string, timezone?: string): { date: string; time?: string } {
-  if (!value.includes("T")) return { date: value.slice(0, 10) };
-  if (value.endsWith("Z")) {
-    const date = new Date(value);
-    if (timezone) {
-      try {
-        const parts = new Intl.DateTimeFormat("en-CA", {
-          timeZone: timezone,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-          hourCycle: "h23",
-        })
-          .formatToParts(date)
-          .reduce<Record<string, string>>((acc, part) => {
-            if (part.type !== "literal") acc[part.type] = part.value;
-            return acc;
-          }, {});
-        return {
-          date: `${parts.year}-${parts.month}-${parts.day}`,
-          time: `${parts.hour}:${parts.minute}`,
-        };
-      } catch {
-        // Unknown/non-IANA TZID: fall back to device local handling.
-      }
-    }
-    return {
-      date: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`,
-      time: `${pad2(date.getHours())}:${pad2(date.getMinutes())}`,
-    };
-  }
-  return { date: value.slice(0, 10), time: value.slice(11, 16) };
-}
-
-export function parseIcsEvents(text: string, calendarId: string): ExternalCalendarEvent[] {
-  const lines = unfoldIcsLines(text);
-  const calendarTimezone = getIcsValue(lines, "X-WR-TIMEZONE") || getIcsValue(lines, "TZID") || undefined;
-  const now = new Date().toISOString();
-  const events: ExternalCalendarEvent[] = [];
-  let block: string[] | null = null;
-
-  for (const line of lines) {
-    if (line === "BEGIN:VEVENT") {
-      block = [];
-      continue;
-    }
-    if (line === "END:VEVENT" && block) {
-      const uid = getIcsValue(block, "UID") || createId("ics-event");
-      const startProperty = getIcsProperty(block, "DTSTART");
-      const startTimezone = startProperty?.params.get("TZID") || calendarTimezone;
-      const start = parseIcsDate(startProperty?.value ?? "", startTimezone);
-      if (!start) {
-        block = null;
-        continue;
-      }
-      const endProperty = getIcsProperty(block, "DTEND");
-      const endTimezone = endProperty?.params.get("TZID") || start.timezone;
-      const end = parseIcsDate(endProperty?.value ?? "", endTimezone);
-      events.push({
-        id: `${calendarId}:${uid}`,
-        externalCalendarId: calendarId,
-        externalUid: uid,
-        title: unescapeIcsText(getIcsValue(block, "SUMMARY")) || "Untitled event",
-        description: unescapeIcsText(getIcsValue(block, "DESCRIPTION")),
-        location: unescapeIcsText(getIcsValue(block, "LOCATION")),
-        start: start.value,
-        end: end?.value,
-        allDay: start.allDay,
-        timezone: start.timezone,
-        sourceUrl: getIcsValue(block, "URL"),
-        readOnly: true,
-        createdAt: now,
-        updatedAt: now,
-      });
-      block = null;
-      continue;
-    }
-    if (block) block.push(line);
-  }
-
-  return events;
 }
 
 function sanitizeCalendar(raw: Partial<ExternalCalendar>): ExternalCalendar | null {
@@ -205,6 +65,12 @@ function sanitizeEvent(raw: Partial<ExternalCalendarEvent>): ExternalCalendarEve
     readOnly: true,
     createdAt: raw.createdAt || now,
     updatedAt: raw.updatedAt || now,
+    // Carried through the cache, or a reload would leave every repeating event
+    // as the single occurrence it was first written on — the exact bug
+    // ./ics/recurrence exists to fix.
+    recurrence: raw.recurrence,
+    exdates: raw.exdates,
+    recurrenceId: raw.recurrenceId,
   };
 }
 
@@ -296,19 +162,3 @@ export async function fetchExternalCalendarEvents(calendar: ExternalCalendar) {
   return parseIcsEvents(text, calendar.id);
 }
 
-export function externalEventDate(event: ExternalCalendarEvent) {
-  return localDateTimeParts(event.start, event.timezone).date;
-}
-
-// End date (exclusive for all-day events per RFC 5545), or undefined.
-export function externalEventEndDate(event: ExternalCalendarEvent) {
-  return event.end ? localDateTimeParts(event.end, event.timezone).date : undefined;
-}
-
-export function externalEventStartTime(event: ExternalCalendarEvent) {
-  return event.allDay ? undefined : localDateTimeParts(event.start, event.timezone).time;
-}
-
-export function externalEventEndTime(event: ExternalCalendarEvent) {
-  return event.allDay || !event.end ? undefined : localDateTimeParts(event.end, event.timezone).time;
-}

@@ -14,6 +14,7 @@ import {
   defaultCalendarLayers,
   type CalendarItem,
 } from "../utils/calendarItems";
+import { toDateInputValue } from "../utils/date";
 import {
   buildCalendarCategories,
   ensureCategoryVisible,
@@ -194,6 +195,23 @@ export function CalendarView({
     [categoriesById, categoryState.hiddenCategoryIds, externalCalendars],
   );
 
+  /**
+   * A month either side of the one on screen.
+   *
+   * Repeating events are expanded within this and nowhere else, so it has to
+   * cover everything a view can reach without a re-render — the month grid,
+   * its leading and trailing days, and the mini month beside it. Wider costs
+   * only the occurrences nobody looks at; narrower leaves gaps in the grid.
+   */
+  const externalCalendarRange = useMemo(() => {
+    const year = anchorDate.getFullYear();
+    const month = anchorDate.getMonth();
+    return {
+      from: toDateInputValue(new Date(year, month - 1, 1)),
+      to: toDateInputValue(new Date(year, month + 2, 0)),
+    };
+  }, [anchorDate]);
+
   const items = useMemo(
     () =>
       buildCalendarItems({
@@ -201,12 +219,22 @@ export function CalendarView({
         focusSessions,
         externalCalendars,
         externalCalendarEvents,
+        externalCalendarRange,
         layers: defaultCalendarLayers,
         categories: categoriesById,
         defaultCategoryId,
         visibleCategoryIds,
       }),
-    [tasks, focusSessions, externalCalendars, externalCalendarEvents, categoriesById, defaultCategoryId, visibleCategoryIds],
+    [
+      tasks,
+      focusSessions,
+      externalCalendars,
+      externalCalendarEvents,
+      externalCalendarRange,
+      categoriesById,
+      defaultCategoryId,
+      visibleCategoryIds,
+    ],
   );
 
   const monthPrefix = `${anchorDate.getFullYear()}-${pad(anchorDate.getMonth() + 1)}`;

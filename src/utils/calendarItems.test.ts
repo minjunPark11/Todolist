@@ -233,6 +233,70 @@ describe("external events", () => {
   });
 });
 
+describe("external events that repeat", () => {
+  const calendar: ExternalCalendar = {
+    id: "cal-1",
+    name: "Team",
+    icsUrl: "https://example.test/a.ics",
+    color: "#af52de",
+    visible: true,
+    enabled: true,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+
+  // A weekly 09:00 meeting, written the way a calendar hands one over: ONE
+  // record carrying the rule, not one record per week.
+  const weekly: ExternalCalendarEvent = {
+    id: "cal-1:standup",
+    externalCalendarId: "cal-1",
+    externalUid: "standup",
+    title: "Standup",
+    start: "2026-08-03T09:00:00",
+    end: "2026-08-03T09:30:00",
+    allDay: false,
+    timezone: "Asia/Seoul",
+    readOnly: true,
+    createdAt: NOW,
+    updatedAt: NOW,
+    recurrence: { freq: "WEEKLY", interval: 1 },
+  };
+
+  it("draws every week in the range, not just the first", () => {
+    const items = build({
+      externalCalendars: [calendar],
+      externalCalendarEvents: [weekly],
+      externalCalendarRange: { from: "2026-08-01", to: "2026-08-31" },
+    });
+    expect(items.map((item) => item.date)).toEqual([
+      "2026-08-03",
+      "2026-08-10",
+      "2026-08-17",
+      "2026-08-24",
+      "2026-08-31",
+    ]);
+  });
+
+  it("gives each week its own key", () => {
+    // Sharing one key is how the calendar lost four of the five: React and
+    // every Map keyed by it keep the last writer.
+    const items = build({
+      externalCalendars: [calendar],
+      externalCalendarEvents: [weekly],
+      externalCalendarRange: { from: "2026-08-01", to: "2026-08-31" },
+    });
+    expect(new Set(keys(items)).size).toBe(items.length);
+  });
+
+  it("shows one occurrence when the caller gives no range", () => {
+    // Not a feature — the documented cost of omitting the range, pinned here so
+    // a caller that forgets it fails visibly in review rather than quietly on
+    // screen.
+    const items = build({ externalCalendars: [calendar], externalCalendarEvents: [weekly] });
+    expect(items).toHaveLength(1);
+  });
+});
+
 describe("actual focus time", () => {
   function session(overrides: Partial<FocusSession> = {}): FocusSession {
     return {
