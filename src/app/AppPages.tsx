@@ -194,7 +194,6 @@ export function AppPages({
         focusSessions={planner.focusSessions}
         activeSession={planner.activeFocusSession}
         settings={focusSettings}
-        onUpdateSettings={onUpdateFocusSettings}
         onStartFocus={planner.startFocusSession}
         onPauseFocus={planner.pauseFocusSession}
         onResumeFocus={planner.resumeFocusSession}
@@ -211,6 +210,8 @@ export function AppPages({
   return (
     <SettingsPage
       settings={appSettings}
+      focusSettings={focusSettings}
+      onUpdateFocusSettings={onUpdateFocusSettings}
       onUpdate={planner.updateAppSettings}
       onExport={exportJson}
       onImport={handleImport}

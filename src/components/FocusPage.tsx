@@ -16,7 +16,6 @@ interface FocusPageProps {
   focusSessions: FocusSession[];
   activeSession: FocusSession | null;
   settings: FocusUserSettings;
-  onUpdateSettings: (patch: Partial<FocusUserSettings>) => void;
   onStartFocus: (taskId: string, source?: FocusSession["source"], durationMinutes?: number) => void;
   onPauseFocus: (sessionId: string) => void;
   onResumeFocus: (sessionId: string) => void;
@@ -48,29 +47,6 @@ function todaySessionFilter(session: FocusSession, today: string) {
   return date === today && session.status === "completed";
 }
 
-function FocusOptionToggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="foc-option-row"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-    >
-      <span>{label}</span>
-      <i>{checked ? "ON" : "OFF"}</i>
-    </button>
-  );
-}
-
 export function FocusPage({
   tasks,
   tags,
@@ -78,7 +54,6 @@ export function FocusPage({
   focusSessions,
   activeSession,
   settings,
-  onUpdateSettings,
   onStartFocus,
   onPauseFocus,
   onResumeFocus,
@@ -96,8 +71,6 @@ export function FocusPage({
   const activeTask = activeSession ? tasks.find((task) => task.id === activeSession.taskId) ?? null : null;
   const [finishTaskId, setFinishTaskId] = useState("");
   const [deleteSessionId, setDeleteSessionId] = useState("");
-  const [optionsOpen, setOptionsOpen] = useState(false);
-  const optionsRef = useRef<HTMLDivElement>(null);
 
   const openTasks = useMemo(
     () => tasks.filter(isTaskOpen),
@@ -131,26 +104,6 @@ export function FocusPage({
   const avgSeconds = todaySessions.length ? Math.round(todaySeconds / todaySessions.length) : 0;
   const longestSeconds = todaySessions.reduce((max, session) => Math.max(max, session.accumulatedSeconds), 0);
   const canOpenMiniTimer = Boolean(activeSession && activeTask && settings.showMiniTimerButton && platform.miniFocusTimer.supported());
-
-  useEffect(() => {
-    if (!optionsOpen) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      if (optionsRef.current?.contains(event.target as Node)) return;
-      setOptionsOpen(false);
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOptionsOpen(false);
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [optionsOpen]);
 
   function toggleTaskFocus(task: Task) {
     if (!activeSession) {
@@ -210,37 +163,6 @@ export function FocusPage({
         <div className="foc-header-chips">
           <span>{formatDate(today, lang)}</span>
           <strong>{t("focus.todayTotal", { time: formatFocusDuration(todaySeconds, true) })}</strong>
-          <div className="foc-options-wrap" ref={optionsRef}>
-            <button
-              type="button"
-              className="foc-options-button"
-              aria-expanded={optionsOpen}
-              aria-label="Open focus options"
-              onClick={() => setOptionsOpen((open) => !open)}
-            >
-              <span aria-hidden="true">⚙</span>
-            </button>
-            {optionsOpen ? (
-              <div className="foc-options-popover" role="dialog" aria-label="Focus options">
-                <h2>{t("focus.optionsTitle")}</h2>
-                <FocusOptionToggle
-                  label={t("focus.optionTabTitleTimer")}
-                  checked={settings.showTabTitleTimer}
-                  onChange={(checked) => onUpdateSettings({ showTabTitleTimer: checked })}
-                />
-                <FocusOptionToggle
-                  label={t("focus.optionCompletionNotification")}
-                  checked={settings.enableCompletionNotification}
-                  onChange={(checked) => onUpdateSettings({ enableCompletionNotification: checked })}
-                />
-                <FocusOptionToggle
-                  label={t("focus.optionMiniTimerButton")}
-                  checked={settings.showMiniTimerButton}
-                  onChange={(checked) => onUpdateSettings({ showMiniTimerButton: checked })}
-                />
-              </div>
-            ) : null}
-          </div>
         </div>
       </header>
 

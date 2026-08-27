@@ -58,6 +58,7 @@ import {
   type TemplateTarget,
 } from "../domain/tasks/templates";
 import { clampHoursAtATime, HOURS_AT_A_TIME } from "../utils/calendarTime";
+import { focusSessionMinutes, sanitizeFocusDefaultLength } from "../domain/focus/sessionLength";
 import {
   migrateReminders,
   planReminderRows,
@@ -157,6 +158,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   timeFormat: "locale",
   weekStart: "sunday",
   hoursAtATime: HOURS_AT_A_TIME,
+  focusDefaultMinutes: "auto",
   showSidebarCounts: true,
   sidebarCollapsed: false,
   reduceMotion: false,
@@ -447,6 +449,7 @@ function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettings {
     // record written by a future client with a wider range should land at the
     // nearest hour we can draw, not back at the default.
     hoursAtATime: clampHoursAtATime(settings?.hoursAtATime),
+    focusDefaultMinutes: sanitizeFocusDefaultLength(settings?.focusDefaultMinutes),
     showSidebarCounts: settings?.showSidebarCounts ?? DEFAULT_APP_SETTINGS.showSidebarCounts,
     sidebarCollapsed: settings?.sidebarCollapsed ?? DEFAULT_APP_SETTINGS.sidebarCollapsed,
     reduceMotion: settings?.reduceMotion ?? DEFAULT_APP_SETTINGS.reduceMotion,
@@ -1859,14 +1862,16 @@ export function usePlannerData() {
       const task = current.tasks.find((item) => item.id === taskId);
       if (!task) return current;
       const project = current.projects.find((item) => item.id === task.projectId);
-      const start = task.startTime && task.endTime ? task.startTime : "";
-      const inferredDurationMinutes =
-        start && task.endTime
-          ? Math.max(1, Math.round((new Date(`2000-01-01T${task.endTime}`).getTime() - new Date(`2000-01-01T${task.startTime}`).getTime()) / 60000))
-          : task.priority === "high"
-            ? 50
-            : 30;
-      const durationMinutes = Math.max(1, Math.min(240, Math.round(requestedDurationMinutes || inferredDurationMinutes)));
+      // SETTINGS_REVIEW.md 4.5: this used to be the whole rule, written here and
+      // untested — the task's span, else 50 minutes for high priority and 30 for
+      // everything else, with the two numbers visible nowhere in the interface.
+      const durationMinutes = focusSessionMinutes({
+        requestedMinutes: requestedDurationMinutes,
+        startTime: task.startTime,
+        endTime: task.endTime,
+        priority: task.priority,
+        preference: current.appSettings.focusDefaultMinutes,
+      });
       const session: FocusSession = {
         id: createId("focus"),
         taskId,
