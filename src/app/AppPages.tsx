@@ -156,6 +156,14 @@ export function AppPages({
           onCreateTask={planner.createTask}
           onToggleDone={planner.toggleTaskDone}
           quadrantViews={appSettings.matrixQuadrantViews}
+          quadrantRules={appSettings.matrixQuadrantRules}
+          tags={planner.tags}
+          onChangeQuadrantRule={(quadrant, rule) =>
+            planner.updateAppSettings({
+              matrixQuadrantRules: { ...appSettings.matrixQuadrantRules, [quadrant]: rule },
+            })
+          }
+          onApplyRulePreset={(rules) => planner.updateAppSettings({ matrixQuadrantRules: rules })}
           onChangeQuadrantView={(quadrant, view) =>
             planner.updateAppSettings({
               matrixQuadrantViews: { ...appSettings.matrixQuadrantViews, [quadrant]: view },

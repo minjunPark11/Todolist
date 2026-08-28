@@ -5,12 +5,13 @@
 // the two things the rule cannot know about: the cap on finished work, and
 // what happens to a card the moment it is ticked.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { List, Task, TaskStatus } from "../types";
 import { I18nProvider } from "../i18n";
 import { FloatingLayerProvider } from "./floating";
 import { MatrixPage } from "./MatrixPage";
+import type { MatrixQuadrantRules } from "../domain/view/matrixRules";
 
 const TODAY = "2026-08-28";
 
@@ -514,5 +515,271 @@ describe("editing what a box is called", () => {
     });
 
     expect(boxOne().style.getPropertyValue("--q-color")).toBe("#5b5bd6");
+  });
+});
+
+describe("boxes made of rules", () => {
+  /** Ⅰ takes only work that is already late; the other three are untouched. */
+  const lateOnly: Partial<MatrixQuadrantRules> = {
+    I: { listIds: [], tagIds: [], dateBuckets: ["overdue"], priorities: ["high"] },
+  };
+
+  function dragOver(box: HTMLElement, taskId: string) {
+    const dataTransfer = {
+      types: ["text/task"],
+      getData: () => taskId,
+      setData: () => {},
+      effectAllowed: "move",
+    };
+    fireEvent.dragStart(document.querySelector(`[data-task-id="${taskId}"]`) as HTMLElement, { dataTransfer });
+    fireEvent.dragOver(box, { dataTransfer });
+  }
+
+  it("draws the same four boxes when nobody has written a rule", () => {
+    // The claim 6a was built to keep: the default rule IS the priority
+    // mapping, so an untouched account sees what it always saw.
+    renderMatrix([task({ title: "High one", priority: "high" })]);
+
+    expect(within(boxOne()).getByText("High one")).toBeTruthy();
+    expect(document.querySelector(".ff-matrix-unmatched")).toBeNull();
+  });
+
+  it("keeps a task the rules do not claim, under the grid rather than inside it", async () => {
+    renderMatrix(
+      [task({ title: "Not late", priority: "high", dueDate: "2026-09-30" })],
+      { quadrantRules: lateOnly },
+    );
+
+    // Not in any box — Ⅰ wants overdue, and Ⅱ..Ⅳ want other priorities.
+    expect(within(boxOne()).queryByText("Not late")).toBeNull();
+    // …and not gone. That distinction is the whole reason this strip exists.
+    const strip = document.querySelector(".ff-matrix-unmatched") as HTMLElement;
+    expect(strip).toBeTruthy();
+    // Outside the 2x2: a fifth box inside it would be the mistake this screen
+    // was built to stop making.
+    expect(document.querySelector(".ff-matrix")?.contains(strip)).toBe(false);
+
+    // Shut by default, because it reports a configuration rather than a to-do.
+    expect(within(strip).queryByText("Not late")).toBeNull();
+    await userEvent.click(within(strip).getByRole("button", { name: /in no box/ }));
+    expect(within(strip).getByText("Not late")).toBeTruthy();
+  });
+
+  it("says how many, and disappears when there are none", () => {
+    renderMatrix(
+      [
+        task({ id: "a", title: "A", priority: "high", dueDate: "2026-09-30" }),
+        task({ id: "b", title: "B", priority: "high", dueDate: "2026-09-30" }),
+        task({ id: "c", title: "C", priority: "high", dueDate: "2026-08-20" }),
+      ],
+      { quadrantRules: lateOnly },
+    );
+
+    expect(screen.getByRole("button", { name: "2 tasks in no box" })).toBeTruthy();
+    // The overdue one is claimed by Ⅰ and is not in the remainder.
+    expect(within(boxOne()).getByText("C")).toBeTruthy();
+  });
+
+  it("refuses a card it would have to move between Lists, and says why", () => {
+    const onUpdateTask = vi.fn();
+    renderMatrix(
+      [task({ id: "t-home", title: "Home thing", priority: "high", listId: "list-home" })],
+      {
+        lists: [{ id: "list-home", name: "Home" } as List, { id: "list-work", name: "Work" } as List],
+        quadrantRules: { II: { listIds: ["list-work"], tagIds: [], dateBuckets: [], priorities: [] } },
+        onUpdateTask,
+      },
+    );
+
+    const two = document.querySelector(".ff-matrix-cell-II") as HTMLElement;
+    dragOver(two, "t-home");
+
+    expect(two.className).toContain("is-refusing");
+    expect(within(two).getByText(/only takes tasks from another List/)).toBeTruthy();
+    // The refusal is spoken before the drop — and honoured by it.
+    fireEvent.drop(two, { dataTransfer: { types: ["text/task"], getData: () => "t-home" } });
+    expect(onUpdateTask).not.toHaveBeenCalled();
+  });
+
+  it("refuses rather than erasing a deadline", () => {
+    // §4.2's accident, in the one place a rule could bring it back.
+    const onUpdateTask = vi.fn();
+    renderMatrix([task({ id: "dated", title: "Dated", priority: "high", dueDate: "2026-09-30" })], {
+      quadrantRules: { II: { listIds: [], tagIds: [], dateBuckets: ["none"], priorities: [] } },
+      onUpdateTask,
+    });
+
+    const two = document.querySelector(".ff-matrix-cell-II") as HTMLElement;
+    dragOver(two, "dated");
+
+    expect(within(two).getByText(/will not erase a deadline/)).toBeTruthy();
+    fireEvent.drop(two, { dataTransfer: { types: ["text/task"], getData: () => "dated" } });
+    expect(onUpdateTask).not.toHaveBeenCalled();
+  });
+
+  it("still accepts a card the rule can be satisfied for", () => {
+    const onUpdateTask = vi.fn();
+    renderMatrix([task({ id: "movable", title: "Movable", priority: "high" })], {
+      quadrantRules: { II: { listIds: [], tagIds: [], dateBuckets: [], priorities: ["medium", "low"] } },
+      onUpdateTask,
+    });
+
+    const two = document.querySelector(".ff-matrix-cell-II") as HTMLElement;
+    dragOver(two, "movable");
+
+    expect(two.className).not.toContain("is-refusing");
+    fireEvent.drop(two, { dataTransfer: { types: ["text/task"], getData: () => "movable" } });
+    // Entered as the stronger of the two the box accepts.
+    expect(onUpdateTask).toHaveBeenCalledWith("movable", { priority: "medium" });
+  });
+
+  it("makes a new task match the box it was typed into", async () => {
+    const onCreateTask = vi.fn(() => "made");
+    renderMatrix([], {
+      quadrantRules: { I: { listIds: [], tagIds: [], dateBuckets: ["today"], priorities: ["high"] } },
+      onCreateTask,
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Add a task to Do first" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "What belongs in this box?" }), "Due now{Enter}");
+
+    // The box wants today, so the task is born today — otherwise typing into a
+    // box would make something the box then has to hide.
+    expect(onCreateTask).toHaveBeenCalledWith({
+      title: "Due now",
+      status: "open",
+      priority: "high",
+      dueDate: TODAY,
+    });
+  });
+});
+
+describe("editing what gets into a box", () => {
+  const workList = [{ id: "list-work", name: "Work" } as List];
+
+  async function openEditor(handlers: Partial<Parameters<typeof MatrixPage>[0]> = {}) {
+    renderMatrix([task({ dueDate: TODAY })], { lists: workList, ...handlers });
+    await userEvent.click(boxOne().querySelector(".ff-matrix-cell-menu") as HTMLElement);
+    await userEvent.click(screen.getByRole("menuitem", { name: /Edit/ }));
+  }
+
+  it("separates what the box is called from what gets into it", async () => {
+    await openEditor();
+
+    // Only the second half can hide a task, so the dialog says where it starts.
+    expect(screen.getByText("What gets into this box")).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Lists" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Dates" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Priorities" })).toBeTruthy();
+    // No Note record exists in this app, so the reference's fifth row is not
+    // offered (§22.4).
+    expect(screen.queryByRole("group", { name: /Task type/i })).toBeNull();
+    // Nor a tag row on an account with no tags: one dead option is not a row.
+    expect(screen.queryByRole("group", { name: "Tags" })).toBeNull();
+  });
+
+  it("opens showing the rule in force, with 'Any' meaning no condition", async () => {
+    await openEditor();
+
+    const dates = within(screen.getByRole("group", { name: "Dates" }));
+    // Ⅰ's default rule constrains priority only, so every other row is "Any".
+    expect((dates.getByRole("checkbox", { name: "Any" }) as HTMLInputElement).checked).toBe(true);
+
+    const priorities = within(screen.getByRole("group", { name: "Priorities" }));
+    expect((priorities.getByRole("checkbox", { name: "High" }) as HTMLInputElement).checked).toBe(true);
+    expect((priorities.getByRole("checkbox", { name: "Any" }) as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("hands the rule up beside the view, kept in separate stores", async () => {
+    const onChangeQuadrantView = vi.fn();
+    const onChangeQuadrantRule = vi.fn();
+    await openEditor({ onChangeQuadrantView, onChangeQuadrantRule });
+
+    const dates = within(screen.getByRole("group", { name: "Dates" }));
+    await userEvent.click(dates.getByRole("checkbox", { name: "Overdue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onChangeQuadrantRule).toHaveBeenCalledWith("I", {
+      listIds: [],
+      tagIds: [],
+      dateBuckets: ["overdue"],
+      priorities: ["high"],
+    });
+    // How a box is drawn is a different question and did not move.
+    expect(onChangeQuadrantView).toHaveBeenCalledWith("I", {
+      groupBy: "dueDate",
+      sortKey: "dueDate",
+      sortOrder: "asc",
+    });
+  });
+
+  it("clears the other values when 'Any' is chosen", async () => {
+    const onChangeQuadrantRule = vi.fn();
+    await openEditor({ onChangeQuadrantRule });
+
+    const priorities = within(screen.getByRole("group", { name: "Priorities" }));
+    await userEvent.click(priorities.getByRole("checkbox", { name: "Any" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    // "Any" is the EMPTY selection, not a ninth value — one representation for
+    // "no constraint", so the two cannot disagree.
+    expect(onChangeQuadrantRule).toHaveBeenCalledWith("I", {
+      listIds: [],
+      tagIds: [],
+      dateBuckets: [],
+      priorities: [],
+    });
+  });
+
+  it("warns while it is being typed that two boxes now claim the same task", async () => {
+    await openEditor();
+
+    expect(screen.queryByText(/Overlaps/)).toBeNull();
+    const priorities = within(screen.getByRole("group", { name: "Priorities" }));
+    await userEvent.click(priorities.getByRole("checkbox", { name: "Medium" }));
+
+    // Ⅱ is medium by default, so Ⅰ now collides with it — and Ⅰ wins, being
+    // first in reading order.
+    expect(screen.getByText(/Overlaps Schedule/)).toBeTruthy();
+    expect(screen.getByText(/appear in Do first/)).toBeTruthy();
+    // Warned, never blocked: an app that refuses the arrangement someone asked
+    // for is worse than one that resolves it predictably and says how.
+    expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("puts the box's own conditions back, not just its name", async () => {
+    const onChangeQuadrantRule = vi.fn();
+    await openEditor({
+      quadrantRules: { I: { listIds: ["list-work"], tagIds: [], dateBuckets: [], priorities: ["high"] } },
+      onChangeQuadrantRule,
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onChangeQuadrantRule).toHaveBeenCalledWith("I", {
+      listIds: [],
+      tagIds: [],
+      dateBuckets: [],
+      priorities: ["high"],
+    });
+  });
+
+  it("says out loud that a preset reaches past the box being edited", async () => {
+    const onApplyRulePreset = vi.fn();
+    await openEditor({ onApplyRulePreset });
+
+    await userEvent.click(screen.getByRole("button", { name: "Presets" }));
+    expect(screen.getByText("Replaces the rules for all four boxes.")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Time + priority" }));
+
+    // The rule this app deleted in Phase 1, back as a choice someone makes.
+    expect(onApplyRulePreset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        I: expect.objectContaining({ dateBuckets: ["overdue", "today", "tomorrow"], priorities: ["high", "medium"] }),
+      }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

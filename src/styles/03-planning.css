@@ -1014,6 +1014,61 @@
    on today, so it is the one thing that is not grey. */
 .ff-matrix-card-due.is-overdue { color: var(--danger); font-weight: 600; }
 
+/* A box that will not take the card in the air (§23.5). Greyed rather than
+   hidden: the box is still a box, it just cannot answer this drag — and the
+   sentence under its header says which of the three reasons it is. */
+.ff-matrix-cell.is-refusing {
+  opacity: 0.55;
+  border-style: dashed;
+}
+.ff-matrix-cell-refusal {
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* What the four rules do not claim between them (§23.3).
+   Under the grid, never inside it — a fifth box in a 2x2 is the mistake this
+   whole screen exists to have stopped making. */
+.ff-matrix-unmatched {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.ff-matrix-unmatched-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 4px 6px 4px 0;
+  background: none;
+  border: 0;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 6px);
+}
+.ff-matrix-unmatched-head:hover { color: var(--text-secondary); }
+/* Capped and scrolling: this is a report, and a long one must not push the
+   matrix itself off the screen it is a report about. */
+.ff-matrix-unmatched-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
 /* The box editor (§20.6). Three fields and a way back to the defaults — what
    a box is CALLED, never what it means. */
 .ff-matrix-edit { display: flex; flex-direction: column; gap: 14px; }
@@ -1065,6 +1120,71 @@
 /* Away from Cancel and Save: it undoes rather than confirms, and a destructive
    button beside the one everybody aims for is a button pressed by accident. */
 .ff-matrix-edit-reset { margin-right: auto; }
+
+/* The line between "what the box is called" and "what gets into it". Only the
+   second half can hide a task, so the dialog says where that half starts. */
+.ff-matrix-edit-divider {
+  margin: 4px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* A condition, as a set of values. Wraps on one line for the fixed rows
+   (dates, priorities) and scrolls for the open-ended ones (lists, tags) — an
+   account with thirty Lists must not push Save off the dialog. */
+.ff-matrix-edit-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  max-height: 108px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.ff-matrix-edit-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ff-matrix-edit-choice input { margin: 0; cursor: pointer; }
+
+/* Said while it is still being typed, not after it is saved: an overlap is a
+   consequence of the draft, and reporting it afterwards reports it too late.
+   It warns and does not block — see §23.4. */
+.ff-matrix-edit-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning) 12%, var(--bg-surface));
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* The one control in this dialog that reaches past the box it is about, so it
+   is separated and says so in words. */
+.ff-matrix-edit-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+}
+.ff-matrix-edit-presets p {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
 
 /* One column per box on a phone: two 240px rows plus their labels do not fit
    side by side, and a squeezed matrix is a matrix nobody can read. */

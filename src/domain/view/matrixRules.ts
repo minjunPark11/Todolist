@@ -251,27 +251,45 @@ function dateForBuckets(buckets: readonly DateBucket[], today: string): string |
 }
 
 /**
- * Moving a card into a box, as a change to the record — or `null` when the box
- * cannot take it.
+ * Why a box will not take a card.
+ *
+ * Named rather than boolean because a refusal the reader cannot explain is
+ * indistinguishable from a bug — "it just would not drop" is the bug report
+ * this type exists to prevent. Each value maps to one sentence the box says
+ * while the card is over it.
+ */
+export type MatrixDropRefusal = "list" | "tag" | "dueDate";
+
+export type MatrixDropOutcome =
+  | { accepted: true; patch: Partial<Task> }
+  | { accepted: false; reason: MatrixDropRefusal };
+
+/**
+ * Moving a card into a box.
  *
  * Three answers, not two:
  *
- *   {}    already matches; the drop changes nothing and must not touch
- *         `updatedAt` (the contract `patchForQuadrant` has always had)
- *   {…}   the fields to write
- *   null  this box cannot accept this task
+ *   accepted, patch {}    already matches; the drop changes nothing and must
+ *                         not touch `updatedAt` (the contract
+ *                         `patchForQuadrant` has always had)
+ *   accepted, patch {…}   the fields to write
+ *   refused               this box cannot accept this task
  *
- * `null` happens when satisfying the rule would need a LIST, a TAG, or the
+ * A refusal happens when satisfying the rule would need a LIST, a TAG, or the
  * deletion of a due date. The caller's job is then to refuse the drop before
  * it lands — §23.5 — rather than to write any of those three.
  */
-export function patchForRule(
+export function dropOutcomeForRule(
   task: Task,
   rule: MatrixQuadrantRule,
   context: MatrixRuleContext,
-): Partial<Task> | null {
-  if (rule.listIds.length > 0 && !rule.listIds.includes(context.listId)) return null;
-  if (rule.tagIds.length > 0 && !task.tags.some((tag) => rule.tagIds.includes(tag))) return null;
+): MatrixDropOutcome {
+  if (rule.listIds.length > 0 && !rule.listIds.includes(context.listId)) {
+    return { accepted: false, reason: "list" };
+  }
+  if (rule.tagIds.length > 0 && !task.tags.some((tag) => rule.tagIds.includes(tag))) {
+    return { accepted: false, reason: "tag" };
+  }
 
   const patch: Partial<Task> = {};
 
@@ -281,11 +299,21 @@ export function patchForRule(
 
   if (rule.dateBuckets.length > 0 && !rule.dateBuckets.includes(dateBucketOf(task.dueDate, context.today))) {
     const dueDate = dateForBuckets(rule.dateBuckets, context.today);
-    if (dueDate === null) return null;
+    if (dueDate === null) return { accepted: false, reason: "dueDate" };
     patch.dueDate = dueDate;
   }
 
-  return patch;
+  return { accepted: true, patch };
+}
+
+/** The patch alone, with a refusal flattened to `null`. */
+export function patchForRule(
+  task: Task,
+  rule: MatrixQuadrantRule,
+  context: MatrixRuleContext,
+): Partial<Task> | null {
+  const outcome = dropOutcomeForRule(task, rule, context);
+  return outcome.accepted ? outcome.patch : null;
 }
 
 /** The fields a task typed straight into a box is born with. */

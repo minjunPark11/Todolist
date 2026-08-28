@@ -13,28 +13,42 @@
 // for a Project's own statuses, and the Tasks Module has its own Kanban per
 // List.
 //
-// What the quadrant MEANS lives in `utils/eisenhower` and has changed: it is
-// the task's PRIORITY, one field, not priority crossed with the due date
-// (TICKTICK_MATRIX_DESIGN.md D1). Still derived rather than stored, so
-// dragging a card writes the one field the box is read from and the two
-// cannot disagree — and, unlike before, a drag can no longer erase a deadline
-// on its way past.
+// What a quadrant MEANS is now a stored RULE (`domain/view/matrixRules`,
+// TICKTICK_MATRIX_DESIGN.md §23). The default rule is the one this screen had
+// hard-coded — the box is the task's priority, D1 — so an account that has
+// never opened the editor sees exactly what it saw before. Still derived
+// rather than stored: nothing writes a quadrant onto a task, so the box and
+// the fields it is read from cannot disagree.
+//
+// What the rule costs, and what this file pays for it: a rule can leave a task
+// matching NO box. That answer is `null` and it is DRAWN — the line under the
+// grid — because a task in the account and on no screen is the worst bug a
+// to-do app has. And a rule can want something a drag is not allowed to write
+// (a List, a tag, the deletion of a deadline), so a box that would need one of
+// those REFUSES the card while it is still in the air rather than rewriting
+// what the task belongs to.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence } from "framer-motion";
-import type { List, Task, TaskPriority } from "../types";
+import type { List, Tag, Task, TaskPriority } from "../types";
+import { MATRIX_QUADRANTS, type MatrixQuadrant } from "../utils/eisenhower";
 import {
-  MATRIX_QUADRANTS,
-  draftForQuadrant,
-  patchForQuadrant,
-  quadrantOf,
-  type MatrixQuadrant,
-} from "../utils/eisenhower";
+  MATRIX_RULE_PRESETS,
+  dropOutcomeForRule,
+  draftForRule,
+  quadrantForTask,
+  resolveMatrixRules,
+  type MatrixDropRefusal,
+  type MatrixQuadrantRule,
+  type MatrixQuadrantRules,
+  type MatrixRulePresetId,
+} from "../domain/view/matrixRules";
 import {
   DEFAULT_MATRIX_VIEW,
   MATRIX_GROUP_AXES,
   MATRIX_SORT_KEYS,
   MATRIX_SORT_ORDERS,
   groupMatrixTasks,
+  matrixComparator,
   matrixQuadrantLabels,
   type MatrixGroup,
   type MatrixQuadrantView,
@@ -66,6 +80,13 @@ interface MatrixPageProps {
   /** How each box is grouped and ordered. Absent boxes read as the default. */
   quadrantViews?: Partial<Record<MatrixQuadrant, MatrixQuadrantView>>;
   onChangeQuadrantView?: (quadrant: MatrixQuadrant, view: MatrixQuadrantView) => void;
+  /** What each box CONTAINS. Absent boxes read as the priority mapping (D1). */
+  quadrantRules?: Partial<MatrixQuadrantRules>;
+  onChangeQuadrantRule?: (quadrant: MatrixQuadrant, rule: MatrixQuadrantRule) => void;
+  /** Replaces all four at once — the only control here that does (§23.2). */
+  onApplyRulePreset?: (rules: MatrixQuadrantRules) => void;
+  /** Offered as conditions a box can be narrowed to. */
+  tags?: Tag[];
 }
 
 export function MatrixPage({
@@ -78,6 +99,10 @@ export function MatrixPage({
   onToggleDone,
   quadrantViews,
   onChangeQuadrantView,
+  quadrantRules,
+  onChangeQuadrantRule,
+  onApplyRulePreset,
+  tags: allTags = [],
 }: MatrixPageProps) {
   const { t } = useT();
   const today = todayValue();
@@ -85,6 +110,7 @@ export function MatrixPage({
   const [draggingId, setDraggingId] = useState("");
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [editing, setEditing] = useState<MatrixQuadrant | "">("");
+  const rules = useMemo(() => resolveMatrixRules(quadrantRules), [quadrantRules]);
 
   const pickableLists = useMemo(
     () => lists.filter((list) => !list.archivedAt && !list.deletedAt),
@@ -96,25 +122,31 @@ export function MatrixPage({
   // reason nothing on screen explains.
   const scope = pickableLists.some((list) => list.id === listId) ? listId : ALL_LISTS;
 
-  const byQuadrant = useMemo(() => {
+  const { byQuadrant, unmatched } = useMemo(() => {
     const groups = new Map<MatrixQuadrant, Task[]>(
       MATRIX_QUADRANTS.map((quadrant) => [quadrant, [] as Task[]]),
     );
+    const orphans: Task[] = [];
     for (const task of tasks) {
       // A subtask is shown inside its parent, never as a card of its own —
       // the same rule the Tasks Module's Scopes follow.
       if (task.parentTaskId) continue;
-      // Finished work is NOT held back any more. It keeps the box its priority
-      // names (D2) and lands in that box's "완료" group — because a card that
-      // vanishes the instant it is ticked takes with it the only evidence of
-      // what was just ticked, and the way back is another screen.
-      if (scope && listIdFor(task, lists) !== scope) continue;
-      groups.get(quadrantOf(task))?.push(task);
+      // Finished work is NOT held back any more. It keeps the box its fields
+      // put it in (D2) and lands in that box's "완료" group — because a card
+      // that vanishes the instant it is ticked takes with it the only evidence
+      // of what was just ticked, and the way back is another screen.
+      const listId = listIdFor(task, lists);
+      if (scope && listId !== scope) continue;
+      const quadrant = quadrantForTask(task, rules, { today, listId });
+      // `null` is not "skip". It is the answer the line under the grid draws,
+      // and the reason that line exists at all.
+      if (quadrant === null) orphans.push(task);
+      else groups.get(quadrant)?.push(task);
     }
     // Not sorted here: the order is per GROUP now, and each box does its own
     // grouping-and-sorting in one pass (`groupMatrixTasks`).
-    return groups;
-  }, [tasks, lists, scope]);
+    return { byQuadrant: groups, unmatched: orphans };
+  }, [tasks, lists, scope, rules, today]);
 
   /** The box's words: the user's if they wrote any, the built-in ones if not. */
   function labelsFor(quadrant: MatrixQuadrant) {
@@ -125,13 +157,38 @@ export function MatrixPage({
     );
   }
 
-  function handleDrop(taskId: string, quadrant: MatrixQuadrant) {
+  /**
+   * Whether a box would take this card, asked while it is still in the air.
+   *
+   * The same question the drop itself asks, so a box cannot light up and then
+   * quietly do nothing.
+   */
+  function dropOutcome(taskId: string, quadrant: MatrixQuadrant) {
     const task = tasks.find((candidate) => candidate.id === taskId);
-    if (!task) return;
-    const patch = patchForQuadrant(task, quadrant);
+    if (!task) return null;
+    return dropOutcomeForRule(task, rules[quadrant], {
+      today,
+      listId: listIdFor(task, lists),
+    });
+  }
+
+  /** Why this box will not take the card being dragged, or `null` if it will. */
+  function refusalFor(taskId: string, quadrant: MatrixQuadrant): MatrixDropRefusal | null {
+    const outcome = dropOutcome(taskId, quadrant);
+    // A drag this page did not start — a card from another screen — is not
+    // refused on a guess. The drop itself asks again and is the real gate.
+    if (!outcome) return null;
+    return outcome.accepted ? null : outcome.reason;
+  }
+
+  function handleDrop(taskId: string, quadrant: MatrixQuadrant) {
+    const outcome = dropOutcome(taskId, quadrant);
+    // Refused: the box said so on the way in, and doing nothing is what that
+    // promise means. It must NOT fall back to writing a List or a tag.
+    if (!outcome || !outcome.accepted) return;
     // An empty patch means the drop would change nothing; writing it anyway
     // would touch `updatedAt` and put a no-op row on the wire.
-    if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
+    if (Object.keys(outcome.patch).length > 0) onUpdateTask(taskId, outcome.patch);
   }
 
   /**
@@ -202,15 +259,17 @@ export function MatrixPage({
   }
 
   function handleAdd(quadrant: MatrixQuadrant, title: string) {
-    // Typed into a box, so it is born in that box (`draftForQuadrant`), and
-    // into the List currently in scope — otherwise a task typed while reading
-    // one List would be filtered straight back out of the screen it was
-    // typed on.
+    // Typed into a box, so it is born matching that box's rule, and into the
+    // List currently in scope — otherwise a task typed while reading one List
+    // would be filtered straight back out of the screen it was typed on.
+    //
+    // The rule's own List is spread AFTER the scope, so a box that only shows
+    // Work cannot be made to hold a task it would then have to hide.
     onCreateTask({
       title,
       status: LIFECYCLE.open,
       ...(scope ? { listId: scope } : {}),
-      ...draftForQuadrant(quadrant),
+      ...draftForRule(rules[quadrant], { today, listId: scope }),
     });
   }
 
@@ -246,6 +305,7 @@ export function MatrixPage({
             key={quadrant}
             quadrant={quadrant}
             labels={labelsFor(quadrant)}
+            refusal={draggingId ? refusalFor(draggingId, quadrant) : null}
             tasks={byQuadrant.get(quadrant) ?? []}
             view={quadrantViews?.[quadrant] ?? DEFAULT_MATRIX_VIEW}
             lists={lists}
@@ -265,14 +325,43 @@ export function MatrixPage({
       {/* No page-level empty state: four boxes, each with its own "add a task"
           line, already say what an empty matrix means and what to do about
           it. A banner under them would be a second answer to the same
-          question. */}
+          question.
+
+          What IS here is the remainder — the tasks the four rules between them
+          do not claim. Outside the grid on purpose: a fifth box inside a 2x2 is
+          the same mistake as the four columns this screen was built to replace
+          (see the top of this file). This is not a quadrant, it is what is
+          left, and where it is drawn says so. */}
+      {unmatched.length > 0 ? (
+        <UnmatchedStrip
+          tasks={unmatched}
+          lists={lists}
+          today={today}
+          selectedTaskId={selectedTaskId}
+          draggingId={draggingId}
+          onOpenTask={onOpenTask}
+          onToggleDone={onToggleDone}
+          onDragStart={setDraggingId}
+          onDragEnd={() => setDraggingId("")}
+        />
+      ) : null}
       {menu ? <ContextMenu state={menu} onClose={() => setMenu(null)} /> : null}
       {editing ? (
         <MatrixQuadrantEditor
+          quadrant={editing}
           defaultName={t(`matrix.q${editing}`)}
           defaultHint={t(`matrix.q${editing}Hint`)}
           view={quadrantViews?.[editing] ?? DEFAULT_MATRIX_VIEW}
-          onSave={(view) => onChangeQuadrantView?.(editing, view)}
+          rules={rules}
+          lists={pickableLists}
+          tags={allTags}
+          onSave={(view, rule) => {
+            // Two stores, written together but kept apart: how a box is drawn
+            // and what gets into it are different questions (§23.1).
+            onChangeQuadrantView?.(editing, view);
+            onChangeQuadrantRule?.(editing, rule);
+          }}
+          onApplyPreset={(preset) => onApplyRulePreset?.(MATRIX_RULE_PRESETS[preset])}
           onClose={() => setEditing("")}
         />
       ) : null}
@@ -283,6 +372,7 @@ export function MatrixPage({
 function QuadrantCell({
   quadrant,
   labels,
+  refusal,
   tasks,
   view,
   lists,
@@ -299,6 +389,8 @@ function QuadrantCell({
 }: {
   quadrant: MatrixQuadrant;
   labels: { name: string; hint: string };
+  /** Set while a card this box cannot take is being dragged. */
+  refusal: MatrixDropRefusal | null;
   tasks: Task[];
   view: MatrixQuadrantView;
   lists: List[];
@@ -325,13 +417,17 @@ function QuadrantCell({
     <MotionDropZone
       as="section"
       isOver={over}
-      className={`ff-matrix-cell ff-matrix-cell-${quadrant}`}
+      className={`ff-matrix-cell ff-matrix-cell-${quadrant}${refusal ? " is-refusing" : ""}`}
       style={chosen ? ({ "--q-color": chosen } as CSSProperties) : undefined}
       animateTransform={false}
       onDragOver={(event) => {
         // Only a task drag is a drop here. Anything else keeps the browser's
         // default so the cursor says "no".
         if (!event.dataTransfer.types.includes("text/task")) return;
+        // And a card this box cannot take gets the same "no" — the refusal is
+        // spoken BEFORE the drop, not swallowed after it. Not calling
+        // preventDefault is what makes the cursor say it.
+        if (refusal) return;
         event.preventDefault();
         setOver(true);
       }}
@@ -384,6 +480,12 @@ function QuadrantCell({
         </button>
       </header>
 
+      {refusal ? (
+        <p className="ff-matrix-cell-refusal" role="status">
+          {t(`matrix.refuse.${refusal}`)}
+        </p>
+      ) : null}
+
       <div className="ff-matrix-cell-body">
         {/* At the TOP, under the `+` that opened it — the input belongs beside
             the control, not at the far end of a box that scrolls. Where the
@@ -408,6 +510,85 @@ function QuadrantCell({
         ))}
       </div>
     </MotionDropZone>
+  );
+}
+
+/**
+ * The tasks the four rules do not claim between them.
+ *
+ * Collapsed, and absent entirely when there are none — which is every account
+ * that has not narrowed a rule, because the default rules cover every task
+ * (§24.3). It appears the moment someone gives a box a condition that leaves
+ * work outside all four.
+ *
+ * The cards are the same draggable cards the boxes hold, and that is the
+ * point: the way out of this strip is to drag a task into a box that will have
+ * it, which is the same gesture the rest of the screen uses. A list that could
+ * only be read would report the problem without offering the fix.
+ */
+function UnmatchedStrip({
+  tasks,
+  lists,
+  today,
+  selectedTaskId,
+  draggingId,
+  onOpenTask,
+  onToggleDone,
+  onDragStart,
+  onDragEnd,
+}: {
+  tasks: Task[];
+  lists: List[];
+  today: string;
+  selectedTaskId: string;
+  draggingId: string;
+  onOpenTask: (id: string) => void;
+  onToggleDone: (id: string) => void;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
+}) {
+  const { t } = useT();
+  // Shut by default. It is a report about a configuration, not a to-do list —
+  // opening it every time would make every session start with an explanation
+  // of a decision the reader already made.
+  const [open, setOpen] = useState(false);
+  const ordered = useMemo(
+    () => [...tasks].sort(matrixComparator(DEFAULT_MATRIX_VIEW)),
+    [tasks],
+  );
+
+  return (
+    <section className="ff-matrix-unmatched">
+      <button
+        type="button"
+        className="ff-matrix-unmatched-head"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="ff-matrix-group-caret" aria-hidden>
+          {open ? "⌄" : "›"}
+        </span>
+        {t("matrix.unmatched", { count: tasks.length })}
+      </button>
+      {open ? (
+        <div className="ff-matrix-unmatched-body">
+          {ordered.map((task) => (
+            <MatrixCard
+              key={task.id}
+              task={task}
+              lists={lists}
+              today={today}
+              selected={task.id === selectedTaskId}
+              isDragging={task.id === draggingId}
+              onOpen={() => onOpenTask(task.id)}
+              onToggleDone={() => onToggleDone(task.id)}
+              onDragStart={() => onDragStart(task.id)}
+              onDragEnd={onDragEnd}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
