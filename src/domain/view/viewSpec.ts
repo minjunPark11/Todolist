@@ -12,7 +12,7 @@
 // and its screen answer identically, so this cannot quietly drift while the
 // two exist side by side.
 import type { Folder, List, Task, TaskPriority } from "../../types";
-import { getMatrixPosition } from "../../utils/eisenhower";
+import { quadrantOf } from "../../utils/eisenhower";
 import { defaultBucketFor } from "../../utils/todayView";
 import type { Item, ItemSource } from "./item";
 import { spanForItem } from "./span";
@@ -192,9 +192,15 @@ export function groupKeyFor(item: Item, axis: GroupAxis, context: GroupContext):
       return item.priority;
     case "dueDate":
       return item.dueDate || "";
+    // Since D1 this partitions the same way `priority` does — the quadrant IS
+    // the priority (TICKTICK_MATRIX_DESIGN.md). The axis is kept rather than
+    // folded into `priority` for two reasons: a spec naming it is stored in
+    // the user's data and would break, and the groups it produces are labelled
+    // Ⅰ–Ⅳ rather than high–none, which is a different thing to read even when
+    // it is the same partition.
     case "quadrant": {
       const task = context.taskById.get(item.sourceId);
-      return task ? getMatrixPosition(task, context.today).quadrant : "";
+      return task ? quadrantOf(task) : "";
     }
     case "bucket": {
       const task = context.taskById.get(item.sourceId);

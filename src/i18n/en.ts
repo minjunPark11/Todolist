@@ -677,10 +677,6 @@ export const en: Dictionary = {
   "caltasks.hint": "Drag a task onto the grid to schedule it.",
   "caltasks.expand": "Open task panel",
   "caltasks.collapse": "Collapse task panel",
-  "caltasks.qI": "Focus now",
-  "caltasks.qII": "Plan",
-  "caltasks.qIII": "Quick wins",
-  "caltasks.qIV": "Unsorted",
   "caltasks.empty": "Nothing to place.",
   "caltasks.dragHint": "Drag onto the calendar to schedule",
   // The Eisenhower matrix screen (MatrixPage). Its own vocabulary rather than
@@ -689,13 +685,10 @@ export const en: Dictionary = {
   // and finished work. On this screen it cannot — done and parked tasks are
   // filtered out — so here the four boxes can say what Eisenhower says.
   "matrix.title": "Eisenhower Matrix",
-  "matrix.subtitle": "Two questions, one grid — is it important, and is it urgent? Drag a card to answer differently.",
+  // The two questions no longer decide the box (TICKTICK_MATRIX_DESIGN.md D1).
+  "matrix.subtitle": "Priority decides the box. Drag a card and its priority changes — its dates do not.",
   "matrix.list": "List",
   "matrix.allLists": "All lists",
-  "matrix.urgent": "Urgent",
-  "matrix.notUrgent": "Not urgent",
-  "matrix.important": "Important",
-  "matrix.notImportant": "Not important",
   "matrix.qI": "Do first",
   "matrix.qIHint": "Important and urgent",
   "matrix.qII": "Schedule",
@@ -712,12 +705,12 @@ export const en: Dictionary = {
   "eis.qIIHint": "Important work to plan ahead",
   "eis.qIII": "Urgent, Not Important",
   "eis.qIIIHint": "Light work to knock out quickly",
-  // Not a real quadrant: I–III are judged positions, IV is where everything
-  // unjudged, paused or finished parks. Calling it "Neither Important nor
-  // Urgent" attributed a judgement the user never made to their new tasks.
-  // Named to match caltasks.qIV, which already said "Unsorted".
-  "eis.qIV": "Unsorted & parked",
-  "eis.qIVHint": "Not judged yet · not important · on hold · completed",
+  // Still not "Neither Important nor Urgent", which would attribute a verdict
+  // the user never gave. It is priority `none` now (TICKTICK_MATRIX_DESIGN.md
+  // D1) — the absence of a judgement, and nothing else: paused and finished
+  // work no longer parks here, it stays in the box its own priority names.
+  "eis.qIV": "Unsorted",
+  "eis.qIVHint": "No priority set",
   "eis.overdue": "Overdue",
   "eis.today": "Today",
   "eis.minutes": "{{n}}m",

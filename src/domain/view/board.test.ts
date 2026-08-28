@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../types";
-import { getMatrixPosition } from "../../utils/eisenhower";
 import { patchForSpanDrag } from "./board";
 
 const TODAY = "2026-08-15";

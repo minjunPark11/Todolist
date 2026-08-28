@@ -4,7 +4,7 @@
 import { DragEvent, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import type { Task } from "../../types";
-import { getMatrixPosition, type MatrixQuadrant } from "../../utils/eisenhower";
+import { priorityForQuadrant, quadrantOf, type MatrixQuadrant } from "../../utils/eisenhower";
 import { useT } from "../../i18n";
 import { MotionCollapse } from "../motion/MotionCollapse";
 import { MotionTaskRow } from "../motion/MotionTaskRow";
@@ -91,7 +91,7 @@ export function CalendarRightTaskPanel({
           key={quadrant}
           quadrant={quadrant}
           defaultOpen={defaultOpen}
-          tasks={candidates.filter((task) => getMatrixPosition(task, today).quadrant === quadrant)}
+          tasks={candidates.filter((task) => quadrantOf(task) === quadrant)}
           today={today}
           draggingTaskId={draggingTaskId}
           onDragStart={onDragStart}
@@ -133,7 +133,12 @@ function PanelSection({
       <button type="button" className="gcal-taskpanel-section-head" onClick={() => setOpen((value) => !value)}>
         <span className="eis-group-caret">{open ? "⌄" : "›"}</span>
         <span className={`eis-cell-roman eis-q-${quadrant}`}>{quadrant}</span>
-        <span className="gcal-taskpanel-section-name">{t(`caltasks.q${quadrant}`)}</span>
+        {/* The priority's own name, not a fourth invented one. These sections
+            had labels of their own ("지금 집중", "계획 필요") back when a
+            quadrant combined two judgements and needed a phrase to describe
+            the pair. A quadrant is the priority now (D1), so a second name for
+            it is a second vocabulary for one field. */}
+        <span className="gcal-taskpanel-section-name">{t(`priority.${priorityForQuadrant(quadrant)}`)}</span>
         <span className="ff-board-count">{tasks.length}</span>
       </button>
       <MotionCollapse open={open} className="gcal-taskpanel-section-body">

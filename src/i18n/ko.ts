@@ -671,23 +671,16 @@ export const ko: Dictionary = {
   "caltasks.hint": "작업을 시간표로 드래그해 일정을 만드세요.",
   "caltasks.expand": "작업 패널 열기",
   "caltasks.collapse": "작업 패널 접기",
-  "caltasks.qI": "지금 집중",
-  "caltasks.qII": "계획 필요",
-  "caltasks.qIII": "빠른 처리",
-  "caltasks.qIV": "미분류",
   "caltasks.empty": "배치할 작업이 없습니다.",
   "caltasks.dragHint": "캘린더로 드래그해 일정 만들기",
   // MatrixPage 전용 어휘. 공용 `eis.*` 는 작업 상세의 사분면 선택기와 캘린더
   // 패널도 함께 읽는데, 그쪽 Q4 에는 보류·완료된 일도 모인다. 이 화면은 그
   // 둘을 빼고 그리므로 네 칸이 아이젠하워 원래 뜻을 그대로 말할 수 있다.
   "matrix.title": "아이젠하워 매트릭스",
-  "matrix.subtitle": "중요한가, 급한가 — 두 질문을 한 판에서 본다. 카드를 끌어 옮기면 답이 바뀐다.",
+  // 두 질문이 칸을 정하지 않는다(TICKTICK_MATRIX_DESIGN.md D1). 우선순위 하나다.
+  "matrix.subtitle": "우선순위가 칸을 정한다. 카드를 끌어 옮기면 우선순위가 바뀐다 — 날짜는 그대로다.",
   "matrix.list": "리스트",
   "matrix.allLists": "전체 리스트",
-  "matrix.urgent": "급함",
-  "matrix.notUrgent": "안 급함",
-  "matrix.important": "중요함",
-  "matrix.notImportant": "안 중요함",
   "matrix.qI": "지금 하기",
   "matrix.qIHint": "중요하고 급한 일",
   "matrix.qII": "계획 세우기",
@@ -704,9 +697,10 @@ export const ko: Dictionary = {
   "eis.qIIHint": "계획해서 진행할 중요한 작업",
   "eis.qIII": "중요하지 않지만 급한 일",
   "eis.qIIIHint": "빠르게 처리할 가벼운 작업",
-  // 실제 사분면이 아니라 보관함이다. en.ts의 eis.qIV 주석 참고.
-  "eis.qIV": "미분류 · 보류함",
-  "eis.qIVHint": "아직 판단하지 않았거나, 안 중요하거나, 보류·완료된 작업",
+  // 우선순위 "없음"이다(TICKTICK_MATRIX_DESIGN.md D1). 판단하지 않았다는 뜻일
+  // 뿐, 보류·완료된 일은 더 이상 여기로 오지 않는다. en.ts의 주석 참고.
+  "eis.qIV": "미분류",
+  "eis.qIVHint": "우선순위를 정하지 않은 일",
   "eis.overdue": "기한 지남",
   "eis.today": "오늘",
   "eis.minutes": "{{n}}분",

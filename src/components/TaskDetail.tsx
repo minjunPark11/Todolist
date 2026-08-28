@@ -4,7 +4,6 @@ import { listIdFor } from "../domain/spaces/membership";
 import { childProgress, childrenOf } from "../domain/tasks/children";
 import { useState } from "react";
 import { todayValue } from "../utils/date";
-import { getMatrixPosition, patchForQuadrant, type MatrixQuadrant } from "../utils/eisenhower";
 import { dependentsOf, eligibleBlockers } from "../domain/tasks/dependencies";
 import { useT } from "../i18n";
 import { DeferredInput, DeferredTextarea } from "./kit";
@@ -40,12 +39,6 @@ interface TaskDetailProps {
 
 // Highest first: the value most worth picking should not be last in the list.
 const taskPriorities: TaskPriority[] = ["high", "medium", "low", "none"];
-const matrixQuadrants: Array<{ key: MatrixQuadrant; labelKey: string; hintKey: string }> = [
-  { key: "I", labelKey: "eis.qI", hintKey: "eis.qIHint" },
-  { key: "II", labelKey: "eis.qII", hintKey: "eis.qIIHint" },
-  { key: "III", labelKey: "eis.qIII", hintKey: "eis.qIIIHint" },
-  { key: "IV", labelKey: "eis.qIV", hintKey: "eis.qIVHint" },
-];
 
 export function TaskDetail({
   task,
@@ -84,7 +77,6 @@ export function TaskDetail({
   const today = todayValue();
   const schedule = scheduleFromTask(task);
   const scheduleLabel = formatScheduleTrigger(schedule, today, locale);
-  const selectedQuadrant = getMatrixPosition(task, today).quadrant;
   // The picker refuses anything that would close a loop, so the cycle rule is
   // enforced where the value is written rather than guarded at every read.
   const blockerOptions = eligibleBlockers(tasks, task.id);
@@ -148,13 +140,14 @@ export function TaskDetail({
       <section className="detail-section">
         <h3>{t("taskDetail.planning")}</h3>
         <div className="detail-field-list">
-          {/* Priority was settable in four creation forms and nowhere after —
-              the only way to change it was the quadrant below, which can only
-              produce "high" or "medium" (patchForQuadrant), so a task saved as
-              Low or None could never be seen or corrected again. The quadrant
-              is derived from this field plus the due date, so the two controls
-              cannot disagree: setting Low here immediately reads as Unsorted
-              below. */}
+          {/* Priority was settable in four creation forms and nowhere after,
+              so a task saved as Low or None could never be seen or corrected
+              again. This control is what fixed that.
+              A second select sat under it for the matrix quadrant, back when a
+              quadrant was priority AND due date combined. The quadrant reads
+              the priority alone now (TICKTICK_MATRIX_DESIGN.md D1), so the two
+              were the same field under two names — and two controls that move
+              each other read as a bug. The quadrant one is gone; this is it. */}
           {/* Where the task LIVES. The panel had no such control at all, so a
               task could only ever be filed by dragging it. */}
           <label>
@@ -186,24 +179,6 @@ export function TaskDetail({
               {taskPriorities.map((priority) => (
                 <option key={priority} value={priority}>
                   {t(`priority.${priority}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>{t("taskDetail.quadrant")}</span>
-            <select
-              value={selectedQuadrant}
-              onChange={(event) => {
-                const quadrant = matrixQuadrants.find((item) => item.key === event.target.value);
-                if (quadrant) {
-                  onUpdateTask(task.id, patchForQuadrant(task, quadrant.key, today));
-                }
-              }}
-            >
-              {matrixQuadrants.map((quadrant) => (
-                <option key={quadrant.key} value={quadrant.key}>
-                  {t(quadrant.labelKey)} ({t(quadrant.hintKey)})
                 </option>
               ))}
             </select>

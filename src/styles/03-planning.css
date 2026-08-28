@@ -751,43 +751,26 @@
 .ff-toggle.on .ff-toggle-knob { transform: translateX(18px); }
 
 /* ===== Planning: Eisenhower matrix (MatrixPage) =====
-   A 2x2 grid, not four columns. The axis labels sit in the grid's own first
-   row and first column, so the boxes cannot drift out of alignment with the
-   words that name them — which is the whole claim the layout makes. */
+   A 2x2 grid, not four columns.
+
+   It used to carry axis labels down the first column and across the first row
+   — 급함/안 급함 and 중요/안 중요 — because the box a task landed in really was
+   the answer to those two questions. The quadrant reads the priority alone now
+   (TICKTICK_MATRIX_DESIGN.md D1), so those words would be asserting a
+   derivation that no longer happens. Each box says what it is in its own
+   header instead, and the grid is four cells and nothing else. */
 .ff-matrix {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-areas:
-    ".          urgent    notUrgent"
-    "important  qI        qII"
-    "notImp     qIII      qIV";
-  /* The header row hugs its text; the two content rows share what is left and
-     never fall below a card or two of height. */
-  grid-template-rows: auto minmax(240px, 1fr) minmax(240px, 1fr);
-  gap: 8px 12px;
+    "qI    qII"
+    "qIII  qIV";
+  /* Neither row falls below a card or two of height. */
+  grid-template-rows: minmax(240px, 1fr) minmax(240px, 1fr);
+  gap: 12px;
   flex: 1 1 auto;
   min-height: 0;
 }
-.ff-matrix-axis {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  align-self: center;
-}
-.ff-matrix-axis.is-col { text-align: center; padding-bottom: 2px; }
-/* Read bottom-to-top so the row labels run along the axis they describe. */
-.ff-matrix-axis.is-row {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  justify-self: center;
-  text-align: center;
-}
-.ff-matrix-urgent { grid-area: urgent; }
-.ff-matrix-not-urgent { grid-area: notUrgent; }
-.ff-matrix-important { grid-area: important; }
-.ff-matrix-not-important { grid-area: notImp; }
 
 .ff-matrix-cell {
   --q-color: var(--text-tertiary);

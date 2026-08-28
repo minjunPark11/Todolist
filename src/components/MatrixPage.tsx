@@ -8,23 +8,25 @@
 // row of columns, the reader has to remember which column meant what, and the
 // tool stops doing the only thing it exists to do.
 //
-// So the axis selector is gone and the layout is a 2x2 grid with both axes
-// labelled. The status board it could also draw is not lost: SpaceDetailView
-// still renders `BoardView` for a Project's own statuses, and the Tasks
-// Module has its own Kanban per List.
+// So the axis selector is gone and the layout is a 2x2 grid. The status board
+// it could also draw is not lost: SpaceDetailView still renders `BoardView`
+// for a Project's own statuses, and the Tasks Module has its own Kanban per
+// List.
 //
-// What the quadrant MEANS is unchanged and still lives in `utils/eisenhower`:
-// derived from priority x due date, never stored, so dragging a card writes
-// the fields the box was read from (`patchForQuadrant`) and the two cannot
-// disagree.
+// What the quadrant MEANS lives in `utils/eisenhower` and has changed: it is
+// the task's PRIORITY, one field, not priority crossed with the due date
+// (TICKTICK_MATRIX_DESIGN.md D1). Still derived rather than stored, so
+// dragging a card writes the one field the box is read from and the two
+// cannot disagree — and, unlike before, a drag can no longer erase a deadline
+// on its way past.
 import { useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import type { List, Task, TaskPriority } from "../types";
 import {
   MATRIX_QUADRANTS,
   draftForQuadrant,
-  getMatrixPosition,
   patchForQuadrant,
+  quadrantOf,
   type MatrixQuadrant,
 } from "../utils/eisenhower";
 import { listIdFor } from "../domain/spaces/membership";
@@ -81,12 +83,15 @@ export function MatrixPage({
       // A subtask is shown inside its parent, never as a card of its own —
       // the same rule the Tasks Module's Scopes follow.
       if (task.parentTaskId) continue;
-      // Finished work has no place on a matrix of what to do next. It is not
-      // hidden anywhere else: Completed is its Scope, and the card can still
-      // be ticked off from here, which is what makes it leave.
+      // Still held back, but no longer for the old reason. Completion has
+      // stopped deciding the BOX (a finished task keeps its priority's box —
+      // TICKTICK_MATRIX_DESIGN.md D2), and what it is waiting for is somewhere
+      // to sit inside one: the "완료" group at the bottom of each box, which
+      // arrives with grouping. Letting it through now would interleave
+      // yesterday's finished work with today's open work in one flat list.
       if (isCompleted(task)) continue;
       if (scope && listIdFor(task, lists) !== scope) continue;
-      groups.get(getMatrixPosition(task, today).quadrant)?.push(task);
+      groups.get(quadrantOf(task))?.push(task);
     }
     for (const bucket of groups.values()) bucket.sort(compareCards);
     return groups;
@@ -95,7 +100,7 @@ export function MatrixPage({
   function handleDrop(taskId: string, quadrant: MatrixQuadrant) {
     const task = tasks.find((candidate) => candidate.id === taskId);
     if (!task) return;
-    const patch = patchForQuadrant(task, quadrant, today);
+    const patch = patchForQuadrant(task, quadrant);
     // An empty patch means the drop would change nothing; writing it anyway
     // would touch `updatedAt` and put a no-op row on the wire.
     if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
@@ -110,7 +115,7 @@ export function MatrixPage({
       title,
       status: LIFECYCLE.open,
       ...(scope ? { listId: scope } : {}),
-      ...draftForQuadrant(quadrant, today),
+      ...draftForQuadrant(quadrant),
     });
   }
 
@@ -137,21 +142,10 @@ export function MatrixPage({
       </header>
 
       <div className="ff-matrix">
-        {/* The axes, named once each. Without them the four boxes are four
-            lists whose order the reader has to have memorised. */}
-        <span className="ff-matrix-axis is-col ff-matrix-urgent" aria-hidden>
-          {t("matrix.urgent")}
-        </span>
-        <span className="ff-matrix-axis is-col ff-matrix-not-urgent" aria-hidden>
-          {t("matrix.notUrgent")}
-        </span>
-        <span className="ff-matrix-axis is-row ff-matrix-important" aria-hidden>
-          {t("matrix.important")}
-        </span>
-        <span className="ff-matrix-axis is-row ff-matrix-not-important" aria-hidden>
-          {t("matrix.notImportant")}
-        </span>
-
+        {/* No axis labels. They named the two questions the box used to be
+            derived from, and the box is one field now (D1) — words claiming a
+            derivation that no longer happens are worse than no words. Each
+            box's own header says which it is. */}
         {MATRIX_QUADRANTS.map((quadrant) => (
           <QuadrantCell
             key={quadrant}

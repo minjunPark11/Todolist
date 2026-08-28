@@ -1,6 +1,6 @@
 ﻿import { describe, expect, it } from "vitest";
 import type { List, Task } from "../../types";
-import { getMatrixPosition } from "../../utils/eisenhower";
+import { quadrantOf } from "../../utils/eisenhower";
 import { collectTodayEntries } from "../../utils/todayView";
 import { makeDefaultList } from "../spaces/hierarchy";
 import { defaultListIdFor } from "../spaces/membership";
@@ -208,7 +208,7 @@ describe("equivalence with the screens it replaces", () => {
     for (const group of groups) {
       for (const item of group.items) {
         const source = tasks.find((candidate) => candidate.id === item.sourceId)!;
-        expect(group.id).toBe(getMatrixPosition(source, TODAY).quadrant);
+        expect(group.id).toBe(quadrantOf(source));
       }
     }
   });
