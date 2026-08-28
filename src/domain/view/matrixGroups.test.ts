@@ -3,10 +3,12 @@ import type { Task, TaskStatus } from "../../types";
 import {
   DEFAULT_MATRIX_VIEW,
   MATRIX_GROUP_ORDER,
+  MATRIX_LABEL_MAX,
   dateBucketOf,
   groupMatrixTasks,
   matrixComparator,
   matrixGroupOf,
+  matrixQuadrantLabels,
   sanitizeMatrixView,
 } from "./matrixGroups";
 
@@ -210,5 +212,46 @@ describe("matrixComparator", () => {
     const [b, a] = [task({ id: "b", title: "b" }), task({ id: "a", title: "a" })];
     expect(compare({ sortKey: "title" }, a, b)).toBeLessThan(0);
     expect(compare({ sortKey: "title", sortOrder: "desc" }, a, b)).toBeGreaterThan(0);
+  });
+});
+
+describe("what a box is called (§20.6)", () => {
+  const base = { groupBy: "dueDate", sortKey: "dueDate", sortOrder: "asc" } as const;
+
+  it("stores nothing for a box nobody has named", () => {
+    // Absent and "" have to be the same state, or "cleared" would be a
+    // preference the account carries around forever.
+    const view = sanitizeMatrixView({ ...base, name: "   ", hint: "", color: "" });
+
+    expect("name" in view).toBe(false);
+    expect("hint" in view).toBe(false);
+    expect("color" in view).toBe(false);
+  });
+
+  it("trims what was typed and caps how long it can be", () => {
+    const view = sanitizeMatrixView({ ...base, name: "  화요일 마감  ", hint: "x".repeat(80) });
+
+    expect(view.name).toBe("화요일 마감");
+    expect(view.hint).toHaveLength(MATRIX_LABEL_MAX);
+  });
+
+  it("keeps a colour it knows and drops one it does not", () => {
+    expect(sanitizeMatrixView({ ...base, color: "indigo" }).color).toBe("indigo");
+    // A value from another build folds to the box's own colour rather than
+    // painting something this one cannot resolve.
+    expect(sanitizeMatrixView({ ...base, color: "chartreuse" }).color).toBeUndefined();
+    expect(sanitizeMatrixView({ ...base, color: "#ff0000" }).color).toBeUndefined();
+  });
+
+  it("falls back to the built-in words, field by field", () => {
+    expect(matrixQuadrantLabels(undefined, "Do first", "Important and urgent")).toEqual({
+      name: "Do first",
+      hint: "Important and urgent",
+    });
+    // Naming a box does not silently rename its second line too.
+    expect(matrixQuadrantLabels({ ...base, name: "Tuesday" }, "Do first", "Important and urgent")).toEqual({
+      name: "Tuesday",
+      hint: "Important and urgent",
+    });
   });
 });

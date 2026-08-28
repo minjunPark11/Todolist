@@ -1014,6 +1014,58 @@
    on today, so it is the one thing that is not grey. */
 .ff-matrix-card-due.is-overdue { color: var(--danger); font-weight: 600; }
 
+/* The box editor (§20.6). Three fields and a way back to the defaults — what
+   a box is CALLED, never what it means. */
+.ff-matrix-edit { display: flex; flex-direction: column; gap: 14px; }
+.ff-matrix-edit-field { display: flex; flex-direction: column; gap: 6px; }
+.ff-matrix-edit-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.ff-matrix-edit-field input {
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+.ff-matrix-edit-field input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+.ff-matrix-edit-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.ff-matrix-edit-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  cursor: pointer;
+  /* The ring sits OUTSIDE the swatch, so choosing one does not change the size
+     of the circle and shuffle the row. */
+  box-shadow: 0 0 0 1px var(--border-subtle);
+}
+/* "No colour chosen" has to look like an option rather than a ninth colour:
+   an empty ring, not a grey dot. */
+.ff-matrix-edit-swatch.is-default {
+  background: transparent;
+  border-color: var(--border-strong);
+}
+.ff-matrix-edit-swatch.is-on {
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--accent);
+}
+.ff-matrix-edit-swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+/* Away from Cancel and Save: it undoes rather than confirms, and a destructive
+   button beside the one everybody aims for is a button pressed by accident. */
+.ff-matrix-edit-reset { margin-right: auto; }
+
 /* One column per box on a phone: two 240px rows plus their labels do not fit
    side by side, and a squeezed matrix is a matrix nobody can read. */
 @media (max-width: 900px) {

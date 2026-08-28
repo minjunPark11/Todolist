@@ -415,3 +415,104 @@ describe("what a card says", () => {
     expect(check.getAttribute("aria-label")).toBe("Reopen Filed");
   });
 });
+
+describe("editing what a box is called", () => {
+  const named = {
+    I: { groupBy: "dueDate", sortKey: "dueDate", sortOrder: "asc", name: "Tuesday", hint: "before the meeting" },
+  } as const;
+
+  function openMenu() {
+    return userEvent.click(boxOne().querySelector(".ff-matrix-cell-menu") as HTMLElement);
+  }
+
+  it("offers Edit as a row that opens a surface, not a set of choices", async () => {
+    renderMatrix([task({ dueDate: TODAY })]);
+    await openMenu();
+
+    const items = screen.getAllByRole("menuitem").map((node) => node.textContent ?? "");
+    expect(items[0]).toContain("Edit");
+    // The reference's own menu draws no chevron on this one, because there is
+    // nothing behind it to choose between.
+    expect(items[0]).not.toContain("›");
+  });
+
+  it("opens on the box it was pressed on", async () => {
+    renderMatrix([task({ dueDate: TODAY })]);
+    await openMenu();
+    await userEvent.click(screen.getByRole("menuitem", { name: /Edit/ }));
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Edit Do first")).toBeTruthy();
+    // An empty field shows what leaving it empty will get you.
+    expect(screen.getByLabelText("Name").getAttribute("placeholder")).toBe("Do first");
+  });
+
+  it("hands the typed name up without touching how the box is ordered", async () => {
+    const onChangeQuadrantView = vi.fn();
+    renderMatrix([task({ dueDate: TODAY })], { onChangeQuadrantView });
+
+    await openMenu();
+    await userEvent.click(screen.getByRole("menuitem", { name: /Edit/ }));
+    await userEvent.type(screen.getByLabelText("Name"), "  Tuesday  ");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onChangeQuadrantView).toHaveBeenCalledWith("I", {
+      groupBy: "dueDate",
+      sortKey: "dueDate",
+      sortOrder: "asc",
+      name: "Tuesday",
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("says the stored name everywhere the box is named", () => {
+    // One rule, three places: a header that disagrees with its own buttons'
+    // labels is a box a screen reader and an eye cannot both find.
+    renderMatrix([task({ dueDate: TODAY })], { quadrantViews: named });
+
+    expect(boxOne().querySelector(".ff-matrix-cell-title")?.textContent).toBe("Tuesday");
+    expect(boxOne().querySelector(".ff-matrix-cell-hint")?.textContent).toBe("before the meeting");
+    expect(screen.getByRole("button", { name: "Add a task to Tuesday" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tuesday settings" })).toBeTruthy();
+  });
+
+  it("gives the box back its own words", async () => {
+    const onChangeQuadrantView = vi.fn();
+    renderMatrix([task({ dueDate: TODAY })], { quadrantViews: named, onChangeQuadrantView });
+
+    await openMenu();
+    await userEvent.click(screen.getByRole("menuitem", { name: /Edit/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    // Cleared, not stored as "": absent is what "never named" means.
+    expect(onChangeQuadrantView).toHaveBeenCalledWith("I", {
+      groupBy: "dueDate",
+      sortKey: "dueDate",
+      sortOrder: "asc",
+    });
+  });
+
+  it("keeps the typed name when the dialog is cancelled", async () => {
+    const onChangeQuadrantView = vi.fn();
+    renderMatrix([task({ dueDate: TODAY })], { onChangeQuadrantView });
+
+    await openMenu();
+    await userEvent.click(screen.getByRole("menuitem", { name: /Edit/ }));
+    await userEvent.type(screen.getByLabelText("Name"), "Never saved");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(onChangeQuadrantView).not.toHaveBeenCalled();
+    expect(boxOne().querySelector(".ff-matrix-cell-title")?.textContent).toBe("Do first");
+  });
+
+  it("paints the chosen colour on the box, which carries it to the checkbox", () => {
+    // Phase 4 hung the checkbox border and the quick-add outline on this one
+    // variable, so one override moves all three.
+    renderMatrix([task({ dueDate: TODAY })], {
+      quadrantViews: { I: { groupBy: "dueDate", sortKey: "dueDate", sortOrder: "asc", color: "indigo" } },
+    });
+
+    expect(boxOne().style.getPropertyValue("--q-color")).toBe("#5b5bd6");
+  });
+});

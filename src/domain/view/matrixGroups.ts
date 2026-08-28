@@ -11,6 +11,7 @@
 // component is one that has to be rewritten to be configured.
 import type { Task } from "../../types";
 import { isCompleted } from "../tasks/taskState";
+import { LIST_COLOR_PRESETS } from "../tasks/listColor";
 import { addDays } from "../../utils/date";
 
 export type DateBucket = "overdue" | "today" | "tomorrow" | "later" | "none";
@@ -30,10 +31,37 @@ export type MatrixGroupAxis = "dueDate" | "none";
 export type MatrixSortKey = "dueDate" | "title" | "createdAt";
 export type MatrixSortOrder = "asc" | "desc";
 
+/**
+ * The colours a box may be given.
+ *
+ * The app's existing palette rather than a second one invented here: a colour
+ * vocabulary that exists twice is two things to keep in step, and the Lists
+ * already answer "which eight colours does this app offer". `""` is not in the
+ * list — it is the absence of a choice, and it means the box's built-in colour.
+ */
+export const MATRIX_QUADRANT_COLORS: readonly string[] = LIST_COLOR_PRESETS.map((preset) => preset.key);
+
+/** Long enough for a sentence fragment, short enough to sit in a box header. */
+export const MATRIX_LABEL_MAX = 40;
+
 export interface MatrixQuadrantView {
   groupBy: MatrixGroupAxis;
   sortKey: MatrixSortKey;
   sortOrder: MatrixSortOrder;
+  /**
+   * What the user calls this box, its second line, and its colour
+   * (TICKTICK_MATRIX_DESIGN.md §20.6). Absent — never "" — means the built-in
+   * one, so an account that has never opened the editor stores nothing and
+   * reads exactly as it does today.
+   *
+   * A name the user typed does NOT follow the interface language. There is no
+   * way to translate "화요일 마감", and guessing would be worse than leaving
+   * the words they chose alone.
+   */
+  name?: string;
+  hint?: string;
+  /** A `MATRIX_QUADRANT_COLORS` key, or absent for the box's own colour. */
+  color?: string;
 }
 
 /** What the reference app's menu reads on a box nobody has touched. */
@@ -54,8 +82,23 @@ export const MATRIX_SORT_ORDERS: readonly MatrixSortOrder[] = ["asc", "desc"];
  * version — or a key this one has retired — must fold to something drawable
  * rather than crash a box.
  */
+/**
+ * A user-typed label, as it is worth storing.
+ *
+ * Trimmed and capped rather than rejected: a name is not a field anyone can
+ * get wrong, and a dialog that refuses "  " is a dialog arguing about
+ * whitespace. Empty comes back as "" and the caller drops the key entirely,
+ * which is what makes "cleared" and "never set" the same state.
+ */
+function sanitizeLabel(value: unknown): string {
+  return typeof value === "string" ? value.trim().slice(0, MATRIX_LABEL_MAX) : "";
+}
+
 export function sanitizeMatrixView(value: unknown): MatrixQuadrantView {
   const record = (value ?? {}) as Partial<MatrixQuadrantView>;
+  const name = sanitizeLabel(record.name);
+  const hint = sanitizeLabel(record.hint);
+  const color = MATRIX_QUADRANT_COLORS.includes(record.color as string) ? (record.color as string) : "";
   return {
     groupBy: MATRIX_GROUP_AXES.includes(record.groupBy as MatrixGroupAxis)
       ? (record.groupBy as MatrixGroupAxis)
@@ -66,6 +109,29 @@ export function sanitizeMatrixView(value: unknown): MatrixQuadrantView {
     sortOrder: MATRIX_SORT_ORDERS.includes(record.sortOrder as MatrixSortOrder)
       ? (record.sortOrder as MatrixSortOrder)
       : DEFAULT_MATRIX_VIEW.sortOrder,
+    // Spread rather than written as "": absent is the default, and an account
+    // that stored `name: ""` would be storing a preference nobody expressed.
+    ...(name ? { name } : {}),
+    ...(hint ? { hint } : {}),
+    ...(color ? { color } : {}),
+  };
+}
+
+/**
+ * What a box is called, and what its second line says.
+ *
+ * The fallbacks come from the caller because they are translations and this
+ * module is pure — but the RULE lives here, so the header, the `+`'s label and
+ * the ⋯'s label cannot disagree about what the box is named.
+ */
+export function matrixQuadrantLabels(
+  view: MatrixQuadrantView | undefined,
+  fallbackName: string,
+  fallbackHint: string,
+): { name: string; hint: string } {
+  return {
+    name: view?.name || fallbackName,
+    hint: view?.hint || fallbackHint,
   };
 }
 

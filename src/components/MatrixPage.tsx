@@ -19,7 +19,7 @@
 // dragging a card writes the one field the box is read from and the two
 // cannot disagree — and, unlike before, a drag can no longer erase a deadline
 // on its way past.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence } from "framer-motion";
 import type { List, Task, TaskPriority } from "../types";
 import {
@@ -35,9 +35,12 @@ import {
   MATRIX_SORT_KEYS,
   MATRIX_SORT_ORDERS,
   groupMatrixTasks,
+  matrixQuadrantLabels,
   type MatrixGroup,
   type MatrixQuadrantView,
 } from "../domain/view/matrixGroups";
+import { MatrixQuadrantEditor } from "./MatrixQuadrantEditor";
+import { listColorHex } from "../domain/tasks/listColor";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./common/ContextMenu";
 import { listIdFor } from "../domain/spaces/membership";
 import { LIFECYCLE, isCompleted } from "../domain/tasks/taskState";
@@ -81,6 +84,7 @@ export function MatrixPage({
   const [listId, setListId] = useState<string>(ALL_LISTS);
   const [draggingId, setDraggingId] = useState("");
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const [editing, setEditing] = useState<MatrixQuadrant | "">("");
 
   const pickableLists = useMemo(
     () => lists.filter((list) => !list.archivedAt && !list.deletedAt),
@@ -111,6 +115,15 @@ export function MatrixPage({
     // grouping-and-sorting in one pass (`groupMatrixTasks`).
     return groups;
   }, [tasks, lists, scope]);
+
+  /** The box's words: the user's if they wrote any, the built-in ones if not. */
+  function labelsFor(quadrant: MatrixQuadrant) {
+    return matrixQuadrantLabels(
+      quadrantViews?.[quadrant],
+      t(`matrix.q${quadrant}`),
+      t(`matrix.q${quadrant}Hint`),
+    );
+  }
 
   function handleDrop(taskId: string, quadrant: MatrixQuadrant) {
     const task = tasks.find((candidate) => candidate.id === taskId);
@@ -148,11 +161,19 @@ export function MatrixPage({
     return {
       x,
       y,
-      label: t("matrix.menuAria", { quadrant: t(`matrix.q${quadrant}`) }),
+      label: t("matrix.menuAria", { quadrant: labelsFor(quadrant).name }),
       sections: [
         {
           id: "view",
           items: [
+            {
+              // No chevron and no current value — it is not a set of choices,
+              // it opens a surface. §8's reading of the reference's own menu,
+              // where this is the one row without a "›".
+              id: "edit",
+              label: t("matrix.menu.edit"),
+              run: () => setEditing(quadrant),
+            },
             {
               id: "groupBy",
               label: t("matrix.menu.groupBy"),
@@ -224,6 +245,7 @@ export function MatrixPage({
           <QuadrantCell
             key={quadrant}
             quadrant={quadrant}
+            labels={labelsFor(quadrant)}
             tasks={byQuadrant.get(quadrant) ?? []}
             view={quadrantViews?.[quadrant] ?? DEFAULT_MATRIX_VIEW}
             lists={lists}
@@ -245,12 +267,22 @@ export function MatrixPage({
           it. A banner under them would be a second answer to the same
           question. */}
       {menu ? <ContextMenu state={menu} onClose={() => setMenu(null)} /> : null}
+      {editing ? (
+        <MatrixQuadrantEditor
+          defaultName={t(`matrix.q${editing}`)}
+          defaultHint={t(`matrix.q${editing}Hint`)}
+          view={quadrantViews?.[editing] ?? DEFAULT_MATRIX_VIEW}
+          onSave={(view) => onChangeQuadrantView?.(editing, view)}
+          onClose={() => setEditing("")}
+        />
+      ) : null}
     </div>
   );
 }
 
 function QuadrantCell({
   quadrant,
+  labels,
   tasks,
   view,
   lists,
@@ -266,6 +298,7 @@ function QuadrantCell({
   onOpenMenu,
 }: {
   quadrant: MatrixQuadrant;
+  labels: { name: string; hint: string };
   tasks: Task[];
   view: MatrixQuadrantView;
   lists: List[];
@@ -284,12 +317,16 @@ function QuadrantCell({
   const [over, setOver] = useState(false);
   const [adding, setAdding] = useState(false);
   const groups = useMemo(() => groupMatrixTasks(tasks, today, view), [tasks, today, view]);
+  // Phase 4 hung the checkbox border and the quick-add outline on `--q-color`
+  // (§19.3), so overriding the one variable moves all three together.
+  const chosen = listColorHex(view.color);
 
   return (
     <MotionDropZone
       as="section"
       isOver={over}
       className={`ff-matrix-cell ff-matrix-cell-${quadrant}`}
+      style={chosen ? ({ "--q-color": chosen } as CSSProperties) : undefined}
       animateTransform={false}
       onDragOver={(event) => {
         // Only a task drag is a drop here. Anything else keeps the browser's
@@ -311,8 +348,8 @@ function QuadrantCell({
           {quadrant}
         </span>
         <div className="ff-matrix-cell-titles">
-          <strong className="ff-matrix-cell-title">{t(`matrix.q${quadrant}`)}</strong>
-          <span className="ff-matrix-cell-hint">{t(`matrix.q${quadrant}Hint`)}</span>
+          <strong className="ff-matrix-cell-title">{labels.name}</strong>
+          <span className="ff-matrix-cell-hint">{labels.hint}</span>
         </div>
         {/* No count on the box. Each group inside carries its own, which is
             the number that answers something — "기한 초과 3" is a fact about
@@ -324,7 +361,7 @@ function QuadrantCell({
         <button
           type="button"
           className="ff-matrix-cell-add"
-          aria-label={t("matrix.addAria", { quadrant: t(`matrix.q${quadrant}`) })}
+          aria-label={t("matrix.addAria", { quadrant: labels.name })}
           aria-expanded={adding}
           onClick={() => setAdding((value) => !value)}
         >
@@ -333,7 +370,7 @@ function QuadrantCell({
         <button
           type="button"
           className="ff-matrix-cell-menu"
-          aria-label={t("matrix.menuAria", { quadrant: t(`matrix.q${quadrant}`) })}
+          aria-label={t("matrix.menuAria", { quadrant: labels.name })}
           aria-haspopup="menu"
           onClick={(event) => {
             // Anchored to the BUTTON rather than to the pointer, so the menu
