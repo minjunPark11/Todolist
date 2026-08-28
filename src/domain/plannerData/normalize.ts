@@ -56,6 +56,7 @@ import { DEFAULT_BACKUP_KEEP, sanitizeBackupInterval, sanitizeBackupKeep } from 
 import { clampHoursAtATime, HOURS_AT_A_TIME } from "../../utils/calendarTime";
 import { MATRIX_QUADRANTS, type MatrixQuadrant } from "../../utils/eisenhower";
 import { sanitizeMatrixView, type MatrixQuadrantView } from "../view/matrixGroups";
+import { sanitizeMatrixRules } from "../view/matrixRules";
 
 // Every value `status` may hold on disk: the three lifecycle values written
 // since Ch. 26 §26.3.2, and the legacy six that accounts still carry. A value
@@ -410,6 +411,12 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
     // matrix would be storing a preference nobody expressed.
     ...(settings?.matrixQuadrantViews
       ? { matrixQuadrantViews: sanitizeMatrixViews(settings.matrixQuadrantViews) }
+      : {}),
+    // Same rule, for the same reason: absent means the default mapping, and
+    // writing four full rules into an account that never opened the editor
+    // would store a decision nobody made.
+    ...(settings?.matrixQuadrantRules
+      ? { matrixQuadrantRules: sanitizeMatrixRules(settings.matrixQuadrantRules) }
       : {}),
   };
 }

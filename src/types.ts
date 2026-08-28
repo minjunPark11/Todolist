@@ -3,6 +3,7 @@ import type { FocusDefaultLength } from "./domain/focus/sessionLength";
 // Type-only, so nothing is imported at runtime and the modules that describe
 // the matrix can keep importing this one.
 import type { MatrixQuadrantView } from "./domain/view/matrixGroups";
+import type { MatrixQuadrantRule } from "./domain/view/matrixRules";
 import type { MatrixQuadrant } from "./utils/eisenhower";
 
 /**
@@ -640,6 +641,18 @@ export interface AppSettings {
    * untouched, and one that has never been set reads as the default.
    */
   matrixQuadrantViews?: Partial<Record<MatrixQuadrant, MatrixQuadrantView>>;
+  /**
+   * What each box CONTAINS, as opposed to how it is drawn
+   * (TICKTICK_MATRIX_DESIGN.md §23.1).
+   *
+   * Separate from `matrixQuadrantViews` on purpose: "how is this grouped" and
+   * "what gets in here" are different questions, and changing one must not
+   * move the other. Optional and additive (M0) like its neighbour — a box
+   * absent from here reads as its DEFAULT rule, which is the priority mapping
+   * this app had hard-coded before rules existed, so an account that never
+   * opens the editor behaves exactly as it does now.
+   */
+  matrixQuadrantRules?: Partial<Record<MatrixQuadrant, MatrixQuadrantRule>>;
 }
 
 export type ExternalCalendarSyncStatus = "idle" | "syncing" | "success" | "failed" | "hidden" | "disabled";
