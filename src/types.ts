@@ -1,5 +1,9 @@
 import type { BackupInterval } from "./domain/backup/schedule";
 import type { FocusDefaultLength } from "./domain/focus/sessionLength";
+// Type-only, so nothing is imported at runtime and the modules that describe
+// the matrix can keep importing this one.
+import type { MatrixQuadrantView } from "./domain/view/matrixGroups";
+import type { MatrixQuadrant } from "./utils/eisenhower";
 
 /**
  * A Goal, as it sits in storage.
@@ -621,6 +625,21 @@ export interface AppSettings {
   // from a client that still has the feature normalize cleanly instead of
   // failing the shape check.
   aiModel: string;
+  /**
+   * How each box of the matrix is grouped and ordered
+   * (TICKTICK_MATRIX_DESIGN.md §7).
+   *
+   * Per box, because the boxes hold different kinds of work and the reader
+   * wants different things from them — Ⅰ is a list of what is late and Ⅱ is a
+   * list of what is coming, and one shared setting would make one of them
+   * wrong.
+   *
+   * Here rather than in device-local state so a person who arranges their
+   * matrix on the desktop finds it arranged on the laptop. Optional and
+   * additive (M0): a client that predates it carries the value through
+   * untouched, and one that has never been set reads as the default.
+   */
+  matrixQuadrantViews?: Partial<Record<MatrixQuadrant, MatrixQuadrantView>>;
 }
 
 export type ExternalCalendarSyncStatus = "idle" | "syncing" | "success" | "failed" | "hidden" | "disabled";

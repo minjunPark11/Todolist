@@ -155,6 +155,12 @@ export function AppPages({
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
           onToggleDone={planner.toggleTaskDone}
+          quadrantViews={appSettings.matrixQuadrantViews}
+          onChangeQuadrantView={(quadrant, view) =>
+            planner.updateAppSettings({
+              matrixQuadrantViews: { ...appSettings.matrixQuadrantViews, [quadrant]: view },
+            })
+          }
         />
         {renderTaskDetail()}
       </section>

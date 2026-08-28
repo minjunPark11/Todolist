@@ -292,6 +292,50 @@ textarea {
   color: var(--danger);
 }
 
+/* A row that leads to a set of choices: its current answer at the trailing
+   edge, then the chevron. Reading "그룹화하기 … 날짜 ›" is what saves opening
+   it to find out. */
+.ff-context-menu-value {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ff-context-menu-chevron {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+}
+/* Without a value beside it the chevron still has to sit at the far edge. */
+.ff-context-menu-value + .ff-context-menu-chevron { margin-left: 0; }
+.ff-context-menu-label + .ff-context-menu-chevron { margin-left: auto; }
+
+/* The way back out of a drilled-in set. Named with the row that opened it, so
+   the surface says where you are as well as how to leave. */
+.ff-context-menu-back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: var(--density-control-h);
+  min-height: var(--density-tap);
+  padding: 0 8px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  border-radius: 0;
+  margin-bottom: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+.ff-context-menu-back:hover,
+.ff-context-menu-back:focus-visible {
+  background: var(--bg-hover-content);
+}
+
 /* §15.5's second case: offered, refused, and saying why. Still focusable —
    `aria-disabled` rather than the attribute — because §15.45's arrows have to
    reach the row for its explanation to be read at all. */

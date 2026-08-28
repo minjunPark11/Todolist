@@ -9,6 +9,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { List, Task, TaskStatus } from "../types";
 import { I18nProvider } from "../i18n";
+import { FloatingLayerProvider } from "./floating";
 import { MatrixPage } from "./MatrixPage";
 
 const TODAY = "2026-08-28";
@@ -35,16 +36,18 @@ const lists: List[] = [];
 function renderMatrix(tasks: Task[], handlers: Partial<Parameters<typeof MatrixPage>[0]> = {}) {
   return render(
     <I18nProvider lang="en">
-      <MatrixPage
-        tasks={tasks}
-        lists={lists}
-        selectedTaskId=""
-        onOpenTask={() => {}}
-        onUpdateTask={() => {}}
-        onCreateTask={() => ""}
-        onToggleDone={() => {}}
-        {...handlers}
-      />
+      <FloatingLayerProvider>
+        <MatrixPage
+          tasks={tasks}
+          lists={lists}
+          selectedTaskId=""
+          onOpenTask={() => {}}
+          onUpdateTask={() => {}}
+          onCreateTask={() => ""}
+          onToggleDone={() => {}}
+          {...handlers}
+        />
+      </FloatingLayerProvider>
     </I18nProvider>,
   );
 }
@@ -199,5 +202,74 @@ describe("ticking a card", () => {
 
     expect(groupNames(boxOne())).toEqual(["Completed"]);
     expect(within(boxOne()).getByText("Write it up")).toBeTruthy();
+  });
+});
+
+describe("the box's ⋯ menu", () => {
+  function openMenu() {
+    return userEvent.click(boxOne().querySelector(".ff-matrix-cell-menu") as HTMLElement);
+  }
+
+  it("says how the box is grouped and ordered without being opened twice", async () => {
+    renderMatrix([task({ dueDate: TODAY })]);
+    await openMenu();
+
+    expect(screen.getByRole("menuitem", { name: /Group by/ }).textContent).toContain("Date");
+    expect(screen.getByRole("menuitem", { name: /Sort by/ }).textContent).toContain("Due date");
+    expect(screen.getByRole("menuitem", { name: /Sort order/ }).textContent).toContain("Ascending");
+  });
+
+  it("offers no priority sort", () => {
+    // Every task in a box has the box's priority, so it would sort nothing.
+    renderMatrix([task({ dueDate: TODAY })]);
+    return openMenu().then(() => {
+      return userEvent.click(screen.getByRole("menuitem", { name: /Sort by/ })).then(() => {
+        expect(screen.queryByRole("menuitem", { name: "Priority" })).toBeNull();
+        expect(screen.getByRole("menuitem", { name: "Title" })).toBeTruthy();
+      });
+    });
+  });
+
+  it("hands the chosen setting up, for the box it was opened on", async () => {
+    const onChangeQuadrantView = vi.fn();
+    renderMatrix([task({ dueDate: TODAY })], { onChangeQuadrantView });
+
+    await openMenu();
+    await userEvent.click(screen.getByRole("menuitem", { name: /Sort order/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Descending" }));
+
+    expect(onChangeQuadrantView).toHaveBeenCalledWith("I", {
+      groupBy: "dueDate",
+      sortKey: "dueDate",
+      sortOrder: "desc",
+    });
+  });
+
+  it("draws the box the way the stored view says", () => {
+    renderMatrix(
+      [
+        task({ id: "b", title: "b", dueDate: "2026-08-20" }),
+        task({ id: "a", title: "a", dueDate: "2026-08-21" }),
+      ],
+      { quadrantViews: { I: { groupBy: "none", sortKey: "title", sortOrder: "asc" } } },
+    );
+
+    // Grouping off: one group of open work with no header at all, and the
+    // order is by title rather than by the deadline the default would use.
+    const box = boxOne();
+    expect(groupNames(box)).toEqual([]);
+    expect([...box.querySelectorAll(".ff-matrix-card-title")].map((node) => node.textContent)).toEqual(["a", "b"]);
+  });
+
+  it("leaves the other boxes alone", async () => {
+    const onChangeQuadrantView = vi.fn();
+    renderMatrix([task({ priority: "low", dueDate: TODAY })], { onChangeQuadrantView });
+
+    const boxThree = document.querySelector(".ff-matrix-cell-III") as HTMLElement;
+    await userEvent.click(boxThree.querySelector(".ff-matrix-cell-menu") as HTMLElement);
+    await userEvent.click(screen.getByRole("menuitem", { name: /Group by/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "None" }));
+
+    expect(onChangeQuadrantView).toHaveBeenCalledWith("III", expect.objectContaining({ groupBy: "none" }));
   });
 });

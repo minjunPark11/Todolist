@@ -29,7 +29,16 @@ import {
   quadrantOf,
   type MatrixQuadrant,
 } from "../utils/eisenhower";
-import { groupMatrixTasks, type MatrixGroup } from "../domain/view/matrixGroups";
+import {
+  DEFAULT_MATRIX_VIEW,
+  MATRIX_GROUP_AXES,
+  MATRIX_SORT_KEYS,
+  MATRIX_SORT_ORDERS,
+  groupMatrixTasks,
+  type MatrixGroup,
+  type MatrixQuadrantView,
+} from "../domain/view/matrixGroups";
+import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./common/ContextMenu";
 import { listIdFor } from "../domain/spaces/membership";
 import { LIFECYCLE } from "../domain/tasks/taskState";
 import { listColorHex } from "../domain/tasks/listColor";
@@ -53,6 +62,9 @@ interface MatrixPageProps {
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: { title: string; listId?: string; priority?: TaskPriority; dueDate?: string; status?: Task["status"] }) => string;
   onToggleDone: (id: string) => void;
+  /** How each box is grouped and ordered. Absent boxes read as the default. */
+  quadrantViews?: Partial<Record<MatrixQuadrant, MatrixQuadrantView>>;
+  onChangeQuadrantView?: (quadrant: MatrixQuadrant, view: MatrixQuadrantView) => void;
 }
 
 export function MatrixPage({
@@ -63,11 +75,14 @@ export function MatrixPage({
   onUpdateTask,
   onCreateTask,
   onToggleDone,
+  quadrantViews,
+  onChangeQuadrantView,
 }: MatrixPageProps) {
   const { t } = useT();
   const today = todayValue();
   const [listId, setListId] = useState<string>(ALL_LISTS);
   const [draggingId, setDraggingId] = useState("");
+  const [menu, setMenu] = useState<ContextMenuState | null>(null);
 
   const pickableLists = useMemo(
     () => lists.filter((list) => !list.archivedAt && !list.deletedAt),
@@ -106,6 +121,65 @@ export function MatrixPage({
     // An empty patch means the drop would change nothing; writing it anyway
     // would touch `updatedAt` and put a no-op row on the wire.
     if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
+  }
+
+  /**
+   * The box's own settings, as a menu.
+   *
+   * Three rows, each a current answer and a list of the others. "편집" — the
+   * reference app's fourth row — is not here: it rewrites what a box MEANS,
+   * and a box means one priority (D1), so there is nothing in it to edit until
+   * that decision is revisited (TICKTICK_MATRIX_DESIGN.md §13 Phase 5).
+   */
+  function viewMenuAt(quadrant: MatrixQuadrant, x: number, y: number): ContextMenuState {
+    const view = quadrantViews?.[quadrant] ?? DEFAULT_MATRIX_VIEW;
+    const set = (patch: Partial<MatrixQuadrantView>) => onChangeQuadrantView?.(quadrant, { ...view, ...patch });
+
+    const choices = <K extends keyof MatrixQuadrantView>(
+      field: K,
+      values: readonly MatrixQuadrantView[K][],
+      labelKey: (value: MatrixQuadrantView[K]) => string,
+    ): ContextMenuItem[] =>
+      values.map((value) => ({
+        id: `${field}-${String(value)}`,
+        label: t(labelKey(value)),
+        selected: view[field] === value,
+        run: () => set({ [field]: value } as Partial<MatrixQuadrantView>),
+      }));
+
+    return {
+      x,
+      y,
+      label: t("matrix.menuAria", { quadrant: t(`matrix.q${quadrant}`) }),
+      sections: [
+        {
+          id: "view",
+          items: [
+            {
+              id: "groupBy",
+              label: t("matrix.menu.groupBy"),
+              value: t(`matrix.axis.${view.groupBy}`),
+              submenu: choices("groupBy", MATRIX_GROUP_AXES, (value) => `matrix.axis.${value}`),
+              run: () => {},
+            },
+            {
+              id: "sortBy",
+              label: t("matrix.menu.sortBy"),
+              value: t(`matrix.sort.${view.sortKey}`),
+              submenu: choices("sortKey", MATRIX_SORT_KEYS, (value) => `matrix.sort.${value}`),
+              run: () => {},
+            },
+            {
+              id: "sortOrder",
+              label: t("matrix.menu.sortOrder"),
+              value: t(`matrix.order.${view.sortOrder}`),
+              submenu: choices("sortOrder", MATRIX_SORT_ORDERS, (value) => `matrix.order.${value}`),
+              run: () => {},
+            },
+          ],
+        },
+      ],
+    };
   }
 
   function handleAdd(quadrant: MatrixQuadrant, title: string) {
@@ -153,9 +227,11 @@ export function MatrixPage({
             key={quadrant}
             quadrant={quadrant}
             tasks={byQuadrant.get(quadrant) ?? []}
+            view={quadrantViews?.[quadrant] ?? DEFAULT_MATRIX_VIEW}
             lists={lists}
             today={today}
             selectedTaskId={selectedTaskId}
+            onOpenMenu={(x, y) => setMenu(viewMenuAt(quadrant, x, y))}
             draggingId={draggingId}
             onOpenTask={onOpenTask}
             onToggleDone={onToggleDone}
@@ -170,6 +246,7 @@ export function MatrixPage({
           line, already say what an empty matrix means and what to do about
           it. A banner under them would be a second answer to the same
           question. */}
+      {menu ? <ContextMenu state={menu} onClose={() => setMenu(null)} /> : null}
     </div>
   );
 }
@@ -194,6 +271,7 @@ function compareCards(a: Task, b: Task): number {
 function QuadrantCell({
   quadrant,
   tasks,
+  view,
   lists,
   today,
   selectedTaskId,
@@ -204,9 +282,11 @@ function QuadrantCell({
   onDragEnd,
   onDropTask,
   onAdd,
+  onOpenMenu,
 }: {
   quadrant: MatrixQuadrant;
   tasks: Task[];
+  view: MatrixQuadrantView;
   lists: List[];
   today: string;
   selectedTaskId: string;
@@ -217,10 +297,11 @@ function QuadrantCell({
   onDragEnd: () => void;
   onDropTask: (id: string) => void;
   onAdd: (title: string) => void;
+  onOpenMenu: (x: number, y: number) => void;
 }) {
   const { t } = useT();
   const [over, setOver] = useState(false);
-  const groups = useMemo(() => groupMatrixTasks(tasks, today, compareCards), [tasks, today]);
+  const groups = useMemo(() => groupMatrixTasks(tasks, today, view), [tasks, today, view]);
 
   return (
     <MotionDropZone
@@ -254,6 +335,21 @@ function QuadrantCell({
         {/* No count on the box. Each group inside carries its own, which is
             the number that answers something — "기한 초과 3" is a fact about
             the day, and "17" over a box is a number to divide up by eye. */}
+        <button
+          type="button"
+          className="ff-matrix-cell-menu"
+          aria-label={t("matrix.menuAria", { quadrant: t(`matrix.q${quadrant}`) })}
+          aria-haspopup="menu"
+          onClick={(event) => {
+            // Anchored to the BUTTON rather than to the pointer, so the menu
+            // opens in the same place however it was triggered — including
+            // from a keyboard, where there is no pointer to anchor to.
+            const box = event.currentTarget.getBoundingClientRect();
+            onOpenMenu(box.left, box.bottom);
+          }}
+        >
+          ⋯
+        </button>
       </header>
 
       <div className="ff-matrix-cell-body">
@@ -326,18 +422,24 @@ function MatrixGroupSection({
 
   return (
     <section className={`ff-matrix-group is-${group.id}`}>
-      <button
-        type="button"
-        className="ff-matrix-group-head"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className="ff-matrix-group-caret" aria-hidden>
-          {open ? "⌄" : "›"}
-        </span>
-        <span className="ff-matrix-group-name">{t(`matrix.group.${group.id}`)}</span>
-        <span className="ff-matrix-group-count">{group.tasks.length}</span>
-      </button>
+      {/* Grouping turned off leaves one group holding everything unfinished,
+          and it gets no header: a heading that says "all of it" over the whole
+          box is a line spent saying nothing. "완료" keeps its own, because that
+          one is still a division. */}
+      {group.id === "all" ? null : (
+        <button
+          type="button"
+          className="ff-matrix-group-head"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <span className="ff-matrix-group-caret" aria-hidden>
+            {open ? "⌄" : "›"}
+          </span>
+          <span className="ff-matrix-group-name">{t(`matrix.group.${group.id}`)}</span>
+          <span className="ff-matrix-group-count">{group.tasks.length}</span>
+        </button>
+      )}
 
       {open ? (
         <div className="ff-matrix-group-body">

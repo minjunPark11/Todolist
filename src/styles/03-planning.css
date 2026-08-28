@@ -808,6 +808,27 @@
   font-weight: 700;
 }
 .ff-matrix-cell-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+/* The box's own settings. Always present rather than revealed on hover: a
+   control that only exists under a pointer is a control a touch screen and a
+   keyboard cannot find. */
+.ff-matrix-cell-menu {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.ff-matrix-cell-menu:hover,
+.ff-matrix-cell-menu:focus-visible {
+  background: var(--bg-hover-content);
+  color: var(--text-primary);
+}
 .ff-matrix-cell-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 .ff-matrix-cell-hint { font-size: 11px; color: var(--text-tertiary); }
 

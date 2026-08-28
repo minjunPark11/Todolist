@@ -54,6 +54,8 @@ import { sanitizeReminder, scheduleFromTask, scheduleToTaskPatch } from "../sche
 import { sanitizeFocusDefaultLength } from "../focus/sessionLength";
 import { DEFAULT_BACKUP_KEEP, sanitizeBackupInterval, sanitizeBackupKeep } from "../backup/schedule";
 import { clampHoursAtATime, HOURS_AT_A_TIME } from "../../utils/calendarTime";
+import { MATRIX_QUADRANTS, type MatrixQuadrant } from "../../utils/eisenhower";
+import { sanitizeMatrixView, type MatrixQuadrantView } from "../view/matrixGroups";
 
 // Every value `status` may hold on disk: the three lifecycle values written
 // since Ch. 26 §26.3.2, and the legacy six that accounts still carry. A value
@@ -403,7 +405,31 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
     timezone:
       typeof settings?.timezone === "string" && settings.timezone ? settings.timezone : DEFAULT_APP_SETTINGS.timezone,
     aiModel: typeof settings?.aiModel === "string" ? settings.aiModel : DEFAULT_APP_SETTINGS.aiModel,
+    // Absent stays absent: a box nobody has arranged reads as the default, and
+    // writing four full view records into every account that never opened the
+    // matrix would be storing a preference nobody expressed.
+    ...(settings?.matrixQuadrantViews
+      ? { matrixQuadrantViews: sanitizeMatrixViews(settings.matrixQuadrantViews) }
+      : {}),
   };
+}
+
+/**
+ * The matrix's per-box view settings, as this build understands them.
+ *
+ * Only the four boxes it knows, each folded to something drawable — these sync,
+ * so a value written by another version must not be able to leave a box unable
+ * to render.
+ */
+function sanitizeMatrixViews(
+  value: Partial<Record<MatrixQuadrant, unknown>>,
+): Partial<Record<MatrixQuadrant, MatrixQuadrantView>> {
+  const views: Partial<Record<MatrixQuadrant, MatrixQuadrantView>> = {};
+  for (const quadrant of MATRIX_QUADRANTS) {
+    const stored = value?.[quadrant];
+    if (stored) views[quadrant] = sanitizeMatrixView(stored);
+  }
+  return views;
 }
 
 /**

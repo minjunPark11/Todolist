@@ -157,3 +157,131 @@ describe("keyboard (§19.39)", () => {
     expect(document.activeElement).toBe(item("Close"));
   });
 });
+
+describe("a row that leads to a set of choices", () => {
+  function setupSubmenu(run = vi.fn()) {
+    render(
+      <I18nProvider lang="en">
+        <FloatingLayerProvider>
+          <ContextMenu
+            state={{
+              x: 0,
+              y: 0,
+              label: "Box settings",
+              sections: [
+                {
+                  id: "view",
+                  items: [
+                    {
+                      id: "sortBy",
+                      label: "Sort by",
+                      value: "Due date",
+                      submenu: [
+                        { id: "due", label: "Due date", selected: true, run: () => {} },
+                        { id: "title", label: "Title", run },
+                      ],
+                      run: () => {},
+                    },
+                    { id: "plain", label: "Something else", run: () => {} },
+                  ],
+                },
+              ],
+            }}
+            onClose={() => {}}
+          />
+        </FloatingLayerProvider>
+      </I18nProvider>,
+    );
+    return run;
+  }
+
+  it("says which answer is in force without being opened", () => {
+    setupSubmenu();
+    expect(screen.getByRole("menuitem", { name: /Sort by/ }).textContent).toContain("Due date");
+  });
+
+  it("replaces the menu with the choices, and can come back", () => {
+    setupSubmenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /Sort by/ }));
+
+    // The rest of the menu is gone; the choices are what is left.
+    expect(screen.queryByRole("menuitem", { name: "Something else" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Title" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /^‹?\s*Sort by$/ }));
+    expect(screen.getByRole("menuitem", { name: "Something else" })).toBeTruthy();
+  });
+
+  it("does not run the parent row on the way past", () => {
+    // Opening a set of choices is not choosing one.
+    const parentRun = vi.fn();
+    render(
+      <I18nProvider lang="en">
+        <FloatingLayerProvider>
+          <ContextMenu
+            state={{
+              x: 0,
+              y: 0,
+              label: "Box settings",
+              sections: [
+                {
+                  id: "view",
+                  items: [
+                    {
+                      id: "sortBy",
+                      label: "Sort by",
+                      submenu: [{ id: "title", label: "Title", run: () => {} }],
+                      run: parentRun,
+                    },
+                  ],
+                },
+              ],
+            }}
+            onClose={() => {}}
+          />
+        </FloatingLayerProvider>
+      </I18nProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /Sort by/ }));
+    expect(parentRun).not.toHaveBeenCalled();
+  });
+
+  it("runs the choice and closes", () => {
+    const onClose = vi.fn();
+    const run = vi.fn();
+    render(
+      <I18nProvider lang="en">
+        <FloatingLayerProvider>
+          <ContextMenu
+            state={{
+              x: 0,
+              y: 0,
+              label: "Box settings",
+              sections: [
+                {
+                  id: "view",
+                  items: [
+                    {
+                      id: "sortBy",
+                      label: "Sort by",
+                      submenu: [{ id: "title", label: "Title", run }],
+                      run: () => {},
+                    },
+                  ],
+                },
+              ],
+            }}
+            onClose={onClose}
+          />
+        </FloatingLayerProvider>
+      </I18nProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /Sort by/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Title" }));
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalled();
+  });
+});

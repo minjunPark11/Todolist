@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Task, TaskStatus } from "../../types";
-import { MATRIX_GROUP_ORDER, dateBucketOf, groupMatrixTasks, matrixGroupOf } from "./matrixGroups";
+import {
+  DEFAULT_MATRIX_VIEW,
+  MATRIX_GROUP_ORDER,
+  dateBucketOf,
+  groupMatrixTasks,
+  matrixComparator,
+  matrixGroupOf,
+  sanitizeMatrixView,
+} from "./matrixGroups";
 
 const TODAY = "2026-08-28";
 const YESTERDAY = "2026-08-27";
@@ -84,16 +92,18 @@ describe("groupMatrixTasks", () => {
     expect(seen.sort()).toEqual(["done", "late", "later", "now", "soon", "undated"]);
   });
 
-  it("orders inside a group with the comparator it was given, and not otherwise", () => {
+  it("orders inside a group the way the view asks", () => {
     const unsorted = [task({ id: "b", title: "b" }), task({ id: "a", title: "a" })];
-    expect(groupMatrixTasks(unsorted, TODAY)[0].tasks.map((entry) => entry.id)).toEqual(["b", "a"]);
-    const sorted = groupMatrixTasks(unsorted, TODAY, (x, y) => x.title.localeCompare(y.title));
-    expect(sorted[0].tasks.map((entry) => entry.id)).toEqual(["a", "b"]);
+    const view = { ...DEFAULT_MATRIX_VIEW, sortKey: "title" as const };
+    expect(groupMatrixTasks(unsorted, TODAY, view)[0].tasks.map((entry) => entry.id)).toEqual(["a", "b"]);
+    expect(
+      groupMatrixTasks(unsorted, TODAY, { ...view, sortOrder: "desc" })[0].tasks.map((entry) => entry.id),
+    ).toEqual(["b", "a"]);
   });
 
   it("does not sort the caller's array underneath it", () => {
     const original = [task({ id: "b", title: "b" }), task({ id: "a", title: "a" })];
-    groupMatrixTasks(original, TODAY, (x, y) => x.title.localeCompare(y.title));
+    groupMatrixTasks(original, TODAY, { ...DEFAULT_MATRIX_VIEW, sortKey: "title" });
     expect(original.map((entry) => entry.id)).toEqual(["b", "a"]);
   });
 });
@@ -119,7 +129,7 @@ describe("the completed group's own order", () => {
     // Sorting finished work by its deadline puts a task completed a moment ago
     // below work completed last month. Every deadline in here is settled.
     const tasks = [done("late-due", "2026-08-01T09:00:00.000Z", "2026-12-31"), done("early-due", "2026-08-28T09:00:00.000Z", "2026-01-01")];
-    const group = groupMatrixTasks(tasks, TODAY, (a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+    const group = groupMatrixTasks(tasks, TODAY, DEFAULT_MATRIX_VIEW)[0];
     expect(group.tasks.map((entry) => entry.id)).toEqual(["early-due", "late-due"]);
   });
 
@@ -133,5 +143,72 @@ describe("the completed group's own order", () => {
 describe("MATRIX_GROUP_ORDER", () => {
   it("ends with completed", () => {
     expect(MATRIX_GROUP_ORDER[MATRIX_GROUP_ORDER.length - 1]).toBe("completed");
+  });
+});
+
+describe("sanitizeMatrixView", () => {
+  it("keeps what it recognises", () => {
+    expect(sanitizeMatrixView({ groupBy: "none", sortKey: "title", sortOrder: "desc" })).toEqual({
+      groupBy: "none",
+      sortKey: "title",
+      sortOrder: "desc",
+    });
+  });
+
+  it("folds anything else to the default", () => {
+    // These sync, so a value written by another version must not be able to
+    // leave a box unable to draw itself.
+    expect(sanitizeMatrixView({ groupBy: "constellation", sortKey: 7, sortOrder: null })).toEqual(
+      DEFAULT_MATRIX_VIEW,
+    );
+    expect(sanitizeMatrixView(undefined)).toEqual(DEFAULT_MATRIX_VIEW);
+    expect(sanitizeMatrixView("nonsense")).toEqual(DEFAULT_MATRIX_VIEW);
+  });
+
+  it("does not offer priority as a sort", () => {
+    // Every task in a box has the box's priority (D1), so sorting by it would
+    // be a control that visibly does nothing.
+    expect(sanitizeMatrixView({ sortKey: "priority" }).sortKey).toBe("dueDate");
+  });
+});
+
+describe("grouping turned off", () => {
+  it("puts everything unfinished in one group, and keeps completed apart", () => {
+    // "Finished" is the one division that is never noise.
+    const groups = groupMatrixTasks(
+      [
+        task({ id: "a", dueDate: YESTERDAY }),
+        task({ id: "b" }),
+        task({ id: "c", status: "completed" as TaskStatus, completedAt: "2026-08-27T09:00:00.000Z" }),
+      ],
+      TODAY,
+      { ...DEFAULT_MATRIX_VIEW, groupBy: "none" },
+    );
+
+    expect(groups.map((group) => group.id)).toEqual(["all", "completed"]);
+    expect(groups[0].tasks.map((entry) => entry.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("matrixComparator", () => {
+  const compare = (view: Partial<typeof DEFAULT_MATRIX_VIEW>, a: Task, b: Task) =>
+    matrixComparator({ ...DEFAULT_MATRIX_VIEW, ...view })(a, b);
+
+  it("sinks undated work under a deadline sort", () => {
+    // Sorting "" as a string would float it above every real date.
+    expect(compare({}, task({ dueDate: "" }), task({ dueDate: "2099-12-31" }))).toBeGreaterThan(0);
+  });
+
+  it("is total and stable — the id breaks the last tie", () => {
+    const twins = [task({ id: "b", dueDate: TODAY, title: "same" }), task({ id: "a", dueDate: TODAY, title: "same" })];
+    expect(compare({}, twins[0], twins[1])).toBeGreaterThan(0);
+    expect(compare({}, twins[1], twins[0])).toBeLessThan(0);
+    expect(compare({}, twins[0], twins[0])).toBe(0);
+  });
+
+  it("reverses everything, ties included", () => {
+    const [b, a] = [task({ id: "b", title: "b" }), task({ id: "a", title: "a" })];
+    expect(compare({ sortKey: "title" }, a, b)).toBeLessThan(0);
+    expect(compare({ sortKey: "title", sortOrder: "desc" }, a, b)).toBeGreaterThan(0);
   });
 });
