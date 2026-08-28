@@ -29,8 +29,9 @@ import {
   quadrantOf,
   type MatrixQuadrant,
 } from "../utils/eisenhower";
+import { groupMatrixTasks, type MatrixGroup } from "../domain/view/matrixGroups";
 import { listIdFor } from "../domain/spaces/membership";
-import { isCompleted, LIFECYCLE } from "../domain/tasks/taskState";
+import { LIFECYCLE } from "../domain/tasks/taskState";
 import { listColorHex } from "../domain/tasks/listColor";
 import { todayValue } from "../utils/date";
 import { ExpandableAdd } from "./motion/ExpandableAdd";
@@ -39,6 +40,9 @@ import { MotionTaskRow } from "./motion/MotionTaskRow";
 import { useT } from "../i18n";
 
 const ALL_LISTS = "";
+
+/** How much of a "완료" group is drawn before the reader has to ask for more. */
+const COMPLETED_PAGE = 5;
 
 interface MatrixPageProps {
   /** Already narrowed to live tasks in live Lists (App.tsx `visibleTasks`). */
@@ -83,19 +87,17 @@ export function MatrixPage({
       // A subtask is shown inside its parent, never as a card of its own —
       // the same rule the Tasks Module's Scopes follow.
       if (task.parentTaskId) continue;
-      // Still held back, but no longer for the old reason. Completion has
-      // stopped deciding the BOX (a finished task keeps its priority's box —
-      // TICKTICK_MATRIX_DESIGN.md D2), and what it is waiting for is somewhere
-      // to sit inside one: the "완료" group at the bottom of each box, which
-      // arrives with grouping. Letting it through now would interleave
-      // yesterday's finished work with today's open work in one flat list.
-      if (isCompleted(task)) continue;
+      // Finished work is NOT held back any more. It keeps the box its priority
+      // names (D2) and lands in that box's "완료" group — because a card that
+      // vanishes the instant it is ticked takes with it the only evidence of
+      // what was just ticked, and the way back is another screen.
       if (scope && listIdFor(task, lists) !== scope) continue;
       groups.get(quadrantOf(task))?.push(task);
     }
-    for (const bucket of groups.values()) bucket.sort(compareCards);
+    // Not sorted here: the order is per GROUP now, and each box does its own
+    // grouping-and-sorting in one pass (`groupMatrixTasks`).
     return groups;
-  }, [tasks, lists, scope, today]);
+  }, [tasks, lists, scope]);
 
   function handleDrop(taskId: string, quadrant: MatrixQuadrant) {
     const task = tasks.find((candidate) => candidate.id === taskId);
@@ -218,6 +220,7 @@ function QuadrantCell({
 }) {
   const { t } = useT();
   const [over, setOver] = useState(false);
+  const groups = useMemo(() => groupMatrixTasks(tasks, today, compareCards), [tasks, today]);
 
   return (
     <MotionDropZone
@@ -248,26 +251,26 @@ function QuadrantCell({
           <strong className="ff-matrix-cell-title">{t(`matrix.q${quadrant}`)}</strong>
           <span className="ff-matrix-cell-hint">{t(`matrix.q${quadrant}Hint`)}</span>
         </div>
-        <span className="ff-board-count">{tasks.length}</span>
+        {/* No count on the box. Each group inside carries its own, which is
+            the number that answers something — "기한 초과 3" is a fact about
+            the day, and "17" over a box is a number to divide up by eye. */}
       </header>
 
       <div className="ff-matrix-cell-body">
-        <AnimatePresence initial={false}>
-          {tasks.map((task) => (
-            <MatrixCard
-              key={task.id}
-              task={task}
-              lists={lists}
-              today={today}
-              selected={task.id === selectedTaskId}
-              isDragging={task.id === draggingId}
-              onOpen={() => onOpenTask(task.id)}
-              onToggleDone={() => onToggleDone(task.id)}
-              onDragStart={() => onDragStart(task.id)}
-              onDragEnd={onDragEnd}
-            />
-          ))}
-        </AnimatePresence>
+        {groups.map((group) => (
+          <MatrixGroupSection
+            key={group.id}
+            group={group}
+            lists={lists}
+            today={today}
+            selectedTaskId={selectedTaskId}
+            draggingId={draggingId}
+            onOpenTask={onOpenTask}
+            onToggleDone={onToggleDone}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+          />
+        ))}
       </div>
 
       {/* Adding here is the fastest way to classify: the box IS the two
@@ -281,6 +284,94 @@ function QuadrantCell({
         onSubmit={onAdd}
       />
     </MotionDropZone>
+  );
+}
+
+/**
+ * One collapsible group inside a box: "기한 초과 3", and the cards under it.
+ *
+ * The cap is on "완료" alone. Every other group is work still to be done and
+ * hiding any of it would be hiding the answer; finished work is the opposite —
+ * it accumulates forever, and a box whose bottom half is last month's
+ * successes has stopped being useful. Five, then a link.
+ */
+function MatrixGroupSection({
+  group,
+  lists,
+  today,
+  selectedTaskId,
+  draggingId,
+  onOpenTask,
+  onToggleDone,
+  onDragStart,
+  onDragEnd,
+}: {
+  group: MatrixGroup;
+  lists: List[];
+  today: string;
+  selectedTaskId: string;
+  draggingId: string;
+  onOpenTask: (id: string) => void;
+  onToggleDone: (id: string) => void;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
+}) {
+  const { t } = useT();
+  const [open, setOpen] = useState(true);
+  const [shown, setShown] = useState(COMPLETED_PAGE);
+
+  const capped = group.id === "completed";
+  const visible = capped ? group.tasks.slice(0, shown) : group.tasks;
+  const hidden = group.tasks.length - visible.length;
+
+  return (
+    <section className={`ff-matrix-group is-${group.id}`}>
+      <button
+        type="button"
+        className="ff-matrix-group-head"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="ff-matrix-group-caret" aria-hidden>
+          {open ? "⌄" : "›"}
+        </span>
+        <span className="ff-matrix-group-name">{t(`matrix.group.${group.id}`)}</span>
+        <span className="ff-matrix-group-count">{group.tasks.length}</span>
+      </button>
+
+      {open ? (
+        <div className="ff-matrix-group-body">
+          {/* One presence per GROUP, not per box. A card that is ticked leaves
+              this group and arrives in "완료", which is an unmount and a mount
+              rather than a reorder — the enter animation is what carries it. */}
+          <AnimatePresence initial={false}>
+            {visible.map((task) => (
+              <MatrixCard
+                key={task.id}
+                task={task}
+                lists={lists}
+                today={today}
+                selected={task.id === selectedTaskId}
+                isDragging={task.id === draggingId}
+                onOpen={() => onOpenTask(task.id)}
+                onToggleDone={() => onToggleDone(task.id)}
+                onDragStart={() => onDragStart(task.id)}
+                onDragEnd={onDragEnd}
+              />
+            ))}
+          </AnimatePresence>
+          {hidden > 0 ? (
+            <button
+              type="button"
+              className="ff-matrix-group-more"
+              onClick={() => setShown((value) => value + COMPLETED_PAGE)}
+            >
+              {t("matrix.showMore")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -307,13 +398,11 @@ function MatrixCard({
 }) {
   const { t } = useT();
   const list = lists.find((candidate) => candidate.id === listIdFor(task, lists));
-  const dateLabel = !task.dueDate
-    ? ""
-    : task.dueDate < today
-      ? t("eis.overdue")
-      : task.dueDate === today
-        ? t("eis.today")
-        : task.dueDate.slice(5).replace("-", ".");
+  // The date itself, not a word for where it falls. "기한 지남" on every card
+  // under a header that already says "기한 초과" is the same fact twice, and
+  // the half it replaced — WHICH day — is the half the reader cannot get
+  // anywhere else on this screen.
+  const dateLabel = task.dueDate ? task.dueDate.slice(5).replace("-", ".") : "";
 
   return (
     <MotionTaskRow
