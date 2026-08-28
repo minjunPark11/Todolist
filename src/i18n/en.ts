@@ -738,6 +738,8 @@ export const en: Dictionary = {
   "matrix.preset.priority": "Priority (default)",
   "matrix.preset.timeAndPriority": "Time + priority",
   "matrix.unmatched": "{{count}} tasks in no box",
+  "matrix.unmatchedInList": "{{count}} tasks in no box, within {{list}}",
+  "matrix.scopedOut": "You are viewing {{list}}. This box only takes other Lists, so nothing can be in it",
   "matrix.refuse.list": "This box only takes tasks from another List, and a drop will not move them",
   "matrix.refuse.tag": "This box only takes tasks with another tag, and a drop will not add one",
   "matrix.refuse.dueDate": "This box only takes undated tasks, and a drop will not erase a deadline",

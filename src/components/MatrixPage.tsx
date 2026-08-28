@@ -121,6 +121,7 @@ export function MatrixPage({
   // scoped to something the picker no longer offers — and looking empty for a
   // reason nothing on screen explains.
   const scope = pickableLists.some((list) => list.id === listId) ? listId : ALL_LISTS;
+  const scopeName = pickableLists.find((list) => list.id === scope)?.name ?? "";
 
   const { byQuadrant, unmatched } = useMemo(() => {
     const groups = new Map<MatrixQuadrant, Task[]>(
@@ -147,6 +148,21 @@ export function MatrixPage({
     // grouping-and-sorting in one pass (`groupMatrixTasks`).
     return { byQuadrant: groups, unmatched: orphans };
   }, [tasks, lists, scope, rules, today]);
+
+  /**
+   * Whether the List picker and this box's own List condition rule each other
+   * out (TICKTICK_MATRIX_DESIGN.md §27).
+   *
+   * Two filters narrow this screen: the picker at the top, which is a view for
+   * as long as the session lasts, and each box's stored rule. When both name
+   * Lists and the sets are disjoint, the box can never hold anything — and
+   * before this it just sat there empty, with the reason split across a
+   * `<select>` and a dialog behind a ⋯ menu.
+   */
+  function scopeConflict(quadrant: MatrixQuadrant): boolean {
+    const listIds = rules[quadrant].listIds;
+    return Boolean(scope) && listIds.length > 0 && !listIds.includes(scope);
+  }
 
   /** The box's words: the user's if they wrote any, the built-in ones if not. */
   function labelsFor(quadrant: MatrixQuadrant) {
@@ -306,6 +322,7 @@ export function MatrixPage({
             quadrant={quadrant}
             labels={labelsFor(quadrant)}
             refusal={draggingId ? refusalFor(draggingId, quadrant) : null}
+            scopedOutBy={scopeConflict(quadrant) ? scopeName : ""}
             tasks={byQuadrant.get(quadrant) ?? []}
             view={quadrantViews?.[quadrant] ?? DEFAULT_MATRIX_VIEW}
             lists={lists}
@@ -335,6 +352,7 @@ export function MatrixPage({
       {unmatched.length > 0 ? (
         <UnmatchedStrip
           tasks={unmatched}
+          scopeName={scopeName}
           lists={lists}
           today={today}
           selectedTaskId={selectedTaskId}
@@ -373,6 +391,7 @@ function QuadrantCell({
   quadrant,
   labels,
   refusal,
+  scopedOutBy,
   tasks,
   view,
   lists,
@@ -391,6 +410,8 @@ function QuadrantCell({
   labels: { name: string; hint: string };
   /** Set while a card this box cannot take is being dragged. */
   refusal: MatrixDropRefusal | null;
+  /** The List being viewed, when it and this box's rule exclude each other. */
+  scopedOutBy: string;
   tasks: Task[];
   view: MatrixQuadrantView;
   lists: List[];
@@ -454,15 +475,21 @@ function QuadrantCell({
             than from a line under the cards. The box is a judgement — "this is
             important and urgent" — and the fastest way to make one is to type
             into the box that already says it, with no follow-up edit. */}
-        <button
-          type="button"
-          className="ff-matrix-cell-add"
-          aria-label={t("matrix.addAria", { quadrant: labels.name })}
-          aria-expanded={adding}
-          onClick={() => setAdding((value) => !value)}
-        >
-          +
-        </button>
+        {/* Gone while the picker and the rule exclude each other. The rule's
+            own List wins when a task is typed here, so the `+` would make a
+            task in a List this screen is not showing — typed, saved, and
+            invisible. A control that can only produce that is not a control. */}
+        {scopedOutBy ? null : (
+          <button
+            type="button"
+            className="ff-matrix-cell-add"
+            aria-label={t("matrix.addAria", { quadrant: labels.name })}
+            aria-expanded={adding}
+            onClick={() => setAdding((value) => !value)}
+          >
+            +
+          </button>
+        )}
         <button
           type="button"
           className="ff-matrix-cell-menu"
@@ -484,6 +511,13 @@ function QuadrantCell({
         <p className="ff-matrix-cell-refusal" role="status">
           {t(`matrix.refuse.${refusal}`)}
         </p>
+      ) : null}
+
+      {/* Empty for a reason no single control on screen explains, so the box
+          explains it. Without this the picker says "일" and the box says
+          nothing at all, and the two halves of the answer never meet. */}
+      {scopedOutBy ? (
+        <p className="ff-matrix-cell-refusal">{t("matrix.scopedOut", { list: scopedOutBy })}</p>
       ) : null}
 
       <div className="ff-matrix-cell-body">
@@ -528,6 +562,7 @@ function QuadrantCell({
  */
 function UnmatchedStrip({
   tasks,
+  scopeName,
   lists,
   today,
   selectedTaskId,
@@ -538,6 +573,8 @@ function UnmatchedStrip({
   onDragEnd,
 }: {
   tasks: Task[];
+  /** The List being viewed, or "" for all of them. */
+  scopeName: string;
   lists: List[];
   today: string;
   selectedTaskId: string;
@@ -568,7 +605,12 @@ function UnmatchedStrip({
         <span className="ff-matrix-group-caret" aria-hidden>
           {open ? "⌄" : "›"}
         </span>
-        {t("matrix.unmatched", { count: tasks.length })}
+        {/* The count is over what the picker is showing, not over the account.
+            Saying "12" while a List is selected and "40" a click later, with
+            no word about why, is a number that cannot be trusted twice. */}
+        {scopeName
+          ? t("matrix.unmatchedInList", { count: tasks.length, list: scopeName })
+          : t("matrix.unmatched", { count: tasks.length })}
       </button>
       {open ? (
         <div className="ff-matrix-unmatched-body">

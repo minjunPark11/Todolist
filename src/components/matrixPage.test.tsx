@@ -783,3 +783,77 @@ describe("editing what gets into a box", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
+
+describe("the List picker beside the boxes' own conditions", () => {
+  const twoLists = [
+    { id: "list-work", name: "Work" } as List,
+    { id: "list-home", name: "Home" } as List,
+  ];
+  /** Ⅰ takes Work only, which the picker can be pointed away from. */
+  const workOnly: Partial<MatrixQuadrantRules> = {
+    I: { listIds: ["list-work"], tagIds: [], dateBuckets: [], priorities: ["high"] },
+  };
+
+  async function viewList(name: string) {
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /List/ }), name);
+  }
+
+  it("says which List a count was taken within", async () => {
+    renderMatrix(
+      [
+        task({ id: "w", title: "Work one", priority: "medium", listId: "list-work" }),
+        task({ id: "h", title: "Home one", priority: "medium", listId: "list-home" }),
+      ],
+      { lists: twoLists, quadrantRules: { II: { listIds: [], tagIds: [], dateBuckets: ["overdue"], priorities: [] } } },
+    );
+
+    // Both are unmatched: Ⅱ wants overdue, and Ⅰ/Ⅲ/Ⅳ want other priorities.
+    expect(screen.getByRole("button", { name: "2 tasks in no box" })).toBeTruthy();
+
+    // A number that halves when a List is picked, with no word about why, is a
+    // number that cannot be trusted twice.
+    await viewList("Work");
+    expect(screen.getByRole("button", { name: "1 tasks in no box, within Work" })).toBeTruthy();
+  });
+
+  it("explains a box the picker has emptied, which neither control says alone", async () => {
+    renderMatrix([task({ priority: "high", listId: "list-work" })], {
+      lists: twoLists,
+      quadrantRules: workOnly,
+    });
+
+    expect(within(boxOne()).queryByText(/only takes other Lists/)).toBeNull();
+
+    await viewList("Home");
+
+    // The picker says "Home" and the rule says "Work"; the box is where those
+    // two halves of the answer finally meet.
+    expect(within(boxOne()).getByText(/You are viewing Home/)).toBeTruthy();
+  });
+
+  it("takes away the + that could only make an invisible task", async () => {
+    // The rule's own List wins over the picker when a task is typed into a
+    // box, so this + would have written a task into Work while the screen was
+    // showing Home — saved, and on no screen.
+    const onCreateTask = vi.fn(() => "made");
+    renderMatrix([], { lists: twoLists, quadrantRules: workOnly, onCreateTask });
+
+    expect(screen.getByRole("button", { name: "Add a task to Do first" })).toBeTruthy();
+
+    await viewList("Home");
+
+    expect(screen.queryByRole("button", { name: "Add a task to Do first" })).toBeNull();
+    // The other three boxes name no List, so they are untouched.
+    expect(screen.getByRole("button", { name: "Add a task to Schedule" })).toBeTruthy();
+    expect(onCreateTask).not.toHaveBeenCalled();
+  });
+
+  it("leaves every box alone when the rules name no List", async () => {
+    renderMatrix([], { lists: twoLists });
+
+    await viewList("Home");
+
+    expect(screen.getAllByRole("button", { name: /^Add a task to / })).toHaveLength(4);
+    expect(document.querySelector(".ff-matrix-cell-refusal")).toBeNull();
+  });
+});

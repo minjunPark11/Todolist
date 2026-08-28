@@ -730,6 +730,8 @@ export const ko: Dictionary = {
   "matrix.preset.priority": "우선순위 (기본)",
   "matrix.preset.timeAndPriority": "시간 + 우선순위",
   "matrix.unmatched": "어느 칸에도 맞지 않는 작업 {{count}}개",
+  "matrix.unmatchedInList": "'{{list}}'에서 어느 칸에도 맞지 않는 작업 {{count}}개",
+  "matrix.scopedOut": "'{{list}}' 리스트를 보는 중입니다. 이 칸은 다른 리스트만 받으므로 여기에는 아무것도 들어올 수 없습니다",
   "matrix.refuse.list": "이 칸은 다른 리스트의 작업만 받습니다. 끌어 놓아도 소속은 바뀌지 않습니다",
   "matrix.refuse.tag": "이 칸은 다른 태그의 작업만 받습니다. 끌어 놓아도 태그는 붙지 않습니다",
   "matrix.refuse.dueDate": "이 칸은 마감일 없는 작업만 받습니다. 끌어 놓아도 마감일을 지우지 않습니다",
