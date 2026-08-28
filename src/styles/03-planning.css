@@ -808,9 +808,10 @@
   font-weight: 700;
 }
 .ff-matrix-cell-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-/* The box's own settings. Always present rather than revealed on hover: a
-   control that only exists under a pointer is a control a touch screen and a
-   keyboard cannot find. */
+/* The box's two controls — add, and settings. Always present rather than
+   revealed on hover: a control that only exists under a pointer is a control a
+   touch screen and a keyboard cannot find. */
+.ff-matrix-cell-add,
 .ff-matrix-cell-menu {
   flex: 0 0 auto;
   width: 24px;
@@ -824,11 +825,52 @@
   line-height: 1;
   cursor: pointer;
 }
+.ff-matrix-cell-add:hover,
+.ff-matrix-cell-add:focus-visible,
 .ff-matrix-cell-menu:hover,
 .ff-matrix-cell-menu:focus-visible {
   background: var(--bg-hover-content);
   color: var(--text-primary);
 }
+/* A `+` at the menu's font size reads as a hyphen with ambitions. */
+.ff-matrix-cell-add { font-size: 17px; }
+.ff-matrix-cell-add[aria-expanded="true"] { background: var(--bg-hover-content); color: var(--q-color); }
+
+/* The box's input, at the top of the body and outlined in the box's own
+   colour — so a caret sitting in Ⅳ cannot be mistaken for one sitting in Ⅰ. */
+.ff-matrix-quick-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--q-color);
+  border-radius: var(--radius-md);
+}
+.ff-matrix-quick-add input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+.ff-matrix-quick-add input:focus { outline: none; }
+.ff-matrix-quick-add button {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ff-matrix-quick-add button:disabled { opacity: 0.45; cursor: default; }
 .ff-matrix-cell-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 .ff-matrix-cell-hint { font-size: 11px; color: var(--text-tertiary); }
 
@@ -917,10 +959,60 @@
 .ff-matrix-card:active { cursor: grabbing; }
 .ff-matrix-card.is-selected { border-color: var(--accent); }
 .ff-matrix-card .ff-check { flex: none; margin-top: 1px; }
-.ff-matrix-card-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
-.ff-matrix-card-title { font-size: 13px; line-height: 1.4; color: var(--text-primary); word-break: break-word; }
-.ff-matrix-card-meta { display: flex; flex-wrap: wrap; gap: 6px; }
-.ff-matrix-add { margin-top: auto; }
+/* The box's colour on the checkbox. Not a fifth signal invented here: it is
+   `--q-color`, the cell's own, and the header two rows up names that same
+   priority in words — so nothing on this card is carried by hue alone
+   (TICKTICK_COMPONENT_06 §6.1). Ticked keeps --success: that is a different
+   question and it needs its own answer. */
+.ff-matrix-cell .ff-check:not(.checked) { border-color: var(--q-color); }
+.ff-matrix-cell .ff-check:not(.checked):hover { border-color: var(--accent); }
+
+/* Title and metadata on ONE line, the way a row is drawn: the title takes what
+   it needs and the rest sits against the right edge. They break onto two lines
+   only when the title leaves no room — a quadrant is half a page wide, and a
+   deadline must not be what falls off the end of it. */
+.ff-matrix-card-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.ff-matrix-card-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+/* `margin-left: auto` and not `justify-content`, so the metadata stays on the
+   right edge on the wrapped second line too. */
+.ff-matrix-card-meta {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+/* The List as a name and nothing else. The coloured dot next to it was a
+   second way of saying one word, on a card whose box already carries a colour
+   that means something different. */
+.ff-matrix-card-list {
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-matrix-card-icon { display: inline-flex; flex: none; }
+.ff-matrix-card-due { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* A deadline already missed is the one thing on this card that has to be acted
+   on today, so it is the one thing that is not grey. */
+.ff-matrix-card-due.is-overdue { color: var(--danger); font-weight: 600; }
 
 /* One column per box on a phone: two 240px rows plus their labels do not fit
    side by side, and a squeezed matrix is a matrix nobody can read. */

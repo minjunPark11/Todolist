@@ -19,7 +19,7 @@
 // dragging a card writes the one field the box is read from and the two
 // cannot disagree — and, unlike before, a drag can no longer erase a deadline
 // on its way past.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import type { List, Task, TaskPriority } from "../types";
 import {
@@ -40,10 +40,8 @@ import {
 } from "../domain/view/matrixGroups";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./common/ContextMenu";
 import { listIdFor } from "../domain/spaces/membership";
-import { LIFECYCLE } from "../domain/tasks/taskState";
-import { listColorHex } from "../domain/tasks/listColor";
-import { todayValue } from "../utils/date";
-import { ExpandableAdd } from "./motion/ExpandableAdd";
+import { LIFECYCLE, isCompleted } from "../domain/tasks/taskState";
+import { formatDate, todayValue } from "../utils/date";
 import { MotionDropZone } from "./motion/MotionDropZone";
 import { MotionTaskRow } from "./motion/MotionTaskRow";
 import { useT } from "../i18n";
@@ -251,23 +249,6 @@ export function MatrixPage({
   );
 }
 
-/**
- * Card order inside a box: the nearest deadline first, undated last, ties
- * broken by priority.
- *
- * Undated work sinks rather than sorting as an empty string, which would
- * float it above everything dated — inside Q2, where most work has no date at
- * all, that reads as random.
- */
-const PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2, none: 3 };
-
-function compareCards(a: Task, b: Task): number {
-  const dueA = a.dueDate || "9999-12-31";
-  const dueB = b.dueDate || "9999-12-31";
-  if (dueA !== dueB) return dueA < dueB ? -1 : 1;
-  return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
-}
-
 function QuadrantCell({
   quadrant,
   tasks,
@@ -301,6 +282,7 @@ function QuadrantCell({
 }) {
   const { t } = useT();
   const [over, setOver] = useState(false);
+  const [adding, setAdding] = useState(false);
   const groups = useMemo(() => groupMatrixTasks(tasks, today, view), [tasks, today, view]);
 
   return (
@@ -335,6 +317,19 @@ function QuadrantCell({
         {/* No count on the box. Each group inside carries its own, which is
             the number that answers something — "기한 초과 3" is a fact about
             the day, and "17" over a box is a number to divide up by eye. */}
+        {/* Adding from the HEADER, next to the box's other control, rather
+            than from a line under the cards. The box is a judgement — "this is
+            important and urgent" — and the fastest way to make one is to type
+            into the box that already says it, with no follow-up edit. */}
+        <button
+          type="button"
+          className="ff-matrix-cell-add"
+          aria-label={t("matrix.addAria", { quadrant: t(`matrix.q${quadrant}`) })}
+          aria-expanded={adding}
+          onClick={() => setAdding((value) => !value)}
+        >
+          +
+        </button>
         <button
           type="button"
           className="ff-matrix-cell-menu"
@@ -353,6 +348,13 @@ function QuadrantCell({
       </header>
 
       <div className="ff-matrix-cell-body">
+        {/* At the TOP, under the `+` that opened it — the input belongs beside
+            the control, not at the far end of a box that scrolls. Where the
+            card LANDS is a separate question the box's own grouping answers,
+            and for a task with no date yet that is the last group, not here. */}
+        {adding ? (
+          <QuadrantQuickAdd onSubmit={onAdd} onClose={() => setAdding(false)} />
+        ) : null}
         {groups.map((group) => (
           <MatrixGroupSection
             key={group.id}
@@ -368,18 +370,65 @@ function QuadrantCell({
           />
         ))}
       </div>
-
-      {/* Adding here is the fastest way to classify: the box IS the two
-          judgements, so a task typed into it needs no follow-up edit. */}
-      <ExpandableAdd
-        className="ff-matrix-add"
-        label={t("matrix.add")}
-        placeholder={t("matrix.addPlaceholder")}
-        submitLabel={t("common.add")}
-        keepOpenAfterSubmit
-        onSubmit={onAdd}
-      />
     </MotionDropZone>
+  );
+}
+
+/**
+ * The box's own input.
+ *
+ * It stays open after a save. Classifying is a batch job — a box is what a
+ * head is emptied into — and closing after each task would make four tasks
+ * four trips to the `+`. It closes on Escape, and on losing focus while
+ * empty: an input holding nothing is not worth the row it sits on.
+ */
+function QuadrantQuickAdd({
+  onSubmit,
+  onClose,
+}: {
+  onSubmit: (title: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useT();
+  const [title, setTitle] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Opened by a click on `+`, so the caret has to arrive without a second one.
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <form
+      className="ff-matrix-quick-add"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const trimmed = title.trim();
+        if (!trimmed) return;
+        onSubmit(trimmed);
+        setTitle("");
+        inputRef.current?.focus();
+      }}
+    >
+      <input
+        ref={inputRef}
+        value={title}
+        placeholder={t("matrix.addPlaceholder")}
+        aria-label={t("matrix.addPlaceholder")}
+        onChange={(event) => setTitle(event.target.value)}
+        // Typed-in text is not thrown away by a stray click elsewhere; only
+        // an empty field closes itself.
+        onBlur={() => {
+          if (!title.trim()) onClose();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onClose();
+        }}
+      />
+      <button type="submit" disabled={!title.trim()}>
+        {t("common.add")}
+      </button>
+    </form>
   );
 }
 
@@ -477,6 +526,15 @@ function MatrixGroupSection({
   );
 }
 
+/**
+ * One task, as the box draws it.
+ *
+ * Everything on the right of the title is what the card cannot say by sitting
+ * where it sits: which List it came from, whether it repeats, whether there is
+ * more of it behind the title, and when it is due. The one thing NOT here is
+ * the priority — the box already is it (D1), so a flag on every card would
+ * repeat the header once per row.
+ */
 function MatrixCard({
   task,
   lists,
@@ -498,13 +556,26 @@ function MatrixCard({
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const list = lists.find((candidate) => candidate.id === listIdFor(task, lists));
+  const done = isCompleted(task);
   // The date itself, not a word for where it falls. "기한 지남" on every card
   // under a header that already says "기한 초과" is the same fact twice, and
   // the half it replaced — WHICH day — is the half the reader cannot get
-  // anywhere else on this screen.
-  const dateLabel = task.dueDate ? task.dueDate.slice(5).replace("-", ".") : "";
+  // anywhere else on this screen. Written the way the reader's language writes
+  // a date ("8월 20일", "Aug 20") rather than as "08.20", which is a date only
+  // once you have worked out which half is the month.
+  const dateLabel = task.dueDate ? formatDate(task.dueDate, lang) : "";
+  // Not on finished work. "Overdue" is a thing to go and do, and a card that
+  // has been ticked has had it done — a red date under a strike-through is an
+  // alarm about a job that is already over. The reference goes further and
+  // drops the date from a completed row entirely (§2.4); this keeps it,
+  // because WHICH day is the one fact the row is read for afterwards.
+  const overdue = !done && Boolean(task.dueDate) && task.dueDate < today;
+  const repeats = task.repeatType !== undefined && task.repeatType !== "none";
+  // Either body counts: `contentMode` decides which one a Task is using, and a
+  // card only reports that there IS more behind the title.
+  const hasBody = Boolean(task.notes?.trim() || task.description?.trim());
 
   return (
     <MotionTaskRow
@@ -527,30 +598,53 @@ function MatrixCard({
         if (event.key === "Enter") onOpen();
       }}
     >
+      {/* Ticked cards were drawing an EMPTY circle: the row was struck through
+          and dimmed while the control that did it still looked untouched, so
+          the one thing on the card that could be acted on said the opposite of
+          the rest. The box's colour rides on it — `--q-color` comes from the
+          cell — which is the priority, but as the box's colour rather than as
+          a claim only a colour makes: the header next to it says the same
+          thing in words. */}
       <button
         type="button"
-        className="ff-check"
-        aria-label={t("kit.markDone")}
+        className={`ff-check${done ? " checked" : ""}`}
+        aria-label={t(done ? "tasks.reopenTask" : "tasks.completeTask", { title: task.title })}
         onClick={(event) => {
           event.stopPropagation();
           onToggleDone();
         }}
-      />
+      >
+        {done ? "✓" : ""}
+      </button>
       <div className="ff-matrix-card-main">
         <span className="ff-matrix-card-title">{task.title}</span>
-        <div className="ff-matrix-card-meta">
-          {list ? (
-            <span className="ff-projbadge">
-              <span className="ff-dot" style={{ background: listColorHex(list.color) || "var(--tm-tag-dot)" }} />
-              {list.name}
+        {/* Wraps under the title only when the row runs out of width — a
+            quadrant is half a page, and a long title must not push the date
+            off the end of it. */}
+        <span className="ff-matrix-card-meta">
+          {list ? <span className="ff-matrix-card-list">{list.name}</span> : null}
+          {repeats ? (
+            <span className="ff-matrix-card-icon" role="img" aria-label={t("matrix.card.repeats")} title={t("matrix.card.repeats")}>
+              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+                <path d="M4.5 12A7.5 7.5 0 0 1 17.3 6.7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                <path d="M17.3 3.2v3.5h-3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                <path d="M6.7 20.8v-3.5h3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          ) : null}
+          {hasBody ? (
+            <span className="ff-matrix-card-icon" role="img" aria-label={t("matrix.card.hasNotes")} title={t("matrix.card.hasNotes")}>
+              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+                <path d="M5 4.5h9L19 9v10.5H5z" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+                <path d="M8.5 12.5h7M8.5 16h4.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+              </svg>
             </span>
           ) : null}
           {dateLabel ? (
-            <span className={`ff-board-chip${task.dueDate && task.dueDate < today ? " is-warn" : ""}`}>
-              {dateLabel}
-            </span>
+            <span className={`ff-matrix-card-due${overdue ? " is-overdue" : ""}`}>{dateLabel}</span>
           ) : null}
-        </div>
+        </span>
       </div>
     </MotionTaskRow>
   );

@@ -273,3 +273,145 @@ describe("the box's ⋯ menu", () => {
     expect(onChangeQuadrantView).toHaveBeenCalledWith("III", expect.objectContaining({ groupBy: "none" }));
   });
 });
+
+describe("the box's +", () => {
+  const addTo = (box: string) => screen.getByRole("button", { name: `Add a task to ${box}` });
+  const field = () => within(boxOne()).getByRole("textbox", { name: "What belongs in this box?" });
+
+  it("is the only way in — the line under the cards is gone", () => {
+    // Two doors into one room is two things to explain and one of them
+    // redundant. The header's is the one next to the box's other control.
+    renderMatrix([]);
+    expect(document.querySelector(".ff-matrix-add")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Add a task to / })).toHaveLength(4);
+  });
+
+  it("opens an input at the top of the box it was pressed in, and nowhere else", async () => {
+    renderMatrix([task({ title: "Already here", dueDate: TODAY })]);
+    await userEvent.click(addTo("Do first"));
+
+    expect(document.querySelectorAll(".ff-matrix-quick-add")).toHaveLength(1);
+    expect(boxOne().querySelector(".ff-matrix-cell-body")?.firstElementChild?.className).toContain(
+      "ff-matrix-quick-add",
+    );
+    // Opened by a click, so the caret has to arrive without a second one.
+    expect(document.activeElement).toBe(field());
+  });
+
+  it("gives what is typed the box's priority, and nothing else it did not ask for", async () => {
+    const onCreateTask = vi.fn(() => "made");
+    renderMatrix([], { onCreateTask });
+
+    await userEvent.click(addTo("Schedule"));
+    await userEvent.type(screen.getByRole("textbox", { name: "What belongs in this box?" }), "  Plan it  ");
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    // Ⅱ is `medium` (D1). No dueDate: the box is a priority now, so typing
+    // into one cannot invent a deadline the way the two-axis rule had to.
+    expect(onCreateTask).toHaveBeenCalledWith({ title: "Plan it", status: "open", priority: "medium" });
+  });
+
+  it("stays open and empty for the next one", async () => {
+    const onCreateTask = vi.fn(() => "made");
+    renderMatrix([], { onCreateTask });
+
+    await userEvent.click(addTo("Do first"));
+    await userEvent.type(field(), "First{Enter}");
+    expect(onCreateTask).toHaveBeenCalledTimes(1);
+
+    expect((field() as HTMLInputElement).value).toBe("");
+    await userEvent.type(field(), "Second{Enter}");
+    expect(onCreateTask).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes on Escape, and makes nothing on the way out", async () => {
+    const onCreateTask = vi.fn(() => "made");
+    renderMatrix([], { onCreateTask });
+
+    await userEvent.click(addTo("Do first"));
+    await userEvent.type(field(), "Never mind");
+    await userEvent.keyboard("{Escape}");
+
+    expect(document.querySelector(".ff-matrix-quick-add")).toBeNull();
+    expect(onCreateTask).not.toHaveBeenCalled();
+  });
+});
+
+describe("what a card says", () => {
+  const lists = [{ id: "school", name: "School" } as List];
+  const card = () => boxOne().querySelector(".ff-matrix-card") as HTMLElement;
+
+  it("names the List without repeating it as a colour", () => {
+    renderMatrix([task({ title: "Read ch. 4", listId: "school" })], { lists });
+
+    expect(within(card()).getByText("School")).toBeTruthy();
+    expect(card().querySelector(".ff-projbadge")).toBeNull();
+    expect(card().querySelector(".ff-dot")).toBeNull();
+  });
+
+  it("writes the date as a date, not as a word for where it falls", () => {
+    renderMatrix([task({ dueDate: "2026-09-20" })]);
+
+    // "09.20" is a date only once the reader has worked out which half is the
+    // month; the group header above it already said "Later".
+    expect(card().querySelector(".ff-matrix-card-due")?.textContent).toBe("Sep 20");
+    expect(card().querySelector(".is-overdue")).toBeNull();
+  });
+
+  it("marks a deadline that has already passed", () => {
+    renderMatrix([task({ dueDate: "2026-08-20" })]);
+
+    expect(card().querySelector(".ff-matrix-card-due")?.className).toContain("is-overdue");
+  });
+
+  it("stops calling it late once it is done", () => {
+    // Red says "go and do this". The card has been ticked, so it is an alarm
+    // about a job that is over — while the date itself is still worth reading.
+    renderMatrix([
+      task({
+        title: "Filed late",
+        dueDate: "2026-08-20",
+        status: "completed" as TaskStatus,
+        completedAt: "2026-08-27T10:00:00.000Z",
+      }),
+    ]);
+
+    const due = card().querySelector(".ff-matrix-card-due");
+    expect(due?.textContent).toBe("Aug 20");
+    expect(due?.className).not.toContain("is-overdue");
+  });
+
+  it("flags work that repeats and work with more behind its title", () => {
+    renderMatrix([
+      task({ id: "rep", title: "Standup", repeatType: "weekly" }),
+      task({ id: "note", title: "Draft", notes: "the outline" }),
+      task({ id: "desc", title: "Spec", description: "why" }),
+      task({ id: "bare", title: "Bare", notes: "   " }),
+    ]);
+
+    expect(screen.getAllByRole("img", { name: "Repeats" })).toHaveLength(1);
+    // Both bodies count: a card only reports that there IS more, not which
+    // field it is in.
+    expect(screen.getAllByRole("img", { name: "Has notes" })).toHaveLength(2);
+  });
+
+  it("says nothing about the priority the box already names", () => {
+    // D1: every card in Ⅰ is high. A flag on each of them would be the header
+    // repeated once per row.
+    renderMatrix([task({ title: "Urgent", priority: "high" })]);
+
+    expect(card().querySelector(".tm-task-priority")).toBeNull();
+    expect(within(card()).queryByText("High")).toBeNull();
+  });
+
+  it("shows the tick on a card that is done, and offers to undo it", () => {
+    // The row was struck through and dimmed while the control that did it
+    // still drew an empty circle — the one thing on the card that could be
+    // acted on said the opposite of everything around it.
+    renderMatrix([task({ title: "Filed", status: "completed" as TaskStatus, completedAt: "2026-08-27T10:00:00.000Z" })]);
+
+    const check = boxOne().querySelector(".ff-check") as HTMLElement;
+    expect(check.className).toContain("checked");
+    expect(check.getAttribute("aria-label")).toBe("Reopen Filed");
+  });
+});
