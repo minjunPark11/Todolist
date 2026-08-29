@@ -43,6 +43,27 @@ export function scheduleSpan(schedule: Schedule): { start: string; end: string }
     : { start: schedule.dueDate, end: schedule.startDate };
 }
 
+/**
+ * How many days late this schedule is, or 0 when it is not late at all.
+ *
+ * Measured from the END of the span, because a range is late when the last
+ * day it covers has passed — a three-day piece of work that started on Monday
+ * is not overdue on Tuesday.
+ *
+ * Whole days only, and never negative: "due tomorrow" is not "-1 late". The
+ * caller decides whether to say it — a finished task keeps its dates and is
+ * not overdue by any of them, which is the same rule `matrixGroupOf` follows
+ * when it refuses to file completed work under "기한 초과".
+ */
+export function overdueDays(schedule: Schedule, today: string): number {
+  const span = scheduleSpan(schedule);
+  if (span === null || span.end >= today) return 0;
+  const end = Date.parse(`${span.end}T00:00:00Z`);
+  const now = Date.parse(`${today}T00:00:00Z`);
+  if (!Number.isFinite(end) || !Number.isFinite(now)) return 0;
+  return Math.max(0, Math.round((now - end) / 86_400_000));
+}
+
 /** Inclusive day count, so a single-day schedule is 1 rather than 0. */
 export function scheduleSpanDays(schedule: Schedule): number {
   const span = scheduleSpan(schedule);

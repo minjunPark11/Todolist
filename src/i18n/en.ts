@@ -592,6 +592,7 @@ export const en: Dictionary = {
   "schedule.currentMonth": "This month",
   "schedule.pickEnd": "Pick an end date.",
   "schedule.clear": "Clear date",
+  "schedule.overdueDays": "{{days}}d overdue",
   "schedule.trigger": "Date and Reminder",
   "schedule.quick.today": "Today",
   "schedule.quick.tomorrow": "Tomorrow",

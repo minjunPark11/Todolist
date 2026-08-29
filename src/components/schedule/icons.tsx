@@ -56,6 +56,16 @@ export function SunriseIcon({ size }: IconProps) {
   );
 }
 
+/** The plain calendar, for the trigger that opens all of this. */
+export function CalendarIcon({ size }: IconProps) {
+  return (
+    <Frame size={size}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" {...STROKE} />
+      <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3" {...STROKE} />
+    </Frame>
+  );
+}
+
 /** +7일 — a calendar carrying the number, because that is the whole meaning. */
 export function CalendarPlus7Icon({ size }: IconProps) {
   return (

@@ -12,8 +12,10 @@
 // about what a schedule was. One editor, one `updateTaskSchedule`, one answer.
 import type { Task } from "../../types";
 import type { ReminderSpec, Schedule, ScheduleIssue } from "../../domain/schedule";
-import { formatScheduleTrigger, scheduleFromTask } from "../../domain/schedule";
+import { formatScheduleTrigger, overdueDays, scheduleFromTask } from "../../domain/schedule";
+import { isCompleted } from "../../domain/tasks/taskState";
 import { ScheduleEditor } from "../schedule/ScheduleEditor";
+import { CalendarIcon } from "../schedule/icons";
 import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "../floating";
 import { useT } from "../../i18n";
 
@@ -39,6 +41,8 @@ export function SchedulePicker({ task, reminders, today, onCommit, restoreFocusT
   const locale = lang === "ko" ? "ko-KR" : "en-US";
   const schedule = scheduleFromTask({ ...task, reminders });
   const label = formatScheduleTrigger(schedule, today, locale);
+  const late = isCompleted(task) ? 0 : overdueDays(schedule, today);
+  const lateLabel = t("schedule.overdueDays", { days: late });
 
   return (
     // §19.11: bottom-start. The calendar is the widest surface in the Detail,
@@ -47,12 +51,27 @@ export function SchedulePicker({ task, reminders, today, onCommit, restoreFocusT
     // on every open.
     <Popover placement="bottom-start" ownerTaskId={task.id} restoreFocusTo={restoreFocusTo}>
       <PopoverTrigger
-        className={`sched-trigger${label ? "" : " is-empty"}`}
+        className={`sched-trigger${label ? "" : " is-empty"}${late > 0 ? " is-late" : ""}`}
         // §5.53: the trigger says what the schedule IS, so an empty one reads
         // as an invitation rather than as a control with a missing value.
-        aria-label={label ? t("tasks.scheduleCurrent", { value: label }) : t("schedule.trigger")}
+        aria-label={
+          label
+            ? t("tasks.scheduleCurrent", { value: late > 0 ? `${label}, ${lateLabel}` : label })
+            : t("schedule.trigger")
+        }
       >
+        {/* Drawn rather than a `content: "🗓"` on a pseudo-element, for the
+            reasons the editor's other seven moved (design G1) — and because a
+            glyph in CSS cannot follow the trigger's own colour when it turns
+            red. */}
+        <CalendarIcon size={14} />
         {label || t("schedule.trigger")}
+        {/* How late, spelled out. The date is already red on an overdue task,
+            but red says THAT it is late and not by how much — and "5월 20일"
+            costs the reader a subtraction to find out. Not shown on finished
+            work: a task completed last week is not late by any of its dates,
+            which is the rule `matrixGroupOf` follows too. */}
+        {late > 0 ? <span className="sched-trigger-late">{lateLabel}</span> : null}
       </PopoverTrigger>
 
       <PopoverContent label={t("taskDetail.schedule")} className="sched-surface">

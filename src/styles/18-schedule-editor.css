@@ -25,9 +25,18 @@
   gap: 6px;
 }
 
-.sched-trigger::before {
-  content: "🗓";
-  font-size: 0.9em;
+/* Late, and by how much. Red is the trigger's whole colour here rather than
+   the counter's alone: the date and the number are one statement, and
+   colouring half of it would read as two. */
+.sched-trigger.is-late {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+}
+
+.sched-trigger-late {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
 }
 
 .sched-trigger:hover {

@@ -586,7 +586,9 @@ export const ko: Dictionary = {
   "schedule.nextMonth": "다음 달",
   "schedule.currentMonth": "현재 달",
   "schedule.pickEnd": "종료일을 선택하세요.",
-  "schedule.clear": "일정 삭제",
+  // "삭제"보다 "지우기": 이 버튼이 없애는 것은 레코드가 아니라 날짜다.
+  "schedule.clear": "일정 지우기",
+  "schedule.overdueDays": "{{days}}일 지남",
   "schedule.trigger": "날짜와 알림",
   "schedule.quick.today": "오늘",
   "schedule.quick.tomorrow": "내일",

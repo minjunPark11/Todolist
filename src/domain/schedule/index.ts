@@ -88,6 +88,7 @@ export {
   isOverdue,
   isAllDay,
   isTimed,
+  overdueDays,
   scheduleSpan,
   scheduleSpanDays,
 } from "./scheduleQueries";

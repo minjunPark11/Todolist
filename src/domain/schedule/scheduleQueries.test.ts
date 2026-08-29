@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { getRangeStage, hasSchedule, isAllDay, isOverdue, isTimed, scheduleSpan, scheduleSpanDays } from "./scheduleQueries";
+import {
+  getRangeStage,
+  hasSchedule,
+  isAllDay,
+  isOverdue,
+  isTimed,
+  overdueDays,
+  scheduleSpan,
+  scheduleSpanDays,
+} from "./scheduleQueries";
 import { isDirty, schedulesEqual } from "./scheduleEquality";
 import { EMPTY_SCHEDULE, type Schedule, type ScheduleDraft, type ScheduleMode } from "./types";
 
@@ -170,5 +179,31 @@ describe("isAllDay", () => {
   // put every undated task on the calendar's all-day row.
   it("is false for a schedule with no date at all", () => {
     expect(isAllDay(EMPTY_SCHEDULE)).toBe(false);
+  });
+});
+
+describe("overdueDays", () => {
+  const on = (patch: Partial<Schedule>): Schedule => ({ ...EMPTY_SCHEDULE, ...patch });
+
+  it("counts whole days from the day that has passed", () => {
+    expect(overdueDays(on({ dueDate: "2026-08-20" }), "2026-08-29")).toBe(9);
+    expect(overdueDays(on({ dueDate: "2026-08-28" }), "2026-08-29")).toBe(1);
+  });
+
+  it("is 0 today, and 0 for anything still ahead", () => {
+    // "Due today" is not late, and "due tomorrow" is not −1 late.
+    expect(overdueDays(on({ dueDate: "2026-08-29" }), "2026-08-29")).toBe(0);
+    expect(overdueDays(on({ dueDate: "2026-09-30" }), "2026-08-29")).toBe(0);
+  });
+
+  it("measures a range from its END", () => {
+    // A three-day piece of work that started on Monday is not overdue on
+    // Tuesday — the last day it covers has not passed yet.
+    expect(overdueDays(on({ startDate: "2026-08-27", dueDate: "2026-08-31" }), "2026-08-29")).toBe(0);
+    expect(overdueDays(on({ startDate: "2026-08-01", dueDate: "2026-08-25" }), "2026-08-29")).toBe(4);
+  });
+
+  it("is 0 when there is no schedule to be late for", () => {
+    expect(overdueDays(EMPTY_SCHEDULE, "2026-08-29")).toBe(0);
   });
 });
