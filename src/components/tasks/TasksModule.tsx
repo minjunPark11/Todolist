@@ -64,7 +64,16 @@ import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
 import { isCompleted } from "../../domain/tasks/taskState";
 import { folderIdFor } from "../../domain/tasks/sidebarFolders";
-import { INBOX_COLUMNS, inboxBucketOf, listBoardColumns, moveToInboxBucket, type InboxBucket } from "../../domain/tasks/board";
+import {
+  INBOX_COLUMNS,
+  createInInboxBucket,
+  createInListSection,
+  inboxBucketOf,
+  listBoardColumns,
+  moveToInboxBucket,
+  type InboxBucket,
+} from "../../domain/tasks/board";
+import { canCommit, resolveCreateContext } from "../../domain/tasks/createResolver";
 import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
 import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
@@ -667,6 +676,33 @@ export function TasksModule(props: TasksModuleProps) {
     }
   }
 
+  /**
+   * A task typed into a column's `+`, and the Board's third adapter.
+   *
+   * §12.16 forbids an entry point working out the owner for itself, so the
+   * Scope's resolution is computed first and the column only narrows it —
+   * exactly as `dropOnBoard` lets the Scope decide which command a drag is.
+   * The narrowing is per Board (Gate 7), which is why there are two functions
+   * here and not one with the column id.
+   */
+  function createInColumn(columnId: string, title: string, date: string) {
+    const base = resolveCreateContext(scope, {
+      inboxListId: lists.find(isInboxList)?.id ?? "",
+      today,
+      savedFilters,
+    });
+    if (!base.enabled) return;
+    const resolution =
+      scope.kind === "inbox"
+        ? createInInboxBucket(base, columnId as InboxBucket, date)
+        : createInListSection(base, columnId);
+    // §12.16's last line, restated where it can actually be violated: a
+    // resolution still missing something is not committed. The form does not
+    // let this happen; the check is here because the form is not the rule.
+    if (!canCommit(resolution)) return;
+    props.onCreate(title, resolution);
+  }
+
   return (
     <section
       className={`tm-shell is-${mode} sidebar-${sidebar}${sidebarOpen ? " sidebar-open" : ""}${
@@ -854,6 +890,7 @@ export function TasksModule(props: TasksModuleProps) {
             openTaskId={state.taskId}
             onOpen={openTask}
             onDrop={dropOnBoard}
+            onCreate={createInColumn}
             onToggleDone={toggleDone}
             canReorder={policy.canManualReorder}
             onContextMenu={(task, x, y) => setMenu(taskMenuAt(task, x, y))}

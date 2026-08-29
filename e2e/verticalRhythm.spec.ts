@@ -41,6 +41,10 @@ const ALLOWED_OFF_GRID = [
   // the 32px grid — the same clause `.ff-btn-sm` above is listed under.
   ".ff-matrix-cell-add",
   ".ff-matrix-cell-menu",
+  // The Board column's `+`, same clause and same 28px. Component 13 §6 measured
+  // the reference at an 18px glyph in a 28px background, which is where the
+  // number came from before §4.87 was consulted — the two agreed.
+  ".tm-column-add",
   // A group heading inside a box. It is a button only because it collapses;
   // what it draws is a label and a count, so it is content like `.motion-task-row`.
   ".ff-matrix-group-head",

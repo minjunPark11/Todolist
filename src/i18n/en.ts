@@ -903,6 +903,7 @@ export const en: Dictionary = {
   "tasks.emptyFilter": "No saved filters yet.",
   "tasks.addPlaceholder": "Add a task",
   "tasks.addDate": "Date",
+  "tasks.addToColumn": "Add a task to {{column}}",
   // Spec §5.53: the trigger says what the schedule IS, so its accessible name
   // carries the value the way the Priority flag's does (§8.28).
   "tasks.scheduleCurrent": "Schedule, {{value}}",

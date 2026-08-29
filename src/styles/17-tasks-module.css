@@ -2812,3 +2812,99 @@
   color: var(--text-muted, #8e8e93);
   text-decoration: line-through;
 }
+
+/* --- the column's own `+` and what it opens (INBOX_COLUMNS §6, phase 1) ----
+   Component 13 §6 measured the reference's: an 18px glyph inside a 28px hover
+   background, the same `bgIconWrapper` pattern its content header uses at
+   20/30. 28 is also what §4.87 gives a section action, which is the clause the
+   Matrix's box header sits under — so the two boards agree without either
+   having to reach the 32px control grid a header this dense cannot spare.
+
+   Always drawn, not revealed on hover. A control that exists only under a
+   pointer is one a touch screen and a keyboard cannot find.                 */
+.tm-column-add {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-tertiary, #8e8e93);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tm-column-add:hover,
+.tm-column-add:focus-visible {
+  background: var(--bg-hover-content, rgba(0, 0, 0, 0.05));
+  color: var(--text-primary, #1c1c1e);
+}
+
+.tm-column-add[aria-expanded="true"] {
+  background: var(--bg-hover-content, rgba(0, 0, 0, 0.05));
+  color: var(--accent, #0a84ff);
+}
+
+/* Outlined in the accent so the caret cannot be mistaken for one sitting in
+   the column beside it — four columns of identical cards need the open input
+   to say WHICH column is listening. */
+.tm-column-add-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 6px;
+  border: 1px solid var(--accent, #0a84ff);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-surface, #fff);
+}
+
+.tm-column-add-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary, #1c1c1e);
+  font: inherit;
+}
+
+.tm-column-add-title:focus {
+  outline: none;
+}
+
+/* The date is part of the form rather than a message after the fact: this
+   column IS a date (§6.25), so the field is the question, asked before there
+   is anything to refuse. */
+.tm-column-add-date {
+  flex: 0 0 auto;
+  height: 32px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-secondary, #48484a);
+  font: inherit;
+  font-size: 12px;
+}
+
+.tm-column-add-submit {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--accent, #0a84ff);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tm-column-add-submit:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

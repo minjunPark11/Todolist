@@ -41,9 +41,30 @@ interface TaskBoardProps {
    * menu is a Task's and not a Board's — the same one a row opens.
    */
   onContextMenu?: (task: Task, x: number, y: number) => void;
+  /**
+   * A task was typed into a column's `+` (INBOX_COLUMNS design §6, phase 1).
+   *
+   * The Board does not know what being in a column means, here any more than
+   * at a drop — it hands over the column and the words, and the Module turns
+   * that into the create the Scope allows. Absent where the Scope cannot
+   * create at all, and then no `+` is drawn: a control that could only fail
+   * is not a control (MATRIX §27.3).
+   */
+  onCreate?: (columnId: string, title: string, date: string) => void;
 }
 
-export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onToggleDone, onDrop, canReorder, onContextMenu }: TaskBoardProps) {
+export function TaskBoard({
+  columns,
+  tasksIn,
+  columnOf,
+  openTaskId,
+  onOpen,
+  onToggleDone,
+  onDrop,
+  canReorder,
+  onContextMenu,
+  onCreate,
+}: TaskBoardProps) {
   const { t } = useT();
   // Which card is being dragged, in a ref as well as in state. The state is
   // what dims the card; the ref is what the drop reads, because a handler
@@ -62,6 +83,18 @@ export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onTo
   const [over, setOver] = useState("");
   // A drop that cannot be committed until the user says which day (§6.25).
   const [pending, setPending] = useState<{ taskId: string; columnId: string; index: number } | null>(null);
+  // Which column is being typed into, and what has been typed. One at a time:
+  // two open inputs would be two carets on one screen with nothing saying
+  // which one Enter belongs to.
+  const [adding, setAdding] = useState("");
+  const [draft, setDraft] = useState("");
+  const [draftDate, setDraftDate] = useState("");
+
+  function closeAdd() {
+    setAdding("");
+    setDraft("");
+    setDraftDate("");
+  }
 
   function label(column: BoardColumn): string {
     return column.name ?? t(column.labelKey ?? "tasks.sectionDefault");
@@ -104,7 +137,71 @@ export function TaskBoard({ columns, tasksIn, columnOf, openTaskId, onOpen, onTo
             <header className="tm-column-head">
               <h3>{label(column)}</h3>
               {cards.length > 0 ? <span className="tm-count">{cards.length}</span> : null}
+              {/* Adding from the column's own header rather than from a row
+                  under the cards. The column is a statement about the work —
+                  "this is scheduled", "this is someday" — and the fastest way
+                  to make one is to type into the column that already says it
+                  (MATRIX §19). */}
+              {onCreate ? (
+                <button
+                  type="button"
+                  className="tm-column-add"
+                  aria-label={t("tasks.addToColumn", { column: label(column) })}
+                  aria-expanded={adding === column.id}
+                  onClick={() => (adding === column.id ? closeAdd() : (closeAdd(), setAdding(column.id)))}
+                >
+                  +
+                </button>
+              ) : null}
             </header>
+
+            {/* The input opens ABOVE and the card appears below it, so the
+                thing just typed is not what moves (MATRIX §19.2). */}
+            {onCreate && adding === column.id ? (
+              <form
+                className="tm-column-add-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const title = draft.trim();
+                  // The same refusal the drop makes: this column IS a date, so
+                  // there is nothing to commit until one is given (§6.25).
+                  if (!title || (column.requiresDate && !draftDate)) return;
+                  onCreate(column.id, title, draftDate);
+                  // The date stays and the title clears: filing several tasks
+                  // under one day is the common case, and re-answering per row
+                  // is a tax (TaskQuickAdd makes the same trade).
+                  setDraft("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") closeAdd();
+                }}
+              >
+                <input
+                  className="tm-column-add-title"
+                  autoFocus
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder={t("tasks.addPlaceholder")}
+                  aria-label={t("tasks.addToColumn", { column: label(column) })}
+                />
+                {column.requiresDate ? (
+                  <input
+                    className="tm-column-add-date"
+                    type="date"
+                    value={draftDate}
+                    onChange={(event) => setDraftDate(event.target.value)}
+                    aria-label={t("tasks.addDate")}
+                  />
+                ) : null}
+                <button
+                  type="submit"
+                  className="tm-column-add-submit"
+                  disabled={!draft.trim() || (column.requiresDate && !draftDate)}
+                >
+                  {t("common.add")}
+                </button>
+              </form>
+            ) : null}
 
             {pending?.columnId === column.id ? (
               <label className="tm-column-date">

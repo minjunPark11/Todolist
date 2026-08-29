@@ -16,6 +16,7 @@
 // a statement about where it sits on a board. A single "move to column"
 // command would have to guess which was meant.
 import type { ListSection, Task } from "../../types";
+import type { CreateResolution } from "./createResolver";
 import type { TaskMutation } from "./mutations";
 import { sectionsForList } from "./sections";
 
@@ -81,6 +82,57 @@ export const INBOX_COLUMNS: BoardColumn[] = [
   { id: "scheduled", labelKey: "tasks.bucketScheduled", requiresDate: true },
   { id: "someday", labelKey: "tasks.bucketSomeday" },
 ];
+
+/**
+ * Creating INTO a column, which §12.16 names as one of its entry points.
+ *
+ * The column does not decide the owner — `resolveCreateContext` already did,
+ * and this narrows that answer rather than replacing it. Everything §12.16
+ * forbids a `+` from working out for itself (which List, which day the Scope
+ * plans) arrives in `base` untouched.
+ *
+ * Two functions rather than one with a flag, because Gate 7 is the same rule
+ * for a creation as for a drag: `createInInboxBucket` cannot reach `sectionId`
+ * and `createInListSection` cannot reach a date. A task typed into a column
+ * has to be a task that column would have accepted by drag.
+ */
+export function createInInboxBucket(base: CreateResolution, bucket: InboxBucket, date = ""): CreateResolution {
+  switch (bucket) {
+    case "unsorted":
+      // Stated rather than left to the defaults. A new Task has neither field
+      // set, but a column that means "neither field is set" should say so —
+      // the day `createTask` starts seeding a date, this column still holds.
+      return { ...base, patch: { ...base.patch, isSomeday: false, dueDate: "" } };
+
+    case "scheduled": {
+      // §6.25's refusal, at the other entry point. The column IS a date, so a
+      // task typed here without one would be committed straight into the
+      // column beside it — §27.3's bug, arriving by a different door.
+      if (!date) {
+        return {
+          ...base,
+          targetListId: null,
+          requiredBeforeCommit: [...base.requiredBeforeCommit, "date"],
+        };
+      }
+      return { ...base, patch: { ...base.patch, isSomeday: false, dueDate: date } };
+    }
+
+    case "someday":
+      // §6.23: the two are exclusive, so the date is cleared in the same patch
+      // rather than left for a later read to reconcile.
+      return { ...base, patch: { ...base.patch, isSomeday: true, dueDate: "" } };
+  }
+}
+
+/**
+ * The List Board's half. `""` is the unsectioned default, and it is written as
+ * an empty `sectionId` rather than skipped: a Task created there must not
+ * inherit a Section from anything else the caller merged into `patch`.
+ */
+export function createInListSection(base: CreateResolution, sectionId: string): CreateResolution {
+  return { ...base, patch: { ...base.patch, sectionId } };
+}
 
 /**
  * A List's columns: its Sections, with the unsectioned default first (§7.34).

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { List, ListSection, Task } from "../../types";
-import { INBOX_COLUMNS, inboxBucketOf, listBoardColumns, moveToInboxBucket } from "./board";
+import {
+  INBOX_COLUMNS,
+  createInInboxBucket,
+  createInListSection,
+  inboxBucketOf,
+  listBoardColumns,
+  moveToInboxBucket,
+} from "./board";
 import { moveTaskToSection } from "./mutations";
 
 const NOW = "2026-08-18T09:00:00.000Z";
@@ -136,5 +143,55 @@ describe("the two Boards answer differently to the same drop", () => {
   it("the Inbox columns are the three §6.24 names and are not records", () => {
     expect(INBOX_COLUMNS.map((column) => column.id)).toEqual(["unsorted", "scheduled", "someday"]);
     expect(INBOX_COLUMNS.find((column) => column.requiresDate)?.id).toBe("scheduled");
+  });
+});
+
+describe("creating into a column (§12.16)", () => {
+  const base = {
+    targetListId: "list-inbox",
+    requiredBeforeCommit: [] as ("list" | "date")[],
+    patch: {},
+    enabled: true,
+  };
+
+  it("keeps what the Scope decided and only narrows it", () => {
+    const planned = { ...base, dailyPlan: { planDate: "2026-08-29" }, applyTagIds: ["tag-1"] };
+    const out = createInInboxBucket(planned, "someday");
+    // §12.16's whole point: the column does not get to re-answer "which List",
+    // and it does not drop the day the Scope planned.
+    expect(out.targetListId).toBe("list-inbox");
+    expect(out.dailyPlan).toEqual({ planDate: "2026-08-29" });
+    expect(out.applyTagIds).toEqual(["tag-1"]);
+  });
+
+  it("writes the fields each Inbox column is made of", () => {
+    expect(createInInboxBucket(base, "unsorted").patch).toEqual({ isSomeday: false, dueDate: "" });
+    expect(createInInboxBucket(base, "someday").patch).toEqual({ isSomeday: true, dueDate: "" });
+    expect(createInInboxBucket(base, "scheduled", "2026-09-01").patch).toEqual({
+      isSomeday: false,
+      dueDate: "2026-09-01",
+    });
+  });
+
+  it("refuses the scheduled column until a date is given, rather than filing it next door", () => {
+    const out = createInInboxBucket(base, "scheduled");
+    expect(out.requiredBeforeCommit).toContain("date");
+    // §12.16's last line: a null target is never handed to createTask, which
+    // is what stops a dateless task being born in the column beside this one.
+    expect(out.targetListId).toBeNull();
+    expect(out.patch).toEqual({});
+  });
+
+  it("Gate 7 holds for creation too — neither column can write the other's field", () => {
+    const inbox = createInInboxBucket(base, "someday");
+    const section = createInListSection(base, "s1");
+    expect("sectionId" in inbox.patch).toBe(false);
+    expect(section.patch).toEqual({ sectionId: "s1" });
+    expect("dueDate" in section.patch).toBe(false);
+    expect("isSomeday" in section.patch).toBe(false);
+  });
+
+  it("the unsectioned default is written, not skipped", () => {
+    expect(createInListSection({ ...base, patch: { sectionId: "s9" } }, "").patch).toEqual({ sectionId: "" });
   });
 });
