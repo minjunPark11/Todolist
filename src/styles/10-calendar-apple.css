@@ -302,3 +302,126 @@
 .gcal-sidebar.is-rail {
   justify-content: flex-start;
 }
+
+/* --- A9: one type ladder for the whole calendar (METRICS §2.8) -------------
+   Measured before writing this: the calendar rendered 18 distinct text sizes,
+   and five of them were fractions — 11.9, 12.04, 10.92, 9.52, 8.68. They are
+   fractions because two type systems met here. The time grid was given
+   Calendar.app's sizes in px (26/32, 15/20, 10/13 — all on the macOS ladder),
+   while the sidebar and toolbar were still written in `rem` against a 14px
+   root: 0.62rem is 8.68px, which is not a size Apple has and is below the
+   10pt floor macOS states as its minimum.
+
+   macOS built-in text styles, which is what Calendar.app draws with:
+
+     Large Title 26/32 · Title 1 22/26 · Title 2 17/22 · Title 3 15/20
+     Body 13/16 · Callout 12/15 · Subheadline 11/14 · Footnote 10/13
+
+   Two consequences beyond the sizes themselves. Line height stops being 1.5:
+   the ladder tightens as it climbs (1.23 at the title, 1.30 at the footnote),
+   and our flat multiplier made every calendar line 15-25% taller than the
+   reference — the thing METRICS §2.9 blamed for half of the 68px header.
+   And the ladder now answers `[data-font]`, which it did not: the setting
+   moved the sidebar's rem text and left the grid's px text where it was, so
+   the two halves of this screen disagreed about how big "large" is. It shifts
+   the whole ladder by one rung instead of multiplying, which is how Dynamic
+   Type moves and is why every value below is still an integer on the table.  */
+.gcal-page-shell {
+  --cal-large-title: 26px;  --cal-large-title-lh: 32px;
+  --cal-title1: 22px;       --cal-title1-lh: 26px;
+  --cal-title3: 15px;       --cal-title3-lh: 20px;
+  --cal-body: 13px;         --cal-body-lh: 16px;
+  --cal-callout: 12px;      --cal-callout-lh: 15px;
+  --cal-subhead: 11px;      --cal-subhead-lh: 14px;
+  --cal-footnote: 10px;     --cal-footnote-lh: 13px;
+}
+
+/* One rung down. The footnote does not move: 10pt is the floor macOS states,
+   and the badges were already under it. */
+[data-font="small"] .gcal-page-shell {
+  --cal-large-title: 22px;  --cal-large-title-lh: 26px;
+  --cal-title1: 17px;       --cal-title1-lh: 22px;
+  --cal-title3: 13px;       --cal-title3-lh: 16px;
+  --cal-body: 12px;         --cal-body-lh: 15px;
+  --cal-callout: 11px;      --cal-callout-lh: 14px;
+  --cal-subhead: 10px;      --cal-subhead-lh: 13px;
+}
+
+/* One rung up. The title has no rung above it on the macOS table, so it takes
+   the 28px METRICS §2.7 actually measured off Calendar.app's own title. */
+[data-font="large"] .gcal-page-shell {
+  --cal-large-title: 28px;  --cal-large-title-lh: 34px;
+  --cal-title1: 26px;       --cal-title1-lh: 32px;
+  --cal-title3: 17px;       --cal-title3-lh: 22px;
+  --cal-body: 15px;         --cal-body-lh: 20px;
+  --cal-callout: 13px;      --cal-callout-lh: 16px;
+  --cal-subhead: 12px;      --cal-subhead-lh: 15px;
+  --cal-footnote: 11px;     --cal-footnote-lh: 14px;
+}
+
+/* Scoped under the shell on purpose: 20-density.css and 21-components.css load
+   after this file, so `.gcal-toolbar button` would otherwise still win. This
+   is also what finally lands `.gcal-today-btn`'s intended 12px — the rule was
+   there, but `.gcal-nav button` outranked it and it rendered at 14. */
+
+.gcal-page-shell .gcal-range-label {
+  font-size: var(--cal-large-title);
+  line-height: var(--cal-large-title-lh);
+}
+
+.gcal-page-shell .gcal-day-title strong {
+  font-size: var(--cal-title1);
+  line-height: var(--cal-title1-lh);
+}
+
+.gcal-page-shell .gcal-col-weekday,
+.gcal-page-shell .gcal-col-date,
+.gcal-page-shell .gcal-col-sep,
+.gcal-page-shell .gcal-year-month-title {
+  font-size: var(--cal-title3);
+  line-height: var(--cal-title3-lh);
+}
+
+.gcal-page-shell .gcal-day-title span,
+.gcal-page-shell .gcal-mini-month-head,
+.gcal-page-shell .gcal-modes button,
+.gcal-page-shell .gcal-cat-name {
+  font-size: var(--cal-body);
+  line-height: var(--cal-body-lh);
+}
+
+.gcal-page-shell .gcal-today-btn,
+.gcal-page-shell .gcal-year-date,
+.gcal-page-shell .gcal-empty-hint {
+  font-size: var(--cal-callout);
+  line-height: var(--cal-callout-lh);
+}
+
+.gcal-page-shell .gcal-month-date,
+.gcal-page-shell .gcal-sidebar-empty {
+  font-size: var(--cal-subhead);
+  line-height: var(--cal-subhead-lh);
+}
+
+/* The mini month's weekday and date are ONE size, not two. §2.7 measured both
+   at cap 7 — the reference draws "S" and "26" the same. Ours had the date a
+   rung above its own column head. */
+.gcal-page-shell .gcal-mini-weekday,
+.gcal-page-shell .gcal-mini-num,
+.gcal-page-shell .gcal-time-label,
+.gcal-page-shell .gcal-time-corner,
+.gcal-page-shell .gcal-cat-badge,
+.gcal-page-shell .gcal-sidebar-section h3,
+.gcal-page-shell .gcal-month-weekdays span,
+.gcal-page-shell .gcal-year-weekdays span,
+.gcal-page-shell .gcal-now-badge span {
+  font-size: var(--cal-footnote);
+  line-height: var(--cal-footnote-lh);
+}
+
+/* Not on the ladder, deliberately: an icon button's size is its glyph, and a
+   glyph is measured against the control that holds it rather than against a
+   text style. `.gcal-nav`'s arrows, the category `⋯`, and the task panel's
+   rail icons keep the sizes their controls were drawn for. Event blocks are
+   already Subheadline/Footnote (09-calendar-redesign.css:400) and the 18px
+   chip's line height is its height, not its rhythm.                        */
