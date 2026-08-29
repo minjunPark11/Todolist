@@ -84,12 +84,21 @@ import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { COMPLETED_PAGE, DEFAULT_MATRIX_VIEW, groupMatrixTasks } from "../../domain/view/matrixGroups";
+import type { InboxColumnRules } from "../../domain/view/inboxColumnRules";
+import { EMPTY_MATRIX_RULE as EMPTY_INBOX_RULE } from "../../domain/view/matrixRules";
 import {
-  columnForTask,
-  dropOutcomeForColumn,
-  resolveInboxColumnRules,
-  type InboxColumnRules,
-} from "../../domain/view/inboxColumnRules";
+  addInboxColumn,
+  columnAsksForDate,
+  columnOfTask,
+  dropOutcomeForColumnId,
+  moveInboxColumn,
+  removeInboxColumn,
+  renameInboxColumn,
+  resolveInboxColumns,
+  setInboxColumnRule,
+  type InboxColumn,
+} from "../../domain/view/inboxColumns";
+import { InboxColumnDialog, type InboxColumnDraft } from "./InboxColumnDialog";
 import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
 import { resolveListView } from "../../domain/tasks/listView";
 import { useResponsiveMode, useViewportHeightVar } from "./useResponsiveMode";
@@ -138,6 +147,16 @@ interface TasksModuleProps {
    * is the property `inboxColumnRules.test.ts` pins shape by shape.
    */
   inboxColumnRules?: Partial<InboxColumnRules>;
+  /**
+   * The Inbox's columns as the user has arranged them (design §6, phase 5).
+   *
+   * Absent means the account predates the controls, and `resolveInboxColumns`
+   * assembles the three built-ins out of the two phase-3 keys instead —
+   * migration on read, because there is no schema and the load path is the
+   * only migration this store has.
+   */
+  inboxColumns?: unknown;
+  onSetInboxColumns?: (columns: InboxColumn[]) => void;
   /**
    * §10.41/§10.42's other half, handed in rather than held here (D-25).
    *
@@ -297,6 +316,18 @@ export function TasksModule(props: TasksModuleProps) {
   const [activityTaskId, setActivityTaskId] = useState("");
   /** The open context menu, or none. One at a time, like the notice above it. */
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  /**
+   * The column dialog, and which question it is asking.
+   *
+   * Adding and editing are the same dialog because a column added without
+   * conditions is a column nothing can ever be in — membership here is derived
+   * (design §4.1), so creation and the question have to be one step. Nothing is
+   * written until it is confirmed: the alternative is a column that exists for
+   * as long as the dialog is open and swallows the board if it is cancelled.
+   */
+  const [dialog, setDialog] = useState<
+    { mode: "edit"; columnId: string } | { mode: "add"; beside: { id: string; side: "left" | "right" } | null } | null
+  >(null);
   // §15.3. Presentation only: nothing below reads this to decide what a Scope
   // contains, which is what keeps §15.9 true — the URL means the same thing at
   // every width.
@@ -625,10 +656,36 @@ export function TasksModule(props: TasksModuleProps) {
   // The Board's two adapters (§16.30). The component below knows about
   // columns and cards; which command a drop is belongs here, because it is the
   // only thing the two Boards do not share.
+  /**
+   * The Inbox's columns, from whatever the account holds.
+   *
+   * A list the user arranged (phase 5), or the three built-ins assembled out
+   * of phase 3's two keys, or the defaults. `resolveInboxColumns` decides
+   * which — the migration is a read, so an account that never opens these
+   * controls is never rewritten.
+   */
+  const inboxColumns = useMemo(
+    () =>
+      resolveInboxColumns(props.inboxColumns, {
+        rules: props.inboxColumnRules,
+        names: props.inboxColumnNames,
+      }),
+    [props.inboxColumns, props.inboxColumnRules, props.inboxColumnNames],
+  );
+
   const boardListId = scope.kind === "list" ? scope.id : "";
   const columns =
     scope.kind === "inbox"
-      ? inboxBoardColumns(props.inboxColumnNames)
+      ? // The Board draws columns; the Inbox's are a list the user arranged, so
+        // they are translated into that shape here rather than the Board being
+        // taught a second model. `requiresDate` is derived from the rule now —
+        // a column asks for a day only when its own conditions cannot name one.
+        inboxColumns.map((column) => ({
+          id: column.id,
+          ...(column.labelKey ? { labelKey: column.labelKey } : {}),
+          ...(column.name ? { name: column.name } : {}),
+          requiresDate: columnAsksForDate(column),
+        }))
       : listBoardColumns(boardListId, listSections);
 
   // The timeline's three arguments, built from the rows the Scope already
@@ -663,12 +720,11 @@ export function TasksModule(props: TasksModuleProps) {
    * column can now be edited into one that leaves a task matching nothing.
    * `null` is that answer, and the row below the board is where it is drawn.
    */
-  const inboxRules = useMemo(() => resolveInboxColumnRules(props.inboxColumnRules), [props.inboxColumnRules]);
   const ruleContext = (task: Task) => ({ today, listId: listIdFor(task, lists) });
 
   const columnOf = (task: Task) =>
     scope.kind === "inbox"
-      ? (columnForTask(task, inboxRules, ruleContext(task)) ?? "")
+      ? (columnOfTask(task, inboxColumns, ruleContext(task)) ?? "")
       : sectionIdFor(task, lists, listSections);
   const tasksIn = (columnId: string) => sortByManualOrder(rows.filter((task) => columnOf(task) === columnId));
 
@@ -685,10 +741,115 @@ export function TasksModule(props: TasksModuleProps) {
   const unmatched = useMemo(
     () =>
       scope.kind === "inbox"
-        ? rows.filter((task) => columnForTask(task, inboxRules, { today, listId: listIdFor(task, lists) }) === null)
+        ? rows.filter((task) => columnOfTask(task, inboxColumns, { today, listId: listIdFor(task, lists) }) === null)
         : [],
-    [scope.kind, rows, inboxRules, today, lists],
+    [scope.kind, rows, inboxColumns, today, lists],
   );
+
+  /**
+   * The rows the reference app puts behind a column's ⋯, and why they can
+   * exist only now.
+   *
+   * Rename was answerable from the start — a name moves nothing. The other
+   * four all end with tasks somewhere they were not, and two of them (delete,
+   * and an added column that takes work off its neighbours) can leave a task
+   * matching NO column at all. Phase 4's remainder row is what makes that a
+   * report rather than a disappearance, which is why this menu comes after it.
+   */
+  function columnMenuAt(columnId: string, x: number, y: number): ContextMenuState | null {
+    const column = inboxColumns.find((candidate) => candidate.id === columnId);
+    if (!column || !props.onSetInboxColumns) return null;
+    const name = column.name ?? t(column.labelKey ?? "tasks.sectionDefault");
+    const at = inboxColumns.findIndex((candidate) => candidate.id === columnId);
+    const write = (next: InboxColumn[]) => props.onSetInboxColumns?.(next);
+    return {
+      x,
+      y,
+      label: t("tasks.columnMenu", { column: name }),
+      sections: [
+        {
+          id: "column",
+          items: [
+            { id: "conditions", label: t("tasks.column.conditions"), run: () => setDialog({ mode: "edit", columnId }) },
+            {
+              id: "add-left",
+              label: t("tasks.column.addLeft"),
+              run: () => setDialog({ mode: "add", beside: { id: columnId, side: "left" } }),
+            },
+            {
+              id: "add-right",
+              label: t("tasks.column.addRight"),
+              run: () => setDialog({ mode: "add", beside: { id: columnId, side: "right" } }),
+            },
+          ],
+        },
+        {
+          id: "move",
+          items: [
+            {
+              id: "move-left",
+              label: t("tasks.column.moveLeft"),
+              disabled: at === 0,
+              run: () => write(moveInboxColumn(inboxColumns, columnId, -1)),
+            },
+            {
+              id: "move-right",
+              label: t("tasks.column.moveRight"),
+              disabled: at === inboxColumns.length - 1,
+              run: () => write(moveInboxColumn(inboxColumns, columnId, +1)),
+            },
+          ],
+        },
+        {
+          id: "danger",
+          items: [
+            {
+              id: "delete",
+              label: t("tasks.column.delete"),
+              danger: true,
+              // §15.5's pairing — disabled AND told why. The last column stays:
+              // a board with none is one every task falls out of, and no undo
+              // makes that a state worth reaching in one click.
+              disabled: inboxColumns.length <= 1,
+              hint: inboxColumns.length <= 1 ? t("tasks.column.deleteLast") : undefined,
+              run: () => write(removeInboxColumn(inboxColumns, columnId)),
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  function columnNameOf(columnId: string): string {
+    const column = inboxColumns.find((candidate) => candidate.id === columnId);
+    return column?.name ?? t(column?.labelKey ?? "tasks.sectionDefault");
+  }
+
+  /** What the dialog opens holding: this column's answers, or a blank one. */
+  function dialogDraft(open: NonNullable<typeof dialog>): InboxColumnDraft {
+    if (open.mode === "add") return { name: "", rule: EMPTY_INBOX_RULE };
+    const column = inboxColumns.find((candidate) => candidate.id === open.columnId);
+    return { name: column?.name ?? "", rule: column?.rule ?? EMPTY_INBOX_RULE };
+  }
+
+  /**
+   * Confirming it — and the two halves land together.
+   *
+   * A name and a rule are separate claims (they are stored apart for exactly
+   * that reason), but here they are one answer to one question, so one write
+   * carries both. Adding does not touch the board until this runs: a column
+   * that existed while the dialog was open would swallow the board if the
+   * dialog were cancelled.
+   */
+  function saveColumnDialog(open: NonNullable<typeof dialog>, draft: InboxColumnDraft) {
+    if (!props.onSetInboxColumns) return;
+    if (open.mode === "add") {
+      props.onSetInboxColumns(addInboxColumn(inboxColumns, open.beside, draft));
+      return;
+    }
+    const renamed = renameInboxColumn(inboxColumns, open.columnId, draft.name);
+    props.onSetInboxColumns(setInboxColumnRule(renamed, open.columnId, draft.rule));
+  }
 
   /**
    * Whether a column would take this card, asked while it is still in the air.
@@ -701,7 +862,7 @@ export function TasksModule(props: TasksModuleProps) {
     if (scope.kind !== "inbox") return null;
     const target = tasks.find((task) => task.id === taskId);
     if (!target) return null;
-    const outcome = dropOutcomeForColumn(target, inboxRules[columnId as InboxBucket], ruleContext(target));
+    const outcome = dropOutcomeForColumnId(target, inboxColumns, columnId, ruleContext(target));
     return outcome.accepted ? null : outcome.reason;
   }
 
@@ -719,7 +880,7 @@ export function TasksModule(props: TasksModuleProps) {
    */
   function inboxDropMutation(target: Task, columnId: string, date?: string): TaskMutation | null {
     if (date) return moveToInboxBucket(target, columnId as InboxBucket, date);
-    const outcome = dropOutcomeForColumn(target, inboxRules[columnId as InboxBucket], ruleContext(target));
+    const outcome = dropOutcomeForColumnId(target, inboxColumns, columnId, ruleContext(target));
     if (!outcome.accepted) return null;
     const undo = { isSomeday: target.isSomeday, dueDate: target.dueDate };
     // Named for what the drop actually did, not for which column it landed in
@@ -1022,6 +1183,16 @@ export function TasksModule(props: TasksModuleProps) {
             finishedIn={finishedIn}
             unmatched={unmatched}
             dropRefusal={boardDropOutcome}
+            onColumnMenu={
+              scope.kind === "inbox" && props.onSetInboxColumns
+                ? (columnId, x, y) => setMenu(columnMenuAt(columnId, x, y))
+                : undefined
+            }
+            onAddColumn={
+              scope.kind === "inbox" && props.onSetInboxColumns
+                ? () => setDialog({ mode: "add", beside: null })
+                : undefined
+            }
             onRename={
               // Only the Inbox's columns are the user's to name here. A List's
               // are Sections — records with a name of their own, and renaming
@@ -1202,6 +1373,23 @@ export function TasksModule(props: TasksModuleProps) {
       ) : null}
 
       {menu ? <ContextMenu state={menu} onClose={() => setMenu(null)} /> : null}
+
+      {dialog ? (
+        <InboxColumnDialog
+          title={
+            dialog.mode === "edit"
+              ? t("tasks.columnEdit", { column: columnNameOf(dialog.columnId) })
+              : t("tasks.columnNew")
+          }
+          placeholder={dialog.mode === "edit" ? columnNameOf(dialog.columnId) : t("tasks.columnNewName")}
+          initial={dialogDraft(dialog)}
+          onClose={() => setDialog(null)}
+          onSave={(draft) => {
+            saveColumnDialog(dialog, draft);
+            setDialog(null);
+          }}
+        />
+      ) : null}
 
       {/* §9.36: the strip is where the way back lives, and it says what it
           would undo rather than just offering the word.

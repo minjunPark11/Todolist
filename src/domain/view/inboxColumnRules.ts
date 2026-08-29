@@ -44,6 +44,17 @@ export type InboxColumnRule = MatrixQuadrantRule;
 export type InboxColumnRules = Record<InboxBucket, InboxColumnRule>;
 
 /**
+ * The two rule operations under the Board's own names.
+ *
+ * Aliases rather than wrappers: the behaviour IS the Matrix's, and a wrapper
+ * would be a place for the two to drift. What they buy is that no file above
+ * this one has to import from `matrixRules` to ask a question about a column —
+ * so §7's Q3, when it renames that module, has one import to move and not ten.
+ */
+export const matchesInboxRule = matchesMatrixRule;
+export const sanitizeInboxColumnRule = sanitizeMatrixRule;
+
+/**
  * The three columns this app has always drawn, said as rules.
  *
  * Every one of them is a date bucket and nothing else, which is the honest

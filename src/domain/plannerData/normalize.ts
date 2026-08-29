@@ -59,6 +59,7 @@ import { sanitizeMatrixView, type MatrixQuadrantView } from "../view/matrixGroup
 import { sanitizeMatrixRules } from "../view/matrixRules";
 import { sanitizeInboxColumnRules } from "../view/inboxColumnRules";
 import { sanitizeInboxColumnNames } from "../tasks/board";
+import { resolveInboxColumns } from "../view/inboxColumns";
 
 // Every value `status` may hold on disk: the three lifecycle values written
 // since Ch. 26 §26.3.2, and the legacy six that accounts still carry. A value
@@ -427,6 +428,11 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
       : {}),
     ...(settings?.inboxColumnNames
       ? { inboxColumnNames: sanitizeInboxColumnNames(settings.inboxColumnNames) }
+      : {}),
+    // The list supersedes the two keys above and does not replace them: both
+    // are carried, so a build that predates this one still finds what it wrote.
+    ...(Array.isArray(settings?.inboxColumns)
+      ? { inboxColumns: resolveInboxColumns(settings.inboxColumns) }
       : {}),
   };
 }

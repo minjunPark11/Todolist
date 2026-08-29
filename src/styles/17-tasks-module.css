@@ -3084,3 +3084,115 @@
   color: var(--text-tertiary, #8e8e93);
   font-weight: 600;
 }
+
+/* --- the column's ⋯ and the board's "새로운 열" (INBOX_COLUMNS §6, phase 5) --
+   Same 28px as the `+` beside it: two section actions on one header, and one
+   of them being bigger would say it mattered more. */
+.tm-column-menu {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-tertiary, #8e8e93);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tm-column-menu:hover,
+.tm-column-menu:focus-visible,
+.tm-column-menu[aria-expanded="true"] {
+  background: var(--bg-hover-content, rgba(0, 0, 0, 0.05));
+  color: var(--text-primary, #1c1c1e);
+}
+
+/* Beside the last column, at the top, where a new column would appear — and
+   plain text rather than a card, because it is not one of them yet. */
+.tm-board-add-column {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--accent, #0a84ff);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tm-board-add-column:hover {
+  background: var(--accent-soft, rgba(10, 132, 255, 0.12));
+}
+
+/* --- the column dialog ----------------------------------------------------
+   The divider is the layout's argument, as it is in the Matrix's editor:
+   above it a name, which cannot break anything; below it what the column
+   HOLDS, which decides where every card on the board sits. */
+.tm-column-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tm-column-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tm-column-dialog-field > span {
+  color: var(--text-secondary, #48484a);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tm-column-dialog-field input[type="text"],
+.tm-column-dialog-field input:not([type]) {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-surface, #fff);
+  color: var(--text-primary, #1c1c1e);
+  font: inherit;
+}
+
+.tm-column-dialog-rule {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+}
+
+.tm-column-dialog-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.tm-column-dialog-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tm-column-dialog-choice input {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Not an error — a question that has not been answered yet. */
+.tm-column-dialog-hint {
+  margin: 0;
+  color: var(--text-tertiary, #8e8e93);
+  font-size: 12px;
+  line-height: 1.4;
+}

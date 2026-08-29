@@ -19,7 +19,7 @@ import { TaskBoard } from "./TaskBoard";
 afterEach(cleanup);
 
 function task(id: string): Task {
-  return { id, title: id, status: "todo", listId: "list-inbox", tags: [] } as Task;
+  return { id, title: id, status: "todo", listId: "list-inbox", tags: [] } as unknown as Task;
 }
 
 function setup(options: { unmatched?: Task[]; refuse?: (taskId: string, columnId: string) => string | null } = {}) {

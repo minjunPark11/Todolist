@@ -91,6 +91,18 @@ interface TaskBoardProps {
    * mean — it names them to the reader and lets the caller decide them.
    */
   dropRefusal?: (taskId: string, columnId: string) => string | null;
+  /**
+   * The column's ⋯ was pressed.
+   *
+   * The Board hands over which column and where, and the caller answers with
+   * the menu — the same split the card's context menu uses, and for the same
+   * reason: what a column can be told to do is the Scope's business (a List's
+   * columns are Sections and cannot be reordered by this menu at all), while
+   * where the menu opens is the Board's.
+   */
+  onColumnMenu?: (columnId: string, x: number, y: number) => void;
+  /** The board's own "새로운 열". Absent where columns are not the user's. */
+  onAddColumn?: () => void;
 }
 
 export function TaskBoard({
@@ -108,6 +120,8 @@ export function TaskBoard({
   onRename,
   unmatched = [],
   dropRefusal,
+  onColumnMenu,
+  onAddColumn,
 }: TaskBoardProps) {
   const { t } = useT();
   // Which card is being dragged, in a ref as well as in state. The state is
@@ -264,6 +278,23 @@ export function TaskBoard({
                   +
                 </button>
               ) : null}
+              {/* Anchored to the BUTTON rather than to the pointer, so the menu
+                  opens in the same place however it was triggered — including
+                  from the keyboard, where there is no pointer to anchor to. */}
+              {onColumnMenu ? (
+                <button
+                  type="button"
+                  className="tm-column-menu"
+                  aria-label={t("tasks.columnMenu", { column: label(column) })}
+                  aria-haspopup="menu"
+                  onClick={(event) => {
+                    const box = event.currentTarget.getBoundingClientRect();
+                    onColumnMenu(column.id, box.left, box.bottom + 4);
+                  }}
+                >
+                  ⋯
+                </button>
+              ) : null}
             </header>
 
             {/* The input opens ABOVE and the card appears below it, so the
@@ -405,6 +436,15 @@ export function TaskBoard({
           </section>
         );
       })}
+
+      {/* Beside the last column rather than inside the ⋯ of one, because it
+          belongs to the board and not to any column — and because a control
+          that adds a column should be where a new column would appear. */}
+      {onAddColumn ? (
+        <button type="button" className="tm-board-add-column" onClick={onAddColumn}>
+          + {t("tasks.addColumn")}
+        </button>
+      ) : null}
 
       {/* The tasks the columns between them do not take.
 

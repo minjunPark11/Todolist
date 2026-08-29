@@ -1216,6 +1216,8 @@ export default function App() {
           listSections={planner.listSections}
           inboxColumnNames={appSettings.inboxColumnNames}
           inboxColumnRules={appSettings.inboxColumnRules}
+          inboxColumns={appSettings.inboxColumns}
+          onSetInboxColumns={(inboxColumns) => planner.updateAppSettings({ inboxColumns })}
           onRenameInboxColumn={(bucket, name) =>
             planner.updateAppSettings({
               // Cleared goes back to the built-in label rather than storing a

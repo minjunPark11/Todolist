@@ -5,6 +5,7 @@ import type { FocusDefaultLength } from "./domain/focus/sessionLength";
 import type { MatrixQuadrantView } from "./domain/view/matrixGroups";
 import type { MatrixQuadrantRule } from "./domain/view/matrixRules";
 import type { InboxBucket } from "./domain/tasks/board";
+import type { InboxColumn } from "./domain/view/inboxColumns";
 import type { MatrixQuadrant } from "./utils/eisenhower";
 
 /**
@@ -676,6 +677,19 @@ export interface AppSettings {
    * storing a blank, so "cleared" and "never named" stay the same state.
    */
   inboxColumnNames?: Partial<Record<InboxBucket, string>>;
+  /**
+   * The Inbox board's columns, in the order the user put them.
+   *
+   * This supersedes the two keys above and does not delete them: an account
+   * that has only those is assembled into this shape on READ
+   * (`resolveInboxColumns`), so an older build still finds what it wrote and a
+   * newer one does not have to migrate anything to be correct.
+   *
+   * Order is the array's. There is no `sortKey` because the whole list is one
+   * stored value — a key that is only ever read back in array order would be a
+   * second thing to keep in step with the first.
+   */
+  inboxColumns?: InboxColumn[];
 }
 
 export type ExternalCalendarSyncStatus = "idle" | "syncing" | "success" | "failed" | "hidden" | "disabled";
