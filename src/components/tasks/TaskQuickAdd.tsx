@@ -56,7 +56,9 @@ export function TaskQuickAdd({
   useEffect(() => {
     if (draftTitle) setTitle(draftTitle);
   }, [draftTitle]);
-  const [chosenDate, setChosenDate] = useState("");
+  // No `chosenDate`. Nothing here asks for a day any more, and the resolver
+  // still takes one for callers that have one of their own (the Board's
+  // `일정` column does).
   const [chosenListId, setChosenListId] = useState("");
 
   const resolution = resolveCreateContext(scope, {
@@ -64,7 +66,6 @@ export function TaskQuickAdd({
     today,
     folderListIds: folderLists.map((list) => list.id),
     chosenListId,
-    chosenDate,
     savedFilters,
   });
 
@@ -74,13 +75,17 @@ export function TaskQuickAdd({
   const needsList = resolution.requiredBeforeCommit.includes("list");
   const ready = Boolean(title.trim()) && canCommit(resolution);
 
-  function submit(event: React.FormEvent) {
-    event.preventDefault();
+  function commit() {
     if (!ready) return;
     onCreate(title.trim(), resolution);
     // The date and the List stay: capturing several tasks into the same day or
     // the same List is the common case, and re-answering per row is a tax.
     setTitle("");
+  }
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    commit();
   }
 
   return (
@@ -91,19 +96,28 @@ export function TaskQuickAdd({
         onChange={(event) => setTitle(event.target.value)}
         placeholder={t("tasks.addPlaceholder")}
         aria-label={t("tasks.addPlaceholder")}
+        /**
+         * Leaving the field commits what is in it. Typing a task and clicking
+         * away is not a change of mind — it reads as "done", and asking for a
+         * button press afterwards is asking twice.
+         *
+         * Moving WITHIN the form is not leaving it: the List select and the
+         * Add button are both part of answering the same question, and a blur
+         * onto them would commit half an answer and then be committed again.
+         * A click on nothing in particular has no `relatedTarget`, and that is
+         * the case this exists for.
+         */
+        onBlur={(event) => {
+          const next = event.relatedTarget as Node | null;
+          if (next && event.currentTarget.form?.contains(next)) return;
+          commit();
+        }}
       />
 
-      {/* §12.6 refuses a task with no date here, so the field is part of the
-          form rather than a validation message after the fact. */}
-      {scope.kind === "upcoming" ? (
-        <input
-          className="tm-quickadd-field"
-          type="date"
-          value={chosenDate}
-          onChange={(event) => setChosenDate(event.target.value)}
-          aria-label={t("tasks.addDate")}
-        />
-      ) : null}
+      {/* No date field. It was here because §12.6 refused to commit without
+          one, and that refusal is gone — Upcoming defaults to the first day it
+          covers. A control whose only job was to unblock the form has nothing
+          left to do, and the Task's own date is edited in the Task. */}
 
       {/* §12.4: a Folder holds several Lists and the app must not pick one
           silently, so the question is asked instead of answered. */}

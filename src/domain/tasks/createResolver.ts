@@ -90,13 +90,30 @@ export function resolveCreateContext(scope: TaskScopeRef, ctx: CreateContext): C
         enabled: true,
       };
 
-    // §12.6. The date is the Scope, so it is required rather than defaulted:
-    // guessing today would file it under a day the user did not pick.
+    /**
+     * §12.6 asked for the date instead of defaulting it, on the grounds that
+     * guessing today would file a task under a day nobody picked. That was
+     * right about the risk and wrong about which risk is worse.
+     *
+     * The cost it did not count is that the question BLOCKS: the field had to
+     * be answered before the form would commit at all, so Enter did nothing on
+     * this Scope and every capture cost a trip to a date picker. A quick-add
+     * that cannot be used quickly is not one.
+     *
+     * Today is not a guess in the way §12.6 feared, either. It is the FIRST
+     * DAY this Scope covers (`due >= today` in scopeQuery), so the task lands
+     * at the top of the very list it was typed into — visible, dated, and one
+     * click from being moved. The failure §12.6 was protecting against is a
+     * task filed somewhere the user cannot see; this is the opposite of that.
+     *
+     * A caller that has a date still wins. Nothing about supplying one
+     * changed — only what happens when nobody does.
+     */
     case "upcoming":
       return {
-        targetListId: ctx.chosenDate ? ctx.chosenListId || ctx.inboxListId : null,
-        requiredBeforeCommit: ctx.chosenDate ? [] : ["date"],
-        patch: ctx.chosenDate ? { dueDate: ctx.chosenDate } : {},
+        targetListId: ctx.chosenListId || ctx.inboxListId,
+        requiredBeforeCommit: [],
+        patch: { dueDate: ctx.chosenDate || ctx.today },
         enabled: true,
       };
 

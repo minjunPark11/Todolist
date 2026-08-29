@@ -22,16 +22,20 @@ describe("Gate 4 — the create matrix", () => {
     expect(canCommit(result)).toBe(true);
   });
 
-  it("Upcoming refuses to commit without a date, then takes the one given", () => {
-    const empty = resolveCreateContext({ kind: "upcoming" }, ctx());
-    expect(empty.requiredBeforeCommit).toEqual(["date"]);
-    expect(empty.targetListId).toBeNull();
-    expect(canCommit(empty)).toBe(false);
-
+  it("Upcoming takes the day given, and today when none is", () => {
     const dated = resolveCreateContext({ kind: "upcoming" }, ctx({ chosenDate: "2026-08-21" }));
     expect(dated.patch.dueDate).toBe("2026-08-21");
     expect(dated.targetListId).toBe(INBOX);
     expect(canCommit(dated)).toBe(true);
+
+    // §12.6 used to refuse here. The refusal BLOCKED the form — Enter did
+    // nothing on this Scope — and today is the first day the Scope covers
+    // (`due >= today`), so the task lands at the top of the list it was typed
+    // into rather than somewhere the user has to go looking for it.
+    const empty = resolveCreateContext({ kind: "upcoming" }, ctx());
+    expect(empty.requiredBeforeCommit).toEqual([]);
+    expect(empty.patch.dueDate).toBe(TODAY);
+    expect(canCommit(empty)).toBe(true);
   });
 
   it("Inbox lands in the Inbox", () => {
