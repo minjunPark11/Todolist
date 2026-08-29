@@ -959,9 +959,9 @@ export const en: Dictionary = {
   "tasks.checklist.toggle": "Toggle item",
   "tasks.checklist.add": "Add an item",
   "tasks.checklist.empty": "No items yet.",
-  "tasks.contentMode": "Content type",
-  "tasks.contentMode.description": "Notes",
-  "tasks.contentMode.checklist": "Checklist",
+  // The icon says what the content IS; these say what pressing it does.
+  "tasks.contentMode.toChecklist": "Turn into a checklist",
+  "tasks.contentMode.toNotes": "Turn into notes",
   "tasks.parentTask": "Parent task",
   "tasks.maxDepthReached": "This is as deep as subtasks go.",
   "tasks.subtasks": "Subtasks",

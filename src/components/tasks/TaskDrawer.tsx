@@ -355,14 +355,27 @@ export function TaskDrawer({
           `resetKey` is the Task id: the same Drawer is reused across Tasks, so
           an unflushed edit has to land on the one it was typed into before the
           field shows the next. */}
-      <DeferredInput
-        className="tm-drawer-title"
-        value={task.title}
-        onCommit={(title) => onUpdate({ title })}
-        resetKey={task.id}
-        required
-        aria-label={t("tasks.titleLabel")}
-      />
+      {/* §11.4 puts the content-mode control here — beside the title, not
+          inside the body it changes:
+
+              Task Title                      ☷
+
+          It was two labelled buttons in the Content header, which said "메모"
+          twice on one line and put the switch below the thing it switches.
+          Nothing about the conversion moves with it: §11.14's transaction and
+          §11.15's single undo are `onSetContentMode`'s, and this is a
+          different way to call it. */}
+      <div className="tm-drawer-title-row">
+        <DeferredInput
+          className="tm-drawer-title"
+          value={task.title}
+          onCommit={(title) => onUpdate({ title })}
+          resetKey={task.id}
+          required
+          aria-label={t("tasks.titleLabel")}
+        />
+        <ContentModeToggle checklist={checklist} onSet={onSetContentMode} />
+      </div>
 
       <div className="tm-drawer-fields">
         {/* §13.8, §13.9: the List is a property row that opens a picker, with
@@ -399,14 +412,9 @@ export function TaskDrawer({
         </div>
       </div>
 
-      {/* §11.4: the mode toggle is the Content header's, and it is the only
-          way into a conversion — §11.20 is explicit that text which looks
-          like a checklist is not read as one until the user asks.
-
-          §11.5: this is not a view switch. Choosing the other mode MOVES the
-          content, in one transaction, and one Undo takes it back (§11.14,
-          §11.15) — which is why the toggle can be two plain buttons rather
-          than a dialog asking permission first. */}
+      {/* The toggle moved to the title (§11.4). What stays is the heading and,
+          for a checklist, how much of it is done — the header says what this
+          content IS, and the control that changes it is where the spec put it. */}
       <section className="tm-drawer-content">
         <header className="tm-drawer-content-head">
           <span>{t(checklist ? "tasks.checklist" : "tasks.notes")}</span>
@@ -415,22 +423,6 @@ export function TaskDrawer({
               {progressLines.done}/{progressLines.total}
             </span>
           ) : null}
-          <div className="tm-drawer-mode" role="group" aria-label={t("tasks.contentMode")}>
-            <button
-              type="button"
-              aria-pressed={!checklist}
-              onClick={() => onSetContentMode("description")}
-            >
-              {t("tasks.contentMode.description")}
-            </button>
-            <button
-              type="button"
-              aria-pressed={checklist}
-              onClick={() => onSetContentMode("checklist")}
-            >
-              {t("tasks.contentMode.checklist")}
-            </button>
-          </div>
         </header>
 
         {checklist ? (
@@ -530,5 +522,51 @@ export function TaskDrawer({
           "Move to trash" and meant nothing by it. */}
       </div>
     </aside>
+  );
+}
+
+/**
+ * The content-mode control (§11.4), as one button rather than two.
+ *
+ * Two states, so a menu would charge a click and buy nothing — and the
+ * conversion behind it is undoable in one step (§11.15), which is what makes
+ * an immediate toggle safe rather than presumptuous.
+ *
+ * The icon draws the PRESENT and the label says what pressing does. An icon is
+ * looked at rather than read, so it has to agree with what is on screen right
+ * now; the label is read, so it has to say what happens next. `aria-pressed`
+ * carries the same state to anyone who cannot see the glyph.
+ */
+function ContentModeToggle({
+  checklist,
+  onSet,
+}: {
+  checklist: boolean;
+  onSet: (mode: TaskContentMode) => void;
+}) {
+  const { t } = useT();
+  const label = t(checklist ? "tasks.contentMode.toNotes" : "tasks.contentMode.toChecklist");
+  return (
+    <button
+      type="button"
+      className="tm-drawer-content-toggle"
+      aria-label={label}
+      title={label}
+      aria-pressed={checklist}
+      onClick={() => onSet(checklist ? "description" : "checklist")}
+    >
+      {checklist ? (
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path d="M4 7.5l2 2 3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M4 17l2 2 3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M12.5 8h7.5M12.5 17.5h7.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path d="M5 4.5h9L19 9v10.5H5z" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+          <path d="M8.5 12.5h7M8.5 16h4.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+        </svg>
+      )}
+    </button>
   );
 }

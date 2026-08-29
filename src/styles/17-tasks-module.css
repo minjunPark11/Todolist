@@ -2625,34 +2625,43 @@
 }
 
 /* Pushed to the trailing edge, away from the label it belongs to. */
-.tm-drawer-mode {
+/* The title and the one control that belongs beside it (§11.4). The input
+   takes the room and the button keeps its own — a 32px target that does not
+   shrink as the title grows. */
+.tm-drawer-title-row {
   display: flex;
-  margin-inline-start: auto;
-  border: 1px solid var(--border, #e5e5e7);
-  /* 7px was a value off §11.39's scale, which `e2e/radiusScale` measures on
-     the running app rather than in the stylesheet. The token, not an 8, so
-     the next reader cannot mistake it for a considered exception. */
-  border-radius: var(--radius-sm);
-  overflow: hidden;
+  align-items: center;
+  gap: 4px;
 }
 
-.tm-drawer-mode button {
-  padding: 3px 10px;
+.tm-drawer-content-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--density-control-h);
+  height: var(--density-control-h);
+  min-width: var(--density-tap);
+  min-height: var(--density-tap);
   border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted, #8e8e93);
-  font: inherit;
-  font-size: 11px;
-  text-transform: none;
-  letter-spacing: 0;
   cursor: pointer;
 }
 
-/* `aria-pressed` is the state, so it is also the selector: the two cannot
-   drift apart the way a parallel `is-active` class would. */
-.tm-drawer-mode button[aria-pressed="true"] {
-  background: var(--surface-2, #f2f2f7);
+.tm-drawer-content-toggle:hover,
+.tm-drawer-content-toggle:focus-visible {
+  background: var(--bg-hover-content);
   color: var(--text, #1c1c1e);
+}
+
+/* `aria-pressed` is the state, so it is also the selector: the two cannot
+   drift apart the way a parallel `is-active` class would. Checklist mode is
+   the one worth colouring — it is the mode a reader is more likely to have
+   arrived in by accident. */
+.tm-drawer-content-toggle[aria-pressed="true"] {
+  color: var(--accent, #007aff);
 }
 
 .tm-drawer-content textarea {
