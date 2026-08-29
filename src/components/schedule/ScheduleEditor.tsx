@@ -5,7 +5,7 @@
 // — the popover owns being open and where it sits, the editor owns the draft —
 // so that opening this from somewhere other than the task detail later means
 // giving it a different trigger and nothing else.
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, type ReactNode } from "react";
 import {
   ALL_DAY_OFFERS,
   sortReminders,
@@ -29,6 +29,15 @@ import { ChoicePanel } from "./ChoicePanel";
 import { ReminderPanel } from "./ReminderPanel";
 import { MonthCalendar } from "./MonthCalendar";
 import { TimePanel } from "./TimePanel";
+import {
+  BellIcon,
+  CalendarPlus7Icon,
+  ClockIcon,
+  MoonIcon,
+  RepeatIcon,
+  SunIcon,
+  SunriseIcon,
+} from "./icons";
 import { useT } from "../../i18n";
 
 interface ScheduleEditorProps {
@@ -42,11 +51,11 @@ interface ScheduleEditorProps {
   onClose: () => void;
 }
 
-const QUICK_ICONS: Record<QuickDateKey, string> = {
-  today: "☀️",
-  tomorrow: "🌅",
-  plus7: "📅",
-  tonight: "🌙",
+const QUICK_ICONS: Record<QuickDateKey, () => ReactNode> = {
+  today: () => <SunIcon size={20} />,
+  tomorrow: () => <SunriseIcon size={20} />,
+  plus7: () => <CalendarPlus7Icon size={20} />,
+  tonight: () => <MoonIcon size={20} />,
 };
 
 /** The wall clock, as the domain's `HH:mm`. Read at press time, never stored. */
@@ -176,7 +185,7 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
             onClick={() => dispatch({ type: "QUICK_DATE", key, today, now: nowTime() })}
           >
             <span className="sched-quick-icon" aria-hidden="true">
-              {QUICK_ICONS[key]}
+              {QUICK_ICONS[key]()}
             </span>
             <span className="sched-quick-label">{t(`schedule.quick.${key}`)}</span>
           </button>
@@ -198,14 +207,14 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
           (INV-03, INV-06, INV-07). */}
       <div className="sched-rows">
         <SummaryRow
-          icon="🕐"
+          icon={<ClockIcon />}
           label={t("schedule.time")}
           value={formatTimeSummary(draft, locale) || t("schedule.noTime")}
           disabled={!dated}
           onClick={() => dispatch({ type: "SET_PANEL", panel: "time" })}
         />
         <SummaryRow
-          icon="🔔"
+          icon={<BellIcon />}
           label={t("schedule.reminder")}
           /* §6.34: a summary, because there may be more than one. The earliest
              is named and the rest are counted — a row that listed all four
@@ -215,7 +224,7 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
           onClick={() => dispatch({ type: "SET_PANEL", panel: "reminder" })}
         />
         <SummaryRow
-          icon="🔁"
+          icon={<RepeatIcon />}
           label={t("schedule.repeat")}
           value={t(`schedule.repeat.${draft.repeat}`)}
           disabled={!dated}
@@ -286,7 +295,7 @@ function offerIdOf(reminder: ReminderSpec): string {
 }
 
 interface SummaryRowProps {
-  icon: string;
+  icon: ReactNode;
   label: string;
   value: string;
   disabled: boolean;
