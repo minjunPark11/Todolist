@@ -36,6 +36,14 @@ const ALLOWED_OFF_GRID = [
   ".foc-task-main", // a task row carrying a title AND a meta line: the grid is for single-line rows
   ".motion-task-row", // the same two-line row, on the Matrix
   ".tm-task-open", // a Task row is content: its hit target is as tall as the row, not as the grid
+  // The Matrix box header. Its two icon buttons are 28px section actions
+  // (§4.87), sized against the 22px badge they sit beside rather than against
+  // the 32px grid — the same clause `.ff-btn-sm` above is listed under.
+  ".ff-matrix-cell-add",
+  ".ff-matrix-cell-menu",
+  // A group heading inside a box. It is a button only because it collapses;
+  // what it draws is a label and a count, so it is content like `.motion-task-row`.
+  ".ff-matrix-group-head",
 ];
 
 interface Offender {

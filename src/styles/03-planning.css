@@ -810,12 +810,16 @@
 .ff-matrix-cell-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
 /* The box's two controls — add, and settings. Always present rather than
    revealed on hover: a control that only exists under a pointer is a control a
-   touch screen and a keyboard cannot find. */
+   touch screen and a keyboard cannot find.
+
+   28px, not the 32 a control usually gets: these sit on a section header beside
+   a 22px badge, which is the case §4.87 gives a section action. The rhythm spec
+   names them for the same reason it names `.ff-btn-sm`. */
 .ff-matrix-cell-add,
 .ff-matrix-cell-menu {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm, 6px);
