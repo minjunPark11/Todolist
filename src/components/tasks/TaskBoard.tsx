@@ -15,6 +15,7 @@ import { useRef, useState } from "react";
 import type { Task } from "../../types";
 import type { BoardColumn } from "../../domain/tasks/board";
 import { useT } from "../../i18n";
+import { COMPLETED_PAGE } from "../../domain/view/matrixGroups";
 import { TaskRowContent } from "./TaskRowContent";
 
 interface TaskBoardProps {
@@ -51,6 +52,15 @@ interface TaskBoardProps {
    * is not a control (MATRIX §27.3).
    */
   onCreate?: (columnId: string, title: string, date: string) => void;
+  /**
+   * The column's finished work, newest first, already grouped by the domain.
+   *
+   * Separate from `tasksIn` rather than mixed into it: §12.4 keeps finished
+   * work out of a Scope's rows, and the column shows it as its own group
+   * instead of quietly restoring it to the pile. Absent means the Board draws
+   * no "완료" group at all.
+   */
+  finishedIn?: (columnId: string) => Task[];
 }
 
 export function TaskBoard({
@@ -64,6 +74,7 @@ export function TaskBoard({
   canReorder,
   onContextMenu,
   onCreate,
+  finishedIn,
 }: TaskBoardProps) {
   const { t } = useT();
   // Which card is being dragged, in a ref as well as in state. The state is
@@ -273,9 +284,90 @@ export function TaskBoard({
                 </li>
               ))}
             </ul>
+
+            {finishedIn ? (
+              <BoardColumnFinished
+                tasks={finishedIn(column.id)}
+                onOpen={onOpen}
+                onToggleDone={onToggleDone}
+                openTaskId={openTaskId}
+              />
+            ) : null}
           </section>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * A column's "완료" group — collapsed to a count, capped, then a link.
+ *
+ * Below the open cards and never above them: a column is read for what is
+ * left to do, and finished work that pushed that down would be answering a
+ * question with last week's answers. It is drawn at all because the tick has
+ * to land somewhere the eye can find it — a card that vanishes on being
+ * checked leaves the reader wondering whether it was the right one.
+ *
+ * The header is a button because it collapses, and the count is on the header
+ * rather than beside the column's name: the number in the column head is how
+ * much work is left, and adding finished work to it would make the two
+ * numbers on this screen mean different things.
+ */
+function BoardColumnFinished({
+  tasks,
+  openTaskId,
+  onOpen,
+  onToggleDone,
+}: {
+  tasks: Task[];
+  openTaskId: string;
+  onOpen: (taskId: string) => void;
+  onToggleDone: (task: Task) => void;
+}) {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState(COMPLETED_PAGE);
+
+  if (tasks.length === 0) return null;
+  const visible = tasks.slice(0, shown);
+  const hidden = tasks.length - visible.length;
+
+  return (
+    <section className="tm-column-done">
+      <button
+        type="button"
+        className="tm-column-done-head"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="tm-column-done-caret" aria-hidden>
+          {open ? "⌄" : "›"}
+        </span>
+        <span className="tm-column-done-name">{t("tasks.completed")}</span>
+        <span className="tm-column-done-count">{tasks.length}</span>
+      </button>
+
+      {open ? (
+        <ul className="tm-column-cards" aria-label={t("tasks.completed")}>
+          {visible.map((task) => (
+            <li key={task.id} className={`tm-task is-card is-done${task.id === openTaskId ? " is-open" : ""}`}>
+              <TaskRowContent task={task} onOpen={onOpen} onToggleDone={onToggleDone} />
+            </li>
+          ))}
+          {hidden > 0 ? (
+            <li>
+              <button
+                type="button"
+                className="tm-column-done-more"
+                onClick={() => setShown((value) => value + COMPLETED_PAGE)}
+              >
+                {t("tasks.showMore")}
+              </button>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+    </section>
   );
 }

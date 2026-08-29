@@ -87,9 +87,16 @@ export function isTaskActive(task: Task, lists: List[]): boolean {
  * §12.4's canonical `active`: alive, in a live List, and not finished.
  *
  * The List-aware sibling of `isTaskOpen` — same question, one more condition.
+ *
+ * `finished` relaxes the last clause and nothing else. A view that draws its
+ * own "완료" group — the Board's columns do — needs the Scope's finished work
+ * as well as its open work, and the alternative was for that view to rebuild
+ * the membership test with the precondition left out. This file exists so
+ * that "which tasks are in this Scope" is answered once; a second copy of it
+ * living in a component is exactly what §12.4 warns about.
  */
-function isActive(task: Task, lists: List[]): boolean {
-  return isTaskActive(task, lists) && !isCompleted(task);
+function isActive(task: Task, lists: List[], finished = false): boolean {
+  return isTaskActive(task, lists) && (finished || !isCompleted(task));
 }
 
 /**
@@ -137,13 +144,42 @@ function hasTag(task: Task, tagId: string, links: TaskTag[]): boolean {
 }
 
 /**
+ * What a query may widen — never what it may narrow.
+ *
+ * Deliberately not a filter bag. §12.19 forbids the UI assembling conditions,
+ * and an options object that could add them would be that prohibition with a
+ * back door. The only thing in here relaxes a precondition the Scope shares
+ * with every other Scope, and membership itself stays where it is written.
+ */
+export interface ScopeQueryOptions {
+  /**
+   * Ask for the Scope's finished work along with its open work.
+   *
+   * Off everywhere by default, and it has to stay that way: §12.14 makes the
+   * sidebar count the row count of this query, and a Scope that started
+   * counting last month's finished tasks would be a number nobody could read.
+   * The Board's columns pass it because they draw a "완료" group of their own
+   * and then the two halves are shown apart rather than mixed.
+   *
+   * A no-op for `completed`, `wontDo` and `trash`, which do not have the
+   * precondition to relax — those Scopes ARE the finished work.
+   */
+  finished?: boolean;
+}
+
+/**
  * The one membership rule (§12.19).
  *
  * Also what an optimistic mutation re-evaluates against, which is why it takes
  * a task rather than running over the collection: after an edit the caller
  * asks this whether the row still belongs where it is showing (§12.21).
  */
-export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext): boolean {
+export function matchesScope(
+  task: Task,
+  scope: TaskScopeRef,
+  ctx: ScopeContext,
+  opts: ScopeQueryOptions = {},
+): boolean {
   // A subtask is not a row in any Scope; it is shown inside its parent.
   //
   // This is the cost §13.3 predicted, and paying it here is the point: the
@@ -186,7 +222,7 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     // once the last day has passed — which is what makes overdue part of
     // Today rather than a bucket beside it.
     case "today": {
-      if (!isActive(task, ctx.lists)) return false;
+      if (!isActive(task, ctx.lists, opts.finished)) return false;
       const span = scheduleSpan(scheduleFromTask(task));
       if (span !== null && span.start <= ctx.today) return true;
       return hasTodayPlan(task, ctx.dailyPlans, ctx.today);
@@ -195,7 +231,7 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     // §12.6. Overdue belongs to Today, not here, and a plan alone does not put
     // a task on a horizon that is made of dates.
     case "upcoming": {
-      if (!isActive(task, ctx.lists)) return false;
+      if (!isActive(task, ctx.lists, opts.finished)) return false;
       const due = effectiveDueDate(task);
       if (!due) return false;
       return due >= ctx.today && due <= addDays(ctx.today, 6);
@@ -204,10 +240,10 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     // §12.7. Membership is the owning List's kind, not `status === "inbox"`:
     // that status is the leg Migration Phase 2 replaced.
     case "inbox":
-      return isActive(task, ctx.lists) && ownerList(task, ctx.lists)?.kind === "inbox";
+      return isActive(task, ctx.lists, opts.finished) && ownerList(task, ctx.lists)?.kind === "inbox";
 
     case "list":
-      return isActive(task, ctx.lists) && listIdFor(task, ctx.lists) === scope.id;
+      return isActive(task, ctx.lists, opts.finished) && listIdFor(task, ctx.lists) === scope.id;
 
     // §12.4 asks for `task.list.sidebarFolderId`, and §6.36 lets the sidebar's
     // grouping and the domain Folder be true at once. `folderIdFor` is the one
@@ -215,11 +251,11 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     // Scope its header opens cannot come to disagree.
     case "folder": {
       const list = ownerList(task, ctx.lists);
-      return isActive(task, ctx.lists) && !!list && folderIdFor(list) === scope.id;
+      return isActive(task, ctx.lists, opts.finished) && !!list && folderIdFor(list) === scope.id;
     }
 
     case "tag":
-      return isActive(task, ctx.lists) && hasTag(task, scope.id, ctx.taskTags);
+      return isActive(task, ctx.lists, opts.finished) && hasTag(task, scope.id, ctx.taskTags);
 
     // §12.11. A Filter's baseline is the Scope's, not the spec's: active and
     // not finished, because Completed and Trash are the Scopes that show
@@ -227,14 +263,14 @@ export function matchesScope(task: Task, scope: TaskScopeRef, ctx: ScopeContext)
     // one cannot read — matches nothing rather than everything.
     case "filter": {
       const saved = ctx.savedFilters?.find((filter) => filter.id === scope.id);
-      if (!saved || !isActive(task, ctx.lists)) return false;
+      if (!saved || !isActive(task, ctx.lists, opts.finished)) return false;
       return matchesFilterSpec(task, saved.spec, { lists: ctx.lists, taskTags: ctx.taskTags, today: ctx.today });
     }
   }
 }
 
-export function queryScopeTasks(scope: TaskScopeRef, ctx: ScopeContext): Task[] {
-  return ctx.tasks.filter((task) => matchesScope(task, scope, ctx));
+export function queryScopeTasks(scope: TaskScopeRef, ctx: ScopeContext, opts: ScopeQueryOptions = {}): Task[] {
+  return ctx.tasks.filter((task) => matchesScope(task, scope, ctx, opts));
 }
 
 /**

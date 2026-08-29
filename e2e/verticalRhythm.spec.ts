@@ -48,6 +48,11 @@ const ALLOWED_OFF_GRID = [
   // A group heading inside a box. It is a button only because it collapses;
   // what it draws is a label and a count, so it is content like `.motion-task-row`.
   ".ff-matrix-group-head",
+  // The Board column's "완료" group, which is the same thing one screen over:
+  // a heading and a count that happen to collapse, and the link that asks for
+  // the rest of them.
+  ".tm-column-done-head",
+  ".tm-column-done-more",
 ];
 
 interface Offender {

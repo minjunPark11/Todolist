@@ -82,6 +82,7 @@ import { TaskGanttView } from "../TaskGanttView";
 import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
+import { COMPLETED_PAGE, DEFAULT_MATRIX_VIEW, groupMatrixTasks } from "../../domain/view/matrixGroups";
 import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
 import { resolveListView } from "../../domain/tasks/listView";
 import { useResponsiveMode, useViewportHeightVar } from "./useResponsiveMode";
@@ -630,6 +631,31 @@ export function TasksModule(props: TasksModuleProps) {
   const tasksIn = (columnId: string) => sortByManualOrder(rows.filter((task) => columnOf(task) === columnId));
 
   /**
+   * The Scope's finished work, which `rows` does not carry.
+   *
+   * §12.4's `active` excludes it and §12.14 needs that to stay true — the
+   * sidebar count is this query's row count, and a count that included last
+   * month's finished tasks is a number nobody can read. So the Board asks a
+   * second time with the precondition relaxed rather than the first query
+   * being widened for everyone, and the two halves are drawn apart: open work
+   * in the column, finished work in the column's own "완료" group.
+   *
+   * Newest first, and it is `groupMatrixTasks` that says so — inside "완료"
+   * every deadline is settled, and what the reader is looking for is the thing
+   * they just ticked.
+   */
+  const finishedRows = useMemo(
+    () => (state.view === "board" ? queryScopeTasks(scope, ctx, { finished: true }).filter(isCompleted) : []),
+    [state.view, scope, ctx],
+  );
+  const finishedIn = (columnId: string) =>
+    groupMatrixTasks(
+      finishedRows.filter((task) => columnOf(task) === columnId),
+      today,
+      { ...DEFAULT_MATRIX_VIEW, groupBy: "none" },
+    ).find((group) => group.id === "completed")?.tasks ?? [];
+
+  /**
    * A card was dropped, in two parts: which column it is now in, and where in
    * that column it sits.
    *
@@ -891,6 +917,7 @@ export function TasksModule(props: TasksModuleProps) {
             onOpen={openTask}
             onDrop={dropOnBoard}
             onCreate={createInColumn}
+            finishedIn={finishedIn}
             onToggleDone={toggleDone}
             canReorder={policy.canManualReorder}
             onContextMenu={(task, x, y) => setMenu(taskMenuAt(task, x, y))}

@@ -43,6 +43,7 @@ import {
   type MatrixRulePresetId,
 } from "../domain/view/matrixRules";
 import {
+  COMPLETED_PAGE,
   DEFAULT_MATRIX_VIEW,
   MATRIX_GROUP_AXES,
   MATRIX_SORT_KEYS,
@@ -64,9 +65,6 @@ import { MotionTaskRow } from "./motion/MotionTaskRow";
 import { useT } from "../i18n";
 
 const ALL_LISTS = "";
-
-/** How much of a "완료" group is drawn before the reader has to ask for more. */
-const COMPLETED_PAGE = 5;
 
 interface MatrixPageProps {
   /** Already narrowed to live tasks in live Lists (App.tsx `visibleTasks`). */

@@ -366,3 +366,40 @@ describe("a subtask is not a row in any Scope (§13.3)", () => {
     expect(matchesScope(gone, { kind: "trash" }, ctx)).toBe(false);
   });
 });
+
+describe("asking a Scope for its finished work too", () => {
+  const open = task({ id: "t-open", listId: "l1" });
+  const done = task({ id: "t-done", status: "done", completedAt: NOW, listId: "l1" });
+  const trashed = task({ id: "t-gone", status: "done", completedAt: NOW, deletedAt: NOW, listId: "l1" });
+  const ctx = context({ tasks: [open, done, trashed] });
+  const scope: TaskScopeRef = { kind: "list", id: "l1" };
+
+  it("is off unless asked for", () => {
+    expect(queryScopeTasks(scope, ctx).map((entry) => entry.id)).toEqual(["t-open"]);
+  });
+
+  it("adds the finished work and nothing else", () => {
+    expect(queryScopeTasks(scope, ctx, { finished: true }).map((entry) => entry.id)).toEqual(["t-open", "t-done"]);
+  });
+
+  it("relaxes ONE clause — a deleted task is still not in the Scope", () => {
+    // The option widens the "not finished" precondition. Everything else the
+    // Scope excludes it still excludes, which is the difference between this
+    // and a view rebuilding the membership test with the guard left out.
+    expect(matchesScope(trashed, scope, ctx, { finished: true })).toBe(false);
+  });
+
+  it("does not reach the count (§12.14)", () => {
+    // The sidebar number is this query's row count. A count that quietly
+    // included last month's finished tasks is a number nobody can read, so the
+    // widening has to be something a caller opts into per call.
+    expect(queryScopeCount(scope, ctx)).toBe(1);
+  });
+
+  it("changes nothing for the Scopes that ARE the finished work", () => {
+    for (const kind of ["completed", "trash", "wontDo"] as const) {
+      const plain = queryScopeTasks({ kind }, ctx).map((entry) => entry.id);
+      expect(queryScopeTasks({ kind }, ctx, { finished: true }).map((entry) => entry.id)).toEqual(plain);
+    }
+  });
+});

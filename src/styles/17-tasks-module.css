@@ -2908,3 +2908,77 @@
   opacity: 0.4;
   cursor: default;
 }
+
+/* --- the column's "완료" group (INBOX_COLUMNS §6, phase 2) -----------------
+   Collapsed by default, which the Matrix's group is not. A box on the Matrix
+   is one of four on a screen built for review; a Board column is a working
+   surface, and finished work open by default would push what is left to do
+   below the fold on the one screen where that is the whole question. */
+.tm-column-done {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* A button because it collapses, and 21px because it is a heading rather than
+   a control — the same reading the rhythm spec's allow list gives the Matrix's
+   group head. */
+.tm-column-done-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 2px 2px 0;
+  border: 0;
+  background: none;
+  color: var(--text-tertiary, #8e8e93);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 6px);
+}
+
+.tm-column-done-head:hover {
+  color: var(--text-secondary, #48484a);
+}
+
+.tm-column-done-caret {
+  flex: 0 0 auto;
+  width: 12px;
+  text-align: center;
+}
+
+.tm-column-done-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tm-column-done-count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Finished work reads as background: it is on screen so the tick can be found
+   again, not so it can be worked on. */
+.tm-task.is-card.is-done {
+  opacity: 0.55;
+}
+
+.tm-column-done-more {
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--text-tertiary, #8e8e93);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-column-done-more:hover {
+  color: var(--accent, #0a84ff);
+}

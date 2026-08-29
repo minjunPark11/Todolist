@@ -44,6 +44,21 @@ export const MATRIX_QUADRANT_COLORS: readonly string[] = LIST_COLOR_PRESETS.map(
 /** Long enough for a sentence fragment, short enough to sit in a box header. */
 export const MATRIX_LABEL_MAX = 40;
 
+/**
+ * How much of a "완료" group is drawn before the reader has to ask for more.
+ *
+ * The cap is on finished work alone, wherever it is grouped. Everything else
+ * on these screens is work still to be done and hiding any of it would be
+ * hiding the answer; finished work is the opposite — it accumulates forever,
+ * and a box or a column whose bottom half is last month's successes has
+ * stopped being useful. Five, then a link.
+ *
+ * Shared rather than declared twice: the Matrix's boxes and the Board's
+ * columns are the same reader making the same request, and two constants that
+ * mean one rule are one rule that can drift.
+ */
+export const COMPLETED_PAGE = 5;
+
 export interface MatrixQuadrantView {
   groupBy: MatrixGroupAxis;
   sortKey: MatrixSortKey;
