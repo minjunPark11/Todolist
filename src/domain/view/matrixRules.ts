@@ -34,7 +34,7 @@ import { dateBucketOf, type DateBucket } from "./matrixGroups";
 import { addDays } from "../../utils/date";
 
 const PRIORITIES: readonly TaskPriority[] = ["high", "medium", "low", "none"];
-const DATE_BUCKETS: readonly DateBucket[] = ["overdue", "today", "tomorrow", "later", "none"];
+const DATE_BUCKETS: readonly DateBucket[] = ["overdue", "today", "tomorrow", "later", "none", "someday"];
 
 /**
  * One box's conditions.
@@ -108,9 +108,9 @@ export const DEFAULT_MATRIX_RULES: MatrixQuadrantRules = {
  */
 export const TIME_AND_PRIORITY_MATRIX_RULES: MatrixQuadrantRules = {
   I: { listIds: [], tagIds: [], dateBuckets: ["overdue", "today", "tomorrow"], priorities: ["high", "medium"] },
-  II: { listIds: [], tagIds: [], dateBuckets: ["later", "none"], priorities: ["high", "medium"] },
+  II: { listIds: [], tagIds: [], dateBuckets: ["later", "none", "someday"], priorities: ["high", "medium"] },
   III: { listIds: [], tagIds: [], dateBuckets: ["overdue", "today", "tomorrow"], priorities: ["low", "none"] },
-  IV: { listIds: [], tagIds: [], dateBuckets: ["later", "none"], priorities: ["low", "none"] },
+  IV: { listIds: [], tagIds: [], dateBuckets: ["later", "none", "someday"], priorities: ["low", "none"] },
 };
 
 export const MATRIX_RULE_PRESETS = {
@@ -194,7 +194,7 @@ export function matchesMatrixRule(
   // Dates only — completion is NOT asked about here. A finished task keeps the
   // box its fields put it in and lands in that box's "완료" group (D2); letting
   // a rule move it would make ticking a card relocate it.
-  if (rule.dateBuckets.length > 0 && !rule.dateBuckets.includes(dateBucketOf(task.dueDate, context.today))) {
+  if (rule.dateBuckets.length > 0 && !rule.dateBuckets.includes(dateBucketOf(task, context.today))) {
     return false;
   }
   if (rule.listIds.length > 0 && !rule.listIds.includes(context.listId)) return false;
@@ -297,7 +297,7 @@ export function dropOutcomeForRule(
     patch.priority = strongestPriority(rule.priorities);
   }
 
-  if (rule.dateBuckets.length > 0 && !rule.dateBuckets.includes(dateBucketOf(task.dueDate, context.today))) {
+  if (rule.dateBuckets.length > 0 && !rule.dateBuckets.includes(dateBucketOf(task, context.today))) {
     const dueDate = dateForBuckets(rule.dateBuckets, context.today);
     if (dueDate === null) return { accepted: false, reason: "dueDate" };
     patch.dueDate = dueDate;

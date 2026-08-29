@@ -14,7 +14,7 @@ import { isCompleted } from "../tasks/taskState";
 import { LIST_COLOR_PRESETS } from "../tasks/listColor";
 import { addDays } from "../../utils/date";
 
-export type DateBucket = "overdue" | "today" | "tomorrow" | "later" | "none";
+export type DateBucket = "overdue" | "today" | "tomorrow" | "later" | "none" | "someday";
 
 /** A date bucket, the group that outranks them, or "no grouping at all". */
 export type MatrixGroupId = DateBucket | "completed" | "all";
@@ -174,16 +174,30 @@ export const MATRIX_GROUP_ORDER: readonly MatrixGroupId[] = [
   "tomorrow",
   "later",
   "none",
+  // After "날짜 없음", because it is the one bucket that is not waiting for a
+  // decision — it IS the decision, and the least of anybody's day.
+  "someday",
   "all",
   "completed",
 ];
 
-/** Which side of today a deadline falls on. Dates only — no completion. */
-export function dateBucketOf(dueDate: string, today: string): DateBucket {
-  if (!dueDate) return "none";
-  if (dueDate < today) return "overdue";
-  if (dueDate === today) return "today";
-  if (dueDate === addDays(today, 1)) return "tomorrow";
+/**
+ * Where a task sits on the time axis. No completion — that is asked above.
+ *
+ * "언젠가" is one of these rather than a dimension of its own, and that is the
+ * whole reason this takes a task now instead of a date string. §6.23 makes the
+ * two exclusive: a someday task has no due date, so under the old reading it
+ * fell into "날짜 없음" beside work that simply has not been scheduled yet.
+ * Those are different statements — "I have not decided when" against "I have
+ * decided not to plan this" — and a rule that cannot tell them apart cannot
+ * describe the Inbox board's `언젠가` column (INBOX_COLUMNS design §7 Q1).
+ */
+export function dateBucketOf(task: Pick<Task, "dueDate" | "isSomeday">, today: string): DateBucket {
+  if (task.isSomeday) return "someday";
+  if (!task.dueDate) return "none";
+  if (task.dueDate < today) return "overdue";
+  if (task.dueDate === today) return "today";
+  if (task.dueDate === addDays(today, 1)) return "tomorrow";
   return "later";
 }
 
@@ -198,7 +212,7 @@ export function dateBucketOf(dueDate: string, today: string): DateBucket {
  */
 export function matrixGroupOf(task: Task, today: string, axis: MatrixGroupAxis = "dueDate"): MatrixGroupId {
   if (isCompleted(task)) return "completed";
-  return axis === "none" ? "all" : dateBucketOf(task.dueDate, today);
+  return axis === "none" ? "all" : dateBucketOf(task, today);
 }
 
 export interface MatrixGroup {

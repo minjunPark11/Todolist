@@ -713,6 +713,7 @@ export const en: Dictionary = {
   "matrix.group.tomorrow": "Tomorrow",
   "matrix.group.later": "Later",
   "matrix.group.none": "No date",
+  "matrix.group.someday": "Someday",
   "matrix.group.completed": "Completed",
   "matrix.showMore": "Show more",
   "matrix.addAria": "Add a task to {{quadrant}}",

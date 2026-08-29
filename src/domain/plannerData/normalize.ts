@@ -57,6 +57,7 @@ import { clampHoursAtATime, HOURS_AT_A_TIME } from "../../utils/calendarTime";
 import { MATRIX_QUADRANTS, type MatrixQuadrant } from "../../utils/eisenhower";
 import { sanitizeMatrixView, type MatrixQuadrantView } from "../view/matrixGroups";
 import { sanitizeMatrixRules } from "../view/matrixRules";
+import { sanitizeInboxColumnRules } from "../view/inboxColumnRules";
 
 // Every value `status` may hold on disk: the three lifecycle values written
 // since Ch. 26 §26.3.2, and the legacy six that accounts still carry. A value
@@ -417,6 +418,11 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
     // would store a decision nobody made.
     ...(settings?.matrixQuadrantRules
       ? { matrixQuadrantRules: sanitizeMatrixRules(settings.matrixQuadrantRules) }
+      : {}),
+    // The Board's columns, on the same terms. Three screens of decisions now
+    // ride in this record and each one is absent until somebody makes it.
+    ...(settings?.inboxColumnRules
+      ? { inboxColumnRules: sanitizeInboxColumnRules(settings.inboxColumnRules) }
       : {}),
   };
 }

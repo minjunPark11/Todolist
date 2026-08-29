@@ -4,6 +4,7 @@ import type { FocusDefaultLength } from "./domain/focus/sessionLength";
 // the matrix can keep importing this one.
 import type { MatrixQuadrantView } from "./domain/view/matrixGroups";
 import type { MatrixQuadrantRule } from "./domain/view/matrixRules";
+import type { InboxBucket } from "./domain/tasks/board";
 import type { MatrixQuadrant } from "./utils/eisenhower";
 
 /**
@@ -653,6 +654,18 @@ export interface AppSettings {
    * opens the editor behaves exactly as it does now.
    */
   matrixQuadrantRules?: Partial<Record<MatrixQuadrant, MatrixQuadrantRule>>;
+  /**
+   * What each Inbox board COLUMN contains
+   * (TICKTICK_INBOX_COLUMNS_DESIGN.md §6, phase 3).
+   *
+   * The same shape as its neighbour above and stored apart from it, because
+   * they are two screens' worth of decisions and editing a matrix box must not
+   * move a board column. Absent reads as the three date buckets this app has
+   * always drawn, so an account that never edits a column behaves exactly as
+   * it does now — which `inboxColumnRules.test.ts` checks against the
+   * `inboxBucketOf` these replace, shape by shape.
+   */
+  inboxColumnRules?: Partial<Record<InboxBucket, MatrixQuadrantRule>>;
 }
 
 export type ExternalCalendarSyncStatus = "idle" | "syncing" | "success" | "failed" | "hidden" | "disabled";

@@ -31,16 +31,33 @@ function task(overrides: Partial<Task> = {}): Task {
 }
 
 describe("dateBucketOf", () => {
+  const on = (dueDate: string, isSomeday = false) => ({ dueDate, isSomeday });
+
   it("sorts a deadline by which side of today it falls on", () => {
-    expect(dateBucketOf(YESTERDAY, TODAY)).toBe("overdue");
-    expect(dateBucketOf(TODAY, TODAY)).toBe("today");
-    expect(dateBucketOf(TOMORROW, TODAY)).toBe("tomorrow");
-    expect(dateBucketOf("2026-09-15", TODAY)).toBe("later");
-    expect(dateBucketOf("", TODAY)).toBe("none");
+    expect(dateBucketOf(on(YESTERDAY), TODAY)).toBe("overdue");
+    expect(dateBucketOf(on(TODAY), TODAY)).toBe("today");
+    expect(dateBucketOf(on(TOMORROW), TODAY)).toBe("tomorrow");
+    expect(dateBucketOf(on("2026-09-15"), TODAY)).toBe("later");
+    expect(dateBucketOf(on(""), TODAY)).toBe("none");
   });
 
   it("crosses a month boundary without arithmetic of its own", () => {
-    expect(dateBucketOf("2026-09-01", "2026-08-31")).toBe("tomorrow");
+    expect(dateBucketOf(on("2026-09-01"), "2026-08-31")).toBe("tomorrow");
+  });
+
+  it("tells 'not decided when' apart from 'decided not to plan'", () => {
+    // Both have no date (§6.23 makes someday and a deadline exclusive), and
+    // before this they were one bucket. They are two different statements, and
+    // the Inbox board's `언젠가` column is the second one.
+    expect(dateBucketOf(on("", true), TODAY)).toBe("someday");
+    expect(dateBucketOf(on(""), TODAY)).toBe("none");
+  });
+
+  it("lets someday outrank a date that should not be there", () => {
+    // §6.23 forbids holding both. A record that has drifted into that state
+    // has to land in exactly one bucket rather than in whichever the caller
+    // asked about first.
+    expect(dateBucketOf(on(YESTERDAY, true), TODAY)).toBe("someday");
   });
 });
 

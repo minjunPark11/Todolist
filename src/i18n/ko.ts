@@ -705,6 +705,7 @@ export const ko: Dictionary = {
   "matrix.group.tomorrow": "내일",
   "matrix.group.later": "이후",
   "matrix.group.none": "날짜 없음",
+  "matrix.group.someday": "언젠가",
   "matrix.group.completed": "완료",
   "matrix.showMore": "추가 보기",
   "matrix.addAria": "{{quadrant}} 칸에 작업 추가",
