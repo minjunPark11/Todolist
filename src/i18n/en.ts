@@ -686,7 +686,6 @@ export const en: Dictionary = {
   // filtered out — so here the four boxes can say what Eisenhower says.
   "matrix.title": "Eisenhower Matrix",
   // The two questions no longer decide the box (TICKTICK_MATRIX_DESIGN.md D1).
-  "matrix.subtitle": "Priority decides the box. Drag a card and its priority changes — its dates do not.",
   "matrix.list": "List",
   "matrix.allLists": "All lists",
   "matrix.qI": "Do first",

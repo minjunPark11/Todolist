@@ -678,7 +678,6 @@ export const ko: Dictionary = {
   // 둘을 빼고 그리므로 네 칸이 아이젠하워 원래 뜻을 그대로 말할 수 있다.
   "matrix.title": "아이젠하워 매트릭스",
   // 두 질문이 칸을 정하지 않는다(TICKTICK_MATRIX_DESIGN.md D1). 우선순위 하나다.
-  "matrix.subtitle": "우선순위가 칸을 정한다. 카드를 끌어 옮기면 우선순위가 바뀐다 — 날짜는 그대로다.",
   "matrix.list": "리스트",
   "matrix.allLists": "전체 리스트",
   "matrix.qI": "지금 하기",

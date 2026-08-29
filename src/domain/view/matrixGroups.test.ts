@@ -243,15 +243,17 @@ describe("what a box is called (§20.6)", () => {
     expect(sanitizeMatrixView({ ...base, color: "#ff0000" }).color).toBeUndefined();
   });
 
-  it("falls back to the built-in words, field by field", () => {
-    expect(matrixQuadrantLabels(undefined, "Do first", "Important and urgent")).toEqual({
-      name: "Do first",
-      hint: "Important and urgent",
-    });
-    // Naming a box does not silently rename its second line too.
-    expect(matrixQuadrantLabels({ ...base, name: "Tuesday" }, "Do first", "Important and urgent")).toEqual({
+  it("falls back to the built-in name, and to no second line at all", () => {
+    expect(matrixQuadrantLabels(undefined, "Do first")).toEqual({ name: "Do first", hint: "" });
+    // Naming a box does not invent a second line for it.
+    expect(matrixQuadrantLabels({ ...base, name: "Tuesday" }, "Do first")).toEqual({
       name: "Tuesday",
-      hint: "Important and urgent",
+      hint: "",
+    });
+    // The one way a second line exists: the user typed it.
+    expect(matrixQuadrantLabels({ ...base, hint: "Before the standup" }, "Do first")).toEqual({
+      name: "Do first",
+      hint: "Before the standup",
     });
   });
 });

@@ -164,13 +164,9 @@ export function MatrixPage({
     return Boolean(scope) && listIds.length > 0 && !listIds.includes(scope);
   }
 
-  /** The box's words: the user's if they wrote any, the built-in ones if not. */
+  /** The box's words: its name, ours or the user's, and their second line if any. */
   function labelsFor(quadrant: MatrixQuadrant) {
-    return matrixQuadrantLabels(
-      quadrantViews?.[quadrant],
-      t(`matrix.q${quadrant}`),
-      t(`matrix.q${quadrant}Hint`),
-    );
+    return matrixQuadrantLabels(quadrantViews?.[quadrant], t(`matrix.q${quadrant}`));
   }
 
   /**
@@ -292,9 +288,11 @@ export function MatrixPage({
   return (
     <div className="ff-page ff-matrix-page">
       <header className="ff-page-head">
+        {/* No subtitle. It described the rule — "priority decides the box,
+            dragging changes priority" — which §23 made editable and therefore
+            made it a sentence that can be false about the boxes below it. */}
         <div>
           <h1 className="ff-page-title">{t("matrix.title")}</h1>
-          <p className="ff-page-sub">{t("matrix.subtitle")}</p>
         </div>
         <div className="ff-board-controls">
           <label className="ff-board-control">
@@ -464,9 +462,12 @@ function QuadrantCell({
         <span className="ff-matrix-roman" aria-hidden>
           {quadrant}
         </span>
+        {/* The second line is the user's or it is not there. An empty span
+            still reserved its line height, so the four headers would keep the
+            gap left by words nobody chose to write. */}
         <div className="ff-matrix-cell-titles">
           <strong className="ff-matrix-cell-title">{labels.name}</strong>
-          <span className="ff-matrix-cell-hint">{labels.hint}</span>
+          {labels.hint ? <span className="ff-matrix-cell-hint">{labels.hint}</span> : null}
         </div>
         {/* No count on the box. Each group inside carries its own, which is
             the number that answers something — "기한 초과 3" is a fact about

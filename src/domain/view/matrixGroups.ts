@@ -120,18 +120,23 @@ export function sanitizeMatrixView(value: unknown): MatrixQuadrantView {
 /**
  * What a box is called, and what its second line says.
  *
- * The fallbacks come from the caller because they are translations and this
- * module is pure — but the RULE lives here, so the header, the `+`'s label and
- * the ⋯'s label cannot disagree about what the box is named.
+ * The name's fallback comes from the caller because it is a translation and
+ * this module is pure — but the RULE lives here, so the header, the `+`'s label
+ * and the ⋯'s label cannot disagree about what the box is named.
+ *
+ * The second line has NO fallback. The built-in one said the name again in
+ * other words — "지금 하기" over "중요하고 급한 일" — and once §23 let a box's
+ * conditions be edited it could be false as well: a box filtered to one List
+ * went on claiming to be about importance. A line appears only if the user
+ * wrote one, and then it is theirs and cannot be wrong about our rules.
  */
 export function matrixQuadrantLabels(
   view: MatrixQuadrantView | undefined,
   fallbackName: string,
-  fallbackHint: string,
 ): { name: string; hint: string } {
   return {
     name: view?.name || fallbackName,
-    hint: view?.hint || fallbackHint,
+    hint: view?.hint ?? "",
   };
 }
 
