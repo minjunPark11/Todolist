@@ -908,6 +908,13 @@ export const en: Dictionary = {
   "tasks.addToColumn": "Add a task to {{column}}",
   "tasks.renameColumn": "Rename {{column}}",
   "tasks.showMore": "Show more",
+  // Why a column turns a card away. The wording differs from the Matrix's
+  // because the fields differ: a column refuses a priority rather than writing
+  // one.
+  "tasks.refuse.list": "This column only takes tasks from another List. Dropping will not move it.",
+  "tasks.refuse.tag": "This column only takes tasks with another tag. Dropping will not tag it.",
+  "tasks.refuse.priority": "This column only takes another priority. Dropping will not change it.",
+  "tasks.unmatched": "{{count}} tasks fit no column",
   // Spec §5.53: the trigger says what the schedule IS, so its accessible name
   // carries the value the way the Priority flag's does (§8.28).
   "tasks.scheduleCurrent": "Schedule, {{value}}",

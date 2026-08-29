@@ -73,6 +73,24 @@ interface TaskBoardProps {
    * Sections are records, and renaming one is a different command.
    */
   onRename?: (columnId: string, name: string) => void;
+  /**
+   * The tasks no column takes (design §3, phase 4).
+   *
+   * Drawn under the board rather than hidden, because a task in the account
+   * and on no screen is the worst bug a to-do app has — and once a column's
+   * conditions can be edited or deleted, that state is one click away. Empty
+   * while nobody has edited anything, which is the whole point of building it
+   * before the controls that make it reachable.
+   */
+  unmatched?: Task[];
+  /**
+   * Why this column would refuse this card, or null if it would take it.
+   *
+   * Asked while the card is still in the air, so a column cannot light up and
+   * then quietly do nothing (§23.5). The Board does not know what the reasons
+   * mean — it names them to the reader and lets the caller decide them.
+   */
+  dropRefusal?: (taskId: string, columnId: string) => string | null;
 }
 
 export function TaskBoard({
@@ -88,6 +106,8 @@ export function TaskBoard({
   onCreate,
   finishedIn,
   onRename,
+  unmatched = [],
+  dropRefusal,
 }: TaskBoardProps) {
   const { t } = useT();
   // Which card is being dragged, in a ref as well as in state. The state is
@@ -129,11 +149,20 @@ export function TaskBoard({
     return column.name ?? t(column.labelKey ?? "tasks.sectionDefault");
   }
 
+  /** Why the card in the air would be turned away here, if it would be. */
+  function refusalFor(column: BoardColumn): string | null {
+    if (!dropRefusal || !dragging) return null;
+    return dropRefusal(dragging, column.id);
+  }
+
   function drop(column: BoardColumn, index: number) {
     const taskId = dragged.current;
     endDrag();
     setOver("");
     if (!taskId) return;
+    // Refused before anything is written, and the column said so on the way in
+    // — a drop that lands and does nothing is indistinguishable from a bug.
+    if (dropRefusal && dropRefusal(taskId, column.id)) return;
     // The date is asked for before anything is written, not after: §6.25 says
     // the column IS a date, so a task moved there without one would be sitting
     // in a column whose rule it does not satisfy.
@@ -148,10 +177,11 @@ export function TaskBoard({
     <div className="tm-board">
       {columns.map((column) => {
         const cards = tasksIn(column.id);
+        const refusal = refusalFor(column);
         return (
           <section
             key={column.id || "default"}
-            className={`tm-column${over === column.id ? " is-over" : ""}`}
+            className={`tm-column${over === column.id ? " is-over" : ""}${refusal ? " is-refusing" : ""}`}
             aria-label={label(column)}
             onDragOver={(event) => {
               event.preventDefault();
@@ -238,6 +268,15 @@ export function TaskBoard({
 
             {/* The input opens ABOVE and the card appears below it, so the
                 thing just typed is not what moves (MATRIX §19.2). */}
+            {/* Said while the card is over the column, not after it lands.
+                Naming the reason is the point — "it just would not drop" is
+                the bug report a silent refusal produces. */}
+            {refusal ? (
+              <p className="tm-column-refusal" role="status">
+                {t(`tasks.refuse.${refusal}`)}
+              </p>
+            ) : null}
+
             {onCreate && adding === column.id ? (
               <form
                 className="tm-column-add-form"
@@ -366,6 +405,39 @@ export function TaskBoard({
           </section>
         );
       })}
+
+      {/* The tasks the columns between them do not take.
+
+          Not a column: it is not somewhere work belongs, it is the report that
+          some work belongs nowhere. Drawn at all because the alternative is a
+          task that is in the account and on no screen — and once a column can
+          be edited or deleted, that is one click away. */}
+      {unmatched.length > 0 ? (
+        <section className="tm-column tm-column-unmatched" aria-label={t("tasks.unmatched", { count: unmatched.length })}>
+          <header className="tm-column-head">
+            <h3>{t("tasks.unmatched", { count: unmatched.length })}</h3>
+          </header>
+          {/* Draggable, because dragging is the way OUT. A card here is one no
+              column claims, and the columns that would take it light up the
+              moment it is picked up — a strip that could only be read would
+              leave the task where it is. */}
+          <ul className="tm-column-cards">
+            {unmatched.map((task) => (
+              <li
+                key={task.id}
+                className={`tm-task is-card${task.id === openTaskId ? " is-open" : ""}${
+                  dragging === task.id ? " is-dragging" : ""
+                }`}
+                draggable
+                onDragStart={() => startDrag(task.id)}
+                onDragEnd={endDrag}
+              >
+                <TaskRowContent task={task} onOpen={onOpen} onToggleDone={onToggleDone} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

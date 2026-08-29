@@ -23,8 +23,10 @@
 // neither has ever been able to write the other's field.
 import type { Task } from "../../types";
 import { INBOX_BUCKETS, type InboxBucket } from "../tasks/board";
+import { dateBucketOf } from "./matrixGroups";
 import {
   EMPTY_MATRIX_RULE,
+  dateForBuckets,
   matchesMatrixRule,
   sanitizeMatrixRule,
   type MatrixQuadrantRule,
@@ -104,4 +106,66 @@ export function columnForTask(task: Task, rules: InboxColumnRules, context: Matr
     if (matchesMatrixRule(task, rules[bucket], context)) return bucket;
   }
   return null;
+}
+
+/**
+ * Why a column will not take a card.
+ *
+ * Named rather than boolean, for the reason the Matrix's twin is: a refusal
+ * the reader cannot explain is indistinguishable from a bug, and "it just
+ * would not drop" is the report this type exists to prevent.
+ */
+export type InboxDropRefusal = "list" | "tag" | "priority";
+
+export type InboxDropOutcome =
+  | { accepted: true; patch: Partial<Task> }
+  | { accepted: false; reason: InboxDropRefusal };
+
+/**
+ * Moving a card into a column — and Gate 7, enforced by there being nothing
+ * else here to write.
+ *
+ * This function can reach `isSomeday` and `dueDate` and no other field. Not
+ * by policy: there is no branch in it that assigns anything else. A column
+ * whose rule needs a List, a tag or a priority to be satisfied therefore
+ * cannot accept the card at all, and says so while it is still in the air
+ * rather than rewriting what the task belongs to.
+ *
+ * The one place this is MORE permissive than the Matrix is erasing a date,
+ * and that is not an oversight. §4.2 taught the Matrix never to erase one
+ * because nobody asked; here `미분류` and `언젠가` ARE "no date" (§6.23), the
+ * board has always written exactly that on a drop, and refusing would make
+ * the app's oldest board gesture stop working.
+ */
+export function dropOutcomeForColumn(
+  task: Task,
+  rule: InboxColumnRule,
+  context: MatrixRuleContext,
+): InboxDropOutcome {
+  if (rule.listIds.length > 0 && !rule.listIds.includes(context.listId)) {
+    return { accepted: false, reason: "list" };
+  }
+  if (rule.tagIds.length > 0 && !task.tags.some((tag) => rule.tagIds.includes(tag))) {
+    return { accepted: false, reason: "tag" };
+  }
+  // The Matrix WRITES a priority to satisfy its own rule, because a box there
+  // is a statement about importance. A column here is a statement about when,
+  // so the same condition is a refusal instead — the two boards keep their
+  // own vocabulary even while sharing the rule's shape.
+  if (rule.priorities.length > 0 && !rule.priorities.includes(task.priority)) {
+    return { accepted: false, reason: "priority" };
+  }
+
+  // Already where it belongs: no patch, and therefore no `updatedAt` either.
+  if (rule.dateBuckets.length === 0 || rule.dateBuckets.includes(dateBucketOf(task, context.today))) {
+    return { accepted: true, patch: {} };
+  }
+
+  // A dated bucket wins over the two empty ones: a column asking for "today or
+  // someday" is asking for work to be scheduled, and picking `someday` would
+  // answer the softer half of its own question.
+  const dueDate = dateForBuckets(rule.dateBuckets, context.today);
+  if (dueDate !== null) return { accepted: true, patch: { isSomeday: false, dueDate } };
+  if (rule.dateBuckets.includes("someday")) return { accepted: true, patch: { isSomeday: true, dueDate: "" } };
+  return { accepted: true, patch: { isSomeday: false, dueDate: "" } };
 }

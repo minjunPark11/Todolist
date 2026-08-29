@@ -4,8 +4,10 @@ import { INBOX_BUCKETS, inboxBucketOf } from "../tasks/board";
 import {
   DEFAULT_INBOX_COLUMN_RULES,
   columnForTask,
+  dropOutcomeForColumn,
   resolveInboxColumnRules,
   sanitizeInboxColumnRules,
+  type InboxColumnRule,
 } from "./inboxColumnRules";
 
 const TODAY = "2026-08-29";
@@ -125,5 +127,93 @@ describe("what a stored set may be", () => {
   it("is empty for anything that is not an object", () => {
     expect(sanitizeInboxColumnRules(null)).toEqual({});
     expect(sanitizeInboxColumnRules("rules")).toEqual({});
+  });
+});
+
+describe("what a drop into a column may write", () => {
+  const rule = (patch: Partial<InboxColumnRule>): InboxColumnRule => ({
+    listIds: [],
+    tagIds: [],
+    dateBuckets: [],
+    priorities: [],
+    ...patch,
+  });
+
+  it("Gate 7: it can reach isSomeday and dueDate, and nothing else, ever", () => {
+    // Not a policy read off a comment — the assertion is over every field the
+    // function is able to produce for the default columns and for a few edited
+    // ones, and the set has two members.
+    const fields = new Set<string>();
+    const rules: InboxColumnRule[] = [
+      ...Object.values(DEFAULT_INBOX_COLUMN_RULES),
+      rule({ dateBuckets: ["today"] }),
+      rule({ dateBuckets: ["someday"] }),
+      rule({ dateBuckets: ["none"] }),
+      rule({ dateBuckets: ["overdue", "someday"] }),
+    ];
+    for (const candidate of rules) {
+      for (const shape of [task(), task({ dueDate: "2026-08-01" }), task({ isSomeday: true })]) {
+        const outcome = dropOutcomeForColumn(shape, candidate, CONTEXT);
+        if (outcome.accepted) for (const key of Object.keys(outcome.patch)) fields.add(key);
+      }
+    }
+    expect([...fields].sort()).toEqual(["dueDate", "isSomeday"]);
+  });
+
+  it("writes nothing at all when the card already belongs there", () => {
+    const dated = task({ dueDate: "2026-09-01" });
+    const outcome = dropOutcomeForColumn(dated, DEFAULT_INBOX_COLUMN_RULES.scheduled, CONTEXT);
+    // An empty patch is not a no-op by accident: it is what keeps a drop that
+    // changes nothing from touching `updatedAt`.
+    expect(outcome).toEqual({ accepted: true, patch: {} });
+  });
+
+  it("writes the two fields each column is made of", () => {
+    const dated = task({ dueDate: "2026-09-01" });
+    expect(dropOutcomeForColumn(dated, DEFAULT_INBOX_COLUMN_RULES.someday, CONTEXT)).toEqual({
+      accepted: true,
+      patch: { isSomeday: true, dueDate: "" },
+    });
+    expect(dropOutcomeForColumn(dated, DEFAULT_INBOX_COLUMN_RULES.unsorted, CONTEXT)).toEqual({
+      accepted: true,
+      patch: { isSomeday: false, dueDate: "" },
+    });
+    expect(dropOutcomeForColumn(task(), DEFAULT_INBOX_COLUMN_RULES.scheduled, CONTEXT)).toEqual({
+      accepted: true,
+      patch: { isSomeday: false, dueDate: TODAY },
+    });
+  });
+
+  it("prefers a real date over someday when a column asks for both", () => {
+    // "Today or someday" is asking for work to be scheduled; answering with
+    // `someday` would satisfy the softer half of its own question.
+    expect(dropOutcomeForColumn(task(), rule({ dateBuckets: ["someday", "today"] }), CONTEXT)).toEqual({
+      accepted: true,
+      patch: { isSomeday: false, dueDate: TODAY },
+    });
+  });
+
+  it("refuses, by name, what it must not write", () => {
+    expect(dropOutcomeForColumn(task(), rule({ listIds: ["other"] }), CONTEXT)).toEqual({
+      accepted: false,
+      reason: "list",
+    });
+    expect(dropOutcomeForColumn(task(), rule({ tagIds: ["work"] }), CONTEXT)).toEqual({
+      accepted: false,
+      reason: "tag",
+    });
+    // The Matrix WRITES a priority here. A column is a statement about when,
+    // so it refuses instead — the shared rule shape does not make the two
+    // boards agree about what a drop means.
+    expect(dropOutcomeForColumn(task(), rule({ priorities: ["high"] }), CONTEXT)).toEqual({
+      accepted: false,
+      reason: "priority",
+    });
+  });
+
+  it("accepts a condition the card already satisfies", () => {
+    const tagged = task({ tags: ["work"], priority: "high", listId: "list-inbox" });
+    expect(dropOutcomeForColumn(tagged, rule({ tagIds: ["work"], priorities: ["high"] }), CONTEXT).accepted).toBe(true);
+    expect(dropOutcomeForColumn(tagged, rule({ listIds: ["list-inbox"] }), CONTEXT).accepted).toBe(true);
   });
 });

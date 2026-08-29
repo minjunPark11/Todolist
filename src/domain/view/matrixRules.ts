@@ -241,7 +241,8 @@ function strongestPriority(priorities: readonly TaskPriority[]): TaskPriority {
  */
 const WRITABLE_BUCKETS: readonly DateBucket[] = ["today", "tomorrow", "later", "overdue"];
 
-function dateForBuckets(buckets: readonly DateBucket[], today: string): string | null {
+/** Exported for the Board, whose columns are date rules too (INBOX_COLUMNS §6). */
+export function dateForBuckets(buckets: readonly DateBucket[], today: string): string | null {
   const bucket = WRITABLE_BUCKETS.find((candidate) => buckets.includes(candidate));
   if (!bucket) return null;
   if (bucket === "today") return today;

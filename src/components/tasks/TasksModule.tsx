@@ -84,6 +84,12 @@ import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { COMPLETED_PAGE, DEFAULT_MATRIX_VIEW, groupMatrixTasks } from "../../domain/view/matrixGroups";
+import {
+  columnForTask,
+  dropOutcomeForColumn,
+  resolveInboxColumnRules,
+  type InboxColumnRules,
+} from "../../domain/view/inboxColumnRules";
 import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
 import { resolveListView } from "../../domain/tasks/listView";
 import { useResponsiveMode, useViewportHeightVar } from "./useResponsiveMode";
@@ -124,6 +130,14 @@ interface TasksModuleProps {
    */
   inboxColumnNames?: InboxColumnNames;
   onRenameInboxColumn?: (bucket: InboxBucket, name: string) => void;
+  /**
+   * What each Inbox column CONTAINS (design §6, phase 3).
+   *
+   * Absent reads as the three date buckets this app has always drawn, so an
+   * account that has never edited a column behaves exactly as it did — which
+   * is the property `inboxColumnRules.test.ts` pins shape by shape.
+   */
+  inboxColumnRules?: Partial<InboxColumnRules>;
   /**
    * §10.41/§10.42's other half, handed in rather than held here (D-25).
    *
@@ -640,9 +654,83 @@ export function TasksModule(props: TasksModuleProps) {
     }),
     [today, rows, ganttSpec.groupBy, lists, folders],
   );
+  /**
+   * The rules in force, and the context a rule is asked against.
+   *
+   * The Inbox's columns are RULES now (design §6, phase 3) rather than
+   * `inboxBucketOf` reading two fields. Under the defaults the two answer
+   * identically — that is a test, not a hope — and what changes is that a
+   * column can now be edited into one that leaves a task matching nothing.
+   * `null` is that answer, and the row below the board is where it is drawn.
+   */
+  const inboxRules = useMemo(() => resolveInboxColumnRules(props.inboxColumnRules), [props.inboxColumnRules]);
+  const ruleContext = (task: Task) => ({ today, listId: listIdFor(task, lists) });
+
   const columnOf = (task: Task) =>
-    scope.kind === "inbox" ? (inboxBucketOf(task) as string) : sectionIdFor(task, lists, listSections);
+    scope.kind === "inbox"
+      ? (columnForTask(task, inboxRules, ruleContext(task)) ?? "")
+      : sectionIdFor(task, lists, listSections);
   const tasksIn = (columnId: string) => sortByManualOrder(rows.filter((task) => columnOf(task) === columnId));
+
+  /**
+   * The tasks the columns between them do not take (design §3, §6 phase 4).
+   *
+   * Empty while nobody has edited a rule, and it has to be standing BEFORE
+   * anybody can — phase 5's delete button is what makes it reachable, and a
+   * task in the account and on no screen is the worst bug a to-do app has.
+   *
+   * Inbox only: a List Board's columns are Sections, membership is stored on
+   * the task, and the unsectioned default takes everything that has none.
+   */
+  const unmatched = useMemo(
+    () =>
+      scope.kind === "inbox"
+        ? rows.filter((task) => columnForTask(task, inboxRules, { today, listId: listIdFor(task, lists) }) === null)
+        : [],
+    [scope.kind, rows, inboxRules, today, lists],
+  );
+
+  /**
+   * Whether a column would take this card, asked while it is still in the air.
+   *
+   * The same question the drop itself asks, so a column cannot light up and
+   * then quietly do nothing — the Matrix learned this at §23.5 and the answer
+   * is the same one.
+   */
+  function boardDropOutcome(taskId: string, columnId: string) {
+    if (scope.kind !== "inbox") return null;
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target) return null;
+    const outcome = dropOutcomeForColumn(target, inboxRules[columnId as InboxBucket], ruleContext(target));
+    return outcome.accepted ? null : outcome.reason;
+  }
+
+  /**
+   * What a drop into an Inbox column writes, and its Undo.
+   *
+   * A column that asks for a day keeps asking (§6.25) — the prompt supplies
+   * one, and a day the user typed beats the day a rule would have picked. With
+   * no prompt the rule decides, and a rule that cannot be satisfied without
+   * touching a List, a tag or a priority refuses instead (Gate 7).
+   *
+   * The undo is the two fields the patch can reach, always both: restoring
+   * only what changed would leave the other holding whatever the drop made of
+   * it, and the pair is what §6.23 keeps consistent.
+   */
+  function inboxDropMutation(target: Task, columnId: string, date?: string): TaskMutation | null {
+    if (date) return moveToInboxBucket(target, columnId as InboxBucket, date);
+    const outcome = dropOutcomeForColumn(target, inboxRules[columnId as InboxBucket], ruleContext(target));
+    if (!outcome.accepted) return null;
+    const undo = { isSomeday: target.isSomeday, dueDate: target.dueDate };
+    // Named for what the drop actually did, not for which column it landed in
+    // — under an edited rule those are no longer the same thing.
+    const labelKey = outcome.patch.isSomeday
+      ? "tasks.undoSomeday"
+      : outcome.patch.dueDate
+        ? "tasks.undoDateChanged"
+        : "tasks.undoMoved";
+    return { patch: outcome.patch, undo, labelKey };
+  }
 
   /**
    * The Scope's finished work, which `rows` does not carry.
@@ -688,7 +776,7 @@ export function TasksModule(props: TasksModuleProps) {
       from === columnId
         ? null
         : scope.kind === "inbox"
-          ? moveToInboxBucket(target, columnId as InboxBucket, date)
+          ? inboxDropMutation(target, columnId, date)
           : moveTaskToSection(target, columnId, lists, listSections);
     // Null means the domain refused the drop — a date that was never supplied,
     // or a Section belonging to another List. Nothing is written, and the card
@@ -932,6 +1020,8 @@ export function TasksModule(props: TasksModuleProps) {
             onDrop={dropOnBoard}
             onCreate={createInColumn}
             finishedIn={finishedIn}
+            unmatched={unmatched}
+            dropRefusal={boardDropOutcome}
             onRename={
               // Only the Inbox's columns are the user's to name here. A List's
               // are Sections — records with a name of their own, and renaming

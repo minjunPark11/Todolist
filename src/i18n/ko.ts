@@ -891,6 +891,12 @@ export const ko: Dictionary = {
   "tasks.addToColumn": "{{column}} 열에 작업 추가",
   "tasks.renameColumn": "{{column}} 열 이름 바꾸기",
   "tasks.showMore": "추가 보기",
+  // 열이 카드를 돌려보내는 이유 셋. 매트릭스와 문장이 다른 것은 열이 바꿀 수 있는
+  // 필드가 다르기 때문이다 — 여기서 우선순위는 쓰지 않고 거절한다.
+  "tasks.refuse.list": "이 열은 다른 리스트의 작업만 받습니다. 끌어 놓아도 소속은 바뀌지 않습니다",
+  "tasks.refuse.tag": "이 열은 다른 태그의 작업만 받습니다. 끌어 놓아도 태그는 붙지 않습니다",
+  "tasks.refuse.priority": "이 열은 다른 우선순위의 작업만 받습니다. 끌어 놓아도 우선순위는 바뀌지 않습니다",
+  "tasks.unmatched": "어느 열에도 맞지 않는 작업 {{count}}개",
   "tasks.scheduleCurrent": "일정, {{value}}",
   "tasks.addList": "리스트",
   "tasks.listCurrent": "리스트, {{value}}",

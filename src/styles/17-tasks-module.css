@@ -3048,3 +3048,39 @@
 .tm-column-name:focus {
   outline: none;
 }
+
+/* --- a column that will not take the card (INBOX_COLUMNS §6, phase 4) ------
+   Said while the card is in the air. `is-over` lights a column up; this one
+   has to read as the opposite of that, so it takes the danger colour and a
+   dashed edge — a border that is drawn but not solid is the visual form of
+   "not here". */
+.tm-column.is-refusing {
+  border-style: dashed;
+  border-color: var(--danger, #ff3b30);
+  background: color-mix(in srgb, var(--danger, #ff3b30) 5%, transparent);
+}
+
+.tm-column-refusal {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, var(--danger, #ff3b30) 10%, transparent);
+  color: var(--danger, #ff3b30);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* --- the remainder ---------------------------------------------------------
+   Deliberately NOT a column. It is not somewhere work belongs; it is the
+   report that some work belongs nowhere, so it takes no drop, no `+` and no
+   colour of its own — only the dashed edge that says "this is not a place". */
+.tm-column-unmatched {
+  border-style: dashed;
+  border-color: var(--border-subtle, rgba(0, 0, 0, 0.08));
+  background: transparent;
+}
+
+.tm-column-unmatched .tm-column-head h3 {
+  color: var(--text-tertiary, #8e8e93);
+  font-weight: 600;
+}
