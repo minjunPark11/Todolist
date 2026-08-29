@@ -905,6 +905,7 @@ export const en: Dictionary = {
   "tasks.addPlaceholder": "Add a task",
   "tasks.addDate": "Date",
   "tasks.addToColumn": "Add a task to {{column}}",
+  "tasks.renameColumn": "Rename {{column}}",
   "tasks.showMore": "Show more",
   // Spec §5.53: the trigger says what the schedule IS, so its accessible name
   // carries the value the way the Priority flag's does (§8.28).

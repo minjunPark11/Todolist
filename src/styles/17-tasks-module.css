@@ -2982,3 +2982,60 @@
 .tm-column-done-more:hover {
   color: var(--accent, #0a84ff);
 }
+
+/* --- renaming a column (INBOX_COLUMNS §6, phase 5a) ------------------------
+   The title IS the control, which is where the reference app puts it
+   (Component 13 §2 measured an invisible edit overlay over the header title).
+   So the button is drawn as the heading it replaces — no chrome at rest, and
+   a hover background that says it can be pressed. */
+/* `min-width: 0` on the heading and NO negative margin on the button: the
+   heading shrink-to-fits around the button, so a -4px margin took 4px off the
+   box that `max-width: 100%` then clamped the text to — every header rendered
+   as "미..." with room to spare. The heading may shrink so that a long name
+   ellipsizes instead of pushing the `+` out of the column. */
+.tm-column-head h3 {
+  min-width: 0;
+}
+
+.tm-column-rename {
+  max-width: 100%;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-column-rename:hover,
+.tm-column-rename:focus-visible {
+  background: var(--bg-hover-content, rgba(0, 0, 0, 0.05));
+}
+
+/* Outlined in the accent while it is open, for the same reason the quick-add
+   input is: four identical headers, and only one of them is listening. */
+/* 32, the control grid — which is what the density layer gives an input here
+   anyway. Stated rather than inherited so the number in this file is the
+   number on screen. */
+.tm-column-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 6px;
+  border: 1px solid var(--accent, #0a84ff);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-surface, #fff);
+  color: var(--text-primary, #1c1c1e);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tm-column-name:focus {
+  outline: none;
+}

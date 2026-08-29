@@ -666,6 +666,16 @@ export interface AppSettings {
    * `inboxBucketOf` these replace, shape by shape.
    */
   inboxColumnRules?: Partial<Record<InboxBucket, MatrixQuadrantRule>>;
+  /**
+   * What the user calls each Inbox board column.
+   *
+   * Stored apart from the rules above because they are separate claims: the
+   * rule is what gets in, the name is what it is called, and renaming a column
+   * must not be able to change what it holds. A column absent from here reads
+   * as its built-in label — and a name cleared to "" drops the key rather than
+   * storing a blank, so "cleared" and "never named" stay the same state.
+   */
+  inboxColumnNames?: Partial<Record<InboxBucket, string>>;
 }
 
 export type ExternalCalendarSyncStatus = "idle" | "syncing" | "success" | "failed" | "hidden" | "disabled";

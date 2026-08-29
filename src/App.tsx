@@ -83,6 +83,7 @@ import { todayValue } from "./utils/date";
 import { I18nProvider, translate, useT } from "./i18n";
 import { isWontDo } from "./domain/tasks/taskState";
 import { isTaskActive } from "./domain/tasks/scopeQuery";
+import { sanitizeInboxColumnNames } from "./domain/tasks/board";
 
 function cloudExternalCalendarSnapshot(calendar: ExternalCalendar): ExternalCalendar {
   return {
@@ -1213,6 +1214,15 @@ export default function App() {
           sidebarFolders={planner.sidebarFolders}
           savedFilters={planner.savedFilters}
           listSections={planner.listSections}
+          inboxColumnNames={appSettings.inboxColumnNames}
+          onRenameInboxColumn={(bucket, name) =>
+            planner.updateAppSettings({
+              // Cleared goes back to the built-in label rather than storing a
+              // blank: "" and "never named" have to stay the same state, or a
+              // column ends up with an empty header nobody can undo.
+              inboxColumnNames: sanitizeInboxColumnNames({ ...appSettings.inboxColumnNames, [bucket]: name }),
+            })
+          }
           dailyPlans={planner.dailyPlans}
           tags={planner.tags}
           taskTags={planner.taskTags}

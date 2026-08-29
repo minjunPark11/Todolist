@@ -45,6 +45,10 @@ const ALLOWED_OFF_GRID = [
   // the reference at an 18px glyph in a 28px background, which is where the
   // number came from before §4.87 was consulted — the two agreed.
   ".tm-column-add",
+  // The column's title, which doubles as the rename control — drawn as the
+  // heading it replaces, so it is measured as one. The input it opens is NOT
+  // listed: that one is a control and sits on the 32px grid.
+  ".tm-column-rename",
   // A group heading inside a box. It is a button only because it collapses;
   // what it draws is a label and a count, so it is content like `.motion-task-row`.
   ".ff-matrix-group-head",

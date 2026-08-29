@@ -65,13 +65,14 @@ import { listIdFor } from "../../domain/spaces/membership";
 import { isCompleted } from "../../domain/tasks/taskState";
 import { folderIdFor } from "../../domain/tasks/sidebarFolders";
 import {
-  INBOX_COLUMNS,
   createInInboxBucket,
   createInListSection,
+  inboxBoardColumns,
   inboxBucketOf,
   listBoardColumns,
   moveToInboxBucket,
   type InboxBucket,
+  type InboxColumnNames,
 } from "../../domain/tasks/board";
 import { canCommit, resolveCreateContext } from "../../domain/tasks/createResolver";
 import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
@@ -113,6 +114,16 @@ interface TasksModuleProps {
   error?: string;
   /** Commits what `resolveCreateContext` decided (§12.16). */
   onCreate: (title: string, resolution: CreateResolution) => void;
+  /**
+   * What the user calls each Inbox board column, and how a new name is saved.
+   *
+   * Handed in rather than read here: these live in the account's settings and
+   * this Module does not own settings — the same arrangement the Matrix's box
+   * names have. Absent means the columns keep their built-in labels and the
+   * header is not editable.
+   */
+  inboxColumnNames?: InboxColumnNames;
+  onRenameInboxColumn?: (bucket: InboxBucket, name: string) => void;
   /**
    * §10.41/§10.42's other half, handed in rather than held here (D-25).
    *
@@ -601,7 +612,10 @@ export function TasksModule(props: TasksModuleProps) {
   // columns and cards; which command a drop is belongs here, because it is the
   // only thing the two Boards do not share.
   const boardListId = scope.kind === "list" ? scope.id : "";
-  const columns = scope.kind === "inbox" ? INBOX_COLUMNS : listBoardColumns(boardListId, listSections);
+  const columns =
+    scope.kind === "inbox"
+      ? inboxBoardColumns(props.inboxColumnNames)
+      : listBoardColumns(boardListId, listSections);
 
   // The timeline's three arguments, built from the rows the Scope already
   // chose.
@@ -918,6 +932,14 @@ export function TasksModule(props: TasksModuleProps) {
             onDrop={dropOnBoard}
             onCreate={createInColumn}
             finishedIn={finishedIn}
+            onRename={
+              // Only the Inbox's columns are the user's to name here. A List's
+              // are Sections — records with a name of their own, and renaming
+              // one is a write to that record rather than to a setting.
+              scope.kind === "inbox" && props.onRenameInboxColumn
+                ? (columnId, name) => props.onRenameInboxColumn?.(columnId as InboxBucket, name)
+                : undefined
+            }
             onToggleDone={toggleDone}
             canReorder={policy.canManualReorder}
             onContextMenu={(task, x, y) => setMenu(taskMenuAt(task, x, y))}

@@ -58,6 +58,7 @@ import { MATRIX_QUADRANTS, type MatrixQuadrant } from "../../utils/eisenhower";
 import { sanitizeMatrixView, type MatrixQuadrantView } from "../view/matrixGroups";
 import { sanitizeMatrixRules } from "../view/matrixRules";
 import { sanitizeInboxColumnRules } from "../view/inboxColumnRules";
+import { sanitizeInboxColumnNames } from "../tasks/board";
 
 // Every value `status` may hold on disk: the three lifecycle values written
 // since Ch. 26 §26.3.2, and the legacy six that accounts still carry. A value
@@ -423,6 +424,9 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
     // ride in this record and each one is absent until somebody makes it.
     ...(settings?.inboxColumnRules
       ? { inboxColumnRules: sanitizeInboxColumnRules(settings.inboxColumnRules) }
+      : {}),
+    ...(settings?.inboxColumnNames
+      ? { inboxColumnNames: sanitizeInboxColumnNames(settings.inboxColumnNames) }
       : {}),
   };
 }

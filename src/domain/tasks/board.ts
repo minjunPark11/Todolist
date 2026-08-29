@@ -83,6 +83,55 @@ export const INBOX_COLUMNS: BoardColumn[] = [
   { id: "someday", labelKey: "tasks.bucketSomeday" },
 ];
 
+/** What a column may be called, before it is more words than a header holds. */
+export const COLUMN_NAME_MAX = 40;
+
+/**
+ * A name the user typed, as it is worth storing.
+ *
+ * Trimmed and capped rather than refused: a column name is not a field anyone
+ * can get wrong, and an editor that argues about whitespace is an editor
+ * arguing about nothing. Empty comes back as "" and the caller drops the key,
+ * which is what makes "cleared" and "never named" the same state — and what
+ * lets clearing a name restore the built-in one instead of leaving a blank
+ * header.
+ *
+ * A name does NOT follow the interface language. There is no way to translate
+ * "이번 주 안에", and guessing would be worse than leaving the words alone.
+ */
+export function sanitizeColumnName(value: unknown): string {
+  return typeof value === "string" ? value.trim().slice(0, COLUMN_NAME_MAX) : "";
+}
+
+export type InboxColumnNames = Partial<Record<InboxBucket, string>>;
+
+export function sanitizeInboxColumnNames(value: unknown): InboxColumnNames {
+  if (!value || typeof value !== "object") return {};
+  const record = value as Record<string, unknown>;
+  const out: InboxColumnNames = {};
+  for (const bucket of INBOX_BUCKETS) {
+    const name = sanitizeColumnName(record[bucket]);
+    if (name) out[bucket] = name;
+  }
+  return out;
+}
+
+/**
+ * The Inbox's columns under whatever the user calls them.
+ *
+ * The rule stays ours and the words become theirs — the two are separate on
+ * purpose (TICKTICK_INBOX_COLUMNS_DESIGN.md §4.1). Renaming `일정` to "이번 주"
+ * does not make the column mean something else, which is exactly why renaming
+ * is the one thing on that ⋯ menu that can be answered before the rules reach
+ * the screen: it moves no task anywhere.
+ */
+export function inboxBoardColumns(names: InboxColumnNames = {}): BoardColumn[] {
+  return INBOX_COLUMNS.map((column) => {
+    const name = names[column.id as InboxBucket];
+    return name ? { ...column, name } : column;
+  });
+}
+
 /**
  * Creating INTO a column, which §12.16 names as one of its entry points.
  *

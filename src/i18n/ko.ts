@@ -887,6 +887,7 @@ export const ko: Dictionary = {
   "tasks.addPlaceholder": "할 일 추가",
   "tasks.addDate": "날짜",
   "tasks.addToColumn": "{{column}} 열에 작업 추가",
+  "tasks.renameColumn": "{{column}} 열 이름 바꾸기",
   "tasks.showMore": "추가 보기",
   "tasks.scheduleCurrent": "일정, {{value}}",
   "tasks.addList": "리스트",

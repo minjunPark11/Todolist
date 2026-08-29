@@ -13,7 +13,7 @@
 // reachable by keyboard and by touch.
 import { useRef, useState } from "react";
 import type { Task } from "../../types";
-import type { BoardColumn } from "../../domain/tasks/board";
+import { COLUMN_NAME_MAX, type BoardColumn } from "../../domain/tasks/board";
 import { useT } from "../../i18n";
 import { COMPLETED_PAGE } from "../../domain/view/matrixGroups";
 import { TaskRowContent } from "./TaskRowContent";
@@ -61,6 +61,18 @@ interface TaskBoardProps {
    * no "완료" group at all.
    */
   finishedIn?: (columnId: string) => Task[];
+  /**
+   * The column was given a new name, or "" to take its built-in one back.
+   *
+   * Renaming is the one item on the reference app's column menu that can be
+   * answered while a column's rule is still a constant: a name says nothing
+   * about membership, so nothing moves and nothing can end up in no column at
+   * all. The other four wait for the rules (INBOX_COLUMNS design §3).
+   *
+   * Absent means this Board's columns are not the user's to name — a List's
+   * Sections are records, and renaming one is a different command.
+   */
+  onRename?: (columnId: string, name: string) => void;
 }
 
 export function TaskBoard({
@@ -75,6 +87,7 @@ export function TaskBoard({
   onContextMenu,
   onCreate,
   finishedIn,
+  onRename,
 }: TaskBoardProps) {
   const { t } = useT();
   // Which card is being dragged, in a ref as well as in state. The state is
@@ -100,6 +113,11 @@ export function TaskBoard({
   const [adding, setAdding] = useState("");
   const [draft, setDraft] = useState("");
   const [draftDate, setDraftDate] = useState("");
+  // Which column's name is being edited, and the words so far. The words are
+  // held here rather than written per keystroke: a name that syncs on every
+  // letter is a name every other device watches being typed.
+  const [renaming, setRenaming] = useState("");
+  const [nameDraft, setNameDraft] = useState("");
 
   function closeAdd() {
     setAdding("");
@@ -146,7 +164,59 @@ export function TaskBoard({
             }}
           >
             <header className="tm-column-head">
-              <h3>{label(column)}</h3>
+              {/* The header IS the rename control, which is where the reference
+                  app puts it too — Component 13 §2 measured an invisible
+                  overlay over the title, revealed on hover. The ⋯ menu's
+                  "이름 바꾸기" will be a second door to this same input. */}
+              {onRename && renaming === column.id ? (
+                <input
+                  className="tm-column-name"
+                  autoFocus
+                  value={nameDraft}
+                  maxLength={COLUMN_NAME_MAX}
+                  aria-label={t("tasks.renameColumn", { column: label(column) })}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  onBlur={() => {
+                    // Committing on blur rather than discarding: clicking away
+                    // from a name you have just typed reads as "done", and a
+                    // rename is undone by typing the old one back.
+                    onRename(column.id, nameDraft.trim());
+                    setRenaming("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      onRename(column.id, nameDraft.trim());
+                      setRenaming("");
+                    }
+                    // Escape puts back what was there, so the input has to stop
+                    // being a rename before it loses focus.
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setRenaming("");
+                    }
+                  }}
+                />
+              ) : onRename ? (
+                <h3>
+                  <button
+                    type="button"
+                    className="tm-column-rename"
+                    aria-label={t("tasks.renameColumn", { column: label(column) })}
+                    onClick={() => {
+                      // Seeded with the CURRENT name, built-in ones included:
+                      // an empty box would ask the user to remember what the
+                      // column was called before they can adjust it.
+                      setNameDraft(label(column));
+                      setRenaming(column.id);
+                    }}
+                  >
+                    {label(column)}
+                  </button>
+                </h3>
+              ) : (
+                <h3>{label(column)}</h3>
+              )}
               {cards.length > 0 ? <span className="tm-count">{cards.length}</span> : null}
               {/* Adding from the column's own header rather than from a row
                   under the cards. The column is a statement about the work —
