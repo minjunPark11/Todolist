@@ -103,9 +103,18 @@
 
 /* ---- Quick date actions ---- */
 
+/* `minmax(0, 1fr)`, not `1fr`. A bare `1fr` is `minmax(auto, 1fr)`, so a track
+   never shrinks below its content — and the content here is a label with
+   `white-space: nowrap`. The editor is a fixed 320px, so a long enough
+   translation would push the four tracks past it and the grid would spill out
+   of the popover rather than the label being trimmed.
+
+   Measured before changing anything (design G2): the widest label today is
+   "Tomorrow" at 57.5px against 63.5px of usable cell, and 오늘 밤 at 39.4px.
+   Nothing overflows now. This is the guard for the translation that would. */
 .sched-quick {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -134,8 +143,15 @@
   line-height: 1;
 }
 
+/* Trimmed rather than wrapped, so a long name costs the row nothing in height:
+   four buttons of different heights would make the strip look broken in a way
+   a shortened word does not. The full text is in the button's own name for
+   anyone who needs it. */
 .sched-quick-label {
+  max-width: 100%;
+  overflow: hidden;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* ---- Calendar ---- */
