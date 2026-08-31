@@ -7,18 +7,15 @@
 // Scopes allow Board, which have counts, or where `/` goes.
 //
 // List rendering only, per §16.26 — Board and the rich Drawer come later.
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type {
-  CheckItem,
   Folder,
   List,
   ListSection,
   SavedFilter,
   SidebarFolder,
-  Space,
   Tag,
   Task,
-  TaskContentMode,
   TaskDailyPlan,
   TaskTag,
   TaskTemplate,
@@ -26,40 +23,30 @@ import type {
 import type { TaskScopeRef, TaskViewKind } from "../../domain/tasks/scopeRegistry";
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, queryScopeTasks, type ScopeContext } from "../../domain/tasks/scopeQuery";
-import { parseSearchUrl, searchUrlFor, taskUrlFor, urlForSearchResult, parseTaskUrl } from "../../app/taskScopeUrl";
+import {
+  parseSearchUrl,
+  searchUrlFor,
+  taskUrlFor,
+  urlForSearchResult,
+  parseTaskUrl,
+} from "../../app/taskScopeUrl";
 import { taskLinkFor } from "../../app/taskLink";
-import type { TaskActivityEntry } from "../../domain/tasks/activity";
-import { copyText } from "../../lib/copyText";
 import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { namedRecordMissing, titleFor } from "../../domain/tasks/scopeTitle";
 import { useT } from "../../i18n";
 import { TasksSidebarSlot } from "../shell/TasksSidebarSlot";
 import { TaskQuickAdd } from "./TaskQuickAdd";
-import { TaskDrawer } from "./TaskDrawer";
+import { TaskDetailPane } from "./TaskDetailPane";
+import { TaskUndoStrip } from "./TaskUndoStrip";
+import type { TaskDetailBundle } from "./taskDetailBundle";
+import { useTaskCommands } from "../../hooks/useTaskCommands";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
-import type { TaskChild } from "../../domain/tasks/children";
-import { ancestorsOf, canAddChild } from "../../domain/tasks/hierarchy";
-import { blockerChoices, dependentsOf } from "../../domain/tasks/dependencies";
 import type { TaskMutation } from "../../domain/tasks/mutations";
-import {
-  completeTask,
-  markWontDo,
-  moveTaskToSection,
-  pinTask,
-  reopenTask,
-  restoreTask,
-  setTaskDueDate,
-  setTaskPriority,
-  trashTask,
-  unmarkWontDo,
-  unpinTask,
-} from "../../domain/tasks/mutations";
-import { canRunTaskAction, taskActions, type TaskActionId } from "../../domain/tasks/actions";
+import { moveTaskToSection, setTaskDueDate, setTaskPriority } from "../../domain/tasks/mutations";
+import { taskActions, type TaskActionId } from "../../domain/tasks/actions";
 import { ContextMenu, type ContextMenuState } from "../common/ContextMenu";
 import { useFloatingLayerOwner } from "../floating";
 import { useTaskDetailWidth } from "../../hooks/useTaskDetailWidth";
-import { priorityChange } from "../../domain/tasks/priority";
-import type { ReminderSpec, Schedule, ScheduleIssue } from "../../domain/schedule";
 import { addDays } from "../../utils/date";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
@@ -68,7 +55,6 @@ import { folderIdFor } from "../../domain/tasks/sidebarFolders";
 import {
   createInInboxBucket,
   createInListSection,
-  inboxBoardColumns,
   inboxBucketOf,
   listBoardColumns,
   moveToInboxBucket,
@@ -84,7 +70,7 @@ import { TaskGanttView } from "../TaskGanttView";
 import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
-import { COMPLETED_PAGE, DEFAULT_GROUP_VIEW, groupTasks } from "../../domain/view/viewGroups";
+import { DEFAULT_GROUP_VIEW, groupTasks } from "../../domain/view/viewGroups";
 import { EMPTY_INBOX_RULE, type InboxColumnRules } from "../../domain/view/inboxColumnRules";
 import {
   addInboxColumn,
@@ -99,13 +85,15 @@ import {
   type InboxColumn,
 } from "../../domain/view/inboxColumns";
 import { InboxColumnDialog, type InboxColumnDraft } from "./InboxColumnDialog";
-import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
 import { resolveListView } from "../../domain/tasks/listView";
 import { useResponsiveMode, useViewportHeightVar } from "./useResponsiveMode";
-import { detailIsFullScreen, sidebarPresentationFor, taskDetailPresentationFor } from "../../domain/tasks/responsive";
+import {
+  detailIsFullScreen,
+  sidebarPresentationFor,
+  taskDetailPresentationFor,
+} from "../../domain/tasks/responsive";
 import type { SearchCollections, SearchResult } from "../../domain/tasks/search";
 import { flattenGroups, PAGE_LIMITS, searchAll } from "../../domain/tasks/search";
-import { platform } from "../../platform";
 import { SEARCH_KINDS, type SearchKind } from "../../domain/tasks/search";
 
 interface TasksModuleProps {
@@ -167,39 +155,15 @@ interface TasksModuleProps {
    */
   draftTitle: string;
   onDraftConsumed: () => void;
-  /** Everything the Drawer can change about the Task it has open (§16.28). */
-  drawer: {
-    childrenOf: (taskId: string) => TaskChild[];
-    onUpdate: (taskId: string, patch: Partial<Task>) => void;
-    onMoveToList: (taskId: string, listId: string) => void;
-    /**
-     * The whole schedule in one write (§5), returning whatever the domain
-     * refused. The editor keeps the draft open on a refusal, so an empty
-     * array is the only thing that means "written".
-     */
-    onCommitSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
-    /** §13.39, by name — §13.41's inline create has no id yet. */
-    onToggleTag: (taskId: string, name: string) => void;
-    onAddSubtask: (taskId: string, title: string) => void;
-    onToggleSubtask: (id: string) => void;
-    onDeleteSubtask: (id: string) => void;
-    /** The Task's checklist and everything that edits it (spec §11). */
-    checkItemsFor: (taskId: string) => CheckItem[];
-    onSetContentMode: (taskId: string, mode: TaskContentMode) => void;
-    onAddCheckItem: (taskId: string, text: string) => void;
-    onAddCheckItems: (taskId: string, texts: string[]) => void;
-    onRenameCheckItem: (itemId: string, text: string) => void;
-    onToggleCheckItem: (itemId: string) => void;
-    onDeleteCheckItem: (itemId: string) => void;
-    /**
-     * §25.7's history, already ordered — the same shape as `checkItemsFor`
-     * above and for the same reason: the ordering is the domain's, and this
-     * needs collections the Module does not hold (the focus sessions).
-     */
-    activityFor: (taskId: string) => TaskActivityEntry[];
-    /** This Task's reminders (§6.3), for the Schedule popover. */
-    remindersFor: (taskId: string) => ReminderSpec[];
-  };
+  /**
+   * Everything the Detail can change about the Task it has open (§16.28).
+   *
+   * Spelled out in `taskDetailBundle.ts` rather than here, because this
+   * Module is no longer the only thing that assembles one — `App.tsx` builds
+   * the same bundle for the pages the legacy panel still serves
+   * (TASK_DETAIL_PANEL_MERGE_DESIGN.md §5).
+   */
+  drawer: TaskDetailBundle;
   /**
    * Creates the List and answers with its id (Add List design §1.10).
    *
@@ -268,15 +232,6 @@ interface TasksModuleProps {
   focusBusy: boolean;
 }
 
-/**
- * The actions the Detail draws as controls of its own (§15.3).
- *
- * Only completion: the schedule, Priority, the List and Tags are property rows
- * rather than registry actions, so there is nothing there for the menu to
- * repeat.
- */
-const DETAIL_PROMOTED_ACTIONS: TaskActionId[] = ["complete", "reopen"];
-
 export function TasksModule(props: TasksModuleProps) {
   const { t } = useT();
   const {
@@ -294,26 +249,8 @@ export function TasksModule(props: TasksModuleProps) {
     onNavigate,
   } = props;
 
-  /**
-   * What just happened, and the way back from it if there is one.
-   *
-   * One at a time, and it is the last thing that happened (§9.40 keeps the
-   * stack out of the MVP). It held only undos before; §15.21 needs the same
-   * strip to say "Link copied", which has nothing to undo, and §15.22 needs it
-   * to show a URL the reader can select when the clipboard refused. So `run`
-   * became optional and `text` arrived beside it — §15.69's point that a menu
-   * hands its result to one feedback layer rather than growing its own.
-   */
-  const [notice, setNotice] = useState<{
-    labelKey: string;
-    run?: () => void;
-    /** Shown verbatim, for a value that is not a translatable phrase. */
-    text?: string;
-  } | null>(null);
   /** The row being dragged, so the ones under it know a drop is coming. */
   const [dragTaskId, setDragTaskId] = useState("");
-  /** Whose history is open (§25.7), or "" for none. */
-  const [activityTaskId, setActivityTaskId] = useState("");
   /** The open context menu, or none. One at a time, like the notice above it. */
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   /**
@@ -401,140 +338,33 @@ export function TasksModule(props: TasksModuleProps) {
   const detailWidth = useTaskDetailWidth();
 
   /**
-   * Apply a mutation, and offer the undo that goes with it.
+   * Everything a Task can be told to do, and the strip that says what just
+   * happened (`hooks/useTaskCommands`).
    *
-   * It used to close the Drawer when the Task left the Scope, on the reading
-   * that a Detail hanging over a row no longer in the list is a broken state.
-   * §1.28 decides the opposite, and says so four more times — §3's acceptance
-   * list spells out "완료로 query에서 사라져도 Detail은 유지된다". The Detail is
-   * not a tooltip for a row; it is the Task, and the Task is still there.
+   * It was 130 lines of this file: the notice, `mutate`, the registry switch
+   * and the clipboard. It left because the Detail is no longer only opened
+   * here — and a second copy of that switch is how two surfaces come to
+   * disagree about what "Won't Do" writes
+   * (TASK_DETAIL_PANEL_MERGE_DESIGN.md §5).
    *
-   * The case that settles it is the ordinary one: ticking Done on the Task you
-   * are reading, in Today. The old behaviour took the panel away at the exact
-   * moment you might want to add a note about what you just finished, and the
-   * way back was to find a row that had by then been filtered out.
-   *
-   * §1.27 is untouched and still closes — a DELETED Task has no Detail to
-   * show, which is a different thing from one that no longer matches a filter.
-   *
-   * The undo comes from the mutation rather than from inverting the patch, so
-   * pressing it restores what was there and not an approximation (§9.35).
+   * The link is built HERE and handed down, because the address is this
+   * surface's: a Task in the Tasks module lives at `?task=` under a Scope,
+   * and a page that keeps the open Task in memory has a different one to
+   * offer (§15.19).
    */
-  function mutate(target: Task, mutation: TaskMutation) {
-    props.onMutate(target.id, mutation.patch);
-    setNotice({
-      labelKey: mutation.labelKey,
-      run: () => props.onMutate(target.id, mutation.undo),
-    });
-  }
-
-  /**
-   * Completion from the row, which is where it belongs (audit L-13).
-   *
-   * The reference finishes a Task from the list; this app could only do it
-   * from the Detail, so the most common thing anyone does here cost opening a
-   * panel first. It is the Drawer's own mutation rather than a second one, so
-   * the two cannot come to disagree about what `done` writes (§12.12) — and
-   * the undo arrives with it.
-   */
-  function toggleDone(task: Task) {
-    mutate(task, isCompleted(task) ? reopenTask(task) : completeTask(task, new Date().toISOString()));
-  }
-
-  /**
-   * Run one registry action (§15.64), whoever asked for it.
-   *
-   * The Task is read from the store again rather than taken from the menu that
-   * was clicked. §15.67 is the reason: a menu is a picture of the state it
-   * opened in, and a sync landing while it hangs there can trash the Task,
-   * finish it, or start a focus session somewhere else. `canRunTaskAction`
-   * asks the registry the same question a second time, and an action that is
-   * no longer allowed is dropped rather than applied to a Task that no longer
-   * looks like the one the reader chose it for.
-   *
-   * Every arm that changes the Task goes through `mutate`, so every one of
-   * them arrives with the Undo §15.56 and §17 expect. Start Focus does not —
-   * it starts a session rather than editing the Task, and §15.55's list of
-   * optimistic, reversible actions does not include it.
-   */
-  function runTaskAction(target: Task, id: TaskActionId) {
-    const task = tasks.find((row) => row.id === target.id);
-    if (!task || !canRunTaskAction(id, task, { focusBusy: props.focusBusy })) return;
-    const now = new Date().toISOString();
-
-    switch (id) {
-      case "pin":
-        return mutate(task, pinTask(task, now));
-      case "unpin":
-        return mutate(task, unpinTask(task));
-      case "complete":
-        return mutate(task, completeTask(task, now));
-      case "reopen":
-        return mutate(task, reopenTask(task));
-      case "wontDo":
-        return mutate(task, markWontDo(task, now));
-      case "restart":
-        return mutate(task, unmarkWontDo(task));
-      case "trash":
-        return mutate(task, trashTask(task, now));
-      case "restore":
-        return mutate(task, restoreTask(task));
-      case "saveAsTemplate": {
-        // §25.8: the Task is not changed, so the way back is to delete the
-        // template rather than to patch anything.
-        const template = props.onSaveAsTemplate(task.id);
-        if (template) {
-          setNotice({
-            labelKey: "tasks.templateSaved",
-            run: () => props.onDeleteTemplate(template),
-          });
-        }
-        return;
-      }
-      case "duplicate": {
-        // §15.54's double-trigger cannot happen from here: the menu closes on
-        // the click that chose the row, and the copy is one synchronous store
-        // write rather than a request that could still be in flight.
-        const discard = props.onDuplicate(task.id);
-        if (discard) setNotice({ labelKey: "tasks.undoDuplicated", run: discard });
-        return;
-      }
-      case "copyLink":
-        return copyTaskLink(task.id);
-      case "activities":
-        // Kept per Task rather than as a boolean: the Detail is reused across
-        // Tasks (§1.26), so a flag would leave the panel open on the next one
-        // showing the history of the one before it.
-        return setActivityTaskId(task.id);
-      case "startFocus":
-        return props.onStartFocus(task.id);
-    }
-  }
-
-  /**
-   * §15.19: the Task's deep link, on the clipboard.
-   *
-   * Not a mutation (§15.58) — nothing about the Task changes, so there is no
-   * patch and nothing to undo, and the strip below says so by drawing no Undo
-   * button. §15.21 asks for both outcomes to be reported and §15.22 refuses to
-   * let a refusal end in silence, which is what the URL in the failure notice
-   * is for: it can still be selected and copied by hand.
-   *
-   * The origin is the running app's. On the desktop build that is the shell's
-   * own, so the link opens the Task here rather than anywhere a colleague
-   * could follow — the honest answer while there is no configured public base
-   * URL to build a shareable link from.
-   */
-  function copyTaskLink(taskId: string) {
-    const link = taskLinkFor(window.location.origin, state, taskId);
-    void copyText(link).then((copied) =>
-      setNotice(
-        copied
-          ? { labelKey: "tasks.linkCopied" }
-          : { labelKey: "tasks.linkCopyFailed", text: link },
-      ),
-    );
-  }
+  const commands = useTaskCommands({
+    tasks,
+    focusBusy: props.focusBusy,
+    onMutate: props.onMutate,
+    onDuplicate: props.onDuplicate,
+    onSaveAsTemplate: props.onSaveAsTemplate,
+    onDeleteTemplate: props.onDeleteTemplate,
+    onStartFocus: props.onStartFocus,
+    linkFor: (taskId) => taskLinkFor(window.location.origin, state, taskId),
+  });
+  // Pulled out by name because the rows and the two menus below call them on
+  // every line; the Detail takes `commands` whole.
+  const { mutate, toggleDone, runTaskAction } = commands;
 
   /** The registry's answer for this Task, as rows a menu can draw. */
   function actionItemsFor(task: Task, groupIds: readonly string[], promoted?: TaskActionId[]) {
@@ -1294,90 +1124,28 @@ export function TasksModule(props: TasksModuleProps) {
         </aside>
       ) : null}
 
+      {/* Everything between "here is a Task" and the Drawer's thirty-odd
+          props is `TaskDetailPane`. It moved out with the commands above,
+          and for the same reason: the derivations it does — the ancestors,
+          the blockers, the registry's answer for this Task — are what the
+          other four pages were missing, not the collections
+          (TASK_DETAIL_PANEL_MERGE_DESIGN.md §5). */}
       {openedTask ? (
-        <TaskDrawer
-          presentation={taskDetailPresentationFor(mode)}
-          /* No `key` on the Drawer — §1.26 forbids exactly what one produces.
-             Keying the pane by Task id remounts the whole panel on every
-             switch, which is "Pane close/reopen" from that section's list of
-             things to avoid: the entrance animation replays, the scroll
-             position resets, and a fast walk down a list flickers.
-
-             Nothing is lost by dropping it. The text fields already take
-             `resetKey={task.id}` (§9), the schedule editor is keyed inside
-             `SchedulePicker`, and the one remaining piece of per-Task local
-             state — the checklist's draft row — is keyed on its own component.
-             Remount what holds the state, not the surface around it. */
+        <TaskDetailPane
           task={openedTask}
+          presentation={taskDetailPresentationFor(mode)}
+          resize={detailWidth}
+          today={today}
+          tasks={tasks}
           lists={lists}
           folders={sidebarFolders}
           tags={tags}
           taskTags={taskTags}
-          onToggleTag={(name) => props.drawer.onToggleTag(openedTask.id, name)}
-          children={props.drawer.childrenOf(openedTask.id)}
+          bundle={props.drawer}
+          commands={commands}
+          focusBusy={props.focusBusy}
           onClose={closeTask}
-          onUpdate={(patch) => props.drawer.onUpdate(openedTask.id, patch)}
-          onMoveToList={(listId) => props.drawer.onMoveToList(openedTask.id, listId)}
-          // §8.8's no-op is decided in the domain, so the Drawer never has to
-          // compare the values itself. Through `mutate` like every other
-          // change, which is what gives it the Undo §8.36 asks for and the
-          // §12.21 check for a Task that has just left the Scope.
-          today={today}
-          // §5.51: the editor keeps the draft open when the domain refuses it,
-          // so the issues have to come back rather than being swallowed here.
-          onCommitSchedule={props.drawer.onCommitSchedule}
-          onSetPriority={(level) => {
-            const change = priorityChange(openedTask, level);
-            if (change) mutate(openedTask, change);
-          }}
-          onAddSubtask={(title) => props.drawer.onAddSubtask(openedTask.id, title)}
-          onToggleSubtask={props.drawer.onToggleSubtask}
-          onDeleteSubtask={props.drawer.onDeleteSubtask}
-          checkItems={props.drawer.checkItemsFor(openedTask.id)}
-          reminders={props.drawer.remindersFor(openedTask.id)}
-          onSetContentMode={(mode) => props.drawer.onSetContentMode(openedTask.id, mode)}
-          onAddCheckItem={(text) => props.drawer.onAddCheckItem(openedTask.id, text)}
-          onAddCheckItems={(texts) => props.drawer.onAddCheckItems(openedTask.id, texts)}
-          onRenameCheckItem={props.drawer.onRenameCheckItem}
-          onToggleCheckItem={props.drawer.onToggleCheckItem}
-          onDeleteCheckItem={props.drawer.onDeleteCheckItem}
-          // The breadcrumb is computed against every Task, not the Scope's
-          // visible rows: an ancestor filtered out of the current view is
-          // still where this Task came from.
-          ancestors={ancestorsOf(openedTask.id, tasks)}
-          // Both directions of §4's dependency row, and both against every
-          // Task rather than the Scope's visible rows — for the same reason
-          // the breadcrumb is: a blocker filtered out of this view is still
-          // what the Task is waiting on.
-          blockerOptions={blockerChoices(tasks, openedTask)}
-          blocking={dependentsOf(tasks, openedTask.id).map((dependent) => ({
-            id: dependent.id,
-            title: dependent.title,
-          }))}
           onOpenTask={openTask}
-          canAddSubtask={canAddChild(openedTask.id, tasks)}
-          resize={detailWidth}
-          onComplete={() =>
-            mutate(
-              openedTask,
-              isCompleted(openedTask)
-                ? reopenTask(openedTask)
-                : completeTask(openedTask, new Date().toISOString()),
-            )
-          }
-          /* §15.3: Complete is drawn in the header as a checkbox, so it is
-             promoted out of the menu rather than repeated inside it. Reopen
-             goes with it — it is the same checkbox, unticked. */
-          actions={taskActions({
-            task: openedTask,
-            promoted: DETAIL_PROMOTED_ACTIONS,
-            focusBusy: props.focusBusy,
-          })}
-          onRunAction={(id) => runTaskAction(openedTask, id)}
-          activity={
-            activityTaskId === openedTask.id ? props.drawer.activityFor(openedTask.id) : null
-          }
-          onCloseActivity={() => setActivityTaskId("")}
         />
       ) : null}
 
@@ -1400,35 +1168,10 @@ export function TasksModule(props: TasksModuleProps) {
         />
       ) : null}
 
-      {/* §9.36: the strip is where the way back lives, and it says what it
-          would undo rather than just offering the word.
-
-          The Undo button is drawn only when there IS one. Copy Link changes
-          no Task (§15.58), so offering to undo it would be offering to undo
-          nothing — and a button that does nothing reads as one that failed. */}
-      {notice ? (
-        <div className="tm-undo" role="status">
-          <span>{t(notice.labelKey)}</span>
-          {/* §15.22's fallback: when the clipboard refused, the URL is put
-              where it can be selected and copied by hand, rather than the
-              action ending with an apology and nothing to act on. */}
-          {notice.text ? <input className="tm-undo-value" readOnly value={notice.text} /> : null}
-          {notice.run ? (
-            <button
-              type="button"
-              onClick={() => {
-                notice.run?.();
-                setNotice(null);
-              }}
-            >
-              {t("app.undo")}
-            </button>
-          ) : null}
-          <button type="button" onClick={() => setNotice(null)} aria-label={t("common.close")}>
-            ×
-          </button>
-        </div>
-      ) : null}
+      {/* §9.36 lives in its own component now, because `useTaskCommands`
+          is a hook two surfaces call and a notice nobody draws is a change
+          nobody can take back. */}
+      <TaskUndoStrip notice={commands.notice} onDismiss={() => commands.setNotice(null)} />
     </section>
   );
 }
