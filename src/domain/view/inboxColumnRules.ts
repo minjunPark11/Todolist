@@ -26,7 +26,7 @@
 // neither has ever been able to write the other's field.
 import type { Task } from "../../types";
 import { INBOX_BUCKETS, type InboxBucket } from "../tasks/board";
-import { dateBucketOf } from "./matrixGroups";
+import { dateBucketOf } from "./viewGroups";
 import {
   EMPTY_RULE,
   dateForBuckets,

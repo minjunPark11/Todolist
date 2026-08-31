@@ -1,7 +1,7 @@
 # TickTick 스타일 아이젠하워 매트릭스 — 설계
 
 > 상태: **Phase 1~6c 구현됨 · 열린 질문 없음** · 2026-08-31
-> (§16~§30이 각 단계의 구현 기록이다. §15의 다섯 질문은 모두 닫혔다 — Q1은 §27, Q2·Q3은
+> (§16~§31이 각 단계의 구현 기록이다. §15의 다섯 질문은 모두 닫혔다 — Q1은 §27, Q2·Q3은
 > Phase 1, Q4는 §28, Q5는 §30.)
 > 근거: TickTick 데스크톱 앱 **스크린샷 2장** (매트릭스 전체 화면, 사분면 ⋯ 메뉴)
 > 결정됨: **D1 = 우선순위 모델**, **D2 = 완료를 각 칸에 표시** (사용자 확정)
@@ -1715,3 +1715,26 @@ judged yet`, ko는 `둘 다 아닌 일 · 아직 판단하지 않은 일`. 죽�
 ### 30.5 검증
 
 - 유닛 2,143개 통과(신규 3개) · `tsc` 통과 · 삭제한 키 9개 × 2언어
+
+---
+
+## 31. 묶는 어휘도 이 문서를 떠났다 (2026-08-31)
+
+§29가 규칙을 옮겼고, 이번엔 **묶는 일**이다. `matrixGroups.ts`에서 날짜 버킷·그룹 순서·
+묶기·정렬·완료 페이지 크기가 `src/domain/view/viewGroups.ts`로 나갔다 — 기본함 보드가
+그 다섯을 전부 쓰고 있었고, 사분면은 그중 어디에도 등장하지 않는다.
+
+이 문서가 적은 이름 중 다음은 이제 `viewGroups.ts`에 있다:
+
+| 이 문서가 적은 이름 | 지금 |
+|---|---|
+| `groupMatrixTasks` · `matrixGroupOf` · `matrixComparator` | `groupTasks` · `groupIdOf` · `taskComparator` |
+| `MatrixGroup` · `MatrixGroupId` · `MatrixGroupAxis` | `TaskGroup` · `GroupId` · `GroupAxis` |
+| `MatrixSortKey` · `MatrixSortOrder` | `SortKey` · `SortOrder` |
+| `MATRIX_GROUP_ORDER` · `MATRIX_GROUP_AXES` · `MATRIX_SORT_KEYS` · `MATRIX_SORT_ORDERS` | `GROUP_ORDER` · `GROUP_AXES` · `SORT_KEYS` · `SORT_ORDERS` |
+| `dateBucketOf` · `DateBucket` · `COMPLETED_PAGE` | 이름 그대로, 자리만 |
+
+`matrixGroups.ts`에 남은 것은 **칸이 무엇으로 불리는가**다: `MatrixQuadrantView`(이제
+`GroupView`를 확장한다) · `DEFAULT_MATRIX_VIEW` · `sanitizeMatrixView` ·
+`matrixQuadrantLabels` · `MATRIX_QUADRANT_COLORS` · `MATRIX_LABEL_MAX`. 동작은 바뀌지
+않았고, 분리의 근거는 `TICKTICK_INBOX_COLUMNS_DESIGN.md` §16에 있다.

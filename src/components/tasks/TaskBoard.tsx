@@ -15,7 +15,7 @@ import { useRef, useState } from "react";
 import type { Task } from "../../types";
 import { COLUMN_NAME_MAX, type BoardColumn } from "../../domain/tasks/board";
 import { useT } from "../../i18n";
-import { COMPLETED_PAGE } from "../../domain/view/matrixGroups";
+import { COMPLETED_PAGE } from "../../domain/view/viewGroups";
 import { TaskRowContent } from "./TaskRowContent";
 
 interface TaskBoardProps {

@@ -2,7 +2,7 @@
 
 > 상태: **1~5단계 구현됨 · Q3까지 종결** · 2026-08-31
 > (§9~§14가 단계별 구현 기록이고, §15가 §7 Q3 — 규칙 어휘를 `viewRules`로 분리한
-> 기록이다.)
+> 기록, §16이 그 나머지 — 묶는 어휘를 `viewGroups`로.)
 > 대상: `기본함`(Inbox) 보드 뷰의 **열(column)** — 헤더의 `+`, `⋯`, 그리고 `새로운 열`
 
 ## 0. 근거 수준
@@ -661,3 +661,64 @@ MatrixQuadrantRule>>` — 기본함의 저장 형식이 매트릭스 타입으�
 
 - `matrixGroups.ts`의 `dateBucketOf`·`DateBucket`도 두 화면이 쓴다. 같은 종류의 거짓말이
   더 작은 규모로 남아 있다 — 이번엔 건드리지 않았다
+
+---
+
+## 16. §15.6의 나머지 — 묶는 일도 어휘였다 (2026-08-31)
+
+### 16.1 두 개가 아니라 여섯 개였다
+
+§15.6은 "`matrixGroups.ts`의 `dateBucketOf`·`DateBucket`도 두 화면이 쓴다"고 적었다. 옮기려고
+보니 보드가 그 파일에서 꺼내 쓰는 것이 **여섯**이었다.
+
+| 보드가 쓰던 것 | 어디서 |
+|---|---|
+| `dateBucketOf` · `DateBucket` | 열 규칙, 열 다이얼로그 |
+| `COMPLETED_PAGE` | `TaskBoard`의 완료 그룹 |
+| `groupMatrixTasks` · `DEFAULT_MATRIX_VIEW` | `TasksModule` — 열 안의 그룹 |
+
+그리고 그 여섯 중 어느 것도 사분면에 대해 말하지 않는다. `groupMatrixTasks`가 하는 일은
+**날짜 버킷과 완료로 나누고 정렬하는 것**이고, 사분면은 그 함수에 들어가지도 않는다 —
+들어가는 것은 `{groupBy, sortKey, sortOrder}` 셋뿐이다.
+
+### 16.2 그래서 규칙 때와 같은 선을 그었다
+
+```
+viewGroups.ts       버킷 · 그룹 순서 · 묶기 · 정렬 · COMPLETED_PAGE · GroupView
+  ├ matrixGroups.ts     칸의 이름 · 설명 · 색 (MatrixQuadrantView = GroupView + 셋)
+  └ (보드)              저장하는 뷰가 없다 — 기본값을 쓴다
+```
+
+`MatrixQuadrantView`가 이제 `GroupView`를 **확장한다.** 이름·설명·색은 매트릭스의 것이고
+(§20.6), 묶는 방법은 둘의 것이다. 보드는 뷰를 저장하지 않으므로 아무것도 넘기지 않고
+`DEFAULT_GROUP_VIEW`를 받는다 — 전에는 그 자리에 `DEFAULT_MATRIX_VIEW`를 넘기고 있었다.
+
+| 전 | 후 |
+|---|---|
+| `groupMatrixTasks` | `groupTasks` |
+| `matrixGroupOf` | `groupIdOf` |
+| `matrixComparator` | `taskComparator` |
+| `MatrixGroup` · `MatrixGroupId` · `MatrixGroupAxis` | `TaskGroup` · `GroupId` · `GroupAxis` |
+| `MatrixSortKey` · `MatrixSortOrder` | `SortKey` · `SortOrder` |
+| `MATRIX_GROUP_ORDER` · `MATRIX_GROUP_AXES` · `MATRIX_SORT_KEYS` · `MATRIX_SORT_ORDERS` | `GROUP_ORDER` · `GROUP_AXES` · `SORT_KEYS` · `SORT_ORDERS` |
+| `MatrixQuadrantView` · `sanitizeMatrixView` · `matrixQuadrantLabels` · `MATRIX_QUADRANT_COLORS` · `MATRIX_LABEL_MAX` | 그대로 — 이것들은 정말 매트릭스의 것이다 |
+
+`DEFAULT_MATRIX_VIEW`는 남겼다. 매트릭스 화면에서 저장된 뷰가 없을 때 넘기는 값이고, 그
+자리에서 `DEFAULT_GROUP_VIEW`를 쓰면 타입이 `GroupView`로 좁아져 이름·색을 넘길 수 없다.
+
+### 16.3 테스트도 같이 갈랐다
+
+`matrixGroups.test.ts` 하나가 버킷·묶기·정렬·이름·색을 다 검사하고 있었다.
+`viewGroups.test.ts`가 앞의 셋을, `matrixGroups.test.ts`가 뒤의 둘을 맡는다. 옮기기만 했고
+개수는 그대로다(2,144).
+
+### 16.4 검증
+
+- 유닛 2,144개 통과 · `tsc` 통과 · **동작 변경 없음** — 이름과 파일만 옮겼다
+- 실제 앱(dev, ko): 매트릭스의 네 칸이 `기한 초과`·`오늘`·`날짜 없음`·`완료`로 나뉘고,
+  School 보드의 `미분류` 열이 카드 둘과 `완료 1`을 그린다
+
+### 16.5 남은 것
+
+- `src/domain/view/`에 이제 어휘 둘(`viewRules` · `viewGroups`)과 각 보드의 파일들이 있다.
+  §7 Q3이 물은 것은 여기서 끝났다

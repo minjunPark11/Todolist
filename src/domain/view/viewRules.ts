@@ -27,7 +27,7 @@
 //     rewriting what the task belongs to (§23.5). That is the whole of §4.2's
 //     lesson, kept intact through a change that could easily have lost it.
 import type { Task, TaskPriority } from "../../types";
-import { dateBucketOf, type DateBucket } from "./matrixGroups";
+import { dateBucketOf, type DateBucket } from "./viewGroups";
 import { addDays } from "../../utils/date";
 
 const PRIORITIES: readonly TaskPriority[] = ["high", "medium", "low", "none"];

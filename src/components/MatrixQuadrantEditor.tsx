@@ -24,6 +24,7 @@ import {
   sanitizeMatrixView,
   type MatrixQuadrantView,
 } from "../domain/view/matrixGroups";
+import { GROUP_AXES, SORT_KEYS, SORT_ORDERS } from "../domain/view/viewGroups";
 import {
   DEFAULT_MATRIX_RULES,
   MATRIX_RULE_PRESETS,

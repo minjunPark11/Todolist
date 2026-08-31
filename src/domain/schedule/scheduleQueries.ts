@@ -52,7 +52,7 @@ export function scheduleSpan(schedule: Schedule): { start: string; end: string }
  *
  * Whole days only, and never negative: "due tomorrow" is not "-1 late". The
  * caller decides whether to say it — a finished task keeps its dates and is
- * not overdue by any of them, which is the same rule `matrixGroupOf` follows
+ * not overdue by any of them, which is the same rule `groupIdOf` follows
  * when it refuses to file completed work under "기한 초과".
  */
 export function overdueDays(schedule: Schedule, today: string): number {

@@ -46,17 +46,19 @@ import {
   type ViewRule,
 } from "../domain/view/viewRules";
 import {
-  COMPLETED_PAGE,
   DEFAULT_MATRIX_VIEW,
-  MATRIX_GROUP_AXES,
-  MATRIX_SORT_KEYS,
-  MATRIX_SORT_ORDERS,
-  groupMatrixTasks,
-  matrixComparator,
   matrixQuadrantLabels,
-  type MatrixGroup,
   type MatrixQuadrantView,
 } from "../domain/view/matrixGroups";
+import {
+  COMPLETED_PAGE,
+  GROUP_AXES,
+  SORT_KEYS,
+  SORT_ORDERS,
+  groupTasks,
+  taskComparator,
+  type TaskGroup,
+} from "../domain/view/viewGroups";
 import { MatrixQuadrantEditor } from "./MatrixQuadrantEditor";
 import { listColorHex } from "../domain/tasks/listColor";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./common/ContextMenu";
@@ -147,7 +149,7 @@ export function MatrixPage({
       else groups.get(quadrant)?.push(task);
     }
     // Not sorted here: the order is per GROUP now, and each box does its own
-    // grouping-and-sorting in one pass (`groupMatrixTasks`).
+    // grouping-and-sorting in one pass (`groupTasks`).
     return { byQuadrant: groups, unmatched: orphans };
   }, [tasks, lists, scope, rules, today]);
 
@@ -249,21 +251,21 @@ export function MatrixPage({
               id: "groupBy",
               label: t("matrix.menu.groupBy"),
               value: t(`matrix.axis.${view.groupBy}`),
-              submenu: choices("groupBy", MATRIX_GROUP_AXES, (value) => `matrix.axis.${value}`),
+              submenu: choices("groupBy", GROUP_AXES, (value) => `matrix.axis.${value}`),
               run: () => {},
             },
             {
               id: "sortBy",
               label: t("matrix.menu.sortBy"),
               value: t(`matrix.sort.${view.sortKey}`),
-              submenu: choices("sortKey", MATRIX_SORT_KEYS, (value) => `matrix.sort.${value}`),
+              submenu: choices("sortKey", SORT_KEYS, (value) => `matrix.sort.${value}`),
               run: () => {},
             },
             {
               id: "sortOrder",
               label: t("matrix.menu.sortOrder"),
               value: t(`matrix.order.${view.sortOrder}`),
-              submenu: choices("sortOrder", MATRIX_SORT_ORDERS, (value) => `matrix.order.${value}`),
+              submenu: choices("sortOrder", SORT_ORDERS, (value) => `matrix.order.${value}`),
               run: () => {},
             },
           ],
@@ -429,7 +431,7 @@ function QuadrantCell({
   const { t } = useT();
   const [over, setOver] = useState(false);
   const [adding, setAdding] = useState(false);
-  const groups = useMemo(() => groupMatrixTasks(tasks, today, view), [tasks, today, view]);
+  const groups = useMemo(() => groupTasks(tasks, today, view), [tasks, today, view]);
   // Phase 4 hung the checkbox border and the quick-add outline on `--q-color`
   // (§19.3), so overriding the one variable moves all three together.
   const chosen = listColorHex(view.color);
@@ -593,7 +595,7 @@ function UnmatchedStrip({
   // of a decision the reader already made.
   const [open, setOpen] = useState(false);
   const ordered = useMemo(
-    () => [...tasks].sort(matrixComparator(DEFAULT_MATRIX_VIEW)),
+    () => [...tasks].sort(taskComparator(DEFAULT_MATRIX_VIEW)),
     [tasks],
   );
 
@@ -714,7 +716,7 @@ function MatrixGroupSection({
   onDragStart,
   onDragEnd,
 }: {
-  group: MatrixGroup;
+  group: TaskGroup;
   lists: List[];
   today: string;
   selectedTaskId: string;

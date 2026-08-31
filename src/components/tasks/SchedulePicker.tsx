@@ -70,7 +70,7 @@ export function SchedulePicker({ task, reminders, today, onCommit, restoreFocusT
             but red says THAT it is late and not by how much — and "5월 20일"
             costs the reader a subtraction to find out. Not shown on finished
             work: a task completed last week is not late by any of its dates,
-            which is the rule `matrixGroupOf` follows too. */}
+            which is the rule `groupIdOf` follows too. */}
         {late > 0 ? <span className="sched-trigger-late">{lateLabel}</span> : null}
       </PopoverTrigger>
 

@@ -83,7 +83,7 @@ import { TaskGanttView } from "../TaskGanttView";
 import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
-import { COMPLETED_PAGE, DEFAULT_MATRIX_VIEW, groupMatrixTasks } from "../../domain/view/matrixGroups";
+import { COMPLETED_PAGE, DEFAULT_GROUP_VIEW, groupTasks } from "../../domain/view/viewGroups";
 import { EMPTY_INBOX_RULE, type InboxColumnRules } from "../../domain/view/inboxColumnRules";
 import {
   addInboxColumn,
@@ -902,7 +902,7 @@ export function TasksModule(props: TasksModuleProps) {
    * being widened for everyone, and the two halves are drawn apart: open work
    * in the column, finished work in the column's own "완료" group.
    *
-   * Newest first, and it is `groupMatrixTasks` that says so — inside "완료"
+   * Newest first, and it is `groupTasks` that says so — inside "완료"
    * every deadline is settled, and what the reader is looking for is the thing
    * they just ticked.
    */
@@ -911,10 +911,10 @@ export function TasksModule(props: TasksModuleProps) {
     [state.view, scope, ctx],
   );
   const finishedIn = (columnId: string) =>
-    groupMatrixTasks(
+    groupTasks(
       finishedRows.filter((task) => columnOf(task) === columnId),
       today,
-      { ...DEFAULT_MATRIX_VIEW, groupBy: "none" },
+      { ...DEFAULT_GROUP_VIEW, groupBy: "none" },
     ).find((group) => group.id === "completed")?.tasks ?? [];
 
   /**

@@ -7,7 +7,7 @@
 // and not by how much — "5월 20일" costs the reader a subtraction to find out.
 // The one thing that must not happen is saying it about finished work: a task
 // completed last week is not late by any of its dates, which is the rule
-// `matrixGroupOf` follows when it refuses to file completed work as overdue.
+// `groupIdOf` follows when it refuses to file completed work as overdue.
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { Task } from "../../types";

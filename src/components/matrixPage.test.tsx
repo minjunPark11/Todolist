@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// The grouping, as the screen actually assembles it. `matrixGroups.test.ts`
+// The grouping, as the screen actually assembles it. `viewGroups.test.ts`
 // proves the rule; this proves the box draws what the rule says — including
 // the two things the rule cannot know about: the cap on finished work, and
 // what happens to a card the moment it is ticked.

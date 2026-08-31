@@ -17,7 +17,7 @@
 import { useState } from "react";
 import { Modal } from "../kit";
 import { COLUMN_NAME_MAX } from "../../domain/tasks/board";
-import type { DateBucket } from "../../domain/view/matrixGroups";
+import type { DateBucket } from "../../domain/view/viewGroups";
 import type { InboxColumnRule } from "../../domain/view/inboxColumnRules";
 import { useT } from "../../i18n";
 
