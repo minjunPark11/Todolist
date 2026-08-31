@@ -406,14 +406,6 @@
     gap: 16px;
   }
 
-  .detail-panel {
-    position: static;
-    width: 100%;
-    max-height: none;
-    border-left: 0;
-    border-top: 1px solid var(--border-subtle);
-  }
-
   .ff-page {
     max-width: none;
     padding: 18px 0 52px;
@@ -428,10 +420,6 @@
   .ff-page-title {
     font-size: clamp(1.75rem, 8vw, 2.25rem);
     line-height: 1.08;
-  }
-
-  .filters {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .ff-segmented {

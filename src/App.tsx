@@ -1,6 +1,13 @@
 ﻿import { FormEvent, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { TaskDetail } from "./components/TaskDetail";
+import { motion } from "framer-motion";
+import { TaskDetailPane } from "./components/tasks/TaskDetailPane";
+import { TaskUndoStrip } from "./components/tasks/TaskUndoStrip";
+import type { TaskDetailBundle } from "./components/tasks/taskDetailBundle";
+import { useTaskCommands } from "./hooks/useTaskCommands";
+import { useTaskDetailWidth } from "./hooks/useTaskDetailWidth";
+import { useResponsiveMode } from "./components/tasks/useResponsiveMode";
+import { taskDetailPresentationFor } from "./domain/tasks/responsive";
+import { taskLinkFor } from "./app/taskLink";
 import { GlobalFocusBar } from "./components/GlobalFocusBar";
 import { UpdateChecker } from "./components/UpdateChecker";
 import { SettingsRow } from "./components/SettingsPage";
@@ -218,6 +225,80 @@ export default function App() {
   const sharePublishTimerRef = useRef<number | null>(null);
 
   const today = todayValue();
+
+  /**
+   * The Task Detail these pages open — the same one the Tasks module opens.
+   *
+   * There were two panels until now: this half of the app drew
+   * `components/TaskDetail.tsx` and the Tasks module drew the Drawer, and the
+   * same Task showed different fields depending on which screen you had
+   * clicked it from. The merge design's §2 has the table; §5 took the Drawer's
+   * wiring out of the module so this file could build one too, which is all
+   * that is happening here (TASK_DETAIL_PANEL_MERGE_DESIGN.md §6).
+   *
+   * Declared above every conditional return below, because these are hooks.
+   */
+  const detailWidth = useTaskDetailWidth();
+  const detailPresentation = taskDetailPresentationFor(useResponsiveMode());
+  const taskDetailBundle: TaskDetailBundle = {
+    // Both kinds of child, through the reader that already knows there are
+    // two: legacy `Subtask` rows and the child Tasks `addSubtask` has been
+    // writing since the promotion path landed.
+    childrenOf: (taskId) => childrenOf(taskId, planner.tasks, planner.subtasks),
+    // Ordering is the domain's (spec §11), not the Detail's.
+    checkItemsFor: (taskId) => checkItemsForTask(taskId, planner.checkItems),
+    // §6.3: the Schedule popover edits these, and they are rows rather than a
+    // field on the Task, so the Detail is handed them the same way it is
+    // handed the checklist.
+    remindersFor: (taskId) => remindersForTask(taskId, planner.reminders).map(specOf),
+    onSetContentMode: planner.setTaskContentMode,
+    onAddCheckItem: planner.addCheckItem,
+    onAddCheckItems: planner.addCheckItems,
+    onRenameCheckItem: planner.updateCheckItemText,
+    onToggleCheckItem: planner.toggleCheckItem,
+    onDeleteCheckItem: planner.deleteCheckItem,
+    // §25.7. Assembled here because the history spans collections the Detail
+    // has no reason to hold — the focus sessions above all — and
+    // `taskActivity` is what decides what counts as one.
+    activityFor: (taskId) => {
+      const task = planner.tasks.find((row) => row.id === taskId);
+      return task
+        ? taskActivity(task, { checkItems: planner.checkItems, focusSessions: planner.focusSessions })
+        : [];
+    },
+    onUpdate: planner.updateTask,
+    onMoveToList: planner.moveTaskToList,
+    onCommitSchedule: planner.updateTaskSchedule,
+    onToggleTag: planner.toggleTaskTag,
+    onAddSubtask: planner.addSubtask,
+    onToggleSubtask: planner.toggleSubtask,
+    onDeleteSubtask: planner.deleteSubtask,
+  };
+  const taskCommands = useTaskCommands({
+    tasks: planner.tasks,
+    focusBusy: Boolean(planner.activeFocusSession),
+    onMutate: planner.updateTask,
+    onDuplicate: (taskId) => {
+      const plan = planner.duplicateTask(taskId);
+      return plan ? () => planner.discardDuplicate(plan) : null;
+    },
+    onSaveAsTemplate: (taskId) => planner.saveTaskAsTemplate(taskId)?.id ?? "",
+    onDeleteTemplate: planner.deleteTaskTemplate,
+    onStartFocus: (taskId) => planner.startFocusSession(taskId, "today_page"),
+    /**
+     * §15.19's link, and the honest answer for these pages.
+     *
+     * They keep the open Task in memory rather than in the address, so there
+     * is no URL here that would reopen it — copying this page's own address
+     * would hand someone a link to Today and let them hunt. The Tasks module
+     * DOES address a Task (`?task=`), and `openedTask` there is looked up
+     * against every Task rather than the Scope's rows, so this link opens the
+     * right Task whatever Scope it lands in. Putting `?task=` in these pages'
+     * own addresses is the better answer and is §6.5's open item.
+     */
+    linkFor: (taskId) =>
+      taskLinkFor(window.location.origin, { scope: { kind: "today" }, view: "list", taskId }, taskId),
+  });
   const focusNow = useNowTick(Boolean(planner.activeFocusSession && planner.activeFocusSession.status === "running"));
   const activeFocusTask = planner.activeFocusSession
     ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null
@@ -896,10 +977,6 @@ export default function App() {
     });
   }
 
-  function handleArchiveTask(taskId: string) {
-    handleArchiveTasks([taskId]);
-  }
-
   function handleDuplicateTask(taskId: string) {
     const plan = planner.duplicateTask(taskId);
     showToast({
@@ -1281,43 +1358,10 @@ export default function App() {
               planner.planTaskForDay(taskId, resolution.dailyPlan.planDate);
             }
           }}
-          drawer={{
-            // Both kinds of child, through the reader that already knows there
-            // are two: legacy `Subtask` rows and the child Tasks `addSubtask`
-            // has been writing since the promotion path landed.
-            childrenOf: (taskId) => childrenOf(taskId, planner.tasks, planner.subtasks),
-            // Ordering is the domain's (spec §11), not the Drawer's.
-            checkItemsFor: (taskId) => checkItemsForTask(taskId, planner.checkItems),
-            // §6.3: the Schedule popover edits these, and they are rows rather
-            // than a field on the Task, so the Module is handed them the same
-            // way it is handed the checklist.
-            remindersFor: (taskId) => remindersForTask(taskId, planner.reminders).map(specOf),
-            onSetContentMode: planner.setTaskContentMode,
-            onAddCheckItem: planner.addCheckItem,
-            onAddCheckItems: planner.addCheckItems,
-            onRenameCheckItem: planner.updateCheckItemText,
-            onToggleCheckItem: planner.toggleCheckItem,
-            onDeleteCheckItem: planner.deleteCheckItem,
-            // §25.7. Assembled here because the history spans collections the
-            // Tasks Module has no reason to hold — the focus sessions above
-            // all — and `taskActivity` is what decides what counts as one.
-            activityFor: (taskId) => {
-              const task = planner.tasks.find((row) => row.id === taskId);
-              return task
-                ? taskActivity(task, {
-                    checkItems: planner.checkItems,
-                    focusSessions: planner.focusSessions,
-                  })
-                : [];
-            },
-            onUpdate: planner.updateTask,
-            onMoveToList: planner.moveTaskToList,
-            onCommitSchedule: planner.updateTaskSchedule,
-            onToggleTag: planner.toggleTaskTag,
-            onAddSubtask: planner.addSubtask,
-            onToggleSubtask: planner.toggleSubtask,
-            onDeleteSubtask: planner.deleteSubtask,
-          }}
+          // The same bundle these pages' own Detail takes (§6). One
+          // assembly, so the two surfaces cannot come to hold different
+          // answers to "what is this Task's checklist".
+          drawer={taskDetailBundle}
           // Add List design §1.10. A List made from the Tasks sidebar belongs
           // to no Project: this module is Project-agnostic — it shows Lists,
           // Folders and Tags and never a Project — so there is no owner to
@@ -1353,35 +1397,24 @@ export default function App() {
   }
 
   function renderTaskDetail() {
+    if (!planner.selectedTask) return null;
     return (
-      <AnimatePresence initial={false}>
-        {planner.selectedTask ? (
-          <TaskDetail
-            key={planner.selectedTask.id}
-            task={planner.selectedTask}
-            reminders={remindersForTask(planner.selectedTask.id, planner.reminders).map(specOf)}
-            tasks={planner.tasks}
-            lists={planner.lists}
-            subtasks={planner.subtasks}
-            checkItems={planner.checkItems}
-            onAddCheckItem={planner.addCheckItem}
-            onAddCheckItems={planner.addCheckItems}
-            onRenameCheckItem={planner.updateCheckItemText}
-            onToggleCheckItem={planner.toggleCheckItem}
-            onDeleteCheckItem={planner.deleteCheckItem}
-            onMoveToList={planner.moveTaskToList}
-            onUpdateTask={planner.updateTask}
-            onUpdateTaskSchedule={planner.updateTaskSchedule}
-            onRequestDeleteTask={setPendingDeleteTaskId}
-            onArchiveTask={handleArchiveTask}
-            onDuplicateTask={handleDuplicateTask}
-            onAddSubtask={planner.addSubtask}
-            onToggleSubtask={planner.toggleSubtask}
-            onDeleteSubtask={planner.deleteSubtask}
-            onClose={() => planner.selectTask("")}
-          />
-        ) : null}
-      </AnimatePresence>
+      <TaskDetailPane
+        task={planner.selectedTask}
+        presentation={detailPresentation}
+        resize={detailWidth}
+        today={today}
+        tasks={planner.tasks}
+        lists={planner.lists}
+        folders={planner.sidebarFolders}
+        tags={planner.tags}
+        taskTags={planner.taskTags}
+        bundle={taskDetailBundle}
+        commands={taskCommands}
+        focusBusy={Boolean(planner.activeFocusSession)}
+        onClose={() => planner.selectTask("")}
+        onOpenTask={planner.selectTask}
+      />
     );
   }
 
@@ -1395,6 +1428,8 @@ export default function App() {
         todayIntent={todayIntent}
         onTodayIntentHandled={() => setTodayIntent("")}
         renderTaskDetail={renderTaskDetail}
+        detailPresentation={detailPresentation}
+        detailWidth={detailWidth.width}
         showToast={showToast}
         handleArchiveTasks={handleArchiveTasks}
         requestDeleteTask={requestDeleteTask}
@@ -1446,6 +1481,14 @@ export default function App() {
           className={[
             "app-shell",
             mobileMenuOpen ? "mobile-menu-open" : "",
+            /* §15.13: a full-screen Detail owns the screen, and what is behind
+               it is not dimmed — it is out of the way, including the way back
+               into navigation. The Tasks module says the same thing with
+               `.tm-shell.detail-full`; this is that rule for the shell these
+               pages use. Measured before it existed: the 42×42 menu button
+               (z-index 220) sat on top of the Detail's own header controls
+               (z-index 50) at 12,12. */
+            planner.selectedTask && detailPresentation === "full-screen" ? "detail-full" : "",
             // `sidebar-collapsed` used to sit here and narrow the column to a
             // 68px icon rail. The Global Rail is where icon-level navigation
             // lives now, and collapsing is gone entirely (AppShell).
@@ -1507,6 +1550,10 @@ export default function App() {
         onStop={(sessionId) => stopFocusWithNotification(sessionId, false)}
         settings={focusSettings}
       />
+      {/* §9.36's strip, for the Detail above. `position: fixed`, so it does
+          not care which grid it was rendered inside — the same reason
+          `AppModals` sits here. */}
+      <TaskUndoStrip notice={taskCommands.notice} onDismiss={() => taskCommands.setNotice(null)} />
       <AppModals
         pendingDeleteTaskId={pendingDeleteTaskId}
         pendingResetAllData={pendingResetAllData}

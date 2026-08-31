@@ -1854,6 +1854,29 @@
   width: var(--tm-detail-w, 480px);
 }
 
+/* The same column, on a page that scrolls as a document.
+
+   `.tm-shell` bounds its own height (`100dvh`, `overflow: hidden`), and that
+   is what lets `.tm-drawer-scroll` scroll inside a pane that does not. The
+   Today and Matrix pages are the legacy shell and scroll as a document, so the
+   pane has to bound itself or it grows to its content's full height and takes
+   the sticky property header with it.
+
+   `sticky` + `max-height` is what the legacy panel used in this exact slot,
+   and it is doing the same job: give the flex column a height to divide, so
+   the header stays put and the scroll region gets the rest. The border becomes
+   a full one because here the pane is a card on a page rather than a column
+   welded to a list. */
+.page-grid > .tm-drawer.is-inline-drawer {
+  position: sticky;
+  top: 32px;
+  max-height: calc(100vh - 64px);
+  align-self: start;
+  border: 1px solid var(--border-subtle, rgba(25, 25, 25, 0.08));
+  border-radius: var(--density-radius, 10px);
+  overflow: hidden;
+}
+
 /* The reserved-but-empty column (audit D1-1). Same width as the real one —
    that is the entire point, since a column of a different width while
    something is selected is the thing that made the list jump. Centred and
@@ -1915,8 +1938,12 @@
 }
 
 /* §15.13: the full-screen detail owns the screen. What is behind it is not
-   dimmed, it is out of the way — including the way back into navigation. */
-.tm-shell.detail-full .tm-menu-open {
+   dimmed, it is out of the way — including the way back into navigation.
+
+   Two shells, one rule: the Tasks module's own menu trigger and the legacy
+   shell's, now that the Today and Matrix pages open this same Detail (§6). */
+.tm-shell.detail-full .tm-menu-open,
+.app-shell.detail-full .mobile-menu-button {
   display: none;
 }
 

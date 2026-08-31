@@ -12,7 +12,6 @@ export const en: Dictionary = {
   "common.clear": "Clear",
   "common.confirm": "Confirm",
   "common.add": "Add",
-  "common.duplicate": "Duplicate",
   "common.archive": "Archive",
   "common.noProject": "No project",
   "common.color": "Color",
@@ -392,7 +391,6 @@ export const en: Dictionary = {
   // ---- Today page ----
   "today.title": "Today",
   "today.doneToday": "Done Today",
-  "today.moveToToday": "Move to Today",
 
   // ---- Today page (redesigned execution view) ----
   "todayv.searchPlaceholder": "Filter today's lists",
@@ -550,24 +548,21 @@ export const en: Dictionary = {
   "calendar.next": "Next",
   "calendar.createdToast": "Created \"{{title}}\"",
 
-  // ---- TaskDetail / QuickAdd / TaskList ----
-  "taskDetail.title": "Task Detail",
-  "taskDetail.selectTaskHint": "Select a task to review its details and planning fields.",
-  "taskDetail.taskTitleAria": "Task title",
-  "taskDetail.taskDescriptionAria": "Task description",
+  /* The `taskDetail.*` that outlived `TaskDetail.tsx`.
+
+     The panel is gone (TASK_DETAIL_PANEL_MERGE_DESIGN.md §6) and nine of its
+     keys went with it. These eight did not, because the Drawer says them: it
+     took the description placeholder, the schedule label, both directions of
+     the dependency row and the Notes field, and it says them under the names
+     the panel gave them rather than under a second spelling. */
   "taskDetail.addDescription": "Add description",
   "taskDetail.schedule": "Schedule",
-  "taskDetail.planning": "Planning",
-  "taskDetail.priority": "Priority",
-  "taskDetail.list": "List",
-  "taskDetail.noList": "None",
   "taskDetail.blockedBy": "Waiting on",
   "taskDetail.blockedByNone": "Nothing",
   "taskDetail.blockedByHint": "This cannot start until that one is done. Today's queue moves it down on its own.",
   "taskDetail.blocks": "Waiting on this",
   "taskDetail.notes": "Notes",
   "taskDetail.addNotes": "Add notes",
-  "taskDetail.actions": "Actions",
 
   // ---- Calendar Month/Week/Forms (additions) ----
   "calendar.allDay": "All day",
@@ -671,12 +666,6 @@ export const en: Dictionary = {
   "calendar.newItemOn": "New item — {{date}}",
   "calendar.newTaskOn": "New task — {{date}}",
   "common.titleLabel": "Title",
-
-  // ---- space detail hub ----
-  "spaceHub.section.subtasks": "Sub-tasks",
-  "spaceHub.action.addSubtask": "Add sub-task",
-  // D-2. The Folders of a Project, managed from the Project.
-  // D-3. The custom statuses of a Project, one panel, two entry points.
 
   // ---- Tasks Module (TickTick plan Phase 3) ----
   "tasks.navLabel": "Task navigation",

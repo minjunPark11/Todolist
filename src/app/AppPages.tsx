@@ -1,4 +1,4 @@
-﻿import { ReactNode, useState } from "react";
+﻿import { CSSProperties, ReactNode, useState } from "react";
 import { MatrixPage } from "../components/MatrixPage";
 import { CalendarView } from "../components/CalendarView";
 import { FocusPage } from "../components/FocusPage";
@@ -10,6 +10,7 @@ import type { CalendarShareState } from "../lib/calendarShare";
 import type { AutoBackupState } from "./useAutoBackup";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import type { AppUpdateStatus } from "../platform";
+import type { TaskDetailPresentation } from "../domain/tasks/responsive";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Task } from "../types";
 
 type Planner = ReturnType<typeof usePlannerData>;
@@ -31,6 +32,16 @@ type AppPagesProps = {
   todayIntent: TodayIntent;
   onTodayIntentHandled: () => void;
   renderTaskDetail: () => ReactNode;
+  /**
+   * Whether the Detail is a COLUMN or a layer over the page (§15.17).
+   *
+   * The only thing about it these grids care about. Three of the four
+   * presentations are `position: fixed` and take no track; `inline-drawer` is
+   * a grid item and needs one.
+   */
+  detailPresentation: TaskDetailPresentation;
+  /** §1.12's stored width, so the reserved track and the pane agree. */
+  detailWidth: number;
   showToast: (toast: ToastState) => void;
   handleArchiveTasks: (taskIds: string[]) => void;
   requestDeleteTask: (taskId: string) => void;
@@ -71,6 +82,8 @@ export function AppPages({
   todayIntent,
   onTodayIntentHandled,
   renderTaskDetail,
+  detailPresentation,
+  detailWidth,
   showToast,
   handleArchiveTasks,
   requestDeleteTask,
@@ -102,17 +115,38 @@ export function AppPages({
   onPublishCalendarShare,
   accountSlot,
 }: AppPagesProps) {
+  /**
+   * The Detail is a column only where §15.17 says it is one.
+   *
+   * It used to be "a Task is open, therefore there is a second column", which
+   * was true while the panel was this half of the app's own. The Drawer has
+   * four presentations and three of them cover the page instead — so on a
+   * narrow window the grid stays full width and the Detail floats above it,
+   * which is the shape the Tasks module has had all along
+   * (TASK_DETAIL_PANEL_MERGE_DESIGN.md §6).
+   */
+  const detailIsColumn = Boolean(planner.selectedTask) && detailPresentation === "inline-drawer";
+
   function pageGridClass(extra = "") {
-    const base = planner.selectedTask ? "page-grid" : "page-grid no-detail";
+    const base = detailIsColumn ? "page-grid" : "page-grid no-detail";
     return extra ? `${base} ${extra}` : base;
   }
 
+  /**
+   * `--tm-detail-w` is the Drawer's own variable (§1.12). The Tasks module
+   * sets it on its shell; these pages set it on the grid, so the column the
+   * pane sits in is exactly as wide as the pane.
+   */
+  const gridStyle = { ["--tm-detail-w"]: `${detailWidth}px` } as CSSProperties;
+
   if (activePage === "today") {
-    // Today has no side-by-side task-detail panel — the grid always uses the
-    // full-width (no-detail) layout. Clicking a task instead opens the
-    // shared TaskDetail as a right-side overlay drawer.
+    // Today had no side-by-side Detail: the grid was pinned to the full-width
+    // layout and a click opened the legacy panel inside a scrim of this page's
+    // own (`.tdy-detail-overlay`). That scrim was a fifth presentation of a
+    // component that already had four, and it is gone — Today's Detail is now
+    // the same column, overlay, sheet or full screen every other Task gets.
     return (
-      <section className="page-grid no-detail tdy-grid">
+      <section className={pageGridClass("tdy-grid")} style={gridStyle}>
         <TodayPage
           tasks={visibleTasks}
           dailyPlans={planner.dailyPlans}
@@ -133,20 +167,14 @@ export function AppPages({
           onIntentHandled={onTodayIntentHandled}
           showToast={showToast}
         />
-        {planner.selectedTask ? (
-          <div className="tdy-detail-overlay" onClick={() => planner.selectTask("")}>
-            <div className="tdy-detail-drawer" onClick={(event) => event.stopPropagation()}>
-              {renderTaskDetail()}
-            </div>
-          </div>
-        ) : null}
+        {renderTaskDetail()}
       </section>
     );
   }
 
   if (activePage === "board") {
     return (
-      <section className={pageGridClass()}>
+      <section className={pageGridClass()} style={gridStyle}>
         <MatrixPage
           tasks={visibleTasks}
           lists={planner.lists}

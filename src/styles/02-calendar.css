@@ -1766,30 +1766,6 @@
     grid-template-columns: 1fr;
   }
 
-  .detail-panel {
-    position: fixed;
-    z-index: 40;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    top: auto;
-    max-height: min(82vh, 720px);
-    border-radius: 12px 12px 0 0;
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
-    box-shadow: var(--product-shadow);
-  }
-
-  .detail-handle {
-    display: block;
-    width: 42px;
-    height: 5px;
-    border-radius: var(--rounded-pill);
-    margin: 10px auto 0;
-    background: var(--color-hairline);
-  }
-
   .board-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1802,10 +1778,6 @@
 
   main {
     padding: 20px;
-  }
-
-  .filters {
-    grid-template-columns: 1fr;
   }
 
   .board-grid {
@@ -1848,51 +1820,8 @@ main {
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* Task-detail panel close: `selectedTask` clears immediately on X, so the grid
-   collapses to the single-column `.no-detail` layout while the panel is still
-   playing its 0.42s exit animation. As the grid's 2nd child it would reflow
-   below the page content (flash at the bottom). Pin the still-mounted panel to
-   the right edge so it slides out in place instead of dropping down. Only ever
-   matches during that exit window (no panel exists otherwise). */
-.page-grid {
-  position: relative;
-}
-
-.page-grid.no-detail > .detail-panel {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 360px;
-}
-
 .priority {
   background: var(--ff-surface-muted);
-}
-
-.task-actions-section {
-  margin-bottom: 18px;
-}
-
-.task-action-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.task-action-row button {
-  min-height: 38px;
-  border: 0;
-  border-radius: 8px;
-  padding: 0 13px;
-  color: var(--ff-blue);
-  background: var(--ff-blue-soft);
-  font-size: 0.86rem;
-  font-weight: 650;
-}
-
-.danger-button-inline {
-  color: #ff3b30 !important;
-  background: #ffecec !important;
 }
 
 /* Sits left of the AI launcher (56px wide at right: 24px) — stacked in the

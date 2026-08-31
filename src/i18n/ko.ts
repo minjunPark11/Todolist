@@ -12,7 +12,6 @@ export const ko: Dictionary = {
   "common.clear": "지우기",
   "common.confirm": "확인",
   "common.add": "추가",
-  "common.duplicate": "복제",
   "common.archive": "보관",
   "common.noProject": "프로젝트 없음",
   "common.color": "색상",
@@ -388,7 +387,6 @@ export const ko: Dictionary = {
   // ---- Today page ----
   "today.title": "오늘",
   "today.doneToday": "오늘 완료",
-  "today.moveToToday": "오늘로 이동",
 
   // ---- Today page (redesigned execution view) ----
   "todayv.searchPlaceholder": "오늘 목록에서 찾기",
@@ -545,24 +543,21 @@ export const ko: Dictionary = {
   "calendar.next": "다음",
   "calendar.createdToast": "\"{{title}}\" 생성됨",
 
-  // ---- TaskDetail / QuickAdd / TaskList ----
-  "taskDetail.title": "태스크 상세",
-  "taskDetail.selectTaskHint": "태스크를 선택하면 상세 정보와 계획 필드를 확인할 수 있습니다.",
-  "taskDetail.taskTitleAria": "태스크 제목",
-  "taskDetail.taskDescriptionAria": "태스크 설명",
+  /* The `taskDetail.*` that outlived `TaskDetail.tsx`.
+
+     The panel is gone (TASK_DETAIL_PANEL_MERGE_DESIGN.md §6) and nine of its
+     keys went with it. These eight did not, because the Drawer says them: it
+     took the description placeholder, the schedule label, both directions of
+     the dependency row and the Notes field, and it says them under the names
+     the panel gave them rather than under a second spelling. */
   "taskDetail.addDescription": "설명 추가",
   "taskDetail.schedule": "일정",
-  "taskDetail.planning": "계획",
-  "taskDetail.priority": "우선순위",
-  "taskDetail.list": "위치",
-  "taskDetail.noList": "없음",
   "taskDetail.blockedBy": "선행 작업",
   "taskDetail.blockedByNone": "없음",
   "taskDetail.blockedByHint": "선행 작업이 끝나야 시작할 수 있습니다. 오늘 큐에서 자동으로 뒤로 밀립니다.",
   "taskDetail.blocks": "이 작업을 기다리는 항목",
   "taskDetail.notes": "메모",
   "taskDetail.addNotes": "메모 추가",
-  "taskDetail.actions": "작업",
 
   // ---- Calendar Month/Week/Forms (additions) ----
   "calendar.allDay": "종일",
@@ -664,10 +659,6 @@ export const ko: Dictionary = {
   "calendar.newItemOn": "새 항목 — {{date}}",
   "calendar.newTaskOn": "새 할 일 — {{date}}",
   "common.titleLabel": "제목",
-
-  // ---- space detail hub ----
-  "spaceHub.section.subtasks": "하위 작업",
-  "spaceHub.action.addSubtask": "하위 작업 추가",
 
   // ---- Tasks Module (TickTick plan Phase 3) ----
   "tasks.navLabel": "작업 탐색",

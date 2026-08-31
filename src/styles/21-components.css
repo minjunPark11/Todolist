@@ -55,7 +55,6 @@
    honest way to say that. (The Matrix quadrant and the calendar columns that
    used to be named here were removed with the rest of the dead CSS; the two
    that remain are the ones any screen actually renders.) */
-.detail-panel,
 .board-column {
   background: var(--bg-surface);
   border-color: var(--border-subtle);
