@@ -177,6 +177,14 @@ export function scheduleFromTask(task: TaskScheduleSource): Schedule {
   // reading storage directly still sees the reminder that is written there.
   const legacy = presetToSpec(task.reminder);
   const base = {
+    // Always null, and that is a floor rather than a default: a Task record
+    // has no zone field, and the write path back (`planScheduleUpdate`) has
+    // nowhere to put one. So `Schedule.timezone` is a shape this type can
+    // carry and this app never fills — which is why the schedule trigger
+    // draws no zone (TASK_DETAIL_SCHEDULE_BODY_DESIGN.md §10): it would be
+    // a label for a fact nothing stores. Giving tasks a zone is a data
+    // change, and §5 puts it with the reminder scheduler that would be the
+    // first thing to interpret it.
     timezone: null,
     reminders: task.reminders ?? (legacy ? [legacy] : []),
     repeat: repeatPresetFromTask(task),
