@@ -950,7 +950,6 @@ export const ko: Dictionary = {
   "tasks.checklist.item": "체크리스트 항목",
   "tasks.checklist.toggle": "항목 완료 전환",
   "tasks.checklist.add": "항목 추가",
-  "tasks.checklist.empty": "아직 항목이 없습니다.",
   // The icon says what the content IS; these say what pressing it does.
   "tasks.contentMode.toChecklist": "체크리스트로 바꾸기",
   "tasks.contentMode.toNotes": "메모로 바꾸기",

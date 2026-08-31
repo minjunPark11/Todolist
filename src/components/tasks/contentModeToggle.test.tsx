@@ -9,7 +9,7 @@
 // whole of §5 in that document.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { CheckItem, Task } from "../../types";
+import type { CheckItem, Task, TaskContentMode } from "../../types";
 import { I18nProvider } from "../../i18n";
 import { FloatingLayerProvider } from "../floating";
 import { TaskDrawer } from "./TaskDrawer";
@@ -35,13 +35,12 @@ function task(overrides: Partial<Task> = {}): Task {
   } as Task;
 }
 
-function setup(overrides: Partial<Task> = {}, checkItems: CheckItem[] = []) {
-  const onSetContentMode = vi.fn();
-  render(
+function tree(subject: Task, checkItems: CheckItem[], onSetContentMode: (mode: TaskContentMode) => void) {
+  return (
     <I18nProvider lang="en">
       <FloatingLayerProvider>
         <TaskDrawer
-          task={task(overrides)}
+          task={subject}
           presentation="inline-drawer"
           lists={[]}
           folders={[]}
@@ -77,9 +76,20 @@ function setup(overrides: Partial<Task> = {}, checkItems: CheckItem[] = []) {
           resize={{ width: 420, onPointerDown: () => {}, onKeyDown: () => {}, reset: () => {} } as never}
         />
       </FloatingLayerProvider>
-    </I18nProvider>,
+    </I18nProvider>
   );
-  return { onSetContentMode };
+}
+
+function setup(overrides: Partial<Task> = {}, checkItems: CheckItem[] = []) {
+  const onSetContentMode = vi.fn();
+  const { rerender } = render(tree(task(overrides), checkItems, onSetContentMode));
+  // The Drawer is controlled: the toggle asks, the account answers, and the
+  // task comes back in the other mode. `show` is that answer, so a test can
+  // follow one conversion the whole way rather than stopping at the request.
+  function show(next: Partial<Task>, nextItems: CheckItem[] = []) {
+    rerender(tree(task({ ...overrides, ...next }), nextItems, onSetContentMode));
+  }
+  return { onSetContentMode, show };
 }
 
 describe("the content-mode toggle", () => {
@@ -121,5 +131,70 @@ describe("the content-mode toggle", () => {
     setup();
     expect(screen.queryByRole("group", { name: "Content type" })).toBeNull();
     expect(screen.getAllByText("Notes")).toHaveLength(1);
+  });
+});
+
+// §11.6, and the Q4 this stage was opened for
+describe("what an empty checklist says", () => {
+  it("says nothing beside its heading — no 0/0", () => {
+    // `progressOf` in the MCP projections refuses the same number for the
+    // same reason: 0/0 reads as "no progress" where the truth is "no parts".
+    // The Subtasks heading below has always hidden its own empty count.
+    setup({ contentMode: "checklist" });
+    const head = document.querySelector(".tm-drawer-content-head") as HTMLElement;
+    expect(head.querySelector(".tm-count")).toBeNull();
+  });
+
+  it("counts once there is something to count", () => {
+    setup({ contentMode: "checklist" }, [
+      {
+        id: "c1",
+        taskId: "t1",
+        text: "Prepare slides",
+        checked: false,
+        completedAt: "",
+        sortKey: 0,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ]);
+    const head = document.querySelector(".tm-drawer-content-head") as HTMLElement;
+    expect(head.querySelector(".tm-count")?.textContent).toBe("0/1");
+  });
+
+  it("puts the caret where the first item goes, after a conversion that left none", () => {
+    // §11.6: an empty description becomes an empty checklist with no confirm
+    // step. The reader pressed a button and the next thing to do is type.
+    const { show } = setup();
+    fireEvent.click(screen.getByRole("button", { name: "Turn into a checklist" }));
+    show({ contentMode: "checklist" });
+    expect(document.activeElement).toBe(screen.getByLabelText("Add an item"));
+  });
+
+  it("leaves the caret alone for a checklist that was merely opened", () => {
+    // Nothing was converted here — the task arrived in checklist mode, and
+    // stealing focus from a Drawer someone just opened is not an answer to
+    // anything they asked.
+    setup({ contentMode: "checklist" });
+    expect(document.activeElement).not.toBe(screen.getByLabelText("Add an item"));
+  });
+
+  it("leaves the caret alone when the description filled the list", () => {
+    // The result is on screen; the empty row under it is not what to read.
+    const { show } = setup({ description: "- Prepare slides" });
+    fireEvent.click(screen.getByRole("button", { name: "Turn into a checklist" }));
+    show({ contentMode: "checklist", description: "" }, [
+      {
+        id: "c1",
+        taskId: "t1",
+        text: "Prepare slides",
+        checked: false,
+        completedAt: "",
+        sortKey: 0,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ]);
+    expect(document.activeElement).not.toBe(screen.getByLabelText("Add an item"));
   });
 });

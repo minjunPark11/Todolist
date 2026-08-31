@@ -980,7 +980,6 @@ export const en: Dictionary = {
   "tasks.checklist.item": "Checklist item",
   "tasks.checklist.toggle": "Toggle item",
   "tasks.checklist.add": "Add an item",
-  "tasks.checklist.empty": "No items yet.",
   // The icon says what the content IS; these say what pressing it does.
   "tasks.contentMode.toChecklist": "Turn into a checklist",
   "tasks.contentMode.toNotes": "Turn into notes",

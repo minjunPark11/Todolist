@@ -2829,13 +2829,6 @@
   padding-inline-start: 21px;
 }
 
-.tm-checklist-empty {
-  margin: 0;
-  padding-inline-start: 27px;
-  font-size: 12px;
-  color: var(--text-muted, #8e8e93);
-}
-
 /* Parent navigation (spec §12.7). Ancestors read root-first with a separator
    drawn between them, so the chain is one line of context rather than a stack
    of buttons. */

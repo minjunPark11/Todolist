@@ -8,7 +8,7 @@
 // §16.28 hides Repeat and Reminder for the MVP, and is explicit that a control
 // must not appear as a disabled placeholder before the model behind it exists.
 // So they are absent, not greyed out.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   CheckItem,
   List,
@@ -194,6 +194,12 @@ export function TaskDrawer({
   const checklist = isChecklistMode(task);
   const progressLines = checklistProgress(task.id, checkItems);
 
+  // Which task was turned INTO a checklist here, so the caret can land in the
+  // row the first item goes in (§11.6). Held as an id rather than a flag
+  // because the Drawer does not remount when the task changes (§1.26) — a
+  // boolean would follow the reader to the next task they opened.
+  const [convertedId, setConvertedId] = useState("");
+
   function submitSubtask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const field = event.currentTarget.elements.namedItem("subtask") as HTMLInputElement | null;
@@ -374,7 +380,13 @@ export function TaskDrawer({
           required
           aria-label={t("tasks.titleLabel")}
         />
-        <ContentModeToggle checklist={checklist} onSet={onSetContentMode} />
+        <ContentModeToggle
+          checklist={checklist}
+          onSet={(mode) => {
+            setConvertedId(mode === "checklist" ? task.id : "");
+            onSetContentMode(mode);
+          }}
+        />
       </div>
 
       <div className="tm-drawer-fields">
@@ -418,7 +430,11 @@ export function TaskDrawer({
       <section className="tm-drawer-content">
         <header className="tm-drawer-content-head">
           <span>{t(checklist ? "tasks.checklist" : "tasks.notes")}</span>
-          {checklist ? (
+          {/* Not `0/0`. `progressOf` in the MCP projections already refuses
+              that number for the same reason: it says "no progress" where the
+              truth is "this task has no parts" — and the Subtasks heading two
+              blocks below has always hidden its own empty count. */}
+          {checklist && progressLines.total > 0 ? (
             <span className="tm-count">
               {progressLines.done}/{progressLines.total}
             </span>
@@ -436,6 +452,11 @@ export function TaskDrawer({
             onRename={onRenameCheckItem}
             onToggle={onToggleCheckItem}
             onDelete={onDeleteCheckItem}
+            /* Only where the conversion left nothing to read. A checklist the
+               description filled has its result on screen, and taking the
+               caret to the empty row under it would be an answer to a
+               question nobody asked. */
+            focusDraft={convertedId === task.id && checkItems.length === 0}
           />
         ) : (
           /* Not single-line: Enter here is a paragraph break (spec §10.4). */

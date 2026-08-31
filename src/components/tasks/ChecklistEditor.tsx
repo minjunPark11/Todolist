@@ -12,6 +12,12 @@
 // loop, and on the draft row it is exactly that. On an existing row it moves
 // down to the next line instead of inserting an empty one in the middle —
 // same motion for the user, no record that §11.27 would then have to remove.
+//
+// An empty checklist says nothing beyond that draft row. §11.6 and §11.21 both
+// draw the empty state as `☐ Add an item…` and nothing else — the row IS the
+// message. We had it and a sentence under it saying the list was empty, which
+// is the same nothing said twice, to a reader who had just pressed the button
+// that emptied it.
 import { useEffect, useRef, useState } from "react";
 import type { CheckItem } from "../../types";
 import { useT } from "../../i18n";
@@ -26,6 +32,14 @@ export interface ChecklistEditorProps {
   onRename: (itemId: string, text: string) => void;
   onToggle: (itemId: string) => void;
   onDelete: (itemId: string) => void;
+  /**
+   * Put the cursor in the draft row when this turns true.
+   *
+   * Asked for by the Drawer rather than decided here: an empty checklist that
+   * was just CONVERTED from an empty description is one the reader is waiting
+   * to type into, while an empty one they merely opened is not (§11.6).
+   */
+  focusDraft?: boolean;
 }
 
 /** Where focus should go after the next render. The draft row has no id. */
@@ -48,6 +62,7 @@ export function ChecklistEditor({
   onRename,
   onToggle,
   onDelete,
+  focusDraft = false,
 }: ChecklistEditorProps) {
   const { t } = useT();
   const [draft, setDraft] = useState("");
@@ -71,6 +86,10 @@ export function ChecklistEditor({
     }
     setFocusTarget(null);
   }, [focusTarget, items]);
+
+  useEffect(() => {
+    if (focusDraft) setFocusTarget({ kind: "draft" });
+  }, [focusDraft]);
 
   /** The row after `index`, or the draft when there is none. */
   function next(index: number): FocusTarget {
@@ -176,10 +195,6 @@ export function ChecklistEditor({
           }}
         />
       </div>
-
-      {/* §11.21: an empty checklist says so, rather than showing a bare row
-          and leaving the user to guess whether anything is there. */}
-      {items.length === 0 ? <p className="tm-checklist-empty">{t("tasks.checklist.empty")}</p> : null}
     </div>
   );
 }

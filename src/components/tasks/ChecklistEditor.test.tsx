@@ -22,7 +22,7 @@ function item(id: string, text: string, checked = false): CheckItem {
   };
 }
 
-function setup(items: CheckItem[] = []) {
+function setup(items: CheckItem[] = [], props: { focusDraft?: boolean } = {}) {
   const handlers = {
     onAdd: vi.fn(),
     onAddMany: vi.fn(),
@@ -32,7 +32,7 @@ function setup(items: CheckItem[] = []) {
   };
   render(
     <I18nProvider lang="en">
-      <ChecklistEditor items={items} {...handlers} />
+      <ChecklistEditor items={items} {...handlers} {...props} />
     </I18nProvider>,
   );
   return handlers;
@@ -213,15 +213,28 @@ describe("editing an existing line", () => {
   });
 });
 
-// §11.21
+// §11.6, §11.21
 describe("an empty checklist", () => {
-  it("says it is empty rather than showing a bare row", () => {
+  it("is the row the first item goes in, and says nothing else", () => {
+    // Both sections draw the empty state as `☐ Add an item…` and nothing
+    // else. A sentence under that row saying the list is empty is the same
+    // nothing said twice.
     setup();
-    expect(screen.getByText("No items yet.")).toBeTruthy();
+    const row = screen.getByLabelText("Add an item");
+    expect(row).toBeTruthy();
+    expect(screen.queryByText(/No items|empty/i)).toBeNull();
   });
 
-  it("stops saying so once there is a line", () => {
-    setup([item("c1", "Prepare slides")]);
-    expect(screen.queryByText("No items yet.")).toBeNull();
+  it("takes the caret when the Drawer says a conversion left it empty", () => {
+    // §11.6: an empty description becomes an empty checklist with no confirm
+    // step, so the next thing to happen is typing — in a field the reader
+    // would otherwise have to go and click.
+    setup([], { focusDraft: true });
+    expect(document.activeElement).toBe(screen.getByLabelText("Add an item"));
+  });
+
+  it("leaves the caret alone when nobody asked for it", () => {
+    setup();
+    expect(document.activeElement).not.toBe(screen.getByLabelText("Add an item"));
   });
 });
