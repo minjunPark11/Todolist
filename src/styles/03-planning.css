@@ -932,11 +932,10 @@
    Dimmed on the card's CONTENTS rather than on the card. The row is a
    framer-motion element and motion writes `opacity` as an inline style, which
    a stylesheet cannot outrank — an `opacity` here would simply never apply. */
-.ff-matrix-group.is-completed .ff-matrix-card-main,
-.ff-matrix-group.is-completed .ff-check {
+.ff-matrix-group.is-completed .ff-matrix-card .tm-task-open,
+.ff-matrix-group.is-completed .ff-matrix-card .tm-task-check {
   opacity: 0.55;
 }
-.ff-matrix-group.is-completed .ff-matrix-card-title { text-decoration: line-through; }
 .ff-matrix-group-more {
   align-self: flex-start;
   padding: 2px 4px;
@@ -962,61 +961,38 @@
 }
 .ff-matrix-card:active { cursor: grabbing; }
 .ff-matrix-card.is-selected { border-color: var(--accent); }
-.ff-matrix-card .ff-check { flex: none; margin-top: 1px; }
-/* The box's colour on the checkbox. Not a fifth signal invented here: it is
-   `--q-color`, the cell's own, and the header two rows up names that same
-   priority in words — so nothing on this card is carried by hue alone
-   (TICKTICK_COMPONENT_06 §6.1). Ticked keeps --success: that is a different
-   question and it needs its own answer. */
-.ff-matrix-cell .ff-check:not(.checked) { border-color: var(--q-color); }
-.ff-matrix-cell .ff-check:not(.checked):hover { border-color: var(--accent); }
+/* The box's colour is no longer on the checkbox (§19.3). The row's box is a
+   native `input`, whose unchecked border no browser lets a stylesheet paint,
+   and faking one would mean a second checkbox implementation — the thing §28
+   exists to remove. Nothing goes unsaid: §19.3's own argument for the colour
+   was that it repeated what the header says in words, and the colour still
+   paints the header, the cell's border and its add field. */
 
-/* Title and metadata on ONE line, the way a row is drawn: the title takes what
-   it needs and the rest sits against the right edge. They break onto two lines
+/* Title and tips on ONE line, the way a row is drawn: the title takes what it
+   needs and the rest sits against the right edge. They break onto two lines
    only when the title leaves no room — a quadrant is half a page wide, and a
    deadline must not be what falls off the end of it. */
-.ff-matrix-card-main {
-  display: flex;
+.ff-matrix-card .tm-task-open {
   flex-wrap: wrap;
   align-items: baseline;
   column-gap: 8px;
   row-gap: 2px;
-  min-width: 0;
-  flex: 1;
 }
-.ff-matrix-card-title {
+/* A card is not a list row: it has half a page of width and no row below it to
+   collide with, so a long title wraps here rather than ending in an ellipsis. */
+.ff-matrix-card .tm-task-title {
   flex: 1 1 auto;
-  min-width: 0;
   font-size: 13px;
   line-height: 1.4;
-  color: var(--text-primary);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
   word-break: break-word;
 }
-/* `margin-left: auto` and not `justify-content`, so the metadata stays on the
-   right edge on the wrapped second line too. */
-.ff-matrix-card-meta {
-  flex: 0 0 auto;
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.ff-matrix-card .tm-task-tips,
+.ff-matrix-card .tm-task-due {
   font-size: 11px;
-  color: var(--text-tertiary);
 }
-/* The List as a name and nothing else. The coloured dot next to it was a
-   second way of saying one word, on a card whose box already carries a colour
-   that means something different. */
-.ff-matrix-card-list {
-  max-width: 10em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ff-matrix-card-icon { display: inline-flex; flex: none; }
-.ff-matrix-card-due { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
-/* A deadline already missed is the one thing on this card that has to be acted
-   on today, so it is the one thing that is not grey. */
-.ff-matrix-card-due.is-overdue { color: var(--danger); font-weight: 600; }
 
 /* A box that will not take the card in the air (§23.5). Greyed rather than
    hidden: the box is still a box, it just cannot answer this drag — and the

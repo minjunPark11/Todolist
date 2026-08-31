@@ -346,6 +346,78 @@
   color: var(--text-muted, #8e8e93);
 }
 
+/* The reference's trailing hints, as one group (COMPONENT_06 §7): date, note
+   and repeat, 4px apart and pinned to the right edge, with the title giving up
+   the width they take. `margin-left: auto` rather than `justify-content`, so
+   they stay against that edge on a card wide enough to wrap them onto a second
+   line. */
+.tm-task-tips {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted, #8e8e93);
+}
+
+/* Where the flag is what pushed the group across (a wrapped card), the group
+   must not push itself again: two auto margins on one line split the free
+   space between them and leave both stranded in the middle. */
+.tm-task-priority + .tm-task-tips {
+  margin-left: 4px;
+}
+
+.tm-task-tip {
+  display: inline-flex;
+  flex: none;
+}
+
+/* The List as a name and nothing else, where the row is somewhere its List is
+   not. The coloured dot that was next to it was a second way of saying one
+   word. */
+.tm-task-list {
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A deadline already missed is the one thing on the row that has to be acted
+   on today, so it is the one thing here that is not grey. */
+.tm-task-due.is-overdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* A card is not a row. It is one column wide, which is narrower than a
+   sentence, and there the trailing tips would take their width out of the
+   title's — a card whose title is an ellipsis and whose date is intact has
+   thrown away the half that identifies it. So the tips drop under the title
+   instead, which a card has the height for and a row does not. (The matrix
+   card says the same thing over its own surface in 03-planning.css: two
+   surfaces that happen to agree, not one rule.) */
+.tm-task.is-card .tm-task-open {
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 2px;
+}
+
+/* On a wrapped card the flag would sit alone at the left of the second line,
+   which reads as a bullet for the tips rather than as the title's own mark.
+   Pushed across, it stays what it is on a row: the last thing on the title. */
+.tm-task.is-card .tm-task-priority {
+  margin-left: auto;
+}
+
+.tm-task.is-card .tm-task-title {
+  flex: 1 1 auto;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+}
+
 .tm-state {
   margin: 8px 4px;
   font-size: 13px;
@@ -1379,6 +1451,23 @@
 
 .tm-task.is-card.is-open {
   border-color: var(--accent, #0a84ff);
+}
+
+/* The move control drops below the row on a narrow card. It is 92px of a
+   260px column, and it was taking that width out of the title's — a card
+   cannot be read by its checkbox and its move select. It is a control the
+   reference's card does not have at all (§16.30, our non-drag path), so where
+   the two compete for a line, the task's own words win it. */
+.tm-task.is-card {
+  flex-wrap: wrap;
+}
+
+.tm-task.is-card .tm-task-open {
+  min-width: 10em;
+}
+
+.tm-card-move {
+  margin-left: auto;
 }
 
 .tm-card-move select {

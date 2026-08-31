@@ -58,10 +58,11 @@ import { MatrixQuadrantEditor } from "./MatrixQuadrantEditor";
 import { listColorHex } from "../domain/tasks/listColor";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./common/ContextMenu";
 import { listIdFor } from "../domain/spaces/membership";
-import { LIFECYCLE, isCompleted } from "../domain/tasks/taskState";
-import { formatDate, todayValue } from "../utils/date";
+import { LIFECYCLE } from "../domain/tasks/taskState";
+import { todayValue } from "../utils/date";
 import { MotionDropZone } from "./motion/MotionDropZone";
 import { MotionTaskRow } from "./motion/MotionTaskRow";
+import { TaskRowContent } from "./tasks/TaskRowContent";
 import { useT } from "../i18n";
 
 const ALL_LISTS = "";
@@ -788,11 +789,13 @@ function MatrixGroupSection({
 /**
  * One task, as the box draws it.
  *
- * Everything on the right of the title is what the card cannot say by sitting
- * where it sits: which List it came from, whether it repeats, whether there is
- * more of it behind the title, and when it is due. The one thing NOT here is
- * the priority — the box already is it (D1), so a flag on every card would
- * repeat the header once per row.
+ * Which is: the same row every other view draws (`TaskRowContent`), on the
+ * card's surface. What is left here is what the matrix does with a row and no
+ * other view does — pick it up and carry it to a day on the calendar — plus
+ * the two facts the row cannot work out for itself: which List the task came
+ * from, and that the priority is not to be drawn because the box IS it (D1).
+ *
+ * It was 90 lines of its own tick, its own icons and its own date until §28.
  */
 function MatrixCard({
   task,
@@ -815,26 +818,7 @@ function MatrixCard({
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
-  const { t, lang } = useT();
   const list = lists.find((candidate) => candidate.id === listIdFor(task, lists));
-  const done = isCompleted(task);
-  // The date itself, not a word for where it falls. "기한 지남" on every card
-  // under a header that already says "기한 초과" is the same fact twice, and
-  // the half it replaced — WHICH day — is the half the reader cannot get
-  // anywhere else on this screen. Written the way the reader's language writes
-  // a date ("8월 20일", "Aug 20") rather than as "08.20", which is a date only
-  // once you have worked out which half is the month.
-  const dateLabel = task.dueDate ? formatDate(task.dueDate, lang) : "";
-  // Not on finished work. "Overdue" is a thing to go and do, and a card that
-  // has been ticked has had it done — a red date under a strike-through is an
-  // alarm about a job that is already over. The reference goes further and
-  // drops the date from a completed row entirely (§2.4); this keeps it,
-  // because WHICH day is the one fact the row is read for afterwards.
-  const overdue = !done && Boolean(task.dueDate) && task.dueDate < today;
-  const repeats = task.repeatType !== undefined && task.repeatType !== "none";
-  // Either body counts: `contentMode` decides which one a Task is using, and a
-  // card only reports that there IS more behind the title.
-  const hasBody = Boolean(task.notes?.trim() || task.description?.trim());
 
   return (
     <MotionTaskRow
@@ -850,61 +834,23 @@ function MatrixCard({
         onDragStart();
       }}
       onNativeDragEnd={onDragEnd}
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") onOpen();
-      }}
     >
-      {/* Ticked cards were drawing an EMPTY circle: the row was struck through
-          and dimmed while the control that did it still looked untouched, so
-          the one thing on the card that could be acted on said the opposite of
-          the rest. The box's colour rides on it — `--q-color` comes from the
-          cell — which is the priority, but as the box's colour rather than as
-          a claim only a colour makes: the header next to it says the same
-          thing in words. */}
-      <button
-        type="button"
-        className={`ff-check${done ? " checked" : ""}`}
-        aria-label={t(done ? "tasks.reopenTask" : "tasks.completeTask", { title: task.title })}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleDone();
-        }}
-      >
-        {done ? "✓" : ""}
-      </button>
-      <div className="ff-matrix-card-main">
-        <span className="ff-matrix-card-title">{task.title}</span>
-        {/* Wraps under the title only when the row runs out of width — a
-            quadrant is half a page, and a long title must not push the date
-            off the end of it. */}
-        <span className="ff-matrix-card-meta">
-          {list ? <span className="ff-matrix-card-list">{list.name}</span> : null}
-          {repeats ? (
-            <span className="ff-matrix-card-icon" role="img" aria-label={t("matrix.card.repeats")} title={t("matrix.card.repeats")}>
-              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
-                <path d="M4.5 12A7.5 7.5 0 0 1 17.3 6.7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-                <path d="M17.3 3.2v3.5h-3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M19.5 12a7.5 7.5 0 0 1-12.8 5.3" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-                <path d="M6.7 20.8v-3.5h3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-          ) : null}
-          {hasBody ? (
-            <span className="ff-matrix-card-icon" role="img" aria-label={t("matrix.card.hasNotes")} title={t("matrix.card.hasNotes")}>
-              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
-                <path d="M5 4.5h9L19 9v10.5H5z" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
-                <path d="M8.5 12.5h7M8.5 16h4.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-              </svg>
-            </span>
-          ) : null}
-          {dateLabel ? (
-            <span className={`ff-matrix-card-due${overdue ? " is-overdue" : ""}`}>{dateLabel}</span>
-          ) : null}
-        </span>
-      </div>
+      {/* The card no longer opens on a click anywhere in it. It could not keep
+          that AND have the row's own controls: a `role="button"` with a
+          checkbox and a second button inside it is a control inside a control,
+          which is a thing a keyboard cannot describe and a screen reader reads
+          twice. The row's own title button is what opens the task now, and it
+          takes every pixel of the card the checkbox does not. */}
+      <TaskRowContent
+        task={task}
+        // The value the boxes grouped with, so a card cannot be drawn late
+        // inside a group that has already decided it is not.
+        today={today}
+        listName={list?.name}
+        showPriority={false}
+        onOpen={() => onOpen()}
+        onToggleDone={() => onToggleDone()}
+      />
     </MotionTaskRow>
   );
 }

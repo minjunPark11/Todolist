@@ -158,7 +158,7 @@ describe("finished work", () => {
       done("middle", "2026-08-14T09:00:00.000Z"),
     ]);
 
-    const titles = [...boxOne().querySelectorAll(".ff-matrix-card-title")].map((node) => node.textContent);
+    const titles = [...boxOne().querySelectorAll(".tm-task-title")].map((node) => node.textContent);
     expect(titles).toEqual(["newest", "middle", "oldest"]);
   });
 });
@@ -168,7 +168,7 @@ describe("ticking a card", () => {
     const onToggleDone = vi.fn();
     renderMatrix([task({ id: "t1", title: "Write it up", dueDate: TODAY })], { onToggleDone });
 
-    await userEvent.click(boxOne().querySelector(".ff-check") as HTMLElement);
+    await userEvent.click(boxOne().querySelector(".tm-task-check input") as HTMLInputElement);
     expect(onToggleDone).toHaveBeenCalledWith("t1");
   });
 
@@ -259,7 +259,7 @@ describe("the box's ⋯ menu", () => {
     // order is by title rather than by the deadline the default would use.
     const box = boxOne();
     expect(groupNames(box)).toEqual([]);
-    expect([...box.querySelectorAll(".ff-matrix-card-title")].map((node) => node.textContent)).toEqual(["a", "b"]);
+    expect([...box.querySelectorAll(".tm-task-title")].map((node) => node.textContent)).toEqual(["a", "b"]);
   });
 
   it("leaves the other boxes alone", async () => {
@@ -355,14 +355,14 @@ describe("what a card says", () => {
 
     // "09.20" is a date only once the reader has worked out which half is the
     // month; the group header above it already said "Later".
-    expect(card().querySelector(".ff-matrix-card-due")?.textContent).toBe("Sep 20");
+    expect(card().querySelector(".tm-task-due")?.textContent).toBe("Sep 20");
     expect(card().querySelector(".is-overdue")).toBeNull();
   });
 
   it("marks a deadline that has already passed", () => {
     renderMatrix([task({ dueDate: "2026-08-20" })]);
 
-    expect(card().querySelector(".ff-matrix-card-due")?.className).toContain("is-overdue");
+    expect(card().querySelector(".tm-task-due")?.className).toContain("is-overdue");
   });
 
   it("stops calling it late once it is done", () => {
@@ -377,7 +377,7 @@ describe("what a card says", () => {
       }),
     ]);
 
-    const due = card().querySelector(".ff-matrix-card-due");
+    const due = card().querySelector(".tm-task-due");
     expect(due?.textContent).toBe("Aug 20");
     expect(due?.className).not.toContain("is-overdue");
   });
@@ -411,9 +411,22 @@ describe("what a card says", () => {
     // acted on said the opposite of everything around it.
     renderMatrix([task({ title: "Filed", status: "completed" as TaskStatus, completedAt: "2026-08-27T10:00:00.000Z" })]);
 
-    const check = boxOne().querySelector(".ff-check") as HTMLElement;
-    expect(check.className).toContain("checked");
+    const check = boxOne().querySelector(".tm-task-check input") as HTMLInputElement;
+    expect(check.checked).toBe(true);
     expect(check.getAttribute("aria-label")).toBe("Reopen Filed");
+  });
+
+  it("is opened from the row, not from a control wrapped around a control", async () => {
+    // The card used to be a `role="button"` with a checkbox and a title button
+    // inside it: a control inside a control, which a keyboard cannot describe
+    // and a screen reader reads twice. The row's own button is the way in now,
+    // and it takes every pixel of the card the checkbox does not.
+    const onOpenTask = vi.fn();
+    renderMatrix([task({ id: "t1", title: "Write it up" })], { onOpenTask });
+
+    expect(card().getAttribute("role")).toBeNull();
+    await userEvent.click(within(card()).getByRole("button", { name: "Open Write it up" }));
+    expect(onOpenTask).toHaveBeenCalledWith("t1");
   });
 });
 
