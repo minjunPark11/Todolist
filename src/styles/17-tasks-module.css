@@ -1381,8 +1381,20 @@
 
 /* --- undo (§9.36, §9.37) --- */
 
+/* The strip is drawn INVERTED — the page's text colour as its background —
+   which is what made it invisible in the dark theme. `--text` resolves to
+   #f5f5f7 there, and the text on top was a hardcoded #fff: white on white, a
+   contrast ratio of about 1.05:1. The message that says a task was completed
+   was the one thing on screen that could not be read after completing one.
+   `--bg-surface` is the other half of the inversion and follows the theme, so
+   both ends of the pair move together now.
+
+   The z-index is §19.4's `toast` band. It had none at all, which left the one
+   surface whose whole job is to be seen stacking below every menu and panel
+   drawn after it. */
 .tm-undo {
   position: fixed;
+  z-index: 400;
   bottom: 20px;
   left: 50%;
   display: flex;
@@ -1390,8 +1402,8 @@
   gap: 12px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: var(--text, #1c1c1e);
-  color: #fff;
+  background: var(--text-primary, #1c1c1e);
+  color: var(--bg-surface, #fff);
   font-size: 13px;
   transform: translateX(-50%);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
@@ -1400,7 +1412,7 @@
 .tm-undo button {
   border: 0;
   background: transparent;
-  color: #fff;
+  color: inherit;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -1412,12 +1424,13 @@
 .tm-undo-value {
   max-width: 320px;
   padding: 4px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid currentcolor;
   border-radius: 6px;
   background: transparent;
-  color: #fff;
+  color: inherit;
   font: inherit;
   font-size: 12px;
+  opacity: 0.85;
 }
 
 /* --- board (§7.21, §7.34, §16.30) --- */
@@ -3116,6 +3129,22 @@
   margin-top: 2px;
 }
 
+/* The list's variant of the same group.
+
+   Two differences from a column's, and both come from what is above it: the
+   rows there are cards with gaps between them, here they are lines with a
+   1px rule between them. So the gap goes (the rows supply their own
+   separation) and the header gets the padding that lines it up with the
+   checkbox column of the rows above rather than sitting 4px to their left. */
+.tm-column-done.is-rows {
+  gap: 0;
+  margin-top: 8px;
+}
+
+.tm-column-done.is-rows .tm-column-done-head {
+  padding: 6px 4px;
+}
+
 /* A button because it collapses, and 21px because it is a heading rather than
    a control — the same reading the rhythm spec's allow list gives the Matrix's
    group head. */
@@ -3157,9 +3186,32 @@
 }
 
 /* Finished work reads as background: it is on screen so the tick can be found
-   again, not so it can be worked on. */
-.tm-task.is-card.is-done {
+   again, not so it can be worked on.
+
+   `.is-card` was in this selector while the Board's columns were the only
+   place a finished row was drawn. The list has a "완료" group now and wants
+   the same answer — the rule is about the STATE, not about which view is
+   asking. */
+.tm-task.is-done {
   opacity: 0.55;
+}
+
+/* Every colour a finished row carries goes grey, which is the reference app's
+   own reading of it: a done row is monochrome except the tick itself.
+
+   Opacity alone would not do this. It fades a colour towards the background
+   without changing what it means, so a High flag stayed red and a checkbox
+   stayed accent-blue — an alarm and a call to action on a row whose whole
+   claim is that there is nothing left to do. The date needs no rule of its
+   own: `TaskRowContent` already refuses to call finished work overdue. */
+.tm-task.is-done .tm-task-check input {
+  accent-color: var(--text-tertiary, #8e8e93);
+}
+
+.tm-task.is-done .tm-task-priority,
+.tm-task.is-done .tm-task-due,
+.tm-task.is-done .tm-task-list {
+  color: var(--text-tertiary, #8e8e93);
 }
 
 .tm-column-done-more {
@@ -3381,4 +3433,69 @@
   color: var(--text-tertiary, #8e8e93);
   font-size: 12px;
   line-height: 1.4;
+}
+
+/* --- the list's date groups -------------------------------------------------
+   The Matrix's boxes and the Board's columns have divided their contents by
+   date since their phase 2s; this is the list view catching up, so the labels,
+   the order and the caret are all the ones already on those screens. What is
+   new is that the group is a DROP TARGET: a row carried out of "기한 초과" and
+   let go under "오늘" is rescheduled. */
+
+.tm-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Only where a drop would actually be taken. A target that lights up and then
+   discards the row is worse than one that never lit up at all — the same rule
+   the Board's columns follow when a drop would be refused. */
+.tm-group.is-over {
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm, 6px);
+}
+
+/* A button because it collapses, and 11px because it is a heading rather than
+   a control — the reading the rhythm spec's allow list gives the Matrix's
+   group head, which this is a second instance of. */
+.tm-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 4px 4px;
+  border: 0;
+  background: none;
+  color: var(--text-tertiary, #8e8e93);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-group-head:hover {
+  color: var(--text-secondary, #48484a);
+}
+
+.tm-group-caret {
+  flex: 0 0 auto;
+  width: 12px;
+  text-align: center;
+}
+
+.tm-group-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tm-group-count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The last row of a group needs no rule under it: the next group's heading is
+   already the division, and two of them stacked reads as a double line. */
+.tm-list.is-grouped > .tm-task:last-child {
+  border-bottom: 0;
 }

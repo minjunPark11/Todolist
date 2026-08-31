@@ -228,13 +228,24 @@ export function matchesScope(
       return hasTodayPlan(task, ctx.dailyPlans, ctx.today);
     }
 
-    // §12.6. Overdue belongs to Today, not here, and a plan alone does not put
-    // a task on a horizon that is made of dates.
+    // §12.6's horizon, with its lower edge opened.
+    //
+    // It ran from today to today+6 and turned overdue work away, on the
+    // reading that overdue "belongs to Today". That is true of where it is
+    // ACTED on and false of where it is planned: a week's screen that leaves
+    // out the three things that are already late is a week's screen missing
+    // the only work whose date is certainly wrong. The reference app makes
+    // the same call — its 다음 7일 opens on a "기한 초과" group — and it is
+    // not double-counting so much as the two Scopes answering two questions:
+    // Today asks what to do now, this asks what the week holds.
+    //
+    // The upper edge is untouched, and a plan alone still does not put a task
+    // on a horizon that is made of dates.
     case "upcoming": {
       if (!isActive(task, ctx.lists, opts.finished)) return false;
       const due = effectiveDueDate(task);
       if (!due) return false;
-      return due >= ctx.today && due <= addDays(ctx.today, 6);
+      return due <= addDays(ctx.today, 6);
     }
 
     // §12.7. Membership is the owning List's kind, not `status === "inbox"`:

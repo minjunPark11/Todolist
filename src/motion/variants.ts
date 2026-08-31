@@ -188,3 +188,27 @@ export const staggerItem = {
     y: 4,
   },
 };
+
+/**
+ * A line in a list arriving and leaving.
+ *
+ * No scale, unlike `cardVariants`: a card is an object, a row is a line of a
+ * page, and a line that shrinks as it goes reads as a rendering fault rather
+ * than as a departure. The exit is faster than the entry because by then the
+ * row has already been acted on — what is worth watching is the gap closing
+ * behind it, not the row itself.
+ */
+export const listRowVariants: Variants = {
+  initial: {
+    opacity: 0,
+    y: -motionDistance.popoverY,
+  },
+  animate: {
+    opacity: 1,
+    y: 0,
+  },
+  exit: {
+    opacity: 0,
+    transition: { duration: motionDurations.fast, ease: [0.2, 0, 0, 1] },
+  },
+};

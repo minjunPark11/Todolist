@@ -182,8 +182,15 @@ describe("Upcoming horizon (§12.6)", () => {
     expect(matchesScope(task({ dueDate: "2026-08-25", listId: "l1" }), scope, ctx)).toBe(false);
   });
 
-  it("leaves overdue to Today", () => {
-    expect(matchesScope(task({ dueDate: "2026-08-01", listId: "l1" }), scope, ctx)).toBe(false);
+  // The lower edge is open, and that is a change from §12.6 as written.
+  //
+  // Overdue work used to be turned away here on the grounds that it
+  // "belongs to Today". A week's screen that omits the work whose date is
+  // already certainly wrong is a week's screen missing the part that most
+  // needs deciding — and the two Scopes are not competing: Today asks what
+  // to do now, this asks what the week holds.
+  it("takes overdue work too, which the week has to account for", () => {
+    expect(matchesScope(task({ dueDate: "2026-08-01", listId: "l1" }), scope, ctx)).toBe(true);
   });
 
   it("does not let a plan alone put a task on a horizon made of dates", () => {
@@ -330,7 +337,7 @@ describe("Gate 2 — one rule, three readers", () => {
   it("puts the fixture where the plan says it goes", () => {
     const ids = (scope: TaskScopeRef) => queryScopeTasks(scope, ctx).map((entry) => entry.id).sort();
     expect(ids({ kind: "today" })).toEqual(["a", "b", "f"]);
-    expect(ids({ kind: "upcoming" })).toEqual(["b", "c"]);
+    expect(ids({ kind: "upcoming" })).toEqual(["a", "b", "c"]);
     expect(ids({ kind: "inbox" })).toEqual(["b"]);
     expect(ids({ kind: "list", id: "l1" })).toEqual(["a", "c", "f"]);
     expect(ids({ kind: "folder", id: "f1" })).toEqual(["a", "c", "f"]);

@@ -7,7 +7,8 @@
 // Scopes allow Board, which have counts, or where `/` goes.
 //
 // List rendering only, per §16.26 — Board and the rich Drawer come later.
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import type {
   Folder,
   List,
@@ -66,11 +67,21 @@ import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
 import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
 import { TaskRowContent } from "./TaskRowContent";
+import { TaskFinishedGroup } from "./TaskFinishedGroup";
+import { TaskListGroup } from "./TaskListGroup";
+import { MotionListRow } from "../motion/MotionListRow";
 import { TaskGanttView } from "../TaskGanttView";
 import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
-import { DEFAULT_GROUP_VIEW, groupTasks } from "../../domain/view/viewGroups";
+import {
+  DEFAULT_GROUP_VIEW,
+  groupIdOf,
+  groupTasks,
+  moveToDateGroup,
+  type GroupId,
+  type TaskGroup,
+} from "../../domain/view/viewGroups";
 import { EMPTY_INBOX_RULE, type InboxColumnRules } from "../../domain/view/inboxColumnRules";
 import {
   addInboxColumn,
@@ -251,6 +262,19 @@ export function TasksModule(props: TasksModuleProps) {
 
   /** The row being dragged, so the ones under it know a drop is coming. */
   const [dragTaskId, setDragTaskId] = useState("");
+  /**
+   * The same row, in a ref as well as in state.
+   *
+   * The state is what dims the row; the ref is what a drop reads. A handler
+   * closes over the render it was created in, and `dragover` can arrive
+   * before React has re-rendered from `dragstart` — so a target asking the
+   * state would see no row in the air, skip `preventDefault()`, and the
+   * browser would refuse a drop that should have been taken. `TaskBoard`
+   * has carried the same pair since it was built, for the same reason.
+   */
+  const draggedRow = useRef("");
+  /** Which date group the carried row is over, so only that one lights up. */
+  const [overGroup, setOverGroup] = useState<GroupId | "">("");
   /** The open context menu, or none. One at a time, like the notice above it. */
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   /**
@@ -469,6 +493,199 @@ export function TasksModule(props: TasksModuleProps) {
    */
   const listRows = policy.canManualReorder ? sortByManualOrder(rows) : rows;
 
+  /**
+   * The Scope's finished work, which `rows` does not carry.
+   *
+   * §12.4's `active` excludes it and §12.14 needs that to stay true — the
+   * sidebar count is this query's row count, and a count that included last
+   * month's finished tasks is a number nobody can read. So the Board asks a
+   * second time with the precondition relaxed rather than the first query
+   * being widened for everyone, and the two halves are drawn apart: open work
+   * in the column, finished work in the column's own "완료" group.
+   *
+   * Newest first, and it is `groupTasks` that says so — inside "완료"
+   * every deadline is settled, and what the reader is looking for is the thing
+   * they just ticked.
+   *
+   * Minus whatever `rows` already has, which is not defensive tidying: for
+   * Completed, Won't Do and Trash the relaxed precondition is a no-op, because
+   * those Scopes ARE the finished work. Without this the Completed screen
+   * draws every task twice — once as a row and once inside a "완료" group
+   * underneath it — and the group is the one that would have to be explained.
+   * Asking `rows` rather than naming the three Scopes keeps the answer with
+   * §12.19's one membership rule; a list of exceptions here is a second one.
+   */
+  const finishedRows = useMemo(() => {
+    const shown = new Set(rows.map((task) => task.id));
+    return queryScopeTasks(scope, ctx, { finished: true }).filter(
+      (task) => isCompleted(task) && !shown.has(task.id),
+    );
+  }, [rows, scope, ctx]);
+  /**
+   * The same tasks, in the order the "완료" group is read in.
+   *
+   * Ordered once here rather than per column. The Board asked `groupTasks` a
+   * question per column while it was the only caller; the list asks the same
+   * question about the whole Scope, and the timeline wants the set and not the
+   * order at all — so the sort is done for everybody and the column filters
+   * what is already sorted.
+   */
+  const finishedSorted = useMemo(
+    () =>
+      groupTasks(finishedRows, today, { ...DEFAULT_GROUP_VIEW, groupBy: "none" }).find(
+        (group) => group.id === "completed",
+      )?.tasks ?? [],
+    [finishedRows, today],
+  );
+
+  /**
+   * The list's rows, divided by date where the Scope has no order of its own.
+   *
+   * `canManualReorder` is the whole test, and it is not a proxy: a manual
+   * order IS the user's division of the list, so laying date groups over it
+   * would be the screen overruling an arrangement they made by hand. Those
+   * Scopes have the Board when they want date columns. Everywhere else the
+   * order is derived anyway, and dividing it is free.
+   *
+   * One group with id "all" when there is no grouping, so the render below
+   * has one shape rather than two — the Matrix's arrangement, and it draws
+   * no header for that id for the same reason: a heading saying "all of it"
+   * over the whole list is a line spent saying nothing.
+   */
+  const groupedList = !policy.canManualReorder;
+  const listGroups: TaskGroup[] = useMemo(
+    () =>
+      groupedList
+        ? groupTasks(listRows, today, DEFAULT_GROUP_VIEW)
+        : [{ id: "all", tasks: listRows }],
+    [groupedList, listRows, today],
+  );
+
+  /** What one group's `<ul>` is called, since the heading above it is a button. */
+  const groupListLabel = (id: GroupId) => (id === "all" ? title : t(`matrix.group.${id}`));
+
+  /**
+   * Whether the row in the air could be let go on this group.
+   *
+   * Two ways to be no, and the header lights up for neither: the domain
+   * refuses the group (`moveToDateGroup` — 기한 초과, 이후 and 완료 are not
+   * days to move something to), or the row is already in it, where a drop
+   * would write the date it already has and offer an undo for nothing.
+   */
+  function canDropOnGroup(taskId: string, groupId: GroupId): boolean {
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target) return false;
+    if (groupIdOf(target, today) === groupId) return false;
+    return moveToDateGroup(target, groupId, today) !== null;
+  }
+
+  /**
+   * A row was carried into a date group: it is rescheduled, not re-sorted.
+   *
+   * The Board's `dropOnBoard` has the second half of this — where in the
+   * column the card sits — and this has none, deliberately. A grouped list
+   * is one whose order is derived (see `groupedList`), so there is no place
+   * within a group to put a row: it lands where the sort says it goes.
+   */
+  function dropOnGroup(taskId: string, groupId: GroupId) {
+    setOverGroup("");
+    setDragTaskId("");
+    draggedRow.current = "";
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target) return;
+    const mutation = moveToDateGroup(target, groupId, today);
+    // Refused by the domain, so nothing is written and the row stays where
+    // it was — rather than moving to a group it does not belong in.
+    if (!mutation) return;
+    mutate(target, mutation);
+  }
+  /**
+   * The rows of one group, or of the whole list where there is no grouping.
+   *
+   * A function rather than a component because of what it closes over: the
+   * open Task, the drag in flight, the menu, the reorder. Passing those
+   * through props would be eleven arguments to say `renderRows(tasks)`.
+   */
+  function renderRows(rows: Task[]) {
+    return (
+      /* A ticked row leaves `rows` the instant it is finished, so with no
+         exit it is gone between two frames and the reader cannot tell which
+         one they checked. Here it fades, and `layout` carries the rows below
+         it up into the gap — the arrangement the Today page's queue uses. */
+      <AnimatePresence initial={false}>
+        {rows.map((task) => {
+          const done = isCompleted(task);
+          return (
+
+            <MotionListRow
+              key={task.id}
+              taskId={task.id}
+              className={["tm-task", task.id === state.taskId ? "is-open" : "", dragTaskId === task.id ? "is-dragging" : ""]
+                .filter(Boolean)
+                .join(" ")}
+              // Draggable for two different reasons, which is why the test is
+              // not `canManualReorder` alone: where there IS a manual order the
+              // drag reorders the list, and where there is not it carries the
+              // row into another date group and reschedules it. Those are the
+              // two halves of `groupedList`, so between them every list view
+              // can be dragged.
+              draggable={policy.canManualReorder || groupedList}
+              onDragStart={(event) => {
+                draggedRow.current = task.id;
+                setDragTaskId(task.id);
+                event.dataTransfer.effectAllowed = "move";
+                // The Calendar and the Matrix both listen for this type, so
+                // a row dragged out of the list still lands on them.
+                event.dataTransfer.setData("text/task", task.id);
+              }}
+              onDragOver={(event) => {
+                if (!policy.canManualReorder || !draggedRow.current) return;
+                event.preventDefault();
+              }}
+              onDrop={(event) => {
+                if (!policy.canManualReorder || !draggedRow.current) return;
+                event.preventDefault();
+                reorderOnto(listRows, draggedRow.current, task.id);
+                draggedRow.current = "";
+                setDragTaskId("");
+              }}
+              onDragEnd={() => {
+                draggedRow.current = "";
+                setDragTaskId("");
+                setOverGroup("");
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setMenu(taskMenuAt(task, event.clientX, event.clientY));
+              }}
+            >
+              {/* The handle is the affordance, not the mechanism — the whole
+                  row is draggable, and this is what says so (audit L-17). */}
+              {policy.canManualReorder ? <span className="tm-task-handle" aria-hidden="true" /> : null}
+              <TaskRowContent task={task} onOpen={openTask} onToggleDone={toggleDone} />
+              {/* The other half of L-17, and the reason the menu is a
+                  component: a right-click is not discoverable and does not
+                  exist on a touch screen, so the same menu needs a button
+                  to open it. Anchored to the button rather than the
+                  pointer, which is where the reader is looking. */}
+              <button
+                type="button"
+                className="tm-task-menu"
+                aria-haspopup="menu"
+                aria-label={t("tasks.rowMenu", { title: task.title })}
+                onClick={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect();
+                  setMenu(taskMenuAt(task, box.left, box.bottom + 4));
+                }}
+              >
+                ⋯
+              </button>
+            </MotionListRow>
+          );
+        })}
+      </AnimatePresence>
+    );
+  }
   const searchCollections: SearchCollections = {
     tasks,
     lists,
@@ -520,9 +737,17 @@ export function TasksModule(props: TasksModuleProps) {
 
   // The timeline's three arguments, built from the rows the Scope already
   // chose.
+  //
+  // Finished work included, which the list and the Board show as a group of
+  // its own and a timeline cannot: a bar is at a place on a date, so moving one
+  // to the bottom of the chart would be moving it to another row of the grid
+  // and saying something about its List. It is drawn where it happened and
+  // greyed instead (`item.done`), and `TaskGanttView`'s own "완료 표시" toggle
+  // is what takes it off — the same choice, made where the bars are.
+  const ganttRows = useMemo(() => [...rows, ...finishedRows], [rows, finishedRows]);
   const ganttItems = useMemo(
-    () => projectItems({ tasks: rows, lists, today, tags, taskTags }),
-    [rows, lists, today, tags, taskTags],
+    () => projectItems({ tasks: ganttRows, lists, today, tags, taskTags }),
+    [ganttRows, lists, today, tags, taskTags],
   );
   const ganttSpec: ViewSpec = useMemo(
     // The scope is passed empty on purpose: `queryScopeTasks` has already
@@ -534,12 +759,12 @@ export function TasksModule(props: TasksModuleProps) {
   const ganttContext: GroupContext = useMemo(
     () => ({
       today,
-      taskById: new Map(rows.map((task) => [task.id, task])),
+      taskById: new Map(ganttRows.map((task) => [task.id, task])),
       // D10: the order the user arranged Lists in outranks the alphabet, and
       // the sidebar and this timeline have to agree about it.
       groupRank: groupRank(ganttSpec.groupBy, { lists, folders }),
     }),
-    [today, rows, ganttSpec.groupBy, lists, folders],
+    [today, ganttRows, ganttSpec.groupBy, lists, folders],
   );
   /**
    * The rules in force, and the context a rule is asked against.
@@ -723,30 +948,7 @@ export function TasksModule(props: TasksModuleProps) {
     return { patch: outcome.patch, undo, labelKey };
   }
 
-  /**
-   * The Scope's finished work, which `rows` does not carry.
-   *
-   * §12.4's `active` excludes it and §12.14 needs that to stay true — the
-   * sidebar count is this query's row count, and a count that included last
-   * month's finished tasks is a number nobody can read. So the Board asks a
-   * second time with the precondition relaxed rather than the first query
-   * being widened for everyone, and the two halves are drawn apart: open work
-   * in the column, finished work in the column's own "완료" group.
-   *
-   * Newest first, and it is `groupTasks` that says so — inside "완료"
-   * every deadline is settled, and what the reader is looking for is the thing
-   * they just ticked.
-   */
-  const finishedRows = useMemo(
-    () => (state.view === "board" ? queryScopeTasks(scope, ctx, { finished: true }).filter(isCompleted) : []),
-    [state.view, scope, ctx],
-  );
-  const finishedIn = (columnId: string) =>
-    groupTasks(
-      finishedRows.filter((task) => columnOf(task) === columnId),
-      today,
-      { ...DEFAULT_GROUP_VIEW, groupBy: "none" },
-    ).find((group) => group.id === "completed")?.tasks ?? [];
+  const finishedIn = (columnId: string) => finishedSorted.filter((task) => columnOf(task) === columnId);
 
   /**
    * A card was dropped, in two parts: which column it is now in, and where in
@@ -977,7 +1179,11 @@ export function TasksModule(props: TasksModuleProps) {
           <p className="tm-state" role="status">
             {t("tasks.missingHint")}
           </p>
-        ) : rows.length === 0 && state.view === "list" ? (
+        ) : /* Finished work counts as something to show. A Scope whose open
+               work is all done still has a "완료" group to draw, and
+               "아직 할 일이 없습니다" over a list of today's finished tasks
+               would be the screen contradicting itself. */
+          rows.length === 0 && finishedSorted.length === 0 && state.view === "list" ? (
           <p className="tm-state" role="status">
             {t(emptyKeyFor(scope.kind))}
           </p>
@@ -1036,64 +1242,54 @@ export function TasksModule(props: TasksModuleProps) {
             onContextMenu={(task, x, y) => setMenu(taskMenuAt(task, x, y))}
           />
         ) : (
-          <ul className="tm-list" aria-label={title}>
-            {listRows.map((task) => {
-              const done = isCompleted(task);
-              return (
-                <li
-                  key={task.id}
-                  className={["tm-task", task.id === state.taskId ? "is-open" : "", dragTaskId === task.id ? "is-dragging" : ""]
-                    .filter(Boolean)
-                    .join(" ")}
-                  draggable={policy.canManualReorder}
-                  onDragStart={(event) => {
-                    setDragTaskId(task.id);
-                    event.dataTransfer.effectAllowed = "move";
-                    // The Calendar and the Matrix both listen for this type, so
-                    // a row dragged out of the list still lands on them.
-                    event.dataTransfer.setData("text/task", task.id);
-                  }}
-                  onDragOver={(event) => {
-                    if (!policy.canManualReorder || !dragTaskId) return;
-                    event.preventDefault();
-                  }}
-                  onDrop={(event) => {
-                    if (!policy.canManualReorder || !dragTaskId) return;
-                    event.preventDefault();
-                    reorderOnto(listRows, dragTaskId, task.id);
-                    setDragTaskId("");
-                  }}
-                  onDragEnd={() => setDragTaskId("")}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setMenu(taskMenuAt(task, event.clientX, event.clientY));
-                  }}
-                >
-                  {/* The handle is the affordance, not the mechanism — the whole
-                      row is draggable, and this is what says so (audit L-17). */}
-                  {policy.canManualReorder ? <span className="tm-task-handle" aria-hidden="true" /> : null}
-                  <TaskRowContent task={task} onOpen={openTask} onToggleDone={toggleDone} />
-                  {/* The other half of L-17, and the reason the menu is a
-                      component: a right-click is not discoverable and does not
-                      exist on a touch screen, so the same menu needs a button
-                      to open it. Anchored to the button rather than the
-                      pointer, which is where the reader is looking. */}
-                  <button
-                    type="button"
-                    className="tm-task-menu"
-                    aria-haspopup="menu"
-                    aria-label={t("tasks.rowMenu", { title: task.title })}
-                    onClick={(event) => {
-                      const box = event.currentTarget.getBoundingClientRect();
-                      setMenu(taskMenuAt(task, box.left, box.bottom + 4));
-                    }}
-                  >
-                    ⋯
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+          {/* Divided by date, where the Scope has no arrangement of its own.
+
+              The rule is `canManualReorder`, and it is not a proxy for
+              anything: manual order IS the user's own division of the list,
+              and laying date groups over it would be the screen overruling
+              a decision they made by hand. So a List and the Inbox keep
+              their flat, dragged order — they have the Board when they want
+              date columns — and 오늘, 다음 7일, a tag and a filter, whose
+              order is derived anyway, get the groups the reference app
+              draws (기한 초과 / 오늘 / 내일 / 이후 / 날짜 없음 / 언젠가).
+
+              One `<ul>` per group rather than one for the screen: a heading
+              between two rows of the same list is a heading a screen reader
+              reads as a row. */}
+          {listGroups.map((group) => (
+            <TaskListGroup
+              key={group.id}
+              id={group.id}
+              count={group.tasks.length}
+              showHeader={group.id !== "all" && listGroups.length > 1}
+              canAccept={() => canDropOnGroup(draggedRow.current, group.id)}
+              isOver={overGroup === group.id}
+              onDragOver={() => setOverGroup(group.id)}
+              onDrop={() => dropOnGroup(draggedRow.current, group.id)}
+            >
+              <ul className={`tm-list${listGroups.length > 1 ? " is-grouped" : ""}`} aria-label={groupListLabel(group.id)}>
+                {renderRows(group.tasks)}
+              </ul>
+            </TaskListGroup>
+          ))}
+          {/* The list's half of the same rule the Board's columns have had
+              since their phase 2: a ticked row leaves `rows` (§12.4) and has
+              to land somewhere the eye can find it, or the only evidence that
+              anything happened is a strip at the bottom of the window.
+
+              Below the open rows and collapsed, for the reason the group
+              itself carries — and it takes the row menu, because unticking is
+              not the only thing anyone does to finished work. */}
+          <TaskFinishedGroup
+            tasks={finishedSorted}
+            openTaskId={state.taskId}
+            variant="row"
+            onOpen={openTask}
+            onToggleDone={toggleDone}
+            onContextMenu={(task, x, y) => setMenu(taskMenuAt(task, x, y))}
+          />
+          </>
         )}
         </>
         )}

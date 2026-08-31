@@ -23,6 +23,23 @@ export interface SeedOptions {
    */
   projects?: Array<{ id: string; name: string; spaceId: string; archived?: boolean }>;
   /**
+   * Tasks to start with.
+   *
+   * Only the fields a spec actually asserts on; everything else takes the
+   * shape `normalize` would give it. Seeded rather than typed in because
+   * a due date is not something Quick Add can be made to write reliably —
+   * and a spec about WHERE a dated row is drawn should not also be a spec
+   * about the parser that read the date.
+   */
+  tasks?: Array<{
+    id: string;
+    title: string;
+    listId?: string;
+    dueDate?: string;
+    isSomeday?: boolean;
+    status?: string;
+  }>;
+  /**
    * The stored theme. Seeded rather than emulated because the app resolves
    * `system` from `prefers-color-scheme` ONCE, at mount — a spec that flipped
    * the media afterwards would be asserting against the palette it started in.
@@ -38,7 +55,27 @@ export interface SeedOptions {
  */
 export async function openApp(page: Page, seed: SeedOptions = {}): Promise<void> {
   const data = {
-    tasks: [],
+    tasks: (seed.tasks ?? []).map((entry, index) => ({
+      id: entry.id,
+      title: entry.title,
+      description: "",
+      status: entry.status ?? "todo",
+      priority: "none",
+      dueDate: entry.dueDate ?? "",
+      startDate: "",
+      projectId: "",
+      listId: entry.listId ?? "list-inbox",
+      sectionId: "",
+      parentTaskId: "",
+      tags: [],
+      notes: "",
+      isSomeday: entry.isSomeday ?? false,
+      order: index,
+      createdAt: NOW,
+      updatedAt: NOW,
+      completedAt: entry.status === "completed" ? NOW : "",
+      repeatType: "none",
+    })),
     projects: (seed.projects ?? []).map((project, index) => ({
       id: project.id,
       name: project.name,

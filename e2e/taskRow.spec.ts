@@ -50,10 +50,25 @@ test.describe("what a Task row can do", () => {
       .poll(async () => (await storedTasks(page)).find((task) => task.title === "Finish from the list")?.status)
       .toBe("completed");
 
-    // And the row leaves, because a List does not keep finished Tasks in it.
-    // That is why `check()` is the wrong call here: it waits for a checkbox
-    // that is on its way out of the document to report itself checked.
-    await expect(page.locator(".tm-task")).toHaveCount(0);
+    // And the row leaves the open list — a List does not keep finished Tasks
+    // among the work still to do. That is why `check()` is the wrong call
+    // here: it waits for a checkbox that is on its way out of the document to
+    // report itself checked.
+    await expect(page.locator("ul.tm-list").first().locator(".tm-task")).toHaveCount(0);
+
+    // It is not gone from the screen, though, and that is the point of the
+    // "완료" group: a row that vanishes on being ticked leaves the reader
+    // unable to check it was the right one. It lands below the open work,
+    // struck through and greyed, under a header that counts it.
+    //
+    // Asserted here rather than in jsdom because the row leaves through an
+    // exit animation, and an animation needs a browser that paints. jsdom
+    // fires no animation frames — and neither does a hidden tab, which is
+    // how this looked for a while like a framer-motion deadlock rather than
+    // a browser that had simply stopped painting.
+    const finished = page.locator(".tm-column-done");
+    await expect(finished.locator(".tm-task.is-done")).toHaveCount(1);
+    await expect(finished.getByRole("button", { name: /Completed/ })).toContainText("1");
 
     // L-13's whole point: this cost a panel before. The URL is how the panel
     // announces itself (`?task=`), so an unchanged query means nothing opened.
@@ -61,6 +76,49 @@ test.describe("what a Task row can do", () => {
     await expect(page.locator(".tm-drawer.is-empty")).toBeVisible();
   });
 
+  // The movement itself, which is what the row leaving is FOR.
+  //
+  // Before this the list jumped: the ticked row left `rows` in one frame and
+  // the rows below it closed the gap in the same one, so there was nothing to
+  // follow from where the row had been to where its replacement now was. The
+  // assertion is that the survivors are transformed at some point after the
+  // tick — a row being CARRIED to its new place rather than redrawn there.
+  //
+  // Sampled across frames rather than at one instant, because a spring has no
+  // fixed duration to wait out; and it needs a browser that paints, which is
+  // the whole reason it is here and not in jsdom.
+  test("the rows below a ticked one are carried up, not redrawn there", async ({ page }) => {
+    await openApp(page, { lists: [LIST] });
+    await page.goto(`/list/${LIST.id}`);
+    await addTask(page, "Goes away");
+    await addTask(page, "Moves up");
+
+    await page.getByRole("checkbox", { name: "Complete Goes away" }).click();
+
+    const moved = await page.evaluate(async () => {
+      const seen: string[] = [];
+      const deadline = performance.now() + 400;
+      await new Promise<void>((resolve) => {
+        const tick = () => {
+          const row = document.querySelector("ul.tm-list .tm-task");
+          if (row) seen.push(getComputedStyle(row).transform);
+          if (performance.now() > deadline) resolve();
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+      return seen.some((value) => value !== "none" && value !== "matrix(1, 0, 0, 1, 0, 0)");
+    });
+
+    expect(moved, "the surviving row was moved by a transform, not by a reflow").toBe(true);
+
+    // And it ends where it belongs, with nothing left over from the tween.
+    const survivor = page.locator("ul.tm-list .tm-task").first();
+    await expect(survivor).toContainText("Moves up");
+    await expect
+      .poll(async () => survivor.evaluate((row) => getComputedStyle(row).transform))
+      .toMatch(/^(none|matrix(1, 0, 0, 1, 0, 0))$/);
+  });
   test("the checkbox is the size of the row, not the size of the box", async ({ page }) => {
     await openApp(page, { lists: [LIST] });
     await page.goto(`/list/${LIST.id}`);

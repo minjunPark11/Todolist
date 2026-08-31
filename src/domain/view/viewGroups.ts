@@ -15,6 +15,7 @@
 // user's to choose (the box's ⋯ menu) — a grouping rule that lives in a
 // component is one that has to be rewritten to be configured.
 import type { Task } from "../../types";
+import type { TaskMutation } from "../tasks/mutations";
 import { isCompleted } from "../tasks/taskState";
 import { addDays } from "../../utils/date";
 
@@ -214,4 +215,44 @@ function byFinishedAt(a: Task, b: Task): number {
   const finishedB = b.completedAt || b.updatedAt || "";
   if (finishedA !== finishedB) return finishedA < finishedB ? 1 : -1;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * What dropping a task into a date group writes, or null where the group is
+ * not somewhere a task can be carried to.
+ *
+ * The inverse of `dateBucketOf`, and deliberately partial. Three groups are
+ * not destinations. "기한 초과" is a date already past and nobody drags work
+ * INTO being late. "이후" is four days at once, so committing any of them
+ * would be the app choosing a deadline the user did not — the same refusal
+ * `moveToInboxBucket` makes for a `scheduled` column with no date supplied
+ * (§6.25), and for the same reason. "완료" is a status, reached by the tick
+ * beside the row rather than by carrying it there.
+ *
+ * `isSomeday` and `dueDate` are the only fields this can write, and that is
+ * enforced by there being no other field here to reach — Gate 7's second line,
+ * one size down from the Board's.
+ */
+export function moveToDateGroup(task: Task, group: GroupId, today: string): TaskMutation | null {
+  const undo = { isSomeday: task.isSomeday, dueDate: task.dueDate };
+  switch (group) {
+    case "today":
+      // §6.23: a dated task is not a someday task, so the flag is cleared in
+      // the same patch rather than left for a later read to reconcile.
+      return { patch: { isSomeday: false, dueDate: today }, undo, labelKey: "tasks.undoDateChanged" };
+    case "tomorrow":
+      return {
+        patch: { isSomeday: false, dueDate: addDays(today, 1) },
+        undo,
+        labelKey: "tasks.undoDateChanged",
+      };
+    case "none":
+      return { patch: { isSomeday: false, dueDate: "" }, undo, labelKey: "tasks.undoMoved" };
+    case "someday":
+      // §6.23 from the other side: keeping the date would leave a task that is
+      // both "no plan to do this" and "due Friday".
+      return { patch: { isSomeday: true, dueDate: "" }, undo, labelKey: "tasks.undoSomeday" };
+    default:
+      return null;
+  }
 }

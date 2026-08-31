@@ -13,6 +13,7 @@ import {
   dateBucketOf,
   groupIdOf,
   groupTasks,
+  moveToDateGroup,
   taskComparator,
 } from "./viewGroups";
 
@@ -208,5 +209,52 @@ describe("taskComparator", () => {
     const [b, a] = [task({ id: "b", title: "b" }), task({ id: "a", title: "a" })];
     expect(compare({ sortKey: "title" }, a, b)).toBeLessThan(0);
     expect(compare({ sortKey: "title", sortOrder: "desc" }, a, b)).toBeGreaterThan(0);
+  });
+});
+
+// The inverse of `dateBucketOf`: what carrying a row into a group writes.
+//
+// This is what makes a grouped list draggable in the way the reference app's
+// is — a task dragged out of "기한 초과" and dropped under "오늘" is
+// rescheduled, not merely re-sorted. What matters as much is which groups
+// REFUSE: a null leaves the row where it was rather than moving it somewhere
+// the app had to invent a date for.
+describe("moveToDateGroup", () => {
+  const late = task({ dueDate: YESTERDAY });
+
+  it("schedules onto the day the group names", () => {
+    expect(moveToDateGroup(late, "today", TODAY)?.patch).toEqual({ isSomeday: false, dueDate: TODAY });
+    expect(moveToDateGroup(late, "tomorrow", TODAY)?.patch).toEqual({
+      isSomeday: false,
+      dueDate: TOMORROW,
+    });
+  });
+
+  it("clears the date for 날짜 없음, and sets the flag for 언젠가", () => {
+    expect(moveToDateGroup(late, "none", TODAY)?.patch).toEqual({ isSomeday: false, dueDate: "" });
+    // §6.23 keeps the two exclusive from both sides: a someday task carries no
+    // date, and a dated one is not someday.
+    expect(moveToDateGroup(late, "someday", TODAY)?.patch).toEqual({ isSomeday: true, dueDate: "" });
+  });
+
+  it("refuses the groups that are not a day to move to", () => {
+    // Nobody drags work into being late; "이후" is four days at once, so any
+    // one of them would be a deadline the app chose; and completion is the
+    // tick beside the row, not a place to carry it to.
+    expect(moveToDateGroup(late, "overdue", TODAY)).toBeNull();
+    expect(moveToDateGroup(late, "later", TODAY)).toBeNull();
+    expect(moveToDateGroup(late, "completed", TODAY)).toBeNull();
+    expect(moveToDateGroup(late, "all", TODAY)).toBeNull();
+  });
+
+  it("carries the way back, and it is both fields whichever one moved", () => {
+    // Restoring only what changed would leave the other holding whatever the
+    // drop made of it, and §6.23 is the pair being consistent.
+    const someday = task({ isSomeday: true, dueDate: "" });
+    expect(moveToDateGroup(someday, "today", TODAY)?.undo).toEqual({ isSomeday: true, dueDate: "" });
+    expect(moveToDateGroup(late, "someday", TODAY)?.undo).toEqual({
+      isSomeday: undefined,
+      dueDate: YESTERDAY,
+    });
   });
 });
