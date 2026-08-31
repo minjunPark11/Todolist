@@ -1631,3 +1631,25 @@ COMPONENT_06 §7이 참조 앱의 행에서 이미 잰 것이다 — 날짜·메
 - `.tm-task-title`에는 아직 하한이 없다. 카드는 줄바꿈으로 피했지만, 창이 아주 좁은
   리스트 행에서는 여전히 팁이 이기고 제목이 준다
 
+---
+
+## 29. 규칙 어휘가 이 문서를 떠났다 (2026-08-31)
+
+기본함 보드가 `matrixRules.ts`를 쓰기 시작하면서 그 파일 이름이 거짓말이 됐다
+(기본함 문서 §7 Q3). 규칙의 **어휘**는 `src/domain/view/viewRules.ts`로 나갔고, 이 문서가
+말하는 사분면 넷 — 기본값·프리셋 둘·읽는 순서·저장 게이트 — 만 `matrixRules.ts`에 남았다.
+
+§24·§25가 적은 이름 중 다음은 이제 다른 곳에 있다:
+
+| 이 문서가 적은 이름 | 지금 |
+|---|---|
+| `MatrixQuadrantRule` | `ViewRule` (`viewRules.ts`) |
+| `matchesMatrixRule` · `sanitizeMatrixRule` | `matchesRule` · `sanitizeRule` |
+| `matrixRulesOverlap` | `rulesOverlap` |
+| `MatrixDropRefusal` · `MatrixRuleDraft` | `DropRefusal` · `RuleDraft` |
+| `EMPTY_MATRIX_RULE` | `EMPTY_RULE` |
+
+`quadrantForTask` · `DEFAULT_MATRIX_RULES` · `TIME_AND_PRIORITY_MATRIX_RULES` ·
+`MATRIX_RULE_PRESETS` · `resolveMatrixRules` · `sanitizeMatrixRules`는 이름 그대로 남았다 —
+그것들은 정말로 이 화면의 것이다. 동작은 하나도 바뀌지 않았다. 자세한 근거와 분리의 경계는
+`TICKTICK_INBOX_COLUMNS_DESIGN.md` §15에 있다.

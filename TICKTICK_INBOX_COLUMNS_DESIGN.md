@@ -1,6 +1,8 @@
 # 기본함 보드 — 열을 만들고, 이름 짓고, 지우기
 
-> 상태: **1~5단계 구현됨** · 2026-08-29
+> 상태: **1~5단계 구현됨 · Q3까지 종결** · 2026-08-31
+> (§9~§14가 단계별 구현 기록이고, §15가 §7 Q3 — 규칙 어휘를 `viewRules`로 분리한
+> 기록이다.)
 > 대상: `기본함`(Inbox) 보드 뷰의 **열(column)** — 헤더의 `+`, `⋯`, 그리고 `새로운 열`
 
 ## 0. 근거 수준
@@ -201,7 +203,7 @@ A로 가면 잃는 것이 분명하다. 지금 기본함 보드는 **일정 상�
 |---|---|---|
 | Q1 | `isSomeday`는 규칙이 된 뒤에도 필드로 남는가, 아니면 `언젠가` 열의 소속으로 대체되는가 | 3단계 |
 | Q2 | 리스트 보드의 열(`ListSection`)도 규칙이 되는가, 통으로 남는가. 둘이 갈라지면 `TaskBoard` 하나가 두 모델을 그려야 한다 | 3단계 |
-| Q3 | 매트릭스의 `matrixRules.ts`를 보드가 쓰려면 이름이 맞지 않는다. `viewRules`로 옮길까 | 3단계 |
+| Q3 | ~~매트릭스의 `matrixRules.ts`를 보드가 쓰려면 이름이 맞지 않는다~~ **어휘를 `viewRules`로 분리. §15에서 종결** | — |
 | Q4 | `이동 ▸` 서브메뉴는 무엇을 여는가 — 다른 열로? 다른 리스트로? 스크린샷으로는 판별 불가 | 5단계 |
 | Q5 | `+`의 날짜 아이콘과 `⌄`가 각각 무엇을 여는지 못 봤다 (스크린샷은 닫힌 상태) | 1단계 |
 
@@ -593,3 +595,69 @@ E2E 118개 통과. 신규 유닛 21개(모델 14 · 다이얼로그 7).
 - §7 Q3 — 이제 두 화면이 같은 규칙 모양을 편집한다. `matrixRules`의 이름이 거짓말이 됐다
 - 리스트 보드의 열(Sections)에는 이 메뉴가 없다. 그쪽은 레코드이고 만드는 UI가 아직 없다
 - 참조 앱의 `이동 ▸` 서브메뉴가 무엇을 여는지는 여전히 모른다(§8). 우리는 좌우 이동 두 줄로 답했다
+
+---
+
+## 15. Q3 종결 — 어휘가 자기 파일을 갖는다 (2026-08-31)
+
+### 15.1 순수 리네임이 아니었다
+
+§7 Q3은 "`matrixRules.ts`를 `viewRules`로 옮길까"였다. 옮기려고 파일을 열어 보니 그 안에
+**두 종류**가 있었다.
+
+| | 무엇 | 누구의 것 |
+|---|---|---|
+| 어휘 | 규칙의 모양, 정화, 판정, 드롭이 쓸 수 있는 것, 초안, 겹침 | **둘 다** |
+| 사분면 | 기본값 넷, 프리셋 둘, 읽는 순서, 저장 게이트 | 매트릭스 |
+
+파일 이름이 거짓말인 이유는 **둘이 한 파일에 있어서**였다. 통째로 `viewRules`로 옮겼다면
+거짓말의 방향만 뒤집혔을 것이다 — 이번엔 사분면 넷이 "view rules"라는 이름 아래 앉는다.
+그래서 리네임이 아니라 **분리**했다.
+
+```
+viewRules.ts        어휘 — 두 화면이 쓴다
+  ├ matrixRules.ts      사분면 넷 · 프리셋 · 읽는 순서
+  └ inboxColumnRules.ts 열 셋 · 순서 있는 목록 · 보드의 드롭
+```
+
+### 15.2 이름 표
+
+| 전 | 후 |
+|---|---|
+| `MatrixQuadrantRule` | `ViewRule` |
+| `EMPTY_MATRIX_RULE` | `EMPTY_RULE` (보드에서는 `EMPTY_INBOX_RULE`) |
+| `MatrixRuleContext` | `RuleContext` |
+| `matchesMatrixRule` · `sanitizeMatrixRule` | `matchesRule` · `sanitizeRule` |
+| `matrixRulesOverlap` | `rulesOverlap` |
+| `MatrixDropRefusal` · `MatrixDropOutcome` · `MatrixRuleDraft` | `DropRefusal` · `DropOutcome` · `RuleDraft` |
+| `MatrixQuadrantRules` · `DEFAULT_MATRIX_RULES` · `quadrantForTask` … | 그대로 — 이것들은 정말 매트릭스의 것이다 |
+
+`types.ts`가 가장 분명한 자리였다: `inboxColumnRules?: Partial<Record<InboxBucket,
+MatrixQuadrantRule>>` — 기본함의 저장 형식이 매트릭스 타입으로 적혀 있었다.
+
+### 15.3 §11.4가 예고한 대로 임포트 하나만 움직였다
+
+3단계가 `matchesInboxRule` · `sanitizeInboxColumnRule` 별칭을 만들면서 "§7 Q3이 이 모듈을
+리네임할 때 옮길 임포트가 열이 아니라 하나"라고 적어 뒀다. **맞았다.** 보드 쪽에서 실제로
+바뀐 임포트는 `inboxColumnRules.ts` 한 줄이고, 그 위의 어떤 파일도 새 모듈을 모른다.
+
+`TasksModule`만 예외였다 — `EMPTY_MATRIX_RULE as EMPTY_INBOX_RULE`을 매트릭스에서 직접
+가져오고 있었다. 그 별칭이 있어야 할 자리는 호출자가 아니라 보드의 어휘 파일이므로,
+`EMPTY_INBOX_RULE`을 `inboxColumnRules`가 내보내고 컴포넌트는 그것을 쓴다.
+
+### 15.4 테스트도 갈랐다
+
+`matrixRules.test.ts` 하나가 두 층을 다 검사하고 있었다. 갈라 놓고 보니 규칙 층의 테스트가
+**매트릭스 프리셋을 픽스처로 쓰고 있었다** — "드롭이 무엇을 쓰는가"를 `DEFAULT_MATRIX_RULES.I`로
+묻고 있었으니, 보드가 같은 답에 기대면서도 그 답은 매트릭스에게 물어보고 있었던 셈이다.
+`viewRules.test.ts`는 손으로 쓴 규칙만 쓴다. 프리셋에 관한 주장은 매트릭스 쪽에 남았다.
+
+### 15.5 검증
+
+- 유닛 2,129개 통과(분리 후 순증 4개) · `tsc` 통과
+- 동작 변경 없음 — 이 작업은 **이름과 파일만** 옮겼다. 화면·저장 형식·규칙의 뜻은 그대로다
+
+### 15.6 남은 것
+
+- `matrixGroups.ts`의 `dateBucketOf`·`DateBucket`도 두 화면이 쓴다. 같은 종류의 거짓말이
+  더 작은 규모로 남아 있다 — 이번엔 건드리지 않았다

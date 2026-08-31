@@ -26,7 +26,7 @@ import {
   type InboxColumnRules,
   type InboxDropOutcome,
 } from "./inboxColumnRules";
-import type { MatrixRuleContext } from "./matrixRules";
+import type { RuleContext } from "./viewRules";
 
 export interface InboxColumn {
   id: string;
@@ -124,7 +124,7 @@ function dedupe(columns: InboxColumn[]): InboxColumn[] {
  * here too: two columns matching is a state the user built, and the one on the
  * left is the one they read first.
  */
-export function columnOfTask(task: Task, columns: InboxColumn[], context: MatrixRuleContext): string | null {
+export function columnOfTask(task: Task, columns: InboxColumn[], context: RuleContext): string | null {
   for (const column of columns) {
     if (matchesInboxRule(task, column.rule, context)) return column.id;
   }
@@ -136,7 +136,7 @@ export function dropOutcomeForColumnId(
   task: Task,
   columns: InboxColumn[],
   columnId: string,
-  context: MatrixRuleContext,
+  context: RuleContext,
 ): InboxDropOutcome {
   const column = columns.find((candidate) => candidate.id === columnId);
   // A column that is not there cannot take anything. Naming it "list" would be

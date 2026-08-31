@@ -27,12 +27,10 @@ import {
 import {
   DEFAULT_MATRIX_RULES,
   MATRIX_RULE_PRESETS,
-  matrixRulesOverlap,
-  sanitizeMatrixRule,
-  type MatrixQuadrantRule,
   type MatrixQuadrantRules,
   type MatrixRulePresetId,
 } from "../domain/view/matrixRules";
+import { rulesOverlap, sanitizeRule, type ViewRule } from "../domain/view/viewRules";
 import { MATRIX_QUADRANTS, type MatrixQuadrant } from "../utils/eisenhower";
 import { listColorHex } from "../domain/tasks/listColor";
 import { useT } from "../i18n";
@@ -52,7 +50,7 @@ interface MatrixQuadrantEditorProps {
   rules: MatrixQuadrantRules;
   lists: List[];
   tags: Tag[];
-  onSave: (view: MatrixQuadrantView, rule: MatrixQuadrantRule) => void;
+  onSave: (view: MatrixQuadrantView, rule: ViewRule) => void;
   /** Replaces all four rules at once — see the note on the preset row. */
   onApplyPreset: (preset: MatrixRulePresetId) => void;
   onClose: () => void;
@@ -74,7 +72,7 @@ export function MatrixQuadrantEditor({
   const [name, setName] = useState(view.name ?? "");
   const [hint, setHint] = useState(view.hint ?? "");
   const [color, setColor] = useState(view.color ?? "");
-  const [rule, setRule] = useState<MatrixQuadrantRule>(rules[quadrant]);
+  const [rule, setRule] = useState<ViewRule>(rules[quadrant]);
   const [presetsOpen, setPresetsOpen] = useState(false);
   const nameRef = useAutoFocus<HTMLInputElement>();
   // The footer's Save submits the form it is not inside. `form=` is what that
@@ -95,7 +93,7 @@ export function MatrixQuadrantEditor({
   const collisions = useMemo(
     () =>
       MATRIX_QUADRANTS.filter(
-        (other) => other !== quadrant && matrixRulesOverlap(rule, rules[other]),
+        (other) => other !== quadrant && rulesOverlap(rule, rules[other]),
       ),
     [quadrant, rule, rules],
   );
@@ -103,7 +101,7 @@ export function MatrixQuadrantEditor({
   function save() {
     // Through the same gates a stored record passes: the dialog and a synced
     // record then cannot disagree about what "" or an unknown value means.
-    onSave(sanitizeMatrixView({ ...view, name, hint, color }), sanitizeMatrixRule(rule));
+    onSave(sanitizeMatrixView({ ...view, name, hint, color }), sanitizeRule(rule));
     onClose();
   }
 
@@ -116,9 +114,9 @@ export function MatrixQuadrantEditor({
 
   const changed =
     Boolean(name || hint || color) ||
-    matrixRuleDiffers(rule, DEFAULT_MATRIX_RULES[quadrant]);
+    ruleDiffers(rule, DEFAULT_MATRIX_RULES[quadrant]);
 
-  const patchRule = (patch: Partial<MatrixQuadrantRule>) =>
+  const patchRule = (patch: Partial<ViewRule>) =>
     setRule((current) => ({ ...current, ...patch }));
 
   return (
@@ -230,7 +228,7 @@ export function MatrixQuadrantEditor({
             label: t(`matrix.group.${bucket}`),
           }))}
           selected={rule.dateBuckets}
-          onChange={(dateBuckets) => patchRule({ dateBuckets: dateBuckets as MatrixQuadrantRule["dateBuckets"] })}
+          onChange={(dateBuckets) => patchRule({ dateBuckets: dateBuckets as ViewRule["dateBuckets"] })}
         />
         <RuleDimension
           label={t("matrix.edit.priorities")}
@@ -283,7 +281,7 @@ function winnerOf(quadrant: MatrixQuadrant, collisions: MatrixQuadrant[]): Matri
   );
 }
 
-function matrixRuleDiffers(a: MatrixQuadrantRule, b: MatrixQuadrantRule): boolean {
+function ruleDiffers(a: ViewRule, b: ViewRule): boolean {
   const same = (x: readonly string[], y: readonly string[]) =>
     x.length === y.length && x.every((value) => y.includes(value));
   return !(

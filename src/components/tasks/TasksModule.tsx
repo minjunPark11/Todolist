@@ -84,8 +84,7 @@ import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { COMPLETED_PAGE, DEFAULT_MATRIX_VIEW, groupMatrixTasks } from "../../domain/view/matrixGroups";
-import type { InboxColumnRules } from "../../domain/view/inboxColumnRules";
-import { EMPTY_MATRIX_RULE as EMPTY_INBOX_RULE } from "../../domain/view/matrixRules";
+import { EMPTY_INBOX_RULE, type InboxColumnRules } from "../../domain/view/inboxColumnRules";
 import {
   addInboxColumn,
   columnAsksForDate,

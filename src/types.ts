@@ -3,7 +3,7 @@ import type { FocusDefaultLength } from "./domain/focus/sessionLength";
 // Type-only, so nothing is imported at runtime and the modules that describe
 // the matrix can keep importing this one.
 import type { MatrixQuadrantView } from "./domain/view/matrixGroups";
-import type { MatrixQuadrantRule } from "./domain/view/matrixRules";
+import type { ViewRule } from "./domain/view/viewRules";
 import type { InboxBucket } from "./domain/tasks/board";
 import type { InboxColumn } from "./domain/view/inboxColumns";
 import type { MatrixQuadrant } from "./utils/eisenhower";
@@ -654,7 +654,7 @@ export interface AppSettings {
    * this app had hard-coded before rules existed, so an account that never
    * opens the editor behaves exactly as it does now.
    */
-  matrixQuadrantRules?: Partial<Record<MatrixQuadrant, MatrixQuadrantRule>>;
+  matrixQuadrantRules?: Partial<Record<MatrixQuadrant, ViewRule>>;
   /**
    * What each Inbox board COLUMN contains
    * (TICKTICK_INBOX_COLUMNS_DESIGN.md §6, phase 3).
@@ -666,7 +666,7 @@ export interface AppSettings {
    * it does now — which `inboxColumnRules.test.ts` checks against the
    * `inboxBucketOf` these replace, shape by shape.
    */
-  inboxColumnRules?: Partial<Record<InboxBucket, MatrixQuadrantRule>>;
+  inboxColumnRules?: Partial<Record<InboxBucket, ViewRule>>;
   /**
    * What the user calls each Inbox board column.
    *

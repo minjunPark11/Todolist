@@ -9,13 +9,16 @@
 // answerable, and it ships without a screen — phase 4 has to build the place
 // an unmatched task is reported BEFORE phase 5 hands anybody a delete button.
 //
-// The vocabulary is the Matrix's, deliberately and not by accident of reuse.
-// "What belongs in this container" is the same question on both screens, and
-// §23 already answered it once with lists, tags, date buckets and priorities.
-// The one thing it could not say was `언젠가` — so `DateBucket` gained a
-// sixth member rather than this module growing a dimension of its own, which
-// keeps ONE vocabulary for both screens and is the evidence §7's Q3 was
-// waiting for: when phase 5 builds one editor, it edits one shape.
+// The vocabulary is shared, deliberately and not by accident of reuse. "What
+// belongs in this container" is the same question on both screens, and §23
+// already answered it once with lists, tags, date buckets and priorities. The
+// one thing it could not say was `언젠가` — so `DateBucket` gained a sixth
+// member rather than this module growing a dimension of its own, which keeps
+// ONE vocabulary for both screens: one editor, editing one shape.
+//
+// That shape used to live in `matrixRules`, which is what §7 Q3 complained
+// about. It is `viewRules` now, and this module is one of its two callers
+// rather than a guest in the other one's file.
 //
 // Gate 7 is not weakened by sharing it. What a rule MEANS is shared; what a
 // drop may WRITE is not, and that stays with each board's own adapter — the
@@ -25,34 +28,36 @@ import type { Task } from "../../types";
 import { INBOX_BUCKETS, type InboxBucket } from "../tasks/board";
 import { dateBucketOf } from "./matrixGroups";
 import {
-  EMPTY_MATRIX_RULE,
+  EMPTY_RULE,
   dateForBuckets,
-  matchesMatrixRule,
-  sanitizeMatrixRule,
-  type MatrixQuadrantRule,
-  type MatrixRuleContext,
-} from "./matrixRules";
+  matchesRule,
+  sanitizeRule,
+  type RuleContext,
+  type ViewRule,
+} from "./viewRules";
 
 /**
  * One column's conditions.
  *
- * The Matrix's shape under another name, because it is the same shape and
- * naming it again here would be a second thing to keep in step. The alias is
- * what a later rename can move without touching either caller.
+ * The shared shape under this board's name, because it is the same shape and
+ * naming it again here would be a second thing to keep in step.
  */
-export type InboxColumnRule = MatrixQuadrantRule;
+export type InboxColumnRule = ViewRule;
 export type InboxColumnRules = Record<InboxBucket, InboxColumnRule>;
 
 /**
  * The two rule operations under the Board's own names.
  *
- * Aliases rather than wrappers: the behaviour IS the Matrix's, and a wrapper
+ * Aliases rather than wrappers: the behaviour IS the shared one, and a wrapper
  * would be a place for the two to drift. What they buy is that no file above
- * this one has to import from `matrixRules` to ask a question about a column —
- * so §7's Q3, when it renames that module, has one import to move and not ten.
+ * this one imports `viewRules` to ask a question about a column — which is why
+ * §7 Q3's rename moved one import here and none anywhere else.
  */
-export const matchesInboxRule = matchesMatrixRule;
-export const sanitizeInboxColumnRule = sanitizeMatrixRule;
+export const matchesInboxRule = matchesRule;
+export const sanitizeInboxColumnRule = sanitizeRule;
+
+/** An unconstrained column, for a dialog that has not been told anything yet. */
+export const EMPTY_INBOX_RULE = EMPTY_RULE;
 
 /**
  * The three columns this app has always drawn, said as rules.
@@ -68,9 +73,9 @@ export const sanitizeInboxColumnRule = sanitizeMatrixRule;
  * property worth a test rather than a promise.
  */
 export const DEFAULT_INBOX_COLUMN_RULES: InboxColumnRules = {
-  unsorted: { ...EMPTY_MATRIX_RULE, dateBuckets: ["none"] },
-  scheduled: { ...EMPTY_MATRIX_RULE, dateBuckets: ["overdue", "today", "tomorrow", "later"] },
-  someday: { ...EMPTY_MATRIX_RULE, dateBuckets: ["someday"] },
+  unsorted: { ...EMPTY_RULE, dateBuckets: ["none"] },
+  scheduled: { ...EMPTY_RULE, dateBuckets: ["overdue", "today", "tomorrow", "later"] },
+  someday: { ...EMPTY_RULE, dateBuckets: ["someday"] },
 };
 
 /**
@@ -78,7 +83,7 @@ export const DEFAULT_INBOX_COLUMN_RULES: InboxColumnRules = {
  *
  * A column missing from storage reads as its default rather than as "no
  * conditions" — an absent key means the user never touched that column, and
- * `EMPTY_MATRIX_RULE` would make it swallow every task in the Inbox.
+ * `EMPTY_RULE` would make it swallow every task in the Inbox.
  */
 export function sanitizeInboxColumnRules(value: unknown): Partial<InboxColumnRules> {
   if (!value || typeof value !== "object") return {};
@@ -86,7 +91,7 @@ export function sanitizeInboxColumnRules(value: unknown): Partial<InboxColumnRul
   const out: Partial<InboxColumnRules> = {};
   for (const bucket of INBOX_BUCKETS) {
     if (record[bucket] === undefined) continue;
-    out[bucket] = sanitizeMatrixRule(record[bucket]);
+    out[bucket] = sanitizeRule(record[bucket]);
   }
   return out;
 }
@@ -112,9 +117,9 @@ export function resolveInboxColumnRules(stored?: Partial<InboxColumnRules>): Inb
  * moment a column's rule is edited it becomes reachable, and phase 4's
  * remainder row is what has to be standing before that happens.
  */
-export function columnForTask(task: Task, rules: InboxColumnRules, context: MatrixRuleContext): InboxBucket | null {
+export function columnForTask(task: Task, rules: InboxColumnRules, context: RuleContext): InboxBucket | null {
   for (const bucket of INBOX_BUCKETS) {
-    if (matchesMatrixRule(task, rules[bucket], context)) return bucket;
+    if (matchesRule(task, rules[bucket], context)) return bucket;
   }
   return null;
 }
@@ -151,7 +156,7 @@ export type InboxDropOutcome =
 export function dropOutcomeForColumn(
   task: Task,
   rule: InboxColumnRule,
-  context: MatrixRuleContext,
+  context: RuleContext,
 ): InboxDropOutcome {
   if (rule.listIds.length > 0 && !rule.listIds.includes(context.listId)) {
     return { accepted: false, reason: "list" };

@@ -13,7 +13,8 @@
 // for a Project's own statuses, and the Tasks Module has its own Kanban per
 // List.
 //
-// What a quadrant MEANS is now a stored RULE (`domain/view/matrixRules`,
+// What a quadrant MEANS is now a stored RULE (`domain/view/matrixRules`, over
+// the vocabulary it shares with the Board in `domain/view/viewRules`;
 // TICKTICK_MATRIX_DESIGN.md §23). The default rule is the one this screen had
 // hard-coded — the box is the task's priority, D1 — so an account that has
 // never opened the editor sees exactly what it saw before. Still derived
@@ -33,15 +34,17 @@ import type { List, Tag, Task, TaskPriority } from "../types";
 import { MATRIX_QUADRANTS, type MatrixQuadrant } from "../utils/eisenhower";
 import {
   MATRIX_RULE_PRESETS,
-  dropOutcomeForRule,
-  draftForRule,
   quadrantForTask,
   resolveMatrixRules,
-  type MatrixDropRefusal,
-  type MatrixQuadrantRule,
   type MatrixQuadrantRules,
   type MatrixRulePresetId,
 } from "../domain/view/matrixRules";
+import {
+  dropOutcomeForRule,
+  draftForRule,
+  type DropRefusal,
+  type ViewRule,
+} from "../domain/view/viewRules";
 import {
   COMPLETED_PAGE,
   DEFAULT_MATRIX_VIEW,
@@ -81,7 +84,7 @@ interface MatrixPageProps {
   onChangeQuadrantView?: (quadrant: MatrixQuadrant, view: MatrixQuadrantView) => void;
   /** What each box CONTAINS. Absent boxes read as the priority mapping (D1). */
   quadrantRules?: Partial<MatrixQuadrantRules>;
-  onChangeQuadrantRule?: (quadrant: MatrixQuadrant, rule: MatrixQuadrantRule) => void;
+  onChangeQuadrantRule?: (quadrant: MatrixQuadrant, rule: ViewRule) => void;
   /** Replaces all four at once — the only control here that does (§23.2). */
   onApplyRulePreset?: (rules: MatrixQuadrantRules) => void;
   /** Offered as conditions a box can be narrowed to. */
@@ -184,7 +187,7 @@ export function MatrixPage({
   }
 
   /** Why this box will not take the card being dragged, or `null` if it will. */
-  function refusalFor(taskId: string, quadrant: MatrixQuadrant): MatrixDropRefusal | null {
+  function refusalFor(taskId: string, quadrant: MatrixQuadrant): DropRefusal | null {
     const outcome = dropOutcome(taskId, quadrant);
     // A drag this page did not start — a card from another screen — is not
     // refused on a guess. The drop itself asks again and is the real gate.
@@ -406,7 +409,7 @@ function QuadrantCell({
   quadrant: MatrixQuadrant;
   labels: { name: string; hint: string };
   /** Set while a card this box cannot take is being dragged. */
-  refusal: MatrixDropRefusal | null;
+  refusal: DropRefusal | null;
   /** The List being viewed, when it and this box's rule exclude each other. */
   scopedOutBy: string;
   tasks: Task[];

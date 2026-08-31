@@ -11,12 +11,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { I18nProvider } from "../../i18n";
-import { EMPTY_MATRIX_RULE } from "../../domain/view/matrixRules";
+import { EMPTY_INBOX_RULE } from "../../domain/view/inboxColumnRules";
 import { InboxColumnDialog, type InboxColumnDraft } from "./InboxColumnDialog";
 
 afterEach(cleanup);
 
-function setup(initial: InboxColumnDraft = { name: "", rule: EMPTY_MATRIX_RULE }) {
+function setup(initial: InboxColumnDraft = { name: "", rule: EMPTY_INBOX_RULE }) {
   const onSave = vi.fn();
   const onClose = vi.fn();
   render(
@@ -48,7 +48,7 @@ describe("adding a column", () => {
     fireEvent.click(screen.getByLabelText("Today"));
     expect(save.disabled).toBe(false);
     fireEvent.click(save);
-    expect(onSave).toHaveBeenCalledWith({ name: "", rule: { ...EMPTY_MATRIX_RULE, dateBuckets: ["today"] } });
+    expect(onSave).toHaveBeenCalledWith({ name: "", rule: { ...EMPTY_INBOX_RULE, dateBuckets: ["today"] } });
   });
 
   it("offers the six buckets the column headers already use", () => {
@@ -70,7 +70,7 @@ describe("adding a column", () => {
 describe("editing one", () => {
   const initial: InboxColumnDraft = {
     name: "Back burner",
-    rule: { ...EMPTY_MATRIX_RULE, dateBuckets: ["someday"], tagIds: ["work"] },
+    rule: { ...EMPTY_INBOX_RULE, dateBuckets: ["someday"], tagIds: ["work"] },
   };
 
   it("opens holding what the column already answers", () => {
@@ -89,7 +89,7 @@ describe("editing one", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(onSave).toHaveBeenCalledWith({
       name: "Back burner",
-      rule: { ...EMPTY_MATRIX_RULE, tagIds: ["work"], dateBuckets: ["someday", "later"] },
+      rule: { ...EMPTY_INBOX_RULE, tagIds: ["work"], dateBuckets: ["someday", "later"] },
     });
   });
 

@@ -14,7 +14,7 @@ import {
   setInboxColumnRule,
   type InboxColumn,
 } from "./inboxColumns";
-import { EMPTY_MATRIX_RULE } from "./matrixRules";
+import { EMPTY_INBOX_RULE } from "./inboxColumnRules";
 
 const TODAY = "2026-08-29";
 const CONTEXT = { today: TODAY, listId: "list-inbox" };
@@ -48,7 +48,7 @@ describe("where the columns come from", () => {
     // The migration is a READ. An account that never opens the new controls is
     // never rewritten, and an older build still understands what it finds.
     const columns = resolveInboxColumns(undefined, {
-      rules: { someday: { ...EMPTY_MATRIX_RULE, dateBuckets: ["someday"], tagIds: ["later"] } },
+      rules: { someday: { ...EMPTY_INBOX_RULE, dateBuckets: ["someday"], tagIds: ["later"] } },
       names: { someday: "Back burner" },
     });
     const someday = columns.find((column) => column.id === "someday");
@@ -94,7 +94,7 @@ describe("the ⋯ menu, as operations", () => {
   });
 
   it("adds beside the column the menu was opened on", () => {
-    const draft = { name: "This week", rule: { ...EMPTY_MATRIX_RULE, dateBuckets: ["today" as const] } };
+    const draft = { name: "This week", rule: { ...EMPTY_INBOX_RULE, dateBuckets: ["today" as const] } };
     const left = addInboxColumn(columns, { id: "scheduled", side: "left" }, draft);
     expect(left.map((column) => column.name ?? column.id)).toEqual([
       "unsorted",
@@ -110,7 +110,7 @@ describe("the ⋯ menu, as operations", () => {
   });
 
   it("puts a column with no neighbour at the end", () => {
-    const added = addInboxColumn(columns, null, { name: "Last", rule: EMPTY_MATRIX_RULE });
+    const added = addInboxColumn(columns, null, { name: "Last", rule: EMPTY_INBOX_RULE });
     expect(added[added.length - 1].name).toBe("Last");
   });
 
@@ -148,7 +148,7 @@ describe("asking which day", () => {
 
   it("does not ask when the rule already names the day", () => {
     const only = setInboxColumnRule(defaultInboxColumns(), "scheduled", {
-      ...EMPTY_MATRIX_RULE,
+      ...EMPTY_INBOX_RULE,
       dateBuckets: ["today"],
     });
     expect(columnAsksForDate(only[1])).toBe(false);
