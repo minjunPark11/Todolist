@@ -13,7 +13,7 @@
 // What these fix is that the panel draws the body it actually has, and offers
 // no editor for a field this task does not use.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { CheckItem, Task } from "../types";
 import { I18nProvider } from "../i18n";
 import { FloatingLayerProvider } from "./floating";
@@ -55,6 +55,13 @@ function item(id: string, text: string, checked = false): CheckItem {
 
 function setup(subject: Task, checkItems: CheckItem[] = []) {
   const onUpdateTask = vi.fn();
+  const checklist = {
+    onAddCheckItem: vi.fn(),
+    onAddCheckItems: vi.fn(),
+    onRenameCheckItem: vi.fn(),
+    onToggleCheckItem: vi.fn(),
+    onDeleteCheckItem: vi.fn(),
+  };
   render(
     <I18nProvider lang="en">
       <FloatingLayerProvider>
@@ -65,6 +72,7 @@ function setup(subject: Task, checkItems: CheckItem[] = []) {
           lists={[]}
           subtasks={[]}
           checkItems={checkItems}
+          {...checklist}
           onMoveToList={() => {}}
           onUpdateTask={onUpdateTask}
           onUpdateTaskSchedule={() => []}
@@ -78,7 +86,7 @@ function setup(subject: Task, checkItems: CheckItem[] = []) {
       </FloatingLayerProvider>
     </I18nProvider>,
   );
-  return { onUpdateTask };
+  return { onUpdateTask, ...checklist };
 }
 
 describe("the older panel, on a task whose body is a checklist", () => {
@@ -100,18 +108,32 @@ describe("the older panel, on a task whose body is a checklist", () => {
       item("c2", "Blockers"),
     ]);
 
-    expect(screen.getByText("Yesterday")).toBeTruthy();
-    expect(screen.getByText("Blockers")).toBeTruthy();
+    expect(screen.getByDisplayValue("Yesterday")).toBeTruthy();
+    expect(screen.getByDisplayValue("Blockers")).toBeTruthy();
     // The tick is a state of the line, so it is on the line rather than in a
     // separate legend the reader has to match up.
-    expect(screen.getByText("Yesterday").closest("li")?.className).toContain("is-checked");
-    expect(screen.getByText("Blockers").closest("li")?.className).not.toContain("is-checked");
+    expect(screen.getByDisplayValue("Yesterday").closest("li")?.className).toContain("is-checked");
+    expect(screen.getByDisplayValue("Blockers").closest("li")?.className).not.toContain("is-checked");
   });
 
-  it("says where the items can be changed, since not here", () => {
-    setup(task({ contentMode: "checklist" }), [item("c1", "Yesterday")]);
+  it("lets a line be ticked from here, which is the whole point of drawing it", () => {
+    // The read-only version of this panel could show the body and not touch
+    // it — "tick it in the other panel" is not something a reader on the
+    // Today page can act on (§12).
+    const { onToggleCheckItem } = setup(task({ contentMode: "checklist" }), [item("c1", "Yesterday")]);
 
-    expect(screen.getByText(/edited in the task list/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Yesterday" }));
+    expect(onToggleCheckItem).toHaveBeenCalledWith("c1");
+  });
+
+  it("adds a line to the task it is open on", () => {
+    const { onAddCheckItem } = setup(task({ contentMode: "checklist" }), []);
+
+    const draft = screen.getByLabelText("Add an item");
+    fireEvent.change(draft, { target: { value: "Blockers" } });
+    fireEvent.keyDown(draft, { key: "Enter" });
+
+    expect(onAddCheckItem).toHaveBeenCalledWith("t1", "Blockers");
   });
 
   it("leaves Notes alone — that field is this panel's own and means what it did", () => {

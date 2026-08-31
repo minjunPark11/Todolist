@@ -686,10 +686,18 @@ textarea {
   color: var(--color-ink-muted-48);
 }
 
+/* One column, stated rather than inherited. The rule further up gives
+   `.detail-panel` four columns, and this panel has exactly one child — so
+   that template could never do anything but cap the content at the first
+   160px track while the panel itself was 359 wide. Everything in here was
+   living in 44% of the panel: the title, the property rows, the notes. It
+   showed up when the body became a checklist, whose rows have no intrinsic
+   width to push back with. */
 .detail-panel {
   position: sticky;
   top: 32px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   max-height: calc(100vh - 64px);
   overflow: auto;
@@ -773,41 +781,6 @@ textarea {
 .detail-description-input:focus,
 .detail-notes:focus {
   outline: none;
-}
-
-/* The body of a checklist task, where this panel cannot edit it. Read like the
-   Description it stands in for — same size, same muted ink — because it is the
-   same thing: what this task says. */
-.detail-checklist {
-  display: grid;
-  gap: 6px;
-  font-size: 0.92rem;
-  color: var(--color-ink-muted-80);
-}
-
-.detail-checklist ul {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.detail-checklist li {
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-}
-
-.detail-checklist li.is-checked {
-  color: var(--color-ink-muted-60, var(--color-ink-muted-80));
-  text-decoration: line-through;
-}
-
-.detail-checklist-note {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--color-ink-muted-60, var(--color-ink-muted-80));
 }
 
 .detail-section {

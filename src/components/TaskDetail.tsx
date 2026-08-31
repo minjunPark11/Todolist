@@ -8,6 +8,7 @@ import { todayValue } from "../utils/date";
 import { dependentsOf, eligibleBlockers } from "../domain/tasks/dependencies";
 import { useT } from "../i18n";
 import { DeferredInput, DeferredTextarea } from "./kit";
+import { ChecklistEditor } from "./tasks/ChecklistEditor";
 import { SchedulePicker } from "./tasks/SchedulePicker";
 import type { ReminderSpec } from "../domain/schedule";
 import {
@@ -36,6 +37,19 @@ interface TaskDetailProps {
    * typed here could not be read anywhere and did not survive (§11.7).
    */
   checkItems: CheckItem[];
+  /**
+   * The checklist's five edits, the same ones the Drawer passes down.
+   *
+   * They are here because the alternative was a body the reader could see and
+   * not touch: this panel is what the Today, Calendar and Project pages open,
+   * and "tick it in the other panel" is not an answer anyone can act on from
+   * here (§12).
+   */
+  onAddCheckItem: (taskId: string, text: string) => void;
+  onAddCheckItems: (taskId: string, texts: string[]) => void;
+  onRenameCheckItem: (itemId: string, text: string) => void;
+  onToggleCheckItem: (itemId: string) => void;
+  onDeleteCheckItem: (itemId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   onRequestDeleteTask: (taskId: string) => void;
@@ -63,6 +77,11 @@ export function TaskDetail({
   onDuplicateTask,
   subtasks,
   checkItems,
+  onAddCheckItem,
+  onAddCheckItems,
+  onRenameCheckItem,
+  onToggleCheckItem,
+  onDeleteCheckItem,
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
@@ -113,26 +132,28 @@ export function TaskDetail({
           aria-label={t("taskDetail.taskTitleAria")}
           onCommit={(title) => onUpdateTask(task.id, { title })}
         />
-        {/* A checklist is not a Description, and this panel cannot edit one.
-            It used to offer the Description editor anyway: the Drawer never
-            showed what was typed here, and the next toggle back to prose
-            overwrote it with the items (§11.19). So the field is replaced by
-            the checklist itself, read-only — the body is legible here, and
-            the one place that can change it is the one place that draws it. */}
+        {/* A checklist is not a Description, and the editor for one is not a
+            textarea. This panel used to offer the Description field anyway:
+            the Drawer never showed what was typed here, and the next toggle
+            back to prose overwrote it with the items (§11.19).
+
+            The same component the Drawer uses, rather than a second one: a
+            checklist that could be read here but only ticked in the other
+            panel was a body the reader could see and not touch, which is half
+            an answer to the same question (§12). */}
         {checklist ? (
-          <div className="detail-checklist">
-            {items.length > 0 ? (
-              <ul>
-                {items.map((item) => (
-                  <li key={item.id} className={item.checked ? "is-checked" : ""}>
-                    <span aria-hidden="true">{item.checked ? "☑" : "☐"}</span>
-                    <span>{item.text}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            <p className="detail-checklist-note">{t("taskDetail.checklistReadOnly")}</p>
-          </div>
+          <ChecklistEditor
+            /* The panel is keyed by task in `App.tsx`, but the draft row is
+               per-task state either way — the same reason the Drawer keys it
+               (§1.26). */
+            key={task.id}
+            items={items}
+            onAdd={(text) => onAddCheckItem(task.id, text)}
+            onAddMany={(texts) => onAddCheckItems(task.id, texts)}
+            onRename={onRenameCheckItem}
+            onToggle={onToggleCheckItem}
+            onDelete={onDeleteCheckItem}
+          />
         ) : (
           <DeferredTextarea
             className="detail-description-input"

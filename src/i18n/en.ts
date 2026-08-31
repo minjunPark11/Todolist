@@ -637,7 +637,6 @@ export const en: Dictionary = {
   "taskDetail.taskTitleAria": "Task title",
   "taskDetail.taskDescriptionAria": "Task description",
   "taskDetail.addDescription": "Add description",
-  "taskDetail.checklistReadOnly": "This task's body is a checklist. Its items are edited in the task list.",
   "taskDetail.schedule": "Schedule",
   "taskDetail.startDate": "Start date",
   "taskDetail.startTime": "Start time",
