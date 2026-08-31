@@ -743,19 +743,6 @@ export const en: Dictionary = {
   "matrix.refuse.list": "This box only takes tasks from another List, and a drop will not move them",
   "matrix.refuse.tag": "This box only takes tasks with another tag, and a drop will not add one",
   "matrix.refuse.dueDate": "This box only takes undated tasks, and a drop will not erase a deadline",
-  "eis.qI": "Important & Urgent",
-  "eis.qIHint": "Core work that needs attention now",
-  "eis.qII": "Important, Not Urgent",
-  "eis.qIIHint": "Important work to plan ahead",
-  "eis.qIII": "Urgent, Not Important",
-  "eis.qIIIHint": "Light work to knock out quickly",
-  // Still not "Neither Important nor Urgent", which would attribute a verdict
-  // the user never gave. It is priority `none` now (TICKTICK_MATRIX_DESIGN.md
-  // D1) — the absence of a judgement, and nothing else: paused and finished
-  // work no longer parks here, it stays in the box its own priority names.
-  "eis.qIV": "Unsorted",
-  "eis.qIVHint": "No priority set",
-  "eis.overdue": "Overdue",
   "eis.today": "Today",
   "eis.minutes": "{{n}}m",
   "calendar.groupEmpty.personal": "No categories yet.",

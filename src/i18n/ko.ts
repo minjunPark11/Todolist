@@ -736,17 +736,6 @@ export const ko: Dictionary = {
   "matrix.refuse.list": "이 칸은 다른 리스트의 작업만 받습니다. 끌어 놓아도 소속은 바뀌지 않습니다",
   "matrix.refuse.tag": "이 칸은 다른 태그의 작업만 받습니다. 끌어 놓아도 태그는 붙지 않습니다",
   "matrix.refuse.dueDate": "이 칸은 마감일 없는 작업만 받습니다. 끌어 놓아도 마감일을 지우지 않습니다",
-  "eis.qI": "중요하고 급한 일",
-  "eis.qIHint": "지금 처리해야 하는 핵심 작업",
-  "eis.qII": "중요하지만 급하지 않은 일",
-  "eis.qIIHint": "계획해서 진행할 중요한 작업",
-  "eis.qIII": "중요하지 않지만 급한 일",
-  "eis.qIIIHint": "빠르게 처리할 가벼운 작업",
-  // 우선순위 "없음"이다(TICKTICK_MATRIX_DESIGN.md D1). 판단하지 않았다는 뜻일
-  // 뿐, 보류·완료된 일은 더 이상 여기로 오지 않는다. en.ts의 주석 참고.
-  "eis.qIV": "미분류",
-  "eis.qIVHint": "우선순위를 정하지 않은 일",
-  "eis.overdue": "기한 지남",
   "eis.today": "오늘",
   "eis.minutes": "{{n}}분",
   "calendar.groupEmpty.personal": "카테고리가 없습니다.",
