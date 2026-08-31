@@ -39,6 +39,7 @@ import { TaskDrawer } from "./TaskDrawer";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
 import type { TaskChild } from "../../domain/tasks/children";
 import { ancestorsOf, canAddChild } from "../../domain/tasks/hierarchy";
+import { blockerChoices, dependentsOf } from "../../domain/tasks/dependencies";
 import type { TaskMutation } from "../../domain/tasks/mutations";
 import {
   completeTask,
@@ -1344,6 +1345,15 @@ export function TasksModule(props: TasksModuleProps) {
           // visible rows: an ancestor filtered out of the current view is
           // still where this Task came from.
           ancestors={ancestorsOf(openedTask.id, tasks)}
+          // Both directions of §4's dependency row, and both against every
+          // Task rather than the Scope's visible rows — for the same reason
+          // the breadcrumb is: a blocker filtered out of this view is still
+          // what the Task is waiting on.
+          blockerOptions={blockerChoices(tasks, openedTask)}
+          blocking={dependentsOf(tasks, openedTask.id).map((dependent) => ({
+            id: dependent.id,
+            title: dependent.title,
+          }))}
           onOpenTask={openTask}
           canAddSubtask={canAddChild(openedTask.id, tasks)}
           resize={detailWidth}

@@ -101,3 +101,33 @@ export function eligibleBlockers(tasks: Task[], taskId: string): Task[] {
     return !wouldCycle(tasks, taskId, candidate.id);
   });
 }
+
+/**
+ * What the picker DRAWS: every eligible blocker, plus the one already set.
+ *
+ * The stored blocker can fall out of `eligibleBlockers` the moment it is
+ * completed — and a select whose value is not among its options renders as
+ * empty, so the control would have read "Nothing" while the field held an id.
+ * Keeping it in the list is what makes the control say what the task is
+ * actually waiting on.
+ *
+ * Titles rather than tasks, because that is all a picker needs, and because
+ * both panels drawing this row can then be handed a list instead of the whole
+ * account (§12.4).
+ *
+ * The id is the fallback title. A blocker that arrived from another device and
+ * is not in this account's tasks is still a value the field holds, and showing
+ * the raw id says "something is here that I cannot name" rather than dropping
+ * the row to Nothing.
+ */
+export function blockerChoices(tasks: Task[], task: Task): Array<{ id: string; title: string }> {
+  const choices = eligibleBlockers(tasks, task.id).map((candidate) => ({
+    id: candidate.id,
+    title: candidate.title,
+  }));
+  const current = task.blockedByTaskId;
+  if (current && !choices.some((choice) => choice.id === current)) {
+    choices.unshift({ id: current, title: tasks.find((item) => item.id === current)?.title ?? current });
+  }
+  return choices;
+}

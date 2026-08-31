@@ -103,6 +103,8 @@ function Harness({ presentation }: { presentation: "inline-drawer" | "right-shee
           onToggleCheckItem={noop}
           onDeleteCheckItem={noop}
           onOpenTask={noop}
+          blockerOptions={[]}
+          blocking={[]}
           resize={resize}
         />
     </div>

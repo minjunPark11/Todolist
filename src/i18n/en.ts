@@ -961,7 +961,16 @@ export const en: Dictionary = {
   "tasks.priority.current": "Priority, {{value}}",
   "tasks.priority.set": "Set priority",
   "tasks.notes": "Notes",
-  // Spec §11. "Checklist" and "Notes" name the two contents; the toggle
+  /* The prose body is the DESCRIPTION, and this is the heading that says so.
+
+     It read "Notes" until the Drawer grew the Notes field itself: `notes` and
+     `description` are two columns on Task, and one word over both of them left
+     the reader unable to tell which one they had just typed into. The
+     reference app's placeholder is "Add notes..." — which is where the old
+     wording came from — but its Task has no second field to be confused with
+     (TASK_DETAIL_PANEL_MERGE_DESIGN.md §3). */
+  "tasks.description": "Description",
+  // Spec §11. "Checklist" and "Description" name the two contents; the toggle
   // labels are the short forms that fit beside them.
   "tasks.checklist": "Checklist",
   "tasks.checklist.item": "Checklist item",

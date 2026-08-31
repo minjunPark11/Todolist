@@ -108,6 +108,18 @@ export interface TaskDrawerProps {
    * the same width — see the `--tm-detail-w` comment there.
    */
   resize: TaskDetailWidthState;
+  /**
+   * What this Task may be told to wait on, already including whatever it is
+   * waiting on now (`blockerChoices`).
+   *
+   * Handed in for the same reason `actions` and `ancestors` are: the rule
+   * about which Tasks are eligible — no self, no cycle, nothing finished — is
+   * `domain/tasks/dependencies`'s, and the Drawer would need every Task in
+   * the account to apply it here.
+   */
+  blockerOptions: Array<{ id: string; title: string }>;
+  /** The other direction, derived rather than stored (`dependentsOf`). */
+  blocking: Array<{ id: string; title: string }>;
   /** False at the deepest allowed level (§12.49). */
   canAddSubtask: boolean;
 }
@@ -147,6 +159,8 @@ export function TaskDrawer({
   onOpenTask,
   canAddSubtask,
   resize,
+  blockerOptions,
+  blocking,
 }: TaskDrawerProps) {
   const { t } = useT();
   const root = useRef<HTMLElement>(null);
@@ -422,14 +436,73 @@ export function TaskDrawer({
             restoreFocusTo={() => root.current}
           />
         </div>
+
+        {/* What this Task is waiting on. It was the legacy panel's row and
+            only its row, which meant the field could be set on the Today page
+            and neither seen nor cleared on the screen the Tasks module calls
+            the Detail — while the Today queue went on demoting the Task for a
+            reason nothing here would say (§4).
+
+            A `<select>` rather than a picker like List and Tags above. Those
+            two have specs behind them (§13.9, §13.36); a dependency picker has
+            none, and inventing a third popover to match the neighbours would
+            be design this row has no evidence for. The plain control is what
+            the legacy panel drew, and moving it unchanged is what keeps this a
+            move rather than a redesign.
+
+            The keys are `taskDetail.*` — the panel this came from — rather
+            than a second spelling of the same four strings under `tasks.*`.
+            §30.2 counted what one-sided key sets cost; the panel is what goes
+            away, and the words outlive it. */}
+        <div className="tm-drawer-field is-dependency">
+          <span>{t("taskDetail.blockedBy")}</span>
+          <select
+            value={task.blockedByTaskId}
+            aria-label={t("taskDetail.blockedBy")}
+            onChange={(event) => onUpdate({ blockedByTaskId: event.target.value })}
+          >
+            <option value="">{t("taskDetail.blockedByNone")}</option>
+            {blockerOptions.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>
+                {candidate.title}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+
+      {/* Only when there is one. An always-drawn hint under an empty select
+          would explain a rule the reader has not invoked. */}
+      {task.blockedByTaskId ? (
+        <p className="tm-drawer-field-note">{t("taskDetail.blockedByHint")}</p>
+      ) : null}
+
+      {/* The reverse direction, and it is read-only because it is DERIVED —
+          `dependentsOf` computes it from the other Tasks' own fields, so there
+          is nothing here that could be written back. Each is a link for the
+          same reason the breadcrumb's ancestors are: the useful next move from
+          "three things are waiting on this" is opening one of them. */}
+      {blocking.length > 0 ? (
+        <section className="tm-drawer-blocking">
+          <h3>{t("taskDetail.blocks")}</h3>
+          <ul>
+            {blocking.map((dependent) => (
+              <li key={dependent.id}>
+                <button type="button" onClick={() => onOpenTask(dependent.id)}>
+                  {dependent.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* The toggle moved to the title (§11.4). What stays is the heading and,
           for a checklist, how much of it is done — the header says what this
           content IS, and the control that changes it is where the spec put it. */}
       <section className="tm-drawer-content">
         <header className="tm-drawer-content-head">
-          <span>{t(checklist ? "tasks.checklist" : "tasks.notes")}</span>
+          <span>{t(checklist ? "tasks.checklist" : "tasks.description")}</span>
           {/* Not `0/0`. `progressOf` in the MCP projections already refuses
               that number for the same reason: it says "no progress" where the
               truth is "this task has no parts" — and the Subtasks heading two
@@ -463,9 +536,10 @@ export function TaskDrawer({
           <DeferredTextarea
             value={task.description}
             rows={3}
+            placeholder={t("taskDetail.addDescription")}
             onCommit={(description) => onUpdate({ description })}
             resetKey={task.id}
-            aria-label={t("tasks.notes")}
+            aria-label={t("tasks.description")}
           />
         )}
       </section>
@@ -532,6 +606,30 @@ export function TaskDrawer({
         ) : (
           <p className="tm-drawer-depth-limit">{t("tasks.maxDepthReached")}</p>
         )}
+      </section>
+
+      {/* `notes`, which is a SECOND field and not the body above.
+
+          The Drawer never drew it. That was survivable while the legacy panel
+          was the only other Detail, and stopped being survivable once the
+          Tasks module became where Tasks are read: a note typed on the Today
+          page was invisible here, the calendar's event popover was writing the
+          same column as its memo, and search was matching text the reader
+          could not find on screen (§4).
+
+          Below the subtasks rather than beside the description, because it is
+          not an alternative to it — a Task can have both, and stacking them
+          under one heading is how they came to share a word (§3). */}
+      <section className="tm-drawer-notes">
+        <h3>{t("taskDetail.notes")}</h3>
+        <DeferredTextarea
+          value={task.notes}
+          rows={2}
+          placeholder={t("taskDetail.addNotes")}
+          onCommit={(notes) => onUpdate({ notes })}
+          resetKey={task.id}
+          aria-label={t("taskDetail.notes")}
+        />
       </section>
 
       {/* Won't Do and Move to trash used to sit here as two buttons at the

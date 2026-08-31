@@ -935,6 +935,7 @@ export const ko: Dictionary = {
   "tasks.priority.current": "우선순위, {{value}}",
   "tasks.priority.set": "우선순위 설정",
   "tasks.notes": "메모",
+  "tasks.description": "설명",
   "tasks.checklist": "체크리스트",
   "tasks.checklist.item": "체크리스트 항목",
   "tasks.checklist.toggle": "항목 완료 전환",

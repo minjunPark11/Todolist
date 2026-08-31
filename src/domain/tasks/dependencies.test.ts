@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Task } from "../../types";
 import {
   blockedTaskIds,
+  blockerChoices,
   dependentsOf,
   eligibleBlockers,
   isTaskBlocked,
@@ -168,5 +169,38 @@ describe("eligibleBlockers", () => {
   it("omits candidates that would close a loop", () => {
     const tasks = [task({ id: "a" }), task({ id: "b", blockedByTaskId: "a" }), task({ id: "c" })];
     expect(eligibleBlockers(tasks, "a").map((item) => item.id)).toEqual(["c"]);
+  });
+});
+
+/**
+ * What the two panels DRAW, which is not quite what is eligible.
+ *
+ * Both the legacy panel and the Drawer render this list into a `<select>`
+ * whose value is `blockedByTaskId`. A select whose value is absent from its
+ * options renders empty — so the one rule these tests exist for is that the
+ * value already held is always among them, however it got there.
+ */
+describe("blockerChoices", () => {
+  it("offers the eligible candidates when nothing is set", () => {
+    const subject = task({ id: "a" });
+    const tasks = [subject, task({ id: "b", title: "B" })];
+    expect(blockerChoices(tasks, subject)).toEqual([{ id: "b", title: "B" }]);
+  });
+
+  it("keeps the blocker already set once it has been completed", () => {
+    const subject = task({ id: "a", blockedByTaskId: "done" });
+    const tasks = [subject, task({ id: "done", title: "Finished", status: "done" })];
+    expect(blockerChoices(tasks, subject)).toEqual([{ id: "done", title: "Finished" }]);
+  });
+
+  it("does not offer the set blocker twice while it is still eligible", () => {
+    const subject = task({ id: "a", blockedByTaskId: "b" });
+    const tasks = [subject, task({ id: "b", title: "B" })];
+    expect(blockerChoices(tasks, subject)).toEqual([{ id: "b", title: "B" }]);
+  });
+
+  it("falls back to the id for a blocker this account does not have", () => {
+    const subject = task({ id: "a", blockedByTaskId: "elsewhere" });
+    expect(blockerChoices([subject], subject)).toEqual([{ id: "elsewhere", title: "elsewhere" }]);
   });
 });

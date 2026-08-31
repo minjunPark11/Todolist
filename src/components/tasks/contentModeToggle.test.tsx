@@ -72,6 +72,8 @@ function tree(subject: Task, checkItems: CheckItem[], onSetContentMode: (mode: T
           onDeleteCheckItem={() => {}}
           ancestors={[]}
           onOpenTask={() => {}}
+          blockerOptions={[]}
+          blocking={[]}
           canAddSubtask
           resize={{ width: 420, onPointerDown: () => {}, onKeyDown: () => {}, reset: () => {} } as never}
         />

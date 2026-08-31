@@ -1228,6 +1228,82 @@
   font-size: 13px;
 }
 
+/* The label is two words and the select will take the whole row if it is
+   let to: a `<select>` sizes to its widest option, and one blocker with a long
+   title wrapped "선행 작업" onto two lines. The label keeps its line and the
+   control gets what is left, with an ellipsis where an option is too long for
+   it — which is the same bargain `.tm-drawer-field`'s other rows make, except
+   theirs are buttons that were already sizing to their content. */
+.tm-drawer-field.is-dependency > span {
+  white-space: nowrap;
+}
+
+.tm-drawer-field.is-dependency select {
+  min-width: 0;
+  max-width: 60%;
+  text-overflow: ellipsis;
+}
+
+/* --- §4's two dependency blocks --------------------------------------------
+   The heading rule is the subtasks' one, borrowed rather than restated: these
+   are the same kind of block — a small-caps heading over a list — and giving
+   them their own copy of six declarations is how two headings drift apart. */
+.tm-drawer-blocking h3,
+.tm-drawer-notes h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-drawer-blocking ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The same link the subtasks list draws, because it does the same thing —
+   opens the Task named on it. */
+.tm-drawer-blocking li button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.tm-drawer-blocking li button:hover {
+  text-decoration: underline;
+}
+
+/* Full width, and it wraps: this is a second body, not a property value.
+   `field-sizing` is progressive — where it is unsupported the two rows stand
+   and the box scrolls, which is what a textarea does anyway. */
+.tm-drawer-notes textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border, #e5e5e7);
+  border-radius: 6px;
+  background: var(--bg, #fff);
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
 /* `.tm-drawer-trash` stood here — see the note in 19-app-shell.css. Trash is
    the ⋯ menu's own destructive group now (§15.29), and `.ff-context-menu-item.
    is-danger` already carries the colour this rule was for. */

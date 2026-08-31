@@ -5,7 +5,7 @@ import { childProgress, childrenOf } from "../domain/tasks/children";
 import { checkItemsForTask, isChecklistMode } from "../domain/tasks/checkItems";
 import { useState } from "react";
 import { todayValue } from "../utils/date";
-import { dependentsOf, eligibleBlockers } from "../domain/tasks/dependencies";
+import { blockerChoices, dependentsOf } from "../domain/tasks/dependencies";
 import { useT } from "../i18n";
 import { DeferredInput, DeferredTextarea } from "./kit";
 import { ChecklistEditor } from "./tasks/ChecklistEditor";
@@ -112,7 +112,11 @@ export function TaskDetail({
   const scheduleLabel = formatScheduleTrigger(schedule, today, locale);
   // The picker refuses anything that would close a loop, so the cycle rule is
   // enforced where the value is written rather than guarded at every read.
-  const blockerOptions = eligibleBlockers(tasks, task.id);
+  // The list includes whatever is already set, even once that has been
+  // completed out of eligibility — the Drawer draws the same row from the same
+  // function now, and the rule about what the control may show belongs to one
+  // of them rather than to both (§4).
+  const blockerOptions = blockerChoices(tasks, task);
   // Derived, never stored — one fact, one place (domain/tasks/dependencies).
   const blocking = dependentsOf(tasks, task.id);
 
@@ -247,15 +251,6 @@ export function TaskDetail({
               onChange={(event) => onUpdateTask(task.id, { blockedByTaskId: event.target.value })}
             >
               <option value="">{t("taskDetail.blockedByNone")}</option>
-              {/* A blocker set earlier can fall out of the eligible list once
-                  it is completed. Keeping it as an option means the select
-                  still shows what it is waiting on instead of silently
-                  reading "Nothing" while the field holds an id. */}
-              {task.blockedByTaskId && !blockerOptions.some((item) => item.id === task.blockedByTaskId) ? (
-                <option value={task.blockedByTaskId}>
-                  {tasks.find((item) => item.id === task.blockedByTaskId)?.title ?? task.blockedByTaskId}
-                </option>
-              ) : null}
               {blockerOptions.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {candidate.title}
