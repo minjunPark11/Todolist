@@ -632,6 +632,7 @@ export const ko: Dictionary = {
   "taskDetail.taskTitleAria": "태스크 제목",
   "taskDetail.taskDescriptionAria": "태스크 설명",
   "taskDetail.addDescription": "설명 추가",
+  "taskDetail.checklistReadOnly": "이 작업의 본문은 체크리스트입니다. 항목 편집은 목록 화면에서 합니다.",
   "taskDetail.schedule": "일정",
   "taskDetail.startDate": "시작일",
   "taskDetail.startTime": "시작 시간",

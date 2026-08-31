@@ -775,6 +775,41 @@ textarea {
   outline: none;
 }
 
+/* The body of a checklist task, where this panel cannot edit it. Read like the
+   Description it stands in for — same size, same muted ink — because it is the
+   same thing: what this task says. */
+.detail-checklist {
+  display: grid;
+  gap: 6px;
+  font-size: 0.92rem;
+  color: var(--color-ink-muted-80);
+}
+
+.detail-checklist ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-checklist li {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.detail-checklist li.is-checked {
+  color: var(--color-ink-muted-60, var(--color-ink-muted-80));
+  text-decoration: line-through;
+}
+
+.detail-checklist-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-ink-muted-60, var(--color-ink-muted-80));
+}
+
 .detail-section {
   display: grid;
   gap: 10px;

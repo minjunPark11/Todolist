@@ -1363,6 +1363,7 @@ export default function App() {
             tasks={planner.tasks}
             lists={planner.lists}
             subtasks={planner.subtasks}
+            checkItems={planner.checkItems}
             onMoveToList={planner.moveTaskToList}
             onUpdateTask={planner.updateTask}
             onUpdateTaskSchedule={planner.updateTaskSchedule}

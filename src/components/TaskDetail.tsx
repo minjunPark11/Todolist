@@ -1,7 +1,8 @@
-import type { List, Subtask, Task, TaskPriority } from "../types";
+import type { CheckItem, List, Subtask, Task, TaskPriority } from "../types";
 import { activeLists, listDisplayName } from "../domain/spaces/hierarchy";
 import { listIdFor } from "../domain/spaces/membership";
 import { childProgress, childrenOf } from "../domain/tasks/children";
+import { checkItemsForTask, isChecklistMode } from "../domain/tasks/checkItems";
 import { useState } from "react";
 import { todayValue } from "../utils/date";
 import { dependentsOf, eligibleBlockers } from "../domain/tasks/dependencies";
@@ -26,6 +27,15 @@ interface TaskDetailProps {
   /** The keyboard-reachable half of U9 — the tree's drop target is the other. */
   onMoveToList: (taskId: string, listId: string) => void;
   subtasks: Subtask[];
+  /**
+   * Every check item in the account; this panel picks out the task's own.
+   *
+   * It is here because this panel used to offer a Description editor for a
+   * task whose body is a checklist — a field the Tasks Drawer never shows and
+   * `descriptionFromCheckItems` overwrites on the next toggle back. What was
+   * typed here could not be read anywhere and did not survive (§11.7).
+   */
+  checkItems: CheckItem[];
   onUpdateTask: (taskId: string, patch: Partial<Task>) => void;
   onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   onRequestDeleteTask: (taskId: string) => void;
@@ -52,6 +62,7 @@ export function TaskDetail({
   onArchiveTask,
   onDuplicateTask,
   subtasks,
+  checkItems,
   onAddSubtask,
   onToggleSubtask,
   onDeleteSubtask,
@@ -73,6 +84,9 @@ export function TaskDetail({
 
   const children = childrenOf(task.id, tasks, subtasks);
   const progress = childProgress(children);
+
+  const checklist = isChecklistMode(task);
+  const items = checklist ? checkItemsForTask(task.id, checkItems) : [];
 
   const today = todayValue();
   const schedule = scheduleFromTask(task);
@@ -99,14 +113,36 @@ export function TaskDetail({
           aria-label={t("taskDetail.taskTitleAria")}
           onCommit={(title) => onUpdateTask(task.id, { title })}
         />
-        <DeferredTextarea
-          className="detail-description-input"
-          placeholder={t("taskDetail.addDescription")}
-          value={task.description}
-          resetKey={task.id}
-          aria-label={t("taskDetail.taskDescriptionAria")}
-          onCommit={(description) => onUpdateTask(task.id, { description })}
-        />
+        {/* A checklist is not a Description, and this panel cannot edit one.
+            It used to offer the Description editor anyway: the Drawer never
+            showed what was typed here, and the next toggle back to prose
+            overwrote it with the items (§11.19). So the field is replaced by
+            the checklist itself, read-only — the body is legible here, and
+            the one place that can change it is the one place that draws it. */}
+        {checklist ? (
+          <div className="detail-checklist">
+            {items.length > 0 ? (
+              <ul>
+                {items.map((item) => (
+                  <li key={item.id} className={item.checked ? "is-checked" : ""}>
+                    <span aria-hidden="true">{item.checked ? "☑" : "☐"}</span>
+                    <span>{item.text}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <p className="detail-checklist-note">{t("taskDetail.checklistReadOnly")}</p>
+          </div>
+        ) : (
+          <DeferredTextarea
+            className="detail-description-input"
+            placeholder={t("taskDetail.addDescription")}
+            value={task.description}
+            resetKey={task.id}
+            aria-label={t("taskDetail.taskDescriptionAria")}
+            onCommit={(description) => onUpdateTask(task.id, { description })}
+          />
+        )}
       </header>
 
       <section className="detail-section">
