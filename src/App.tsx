@@ -1812,7 +1812,14 @@ function AccountSection({
        Settings left behind — `settings-card`, `section-title`, `account-stack`
        — so its five pieces spread across a 1326px row with nothing aligning
        them, and the login screen's subtitle ("Your day starts here") was
-       showing as an empty state where it means nothing. */
+       showing as an empty state where it means nothing.
+
+       `.settings-card` has since been deleted from the stylesheet: this
+       sentence was the only place left in the repo that said the word, and a
+       comment naming a class is what kept it looking alive for a round longer
+       than the other seven dead card names (21-components.css). It stays here
+       as history — what this card used to be called — and not as a class
+       anything still resolves to. */
     <div className="ff-settings-card">
       <SettingsRow
         title={t("auth.accountTitle")}

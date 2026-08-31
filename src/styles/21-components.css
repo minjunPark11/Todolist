@@ -30,16 +30,18 @@
    18) and two backgrounds — `--bg-surface` and a 92%-opaque `--ff-panel`,
    which put a translucent card on some screens and an opaque one on others.
 
-   Seven more names were on this list until it turned out no screen rendered
+   Eight more names were on this list until it turned out no screen rendered
    any of them. An alias is only worth its line while something still says the
    old word; these were kept alive by nothing but the spec that checked them.
+   `.settings-card` was the eighth, and it took longer to catch because a
+   comment in App.tsx still names it — the settings screens say
+   `.ff-settings-card`, and a mention is not a call site.
    `.ff-card` stays without a call site of its own on purpose — it is the name
    a new card is meant to reach for. */
 .ff-card,
 .tdy-card,
 .foc-card,
-.sdv-metric-card,
-.settings-card {
+.sdv-metric-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--density-radius);

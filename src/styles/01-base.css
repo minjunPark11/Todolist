@@ -613,17 +613,6 @@ textarea {
   color: var(--color-ink-muted-80);
 }
 
-.settings-card,
-.detail-panel {
-  display: grid;
-  grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 1fr) auto;
-  gap: 10px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-lg);
-  padding: 14px;
-  background: var(--color-canvas);
-}
-
 .section-title {
   display: flex;
   align-items: center;
@@ -632,8 +621,7 @@ textarea {
 }
 
 .section-title h2,
-.detail-panel h2,
-.settings-card h2 {
+.detail-panel h2 {
   margin: 0;
   font-size: 1rem;
 }
@@ -686,13 +674,26 @@ textarea {
   color: var(--color-ink-muted-48);
 }
 
-/* One column, stated rather than inherited. The rule further up gives
-   `.detail-panel` four columns, and this panel has exactly one child — so
-   that template could never do anything but cap the content at the first
-   160px track while the panel itself was 359 wide. Everything in here was
-   living in 44% of the panel: the title, the property rows, the notes. It
-   showed up when the body became a checklist, whose rows have no intrinsic
-   width to push back with. */
+/* One column, and now the panel's ONLY rule here.
+
+   It shared one with `.settings-card` until this pass, and that rule gave it
+   four columns — `minmax(160px, 1fr) auto minmax(160px, 1fr) auto` — which
+   could do nothing but cap this panel's single child at the first 160px track
+   while the panel itself was 359 wide. Everything lived in 44% of it: the
+   title, the property rows, the notes. It surfaced only when the body became a
+   checklist, whose rows have no intrinsic width to push back with.
+
+   The rule is gone rather than overridden. `.settings-card` has had no call
+   site since the settings screens moved to `.ff-settings-card`, so it was
+   holding a stale template over a live panel on behalf of nothing — and every
+   other declaration it carried (`gap`, `padding`, `border-radius`,
+   `background`) was already being overwritten here or in 21-components.css.
+   The border was the single exception, which is why the shorthand moved in
+   below: `.detail-panel, .board-column` sets only `border-color`.
+
+   Measured after the move (1440×900, `발표 준비` open with a 3-item
+   checklist): panel 359, content 321, checklist rows 265, and nothing in the
+   subtree scrolls horizontally. Same at the board's sticky column: 360/322. */
 .detail-panel {
   position: sticky;
   top: 32px;
@@ -702,6 +703,7 @@ textarea {
   max-height: calc(100vh - 64px);
   overflow: auto;
   align-self: start;
+  border: 1px solid var(--color-hairline);
   padding: 0;
 }
 

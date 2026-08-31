@@ -21,19 +21,26 @@ import { openApp } from "./addList.helpers";
 /**
  * What 21-components.css claims are the same thing.
  *
- * This list used to be twelve. Seven of the names on it — `.summary-card`,
+ * This list used to be twelve. Eight of the names on it — `.summary-card`,
  * `.panel-section`, `.focus-summary`, `.focus-timer-card`, `.topic-card`,
- * `.project-tasks`, `.sdv-card` — turned out to have no call site anywhere in
- * the app, so the equality this file was proving about them was an equality
- * between two things nobody drew. They were deleted from the stylesheet and
- * from here together; an alias earns its line by being said somewhere.
+ * `.project-tasks`, `.sdv-card`, `.settings-card` — turned out to have no
+ * call site anywhere in the app, so the equality this file was proving about
+ * them was an equality between two things nobody drew. They were deleted from
+ * the stylesheet and from here together; an alias earns its line by being said
+ * somewhere.
+ *
+ * `.settings-card` outlasted the other seven by a round because a comment in
+ * App.tsx still names it. The settings screens render `.ff-settings-card`; the
+ * bare name was also sharing a rule with the legacy task Detail, where its
+ * four-column grid template was quietly capping that panel's content at 160px
+ * (TASK_CONTENT_MODE_DESIGN.md §12.2).
  *
  * `.ff-card` has no call site either and stays anyway, because it is the name
  * a new card is supposed to reach for. What keeps it honest is the last test
  * in this file, which builds a screen out of the canonical names and checks
  * that each one draws something.
  */
-const CARDS = ["ff-card", "tdy-card", "foc-card", "sdv-metric-card", "settings-card"];
+const CARDS = ["ff-card", "tdy-card", "foc-card", "sdv-metric-card"];
 
 /** Same claim, for the button — base, primary and the small size. */
 const BUTTONS = {
