@@ -169,6 +169,39 @@
   font-size: 12px;
 }
 
+/* The Detail's title is the one input that is not a field.
+
+   It has to be here rather than beside the rest of the Detail's own rules,
+   because the field rule below wins on specificity wherever it is written:
+   `input:not([type="checkbox"]):not([type="radio"]):not([type="range"])` is
+   (0,3,1), and no sane selector built out of `.tm-drawer-*` class names beats
+   that. The exception is small and it is stated where the rule it excepts is
+   stated, which is the honest place for it — the alternative was an
+   `!important` in another file for the next person to find by accident.
+
+   Why except it at all: the reference app draws the Task's title as bold text
+   with nothing around it, and a box there turns an ordinary Detail into a form
+   (TICKTICK_DETAIL_ANATOMY_DESIGN.md §1). The border comes back on hover and
+   on focus, which is when "can I type here" is the reader's question. */
+/* Four classes, because three lose. The field rule below matches this input
+   as `input:not([type="checkbox"]):not([type="radio"]):not([type="range"])` —
+   (0,3,1) — and no shorter chain of `.tm-drawer-*` names outranks it. This one
+   is (0,4,0) and it spells out the nesting that actually exists rather than
+   reaching for `!important`, which the next person would have to fight
+   without being told why it was there. */
+.tm-drawer > .tm-drawer-scroll > .tm-drawer-title-row > .tm-drawer-title {
+  border-color: transparent;
+  background: transparent;
+}
+
+.tm-drawer > .tm-drawer-scroll > .tm-drawer-title-row > .tm-drawer-title:hover {
+  border-color: var(--border-subtle);
+}
+
+.tm-drawer > .tm-drawer-scroll > .tm-drawer-title-row > .tm-drawer-title:focus {
+  border-color: var(--border);
+}
+
 /* --- the field -----------------------------------------------------------
    Inputs came in at 32, 33, 34, 38 and 58px, with three paddings and two
    border tokens, because most of them were styled by where they sat rather

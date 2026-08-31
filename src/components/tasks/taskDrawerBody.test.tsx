@@ -15,6 +15,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { Task } from "../../types";
+import { taskActions } from "../../domain/tasks/actions";
 import { I18nProvider } from "../../i18n";
 import { FloatingLayerProvider } from "../floating";
 import { TaskDrawer } from "./TaskDrawer";
@@ -74,7 +75,7 @@ function renderDrawer(
           onAddSubtask={noop}
           onToggleSubtask={noop}
           onDeleteSubtask={noop}
-          actions={[]}
+          actions={taskActions({ task: task(overrides), surface: "detail" })}
           onRunAction={noop}
           reminders={[]}
           activity={null}
@@ -99,17 +100,30 @@ function renderDrawer(
 }
 
 describe("the Drawer's two bodies", () => {
-  it("gives the prose body and the notes field different names", () => {
+  it("draws the prose body and nothing over it", () => {
     renderDrawer();
-    // Not the same word twice. The description heading said "Notes" until the
-    // notes field arrived under it, at which point the panel had two.
-    expect(screen.getByText("Description")).toBeTruthy();
-    expect(screen.getByText("Notes")).toBeTruthy();
+    // §2 took the heading: the placeholder already names the field, and a
+    // second word for it was the thing that made "Notes" mean two fields.
+    expect(screen.getByLabelText("Description")).toBeTruthy();
+    expect(screen.queryByText("Description")).toBeNull();
+  });
+
+  it("keeps the notes field out of a Task that has no note", () => {
+    // The rule the whole body follows now: a section appears because the Task
+    // uses it, not because the field exists.
+    renderDrawer();
+    expect(screen.queryByLabelText("Notes")).toBeNull();
+  });
+
+  it("shows what was typed into notes elsewhere", () => {
+    // §4's point survives §2: a note written on the Today page is READ here.
+    renderDrawer({ notes: "bring the laptop" });
+    expect((screen.getByLabelText("Notes") as HTMLTextAreaElement).value).toBe("bring the laptop");
   });
 
   it("writes the notes box to `notes` and the body box to `description`", () => {
     const onUpdate = vi.fn();
-    renderDrawer({}, { onUpdate });
+    renderDrawer({ notes: "room 3" }, { onUpdate });
 
     const body = screen.getByLabelText("Description") as HTMLTextAreaElement;
     fireEvent.change(body, { target: { value: "why this matters" } });
@@ -117,26 +131,84 @@ describe("the Drawer's two bodies", () => {
     expect(onUpdate).toHaveBeenCalledWith({ description: "why this matters" });
 
     const notes = screen.getByLabelText("Notes") as HTMLTextAreaElement;
-    fireEvent.change(notes, { target: { value: "room 3" } });
+    fireEvent.change(notes, { target: { value: "room 4" } });
     fireEvent.blur(notes);
-    expect(onUpdate).toHaveBeenCalledWith({ notes: "room 3" });
-  });
-
-  it("shows what was typed into notes elsewhere", () => {
-    // The whole point of §4: a note written on the Today page is READ here.
-    renderDrawer({ notes: "bring the laptop" });
-    expect((screen.getByLabelText("Notes") as HTMLTextAreaElement).value).toBe("bring the laptop");
+    expect(onUpdate).toHaveBeenCalledWith({ notes: "room 4" });
   });
 });
 
-describe("the Drawer's dependency row", () => {
-  it("sets a blocker from the offered choices", () => {
+/**
+ * §2's rule, which is the whole shape of the new body: a section is drawn
+ * because the Task uses it, and the ⋯ is how a Task starts using one.
+ *
+ * These are the tests that would catch the obvious wrong fix — hiding the
+ * fields and leaving no way to reach them.
+ */
+describe("the sections a Task has to ask for", () => {
+  function openMenu() {
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+  }
+
+  it("offers the four in the menu, before everything else", () => {
+    renderDrawer();
+    openMenu();
+    const rows = screen.getAllByRole("menuitem").map((item) => item.textContent);
+    expect(rows.slice(0, 4)).toEqual(["Add a subtask", "Tags", "Waiting on", "Notes"]);
+  });
+
+  it("opens the note field, and puts the caret in it", () => {
+    renderDrawer();
+    expect(screen.queryByLabelText("Notes")).toBeNull();
+
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Notes" }));
+
+    const notes = screen.getByLabelText("Notes");
+    expect(notes).toBeTruthy();
+    expect(document.activeElement).toBe(notes);
+  });
+
+  it("opens the dependency section", () => {
+    renderDrawer({}, { blockerOptions: [{ id: "t2", title: "Get approval" }] });
+    expect(screen.queryByLabelText("Waiting on")).toBeNull();
+
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Waiting on" }));
+    expect(screen.getByLabelText("Waiting on")).toBeTruthy();
+  });
+
+  it("opens the subtask form", () => {
+    renderDrawer();
+    expect(screen.queryByLabelText("Add a subtask")).toBeNull();
+
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add a subtask" }));
+    expect(screen.getByLabelText("Add a subtask")).toBeTruthy();
+  });
+});
+
+describe("the Drawer's dependency section", () => {
+  it("is absent from a Task that waits on nothing", () => {
+    renderDrawer({}, { blockerOptions: [{ id: "t2", title: "Get approval" }] });
+    expect(screen.queryByLabelText("Waiting on")).toBeNull();
+  });
+
+  it("changes a blocker that is already set", () => {
     const onUpdate = vi.fn();
-    renderDrawer({}, { onUpdate, blockerOptions: [{ id: "t2", title: "Get approval" }] });
+    renderDrawer(
+      { blockedByTaskId: "t2" },
+      {
+        onUpdate,
+        blockerOptions: [
+          { id: "t2", title: "Get approval" },
+          { id: "t3", title: "Book the room" },
+        ],
+      },
+    );
 
     const select = screen.getByLabelText("Waiting on") as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: "t2" } });
-    expect(onUpdate).toHaveBeenCalledWith({ blockedByTaskId: "t2" });
+    fireEvent.change(select, { target: { value: "t3" } });
+    expect(onUpdate).toHaveBeenCalledWith({ blockedByTaskId: "t3" });
   });
 
   it("clears one back to nothing", () => {
@@ -153,7 +225,9 @@ describe("the Drawer's dependency row", () => {
   });
 
   it("explains the demotion only while something is blocking", () => {
-    renderDrawer();
+    // The section is open here because something waits on this Task, and the
+    // hint is still absent because this Task waits on nothing.
+    renderDrawer({}, { blocking: [{ id: "t9", title: "Announce it" }] });
     expect(screen.queryByText(/cannot start until/)).toBeNull();
 
     cleanup();

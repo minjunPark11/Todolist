@@ -181,8 +181,16 @@ describe("the Detail, opened by a surface that is not the Tasks module", () => {
 
     expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Ship it");
     expect(screen.getByLabelText("Description")).toBeTruthy();
-    expect(screen.getByLabelText("Notes")).toBeTruthy();
-    expect(screen.getByLabelText("Waiting on")).toBeTruthy();
+    // §2: a Task with no note, no blocker, no subtask and no tag draws none of
+    // them. "Nothing else" is meant literally now — the four sections and the
+    // three property rows that stood here are what the reference app does not
+    // have (TICKTICK_DETAIL_ANATOMY_DESIGN.md).
+    expect(screen.queryByLabelText("Notes")).toBeNull();
+    expect(screen.queryByLabelText("Waiting on")).toBeNull();
+    expect(screen.queryByText("Subtasks")).toBeNull();
+    // The List did not go away — it moved to the footer, where the reference
+    // app draws it.
+    expect(document.querySelector(".tm-drawer-foot .tm-list-trigger")).toBeTruthy();
   });
 
   it("completes through the command path, with the undo beside it", () => {
@@ -208,14 +216,18 @@ describe("the Detail, opened by a surface that is not the Tasks module", () => {
 
   it("derives the breadcrumb, the blockers and the dependents from the Tasks it is given", () => {
     const parent = task({ id: "p1", title: "Release" });
-    const child = task({ id: "t1", parentTaskId: "p1" });
+    // Waiting on its own parent, so the picker is drawn at all: since §2.4 the
+    // dependency section shows the select only for a Task that IS waiting on
+    // something, and the reverse list for one that has others waiting on it.
+    const child = task({ id: "t1", parentTaskId: "p1", blockedByTaskId: "p1" });
     const dependent = task({ id: "d1", title: "Announce it", blockedByTaskId: "t1" });
     const { bundle } = bundleFor();
     const onOpenTask = vi.fn();
     renderPane({ tasks: [parent, child, dependent], openId: "t1", onMutate: vi.fn(), bundle, onOpenTask });
 
-    // §12.7's way back up.
-    fireEvent.click(screen.getByRole("button", { name: "Release" }));
+    // §12.7's way back up. The breadcrumb button, not the blocker's name in
+    // the select — `getAllByRole` because both now say "Release".
+    fireEvent.click(screen.getAllByRole("button", { name: "Release" })[0]);
     expect(onOpenTask).toHaveBeenCalledWith("p1");
 
     // The reverse dependency, and the eligible blockers — neither of which the

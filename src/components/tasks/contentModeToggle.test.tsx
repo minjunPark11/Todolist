@@ -127,12 +127,17 @@ describe("the content-mode toggle", () => {
     expect(onSetContentMode).toHaveBeenCalledWith("description");
   });
 
-  it("leaves one control, not two — the segmented pair is gone", () => {
+  it("leaves one control, and no heading over the body at all", () => {
     // It used to say "Notes" twice on one line: once as the heading and once
-    // as the button that was already pressed.
+    // as the button that was already pressed. §11.4 took one of them; §2 took
+    // the heading itself, because the body's own placeholder already names the
+    // field it is (TICKTICK_DETAIL_ANATOMY_DESIGN.md).
     setup();
     expect(screen.queryByRole("group", { name: "Content type" })).toBeNull();
-    expect(screen.getAllByText("Notes")).toHaveLength(1);
+    expect(document.querySelector(".tm-drawer-content-head")).toBeNull();
+    // The word survives only as the toggle's own label.
+    expect(screen.queryByText("Notes")).toBeNull();
+    expect(screen.getByRole("button", { name: "Turn into a checklist" })).toBeTruthy();
   });
 });
 
@@ -143,8 +148,8 @@ describe("what an empty checklist says", () => {
     // same reason: 0/0 reads as "no progress" where the truth is "no parts".
     // The Subtasks heading below has always hidden its own empty count.
     setup({ contentMode: "checklist" });
-    const head = document.querySelector(".tm-drawer-content-head") as HTMLElement;
-    expect(head.querySelector(".tm-count")).toBeNull();
+    const row = document.querySelector(".tm-drawer-title-row") as HTMLElement;
+    expect(row.querySelector(".tm-count")).toBeNull();
   });
 
   it("counts once there is something to count", () => {
@@ -160,8 +165,10 @@ describe("what an empty checklist says", () => {
         updatedAt: NOW,
       },
     ]);
-    const head = document.querySelector(".tm-drawer-content-head") as HTMLElement;
-    expect(head.querySelector(".tm-count")?.textContent).toBe("0/1");
+    // Beside the title now, not over the body: the heading it used to sit in
+    // went with §2, and this is the one thing that heading said.
+    const row = document.querySelector(".tm-drawer-title-row") as HTMLElement;
+    expect(row.querySelector(".tm-count")?.textContent).toBe("0/1");
   });
 
   it("puts the caret where the first item goes, after a conversion that left none", () => {

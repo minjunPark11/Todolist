@@ -26,6 +26,23 @@ import { isCompleted, isPinned, isTaskOpen, isTrashed, isWontDo } from "./taskSt
  * the state this file already knows.
  */
 export type TaskActionId =
+  /**
+   * The four that OPEN something in the Detail rather than change the Task.
+   *
+   * They are here because the reference app puts them here: its ⋯ opens with
+   * `하위 할일 추가` and carries `태그 ▸` two rows down
+   * (TICKTICK_DETAIL_ANATOMY_DESIGN.md §2). A property row that is always drawn
+   * costs every Task the space of a field most Tasks do not use; a menu row
+   * costs a click only the Tasks that use it pay.
+   *
+   * `activities` has worked this way since §25.7 — it opens a panel and
+   * changes nothing — so this is that shape with four more members rather than
+   * a new idea.
+   */
+  | "addSubtask"
+  | "addTag"
+  | "setBlocker"
+  | "addNote"
   | "pin"
   | "unpin"
   | "duplicate"
@@ -47,9 +64,10 @@ export type TaskActionId =
  * point is that it does not move: a menu whose rows change places between two
  * openings costs the reader the muscle memory that made the menu fast.
  */
-export type TaskActionGroupId = "quick" | "work" | "status" | "danger";
+export type TaskActionGroupId = "add" | "quick" | "work" | "status" | "danger";
 
-const GROUP_ORDER: readonly TaskActionGroupId[] = ["quick", "work", "status", "danger"];
+// `add` leads, which is where the reference app's `하위 할일 추가` sits.
+const GROUP_ORDER: readonly TaskActionGroupId[] = ["add", "quick", "work", "status", "danger"];
 
 export interface TaskAction {
   id: TaskActionId;
@@ -94,11 +112,31 @@ export interface TaskActionContext {
    * the menu item would be a button that silently did nothing.
    */
   focusBusy?: boolean;
+  /**
+   * Which surface is asking (§15.3).
+   *
+   * Only the Detail gets the `add` group: those four reveal a section of the
+   * Detail, and a row's right-click menu has no Detail to reveal one in. It is
+   * not `promoted` — that word means "I draw this myself", and the row does
+   * not draw them at all.
+   *
+   * Absent means `row`, so a surface that has not thought about it gets the
+   * conservative set.
+   */
+  surface?: "detail" | "row";
 }
 
 type Availability = "hidden" | "enabled" | { disabledReasonKey: string };
 
 const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
+  /* The four label themselves with the words already on the section each one
+     opens — no `tasks.menu.*` spelling of its own. Four new keys would have
+     been four second names for four fields the reader can already see named,
+     which is the duplicate §4.2 refused. */
+  { id: "addSubtask", labelKey: "tasks.addSubtask", group: "add" },
+  { id: "addTag", labelKey: "tasks.tags", group: "add" },
+  { id: "setBlocker", labelKey: "taskDetail.blockedBy", group: "add" },
+  { id: "addNote", labelKey: "taskDetail.notes", group: "add" },
   { id: "pin", labelKey: "tasks.menu.pin", group: "quick" },
   { id: "unpin", labelKey: "tasks.menu.unpin", group: "quick" },
   { id: "duplicate", labelKey: "tasks.menu.duplicate", group: "quick" },
@@ -131,10 +169,21 @@ const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
  */
 const TRASHED_ACTIONS: readonly TaskActionId[] = ["copyLink", "activities", "restore"];
 
+/** The four that open a section of the Detail (§2). */
+export const DETAIL_REVEAL_ACTIONS: readonly TaskActionId[] = [
+  "addSubtask",
+  "addTag",
+  "setBlocker",
+  "addNote",
+];
+
 function availabilityOf(id: TaskActionId, ctx: TaskActionContext): Availability {
   const { task } = ctx;
 
   if (isTrashed(task)) return TRASHED_ACTIONS.includes(id) ? "enabled" : "hidden";
+
+  // A row's menu has nowhere to put what these open (§15.3).
+  if (DETAIL_REVEAL_ACTIONS.includes(id) && ctx.surface !== "detail") return "hidden";
 
   switch (id) {
     case "restore":

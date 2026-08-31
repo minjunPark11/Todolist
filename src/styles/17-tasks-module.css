@@ -714,53 +714,15 @@
   margin-left: 0;
 }
 
+/* Size and weight only. The border is 21-components.css's to give up — see
+   the note beside the field rule there. */
 .tm-drawer-title {
   width: 100%;
   padding: 6px 8px;
-  border: 1px solid transparent;
   border-radius: 6px;
-  background: transparent;
-  color: var(--text, #1c1c1e);
   font: inherit;
   font-size: 17px;
   font-weight: 600;
-}
-
-.tm-drawer-title:focus {
-  border-color: var(--border, #e5e5e7);
-  outline: none;
-}
-
-.tm-drawer-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.tm-drawer-field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--text-muted, #8e8e93);
-}
-
-.tm-drawer-field.is-block {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.tm-drawer-field input,
-.tm-drawer-field select,
-.tm-drawer-field textarea {
-  padding: 5px 8px;
-  border: 1px solid var(--border, #e5e5e7);
-  border-radius: 6px;
-  background: var(--bg, #fff);
-  color: var(--text, #1c1c1e);
-  font: inherit;
-  font-size: 13px;
 }
 
 /* Priority (spec §8.13, §8.29, §8.30). The trigger reflects the value it
@@ -1228,66 +1190,6 @@
   font-size: 13px;
 }
 
-/* The label is two words and the select will take the whole row if it is
-   let to: a `<select>` sizes to its widest option, and one blocker with a long
-   title wrapped "선행 작업" onto two lines. The label keeps its line and the
-   control gets what is left, with an ellipsis where an option is too long for
-   it — which is the same bargain `.tm-drawer-field`'s other rows make, except
-   theirs are buttons that were already sizing to their content. */
-.tm-drawer-field.is-dependency > span {
-  white-space: nowrap;
-}
-
-.tm-drawer-field.is-dependency select {
-  min-width: 0;
-  max-width: 60%;
-  text-overflow: ellipsis;
-}
-
-/* --- §4's two dependency blocks --------------------------------------------
-   The heading rule is the subtasks' one, borrowed rather than restated: these
-   are the same kind of block — a small-caps heading over a list — and giving
-   them their own copy of six declarations is how two headings drift apart. */
-.tm-drawer-blocking h3,
-.tm-drawer-notes h3 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted, #8e8e93);
-}
-
-.tm-drawer-blocking ul {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* The same link the subtasks list draws, because it does the same thing —
-   opens the Task named on it. */
-.tm-drawer-blocking li button {
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 13px;
-  text-align: start;
-  cursor: pointer;
-}
-
-.tm-drawer-blocking li button:hover {
-  text-decoration: underline;
-}
-
 /* Full width, and it wraps: this is a second body, not a property value.
    `field-sizing` is progressive — where it is unsupported the two rows stand
    and the box scrolls, which is what a textarea does anyway. */
@@ -1307,6 +1209,96 @@
 /* `.tm-drawer-trash` stood here — see the note in 19-app-shell.css. Trash is
    the ⋯ menu's own destructive group now (§15.29), and `.ff-context-menu-item.
    is-danger` already carries the colour this rule was for. */
+
+/* --- §1.6's fourth region: the footer ---------------------------------------
+   48px, outside the scroll, List on the left and ⋯ on the right — the shape
+   `TICKTICK_COMPONENT_07_TASK_DETAIL_PANEL.md` §3.1 measured. `flex-none` for
+   the same reason the header is sticky: the two things the reader reaches for
+   without reading do not move. */
+.tm-drawer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  height: 48px;
+  padding: 0 16px;
+  border-top: 1px solid var(--border-subtle, rgba(25, 25, 25, 0.08));
+}
+
+/* The trigger carries the List's name, so it takes the room it needs and the
+   ⋯ keeps its own. */
+.tm-drawer-foot .tm-list-trigger {
+  min-width: 0;
+  max-width: calc(100% - 48px);
+}
+
+/* Chips and a `+`, with no label over them (§13.36's second form). */
+.tm-drawer-tags {
+  padding: 2px 0;
+}
+
+.tm-drawer-dependency h3,
+.tm-drawer-notes h3,
+.tm-drawer-subtasks h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8e8e93);
+}
+
+/* The second heading in the block ("Waiting on this") needs the space the
+   first one gets from the section above it. */
+.tm-drawer-dependency h3 + select + p + h3,
+.tm-drawer-dependency ul + h3,
+.tm-drawer-dependency select ~ h3 {
+  margin-top: 12px;
+}
+
+.tm-drawer-dependency select {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--border, #e5e5e7);
+  border-radius: 6px;
+  background: var(--bg, #fff);
+  color: var(--text, #1c1c1e);
+  font: inherit;
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+
+.tm-drawer-dependency ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The same link the subtasks list draws, because it does the same thing —
+   opens the Task named on it. */
+.tm-drawer-dependency li button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.tm-drawer-dependency li button:hover {
+  text-decoration: underline;
+}
 
 /* --- §25.7 the history surface ---------------------------------------------
    A panel inside the Detail rather than a floating layer: the row that opens
@@ -2008,7 +2000,6 @@
 .tm-undo {
   bottom: max(16px, env(safe-area-inset-bottom));
 }
-
 
 /* --- Add List dialog (Add List design §2) --- */
 
@@ -2805,21 +2796,16 @@
   gap: 8px;
 }
 
-.tm-drawer-content-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted, #8e8e93);
-}
-
-/* Pushed to the trailing edge, away from the label it belongs to. */
-/* The title and the one control that belongs beside it (§11.4). The input
-   takes the room and the button keeps its own — a 32px target that does not
-   shrink as the title grows. */
+/* The body reads as text until it is being edited — the same bargain the title
+   above already makes, and what the reference app's description area does
+   (TICKTICK_DETAIL_ANATOMY_DESIGN.md §1). A bordered box under a bordered
+   title made a Detail of two empty form fields where the reference has two
+   lines of writing. The global field rule gives every `textarea` a border; the
+   Detail's body is the one place that is a sentence rather than an input. */
+/* Title, the checklist count when there is one, and the content-mode toggle
+   (§11.4). The input takes the room and the button keeps its own — a 32px
+   target that does not shrink as the title grows. The count arrived when §2
+   took the content heading away. */
 .tm-drawer-title-row {
   display: flex;
   align-items: center;
@@ -2856,15 +2842,30 @@
   color: var(--accent, #007aff);
 }
 
+/* The body reads as text until it is being edited.
+
+   It was a bordered box on a white fill, under a title that is another one, so
+   an ordinary Task's Detail was two empty form fields where the reference app
+   has two lines of writing (TICKTICK_DETAIL_ANATOMY_DESIGN.md §1). The border
+   is still there on hover and focus — it says "this is editable" at the moment
+   that is the question. */
 .tm-drawer-content textarea {
-  padding: 5px 8px;
-  border: 1px solid var(--border, #e5e5e7);
+  padding: 6px 8px;
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: var(--bg, #fff);
+  background: transparent;
   color: var(--text, #1c1c1e);
   font: inherit;
   font-size: 13px;
   resize: vertical;
+}
+
+.tm-drawer-content textarea:hover {
+  border-color: var(--border-subtle, rgba(25, 25, 25, 0.08));
+}
+
+.tm-drawer-content textarea:focus {
+  border-color: var(--border, #e5e5e7);
 }
 
 .tm-checklist-items {

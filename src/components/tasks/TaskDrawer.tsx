@@ -22,6 +22,8 @@ import type {
 import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
 import type { TaskActionGroup, TaskActionId } from "../../domain/tasks/actions";
+import { DETAIL_REVEAL_ACTIONS } from "../../domain/tasks/actions";
+import { tagsForTask } from "../../domain/tags/tags";
 import type { TaskActivityEntry } from "../../domain/tasks/activity";
 import { childProgress } from "../../domain/tasks/children";
 import { isCompleted, isPinned } from "../../domain/tasks/taskState";
@@ -214,6 +216,55 @@ export function TaskDrawer({
   // boolean would follow the reader to the next task they opened.
   const [convertedId, setConvertedId] = useState("");
 
+  /**
+   * Which of the four optional sections this Task has been asked to show (§2).
+   *
+   * A Task that has tags shows its tags; one that has none shows nothing until
+   * the ⋯ opens the section. That is the rule the whole body follows now, and
+   * it is why the Detail of an ordinary Task is a title and a body rather than
+   * five labelled rows most Tasks leave empty.
+   *
+   * Held with the Task id for `convertedId`'s reason: the Drawer does not
+   * remount on a Task switch (§1.26), so a bare set would follow the reader to
+   * the next Task and open sections there that nobody asked for.
+   */
+  const [revealed, setRevealed] = useState<{ taskId: string; fields: TaskActionId[] }>({
+    taskId: "",
+    fields: [],
+  });
+  const isRevealed = (id: TaskActionId) =>
+    revealed.taskId === task.id && revealed.fields.includes(id);
+
+  function reveal(id: TaskActionId) {
+    setRevealed((current) =>
+      current.taskId === task.id
+        ? { taskId: task.id, fields: current.fields.includes(id) ? current.fields : [...current.fields, id] }
+        : { taskId: task.id, fields: [id] },
+    );
+  }
+
+  /**
+   * The caret goes where the section just opened.
+   *
+   * Without this the menu closes, a field appears somewhere below the fold and
+   * the reader has to find it — which is the same complaint §11.6 made about
+   * converting to a checklist and landing nowhere.
+   */
+  const revealCount = revealed.taskId === task.id ? revealed.fields.length : 0;
+  useEffect(() => {
+    if (revealCount === 0) return;
+    const field = root.current?.querySelector<HTMLElement>("[data-reveal-focus='true']");
+    field?.focus();
+  }, [revealCount]);
+
+  // What the body actually has to draw. Content, then whatever this Task uses.
+  const held = tagsForTask(task.id, tags, taskTags);
+  const showSubtasks = children.length > 0 || isRevealed("addSubtask");
+  const showTags = held.length > 0 || isRevealed("addTag");
+  const showDependency =
+    Boolean(task.blockedByTaskId) || blocking.length > 0 || isRevealed("setBlocker");
+  const showNote = Boolean(task.notes?.trim()) || isRevealed("addNote");
+
   function submitSubtask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const field = event.currentTarget.elements.namedItem("subtask") as HTMLInputElement | null;
@@ -318,20 +369,10 @@ export function TaskDrawer({
             §15.44's reason. */}
         {isPinned(task) ? <span className="tm-drawer-pinned">{t("tasks.pinned")}</span> : null}
 
-        {/* §15.2's entry point. Everything §15.3 calls secondary or structural
-            lives behind it — and until now the Detail had no such surface at
-            all, so Won't Do and Trash were two loose buttons at the bottom of
-            the panel and Pin and Start Focus were reachable from nowhere.
-
-            §15.62: opening it selects nothing. The Detail is already this
-            Task's, which is why the menu needs no target of its own. */}
-        <TaskActionsMenu
-          taskId={task.id}
-          title={task.title}
-          groups={actions}
-          onRun={onRunAction}
-          restoreFocusTo={() => root.current}
-        />
+        {/* The ⋯ used to stand here. It is in the footer now, beside the List
+            — which is where the reference app puts both
+            (TICKTICK_DETAIL_ANATOMY_DESIGN.md §1): the header is Complete, the
+            date and Priority, and nothing else. */}
 
         <button type="button" className="tm-drawer-close" onClick={onClose} aria-label={t("common.close")}>
           ×
@@ -394,6 +435,17 @@ export function TaskDrawer({
           required
           aria-label={t("tasks.titleLabel")}
         />
+        {/* The count the content heading used to carry. It followed the
+            heading out (§2) and landed here rather than being dropped: it is
+            the one thing that heading said which the body does not say for
+            itself. Not `0/0` — `progressOf` in the MCP projections refuses
+            that number for the same reason, that it reads as "no progress"
+            where the truth is "this task has no parts". */}
+        {checklist && progressLines.total > 0 ? (
+          <span className="tm-count">
+            {progressLines.done}/{progressLines.total}
+          </span>
+        ) : null}
         <ContentModeToggle
           checklist={checklist}
           onSet={(mode) => {
@@ -403,117 +455,15 @@ export function TaskDrawer({
         />
       </div>
 
-      <div className="tm-drawer-fields">
-        {/* §13.8, §13.9: the List is a property row that opens a picker, with
-            Folders as headings (§13.10) and a search (§13.26).
+      {/* §1.6's Content Body, and only that: the title above, the text here.
 
-            The `<select>` this replaces could show no grouping, had no search,
-            and — worse — moved only this Task. §13.14 and §2.24's invariant
-            say a subtree moves together, so a parent moved through that
-            control left its children behind in the old List. `listMovePlan`
-            is where that is decided now. */}
-        <div className="tm-drawer-field">
-          <span>{t("tasks.addList")}</span>
-          <ListPicker
-            task={task}
-            lists={lists}
-            folders={folders}
-            onMove={onMoveToList}
-            restoreFocusTo={() => root.current}
-          />
-        </div>
-
-        {/* §13.36. The Detail had no tag control at all, so a Task could only
-            be tagged at capture time through Quick Add's `#` syntax and never
-            afterwards — the same shape of gap Priority had. */}
-        <div className="tm-drawer-field">
-          <span>{t("tasks.tags")}</span>
-          <TagPicker
-            task={task}
-            tags={tags}
-            taskTags={taskTags}
-            onToggle={onToggleTag}
-            restoreFocusTo={() => root.current}
-          />
-        </div>
-
-        {/* What this Task is waiting on. It was the legacy panel's row and
-            only its row, which meant the field could be set on the Today page
-            and neither seen nor cleared on the screen the Tasks module calls
-            the Detail — while the Today queue went on demoting the Task for a
-            reason nothing here would say (§4).
-
-            A `<select>` rather than a picker like List and Tags above. Those
-            two have specs behind them (§13.9, §13.36); a dependency picker has
-            none, and inventing a third popover to match the neighbours would
-            be design this row has no evidence for. The plain control is what
-            the legacy panel drew, and moving it unchanged is what keeps this a
-            move rather than a redesign.
-
-            The keys are `taskDetail.*` — the panel this came from — rather
-            than a second spelling of the same four strings under `tasks.*`.
-            §30.2 counted what one-sided key sets cost; the panel is what goes
-            away, and the words outlive it. */}
-        <div className="tm-drawer-field is-dependency">
-          <span>{t("taskDetail.blockedBy")}</span>
-          <select
-            value={task.blockedByTaskId}
-            aria-label={t("taskDetail.blockedBy")}
-            onChange={(event) => onUpdate({ blockedByTaskId: event.target.value })}
-          >
-            <option value="">{t("taskDetail.blockedByNone")}</option>
-            {blockerOptions.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.title}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Only when there is one. An always-drawn hint under an empty select
-          would explain a rule the reader has not invoked. */}
-      {task.blockedByTaskId ? (
-        <p className="tm-drawer-field-note">{t("taskDetail.blockedByHint")}</p>
-      ) : null}
-
-      {/* The reverse direction, and it is read-only because it is DERIVED —
-          `dependentsOf` computes it from the other Tasks' own fields, so there
-          is nothing here that could be written back. Each is a link for the
-          same reason the breadcrumb's ancestors are: the useful next move from
-          "three things are waiting on this" is opening one of them. */}
-      {blocking.length > 0 ? (
-        <section className="tm-drawer-blocking">
-          <h3>{t("taskDetail.blocks")}</h3>
-          <ul>
-            {blocking.map((dependent) => (
-              <li key={dependent.id}>
-                <button type="button" onClick={() => onOpenTask(dependent.id)}>
-                  {dependent.title}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {/* The toggle moved to the title (§11.4). What stays is the heading and,
-          for a checklist, how much of it is done — the header says what this
-          content IS, and the control that changes it is where the spec put it. */}
+          Three labelled property rows stood between them — List, Tags and
+          Waiting on — and a heading stood over this one. All four are gone
+          (TICKTICK_DETAIL_ANATOMY_DESIGN.md §2). The reference app's body is
+          the description with nothing over it; List is in the footer; Tags is
+          a section that appears when the Task has tags; and the heading was
+          naming a field the placeholder already names. */}
       <section className="tm-drawer-content">
-        <header className="tm-drawer-content-head">
-          <span>{t(checklist ? "tasks.checklist" : "tasks.description")}</span>
-          {/* Not `0/0`. `progressOf` in the MCP projections already refuses
-              that number for the same reason: it says "no progress" where the
-              truth is "this task has no parts" — and the Subtasks heading two
-              blocks below has always hidden its own empty count. */}
-          {checklist && progressLines.total > 0 ? (
-            <span className="tm-count">
-              {progressLines.done}/{progressLines.total}
-            </span>
-          ) : null}
-        </header>
-
         {checklist ? (
           <ChecklistEditor
             /* §1.26: the Drawer no longer remounts on a Task switch, so the
@@ -545,101 +495,216 @@ export function TaskDrawer({
       </section>
 
       {/* §12.7: below the content, and §12.8: no empty card when there is
-          nothing — just the way to add one. */}
-      <section className="tm-drawer-subtasks">
-        <h3>
-          {t("tasks.subtasks")}
-          {progress.total > 0 ? (
-            <span className="tm-count">
-              {progress.done}/{progress.total}
-            </span>
-          ) : null}
-        </h3>
+          nothing — now taken literally. The section used to draw its heading,
+          an empty list and an add form for every Task, which is a card with
+          nothing in it on most of them. It appears when the Task HAS children,
+          or when the ⋯ asked for it (§2). */}
+      {showSubtasks ? (
+        <section className="tm-drawer-subtasks">
+          <h3>
+            {t("tasks.subtasks")}
+            {progress.total > 0 ? (
+              <span className="tm-count">
+                {progress.done}/{progress.total}
+              </span>
+            ) : null}
+          </h3>
 
-        <ul>
-          {children.map((child) => (
-            <li key={child.id}>
-              <input
-                type="checkbox"
-                checked={child.done}
-                onChange={() => onToggleSubtask(child.id)}
-                aria-label={child.title}
-              />
-              {/* A child Task opens like any other Task — which is what makes
-                  the breadcrumb above a round trip rather than a one-way exit.
-                  A legacy Subtask is not a Task and has no Detail to open, so
-                  it stays plain text until something promotes it. */}
-              {child.kind === "task" ? (
+          <ul>
+            {children.map((child) => (
+              <li key={child.id}>
+                <input
+                  type="checkbox"
+                  checked={child.done}
+                  onChange={() => onToggleSubtask(child.id)}
+                  aria-label={child.title}
+                />
+                {/* A child Task opens like any other Task — which is what makes
+                    the breadcrumb above a round trip rather than a one-way exit.
+                    A legacy Subtask is not a Task and has no Detail to open, so
+                    it stays plain text until something promotes it. */}
+                {child.kind === "task" ? (
+                  <button
+                    type="button"
+                    className={`tm-drawer-subtask-open${child.done ? " is-done" : ""}`}
+                    onClick={() => onOpenTask(child.id)}
+                  >
+                    {child.title}
+                  </button>
+                ) : (
+                  <span className={child.done ? "is-done" : ""}>{child.title}</span>
+                )}
                 <button
                   type="button"
-                  className={`tm-drawer-subtask-open${child.done ? " is-done" : ""}`}
-                  onClick={() => onOpenTask(child.id)}
+                  onClick={() => onDeleteSubtask(child.id)}
+                  aria-label={t("common.delete")}
                 >
-                  {child.title}
+                  ×
                 </button>
-              ) : (
-                <span className={child.done ? "is-done" : ""}>{child.title}</span>
-              )}
-              <button
-                type="button"
-                onClick={() => onDeleteSubtask(child.id)}
-                aria-label={t("common.delete")}
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
 
-        {/* Enter submits, and the button is not decoration: a form whose only
-            commit is a keypress has no affordance on touch, where §15.40 wants
-            a target you can hit.
+          {/* Enter submits, and the button is not decoration: a form whose only
+              commit is a keypress has no affordance on touch, where §15.40 wants
+              a target you can hit.
 
-            At the deepest allowed level the form is absent, not disabled:
-            §16.28 is explicit that a control must not appear and then refuse.
-            The line says why, so "the button is gone" is not a mystery. */}
-        {canAddSubtask ? (
-          <form onSubmit={submitSubtask}>
-            <input name="subtask" placeholder={t("tasks.addSubtask")} aria-label={t("tasks.addSubtask")} />
-            <button type="submit">{t("common.add")}</button>
-          </form>
-        ) : (
-          <p className="tm-drawer-depth-limit">{t("tasks.maxDepthReached")}</p>
-        )}
-      </section>
+              At the deepest allowed level the form is absent, not disabled:
+              §16.28 is explicit that a control must not appear and then refuse.
+              The line says why, so "the button is gone" is not a mystery. */}
+          {canAddSubtask ? (
+            <form onSubmit={submitSubtask}>
+              <input
+                name="subtask"
+                placeholder={t("tasks.addSubtask")}
+                aria-label={t("tasks.addSubtask")}
+                data-reveal-focus={isRevealed("addSubtask") && children.length === 0 ? "true" : undefined}
+              />
+              <button type="submit">{t("common.add")}</button>
+            </form>
+          ) : (
+            <p className="tm-drawer-depth-limit">{t("tasks.maxDepthReached")}</p>
+          )}
+        </section>
+      ) : null}
 
-      {/* `notes`, which is a SECOND field and not the body above.
+      {/* §13.36's Tags, as the section the reference app draws — chips and a
+          `+`, with no label over them, and nothing at all on a Task with no
+          tags (its `.detail-tag-view` measures 0 there too;
+          TICKTICK_COMPONENT_07_TASK_DETAIL_PANEL.md §3). */}
+      {showTags ? (
+        <section className="tm-drawer-tags">
+          <TagPicker
+            task={task}
+            tags={tags}
+            taskTags={taskTags}
+            onToggle={onToggleTag}
+            restoreFocusTo={() => root.current}
+          />
+        </section>
+      ) : null}
 
-          The Drawer never drew it. That was survivable while the legacy panel
-          was the only other Detail, and stopped being survivable once the
-          Tasks module became where Tasks are read: a note typed on the Today
-          page was invisible here, the calendar's event popover was writing the
-          same column as its memo, and search was matching text the reader
-          could not find on screen (§4).
+      {/* What this Task is waiting on, and what waits on it.
 
-          Below the subtasks rather than beside the description, because it is
-          not an alternative to it — a Task can have both, and stacking them
-          under one heading is how they came to share a word (§3). */}
-      <section className="tm-drawer-notes">
-        <h3>{t("taskDetail.notes")}</h3>
-        <DeferredTextarea
-          value={task.notes}
-          rows={2}
-          placeholder={t("taskDetail.addNotes")}
-          onCommit={(notes) => onUpdate({ notes })}
-          resetKey={task.id}
-          aria-label={t("taskDetail.notes")}
-        />
-      </section>
+          Ours, not the reference's — it has no dependencies — so the shape is
+          borrowed from the sections around it rather than observed: present
+          when the field holds something, absent otherwise, opened from the ⋯.
+          A `<select>` rather than a picker, because a dependency picker has no
+          spec behind it the way List (§13.9) and Tags (§13.36) do. */}
+      {showDependency ? (
+        <section className="tm-drawer-dependency">
+          {/* The picker is drawn for a Task that IS waiting on something, or
+              that has just been asked to. A Task that only has others waiting
+              on IT gets the list below and no empty select above it — the
+              reverse direction is derived and asks nothing of this reader. */}
+          {task.blockedByTaskId || isRevealed("setBlocker") ? (
+            <>
+          <h3>{t("taskDetail.blockedBy")}</h3>
+          <select
+            value={task.blockedByTaskId}
+            aria-label={t("taskDetail.blockedBy")}
+            data-reveal-focus={isRevealed("setBlocker") && !task.blockedByTaskId ? "true" : undefined}
+            onChange={(event) => onUpdate({ blockedByTaskId: event.target.value })}
+          >
+            <option value="">{t("taskDetail.blockedByNone")}</option>
+            {blockerOptions.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>
+                {candidate.title}
+              </option>
+            ))}
+          </select>
 
-      {/* Won't Do and Move to trash used to sit here as two buttons at the
-          foot of the panel. §15.3 puts secondary and destructive work behind
-          the ⋯ in the header, and §15.29 asks for Delete to be in a group of
-          its own — which a pair of buttons under the subtasks cannot be. Both
-          are in the menu now, with Restore in the same slot for a Task that is
-          already in the Trash (§15.66) — a state in which the old panel drew
-          "Move to trash" and meant nothing by it. */}
+          {/* Only when there is one. An always-drawn hint under an empty select
+              would explain a rule the reader has not invoked. */}
+          {task.blockedByTaskId ? (
+            <p className="tm-drawer-field-note">{t("taskDetail.blockedByHint")}</p>
+          ) : null}
+            </>
+          ) : null}
+
+          {/* The reverse direction, read-only because it is DERIVED —
+              `dependentsOf` computes it from the other Tasks' own fields, so
+              there is nothing here that could be written back. Each is a link
+              for the same reason the breadcrumb's ancestors are: the useful
+              next move from "three things are waiting on this" is opening one
+              of them. */}
+          {blocking.length > 0 ? (
+            <>
+              <h3>{t("taskDetail.blocks")}</h3>
+              <ul>
+                {blocking.map((dependent) => (
+                  <li key={dependent.id}>
+                    <button type="button" onClick={() => onOpenTask(dependent.id)}>
+                      {dependent.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* `notes`, which is a SECOND field and not the body above (§3).
+
+          Drawn when it holds something, or when the ⋯ opened it. It was an
+          always-present box under the subtasks, which put an empty textarea on
+          every Task in the account for the sake of the few that use it — the
+          same charge §2 lays against the property rows. */}
+      {showNote ? (
+        <section className="tm-drawer-notes">
+          <h3>{t("taskDetail.notes")}</h3>
+          <DeferredTextarea
+            value={task.notes}
+            rows={2}
+            placeholder={t("taskDetail.addNotes")}
+            onCommit={(notes) => onUpdate({ notes })}
+            resetKey={task.id}
+            aria-label={t("taskDetail.notes")}
+            data-reveal-focus={isRevealed("addNote") && !task.notes?.trim() ? "true" : undefined}
+          />
+        </section>
+      ) : null}
+
       </div>
+
+      {/* §1.6's fourth region, which this Detail did not have: the List on the
+          left and the ⋯ on the right, 48px, outside the scroll
+          (TICKTICK_COMPONENT_07_TASK_DETAIL_PANEL.md §3.1 measured exactly
+          that). The List was a labelled property row and the ⋯ was in the
+          header; both cost the body a line it no longer spends. */}
+      <footer className="tm-drawer-foot">
+        <ListPicker
+          task={task}
+          lists={lists}
+          folders={folders}
+          onMove={onMoveToList}
+          restoreFocusTo={() => root.current}
+        />
+
+        {/* §15.2's entry point. Everything §15.3 calls secondary or structural
+            lives behind it, and since §2 that includes the four that open a
+            section of this Detail — Add subtask, Tags, Waiting on, Note.
+
+            §15.62: opening it selects nothing. The Detail is already this
+            Task's, which is why the menu needs no target of its own. */}
+        <TaskActionsMenu
+          taskId={task.id}
+          title={task.title}
+          groups={actions}
+          onRun={(id) => {
+            // The four that open rather than change (§2). They are the
+            // Detail's own state, so they stop here rather than travelling to
+            // the command layer, which has no section to open.
+            if (DETAIL_REVEAL_ACTIONS.includes(id)) {
+              reveal(id);
+              return;
+            }
+            onRunAction(id);
+          }}
+          restoreFocusTo={() => root.current}
+        />
+      </footer>
     </aside>
   );
 }

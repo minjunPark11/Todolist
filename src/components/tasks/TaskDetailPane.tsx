@@ -145,7 +145,10 @@ export function TaskDetailPane({
       /* §15.3: Complete is drawn in the header as a checkbox, so it is
          promoted out of the menu rather than repeated inside it. Reopen goes
          with it — it is the same checkbox, unticked. */
-      actions={taskActions({ task, promoted: DETAIL_PROMOTED_ACTIONS, focusBusy })}
+      /* `surface: "detail"` is what admits the four that OPEN a section of
+         this panel (§2). A row's right-click menu asks the same registry and
+         does not get them, because it has no Detail to open one in. */
+      actions={taskActions({ task, promoted: DETAIL_PROMOTED_ACTIONS, focusBusy, surface: "detail" })}
       onRunAction={(id) => commands.runTaskAction(task, id)}
       activity={commands.activityTaskId === task.id ? bundle.activityFor(task.id) : null}
       onCloseActivity={commands.closeActivity}

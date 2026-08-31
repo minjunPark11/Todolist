@@ -159,6 +159,14 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     await openMore(user);
 
     expect(rows()).toEqual([
+      // The `add` group leads, which is where the reference app puts
+      // "Add subtask" (TICKTICK_DETAIL_ANATOMY_DESIGN.md §2). These four open a
+      // section of the Detail rather than change the Task, and only the Detail
+      // is offered them — a row's menu has nowhere to open one.
+      "Add a subtask",
+      "Tags",
+      "Waiting on",
+      "Notes",
       "Pin",
       "Duplicate",
       "Save as template",
