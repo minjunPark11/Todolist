@@ -70,7 +70,6 @@ import {
 } from "../domain/schedule";
 import {
   checkItemsForTask,
-  pruneOrphanCheckItems,
   removeCheckItemsForTask,
   sanitizeCheckItem,
   sortKeyForMovedCheckItem,
@@ -91,6 +90,7 @@ import { childDraft, promoteDraft } from "../domain/tasks/children";
 import { canAddChild } from "../domain/tasks/hierarchy";
 import { listMovePlan } from "../domain/tasks/listPicker";
 import { LIFECYCLE, isCompleted, isTaskOpen } from "../domain/tasks/taskState";
+import { emptyTrash as emptyTrashRows, permanentlyDeleteTask as removeTaskForever, removeTasksForever } from "../domain/tasks/trash";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
@@ -1071,25 +1071,43 @@ export function usePlannerData() {
     return { ...task, reminders: remindersForTask(task.id, rows).map(specOf) };
   }
 
+  /**
+   * Removes a Task for good, whatever state it was in.
+   *
+   * The rule this used to write out by hand lives in `domain/tasks/trash.ts`
+   * now (TRASH_PERMANENT_DELETE_DESIGN.md §4 Phase 1) — including the part
+   * this one was missing, which was the `taskTags` links. The Calendar's
+   * delete is the only caller: everywhere else throws a Task away instead
+   * (`trashTask`), and `permanentlyDeleteTask` below is the guarded door out
+   * of the Trash.
+   */
   function deleteTask(taskId: string) {
-    setData((current) => ({
-      ...current,
-      // Children of a deleted parent are promoted to top-level instead of
-      // being orphaned or cascade-deleted (their work is still real).
-      tasks: current.tasks
-        .filter((task) => task.id !== taskId)
-        .map((task) => (task.parentTaskId === taskId ? { ...task, parentTaskId: "" } : task)),
-      subtasks: current.subtasks.filter((subtask) => subtask.taskId !== taskId),
-      // Checklist lines go with the Task. Unlike a child Task — which is real
-      // work and gets promoted to top level above — a CheckItem has no
-      // meaning apart from the Task it is a line of, so leaving it would be
-      // leaving a row nothing can ever show.
-      checkItems: removeCheckItemsForTask(taskId, current.checkItems),
-      // Reminders go with the Task for the same reason the checklist does: a
-      // reminder about a Task that no longer exists can never fire and can
-      // never be found to be removed.
-      reminders: current.reminders.filter((row) => row.taskId !== taskId),
-    }));
+    setData((current) => ({ ...current, ...removeTasksForever(current, [taskId]) }));
+  }
+
+  /**
+   * §3.1's one Task, out of the Trash and gone.
+   *
+   * Guarded in the domain on `deletedAt`, so this cannot be turned into a
+   * one-click hard delete by a caller that forgets where it is.
+   */
+  function permanentlyDeleteTask(taskId: string) {
+    setData((current) => {
+      const result = removeTaskForever(current, taskId);
+      return result.done ? { ...current, ...result.rows } : current;
+    });
+  }
+
+  /**
+   * §3.3's whole Trash, gone. Returns the count for the confirmation that
+   * already happened — the caller asked before calling.
+   */
+  function emptyTrash(): number {
+    const { removed } = emptyTrashRows(data);
+    if (removed > 0) {
+      setData((current) => ({ ...current, ...emptyTrashRows(current).rows }));
+    }
+    return removed;
   }
 
   /**
@@ -1120,7 +1138,21 @@ export function usePlannerData() {
   // Deletion is a hard removal, so undo re-inserts the rows the caller
   // captured beforehand. Targeted on purpose: restoring a whole-store snapshot
   // would also throw away anything the user changed while the toast was up.
-  function restoreDeletedTask(task: Task, subtasks: Subtask[], childTaskIds: string[] = []) {
+  //
+  // It used to put back the Task, its children's parentage and the legacy
+  // subtasks — and nothing else, while `deleteTask` was taking the checklist
+  // and the reminders as well. Undo looked like it worked and the lines were
+  // gone (TRASH_PERMANENT_DELETE_DESIGN.md §2.3). Everything the delete takes
+  // is a parameter here now, so the two cannot drift apart again without the
+  // signature saying so.
+  function restoreDeletedTask(
+    task: Task,
+    subtasks: Subtask[],
+    childTaskIds: string[] = [],
+    checkItems: CheckItem[] = [],
+    taskTags: TaskTag[] = [],
+    reminders: Reminder[] = [],
+  ) {
     setData((current) => ({
       ...current,
       tasks: (current.tasks.some((item) => item.id === task.id)
@@ -1130,9 +1162,24 @@ export function usePlannerData() {
         // deleteTask promotes children to top level; put them back under the parent.
         childTaskIds.includes(item.id) ? { ...item, parentTaskId: task.id } : item,
       ),
+      // Each list is rebuilt as "what is there for other Tasks, plus what this
+      // Task had" — an append alone would double a row if the same undo ran
+      // twice, which a toast that is clicked and then clicked again can do.
       subtasks: [
         ...current.subtasks.filter((item) => item.taskId !== task.id),
         ...subtasks,
+      ],
+      checkItems: [
+        ...current.checkItems.filter((item) => item.taskId !== task.id),
+        ...checkItems,
+      ],
+      taskTags: [
+        ...current.taskTags.filter((item) => item.taskId !== task.id),
+        ...taskTags,
+      ],
+      reminders: [
+        ...current.reminders.filter((item) => item.taskId !== task.id),
+        ...reminders,
       ],
     }));
   }
@@ -1904,14 +1951,14 @@ export function usePlannerData() {
     setData((current) => {
       const next = lifecycle.permanentlyDeleteList(current.lists, current.tasks, listId);
       if (!next.done) return current;
-      return {
-        ...current,
-        lists: next.lists,
-        tasks: next.tasks,
-        // The Tasks went with the List, so their checklist lines go too —
-        // this is the one delete that removes Tasks in bulk.
-        checkItems: pruneOrphanCheckItems(next.tasks, current.checkItems),
-      };
+      // The Tasks go through the same door as any other permanent delete
+      // (TRASH_PERMANENT_DELETE_DESIGN.md §4 Phase 1). This used to prune the
+      // checklist lines by hand and leave the subtasks, the tag links and the
+      // reminders behind — and a child Task in another List kept pointing at a
+      // parent that no longer existed. One rule answers all four and promotes
+      // the child, which `lifecycle` cannot do because it only sees Lists.
+      const doomed = current.tasks.filter((task) => task.listId === listId).map((task) => task.id);
+      return { ...current, lists: next.lists, ...removeTasksForever(current, doomed) };
     });
   }
 
@@ -2128,6 +2175,8 @@ export function usePlannerData() {
     updateTaskSchedule,
     completeTask,
     deleteTask,
+    permanentlyDeleteTask,
+    emptyTrash,
     restoreDeletedTask,
     archiveTask,
     restoreTask,

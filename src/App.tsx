@@ -1042,11 +1042,18 @@ export default function App() {
     const childTaskIds = planner.tasks
       .filter((item) => item.parentTaskId === taskId)
       .map((item) => item.id);
+    // Everything the delete takes, captured before it is taken. The checklist,
+    // the tag links and the reminders were missing here, so Undo put back a
+    // Task with no lines on it (TRASH_PERMANENT_DELETE_DESIGN.md §2.3).
+    const checkItems = planner.checkItems.filter((item) => item.taskId === taskId);
+    const taskTags = planner.taskTags.filter((item) => item.taskId === taskId);
+    const reminders = planner.reminders.filter((item) => item.taskId === taskId);
     planner.deleteTask(taskId);
     showToast({
       message: t("app.toastTaskDeleted"),
       actionLabel: t("app.undo"),
-      onAction: () => planner.restoreDeletedTask(task, subtasks, childTaskIds),
+      onAction: () =>
+        planner.restoreDeletedTask(task, subtasks, childTaskIds, checkItems, taskTags, reminders),
     });
   }
 
