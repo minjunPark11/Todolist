@@ -90,6 +90,8 @@ export const en: Dictionary = {
   // ---- App.tsx chrome ----
   "app.deleteTaskTitle": "Delete task?",
   "app.deleteTaskBody": "This removes the task and its subtasks. This action cannot be undone.",
+  "tasks.deleteForeverTitle": "Delete this task forever?",
+  "tasks.deleteForeverBody": "It leaves the trash and the account. Subtasks stay, at the top level. This cannot be undone.",
   "app.toastTaskArchived": "Task archived.",
   "app.toastTasksArchived": "Archived {{n}} tasks.",
   "app.toastTaskDuplicated": "Task duplicated.",
@@ -870,6 +872,7 @@ export const en: Dictionary = {
   "tasks.menu.clearDue": "Clear the date",
   "tasks.menu.trash": "Move to trash",
   "tasks.menu.restore": "Restore",
+  "tasks.menu.deleteForever": "Delete forever",
   "tasks.menu.duplicate": "Duplicate",
   "tasks.menu.saveAsTemplate": "Save as template",
   "tasks.templateSaved": "Saved as a template.",

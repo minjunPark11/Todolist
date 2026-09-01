@@ -73,6 +73,7 @@ function renderModule(
   extra: {
     focusBusy?: boolean;
     onStartFocus?: (taskId: string) => void;
+    onDeleteForever?: (taskId: string) => void;
     onDuplicate?: (taskId: string) => (() => void) | null;
     activityFor?: (taskId: string) => TaskActivityEntry[];
     onSaveAsTemplate?: (taskId: string) => string;
@@ -97,6 +98,7 @@ function renderModule(
           url="/list/l1?task=t1"
           onNavigate={() => {}}
           onStartFocus={extra.onStartFocus ?? (() => {})}
+          onDeleteForever={extra.onDeleteForever ?? (() => {})}
           onDuplicate={extra.onDuplicate ?? (() => null)}
           focusBusy={extra.focusBusy ?? false}
           onCreate={() => {}}
@@ -220,10 +222,43 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     await openMore(user);
 
     // The old panel drew "Move to trash" here, where its only effect was to
-    // rewrite the timestamp that had put the Task there (§15.66).
-    expect(rows()).toEqual(["Copy link", "Task activities", "Restore"]);
+    // rewrite the timestamp that had put the Task there (§15.66). The way out
+    // the other side sits below it (TRASH_PERMANENT_DELETE_DESIGN.md §3.1).
+    expect(rows()).toEqual(["Copy link", "Task activities", "Restore", "Delete forever"]);
     await user.click(screen.getByRole("menuitem", { name: "Restore" }));
     expect(onMutate.mock.calls[0][1]).toEqual({ deletedAt: "" });
+  });
+
+  // §3.3: the app's one action with no way back does not happen on the click
+  // that chose it. The menu row asks; the dialog is what deletes.
+  it("asks before deleting a trashed Task forever, and deletes nothing until it is answered", async () => {
+    const user = userEvent.setup();
+    const onDeleteForever = vi.fn();
+    const { onMutate } = renderModule({ deletedAt: NOW }, { onDeleteForever });
+    await openMore(user);
+
+    await user.click(screen.getByRole("menuitem", { name: "Delete forever" }));
+    expect(onDeleteForever).not.toHaveBeenCalled();
+    // Nothing was patched on the way past, either — the row is not a mutation.
+    expect(onMutate).not.toHaveBeenCalled();
+
+    expect(screen.getByText("Delete this task forever?")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Delete forever" }));
+    expect(onDeleteForever).toHaveBeenCalledWith("t1");
+  });
+
+  it("deletes nothing when the question is answered no", async () => {
+    const user = userEvent.setup();
+    const onDeleteForever = vi.fn();
+    renderModule({ deletedAt: NOW }, { onDeleteForever });
+    await openMore(user);
+
+    await user.click(screen.getByRole("menuitem", { name: "Delete forever" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    // Only that nothing was deleted. Whether the dialog has finished leaving
+    // is `ConfirmModal`'s exit animation, which jsdom does not run — asserting
+    // on it here would be testing framer-motion under a name about deletion.
+    expect(onDeleteForever).not.toHaveBeenCalled();
   });
 
   it("saves a template without changing the Task, and offers to take it back (§25.8)", async () => {

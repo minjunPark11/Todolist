@@ -89,6 +89,8 @@ export const ko: Dictionary = {
   // ---- App.tsx chrome ----
   "app.deleteTaskTitle": "할 일을 삭제할까요?",
   "app.deleteTaskBody": "할 일과 하위 작업이 함께 삭제됩니다. 되돌릴 수 없습니다.",
+  "tasks.deleteForeverTitle": "이 할 일을 영구히 삭제할까요?",
+  "tasks.deleteForeverBody": "휴지통에서도 계정에서도 사라집니다. 하위 작업은 최상위로 남습니다. 되돌릴 수 없습니다.",
   "app.toastTaskArchived": "할 일을 보관했습니다.",
   "app.toastTasksArchived": "할 일 {{n}}개를 보관했습니다.",
   "app.toastTaskDuplicated": "할 일을 복제했습니다.",
@@ -841,6 +843,7 @@ export const ko: Dictionary = {
   "tasks.menu.clearDue": "날짜 지우기",
   "tasks.menu.trash": "휴지통으로",
   "tasks.menu.restore": "복원",
+  "tasks.menu.deleteForever": "영구 삭제",
   "tasks.menu.duplicate": "복제",
   "tasks.menu.saveAsTemplate": "템플릿으로 저장",
   "tasks.templateSaved": "템플릿으로 저장했습니다.",

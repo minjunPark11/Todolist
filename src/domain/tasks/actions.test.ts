@@ -77,7 +77,31 @@ describe("taskActions", () => {
       "copyLink",
       "activities",
       "restore",
+      "deleteForever",
     ]);
+  });
+
+  // The two are the same verb at two depths, so they must never be offered at
+  // once: a menu with both would be asking the reader to notice which of two
+  // adjacent red rows is the one that cannot be taken back
+  // (TRASH_PERMANENT_DELETE_DESIGN.md §3.1).
+  it("never offers Trash and Delete forever together", () => {
+    const live = ids(OPEN);
+    expect(live).toContain("trash");
+    expect(live).not.toContain("deleteForever");
+
+    const trashed = ids({ status: "open", deletedAt: "2026-08-25T10:00:00.000Z" });
+    expect(trashed).toContain("deleteForever");
+    expect(trashed).not.toContain("trash");
+  });
+
+  // §15.66's re-ask is the last thing standing between a stale dialog and a
+  // hard delete on a Task somebody else has already restored.
+  it("refuses Delete forever the moment the Task leaves the Trash", () => {
+    const trashed = { status: "open", deletedAt: "2026-08-25T10:00:00.000Z" } as const;
+    expect(canRunTaskAction("deleteForever", trashed)).toBe(true);
+    expect(canRunTaskAction("deleteForever", { ...trashed, deletedAt: "" })).toBe(false);
+    expect(canRunTaskAction("deleteForever", undefined)).toBe(false);
   });
 
   it("hides Start Focus for work that is over, and disables it with a reason while a session runs", () => {

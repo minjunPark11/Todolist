@@ -55,7 +55,8 @@ export type TaskActionId =
   | "wontDo"
   | "restart"
   | "trash"
-  | "restore";
+  | "restore"
+  | "deleteForever";
 
 /**
  * §15.42's groups, in §15.42's order.
@@ -150,6 +151,11 @@ const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
   { id: "restart", labelKey: "tasks.unmarkWontDo", group: "status" },
   { id: "restore", labelKey: "tasks.menu.restore", group: "status" },
   { id: "trash", labelKey: "tasks.menu.trash", group: "danger", danger: true },
+  // Below Trash and only ever beside it: the two are the same verb at two
+  // depths, and the order says which one is further (TRASH_PERMANENT_DELETE_
+  // DESIGN.md §3.1). Never both at once — `availabilityOf` shows Trash to a
+  // live Task and this one only to a Task already in the Trash.
+  { id: "deleteForever", labelKey: "tasks.menu.deleteForever", group: "danger", danger: true },
 ];
 
 /**
@@ -161,13 +167,19 @@ const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
  * offered a trashed Task a "Move to trash" button — a control whose only
  * possible effect was to rewrite the timestamp that had put it there.
  *
- * Getting it back is the one thing left to do with it, so that is what is
- * offered — together with the two that change nothing. Copy Link survives
+ * Two things are left to do with it — get it back, or stop keeping it — so
+ * those are what is offered, together with the two that change nothing. Copy
+ * Link survives
  * because §15.58 says it is not a mutation, and a link to a trashed Task is
  * how one person shows another what they are about to restore; Activities
  * survives because it is the surface that says when the Task was thrown away.
  */
-const TRASHED_ACTIONS: readonly TaskActionId[] = ["copyLink", "activities", "restore"];
+const TRASHED_ACTIONS: readonly TaskActionId[] = [
+  "copyLink",
+  "activities",
+  "restore",
+  "deleteForever",
+];
 
 /** The four that open a section of the Detail (§2). */
 export const DETAIL_REVEAL_ACTIONS: readonly TaskActionId[] = [
@@ -186,7 +198,11 @@ function availabilityOf(id: TaskActionId, ctx: TaskActionContext): Availability 
   if (DETAIL_REVEAL_ACTIONS.includes(id) && ctx.surface !== "detail") return "hidden";
 
   switch (id) {
+    // Both belong to a Task in the Trash, and the branch above has already
+    // answered for those. Reaching here means the Task is not in the Trash, so
+    // there is nothing to restore and nothing to stop keeping.
     case "restore":
+    case "deleteForever":
       return "hidden";
     case "pin":
       return isPinned(task) ? "hidden" : "enabled";

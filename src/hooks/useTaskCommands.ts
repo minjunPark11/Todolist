@@ -64,6 +64,14 @@ export interface TaskCommandsInput {
   /** §25.6's entry point, and only that — the engine owns everything after. */
   onStartFocus: (taskId: string) => void;
   /**
+   * Removes a trashed Task from the account, for good.
+   *
+   * The store's own guard refuses a Task nobody threw away
+   * (TRASH_PERMANENT_DELETE_DESIGN.md §7.1), so this hook does not have to be
+   * the only thing standing between a menu row and a hard delete.
+   */
+  onDeleteForever: (taskId: string) => void;
+  /**
    * This Task's deep link, as the surface addresses it (§15.19).
    *
    * Handed in because the address is the SURFACE's, not this hook's: the Tasks
@@ -95,6 +103,17 @@ export interface TaskCommands {
   toggleDone: (task: Task) => void;
   /** Run one registry action (§15.64), whoever asked for it. */
   runTaskAction: (target: Task, id: TaskActionId) => void;
+  /**
+   * The Task the reader has asked to delete forever, or null (§3.3).
+   *
+   * The one action here that ASKS instead of doing. It is held in the hook
+   * rather than in each shell because "a hard delete is asked twice" is a rule
+   * about the command, not about a screen — two screens owning it separately
+   * is how one of them ends up not asking.
+   */
+  pendingDeleteForever: Task | null;
+  confirmDeleteForever: () => void;
+  cancelDeleteForever: () => void;
   /** Whose history is open (§25.7), or "" for none. */
   activityTaskId: string;
   closeActivity: () => void;
@@ -108,6 +127,7 @@ export function useTaskCommands(input: TaskCommandsInput): TaskCommands {
    * history of the one before it.
    */
   const [activityTaskId, setActivityTaskId] = useState("");
+  const [pendingDeleteForever, setPendingDeleteForever] = useState<Task | null>(null);
 
   function mutate(target: Task, mutation: TaskMutation) {
     input.onMutate(target.id, mutation.patch);
@@ -201,7 +221,25 @@ export function useTaskCommands(input: TaskCommandsInput): TaskCommands {
         return setActivityTaskId(task.id);
       case "startFocus":
         return input.onStartFocus(task.id);
+      // The only arm that does not act. §3.3: the one thing in this app with
+      // no way back is asked about first, and `mutate` is no help — there is
+      // no patch that puts a removed row back, which is exactly why the
+      // question comes before the click and not after it in a toast.
+      case "deleteForever":
+        return setPendingDeleteForever(task);
     }
+  }
+
+  function confirmDeleteForever() {
+    const target = pendingDeleteForever;
+    setPendingDeleteForever(null);
+    if (!target) return;
+    // Asked a third time, in effect: §15.67's re-read applies here more than
+    // anywhere, because the dialog can sit open while a sync restores the Task
+    // somewhere else — and then this would be deleting something that is no
+    // longer in the Trash at all.
+    if (!canRunTaskAction("deleteForever", input.tasks.find((row) => row.id === target.id))) return;
+    input.onDeleteForever(target.id);
   }
 
   return {
@@ -210,6 +248,9 @@ export function useTaskCommands(input: TaskCommandsInput): TaskCommands {
     mutate,
     toggleDone,
     runTaskAction,
+    pendingDeleteForever,
+    confirmDeleteForever,
+    cancelDeleteForever: () => setPendingDeleteForever(null),
     activityTaskId,
     closeActivity: () => setActivityTaskId(""),
   };

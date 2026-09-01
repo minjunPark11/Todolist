@@ -130,6 +130,7 @@ function Harness({
     onDuplicate: () => null,
     onSaveAsTemplate: () => "",
     onDeleteTemplate: () => {},
+    onDeleteForever: () => {},
     onStartFocus: () => {},
     linkFor: (taskId) => `https://example.test/#${taskId}`,
   });

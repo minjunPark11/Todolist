@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { TaskDetailPane } from "./components/tasks/TaskDetailPane";
 import { TaskUndoStrip } from "./components/tasks/TaskUndoStrip";
+import { TaskDeleteForeverGate } from "./components/tasks/TaskDeleteForeverGate";
 import type { TaskDetailBundle } from "./components/tasks/taskDetailBundle";
 import { useTaskCommands } from "./hooks/useTaskCommands";
 import { useTaskDetailWidth } from "./hooks/useTaskDetailWidth";
@@ -309,6 +310,7 @@ export default function App() {
     onSaveAsTemplate: (taskId) => planner.saveTaskAsTemplate(taskId)?.id ?? "",
     onDeleteTemplate: planner.deleteTaskTemplate,
     onStartFocus: (taskId) => planner.startFocusSession(taskId, "today_page"),
+    onDeleteForever: planner.permanentlyDeleteTask,
     /**
      * §15.19's link — now this page's own address.
      *
@@ -1367,6 +1369,7 @@ export default function App() {
           // rest. `source` says where the session was started from, which is
           // what the focus statistics group by.
           onStartFocus={(taskId) => planner.startFocusSession(taskId, "today_page")}
+          onDeleteForever={planner.permanentlyDeleteTask}
           onDuplicate={(taskId) => {
             const plan = planner.duplicateTask(taskId);
             return plan ? () => planner.discardDuplicate(plan) : null;
@@ -1610,6 +1613,11 @@ export default function App() {
           not care which grid it was rendered inside — the same reason
           `AppModals` sits here. */}
       <TaskUndoStrip notice={taskCommands.notice} onDismiss={() => taskCommands.setNotice(null)} />
+      <TaskDeleteForeverGate
+        task={taskCommands.pendingDeleteForever}
+        onCancel={taskCommands.cancelDeleteForever}
+        onConfirm={taskCommands.confirmDeleteForever}
+      />
       <AppModals
         pendingDeleteTaskId={pendingDeleteTaskId}
         pendingResetAllData={pendingResetAllData}

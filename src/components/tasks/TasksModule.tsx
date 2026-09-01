@@ -38,6 +38,7 @@ import { TasksSidebarSlot } from "../shell/TasksSidebarSlot";
 import { TaskQuickAdd } from "./TaskQuickAdd";
 import { TaskDetailPane } from "./TaskDetailPane";
 import { TaskUndoStrip } from "./TaskUndoStrip";
+import { TaskDeleteForeverGate } from "./TaskDeleteForeverGate";
 import type { TaskDetailBundle } from "./taskDetailBundle";
 import { useTaskCommands } from "../../hooks/useTaskCommands";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
@@ -203,6 +204,11 @@ interface TasksModuleProps {
    */
   onStartFocus: (taskId: string) => void;
   /**
+   * §3.1's way out of the Trash. The store guards it on `deletedAt`, so this
+   * module hands over an id and does not have to re-check where the Task is.
+   */
+  onDeleteForever: (taskId: string) => void;
+  /**
    * §15.9's Duplicate. Makes the copy and hands back the way to take it back.
    *
    * A callback rather than the new id, because undoing a Duplicate is not a
@@ -360,6 +366,7 @@ export function TasksModule(props: TasksModuleProps) {
     onSaveAsTemplate: props.onSaveAsTemplate,
     onDeleteTemplate: props.onDeleteTemplate,
     onStartFocus: props.onStartFocus,
+    onDeleteForever: props.onDeleteForever,
     linkFor: (taskId) => taskLinkFor(window.location.origin, state, taskId),
   });
   // Pulled out by name because the rows and the two menus below call them on
@@ -1172,6 +1179,11 @@ export function TasksModule(props: TasksModuleProps) {
           is a hook two surfaces call and a notice nobody draws is a change
           nobody can take back. */}
       <TaskUndoStrip notice={commands.notice} onDismiss={() => commands.setNotice(null)} />
+      <TaskDeleteForeverGate
+        task={commands.pendingDeleteForever}
+        onCancel={commands.cancelDeleteForever}
+        onConfirm={commands.confirmDeleteForever}
+      />
     </section>
   );
 }

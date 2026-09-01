@@ -153,6 +153,7 @@ function renderModule(url: string) {
           onUseTemplate={() => {}}
           onMutate={() => {}}
           onStartFocus={() => {}}
+          onDeleteForever={() => {}}
           onDuplicate={() => null}
           focusBusy={false}
         />
