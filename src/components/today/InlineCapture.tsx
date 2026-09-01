@@ -24,6 +24,21 @@ export function InlineCapture({
 }: InlineCaptureProps) {
   const { t, lang } = useT();
   const [value, setValue] = useState("");
+  const [focused, setFocused] = useState(false);
+
+  /**
+   * Whether the row shows its controls (§3.3).
+   *
+   * The reference app's Today has one add affordance and it is a single quiet
+   * line at the top of the list; ours was a card with a toggle, a button and a
+   * hint under it, standing open every day whether or not anybody typed. So it
+   * folds: `+ 작업 추가` until it is asked for, everything it had once it is.
+   *
+   * `value` counts as well as focus. Text typed and then clicked away from is
+   * still a capture in progress, and folding the Add button away under it
+   * would be taking the control back mid-sentence.
+   */
+  const expanded = focused || value.trim().length > 0;
 
   // Parsed live so the chips below show what the app understood before the
   // capture is stored — a misread is visible rather than silent.
@@ -51,7 +66,7 @@ export function InlineCapture({
   ].filter((chip): chip is { key: string; label: string } => chip !== null);
 
   return (
-    <form className="tdy-capture" onSubmit={submit}>
+    <form className={`tdy-capture${expanded ? " is-open" : ""}`} onSubmit={submit}>
       <div className="tdy-capture-row">
         <span className="tdy-capture-icon" aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -62,12 +77,20 @@ export function InlineCapture({
           ref={inputRef}
           className="tdy-capture-input"
           value={value}
-          placeholder={t("todayv.capturePlaceholder")}
-          aria-label={t("todayv.capturePlaceholder")}
+          placeholder={expanded ? t("todayv.capturePlaceholder") : t("todayv.addRow")}
+          // The label does not fold with the row: a screen reader meets the
+          // same control either way, and "작업 추가" is what it is for.
+          aria-label={t("todayv.addRow")}
           aria-describedby="tdy-capture-hint"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
+              // Empty already? Then Escape means "I am done here", and the row
+              // folds. With text in it, Escape clears and the row stays open —
+              // one key doing two things is what the hint line promises.
+              if (!value) event.currentTarget.blur();
               setValue("");
               return;
             }
@@ -91,6 +114,8 @@ export function InlineCapture({
             submit();
           }}
         />
+        {expanded ? (
+          <>
         <button
           type="button"
           className={`tdy-capture-toggle${addToToday ? " is-on" : ""}`}
@@ -103,6 +128,8 @@ export function InlineCapture({
         <button type="submit" className="tdy-btn tdy-btn-navy tdy-btn-sm" disabled={!canSave}>
           {t("common.add")}
         </button>
+          </>
+        ) : null}
       </div>
 
       {chips.length > 0 ? (
@@ -115,9 +142,11 @@ export function InlineCapture({
         </div>
       ) : null}
 
-      <p className="tdy-capture-hint" id="tdy-capture-hint">
-        {t("todayv.captureHint")}
-      </p>
+      {expanded ? (
+        <p className="tdy-capture-hint" id="tdy-capture-hint">
+          {t("todayv.captureHint")}
+        </p>
+      ) : null}
     </form>
   );
 }

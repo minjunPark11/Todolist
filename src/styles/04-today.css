@@ -242,14 +242,44 @@
 
 /* One-line capture bar, above the queue. Always present so a stray thought
    costs one keystroke rather than a modal. */
+/* One quiet line at the top of the list until it is asked for (§3.3).
+   Folded, it is a row like the ones under it — same 46px, same padding, no
+   surface. Open, it takes the card back, because what it then holds is a form
+   and a form wants an edge. */
 .tdy-capture {
   display: grid;
   gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--border-subtle);
+  min-height: 46px;
+  padding: 7px 12px;
+  border: 1px solid transparent;
   border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.tdy-capture:hover {
+  background: var(--bg-surface-muted);
+}
+
+.tdy-capture.is-open {
+  padding: 12px 14px;
+  border-color: var(--border-subtle);
   background: var(--bg-surface);
   box-shadow: var(--shadow-card);
+}
+
+.tdy-capture.is-open:hover {
+  background: var(--bg-surface);
+}
+
+/* The `+` is the whole affordance while the row is folded, so it stops being a
+   filled chip and becomes what the placeholder beside it is: quiet. */
+.tdy-capture:not(.is-open) .tdy-capture-icon {
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  color: var(--text-tertiary);
 }
 
 .tdy-capture-row {

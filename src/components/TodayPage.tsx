@@ -473,7 +473,11 @@ export function TodayPage({
             today={today}
             openedTaskId={openedTaskId}
             onMoveBucket={handleMoveBucket}
-            onAddTask={() => setQuickAddOpen(true)}
+            /* The empty day's call to action points at the row above it
+               rather than opening the full form (§3.3). Two ways to add on a
+               blank screen is the duplication this phase removed from the
+               header; a button that focuses the one way is a signpost. */
+            onAddTask={() => captureRef.current?.focus()}
           />
 
           {/* Cards that would only say "nothing here" stay out of the daily

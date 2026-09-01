@@ -445,6 +445,7 @@ export const ko: Dictionary = {
   "todayv.scheduleCalendar": "Calendar에 배치",
   "todayv.addToTodayAria": "{{title}}을(를) 오늘로 보내기",
   "todayv.toastAddedToInbox": "받은함에 추가했습니다.",
+  "todayv.addRow": "작업 추가",
   "todayv.capturePlaceholder": "빠르게 적어두기 — 예: 내일 오후 3시 팀 회의 !!",
   "todayv.captureHint": "Enter 저장 · Alt+Enter 자세히 입력 · Esc 지우기",
   "todayv.captureTargetToday": "오늘 할 일로 추가합니다. 눌러서 받은함으로 바꾸세요.",

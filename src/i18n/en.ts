@@ -449,6 +449,7 @@ export const en: Dictionary = {
   "todayv.scheduleCalendar": "Schedule in Calendar",
   "todayv.addToTodayAria": "Send {{title}} to Today",
   "todayv.toastAddedToInbox": "Added to Inbox.",
+  "todayv.addRow": "Add task",
   "todayv.capturePlaceholder": "Jot it down — e.g. tomorrow 3pm team sync !!",
   "todayv.captureHint": "Enter to save · Alt+Enter for details · Esc to clear",
   "todayv.captureTargetToday": "Filed as a Today task. Click to switch to Inbox.",
