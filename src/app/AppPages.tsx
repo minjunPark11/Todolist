@@ -11,6 +11,7 @@ import type { AutoBackupState } from "./useAutoBackup";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import type { AppUpdateStatus } from "../platform";
 import type { TaskDetailPresentation } from "../domain/tasks/responsive";
+import { DEFAULT_TODAY_AXIS } from "../domain/view/todayGroups";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Task } from "../types";
 
 type Planner = ReturnType<typeof usePlannerData>;
@@ -176,6 +177,8 @@ export function AppPages({
           onToggleShowCompleted={() =>
             planner.updateAppSettings({ showCompletedInToday: !appSettings.showCompletedInToday })
           }
+          groupAxis={appSettings.todayGroupAxis ?? DEFAULT_TODAY_AXIS}
+          onSetGroupAxis={(todayGroupAxis) => planner.updateAppSettings({ todayGroupAxis })}
           intent={todayIntent}
           onIntentHandled={onTodayIntentHandled}
           showToast={showToast}

@@ -1,6 +1,12 @@
 import { useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
-import { GROUP_ORDER, groupIdOf, type GroupId } from "../../domain/view/viewGroups";
+import {
+  todayGroupOf,
+  todayGroupOrder,
+  todayGroupLabelKey,
+  type TodayGroupAxis,
+  type TodayGroupId,
+} from "../../domain/view/todayGroups";
 import {
   formatMinuteOfDay,
   parseTimeToMinutes,
@@ -36,31 +42,6 @@ import { MotionTaskRow } from "../motion/MotionTaskRow";
  */
 const BUCKETS: TodayBucketId[] = ["now", "next", "later"];
 
-/**
- * The plan's three groups, and only three (§7.5).
- *
- * `groupIdOf` answers for a task in general: no deadline is `날짜 없음`, a
- * deadline next week is `이후`. On a board that is the right answer. Here it is
- * the wrong question — every task on this screen is on it for one of three
- * reasons (§12.5.1), and two of those reasons produce those very labels:
- *
- *   - planned for today with no deadline  → `groupIdOf` says `날짜 없음`
- *   - planned for today, due next week    → `groupIdOf` says `이후`
- *
- * Both are on today's list because the reader PUT them there, and a group
- * called "No date" tells them the opposite — that the app does not know when
- * this is for. So everything that is neither late nor finished is `오늘`.
- *
- * Local to this screen on purpose: the reason it holds is that Today's
- * membership includes a plan, which is not true of a Matrix box or an Inbox
- * column, and `viewGroups` is those two boards' rule as much as it is this
- * screen's.
- */
-function todayGroupOf(entry: TodayEntry, today: string): GroupId {
-  const id = groupIdOf(entry.task, today);
-  return id === "overdue" || id === "completed" ? id : "today";
-}
-
 interface FocusQueueProps {
   entries: TodayEntry[];
   hasQuery: boolean;
@@ -79,6 +60,8 @@ interface FocusQueueProps {
   onMoveBucket: (taskId: string, bucket: TodayBucketId) => void;
   /** Today as `YYYY-MM-DD` — which date the groups are measured against. */
   today: string;
+  /** Which question the list is grouped by (§3.4). */
+  groupAxis: TodayGroupAxis;
   /**
    * The Task the Detail has open, or "" (§1.4's observation, redesign Q6).
    *
@@ -101,6 +84,7 @@ export function FocusQueue({
   onOpenTask,
   onMoveBucket,
   today,
+  groupAxis,
   openedTaskId,
   onAddTask,
 }: FocusQueueProps) {
@@ -118,16 +102,14 @@ export function FocusQueue({
    * answer to a question already answered.
    */
   const groups = useMemo(() => {
-    const byGroup = new Map<GroupId, TodayEntry[]>();
+    const byGroup = new Map<TodayGroupId, TodayEntry[]>();
     for (const entry of entries) {
-      // `completed` wins over every date, which is `groupIdOf`'s rule and the
-      // reason finished work is not reported as overdue.
-      const id = todayGroupOf(entry, today);
+      const id = todayGroupOf(entry.task, entry.bucket, today, groupAxis);
       const bucket = byGroup.get(id);
       if (bucket) bucket.push(entry);
       else byGroup.set(id, [entry]);
     }
-    return GROUP_ORDER.flatMap((id) => {
+    return todayGroupOrder(groupAxis).flatMap((id) => {
       const rows = byGroup.get(id);
       if (!rows || rows.length === 0) return [];
       // The one group the reader can switch off. It is a group like any other
@@ -135,7 +117,7 @@ export function FocusQueue({
       if (id === "completed" && !showCompleted) return [];
       return [{ id, rows }];
     });
-  }, [entries, today, showCompleted]);
+  }, [entries, today, groupAxis, showCompleted]);
 
   return (
     /* Not a card any more (§3.1), and no head of its own (§3.2). "오늘 할 일"
@@ -166,7 +148,7 @@ export function FocusQueue({
             <section className={`tdy-bucket is-${group.id}`} key={group.id}>
               <header className="tdy-bucket-head">
                 <span className={`tdy-bucket-dot tdy-bucket-dot-${group.id}`} aria-hidden="true" />
-                <strong>{t(`view.group.${group.id}`)}</strong>
+                <strong>{t(todayGroupLabelKey(group.id))}</strong>
                 <span className="tdy-bucket-count">{group.rows.length}</span>
               </header>
               <div className="tdy-rows">

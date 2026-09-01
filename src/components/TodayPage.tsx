@@ -3,6 +3,11 @@ import type { List, PageId, Task, TaskDailyPlan, TaskDraft } from "../types";
 import { formatDate, getDayLabel, todayValue } from "../utils/date";
 import { MoreMenu, type MoreMenuItem } from "./kit";
 import {
+  DEFAULT_TODAY_AXIS,
+  TODAY_GROUP_AXES,
+  type TodayGroupAxis,
+} from "../domain/view/todayGroups";
+import {
   buildTimeRail,
   buildTodayPlan,
   collectTodayEntries,
@@ -54,6 +59,9 @@ interface TodayPageProps {
   // Settings page shows, so the two never disagree.
   showCompleted: boolean;
   onToggleShowCompleted: () => void;
+  /** Which question the list is grouped by, and how to change it (§3.4). */
+  groupAxis: TodayGroupAxis;
+  onSetGroupAxis: (axis: TodayGroupAxis) => void;
   /** The Task the Detail beside this page has open, or "" (redesign Q6). */
   openedTaskId: string;
   intent?: TodayIntent;
@@ -75,6 +83,8 @@ export function TodayPage({
   onScheduleInCalendar,
   showCompleted,
   onToggleShowCompleted,
+  groupAxis,
+  onSetGroupAxis,
   openedTaskId,
   intent = "",
   onIntentHandled,
@@ -388,16 +398,39 @@ export function TodayPage({
    */
   const headMenuItems: MoreMenuItem[] = [
     { label: t("todayv.searchPlaceholder"), onClick: openSearch },
-    { separator: true },
-    { label: t("todayv.planToday"), onClick: handlePlanToday },
     {
       label: showCompleted ? t("todayv.hideCompleted") : t("todayv.showCompleted"),
       onClick: onToggleShowCompleted,
     },
-    { label: t("todayv.moveAllLater"), onClick: handleMoveAllLater },
-    { separator: true },
-    { label: t("todayv.clearPlan"), onClick: handleClearPlan },
+    /**
+     * The three that arrange the plan's boxes, offered only while the boxes
+     * are what the reader is looking at (§3.4).
+     *
+     * They have been editing something invisible since the groups became dates
+     * (§7) — this is where that ends. A button that rearranges a grouping the
+     * screen is not drawing is a button whose effect the reader cannot see.
+     */
+    ...(groupAxis === "plan"
+      ? ([
+          { separator: true },
+          { label: t("todayv.planToday"), onClick: handlePlanToday },
+          { label: t("todayv.moveAllLater"), onClick: handleMoveAllLater },
+          { label: t("todayv.clearPlan"), onClick: handleClearPlan },
+        ] as MoreMenuItem[])
+      : []),
   ];
+
+  /**
+   * The `↕`, and the two ways to read the day (§3.4).
+   *
+   * A menu of its own rather than a section of the ⋯: what it changes is the
+   * SHAPE of the list, and the ⋯ holds things that act on it. The reference
+   * app splits them the same way — a sort control beside the ⋯, not inside it.
+   */
+  const axisMenuItems: MoreMenuItem[] = TODAY_GROUP_AXES.map((axis) => ({
+    label: `${axis === groupAxis ? "✓ " : ""}${t(`todayv.axis.${axis}`)}`,
+    onClick: () => onSetGroupAxis(axis),
+  }));
 
   return (
     <div className="tdy-page">
@@ -415,6 +448,7 @@ export function TodayPage({
           <p>{getDayLabel(today, lang)}</p>
         </div>
         <div className="tdy-head-actions">
+          <MoreMenu items={axisMenuItems} label={t("todayv.axisMenuAria")} icon="↕" />
           <MoreMenu items={headMenuItems} label={t("todayv.queueMenuAria")} />
         </div>
       </header>
@@ -471,6 +505,7 @@ export function TodayPage({
             onToggleDone={onToggleDone}
             onOpenTask={onOpenTask}
             today={today}
+            groupAxis={groupAxis}
             openedTaskId={openedTaskId}
             onMoveBucket={handleMoveBucket}
             /* The empty day's call to action points at the row above it

@@ -4,6 +4,7 @@ import type { FocusDefaultLength } from "./domain/focus/sessionLength";
 // the matrix can keep importing this one.
 import type { MatrixQuadrantView } from "./domain/view/matrixGroups";
 import type { ViewRule } from "./domain/view/viewRules";
+import type { TodayGroupAxis } from "./domain/view/todayGroups";
 import type { InboxBucket } from "./domain/tasks/board";
 import type { InboxColumn } from "./domain/view/inboxColumns";
 import type { MatrixQuadrant } from "./utils/eisenhower";
@@ -643,6 +644,18 @@ export interface AppSettings {
    * untouched, and one that has never been set reads as the default.
    */
   matrixQuadrantViews?: Partial<Record<MatrixQuadrant, MatrixQuadrantView>>;
+  /**
+   * Which question the day's list is grouped by
+   * (TODAY_TICKTICK_REDESIGN.md §3.4).
+   *
+   * One value and not one per box: Today is a single list, so there is nothing
+   * to keep separate settings for. Here rather than in device-local state for
+   * the reason its neighbour above gives — a reader who chooses their own plan
+   * on the desktop should find it chosen on the laptop. Optional and additive
+   * (M0): absent reads as `date`, which is what this screen has done since the
+   * groups became dates.
+   */
+  todayGroupAxis?: TodayGroupAxis;
   /**
    * What each box CONTAINS, as opposed to how it is drawn
    * (TICKTICK_MATRIX_DESIGN.md §23.1).

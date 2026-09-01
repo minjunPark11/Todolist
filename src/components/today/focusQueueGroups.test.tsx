@@ -17,6 +17,7 @@ import { FloatingLayerProvider } from "../floating";
 import { FocusQueue } from "./FocusQueue";
 import type { TodayEntry } from "../../utils/todayView";
 import type { Task } from "../../types";
+import type { TodayGroupAxis } from "../../domain/view/todayGroups";
 
 const TODAY = "2026-09-01";
 
@@ -41,7 +42,7 @@ function entry(id: string, over: Partial<Task> = {}, completed = false): TodayEn
   } as TodayEntry;
 }
 
-function renderQueue(entries: TodayEntry[], showCompleted = true) {
+function renderQueue(entries: TodayEntry[], showCompleted = true, axis: TodayGroupAxis = "date") {
   render(
     <I18nProvider lang="en">
       <FloatingLayerProvider>
@@ -50,6 +51,7 @@ function renderQueue(entries: TodayEntry[], showCompleted = true) {
         hasQuery={false}
         query=""
         today={TODAY}
+        groupAxis={axis}
         openedTaskId=""
         showCompleted={showCompleted}
         onToggleDone={() => {}}
@@ -74,6 +76,16 @@ function countFor(name: string): string {
     (node) => node.querySelector("strong")?.textContent === name,
   );
   return head?.querySelector(".tdy-bucket-count")?.textContent ?? "";
+}
+
+/** An entry filed in one of the plan's three boxes. */
+function bucketed(
+  id: string,
+  bucket: "now" | "next" | "later",
+  completed = false,
+  over: Partial<Task> = {},
+): TodayEntry {
+  return { ...entry(id, over, completed), bucket, defaultBucket: bucket };
 }
 
 afterEach(cleanup);
@@ -132,5 +144,41 @@ describe("the day's groups", () => {
   it("hides Completed when the reader has switched it off", () => {
     renderQueue([entry("due", { dueDate: TODAY }), entry("done", { dueDate: TODAY }, true)], false);
     expect(headings()).toEqual(["Today"]);
+  });
+});
+
+// §3.4: the plan's boxes did not go away when the dates arrived — they became
+// the other way to read the same day.
+describe("the plan axis", () => {
+  it("groups by the box the task was put in", () => {
+    renderQueue(
+      [
+        bucketed("a", "later"),
+        bucketed("b", "now"),
+        bucketed("c", "next"),
+      ],
+      true,
+      "plan",
+    );
+    expect(headings()).toEqual(["Now", "Next", "Later"]);
+  });
+
+  // The one rule both axes share, and the one that makes "완료" a group rather
+  // than a filter: a task finished this morning is not waiting in a box.
+  it("still files finished work under Completed", () => {
+    renderQueue([bucketed("done", "now", true)], true, "plan");
+    expect(headings()).toEqual(["Completed"]);
+  });
+
+  it("draws no box that is empty", () => {
+    renderQueue([bucketed("only", "next")], true, "plan");
+    expect(headings()).toEqual(["Next"]);
+  });
+
+  // The dates say nothing here. A task three weeks late sits in whichever box
+  // the reader filed it in, because that is the question they asked.
+  it("does not reach for the date at all", () => {
+    renderQueue([bucketed("late", "later", false, { dueDate: "2026-08-01" })], true, "plan");
+    expect(headings()).toEqual(["Later"]);
   });
 });

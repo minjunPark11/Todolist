@@ -168,14 +168,26 @@ export function useOutsideClose(onClose: () => void) {
  * `stopPropagation` on the wrapper stays. The rows underneath open a Detail on
  * click, and the menu sits inside the row.
  */
-export function MoreMenu({ items, label }: { items: MoreMenuItem[]; label?: string }) {
+export function MoreMenu({
+  items,
+  label,
+  // The glyph on the trigger. `⋯` is what a menu of ACTIONS wears; a menu that
+  // changes the shape of a list wears something else, and both are still one
+  // component because what they open is identical (TODAY_TICKTICK_REDESIGN.md
+  // §3.4).
+  icon = "⋯",
+}: {
+  items: MoreMenuItem[];
+  label?: string;
+  icon?: string;
+}) {
   const { t } = useT();
   const resolvedLabel = label ?? t("common.more");
   return (
     <div className="ff-anchor" onClick={(e) => e.stopPropagation()}>
       <Popover type="menu" placement="bottom-end">
         <PopoverTrigger className="ff-icon-btn" aria-label={resolvedLabel}>
-          ⋯
+          {icon}
         </PopoverTrigger>
         <PopoverContent label={resolvedLabel} role="menu">
           <MoreMenuItems items={items} />

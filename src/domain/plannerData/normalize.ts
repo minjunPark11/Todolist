@@ -57,6 +57,7 @@ import { clampHoursAtATime, HOURS_AT_A_TIME } from "../../utils/calendarTime";
 import { MATRIX_QUADRANTS, type MatrixQuadrant } from "../../utils/eisenhower";
 import { sanitizeMatrixView, type MatrixQuadrantView } from "../view/matrixGroups";
 import { sanitizeMatrixRules } from "../view/matrixRules";
+import { isTodayGroupAxis } from "../view/todayGroups";
 import { sanitizeInboxColumnRules } from "../view/inboxColumnRules";
 import { sanitizeInboxColumnNames } from "../tasks/board";
 import { resolveInboxColumns } from "../view/inboxColumns";
@@ -418,6 +419,11 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
     // Same rule, for the same reason: absent means the default mapping, and
     // writing four full rules into an account that never opened the editor
     // would store a decision nobody made.
+    // Additive and validated on the way in: an unknown axis from a newer
+    // client (or a corrupted store) reads as absent, and absent is `date`.
+    ...(isTodayGroupAxis(settings?.todayGroupAxis)
+      ? { todayGroupAxis: settings.todayGroupAxis }
+      : {}),
     ...(settings?.matrixQuadrantRules
       ? { matrixQuadrantRules: sanitizeMatrixRules(settings.matrixQuadrantRules) }
       : {}),
