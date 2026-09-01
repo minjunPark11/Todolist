@@ -370,26 +370,56 @@
   font-weight: 600;
 }
 
+/* A list, not a stack of cards (TODAY_TICKTICK_REDESIGN.md §3.1).
+   No gap: the rows meet, and a rule between them is what separates them. */
 .tdy-rows {
   display: grid;
-  gap: 8px;
+  gap: 0;
 }
 
 .tdy-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 46px;
   padding: 7px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background: var(--bg-surface);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   cursor: pointer;
-  transition: background var(--motion-fast), border-color var(--motion-fast);
+  transition: background var(--motion-fast);
 }
 
+/* The rule starts where the TITLE starts, not at the edge of the row — the
+   checkbox column reads as one column down the list, and a line cutting across
+   it would break that column into rungs. 12px of padding + the 22px box + the
+   12px gap is where the title begins. */
+/* `.motion-task-row` is between them: each row is wrapped so it can animate in
+   and out, so the rows themselves are not siblings and `.tdy-row + .tdy-row`
+   matches nothing. Measured, not guessed — the first version of this rule drew
+   no line at all. */
+.tdy-rows > * + * > .tdy-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 46px;
+  right: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* The border did this before. A row with no border of its own answers a hover
+   with its background, which is also what the open row uses — one language for
+   "this row is the one". */
 .tdy-row:hover {
-  border-color: var(--accent);
+  background: var(--bg-surface-muted);
+}
+
+/* Hovering hides the rule above the hovered row so the tint reads as one
+   shape rather than a shape with a line through its top edge. */
+.tdy-row:hover::before,
+.tdy-rows > *:has(.tdy-row:hover) + * > .tdy-row::before {
+  border-top-color: transparent;
 }
 
 .tdy-row.is-done {

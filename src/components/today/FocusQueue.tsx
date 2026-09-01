@@ -146,7 +146,11 @@ export function FocusQueue({
   ];
 
   return (
-    <section className="tdy-card tdy-queue">
+    /* Not a card any more (§3.1). The list IS the page — a surface drawn
+       around it made the day look like one item on a dashboard rather than
+       the thing the screen is for. `받은함 정리` keeps its card, because that
+       one really is something else beside the day. */
+    <section className="tdy-queue">
       <header className="tdy-card-head">
         <span className="tdy-card-head-icon" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
