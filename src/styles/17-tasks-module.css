@@ -1233,6 +1233,52 @@
   max-width: calc(100% - 48px);
 }
 
+/* A thrown-away Task's two answers (TRASH_PERMANENT_DELETE_DESIGN.md §3.2).
+   They stand in the same 48px row the List and the ⋯ stood in, and take the
+   same two ends of it — `space-between` on the footer does the placing, so
+   neither needs a margin of its own. */
+.tm-drawer-restore {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #1c1c1e);
+  cursor: pointer;
+}
+
+.tm-drawer-restore:hover {
+  background: var(--surface-2, rgba(25, 25, 25, 0.05));
+}
+
+/* Icon only, and quiet until it is aimed at. It opens a dialog rather than
+   deleting, so it does not need to look like a wall — but it is the one
+   control in this app with no way back, so it does not read as neutral once
+   the pointer is on it either. */
+.tm-drawer-delete-forever {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary, #6b6b70);
+  cursor: pointer;
+}
+
+.tm-drawer-delete-forever:hover,
+.tm-drawer-delete-forever:focus-visible {
+  color: var(--danger, #ff3b30);
+  background: rgba(255, 59, 48, 0.08);
+}
+
 /* Chips and a `+`, with no label over them (§13.36's second form). */
 .tm-drawer-tags {
   padding: 2px 0;

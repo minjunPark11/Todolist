@@ -26,7 +26,7 @@ import { DETAIL_REVEAL_ACTIONS } from "../../domain/tasks/actions";
 import { tagsForTask } from "../../domain/tags/tags";
 import type { TaskActivityEntry } from "../../domain/tasks/activity";
 import { childProgress } from "../../domain/tasks/children";
-import { isCompleted, isPinned } from "../../domain/tasks/taskState";
+import { isCompleted, isPinned, isTrashed } from "../../domain/tasks/taskState";
 import { checklistProgress, isChecklistMode } from "../../domain/tasks/checkItems";
 import { ChecklistEditor } from "./ChecklistEditor";
 import type { ReminderSpec, Schedule, ScheduleIssue } from "../../domain/schedule";
@@ -674,6 +674,17 @@ export function TaskDrawer({
           that). The List was a labelled property row and the ⋯ was in the
           header; both cost the body a line it no longer spends. */}
       <footer className="tm-drawer-foot">
+        {isTrashed(task) ? (
+          /* A thrown-away Task's Detail is a two-answer screen
+             (TRASH_PERMANENT_DELETE_DESIGN.md §3.2, from §1.4's screenshot):
+             get it back, or stop keeping it. The List picker goes because
+             moving a Task you have thrown away is not a question to answer
+             before deciding whether to keep it at all, and the ⋯ goes because
+             the registry leaves a trashed Task four items — two of which are
+             these — and a menu hiding two rows is a menu in the way. */
+          <TrashedFooter onRunAction={onRunAction} />
+        ) : (
+          <>
         <ListPicker
           task={task}
           lists={lists}
@@ -704,8 +715,74 @@ export function TaskDrawer({
           }}
           restoreFocusTo={() => root.current}
         />
+          </>
+        )}
       </footer>
     </aside>
+  );
+}
+
+/**
+ * `되살리기` and `영구 삭제`, and nothing else (§3.2).
+ *
+ * Both go through `onRunAction` rather than doing anything themselves, so they
+ * are the same two commands the ⋯ was offering a moment ago — including the
+ * second ask in front of the delete, which lives in `useTaskCommands` and
+ * would be missing from a button that called a store function directly.
+ *
+ * Restore carries its label and Delete forever does not, which is §1.4's
+ * arrangement and also the safer one: the destructive half is the one you have
+ * to aim at, and it opens a dialog rather than acting.
+ */
+function TrashedFooter({ onRunAction }: { onRunAction: (id: TaskActionId) => void }) {
+  const { t } = useT();
+  return (
+    <>
+      <button
+        type="button"
+        className="tm-drawer-restore"
+        onClick={() => onRunAction("restore")}
+      >
+        <RestoreIcon />
+        {t("tasks.menu.restore")}
+      </button>
+      <button
+        type="button"
+        className="tm-drawer-delete-forever"
+        aria-label={t("tasks.menu.deleteForever")}
+        title={t("tasks.menu.deleteForever")}
+        onClick={() => onRunAction("deleteForever")}
+      >
+        <TrashIcon />
+      </button>
+    </>
+  );
+}
+
+/* Line art on the same 24-viewBox grid at stroke 1.9 as the rest of the app's
+   icons, for the reason `components/schedule/icons.tsx` gives at length: an
+   emoji is the platform's drawing in the font's colour at the type scale's
+   size, and none of those three is one this app chose. */
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path d="M4.5 6.5h15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <path d="M9.5 6.5V4.8h5v1.7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+      <path d="M6.5 6.5l1 12.2h9l1-12.2" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+      <path d="M10.3 10v5.5M13.7 10v5.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** The same can, with the arrow coming back out of it. */
+function RestoreIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path d="M4.5 6.5h15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <path d="M6.5 6.5l1 12.2h9l1-12.2" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+      <path d="M12 15.5V9.8" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <path d="M9.6 12.2L12 9.8l2.4 2.4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 

@@ -78,6 +78,15 @@ function renderModule(
     activityFor?: (taskId: string) => TaskActivityEntry[];
     onSaveAsTemplate?: (taskId: string) => string;
     onDeleteTemplate?: (templateId: string) => void;
+    /**
+     * The Scope to render in.
+     *
+     * A trashed Task has no ROW in a List Scope — `queryScopeTasks` keeps it
+     * out — while the Detail still opens it, because `?task=` is looked up
+     * against every Task. So a test about a trashed Task's row menu has to be
+     * in `/trash`, where the row exists.
+     */
+    url?: string;
   } = {},
 ) {
   const onMutate = vi.fn();
@@ -95,7 +104,7 @@ function renderModule(
           tags={[]}
           taskTags={[]}
           today={TODAY}
-          url="/list/l1?task=t1"
+          url={extra.url ?? "/list/l1?task=t1"}
           onNavigate={() => {}}
           onStartFocus={extra.onStartFocus ?? (() => {})}
           onDeleteForever={extra.onDeleteForever ?? (() => {})}
@@ -145,6 +154,21 @@ function renderModule(
 
 async function openMore(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "More" }));
+  return screen.getByRole("menu");
+}
+
+/**
+ * The row's menu rather than the Detail's.
+ *
+ * Needed since §3.2 took the ⋯ out of a trashed Task's Detail: the Detail
+ * answers two questions there and the full list stays on the row, so a test
+ * about what a trashed Task is OFFERED has to ask the surface that still
+ * offers it.
+ */
+async function openRowMore(user: ReturnType<typeof userEvent.setup>) {
+  // Right-click, the way the row's own suite below opens it. The ⋯ on a row
+  // appears on hover, which jsdom has no pointer to give it.
+  await user.pointer({ keys: "[MouseRight]", target: screen.getByText("Write the release notes") });
   return screen.getByRole("menu");
 }
 
@@ -218,15 +242,52 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
 
   it("offers a trashed Task the way back instead of a second trip to the Trash", async () => {
     const user = userEvent.setup();
-    const { onMutate } = renderModule({ deletedAt: NOW });
-    await openMore(user);
+    const { onMutate } = renderModule({ deletedAt: NOW }, { url: "/trash?task=t1" });
+    await openRowMore(user);
 
     // The old panel drew "Move to trash" here, where its only effect was to
     // rewrite the timestamp that had put the Task there (§15.66). The way out
     // the other side sits below it (TRASH_PERMANENT_DELETE_DESIGN.md §3.1).
-    expect(rows()).toEqual(["Copy link", "Task activities", "Restore", "Delete forever"]);
+    //
+    // What the REGISTRY contributes, rather than the whole list: this row menu
+    // draws priority and date sets of its own, which it still offers a trashed
+    // Task (§8.5 counts that and does not fix it). Pinning the exact list here
+    // would nail that down as intended.
+    const labels = rows();
+    expect(labels).toContain("Restore");
+    expect(labels).toContain("Delete forever");
+    expect(labels).toContain("Copy link");
+    expect(labels).not.toContain("Move to trash");
+    expect(labels).not.toContain("Pin");
+    expect(labels).not.toContain("Complete");
+
     await user.click(screen.getByRole("menuitem", { name: "Restore" }));
     expect(onMutate.mock.calls[0][1]).toEqual({ deletedAt: "" });
+  });
+
+  // §3.2: a thrown-away Task's Detail answers two questions and drops the rest.
+  // The List picker is the one that would otherwise let a reader edit what they
+  // have already thrown away, before deciding whether to keep it at all.
+  it("gives a trashed Task's Detail a footer of Restore and Delete forever", async () => {
+    renderModule({ deletedAt: NOW });
+
+    const footer = document.querySelector(".tm-drawer-foot")!;
+    expect(footer).toBeTruthy();
+    expect(within(footer as HTMLElement).getByRole("button", { name: "Restore" })).toBeTruthy();
+    expect(
+      within(footer as HTMLElement).getByRole("button", { name: "Delete forever" }),
+    ).toBeTruthy();
+    // The two the footer used to hold are gone with it.
+    expect(footer.querySelector(".tm-list-trigger")).toBeNull();
+    expect(within(footer as HTMLElement).queryByRole("button", { name: "More" })).toBeNull();
+  });
+
+  it("leaves a live Task's Detail footer alone", async () => {
+    renderModule();
+
+    const footer = document.querySelector(".tm-drawer-foot")!;
+    expect(footer.querySelector(".tm-list-trigger")).toBeTruthy();
+    expect(within(footer as HTMLElement).queryByRole("button", { name: "Restore" })).toBeNull();
   });
 
   // §3.3: the app's one action with no way back does not happen on the click
@@ -234,24 +295,27 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
   it("asks before deleting a trashed Task forever, and deletes nothing until it is answered", async () => {
     const user = userEvent.setup();
     const onDeleteForever = vi.fn();
-    const { onMutate } = renderModule({ deletedAt: NOW }, { onDeleteForever });
-    await openMore(user);
+    const { onMutate } = renderModule({ deletedAt: NOW }, { onDeleteForever, url: "/trash?task=t1" });
+    await openRowMore(user);
 
     await user.click(screen.getByRole("menuitem", { name: "Delete forever" }));
     expect(onDeleteForever).not.toHaveBeenCalled();
     // Nothing was patched on the way past, either — the row is not a mutation.
     expect(onMutate).not.toHaveBeenCalled();
 
-    expect(screen.getByText("Delete this task forever?")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Delete forever" }));
+    // Scoped to the dialog: the Detail's own footer carries a button by the
+    // same name, and the one that deletes is the one inside the question.
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Delete this task forever?")).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Delete forever" }));
     expect(onDeleteForever).toHaveBeenCalledWith("t1");
   });
 
   it("deletes nothing when the question is answered no", async () => {
     const user = userEvent.setup();
     const onDeleteForever = vi.fn();
-    renderModule({ deletedAt: NOW }, { onDeleteForever });
-    await openMore(user);
+    renderModule({ deletedAt: NOW }, { onDeleteForever, url: "/trash?task=t1" });
+    await openRowMore(user);
 
     await user.click(screen.getByRole("menuitem", { name: "Delete forever" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
