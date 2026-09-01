@@ -423,6 +423,7 @@ export function TodayPage({
             onToggleShowCompleted={onToggleShowCompleted}
             onToggleDone={onToggleDone}
             onOpenTask={onOpenTask}
+            today={today}
             onMoveBucket={handleMoveBucket}
             onPlanToday={handlePlanToday}
             onMoveAllLater={handleMoveAllLater}

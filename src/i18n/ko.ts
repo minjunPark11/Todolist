@@ -388,7 +388,6 @@ export const ko: Dictionary = {
 
   // ---- Today page ----
   "today.title": "오늘",
-  "today.doneToday": "오늘 완료",
 
   // ---- Today page (redesigned execution view) ----
   "todayv.searchPlaceholder": "오늘 목록에서 찾기",
@@ -399,9 +398,6 @@ export const ko: Dictionary = {
   "todayv.focusQueue": "오늘 할 일",
   "todayv.queueMenuAria": "오늘 할 일 메뉴 열기",
   "todayv.rowMenuAria": "할 일 메뉴 열기",
-  "todayv.bucket.now": "지금",
-  "todayv.bucket.next": "다음",
-  "todayv.bucket.later": "나중에",
   "todayv.queueEmptyTitle": "오늘 포커스 할 일이 없습니다.",
   "todayv.queueEmptyText": "위 입력창에 적어서 첫 할 일을 추가하세요.",
   "todayv.hideCompleted": "완료 숨기기",
@@ -607,13 +603,13 @@ export const ko: Dictionary = {
   "matrix.sort.createdAt": "만든 날짜",
   "matrix.order.asc": "오름차순",
   "matrix.order.desc": "내림차순",
-  "matrix.group.overdue": "기한 초과",
-  "matrix.group.today": "오늘",
-  "matrix.group.tomorrow": "내일",
-  "matrix.group.later": "이후",
-  "matrix.group.none": "날짜 없음",
-  "matrix.group.someday": "언젠가",
-  "matrix.group.completed": "완료",
+  "view.group.overdue": "기한 초과",
+  "view.group.today": "오늘",
+  "view.group.tomorrow": "내일",
+  "view.group.later": "이후",
+  "view.group.none": "날짜 없음",
+  "view.group.someday": "언젠가",
+  "view.group.completed": "완료",
   "matrix.showMore": "추가 보기",
   "matrix.addAria": "{{quadrant}} 칸에 작업 추가",
   "matrix.addPlaceholder": "이 칸에 들어갈 일은?",

@@ -103,7 +103,7 @@ export function InboxColumnDialog({
             {DATE_BUCKETS.map((bucket) => (
               <label key={bucket} className="tm-column-dialog-choice">
                 <input type="checkbox" checked={buckets.includes(bucket)} onChange={() => toggle(bucket)} />
-                {t(`matrix.group.${bucket}`)}
+                {t(`view.group.${bucket}`)}
               </label>
             ))}
           </div>

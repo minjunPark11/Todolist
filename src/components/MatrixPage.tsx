@@ -750,7 +750,7 @@ function MatrixGroupSection({
           <span className="ff-matrix-group-caret" aria-hidden>
             {open ? "⌄" : "›"}
           </span>
-          <span className="ff-matrix-group-name">{t(`matrix.group.${group.id}`)}</span>
+          <span className="ff-matrix-group-name">{t(`view.group.${group.id}`)}</span>
           <span className="ff-matrix-group-count">{group.tasks.length}</span>
         </button>
       )}

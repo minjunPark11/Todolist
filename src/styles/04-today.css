@@ -335,6 +335,23 @@
   border-radius: 50%;
 }
 
+/* The date groups (TODAY_TICKTICK_REDESIGN.md §3.4). Late work is the app's
+   danger colour, today's is the accent, finished work is quiet — the same
+   three readings the row's own date already gets, so the dot and the date
+   under it never disagree. */
+.tdy-bucket-dot-overdue { background: var(--danger); }
+.tdy-bucket-dot-today { background: var(--accent); }
+.tdy-bucket-dot-completed { background: var(--text-tertiary); }
+
+/* Today's Scope holds overdue and today only (`scopeQuery` §12.5.1), so these
+   three cannot appear from a date. They are here because the OTHER axis — the
+   plan's three boxes — reuses this class list in §5 of the redesign, and
+   because a group with no dot reads as a group that failed to load. */
+.tdy-bucket-dot-tomorrow { background: var(--warning); }
+.tdy-bucket-dot-later,
+.tdy-bucket-dot-none,
+.tdy-bucket-dot-someday { background: var(--text-tertiary); }
+
 .tdy-bucket-dot-now { background: var(--success); }
 .tdy-bucket-dot-next { background: var(--warning); }
 .tdy-bucket-dot-later { background: var(--accent); }

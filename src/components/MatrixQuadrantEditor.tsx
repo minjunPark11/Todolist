@@ -226,7 +226,7 @@ export function MatrixQuadrantEditor({
           // box that takes overdue work" reads the same in both places.
           options={DATE_BUCKET_OPTIONS.map((bucket) => ({
             value: bucket,
-            label: t(`matrix.group.${bucket}`),
+            label: t(`view.group.${bucket}`),
           }))}
           selected={rule.dateBuckets}
           onChange={(dateBuckets) => patchRule({ dateBuckets: dateBuckets as ViewRule["dateBuckets"] })}

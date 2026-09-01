@@ -392,7 +392,6 @@ export const en: Dictionary = {
 
   // ---- Today page ----
   "today.title": "Today",
-  "today.doneToday": "Done Today",
 
   // ---- Today page (redesigned execution view) ----
   "todayv.searchPlaceholder": "Filter today's lists",
@@ -403,9 +402,6 @@ export const en: Dictionary = {
   "todayv.focusQueue": "Today's To-dos",
   "todayv.queueMenuAria": "Open today's to-do menu",
   "todayv.rowMenuAria": "Open task menu",
-  "todayv.bucket.now": "Now",
-  "todayv.bucket.next": "Next",
-  "todayv.bucket.later": "Later",
   "todayv.queueEmptyTitle": "No focus tasks for today.",
   "todayv.queueEmptyText": "Type in the bar above to add your first one.",
   "todayv.hideCompleted": "Hide completed",
@@ -614,13 +610,13 @@ export const en: Dictionary = {
   "matrix.sort.createdAt": "Created",
   "matrix.order.asc": "Ascending",
   "matrix.order.desc": "Descending",
-  "matrix.group.overdue": "Overdue",
-  "matrix.group.today": "Today",
-  "matrix.group.tomorrow": "Tomorrow",
-  "matrix.group.later": "Later",
-  "matrix.group.none": "No date",
-  "matrix.group.someday": "Someday",
-  "matrix.group.completed": "Completed",
+  "view.group.overdue": "Overdue",
+  "view.group.today": "Today",
+  "view.group.tomorrow": "Tomorrow",
+  "view.group.later": "Later",
+  "view.group.none": "No date",
+  "view.group.someday": "Someday",
+  "view.group.completed": "Completed",
   "matrix.showMore": "Show more",
   "matrix.addAria": "Add a task to {{quadrant}}",
   "matrix.addPlaceholder": "What belongs in this box?",
