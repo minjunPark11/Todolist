@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { List, PageId, Task, TaskDailyPlan, TaskDraft } from "../types";
 import { formatDate, getDayLabel, todayValue } from "../utils/date";
+import { MoreMenu, type MoreMenuItem } from "./kit";
 import {
   buildTimeRail,
   buildTodayPlan,
@@ -53,6 +54,8 @@ interface TodayPageProps {
   // Settings page shows, so the two never disagree.
   showCompleted: boolean;
   onToggleShowCompleted: () => void;
+  /** The Task the Detail beside this page has open, or "" (redesign Q6). */
+  openedTaskId: string;
   intent?: TodayIntent;
   onIntentHandled?: () => void;
   showToast: (toast: ToastState) => void;
@@ -72,6 +75,7 @@ export function TodayPage({
   onScheduleInCalendar,
   showCompleted,
   onToggleShowCompleted,
+  openedTaskId,
   intent = "",
   onIntentHandled,
   showToast,
@@ -81,6 +85,25 @@ export function TodayPage({
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
+  /**
+   * Whether the in-list filter is on screen (§3.2).
+   *
+   * It used to sit open in the header, spending half its width on a control
+   * most days do not need. It is a filter of THIS list — the app's search is
+   * the Rail's — so it lives behind the ⋯ and appears when asked for.
+   */
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  function openSearch() {
+    setSearchOpen(true);
+    // After the input exists. Focusing in the same tick focuses nothing.
+    window.setTimeout(() => searchRef.current?.focus(), 0);
+  }
+
+  function closeSearch() {
+    setSearchOpen(false);
+    setSearchQuery("");
+  }
   // Derived from the synced records, not local state: the plan is the same on
   // every device now (§6.18), so this page reads it rather than owning it.
   const overrides = useMemo<BucketOverrides>(
@@ -120,17 +143,17 @@ export function TodayPage({
     triageReturnFocusRef.current?.focus();
   }
 
-  // Cmd/Ctrl + K focuses the Today search (spec §25).
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        searchRef.current?.focus();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  /*
+   * Cmd/Ctrl+K used to focus this page's search, and it still opened the
+   * Global Command Menu at the same time — `App` binds the same key on the
+   * same window (§10.6) and both handlers ran. That was survivable while the
+   * input was on screen; with the input behind the ⋯ it would be a shortcut
+   * that focuses something invisible.
+   *
+   * So this page gives the key back. The menu owns it, the way the Rail owns
+   * the app's one search entry point — the duplication P0-6 removed when a
+   * second Search button stood in the Tasks header.
+   */
 
   // The same context the Tasks Module counts with, so this list and the
   // sidebar's number cannot disagree about the day (Gate 11).
@@ -353,56 +376,81 @@ export function TodayPage({
     });
   }
 
+  /**
+   * The page's one menu (§3.2).
+   *
+   * It was the list's, drawn on a card head that §3.1 took away. Nothing about
+   * its contents is new here — including the three that arrange the plan's
+   * boxes, which have arranged something invisible since the groups became
+   * dates (§7). Phase 5 is where they go back to being conditional on the axis
+   * the reader chose; taking them out now would leave "Plan Today" with no
+   * entry point at all in between.
+   */
+  const headMenuItems: MoreMenuItem[] = [
+    { label: t("todayv.searchPlaceholder"), onClick: openSearch },
+    { separator: true },
+    { label: t("todayv.planToday"), onClick: handlePlanToday },
+    {
+      label: showCompleted ? t("todayv.hideCompleted") : t("todayv.showCompleted"),
+      onClick: onToggleShowCompleted,
+    },
+    { label: t("todayv.moveAllLater"), onClick: handleMoveAllLater },
+    { separator: true },
+    { label: t("todayv.clearPlan"), onClick: handleClearPlan },
+  ];
+
   return (
     <div className="tdy-page">
+      {/* §3.2: a title, the day it means, and one menu. The search input and
+          the big Add button that stood here are gone — search is behind the ⋯
+          (it is a filter of this list, not the app's search, which the Rail
+          owns), and adding is the list's own first row from §4. */}
       <header className="tdy-head">
         <div className="tdy-head-title">
           <h1>{t("today.title")}</h1>
+          {/* Beside the title rather than under it. The reference app shows no
+              date at all; we keep ours because a screen called "오늘" should
+              say which day that is to someone opening a laptop that slept —
+              and beside the title it costs no line. */}
           <p>{getDayLabel(today, lang)}</p>
         </div>
         <div className="tdy-head-actions">
-          <div className="tdy-search">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.3-4.3" />
-            </svg>
-            <input
-              ref={searchRef}
-              value={searchQuery}
-              placeholder={t("todayv.searchPlaceholder")}
-              aria-label={t("todayv.searchPlaceholder")}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setSearchQuery("");
-              }}
-            />
-            {searchQuery ? (
-              <button
-                type="button"
-                className="tdy-search-clear"
-                aria-label={t("common.clear")}
-                onClick={() => setSearchQuery("")}
-              >
-                ✕
-              </button>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            className="tdy-btn tdy-btn-navy tdy-add"
-            aria-label={t("todayv.addTaskAria")}
-            onClick={() => setQuickAddOpen(true)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            {t("todayv.add")}
-          </button>
+          <MoreMenu items={headMenuItems} label={t("todayv.queueMenuAria")} />
         </div>
       </header>
 
       <div className="tdy-body">
         <div className="tdy-main">
+          {searchOpen ? (
+            <div className="tdy-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.3-4.3" />
+              </svg>
+              <input
+                ref={searchRef}
+                value={searchQuery}
+                placeholder={t("todayv.searchPlaceholder")}
+                aria-label={t("todayv.searchPlaceholder")}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  // Escape closes the whole thing rather than only emptying
+                  // it: an empty box that is still there is a filter the
+                  // reader has to dismiss twice.
+                  if (event.key === "Escape") closeSearch();
+                }}
+              />
+              <button
+                type="button"
+                className="tdy-search-clear"
+                aria-label={t("common.clear")}
+                onClick={closeSearch}
+              >
+                ✕
+              </button>
+            </div>
+          ) : null}
+
           <InlineCapture
               today={today}
             addToToday={addToToday}
@@ -420,14 +468,11 @@ export function TodayPage({
               hasQuery={hasQuery}
             query={searchQuery.trim()}
             showCompleted={showCompleted}
-            onToggleShowCompleted={onToggleShowCompleted}
             onToggleDone={onToggleDone}
             onOpenTask={onOpenTask}
             today={today}
+            openedTaskId={openedTaskId}
             onMoveBucket={handleMoveBucket}
-            onPlanToday={handlePlanToday}
-            onMoveAllLater={handleMoveAllLater}
-            onClearPlan={handleClearPlan}
             onAddTask={() => setQuickAddOpen(true)}
           />
 

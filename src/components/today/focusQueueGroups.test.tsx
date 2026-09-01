@@ -50,14 +50,11 @@ function renderQueue(entries: TodayEntry[], showCompleted = true) {
         hasQuery={false}
         query=""
         today={TODAY}
+        openedTaskId=""
         showCompleted={showCompleted}
-        onToggleShowCompleted={() => {}}
         onToggleDone={() => {}}
         onOpenTask={() => {}}
         onMoveBucket={() => {}}
-        onPlanToday={() => {}}
-        onMoveAllLater={() => {}}
-        onClearPlan={() => {}}
         onAddTask={() => {}}
       />
       </FloatingLayerProvider>

@@ -66,23 +66,29 @@ interface FocusQueueProps {
   hasQuery: boolean;
   query: string;
   showCompleted: boolean;
-  onToggleShowCompleted: () => void;
+  /**
+   * Whether the finished group is drawn.
+   *
+   * The value is still the page's — the ⋯ that flips it is the page's now
+   * (§3.2) — but this component is what reads it, so it stays a prop rather
+   * than becoming something the page filters before handing entries over.
+   * Filtering there would take completion out of `groupIdOf`'s hands.
+   */
   onToggleDone: (taskId: string) => void;
   onOpenTask: (taskId: string) => void;
   onMoveBucket: (taskId: string, bucket: TodayBucketId) => void;
   /** Today as `YYYY-MM-DD` — which date the groups are measured against. */
   today: string;
   /**
-   * "Plan today" — the rule-based sort into now/next/later.
+   * The Task the Detail has open, or "" (§1.4's observation, redesign Q6).
    *
-   * It was a button on the Today brief card, which is gone. The queue is what
-   * it rearranges, so its own menu is where it belongs: the action and the
-   * thing it acts on are one control apart, and "계획 지우기" — its inverse —
-   * was already here.
+   * The reference app paints that row and this list did not, which was
+   * survivable while the Detail was an overlay of its own and is not now that
+   * it is the column beside this one — a pane with no line back to the row it
+   * came from. The Matrix and the Tasks module already draw it; this is the
+   * same reading, third time.
    */
-  onPlanToday: () => void;
-  onMoveAllLater: () => void;
-  onClearPlan: () => void;
+  openedTaskId: string;
   onAddTask: () => void;
 }
 
@@ -91,14 +97,11 @@ export function FocusQueue({
   hasQuery,
   query,
   showCompleted,
-  onToggleShowCompleted,
   onToggleDone,
   onOpenTask,
   onMoveBucket,
   today,
-  onPlanToday,
-  onMoveAllLater,
-  onClearPlan,
+  openedTaskId,
   onAddTask,
 }: FocusQueueProps) {
   const { t } = useT();
@@ -134,34 +137,12 @@ export function FocusQueue({
     });
   }, [entries, today, showCompleted]);
 
-  const menuItems: MoreMenuItem[] = [
-    { label: t("todayv.planToday"), onClick: onPlanToday },
-    {
-      label: showCompleted ? t("todayv.hideCompleted") : t("todayv.showCompleted"),
-      onClick: onToggleShowCompleted,
-    },
-    { label: t("todayv.moveAllLater"), onClick: onMoveAllLater },
-    { separator: true },
-    { label: t("todayv.clearPlan"), onClick: onClearPlan },
-  ];
-
   return (
-    /* Not a card any more (§3.1). The list IS the page — a surface drawn
-       around it made the day look like one item on a dashboard rather than
-       the thing the screen is for. `받은함 정리` keeps its card, because that
-       one really is something else beside the day. */
+    /* Not a card any more (§3.1), and no head of its own (§3.2). "오늘 할 일"
+       under a page titled "오늘" was the same word twice, and the ⋯ it carried
+       belongs to the page — one menu for one screen. `받은함 정리` keeps its
+       card, because that one really is something else beside the day. */
     <section className="tdy-queue">
-      <header className="tdy-card-head">
-        <span className="tdy-card-head-icon" aria-hidden="true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M8 6h13M8 12h13M8 18h13" />
-            <path d="M3 6h.01M3 12h.01M3 18h.01" strokeWidth="2.6" />
-          </svg>
-        </span>
-        <h2>{t("todayv.focusQueue")}</h2>
-        {!isEmpty ? <MoreMenu items={menuItems} label={t("todayv.queueMenuAria")} /> : null}
-      </header>
-
       {isEmpty && !hasQuery ? (
         <div className="tdy-queue-empty">
           <strong>{t("todayv.queueEmptyTitle")}</strong>
@@ -194,6 +175,7 @@ export function FocusQueue({
                     <FocusQueueRow
                       key={entry.task.id}
                       entry={entry}
+                      isOpen={entry.task.id === openedTaskId}
                       onToggleDone={onToggleDone}
                       onOpenTask={onOpenTask}
                       onMoveBucket={onMoveBucket}
@@ -212,11 +194,13 @@ export function FocusQueue({
 
 function FocusQueueRow({
   entry,
+  isOpen,
   onToggleDone,
   onOpenTask,
   onMoveBucket,
 }: {
   entry: TodayEntry;
+  isOpen: boolean;
   onToggleDone: (taskId: string) => void;
   onOpenTask: (taskId: string) => void;
   onMoveBucket: (taskId: string, bucket: TodayBucketId) => void;
@@ -252,7 +236,7 @@ function FocusQueueRow({
   return (
     <MotionTaskRow taskId={task.id}>
       <div
-        className={`tdy-row${completed ? " is-done" : ""}`}
+        className={`tdy-row${completed ? " is-done" : ""}${isOpen ? " is-open" : ""}`}
         onClick={() => onOpenTask(task.id)}
         onKeyDown={handleKeyDown}
       >

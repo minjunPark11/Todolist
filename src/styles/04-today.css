@@ -47,10 +47,37 @@
   letter-spacing: -0.6px;
 }
 
+/* Title and date on one line (§3.2). The date used to be a second line under
+   the title, which spent a row of the page on four words. Baseline-aligned so
+   the two read as one heading rather than as a heading and a caption. */
+.tdy-head-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
 .tdy-head-title p {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: 14px;
   color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* The page's ⋯ is a page control, so it is on the 32px grid (§11.2) rather
+   than at `.ff-icon-btn`'s 28. That 28 is §4.87's SECTION action — the size
+   the Matrix box's two icons and the Board column's `+` take, against the
+   badge they sit beside. This one sits beside a 30px title. Measured: the
+   rhythm spec caught it at 28 the moment the menu moved out of the card head,
+   where it had only ever rendered on a day that had work in it. */
+.tdy-head-actions .ff-icon-btn {
+  width: 32px;
+  height: 32px;
+}
+
+/* The search is a row above the list now, not a fixture of the header. */
+.tdy-main > .tdy-search {
+  width: 100%;
 }
 
 .tdy-head-actions {
@@ -419,6 +446,21 @@
    shape rather than a shape with a line through its top edge. */
 .tdy-row:hover::before,
 .tdy-rows > *:has(.tdy-row:hover) + * > .tdy-row::before {
+  border-top-color: transparent;
+}
+
+/* The row the Detail has open (§1.4, Q6). Same reading the Matrix and the
+   Tasks module draw, and it is what gives the pane beside this list a line
+   back to the row it came from. Stronger than hover, because hover is where
+   the pointer is and this is where the reader IS — which is why it is written
+   AFTER the hover rule: the two have the same specificity, so the later one
+   wins, and the other order let pointing at the open row grey it out. */
+.tdy-row.is-open {
+  background: var(--accent-soft);
+}
+
+.tdy-row.is-open::before,
+.tdy-rows > *:has(.tdy-row.is-open) + * > .tdy-row::before {
   border-top-color: transparent;
 }
 

@@ -165,6 +165,7 @@ export function AppPages({
           lists={planner.lists}
           onSetBuckets={planner.setTodayBuckets}
           onOpenTask={onOpenTask}
+          openedTaskId={openedTaskId}
           onToggleDone={planner.toggleTaskDone}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
