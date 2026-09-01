@@ -302,7 +302,6 @@ export function usePlannerData() {
       return next;
     });
   }
-  const [selectedTaskId, setSelectedTaskId] = useState<string>("");
   const [userEmail, setUserEmail] = useState("");
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [syncStatus, setSyncStatus] = useState(
@@ -527,11 +526,6 @@ export function usePlannerData() {
     if (!detected || detected === data.appSettings.timezone) return;
     updateAppSettings({ timezone: detected });
   }, [data.appSettings.timezone, remoteLoaded]);
-
-  const selectedTask = useMemo(
-    () => data.tasks.find((task) => task.id === selectedTaskId) ?? null,
-    [data.tasks, selectedTaskId],
-  );
 
   async function getUserId() {
     if (!supabase) {
@@ -1096,7 +1090,6 @@ export function usePlannerData() {
       // never be found to be removed.
       reminders: current.reminders.filter((row) => row.taskId !== taskId),
     }));
-    setSelectedTaskId("");
   }
 
   /**
@@ -1122,7 +1115,6 @@ export function usePlannerData() {
           : task,
       ),
     }));
-    setSelectedTaskId("");
   }
 
   // Deletion is a hard removal, so undo re-inserts the rows the caller
@@ -1195,7 +1187,6 @@ export function usePlannerData() {
       taskTags: [...current.taskTags, ...plan.taskTags],
       reminders: [...current.reminders, ...plan.reminders],
     }));
-    setSelectedTaskId(plan.rootId);
     return plan;
   }
 
@@ -1285,7 +1276,6 @@ export function usePlannerData() {
       taskTags: current.taskTags.filter((link) => !taskTags.has(link.id)),
       reminders: current.reminders.filter((row) => !reminders.has(row.id)),
     }));
-    setSelectedTaskId((open) => (tasks.has(open) ? "" : open));
   }
 
   function toggleTaskDone(taskId: string) {
@@ -2082,7 +2072,6 @@ export function usePlannerData() {
 
     const normalized = adoptLoadedData(normalizeData(raw as Partial<PlannerData>));
     setData(normalized);
-    setSelectedTaskId("");
     return true;
   }
 
@@ -2092,7 +2081,6 @@ export function usePlannerData() {
 
   function resetData() {
     setData(emptyData());
-    setSelectedTaskId("");
   }
 
   return {
@@ -2121,7 +2109,6 @@ export function usePlannerData() {
       ) ?? null,
     settings: data.settings,
     appSettings: data.appSettings,
-    selectedTask,
     storageError,
     retryLocalSave,
     auth: {
@@ -2193,6 +2180,5 @@ export function usePlannerData() {
     updatePassword,
     uploadLocalDataToSupabase,
     refreshSupabaseData: loadSupabaseData,
-    selectTask: setSelectedTaskId,
   };
 }

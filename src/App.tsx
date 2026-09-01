@@ -7,7 +7,6 @@ import { useTaskCommands } from "./hooks/useTaskCommands";
 import { useTaskDetailWidth } from "./hooks/useTaskDetailWidth";
 import { useResponsiveMode } from "./components/tasks/useResponsiveMode";
 import { taskDetailPresentationFor } from "./domain/tasks/responsive";
-import { taskLinkFor } from "./app/taskLink";
 import { GlobalFocusBar } from "./components/GlobalFocusBar";
 import { UpdateChecker } from "./components/UpdateChecker";
 import { SettingsRow } from "./components/SettingsPage";
@@ -22,9 +21,11 @@ import {
   RETIRED_ROUTES,
   bootRedirectFor,
   pageForPath,
+  pageUrlFor,
   pathForDefaultView,
   pathForPage,
   returnToFromSearch,
+  taskIdForPageUrl,
 } from "./app/pageRoute";
 import {
   RAIL_DESTINATIONS,
@@ -176,6 +177,24 @@ export default function App() {
   // it. Everything that used to call `setActivePage` navigates instead, which
   // is what lets a reload, Back, and (from P0-2) the Rail all agree.
   const activePage = pageForPath(currentPath);
+  /**
+   * And which Task is open is the same kind of reading (§6.6 → §8).
+   *
+   * These three pages kept it in `usePlannerData`, so a reload lost it, Back
+   * walked past it, and `링크 복사` had to hand out the Module's address
+   * because this one said nothing. The Module has read it from the URL since
+   * §5.15; this is that, for the pages the Module does not own.
+   *
+   * Looked up against every Task rather than the page's rows: the same reason
+   * the Module gives (§5.30) — a link should open the Task it names even when
+   * the page it lands on would not have listed it. An id that names nothing
+   * opens nothing, which is also how a deleted Task closes its own Detail
+   * without anybody navigating.
+   */
+  const openedTaskId = taskIdForPageUrl(currentUrl);
+  const openedTask = openedTaskId
+    ? planner.tasks.find((task) => task.id === openedTaskId) ?? null
+    : null;
   // §2.19: the Rail's active item is the same reading, one level coarser —
   // four items over seven pages, because Board, Archive and the Spaces tree
   // are places inside Tasks rather than siblings of it (§1.5).
@@ -280,24 +299,26 @@ export default function App() {
     onMutate: planner.updateTask,
     onDuplicate: (taskId) => {
       const plan = planner.duplicateTask(taskId);
-      return plan ? () => planner.discardDuplicate(plan) : null;
+      if (!plan) return null;
+      // The copy takes the Detail, which is what `duplicateTask` used to do
+      // for itself by setting the planner's selection. That selection is gone;
+      // the address does it instead, and only where there is a Detail to take.
+      if (openedTaskId) openTaskOnPage(plan.rootId);
+      return () => planner.discardDuplicate(plan);
     },
     onSaveAsTemplate: (taskId) => planner.saveTaskAsTemplate(taskId)?.id ?? "",
     onDeleteTemplate: planner.deleteTaskTemplate,
     onStartFocus: (taskId) => planner.startFocusSession(taskId, "today_page"),
     /**
-     * §15.19's link, and the honest answer for these pages.
+     * §15.19's link — now this page's own address.
      *
-     * They keep the open Task in memory rather than in the address, so there
-     * is no URL here that would reopen it — copying this page's own address
-     * would hand someone a link to Today and let them hunt. The Tasks module
-     * DOES address a Task (`?task=`), and `openedTask` there is looked up
-     * against every Task rather than the Scope's rows, so this link opens the
-     * right Task whatever Scope it lands in. Putting `?task=` in these pages'
-     * own addresses is the better answer and is §6.5's open item.
+     * It used to point at the Module (`/today?task=…`) because these pages
+     * kept the open Task in memory and had no address that would reopen it.
+     * They have one now, so the link is the page the reader is actually on:
+     * copying from the Matrix hands back the Matrix, with that Task open.
      */
     linkFor: (taskId) =>
-      taskLinkFor(window.location.origin, { scope: { kind: "today" }, view: "list", taskId }, taskId),
+      `${window.location.origin.replace(/\/$/, "")}${pageUrlFor(activePage, taskId)}`,
   });
   const focusNow = useNowTick(Boolean(planner.activeFocusSession && planner.activeFocusSession.status === "running"));
   const activeFocusTask = planner.activeFocusSession
@@ -361,7 +382,7 @@ export default function App() {
         target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT";
 
       if (event.key === "Escape") {
-        planner.selectTask("");
+        closeTaskOnPage();
         return;
       }
 
@@ -400,7 +421,10 @@ export default function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [planner]);
+    // `activePage` and `openedTaskId` are here because Escape now navigates:
+    // the address it should write is the one open at the moment the key is
+    // pressed, and `planner` alone does not change when only the URL does.
+  }, [planner, activePage, openedTaskId]);
 
   // Module switching (§2.31). Deliberately NOT in the handler above: that one
   // returns early on any modifier and while the user is typing, and a module
@@ -569,6 +593,23 @@ export default function App() {
     window.history[mode === "replace" ? "replaceState" : "pushState"](null, "", url);
     setCurrentPath(url.split("?")[0]);
     setCurrentUrl(url);
+  }
+
+  /**
+   * Opening and closing the Detail on a page that draws one.
+   *
+   * A push each way, which is the Module's rule (§16.28 Gate 5) and the reason
+   * one Back closes what one click opened. Guarded on `openedTaskId` when
+   * closing so Escape on a page with nothing open does not stack an entry for
+   * a keystroke that changed nothing.
+   */
+  function openTaskOnPage(taskId: string) {
+    navigateUrl(pageUrlFor(activePage, taskId));
+  }
+
+  function closeTaskOnPage() {
+    if (!openedTaskId) return;
+    navigateUrl(pageUrlFor(activePage));
   }
 
   useEffect(() => {
@@ -1032,7 +1073,9 @@ export default function App() {
   function confirmResetAllData() {
     planner.resetData();
     setPendingResetAllData(false);
-    planner.selectTask("");
+    // Replace rather than push: a reset is not a place to go Back to, and the
+    // `?task=` left behind names a Task that no longer exists.
+    if (openedTaskId) navigateUrl(pageUrlFor(activePage), "replace");
     try {
       localStorage.removeItem("todo-planner-space-hub-v1");
       localStorage.removeItem("todo-planner-local-spaces-v1");
@@ -1044,8 +1087,11 @@ export default function App() {
   }
 
 
-  function viewTaskInCalendar(taskId: string) {
-    planner.selectTask(taskId);
+  // Today's "see this in the Calendar". The Task is not carried into the
+  // address because the Calendar draws no Detail — it never did, and the
+  // selection this used to set was read by nothing on the way in and cleared
+  // by five of the Calendar's own handlers on the way out.
+  function viewTaskInCalendar(_taskId: string) {
     navigate(PAGE_ROUTES.calendar);
   }
 
@@ -1228,8 +1274,9 @@ export default function App() {
     // with the page's own address IS clearing it. The separate
     // `clearSelection()` this used to call would have pushed a second history
     // entry for the same click.
+    // The open Task goes with it for the same reason and by the same means:
+    // it lives in `?task=` now, and `navigate` writes a path with no query.
     navigate(pathForPage(page));
-    planner.selectTask("");
   }
 
   // A password-reset link opens the app with a recovery session — before any
@@ -1397,10 +1444,10 @@ export default function App() {
   }
 
   function renderTaskDetail() {
-    if (!planner.selectedTask) return null;
+    if (!openedTask) return null;
     return (
       <TaskDetailPane
-        task={planner.selectedTask}
+        task={openedTask}
         presentation={detailPresentation}
         resize={detailWidth}
         today={today}
@@ -1412,8 +1459,8 @@ export default function App() {
         bundle={taskDetailBundle}
         commands={taskCommands}
         focusBusy={Boolean(planner.activeFocusSession)}
-        onClose={() => planner.selectTask("")}
-        onOpenTask={planner.selectTask}
+        onClose={closeTaskOnPage}
+        onOpenTask={openTaskOnPage}
       />
     );
   }
@@ -1428,6 +1475,8 @@ export default function App() {
         todayIntent={todayIntent}
         onTodayIntentHandled={() => setTodayIntent("")}
         renderTaskDetail={renderTaskDetail}
+        openedTaskId={openedTaskId}
+        onOpenTask={openTaskOnPage}
         detailPresentation={detailPresentation}
         detailWidth={detailWidth.width}
         showToast={showToast}
@@ -1488,7 +1537,7 @@ export default function App() {
                pages use. Measured before it existed: the 42×42 menu button
                (z-index 220) sat on top of the Detail's own header controls
                (z-index 50) at 12,12. */
-            planner.selectedTask && detailPresentation === "full-screen" ? "detail-full" : "",
+            openedTask && detailPresentation === "full-screen" ? "detail-full" : "",
             // `sidebar-collapsed` used to sit here and narrow the column to a
             // 68px icon rail. The Global Rail is where icon-level navigation
             // lives now, and collapsing is gone entirely (AppShell).

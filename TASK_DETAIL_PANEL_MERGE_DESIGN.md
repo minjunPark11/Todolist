@@ -1,10 +1,10 @@
 # 상세 패널 둘 — 무엇이 다르고, 어느 쪽이 남는가
 
-> 상태: **1~3단계 구현됨 · 패널은 하나다** · 2026-09-01
-> (§3~§4가 1단계, §5가 2단계, §6이 3단계다. `TASK_CONTENT_MODE_DESIGN.md` §11.6과
-> §12.4가 "패널 하나로 합칠 것인가"를 두 번 남겼고, 그 문서 밖이라고 적었다. 여기가 그
-> 밖이었고, 답은 **드로어**다. 남은 것은 §6.9의 넷 — 전부 이 문서가 만든 것이 아니라
-> 지나가며 세어 둔 것이다.)
+> 상태: **1~3단계 구현됨 · 패널은 하나고 주소를 갖는다** · 2026-09-01
+> (§3~§4가 1단계, §5가 2단계, §6이 3단계, §7·§8이 §6.9의 첫 두 줄이다.
+> `TASK_CONTENT_MODE_DESIGN.md` §11.6과 §12.4가 "패널 하나로 합칠 것인가"를 두 번
+> 남겼고, 그 문서 밖이라고 적었다. 여기가 그 밖이었고, 답은 **드로어**다. 남은 것은
+> §6.9의 둘 — 전부 이 문서가 만든 것이 아니라 지나가며 세어 둔 것이다.)
 > 대상: `components/TaskDetail.tsx`(레거시 패널, **지웠다**)와
 > `components/tasks/TaskDrawer.tsx`(드로어, 남았다)
 
@@ -401,7 +401,237 @@ const detailIsColumn = Boolean(planner.selectedTask) && detailPresentation === "
 
 ### 6.9 남은 것
 
-- **집중 페이지의 죽은 클릭**(§6.1). 이제 패널을 붙이면 끝나는 일이다
+- **집중 페이지의 죽은 클릭**(§6.1). 이제 패널을 붙이면 끝나는 일이다 — **§7에서 붙였다**
 - **`?task=`를 이 페이지들의 주소로**(§6.6). 링크·새로고침·뒤로 가기가 한 번에 풀린다
+  — **§8에서 넣었다**
 - **휴지통을 비우는 방법**(§6.4). 영구 삭제가 캘린더 한 곳에만 남았다
 - **`estimatedMinutes` · `categoryId`**(§6.4). 여전히 어느 화면에도 없다
+
+---
+
+## 7. §6.9의 첫 줄 — 집중 페이지가 클릭을 그린다 (2026-09-01)
+
+### 7.1 고칠 것은 컴포넌트가 아니라 어느 페이지가 패널을 그리느냐였다 [실측]
+
+`FocusPage`는 4년 내내 맞게 동작하고 있었다. 큐의 모든 행이
+`onClick={() => onOpenTask(task.id)}`이고([FocusPage.tsx:207]), `AppPages`가 거기에
+`planner.selectTask`를 넘긴다. 선택은 **정말로 일어났다.** 다만 `renderTaskDetail()`의
+호출처가 오늘과 매트릭스 둘뿐이어서, 그 선택을 그리는 것이 없었다.
+
+그래서 이 변경에는 컴포넌트가 없다. 집중 페이지를 오늘·매트릭스와 **같은 그리드**에
+넣고 그 안에서 `renderTaskDetail()`을 부르는 것이 전부다.
+
+```
+- <FocusPage … />
++ <section className={pageGridClass("foc-grid")} style={gridStyle}>
++   <FocusPage … />
++   {renderTaskDetail()}
++ </section>
+```
+
+다섯 번째 표현을 만들지 않았다는 것이 요점이다. §6.2가 오늘 페이지에서 지운 것이 바로
+그것이고, 집중에 스크림 하나를 새로 그렸다면 같은 자리로 돌아갔을 것이다. 네 표현
+(옆칸·오버레이·시트·전체 화면)이 폭에 따라 그대로 나온다.
+
+### 7.2 `no-detail`의 980px 상한만 사양이 다르다
+
+`.page-grid.no-detail`은 아무것도 열리지 않았을 때 페이지를 980px로 좁혀 가운데
+세운다. 집중 페이지의 좌우 여백은 캘린더·오늘과 맞추기로 되어 있으므로(§05-spaces의
+`.foc-page` 주석) 이 상한은 원하지 않는 것이다. 오늘이 `.tdy-grid`로 빠져나가는 것과
+같은 방법으로 `.foc-grid`를 만들었다 — 한 줄짜리 오버라이드다.
+
+실측(1280폭): 닫힌 상태 `page-grid no-detail foc-grid`, 한 트랙 1166px, 왼쪽 82px —
+변경 전과 같은 수. 열린 상태 `page-grid foc-grid`, `662px 480px`, 드로어는
+`is-inline-drawer`에 `position: sticky`.
+
+`.foc-page`에 `min-width: 0`도 함께 붙였다. 그리드 아이템의 하한은 콘텐츠이므로,
+없으면 페이지가 옆칸을 내주는 대신 넘쳐 나간다.
+
+### 7.3 지나가다 찾은 것 — 1240px 아래에서 큐는 눌러지지 않았다 [실측]
+
+E2E를 세 뷰포트에 돌리자 태블릿(800)과 모바일(393)에서 클릭이 **가로채였다**:
+`.foc-summary`가 큐의 행 위에 앉아 있었다. 스태시하고 다시 재 봤다 — **변경 전에도
+똑같았다.** 이 문서가 만든 것이 아니다.
+
+원인은 `@media (max-width: 1240px)`의 두 줄이다:
+
+```css
+.foc-layout {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: none;   /* ← 영역만 지웠다 */
+}
+```
+
+`grid-template-areas: none`은 영역을 지우지만, 그 영역을 쓰던 아이템들의
+`grid-area: queue`는 그대로 남는다. 남은 `grid-area: queue`는 이제 **`queue`라는 이름의
+선**으로 읽히고, 그런 선도 없으므로 브라우저가 암시적 트랙을 만들어 낸다. 800폭에서
+계산된 트랙이 `314px 0px 340px`였고, 큐 카드와 요약 카드가 **둘 다 x=428에서**
+시작했다. 나중에 그려지는 요약이 큐로 가는 클릭을 전부 받았다.
+
+넷을 `grid-area: auto`로 돌려보내는 것이 실제로 쌓는 일이다. 실측(800폭): 큐 130 ·
+타이머 402 · 요약 738 · 인사이트 1005, 넷 다 x=82 w=686, 클릭은 `.foc-task-main`에
+닿는다.
+
+이걸 이 단계에서 고친 이유는 범위가 아니라 **주장** 때문이다. 이 단계의 주장은 "집중
+페이지에서 작업을 누르면 상세가 열린다"인데, 1240px 아래에서는 애초에 누를 수가
+없었다. 고치지 않으면 세 뷰포트 중 하나에서만 참인 주장이 된다.
+
+### 7.4 시험은 E2E다
+
+`e2e/focusDetail.spec.ts` — 버그가 컴포넌트에 있던 적이 없기 때문이다. `FocusPage`를
+jsdom에서 마운트하면 프롭을 부르는 것까지는 언제나 통과했고, 통과하는 동안 화면에는
+아무 일도 일어나지 않았다. **어느 페이지가 패널을 그리는가**는 조립된 앱만 답한다.
+
+두 시험이고 하나는 세 뷰포트 전부에서 돈다:
+
+- `clicking a task opens it` — 세 뷰포트. 폭마다 표현이 다르므로 주장은 "옆칸이
+  생긴다"가 아니라 **"무언가 열린다"**다. 누르기 전 `.tm-drawer`가 0개라는 것을 먼저
+  본다 — 매트릭스에서 열어 둔 상세가 남아 있으면 집중이 아무 일도 안 하고도 통과한다
+- `closing it gives the page its width back` — 1280 이상만(§15.17). 열었을 때 페이지가
+  실제로 좁아지는지까지 보는 이유는, 안 좁아지면 두 폭이 같아져서 마지막 줄이 **틀린
+  이유로** 통과하기 때문이다. 닫은 뒤에는 "더 넓어졌다"가 아니라 **같은 수**를 요구한다
+  — `.foc-grid` 오버라이드가 빠지면 980과 1166 사이 어딘가에 앉고, 그것도 그럴듯해
+  보인다
+
+제목을 `toHaveValue`로 읽는다. 드로어의 제목은 아직 `<input>`이고
+(`TICKTICK_DETAIL_ANATOMY_DESIGN.md` §3), `toHaveText`는 빈 문자열을 받는다.
+
+### 7.5 검증
+
+- 유닛 2,161개 통과 · `tsc` 통과 · E2E 신규 6개(2개는 폭 조건으로 skip) 포함 전체 통과
+- 실제 앱(dev, en): 1280 → 옆칸 · 1100 → 오버레이(fixed) · 900 → 우측 시트 · 420 →
+  전체 화면(`app-shell detail-full`). 네 폭 모두 가로 스크롤 없음
+- 콘솔 오류는 업데이터의 CORS 하나뿐 — 브라우저 dev에서만 나는 기존 잡음이다
+
+### 7.6 남은 것
+
+§6.9의 나머지 셋. 다음은 둘째 줄 — **`?task=`를 이 페이지들의 주소로**(§6.6). 집중이
+이제 같은 그리드에 들어왔으므로 세 페이지가 한 번에 같이 고쳐진다. §8이 그 일이다.
+
+---
+
+## 8. §6.9의 둘째 줄 — 열린 작업이 주소가 된다 (2026-09-01)
+
+### 8.1 진짜 문제는 링크가 아니라 출처가 둘이었다는 것 [실측]
+
+§6.6은 이것을 "링크 하나가 정직하지 않다"로 적었지만, 부정직한 링크는 증상이었다.
+원인은 **어느 작업이 열려 있는가**의 답을 이 세 페이지가 `usePlannerData`의
+`selectedTaskId`에서 읽고 있었다는 것이다. 모듈은 §5.15부터 URL에서 읽는다. 같은
+질문에 두 개의 답이 있었고, 그중 하나만 새로고침·뒤로 가기·링크가 볼 수 있었다.
+
+그래서 이 단계는 링크를 고치는 일이 아니라 **답을 하나로 줄이는 일**이다. 셋이
+한꺼번에 풀리는 것은 그 결과다.
+
+### 8.2 주소가 답한다
+
+`pageRoute.ts`는 "페이지마다 경로 하나, 정확히 일치, 매개변수 없음"이라고 적어
+두었다. 매개변수 하나가 생겼고, 그 하나가 링크·새로고침·뒤로 가기가 나를 이유 전부다.
+
+```ts
+const PAGES_WITH_DETAIL = new Set<PageId>(["today", "board", "focus"]);
+export function pageUrlFor(page: PageId, taskId = ""): string
+export function taskIdForPageUrl(url: string): string
+```
+
+캘린더와 설정은 목록에 없다. 둘 다 상세를 그리지 않으므로 `?task=`는 페이지가 지킬 수
+없는 약속이 된다 — **쓰지도 읽지도 않는다.**
+
+`taskIdForPageUrl`이 `pageForPath` 대신 `ROUTE_TO_PAGE`를 직접 보는 이유가 하나 더
+있다. `pageForPath`는 모르는 주소에 `today`라고 답하고, 모듈의 주소는 **자기
+`?task=`를 갖고 있다**. 여기서까지 답하면 주소 하나에 주인이 둘이 되고, 그것이 이
+변경이 없애려는 바로 그 모양이다.
+
+`App`은 이제 이렇게 읽는다:
+
+```ts
+const openedTaskId = taskIdForPageUrl(currentUrl);
+const openedTask = openedTaskId ? planner.tasks.find((t) => t.id === openedTaskId) ?? null : null;
+```
+
+전체 작업에서 찾는다 — 모듈이 §5.30에서 대는 것과 같은 이유다. 링크는 그것이 지목한
+작업을 열어야 하고, 도착한 페이지가 그 작업을 목록에 넣지 않았더라도 그렇다.
+
+### 8.3 지워진 것이 남은 것보다 많다
+
+`selectedTaskId`가 죽으면서 그 주위의 배선이 같이 나갔다. `usePlannerData`에서 14줄:
+상태 하나, 파생 하나, 그리고 **`setSelectedTaskId` 호출 여섯**이다. 여섯을 하나씩
+대신할 필요가 없었던 것이 이 모델의 요점이다.
+
+| 있던 것 | 대신하는 것 |
+|---|---|
+| `deleteTask` · `giveUpTask` · `deleteTasks`의 선택 해제 | 없음. 없는 id는 아무것도 열지 않는다(§5.30) |
+| `importData` · `resetData`의 선택 해제 | 리셋만 `replace`로 주소를 씻는다 — 뒤로 갈 자리가 아니다 |
+| `duplicateTask`의 `setSelectedTaskId(plan.rootId)` | `App`의 `onDuplicate`가 사본을 연다. 상세가 있는 자리에서만 |
+
+캘린더의 `onClearTaskSelection`도 나갔다. 프롭 하나와 호출 다섯인데, **읽는 쪽이
+없었다.** `viewTaskInCalendar`가 작업을 고르고 캘린더로 보내면 캘린더는 그것을
+그리지 않고 자기 핸들러 다섯 곳에서 지우기만 했다. 보이지 않는 것을 지우고 있었던
+것이다. 지금은 고르지 않고 보내고, 지울 것도 없다.
+
+### 8.4 여닫는 것은 양쪽 다 push다
+
+모듈의 규칙 그대로다(§16.28 Gate 5): 한 번의 클릭이 연 것을 한 번의 Back이 닫는다.
+
+```ts
+function openTaskOnPage(taskId: string) { navigateUrl(pageUrlFor(activePage, taskId)); }
+function closeTaskOnPage() {
+  if (!openedTaskId) return;
+  navigateUrl(pageUrlFor(activePage));
+}
+```
+
+`closeTaskOnPage`의 가드는 Escape 때문에 있다. Escape는 아무것도 열려 있지 않을 때도
+눌리고, 그때마다 같은 주소를 한 항목씩 쌓으면 Back이 자기 자리에서 제자리걸음을 한다.
+E2E가 그 방향으로 시험한다 — 두 번째 Escape 뒤의 Back이 **작업이 열린 주소로
+돌아오는지**(가드가 있음) 아니면 중복된 `/board`에 써버리는지(가드가 없음).
+
+키다운 이펙트의 의존성에 `activePage`와 `openedTaskId`를 더했다. Escape가 이제
+navigate이므로 **키를 누른 순간에 열려 있던 주소**를 써야 하는데, `planner`는 URL만
+바뀔 때 바뀌지 않는다.
+
+### 8.5 링크는 이제 읽는 사람이 보고 있는 페이지다
+
+```ts
+linkFor: (taskId) => `${origin}${pageUrlFor(activePage, taskId)}`
+```
+
+매트릭스에서 복사하면 매트릭스가, 그 작업이 열린 채로 돌아온다. §6.6이 `/today?task=`로
+우회한 것은 이 주소가 존재하지 않았기 때문이고, 이제 존재한다. `taskLink.ts`의
+`taskLinkFor`는 모듈만 쓰므로 `App`의 import만 지웠다.
+
+### 8.6 시험
+
+유닛 6개(`pageRoute.test.ts`) — 왕복, 상세를 그리지 않는 페이지의 거부, 모듈 주소에
+답하지 않기, 아무것도 열지 않았을 때, 이스케이프가 필요한 id.
+
+E2E 6개(`e2e/pageTaskUrl.spec.ts`) — 유닛이 덮을 수 없는 것이 이 변경의 이유 전부이기
+때문이다. 셋 다 브라우저의 것이다: 새로고침이 열려 있던 것을 다시 열고, Back이 닫고,
+복사한 링크가 같은 페이지에 같은 작업을 연다.
+
+- `opening writes it, closing takes it away`
+- `Escape closes it, and only when something is open`
+- `a reload reopens it` — 이 변경 전에는 빈 매트릭스에 내려앉던 자리다
+- `one Back closes what one click opened`
+- `the copied link is this page, not the Module's`
+- `leaving the page leaves the Task behind` — 캘린더가 `?task=`를 물려받지 않는다.
+  모바일은 제외했다. 전체 화면 상세가 화면을 가지므로(§15.13) 누를 레일이 없고,
+  먼저 닫으면 시험할 것이 남지 않는다
+
+### 8.7 검증
+
+- 유닛 2,167개 통과(신규 6) · `tsc` 통과 · E2E 신규 6개 × 세 뷰포트에서 17 통과 1 skip
+- 실제 앱(dev): 집중에서 작업 클릭 → `/focus?task=task-0f8be…`, 새로고침 → 같은 작업이
+  다시 열림, Back → `/focus`에 드로어 없음
+- 폭을 바꿔도 주소는 그대로다(§15.9) — 800에서 `is-right-sheet`, 1280에서
+  `is-inline-drawer`, `?task=`는 양쪽 다 같은 값
+
+> 실측 메모: 브라우저 창(Browser pane)으로는 Escape를 시험할 수 없었다. 진짜 키가
+> 페이지에 **도달하지 않는다** — window의 capture 리스너까지 걸어 두고 눌러도 아무것도
+> 보이지 않았고, `dispatchEvent`로 만든 것만 핸들러에 닿았다. 창의 문제이지 앱의
+> 문제가 아니며, Playwright는 진짜 키를 보내므로 §8.6의 시험이 이 자리를 덮는다.
+
+### 8.8 남은 것
+
+§6.9의 나머지 둘 — **휴지통을 비우는 방법**(§6.4)과 **`estimatedMinutes` ·
+`categoryId`**(§6.4). 둘 다 이 문서가 만든 것이 아니라 지나가며 세어 둔 것이고, 둘 다
+새 화면을 요구하므로 설계가 먼저다.

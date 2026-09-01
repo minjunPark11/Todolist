@@ -6,6 +6,15 @@
  * living underneath it. The grid is gone; what is left is the Focus page, and
  * the filename now outlives what it was named for. */
 
+/* Focus sits in the same grid as Today and the Matrix so the Detail can be a
+   column beside it. `no-detail`'s 980px cap is the one thing it does not want
+   — the page's own margins are meant to match Calendar and Today, which the
+   cap would pull in by a couple of hundred pixels the moment nothing is
+   selected. Today buys itself out of the cap the same way (`.tdy-grid`). */
+.page-grid.no-detail.foc-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .foc-page {
   display: grid;
   gap: 18px;
@@ -15,6 +24,9 @@
   padding: 0 0 28px;
   min-height: 100vh;
   background: var(--bg-app);
+  /* A grid item's floor is its content, so without this the page refuses to
+     give the Detail its column and overflows instead. */
+  min-width: 0;
 }
 
 .foc-header {
@@ -595,6 +607,20 @@
   .foc-layout {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: none;
+  }
+
+  /* Dropping the areas is not enough to un-place the items that used them.
+     `grid-area: queue` with no such area left is read as a LINE named `queue`,
+     which does not exist either — so the browser invents implicit tracks and
+     drops the four cards on top of each other. Measured at 800px: the queue
+     card and the summary card both started at x=428 and the summary, painted
+     last, took every click meant for a task in the queue. Sending them back to
+     `auto` is what actually stacks them. */
+  .foc-timer,
+  .foc-queue,
+  .foc-summary,
+  .foc-insights {
+    grid-area: auto;
   }
 
   .foc-timer {

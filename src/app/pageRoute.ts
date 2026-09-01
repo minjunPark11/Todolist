@@ -66,6 +66,43 @@ export function pathForPage(page: PageId): string {
 }
 
 /**
+ * The pages that draw a Task Detail (TASK_DETAIL_PANEL_MERGE_DESIGN.md §7).
+ *
+ * Calendar and Settings are not here because neither renders the pane. A
+ * `?task=` on their address would be a promise the page cannot keep, so it is
+ * not written and not read.
+ */
+const PAGES_WITH_DETAIL = new Set<PageId>(["today", "board", "focus"]);
+
+/**
+ * A page's address with the open Task written into it (§6.6).
+ *
+ * The table above says "one path per page, exact match, no parameters", and
+ * this is the one parameter — which is also the only thing about these pages
+ * that a link, a reload or Back has any reason to carry. Everything else they
+ * hold is genuinely UI state.
+ */
+export function pageUrlFor(page: PageId, taskId = ""): string {
+  const path = PAGE_ROUTES[page];
+  if (!taskId || !PAGES_WITH_DETAIL.has(page)) return path;
+  return `${path}?task=${encodeURIComponent(taskId)}`;
+}
+
+/**
+ * Which Task a page address has open, if the page can hold one.
+ *
+ * Reads `ROUTE_TO_PAGE` rather than `pageForPath`, because that one answers
+ * `today` for anything it does not recognise — including every Tasks Module
+ * address, which carries its own `?task=` and must not be answered here.
+ */
+export function taskIdForPageUrl(url: string): string {
+  const [path = "", search = ""] = url.split("?");
+  const page = ROUTE_TO_PAGE.get(normalize(path));
+  if (!page || !PAGES_WITH_DETAIL.has(page)) return "";
+  return new URLSearchParams(search).get("task") ?? "";
+}
+
+/**
  * Which page an address names.
  *
  * Falls back to `today` for anything unrecognised — `/`, `/index.html` in the

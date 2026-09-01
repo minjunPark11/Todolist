@@ -4,9 +4,11 @@ import {
   bootRedirectFor,
   namesAPage,
   pageForPath,
+  pageUrlFor,
   pathForDefaultView,
   pathForPage,
   returnToFromSearch,
+  taskIdForPageUrl,
 } from "./pageRoute";
 import { parseTaskScope } from "./taskScopeUrl";
 import type { PageId } from "../types";
@@ -133,6 +135,55 @@ describe("pageRoute", () => {
         expect(bootRedirectFor(path, "/calendar")).toBe("");
         expect(namesAPage(path)).toBe(true);
       }
+    });
+  });
+
+  // TASK_DETAIL_PANEL_MERGE_DESIGN.md §8. The Detail used to live in
+  // `usePlannerData`, where a reload lost it and Back walked past it.
+  describe("the open Task in a page's address", () => {
+    const HOLDERS: PageId[] = ["today", "board", "focus"];
+
+    it("round-trips on every page that draws a Detail", () => {
+      for (const page of HOLDERS) {
+        expect(taskIdForPageUrl(pageUrlFor(page, "t1"))).toBe("t1");
+      }
+    });
+
+    it("keeps the page it was written on", () => {
+      for (const page of HOLDERS) {
+        expect(pageForPath(pageUrlFor(page, "t1").split("?")[0])).toBe(page);
+      }
+    });
+
+    // Calendar and Settings render no pane, so a `?task=` on either would be a
+    // promise the page cannot keep. It is neither written nor read.
+    it("refuses the pages that draw no Detail", () => {
+      expect(pageUrlFor("calendar", "t1")).toBe(PAGE_ROUTES.calendar);
+      expect(pageUrlFor("settings", "t1")).toBe(PAGE_ROUTES.settings);
+      expect(taskIdForPageUrl("/calendar?task=t1")).toBe("");
+      expect(taskIdForPageUrl("/settings?task=t1")).toBe("");
+    });
+
+    // The Module carries its own `?task=` and reads it with `parseTaskUrl`.
+    // Answering here as well would give one address two owners, which is the
+    // shape of the bug this whole change exists to remove.
+    it("does not answer for a Tasks Module address", () => {
+      expect(taskIdForPageUrl("/list/l1?view=board&task=t1")).toBe("");
+      expect(taskIdForPageUrl("/today?task=t1")).toBe("");
+    });
+
+    it("writes nothing when nothing is open", () => {
+      for (const page of HOLDERS) {
+        expect(pageUrlFor(page)).toBe(PAGE_ROUTES[page]);
+        expect(taskIdForPageUrl(PAGE_ROUTES[page])).toBe("");
+      }
+    });
+
+    // Ids are generated, but a link is a value from the address bar and this
+    // one is written back into an address.
+    it("survives an id that needs escaping", () => {
+      const id = "a b&c=d?e#f";
+      expect(taskIdForPageUrl(pageUrlFor("board", id))).toBe(id);
     });
   });
 });

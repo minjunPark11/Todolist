@@ -33,6 +33,16 @@ type AppPagesProps = {
   onTodayIntentHandled: () => void;
   renderTaskDetail: () => ReactNode;
   /**
+   * The open Task, and how to open one — read from and written to `?task=`
+   * (TASK_DETAIL_PANEL_MERGE_DESIGN.md §8).
+   *
+   * The id rather than the Task: what these grids and their pages need is
+   * "which one", and the row that draws itself as open is comparing ids. The
+   * Task itself is `App`'s, because `App` is what renders the pane.
+   */
+  openedTaskId: string;
+  onOpenTask: (taskId: string) => void;
+  /**
    * Whether the Detail is a COLUMN or a layer over the page (§15.17).
    *
    * The only thing about it these grids care about. Three of the four
@@ -82,6 +92,8 @@ export function AppPages({
   todayIntent,
   onTodayIntentHandled,
   renderTaskDetail,
+  openedTaskId,
+  onOpenTask,
   detailPresentation,
   detailWidth,
   showToast,
@@ -125,7 +137,7 @@ export function AppPages({
    * which is the shape the Tasks module has had all along
    * (TASK_DETAIL_PANEL_MERGE_DESIGN.md §6).
    */
-  const detailIsColumn = Boolean(planner.selectedTask) && detailPresentation === "inline-drawer";
+  const detailIsColumn = Boolean(openedTaskId) && detailPresentation === "inline-drawer";
 
   function pageGridClass(extra = "") {
     const base = detailIsColumn ? "page-grid" : "page-grid no-detail";
@@ -152,7 +164,7 @@ export function AppPages({
           dailyPlans={planner.dailyPlans}
           lists={planner.lists}
           onSetBuckets={planner.setTodayBuckets}
-          onOpenTask={planner.selectTask}
+          onOpenTask={onOpenTask}
           onToggleDone={planner.toggleTaskDone}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
@@ -178,8 +190,8 @@ export function AppPages({
         <MatrixPage
           tasks={visibleTasks}
           lists={planner.lists}
-          selectedTaskId={planner.selectedTask?.id ?? ""}
-          onOpenTask={planner.selectTask}
+          selectedTaskId={openedTaskId}
+          onOpenTask={onOpenTask}
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
           onToggleDone={planner.toggleTaskDone}
@@ -216,7 +228,6 @@ export function AppPages({
           onUpdateTaskSchedule={planner.updateTaskSchedule}
           onCreateTask={planner.createTask}
           onDeleteTask={requestDeleteTask}
-          onClearTaskSelection={() => planner.selectTask("")}
           showToast={showToast}
         />
       </section>
@@ -224,24 +235,31 @@ export function AppPages({
   }
 
   if (activePage === "focus") {
+    // Focus handed `selectTask` to every task row and drew nothing with the
+    // selection — the click set state no one read (PANEL_MERGE §6.1). It is
+    // the same grid Today and the Matrix use, so the fix is the grid, not a
+    // fifth presentation of a pane that already has four.
     return (
-      <FocusPage
-        tasks={visibleTasks}
-        tags={planner.tags}
-        taskTags={planner.taskTags}
-        focusSessions={planner.focusSessions}
-        activeSession={planner.activeFocusSession}
-        settings={focusSettings}
-        onStartFocus={planner.startFocusSession}
-        onPauseFocus={planner.pauseFocusSession}
-        onResumeFocus={planner.resumeFocusSession}
-        onStopFocus={onStopFocus}
-        onDeleteFocusSession={planner.deleteFocusSession}
-        onUpdateFocusNote={planner.updateFocusSessionNote}
-        onCompleteTask={planner.completeTask}
-        onOpenTask={planner.selectTask}
-        onNavigate={onNavigate}
-      />
+      <section className={pageGridClass("foc-grid")} style={gridStyle}>
+        <FocusPage
+          tasks={visibleTasks}
+          tags={planner.tags}
+          taskTags={planner.taskTags}
+          focusSessions={planner.focusSessions}
+          activeSession={planner.activeFocusSession}
+          settings={focusSettings}
+          onStartFocus={planner.startFocusSession}
+          onPauseFocus={planner.pauseFocusSession}
+          onResumeFocus={planner.resumeFocusSession}
+          onStopFocus={onStopFocus}
+          onDeleteFocusSession={planner.deleteFocusSession}
+          onUpdateFocusNote={planner.updateFocusSessionNote}
+          onCompleteTask={planner.completeTask}
+          onOpenTask={onOpenTask}
+          onNavigate={onNavigate}
+        />
+        {renderTaskDetail()}
+      </section>
     );
   }
 

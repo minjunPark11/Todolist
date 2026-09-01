@@ -93,7 +93,6 @@ interface CalendarViewProps {
   onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   onCreateTask: (draft: TaskDraft) => string;
   onDeleteTask?: (taskId: string) => void;
-  onClearTaskSelection?: () => void;
   showToast?: (toast: ToastState) => void;
 }
 
@@ -111,7 +110,6 @@ export function CalendarView({
   onUpdateTaskSchedule,
   onCreateTask,
   onDeleteTask,
-  onClearTaskSelection,
   showToast,
 }: CalendarViewProps) {
   const { t, lang } = useT();
@@ -287,7 +285,6 @@ export function CalendarView({
     setDraftAnchor(null);
     setPopover(null);
     setSelected(null);
-    onClearTaskSelection?.();
   }
 
   function shift(delta: number) {
@@ -384,7 +381,6 @@ export function CalendarView({
   // (external) categories cannot become the active category; hidden ones are
   // re-shown so the next created event is not invisible.
   function handleSelectCategory(category: CalendarCategory) {
-    onClearTaskSelection?.();
     if (category.isReadOnly) {
       showToast?.({ message: t("calendar.readOnlyCategoryToast") });
       return;
@@ -396,7 +392,6 @@ export function CalendarView({
   // §16.2: checkbox only flips visibility — never the active category.
   // External categories keep their visibility on the calendar record itself.
   function handleToggleCategory(category: CalendarCategory) {
-    onClearTaskSelection?.();
     if (category.group === "external" && category.sourceId) {
       const calendar = externalCalendars.find((item) => item.id === category.sourceId);
       if (calendar) onUpdateExternalCalendar(calendar.id, { visible: !calendar.visible });
@@ -665,7 +660,6 @@ export function CalendarView({
   function handleDeleteFromPopover(item: CalendarItem) {
     if (item.sourceType !== "task") return;
     setPopover(null);
-    onClearTaskSelection?.();
     // The ring deliberately stays put: onDeleteTask opens the app's confirm
     // dialog, and dropping the ring first would leave the user confirming a
     // deletion with nothing on screen to say which event it is. The effect
@@ -699,7 +693,6 @@ export function CalendarView({
     setDraft(null);
     setDraftAnchor(null);
     setPopover(null);
-    onClearTaskSelection?.();
   }
 
   function handleDraftCreate(day: string, startTime: string, endTime: string, anchor: PopoverAnchor) {
