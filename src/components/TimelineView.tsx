@@ -18,6 +18,8 @@ import { spanForItem } from "../domain/view/span";
 import {
   columnOf,
   dateAtColumnOffset,
+  instantAtColumnOffset,
+  type Instant,
   placeBar,
   todayColumn,
   ZOOM_COLUMNS,
@@ -25,7 +27,11 @@ import {
 } from "../domain/view/timeline";
 import type { SpanDrag } from "../domain/view/board";
 import { useT } from "../i18n";
-import { daysBetween } from "../utils/date";
+/** Two instants apart, in minutes. Midnight stands in for "no clock". */
+function minutesBetween(from: Instant, to: Instant): number {
+  const at = (i: Instant) => new Date(`${i.date}T${i.time || "00:00"}:00`).getTime();
+  return Math.round((at(to) - at(from)) / 60000);
+}
 
 /**
  * What the pointer picked up. Column-level drops rather than pixel dragging:
@@ -136,6 +142,8 @@ export function TimelineView({
     const box = event.currentTarget.getBoundingClientRect();
     if (box.width <= 0) return "";
     const across = Math.min(Math.max((event.clientX - box.left) / box.width, 0), 0.999999);
+    // The DATE only: a chip carries no schedule yet, and §3.2 has it declaring
+    // one day rather than an hour of one.
     return dateAtColumnOffset(window, index, across);
   }
 
@@ -261,7 +269,7 @@ function TimelineRowView({
    * remembered — otherwise a bar taken hold of in its middle would jump
    * backwards by however far along that was.
    */
-  const grabbedOn = useRef("");
+  const grabbedOn = useRef<Instant>({ date: "", time: "" });
   const trackRef = useRef<HTMLDivElement>(null);
   const span = spanForItem(item);
   const placement = span ? placeBar(span, window) : null;
@@ -279,34 +287,34 @@ function TimelineRowView({
    * so the same target gave three answers and only one matched the label
    * written on it [실측].
    */
-  function dateUnderPointer(event: { clientX: number }, track: Element | null): string {
-    if (!track) return "";
+  function instantUnderPointer(event: { clientX: number }, track: Element | null): Instant {
+    if (!track) return { date: "", time: "" };
     const box = track.getBoundingClientRect();
-    if (box.width <= 0) return "";
+    if (box.width <= 0) return { date: "", time: "" };
     // Clamped just inside, so the far edge is the last column and not one past
     // the end of the window.
     const across = Math.min(Math.max((event.clientX - box.left) / box.width, 0), 0.999999);
     const columnFloat = across * columns;
     const index = Math.floor(columnFloat);
-    return dateAtColumnOffset(window, index, columnFloat - index);
+    return instantAtColumnOffset(window, index, columnFloat - index);
   }
 
-  function handleDropAt(date: string, kind: DragKind) {
-    if (!date) return;
+  function handleDropAt(at: Instant, kind: DragKind) {
+    if (!at.date) return;
     if (kind === "start") {
-      onDrag({ kind: "resizeStart", date });
+      onDrag({ kind: "resizeStart", date: at.date, time: at.time });
       return;
     }
     if (kind === "end") {
-      onDrag({ kind: "resizeEnd", date });
+      onDrag({ kind: "resizeEnd", date: at.date, time: at.time });
       return;
     }
-    // Days, measured from where the pointer picked the bar up — NOT from where
-    // the bar starts. A reader grabs a bar in the middle as often as at its
-    // edge, and moving it "to" a date would then jump it by however far along
-    // they happened to take hold of it.
-    if (!grabbedOn.current) return;
-    onDrag({ kind: "move", days: daysBetween(grabbedOn.current, date) });
+    // Minutes, measured from where the pointer picked the bar up — NOT from
+    // where the bar starts. A reader grabs a bar in the middle as often as at
+    // its edge, and moving it "to" an instant would jump it by however far
+    // along they happened to take hold of it.
+    if (!grabbedOn.current.date) return;
+    onDrag({ kind: "move", minutes: minutesBetween(grabbedOn.current, at) });
   }
 
   return (
@@ -334,7 +342,7 @@ function TimelineRowView({
                 ? (event) => {
                     event.preventDefault();
                     const kind = event.dataTransfer.getData(DRAG_MIME) as DragKind;
-                    if (kind) handleDropAt(dateUnderPointer(event, trackRef.current), kind);
+                    if (kind) handleDropAt(instantUnderPointer(event, trackRef.current), kind);
                   }
                 : undefined
             }
@@ -371,7 +379,7 @@ function TimelineRowView({
           draggable={draggable}
           onDragStart={(event) => {
             event.dataTransfer.setData(DRAG_MIME, "move");
-            grabbedOn.current = dateUnderPointer(event, trackRef.current);
+            grabbedOn.current = instantUnderPointer(event, trackRef.current);
             onDragStateChange(true);
           }}
           onDragEnd={() => onDragStateChange(false)}

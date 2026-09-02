@@ -241,19 +241,68 @@ export function columnStartDate(window: TimelineWindow, index: number): string {
  * of the next one.
  */
 export function dateAtColumnOffset(window: TimelineWindow, index: number, ratio: number): string {
+  return instantAtColumnOffset(window, index, ratio).date;
+}
+
+/** Minutes a drag snaps to where a column can name a time (§16). */
+export const CLOCK_STEP_MINUTES = 15;
+
+export interface Instant {
+  /** `YYYY-MM-DD`. Always present. */
+  date: string;
+  /**
+   * `HH:mm`, or "" where the column is too long to name one (§16).
+   *
+   * A column names the finest unit it is made of and no finer: an hour column
+   * can say 09:30, a week column can say Wednesday and nothing about the
+   * clock. That is §13's rule, one unit further down.
+   */
+  time: string;
+}
+
+/**
+ * The instant at `ratio` through a column (§16).
+ *
+ * `dateAtColumnOffset` is this with the clock thrown away, and remains what
+ * the gestures that write only dates use.
+ */
+export function instantAtColumnOffset(
+  window: TimelineWindow,
+  index: number,
+  ratio: number,
+): Instant {
   const start = window.edges[index];
   const next = window.edges[index + 1];
-  // A column off the end of the window, or a pointer that reported no
-  // position: either would otherwise arrive as `NaN-NaN-NaN` in the record.
-  if (!start || !next) return "";
-  if (!Number.isFinite(ratio)) return start.slice(0, 10);
-  const days = Math.round((instantOf(next) - instantOf(start)) / 86400000);
-  // Under a day the column cannot name more than the day it sits in — which
-  // is the hour zoom, where the whole window is one date.
-  if (days < 1) return start.slice(0, 10);
-  const offset = Math.min(Math.max(Math.floor(ratio * days), 0), days - 1);
-  return addDays(start.slice(0, 10), offset);
+  if (!start || !next) return { date: "", time: "" };
+  const safe = Number.isFinite(ratio) ? Math.min(Math.max(ratio, 0), 0.999999) : 0;
+
+  const span = instantOf(next) - instantOf(start);
+  // A day or longer: the column names a day, and the clock means nothing.
+  if (span >= 86400000) {
+    const days = Math.round(span / 86400000);
+    const offset = Math.min(Math.max(Math.floor(safe * days), 0), days - 1);
+    return { date: addDays(start.slice(0, 10), offset), time: "" };
+  }
+
+  // Shorter than a day: the pointer can name a time, rounded to something a
+  // reader would have chosen. An hour column is ~21px [실측], so a free-form
+  // minute would be three pixels of aim and produce times like 09:37.
+  const step = CLOCK_STEP_MINUTES * 60000;
+  // Clamped inside the column, as §13 clamps the day version: rounding near
+  // the far edge would otherwise reach the next boundary — 23:54 in the 23:00
+  // column became midnight, and with it the NEXT DAY [실측].
+  const raw = instantOf(start) + Math.round((safe * span) / step) * step;
+  const at = Math.min(raw, instantOf(next) - step);
+  const clock = new Date(at);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return {
+    date: `${clock.getFullYear()}-${pad(clock.getMonth() + 1)}-${pad(clock.getDate())}`,
+    time: `${pad(clock.getHours())}:${pad(clock.getMinutes())}`,
+  };
 }
+
+
+
 
 /**
  * Last day of a column. Dragging the right edge onto a month column means

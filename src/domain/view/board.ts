@@ -27,9 +27,16 @@ export type SpanDrag =
    *
    * The zoom is gone with it: a day is a day at every zoom.
    */
-  | { kind: "move"; days: number }
-  | { kind: "resizeStart"; date: string }
-  | { kind: "resizeEnd"; date: string };
+  | { kind: "move"; minutes: number }
+  /**
+   * An edge dropped on an instant (§16).
+   *
+   * `time` is "" where the column was too long to name one, which is every
+   * zoom above `1일` — and there the write is the date alone, exactly as
+   * before.
+   */
+  | { kind: "resizeStart"; date: string; time: string }
+  | { kind: "resizeEnd"; date: string; time: string };
 
 /**
  * What dragging a bar means as a change to the record.
@@ -106,20 +113,100 @@ export function patchForTrayDrop(task: Task, date: string): Partial<Task> {
 
 export function patchForSpanDrag(task: Task, drag: SpanDrag): Partial<Task> {
   if (drag.kind === "resizeStart") {
-    if (!drag.date || drag.date === task.startDate) return {};
-    return { startDate: drag.date };
+    return edgePatch(drag, task.startDate, task.startTime, "startDate", "startTime");
   }
 
   if (drag.kind === "resizeEnd") {
-    if (!drag.date || drag.date === task.dueDate) return {};
-    return { dueDate: drag.date };
+    return edgePatch(drag, task.dueDate, task.endTime, "dueDate", "endTime");
   }
 
-  if (drag.days === 0) return {};
+  if (drag.minutes === 0) return {};
   const patch: Partial<Task> = {};
   // Only what is already there. An absent field stays absent — which is how a
-  // bar whose start was inferred keeps deriving it instead of freezing it.
-  if (task.startDate) patch.startDate = addDays(task.startDate, drag.days);
-  if (task.dueDate) patch.dueDate = addDays(task.dueDate, drag.days);
+  // bar whose start was inferred keeps deriving it instead of freezing it, and
+  // now also how a Task with no clock survives being dragged across one.
+  //
+  // A Task WITHOUT times moves in whole days, because that is all it has to
+  // move by: it occupies its days entirely, so half an hour is no distance at
+  // all and rounding it to a day would move it further than the pointer went.
+  const days = Math.round(drag.minutes / MINUTES_PER_DAY);
+  if (task.startTime || task.endTime) {
+    // NOT guarded on `startDate`: a one-day Task keeps only `dueDate` — the
+    // store normalises the other away [실측] — so a Task with a `startTime`
+    // and no `startDate` is the ordinary case, and guarding on the date left
+    // the start where it was while the end moved (`09:00 → 13:30`).
+    shiftEnd(patch, drag.minutes, task.startDate, task.dueDate, task.startTime, "startDate", "startTime");
+    shiftEnd(patch, drag.minutes, task.dueDate, task.dueDate, task.endTime, "dueDate", "endTime");
+    if (!task.startTime && task.startDate && days !== 0) {
+      patch.startDate = addDays(task.startDate, days);
+    }
+    if (!task.endTime && task.dueDate && days !== 0) patch.dueDate = addDays(task.dueDate, days);
+    return patch;
+  }
+  if (days === 0) return {};
+  if (task.startDate) patch.startDate = addDays(task.startDate, days);
+  if (task.dueDate) patch.dueDate = addDays(task.dueDate, days);
   return patch;
+}
+
+const MINUTES_PER_DAY = 1440;
+
+/**
+ * One edge, written including the field it was empty in (§16).
+ *
+ * The rule this extends is the one already on `resizeStart`: dragging a handle
+ * onto a date is the user SAYING it starts there, so the field is written even
+ * when nothing was in it. A handle dropped on 09:30 says the same about the
+ * clock, so `startTime` is written on a Task that had none.
+ *
+ * A column that cannot name a time leaves the stored one alone rather than
+ * clearing it: dragging a bar's edge at week zoom is a statement about days,
+ * and silently dropping the hour someone set in the Calendar would be a change
+ * they did not ask for.
+ */
+function edgePatch(
+  drag: { date: string; time: string },
+  currentDate: string,
+  currentTime: string,
+  dateField: "startDate" | "dueDate",
+  timeField: "startTime" | "endTime",
+): Partial<Task> {
+  if (!drag.date) return {};
+  const sameDate = drag.date === currentDate;
+  const sameTime = !drag.time || drag.time === currentTime;
+  if (sameDate && sameTime) return {};
+
+  const patch: Partial<Task> = {};
+  if (!sameDate) patch[dateField] = drag.date;
+  if (drag.time && drag.time !== currentTime) patch[timeField] = drag.time;
+  return patch;
+}
+
+/**
+ * Moves one end of a Task that keeps a clock (§16).
+ *
+ * The DATE field is written only when the record already held one. A Task with
+ * no `startDate` derives its start from the deadline, so the deadline moving is
+ * what carries that end across midnight — writing a `startDate` here would
+ * freeze a derivation into the record, which is the rule `move` has kept since
+ * D6.
+ */
+function shiftEnd(
+  patch: Partial<Task>,
+  minutes: number,
+  storedDate: string,
+  fallbackDate: string,
+  time: string,
+  dateField: "startDate" | "dueDate",
+  timeField: "startTime" | "endTime",
+): void {
+  if (!time) return;
+  const on = storedDate || fallbackDate;
+  if (!on) return;
+  const moved = new Date(new Date(`${on}T${time}:00`).getTime() + minutes * 60000);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const nextDate = `${moved.getFullYear()}-${pad(moved.getMonth() + 1)}-${pad(moved.getDate())}`;
+  const nextTime = `${pad(moved.getHours())}:${pad(moved.getMinutes())}`;
+  if (nextTime !== time) patch[timeField] = nextTime;
+  if (storedDate && nextDate !== storedDate) patch[dateField] = nextDate;
 }

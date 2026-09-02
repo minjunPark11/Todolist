@@ -6,6 +6,7 @@ import {
   alignToZoom,
   columnUnitOf,
   dateAtColumnOffset,
+  instantAtColumnOffset,
   placeBar,
   shiftWindow,
   timelineWindow,
@@ -225,7 +226,10 @@ describe("the day window", () => {
   // gestures write dates, and phase C is where an hour would be written.
   it("names the day for any hour column", () => {
     expect(dateAtColumnOffset(day, 9, 0.5)).toBe("2026-09-02");
+    // The far end of the LAST hour: rounding to the quarter reached midnight
+    // and carried the date into the next day until it was clamped (§16).
     expect(dateAtColumnOffset(day, 23, 0.9)).toBe("2026-09-02");
+    expect(instantAtColumnOffset(day, 23, 1).time).toBe("23:45");
   });
 });
 
