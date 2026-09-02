@@ -313,7 +313,9 @@ function TimelineRowView({
           }}
           // How TimelineConnectors finds this bar to measure it.
           data-bar-key={item.key}
-          title={`${span.start} → ${span.end}`}
+          // The name first: a bar too narrow for its text (§11) has nothing
+          // else to say what it is, and the dates alone do not name it.
+          title={`${item.title} · ${span.start} → ${span.end}`}
           draggable={draggable}
           onDragStart={(event) => {
             event.dataTransfer.setData(DRAG_MIME, "move");

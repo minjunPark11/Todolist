@@ -150,6 +150,32 @@
   cursor: pointer;
   overflow: hidden;
 }
+/* The title inside the bar, only where the bar can hold it (§11).
+
+   It is drawn TWICE on every row — once in the label column, once here — and
+   at the default zoom half the bars cannot fit it: a column is 47px wide and
+   the handles and padding take 24 of it [실측]. What came out was `P` or
+   `Projec…`, which is not information, it is a word that looks damaged.
+
+   The label column is the title that is always readable, so this one is the
+   one that gives way. It stays where the reference's look depends on it — a
+   wide block with its name inside — and steps out where it would only be a
+   fragment. 80px is the handles and padding plus room for about eight
+   characters; below that there is nothing worth clipping to.
+
+   A container query rather than a media query, because what decides this is
+   the BAR's width, and that comes from how many columns the task spans as
+   much as from the window. */
+.ff-timeline-bar {
+  container-type: inline-size;
+}
+
+@container (max-width: 80px) {
+  .ff-timeline-bar-text {
+    display: none;
+  }
+}
+
 .ff-timeline-bar-text {
   flex: 1;
   min-width: 0;

@@ -132,6 +132,28 @@ describe("Arrange tasks", () => {
 
 // §4 (phase 3): the drag, and the drop target that belongs to a column
 // rather than to an Item's row.
+// GANTT_TIMELINE_DESIGN.md §11. The title is drawn twice on a row — in the
+// label column and inside the bar — and at the default zoom half the bars are
+// too narrow to hold it. The bar's copy gives way; the tooltip is what a
+// narrow bar has left to say what it is.
+describe("a bar that cannot hold its title", () => {
+  it("names itself in the tooltip, ahead of its dates", () => {
+    draw([task({ id: "b1", title: "Project A", startDate: "2026-09-08", dueDate: "2026-09-15" })]);
+
+    const bar = document.querySelector(".ff-timeline-bar");
+    // The name first: the dates alone do not say which task this is, and on a
+    // narrow bar they would be all there is.
+    expect(bar?.getAttribute("title")).toBe("Project A · 2026-09-08 → 2026-09-15");
+  });
+
+  // The hiding itself is a container query on the bar's own width, which jsdom
+  // has no layout to answer — measured in the running app instead (§11.3).
+  it("keeps the text in the DOM for the widths that can show it", () => {
+    draw([task({ id: "b1", title: "Project A", startDate: "2026-09-08", dueDate: "2026-09-15" })]);
+    expect(document.querySelector(".ff-timeline-bar-text")?.textContent).toContain("Project A");
+  });
+});
+
 // §4 phase 5: the states around the panel rather than inside it.
 describe("Arrange tasks at its edges", () => {
   // An empty panel is absent, not empty — §15.5's idiom. The gate is
