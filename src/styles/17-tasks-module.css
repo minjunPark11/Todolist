@@ -3437,6 +3437,20 @@
   background: var(--surface-2, rgba(25, 25, 25, 0.04));
 }
 
+/* §3.8: a line of the body under the title. One line, quiet, and truncated —
+   a card that grew with its body would answer the question `Kanban Size` is
+   for. */
+.tm-task-body {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-tertiary, #8e8e93);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* The value on the right of a row. It is a `<select>`, so it keeps the
    platform's own affordance and only loses the box it usually sits in — the
    row is already the surface. */

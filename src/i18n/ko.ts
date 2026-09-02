@@ -734,6 +734,8 @@ export const ko: Dictionary = {
   "tasks.kanbanSize.small": "작게",
   "tasks.kanbanSize.medium": "보통",
   "tasks.kanbanSize.large": "크게",
+  "tasks.hideCompleted": "완료 숨기기",
+  "tasks.showDetails": "상세 보기",
   "tasks.showDateBy": "날짜 표기",
   "tasks.dateBy.taskTime": "작업 시간",
   "tasks.dateBy.countdown": "남은 기간",

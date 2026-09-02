@@ -67,6 +67,8 @@ interface TaskBoardProps {
   dateBy?: ScopeDateBy;
   /** §3.6: how wide a column is, and so how many of them fit on screen. */
   kanbanSize?: ScopeKanbanSize;
+  /** §3.8: whether a card draws a line of its body or only reports one. */
+  showDetails?: boolean;
   /** Today, for the countdown to measure from. */
   today?: string;
   /**
@@ -136,6 +138,7 @@ export function TaskBoard({
   showInputBox = true,
   dateBy,
   kanbanSize = "medium",
+  showDetails,
   today,
   finishedIn,
   onRename,
@@ -427,7 +430,7 @@ export function TaskBoard({
                     onContextMenu(task, event.clientX, event.clientY);
                   }}
                 >
-                  <TaskRowContent task={task} today={today} dateBy={dateBy} onOpen={onOpen} onToggleDone={onToggleDone} />
+                  <TaskRowContent task={task} today={today} dateBy={dateBy} showDetails={showDetails} onOpen={onOpen} onToggleDone={onToggleDone} />
 
                   {/* The non-drag path (§16.30). Same command, no gesture. */}
                   <label className="tm-card-move">
@@ -460,6 +463,7 @@ export function TaskBoard({
               <BoardColumnFinished
                 tasks={finishedIn(column.id)}
                 dateBy={dateBy}
+                showDetails={showDetails}
                 today={today}
                 onOpen={onOpen}
                 onToggleDone={onToggleDone}
@@ -505,7 +509,7 @@ export function TaskBoard({
                 onDragStart={() => startDrag(task.id)}
                 onDragEnd={endDrag}
               >
-                <TaskRowContent task={task} today={today} dateBy={dateBy} onOpen={onOpen} onToggleDone={onToggleDone} />
+                <TaskRowContent task={task} today={today} dateBy={dateBy} showDetails={showDetails} onOpen={onOpen} onToggleDone={onToggleDone} />
               </li>
             ))}
           </ul>
@@ -533,6 +537,7 @@ function BoardColumnFinished({
   tasks,
   openTaskId,
   dateBy,
+  showDetails,
   today,
   onOpen,
   onToggleDone,
@@ -543,6 +548,7 @@ function BoardColumnFinished({
   // rows as the ones above them, and a group that read its dates differently
   // from the column it sits in would be one screen speaking two ways.
   dateBy?: ScopeDateBy;
+  showDetails?: boolean;
   today?: string;
   onOpen: (taskId: string) => void;
   onToggleDone: (task: Task) => void;
@@ -574,7 +580,7 @@ function BoardColumnFinished({
         <ul className="tm-column-cards" aria-label={t("tasks.completed")}>
           {visible.map((task) => (
             <li key={task.id} className={`tm-task is-card is-done${task.id === openTaskId ? " is-open" : ""}`}>
-              <TaskRowContent task={task} today={today} dateBy={dateBy} onOpen={onOpen} onToggleDone={onToggleDone} />
+              <TaskRowContent task={task} today={today} dateBy={dateBy} showDetails={showDetails} onOpen={onOpen} onToggleDone={onToggleDone} />
             </li>
           ))}
           {hidden > 0 ? (

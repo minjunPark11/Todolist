@@ -486,7 +486,15 @@ describe("the Scope's menu", () => {
     expect(document.querySelector(".tm-header .tm-views")).toBeNull();
 
     await openScopeMenu(user);
-    expect(rows()).toEqual(["List", "✓ Board", "Timeline", "View Options"]);
+    expect(rows()).toEqual([
+      "List",
+      "✓ Board",
+      "Timeline",
+      // Only on the Board — the list view already leaves finished work out.
+      "Hide Completed",
+      "Show Details",
+      "View Options",
+    ]);
   });
 
   it("switches the view when one is chosen", async () => {
@@ -515,7 +523,8 @@ describe("the Scope's menu", () => {
     renderModule({}, { url: "/today" });
 
     await openScopeMenu(user);
-    expect(rows()).toEqual(["View Options"]);
+    // `Hide Completed` is absent too: this Scope has no Board to hide any in.
+    expect(rows()).toEqual(["Show Details", "View Options"]);
   });
 
   // §3.1: three lists of work that is over. "완료 숨기기" on the Completed
@@ -656,6 +665,67 @@ describe("View Options", () => {
     // And nothing took its place in the header — the `+` that used to be the
     // other answer is gone for good.
     expect(document.querySelector(".tm-column-add")).toBeNull();
+  });
+});
+
+// §3.7 and §3.8: the two the menu carries rather than the dialog — they act on
+// the Scope rather than settling how it is drawn.
+describe("Hide Completed and Show Details", () => {
+  it("takes the Board's finished groups away when asked", () => {
+    renderModule({ status: "completed", completedAt: NOW }, { url: "/list/l1?view=board" });
+    expect(document.querySelector(".tm-column-done")).toBeTruthy();
+
+    cleanup();
+    renderModule(
+      { status: "completed", completedAt: NOW },
+      {
+        url: "/list/l1?view=board",
+        scopeViewOptions: { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, hideCompleted: true } },
+      },
+    );
+    expect(document.querySelector(".tm-column-done")).toBeNull();
+  });
+
+  // §3.8: the mark and the line are the same fact, so only one is drawn.
+  it("swaps the mark for a line of the body", () => {
+    renderModule({ description: "the first line" }, { url: "/list/l1?view=board" });
+    expect(document.querySelector(".tm-task-body")).toBeNull();
+    expect(document.querySelector(".tm-task-tip")).toBeTruthy();
+
+    cleanup();
+    renderModule(
+      { description: "the first line" },
+      {
+        url: "/list/l1?view=board",
+        scopeViewOptions: { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, showDetails: true } },
+      },
+    );
+    expect(document.querySelector(".tm-task-body")?.textContent).toBe("the first line");
+    expect(document.querySelector(".tm-task-tip")).toBeNull();
+  });
+
+  // Q3: a card with no body draws nothing extra. An empty line kept for even
+  // card heights would be a row of blank saying this task has nothing to say.
+  it("draws nothing for a card with no body", () => {
+    renderModule(
+      { description: "", notes: "" },
+      {
+        url: "/list/l1?view=board",
+        scopeViewOptions: { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, showDetails: true } },
+      },
+    );
+    expect(document.querySelector(".tm-task-body")).toBeNull();
+  });
+
+  it("reads one line of a body that has several", () => {
+    renderModule(
+      { description: "first" + String.fromCharCode(10) + "second" },
+      {
+        url: "/list/l1?view=board",
+        scopeViewOptions: { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, showDetails: true } },
+      },
+    );
+    expect(document.querySelector(".tm-task-body")?.textContent).toBe("first");
   });
 });
 

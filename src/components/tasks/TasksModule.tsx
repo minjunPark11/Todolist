@@ -347,6 +347,20 @@ export function TasksModule(props: TasksModuleProps) {
    * are rows, the Today axis picker chose the same shape, and a new menu
    * primitive is not what this phase is for (§5 Q6).
    */
+  /** This Scope's five, or the defaults where nobody has set any (§3.3). */
+  const viewOptions = viewOptionsFor(props.scopeViewOptions, scope);
+
+  function patchViewOptions(patch: Partial<ScopeViewOptions>) {
+    const key = scopeOptionKey(scope);
+    if (!key) return;
+    props.onSetScopeViewOptions({
+      ...(props.scopeViewOptions ?? {}),
+      [key]: { ...viewOptions, ...patch },
+    });
+  }
+
+  /** A menu row that is a state says so with the same mark everywhere. */
+  const prefix = (on: boolean) => (on ? String.fromCharCode(10003) + " " : "");
   const scopeMenuItems: MoreMenuItem[] = [
     ...(policy.allowedViews.length > 1
       ? policy.allowedViews.map((view) => ({
@@ -355,6 +369,23 @@ export function TasksModule(props: TasksModuleProps) {
         }))
       : []),
     ...(policy.allowedViews.length > 1 ? [{ separator: true } as MoreMenuItem] : []),
+    // Only on the Board: the list view already leaves finished work out of
+    // its query (`isActive`), so there is nothing on that screen for this to
+    // hide. §15.5 again — the same clause that took `Kanban Size` off the
+    // Scopes with no columns.
+    ...(state.view === "board"
+      ? [
+          {
+            label: prefix(viewOptions.hideCompleted) + t("tasks.hideCompleted"),
+            onClick: () => patchViewOptions({ hideCompleted: !viewOptions.hideCompleted }),
+          } as MoreMenuItem,
+        ]
+      : []),
+    {
+      label: prefix(viewOptions.showDetails) + t("tasks.showDetails"),
+      onClick: () => patchViewOptions({ showDetails: !viewOptions.showDetails }),
+    },
+    { separator: true },
     { label: t("tasks.viewOptions"), onClick: () => setViewOptionsOpen(true) },
   ];
 
@@ -416,17 +447,6 @@ export function TasksModule(props: TasksModuleProps) {
   const [emptyingTrash, setEmptyingTrash] = useState(false);
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
 
-  /** This Scope's five, or the defaults where nobody has set any (§3.3). */
-  const viewOptions = viewOptionsFor(props.scopeViewOptions, scope);
-
-  function patchViewOptions(patch: Partial<ScopeViewOptions>) {
-    const key = scopeOptionKey(scope);
-    if (!key) return;
-    props.onSetScopeViewOptions({
-      ...(props.scopeViewOptions ?? {}),
-      [key]: { ...viewOptions, ...patch },
-    });
-  }
   const trashedCount = trashedTaskIds(tasks).length;
 
   const commands = useTaskCommands({
@@ -816,8 +836,11 @@ export function TasksModule(props: TasksModuleProps) {
    * they just ticked.
    */
   const finishedRows = useMemo(
-    () => (state.view === "board" ? queryScopeTasks(scope, ctx, { finished: true }).filter(isCompleted) : []),
-    [state.view, scope, ctx],
+    () =>
+      state.view === "board" && !viewOptions.hideCompleted
+        ? queryScopeTasks(scope, ctx, { finished: true }).filter(isCompleted)
+        : [],
+    [state.view, scope, ctx, viewOptions.hideCompleted],
   );
   const finishedIn = (columnId: string) =>
     groupTasks(
@@ -1106,6 +1129,7 @@ export function TasksModule(props: TasksModuleProps) {
             showInputBox={viewOptions.showInputBox}
             dateBy={viewOptions.dateBy}
             kanbanSize={viewOptions.kanbanSize}
+            showDetails={viewOptions.showDetails}
             today={today}
             onOpen={openTask}
             onDrop={dropOnBoard}
@@ -1172,7 +1196,7 @@ export function TasksModule(props: TasksModuleProps) {
                   {/* The handle is the affordance, not the mechanism — the whole
                       row is draggable, and this is what says so (audit L-17). */}
                   {policy.canManualReorder ? <span className="tm-task-handle" aria-hidden="true" /> : null}
-                  <TaskRowContent task={task} today={today} dateBy={viewOptions.dateBy} onOpen={openTask} onToggleDone={toggleDone} />
+                  <TaskRowContent task={task} today={today} dateBy={viewOptions.dateBy} showDetails={viewOptions.showDetails} onOpen={openTask} onToggleDone={toggleDone} />
                   {/* The other half of L-17, and the reason the menu is a
                       component: a right-click is not discoverable and does not
                       exist on a touch screen, so the same menu needs a button

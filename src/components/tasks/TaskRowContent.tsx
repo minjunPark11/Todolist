@@ -53,6 +53,14 @@ interface TaskRowContentProps {
    */
   dateBy?: ScopeDateBy;
   /**
+   * Whether the body is drawn or only reported (§3.8).
+   *
+   * Off (the default, and what every row did before) the row says a body
+   * EXISTS with a 12px mark. On, it says the first line of it instead — the
+   * mark and the line are the same fact, so only one of them is drawn.
+   */
+  showDetails?: boolean;
+  /**
    * False where the row's PLACE already is the priority — the matrix's boxes
    * after D1. A flag there would repeat the box's header once per card.
    */
@@ -65,12 +73,18 @@ interface TaskRowContentProps {
   today?: string;
 }
 
+/** A body is drawn one line deep, so this is what a row reads of it. */
+function firstLine(text: string): string {
+  const cut = text.indexOf(String.fromCharCode(10));
+  return (cut === -1 ? text : text.slice(0, cut)).trim();
+}
 export function TaskRowContent({
   task,
   onOpen,
   onToggleDone,
   listName,
   dateBy = "taskTime",
+  showDetails = false,
   showPriority = true,
   today,
 }: TaskRowContentProps) {
@@ -96,7 +110,16 @@ export function TaskRowContent({
   const repeats = task.repeatType !== undefined && task.repeatType !== "none";
   // Either body counts: `contentMode` decides which one a Task is using, and a
   // row only reports that there IS more behind the title.
-  const hasBody = Boolean(task.notes?.trim() || task.description?.trim());
+  // The first line only. A body's later lines are the Detail's to draw; a row
+  // that grew with them would turn a column of three cards into a column of
+  // one, which is the question Kanban Size answers and not the card's.
+  const body = firstLine(task.notes?.trim() || task.description?.trim() || "");
+  const hasBody = Boolean(body);
+  // Q3: a card with no body draws nothing extra. An empty line kept for the
+  // sake of even card heights would be a row of blank spent saying that this
+  // task has nothing to say — and the mark it replaces was absent in that case
+  // too, so nothing about the quiet card changes.
+  const bodyLine = showDetails ? body : "";
   const hasTips = Boolean(listName) || repeats || hasBody || Boolean(dueLabel);
   return (
     <>
@@ -136,6 +159,11 @@ export function TaskRowContent({
             </svg>
           </span>
         ) : null}
+        {/* §1.5: under the title, quiet, one line. Cut to one because a card
+            that grows with its body turns a column of three into a column of
+            one, which is the question `Kanban Size` is for — the card does not
+            get to answer it. */}
+        {bodyLine ? <span className="tm-task-body">{bodyLine}</span> : null}
         {/* One group at the right edge rather than four things loose in the
             row: the tips are what the row says about itself after the title,
             and they have to stay together when the title takes the width. */}
@@ -154,7 +182,7 @@ export function TaskRowContent({
                 </svg>
               </span>
             ) : null}
-            {hasBody ? (
+            {hasBody && !showDetails ? (
               <span className="tm-task-tip" role="img" aria-label={t("tasks.card.hasNotes")} title={t("tasks.card.hasNotes")}>
                 <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
                   <path d="M5 4.5h9L19 9v10.5H5z" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />

@@ -742,6 +742,8 @@ export const en: Dictionary = {
   "tasks.kanbanSize.small": "Small",
   "tasks.kanbanSize.medium": "Medium",
   "tasks.kanbanSize.large": "Large",
+  "tasks.hideCompleted": "Hide Completed",
+  "tasks.showDetails": "Show Details",
   "tasks.showDateBy": "Show Date by",
   "tasks.dateBy.taskTime": "Task Time",
   "tasks.dateBy.countdown": "Countdown",
