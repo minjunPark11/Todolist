@@ -39,11 +39,35 @@ export interface PriorityPickerProps {
   onChange: (level: TaskPriority) => void;
   /** §19.32's fallback, for when a Task switch removes the trigger. */
   restoreFocusTo?: () => HTMLElement | null;
+  /**
+   * Shows the level without offering to change it
+   * (TRASH_PERMANENT_DELETE_DESIGN.md §14).
+   *
+   * The flag is a FACT here, not a control. A prop rather than a second
+   * component so the name, the glyph and the sentence stay written once —
+   * a static twin would be the third place this file's rules live.
+   */
+  readOnly?: boolean;
 }
 
-export function PriorityPicker({ task, onChange, restoreFocusTo }: PriorityPickerProps) {
+export function PriorityPicker({ task, onChange, restoreFocusTo, readOnly }: PriorityPickerProps) {
   const { t } = useT();
   const current = task.priority;
+  const sentence =
+    current === NO_PRIORITY
+      ? t("tasks.priority.set")
+      : t("tasks.priority.current", { value: t(`tasks.priority.${current}`) });
+
+  // Nothing at all where there is nothing to report: a `⚐` that cannot be
+  // clicked is an empty control rather than a fact about the Task.
+  if (readOnly) {
+    if (current === NO_PRIORITY) return null;
+    return (
+      <span className={`tm-priority-trigger is-${current} is-readonly`} title={sentence} aria-label={sentence}>
+        <span aria-hidden="true">{GLYPH[current]}</span>
+      </span>
+    );
+  }
 
   return (
     <Popover

@@ -34,15 +34,40 @@ export interface SchedulePickerProps {
   /** Returns whatever was wrong; empty means it was written (§5.51). */
   onCommit: (taskId: string, next: Schedule) => ScheduleIssue[];
   restoreFocusTo?: () => HTMLElement | null;
+  /**
+   * Shows the schedule without offering to edit it
+   * (TRASH_PERMANENT_DELETE_DESIGN.md §14).
+   *
+   * Same reason as `PriorityPicker.readOnly`: the label, the lateness and
+   * the red are worked out here, and a static twin elsewhere would be a
+   * second copy of all three.
+   */
+  readOnly?: boolean;
 }
 
-export function SchedulePicker({ task, reminders, today, onCommit, restoreFocusTo }: SchedulePickerProps) {
+export function SchedulePicker({ task, reminders, today, onCommit, restoreFocusTo, readOnly }: SchedulePickerProps) {
   const { t, lang } = useT();
   const locale = lang === "ko" ? "ko-KR" : "en-US";
   const schedule = scheduleFromTask({ ...task, reminders });
   const label = formatScheduleTrigger(schedule, today, locale);
   const late = isCompleted(task) ? 0 : overdueDays(schedule, today);
   const lateLabel = t("schedule.overdueDays", { days: late });
+
+  // A Task with no schedule says nothing rather than inviting one: the
+  // trigger's empty state is the invitation, and there is nothing to accept.
+  if (readOnly) {
+    if (!label) return null;
+    return (
+      <span
+        className={`sched-trigger is-readonly${late > 0 ? " is-late" : ""}`}
+        aria-label={t("tasks.scheduleCurrent", { value: late > 0 ? `${label}, ${lateLabel}` : label })}
+      >
+        <CalendarIcon size={14} />
+        {label}
+        {late > 0 ? <span className="sched-trigger-late">{lateLabel}</span> : null}
+      </span>
+    );
+  }
 
   return (
     // §19.11: bottom-start. The calendar is the widest surface in the Detail,

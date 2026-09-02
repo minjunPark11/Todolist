@@ -39,7 +39,10 @@
   opacity: 0.85;
 }
 
-.sched-trigger:hover {
+/* `:not(.is-readonly)` because the read-only twin is a `<span>` carrying
+   the same class, and a class selector does not care which element it is on
+   (Trash §14). */
+.sched-trigger:not(.is-readonly):hover {
   background: var(--accent-active);
 }
 
@@ -618,5 +621,12 @@
   border-color: var(--border-subtle);
   background: var(--bg-surface-muted);
   color: var(--text-tertiary);
+  cursor: default;
+}
+
+/* The schedule as a fact rather than a door (Trash §14). Same border, same
+   colour, same red when late — only the hover and the pointer go, because
+   what the reader needs here is to READ the date before deciding. */
+.sched-trigger.is-readonly {
   cursor: default;
 }

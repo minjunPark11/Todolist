@@ -248,3 +248,61 @@ describe("the Drawer's dependency section", () => {
     expect(screen.queryByText("Waiting on this")).toBeNull();
   });
 });
+
+// TRASH_PERMANENT_DELETE_DESIGN.md §14 (Q1). A Task in the Trash is frozen in
+// what it IS and not in what it says.
+describe("the Detail of a Task that is in the Trash", () => {
+  const NOW = "2026-08-31T09:00:00.000Z";
+
+  /** The header's Complete control, which has no accessible name of its own. */
+  const doneBox = () =>
+    document.querySelector(".tm-drawer-done input") as HTMLInputElement;
+
+  it("freezes the four that change what the Task is", () => {
+    renderDrawer({ deletedAt: NOW, dueDate: "2026-08-20", priority: "high" });
+
+    // Completion is the one that was actually broken: `completedAt` beside
+    // `deletedAt` is a pair no Scope shows, and it handed back a DONE task on
+    // restore.
+    expect(doneBox().disabled).toBe(true);
+    // The two pickers keep their words and lose their door — a reader deciding
+    // whether to restore has to be able to READ the date.
+    expect(document.querySelector("button.sched-trigger")).toBeNull();
+    expect(document.querySelector("span.sched-trigger.is-readonly")).toBeTruthy();
+    expect(document.querySelector("button.tm-priority-trigger")).toBeNull();
+    expect(document.querySelector("span.tm-priority-trigger.is-readonly")).toBeTruthy();
+    // Turning a note into a checklist rewrites the body's shape, which is the
+    // same kind of change and not the typo fix the text is left open for.
+    expect(document.querySelector(".tm-drawer-content-toggle")).toBeNull();
+  });
+
+  it("leaves the words alone", () => {
+    renderDrawer({ deletedAt: NOW });
+
+    expect((screen.getByRole("textbox", { name: "Title" }) as HTMLInputElement).disabled).toBe(false);
+    expect(
+      (screen.getByRole("textbox", { name: "Description" }) as HTMLTextAreaElement).disabled,
+    ).toBe(false);
+  });
+
+  // The freeze is the Trash's and nowhere else's: an ordinary Task keeps every
+  // one of them.
+  it("does none of this to a Task that is not deleted", () => {
+    renderDrawer({ dueDate: "2026-08-20", priority: "high" });
+
+    expect(doneBox().disabled).toBe(false);
+    expect(document.querySelector("button.sched-trigger")).toBeTruthy();
+    expect(document.querySelector("button.tm-priority-trigger")).toBeTruthy();
+    expect(document.querySelector(".tm-drawer-content-toggle")).toBeTruthy();
+    expect(document.querySelectorAll(".is-readonly")).toHaveLength(0);
+  });
+
+  // §14: nothing at all where there is nothing to report, rather than a chip
+  // that cannot be clicked standing in for a value nobody set.
+  it("draws no chip for a schedule or a priority that was never set", () => {
+    renderDrawer({ deletedAt: NOW, dueDate: "", priority: "none" });
+
+    expect(document.querySelector(".sched-trigger")).toBeNull();
+    expect(document.querySelector(".tm-priority-trigger")).toBeNull();
+  });
+});

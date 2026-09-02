@@ -764,7 +764,8 @@
   color: var(--text-tertiary, #8e8e93);
 }
 
-.tm-priority-trigger:hover {
+/* Not the frozen twin — see the note on `.sched-trigger:not(.is-readonly)`. */
+.tm-priority-trigger:not(.is-readonly):hover {
   background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
 }
 
@@ -3665,4 +3666,20 @@
 .tm-column-add-head:focus-visible {
   background: var(--bg-hover-content, rgba(0, 0, 0, 0.05));
   color: var(--text-primary, #1c1c1e);
+}
+
+/* A Task in the Trash, frozen (TRASH_PERMANENT_DELETE_DESIGN.md §14).
+   The facts stay legible — the reader is deciding whether to restore, and a
+   date they cannot read is a decision made blind — so this is the cursor and
+   the affordance going, not the contrast. */
+.tm-drawer-done.is-frozen {
+  cursor: default;
+}
+
+.tm-drawer-done.is-frozen input[type="checkbox"] {
+  cursor: default;
+}
+
+.tm-priority-trigger.is-readonly {
+  cursor: default;
 }

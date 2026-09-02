@@ -166,6 +166,23 @@ export function TaskDrawer({
 }: TaskDrawerProps) {
   const { t } = useT();
   const root = useRef<HTMLElement>(null);
+  /**
+   * A Task in the Trash is frozen in what it IS, not in what it says
+   * (TRASH_PERMANENT_DELETE_DESIGN.md §14, Q1).
+   *
+   * The reference app strips this Detail's footer to `Restore` and
+   * `Delete forever` — it removes the List picker and the ⋯, which are
+   * where the Task is and what to do to it, and leaves the title and body
+   * area looking ordinary. That line is the rule: lifecycle is settled
+   * while a Task is deleted, and the words are still the reader's.
+   *
+   * Completion is the one that was actually broken. Ticking it wrote
+   * `completedAt` beside `deletedAt` — a pair `matchesScope` shows in no
+   * Scope, since `completed` requires `!deletedAt` — so it went nowhere and
+   * then handed back a DONE task on restore, which is not the task the
+   * reader put in the bin.
+   */
+  const frozen = isTrashed(task);
 
   /**
    * §15.20: focus does not wander out of a sheet that covers what is behind
@@ -328,10 +345,15 @@ export function TaskDrawer({
       <header className="tm-drawer-head">
         {/* §4: completion is one control and it is the first one. ST-I5 lets a
             parent finish with subtasks still open — they are not a gate. */}
-        <label className="tm-drawer-done">
+        {/* Disabled rather than absent, which is the opposite of §15.5 and
+            deliberately so: that rule is for an action with nothing to do
+            here, and this is a FACT that cannot be changed. The reference
+            draws a checkbox on this screen too (§1.4). */}
+        <label className={`tm-drawer-done${frozen ? " is-frozen" : ""}`}>
           <input
             type="checkbox"
             checked={isCompleted(task)}
+            disabled={frozen}
             onChange={onComplete}
           />
           <span>{t("tasks.markDone")}</span>
@@ -349,6 +371,7 @@ export function TaskDrawer({
           today={today}
           onCommit={onCommitSchedule}
           restoreFocusTo={() => root.current}
+          readOnly={frozen}
         />
 
         {/* §8.2, §8.5: a flag that opens a popover, not a dropdown. The
@@ -360,7 +383,7 @@ export function TaskDrawer({
             §19.32: the Drawer is the focus fallback. The Detail is reused
             across Tasks, so a Task switch can remove this trigger while its
             popover is open, and focus would otherwise land on the body. */}
-        <PriorityPicker task={task} onChange={onSetPriority} restoreFocusTo={() => root.current} />
+        <PriorityPicker task={task} onChange={onSetPriority} restoreFocusTo={() => root.current} readOnly={frozen} />
 
         {/* §15.6, §15.8: the one canonical value, said out loud.
             Without it Pin would be a state with no visible effect anywhere in
@@ -446,13 +469,19 @@ export function TaskDrawer({
             {progressLines.done}/{progressLines.total}
           </span>
         ) : null}
-        <ContentModeToggle
-          checklist={checklist}
-          onSet={(mode) => {
-            setConvertedId(mode === "checklist" ? task.id : "");
-            onSetContentMode(mode);
-          }}
-        />
+        {/* Not while it is deleted. This one rewrites the body's SHAPE —
+            a note becomes a list of items and back — which is the same kind
+            of change as the three above, and not the typo fix the title and
+            the body are left unlocked for. */}
+        {frozen ? null : (
+          <ContentModeToggle
+            checklist={checklist}
+            onSet={(mode) => {
+              setConvertedId(mode === "checklist" ? task.id : "");
+              onSetContentMode(mode);
+            }}
+          />
+        )}
       </div>
 
       {/* §1.6's Content Body, and only that: the title above, the text here.
