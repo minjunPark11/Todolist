@@ -132,6 +132,50 @@ describe("Arrange tasks", () => {
 
 // §4 (phase 3): the drag, and the drop target that belongs to a column
 // rather than to an Item's row.
+// §4 phase 5: the states around the panel rather than inside it.
+describe("Arrange tasks at its edges", () => {
+  // An empty panel is absent, not empty — §15.5's idiom. The gate is
+  // `undated.length > 0`, so there is no "nothing here yet" card to write.
+  it("draws no empty panel", () => {
+    draw([task({ id: "dated", dueDate: "2026-09-04" })]);
+    expect(document.querySelector(".tgv-arrange")).toBeNull();
+    // And the grid is still there to receive one later.
+    expect(document.querySelector(".ff-timeline")).toBeTruthy();
+  });
+
+  // The first screen this feature ever shows: nothing scheduled, a pile to
+  // place. The grid has no rows but keeps its day columns, so there is
+  // something to drop onto.
+  it("keeps the grid and its columns when every Task is still unplaced", () => {
+    draw([task({ id: "bare", title: "Has neither" })], vi.fn(), vi.fn());
+
+    expect(document.querySelector(".tgv-arrange")).toBeTruthy();
+    expect(document.querySelectorAll(".ff-timeline-row")).toHaveLength(0);
+    expect(document.querySelectorAll(".ff-timeline-col").length).toBeGreaterThan(0);
+    // Not the empty state: that is for a Scope with no Tasks at all.
+    expect(document.querySelector(".ff-empty")).toBeNull();
+  });
+
+  // Both empty is the only case the empty state is for.
+  it("shows the empty state only when there is nothing either side", () => {
+    draw([]);
+    expect(document.querySelector(".ff-empty")).toBeTruthy();
+    expect(document.querySelector(".tgv-arrange")).toBeNull();
+  });
+
+  // §3.5. The hint names the way in that this timeline actually has: a
+  // read-only one cannot be dragged onto, so telling the reader to drag would
+  // be an instruction they cannot follow.
+  it("names the drag only where the drag exists", () => {
+    draw([task({ id: "bare" })], vi.fn(), vi.fn());
+    expect(document.querySelector(".tgv-arrange-hint")?.textContent).toContain("Drag");
+
+    cleanup();
+    draw([task({ id: "bare" })]);
+    expect(document.querySelector(".tgv-arrange-hint")?.textContent).not.toContain("Drag");
+  });
+});
+
 describe("dropping a chip on a day", () => {
   /** jsdom has no drag, so the payload is carried by hand. */
   function dataTransfer(mime: string, value: string) {

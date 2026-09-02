@@ -207,11 +207,16 @@ export function TaskGanttView({
             <h3>{t("timeline.arrangeTitle")}</h3>
             <span className="tm-count">{undated.length}</span>
           </header>
-          {/* Still the only way to give one a date until phase 3 brings the
-              drag, and still the KEYBOARD's way after it (§3.5): a panel
-              that can only be dragged from is a panel some readers cannot
-              use at all. */}
-          <p className="tgv-arrange-hint">{t("timeline.trayHint")}</p>
+          {/* Two ways in, and the hint names the one this timeline has.
+
+              Opening the Task is the KEYBOARD's way and never goes (§3.5) —
+              a panel that can only be dragged from is a panel some readers
+              cannot use at all — but where the drag exists it is the
+              shorter sentence, so it is the one worth spending a line on.
+              A read-only timeline gets the other. */}
+          <p className="tgv-arrange-hint">
+            {t(onMutateTask ? "timeline.arrangeHint" : "timeline.trayHint")}
+          </p>
           <ul>
             {undated.map((item) => (
               <li key={item.key}>

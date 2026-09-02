@@ -63,6 +63,7 @@ export const en: Dictionary = {
   "timeline.emptyHint": "A task appears here as soon as it has any date.",
   "timeline.arrangeTitle": "Arrange tasks",
   "timeline.trayHint": "Give one a start date or a deadline and it gets a bar.",
+  "timeline.arrangeHint": "Drag one onto a day, or open it to give it dates.",
   "timeline.dependencies": "Dependencies",
   "timeline.blockerOffWindow": "Waiting on something outside this window",
   "timeline.dependentOffWindow": "Something outside this window waits on this",

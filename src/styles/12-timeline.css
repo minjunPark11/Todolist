@@ -262,16 +262,23 @@
   min-width: 0;
 }
 
+/* `.ff-empty` is what `EmptyState` actually renders — this said
+   `.ff-empty-state` from phase 1 and matched nothing [실측]. */
 .tgv-body > .ff-timeline,
-.tgv-body > .ff-empty-state {
+.tgv-body > .ff-empty {
   /* Basis 0, not `auto`. On `auto` the grid's base size is its own content —
      which is wider than any line it is given — so it claimed the whole row and
      the panel wrapped even at 1800px [실측]. At 0 it takes what is left after
      the panel, and the floor below decides whether there is enough. */
   flex: 1 1 0;
-  /* The floor: the 220px label column plus seven columns with something in
-     them. `min-width: 0` would let the grid vanish instead of wrapping. */
-  min-width: min(100%, 420px);
+  /* The floor: the label column plus enough track for the days to be days.
+     Read from the variable rather than written as 420 so that changing the
+     label width moves the floor with it — the number is not repeated in two
+     places. It does NOT change what wraps today [실측]: above 900 the label is
+     220 and this is the same 420 it replaced, and below 900 the panel takes
+     the whole line anyway (see the narrow block). `min-width: 0` would let the
+     grid vanish instead of wrapping. */
+  min-width: min(100%, calc(var(--timeline-label-width) + 200px));
 }
 
 .tgv-arrange {
@@ -350,4 +357,10 @@
 @media (max-width: 900px) {
   .ff-timeline { --timeline-label-width: 130px; }
   .ff-timeline-col { font-size: 10px; }
+
+  /* Once it has wrapped, 220px of panel with empty space beside it is a
+     column pretending it still has a neighbour. It takes the line. */
+  .tgv-arrange {
+    flex-basis: 100%;
+  }
 }

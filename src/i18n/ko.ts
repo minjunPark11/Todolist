@@ -62,6 +62,7 @@ export const ko: Dictionary = {
   "timeline.emptyHint": "날짜가 하나라도 있으면 여기에 나타납니다.",
   "timeline.arrangeTitle": "작업 배치",
   "timeline.trayHint": "시작일이나 마감일을 넣으면 기간이 생깁니다.",
+  "timeline.arrangeHint": "날짜 위로 끌어다 놓거나, 열어서 날짜를 넣으세요.",
   "timeline.dependencies": "의존 관계",
   "timeline.blockerOffWindow": "이 창 밖의 작업을 기다리는 중",
   "timeline.dependentOffWindow": "이 창 밖의 작업이 이것을 기다리는 중",
