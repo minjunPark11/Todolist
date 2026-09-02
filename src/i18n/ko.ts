@@ -89,6 +89,9 @@ export const ko: Dictionary = {
   // ---- App.tsx chrome ----
   "app.deleteTaskTitle": "할 일을 삭제할까요?",
   "app.deleteTaskBody": "할 일과 하위 작업이 함께 삭제됩니다. 되돌릴 수 없습니다.",
+  "tasks.emptyTrashAction": "휴지통 비우기",
+  "tasks.emptyTrashTitle": "휴지통을 비울까요?",
+  "tasks.emptyTrashBody": "작업 {{n}}개가 휴지통에서도 계정에서도 사라집니다. 하위 작업은 최상위로 남습니다. 되돌릴 수 없습니다.",
   "tasks.deleteForeverTitle": "이 할 일을 영구히 삭제할까요?",
   "tasks.deleteForeverBody": "휴지통에서도 계정에서도 사라집니다. 하위 작업은 최상위로 남습니다. 되돌릴 수 없습니다.",
   "app.toastTaskArchived": "할 일을 보관했습니다.",

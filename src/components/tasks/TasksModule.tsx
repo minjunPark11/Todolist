@@ -39,6 +39,8 @@ import { TaskQuickAdd } from "./TaskQuickAdd";
 import { TaskDetailPane } from "./TaskDetailPane";
 import { TaskUndoStrip } from "./TaskUndoStrip";
 import { TaskDeleteForeverGate } from "./TaskDeleteForeverGate";
+import { TrashEmptyGate } from "./TrashEmptyGate";
+import { trashedTaskIds } from "../../domain/tasks/trash";
 import type { TaskDetailBundle } from "./taskDetailBundle";
 import { useTaskCommands } from "../../hooks/useTaskCommands";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
@@ -208,6 +210,8 @@ interface TasksModuleProps {
    * module hands over an id and does not have to re-check where the Task is.
    */
   onDeleteForever: (taskId: string) => void;
+  /** §3.3's whole Trash, gone. Answers with how many actually went. */
+  onEmptyTrash: () => number;
   /**
    * §15.9's Duplicate. Makes the copy and hands back the way to take it back.
    *
@@ -358,6 +362,19 @@ export function TasksModule(props: TasksModuleProps) {
    * and a page that keeps the open Task in memory has a different one to
    * offer (§15.19).
    */
+  /**
+   * Whether the "empty the trash" question is on screen (§3.3).
+   *
+   * The count comes from the domain rather than from the Scope's row count,
+   * and that is not pedantry: the Trash list hides child Tasks
+   * (`scopeQuery` drops anything with a `parentTaskId`), so a reader could be
+   * shown "3" and lose five. §7.1 put the counting inside `emptyTrash` for
+   * exactly this — the screen must not count differently from what is about to
+   * be deleted.
+   */
+  const [emptyingTrash, setEmptyingTrash] = useState(false);
+  const trashedCount = trashedTaskIds(tasks).length;
+
   const commands = useTaskCommands({
     tasks,
     focusBusy: props.focusBusy,
@@ -946,6 +963,29 @@ export function TasksModule(props: TasksModuleProps) {
               </button>
             </div>
           ) : null}
+
+          {/* §1.2: one icon button at the far end of the Trash's own header,
+              and nowhere else. Absent while the Trash is empty — a button
+              whose whole job is to remove things has nothing to say when
+              there is nothing to remove. */}
+          {scope.kind === "trash" && trashedCount > 0 ? (
+            <div className="tm-scope-actions">
+              <button
+                type="button"
+                className="tm-scope-danger"
+                aria-label={t("tasks.emptyTrashAction")}
+                title={t("tasks.emptyTrashAction")}
+                onClick={() => setEmptyingTrash(true)}
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <path d="M4.5 6.5h15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                  <path d="M9.5 6.5V4.8h5v1.7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+                  <path d="M6.5 6.5l1 12.2h9l1-12.2" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+                  <path d="M10.3 10v5.5M13.7 10v5.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+          ) : null}
         </header>
 
         {!missing && !props.loading ? (
@@ -1183,6 +1223,14 @@ export function TasksModule(props: TasksModuleProps) {
         task={commands.pendingDeleteForever}
         onCancel={commands.cancelDeleteForever}
         onConfirm={commands.confirmDeleteForever}
+      />
+      <TrashEmptyGate
+        count={emptyingTrash ? trashedCount : 0}
+        onCancel={() => setEmptyingTrash(false)}
+        onConfirm={() => {
+          setEmptyingTrash(false);
+          props.onEmptyTrash();
+        }}
       />
     </section>
   );

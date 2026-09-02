@@ -74,6 +74,7 @@ function renderModule(
     focusBusy?: boolean;
     onStartFocus?: (taskId: string) => void;
     onDeleteForever?: (taskId: string) => void;
+    onEmptyTrash?: () => number;
     onDuplicate?: (taskId: string) => (() => void) | null;
     activityFor?: (taskId: string) => TaskActivityEntry[];
     onSaveAsTemplate?: (taskId: string) => string;
@@ -108,6 +109,7 @@ function renderModule(
           onNavigate={() => {}}
           onStartFocus={extra.onStartFocus ?? (() => {})}
           onDeleteForever={extra.onDeleteForever ?? (() => {})}
+          onEmptyTrash={extra.onEmptyTrash ?? (() => 0)}
           onDuplicate={extra.onDuplicate ?? (() => null)}
           focusBusy={extra.focusBusy ?? false}
           onCreate={() => {}}
@@ -457,6 +459,51 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     expect(screen.queryByRole("menu")).toBeNull();
     // §15.49's second Escape is the Drawer's, so the first must leave it open.
     expect(screen.getByRole("complementary", { name: "Task detail" })).toBeTruthy();
+  });
+});
+
+// §3.3: the Trash's own header action, and the sentence that says the number.
+describe("emptying the Trash", () => {
+  it("is offered on the Trash's header and nowhere else", () => {
+    renderModule({ deletedAt: NOW }, { url: "/trash?task=t1" });
+    expect(screen.getByRole("button", { name: "Empty trash" })).toBeTruthy();
+
+    cleanup();
+    renderModule();
+    expect(screen.queryByRole("button", { name: "Empty trash" })).toBeNull();
+  });
+
+  // A button whose whole job is to remove things has nothing to say when
+  // there is nothing to remove.
+  it("is absent while the Trash is empty", () => {
+    renderModule({}, { url: "/trash" });
+    expect(screen.queryByRole("button", { name: "Empty trash" })).toBeNull();
+  });
+
+  it("asks with the number, and empties nothing until it is answered", async () => {
+    const user = userEvent.setup();
+    const onEmptyTrash = vi.fn(() => 1);
+    renderModule({ deletedAt: NOW }, { url: "/trash?task=t1", onEmptyTrash });
+
+    await user.click(screen.getByRole("button", { name: "Empty trash" }));
+    expect(onEmptyTrash).not.toHaveBeenCalled();
+
+    const dialog = screen.getByRole("dialog");
+    // The count is the fact "empty" hides — a reader who does not know whether
+    // it holds three or thirty is agreeing to something they cannot picture.
+    expect(dialog.textContent).toContain("1 tasks");
+    await user.click(within(dialog).getByRole("button", { name: "Empty trash" }));
+    expect(onEmptyTrash).toHaveBeenCalledTimes(1);
+  });
+
+  it("empties nothing when the question is answered no", async () => {
+    const user = userEvent.setup();
+    const onEmptyTrash = vi.fn(() => 0);
+    renderModule({ deletedAt: NOW }, { url: "/trash?task=t1", onEmptyTrash });
+
+    await user.click(screen.getByRole("button", { name: "Empty trash" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onEmptyTrash).not.toHaveBeenCalled();
   });
 });
 

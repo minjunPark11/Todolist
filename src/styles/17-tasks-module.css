@@ -1804,6 +1804,26 @@
   cursor: pointer;
 }
 
+/* The Trash's own header action (TRASH_PERMANENT_DELETE_DESIGN.md §1.2).
+   Icon only, and quiet until it is aimed at — the same treatment the Detail's
+   `영구 삭제` gets, for the same reason: it opens a question rather than
+   deleting, but it is still the door with no way back. 32px like its
+   neighbours, so the header keeps one rhythm. */
+.tm-scope-actions .tm-scope-danger {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  padding: 0;
+  color: var(--text-secondary, #6b6b70);
+}
+
+.tm-scope-actions .tm-scope-danger:hover,
+.tm-scope-actions .tm-scope-danger:focus-visible {
+  color: var(--danger, #ff3b30);
+  border-color: rgba(255, 59, 48, 0.25);
+  background: rgba(255, 59, 48, 0.08);
+}
+
 /* ============================================================================
    Responsive contract (§15)
 

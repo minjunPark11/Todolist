@@ -7,10 +7,15 @@
 // Tasks were never touched (§6.56). Restoring from one screen brings back one
 // Task; restoring from this one brings back everything that was inside.
 //
-// Permanent delete is the only place in the app that hard-deletes anything,
-// so it is the only place that asks twice. The confirmation says the number of
-// Tasks going with it, because that is the fact the user needs and the one the
-// word "delete" hides.
+// Permanent delete used to be the only place in the app that hard-deletes
+// anything. It is not any more — the Trash has two of its own since
+// TRASH_PERMANENT_DELETE_DESIGN.md §3.1: one Task, from its Detail's footer or
+// its row menu, and the whole Trash from that screen's header.
+//
+// What survived the change is the rule this comment was really about. A hard
+// delete asks twice, and the confirmation says the number going with it,
+// because that is the fact the user needs and the one the word "delete" hides.
+// All three say it.
 import { useState } from "react";
 import type { List, Task } from "../../types";
 import { archivedLists, deletedLists, taskCountInList } from "../../domain/spaces/lifecycle";

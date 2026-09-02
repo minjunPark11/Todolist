@@ -1370,6 +1370,7 @@ export default function App() {
           // what the focus statistics group by.
           onStartFocus={(taskId) => planner.startFocusSession(taskId, "today_page")}
           onDeleteForever={planner.permanentlyDeleteTask}
+          onEmptyTrash={planner.emptyTrash}
           onDuplicate={(taskId) => {
             const plan = planner.duplicateTask(taskId);
             return plan ? () => planner.discardDuplicate(plan) : null;

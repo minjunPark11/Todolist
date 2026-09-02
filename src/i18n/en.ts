@@ -90,6 +90,9 @@ export const en: Dictionary = {
   // ---- App.tsx chrome ----
   "app.deleteTaskTitle": "Delete task?",
   "app.deleteTaskBody": "This removes the task and its subtasks. This action cannot be undone.",
+  "tasks.emptyTrashAction": "Empty trash",
+  "tasks.emptyTrashTitle": "Empty the trash?",
+  "tasks.emptyTrashBody": "{{n}} tasks leave the trash and the account. Subtasks stay, at the top level. This cannot be undone.",
   "tasks.deleteForeverTitle": "Delete this task forever?",
   "tasks.deleteForeverBody": "It leaves the trash and the account. Subtasks stay, at the top level. This cannot be undone.",
   "app.toastTaskArchived": "Task archived.",
