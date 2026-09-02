@@ -399,6 +399,8 @@ export const ko: Dictionary = {
   "todayv.bucket.now": "지금",
   "todayv.bucket.next": "다음",
   "todayv.bucket.later": "나중",
+  "todayv.postponeOverdue": "오늘로 미루기",
+  "todayv.toastPostponed": "늦은 작업 {{n}}개를 오늘로 옮겼습니다",
   "todayv.planToday": "오늘 계획하기",
   "todayv.queueMenuAria": "오늘 할 일 메뉴 열기",
   "todayv.rowMenuAria": "할 일 메뉴 열기",

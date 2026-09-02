@@ -414,6 +414,27 @@
 .tdy-bucket-dot-later { background: var(--accent); }
 .tdy-bucket-dot-done { background: var(--text-tertiary); }
 
+/* One group's own action, at the far end of its own header (§3.5). Quiet
+   until it is wanted: it is a way out of a backlog, not something to do every
+   time the day is opened. */
+.tdy-bucket-action {
+  margin-left: auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.tdy-bucket-action:hover {
+  background: var(--accent-soft);
+}
+
 .tdy-bucket-count {
   min-width: 22px;
   height: 20px;

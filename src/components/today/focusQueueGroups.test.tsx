@@ -52,6 +52,7 @@ function renderQueue(entries: TodayEntry[], showCompleted = true, axis: TodayGro
         query=""
         today={TODAY}
         groupAxis={axis}
+        onPostponeOverdue={() => {}}
         openedTaskId=""
         showCompleted={showCompleted}
         onToggleDone={() => {}}
@@ -144,6 +145,35 @@ describe("the day's groups", () => {
   it("hides Completed when the reader has switched it off", () => {
     renderQueue([entry("due", { dueDate: TODAY }), entry("done", { dueDate: TODAY }, true)], false);
     expect(headings()).toEqual(["Today"]);
+  });
+});
+
+describe("the Overdue group's own action", () => {
+  // §3.5: it belongs to that group and to no other. The rest of the day is
+  // work whose date is already what the reader meant.
+  it("is drawn on Overdue only", () => {
+    renderQueue([
+      entry("late", { dueDate: "2026-08-25" }),
+      entry("due", { dueDate: TODAY }),
+      entry("done", { dueDate: TODAY }, true),
+    ]);
+
+    const heads = [...document.querySelectorAll(".tdy-bucket-head")];
+    const withAction = heads.filter((head) => head.querySelector(".tdy-bucket-action"));
+    expect(withAction).toHaveLength(1);
+    expect(withAction[0].querySelector("strong")?.textContent).toBe("Overdue");
+  });
+
+  it("is absent on a day with nothing late", () => {
+    renderQueue([entry("due", { dueDate: TODAY })]);
+    expect(document.querySelector(".tdy-bucket-action")).toBeNull();
+  });
+
+  // On the plan axis there is no Overdue group at all, so there is nothing to
+  // draw it on — the action follows the group, not the screen.
+  it("is absent on the plan axis", () => {
+    renderQueue([bucketed("late", "now", false, { dueDate: "2026-08-25" })], true, "plan");
+    expect(document.querySelector(".tdy-bucket-action")).toBeNull();
   });
 });
 

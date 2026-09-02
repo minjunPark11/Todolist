@@ -403,6 +403,8 @@ export const en: Dictionary = {
   "todayv.bucket.now": "Now",
   "todayv.bucket.next": "Next",
   "todayv.bucket.later": "Later",
+  "todayv.postponeOverdue": "Postpone",
+  "todayv.toastPostponed": "Moved {{n}} late tasks to today",
   "todayv.planToday": "Plan Today",
   "todayv.queueMenuAria": "Open today's to-do menu",
   "todayv.rowMenuAria": "Open task menu",

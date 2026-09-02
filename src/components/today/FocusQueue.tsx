@@ -63,6 +63,14 @@ interface FocusQueueProps {
   /** Which question the list is grouped by (§3.4). */
   groupAxis: TodayGroupAxis;
   /**
+   * Moves everything in the `기한 지남` group onto today (§3.5).
+   *
+   * A group's own action, drawn on that group's header and on no other —
+   * which is why it is a prop of the list rather than a row in the page's ⋯:
+   * the ⋯ acts on the whole day, and this acts on one group of it.
+   */
+  onPostponeOverdue: () => void;
+  /**
    * The Task the Detail has open, or "" (§1.4's observation, redesign Q6).
    *
    * The reference app paints that row and this list did not, which was
@@ -85,6 +93,7 @@ export function FocusQueue({
   onMoveBucket,
   today,
   groupAxis,
+  onPostponeOverdue,
   openedTaskId,
   onAddTask,
 }: FocusQueueProps) {
@@ -150,6 +159,15 @@ export function FocusQueue({
                 <span className={`tdy-bucket-dot tdy-bucket-dot-${group.id}`} aria-hidden="true" />
                 <strong>{t(todayGroupLabelKey(group.id))}</strong>
                 <span className="tdy-bucket-count">{group.rows.length}</span>
+                {/* Only here. Every other group is work whose date is already
+                    what the reader meant; this is the one that is a backlog,
+                    and the reference app puts the way out of it on this
+                    header (§1.3). */}
+                {group.id === "overdue" ? (
+                  <button type="button" className="tdy-bucket-action" onClick={onPostponeOverdue}>
+                    {t("todayv.postponeOverdue")}
+                  </button>
+                ) : null}
               </header>
               <div className="tdy-rows">
                 <AnimatePresence initial={false}>

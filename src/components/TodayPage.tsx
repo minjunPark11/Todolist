@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { List, PageId, Task, TaskDailyPlan, TaskDraft } from "../types";
 import { formatDate, getDayLabel, todayValue } from "../utils/date";
 import { MoreMenu, type MoreMenuItem } from "./kit";
+import { postponeAllToToday } from "../domain/tasks/postpone";
 import {
   DEFAULT_TODAY_AXIS,
   TODAY_GROUP_AXES,
@@ -286,6 +287,35 @@ export function TodayPage({
     });
   }
 
+  /**
+   * Everything late, onto today (§3.5).
+   *
+   * The count in the toast is the number of rows the domain came back with,
+   * not the number of rows on screen: a group can hold a task whose deadline
+   * this cannot move, and reporting the group's size would be reporting a
+   * number nobody can check against what changed.
+   *
+   * Undo restores each task's own two dates. One click changed N schedules, so
+   * §9.35's "restore the state" is not a nicety here — "a day back" is not the
+   * inverse of this for a task that was three weeks late.
+   */
+  function handlePostponeOverdue() {
+    const moved = postponeAllToToday(
+      entries.filter((entry) => !entry.completed).map((entry) => entry.task),
+      today,
+    );
+    if (moved.length === 0) return;
+
+    for (const row of moved) onUpdateTask(row.taskId, row.patch);
+    showToast({
+      message: t("todayv.toastPostponed", { n: moved.length }),
+      actionLabel: t("app.undo"),
+      onAction: () => {
+        for (const row of moved) onUpdateTask(row.taskId, row.undo);
+      },
+    });
+  }
+
   function handleMoveBucket(taskId: string, bucket: TodayBucketId) {
     onSetBuckets({ ...overrides, [taskId]: bucket }, today);
   }
@@ -506,6 +536,7 @@ export function TodayPage({
             onOpenTask={onOpenTask}
             today={today}
             groupAxis={groupAxis}
+            onPostponeOverdue={handlePostponeOverdue}
             openedTaskId={openedTaskId}
             onMoveBucket={handleMoveBucket}
             /* The empty day's call to action points at the row above it
