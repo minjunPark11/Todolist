@@ -1161,8 +1161,18 @@ export function TasksModule(props: TasksModuleProps) {
        * Only for `inline-drawer`. In the other three presentations the Detail
        * is an overlay, a sheet or the whole screen (§15.17) — it takes no
        * track, so there is nothing to reserve and an empty panel would be a
-       * surface floating over the page. */}
-      {!openedTask && taskDetailPresentationFor(mode) === "inline-drawer" ? (
+       * surface floating over the page.
+       *
+       * And NOT on the Board. What the reservation buys is that the rows do
+       * not move when a Task is opened, and a Board's cards cannot move: the
+       * columns are `flex: none` at a fixed width and the Board scrolls
+       * sideways rather than shrinking (§15). So the 480px buys nothing there
+       * and costs everything — measured at 1280: the shell was
+       * `248px 502px 480px`, which left the Board 438px of the 982 it could
+       * have had, with the second column clipped at the edge. Opening a Task
+       * narrows the Board's viewport instead, which is the same thing that
+       * happens when the window is resized and is what its scroll is for. */}
+      {!openedTask && state.view !== "board" && taskDetailPresentationFor(mode) === "inline-drawer" ? (
         <aside
           className="tm-drawer is-inline-drawer is-empty"
           aria-label={t("tasks.drawerLabel")}

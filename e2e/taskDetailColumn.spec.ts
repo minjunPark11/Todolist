@@ -71,6 +71,35 @@ test.describe("the Task Detail column", () => {
     expect({ before, after }).toEqual({ before, after: before });
   });
 
+  // The Board is where the reservation buys nothing and costs everything: its
+  // columns are a fixed width and it scrolls sideways, so nothing on it moves
+  // when a Task is opened — there is no jump to prevent, and the 480px is
+  // simply taken away from a surface that can always use more.
+  test("is not reserved on the Board, which uses the width instead", async ({ page }) => {
+    await openApp(page, { lists: [LIST] });
+    // Added from the list, where the quick-add field lives, then read on the
+    // Board — this test is about the Board's width, not its capture.
+    await page.goto(`/list/${LIST.id}`);
+    await addTask(page, "Measure the board width");
+    await page.goto(`/list/${LIST.id}?view=board`);
+
+    const board = page.locator(".tm-board");
+    await expect(board).toBeVisible();
+    await expect(page.locator(".tm-drawer.is-empty")).toHaveCount(0);
+
+    const wide = Math.round((await board.boundingBox())?.width ?? 0);
+
+    // And when a Task IS open, the Board gives the column up and keeps its
+    // scroll — which is the same thing that happens when the window narrows.
+    await page.getByRole("button", { name: "Open Measure the board width" }).click();
+    await expect(page).toHaveURL(/task=/);
+
+    const narrow = Math.round((await board.boundingBox())?.width ?? 0);
+    expect(narrow).toBeLessThan(wide);
+    // Measured at 1280 before this changed: 438 of a possible 918.
+    expect(wide - narrow).toBeGreaterThan(400);
+  });
+
   test("Escape closes the Detail and the list still does not move", async ({ page }) => {
     await openApp(page, { lists: [LIST] });
     await page.goto(`/list/${LIST.id}`);
