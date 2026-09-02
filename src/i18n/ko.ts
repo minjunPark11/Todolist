@@ -737,6 +737,8 @@ export const ko: Dictionary = {
   "tasks.hideCompleted": "완료 숨기기",
   "tasks.showDetails": "상세 보기",
   "tasks.showDateBy": "날짜 표기",
+  "tasks.dateByMenu.taskTime": "날짜를 그 날로 보기",
+  "tasks.dateByMenu.countdown": "날짜를 남은 기간으로 보기",
   "tasks.dateBy.taskTime": "작업 시간",
   "tasks.dateBy.countdown": "남은 기간",
   "view.daysLeft": "{{days}}일 남음",

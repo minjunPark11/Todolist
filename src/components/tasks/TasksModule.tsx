@@ -42,6 +42,7 @@ import { TaskDeleteForeverGate } from "./TaskDeleteForeverGate";
 import { TrashEmptyGate } from "./TrashEmptyGate";
 import { MoreMenu, type MoreMenuItem } from "../kit";
 import {
+  SCOPE_DATE_BY,
   scopeHasViewOptions,
   scopeOptionKey,
   viewOptionsFor,
@@ -360,6 +361,7 @@ export function TasksModule(props: TasksModuleProps) {
   }
 
   /** A menu row that is a state says so with the same mark everywhere. */
+  const hasBoard = policy.allowedViews.includes("board");
   const prefix = (on: boolean) => (on ? String.fromCharCode(10003) + " " : "");
   const scopeMenuItems: MoreMenuItem[] = [
     ...(policy.allowedViews.length > 1
@@ -386,7 +388,22 @@ export function TasksModule(props: TasksModuleProps) {
       onClick: () => patchViewOptions({ showDetails: !viewOptions.showDetails }),
     },
     { separator: true },
-    { label: t("tasks.viewOptions"), onClick: () => setViewOptionsOpen(true) },
+    /**
+     * The dialog, or the one setting that would have been alone in it (Q4).
+     *
+     * Two of its three rows act on columns, so on a Scope with no Board the
+     * dialog would open a scrim and a modal to show a single line. The line
+     * comes to the menu instead — as two rows with a mark, which is the shape
+     * this app already uses for a small closed choice (the views above, and
+     * Today’s axis picker). Their labels say what they are FOR, because a
+     * menu has no heading to say it for them.
+     */
+    ...(hasBoard
+      ? [{ label: t("tasks.viewOptions"), onClick: () => setViewOptionsOpen(true) } as MoreMenuItem]
+      : SCOPE_DATE_BY.map((value) => ({
+          label: prefix(viewOptions.dateBy === value) + t("tasks.dateByMenu." + value),
+          onClick: () => patchViewOptions({ dateBy: value }),
+        }))),
   ];
 
   function setView(view: TaskViewKind) {
@@ -1314,7 +1331,7 @@ export function TasksModule(props: TasksModuleProps) {
       {viewOptionsOpen ? (
         <ScopeViewOptionsDialog
           options={viewOptions}
-          hasBoard={policy.allowedViews.includes("board")}
+          hasBoard={hasBoard}
           onChange={patchViewOptions}
           onClose={() => setViewOptionsOpen(false)}
         />

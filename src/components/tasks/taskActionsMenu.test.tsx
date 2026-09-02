@@ -524,7 +524,26 @@ describe("the Scope's menu", () => {
 
     await openScopeMenu(user);
     // `Hide Completed` is absent too: this Scope has no Board to hide any in.
-    expect(rows()).toEqual(["Show Details", "View Options"]);
+    // And there is no `View Options` — Q4: the dialog would have held one row,
+    // so that row is here instead.
+    expect(rows()).toEqual([
+      "Show Details",
+      "✓ Show date as the day",
+      "Show date as a countdown",
+    ]);
+  });
+
+  // Q4. A scrim and a modal to show a single line is a door for a doorway.
+  it("opens no dialog where the dialog would hold one row", async () => {
+    const user = userEvent.setup();
+    const onSetScopeViewOptions = vi.fn();
+    renderModule({}, { url: "/today", onSetScopeViewOptions });
+
+    await openScopeMenu(user);
+    await user.click(screen.getByRole("menuitem", { name: "Show date as a countdown" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onSetScopeViewOptions.mock.calls[0][0].today.dateBy).toBe("countdown");
   });
 
   // §3.1: three lists of work that is over. "완료 숨기기" on the Completed
@@ -614,20 +633,16 @@ describe("View Options", () => {
   // §3.6 and §15.5: the two rows that act on columns are drawn only where
   // there are columns. A switch that flips and changes nothing is worse than
   // one that is not there.
-  it("offers the column settings on a Scope that has a Board, and not on one that does not", async () => {
+  it("offers the column settings on a Scope that has a Board", async () => {
     const user = userEvent.setup();
     renderModule({}, { url: "/list/l1?view=board" });
-    let dialog = await openDialog(user, "/list/l1?view=board");
+    const dialog = await openDialog(user, "/list/l1?view=board");
     expect(within(dialog).getByRole("combobox", { name: "Kanban Size" })).toBeTruthy();
     expect(within(dialog).getByRole("switch", { name: "Show Input Box" })).toBeTruthy();
 
-    cleanup();
-    renderModule({}, { url: "/today" });
-    dialog = await openDialog(user, "/today");
-    expect(within(dialog).queryByRole("combobox", { name: "Kanban Size" })).toBeNull();
-    expect(within(dialog).queryByRole("switch", { name: "Show Input Box" })).toBeNull();
-    // The one that means something everywhere stays.
-    expect(within(dialog).getByRole("combobox", { name: "Show Date by" })).toBeTruthy();
+    // The board-less half of this claim is one test up: those Scopes have no
+    // dialog at all since Q4, because the only row left in it would have been
+    // `Show Date by`.
   });
 
   // The size is the column's width, so it is set once on the board and read by

@@ -745,6 +745,8 @@ export const en: Dictionary = {
   "tasks.hideCompleted": "Hide Completed",
   "tasks.showDetails": "Show Details",
   "tasks.showDateBy": "Show Date by",
+  "tasks.dateByMenu.taskTime": "Show date as the day",
+  "tasks.dateByMenu.countdown": "Show date as a countdown",
   "tasks.dateBy.taskTime": "Task Time",
   "tasks.dateBy.countdown": "Countdown",
   "view.daysLeft": "{{days}}d left",
