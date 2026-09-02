@@ -53,6 +53,16 @@ interface TaskBoardProps {
    */
   onCreate?: (columnId: string, title: string, date: string) => void;
   /**
+   * Whether each column carries a way in (SCOPE_VIEW_OPTIONS_DESIGN.md §3.4).
+   *
+   * On: an `Add Task` row at the top of the column, which becomes the form.
+   * Off: no way in at all — the header `+` that used to be the other answer is
+   * gone, because two entry points to one column is what this toggle exists to
+   * settle. The reader who turned it off asked for the column to be a list of
+   * what is there.
+   */
+  showInputBox?: boolean;
+  /**
    * The column's finished work, newest first, already grouped by the domain.
    *
    * Separate from `tasksIn` rather than mixed into it: §12.4 keeps finished
@@ -116,6 +126,7 @@ export function TaskBoard({
   canReorder,
   onContextMenu,
   onCreate,
+  showInputBox = true,
   finishedIn,
   onRename,
   unmatched = [],
@@ -144,7 +155,14 @@ export function TaskBoard({
   // Which column is being typed into, and what has been typed. One at a time:
   // two open inputs would be two carets on one screen with nothing saying
   // which one Enter belongs to.
-  const [adding, setAdding] = useState("");
+  //
+  // `null` is "nothing open", not `""`. A List with no sections has ONE column
+  // whose id IS `""` (the no-section bucket), so an empty-string sentinel read
+  // as "that column is being typed into" — its form stood open from the first
+  // paint and its `+` reported itself expanded forever. Found when the `+`
+  // became a row (SCOPE_VIEW_OPTIONS_DESIGN.md §3.4): the row is drawn while
+  // nothing is open, so on that List it was never drawn at all.
+  const [adding, setAdding] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [draftDate, setDraftDate] = useState("");
   // Which column's name is being edited, and the words so far. The words are
@@ -154,7 +172,7 @@ export function TaskBoard({
   const [nameDraft, setNameDraft] = useState("");
 
   function closeAdd() {
-    setAdding("");
+    setAdding(null);
     setDraft("");
     setDraftDate("");
   }
@@ -262,22 +280,6 @@ export function TaskBoard({
                 <h3>{label(column)}</h3>
               )}
               {cards.length > 0 ? <span className="tm-count">{cards.length}</span> : null}
-              {/* Adding from the column's own header rather than from a row
-                  under the cards. The column is a statement about the work —
-                  "this is scheduled", "this is someday" — and the fastest way
-                  to make one is to type into the column that already says it
-                  (MATRIX §19). */}
-              {onCreate ? (
-                <button
-                  type="button"
-                  className="tm-column-add"
-                  aria-label={t("tasks.addToColumn", { column: label(column) })}
-                  aria-expanded={adding === column.id}
-                  onClick={() => (adding === column.id ? closeAdd() : (closeAdd(), setAdding(column.id)))}
-                >
-                  +
-                </button>
-              ) : null}
               {/* Anchored to the BUTTON rather than to the pointer, so the menu
                   opens in the same place however it was triggered — including
                   from the keyboard, where there is no pointer to anchor to. */}
@@ -308,7 +310,26 @@ export function TaskBoard({
               </p>
             ) : null}
 
-            {onCreate && adding === column.id ? (
+            {/* The way in, at the top of the column (§3.4). It was a `+` in the
+                header; it is a row now, which is where the reference app puts
+                it and also where the thing being typed belongs — the column is
+                a statement about the work, and typing into the column that
+                already says it is the fastest way to make one (MATRIX §19).
+                The card still appears BELOW, so what was just typed is not
+                what moves (§19.2). */}
+            {onCreate && showInputBox && adding !== column.id ? (
+              <button
+                type="button"
+                className="tm-column-add-row"
+                aria-label={t("tasks.addToColumn", { column: label(column) })}
+                onClick={() => (closeAdd(), setAdding(column.id))}
+              >
+                <span aria-hidden="true">+</span>
+                {t("tasks.addPlaceholder")}
+              </button>
+            ) : null}
+
+            {onCreate && showInputBox && adding === column.id ? (
               <form
                 className="tm-column-add-form"
                 onSubmit={(event) => {

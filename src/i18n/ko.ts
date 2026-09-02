@@ -730,6 +730,8 @@ export const ko: Dictionary = {
   "tasks.managerDeleteForever": "영구 삭제",
   "tasks.managerConfirm": "작업 {{count}}개도 함께 영구 삭제됩니다.",
   "tasks.scopeMenu": "보기와 옵션",
+  "tasks.viewOptions": "보기 옵션",
+  "tasks.showInputBox": "입력칸 보이기",
   "tasks.viewLabel": "보기 전환",
   "tasks.view.list": "목록",
   "tasks.view.board": "보드",

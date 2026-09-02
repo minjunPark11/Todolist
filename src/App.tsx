@@ -1371,6 +1371,8 @@ export default function App() {
           onStartFocus={(taskId) => planner.startFocusSession(taskId, "today_page")}
           onDeleteForever={planner.permanentlyDeleteTask}
           onEmptyTrash={planner.emptyTrash}
+          scopeViewOptions={appSettings.scopeViewOptions}
+          onSetScopeViewOptions={(scopeViewOptions) => planner.updateAppSettings({ scopeViewOptions })}
           onDuplicate={(taskId) => {
             const plan = planner.duplicateTask(taskId);
             return plan ? () => planner.discardDuplicate(plan) : null;

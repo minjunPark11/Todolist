@@ -3373,6 +3373,98 @@
 
 /* Beside the last column, at the top, where a new column would appear — and
    plain text rather than a card, because it is not one of them yet. */
+/* The column's way in, at its top (SCOPE_VIEW_OPTIONS_DESIGN.md §3.4). A row
+   the width of the column rather than a `+` in its header — it reads as the
+   first thing in the list, which is what it is about to become. */
+.tm-column-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-tertiary, #8e8e93);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tm-column-add-row:hover {
+  border-color: var(--border-subtle, rgba(25, 25, 25, 0.08));
+  color: var(--text-secondary, #6b6b70);
+}
+
+/* `View Options` (§1.2). The same shell `.tm-manager` uses — this app's shape
+   for a dialog that is not a question — at the width the three rows want. */
+.tm-view-options-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(420px, 92vw);
+  padding: 16px 18px 20px;
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+/* The rows: the name on the left, the value on the right, each on its own
+   surface. */
+.tm-view-options {
+  display: grid;
+  gap: 10px;
+}
+
+.tm-view-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: var(--density-radius, 10px);
+  background: var(--surface-2, rgba(25, 25, 25, 0.04));
+}
+
+.tm-view-option-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* A switch, because these are settings that stay set — a checkbox reads as
+   something a form will later submit. */
+.tm-switch {
+  flex: none;
+  width: 44px;
+  height: 26px;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--border-strong, rgba(25, 25, 25, 0.22));
+  cursor: pointer;
+  transition: background var(--motion-fast);
+}
+
+.tm-switch.is-on {
+  background: var(--accent, #0a84ff);
+}
+
+.tm-switch-knob {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform var(--motion-fast);
+}
+
+.tm-switch.is-on .tm-switch-knob {
+  transform: translateX(18px);
+}
+
 .tm-board-add-column {
   flex: 0 0 auto;
   align-self: flex-start;

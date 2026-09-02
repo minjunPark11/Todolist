@@ -45,14 +45,17 @@ function openAdd(column: string) {
 describe("the Board column's +", () => {
   it("every column offers one, and opening one closes the last", () => {
     setup();
-    const unsorted = screen.getByRole("button", { name: "Add a task to Unsorted" });
+    // The way in is a row at the top of the column now, and it becomes the
+    // form rather than sitting above it (SCOPE_VIEW_OPTIONS_DESIGN.md §3.4) —
+    // so "is it open" is read as which control is on screen, not as an
+    // `aria-expanded` on a button that stays.
     openAdd("Unsorted");
-    expect(unsorted.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.queryByRole("button", { name: "Add a task to Unsorted" })).toBeNull();
 
     openAdd("Someday");
     // Two carets on one screen, with nothing saying which one Enter belongs
     // to, is the state this avoids.
-    expect(unsorted.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("button", { name: "Add a task to Unsorted" })).toBeTruthy();
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
   });
 

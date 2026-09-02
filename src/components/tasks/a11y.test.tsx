@@ -155,6 +155,7 @@ function renderModule(url: string) {
           onStartFocus={() => {}}
           onDeleteForever={() => {}}
           onEmptyTrash={() => 0}
+          onSetScopeViewOptions={() => {}}
           onDuplicate={() => null}
           focusBusy={false}
         />

@@ -16,6 +16,7 @@ import { I18nProvider } from "../../i18n";
 import { FloatingLayerProvider } from "../floating";
 import { TasksModule } from "./TasksModule";
 import type { TaskActivityEntry } from "../../domain/tasks/activity";
+import { DEFAULT_SCOPE_VIEW_OPTIONS, type ScopeViewOptions } from "../../domain/view/scopeViewOptions";
 
 const TODAY = "2026-08-18";
 const NOW = `${TODAY}T09:00:00.000Z`;
@@ -76,6 +77,8 @@ function renderModule(
     onDeleteForever?: (taskId: string) => void;
     onNavigate?: (url: string, mode?: "push" | "replace") => void;
     onEmptyTrash?: () => number;
+    scopeViewOptions?: Record<string, ScopeViewOptions>;
+    onSetScopeViewOptions?: (next: Record<string, ScopeViewOptions>) => void;
     onDuplicate?: (taskId: string) => (() => void) | null;
     activityFor?: (taskId: string) => TaskActivityEntry[];
     onSaveAsTemplate?: (taskId: string) => string;
@@ -111,6 +114,8 @@ function renderModule(
           onStartFocus={extra.onStartFocus ?? (() => {})}
           onDeleteForever={extra.onDeleteForever ?? (() => {})}
           onEmptyTrash={extra.onEmptyTrash ?? (() => 0)}
+          scopeViewOptions={extra.scopeViewOptions}
+          onSetScopeViewOptions={extra.onSetScopeViewOptions ?? (() => {})}
           onDuplicate={extra.onDuplicate ?? (() => null)}
           focusBusy={extra.focusBusy ?? false}
           onCreate={() => {}}
@@ -481,7 +486,7 @@ describe("the Scope's menu", () => {
     expect(document.querySelector(".tm-header .tm-views")).toBeNull();
 
     await openScopeMenu(user);
-    expect(rows()).toEqual(["List", "✓ Board", "Timeline"]);
+    expect(rows()).toEqual(["List", "✓ Board", "Timeline", "View Options"]);
   });
 
   it("switches the view when one is chosen", async () => {
@@ -502,11 +507,15 @@ describe("the Scope's menu", () => {
   });
 
   // §16.26 Gate 3, one level up from where it used to live: six of the eight
-  // Scopes have one view, and a menu whose only section is a single-row radio
-  // is a menu that should not open.
-  it("does not appear where there is nothing to choose", () => {
+  // Scopes have one view, and a single-row radio is not a choice. The MENU
+  // still opens — §3.1 gives it to every Scope that is not finished work, and
+  // since phase 3 it carries `View Options` — but the view section is absent.
+  it("offers no views where there is nothing to choose", async () => {
+    const user = userEvent.setup();
     renderModule({}, { url: "/today" });
-    expect(screen.queryByRole("button", { name: "View and options" })).toBeNull();
+
+    await openScopeMenu(user);
+    expect(rows()).toEqual(["View Options"]);
   });
 
   // §3.1: three lists of work that is over. "완료 숨기기" on the Completed
@@ -514,6 +523,68 @@ describe("the Scope's menu", () => {
   it("does not appear on the Scopes that are finished work", () => {
     renderModule({ deletedAt: NOW }, { url: "/trash" });
     expect(screen.queryByRole("button", { name: "View and options" })).toBeNull();
+  });
+});
+
+// SCOPE_VIEW_OPTIONS_DESIGN.md §1.2 / §3.4: the dialog, and the one setting it
+// carries so far.
+describe("View Options", () => {
+  const openDialog = async (user: ReturnType<typeof userEvent.setup>, url: string) => {
+    await user.click(screen.getByRole("button", { name: "View and options" }));
+    await user.click(screen.getByRole("menuitem", { name: "View Options" }));
+    return screen.getByRole("dialog");
+  };
+
+  it("opens from the Scope's menu and shows the setting", async () => {
+    const user = userEvent.setup();
+    renderModule({}, { url: "/list/l1?view=board" });
+
+    const dialog = await openDialog(user, "/list/l1?view=board");
+    expect(within(dialog).getByRole("switch", { name: "Show Input Box" })).toBeTruthy();
+  });
+
+  // The value is per Scope (§3.3), so what the dialog writes is a record under
+  // this Scope's key and nothing else in the map is disturbed.
+  it("writes under this Scope's key, leaving the others alone", async () => {
+    const user = userEvent.setup();
+    const onSetScopeViewOptions = vi.fn();
+    renderModule(
+      {},
+      {
+        url: "/list/l1?view=board",
+        scopeViewOptions: { today: { ...DEFAULT_SCOPE_VIEW_OPTIONS, showDetails: true } },
+        onSetScopeViewOptions,
+      },
+    );
+
+    const dialog = await openDialog(user, "/list/l1?view=board");
+    await user.click(within(dialog).getByRole("switch", { name: "Show Input Box" }));
+
+    const written = onSetScopeViewOptions.mock.calls[0][0];
+    expect(written["list:l1"].showInputBox).toBe(false);
+    // The other Scope's record is carried through untouched — a settings map
+    // written back without its neighbours is how one screen erases another's.
+    expect(written.today.showDetails).toBe(true);
+  });
+
+  // §3.4: two entry points to one column is what the toggle exists to settle.
+  it("takes the column's way in away when it is off", async () => {
+    const user = userEvent.setup();
+    renderModule({}, { url: "/list/l1?view=board" });
+    expect(screen.getAllByRole("button", { name: /^Add a task to/ }).length).toBeGreaterThan(0);
+
+    cleanup();
+    renderModule(
+      {},
+      {
+        url: "/list/l1?view=board",
+        scopeViewOptions: { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, showInputBox: false } },
+      },
+    );
+    expect(screen.queryByRole("button", { name: /^Add a task to/ })).toBeNull();
+    // And nothing took its place in the header — the `+` that used to be the
+    // other answer is gone for good.
+    expect(document.querySelector(".tm-column-add")).toBeNull();
   });
 });
 

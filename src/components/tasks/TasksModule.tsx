@@ -41,7 +41,13 @@ import { TaskUndoStrip } from "./TaskUndoStrip";
 import { TaskDeleteForeverGate } from "./TaskDeleteForeverGate";
 import { TrashEmptyGate } from "./TrashEmptyGate";
 import { MoreMenu, type MoreMenuItem } from "../kit";
-import { scopeHasViewOptions } from "../../domain/view/scopeViewOptions";
+import {
+  scopeHasViewOptions,
+  scopeOptionKey,
+  viewOptionsFor,
+  type ScopeViewOptions,
+} from "../../domain/view/scopeViewOptions";
+import { ScopeViewOptionsDialog } from "./ScopeViewOptionsDialog";
 import { trashedTaskIds } from "../../domain/tasks/trash";
 import type { TaskDetailBundle } from "./taskDetailBundle";
 import { useTaskCommands } from "../../hooks/useTaskCommands";
@@ -215,6 +221,15 @@ interface TasksModuleProps {
   /** §3.3's whole Trash, gone. Answers with how many actually went. */
   onEmptyTrash: () => number;
   /**
+   * What each Scope shows, and how to change one (§3.3).
+   *
+   * The whole map rather than this Scope's slice: the module knows which Scope
+   * it is drawing and `viewOptionsFor` is the one place that reads a key, so
+   * handing a slice would mean the caller worked the key out too.
+   */
+  scopeViewOptions?: Record<string, ScopeViewOptions>;
+  onSetScopeViewOptions: (next: Record<string, ScopeViewOptions>) => void;
+  /**
    * §15.9's Duplicate. Makes the copy and hands back the way to take it back.
    *
    * A callback rather than the new id, because undoing a Duplicate is not a
@@ -332,13 +347,16 @@ export function TasksModule(props: TasksModuleProps) {
    * are rows, the Today axis picker chose the same shape, and a new menu
    * primitive is not what this phase is for (§5 Q6).
    */
-  const scopeMenuItems: MoreMenuItem[] =
-    policy.allowedViews.length > 1
+  const scopeMenuItems: MoreMenuItem[] = [
+    ...(policy.allowedViews.length > 1
       ? policy.allowedViews.map((view) => ({
           label: `${view === state.view ? "✓ " : ""}${t(`tasks.view.${view}`)}`,
           onClick: () => setView(view),
         }))
-      : [];
+      : []),
+    ...(policy.allowedViews.length > 1 ? [{ separator: true } as MoreMenuItem] : []),
+    { label: t("tasks.viewOptions"), onClick: () => setViewOptionsOpen(true) },
+  ];
 
   function setView(view: TaskViewKind) {
     onNavigate(taskUrlFor({ ...state, view }), "replace");
@@ -396,6 +414,19 @@ export function TasksModule(props: TasksModuleProps) {
    * be deleted.
    */
   const [emptyingTrash, setEmptyingTrash] = useState(false);
+  const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
+
+  /** This Scope's five, or the defaults where nobody has set any (§3.3). */
+  const viewOptions = viewOptionsFor(props.scopeViewOptions, scope);
+
+  function patchViewOptions(patch: Partial<ScopeViewOptions>) {
+    const key = scopeOptionKey(scope);
+    if (!key) return;
+    props.onSetScopeViewOptions({
+      ...(props.scopeViewOptions ?? {}),
+      [key]: { ...viewOptions, ...patch },
+    });
+  }
   const trashedCount = trashedTaskIds(tasks).length;
 
   const commands = useTaskCommands({
@@ -1072,6 +1103,7 @@ export function TasksModule(props: TasksModuleProps) {
             tasksIn={tasksIn}
             columnOf={columnOf}
             openTaskId={state.taskId}
+            showInputBox={viewOptions.showInputBox}
             onOpen={openTask}
             onDrop={dropOnBoard}
             onCreate={createInColumn}
@@ -1252,6 +1284,13 @@ export function TasksModule(props: TasksModuleProps) {
         onCancel={commands.cancelDeleteForever}
         onConfirm={commands.confirmDeleteForever}
       />
+      {viewOptionsOpen ? (
+        <ScopeViewOptionsDialog
+          options={viewOptions}
+          onChange={patchViewOptions}
+          onClose={() => setViewOptionsOpen(false)}
+        />
+      ) : null}
       <TrashEmptyGate
         count={emptyingTrash ? trashedCount : 0}
         onCancel={() => setEmptyingTrash(false)}
