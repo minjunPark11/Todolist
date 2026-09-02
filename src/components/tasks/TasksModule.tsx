@@ -395,9 +395,23 @@ export function TasksModule(props: TasksModuleProps) {
     });
   }
 
+  // §5.28: an id that names nothing is a broken link, not an empty Scope. The
+  // difference matters — "this List has no tasks" and "this List is gone" ask
+  // the reader to do different things.
+  const missing = namedRecordMissing(scope, lists, folders, sidebarFolders, tags, savedFilters);
   /** A menu row that is a state says so with the same mark everywhere. */
   const hasBoard = policy.allowedViews.includes("board");
   const prefix = (on: boolean) => (on ? String.fromCharCode(10003) + " " : "");
+  /** The two a List can be told, or nothing for every other Scope. */
+  function listActionsFor(ref: TaskScopeRef): MoreMenuItem[] | null {
+    if (ref.kind !== "list" || missing) return null;
+    if (isInboxList(lists.find((list) => list.id === ref.id) ?? { kind: "regular" })) return null;
+    return [
+      { separator: true },
+      { label: t("tasks.archiveList"), onClick: () => props.lifecycle.onArchiveList(ref.id) },
+      { label: t("tasks.deleteList"), danger: true, onClick: () => props.lifecycle.onTrashList(ref.id) },
+    ];
+  }
   const scopeMenuItems: MoreMenuItem[] = [
     // Only on the Board: the list view already leaves finished work out of
     // its query (`isActive`), so there is nothing on that screen for this to
@@ -432,6 +446,20 @@ export function TasksModule(props: TasksModuleProps) {
           label: prefix(viewOptions.dateBy === value) + t("tasks.dateByMenu." + value),
           onClick: () => patchViewOptions({ dateBy: value }),
         }))),
+    /**
+     * §13.21/§13.22, at the bottom (Q7).
+     *
+     * They stood in the header as two words and 152px, in front of the four
+     * icons. The reference app's third group is this — what to do with the
+     * LIST rather than with what it shows — and a menu is where an action
+     * taken once in a list's life belongs.
+     *
+     * The Inbox is offered neither: it is the floor a Task falls back to, so
+     * putting it away would leave the account with nowhere to capture (§6.5).
+     * Both stay soft — the Tasks are not touched and Manage is where they
+     * come back — which is why neither asks twice.
+     */
+    ...(listActionsFor(scope) ?? []),
   ];
 
   function setView(view: TaskViewKind) {
@@ -596,10 +624,6 @@ export function TasksModule(props: TasksModuleProps) {
     }
   }
 
-  // §5.28: an id that names nothing is a broken link, not an empty Scope. The
-  // difference matters — "this List has no tasks" and "this List is gone" ask
-  // the reader to do different things.
-  const missing = namedRecordMissing(scope, lists, folders, sidebarFolders, tags, savedFilters);
   const title = missing ? t("tasks.missingTitle") : titleFor(scope, lists, folders, sidebarFolders, tags, savedFilters, t);
   const rows = missing ? [] : queryScopeTasks(scope, ctx);
   const count = missing ? 0 : queryScopeCount(scope, ctx);
@@ -1049,23 +1073,6 @@ export function TasksModule(props: TasksModuleProps) {
             <span className="tm-title-count" aria-label={t("tasks.countLabel", { count })}>
               {count}
             </span>
-          ) : null}
-
-
-          {/* §13.21/§13.22 from the List's own screen, which is where the
-              plan puts them. The Inbox is not offered either one: it is the
-              floor a Task falls back to, so putting it away would leave the
-              account with nowhere to capture (§6.5). Both are soft — the
-              Tasks are not touched, and Manage is where they come back. */}
-          {scope.kind === "list" && !missing && !isInboxList(lists.find((list) => list.id === scope.id) ?? { kind: "regular" }) ? (
-            <div className="tm-scope-actions">
-              <button type="button" onClick={() => props.lifecycle.onArchiveList(scope.id)}>
-                {t("tasks.archiveList")}
-              </button>
-              <button type="button" onClick={() => props.lifecycle.onTrashList(scope.id)}>
-                {t("tasks.deleteList")}
-              </button>
-            </div>
           ) : null}
 
           {/* §1.2: one icon button at the far end of the Trash's own header,

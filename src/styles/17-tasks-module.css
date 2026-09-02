@@ -1812,15 +1812,15 @@
   gap: 6px;
 }
 
+/* Only the Trash reaches this now. The List had two word buttons here until
+   SCOPE_VIEW_OPTIONS_DESIGN.md §13.5 (Q7) sent them to the ⋯; what is left is
+   one icon, so the text sizing that used to be here has gone with them. */
 .tm-scope-actions button {
-  padding: 0 8px;
   min-height: 32px;
   border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
   border-radius: 8px;
   background: transparent;
   color: var(--text-muted, #8e8e93);
-  font: inherit;
-  font-size: 12px;
   cursor: pointer;
 }
 
@@ -2080,10 +2080,17 @@
     min-height: 44px;
   }
 
-  .tm-scope-actions button,
   .tm-manager .tm-task button {
     min-height: 44px;
     padding-inline: 12px;
+  }
+
+  /* The Trash icon grows to the touch target as a SQUARE. `padding-inline`
+     was right for the word buttons that used to share this rule and wrong
+     for an icon, which would have come out 44 tall and 56 wide. */
+  .tm-scope-actions .tm-scope-danger {
+    width: 44px;
+    min-height: 44px;
   }
 }
 

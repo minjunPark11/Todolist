@@ -69,6 +69,17 @@ const workList: List = {
   updatedAt: NOW,
 };
 
+const inboxList: List = {
+  id: "l-inbox",
+  projectId: "p1",
+  kind: "inbox",
+  name: "Inbox",
+  order: 1,
+  isDefault: false,
+  createdAt: NOW,
+  updatedAt: NOW,
+};
+
 function renderModule(
   overrides: Partial<Task> = {},
   extra: {
@@ -83,6 +94,10 @@ function renderModule(
     activityFor?: (taskId: string) => TaskActivityEntry[];
     onSaveAsTemplate?: (taskId: string) => string;
     onDeleteTemplate?: (templateId: string) => void;
+    /** Q7 moved the List actions into the ⋯, so a test has to see them fire. */
+    onArchiveList?: (listId: string) => void;
+    onTrashList?: (listId: string) => void;
+    lists?: List[];
     /**
      * The Scope to render in.
      *
@@ -100,7 +115,7 @@ function renderModule(
       <FloatingLayerProvider>
         <TasksModule
           tasks={[task(overrides)]}
-          lists={[workList]}
+          lists={extra.lists ?? [workList]}
           folders={[]}
           sidebarFolders={[]}
           savedFilters={[]}
@@ -143,8 +158,8 @@ function renderModule(
             remindersFor: () => [],
           }}
           lifecycle={{
-            onArchiveList: () => {},
-            onTrashList: () => {},
+            onArchiveList: extra.onArchiveList ?? (() => {}),
+            onTrashList: extra.onTrashList ?? (() => {}),
             onRestoreList: () => {},
             onPermanentlyDeleteList: () => {},
           }}
@@ -542,6 +557,52 @@ describe("the Scope's menu", () => {
     expect(onSetScopeViewOptions.mock.calls[0][0].today.dateBy).toBe("countdown");
   });
 
+  // §13.5 (Q7). The two used to be words in the header, 152px in front of
+  // the view icons, for something a List is told once in its life.
+  it("offers a List what to do with itself, at the bottom", async () => {
+    const user = userEvent.setup();
+    const onArchiveList = vi.fn();
+    const onTrashList = vi.fn();
+    renderModule({}, { url: "/list/l1", onArchiveList, onTrashList });
+
+    await openScopeMenu(user);
+    // Last, under the separator: the rows above act on what the screen
+    // SHOWS, and these two act on the List.
+    expect(rows().slice(-2)).toEqual(["Archive list", "Delete list"]);
+
+    await user.click(screen.getByRole("menuitem", { name: "Delete list" }));
+    // Straight through, no second question — the List is recoverable from
+    // Manage and its Tasks are not touched (§13.5).
+    expect(onTrashList).toHaveBeenCalledWith("l1");
+    expect(onArchiveList).not.toHaveBeenCalled();
+  });
+
+  // The Inbox is the floor a Task falls back to (§6.5). Putting it away
+  // would leave the account with nowhere to capture.
+  it("offers the Inbox neither", async () => {
+    const user = userEvent.setup();
+    renderModule({}, { url: "/list/l-inbox", lists: [workList, inboxList] });
+
+    await openScopeMenu(user);
+    const labels = rows();
+    expect(labels).not.toContain("Archive list");
+    expect(labels).not.toContain("Delete list");
+  });
+
+  // Every other Scope: there is no List to archive on `/today`.
+  it("offers them to nothing that is not a List", async () => {
+    const user = userEvent.setup();
+    renderModule({}, { url: "/today" });
+
+    await openScopeMenu(user);
+    expect(rows()).not.toContain("Delete list");
+  });
+
+  // They left a gap where they stood. Nothing else was in it.
+  it("leaves the header to the title, the count and the icons", () => {
+    renderModule({}, { url: "/list/l1" });
+    expect(document.querySelector(".tm-header .tm-scope-actions")).toBeNull();
+  });
   // §3.1: three lists of work that is over. "완료 숨기기" on the Completed
   // Scope is a button that empties the screen.
   it("does not appear on the Scopes that are finished work", () => {
