@@ -5,6 +5,7 @@ import type { FocusDefaultLength } from "./domain/focus/sessionLength";
 import type { MatrixQuadrantView } from "./domain/view/matrixGroups";
 import type { ViewRule } from "./domain/view/viewRules";
 import type { TodayGroupAxis } from "./domain/view/todayGroups";
+import type { ScopeViewOptions } from "./domain/view/scopeViewOptions";
 import type { InboxBucket } from "./domain/tasks/board";
 import type { InboxColumn } from "./domain/view/inboxColumns";
 import type { MatrixQuadrant } from "./utils/eisenhower";
@@ -656,6 +657,21 @@ export interface AppSettings {
    * groups became dates.
    */
   todayGroupAxis?: TodayGroupAxis;
+  /**
+   * What each Scope shows, as the reader has set it
+   * (SCOPE_VIEW_OPTIONS_DESIGN.md §3.3).
+   *
+   * Keyed by the Scope's own address flattened — `today`, `list:l1`, `tag:t3`.
+   * Per Scope rather than per app because that is the difference the setting
+   * exists for: a meetings list wants a countdown and a shopping list does
+   * not. Optional and additive (M0) like its neighbours, so a Scope absent
+   * from here reads as `DEFAULT_SCOPE_VIEW_OPTIONS`, which is what this app
+   * does today.
+   *
+   * Swept on load: a key whose List, Folder, Tag or Filter no longer exists is
+   * dropped. A TRASHED one is kept — it can still be restored.
+   */
+  scopeViewOptions?: Record<string, ScopeViewOptions>;
   /**
    * What each box CONTAINS, as opposed to how it is drawn
    * (TICKTICK_MATRIX_DESIGN.md §23.1).

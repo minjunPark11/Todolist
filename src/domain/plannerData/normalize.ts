@@ -58,6 +58,7 @@ import { MATRIX_QUADRANTS, type MatrixQuadrant } from "../../utils/eisenhower";
 import { sanitizeMatrixView, type MatrixQuadrantView } from "../view/matrixGroups";
 import { sanitizeMatrixRules } from "../view/matrixRules";
 import { isTodayGroupAxis } from "../view/todayGroups";
+import { pruneScopeViewOptions, sanitizeScopeViewOptions } from "../view/scopeViewOptions";
 import { sanitizeInboxColumnRules } from "../view/inboxColumnRules";
 import { sanitizeInboxColumnNames } from "../tasks/board";
 import { resolveInboxColumns } from "../view/inboxColumns";
@@ -419,6 +420,19 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
     // Same rule, for the same reason: absent means the default mapping, and
     // writing four full rules into an account that never opened the editor
     // would store a decision nobody made.
+    // Read back field by field, so a value a newer client wrote that this one
+    // cannot draw lands on something drawable rather than reaching a `<select>`
+    // with no such option.
+    ...(settings?.scopeViewOptions && typeof settings.scopeViewOptions === "object"
+      ? {
+          scopeViewOptions: Object.fromEntries(
+            Object.entries(settings.scopeViewOptions).map(([key, value]) => [
+              key,
+              sanitizeScopeViewOptions(value),
+            ]),
+          ),
+        }
+      : {}),
     // Additive and validated on the way in: an unknown axis from a newer
     // client (or a corrupted store) reads as absent, and absent is `date`.
     ...(isTodayGroupAxis(settings?.todayGroupAxis)
@@ -544,6 +558,23 @@ export function normalizeData(data: RawPlannerData): PlannerData {
     settings: normalizeSettings(data.settings),
     appSettings: normalizeAppSettings(data.appSettings),
   };
+
+  // The Scope options are swept HERE rather than in `normalizeAppSettings`,
+  // which sees only the settings: whether `list:l1` still names anything is a
+  // question about the Lists, and the answer is in the store this function is
+  // assembling (SCOPE_VIEW_OPTIONS_DESIGN.md §3.3).
+  const swept = pruneScopeViewOptions(normalized.appSettings.scopeViewOptions, {
+    listIds: normalized.lists.map((list) => list.id),
+    folderIds: normalized.sidebarFolders.map((folder) => folder.id),
+    tagIds: normalized.tags.map((tag) => tag.id),
+    filterIds: normalized.savedFilters.map((filter) => filter.id),
+  });
+  if (swept !== normalized.appSettings.scopeViewOptions) {
+    normalized.appSettings = swept
+      ? { ...normalized.appSettings, scopeViewOptions: swept }
+      : normalized.appSettings;
+  }
+
   return normalized;
 }
 
