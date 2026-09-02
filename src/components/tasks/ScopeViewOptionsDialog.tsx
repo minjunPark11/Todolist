@@ -19,7 +19,11 @@
 // drawn — a Scope with no Board has nothing to say about a Board's column
 // width, and §15.5 sends that case to hide rather than to disable.
 import { useT } from "../../i18n";
-import type { ScopeViewOptions } from "../../domain/view/scopeViewOptions";
+import {
+  SCOPE_DATE_BY,
+  type ScopeDateBy,
+  type ScopeViewOptions,
+} from "../../domain/view/scopeViewOptions";
 
 export function ScopeViewOptionsDialog({
   options,
@@ -52,6 +56,25 @@ export function ScopeViewOptionsDialog({
         </header>
 
         <div className="tm-view-options">
+          <div className="tm-view-option">
+            <span className="tm-view-option-label">{t("tasks.showDateBy")}</span>
+            {/* A `<select>` and not a popover: two choices, no icons, and the
+                platform's own control already says "there are other values
+                behind this one". */}
+            <select
+              className="tm-view-option-value"
+              value={options.dateBy}
+              aria-label={t("tasks.showDateBy")}
+              onChange={(event) => onChange({ dateBy: event.target.value as ScopeDateBy })}
+            >
+              {SCOPE_DATE_BY.map((value) => (
+                <option key={value} value={value}>
+                  {t(`tasks.dateBy.${value}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="tm-view-option">
             <span className="tm-view-option-label">{t("tasks.showInputBox")}</span>
             <button

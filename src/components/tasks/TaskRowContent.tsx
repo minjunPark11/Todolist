@@ -29,6 +29,8 @@
 import type { Task } from "../../types";
 import { isCompleted } from "../../domain/tasks/taskState";
 import { useT } from "../../i18n";
+import { countdownLabel } from "../../domain/view/countdown";
+import type { ScopeDateBy } from "../../domain/view/scopeViewOptions";
 import { formatDate, todayValue } from "../../utils/date";
 
 interface TaskRowContentProps {
@@ -42,6 +44,14 @@ interface TaskRowContentProps {
    * one grid, and there the name is the fact a card cannot get from its place.
    */
   listName?: string;
+  /**
+   * How this row says its deadline (SCOPE_VIEW_OPTIONS_DESIGN.md §3.5).
+   *
+   * Optional and `taskTime` by default: it is a SCOPE's setting, and the
+   * Matrix draws this row without being one. The Scopes that have the setting
+   * pass it; everything else keeps the date it has always drawn.
+   */
+  dateBy?: ScopeDateBy;
   /**
    * False where the row's PLACE already is the priority — the matrix's boxes
    * after D1. A flag there would repeat the box's header once per card.
@@ -60,6 +70,7 @@ export function TaskRowContent({
   onOpen,
   onToggleDone,
   listName,
+  dateBy = "taskTime",
   showPriority = true,
   today,
 }: TaskRowContentProps) {
@@ -68,7 +79,16 @@ export function TaskRowContent({
   // The date itself, written the way the reader's language writes a date
   // ("8월 20일", "Aug 20") rather than as the stored `2026-08-20`, which is a
   // date only once you have worked out which half is the month.
-  const dueLabel = task.dueDate ? formatDate(task.dueDate, lang) : "";
+  // The same date either way (§3.5) — one is the day it falls on, the other is
+  // what is left of it. Replaced rather than joined: a row that said both
+  // would be answering one question twice, and the reference app swaps them in
+  // the same slot.
+  const countdown = dateBy === "countdown" ? countdownLabel(task.dueDate, today ?? todayValue()) : null;
+  const dueLabel = countdown
+    ? t(countdown.key, { days: countdown.days })
+    : task.dueDate
+      ? formatDate(task.dueDate, lang)
+      : "";
   // Not on finished work (§19.5). "Overdue" is a thing to go and do, and a row
   // that has been ticked has had it done — a red date under a strike-through is
   // an alarm about a job that is already over.

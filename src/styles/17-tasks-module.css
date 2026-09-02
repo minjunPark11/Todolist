@@ -3429,6 +3429,19 @@
   background: var(--surface-2, rgba(25, 25, 25, 0.04));
 }
 
+/* The value on the right of a row. It is a `<select>`, so it keeps the
+   platform's own affordance and only loses the box it usually sits in — the
+   row is already the surface. */
+.tm-view-option-value {
+  flex: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-secondary, #6b6b70);
+  cursor: pointer;
+}
+
 .tm-view-option-label {
   font-size: 14px;
   font-weight: 600;

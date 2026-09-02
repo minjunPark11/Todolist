@@ -1104,6 +1104,8 @@ export function TasksModule(props: TasksModuleProps) {
             columnOf={columnOf}
             openTaskId={state.taskId}
             showInputBox={viewOptions.showInputBox}
+            dateBy={viewOptions.dateBy}
+            today={today}
             onOpen={openTask}
             onDrop={dropOnBoard}
             onCreate={createInColumn}
@@ -1169,7 +1171,7 @@ export function TasksModule(props: TasksModuleProps) {
                   {/* The handle is the affordance, not the mechanism — the whole
                       row is draggable, and this is what says so (audit L-17). */}
                   {policy.canManualReorder ? <span className="tm-task-handle" aria-hidden="true" /> : null}
-                  <TaskRowContent task={task} onOpen={openTask} onToggleDone={toggleDone} />
+                  <TaskRowContent task={task} today={today} dateBy={viewOptions.dateBy} onOpen={openTask} onToggleDone={toggleDone} />
                   {/* The other half of L-17, and the reason the menu is a
                       component: a right-click is not discoverable and does not
                       exist on a touch screen, so the same menu needs a button

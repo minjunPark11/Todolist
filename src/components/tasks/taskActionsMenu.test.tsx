@@ -567,6 +567,41 @@ describe("View Options", () => {
     expect(written.today.showDetails).toBe(true);
   });
 
+  // §3.5, the write half. The read half is below, and they are separate
+  // because this harness's `onSetScopeViewOptions` goes nowhere — the value
+  // lives above the module, so what the dialog can be seen to do is ASK.
+  it("asks for the other reading of the date", async () => {
+    const user = userEvent.setup();
+    const onSetScopeViewOptions = vi.fn();
+    renderModule({}, { url: "/list/l1?view=board", onSetScopeViewOptions });
+
+    const dialog = await openDialog(user, "/list/l1?view=board");
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Show Date by" }),
+      "countdown",
+    );
+    expect(onSetScopeViewOptions.mock.calls[0][0]["list:l1"].dateBy).toBe("countdown");
+  });
+
+  // The read half: the same date, said the other way. A row that drew both
+  // would be answering one question twice.
+  it("draws the date as what is left of it when that is the setting", () => {
+    renderModule({ dueDate: "2026-08-25" }, { url: "/list/l1?view=board" });
+    expect(document.querySelector(".tm-task-due")?.textContent).toBe("Aug 25");
+
+    cleanup();
+    renderModule(
+      { dueDate: "2026-08-25" },
+      {
+        url: "/list/l1?view=board",
+        scopeViewOptions: { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, dateBy: "countdown" } },
+      },
+    );
+    // TODAY is 2026-08-18 in this file, so a deadline a week later reads as
+    // what is left rather than as the day it falls on.
+    expect(document.querySelector(".tm-task-due")?.textContent).toBe("7d left");
+  });
+
   // §3.4: two entry points to one column is what the toggle exists to settle.
   it("takes the column's way in away when it is off", async () => {
     const user = userEvent.setup();

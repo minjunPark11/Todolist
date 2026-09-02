@@ -17,6 +17,7 @@ import { COLUMN_NAME_MAX, type BoardColumn } from "../../domain/tasks/board";
 import { useT } from "../../i18n";
 import { COMPLETED_PAGE } from "../../domain/view/viewGroups";
 import { TaskRowContent } from "./TaskRowContent";
+import type { ScopeDateBy } from "../../domain/view/scopeViewOptions";
 
 interface TaskBoardProps {
   columns: BoardColumn[];
@@ -62,6 +63,10 @@ interface TaskBoardProps {
    * what is there.
    */
   showInputBox?: boolean;
+  /** §3.5's reading, passed down to every card the Board draws. */
+  dateBy?: ScopeDateBy;
+  /** Today, for the countdown to measure from. */
+  today?: string;
   /**
    * The column's finished work, newest first, already grouped by the domain.
    *
@@ -127,6 +132,8 @@ export function TaskBoard({
   onContextMenu,
   onCreate,
   showInputBox = true,
+  dateBy,
+  today,
   finishedIn,
   onRename,
   unmatched = [],
@@ -417,7 +424,7 @@ export function TaskBoard({
                     onContextMenu(task, event.clientX, event.clientY);
                   }}
                 >
-                  <TaskRowContent task={task} onOpen={onOpen} onToggleDone={onToggleDone} />
+                  <TaskRowContent task={task} today={today} dateBy={dateBy} onOpen={onOpen} onToggleDone={onToggleDone} />
 
                   {/* The non-drag path (§16.30). Same command, no gesture. */}
                   <label className="tm-card-move">
@@ -449,6 +456,8 @@ export function TaskBoard({
             {finishedIn ? (
               <BoardColumnFinished
                 tasks={finishedIn(column.id)}
+                dateBy={dateBy}
+                today={today}
                 onOpen={onOpen}
                 onToggleDone={onToggleDone}
                 openTaskId={openTaskId}
@@ -493,7 +502,7 @@ export function TaskBoard({
                 onDragStart={() => startDrag(task.id)}
                 onDragEnd={endDrag}
               >
-                <TaskRowContent task={task} onOpen={onOpen} onToggleDone={onToggleDone} />
+                <TaskRowContent task={task} today={today} dateBy={dateBy} onOpen={onOpen} onToggleDone={onToggleDone} />
               </li>
             ))}
           </ul>
@@ -520,11 +529,18 @@ export function TaskBoard({
 function BoardColumnFinished({
   tasks,
   openTaskId,
+  dateBy,
+  today,
   onOpen,
   onToggleDone,
 }: {
   tasks: Task[];
   openTaskId: string;
+  // Carried down rather than defaulted here: the finished cards are the same
+  // rows as the ones above them, and a group that read its dates differently
+  // from the column it sits in would be one screen speaking two ways.
+  dateBy?: ScopeDateBy;
+  today?: string;
   onOpen: (taskId: string) => void;
   onToggleDone: (task: Task) => void;
 }) {
@@ -555,7 +571,7 @@ function BoardColumnFinished({
         <ul className="tm-column-cards" aria-label={t("tasks.completed")}>
           {visible.map((task) => (
             <li key={task.id} className={`tm-task is-card is-done${task.id === openTaskId ? " is-open" : ""}`}>
-              <TaskRowContent task={task} onOpen={onOpen} onToggleDone={onToggleDone} />
+              <TaskRowContent task={task} today={today} dateBy={dateBy} onOpen={onOpen} onToggleDone={onToggleDone} />
             </li>
           ))}
           {hidden > 0 ? (
