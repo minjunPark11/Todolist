@@ -212,28 +212,110 @@
 
 .ff-timeline-empty { color: var(--text-tertiary); font-size: 13px; padding: 16px 4px; }
 
-.ff-timeline-tray {
-  margin-top: 20px;
-  padding: 12px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-lg);
+/* The grid and the panel, side by side
+   (TIMELINE_ARRANGE_TASKS_DESIGN.md §3.1, phase 1).
+
+   The panel NARROWS the grid rather than covering it. The reference lies over
+   the days it does not need; it can, because it scrolls sideways. Ours does
+   not (D3), so a covered column would be a day with no way to reach it. */
+.tgv-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  /* Wraps rather than squeezes. Beside the grid is where the panel belongs,
+     but not at any price: the timeline area is 438px wide at 1280 with the
+     Detail column reserved [실측], and 220 of that left the grid 202px — less
+     than its own 220px label column, so the days had nowhere to go. Below the
+     floor the panel drops under the grid and takes the width, which is where
+     it used to live and a sane narrow-screen answer. */
+  flex-wrap: wrap;
+  min-width: 0;
 }
-.ff-timeline-tray h3 { font-size: 13px; font-weight: 700; }
-.ff-timeline-tray-hint { font-size: 12px; color: var(--text-tertiary); margin: 2px 0 8px; }
-.ff-timeline-tray ul { display: flex; flex-wrap: wrap; gap: 6px; }
-.ff-timeline-tray li { list-style: none; }
-.ff-timeline-tray button {
+
+.tgv-body > .ff-timeline,
+.tgv-body > .ff-empty-state {
+  /* Basis 0, not `auto`. On `auto` the grid's base size is its own content —
+     which is wider than any line it is given — so it claimed the whole row and
+     the panel wrapped even at 1800px [실측]. At 0 it takes what is left after
+     the panel, and the floor below decides whether there is enough. */
+  flex: 1 1 0;
+  /* The floor: the 220px label column plus seven columns with something in
+     them. `min-width: 0` would let the grid vanish instead of wrapping. */
+  min-width: min(100%, 420px);
+}
+
+.tgv-arrange {
+  flex: 0 0 220px;
+  /* `flex-basis: 220px` is not enough on its own. A flex item's `min-width` is
+     `auto`, which resolves to its MIN-CONTENT width — and a chip with
+     `white-space: nowrap` has the whole title as its min-content. One long
+     title pushed this panel to 429px [실측] and squeezed the grid to zero.
+     The ellipsis cannot help until the box is allowed to be narrower than the
+     string it holds. */
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2, rgba(25, 25, 25, 0.04));
+}
+
+/* Name and count together, then the hint. §13.6.4's rule from the Board's
+   column heads: the count is part of the name, not a column of its own. */
+.tgv-arrange-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  padding: 4px 10px;
+  gap: 8px;
+}
+
+.tgv-arrange-head h3 {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tgv-arrange-hint {
+  margin: 4px 0 10px;
   font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* A column, not a wrapped row. The chips were pills in a horizontal tray and
+   read as tags; stacked full-width they read as a queue to work through,
+   which is what `Arrange tasks` says they are. */
+.tgv-arrange ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tgv-arrange li { list-style: none; }
+
+.tgv-chip {
+  display: block;
+  width: 100%;
+  /* Same reason as the panel's: the chip is a flex item of the `ul` column,
+     and `auto` there is the un-wrapped title. */
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  /* One line. A long title must not turn one chip into three and push the
+     rest of the queue off the screen. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
 }
-.ff-timeline-tray button:hover { border-color: var(--accent); color: var(--accent); }
+
+.tgv-chip:hover,
+.tgv-chip:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--bg-hover-content, rgba(0, 0, 0, 0.05));
+}
 
 @media (max-width: 900px) {
   .ff-timeline { --timeline-label-width: 130px; }

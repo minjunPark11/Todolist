@@ -61,7 +61,7 @@ export const en: Dictionary = {
   "timeline.noBars": "Nothing falls in this window.",
   "timeline.empty": "Nothing to place yet",
   "timeline.emptyHint": "A task appears here as soon as it has any date.",
-  "timeline.trayTitle": "No dates ({{n}})",
+  "timeline.arrangeTitle": "Arrange tasks",
   "timeline.trayHint": "Give one a start date or a deadline and it gets a bar.",
   "timeline.dependencies": "Dependencies",
   "timeline.blockerOffWindow": "Waiting on something outside this window",

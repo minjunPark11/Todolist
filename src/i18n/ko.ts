@@ -60,7 +60,7 @@ export const ko: Dictionary = {
   "timeline.noBars": "이 기간에 해당하는 항목이 없습니다.",
   "timeline.empty": "아직 놓을 것이 없습니다",
   "timeline.emptyHint": "날짜가 하나라도 있으면 여기에 나타납니다.",
-  "timeline.trayTitle": "기간 없음 ({{n}})",
+  "timeline.arrangeTitle": "작업 배치",
   "timeline.trayHint": "시작일이나 마감일을 넣으면 기간이 생깁니다.",
   "timeline.dependencies": "의존 관계",
   "timeline.blockerOffWindow": "이 창 밖의 작업을 기다리는 중",

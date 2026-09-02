@@ -8,6 +8,7 @@
 // whose meaning still lives here.
 import type { Task } from "../../types";
 import { addDays, addMonths } from "../../utils/date";
+import { columnStartDate, type TimelineWindow } from "./timeline";
 import type { TimelineZoom } from "./timeline";
 
 /**
@@ -41,6 +42,37 @@ function shiftDate(date: string, zoom: TimelineZoom, steps: number): string {
  * writing it would freeze an inference into the record as if they had. The
  * start keeps being derived, and moves because the stored dates moved.
  */
+/**
+ * What dropping a dateless Task on a column means as a change to the record
+ * (TIMELINE_ARRANGE_TASKS_DESIGN.md §3.2, §3.3, phase 2).
+ *
+ * `Arrange tasks` holds exactly the Items `spanForItem` could not place. A
+ * chip dropped on a column is one sentence — "this happens on that day" —
+ * and the field that sentence writes is `dueDate`. `spanForItem` turns a lone
+ * deadline into a one-day bar, so the chip leaves the panel and appears on
+ * the grid in the same render.
+ *
+ * NOT `startDate` as well. A start is a DECLARATION — it is why
+ * `resizeStart` writes that field even when it was empty — and someone who
+ * dropped a chip on a day declared one day, not a beginning. The bar's start
+ * stays inferred, which is the state `patchForSpanDrag`'s move branch already
+ * refuses to freeze.
+ *
+ * The column's FIRST day, at every zoom. A week column is seven days and a
+ * month column is a month, so "which day" needs a rule; `columnLabel` picked
+ * the same one ("Day and week columns are both identified by their first
+ * day") and two rules for one question is one too many.
+ */
+export function patchForTrayDrop(task: Task, window: TimelineWindow, columnIndex: number): Partial<Task> {
+  const date = columnStartDate(window, columnIndex);
+  // A column off the end of the window has no date, and a drop that lands
+  // where the Task already is writes nothing — the same two guards the resize
+  // branches keep, and for the same reason: an empty patch still costs an
+  // `updatedAt` and a row on the wire.
+  if (!date || date === task.dueDate) return {};
+  return { dueDate: date };
+}
+
 export function patchForSpanDrag(task: Task, drag: SpanDrag): Partial<Task> {
   if (drag.kind === "resizeStart") {
     if (!drag.date || drag.date === task.startDate) return {};

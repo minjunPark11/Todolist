@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../types";
-import { patchForSpanDrag } from "./board";
+import { patchForSpanDrag, patchForTrayDrop } from "./board";
+import { timelineWindow } from "./timeline";
 
 const TODAY = "2026-08-15";
 const NOW = `${TODAY}T00:00:00.000Z`;
@@ -103,5 +104,45 @@ describe("patchForSpanDrag", () => {
   it("leaves an undated task alone — it is not on the timeline to drag", () => {
     const undated = task({ startDate: "", dueDate: "" });
     expect(patchForSpanDrag(undated, { kind: "move", zoom: "day", steps: 5 })).toEqual({});
+  });
+});
+
+// TIMELINE_ARRANGE_TASKS_DESIGN.md §3.2, §3.3 (phase 2). What a chip from
+// `Arrange tasks`, dropped on a column, means as a change to the record.
+describe("patchForTrayDrop", () => {
+  // A Wednesday, so the week window starts on the Sunday before it and the
+  // difference between "the column" and "its first day" is visible.
+  const week = timelineWindow("week", "2026-09-02");
+
+  it("writes the deadline and nothing else", () => {
+    // `startDate` is a declaration; dropping a chip on a day declares one day.
+    expect(patchForTrayDrop(task(), week, 0)).toEqual({ dueDate: week.edges[0] });
+  });
+
+  it("uses the column's first day at a zoom where a column is not a day", () => {
+    const month = timelineWindow("month", "2026-09-02");
+    const patch = patchForTrayDrop(task(), month, 1);
+
+    expect(patch.dueDate).toBe(month.edges[1]);
+    // The same rule `columnLabel` reads: a column is identified by where it
+    // begins, not by the day the pointer happened to be over.
+    expect(patch.dueDate?.slice(8)).toBe("01");
+  });
+
+  it("writes nothing when the drop lands where the Task already is", () => {
+    // Not a no-op for its own sake: an empty patch still costs an `updatedAt`
+    // and a row on the wire, which is why the resize branches guard too.
+    expect(patchForTrayDrop(task({ dueDate: week.edges[2] }), week, 2)).toEqual({});
+  });
+
+  it("writes nothing for a column past the end of the window", () => {
+    expect(patchForTrayDrop(task(), week, 99)).toEqual({});
+  });
+
+  // The start stays derived. `spanForItem` makes a one-day bar out of a lone
+  // deadline, and `patchForSpanDrag`'s move branch already refuses to freeze
+  // an inferred start into the record — this must not do it either.
+  it("leaves an absent start absent", () => {
+    expect(patchForTrayDrop(task(), week, 3)).not.toHaveProperty("startDate");
   });
 });

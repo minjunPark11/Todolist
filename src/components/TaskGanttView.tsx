@@ -134,6 +134,13 @@ export function TaskGanttView({
         </label>
       </div>
 
+      {/* §3.1: the panel takes a COLUMN beside the grid rather than lying
+          over it, which is what the reference does. It scrolls sideways and
+          we deliberately do not (D3) — the `Today` button is the only way
+          back precisely because there is no scrollbar — so a column hidden
+          under a panel here would be unreachable rather than scrolled past.
+          Copying the picture would have cost the days it covers. */}
+      <div className="tgv-body">
       {onWindow.length === 0 && undated.length === 0 ? (
         <EmptyState icon="📆" title={t("timeline.empty")} text={t("timeline.emptyHint")} />
       ) : (
@@ -152,24 +159,39 @@ export function TaskGanttView({
         />
       )}
 
-      {/* T-GV06: an Item with no dates is not given invented ones. It stays in
-          the scope and is listed here, where it can be opened and given real
-          ones. */}
+      {/* T-GV06: an Item with no dates is not given invented ones. It stays
+          in the scope and is listed here, where it can be opened and given
+          real ones.
+
+          `Arrange tasks` is the reference app's name for this, and it is a
+          better one than ours was (`No dates (3)`): the panel is not a
+          report of what is missing, it is the pile you work through. The
+          count stays, beside the name rather than inside it — §13.6.4's
+          rule from the Board's columns, where `Overdue 1` reads as two
+          words and a count in its own column did not. */}
       {undated.length > 0 ? (
-        <section className="ff-timeline-tray">
-          <h3>{t("timeline.trayTitle", { n: undated.length })}</h3>
-          <p className="ff-timeline-tray-hint">{t("timeline.trayHint")}</p>
+        <aside className="tgv-arrange" aria-label={t("timeline.arrangeTitle")}>
+          <header className="tgv-arrange-head">
+            <h3>{t("timeline.arrangeTitle")}</h3>
+            <span className="tm-count">{undated.length}</span>
+          </header>
+          {/* Still the only way to give one a date until phase 3 brings the
+              drag, and still the KEYBOARD's way after it (§3.5): a panel
+              that can only be dragged from is a panel some readers cannot
+              use at all. */}
+          <p className="tgv-arrange-hint">{t("timeline.trayHint")}</p>
           <ul>
             {undated.map((item) => (
               <li key={item.key}>
-                <button type="button" onClick={() => onOpenItem(item)}>
+                <button type="button" className="tgv-chip" onClick={() => onOpenItem(item)} title={item.title}>
                   {item.title}
                 </button>
               </li>
             ))}
           </ul>
-        </section>
+        </aside>
       ) : null}
+      </div>
     </div>
   );
 }
