@@ -342,6 +342,24 @@ const detailIsColumn = Boolean(planner.selectedTask) && detailPresentation === "
 레지스트리의 danger 그룹에는 그 자리가 없다(§15.29). **휴지통을 비우는 방법이 없다**는
 것은 이 문서의 일이 아니고, 다음 사람이 조사부터 하지 않도록 여기 적어 둔다.
 
+> **정정 (2026-09-02).** 위의 "어느 화면에도 없다"는 **두 항목 모두에 대해 틀렸다.**
+> 다시 재 보니:
+>
+> - `categoryId`는 캘린더 이벤트 팝오버에서 편집된다(`EventPopover.tsx:240`의
+>   `onChangeCategory`).
+> - `estimatedMinutes`는 두 곳에서 읽힌다 — 오늘 큐의 `예상 N분`
+>   (`FocusQueue.tsx:231`)과 캘린더 오른쪽 패널의 `· N분`
+>   (`CalendarRightTaskPanel.tsx:176`) — 그리고 캘린더 리사이즈가 값을 쓴다
+>   (`CalendarView.tsx:568`).
+>
+> 없는 것은 화면이 아니라 **상세의 편집 칸**이고, 그보다 큰 것이 하나 더 있다:
+> `getTaskDuration`(`CalendarView.tsx:436`)이 `estimatedMinutes`를
+> `endTime − startTime`보다 **먼저** 보는데, 시각을 바꾸는 세 자리 중 추정치를 같이
+> 갱신하는 것은 캘린더 리사이즈 하나뿐이다. 상세의 일정 피커로 종료 시각을 바꾸면
+> 추정치가 옛 값으로 남고 캘린더가 **그것을 실제 시각보다 우선한다.**
+>
+> 세어만 둔다. 이 문서의 일이 아니고, 별도 설계도 두지 않기로 했다(사용자 확정).
+
 ### 6.5 지운 것
 
 | 무엇 | 줄 |
@@ -404,8 +422,10 @@ const detailIsColumn = Boolean(planner.selectedTask) && detailPresentation === "
 - **집중 페이지의 죽은 클릭**(§6.1). 이제 패널을 붙이면 끝나는 일이다 — **§7에서 붙였다**
 - **`?task=`를 이 페이지들의 주소로**(§6.6). 링크·새로고침·뒤로 가기가 한 번에 풀린다
   — **§8에서 넣었다**
-- **휴지통을 비우는 방법**(§6.4). 영구 삭제가 캘린더 한 곳에만 남았다
-- **`estimatedMinutes` · `categoryId`**(§6.4). 여전히 어느 화면에도 없다
+- **휴지통을 비우는 방법**(§6.4). 영구 삭제가 캘린더 한 곳에만 남았다 —
+  **`TRASH_PERMANENT_DELETE_DESIGN.md`가 받아 갔고 다섯 단계로 끝났다**
+- **`estimatedMinutes` · `categoryId`**(§6.4). 여전히 어느 화면에도 없다 —
+  **이 줄은 틀렸다**, §6.4의 정정을 볼 것
 
 ---
 
@@ -633,5 +653,8 @@ E2E 6개(`e2e/pageTaskUrl.spec.ts`) — 유닛이 덮을 수 없는 것이 이 �
 ### 8.8 남은 것
 
 §6.9의 나머지 둘 — **휴지통을 비우는 방법**(§6.4)과 **`estimatedMinutes` ·
-`categoryId`**(§6.4). 둘 다 이 문서가 만든 것이 아니라 지나가며 세어 둔 것이고, 둘 다
-새 화면을 요구하므로 설계가 먼저다.
+`categoryId`**(§6.4). 둘 다 이 문서가 만든 것이 아니라 지나가며 세어 둔 것이다.
+
+첫째는 `TRASH_PERMANENT_DELETE_DESIGN.md`가 받아 갔고 끝났다. 둘째는 §6.4의 정정이
+말하는 대로 처음 세어 둔 문장 자체가 틀렸고, **설계를 두지 않기로 했다** — 세어 둔
+채로 남는다.
