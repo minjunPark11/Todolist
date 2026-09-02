@@ -65,6 +65,15 @@ interface TodayPageProps {
   onSetGroupAxis: (axis: TodayGroupAxis) => void;
   /** The Task the Detail beside this page has open, or "" (redesign Q6). */
   openedTaskId: string;
+  /**
+   * Whether the Detail is drawn as a COLUMN beside this page (§3.7).
+   *
+   * The Time Rail wants the right-hand side and so does the Detail, and at
+   * 1280 they would make a third column between them — `.tdy-body` reserves
+   * 340px and `.page-grid` takes 480 more outside it. The Rail is the one that
+   * yields: it is glanced at, while the Detail is what the reader just opened.
+   */
+  detailIsColumn: boolean;
   intent?: TodayIntent;
   onIntentHandled?: () => void;
   showToast: (toast: ToastState) => void;
@@ -87,6 +96,7 @@ export function TodayPage({
   groupAxis,
   onSetGroupAxis,
   openedTaskId,
+  detailIsColumn,
   intent = "",
   onIntentHandled,
   showToast,
@@ -554,7 +564,11 @@ export function TodayPage({
           ) : null}
         </div>
 
-        {visibleRail.scheduledCount > 0 ? (
+        {/* §3.7: it steps aside for the Detail and comes back when it closes.
+            Not hidden with CSS — the grid asks `:has(.tdy-side)` whether the
+            column exists at all, so leaving an empty aside behind would hold
+            340px open for something nobody can see. */}
+        {visibleRail.scheduledCount > 0 && !detailIsColumn ? (
           <aside className="tdy-side">
             <TimeRail rail={visibleRail} onOpenTask={onOpenTask} />
           </aside>

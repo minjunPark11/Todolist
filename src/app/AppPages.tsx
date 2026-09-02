@@ -177,6 +177,7 @@ export function AppPages({
           onToggleShowCompleted={() =>
             planner.updateAppSettings({ showCompletedInToday: !appSettings.showCompletedInToday })
           }
+          detailIsColumn={detailIsColumn}
           groupAxis={appSettings.todayGroupAxis ?? DEFAULT_TODAY_AXIS}
           onSetGroupAxis={(todayGroupAxis) => planner.updateAppSettings({ todayGroupAxis })}
           intent={todayIntent}
