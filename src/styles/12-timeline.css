@@ -119,6 +119,16 @@
 }
 .ff-timeline-cell.is-today { background: var(--accent-soft); }
 
+/* A filled rectangle, not a pill (§12).
+   [관찰] The reference draws a bar as a solid block that fills most of its
+   row — the title sits inside it and the corners are barely rounded. Ours was
+   a 20px pill floating in a 30px row, which reads as a TAG on a track rather
+   than as a span of time occupied.
+   24 of 30 is the reference's own proportion (its bars measure ~74% of the row
+   pitch). `--radius-sm` is the floor of the app's scale (§11.39) — the
+   reference is squarer still, but going below 8 means an entry on
+   `radiusScale`'s allow list, and that list exists to stop a scale of five
+   becoming a scale of eight. */
 .ff-timeline-bar,
 .ff-timeline-marker {
   grid-row: 1;
@@ -126,13 +136,16 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
-  height: 20px;
+  height: 24px;
+  /* 6, not 8. A one-day bar is one column wide, and the two handles already
+     take 12 of it — the extra 4 of padding was the difference between a
+     letter and nothing [실측]. */
   padding: 0 6px;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--bar-color, var(--accent));
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   overflow: hidden;
@@ -161,12 +174,25 @@
   flex: none;
   width: 6px;
   align-self: stretch;
-  border-radius: var(--radius-pill);
   cursor: ew-resize;
-  background: rgba(255, 255, 255, 0.55);
+  /* Invisible until the bar is pointed at (§12).
+     They were two white pills sitting inside the bar at all times, which cut
+     the rectangle into three pieces — the one thing a "filled rectangle" must
+     not be. The reference draws an unbroken block and finds its edges on
+     hover. Square rather than pill for the same reason: a rounded cap inside
+     a rounded rectangle reads as a second object. */
+  background: transparent;
+  transition: background var(--motion-fast);
 }
-.ff-timeline-bar.is-inferred .ff-timeline-handle { background: var(--bar-color, var(--accent)); opacity: 0.5; }
-.ff-timeline-bar:hover .ff-timeline-handle { background: rgba(255, 255, 255, 0.9); }
+.ff-timeline-bar:hover .ff-timeline-handle,
+.ff-timeline-bar:focus-within .ff-timeline-handle { background: rgba(255, 255, 255, 0.55); }
+.ff-timeline-bar.is-inferred:hover .ff-timeline-handle,
+.ff-timeline-bar.is-inferred:focus-within .ff-timeline-handle {
+  /* The inferred bar is an outline on the page's own background, so white
+     would vanish into it. */
+  background: var(--bar-color, var(--accent));
+  opacity: 0.5;
+}
 .ff-timeline-marker .ff-timeline-handle { display: none; }
 
 /* The start was derived rather than declared, so the bar says so (D5). */
