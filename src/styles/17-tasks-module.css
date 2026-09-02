@@ -1478,12 +1478,20 @@
   align-items: flex-start;
 }
 
+/* §3.6: the size the reader chose is the column's WIDTH, so what it answers
+   is "how many columns fit". Set on the board and read by every column, so a
+   board cannot end up with columns of two minds. 260 is what every board drew
+   before the setting existed, which is why it is `medium`. */
+.tm-board { --tm-column-w: 260px; }
+.tm-board.is-small { --tm-column-w: 208px; }
+.tm-board.is-large { --tm-column-w: 320px; }
+
 .tm-column {
   display: flex;
   flex: none;
   flex-direction: column;
   gap: 8px;
-  width: 260px;
+  width: var(--tm-column-w, 260px);
   padding: 10px;
   /* Component 13 §2: the reference draws the column itself completely
      transparent and lets the cards do the grouping. Ours painted the column

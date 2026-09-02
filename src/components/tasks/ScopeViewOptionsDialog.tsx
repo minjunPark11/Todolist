@@ -21,16 +21,28 @@
 import { useT } from "../../i18n";
 import {
   SCOPE_DATE_BY,
+  SCOPE_KANBAN_SIZES,
   type ScopeDateBy,
+  type ScopeKanbanSize,
   type ScopeViewOptions,
 } from "../../domain/view/scopeViewOptions";
 
 export function ScopeViewOptionsDialog({
   options,
+  hasBoard,
   onChange,
   onClose,
 }: {
   options: ScopeViewOptions;
+  /**
+   * Whether this Scope can draw a Board (§3.6).
+   *
+   * Two of the eight can (§2.1), and the two rows below that act on columns
+   * are drawn only there. §15.5: an action with nothing to do here is absent,
+   * not greyed — and a `Show Input Box` on a Scope with no columns was a
+   * switch that flipped and changed nothing.
+   */
+  hasBoard: boolean;
   onChange: (patch: Partial<ScopeViewOptions>) => void;
   onClose: () => void;
 }) {
@@ -75,6 +87,30 @@ export function ScopeViewOptionsDialog({
             </select>
           </div>
 
+          {hasBoard ? (
+            <div className="tm-view-option">
+              <span className="tm-view-option-label">{t("tasks.kanbanSize")}</span>
+              {/* §3.6: the WIDTH of a column, not the height of a card. The
+                  Board scrolls sideways, so the question a size answers is how
+                  many columns fit — a card's height is its content's. */}
+              <select
+                className="tm-view-option-value"
+                value={options.kanbanSize}
+                aria-label={t("tasks.kanbanSize")}
+                onChange={(event) =>
+                  onChange({ kanbanSize: event.target.value as ScopeKanbanSize })
+                }
+              >
+                {SCOPE_KANBAN_SIZES.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`tasks.kanbanSize.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
+          {hasBoard ? (
           <div className="tm-view-option">
             <span className="tm-view-option-label">{t("tasks.showInputBox")}</span>
             <button
@@ -88,6 +124,7 @@ export function ScopeViewOptionsDialog({
               <span className="tm-switch-knob" aria-hidden="true" />
             </button>
           </div>
+          ) : null}
         </div>
       </div>
     </div>

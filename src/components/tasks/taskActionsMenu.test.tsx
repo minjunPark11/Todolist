@@ -602,6 +602,42 @@ describe("View Options", () => {
     expect(document.querySelector(".tm-task-due")?.textContent).toBe("7d left");
   });
 
+  // §3.6 and §15.5: the two rows that act on columns are drawn only where
+  // there are columns. A switch that flips and changes nothing is worse than
+  // one that is not there.
+  it("offers the column settings on a Scope that has a Board, and not on one that does not", async () => {
+    const user = userEvent.setup();
+    renderModule({}, { url: "/list/l1?view=board" });
+    let dialog = await openDialog(user, "/list/l1?view=board");
+    expect(within(dialog).getByRole("combobox", { name: "Kanban Size" })).toBeTruthy();
+    expect(within(dialog).getByRole("switch", { name: "Show Input Box" })).toBeTruthy();
+
+    cleanup();
+    renderModule({}, { url: "/today" });
+    dialog = await openDialog(user, "/today");
+    expect(within(dialog).queryByRole("combobox", { name: "Kanban Size" })).toBeNull();
+    expect(within(dialog).queryByRole("switch", { name: "Show Input Box" })).toBeNull();
+    // The one that means something everywhere stays.
+    expect(within(dialog).getByRole("combobox", { name: "Show Date by" })).toBeTruthy();
+  });
+
+  // The size is the column's width, so it is set once on the board and read by
+  // every column — a board cannot end up with columns of two minds.
+  it("sizes the columns from the Scope's setting", () => {
+    renderModule({}, { url: "/list/l1?view=board" });
+    expect(document.querySelector(".tm-board")?.className).toContain("is-medium");
+
+    cleanup();
+    renderModule(
+      {},
+      {
+        url: "/list/l1?view=board",
+        scopeViewOptions: { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, kanbanSize: "large" } },
+      },
+    );
+    expect(document.querySelector(".tm-board")?.className).toContain("is-large");
+  });
+
   // §3.4: two entry points to one column is what the toggle exists to settle.
   it("takes the column's way in away when it is off", async () => {
     const user = userEvent.setup();

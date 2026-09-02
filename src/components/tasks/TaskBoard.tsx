@@ -17,7 +17,7 @@ import { COLUMN_NAME_MAX, type BoardColumn } from "../../domain/tasks/board";
 import { useT } from "../../i18n";
 import { COMPLETED_PAGE } from "../../domain/view/viewGroups";
 import { TaskRowContent } from "./TaskRowContent";
-import type { ScopeDateBy } from "../../domain/view/scopeViewOptions";
+import type { ScopeDateBy, ScopeKanbanSize } from "../../domain/view/scopeViewOptions";
 
 interface TaskBoardProps {
   columns: BoardColumn[];
@@ -65,6 +65,8 @@ interface TaskBoardProps {
   showInputBox?: boolean;
   /** §3.5's reading, passed down to every card the Board draws. */
   dateBy?: ScopeDateBy;
+  /** §3.6: how wide a column is, and so how many of them fit on screen. */
+  kanbanSize?: ScopeKanbanSize;
   /** Today, for the countdown to measure from. */
   today?: string;
   /**
@@ -133,6 +135,7 @@ export function TaskBoard({
   onCreate,
   showInputBox = true,
   dateBy,
+  kanbanSize = "medium",
   today,
   finishedIn,
   onRename,
@@ -213,7 +216,7 @@ export function TaskBoard({
   }
 
   return (
-    <div className="tm-board">
+    <div className={`tm-board is-${kanbanSize}`}>
       {columns.map((column) => {
         const cards = tasksIn(column.id);
         const refusal = refusalFor(column);

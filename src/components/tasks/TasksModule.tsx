@@ -1105,6 +1105,7 @@ export function TasksModule(props: TasksModuleProps) {
             openTaskId={state.taskId}
             showInputBox={viewOptions.showInputBox}
             dateBy={viewOptions.dateBy}
+            kanbanSize={viewOptions.kanbanSize}
             today={today}
             onOpen={openTask}
             onDrop={dropOnBoard}
@@ -1289,6 +1290,7 @@ export function TasksModule(props: TasksModuleProps) {
       {viewOptionsOpen ? (
         <ScopeViewOptionsDialog
           options={viewOptions}
+          hasBoard={policy.allowedViews.includes("board")}
           onChange={patchViewOptions}
           onClose={() => setViewOptionsOpen(false)}
         />
