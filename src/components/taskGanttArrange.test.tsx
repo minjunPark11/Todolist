@@ -249,11 +249,11 @@ describe("dropping a chip on a day", () => {
     // the field's PREVIOUS value — empty, because this Task had no deadline.
     expect(mutation.undo).toEqual({ dueDate: "" });
     expect(mutation.labelKey).toBe("tasks.undoDateChanged");
-    // The view opens at `week` zoom, where a column is a WEEK — so the fourth
-    // one is three weeks out, and the date written is the day that week
+    // The view opens on `1개월`, which is cut into WEEKS (§12) — so the fourth
+    // column is three weeks out, and the date written is the day that week
     // BEGINS (§3.3). Not the day the pointer was over: at this zoom there is
     // no such day, which is the whole reason that rule exists.
-    expect(patch).toEqual({ dueDate: timelineWindow("week", TODAY).edges[3] });
+    expect(patch).toEqual({ dueDate: timelineWindow("month", TODAY).edges[3] });
     // And only the deadline (§3.2).
     expect(patch).not.toHaveProperty("startDate");
   });

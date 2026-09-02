@@ -67,27 +67,32 @@ describe("patchForSpanDrag", () => {
     // The whole point of D6. This bar's start came from its deadline; moving
     // it must not freeze that guess into the record as a user decision.
     const inferred = task({ startDate: "", dueDate: "2026-08-20" });
-    const patch = patchForSpanDrag(inferred, { kind: "move", zoom: "day", steps: 3 });
+    const patch = patchForSpanDrag(inferred, { kind: "move", zoom: "week", steps: 3 });
     expect(patch).toEqual({ dueDate: "2026-08-23" });
     expect("startDate" in patch).toBe(false);
   });
 
   it("moves every date the record actually holds, together", () => {
     const spanned = task({ startDate: "2026-08-10", dueDate: "2026-08-14" });
-    expect(patchForSpanDrag(spanned, { kind: "move", zoom: "day", steps: 2 })).toEqual({
+    expect(patchForSpanDrag(spanned, { kind: "move", zoom: "week", steps: 2 })).toEqual({
       startDate: "2026-08-12",
       dueDate: "2026-08-16",
     });
   });
 
+  // §12: what a step means is the COLUMN's unit, not the zoom's name — and
+  // two zooms now share a unit, so both have to move the same distance.
   it("moves by columns, not by days, at coarse zooms", () => {
-    // One column right at month zoom is next month, whatever its length.
+    // One column right where a column is a month is next month, whatever its
+    // length.
     const march = task({ startDate: "2026-03-03", dueDate: "2026-03-20" });
-    expect(patchForSpanDrag(march, { kind: "move", zoom: "month", steps: 1 })).toEqual({
-      startDate: "2026-04-03",
-      dueDate: "2026-04-20",
-    });
-    expect(patchForSpanDrag(march, { kind: "move", zoom: "week", steps: 2 })).toEqual({
+    const aMonthOn = { startDate: "2026-04-03", dueDate: "2026-04-20" };
+    expect(patchForSpanDrag(march, { kind: "move", zoom: "year", steps: 1 })).toEqual(aMonthOn);
+    // `6개월` is cut into months too, so a step there is the same distance.
+    expect(patchForSpanDrag(march, { kind: "move", zoom: "halfYear", steps: 1 })).toEqual(aMonthOn);
+
+    // And where a column is a week, two of them are fourteen days.
+    expect(patchForSpanDrag(march, { kind: "move", zoom: "month", steps: 2 })).toEqual({
       startDate: "2026-03-17",
       dueDate: "2026-04-03",
     });
@@ -95,7 +100,7 @@ describe("patchForSpanDrag", () => {
 
   it("writes nothing when the drag changes nothing", () => {
     const t = task({ startDate: "2026-08-10", dueDate: "2026-08-14" });
-    expect(patchForSpanDrag(t, { kind: "move", zoom: "day", steps: 0 })).toEqual({});
+    expect(patchForSpanDrag(t, { kind: "move", zoom: "week", steps: 0 })).toEqual({});
     expect(patchForSpanDrag(t, { kind: "resizeStart", date: "2026-08-10" })).toEqual({});
     expect(patchForSpanDrag(t, { kind: "resizeEnd", date: "2026-08-14" })).toEqual({});
     expect(patchForSpanDrag(t, { kind: "resizeStart", date: "" })).toEqual({});
@@ -103,7 +108,7 @@ describe("patchForSpanDrag", () => {
 
   it("leaves an undated task alone — it is not on the timeline to drag", () => {
     const undated = task({ startDate: "", dueDate: "" });
-    expect(patchForSpanDrag(undated, { kind: "move", zoom: "day", steps: 5 })).toEqual({});
+    expect(patchForSpanDrag(undated, { kind: "move", zoom: "week", steps: 5 })).toEqual({});
   });
 });
 
@@ -119,13 +124,18 @@ describe("patchForTrayDrop", () => {
     expect(patchForTrayDrop(task(), week, 0)).toEqual({ dueDate: week.edges[0] });
   });
 
-  it("uses the column's first day at a zoom where a column is not a day", () => {
-    const month = timelineWindow("month", "2026-09-02");
-    const patch = patchForTrayDrop(task(), month, 1);
+  // The same rule `columnLabel` reads: a column is identified by where it
+  // BEGINS, not by the day the pointer happened to be over — and at these
+  // zooms there is no such day to use instead.
+  it("uses the column's first day wherever a column is not a day", () => {
+    // Weeks: the day the week starts on.
+    const weeks = timelineWindow("month", "2026-09-02");
+    expect(patchForTrayDrop(task(), weeks, 1).dueDate).toBe(weeks.edges[1]);
 
-    expect(patch.dueDate).toBe(month.edges[1]);
-    // The same rule `columnLabel` reads: a column is identified by where it
-    // begins, not by the day the pointer happened to be over.
+    // Months: the 1st.
+    const months = timelineWindow("year", "2026-09-02");
+    const patch = patchForTrayDrop(task(), months, 1);
+    expect(patch.dueDate).toBe(months.edges[1]);
     expect(patch.dueDate?.slice(8)).toBe("01");
   });
 
@@ -172,7 +182,7 @@ describe("dateMutation", () => {
   // Moving a bar writes both fields, so both have to come back.
   it("carries every field the patch touches, and no others", () => {
     const before = task({ startDate: "2026-08-10", dueDate: "2026-08-12" });
-    const mutation = dateMutation(before, patchForSpanDrag(before, { kind: "move", zoom: "day", steps: 3 }));
+    const mutation = dateMutation(before, patchForSpanDrag(before, { kind: "move", zoom: "week", steps: 3 }));
 
     expect(Object.keys(mutation?.patch ?? {}).sort()).toEqual(["dueDate", "startDate"]);
     expect(mutation?.undo).toEqual({ startDate: "2026-08-10", dueDate: "2026-08-12" });
@@ -182,6 +192,6 @@ describe("dateMutation", () => {
   it("is null for a drag that changed nothing", () => {
     const before = task({ dueDate: week.edges[2] });
     expect(dateMutation(before, patchForTrayDrop(before, week, 2))).toBeNull();
-    expect(dateMutation(before, patchForSpanDrag(before, { kind: "move", zoom: "day", steps: 0 }))).toBeNull();
+    expect(dateMutation(before, patchForSpanDrag(before, { kind: "move", zoom: "week", steps: 0 }))).toBeNull();
   });
 });

@@ -16,15 +16,47 @@ import type { Span } from "./span";
  * `life` is deliberately absent. A period with no first and no last day cannot
  * be cut into columns; those goals belong in the undated tray (D3).
  */
-export type TimelineZoom = "day" | "week" | "month" | "year";
+/**
+ * What the reader picks, named for how much TIME the window covers (§12).
+ *
+ * It used to name the width of a COLUMN — `day` meant day-wide columns and the
+ * window's length fell out of the count. That made two of these impossible to
+ * have at once: `6개월` and `1년` are both cut into months and differ only in
+ * how many. The id and the unit are separate now.
+ */
+export type TimelineZoom = "week" | "month" | "halfYear" | "year";
+
+/** What ONE column covers. Two zooms may share it and differ in length. */
+export type ColumnUnit = "day" | "week" | "month";
+
+/**
+ * The four windows, and how each is cut.
+ *
+ * The old set ran 2 weeks / 12 weeks / 12 months / 5 years, which left every
+ * column between 41 and 47px on a 568px track [실측] — narrow enough that half
+ * the bars could not hold their own title (GANTT §11). These are shorter
+ * windows with wider columns.
+ *
+ * `month` is FIVE WEEKS rather than a calendar month. A month cut into day
+ * columns is 30 of them at 18px, which is back where we started; four weeks is
+ * 28 days and falls short of a month. Five is the nearest cut that covers one.
+ */
+export const ZOOM_SPEC: Record<TimelineZoom, { unit: ColumnUnit; columns: number }> = {
+  week: { unit: "day", columns: 7 },
+  month: { unit: "week", columns: 5 },
+  halfYear: { unit: "month", columns: 6 },
+  year: { unit: "month", columns: 12 },
+};
 
 /** Fixed by D11 — the window never changes length with the viewport. */
-export const ZOOM_COLUMNS: Record<TimelineZoom, number> = {
-  day: 14,
-  week: 12,
-  month: 12,
-  year: 5,
-};
+export const ZOOM_COLUMNS: Record<TimelineZoom, number> = Object.fromEntries(
+  Object.entries(ZOOM_SPEC).map(([zoom, spec]) => [zoom, spec.columns]),
+) as Record<TimelineZoom, number>;
+
+/** What a column of this zoom covers — the only thing most callers need. */
+export function columnUnitOf(zoom: TimelineZoom): ColumnUnit {
+  return ZOOM_SPEC[zoom].unit;
+}
 
 export interface TimelineWindow {
   zoom: TimelineZoom;
@@ -41,19 +73,26 @@ export interface TimelineWindow {
   to: string;
 }
 
-/** Start of the period `date` falls in, so a window never begins mid-column. */
+/**
+ * Start of the period `date` falls in, so a window never begins mid-column.
+ *
+ * Reads the UNIT, not the id: `1년` and `6개월` are both cut into months and
+ * both start on the 1st. The year window is therefore ROLLING — twelve months
+ * from this one rather than pinned to January, which is the more useful answer
+ * to "what is coming" and the place `Today` returns to.
+ */
 export function alignToZoom(date: string, zoom: TimelineZoom): string {
-  if (zoom === "day") return date;
-  if (zoom === "week") return getWeekStart(date);
-  if (zoom === "month") return `${date.slice(0, 7)}-01`;
-  return `${date.slice(0, 4)}-01-01`;
+  const unit = columnUnitOf(zoom);
+  if (unit === "day") return date;
+  if (unit === "week") return getWeekStart(date);
+  return `${date.slice(0, 7)}-01`;
 }
 
 function advance(date: string, zoom: TimelineZoom, steps: number): string {
-  if (zoom === "day") return addDays(date, steps);
-  if (zoom === "week") return addDays(date, steps * 7);
-  if (zoom === "month") return addMonths(date, steps);
-  return addMonths(date, steps * 12);
+  const unit = columnUnitOf(zoom);
+  if (unit === "day") return addDays(date, steps);
+  if (unit === "week") return addDays(date, steps * 7);
+  return addMonths(date, steps);
 }
 
 export function timelineWindow(zoom: TimelineZoom, anchorDate: string): TimelineWindow {

@@ -8,7 +8,7 @@
 // whose meaning still lives here.
 import type { Task } from "../../types";
 import { addDays, addMonths } from "../../utils/date";
-import { columnStartDate, type TimelineWindow } from "./timeline";
+import { columnStartDate, columnUnitOf, type TimelineWindow } from "./timeline";
 import type { TaskMutation } from "../tasks/mutations";
 import type { TimelineZoom } from "./timeline";
 
@@ -22,12 +22,13 @@ export type SpanDrag =
   | { kind: "resizeStart"; date: string }
   | { kind: "resizeEnd"; date: string };
 
+/** A column, in days or months — which is what `steps` counts (§12). */
 function shiftDate(date: string, zoom: TimelineZoom, steps: number): string {
   if (!date) return date;
-  if (zoom === "day") return addDays(date, steps);
-  if (zoom === "week") return addDays(date, steps * 7);
-  if (zoom === "month") return addMonths(date, steps);
-  return addMonths(date, steps * 12);
+  const unit = columnUnitOf(zoom);
+  if (unit === "day") return addDays(date, steps);
+  if (unit === "week") return addDays(date, steps * 7);
+  return addMonths(date, steps);
 }
 
 /**

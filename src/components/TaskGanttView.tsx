@@ -20,12 +20,18 @@ import type { Item } from "../domain/view/item";
 import type { GroupContext, ViewSpec } from "../domain/view/viewSpec";
 import { dateMutation, patchForSpanDrag, patchForTrayDrop, type SpanDrag } from "../domain/view/board";
 import { spanForItem, spanIntersects } from "../domain/view/span";
-import { shiftWindow, timelineWindow, ZOOM_COLUMNS, type TimelineZoom } from "../domain/view/timeline";
+import {
+  columnUnitOf,
+  shiftWindow,
+  timelineWindow,
+  ZOOM_COLUMNS,
+  type TimelineZoom,
+} from "../domain/view/timeline";
 import { TimelineView, TRAY_DRAG_MIME } from "./TimelineView";
 import { EmptyState } from "./kit";
 import { useT } from "../i18n";
 
-const ZOOMS: TimelineZoom[] = ["day", "week", "month", "year"];
+const ZOOMS: TimelineZoom[] = ["week", "month", "halfYear", "year"];
 
 interface TaskGanttViewProps {
   /** Already scoped by the caller; this narrows only by date. */
@@ -61,7 +67,9 @@ export function TaskGanttView({
   onMutateTask,
 }: TaskGanttViewProps) {
   const { t, lang } = useT();
-  const [zoom, setZoom] = useState<TimelineZoom>("week");
+  // Five weeks: long enough to hold a piece of work end to end, short
+  // enough that a column is ~114px and a one-column bar carries its name.
+  const [zoom, setZoom] = useState<TimelineZoom>("month");
   const [anchor, setAnchor] = useState<string>(today);
   // Whether a chip is in the air. The lanes only exist while it is (§4):
   // they cover the grid, so leaving them up would put a sheet of drop
@@ -251,8 +259,11 @@ export function TaskGanttView({
 
 /** Narrow screens get a shorter label, never a shorter window (D11). */
 function columnLabel(edge: string, zoom: TimelineZoom, lang: string): string {
-  if (zoom === "year") return edge.slice(0, 4);
-  if (zoom === "month") return lang === "ko" ? `${Number(edge.slice(5, 7))}월` : edge.slice(0, 7);
+  // The UNIT, not the id (§12): `6개월` and `1년` are both months and label the
+  // same way, and neither is a year-wide column any more.
+  if (columnUnitOf(zoom) === "month") {
+    return lang === "ko" ? `${Number(edge.slice(5, 7))}월` : edge.slice(0, 7);
+  }
   // Day and week columns are both identified by their first day.
   return `${edge.slice(5, 7)}.${edge.slice(8, 10)}`;
 }
