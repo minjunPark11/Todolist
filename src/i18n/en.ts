@@ -737,6 +737,7 @@ export const en: Dictionary = {
   "tasks.managerRestore": "Restore",
   "tasks.managerDeleteForever": "Delete forever",
   "tasks.managerConfirm": "This also deletes {{count}} tasks, for good.",
+  "tasks.scopeMenu": "View and options",
   "tasks.viewLabel": "Switch view",
   "tasks.view.list": "List",
   "tasks.view.board": "Board",

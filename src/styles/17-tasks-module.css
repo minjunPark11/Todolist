@@ -1804,6 +1804,16 @@
   cursor: pointer;
 }
 
+/* The Scope's ⋯ is a header control, so it takes the 32px grid (§11.2) rather
+   than `.ff-icon-btn`'s 28. That 28 is §4.87's SECTION action — what the
+   Matrix box's icons and the Board column's `+` take against the 22px badge
+   beside them. This one sits beside the Scope's title. Caught by the rhythm
+   spec, exactly as the Today header's ⋯ was. */
+.tm-header > .ff-anchor .ff-icon-btn {
+  width: 32px;
+  height: 32px;
+}
+
 /* The Trash's own header action (TRASH_PERMANENT_DELETE_DESIGN.md §1.2).
    Icon only, and quiet until it is aimed at — the same treatment the Detail's
    `영구 삭제` gets, for the same reason: it opens a question rather than

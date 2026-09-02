@@ -158,7 +158,10 @@ test.describe("the context menu", () => {
     await page.goto(`/list/${LIST.id}`);
     await addTask(page, "On a card");
 
-    await page.getByRole("button", { name: "Board" }).click();
+    // The view selector lives in the Scope's ⋯ since
+    // SCOPE_VIEW_OPTIONS_DESIGN.md §3.2, not in the header.
+    await page.getByRole("button", { name: "View and options" }).click();
+    await page.getByRole("menuitem", { name: "Board" }).click();
     await expect(page.locator(".tm-task.is-card")).toHaveCount(1);
 
     await page.locator(".tm-task.is-card").first().click({ button: "right" });

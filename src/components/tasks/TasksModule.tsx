@@ -40,6 +40,8 @@ import { TaskDetailPane } from "./TaskDetailPane";
 import { TaskUndoStrip } from "./TaskUndoStrip";
 import { TaskDeleteForeverGate } from "./TaskDeleteForeverGate";
 import { TrashEmptyGate } from "./TrashEmptyGate";
+import { MoreMenu, type MoreMenuItem } from "../kit";
+import { scopeHasViewOptions } from "../../domain/view/scopeViewOptions";
 import { trashedTaskIds } from "../../domain/tasks/trash";
 import type { TaskDetailBundle } from "./taskDetailBundle";
 import { useTaskCommands } from "../../hooks/useTaskCommands";
@@ -316,6 +318,27 @@ export function TasksModule(props: TasksModuleProps) {
     const owner = next.kind === "list" ? lists.find((list) => list.id === next.id) : undefined;
     onNavigate(taskUrlFor({ scope: next, view: resolveListView(owner?.defaultViewKey, policy), taskId: "" }));
   }
+
+  /**
+   * What the Scope's ⋯ offers (§3.2).
+   *
+   * §16.26 Gate 3 moves in with the selector: only the views the Scope allows
+   * are offered, and where there is nothing to choose the section is absent
+   * rather than drawn with one row. Six of the eight Scopes have one view
+   * (§2.1), so on those the menu is empty and does not appear at all — which
+   * is the same rule the header applied, one level up.
+   *
+   * Rows with a ✓ rather than the reference's row of icons: this app's menus
+   * are rows, the Today axis picker chose the same shape, and a new menu
+   * primitive is not what this phase is for (§5 Q6).
+   */
+  const scopeMenuItems: MoreMenuItem[] =
+    policy.allowedViews.length > 1
+      ? policy.allowedViews.map((view) => ({
+          label: `${view === state.view ? "✓ " : ""}${t(`tasks.view.${view}`)}`,
+          onClick: () => setView(view),
+        }))
+      : [];
 
   function setView(view: TaskViewKind) {
     onNavigate(taskUrlFor({ ...state, view }), "replace");
@@ -929,24 +952,6 @@ export function TasksModule(props: TasksModuleProps) {
             </span>
           ) : null}
 
-          {/* §16.26 Gate 3: only the views the Scope allows are offered. The
-              selector is absent entirely where there is nothing to choose,
-              rather than shown with one disabled option. */}
-          {policy.allowedViews.length > 1 ? (
-            <div className="tm-views" role="group" aria-label={t("tasks.viewLabel")}>
-              {policy.allowedViews.map((view) => (
-                <button
-                  key={view}
-                  type="button"
-                  className={`tm-view${view === state.view ? " is-current" : ""}`}
-                  aria-pressed={view === state.view}
-                  onClick={() => setView(view)}
-                >
-                  {t(`tasks.view.${view}`)}
-                </button>
-              ))}
-            </div>
-          ) : null}
 
           {/* §13.21/§13.22 from the List's own screen, which is where the
               plan puts them. The Inbox is not offered either one: it is the
@@ -985,6 +990,19 @@ export function TasksModule(props: TasksModuleProps) {
                 </svg>
               </button>
             </div>
+          ) : null}
+
+          {/* The Scope's own menu (SCOPE_VIEW_OPTIONS_DESIGN.md §3.2).
+              Everything that says what this Scope SHOWS lives behind it,
+              starting with the view — which stood in the header as three text
+              buttons and is one press further away now, in exchange for a
+              header that is a title and a count.
+
+              Absent on the three Scopes that are finished work: half of what
+              this menu will hold loses its meaning there, and "완료 숨기기" on
+              the Completed Scope is a button that empties the screen (§3.1). */}
+          {scopeHasViewOptions(scope.kind) && scopeMenuItems.length > 0 ? (
+            <MoreMenu items={scopeMenuItems} label={t("tasks.scopeMenu")} />
           ) : null}
         </header>
 

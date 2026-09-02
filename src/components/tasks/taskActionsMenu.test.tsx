@@ -74,6 +74,7 @@ function renderModule(
     focusBusy?: boolean;
     onStartFocus?: (taskId: string) => void;
     onDeleteForever?: (taskId: string) => void;
+    onNavigate?: (url: string, mode?: "push" | "replace") => void;
     onEmptyTrash?: () => number;
     onDuplicate?: (taskId: string) => (() => void) | null;
     activityFor?: (taskId: string) => TaskActivityEntry[];
@@ -106,7 +107,7 @@ function renderModule(
           taskTags={[]}
           today={TODAY}
           url={extra.url ?? "/list/l1?task=t1"}
-          onNavigate={() => {}}
+          onNavigate={extra.onNavigate ?? (() => {})}
           onStartFocus={extra.onStartFocus ?? (() => {})}
           onDeleteForever={extra.onDeleteForever ?? (() => {})}
           onEmptyTrash={extra.onEmptyTrash ?? (() => 0)}
@@ -459,6 +460,60 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     expect(screen.queryByRole("menu")).toBeNull();
     // §15.49's second Escape is the Drawer's, so the first must leave it open.
     expect(screen.getByRole("complementary", { name: "Task detail" })).toBeTruthy();
+  });
+});
+
+// SCOPE_VIEW_OPTIONS_DESIGN.md §3.2: the view selector moved out of the header
+// and into the Scope's own menu.
+describe("the Scope's menu", () => {
+  const openScopeMenu = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole("button", { name: "View and options" }));
+    return screen.getByRole("menu");
+  };
+
+  it("holds the views, with the current one marked", async () => {
+    const user = userEvent.setup();
+    renderModule({}, { url: "/list/l1?view=board" });
+
+    // Gone from the header — that is the half of this change that is a
+    // removal, and a selector left in both places is the duplication this
+    // repo keeps deleting.
+    expect(document.querySelector(".tm-header .tm-views")).toBeNull();
+
+    await openScopeMenu(user);
+    expect(rows()).toEqual(["List", "✓ Board", "Timeline"]);
+  });
+
+  it("switches the view when one is chosen", async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    renderModule({}, { url: "/list/l1?view=board", onNavigate });
+
+    await openScopeMenu(user);
+    await user.click(screen.getByRole("menuitem", { name: "Timeline" }));
+
+    // Asserted on the address rather than on the render: the view is a reading
+    // of the URL (§15.9), and this harness hands the module a `onNavigate`
+    // that goes nowhere — so what there is to check is what it was asked for.
+    // The Scope stays and only the view moves.
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate.mock.calls[0][0]).toContain("/list/l1");
+    expect(onNavigate.mock.calls[0][0]).toContain("view=gantt");
+  });
+
+  // §16.26 Gate 3, one level up from where it used to live: six of the eight
+  // Scopes have one view, and a menu whose only section is a single-row radio
+  // is a menu that should not open.
+  it("does not appear where there is nothing to choose", () => {
+    renderModule({}, { url: "/today" });
+    expect(screen.queryByRole("button", { name: "View and options" })).toBeNull();
+  });
+
+  // §3.1: three lists of work that is over. "완료 숨기기" on the Completed
+  // Scope is a button that empties the screen.
+  it("does not appear on the Scopes that are finished work", () => {
+    renderModule({ deletedAt: NOW }, { url: "/trash" });
+    expect(screen.queryByRole("button", { name: "View and options" })).toBeNull();
   });
 });
 
