@@ -3452,11 +3452,21 @@
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
 }
 
-/* The rows: the name on the left, the value on the right, each on its own
-   surface. */
+/* The rows: the name on the left, the value on the right (§13.8).
+
+   The CARD belongs to the group, not to the row. Each of the two choosers is
+   alone in one; the switches share a third, because a card is a claim that
+   its rows belong together and two switches about what a card carries do. A
+   group of one looks exactly like the row-per-card it replaces, which is why
+   this costs nothing to have in place before the second switch exists. */
 .tm-view-options {
   display: grid;
   gap: 10px;
+}
+
+.tm-view-group {
+  border-radius: var(--density-radius, 10px);
+  background: var(--surface-2, rgba(25, 25, 25, 0.04));
 }
 
 .tm-view-option {
@@ -3466,8 +3476,6 @@
   gap: 16px;
   min-height: 48px;
   padding: 0 14px;
-  border-radius: var(--density-radius, 10px);
-  background: var(--surface-2, rgba(25, 25, 25, 0.04));
 }
 
 /* §3.8: a line of the body under the title. One line, quiet, and truncated —
@@ -3487,8 +3495,16 @@
 /* The value on the right of a row. It is a `<select>`, so it keeps the
    platform's own affordance and only loses the box it usually sits in — the
    row is already the surface. */
+/* `width: auto` is the whole point of this rule.
+
+   The app's form reset gives every `select` `width: 100%`, and this one is
+   in a flex row — so it took all 356px of it and squeezed the label into a
+   37px column, where `Show Date by` folded onto THREE lines and made that
+   row 63px tall against its neighbours' 48. `flex: none` did not save it:
+   the basis is `auto`, which reads the width, which was 100%. */
 .tm-view-option-value {
   flex: none;
+  width: auto;
   border: 0;
   background: transparent;
   font: inherit;

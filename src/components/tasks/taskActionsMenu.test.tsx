@@ -628,6 +628,31 @@ describe("View Options", () => {
     expect(within(dialog).getByRole("switch", { name: "Show Input Box" })).toBeTruthy();
   });
 
+  // §13.8: the card belongs to the GROUP, not to the row. Each chooser is
+  // alone in one and the switches share a third — which is the reference's
+  // arrangement and the shape a second switch drops into rather than
+  // occasioning a rebuild.
+  it("puts each chooser on its own card and the switches together", async () => {
+    const user = userEvent.setup();
+    renderModule({}, { url: "/list/l1?view=board" });
+
+    const dialog = await openDialog(user, "/list/l1?view=board");
+    const groups = [...dialog.querySelectorAll(".tm-view-group")];
+    expect(groups).toHaveLength(3);
+
+    // The switch is not sharing with `Kanban Size`, which is the grouping
+    // this replaced getting it wrong by accident rather than on purpose.
+    const withSwitch = groups.filter((g) => g.querySelector("[role=\"switch\"]"));
+    expect(withSwitch).toHaveLength(1);
+    expect(withSwitch[0].querySelectorAll("select")).toHaveLength(0);
+
+    // And every row still sits inside one — a row loose in the dialog would
+    // have no card at all now that the row is not one.
+    expect(dialog.querySelectorAll(".tm-view-option")).toHaveLength(
+      dialog.querySelectorAll(".tm-view-group .tm-view-option").length,
+    );
+  });
+
   // The value is per Scope (§3.3), so what the dialog writes is a record under
   // this Scope's key and nothing else in the map is disturbed.
   it("writes under this Scope's key, leaving the others alone", async () => {

@@ -14,10 +14,15 @@
 // shell `ListManager` uses, which is this app's shape for a dialog that is not
 // a question.
 //
-// Each row is its own card with the label on the left and the value on the
-// right, which is §1.2's arrangement. Only the rows this Scope can answer are
-// drawn — a Scope with no Board has nothing to say about a Board's column
-// width, and §15.5 sends that case to hide rather than to disable.
+// Rows are the label on the left and the value on the right, and they sit in
+// GROUPS — one card per group, not per row (§13.8). The reference app puts
+// each of the two choosers on its own card and the switches together on a
+// third: a card is a claim that its rows belong together, and two switches
+// that both say what a card carries do.
+//
+// Only the rows this Scope can answer are drawn — a Scope with no Board has
+// nothing to say about a Board's column width, and §15.5 sends that case to
+// hide rather than to disable.
 import { useT } from "../../i18n";
 import {
   SCOPE_DATE_BY,
@@ -68,62 +73,71 @@ export function ScopeViewOptionsDialog({
         </header>
 
         <div className="tm-view-options">
-          <div className="tm-view-option">
-            <span className="tm-view-option-label">{t("tasks.showDateBy")}</span>
-            {/* A `<select>` and not a popover: two choices, no icons, and the
-                platform's own control already says "there are other values
-                behind this one". */}
-            <select
-              className="tm-view-option-value"
-              value={options.dateBy}
-              aria-label={t("tasks.showDateBy")}
-              onChange={(event) => onChange({ dateBy: event.target.value as ScopeDateBy })}
-            >
-              {SCOPE_DATE_BY.map((value) => (
-                <option key={value} value={value}>
-                  {t(`tasks.dateBy.${value}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {hasBoard ? (
+          <div className="tm-view-group">
             <div className="tm-view-option">
-              <span className="tm-view-option-label">{t("tasks.kanbanSize")}</span>
-              {/* §3.6: the WIDTH of a column, not the height of a card. The
-                  Board scrolls sideways, so the question a size answers is how
-                  many columns fit — a card's height is its content's. */}
+              <span className="tm-view-option-label">{t("tasks.showDateBy")}</span>
+              {/* A `<select>` and not a popover: two choices, no icons, and the
+                  platform's own control already says "there are other values
+                  behind this one". */}
               <select
                 className="tm-view-option-value"
-                value={options.kanbanSize}
-                aria-label={t("tasks.kanbanSize")}
-                onChange={(event) =>
-                  onChange({ kanbanSize: event.target.value as ScopeKanbanSize })
-                }
+                value={options.dateBy}
+                aria-label={t("tasks.showDateBy")}
+                onChange={(event) => onChange({ dateBy: event.target.value as ScopeDateBy })}
               >
-                {SCOPE_KANBAN_SIZES.map((value) => (
+                {SCOPE_DATE_BY.map((value) => (
                   <option key={value} value={value}>
-                    {t(`tasks.kanbanSize.${value}`)}
+                    {t(`tasks.dateBy.${value}`)}
                   </option>
                 ))}
               </select>
             </div>
-          ) : null}
+          </div>
 
           {hasBoard ? (
-          <div className="tm-view-option">
-            <span className="tm-view-option-label">{t("tasks.showInputBox")}</span>
-            <button
-              type="button"
-              className={`tm-switch${options.showInputBox ? " is-on" : ""}`}
-              role="switch"
-              aria-checked={options.showInputBox}
-              aria-label={t("tasks.showInputBox")}
-              onClick={() => onChange({ showInputBox: !options.showInputBox })}
-            >
-              <span className="tm-switch-knob" aria-hidden="true" />
-            </button>
-          </div>
+            <div className="tm-view-group">
+              <div className="tm-view-option">
+                <span className="tm-view-option-label">{t("tasks.kanbanSize")}</span>
+                {/* §3.6: the WIDTH of a column, not the height of a card. The
+                    Board scrolls sideways, so the question a size answers is
+                    how many columns fit — a card's height is its content's. */}
+                <select
+                  className="tm-view-option-value"
+                  value={options.kanbanSize}
+                  aria-label={t("tasks.kanbanSize")}
+                  onChange={(event) =>
+                    onChange({ kanbanSize: event.target.value as ScopeKanbanSize })
+                  }
+                >
+                  {SCOPE_KANBAN_SIZES.map((value) => (
+                    <option key={value} value={value}>
+                      {t(`tasks.kanbanSize.${value}`)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : null}
+
+          {/* The switches, together on one card. One of them so far; the card
+              is what a second joins, rather than a shape to build when one
+              arrives. */}
+          {hasBoard ? (
+            <div className="tm-view-group">
+              <div className="tm-view-option">
+                <span className="tm-view-option-label">{t("tasks.showInputBox")}</span>
+                <button
+                  type="button"
+                  className={`tm-switch${options.showInputBox ? " is-on" : ""}`}
+                  role="switch"
+                  aria-checked={options.showInputBox}
+                  aria-label={t("tasks.showInputBox")}
+                  onClick={() => onChange({ showInputBox: !options.showInputBox })}
+                >
+                  <span className="tm-switch-knob" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
           ) : null}
         </div>
       </div>
