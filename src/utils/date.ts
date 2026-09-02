@@ -104,6 +104,24 @@ export function formatDate(dateValue: string, locale: Language = "en"): string {
   );
 }
 
+/**
+ * A day as its weekday alone — `Fri`, `금요일`.
+ *
+ * Drawn inside a row beside a title, so it has to be short. English is cut
+ * to `Fri` because `Friday` is nine characters of the title's width; Korean
+ * is NOT, because `short` there is the single letter `월`, which is also the
+ * word for `month` — and `다음 주 월` reads as an unfinished sentence. The
+ * long form is three characters, so Korean pays nothing for being clear.
+ *
+ * `Intl` rather than a catalogue key: there are seven of them per language
+ * and the platform already has all of them right.
+ */
+export function formatWeekday(dateValue: string, locale: Language = "en"): string {
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
+    weekday: locale === "ko" ? "long" : "short",
+  }).format(new Date(`${dateValue}T00:00:00`));
+}
+
 export function getMonthDays(anchor = new Date()): string[] {
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const last = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);

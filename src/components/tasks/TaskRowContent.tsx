@@ -26,12 +26,14 @@
 // views — the List's drag handle and its ⋯ menu, the Board's move-to-column
 // select, the matrix card's drag-to-a-day. Those are not a row; they are what
 // the view does with a row.
-import type { Task } from "../../types";
+import type { Language, Task } from "../../types";
 import { isCompleted } from "../../domain/tasks/taskState";
 import { useT } from "../../i18n";
 import { countdownLabel } from "../../domain/view/countdown";
+import { taskTimeLabel, type TaskTimeLabel } from "../../domain/view/taskTime";
 import type { ScopeDateBy } from "../../domain/view/scopeViewOptions";
-import { formatDate, todayValue } from "../../utils/date";
+import { formatDate, formatWeekday, todayValue } from "../../utils/date";
+import { getWeekStartPref } from "../../utils/appPrefs";
 
 interface TaskRowContentProps {
   task: Task;
@@ -73,6 +75,32 @@ interface TaskRowContentProps {
   today?: string;
 }
 
+/**
+ * The descriptor as the words a row draws.
+ *
+ * A function rather than the ternary it replaced, which had grown five deep:
+ * the shape of a `TaskTimeLabel` is a union with three arms and a `switch`
+ * is what reads one. It also makes the compiler check that all three are
+ * answered.
+ */
+function writeTaskTime(
+  label: TaskTimeLabel | null,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  lang: Language,
+): string {
+  if (label === null) return "";
+  switch (label.kind) {
+    case "word":
+      return t(label.key);
+    case "weekday":
+      return label.nextWeek
+        ? t("view.nextWeekday", { day: formatWeekday(label.date, lang) })
+        : formatWeekday(label.date, lang);
+    case "date":
+      return formatDate(label.date, lang);
+  }
+}
+
 /** A body is drawn one line deep, so this is what a row reads of it. */
 function firstLine(text: string): string {
   const cut = text.indexOf(String.fromCharCode(10));
@@ -97,12 +125,17 @@ export function TaskRowContent({
   // what is left of it. Replaced rather than joined: a row that said both
   // would be answering one question twice, and the reference app swaps them in
   // the same slot.
-  const countdown = dateBy === "countdown" ? countdownLabel(task.dueDate, today ?? todayValue()) : null;
+  const day = today ?? todayValue();
+  const countdown = dateBy === "countdown" ? countdownLabel(task.dueDate, day) : null;
+  // §13.7: `Task Time` is not the raw date either. The reference app names
+  // the days a reader already has a word for — `Today`, `Tomorrow`, `Next
+  // Mon` — and falls back to `Aug 20` only when there is no name to use. It
+  // was `formatDate` unconditionally, which wrote `Sep 7` where the reference
+  // writes `Next Mon`.
+  const taskTime = countdown ? null : taskTimeLabel(task.dueDate, day, getWeekStartPref());
   const dueLabel = countdown
     ? t(countdown.key, { days: countdown.days })
-    : task.dueDate
-      ? formatDate(task.dueDate, lang)
-      : "";
+    : writeTaskTime(taskTime, t, lang);
   // Not on finished work (§19.5). "Overdue" is a thing to go and do, and a row
   // that has been ticked has had it done — a red date under a strike-through is
   // an alarm about a job that is already over.

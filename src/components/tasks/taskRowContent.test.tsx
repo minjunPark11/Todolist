@@ -44,6 +44,68 @@ function draw(overrides: Partial<Task> = {}, props: Partial<Parameters<typeof Ta
   );
 }
 
+// §13.7. `Task Time` was `formatDate` and nothing else, so the row wrote
+// `Sep 7` where the reference app writes `Next Mon`. TODAY is a Monday.
+describe("Show Date by: Task Time", () => {
+  it("uses the word for the days that have one", () => {
+    draw({ dueDate: TODAY });
+    expect(screen.getByText("Today")).toBeTruthy();
+
+    cleanup();
+    draw({ dueDate: "2026-09-01" });
+    expect(screen.getByText("Tomorrow")).toBeTruthy();
+  });
+
+  it("names the weekday inside this week, and marks the next one", () => {
+    // Fri Sep 4, four days out and in this same week (it starts Sunday).
+    draw({ dueDate: "2026-09-04" });
+    expect(screen.getByText("Fri")).toBeTruthy();
+
+    cleanup();
+    // Sun Sep 6 begins the week after.
+    draw({ dueDate: "2026-09-06" });
+    expect(screen.getByText("Next Sun")).toBeTruthy();
+  });
+
+  it("writes the date where there is no name to use", () => {
+    // A week out is far enough that `Mon` would be the wrong Monday.
+    draw({ dueDate: "2026-09-07" });
+    expect(screen.getByText("Sep 7")).toBeTruthy();
+
+    cleanup();
+    // And behind, where the reference falls back to a date too. Still red:
+    // the colour is the deadline being missed, not the words used for it.
+    draw({ dueDate: "2026-08-20" });
+    const late = screen.getByText("Aug 20");
+    expect(late.className).toContain("is-overdue");
+  });
+
+  // `short` in Korean is the single letter `월`, which is also the word for
+  // `month` — `다음 주 월` reads as a sentence that stops halfway. The long
+  // form costs three characters there, against nine for `Monday`.
+  it("writes a Korean weekday in full", () => {
+    render(
+      <I18nProvider lang="ko">
+        <TaskRowContent
+          task={task({ dueDate: "2026-09-06" })}
+          today={TODAY}
+          onOpen={vi.fn()}
+          onToggleDone={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+    expect(screen.getByText("다음 주 일요일")).toBeTruthy();
+  });
+
+  // The other half of the setting is untouched by all this: it replaces the
+  // date rather than joining it, so only one of the two is ever on the row.
+  it("gives way to the countdown when that is what was asked for", () => {
+    draw({ dueDate: "2026-09-06" }, { dateBy: "countdown" });
+    expect(screen.getByText("6d left")).toBeTruthy();
+    expect(screen.queryByText("Next Sun")).toBeNull();
+  });
+});
+
 describe("what a row says about a task", () => {
   it("carries all three tips, not the one the List used to have", () => {
     // COMPONENT_06 §7 measured date + note + repeat on a single reference row.

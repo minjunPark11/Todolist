@@ -742,6 +742,7 @@ export const ko: Dictionary = {
   "tasks.dateBy.taskTime": "작업 시간",
   "tasks.dateBy.countdown": "남은 기간",
   "view.daysLeft": "{{days}}일 남음",
+  "view.nextWeekday": "다음 주 {{day}}",
   "tasks.viewOptions": "보기 옵션",
   "tasks.showInputBox": "입력칸 보이기",
   "tasks.viewLabel": "보기 전환",

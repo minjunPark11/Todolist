@@ -750,6 +750,7 @@ export const en: Dictionary = {
   "tasks.dateBy.taskTime": "Task Time",
   "tasks.dateBy.countdown": "Countdown",
   "view.daysLeft": "{{days}}d left",
+  "view.nextWeekday": "Next {{day}}",
   "tasks.viewOptions": "View Options",
   "tasks.showInputBox": "Show Input Box",
   "tasks.viewLabel": "Switch view",
