@@ -55,33 +55,59 @@ describe("timelineWindow", () => {
 });
 
 describe("placeBar", () => {
-  const w = timelineWindow("week", "2026-08-15"); // 08-15 .. 08-21
+  const w = timelineWindow("week", "2026-08-15"); // 08-15 .. 08-21, seven days
 
-  it("gives a single-day bar exactly one column", () => {
+  /** A seventh of this window, which is one of its day columns. */
+  const DAY = 1 / 7;
+  const near = (value: number, want: number) => expect(value).toBeCloseTo(want, 6);
+
+  // §14: the geometry is the dates, not the columns they fall in. A one-day
+  // bar is one day WIDE — it used to be one column, which at week zoom made a
+  // three-day task and a seven-day one identical [실측].
+  it("gives a single-day bar exactly one day of width", () => {
     const p = placeBar(span("2026-08-15"), w)!;
-    expect(p).toMatchObject({ columnStart: 1, columnEnd: 2, clippedStart: false, clippedEnd: false });
+    near(p.left, 0);
+    near(p.width, DAY);
+    expect(p).toMatchObject({ clippedStart: false, clippedEnd: false });
   });
 
   it("spans start to end inclusive", () => {
+    // The 16th to the 18th is three days, and it begins one day in.
     const p = placeBar(span("2026-08-16", "2026-08-18"), w)!;
-    expect(p.columnStart).toBe(2);
-    expect(p.columnEnd).toBe(5); // exclusive end of the 4th column
+    near(p.left, DAY);
+    near(p.width, 3 * DAY);
+  });
+
+  // The difference the whole change exists for: two lengths that used to draw
+  // the same now differ.
+  it("draws a longer task longer", () => {
+    const three = placeBar(span("2026-08-16", "2026-08-18"), w)!;
+    const one = placeBar(span("2026-08-16"), w)!;
+    expect(three.width).toBeGreaterThan(one.width);
+    near(three.width / one.width, 3);
   });
 
   it("clips a bar that starts before the window", () => {
     const p = placeBar(span("2026-08-01", "2026-08-17"), w)!;
-    expect(p).toMatchObject({ columnStart: 1, clippedStart: true, clippedEnd: false });
+    near(p.left, 0);
+    // Only the part inside is drawn: the 15th to the 17th, three days.
+    near(p.width, 3 * DAY);
+    expect(p).toMatchObject({ clippedStart: true, clippedEnd: false });
   });
 
   it("clips a bar that runs past the window", () => {
     const p = placeBar(span("2026-08-20", "2026-09-30"), w)!;
-    expect(p).toMatchObject({ columnEnd: ZOOM_COLUMNS.week + 1, clippedStart: false, clippedEnd: true });
+    near(p.left, 5 * DAY);
+    near(p.left + p.width, 1);
+    expect(p).toMatchObject({ clippedStart: false, clippedEnd: true });
   });
 
   it("still renders a bar wider than the whole window", () => {
     // Disappearing at the zoom where it matters most is the worst outcome.
     const p = placeBar(span("2026-01-01", "2026-12-31"), w)!;
-    expect(p).toMatchObject({ columnStart: 1, columnEnd: ZOOM_COLUMNS.week + 1, clippedStart: true, clippedEnd: true });
+    near(p.left, 0);
+    near(p.width, 1);
+    expect(p).toMatchObject({ clippedStart: true, clippedEnd: true });
   });
 
   it("includes a bar that only touches an edge", () => {
@@ -94,17 +120,21 @@ describe("placeBar", () => {
     expect(placeBar(span("2026-08-01", "2026-08-14"), w)).toBeNull();
   });
 
-  it("places into the containing column at coarser zooms", () => {
-    const months = timelineWindow("year", "2026-01-01");
-    // Mid-month dates land in the month's column, not between columns.
+  // Months are uneven, so a fraction of the window is the only honest answer:
+  // March starts 59 days into a 365-day year, not at three twelfths of it.
+  it("measures a coarse window in days rather than in columns", () => {
+    const months = timelineWindow("year", "2026-01-01"); // 365 days
     const p = placeBar(span("2026-03-14", "2026-05-02"), months)!;
-    expect(p).toMatchObject({ columnStart: 3, columnEnd: 6 });
+    near(p.left, 72 / 365); // Jan 31 + Feb 28 + 13
+    near(p.width, 50 / 365); // Mar 14 → May 2 inclusive
   });
 
   it("handles a month window across a leap February", () => {
-    const months = timelineWindow("year", "2028-01-01");
+    const months = timelineWindow("year", "2028-01-01"); // 366 days
     expect(months.to).toBe("2028-12-31");
-    expect(placeBar(span("2028-02-29"), months)).toMatchObject({ columnStart: 2, columnEnd: 3 });
+    const p = placeBar(span("2028-02-29"), months)!;
+    near(p.left, 59 / 366); // Jan 31 + Feb 28
+    near(p.width, 1 / 366);
   });
 });
 

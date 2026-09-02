@@ -132,6 +132,12 @@
 .ff-timeline-bar,
 .ff-timeline-marker {
   grid-row: 1;
+  /* Positioned, not grid-placed (§14). A bar's geometry comes from its dates
+     now — `left` and `width` are fractions of the track — so it no longer
+     snaps to the column lines it used to be laid into. The track is already
+     `position: relative`; the cells behind it stay in the grid and are the
+     ruler. */
+  position: absolute;
   display: flex;
   align-items: center;
   gap: 4px;

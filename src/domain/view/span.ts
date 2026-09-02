@@ -45,6 +45,27 @@ export function spanForItem(item: Pick<Item, "startDate" | "dueDate">): Span | n
   return { start, end, inferredStart: !item.startDate || item.startDate !== start };
 }
 
+/** Midnight local, as milliseconds. The one place dates become numbers. */
+function midnight(date: string): number {
+  return new Date(`${date}T00:00:00`).getTime();
+}
+
+/**
+ * The half-open interval a span occupies, in milliseconds (§14).
+ *
+ * A bar used to be placed by which COLUMN its dates fell in, so it was always
+ * a whole number of columns wide — a three-day task and a seven-day one drew
+ * identically at week zoom [실측], and nudging a task by a day moved the bar
+ * by nothing at all. Placing it needs a continuous coordinate, and this is it.
+ *
+ * The end is EXCLUSIVE and runs to the end of the last day: a task due on the
+ * 4th occupies the 4th, so it ends at midnight on the 5th. A one-day bar is
+ * therefore a full day wide rather than zero.
+ */
+export function spanBounds(span: Span): { from: number; to: number } {
+  return { from: midnight(span.start), to: midnight(span.end) + 86400000 };
+}
+
 /** Inclusive day count, so a single-day bar is 1 rather than 0. */
 export function spanDays(span: Span): number {
   const start = Date.parse(`${span.start}T00:00:00Z`);

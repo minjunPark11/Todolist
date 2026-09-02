@@ -10,7 +10,7 @@
 // the same arithmetic can be tested without a DOM and reused if the rendering
 // ever changes.
 import { addDays, addMonths, daysBetween, getWeekStart } from "../../utils/date";
-import type { Span } from "./span";
+import { spanBounds, type Span } from "./span";
 
 /**
  * `life` is deliberately absent. A period with no first and no last day cannot
@@ -116,14 +116,29 @@ export function shiftWindow(window: TimelineWindow, direction: -1 | 1): string {
 }
 
 export interface BarPlacement {
-  /** 1-based CSS grid line where the bar starts. */
-  columnStart: number;
-  /** Exclusive CSS grid line where it ends; `grid-column: start / end`. */
-  columnEnd: number;
+  /**
+   * Where the bar begins and how wide it is, as fractions of the track (§14).
+   *
+   * Grid lines before: a bar spanned whole columns, so at week zoom a
+   * three-day task and a seven-day one were the same width, and moving a task
+   * one day moved the bar zero pixels [실측]. The dates decide the geometry
+   * now, and the columns are only the ruler drawn behind it.
+   */
+  left: number;
+  width: number;
   /** The bar begins before the window and was cut (D4). */
   clippedStart: boolean;
   /** The bar continues past the window and was cut. */
   clippedEnd: boolean;
+}
+
+/** The window as the half-open interval it covers, in milliseconds. */
+export function windowBounds(window: TimelineWindow): { from: number; to: number } {
+  const edges = window.edges;
+  return {
+    from: new Date(`${edges[0]}T00:00:00`).getTime(),
+    to: new Date(`${edges[edges.length - 1]}T00:00:00`).getTime(),
+  };
 }
 
 /** Index of the column containing `date`, or -1 when it falls outside. */
@@ -144,22 +159,23 @@ export function columnOf(date: string, window: TimelineWindow): number {
  * level where it matters most.
  */
 export function placeBar(span: Span, window: TimelineWindow): BarPlacement | null {
-  if (span.start > window.to || span.end < window.from) return null;
+  const view = windowBounds(window);
+  const bar = spanBounds(span);
+  // Half-open on both sides: a bar that ends exactly where the window begins
+  // occupies none of it.
+  if (bar.from >= view.to || bar.to <= view.from) return null;
 
-  const clippedStart = span.start < window.from;
-  const clippedEnd = span.end > window.to;
+  const total = view.to - view.from;
+  if (total <= 0) return null;
 
-  const startIndex = clippedStart ? 0 : columnOf(span.start, window);
-  const endIndex = clippedEnd ? ZOOM_COLUMNS[window.zoom] - 1 : columnOf(span.end, window);
-  // Both are in range here: the intersect test above already excluded the
-  // cases where a lookup could miss.
-  if (startIndex === -1 || endIndex === -1) return null;
+  const clippedStart = bar.from < view.from;
+  const clippedEnd = bar.to > view.to;
+  const from = clippedStart ? view.from : bar.from;
+  const to = clippedEnd ? view.to : bar.to;
 
   return {
-    columnStart: startIndex + 1,
-    // +2 = 1-based, plus one to make the end exclusive, so a single-column bar
-    // spans exactly one column rather than collapsing to zero width.
-    columnEnd: endIndex + 2,
+    left: (from - view.from) / total,
+    width: (to - from) / total,
     clippedStart,
     clippedEnd,
   };

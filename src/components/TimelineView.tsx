@@ -356,7 +356,12 @@ function TimelineRowView({
             .filter(Boolean)
             .join(" ")}
           style={{
-            gridColumn: `${placement.columnStart} / ${placement.columnEnd}`,
+            // §14: a fraction of the track, so the bar is as long as its dates
+            // are. `minWidth` keeps a one-day task from vanishing at the coarse
+            // zooms, where a day can be three pixels.
+            left: `${placement.left * 100}%`,
+            width: `${placement.width * 100}%`,
+            minWidth: "6px",
           }}
           // How TimelineConnectors finds this bar to measure it.
           data-bar-key={item.key}
