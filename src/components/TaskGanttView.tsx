@@ -17,10 +17,10 @@ import { useMemo, useState } from "react";
 import type { Project, Task } from "../types";
 import type { Item } from "../domain/view/item";
 import type { GroupContext, ViewSpec } from "../domain/view/viewSpec";
-import { patchForSpanDrag, type SpanDrag } from "../domain/view/board";
+import { patchForSpanDrag, patchForTrayDrop, type SpanDrag } from "../domain/view/board";
 import { spanForItem, spanIntersects } from "../domain/view/span";
 import { shiftWindow, timelineWindow, ZOOM_COLUMNS, type TimelineZoom } from "../domain/view/timeline";
-import { TimelineView } from "./TimelineView";
+import { TimelineView, TRAY_DRAG_MIME } from "./TimelineView";
 import { EmptyState } from "./kit";
 import { useT } from "../i18n";
 
@@ -55,6 +55,10 @@ export function TaskGanttView({
   const { t, lang } = useT();
   const [zoom, setZoom] = useState<TimelineZoom>("week");
   const [anchor, setAnchor] = useState<string>(today);
+  // Whether a chip is in the air. The lanes only exist while it is (§4):
+  // they cover the grid, so leaving them up would put a sheet of drop
+  // targets over every bar.
+  const [draggingChip, setDraggingChip] = useState(false);
   // D12: shown by default, and one click from gone.
   const [showDone, setShowDone] = useState(true);
 
@@ -91,6 +95,23 @@ export function TaskGanttView({
     const patch = patchForSpanDrag(task, drag);
     // An empty patch means the drag landed where the bar already was; writing
     // it would touch `updatedAt` and put a no-op row on the wire.
+    if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
+  }
+
+  /** A chip let go over a column (§3.2, §3.3). */
+  function handleTrayDrop(sourceId: string, columnIndex: number) {
+    // Here and not only in the chip's `onDragEnd`. A successful drop takes the
+    // Task out of the panel, so the chip unmounts and its handler goes with it
+    // — `dragend` then reaches nothing and the lanes stay up as a sheet over
+    // the whole grid [실측]. `onDragEnd` still covers the cancelled drag,
+    // where the chip is still there and no drop ever happens.
+    setDraggingChip(false);
+    if (!onUpdateTask) return;
+    const task = context.taskById.get(sourceId);
+    if (!task) return;
+    const patch = patchForTrayDrop(task, window, columnIndex);
+    // The domain already refuses a column off the end and a drop where the
+    // Task already is; an empty patch here is one of those.
     if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
   }
 
@@ -156,6 +177,8 @@ export function TaskGanttView({
           selectedTaskId={selectedTaskId}
           onOpenItem={onOpenItem}
           onDragItem={onUpdateTask ? handleDrag : undefined}
+          trayDragging={draggingChip}
+          onDropTray={onUpdateTask ? handleTrayDrop : undefined}
         />
       )}
 
@@ -183,7 +206,23 @@ export function TaskGanttView({
           <ul>
             {undated.map((item) => (
               <li key={item.key}>
-                <button type="button" className="tgv-chip" onClick={() => onOpenItem(item)} title={item.title}>
+                <button
+                  type="button"
+                  className="tgv-chip"
+                  title={item.title}
+                  // Only where a drop could be written. Read-only timelines
+                  // keep the chip as a way to OPEN the Task and nothing more.
+                  draggable={Boolean(onUpdateTask)}
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData(TRAY_DRAG_MIME, item.sourceId);
+                    event.dataTransfer.effectAllowed = "move";
+                    setDraggingChip(true);
+                  }}
+                  // Fires on a cancelled drag too, which is the case that
+                  // would otherwise leave the lanes up over the whole grid.
+                  onDragEnd={() => setDraggingChip(false)}
+                  onClick={() => onOpenItem(item)}
+                >
                   {item.title}
                 </button>
               </li>

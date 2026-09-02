@@ -35,6 +35,17 @@ import { useT } from "../i18n";
  */
 type DragKind = "move" | "start" | "end";
 const DRAG_MIME = "text/timeline";
+/**
+ * A chip from `Arrange tasks`, as distinct from a bar
+ * (TIMELINE_ARRANGE_TASKS_DESIGN.md §4, phase 3).
+ *
+ * Its own MIME rather than a value inside `DRAG_MIME`, so the two kinds of
+ * drag cannot be confused by a drop target that only understands one of
+ * them: a bar's cells read `DRAG_MIME` and find nothing on a chip drag,
+ * and the lanes read this one and find nothing on a bar drag. The payload
+ * is the Item's `sourceId`.
+ */
+export const TRAY_DRAG_MIME = "text/timeline-tray";
 
 export interface TimelineRow {
   item: Item;
@@ -58,6 +69,16 @@ interface TimelineViewProps {
   onOpenItem: (item: Item) => void;
   /** Absent makes the timeline read-only, which is what P1 shipped. */
   onDragItem?: (item: Item, drag: SpanDrag) => void;
+  /**
+   * A chip is being dragged right now, so the date lanes are live (§4).
+   *
+   * They are drawn ONLY then. A lane spans the full height of the grid and
+   * would otherwise sit over every bar, swallowing the clicks and the
+   * drags that belong to them.
+   */
+  trayDragging?: boolean;
+  /** Given the Item's id and the column it landed on. */
+  onDropTray?: (sourceId: string, columnIndex: number) => void;
 }
 
 export function TimelineView({
@@ -72,11 +93,16 @@ export function TimelineView({
   selectedTaskId = "",
   onOpenItem,
   onDragItem,
+  trayDragging = false,
+  onDropTray,
 }: TimelineViewProps) {
   const { t } = useT();
   const columns = ZOOM_COLUMNS[window.zoom];
   const nowColumn = todayColumn(window, today);
   const [dragKey, setDragKey] = useState("");
+  // Which lane the pointer is over, so the reader can see the day before
+  // letting go. A drop with no aim is a date chosen by accident.
+  const [overLane, setOverLane] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const groups = useMemo(() => applyView(items, spec, context), [items, spec, context]);
@@ -110,6 +136,34 @@ export function TimelineView({
         revision={`${items.length}:${window.anchor}:${window.zoom}:${spec.groupBy}`}
         containerRef={gridRef}
       />
+      {/* The one thing this design had to build: a drop target that belongs
+          to a COLUMN and not to a row. Every existing target is a cell in
+          some Item's own row, and a chip has no row — what it needs to say
+          is a DATE. */}
+      {onDropTray && trayDragging ? (
+        <div className="ff-timeline-lanes">
+          {Array.from({ length: columns }, (_, index) => (
+            <div
+              key={index}
+              className={`ff-timeline-lane${overLane === index ? " is-over" : ""}`}
+              onDragOver={(event) => {
+                // Without this the browser refuses the drop and the chip
+                // springs back with no explanation.
+                event.preventDefault();
+                setOverLane(index);
+              }}
+              onDragLeave={() => setOverLane((current) => (current === index ? null : current))}
+              onDrop={(event) => {
+                event.preventDefault();
+                setOverLane(null);
+                const sourceId = event.dataTransfer.getData(TRAY_DRAG_MIME);
+                if (sourceId) onDropTray(sourceId, index);
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+
       <header className="ff-timeline-head">
         <div className="ff-timeline-rowhead" />
         <div className="ff-timeline-columns">

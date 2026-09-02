@@ -49,6 +49,36 @@
 }
 .ff-timeline-col.is-today { color: var(--accent); font-weight: 800; }
 
+/* The date lanes (TIMELINE_ARRANGE_TASKS_DESIGN.md §4, phase 3).
+
+   One transparent column per day, over the whole grid, live only while a chip
+   is being dragged. `.ff-timeline` is already the positioning context — the
+   connector overlay uses it too — and the left offset is the label column plus
+   the row's own 8px gap, which is where the track begins. */
+.ff-timeline-lanes {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: calc(var(--timeline-label-width) + 8px);
+  display: grid;
+  grid-template-columns: repeat(var(--timeline-columns), minmax(0, 1fr));
+  /* Above the bars, so the drop is the lane's and not a bar's. Below the
+     sticky header's 2, which has to stay readable while aiming. */
+  z-index: 1;
+}
+
+/* Quiet until aimed at. A grid painted with a dozen boxes the moment a drag
+   starts is a grid the reader has to re-find their day in. */
+.ff-timeline-lane {
+  border-radius: 4px;
+}
+
+.ff-timeline-lane.is-over {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
 .ff-timeline-group { display: flex; flex-direction: column; gap: 2px; }
 .ff-timeline-group-head {
   font-size: 12px;
