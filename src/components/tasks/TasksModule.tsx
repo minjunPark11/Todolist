@@ -260,6 +260,41 @@ interface TasksModuleProps {
   focusBusy: boolean;
 }
 
+/**
+ * The three views, drawn (§13.4).
+ *
+ * Line art on the 24-viewBox grid at stroke 1.9, like the rest of the app's
+ * icons — an emoji would be the platform's drawing in the font's colour, and
+ * none of the three shapes below exists as one anyway.
+ *
+ * Each says what its view LOOKS like rather than what it is called: rows for
+ * the list, columns for the Board, staggered bars for the timeline. That is
+ * what makes three unlabelled squares readable, and it is why the button
+ * still carries the name for anyone who cannot see them.
+ */
+function ViewIcon({ view }: { view: TaskViewKind }) {
+  const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" } as const;
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+      {view === "list" ? (
+        <>
+          <path d="M9 6.5h11M9 12h11M9 17.5h11" {...stroke} />
+          <path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" {...stroke} strokeWidth={2.6} />
+        </>
+      ) : null}
+      {view === "board" ? (
+        <>
+          <path d="M5 4.5h4v15H5zM15 4.5h4v10h-4z" {...stroke} strokeLinejoin="round" />
+        </>
+      ) : null}
+      {view === "gantt" ? (
+        <>
+          <path d="M4.5 6.5h9M8 12h11M4.5 17.5h7" {...stroke} />
+        </>
+      ) : null}
+    </svg>
+  );
+}
 export function TasksModule(props: TasksModuleProps) {
   const { t } = useT();
   const {
@@ -364,13 +399,6 @@ export function TasksModule(props: TasksModuleProps) {
   const hasBoard = policy.allowedViews.includes("board");
   const prefix = (on: boolean) => (on ? String.fromCharCode(10003) + " " : "");
   const scopeMenuItems: MoreMenuItem[] = [
-    ...(policy.allowedViews.length > 1
-      ? policy.allowedViews.map((view) => ({
-          label: `${view === state.view ? "✓ " : ""}${t(`tasks.view.${view}`)}`,
-          onClick: () => setView(view),
-        }))
-      : []),
-    ...(policy.allowedViews.length > 1 ? [{ separator: true } as MoreMenuItem] : []),
     // Only on the Board: the list view already leaves finished work out of
     // its query (`isActive`), so there is nothing on that screen for this to
     // hide. §15.5 again — the same clause that took `Kanban Size` off the
@@ -1060,6 +1088,32 @@ export function TasksModule(props: TasksModuleProps) {
                   <path d="M10.3 10v5.5M13.7 10v5.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
                 </svg>
               </button>
+            </div>
+          ) : null}
+
+          {/* §16.26 Gate 3: only the views the Scope allows are offered, and
+              the selector is absent where there is nothing to choose rather
+              than shown with one option.
+
+              Icons rather than words, and the header rather than the ⋯
+              (§13.4 corrects §3.2). Switching view is the one thing here
+              that is done often enough to be worth its own room, and three
+              32px squares cost less of the header than three words did. */}
+          {policy.allowedViews.length > 1 ? (
+            <div className="tm-views" role="group" aria-label={t("tasks.viewLabel")}>
+              {policy.allowedViews.map((view) => (
+                <button
+                  key={view}
+                  type="button"
+                  className={`tm-view is-icon${view === state.view ? " is-current" : ""}`}
+                  aria-pressed={view === state.view}
+                  aria-label={t(`tasks.view.${view}`)}
+                  title={t(`tasks.view.${view}`)}
+                  onClick={() => setView(view)}
+                >
+                  <ViewIcon view={view} />
+                </button>
+              ))}
             </div>
           ) : null}
 

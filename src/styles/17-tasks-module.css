@@ -226,6 +226,18 @@
   cursor: pointer;
 }
 
+/* The header's selector is icons (§13.4). Square, on the 32px control grid,
+   and the padding that made room for words is gone with them. The `.tm-view`
+   above still dresses the Create List modal's text version, which is why
+   this is a modifier rather than a rewrite. */
+.tm-view.is-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
 .tm-view.is-current {
   background: var(--bg, #fff);
   color: var(--text, #1c1c1e);

@@ -476,25 +476,15 @@ describe("the Scope's menu", () => {
     return screen.getByRole("menu");
   };
 
-  it("holds the views, with the current one marked", async () => {
-    const user = userEvent.setup();
+  // §13.4 put the selector back in the header, as icons. The menu holds what
+  // a Scope SHOWS; switching view is done often enough to be worth its room.
+  it("draws the views in the header, with the current one pressed", () => {
     renderModule({}, { url: "/list/l1?view=board" });
 
-    // Gone from the header — that is the half of this change that is a
-    // removal, and a selector left in both places is the duplication this
-    // repo keeps deleting.
-    expect(document.querySelector(".tm-header .tm-views")).toBeNull();
-
-    await openScopeMenu(user);
-    expect(rows()).toEqual([
-      "List",
-      "✓ Board",
-      "Timeline",
-      // Only on the Board — the list view already leaves finished work out.
-      "Hide Completed",
-      "Show Details",
-      "View Options",
-    ]);
+    const views = document.querySelector(".tm-header .tm-views");
+    expect(views).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Board" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "List" }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("switches the view when one is chosen", async () => {
@@ -502,8 +492,7 @@ describe("the Scope's menu", () => {
     const onNavigate = vi.fn();
     renderModule({}, { url: "/list/l1?view=board", onNavigate });
 
-    await openScopeMenu(user);
-    await user.click(screen.getByRole("menuitem", { name: "Timeline" }));
+    await user.click(screen.getByRole("button", { name: "Timeline" }));
 
     // Asserted on the address rather than on the render: the view is a reading
     // of the URL (§15.9), and this harness hands the module a `onNavigate`
@@ -514,11 +503,18 @@ describe("the Scope's menu", () => {
     expect(onNavigate.mock.calls[0][0]).toContain("view=gantt");
   });
 
+  // §16.26 Gate 3: six of the eight Scopes have one view, and a single-option
+  // selector is not a choice.
+  it("draws no selector where there is nothing to choose", () => {
+    renderModule({}, { url: "/today" });
+    expect(document.querySelector(".tm-header .tm-views")).toBeNull();
+  });
+
   // §16.26 Gate 3, one level up from where it used to live: six of the eight
   // Scopes have one view, and a single-row radio is not a choice. The MENU
   // still opens — §3.1 gives it to every Scope that is not finished work, and
   // since phase 3 it carries `View Options` — but the view section is absent.
-  it("offers no views where there is nothing to choose", async () => {
+  it("holds what the Scope shows, and no views", async () => {
     const user = userEvent.setup();
     renderModule({}, { url: "/today" });
 
