@@ -7,8 +7,7 @@
 // different file with a different question. What is left is the one drag
 // whose meaning still lives here.
 import type { Task } from "../../types";
-import { addDays, addMonths } from "../../utils/date";
-import { columnStartDate, columnUnitOf, type TimelineWindow } from "./timeline";
+import { addDays } from "../../utils/date";
 import type { TaskMutation } from "../tasks/mutations";
 import type { TimelineZoom } from "./timeline";
 
@@ -18,18 +17,19 @@ import type { TimelineZoom } from "./timeline";
  * day-count delta would land it on the 31st of the wrong month.
  */
 export type SpanDrag =
-  | { kind: "move"; zoom: TimelineZoom; steps: number }
+  /**
+   * How far the POINTER moved, in days (§13).
+   *
+   * It used to be a column delta, which meant the smallest move at the default
+   * zoom was a whole week — a column there is a week. Days are what a reader
+   * means by "push it back a bit", and the view works them out from where the
+   * pointer fell inside a column rather than from the column alone.
+   *
+   * The zoom is gone with it: a day is a day at every zoom.
+   */
+  | { kind: "move"; days: number }
   | { kind: "resizeStart"; date: string }
   | { kind: "resizeEnd"; date: string };
-
-/** A column, in days or months — which is what `steps` counts (§12). */
-function shiftDate(date: string, zoom: TimelineZoom, steps: number): string {
-  if (!date) return date;
-  const unit = columnUnitOf(zoom);
-  if (unit === "day") return addDays(date, steps);
-  if (unit === "week") return addDays(date, steps * 7);
-  return addMonths(date, steps);
-}
 
 /**
  * What dragging a bar means as a change to the record.
@@ -95,12 +95,11 @@ export function dateMutation(task: Task, patch: Partial<Task>): TaskMutation | n
  * the same one ("Day and week columns are both identified by their first
  * day") and two rules for one question is one too many.
  */
-export function patchForTrayDrop(task: Task, window: TimelineWindow, columnIndex: number): Partial<Task> {
-  const date = columnStartDate(window, columnIndex);
-  // A column off the end of the window has no date, and a drop that lands
-  // where the Task already is writes nothing — the same two guards the resize
-  // branches keep, and for the same reason: an empty patch still costs an
-  // `updatedAt` and a row on the wire.
+export function patchForTrayDrop(task: Task, date: string): Partial<Task> {
+  // The caller reads the date off the pointer (§13), so a drop outside the
+  // track gives an empty one — and a drop that lands where the Task already is
+  // writes nothing, the same guard the resize branches keep and for the same
+  // reason: an empty patch still costs an `updatedAt` and a row on the wire.
   if (!date || date === task.dueDate) return {};
   return { dueDate: date };
 }
@@ -116,10 +115,11 @@ export function patchForSpanDrag(task: Task, drag: SpanDrag): Partial<Task> {
     return { dueDate: drag.date };
   }
 
-  if (drag.steps === 0) return {};
+  if (drag.days === 0) return {};
   const patch: Partial<Task> = {};
-  // Only what is already there. An absent field stays absent.
-  if (task.startDate) patch.startDate = shiftDate(task.startDate, drag.zoom, drag.steps);
-  if (task.dueDate) patch.dueDate = shiftDate(task.dueDate, drag.zoom, drag.steps);
+  // Only what is already there. An absent field stays absent — which is how a
+  // bar whose start was inferred keeps deriving it instead of freezing it.
+  if (task.startDate) patch.startDate = addDays(task.startDate, drag.days);
+  if (task.dueDate) patch.dueDate = addDays(task.dueDate, drag.days);
   return patch;
 }

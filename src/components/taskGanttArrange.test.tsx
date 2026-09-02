@@ -11,7 +11,7 @@
 // the rest, and wrapped under it when the grid would fall below its floor" is
 // measured in the running app and recorded in §7.2 instead.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import type { List, Task } from "../types";
 import type { TaskMutation } from "../domain/tasks/mutations";
 import { I18nProvider } from "../i18n";
@@ -19,7 +19,7 @@ import { TaskGanttView } from "./TaskGanttView";
 import { TRAY_DRAG_MIME } from "./TimelineView";
 import { projectItems } from "../domain/view/item";
 import { specForSpaceView } from "../domain/view/spaceViews";
-import { timelineWindow } from "../domain/view/timeline";
+import { dateAtColumnOffset, timelineWindow } from "../domain/view/timeline";
 
 const TODAY = "2026-09-02";
 
@@ -233,13 +233,30 @@ describe("dropping a chip on a day", () => {
     expect(lanes()).toHaveLength(0);
   });
 
-  it("writes the deadline of the column it was let go over", () => {
+  /**
+   * jsdom has no layout, so a lane reports a zero-width box and the date the
+   * pointer named would always come back empty (§13). The box is stood up by
+   * hand here — which is itself the fact worth pinning: the drop reads the
+   * POINTER now, not the column it fell in.
+   */
+  function standUp(lane: Element, left = 0, width = 100) {
+    lane.getBoundingClientRect = () =>
+      ({ left, width, right: left + width, top: 0, bottom: 24, height: 24, x: left, y: 0 }) as DOMRect;
+  }
+
+  it("writes the day the pointer named, not the column's first", () => {
     const onMutateTask = vi.fn();
     draw([task({ id: "bare", title: "Has neither" })], vi.fn(), onMutateTask);
 
     const transfer = dataTransfer(TRAY_DRAG_MIME, "bare");
     fireEvent.dragStart(chip(), { dataTransfer: transfer });
-    fireEvent.drop(lanes()[3], { dataTransfer: transfer });
+    standUp(lanes()[3]);
+    // `fireEvent.drop(node, { clientX })` does not carry the coordinate through
+    // this jsdom [실측] — the event has to be built and the property defined on
+    // it. Halfway across the lane, which at this zoom is halfway through a week.
+    const drop = createEvent.drop(lanes()[3], { dataTransfer: transfer });
+    Object.defineProperty(drop, "clientX", { value: 50 });
+    fireEvent(lanes()[3], drop);
 
     expect(onMutateTask).toHaveBeenCalledTimes(1);
     const [target, mutation] = onMutateTask.mock.calls[0];
@@ -249,11 +266,12 @@ describe("dropping a chip on a day", () => {
     // the field's PREVIOUS value — empty, because this Task had no deadline.
     expect(mutation.undo).toEqual({ dueDate: "" });
     expect(mutation.labelKey).toBe("tasks.undoDateChanged");
-    // The view opens on `1개월`, which is cut into WEEKS (§12) — so the fourth
-    // column is three weeks out, and the date written is the day that week
-    // BEGINS (§3.3). Not the day the pointer was over: at this zoom there is
-    // no such day, which is the whole reason that rule exists.
-    expect(patch).toEqual({ dueDate: timelineWindow("month", TODAY).edges[3] });
+    // The view opens on `1개월`, cut into WEEKS — and the day written is the
+    // one under the pointer, three days into that week rather than the Sunday
+    // it starts on. That difference is the whole of §13.
+    const window = timelineWindow("month", TODAY);
+    expect(patch).toEqual({ dueDate: dateAtColumnOffset(window, 3, 0.5) });
+    expect(patch.dueDate).not.toBe(window.edges[3]);
     // And only the deadline (§3.2).
     expect(patch).not.toHaveProperty("startDate");
   });

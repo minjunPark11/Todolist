@@ -9,7 +9,7 @@
 // Pure, and unaware of pixels. `placeBar` answers in grid column numbers so
 // the same arithmetic can be tested without a DOM and reused if the rendering
 // ever changes.
-import { addDays, addMonths, getWeekStart } from "../../utils/date";
+import { addDays, addMonths, daysBetween, getWeekStart } from "../../utils/date";
 import type { Span } from "./span";
 
 /**
@@ -168,6 +168,35 @@ export function placeBar(span: Span, window: TimelineWindow): BarPlacement | nul
 /** First day of a column — where a bar dropped on it should begin. */
 export function columnStartDate(window: TimelineWindow, index: number): string {
   return window.edges[index];
+}
+
+/**
+ * The day at `ratio` through a column (§13).
+ *
+ * A column is only a day at the shortest zoom; everywhere else it is a week or
+ * a month, and a gesture that can name only the column can name only that week
+ * or that month. Dragging a bar one column right moved it seven days [실측] —
+ * so the smallest nudge on the default screen was a week, and a drop never
+ * landed on the day it was aimed at.
+ *
+ * `ratio` is how far across the column the pointer fell, 0 to 1. The column's
+ * own length decides what that buys: a day column has one day and ignores it,
+ * a week has seven, a month has as many as it has. At month zoom a column is
+ * ~95px, so a day is ~3px — coarse, but coarse in the direction of "about the
+ * 15th" rather than "the 1st, always".
+ *
+ * Clamped inside the column: a ratio of 1 is its last day, never the first day
+ * of the next one.
+ */
+export function dateAtColumnOffset(window: TimelineWindow, index: number, ratio: number): string {
+  const start = window.edges[index];
+  const next = window.edges[index + 1];
+  // A column off the end of the window, or a pointer that reported no
+  // position: either would otherwise arrive as `NaN-NaN-NaN` in the record.
+  if (!start || !next || !Number.isFinite(ratio)) return start ?? "";
+  const days = daysBetween(start, next);
+  const offset = Math.min(Math.max(Math.floor(ratio * days), 0), Math.max(days - 1, 0));
+  return addDays(start, offset);
 }
 
 /**

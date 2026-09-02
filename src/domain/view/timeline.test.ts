@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Span } from "./span";
+import { addDays } from "../../utils/date";
 import {
   alignToZoom,
   columnUnitOf,
+  dateAtColumnOffset,
   placeBar,
   shiftWindow,
   timelineWindow,
@@ -116,5 +118,45 @@ describe("todayColumn", () => {
   it("reports nothing when today is off-window, so no marker is drawn", () => {
     const w = timelineWindow("week", "2026-08-15");
     expect(todayColumn(w, "2026-09-01")).toBeNull();
+  });
+});
+
+// §13. A column is a week or a month at three of the four zooms, so a gesture
+// that could name only the column could name only that week or that month.
+describe("dateAtColumnOffset", () => {
+  it("ignores the ratio where a column is already one day", () => {
+    const days = timelineWindow("week", "2026-09-02");
+    expect(dateAtColumnOffset(days, 2, 0)).toBe("2026-09-04");
+    expect(dateAtColumnOffset(days, 2, 0.9)).toBe("2026-09-04");
+  });
+
+  it("names the day inside a week column", () => {
+    const weeks = timelineWindow("month", "2026-09-02"); // columns start Sunday
+    const start = weeks.edges[1];
+    expect(dateAtColumnOffset(weeks, 1, 0)).toBe(start);
+    // Three days in, which is the difference the whole change exists for.
+    expect(dateAtColumnOffset(weeks, 1, 0.5)).toBe(addDays(start, 3));
+  });
+
+  // A ratio of 1 is the column's LAST day, never the first day of the next —
+  // otherwise the far edge of a column would silently belong to its neighbour.
+  it("stays inside the column at the far edge", () => {
+    const weeks = timelineWindow("month", "2026-09-02");
+    expect(dateAtColumnOffset(weeks, 1, 1)).toBe(addDays(weeks.edges[1], 6));
+    expect(dateAtColumnOffset(weeks, 1, 0.999999)).toBe(addDays(weeks.edges[1], 6));
+  });
+
+  it("spreads a month column across its own length", () => {
+    const months = timelineWindow("year", "2026-01-01"); // January, 31 days
+    expect(dateAtColumnOffset(months, 0, 0)).toBe("2026-01-01");
+    expect(dateAtColumnOffset(months, 0, 0.5)).toBe("2026-01-16");
+    expect(dateAtColumnOffset(months, 0, 1)).toBe("2026-01-31");
+  });
+
+  // Both would otherwise reach the record as `NaN-NaN-NaN`.
+  it("gives a usable date when the pointer reported nothing", () => {
+    const weeks = timelineWindow("month", "2026-09-02");
+    expect(dateAtColumnOffset(weeks, 1, Number.NaN)).toBe(weeks.edges[1]);
+    expect(dateAtColumnOffset(weeks, 99, 0.5)).toBe("");
   });
 });

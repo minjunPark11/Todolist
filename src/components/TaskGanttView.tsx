@@ -116,7 +116,7 @@ export function TaskGanttView({
   }
 
   /** A chip let go over a column (§3.2, §3.3). */
-  function handleTrayDrop(sourceId: string, columnIndex: number) {
+  function handleTrayDrop(sourceId: string, date: string) {
     // Here and not only in the chip's `onDragEnd`. A successful drop takes the
     // Task out of the panel, so the chip unmounts and its handler goes with it
     // — `dragend` then reaches nothing and the lanes stay up as a sheet over
@@ -126,9 +126,9 @@ export function TaskGanttView({
     if (!onMutateTask) return;
     const task = context.taskById.get(sourceId);
     if (!task) return;
-    // The domain already refuses a column off the end and a drop where the
-    // Task already is; a null here is one of those.
-    const mutation = dateMutation(task, patchForTrayDrop(task, window, columnIndex));
+    // The domain already refuses an empty date and a drop where the Task
+    // already is; a null here is one of those.
+    const mutation = dateMutation(task, patchForTrayDrop(task, date));
     if (mutation) onMutateTask(task, mutation);
   }
 
