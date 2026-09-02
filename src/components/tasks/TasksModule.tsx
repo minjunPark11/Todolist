@@ -62,7 +62,7 @@ import { useTaskDetailWidth } from "../../hooks/useTaskDetailWidth";
 import { addDays } from "../../utils/date";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
-import { isCompleted } from "../../domain/tasks/taskState";
+import { isCompleted, isTrashed } from "../../domain/tasks/taskState";
 import { folderIdFor } from "../../domain/tasks/sidebarFolders";
 import {
   createInInboxBucket,
@@ -597,32 +597,48 @@ export function TasksModule(props: TasksModuleProps) {
       // "Move to trash" and never to offer Pin or Start Focus at all.
       sections: [
         ...actionItemsFor(task, ["quick", "work"]),
-        {
-          id: "priority",
-          items: priorities.map((level) => ({
-            id: `priority-${level}`,
-            label: t(`priority.${level}`),
-            selected: task.priority === level,
-            icon: level === "none" ? null : <span className={`tm-menu-flag is-${level}`} />,
-            run: () => mutate(task, setTaskPriority(task, level)),
-          })),
-        },
-        {
-          id: "date",
-          items: [
-            { id: "date-today", label: t("tasks.menu.dueToday"), run: () => mutate(task, setTaskDueDate(task, today)) },
+        // Neither of the two while the Task is in the Trash
+        // (TRASH_PERMANENT_DELETE_DESIGN.md §15, Q5).
+        //
+        // §14 froze exactly these on the Detail — priority and the schedule
+        // change what a Task IS, and a deleted Task's lifecycle is settled —
+        // and this menu was the back door left open. Seven rows here undid
+        // the rule the panel beside them was keeping.
+        //
+        // The comment above is the same lesson one layer up: the registry
+        // learned that a trashed Task has four actions, and these two
+        // sections, written out by hand, did not. Hand-written items are how
+        // the row menu once offered a trashed Task `Move to trash`.
+        ...(isTrashed(task)
+          ? []
+          : [
             {
-              id: "date-tomorrow",
-              label: t("tasks.menu.dueTomorrow"),
-              run: () => mutate(task, setTaskDueDate(task, addDays(today, 1))),
+              id: "priority",
+              items: priorities.map((level) => ({
+                id: `priority-${level}`,
+                label: t(`priority.${level}`),
+                selected: task.priority === level,
+                icon: level === "none" ? null : <span className={`tm-menu-flag is-${level}`} />,
+                run: () => mutate(task, setTaskPriority(task, level)),
+              })),
             },
-            // Only where there is one to clear: an item that does nothing is
-            // an item the reader has to rule out every time they open this.
-            ...(task.dueDate
-              ? [{ id: "date-clear", label: t("tasks.menu.clearDue"), run: () => mutate(task, setTaskDueDate(task, "")) }]
-              : []),
-          ],
-        },
+            {
+              id: "date",
+              items: [
+                { id: "date-today", label: t("tasks.menu.dueToday"), run: () => mutate(task, setTaskDueDate(task, today)) },
+                {
+                  id: "date-tomorrow",
+                  label: t("tasks.menu.dueTomorrow"),
+                  run: () => mutate(task, setTaskDueDate(task, addDays(today, 1))),
+                },
+                // Only where there is one to clear: an item that does nothing is
+                // an item the reader has to rule out every time they open this.
+                ...(task.dueDate
+                  ? [{ id: "date-clear", label: t("tasks.menu.clearDue"), run: () => mutate(task, setTaskDueDate(task, "")) }]
+                  : []),
+              ],
+            },
+            ]),
         ...actionItemsFor(task, ["status", "danger"]),
       ],
     };

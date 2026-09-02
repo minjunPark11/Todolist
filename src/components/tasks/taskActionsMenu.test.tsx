@@ -272,20 +272,42 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     // rewrite the timestamp that had put the Task there (§15.66). The way out
     // the other side sits below it (TRASH_PERMANENT_DELETE_DESIGN.md §3.1).
     //
-    // What the REGISTRY contributes, rather than the whole list: this row menu
-    // draws priority and date sets of its own, which it still offers a trashed
-    // Task (§8.5 counts that and does not fix it). Pinning the exact list here
-    // would nail that down as intended.
-    const labels = rows();
-    expect(labels).toContain("Restore");
-    expect(labels).toContain("Delete forever");
-    expect(labels).toContain("Copy link");
-    expect(labels).not.toContain("Move to trash");
-    expect(labels).not.toContain("Pin");
-    expect(labels).not.toContain("Complete");
+    // The exact list, which this test would not pin while the menu still
+    // added priority and date sets of its own — §8.5 counted them and left
+    // them, and §15 took them away. They were the back door around §14's
+    // freeze: the Detail beside this menu drew the same two as facts.
+    // `Close` is the context menu's own last row, not the registry's.
+    expect(rows()).toEqual(["Copy link", "Task activities", "Restore", "Delete forever", "Close"]);
 
     await user.click(screen.getByRole("menuitem", { name: "Restore" }));
     expect(onMutate.mock.calls[0][1]).toEqual({ deletedAt: "" });
+  });
+
+  // §15 (Q5). The two sets were written out by hand in `taskMenuAt`, outside
+  // the registry that already knew a trashed Task has four actions — the same
+  // mistake, one layer up, as the `Move to trash` the comment there recalls.
+  it("adds no priority or date set to a trashed Task's row menu", async () => {
+    const user = userEvent.setup();
+    renderModule({ deletedAt: NOW, dueDate: "2026-08-20" }, { url: "/trash?task=t1" });
+    await openRowMore(user);
+
+    const labels = rows();
+    for (const gone of ["High", "Medium", "Low", "No priority", "Due today", "Due tomorrow", "Clear the date"]) {
+      expect(labels).not.toContain(gone);
+    }
+  });
+
+  // And the sets are still there for a Task that is not deleted: the gate is
+  // the Trash's, not a removal.
+  it("still adds them to a Task that is not in the Trash", async () => {
+    const user = userEvent.setup();
+    renderModule({ dueDate: "2026-08-20" });
+    await openRowMore(user);
+
+    const labels = rows();
+    expect(labels).toContain("High");
+    expect(labels).toContain("Due today");
+    expect(labels).toContain("Clear the date");
   });
 
   // §3.2: a thrown-away Task's Detail answers two questions and drops the rest.

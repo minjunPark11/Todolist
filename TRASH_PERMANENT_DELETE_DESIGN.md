@@ -262,7 +262,7 @@
 | ~~Q2~~ | ~~하위 작업이 있는 작업을 영구 삭제하면 자식도 함께 가는가~~ — **닫혔다**(§7.2). 자식은 **가지 않는다.** 최상위로 승격된다 |  |
 | ~~Q3~~ | ~~부모는 휴지통에 없고 자식만 휴지통에 있을 수 있는가~~ — **닫혔다**(§13). 있을 수 있었고, 그 행은 **어디에도 안 보이는데 `비우기`가 지웠다**. 휴지통만 예외로 자식을 보여준다 |  |
 | ~~Q4~~ | ~~`비우기`의 확인은 제자리인가 모달인가~~ — **닫혔다**(§10.2). 모달. 제자리로 바꿀 행이 없다 |  |
-| Q5 | 행의 `⋯`를 참조 앱이 정말로 안 주는가, 아니면 호버에만 나오는가 | 스크린샷 한 장 더 |
+| ~~Q5~~ | ~~행의 `⋯`를 참조가 정말 안 주는가~~ — **닫혔다**(§15). 캡처가 필요 없어졌다: 우리 §14가 이미 답을 갖고 있었고, 그 메뉴는 §14를 우회하는 **뒷문**이었다 |  |
 
 ---
 
@@ -698,3 +698,60 @@ it("keeps a deleted child out of Trash too, where it would also be a row")
   `span.sched-trigger.is-readonly.is-late "Schedule, Aug 20, 13d overdue"` ·
   `span.tm-priority-trigger.is-high.is-readonly "Priority, High"` · 전환 없음 ·
   제목·본문·`Restore`·`Delete forever` 살아 있음. 일반 작업은 `.is-readonly` 0개
+
+---
+
+## 15. Q5 — 캡처를 기다릴 필요가 없었다 (2026-09-02)
+
+### 15.1 질문이 바뀌었다
+
+원래 질문은 "참조 앱이 휴지통 행에 `⋯`를 안 주는가, 호버에만 주는가"였고 캡처 한 장을
+기다리고 있었다. §14를 만들고 나니 그 질문이 **우리 것이 아니게** 됐다.
+
+[실측] 우리 휴지통 행의 `⋯`가 열던 것:
+
+```
+Copy link · Task activities
+High · Medium · Low · No priority          ← 우선순위
+Due today · Due tomorrow · Clear the date  ← 일정
+Restore · Delete forever
+```
+
+§14가 상세에서 **정적 `<span>`으로 얼려놓은 바로 그 둘**이 여기서는 눌리고 있었다.
+패널이 지키던 규칙을 그 옆의 메뉴 일곱 줄이 되돌리고 있었다. 참조가 무엇을 하든,
+우리 규칙이 이미 답을 갖고 있었다.
+
+### 15.2 레지스트리는 옳았고, 손으로 쓴 두 구획이 몰랐다
+
+`actions.ts`의 `TRASHED_ACTIONS`는 이미 넷뿐이고 나머지를 `hidden`으로 보낸다.
+그런데 `TasksModule.taskMenuAt`이 우선순위와 일정 구획을 **레지스트리 밖에서 손으로**
+끼워 넣는다.
+
+그 함수 바로 위 주석이 같은 사고를 이미 기록해 두고 있었다.
+
+> Complete, Won't Do and Trash used to be written out here by hand — which is
+> how the row menu came to offer a trashed Task "Move to trash".
+
+**한 겹 위에서 같은 실수가 남아 있었다.** 레지스트리는 배웠고, 손으로 쓴 두 구획은
+배우지 못했다. `isTrashed(task)`로 둘을 막았다.
+
+### 15.3 시험이 이것을 정직하게 비워 뒀었다
+
+기존 시험은 정확한 목록을 박지 않고 이렇게 적어놨다.
+
+> What the REGISTRY contributes, rather than the whole list: this row menu draws
+> priority and date sets of its own, which it still offers a trashed Task (§8.5
+> counts that and does not fix it). **Pinning the exact list here would nail
+> that down as intended.**
+
+결함을 고정하지 않으려고 일부러 비워 둔 것이다 — 이 세션에서 마주친 다른 셋과 달리
+이 시험은 옳았다. 이제 박을 수 있게 됐으므로 박았다(문맥 메뉴 자신의 `Close` 포함).
+
+### 15.4 검증
+
+- 유닛 **2,298개 통과** · `tsc` 통과 · 전체 E2E **140 통과, 실패 0**(단독 7.9분)
+- 시험 셋: 휴지통 행 메뉴의 **정확한 목록** · 일곱 줄이 하나도 없다는 것 ·
+  버려지지 않은 작업에는 그대로 있다는 것
+- [실측] 실행 중인 앱: 휴지통 행의 `⋯`와 **우클릭** 둘 다
+  `Copy link · Task activities · Restore · Delete forever · Close`.
+  일반 작업은 17줄 그대로
