@@ -719,11 +719,14 @@ describe("View Options", () => {
     expect(document.querySelector(".tm-board")?.className).toContain("is-large");
   });
 
-  // §3.4: two entry points to one column is what the toggle exists to settle.
-  it("takes the column's way in away when it is off", async () => {
-    const user = userEvent.setup();
+  // §13.6 (Q1). This test used to assert the opposite — that turning the
+  // setting off left the column with NO way in — and the reference app's own
+  // screen says otherwise: the header grows a `+` the moment the row goes.
+  // The setting chooses WHERE the door is, not WHETHER there is one.
+  it("moves the column's way in rather than taking it away", () => {
     renderModule({}, { url: "/list/l1?view=board" });
-    expect(screen.getAllByRole("button", { name: /^Add a task to/ }).length).toBeGreaterThan(0);
+    expect(document.querySelector(".tm-column-add-row")).toBeTruthy();
+    expect(document.querySelector(".tm-column-add-head")).toBeNull();
 
     cleanup();
     renderModule(
@@ -733,10 +736,37 @@ describe("View Options", () => {
         scopeViewOptions: { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, showInputBox: false } },
       },
     );
-    expect(screen.queryByRole("button", { name: /^Add a task to/ })).toBeNull();
-    // And nothing took its place in the header — the `+` that used to be the
-    // other answer is gone for good.
-    expect(document.querySelector(".tm-column-add")).toBeNull();
+    expect(document.querySelector(".tm-column-add-row")).toBeNull();
+    expect(document.querySelector(".tm-column-add-head")).toBeTruthy();
+    // Still one per column and no more: the two are never both drawn.
+    const doors = screen.getAllByRole("button", { name: /^Add a task to/ });
+    expect(doors.length).toBe(document.querySelectorAll(".tm-column").length);
+  });
+
+  // The half that was actually broken: the header `+` was drawn by nothing,
+  // and the form it opens was gated on the same setting that hid the row —
+  // so a `+` there would have been a button that did nothing.
+  it("opens the same form from the header as from the row", async () => {
+    const user = userEvent.setup();
+    renderModule(
+      {},
+      {
+        url: "/list/l1?view=board",
+        scopeViewOptions: { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, showInputBox: false } },
+      },
+    );
+
+    const door = screen.getAllByRole("button", { name: /^Add a task to/ })[0];
+    const name = door.getAttribute("aria-label") ?? "";
+    await user.click(door);
+
+    expect(screen.getByRole("textbox", { name })).toBeTruthy();
+    // Its own `+` steps aside while the form is open — one door at a time —
+    // and the other columns keep theirs.
+    expect(screen.queryByRole("button", { name })).toBeNull();
+    expect(document.querySelectorAll(".tm-column-add-head").length).toBe(
+      document.querySelectorAll(".tm-column").length - 1,
+    );
   });
 });
 

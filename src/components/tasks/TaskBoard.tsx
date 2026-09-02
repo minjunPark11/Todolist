@@ -293,6 +293,32 @@ export function TaskBoard({
                 <h3>{label(column)}</h3>
               )}
               {cards.length > 0 ? <span className="tm-count">{cards.length}</span> : null}
+              {/* The other half of §3.4's door (Q1).
+
+                  `Show Input Box` moves the way in; it does not take it
+                  away. On, the door is a row at the top of the column; off,
+                  it is this — the reference app draws exactly one of the two
+                  at a time, in the header when the row is gone.
+
+                  Without it, turning the setting off left the column with no
+                  way to be added to. The Scope's own quick-add is still
+                  above the board, but what it cannot do is put the task in
+                  THIS column, and a column on a board IS the statement being
+                  made about the work.
+
+                  Hidden while its own form is open, for the same reason the
+                  row hides: one door at a time, and the form is already the
+                  answer to having opened it. */}
+              {onCreate && !showInputBox && adding !== column.id ? (
+                <button
+                  type="button"
+                  className="tm-column-add-head"
+                  aria-label={t("tasks.addToColumn", { column: label(column) })}
+                  onClick={() => (closeAdd(), setAdding(column.id))}
+                >
+                  +
+                </button>
+              ) : null}
               {/* Anchored to the BUTTON rather than to the pointer, so the menu
                   opens in the same place however it was triggered — including
                   from the keyboard, where there is no pointer to anchor to. */}
@@ -342,7 +368,10 @@ export function TaskBoard({
               </button>
             ) : null}
 
-            {onCreate && showInputBox && adding === column.id ? (
+            {/* Not gated on `showInputBox`: the setting chooses WHICH door
+                is drawn, and both open this. Gating it here made the header
+                `+` a button that did nothing. */}
+            {onCreate && adding === column.id ? (
               <form
                 className="tm-column-add-form"
                 onSubmit={(event) => {

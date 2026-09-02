@@ -1522,11 +1522,25 @@
   background: var(--accent-soft, rgba(10, 132, 255, 0.08));
 }
 
+/* Name and count together at the left, controls at the right (§13.6).
+
+   It was `space-between`, which spreads EVERY child evenly — so the count
+   floated in the middle of the header, 64px away from the title it counts,
+   and Q1's `+` landed in a third empty spot. The reference app writes
+   `Overdue 1` as two words: the count is part of the name, not a column of
+   its own. Measured at `/inbox?view=board`: title ended at x=691, count sat
+   at x=755. */
 .tm-column-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+}
+
+/* Whatever the first control turns out to be — the header carries the `+`,
+   the ⋯, either, or neither, and the gap belongs in front of the group
+   rather than to any one of them. */
+.tm-column-head > button:first-of-type {
+  margin-left: auto;
 }
 
 .tm-column-head h3 {
@@ -3603,4 +3617,31 @@
   color: var(--text-tertiary, #8e8e93);
   font-size: 12px;
   line-height: 1.4;
+}
+
+/* The column's way in when `Show Input Box` is off
+   (SCOPE_VIEW_OPTIONS_DESIGN.md §13.6, Q1).
+
+   Sized and coloured as `.tm-column-menu`, which is its neighbour and the only
+   other control in this header — two icon buttons side by side that did not
+   match would read as two different kinds of thing. 28px is §4.87's section
+   action, which is what this header's row is. */
+.tm-column-add-head {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-tertiary, #8e8e93);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tm-column-add-head:hover,
+.tm-column-add-head:focus-visible {
+  background: var(--bg-hover-content, rgba(0, 0, 0, 0.05));
+  color: var(--text-primary, #1c1c1e);
 }
