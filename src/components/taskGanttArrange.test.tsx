@@ -13,6 +13,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { List, Task } from "../types";
+import type { TaskMutation } from "../domain/tasks/mutations";
 import { I18nProvider } from "../i18n";
 import { TaskGanttView } from "./TaskGanttView";
 import { TRAY_DRAG_MIME } from "./TimelineView";
@@ -51,7 +52,7 @@ function task(over: Partial<Task> = {}): Task {
   } as Task;
 }
 
-function draw(tasks: Task[], onOpenItem = vi.fn(), onUpdateTask?: (id: string, patch: Partial<Task>) => void) {
+function draw(tasks: Task[], onOpenItem = vi.fn(), onMutateTask?: (task: Task, mutation: TaskMutation) => void) {
   const items = projectItems({ tasks, lists: [list], today: TODAY });
   render(
     <I18nProvider lang="en">
@@ -63,11 +64,11 @@ function draw(tasks: Task[], onOpenItem = vi.fn(), onUpdateTask?: (id: string, p
         tasks={tasks}
         groupLabel={() => "School"}
         onOpenItem={onOpenItem}
-        onUpdateTask={onUpdateTask}
+        onMutateTask={onMutateTask}
       />
     </I18nProvider>,
   );
-  return { onOpenItem, onUpdateTask };
+  return { onOpenItem, onMutateTask };
 }
 
 const chips = () =>
@@ -167,16 +168,21 @@ describe("dropping a chip on a day", () => {
   });
 
   it("writes the deadline of the column it was let go over", () => {
-    const onUpdateTask = vi.fn();
-    draw([task({ id: "bare", title: "Has neither" })], vi.fn(), onUpdateTask);
+    const onMutateTask = vi.fn();
+    draw([task({ id: "bare", title: "Has neither" })], vi.fn(), onMutateTask);
 
     const transfer = dataTransfer(TRAY_DRAG_MIME, "bare");
     fireEvent.dragStart(chip(), { dataTransfer: transfer });
     fireEvent.drop(lanes()[3], { dataTransfer: transfer });
 
-    expect(onUpdateTask).toHaveBeenCalledTimes(1);
-    const [id, patch] = onUpdateTask.mock.calls[0];
-    expect(id).toBe("bare");
+    expect(onMutateTask).toHaveBeenCalledTimes(1);
+    const [target, mutation] = onMutateTask.mock.calls[0];
+    const patch = mutation.patch;
+    expect(target.id).toBe("bare");
+    // §3.4: it arrives as something that can be taken back, and the undo is
+    // the field's PREVIOUS value — empty, because this Task had no deadline.
+    expect(mutation.undo).toEqual({ dueDate: "" });
+    expect(mutation.labelKey).toBe("tasks.undoDateChanged");
     // The view opens at `week` zoom, where a column is a WEEK — so the fourth
     // one is three weeks out, and the date written is the day that week
     // BEGINS (§3.3). Not the day the pointer was over: at this zoom there is
@@ -190,8 +196,8 @@ describe("dropping a chip on a day", () => {
   // the panel, so the chip UNMOUNTS and its `onDragEnd` goes with it. `dragend`
   // then reaches nothing and the lanes stay up as a sheet over the whole grid.
   it("takes the lanes away after a drop, without waiting for dragend", () => {
-    const onUpdateTask = vi.fn();
-    draw([task({ id: "bare" })], vi.fn(), onUpdateTask);
+    const onMutateTask = vi.fn();
+    draw([task({ id: "bare" })], vi.fn(), onMutateTask);
 
     const transfer = dataTransfer(TRAY_DRAG_MIME, "bare");
     fireEvent.dragStart(chip(), { dataTransfer: transfer });
@@ -204,12 +210,12 @@ describe("dropping a chip on a day", () => {
   // A bar drag carries `text/timeline` and nothing else, so a lane must find
   // no payload and write nothing.
   it("ignores a drop that is not carrying a chip", () => {
-    const onUpdateTask = vi.fn();
-    draw([task({ id: "bare" })], vi.fn(), onUpdateTask);
+    const onMutateTask = vi.fn();
+    draw([task({ id: "bare" })], vi.fn(), onMutateTask);
     fireEvent.dragStart(chip(), { dataTransfer: dataTransfer(TRAY_DRAG_MIME, "bare") });
 
     fireEvent.drop(lanes()[1], { dataTransfer: dataTransfer("text/timeline", "move") });
-    expect(onUpdateTask).not.toHaveBeenCalled();
+    expect(onMutateTask).not.toHaveBeenCalled();
   });
 
   // §3.5: a panel that can only be dragged from is a panel some readers

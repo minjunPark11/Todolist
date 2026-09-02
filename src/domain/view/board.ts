@@ -9,6 +9,7 @@
 import type { Task } from "../../types";
 import { addDays, addMonths } from "../../utils/date";
 import { columnStartDate, type TimelineWindow } from "./timeline";
+import type { TaskMutation } from "../tasks/mutations";
 import type { TimelineZoom } from "./timeline";
 
 /**
@@ -42,6 +43,36 @@ function shiftDate(date: string, zoom: TimelineZoom, steps: number): string {
  * writing it would freeze an inference into the record as if they had. The
  * start keeps being derived, and moves because the stored dates moved.
  */
+/**
+ * A date patch as something that can be taken back
+ * (TIMELINE_ARRANGE_TASKS_DESIGN.md §3.4, phase 4).
+ *
+ * Both timeline drags produced a bare patch and went out through
+ * `planner.updateTask`, so neither could be undone — while the row menu one
+ * screen over says of itself that "everything on it goes through `mutate`,
+ * so everything on it can be undone". Dropping a chip is the change that
+ * most wants taking back: it puts a date on work that had none, and the way
+ * back is to know which field to empty.
+ *
+ * The undo is the PREVIOUS VALUE of exactly the fields the patch writes, not
+ * the opposite verb (§9.35). That matters here because both fields are
+ * optional: a Task that never had a start and one whose start was cleared
+ * are different records, and putting back `""` where `undefined` was would
+ * be a change of its own dressed as an undo.
+ *
+ * Null for an empty patch. The two rules below already refuse a drag that
+ * lands where the bar was and a column past the end of the window; a
+ * mutation for those would be a toast offering to undo nothing.
+ */
+export function dateMutation(task: Task, patch: Partial<Task>): TaskMutation | null {
+  const keys = Object.keys(patch) as Array<"startDate" | "dueDate">;
+  if (keys.length === 0) return null;
+
+  const undo: Partial<Task> = {};
+  for (const key of keys) undo[key] = task[key];
+  return { patch, undo, labelKey: "tasks.undoDateChanged" };
+}
+
 /**
  * What dropping a dateless Task on a column means as a change to the record
  * (TIMELINE_ARRANGE_TASKS_DESIGN.md §3.2, §3.3, phase 2).

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../types";
-import { patchForSpanDrag, patchForTrayDrop } from "./board";
+import { dateMutation, patchForSpanDrag, patchForTrayDrop } from "./board";
 import { timelineWindow } from "./timeline";
 
 const TODAY = "2026-08-15";
@@ -144,5 +144,44 @@ describe("patchForTrayDrop", () => {
   // an inferred start into the record — this must not do it either.
   it("leaves an absent start absent", () => {
     expect(patchForTrayDrop(task(), week, 3)).not.toHaveProperty("startDate");
+  });
+});
+
+// §3.4 (phase 4). The timeline's two drags used to write straight through and
+// could not be taken back.
+describe("dateMutation", () => {
+  const week = timelineWindow("week", "2026-09-02");
+
+  it("carries the field's previous value back", () => {
+    const before = task({ dueDate: "2026-08-01" });
+    const mutation = dateMutation(before, patchForTrayDrop(before, week, 2));
+
+    expect(mutation?.patch).toEqual({ dueDate: week.edges[2] });
+    expect(mutation?.undo).toEqual({ dueDate: "2026-08-01" });
+    expect(mutation?.labelKey).toBe("tasks.undoDateChanged");
+  });
+
+  // §9.35: the undo is the state, not the reverse verb. Undoing a drop has to
+  // put the Task back among the dateless, which means writing the empty string
+  // the field actually held.
+  it("puts a Task that had no deadline back without one", () => {
+    const before = task();
+    expect(dateMutation(before, patchForTrayDrop(before, week, 1))?.undo).toEqual({ dueDate: "" });
+  });
+
+  // Moving a bar writes both fields, so both have to come back.
+  it("carries every field the patch touches, and no others", () => {
+    const before = task({ startDate: "2026-08-10", dueDate: "2026-08-12" });
+    const mutation = dateMutation(before, patchForSpanDrag(before, { kind: "move", zoom: "day", steps: 3 }));
+
+    expect(Object.keys(mutation?.patch ?? {}).sort()).toEqual(["dueDate", "startDate"]);
+    expect(mutation?.undo).toEqual({ startDate: "2026-08-10", dueDate: "2026-08-12" });
+  });
+
+  // A toast offering to undo nothing is worse than no toast.
+  it("is null for a drag that changed nothing", () => {
+    const before = task({ dueDate: week.edges[2] });
+    expect(dateMutation(before, patchForTrayDrop(before, week, 2))).toBeNull();
+    expect(dateMutation(before, patchForSpanDrag(before, { kind: "move", zoom: "day", steps: 0 }))).toBeNull();
   });
 });

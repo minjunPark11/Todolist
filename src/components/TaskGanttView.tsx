@@ -15,9 +15,10 @@
 // component asks that module and draws the answer.
 import { useMemo, useState } from "react";
 import type { Project, Task } from "../types";
+import type { TaskMutation } from "../domain/tasks/mutations";
 import type { Item } from "../domain/view/item";
 import type { GroupContext, ViewSpec } from "../domain/view/viewSpec";
-import { patchForSpanDrag, patchForTrayDrop, type SpanDrag } from "../domain/view/board";
+import { dateMutation, patchForSpanDrag, patchForTrayDrop, type SpanDrag } from "../domain/view/board";
 import { spanForItem, spanIntersects } from "../domain/view/span";
 import { shiftWindow, timelineWindow, ZOOM_COLUMNS, type TimelineZoom } from "../domain/view/timeline";
 import { TimelineView, TRAY_DRAG_MIME } from "./TimelineView";
@@ -37,8 +38,15 @@ interface TaskGanttViewProps {
   groupLabel: (groupId: string) => string;
   selectedTaskId?: string;
   onOpenItem: (item: Item) => void;
-  /** Omit to leave the timeline read-only. */
-  onUpdateTask?: (id: string, patch: Partial<Task>) => void;
+  /**
+   * Omit to leave the timeline read-only.
+   *
+   * A MUTATION, not a patch (§3.4). It used to be `planner.updateTask`
+   * straight through, which is why nothing done on this screen could be
+   * taken back — the row menu one screen over has said of itself since it
+   * was written that everything on it can be.
+   */
+  onMutateTask?: (task: Task, mutation: TaskMutation) => void;
 }
 
 export function TaskGanttView({
@@ -50,7 +58,7 @@ export function TaskGanttView({
   groupLabel,
   selectedTaskId = "",
   onOpenItem,
-  onUpdateTask,
+  onMutateTask,
 }: TaskGanttViewProps) {
   const { t, lang } = useT();
   const [zoom, setZoom] = useState<TimelineZoom>("week");
@@ -89,13 +97,14 @@ export function TaskGanttView({
   const isCurrentWindow = today >= window.from && today <= window.to;
 
   function handleDrag(item: Item, drag: SpanDrag) {
-    if (!onUpdateTask) return;
+    if (!onMutateTask) return;
     const task = context.taskById.get(item.sourceId);
     if (!task) return;
-    const patch = patchForSpanDrag(task, drag);
-    // An empty patch means the drag landed where the bar already was; writing
-    // it would touch `updatedAt` and put a no-op row on the wire.
-    if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
+    // Null means the drag landed where the bar already was; writing it
+    // would touch `updatedAt`, put a no-op row on the wire, and raise a
+    // toast offering to undo nothing.
+    const mutation = dateMutation(task, patchForSpanDrag(task, drag));
+    if (mutation) onMutateTask(task, mutation);
   }
 
   /** A chip let go over a column (§3.2, §3.3). */
@@ -106,13 +115,13 @@ export function TaskGanttView({
     // the whole grid [실측]. `onDragEnd` still covers the cancelled drag,
     // where the chip is still there and no drop ever happens.
     setDraggingChip(false);
-    if (!onUpdateTask) return;
+    if (!onMutateTask) return;
     const task = context.taskById.get(sourceId);
     if (!task) return;
-    const patch = patchForTrayDrop(task, window, columnIndex);
     // The domain already refuses a column off the end and a drop where the
-    // Task already is; an empty patch here is one of those.
-    if (Object.keys(patch).length > 0) onUpdateTask(task.id, patch);
+    // Task already is; a null here is one of those.
+    const mutation = dateMutation(task, patchForTrayDrop(task, window, columnIndex));
+    if (mutation) onMutateTask(task, mutation);
   }
 
   return (
@@ -176,9 +185,9 @@ export function TaskGanttView({
           columnLabels={columnLabels}
           selectedTaskId={selectedTaskId}
           onOpenItem={onOpenItem}
-          onDragItem={onUpdateTask ? handleDrag : undefined}
+          onDragItem={onMutateTask ? handleDrag : undefined}
           trayDragging={draggingChip}
-          onDropTray={onUpdateTask ? handleTrayDrop : undefined}
+          onDropTray={onMutateTask ? handleTrayDrop : undefined}
         />
       )}
 
@@ -212,7 +221,7 @@ export function TaskGanttView({
                   title={item.title}
                   // Only where a drop could be written. Read-only timelines
                   // keep the chip as a way to OPEN the Task and nothing more.
-                  draggable={Boolean(onUpdateTask)}
+                  draggable={Boolean(onMutateTask)}
                   onDragStart={(event) => {
                     event.dataTransfer.setData(TRAY_DRAG_MIME, item.sourceId);
                     event.dataTransfer.effectAllowed = "move";

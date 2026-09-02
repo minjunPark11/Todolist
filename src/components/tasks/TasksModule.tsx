@@ -1225,7 +1225,10 @@ export function TasksModule(props: TasksModuleProps) {
             }}
             selectedTaskId={state.taskId}
             onOpenItem={(item) => openTask(item.sourceId)}
-            onUpdateTask={props.drawer.onUpdate}
+            /* §3.4: through `mutate`, so a drag on the timeline can be
+               taken back like everything on the row's menu. It was
+               `props.drawer.onUpdate` — a raw patch, no undo. */
+            onMutateTask={mutate}
           />
         ) : state.view === "board" ? (
           <TaskBoard
