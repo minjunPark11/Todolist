@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
+import { COMPLETED_PAGE } from "../../domain/view/viewGroups";
 import {
   todayGroupOf,
   todayGroupOrder,
@@ -14,6 +15,9 @@ import {
   type TodayEntry,
 } from "../../utils/todayView";
 import { useT } from "../../i18n";
+import { formatDate } from "../../utils/date";
+import { listDisplayName } from "../../domain/spaces/hierarchy";
+import type { List } from "../../types";
 import { MoreMenu, type MoreMenuItem } from "../kit";
 import { MotionTaskRow } from "../motion/MotionTaskRow";
 
@@ -62,6 +66,8 @@ interface FocusQueueProps {
   today: string;
   /** Which question the list is grouped by (§3.4). */
   groupAxis: TodayGroupAxis;
+  /** For the list name on a row — the same one the Module's rows carry. */
+  lists: List[];
   /**
    * Moves everything in the `기한 지남` group onto today (§3.5).
    *
@@ -93,6 +99,7 @@ export function FocusQueue({
   onMoveBucket,
   today,
   groupAxis,
+  lists,
   onPostponeOverdue,
   openedTaskId,
   onAddTask,
@@ -154,36 +161,18 @@ export function FocusQueue({
       ) : (
         <>
           {groups.map((group) => (
-            <section className={`tdy-bucket is-${group.id}`} key={group.id}>
-              <header className="tdy-bucket-head">
-                <span className={`tdy-bucket-dot tdy-bucket-dot-${group.id}`} aria-hidden="true" />
-                <strong>{t(todayGroupLabelKey(group.id))}</strong>
-                <span className="tdy-bucket-count">{group.rows.length}</span>
-                {/* Only here. Every other group is work whose date is already
-                    what the reader meant; this is the one that is a backlog,
-                    and the reference app puts the way out of it on this
-                    header (§1.3). */}
-                {group.id === "overdue" ? (
-                  <button type="button" className="tdy-bucket-action" onClick={onPostponeOverdue}>
-                    {t("todayv.postponeOverdue")}
-                  </button>
-                ) : null}
-              </header>
-              <div className="tdy-rows">
-                <AnimatePresence initial={false}>
-                  {group.rows.map((entry) => (
-                    <FocusQueueRow
-                      key={entry.task.id}
-                      entry={entry}
-                      isOpen={entry.task.id === openedTaskId}
-                      onToggleDone={onToggleDone}
-                      onOpenTask={onOpenTask}
-                      onMoveBucket={onMoveBucket}
-                    />
-                  ))}
-                </AnimatePresence>
-              </div>
-            </section>
+            <TodayGroup
+              key={group.id}
+              group={group}
+              lists={lists}
+              today={today}
+              hideOverdueReason={groupAxis === "date"}
+              openedTaskId={openedTaskId}
+              onPostponeOverdue={onPostponeOverdue}
+              onToggleDone={onToggleDone}
+              onOpenTask={onOpenTask}
+              onMoveBucket={onMoveBucket}
+            />
           ))}
 
         </>
@@ -192,14 +181,127 @@ export function FocusQueue({
   );
 }
 
+/**
+ * One group: a header that collapses, and the rows under it (§1.3).
+ *
+ * Local state, not a stored setting — which is the Matrix's answer for the
+ * same control (`MatrixPage`'s group head). Whether a heading is folded right
+ * now is a moment's reading, not a preference worth carrying to another
+ * device.
+ *
+ * "완료" starts folded and the rest start open. That is the Inbox board's
+ * split rather than the Matrix's, and for the board's reason: this is a
+ * WORKING surface, and remaining work sliding down under finished work is the
+ * worst thing that can happen on a screen whose whole question is what is
+ * left.
+ */
+function TodayGroup({
+  group,
+  lists,
+  today,
+  hideOverdueReason,
+  openedTaskId,
+  onPostponeOverdue,
+  onToggleDone,
+  onOpenTask,
+  onMoveBucket,
+}: {
+  group: { id: TodayGroupId; rows: TodayEntry[] };
+  lists: List[];
+  today: string;
+  hideOverdueReason: boolean;
+  openedTaskId: string;
+  onPostponeOverdue: () => void;
+  onToggleDone: (taskId: string) => void;
+  onOpenTask: (taskId: string) => void;
+  onMoveBucket: (taskId: string, bucket: TodayBucketId) => void;
+}) {
+  const { t } = useT();
+  const finished = group.id === "completed";
+  const [open, setOpen] = useState(!finished);
+  const [shown, setShown] = useState(COMPLETED_PAGE);
+
+  // The cap is on finished work alone, and it is `COMPLETED_PAGE` rather than
+  // a number of this screen's own: the Matrix's boxes and the Board's columns
+  // already answer "how much of 완료 before the reader has to ask", and two
+  // constants that mean one rule are one rule that can drift.
+  const visible = finished ? group.rows.slice(0, shown) : group.rows;
+  const hidden = group.rows.length - visible.length;
+
+  return (
+    <section className={`tdy-bucket is-${group.id}`}>
+      <header className="tdy-bucket-head">
+        <button
+          type="button"
+          className="tdy-bucket-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <span className="tdy-bucket-caret" aria-hidden="true">{open ? "⌄" : "›"}</span>
+          <span className={`tdy-bucket-dot tdy-bucket-dot-${group.id}`} aria-hidden="true" />
+          <strong>{t(todayGroupLabelKey(group.id))}</strong>
+          <span className="tdy-bucket-count">{group.rows.length}</span>
+        </button>
+        {/* Only here. Every other group is work whose date is already what the
+            reader meant; this is the one that is a backlog, and the reference
+            app puts the way out of it on this header (§1.3). */}
+        {group.id === "overdue" ? (
+          <button type="button" className="tdy-bucket-action" onClick={onPostponeOverdue}>
+            {t("todayv.postponeOverdue")}
+          </button>
+        ) : null}
+      </header>
+
+      {open ? (
+        <div className="tdy-rows">
+          <AnimatePresence initial={false}>
+            {visible.map((entry) => (
+              <FocusQueueRow
+                key={entry.task.id}
+                entry={entry}
+                lists={lists}
+                today={today}
+                // §3.6: the group already says it. A row inside "기한 지남"
+                // that also says "기한 지남" is the screen making the same
+                // statement twice, and the group is the one that can say it
+                // once for everything under it.
+                hideOverdueReason={hideOverdueReason}
+                isOpen={entry.task.id === openedTaskId}
+                onToggleDone={onToggleDone}
+                onOpenTask={onOpenTask}
+                onMoveBucket={onMoveBucket}
+              />
+            ))}
+          </AnimatePresence>
+          {hidden > 0 ? (
+            <button
+              type="button"
+              className="tdy-bucket-more"
+              onClick={() => setShown((value) => value + COMPLETED_PAGE)}
+            >
+              {t("tasks.showMore")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function FocusQueueRow({
   entry,
+  lists,
+  today,
+  hideOverdueReason,
   isOpen,
   onToggleDone,
   onOpenTask,
   onMoveBucket,
 }: {
   entry: TodayEntry;
+  lists: List[];
+  today: string;
+  hideOverdueReason: boolean;
   isOpen: boolean;
   onToggleDone: (taskId: string) => void;
   onOpenTask: (taskId: string) => void;
@@ -208,6 +310,21 @@ function FocusQueueRow({
   const { t, lang } = useT();
   const { task, bucket, reason, completed } = entry;
   const startMin = parseTimeToMinutes(task.startTime);
+
+  // The same four the Module's rows carry, read the same way — which list, is
+  // there more behind the title, when is it due, and is that date late. A
+  // second answer to any of them is a second thing to keep in step.
+  const listName = listDisplayName(
+    lists.find((list) => list.id === task.listId),
+    t("common.list"),
+    t("status.inbox"),
+  );
+  const hasBody = Boolean(task.notes?.trim() || task.description?.trim());
+  const dueLabel = task.dueDate ? formatDate(task.dueDate, lang) : "";
+  // Not on finished work (§19.5): a red date under a strike-through is an
+  // alarm about a job that is already over.
+  const overdue = !completed && Boolean(task.dueDate) && task.dueDate < today;
+  const showReason = reason !== "none" && !(hideOverdueReason && reason === "overdue");
 
   const menuItems: MoreMenuItem[] = [
     ...BUCKETS.filter((candidate) => candidate !== bucket).map((candidate) => ({
@@ -261,15 +378,33 @@ function FocusQueueRow({
         >
           {task.title}
         </button>
-        {reason !== "none" ? (
-          <span className={`tdy-reason tdy-reason-${reason}`}>{t(`todayv.reason.${reason}`)}</span>
-        ) : null}
-        {task.estimatedMinutes > 0 ? (
-          <span className="tdy-estimate">{t("todayv.estimate", { n: task.estimatedMinutes })}</span>
-        ) : null}
-        {startMin !== undefined ? (
-          <span className="tdy-row-time">{formatMinuteOfDay(startMin, lang)}</span>
-        ) : null}
+        {/* §3.6: everything that is not the title, in one cluster at the far
+            end. The title is what is read first, and a badge between it and
+            the row's edge is a word the eye has to step over to get to the
+            date it was looking for. */}
+        <span className="tdy-row-meta">
+          {showReason ? (
+            <span className={`tdy-reason tdy-reason-${reason}`}>{t(`todayv.reason.${reason}`)}</span>
+          ) : null}
+          {task.estimatedMinutes > 0 ? (
+            <span className="tdy-estimate">{t("todayv.estimate", { n: task.estimatedMinutes })}</span>
+          ) : null}
+          {listName ? <span className="tdy-row-list">{listName}</span> : null}
+          {hasBody ? (
+            <span className="tdy-row-tip" role="img" aria-label={t("tasks.card.hasNotes")}>
+              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+                <path d="M5 4.5h9L19 9v10.5H5z" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+                <path d="M8.5 12.5h7M8.5 16h4.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+              </svg>
+            </span>
+          ) : null}
+          {startMin !== undefined ? (
+            <span className="tdy-row-time">{formatMinuteOfDay(startMin, lang)}</span>
+          ) : null}
+          {dueLabel ? (
+            <span className={`tdy-row-due${overdue ? " is-overdue" : ""}`}>{dueLabel}</span>
+          ) : null}
+        </span>
         <MoreMenu items={menuItems} label={t("todayv.rowMenuAria")} />
       </div>
     </MotionTaskRow>

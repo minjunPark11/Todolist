@@ -381,9 +381,54 @@
   margin-bottom: 10px;
 }
 
+/* The header is a button now (§1.3's caret). It carries the whole heading —
+   caret, dot, name, count — so the hit target is the heading rather than a
+   12px arrow beside it. The `Postpone` beside it stays its own button, which
+   is why this one does not stretch. */
+.tdy-bucket-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.tdy-bucket-caret {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
 .tdy-bucket-head strong {
   font-size: 15px;
   font-weight: 650;
+}
+
+/* "추가 보기" under a capped 완료 group — the same control the Matrix's boxes
+   and the Board's columns draw, at the same 5 (`COMPLETED_PAGE`). */
+.tdy-bucket-more {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.tdy-bucket-more:hover {
+  background: var(--accent-soft);
 }
 
 .tdy-bucket-dot {
@@ -524,6 +569,49 @@
   text-decoration: line-through;
 }
 
+/* Everything that is not the title, at the far end of the row (§3.6). The
+   title takes the space that is left, so a long one truncates instead of
+   pushing the date off the edge — the date is the fact the reader came to the
+   right-hand side for. */
+.tdy-row-meta {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 10px;
+}
+
+/* Which list it belongs to. Quiet: it is context, not the row's subject. */
+.tdy-row-list {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* "There is more behind the title" and nothing else — the same 12px glyph the
+   Module's rows use, so one mark means one thing across the app. */
+.tdy-row-tip {
+  display: inline-flex;
+  color: var(--text-tertiary);
+}
+
+.tdy-row-due {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Late is the app's danger colour here as it is on the Module's rows. Never on
+   finished work — §19.5, and `overdue` is computed with that in it. */
+.tdy-row-due.is-overdue {
+  color: var(--danger);
+}
+
 .tdy-row-time {
   flex-shrink: 0;
   font-size: 13px;
@@ -595,6 +683,10 @@ button.tdy-row-title {
   text-overflow: ellipsis;
 }
 
+/* `min-width` is gone with §3.6. It reserved a column so the badges lined up
+   down the list, which mattered while the badge sat between the title and the
+   edge; inside the meta cluster it would hold 74px of nothing open on every
+   row that has no reason to show. */
 .tdy-reason {
   flex-shrink: 0;
   display: inline-flex;
@@ -602,7 +694,6 @@ button.tdy-row-title {
   gap: 5px;
   font-size: 13px;
   font-weight: 600;
-  min-width: 74px;
 }
 
 .tdy-reason-overdue { color: var(--danger); }

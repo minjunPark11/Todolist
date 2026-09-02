@@ -11,7 +11,8 @@
 // pure function in `domain/view/viewGroups.test.ts`. What is untested there is
 // that THIS screen asks it, in `GROUP_ORDER`, with the empty groups dropped.
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { I18nProvider } from "../../i18n";
 import { FloatingLayerProvider } from "../floating";
 import { FocusQueue } from "./FocusQueue";
@@ -42,7 +43,12 @@ function entry(id: string, over: Partial<Task> = {}, completed = false): TodayEn
   } as TodayEntry;
 }
 
-function renderQueue(entries: TodayEntry[], showCompleted = true, axis: TodayGroupAxis = "date") {
+function renderQueue(
+  entries: TodayEntry[],
+  showCompleted = true,
+  axis: TodayGroupAxis = "date",
+  lists: never[] = [],
+) {
   render(
     <I18nProvider lang="en">
       <FloatingLayerProvider>
@@ -52,6 +58,7 @@ function renderQueue(entries: TodayEntry[], showCompleted = true, axis: TodayGro
         query=""
         today={TODAY}
         groupAxis={axis}
+        lists={lists}
         onPostponeOverdue={() => {}}
         openedTaskId=""
         showCompleted={showCompleted}
@@ -145,6 +152,87 @@ describe("the day's groups", () => {
   it("hides Completed when the reader has switched it off", () => {
     renderQueue([entry("due", { dueDate: TODAY }), entry("done", { dueDate: TODAY }, true)], false);
     expect(headings()).toEqual(["Today"]);
+  });
+});
+
+// §3.6: the title is read first, and everything else sits at the far end.
+describe("what a row says beside its title", () => {
+  const withList = (rows: TodayEntry[]) =>
+    renderQueue(rows, true, "date", [
+      { id: "l1", name: "학교", kind: "regular" } as never,
+    ]);
+
+  it("carries the list, the date, and a mark for a body it has", () => {
+    withList([entry("lab", { listId: "l1", dueDate: "2026-08-20", description: "notes" })]);
+
+    const meta = document.querySelector(".tdy-row-meta") as HTMLElement;
+    expect(meta).toBeTruthy();
+    expect(meta.querySelector(".tdy-row-list")?.textContent).toBe("학교");
+    expect(meta.querySelector(".tdy-row-due")?.textContent).toBeTruthy();
+    expect(meta.querySelector(".tdy-row-tip")).toBeTruthy();
+  });
+
+  it("marks a late date and leaves a finished one alone", () => {
+    withList([entry("late", { listId: "l1", dueDate: "2026-08-20" })]);
+    expect(document.querySelector(".tdy-row-due.is-overdue")).toBeTruthy();
+
+    cleanup();
+    // §19.5: a red date under a strike-through is an alarm about a job that is
+    // already over. The finished group starts folded (§3.4), so this has to
+    // open it before there is a row to read.
+    withList([entry("done", { listId: "l1", dueDate: "2026-08-20" }, true)]);
+    // `fireEvent`, not a raw `.click()`: outside `act` React does not flush the
+    // state change and the row would still be behind the fold.
+    fireEvent.click(document.querySelector(".tdy-bucket-toggle") as HTMLButtonElement);
+    expect(document.querySelector(".tdy-row-due")).toBeTruthy();
+    expect(document.querySelector(".tdy-row-due.is-overdue")).toBeNull();
+  });
+
+  // The group above it already said it. Saying it again on every row under
+  // that header is the screen making one statement twice.
+  it("drops the Overdue badge on the date axis, and keeps it on the plan axis", () => {
+    // `reason` is a field on the entry — `collectTodayEntries` works it out
+    // before the list ever sees it — so a fixture has to say so.
+    const late = { ...entry("late", { dueDate: "2026-08-20" }), reason: "overdue" } as TodayEntry;
+
+    renderQueue([late], true, "date");
+    expect(document.querySelector(".tdy-reason-overdue")).toBeNull();
+
+    cleanup();
+    renderQueue([{ ...late, bucket: "now", defaultBucket: "now" } as TodayEntry], true, "plan");
+    expect(document.querySelector(".tdy-reason-overdue")).toBeTruthy();
+  });
+
+  it("keeps the other reasons on both axes", () => {
+    renderQueue([{ ...entry("wait"), reason: "waiting" } as TodayEntry], true, "date");
+    expect(document.querySelector(".tdy-reason-waiting")).toBeTruthy();
+  });
+});
+
+// §1.3's caret, and §3.4's "완료됨 ← 접힘".
+describe("folding a group", () => {
+  it("starts open, and folds when the header is clicked", async () => {
+    const user = userEvent.setup();
+    renderQueue([entry("due", { dueDate: TODAY })]);
+
+    expect(document.querySelectorAll(".tdy-row")).toHaveLength(1);
+    await user.click(screen.getByRole("button", { expanded: true }));
+    expect(document.querySelectorAll(".tdy-row")).toHaveLength(0);
+    // The count stays on the header: what a fold hides is the rows, not how
+    // many there are.
+    expect(countFor("Today")).toBe("1");
+  });
+
+  // This is a WORKING surface. Remaining work sliding down under finished work
+  // is the worst thing that can happen on a screen whose whole question is
+  // what is left — the Inbox board's split rather than the Matrix's.
+  it("starts the finished group folded and the rest open", () => {
+    renderQueue([entry("due", { dueDate: TODAY }), entry("done", { dueDate: TODAY }, true)]);
+
+    const toggles = [...document.querySelectorAll(".tdy-bucket-toggle")];
+    expect(toggles.map((b) => b.getAttribute("aria-expanded"))).toEqual(["true", "false"]);
+    // One row drawn: the open one. The finished one is behind its caret.
+    expect(document.querySelectorAll(".tdy-row")).toHaveLength(1);
   });
 });
 

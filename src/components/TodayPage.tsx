@@ -546,6 +546,7 @@ export function TodayPage({
             onOpenTask={onOpenTask}
             today={today}
             groupAxis={groupAxis}
+            lists={lists}
             onPostponeOverdue={handlePostponeOverdue}
             openedTaskId={openedTaskId}
             onMoveBucket={handleMoveBucket}
