@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Span } from "./span";
 import { addDays } from "../../utils/date";
+import { spanBounds } from "./span";
 import {
   alignToZoom,
   columnUnitOf,
@@ -12,7 +13,7 @@ import {
   ZOOM_COLUMNS,
 } from "./timeline";
 
-const span = (start: string, end = start): Span => ({ start, end, inferredStart: false });
+const span = (start: string, end = start): Span => ({ start, end, inferredStart: false, startTime: "", endTime: "" });
 
 describe("timelineWindow", () => {
   it("starts a day-cut window on the date itself", () => {
@@ -29,7 +30,9 @@ describe("timelineWindow", () => {
     // §12: the year window is ROLLING now — twelve months from this one, not
     // pinned to January, because its columns are months like `6개월`'s.
     expect(timelineWindow("year", "2026-08-15").from).toBe("2026-08-01");
-    expect(alignToZoom("2026-08-15", "month")).toBe(timelineWindow("month", "2026-08-15").from);
+    // §15: an edge carries a clock, and `from` is that edge with the clock cut
+    // off — so the aligned anchor is compared against the edge itself.
+    expect(alignToZoom("2026-08-15", "month")).toBe(timelineWindow("month", "2026-08-15").edges[0]);
   });
 
   it("covers six months and a rolling year", () => {
@@ -162,7 +165,7 @@ describe("dateAtColumnOffset", () => {
 
   it("names the day inside a week column", () => {
     const weeks = timelineWindow("month", "2026-09-02"); // columns start Sunday
-    const start = weeks.edges[1];
+    const start = weeks.edges[1].slice(0, 10);
     expect(dateAtColumnOffset(weeks, 1, 0)).toBe(start);
     // Three days in, which is the difference the whole change exists for.
     expect(dateAtColumnOffset(weeks, 1, 0.5)).toBe(addDays(start, 3));
@@ -172,8 +175,9 @@ describe("dateAtColumnOffset", () => {
   // otherwise the far edge of a column would silently belong to its neighbour.
   it("stays inside the column at the far edge", () => {
     const weeks = timelineWindow("month", "2026-09-02");
-    expect(dateAtColumnOffset(weeks, 1, 1)).toBe(addDays(weeks.edges[1], 6));
-    expect(dateAtColumnOffset(weeks, 1, 0.999999)).toBe(addDays(weeks.edges[1], 6));
+    const start = weeks.edges[1].slice(0, 10);
+    expect(dateAtColumnOffset(weeks, 1, 1)).toBe(addDays(start, 6));
+    expect(dateAtColumnOffset(weeks, 1, 0.999999)).toBe(addDays(start, 6));
   });
 
   it("spreads a month column across its own length", () => {
@@ -186,7 +190,64 @@ describe("dateAtColumnOffset", () => {
   // Both would otherwise reach the record as `NaN-NaN-NaN`.
   it("gives a usable date when the pointer reported nothing", () => {
     const weeks = timelineWindow("month", "2026-09-02");
-    expect(dateAtColumnOffset(weeks, 1, Number.NaN)).toBe(weeks.edges[1]);
+    expect(dateAtColumnOffset(weeks, 1, Number.NaN)).toBe(weeks.edges[1].slice(0, 10));
     expect(dateAtColumnOffset(weeks, 99, 0.5)).toBe("");
+  });
+});
+
+// §15. One day, cut into hours — the only zoom where the record's own times
+// are legible, and the reason a boundary had to grow a clock.
+describe("the day window", () => {
+  const day = timelineWindow("day", "2026-09-02");
+
+  it("covers exactly the day it was anchored on", () => {
+    expect(day.from).toBe("2026-09-02");
+    expect(day.to).toBe("2026-09-02");
+    expect(day.edges).toHaveLength(25);
+  });
+
+  it("cuts it at every hour, ending on the next midnight", () => {
+    expect(day.edges[0]).toBe("2026-09-02T00:00");
+    expect(day.edges[9]).toBe("2026-09-02T09:00");
+    expect(day.edges[24]).toBe("2026-09-03T00:00");
+  });
+
+  // Everything else is midnight, which is what lets `from`/`to` go on being
+  // dates and every existing caller go on filtering with them.
+  it("leaves every other zoom's boundaries at midnight", () => {
+    for (const zoom of ["week", "month", "halfYear", "year"] as const) {
+      const w = timelineWindow(zoom, "2026-09-02");
+      expect(w.edges.every((edge) => edge.endsWith("T00:00"))).toBe(true);
+    }
+  });
+
+  // A column under a day long cannot name more than the date it sits in — the
+  // gestures write dates, and phase C is where an hour would be written.
+  it("names the day for any hour column", () => {
+    expect(dateAtColumnOffset(day, 9, 0.5)).toBe("2026-09-02");
+    expect(dateAtColumnOffset(day, 23, 0.9)).toBe("2026-09-02");
+  });
+});
+
+// §15: a span reads the hours the record set, so two tasks on one day are two
+// different bars rather than one shape drawn twice.
+describe("spanBounds with times", () => {
+  const at = (date: string, time: string) => new Date(`${date}T${time}:00`).getTime();
+
+  it("runs the whole day when the record set no times", () => {
+    const s = { start: "2026-09-02", end: "2026-09-02", inferredStart: false, startTime: "", endTime: "" };
+    expect(spanBounds(s)).toEqual({ from: at("2026-09-02", "00:00"), to: at("2026-09-03", "00:00") });
+  });
+
+  it("runs between the hours when it did", () => {
+    const s = { start: "2026-09-02", end: "2026-09-02", inferredStart: false, startTime: "09:00", endTime: "10:30" };
+    expect(spanBounds(s)).toEqual({ from: at("2026-09-02", "09:00"), to: at("2026-09-02", "10:30") });
+  });
+
+  // The Calendar lets a range be typed either way round, and a bar with a
+  // negative width would be worse than one drawn across the day it falls on.
+  it("falls back to the whole day when the hours are backwards", () => {
+    const s = { start: "2026-09-02", end: "2026-09-02", inferredStart: false, startTime: "18:00", endTime: "09:00" };
+    expect(spanBounds(s)).toEqual({ from: at("2026-09-02", "00:00"), to: at("2026-09-03", "00:00") });
   });
 });

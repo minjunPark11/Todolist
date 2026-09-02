@@ -143,10 +143,12 @@
   gap: 4px;
   min-width: 0;
   height: 24px;
-  /* 6, not 8. A one-day bar is one column wide, and the two handles already
-     take 12 of it — the extra 4 of padding was the difference between a
-     letter and nothing [실측]. */
-  padding: 0 6px;
+  /* No padding on the BAR (§15). With `box-sizing: border-box` the padding is
+     a floor on the width: 12px of it meant no bar could ever be narrower than
+     12px, which at hour zoom is 34 minutes — every meeting under half an hour
+     drew the same size [실측]. The text carries its own inset instead, and the
+     handles sit flush at the edges, which is where a grip belongs. */
+  padding: 0;
   border: none;
   border-radius: var(--radius-sm);
   background: var(--bar-color, var(--accent));
@@ -184,6 +186,9 @@
 
 .ff-timeline-bar-text {
   flex: 1;
+  /* The inset the bar used to carry — here it cannot become a floor on how
+     short a bar may be (§15). */
+  padding: 0 6px;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;

@@ -49,6 +49,7 @@ export const en: Dictionary = {
   // TimelinePage. What is left is the renderer's own vocabulary, which every
   // scope's Gantt view uses.
   "timeline.zoom": "Zoom",
+  "timeline.zoom.day": "1 day",
   "timeline.zoom.week": "1 week",
   "timeline.zoom.month": "1 month",
   "timeline.zoom.halfYear": "6 months",

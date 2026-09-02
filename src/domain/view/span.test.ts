@@ -13,7 +13,7 @@ describe("spanForItem", () => {
     expect(spanForItem(dates("2026-08-10", "2026-08-14"))).toEqual({
       start: "2026-08-10",
       end: "2026-08-14",
-      inferredStart: false,
+      inferredStart: false, startTime: "", endTime: "",
     });
   });
 
@@ -45,18 +45,18 @@ describe("spanForItem", () => {
 
 describe("spanDays", () => {
   it("counts both ends", () => {
-    expect(spanDays({ start: "2026-08-10", end: "2026-08-14", inferredStart: false })).toBe(5);
-    expect(spanDays({ start: "2026-08-10", end: "2026-08-10", inferredStart: false })).toBe(1);
+    expect(spanDays({ start: "2026-08-10", end: "2026-08-14", inferredStart: false, startTime: "", endTime: "" })).toBe(5);
+    expect(spanDays({ start: "2026-08-10", end: "2026-08-10", inferredStart: false, startTime: "", endTime: "" })).toBe(1);
   });
 
   it("counts across a month boundary and a leap day", () => {
-    expect(spanDays({ start: "2026-08-30", end: "2026-09-02", inferredStart: false })).toBe(4);
-    expect(spanDays({ start: "2028-02-28", end: "2028-03-01", inferredStart: false })).toBe(3);
+    expect(spanDays({ start: "2026-08-30", end: "2026-09-02", inferredStart: false, startTime: "", endTime: "" })).toBe(4);
+    expect(spanDays({ start: "2028-02-28", end: "2028-03-01", inferredStart: false, startTime: "", endTime: "" })).toBe(3);
   });
 });
 
 describe("spanIntersects", () => {
-  const span = { start: "2026-08-10", end: "2026-08-14", inferredStart: false };
+  const span = { start: "2026-08-10", end: "2026-08-14", inferredStart: false, startTime: "", endTime: "" };
 
   it("includes a bar that merely touches the window edge", () => {
     expect(spanIntersects(span, "2026-08-14", "2026-08-20")).toBe(true);

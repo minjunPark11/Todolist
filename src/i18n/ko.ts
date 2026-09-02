@@ -48,6 +48,7 @@ export const ko: Dictionary = {
   // `title`/`subtitle`과 축 라벨은 독립 TimelinePage의 것이었다. 남은 것은
   // 렌더러 자신의 어휘로, 모든 스코프의 간트 뷰가 함께 쓴다.
   "timeline.zoom": "확대",
+  "timeline.zoom.day": "하루",
   "timeline.zoom.week": "1주",
   "timeline.zoom.month": "1개월",
   "timeline.zoom.halfYear": "6개월",

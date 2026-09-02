@@ -31,7 +31,7 @@ import { TimelineView, TRAY_DRAG_MIME } from "./TimelineView";
 import { EmptyState } from "./kit";
 import { useT } from "../i18n";
 
-const ZOOMS: TimelineZoom[] = ["week", "month", "halfYear", "year"];
+const ZOOMS: TimelineZoom[] = ["day", "week", "month", "halfYear", "year"];
 
 interface TaskGanttViewProps {
   /** Already scoped by the caller; this narrows only by date. */
@@ -261,7 +261,13 @@ export function TaskGanttView({
 function columnLabel(edge: string, zoom: TimelineZoom, lang: string): string {
   // The UNIT, not the id (§12): `6개월` and `1년` are both months and label the
   // same way, and neither is a year-wide column any more.
-  if (columnUnitOf(zoom) === "month") {
+  const unit = columnUnitOf(zoom);
+  // The hour alone, where a column is an hour (§15). `HH:mm` needs about 34px
+  // and an hour column is 21 [실측] — the minutes are always `00` on a
+  // boundary anyway, so they were four characters of nothing that pushed the
+  // hour out of its own label.
+  if (unit === "hour") return edge.slice(11, 13);
+  if (unit === "month") {
     return lang === "ko" ? `${Number(edge.slice(5, 7))}월` : edge.slice(0, 7);
   }
   // Day and week columns are both identified by their first day.

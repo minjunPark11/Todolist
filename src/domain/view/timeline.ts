@@ -24,10 +24,10 @@ import { spanBounds, type Span } from "./span";
  * have at once: `6개월` and `1년` are both cut into months and differ only in
  * how many. The id and the unit are separate now.
  */
-export type TimelineZoom = "week" | "month" | "halfYear" | "year";
+export type TimelineZoom = "day" | "week" | "month" | "halfYear" | "year";
 
 /** What ONE column covers. Two zooms may share it and differ in length. */
-export type ColumnUnit = "day" | "week" | "month";
+export type ColumnUnit = "hour" | "day" | "week" | "month";
 
 /**
  * The four windows, and how each is cut.
@@ -42,6 +42,9 @@ export type ColumnUnit = "day" | "week" | "month";
  * 28 days and falls short of a month. Five is the nearest cut that covers one.
  */
 export const ZOOM_SPEC: Record<TimelineZoom, { unit: ColumnUnit; columns: number }> = {
+  // One day, hour by hour (§15). The only zoom where the record's times are
+  // legible at all — above it an hour is under a pixel.
+  day: { unit: "hour", columns: 24 },
   week: { unit: "day", columns: 7 },
   month: { unit: "week", columns: 5 },
   halfYear: { unit: "month", columns: 6 },
@@ -63,9 +66,15 @@ export interface TimelineWindow {
   /** First day of the first column. */
   anchor: string;
   /**
-   * Column boundaries, length = columns + 1. The extra entry is the day AFTER
-   * the last column, which is what makes the exclusive end of a bar and the
-   * "does it fit" test both fall out of the same array.
+   * Column boundaries as local `YYYY-MM-DDTHH:mm`, length = columns + 1.
+   *
+   * The extra entry is the boundary AFTER the last column, which is what makes
+   * the exclusive end of a bar and the "does it fit" test fall out of the same
+   * array.
+   *
+   * They carry a clock since §15. Everywhere but the day zoom every one of
+   * them is `T00:00`, and `from`/`to` slice it away — but a day cut into hours
+   * has 24 boundaries inside ONE date, and a date could not tell them apart.
    */
   edges: string[];
   /** Inclusive window bounds, for `spanIntersects`. */
@@ -83,16 +92,29 @@ export interface TimelineWindow {
  */
 export function alignToZoom(date: string, zoom: TimelineZoom): string {
   const unit = columnUnitOf(zoom);
-  if (unit === "day") return date;
-  if (unit === "week") return getWeekStart(date);
-  return `${date.slice(0, 7)}-01`;
+  // An hour window still BEGINS on a day: its columns divide that day rather
+  // than running from whatever hour the reader happened to be looking at.
+  const day =
+    unit === "hour" || unit === "day"
+      ? date.slice(0, 10)
+      : unit === "week"
+        ? getWeekStart(date.slice(0, 10))
+        : `${date.slice(0, 7)}-01`;
+  return `${day}T00:00`;
 }
 
-function advance(date: string, zoom: TimelineZoom, steps: number): string {
+function advance(at: string, zoom: TimelineZoom, steps: number): string {
   const unit = columnUnitOf(zoom);
-  if (unit === "day") return addDays(date, steps);
-  if (unit === "week") return addDays(date, steps * 7);
-  return addMonths(date, steps);
+  const day = at.slice(0, 10);
+  // The one unit that moves the clock rather than the calendar. 24 of them is
+  // one day, so the boundary after the last column is the next midnight.
+  if (unit === "hour") {
+    const hour = Number(at.slice(11, 13)) + steps;
+    return `${addDays(day, Math.floor(hour / 24))}T${String(((hour % 24) + 24) % 24).padStart(2, "0")}:00`;
+  }
+  if (unit === "day") return `${addDays(day, steps)}T00:00`;
+  if (unit === "week") return `${addDays(day, steps * 7)}T00:00`;
+  return `${addMonths(day, steps)}T00:00`;
 }
 
 export function timelineWindow(zoom: TimelineZoom, anchorDate: string): TimelineWindow {
@@ -104,9 +126,17 @@ export function timelineWindow(zoom: TimelineZoom, anchorDate: string): Timeline
     zoom,
     anchor,
     edges,
-    from: edges[0],
-    // Inclusive: the day before the boundary that follows the last column.
-    to: addDays(edges[count], -1),
+    // Dates, not boundaries: these two are the filter every caller uses to ask
+    // whether an Item belongs on this screen at all, and an Item is dated.
+    from: edges[0].slice(0, 10),
+    // Inclusive. The boundary after the last column is the next midnight, so
+    // the last day the window covers is the day before it — except where that
+    // boundary is mid-day, which only the hour zoom can produce and where the
+    // window is the one day it started on.
+    to:
+      edges[count].slice(11) === "00:00"
+        ? addDays(edges[count].slice(0, 10), -1)
+        : edges[count].slice(0, 10),
   };
 }
 
@@ -135,17 +165,23 @@ export interface BarPlacement {
 /** The window as the half-open interval it covers, in milliseconds. */
 export function windowBounds(window: TimelineWindow): { from: number; to: number } {
   const edges = window.edges;
-  return {
-    from: new Date(`${edges[0]}T00:00:00`).getTime(),
-    to: new Date(`${edges[edges.length - 1]}T00:00:00`).getTime(),
-  };
+  return { from: instantOf(edges[0]), to: instantOf(edges[edges.length - 1]) };
+}
+
+/** A `YYYY-MM-DDTHH:mm` boundary as local milliseconds. */
+function instantOf(edge: string): number {
+  return new Date(`${edge}:00`).getTime();
 }
 
 /** Index of the column containing `date`, or -1 when it falls outside. */
 export function columnOf(date: string, window: TimelineWindow): number {
   const count = ZOOM_COLUMNS[window.zoom];
+  // A date against boundaries that carry a clock: compared on the day alone,
+  // so a date lands in the first column of the day it falls on. The hour zoom
+  // therefore reports column 0 for its whole day, which is what a marker drawn
+  // from a DATE can honestly say.
   for (let i = 0; i < count; i += 1) {
-    if (date >= window.edges[i] && date < window.edges[i + 1]) return i;
+    if (date >= window.edges[i].slice(0, 10) && date < window.edges[i + 1].slice(0, 10)) return i;
   }
   return -1;
 }
@@ -183,7 +219,7 @@ export function placeBar(span: Span, window: TimelineWindow): BarPlacement | nul
 
 /** First day of a column — where a bar dropped on it should begin. */
 export function columnStartDate(window: TimelineWindow, index: number): string {
-  return window.edges[index];
+  return window.edges[index]?.slice(0, 10) ?? "";
 }
 
 /**
@@ -209,10 +245,14 @@ export function dateAtColumnOffset(window: TimelineWindow, index: number, ratio:
   const next = window.edges[index + 1];
   // A column off the end of the window, or a pointer that reported no
   // position: either would otherwise arrive as `NaN-NaN-NaN` in the record.
-  if (!start || !next || !Number.isFinite(ratio)) return start ?? "";
-  const days = daysBetween(start, next);
-  const offset = Math.min(Math.max(Math.floor(ratio * days), 0), Math.max(days - 1, 0));
-  return addDays(start, offset);
+  if (!start || !next) return "";
+  if (!Number.isFinite(ratio)) return start.slice(0, 10);
+  const days = Math.round((instantOf(next) - instantOf(start)) / 86400000);
+  // Under a day the column cannot name more than the day it sits in — which
+  // is the hour zoom, where the whole window is one date.
+  if (days < 1) return start.slice(0, 10);
+  const offset = Math.min(Math.max(Math.floor(ratio * days), 0), days - 1);
+  return addDays(start.slice(0, 10), offset);
 }
 
 /**
@@ -221,7 +261,7 @@ export function dateAtColumnOffset(window: TimelineWindow, index: number, ratio:
  * unusable otherwise.
  */
 export function columnEndDate(window: TimelineWindow, index: number): string {
-  return addDays(window.edges[index + 1], -1);
+  return addDays(window.edges[index + 1].slice(0, 10), -1);
 }
 
 /** True when the column contains today, for the "now" marker. */

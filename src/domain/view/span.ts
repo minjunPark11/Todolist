@@ -23,6 +23,20 @@ export interface Span {
    * actually set, so it can be shown without being asserted.
    */
   inferredStart: boolean;
+  /**
+   * `HH:mm` where the record set one, "" otherwise (§15).
+   *
+   * A span was days only, which is all any zoom above a day can draw. The day
+   * zoom cuts one day into hours, and a bar with no hour in it would fill the
+   * whole window — every task on that day drawn identically, which is the
+   * `1일`-shaped version of the fault §14 fixed for weeks.
+   *
+   * Read, never written: like `inferredStart`, this is a projection of what
+   * the record already holds (`Task.startTime` / `endTime`, which the Calendar
+   * has always edited).
+   */
+  startTime: string;
+  endTime: string;
 }
 
 /**
@@ -32,7 +46,9 @@ export interface Span {
  * blindly would render a backwards bar. Taking min/max over what is set means
  * the bar always covers the dates the user typed, whatever order they are in.
  */
-export function spanForItem(item: Pick<Item, "startDate" | "dueDate">): Span | null {
+export function spanForItem(
+  item: Pick<Item, "startDate" | "dueDate"> & Partial<Pick<Item, "startTime" | "endTime">>,
+): Span | null {
   const dates = [item.startDate, item.dueDate].filter(Boolean);
   if (dates.length === 0) return null;
 
@@ -42,12 +58,27 @@ export function spanForItem(item: Pick<Item, "startDate" | "dueDate">): Span | n
     if (date < start) start = date;
     if (date > end) end = date;
   }
-  return { start, end, inferredStart: !item.startDate || item.startDate !== start };
+  return {
+    start,
+    end,
+    inferredStart: !item.startDate || item.startDate !== start,
+    startTime: item.startTime ?? "",
+    endTime: item.endTime ?? "",
+  };
 }
+
+const DAY_MS = 86400000;
 
 /** Midnight local, as milliseconds. The one place dates become numbers. */
 function midnight(date: string): number {
   return new Date(`${date}T00:00:00`).getTime();
+}
+
+/** `HH:mm` as milliseconds past midnight; 0 for anything unreadable. */
+function minutesOf(time: string): number {
+  const [hour, minute] = time.split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
+  return (hour * 60 + minute) * 60000;
 }
 
 /**
@@ -63,7 +94,18 @@ function midnight(date: string): number {
  * therefore a full day wide rather than zero.
  */
 export function spanBounds(span: Span): { from: number; to: number } {
-  return { from: midnight(span.start), to: midnight(span.end) + 86400000 };
+  const dayStart = midnight(span.start);
+  const dayEnd = midnight(span.end) + DAY_MS;
+
+  // No hours set: the span is the whole of every day it touches, which is what
+  // every zoom above a day draws anyway.
+  const from = span.startTime ? dayStart + minutesOf(span.startTime) : dayStart;
+  const to = span.endTime ? midnight(span.end) + minutesOf(span.endTime) : dayEnd;
+
+  // A record can hold an end before its start — the Calendar allows a range to
+  // be typed either way round. Drawing a negative bar would be worse than
+  // drawing the day it falls on.
+  return to > from ? { from, to } : { from: dayStart, to: dayEnd };
 }
 
 /** Inclusive day count, so a single-day bar is 1 rather than 0. */
