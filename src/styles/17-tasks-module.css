@@ -387,7 +387,12 @@
 /* The List as a name and nothing else, where the row is somewhere its List is
    not. The coloured dot that was next to it was a second way of saying one
    word. */
-.tm-task-list {
+/* The two names a row can carry that are not its own: the List it is in, and
+   the Task it is under (Trash §13). Same treatment, because they answer the
+   same kind of question — where this row belongs — and a row in the Trash may
+   well show both. */
+.tm-task-list,
+.tm-task-parent {
   max-width: 10em;
   overflow: hidden;
   text-overflow: ellipsis;

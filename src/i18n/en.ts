@@ -886,6 +886,7 @@ export const en: Dictionary = {
   "tasks.reopenTask": "Reopen {{title}}",
   "tasks.card.repeats": "Repeats",
   "tasks.card.hasNotes": "Has notes",
+  "tasks.childOf": "Subtask of {{title}}",
   "tasks.rowMenu": "Actions for {{title}}",
   "tasks.menu.complete": "Complete",
   "tasks.menu.reopen": "Reopen",

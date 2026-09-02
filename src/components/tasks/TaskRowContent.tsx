@@ -47,6 +47,16 @@ interface TaskRowContentProps {
    */
   listName?: string;
   /**
+   * The parent's title, where the row is a child (Trash §13).
+   *
+   * A child is a row in exactly one Scope — the Trash — and there it looks
+   * like any top-level task. Without this, restoring one puts it back
+   * somewhere the reader was not looking and it reads as having vanished.
+   * `listName`'s reason exactly: the fact a row cannot get from where it
+   * sits.
+   */
+  parentTitle?: string;
+  /**
    * How this row says its deadline (SCOPE_VIEW_OPTIONS_DESIGN.md §3.5).
    *
    * Optional and `taskTime` by default: it is a SCOPE's setting, and the
@@ -111,6 +121,7 @@ export function TaskRowContent({
   onOpen,
   onToggleDone,
   listName,
+  parentTitle,
   dateBy = "taskTime",
   showDetails = false,
   showPriority = true,
@@ -153,7 +164,8 @@ export function TaskRowContent({
   // task has nothing to say — and the mark it replaces was absent in that case
   // too, so nothing about the quiet card changes.
   const bodyLine = showDetails ? body : "";
-  const hasTips = Boolean(listName) || repeats || hasBody || Boolean(dueLabel);
+  const hasTips =
+    Boolean(listName) || Boolean(parentTitle) || repeats || hasBody || Boolean(dueLabel);
   return (
     <>
       {/* A 17px box with the row's full height as its hit area. That is the
@@ -205,6 +217,15 @@ export function TaskRowContent({
             {/* The List as a name and nothing else. A coloured dot beside it
                 would be a second way of saying one word. */}
             {listName ? <span className="tm-task-list">{listName}</span> : null}
+            {/* `↳` and the parent's name, quiet, in the same cluster as the
+                List's. The arrow is what makes it a relationship rather
+                than a second list name. */}
+            {parentTitle ? (
+              <span className="tm-task-parent" title={t("tasks.childOf", { title: parentTitle })}>
+                <span aria-hidden="true">↳ </span>
+                {parentTitle}
+              </span>
+            ) : null}
             {repeats ? (
               <span className="tm-task-tip" role="img" aria-label={t("tasks.card.repeats")} title={t("tasks.card.repeats")}>
                 <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">

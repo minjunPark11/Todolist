@@ -412,6 +412,19 @@ export function TasksModule(props: TasksModuleProps) {
       { label: t("tasks.deleteList"), danger: true, onClick: () => props.lifecycle.onTrashList(ref.id) },
     ];
   }
+  /**
+   * Whose child this row is, or nothing where it is not one.
+   *
+   * Empty when the parent is gone as well: `removeTasksForever` promotes
+   * children to top level, so a row pointing at a record that no longer
+   * exists means the store is mid-something, not that the reader needs a
+   * dangling name.
+   */
+  function parentTitleOf(task: Task): string {
+    if (!task.parentTaskId) return "";
+    return tasks.find((row) => row.id === task.parentTaskId)?.title ?? "";
+  }
+
   const scopeMenuItems: MoreMenuItem[] = [
     // Only on the Board: the list view already leaves finished work out of
     // its query (`isActive`), so there is nothing on that screen for this to
@@ -1274,7 +1287,17 @@ export function TasksModule(props: TasksModuleProps) {
                   {/* The handle is the affordance, not the mechanism — the whole
                       row is draggable, and this is what says so (audit L-17). */}
                   {policy.canManualReorder ? <span className="tm-task-handle" aria-hidden="true" /> : null}
-                  <TaskRowContent task={task} today={today} dateBy={viewOptions.dateBy} showDetails={viewOptions.showDetails} onOpen={openTask} onToggleDone={toggleDone} />
+                  <TaskRowContent
+                    task={task}
+                    today={today}
+                    dateBy={viewOptions.dateBy}
+                    showDetails={viewOptions.showDetails}
+                    /* Only ever non-empty in the Trash: that is the one Scope
+                       a child is a row in (§13). */
+                    parentTitle={parentTitleOf(task)}
+                    onOpen={openTask}
+                    onToggleDone={toggleDone}
+                  />
                   {/* The other half of L-17, and the reason the menu is a
                       component: a right-click is not discoverable and does not
                       exist on a touch screen, so the same menu needs a button

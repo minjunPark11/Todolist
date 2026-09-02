@@ -188,7 +188,26 @@ export function matchesScope(
   // is remembered in eight. `addSubtask` writes a child Task today, so until
   // subtasks become their own records the exception is real — it just lives in
   // one line instead of one per Scope.
-  if (task.parentTaskId) return false;
+  //
+  // Except in the Trash (TRASH_PERMANENT_DELETE_DESIGN.md §13, Q3).
+  //
+  // The rule above is about where WORK is shown, and it is right everywhere
+  // work is the question: a child belongs to its parent's Detail, not to a
+  // list. The Trash is not a list of work. It is the list of records that
+  // were deleted and are waiting on a decision, which is why it is one of
+  // the two Scopes the `active` precondition does not reach either.
+  //
+  // Applying the rule here stranded them. `deleteSubtask` soft-deletes a
+  // promoted child — its own comment says "so it can be undone like any
+  // other" — and then `childrenOf` skips it for having `deletedAt` while
+  // this line kept it out of the Trash. The row was visible NOWHERE and
+  // could not be restored once the Undo toast was gone. Worse,
+  // `trashedTaskIds` reads `deletedAt` alone, so the same row was counted in
+  // the Trash's badge and destroyed by `Empty Trash` — a record that could
+  // be erased but never seen.
+  //
+  // Whatever the Trash's own button can delete, the Trash has to show.
+  if (task.parentTaskId && scope.kind !== "trash") return false;
 
   switch (scope.kind) {
     // §12.12 and §12.13 are the two Scopes the `active` precondition does not

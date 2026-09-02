@@ -361,9 +361,34 @@ describe("a subtask is not a row in any Scope (§13.3)", () => {
     }
   });
 
-  it("keeps a deleted child out of Trash too, where it would also be a row", () => {
+  // TRASH_PERMANENT_DELETE_DESIGN.md §13 (Q3). This test asserted the
+  // opposite and was holding a data-loss bug in place: a child deleted on
+  // its own was in no Scope, was skipped by `childrenOf` for having
+  // `deletedAt`, and so appeared on no screen at all — while
+  // `trashedTaskIds` still counted it and `Empty Trash` still destroyed it.
+  //
+  // The rule above is about where WORK is shown. The Trash shows records.
+  it("shows a deleted child in the Trash, which is the one Scope that must", () => {
     const gone = task({ id: "c", parentTaskId: "p", deletedAt: NOW });
-    expect(matchesScope(gone, { kind: "trash" }, ctx)).toBe(false);
+    expect(matchesScope(gone, { kind: "trash" }, ctx)).toBe(true);
+  });
+
+  // The exception is the Trash and nothing else: a child that is merely
+  // finished is still shown inside its parent, so it is not stranded and has
+  // no reason to become a row.
+  it("does not let the exception reach the other terminal Scopes", () => {
+    const done = task({ id: "c2", parentTaskId: "p", status: "done", completedAt: NOW });
+    expect(matchesScope(done, { kind: "completed" }, ctx)).toBe(false);
+  });
+
+  // The whole point of showing it: it can be picked out of the Trash again.
+  // `queryScopeTasks` is what the screen actually calls, so the row has to
+  // survive the collection path and not just the single-task predicate.
+  it("puts the deleted child in the Trash's rows, not only past the guard", () => {
+    const gone = task({ id: "c", parentTaskId: "p", deletedAt: NOW });
+    const withGone = context({ tasks: [parent, gone] });
+    expect(queryScopeTasks({ kind: "trash" }, withGone).map((row) => row.id)).toEqual(["c"]);
+    expect(queryScopeCount({ kind: "trash" }, withGone)).toBe(1);
   });
 });
 

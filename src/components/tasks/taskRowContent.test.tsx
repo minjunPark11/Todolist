@@ -44,6 +44,26 @@ function draw(overrides: Partial<Task> = {}, props: Partial<Parameters<typeof Ta
   );
 }
 
+// Trash §13 (Q3). A child is a row in exactly one Scope, and there it looked
+// like any top-level task — so restoring one put it back somewhere the reader
+// was not looking and it read as having vanished.
+describe("a row that is somebody's child", () => {
+  it("says whose, in the same cluster as the List name", () => {
+    draw({ dueDate: "" }, { parentTitle: "Ship the release" });
+
+    const chip = screen.getByTitle("Subtask of Ship the release");
+    expect(chip.textContent).toContain("Ship the release");
+    // The arrow is decoration on top of the name, not part of it — a screen
+    // reader gets the sentence from the title instead.
+    expect(chip.querySelector("[aria-hidden=\"true\"]")).toBeTruthy();
+  });
+
+  it("draws nothing where the row is nobody's child", () => {
+    draw();
+    expect(document.querySelector(".tm-task-parent")).toBeNull();
+  });
+});
+
 // §13.7. `Task Time` was `formatDate` and nothing else, so the row wrote
 // `Sep 7` where the reference app writes `Next Mon`. TODAY is a Monday.
 describe("Show Date by: Task Time", () => {

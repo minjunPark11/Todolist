@@ -857,6 +857,7 @@ export const ko: Dictionary = {
   "tasks.reopenTask": "{{title}} 완료 취소",
   "tasks.card.repeats": "반복하는 일",
   "tasks.card.hasNotes": "메모 있음",
+  "tasks.childOf": "{{title}}의 하위 작업",
   "tasks.rowMenu": "{{title}} 작업 메뉴",
   "tasks.menu.complete": "완료",
   "tasks.menu.reopen": "완료 취소",
