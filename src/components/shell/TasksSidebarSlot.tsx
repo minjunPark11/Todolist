@@ -56,6 +56,9 @@ export interface TasksSidebarSlotProps {
     sidebarFolderId?: string;
   }) => Promise<string> | string;
   onCreateSidebarFolder: (name: string) => Promise<string> | string;
+  /** §13.1's account setting, carried through untouched. */
+  collapsedFolderIds?: string[];
+  onToggleFolder?: (folderId: string) => void;
 }
 
 export function TasksSidebarSlot({
@@ -74,6 +77,8 @@ export function TasksSidebarSlot({
   onBeforeNavigate,
   onCreateList,
   onCreateSidebarFolder,
+  collapsedFolderIds,
+  onToggleFolder,
 }: TasksSidebarSlotProps) {
   // The List manager's `managing` state stood here. Its dialog was the only
   // door to archived and deleted Lists, and that door is the Trash now
@@ -126,6 +131,8 @@ export function TasksSidebarSlot({
         ctx={ctx}
         folders={folders}
         sidebarFolders={sidebarFolders}
+        collapsedFolderIds={collapsedFolderIds}
+        onToggleFolder={onToggleFolder}
         tags={tags}
         savedFilters={savedFilters}
         onCreateList={(contextFolderId) => openFromSidebar(() => setCreatingListIn(contextFolderId))}

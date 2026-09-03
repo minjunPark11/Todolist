@@ -26,6 +26,21 @@ export interface ScopeViewOptions {
   hideCompleted: boolean;
   /** §3.8: a line of the body under the title, rather than a mark saying one exists. */
   showDetails: boolean;
+  /**
+   * The Lists whose group is folded away on a Folder's screen
+   * (FOLDER_TREE_AND_VIEW_DESIGN.md §13.4).
+   *
+   * Per Scope, which for a Folder means per Folder — so folding six of eight
+   * Lists is remembered for THAT Folder and says nothing about any other.
+   *
+   * Remembered, where the Board's "완료" group is not, and the difference is
+   * what the group holds: 완료 is a pile at the edge of a column, and a
+   * Folder's Lists are its contents. Re-folding six every visit is a chore.
+   *
+   * Meaningless on every Scope but `folder`, and harmless there: nothing else
+   * groups by List, so nothing else reads it.
+   */
+  collapsedListIds: string[];
 }
 
 export const SCOPE_DATE_BY: readonly ScopeDateBy[] = ["taskTime", "countdown"];
@@ -44,6 +59,7 @@ export const DEFAULT_SCOPE_VIEW_OPTIONS: ScopeViewOptions = {
   showInputBox: true,
   hideCompleted: false,
   showDetails: false,
+  collapsedListIds: [],
 };
 
 /**
@@ -93,6 +109,11 @@ export function sanitizeScopeViewOptions(raw: unknown): ScopeViewOptions {
     showInputBox: typeof row.showInputBox === "boolean" ? row.showInputBox : DEFAULT_SCOPE_VIEW_OPTIONS.showInputBox,
     hideCompleted: typeof row.hideCompleted === "boolean" ? row.hideCompleted : DEFAULT_SCOPE_VIEW_OPTIONS.hideCompleted,
     showDetails: typeof row.showDetails === "boolean" ? row.showDetails : DEFAULT_SCOPE_VIEW_OPTIONS.showDetails,
+    // Filtered rather than taken: a stored array from a newer client could hold
+    // anything, and what this becomes is a set of ids compared against Lists.
+    collapsedListIds: Array.isArray(row.collapsedListIds)
+      ? row.collapsedListIds.filter((id): id is string => typeof id === "string" && id.length > 0)
+      : [],
   };
 }
 

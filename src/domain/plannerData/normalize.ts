@@ -405,6 +405,15 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
     // away or deleted from stored records: the M0 spread above carries it, so a
     // saved value survives untouched if sidebar counts are ever built.
     sidebarCollapsed: settings?.sidebarCollapsed ?? DEFAULT_APP_SETTINGS.sidebarCollapsed,
+    // Absent stays absent, like its matrix neighbours below: an account that
+    // has never folded a Folder should not get an empty array written into it.
+    ...(Array.isArray(settings?.collapsedFolderIds)
+      ? {
+          collapsedFolderIds: settings.collapsedFolderIds.filter(
+            (id): id is string => typeof id === "string" && id.length > 0,
+          ),
+        }
+      : {}),
     reduceMotion: settings?.reduceMotion ?? DEFAULT_APP_SETTINGS.reduceMotion,
     // Not `...(x ? {} : {})` like its matrix neighbours below: this one is a
     // boolean, so a stored `false` must survive as a value rather than be

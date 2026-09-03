@@ -629,6 +629,28 @@ export interface AppSettings {
   /** How many files survive a prune, newest first. */
   autoBackupKeep: number;
   sidebarCollapsed: boolean;
+  /**
+   * The Folders whose children are folded away in the Lists tree
+   * (FOLDER_TREE_AND_VIEW_DESIGN.md §13.1).
+   *
+   * Optional and additive (M0): absent means nothing is folded, which is what
+   * every account did before this existed.
+   *
+   * One array for BOTH kinds of group — a `SidebarFolder` the user made and a
+   * domain `Folder` the ladder arranged. `SidebarFolder` already carries a
+   * `collapsed` field through sanitize, and it is deliberately not used: only
+   * half the rows in that tree could have one, and two visually identical rows
+   * behaving differently is the worst of the three options.
+   *
+   * Here rather than in localStorage because `sidebarCollapsed` above is here
+   * and syncs. Folding the whole sidebar following you between devices while
+   * folding one Folder does not is two rules nobody can explain.
+   *
+   * Never swept. An id whose Folder is gone is one inert string; unlike
+   * `scopeViewOptions`, what this holds is not a setting a restored record
+   * should get back.
+   */
+  collapsedFolderIds?: string[];
   reduceMotion: boolean;
   /**
    * The device's IANA time zone, e.g. "Asia/Seoul". "" = not detected.

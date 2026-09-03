@@ -27,7 +27,7 @@ import type { List, ListSection, Task } from "../../types";
 import type { BoardColumn } from "./board";
 import type { CreateResolution } from "./createResolver";
 import { listDisplayName } from "../spaces/hierarchy";
-import { folderIdFor } from "./sidebarFolders";
+import { listsInFolder } from "./sidebarFolders";
 import { listIdFor } from "../spaces/membership";
 import { moveTaskToList, type TaskMutation } from "./mutations";
 import { groupRank } from "../view/viewSpec";
@@ -87,15 +87,27 @@ export function listAxisColumns(
   const live = ctx.lists.filter(isLive);
   const present = new Set(rows.map((task) => listIdFor(task, ctx.lists)));
 
-  const chosen =
-    scope.kind === "folder"
-      ? live.filter((list) => folderIdFor(list) === scope.id)
-      : live.filter((list) => present.has(list.id));
-
+  // A Folder's columns come from `listsInFolder`, which is the app's single
+  // answer to "in what order are the Lists of this Folder"
+  // (FOLDER_TREE_AND_VIEW_DESIGN.md §5.2). It already sorts, so `groupRank`
+  // does not run over it.
+  //
+  // The order this changes: `groupRank` reads `order` and this reads
+  // `sidebarSortKey ?? order`, so a Folder whose Lists the user dragged into
+  // an order in the sidebar now shows the Board's columns in that same order.
+  // Accepted knowingly — a Folder read two ways must not be two truths, which
+  // is the argument `groupRank`'s own comment makes.
+  //
+  // Every other Scope is unchanged: its columns are whatever Lists answered
+  // the query, ranked as before.
   const rank = groupRank("list", { lists: live });
-  const ordered = [...chosen].sort(
-    (a, b) => (rank?.get(a.id) ?? Number.POSITIVE_INFINITY) - (rank?.get(b.id) ?? Number.POSITIVE_INFINITY),
-  );
+  const ordered =
+    scope.kind === "folder"
+      ? listsInFolder(scope.id, ctx.lists)
+      : [...live.filter((list) => present.has(list.id))].sort(
+          (a, b) =>
+            (rank?.get(a.id) ?? Number.POSITIVE_INFINITY) - (rank?.get(b.id) ?? Number.POSITIVE_INFINITY),
+        );
 
   const columns = ordered.map((list) => ({
     id: list.id,
@@ -114,7 +126,7 @@ export function listAxisColumns(
   //
   // Added only when such a row exists: an empty "no list" heading on every
   // board would be a permanent report of nothing.
-  const orphaned = rows.some((task) => !chosen.some((list) => list.id === listIdFor(task, ctx.lists)));
+  const orphaned = rows.some((task) => !ordered.some((list) => list.id === listIdFor(task, ctx.lists)));
   return orphaned ? [{ id: NO_LIST_COLUMN, labelKey: "tasks.listAxisNone" }, ...columns] : columns;
 }
 

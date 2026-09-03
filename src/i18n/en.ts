@@ -634,6 +634,8 @@ export const en: Dictionary = {
   // D-4: door alongside Projects in the Lists section.
   "tasks.goals": "Goals",
   "tasks.sectionLists": "Lists",
+  "tasks.collapseFolder": "Collapse {{folder}}",
+  "tasks.expandFolder": "Expand {{folder}}",
   "tasks.sectionTags": "Tags",
   "tasks.sectionFilters": "Filters",
   "tasks.noLists": "No lists yet.",
@@ -745,7 +747,7 @@ export const en: Dictionary = {
   // carries the value the way the Priority flag's does (§8.28).
   "tasks.scheduleCurrent": "Schedule, {{value}}",
   "tasks.addList": "List",
-  "tasks.addPickList": "Pick a list…",
+  "tasks.listGroup": "{{list}}, {{n}} tasks",
   // Spec §13.8–§13.11, §13.15, §13.26. "Move to" rather than "Lists" names the
   // action the surface performs, which is what §13.9 titles it.
   "tasks.listCurrent": "List, {{value}}",

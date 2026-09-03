@@ -62,7 +62,7 @@ import { addDays } from "../../utils/date";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { listIdFor } from "../../domain/spaces/membership";
 import { isCompleted, isTrashed } from "../../domain/tasks/taskState";
-import { folderIdFor } from "../../domain/tasks/sidebarFolders";
+import { listsInFolder } from "../../domain/tasks/sidebarFolders";
 import {
   createInInboxBucket,
   createInListSection,
@@ -93,6 +93,8 @@ import { projectItems } from "../../domain/view/item";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { DEFAULT_GROUP_VIEW, groupTasks } from "../../domain/view/viewGroups";
+import { groupTasksByList } from "../../domain/view/listGroups";
+import { Caret } from "../common/Caret";
 import { EMPTY_INBOX_RULE, type InboxColumnRules } from "../../domain/view/inboxColumnRules";
 import {
   addInboxColumn,
@@ -240,6 +242,9 @@ interface TasksModuleProps {
    */
   scopeViewOptions?: Record<string, ScopeViewOptions>;
   onSetScopeViewOptions: (next: Record<string, ScopeViewOptions>) => void;
+  /** §13.1's account setting, for the sidebar this module renders. */
+  collapsedFolderIds?: string[];
+  onToggleFolder?: (folderId: string) => void;
   /**
    * §15.9's Duplicate. Makes the copy and hands back the way to take it back.
    *
@@ -726,6 +731,28 @@ export function TasksModule(props: TasksModuleProps) {
    */
   const listRows = policy.canManualReorder ? sortByManualOrder(rows) : rows;
 
+  /**
+   * The Lists of the Folder this Scope is, in the sidebar's order
+   * (FOLDER_TREE_AND_VIEW_DESIGN.md §5.2).
+   *
+   * One computation, two uses: the quick add takes `[0]` as its default target
+   * (§4.2), and the list view groups by it (§5). Computing it twice is how
+   * "the top List" could come to mean two different Lists on one screen.
+   */
+  const folderLists = scope.kind === "folder" ? listsInFolder(scope.id, lists) : [];
+
+  /**
+   * The list view's groups, or null for the flat list every other Scope draws.
+   *
+   * Null and not an empty array: a Scope with no grouping is a different shape
+   * from a Folder that happens to hold no Lists, and the render has to be able
+   * to tell them apart.
+   */
+  const folderGroups =
+    scope.kind === "folder" && folderLists.length > 0
+      ? groupTasksByList(listRows, folderLists, lists)
+      : null;
+
   const searchCollections: SearchCollections = {
     tasks,
     lists,
@@ -1111,6 +1138,81 @@ export function TasksModule(props: TasksModuleProps) {
     props.onCreate(title, resolution);
   }
 
+  /**
+   * One row of the list view.
+   *
+   * A function rather than an inline `.map` callback because the list view has
+   * two shapes now (FOLDER_TREE_AND_VIEW_DESIGN.md §5): one flat list, or one
+   * per List inside a Folder. Two copies of a 60-line row is how the two
+   * shapes come to differ in a way nobody intended.
+   */
+  function taskRow(task: Task) {
+    const done = isCompleted(task);
+    return (
+      <li
+        key={task.id}
+        className={["tm-task", task.id === state.taskId ? "is-open" : "", dragTaskId === task.id ? "is-dragging" : ""]
+          .filter(Boolean)
+          .join(" ")}
+        draggable={policy.canManualReorder}
+        onDragStart={(event) => {
+          setDragTaskId(task.id);
+          event.dataTransfer.effectAllowed = "move";
+          // The Calendar and the Matrix both listen for this type, so
+          // a row dragged out of the list still lands on them.
+          event.dataTransfer.setData("text/task", task.id);
+        }}
+        onDragOver={(event) => {
+          if (!policy.canManualReorder || !dragTaskId) return;
+          event.preventDefault();
+        }}
+        onDrop={(event) => {
+          if (!policy.canManualReorder || !dragTaskId) return;
+          event.preventDefault();
+          reorderOnto(listRows, dragTaskId, task.id);
+          setDragTaskId("");
+        }}
+        onDragEnd={() => setDragTaskId("")}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setMenu(taskMenuAt(task, event.clientX, event.clientY));
+        }}
+      >
+        {/* The handle is the affordance, not the mechanism — the whole
+            row is draggable, and this is what says so (audit L-17). */}
+        {policy.canManualReorder ? <span className="tm-task-handle" aria-hidden="true" /> : null}
+        <TaskRowContent
+          task={task}
+          today={today}
+          dateBy={viewOptions.dateBy}
+          showDetails={viewOptions.showDetails}
+          /* Only ever non-empty in the Trash: that is the one Scope
+             a child is a row in (§13). */
+          parentTitle={parentTitleOf(task)}
+          onOpen={openTask}
+          onToggleDone={toggleDone}
+        />
+        {/* The other half of L-17, and the reason the menu is a
+            component: a right-click is not discoverable and does not
+            exist on a touch screen, so the same menu needs a button
+            to open it. Anchored to the button rather than the
+            pointer, which is where the reader is looking. */}
+        <button
+          type="button"
+          className="tm-task-menu"
+          aria-haspopup="menu"
+          aria-label={t("tasks.rowMenu", { title: task.title })}
+          onClick={(event) => {
+            const box = event.currentTarget.getBoundingClientRect();
+            setMenu(taskMenuAt(task, box.left, box.bottom + 4));
+          }}
+        >
+          ⋯
+        </button>
+      </li>
+    );
+  }
+
   return (
     <section
       className={`tm-shell is-${mode} sidebar-${sidebar}${sidebarOpen ? " sidebar-open" : ""}${
@@ -1149,6 +1251,8 @@ export function TasksModule(props: TasksModuleProps) {
         dailyPlans={dailyPlans}
         taskTags={taskTags}
         today={today}
+        collapsedFolderIds={props.collapsedFolderIds}
+        onToggleFolder={props.onToggleFolder}
         current={searchQuery === null ? scope : null}
         onNavigateUrl={onNavigate}
         onBeforeNavigate={() => setSidebarOpen(false)}
@@ -1242,11 +1346,11 @@ export function TasksModule(props: TasksModuleProps) {
             lists={lists}
             inboxListId={lists.find(isInboxList)?.id ?? ""}
             today={today}
-            folderLists={
-              scope.kind === "folder"
-                ? lists.filter((list) => folderIdFor(list) === scope.id && !list.archivedAt && !list.deletedAt)
-                : []
-            }
+            /* The sidebar's order, from the one function that answers it
+               (FOLDER_TREE_AND_VIEW_DESIGN.md §5.2). `[0]` of this is what
+               §4.2 means by "the top List", so it has to be the same top the
+               reader is looking at in the tree. */
+            folderLists={folderLists}
             folders={sidebarFolders}
             tags={tags}
             savedFilters={savedFilters}
@@ -1357,74 +1461,68 @@ export function TasksModule(props: TasksModuleProps) {
             onContextMenu={(task, x, y) => setMenu(taskMenuAt(task, x, y))}
           />
         ) : (
-          <ul className="tm-list" aria-label={title}>
-            {listRows.map((task) => {
-              const done = isCompleted(task);
-              return (
-                <li
-                  key={task.id}
-                  className={["tm-task", task.id === state.taskId ? "is-open" : "", dragTaskId === task.id ? "is-dragging" : ""]
-                    .filter(Boolean)
-                    .join(" ")}
-                  draggable={policy.canManualReorder}
-                  onDragStart={(event) => {
-                    setDragTaskId(task.id);
-                    event.dataTransfer.effectAllowed = "move";
-                    // The Calendar and the Matrix both listen for this type, so
-                    // a row dragged out of the list still lands on them.
-                    event.dataTransfer.setData("text/task", task.id);
-                  }}
-                  onDragOver={(event) => {
-                    if (!policy.canManualReorder || !dragTaskId) return;
-                    event.preventDefault();
-                  }}
-                  onDrop={(event) => {
-                    if (!policy.canManualReorder || !dragTaskId) return;
-                    event.preventDefault();
-                    reorderOnto(listRows, dragTaskId, task.id);
-                    setDragTaskId("");
-                  }}
-                  onDragEnd={() => setDragTaskId("")}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setMenu(taskMenuAt(task, event.clientX, event.clientY));
-                  }}
-                >
-                  {/* The handle is the affordance, not the mechanism — the whole
-                      row is draggable, and this is what says so (audit L-17). */}
-                  {policy.canManualReorder ? <span className="tm-task-handle" aria-hidden="true" /> : null}
-                  <TaskRowContent
-                    task={task}
-                    today={today}
-                    dateBy={viewOptions.dateBy}
-                    showDetails={viewOptions.showDetails}
-                    /* Only ever non-empty in the Trash: that is the one Scope
-                       a child is a row in (§13). */
-                    parentTitle={parentTitleOf(task)}
-                    onOpen={openTask}
-                    onToggleDone={toggleDone}
-                  />
-                  {/* The other half of L-17, and the reason the menu is a
-                      component: a right-click is not discoverable and does not
-                      exist on a touch screen, so the same menu needs a button
-                      to open it. Anchored to the button rather than the
-                      pointer, which is where the reader is looking. */}
-                  <button
-                    type="button"
-                    className="tm-task-menu"
-                    aria-haspopup="menu"
-                    aria-label={t("tasks.rowMenu", { title: task.title })}
-                    onClick={(event) => {
-                      const box = event.currentTarget.getBoundingClientRect();
-                      setMenu(taskMenuAt(task, box.left, box.bottom + 4));
-                    }}
-                  >
-                    ⋯
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          folderGroups ? (
+            /* A Folder is a SET OF LISTS, so its screen is divided by them
+               (FOLDER_TREE_AND_VIEW_DESIGN.md §5). The Board has read a Folder
+               this way all along — a column per List — and a Folder that is
+               three columns on one view and one flat column on another is two
+               answers about the same thing. */
+            <div className="tm-listgroups">
+              {folderGroups.map((group) => {
+                const name = listDisplayName(group.list, t("tasks.defaultList"), t("tasks.inbox"));
+                const folded = viewOptions.collapsedListIds.includes(group.list.id);
+                return (
+                  <section key={group.list.id} className="tm-listgroup">
+                    {/* A heading AND a control (§13.4). It folds; it still does
+                        not NAVIGATE (§11 answer 2) — the row for going to the
+                        List is in the sidebar, and a heading that quietly moved
+                        the screen would be a second door nobody asked for.
+
+                        `<h3><button>` rather than a button with a heading role
+                        bolted on: it has to stay in the document's outline for
+                        a reader skipping by heading, and be a control for
+                        everyone else. */}
+                    <h3 className="tm-listgroup-head">
+                      <button
+                        type="button"
+                        className="tm-listgroup-fold"
+                        aria-expanded={!folded}
+                        onClick={() =>
+                          patchViewOptions({
+                            collapsedListIds: folded
+                              ? viewOptions.collapsedListIds.filter((id) => id !== group.list.id)
+                              : [...viewOptions.collapsedListIds, group.list.id],
+                          })
+                        }
+                      >
+                        <Caret open={!folded} />
+                        <span className="tm-listgroup-name">{name}</span>
+                        {group.tasks.length > 0 ? (
+                          <span className="tm-count">{group.tasks.length}</span>
+                        ) : null}
+                      </button>
+                    </h3>
+                    {/* Counted off the array in hand rather than by asking
+                        `queryScopeCount` again — two ways of counting one
+                        group is how a heading and its contents disagree.
+
+                        The count stays visible while the group is folded: that
+                        is most of what folding is for — putting a List aside
+                        without losing sight of how much is in it. */}
+                    {folded ? null : (
+                      <ul className="tm-list" aria-label={t("tasks.listGroup", { list: name, n: group.tasks.length })}>
+                        {group.tasks.map(taskRow)}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            <ul className="tm-list" aria-label={title}>
+              {listRows.map(taskRow)}
+            </ul>
+          )
         )}
         </>
         )}

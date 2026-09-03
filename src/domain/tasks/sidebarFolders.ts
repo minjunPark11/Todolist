@@ -48,14 +48,55 @@ export function activeSidebarFolders(folders: SidebarFolder[]): SidebarFolder[] 
   return [...folders].sort((a, b) => (a.sortKey ?? 0) - (b.sortKey ?? 0) || a.name.localeCompare(b.name));
 }
 
-/** The Lists shown under one group, in sidebar order. */
+/**
+ * The Lists shown under one group, in sidebar order.
+ *
+ * The ONE answer to "in what order are the Lists of this Folder"
+ * (FOLDER_TREE_AND_VIEW_DESIGN.md §5.2). There were three: the sidebar did not
+ * sort at all, the Board sorted by `groupRank("list")` — `order` then name —
+ * and this function, which nothing called. Three answers were invisible only
+ * because the list view had no groups to disagree with the Board's columns;
+ * the moment it has them, the same Folder would read in two orders on two
+ * views of itself.
+ *
+ * This rule wins because it is the widest: it honours `sidebarSortKey` — what
+ * the user arranged — and falls back to `order` and then name, which is
+ * exactly what `groupRank` did on its own.
+ *
+ * Deleted as well as archived. A List in the Trash is not somewhere work can
+ * be filed, and the two callers that used to filter for themselves both said
+ * so separately.
+ */
 export function listsInFolder(folderId: string, lists: List[]): List[] {
   return lists
-    .filter((list) => !list.archivedAt && folderIdFor(list) === folderId)
+    .filter((list) => !list.archivedAt && !list.deletedAt && folderIdFor(list) === folderId)
     .sort(
       (a, b) =>
         (a.sidebarSortKey ?? a.order) - (b.sidebarSortKey ?? b.order) || a.name.localeCompare(b.name),
     );
+}
+
+/**
+ * Whether a group's children are folded away
+ * (FOLDER_TREE_AND_VIEW_DESIGN.md §13.1).
+ *
+ * Takes the array rather than the settings record, so this stays a fact about
+ * a list of ids and nothing here has to know where they are stored.
+ */
+export function isFolderCollapsed(collapsed: readonly string[] | undefined, folderId: string): boolean {
+  return Boolean(folderId) && (collapsed?.includes(folderId) ?? false);
+}
+
+/** The array with this group's fold flipped. */
+export function toggleFolderCollapsed(
+  collapsed: readonly string[] | undefined,
+  folderId: string,
+): string[] {
+  const current = collapsed ?? [];
+  if (!folderId) return [...current];
+  return current.includes(folderId)
+    ? current.filter((id) => id !== folderId)
+    : [...current, folderId];
 }
 
 export function addSidebarFolder(

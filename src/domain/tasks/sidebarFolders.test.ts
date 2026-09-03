@@ -4,11 +4,13 @@ import {
   activeSidebarFolders,
   addSidebarFolder,
   folderIdFor,
+  isFolderCollapsed,
   listsInFolder,
   moveListToSidebarFolder,
   removeSidebarFolder,
   renameSidebarFolder,
   sanitizeSidebarFolder,
+  toggleFolderCollapsed,
 } from "./sidebarFolders";
 
 const NOW = "2026-08-18T09:00:00.000Z";
@@ -78,8 +80,11 @@ describe("listsInFolder", () => {
     expect(listsInFolder("sf1", lists).map((item) => item.id)).toEqual(["l2", "l1"]);
   });
 
-  it("leaves out archived Lists", () => {
-    const lists = [list({ id: "l1", sidebarFolderId: "sf1", archivedAt: NOW })];
+  it("leaves out archived and binned Lists", () => {
+    const lists = [
+      list({ id: "l1", sidebarFolderId: "sf1", archivedAt: NOW }),
+      list({ id: "l2", sidebarFolderId: "sf1", deletedAt: NOW }),
+    ];
     expect(listsInFolder("sf1", lists)).toEqual([]);
   });
 });
@@ -134,5 +139,25 @@ describe("moveListToSidebarFolder", () => {
     const lists = [list({ id: "l1", sidebarFolderId: "sf1" })];
     expect(moveListToSidebarFolder(lists, "l1", "sf1", LATER)).toBe(lists);
     expect(moveListToSidebarFolder(lists, "nope", "sf2", LATER)).toBe(lists);
+  });
+});
+
+// FOLDER_TREE_AND_VIEW_DESIGN.md §13.1. One array covering both kinds of
+// group, because only one of them could have carried a field of its own.
+describe("folding a group", () => {
+  it("reads absent as nothing folded", () => {
+    expect(isFolderCollapsed(undefined, "sf1")).toBe(false);
+    expect(isFolderCollapsed([], "sf1")).toBe(false);
+  });
+
+  it("flips one id and leaves the rest", () => {
+    expect(toggleFolderCollapsed(["sf1"], "sf2")).toEqual(["sf1", "sf2"]);
+    expect(toggleFolderCollapsed(["sf1", "sf2"], "sf1")).toEqual(["sf2"]);
+    expect(isFolderCollapsed(toggleFolderCollapsed(undefined, "sf1"), "sf1")).toBe(true);
+  });
+
+  it("takes no id at all as no change", () => {
+    expect(toggleFolderCollapsed(["sf1"], "")).toEqual(["sf1"]);
+    expect(isFolderCollapsed(["sf1", ""], "")).toBe(false);
   });
 });

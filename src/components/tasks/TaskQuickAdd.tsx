@@ -299,16 +299,22 @@ export function TaskQuickAdd({
 
       <div className="tm-quickadd-extras">
 
-      {/* §12.4: a Folder holds several Lists and the app must not pick one
-          silently, so the question is asked instead of answered. */}
-      {scope.kind === "folder" ? (
+      {/* Which List inside the Folder (FOLDER_TREE_AND_VIEW_DESIGN.md §4.4).
+          It used to open on "리스트 선택…" — an empty option standing for "not
+          answered yet", which was a state that BLOCKED the form. There is no
+          such state now: the resolver takes the top List, so the control opens
+          showing the answer and exists to change it.
+
+          Bound to `resolution.targetListId` rather than to `chosenListId`, so
+          it says the same thing the placeholder above it says. Reading the raw
+          choice would leave it blank while the field claimed a destination. */}
+      {scope.kind === "folder" && folderLists.length > 0 ? (
         <select
           className="tm-quickadd-field"
-          value={chosenListId}
+          value={resolution.targetListId ?? ""}
           onChange={(event) => setChosenListId(event.target.value)}
           aria-label={t("tasks.addList")}
         >
-          <option value="">{t("tasks.addPickList")}</option>
           {folderLists.map((list) => (
             <option key={list.id} value={list.id}>
               {list.name}

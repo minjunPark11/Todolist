@@ -95,9 +95,11 @@ const DISABLED: CreateResolution = {
  *   - Upcoming asks for a date, because the Scope IS a set of dates. §12.6
  *     refuses to commit a task with none — it would be created into a horizon
  *     it does not appear on.
- *   - Folder asks for a List, and only one of its own. §12.4 is explicit that
- *     a Folder holds several and the app must not pick silently; a Task filed
- *     somewhere the user did not choose is worse than a second question.
+ *   - Folder no longer asks. It did — §12.4 required a List — and §4 of
+ *     FOLDER_TREE_AND_VIEW_DESIGN.md gives the reason for the reversal at
+ *     length: the top List is taken, and the two screens that would have hidden
+ *     that choice now say it out loud. It still refuses a Folder with no List
+ *     at all, which is the one case where there is nothing to take.
  */
 export function resolveCreateContext(scope: TaskScopeRef, ctx: CreateContext): CreateResolution {
   if (!scopeRegistry[scope.kind].canCreate) return DISABLED;
@@ -148,14 +150,35 @@ export function resolveCreateContext(scope: TaskScopeRef, ctx: CreateContext): C
     case "list":
       return { targetListId: scope.id, requiredBeforeCommit: [], patch: {}, enabled: true };
 
-    // §12.4: "하위 List 선택 필수". A choice from outside this Folder is not a
-    // choice for this Folder, so it is refused rather than honoured.
+    /**
+     * The top List of the Folder, unless the user names another
+     * (FOLDER_TREE_AND_VIEW_DESIGN.md §4).
+     *
+     * §12.4 used to REQUIRE a choice here, and the word that carried that rule
+     * was `silently`: *"the app must not pick one silently"*. What it was
+     * guarding against is not a task being filed without a choice — it is a
+     * task being filed somewhere the user never saw. Two things say it now:
+     * the quick add's placeholder names the target List before a character is
+     * typed, and the Folder's own screen is divided by List, so the row lands
+     * under a heading with that name on it.
+     *
+     * The app had already made this call once. `createInListColumn` drops the
+     * same requirement on a Board because *"the column NAMES the List"*; a
+     * placeholder that names it is the same kind of naming.
+     *
+     * What did NOT change: a List from outside this Folder is still not a
+     * choice for this Folder, so it falls back rather than being honoured. And
+     * a Folder holding no List still refuses — there is nowhere to put it.
+     */
     case "folder": {
       const inside = ctx.folderListIds ?? [];
       const chosen = ctx.chosenListId && inside.includes(ctx.chosenListId) ? ctx.chosenListId : "";
+      // `[0]` is the sidebar's top, because `folderListIds` arrives in
+      // `listsInFolder` order — the app's one answer to that question (§5.2).
+      const target = chosen || inside[0] || "";
       return {
-        targetListId: chosen || null,
-        requiredBeforeCommit: chosen ? [] : ["list"],
+        targetListId: target || null,
+        requiredBeforeCommit: target ? [] : ["list"],
         patch: {},
         enabled: true,
       };

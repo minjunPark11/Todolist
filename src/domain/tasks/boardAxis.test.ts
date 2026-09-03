@@ -110,6 +110,20 @@ describe("the columns of a List-axis Board", () => {
     expect(columns.map((column) => column.id)).toEqual(["list-a", "list-b"]);
   });
 
+  // FOLDER_TREE_AND_VIEW_DESIGN.md §5.2: a Folder read two ways must not be
+  // two truths. `groupRank` sorted by `order` alone, so a Folder whose Lists
+  // the user had dragged in the sidebar showed one order there and another
+  // here.
+  it("puts a Folder's columns in the order the sidebar puts them", () => {
+    const dragged = [
+      list({ id: "list-a", name: "A", order: 0, sidebarFolderId: "f1", sidebarSortKey: 2 }),
+      list({ id: "list-b", name: "B", order: 1, sidebarFolderId: "f1", sidebarSortKey: 1 }),
+    ];
+    const columns = listAxisColumns({ kind: "folder", id: "f1" }, [], { lists: dragged }, LABELS);
+
+    expect(columns.map((column) => column.id)).toEqual(["list-b", "list-a"]);
+  });
+
   it("translates the Inbox and a default List, and leaves a chosen name alone", () => {
     const named = [
       list({ id: "list-inbox", kind: "inbox", name: "Inbox", order: 0 }),

@@ -46,11 +46,17 @@ describe("Gate 4 — the create matrix", () => {
     expect(resolveCreateContext({ kind: "list", id: "l-abm" }, ctx()).targetListId).toBe("l-abm");
   });
 
-  it("Folder asks which of its Lists, and takes no answer from outside it", () => {
+  // FOLDER_TREE_AND_VIEW_DESIGN.md §4. This used to require an answer, and the
+  // reversal turns on one word of §12.4: what it forbade was picking
+  // `silently`, and the placeholder and the Folder's own grouped screen both
+  // say where the task is going before it goes there.
+  it("Folder takes its top List, and takes no answer from outside it", () => {
     const scope: TaskScopeRef = { kind: "folder", id: "f-school" };
     const unanswered = resolveCreateContext(scope, ctx({ folderListIds: ["l-abm", "l-eng"] }));
-    expect(unanswered.requiredBeforeCommit).toEqual(["list"]);
-    expect(canCommit(unanswered)).toBe(false);
+    // `[0]`, because `folderListIds` arrives in the order the sidebar draws.
+    expect(unanswered.targetListId).toBe("l-abm");
+    expect(unanswered.requiredBeforeCommit).toEqual([]);
+    expect(canCommit(unanswered)).toBe(true);
 
     const answered = resolveCreateContext(
       scope,
@@ -59,13 +65,22 @@ describe("Gate 4 — the create matrix", () => {
     expect(answered.targetListId).toBe("l-eng");
     expect(canCommit(answered)).toBe(true);
 
-    // A List from another Folder is not an answer to this question.
+    // A List from another Folder is still not an answer to this question — it
+    // falls back to the top one rather than being honoured.
     const foreign = resolveCreateContext(
       scope,
       ctx({ folderListIds: ["l-abm", "l-eng"], chosenListId: "l-other" }),
     );
-    expect(foreign.requiredBeforeCommit).toEqual(["list"]);
-    expect(foreign.targetListId).toBeNull();
+    expect(foreign.targetListId).toBe("l-abm");
+  });
+
+  // The one case with nothing to take. The sidebar does not draw an empty
+  // Folder at all, but its URL still opens.
+  it("Folder holding no List still refuses", () => {
+    const empty = resolveCreateContext({ kind: "folder", id: "f-empty" }, ctx({ folderListIds: [] }));
+    expect(empty.requiredBeforeCommit).toEqual(["list"]);
+    expect(empty.targetListId).toBeNull();
+    expect(canCommit(empty)).toBe(false);
   });
 
   it("Tag lands in the Inbox carrying the Tag it was made under", () => {

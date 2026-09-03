@@ -92,6 +92,7 @@ import { I18nProvider, translate, useT } from "./i18n";
 import { isWontDo } from "./domain/tasks/taskState";
 import { isTaskActive } from "./domain/tasks/scopeQuery";
 import { sanitizeInboxColumnNames } from "./domain/tasks/board";
+import { toggleFolderCollapsed } from "./domain/tasks/sidebarFolders";
 
 function cloudExternalCalendarSnapshot(calendar: ExternalCalendar): ExternalCalendar {
   return {
@@ -1237,6 +1238,18 @@ export default function App() {
    * said `tasks` and drew the Space tree. Now `tasks` means the Tasks sidebar
    * wherever you are, and the tree belongs to `space`.
    */
+  /**
+   * Folding a group in the Lists tree (FOLDER_TREE_AND_VIEW_DESIGN.md §13.1).
+   *
+   * An account setting, like `sidebarCollapsed` beside it, so folding follows
+   * the reader between devices. One handler for both sidebars — the legacy
+   * shell's and the Tasks Module's — because they are the same tree.
+   */
+  const toggleSidebarFolder = (folderId: string) =>
+    planner.updateAppSettings({
+      collapsedFolderIds: toggleFolderCollapsed(appSettings.collapsedFolderIds, folderId),
+    });
+
   function renderLegacySidebar() {
     if (contextSidebar.mode === "none") return null;
     if (contextSidebar.mode === "tasks") {
@@ -1260,6 +1273,8 @@ export default function App() {
             planner.createList("", name, undefined, { color, defaultViewKey, sidebarFolderId })
           }
           onCreateSidebarFolder={planner.createSidebarFolder}
+          collapsedFolderIds={appSettings.collapsedFolderIds}
+          onToggleFolder={toggleSidebarFolder}
         />
       );
     }
@@ -1449,6 +1464,8 @@ export default function App() {
             planner.createList("", name, undefined, { color, defaultViewKey, sidebarFolderId })
           }
           onCreateSidebarFolder={planner.createSidebarFolder}
+          collapsedFolderIds={appSettings.collapsedFolderIds}
+          onToggleFolder={toggleSidebarFolder}
           // Straight to the store. The legacy confirmation modal lives in
           // AppModals, which this branch does not render — and §9.45 keeps
           // confirmation for what cannot be taken back, which a soft delete

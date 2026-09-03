@@ -15,20 +15,26 @@ import { TaskQuickAdd } from "./TaskQuickAdd";
 
 afterEach(cleanup);
 
+/** Two Lists inside one Folder, in the order the sidebar draws them. */
+const FOLDER_LISTS = [
+  { id: "l-alpha", name: "Alpha", sidebarFolderId: "f1" },
+  { id: "l-beta", name: "Beta", sidebarFolderId: "f1" },
+] as never[];
+
 const TODAY = "2026-08-29";
 const INBOX = "list-inbox";
 
-function setup(scope: TaskScopeRef = { kind: "upcoming" }) {
+function setup(scope: TaskScopeRef = { kind: "upcoming" }, folderLists: never[] = []) {
   const onCreate = vi.fn();
   render(
     <I18nProvider lang="en">
       <FloatingLayerProvider>
         <TaskQuickAdd
           scope={scope}
-          lists={[{ id: INBOX, name: "Inbox", kind: "inbox" } as never]}
+          lists={[{ id: INBOX, name: "Inbox", kind: "inbox" } as never, ...folderLists]}
           inboxListId={INBOX}
           today={TODAY}
-          folderLists={[]}
+          folderLists={folderLists}
           folders={[]}
           tags={[]}
           savedFilters={[]}
@@ -149,13 +155,32 @@ describe("the quick add as one quiet row", () => {
     expect(document.querySelector(".tm-quickadd-extras")?.children.length).toBe(0);
   });
 
-  it("puts the Folder's List question under the row, not in it", () => {
-    // A Folder must be asked which List (§12.4), and that is not a question
-    // that belongs on the line where a title is typed.
-    setup({ kind: "folder", id: "f1" });
+  it("puts the Folder's List control under the row, not in it", () => {
+    // Changing which List is not a question that belongs on the line where a
+    // title is typed.
+    setup({ kind: "folder", id: "f1" }, FOLDER_LISTS);
     const extras = document.querySelector(".tm-quickadd-extras") as HTMLElement;
     expect(extras.querySelector("select")).toBeTruthy();
     expect(document.querySelector(".tm-quickadd-box select")).toBeNull();
+  });
+
+  // FOLDER_TREE_AND_VIEW_DESIGN.md §4. The form used to be BLOCKED here until
+  // a List was chosen, and the control opened on an empty "리스트 선택…".
+  it("opens on the Folder's top List, and says so in the field", () => {
+    const { field } = setup({ kind: "folder", id: "f1" }, FOLDER_LISTS);
+    expect(field.placeholder).toBe("Add a task to Alpha");
+
+    const select = document.querySelector("select") as HTMLSelectElement;
+    expect(select.value).toBe("l-alpha");
+    // The empty option stood for "not answered yet", and there is no such
+    // state any more.
+    expect([...select.options].map((option) => option.value)).toEqual(["l-alpha", "l-beta"]);
+  });
+
+  it("still lets another List of the Folder be chosen", () => {
+    const { field } = setup({ kind: "folder", id: "f1" }, FOLDER_LISTS);
+    fireEvent.change(document.querySelector("select") as HTMLSelectElement, { target: { value: "l-beta" } });
+    expect(field.placeholder).toBe("Add a task to Beta");
   });
 });
 

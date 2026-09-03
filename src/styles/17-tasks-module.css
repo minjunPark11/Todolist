@@ -128,9 +128,35 @@
 }
 
 /* §2.16: one level of indent means one level of nesting. Lists sit under the
-   Folder that holds them and nothing else is indented. */
+   Folder that holds them and nothing else is indented.
+
+   It stays, and it is NOT what tells a Folder from a List any more
+   (FOLDER_TREE_AND_VIEW_DESIGN.md §3.3): the glyph says what KIND of row this
+   is, the indent says what it is UNDER. Two different facts. */
 .tm-row.is-indented {
-  padding-left: 26px;
+  /* 26px + the 16px the disclosure caret adds to a Folder row (§13.2), so the
+     step between a Folder and its children is what it always was. */
+  padding-left: 42px;
+}
+
+/* The kind glyph (§3). Fixed width so every label in the column starts at the
+   same x, which is the whole reason the Smart Lists got one too (§3.4). */
+.tm-row-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  /* Dimmer than the label: it says what sort of thing this is, and the name is
+     what the reader is scanning for. `currentColor` at reduced opacity rather
+     than a colour of its own, so it still dims with a disabled row and inverts
+     in dark. */
+  opacity: 0.65;
+}
+
+.tm-row.is-current .tm-row-icon {
+  opacity: 1;
 }
 
 .tm-row-label {
@@ -255,6 +281,58 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* A Folder's screen, divided by the Lists it holds
+   (FOLDER_TREE_AND_VIEW_DESIGN.md §5). */
+.tm-listgroups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The heading is a heading AND a fold (§13.4). It is still not a DOOR — the
+   row that goes to the List is in the sidebar — so what it offers is the
+   caret, not a destination. */
+.tm-listgroup-head {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tm-listgroup-fold {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-listgroup-fold:hover {
+  background: var(--bg-hover-nav);
+}
+
+.tm-listgroup-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A line under the name rather than around the group: the rows below already
+   have their own separators, and a boxed group would read as a card — which is
+   what the Board is for. */
+.tm-listgroup + .tm-listgroup {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
 }
 
 .tm-task {
@@ -3293,6 +3371,29 @@
 .tm-group-head {
   display: flex;
   align-items: center;
+}
+
+/* §13.2. Its own hit target, because the row beside it still navigates to the
+   Folder — which is worth navigating to now that its screen is divided by
+   List. 16px wide including its gap, which is exactly what `is-indented` grew
+   by so the tree's one step stayed one step. */
+.tm-group-fold {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 36px;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #8e8e93);
+  cursor: pointer;
+}
+
+.tm-group-fold:hover {
+  color: var(--text);
 }
 
 .tm-group-head .tm-row {

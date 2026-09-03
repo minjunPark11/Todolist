@@ -10,12 +10,17 @@
 // forbids a screen from inventing a count formula, and §6.94 asks the sidebar
 // and the thing it points at to run the same query — the two numbers
 // disagreeing is what v0.10.1 and v0.10.2 each fixed by hand.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { Folder, List, SavedFilter, SidebarFolder, Tag } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { queryScopeCount, type ScopeContext } from "../../domain/tasks/scopeQuery";
 import { activeTags } from "../../domain/tags/tags";
-import { activeSidebarFolders, folderIdFor } from "../../domain/tasks/sidebarFolders";
+import {
+  activeSidebarFolders,
+  folderIdFor,
+  isFolderCollapsed,
+  listsInFolder,
+} from "../../domain/tasks/sidebarFolders";
 import { activeSavedFilters } from "../../domain/tasks/filters";
 import { isInboxList } from "../../domain/spaces/hierarchy";
 import { useT } from "../../i18n";
@@ -24,6 +29,19 @@ import { useT } from "../../i18n";
 import { CONTEXT_SIDEBAR_ID } from "../../app/contextSidebar";
 import { listColorHex } from "../../domain/tasks/listColor";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { Caret } from "../common/Caret";
+import {
+  CompletedIcon,
+  FilterIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  InboxIcon,
+  ListIcon,
+  TagIcon,
+  TodayIcon,
+  TrashIcon,
+  UpcomingIcon,
+} from "./treeIcons";
 
 /**
  * §3.50: what this sidebar IS depends on how it is presented.
@@ -56,6 +74,14 @@ interface TasksSidebarProps {
    * group, or none.
    */
   onCreateList: (contextFolderId: string) => void;
+  /**
+   * The groups folded away (FOLDER_TREE_AND_VIEW_DESIGN.md §13.1).
+   *
+   * One array for both kinds of group. Absent reads as nothing folded, which
+   * is what this tree did before it could fold.
+   */
+  collapsedFolderIds?: string[];
+  onToggleFolder?: (folderId: string) => void;
   /** Null on the Search Page, which is not a Scope and highlights nothing. */
   current: TaskScopeRef | null;
   onNavigate: (scope: TaskScopeRef) => void;
@@ -74,6 +100,8 @@ export function TasksSidebar({
   tags,
   savedFilters,
   onCreateList,
+  collapsedFolderIds,
+  onToggleFolder,
   current,
   onNavigate,
 }: TasksSidebarProps) {
@@ -96,7 +124,11 @@ export function TasksSidebar({
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpenDrawer, drawer]);
 
-  function row(scope: TaskScopeRef, label: string, options: { indent?: boolean; dot?: string } = {}) {
+  function row(
+    scope: TaskScopeRef,
+    label: string,
+    options: { indent?: boolean; dot?: string; icon?: ReactNode } = {},
+  ) {
     const count = queryScopeCount(scope, ctx);
     return (
       <button
@@ -106,8 +138,20 @@ export function TasksSidebar({
         aria-current={sameScope(scope, current) ? "page" : undefined}
         onClick={() => onNavigate(scope)}
       >
-        {options.dot ? <span className="tm-dot" style={{ background: options.dot }} aria-hidden /> : null}
+        {/* What KIND of row this is (FOLDER_TREE_AND_VIEW_DESIGN.md §3). Every
+            row has one, including the Smart Lists — §3.4: give the glyph to
+            some rows and not others and the labels of one column start at two
+            different x. */}
+        {options.icon ? (
+          <span className="tm-row-icon" aria-hidden="true">
+            {options.icon}
+          </span>
+        ) : null}
         <span className="tm-row-label">{label}</span>
+        {/* §3.2: the colour moved here from in front of the label. The leading
+            slot answers one question — what kind of row — and the trailing
+            slot answers the rest: which List, and how much is in it. */}
+        {options.dot ? <span className="tm-dot" style={{ background: options.dot }} aria-hidden /> : null}
         {/* A zero is not shown. An empty Scope says so on its own screen; a
             column of noughts in the tree is noise (§2.10). */}
         {count > 0 ? <span className="tm-count">{count}</span> : null}
@@ -127,23 +171,6 @@ export function TasksSidebar({
   const treeLists = ctx.lists.filter(
     (list) => !isInboxList(list) && !list.archivedAt && !list.deletedAt && (list.projectId || list.kind === "regular"),
   );
-  // Grouped by `folderIdFor`, the same answer the `folder` Scope reads
-  // (§12.4). A List the user has put in a sidebar group is therefore under
-  // that group and NOT also under the domain Folder it belongs to — the two
-  // showing it twice is exactly what one shared answer prevents.
-  const byFolder = new Map<string, List[]>();
-  const loose: List[] = [];
-  for (const list of treeLists) {
-    const groupId = folderIdFor(list);
-    if (groupId) {
-      const bucket = byFolder.get(groupId) ?? [];
-      bucket.push(list);
-      byFolder.set(groupId, bucket);
-    } else {
-      loose.push(list);
-    }
-  }
-
   // The user's own groups first, then the ones the domain arranged. Both open
   // the same `folder` Scope, because from the sidebar they are the same kind
   // of thing — a group of Lists (§6.33).
@@ -153,6 +180,28 @@ export function TasksSidebar({
       .filter((folder) => !folder.archivedAt && !folder.deletedAt)
       .map((folder) => ({ id: folder.id, name: folder.name })),
   ];
+
+  // Grouped by `folderIdFor`, the same answer the `folder` Scope reads
+  // (§12.4). A List the user has put in a sidebar group is therefore under
+  // that group and NOT also under the domain Folder it belongs to — the two
+  // showing it twice is exactly what one shared answer prevents.
+  //
+  // Ordered by `listsInFolder`, which is now the app's only answer to that
+  // question (FOLDER_TREE_AND_VIEW_DESIGN.md §5.2). This used to keep whatever
+  // order `ctx.lists` happened to be in, so a Folder's Board columns and its
+  // sidebar children could disagree — and once the list view groups by List
+  // too, that disagreement would be on screen twice at once.
+  const byFolder = new Map<string, List[]>(
+    groups.map((folder) => [folder.id, listsInFolder(folder.id, treeLists)]),
+  );
+
+  // A List whose group is not among them still has to be SOMEWHERE. Its
+  // `folderId` can name a Folder that was archived or deleted, and such a List
+  // used to land in a bucket nothing rendered — present in the account, on no
+  // screen, which is the worst state a List can be in. It shows at the top
+  // level instead, which is where a List with no group belongs.
+  const grouped = new Set(groups.flatMap((folder) => byFolder.get(folder.id)?.map((list) => list.id) ?? []));
+  const loose = treeLists.filter((list) => !grouped.has(list.id));
 
   const visibleTags = activeTags(tags);
   const visibleFilters = activeSavedFilters(savedFilters);
@@ -172,9 +221,9 @@ export function TasksSidebar({
       {...(isOpenDrawer ? { role: "dialog" as const, "aria-modal": true } : {})}
     >
       <div className="tm-section">
-        {row({ kind: "today" }, t("tasks.today"))}
-        {row({ kind: "upcoming" }, t("tasks.upcoming"))}
-        {row({ kind: "inbox" }, t("tasks.inbox"))}
+        {row({ kind: "today" }, t("tasks.today"), { icon: <TodayIcon /> })}
+        {row({ kind: "upcoming" }, t("tasks.upcoming"), { icon: <UpcomingIcon /> })}
+        {row({ kind: "inbox" }, t("tasks.inbox"), { icon: <InboxIcon /> })}
       </div>
 
       <div className="tm-section">
@@ -201,10 +250,31 @@ export function TasksSidebar({
         {groups.map((folder) => {
           const inside = byFolder.get(folder.id) ?? [];
           if (inside.length === 0) return null;
+          const collapsed = isFolderCollapsed(collapsedFolderIds, folder.id);
           return (
             <div key={folder.id} className="tm-group">
               <div className="tm-group-head">
-                {row({ kind: "folder", id: folder.id }, folder.name)}
+                {/* §13.2: the fold is this button's job and the row's job is
+                    still to go to the Folder — which is worth going to now that
+                    its screen is divided by List (§5). The caret is the app's
+                    own (`common/Caret`), which four other groups already use. */}
+                <button
+                  type="button"
+                  className="tm-group-fold"
+                  aria-expanded={!collapsed}
+                  aria-label={t(collapsed ? "tasks.expandFolder" : "tasks.collapseFolder", {
+                    folder: folder.name,
+                  })}
+                  onClick={() => onToggleFolder?.(folder.id)}
+                >
+                  <Caret open={!collapsed} />
+                </button>
+                {/* §13.3: the glyph says the same thing the caret does, on
+                    purpose — in a long tree the eye finds the 16px mark before
+                    the 12px one. */}
+                {row({ kind: "folder", id: folder.id }, folder.name, {
+                  icon: collapsed ? <FolderIcon /> : <FolderOpenIcon />,
+                })}
                 {/* §1.2. Same dialog, one default filled in. */}
                 <button
                   type="button"
@@ -215,13 +285,26 @@ export function TasksSidebar({
                   +
                 </button>
               </div>
-                    {inside.map((list) =>
-                row({ kind: "list", id: list.id }, list.name, { indent: true, dot: listColorHex(list.color) }),
-              )}
+              {/* Not rendered at all when folded, rather than hidden with CSS:
+                  a folded Folder's children should be out of the tab order and
+                  out of a screen reader's reading of it, and `display: none`
+                  on a dozen buttons is a thing to remember rather than a thing
+                  the markup says. */}
+              {collapsed
+                ? null
+                : inside.map((list) =>
+                    row({ kind: "list", id: list.id }, list.name, {
+                      indent: true,
+                      icon: <ListIcon />,
+                      dot: listColorHex(list.color),
+                    }),
+                  )}
             </div>
           );
         })}
-        {loose.map((list) => row({ kind: "list", id: list.id }, list.name, { dot: listColorHex(list.color) }))}
+        {loose.map((list) =>
+          row({ kind: "list", id: list.id }, list.name, { icon: <ListIcon />, dot: listColorHex(list.color) }),
+        )}
         {treeLists.length === 0 ? <p className="tm-section-empty">{t("tasks.noLists")}</p> : null}
       </div>
 
@@ -229,7 +312,10 @@ export function TasksSidebar({
         <div className="tm-section">
           <h2 className="tm-section-title">{t("tasks.sectionTags")}</h2>
           {visibleTags.map((tag) =>
-            row({ kind: "tag", id: tag.id }, tag.name, { dot: tag.color || "var(--tm-tag-dot)" }),
+            row({ kind: "tag", id: tag.id }, tag.name, {
+              icon: <TagIcon />,
+              dot: tag.color || "var(--tm-tag-dot)",
+            }),
           )}
         </div>
       ) : null}
@@ -240,7 +326,7 @@ export function TasksSidebar({
       {visibleFilters.length > 0 ? (
         <div className="tm-section">
           <h2 className="tm-section-title">{t("tasks.sectionFilters")}</h2>
-          {visibleFilters.map((filter) => row({ kind: "filter", id: filter.id }, filter.name))}
+          {visibleFilters.map((filter) => row({ kind: "filter", id: filter.id }, filter.name, { icon: <FilterIcon /> }))}
         </div>
       ) : null}
 
@@ -256,8 +342,8 @@ export function TasksSidebar({
           of places to filter by is easier to read without two rows that jump
           somewhere else instead. Both pages keep their addresses. */}
       <div className="tm-section">
-        {row({ kind: "completed" }, t("tasks.completed"))}
-        {row({ kind: "trash" }, t("tasks.trash"))}
+        {row({ kind: "completed" }, t("tasks.completed"), { icon: <CompletedIcon /> })}
+        {row({ kind: "trash" }, t("tasks.trash"), { icon: <TrashIcon /> })}
       </div>
     </nav>
   );
