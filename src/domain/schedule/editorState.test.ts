@@ -136,9 +136,9 @@ describe("hover (design §2.44)", () => {
 
 describe("panels and navigation", () => {
   it("keeps the draft across a panel change (design §2.37)", () => {
-    const state = run(open(), { type: "SELECT_DATE", date: "2026-08-20" }, { type: "SET_PANEL", panel: "time" });
+    const state = run(open(), { type: "SELECT_DATE", date: "2026-08-20" }, { type: "SET_PANEL", panel: "start" });
     expect(opened(state).draft.dueDate).toBe("2026-08-20");
-    expect(opened(state).panel).toBe("time");
+    expect(opened(state).panel).toBe("start");
   });
 
   // §2.45 — looking at another month is not an edit.
@@ -219,7 +219,7 @@ describe("closed is inert (design §2.43)", () => {
       { type: "SELECT_DATE", date: "2026-08-20" },
       { type: "SET_MODE", mode: "duration" },
       { type: "HOVER_DATE", date: "2026-08-20" },
-      { type: "SET_PANEL", panel: "time" },
+      { type: "SET_PANEL", panel: "start" },
       { type: "STEP_MONTH", delta: 1 },
       { type: "CLEAR_SCHEDULE" },
     ];

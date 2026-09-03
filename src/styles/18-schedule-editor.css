@@ -363,55 +363,78 @@
 
 .sched-row-chevron {
   color: var(--text-tertiary);
+  transition: transform 120ms ease-out;
 }
 
-/* ---- Subpanels (time, reminder, repeat) ---- */
-
-.sched-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* §4: `›` becomes `⌄` — the same glyph, a quarter turn. Driven by the
+   trigger's own `aria-expanded` rather than by a class the component would
+   have to remember to set, so the mark and the state cannot disagree. */
+.sched-row[aria-expanded="true"] .sched-row-chevron {
+  transform: rotate(90deg);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .sched-row-chevron {
+    transition: none;
+  }
+}
+
+/* ---- The range ends' grid (the only sub-screen left) ----
+
+   시간, 알림 and 반복 used to have chrome here too — a centred title, a `‹`,
+   and a spacer to balance it. SCHEDULE_TIME_FIELD_DESIGN.md §4.2 removed all
+   three screens, and their styles with them: a row that opens under itself has
+   nothing to go back from. */
 
 .sched-panel-head {
   display: flex;
   align-items: center;
 }
 
-.sched-panel-back {
-  width: 26px;
-  height: 26px;
+/* ---- The 시간 row, expanded (§4.1.2) ----
+
+   The row becomes a field rather than opening a list, so it is a block in the
+   flow where the other two are triggers. It keeps the row's own padding, so
+   that opening it does not make the column jump sideways. */
+.sched-timerow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sched-rows .sched-timerow:last-child {
+  border-bottom: 0;
+}
+
+.sched-timerow-clear {
+  align-self: flex-start;
   border: 0;
   border-radius: 8px;
+  padding: 4px 6px;
+  margin-left: -6px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--danger);
   font: inherit;
-  font-size: 16px;
-  line-height: 1;
+  font-size: 12px;
   cursor: pointer;
 }
 
-.sched-panel-back:hover {
-  background: var(--bg-surface-muted);
+.sched-timerow-clear:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
 }
 
-.sched-panel-title {
-  flex: 1;
-  text-align: center;
-  font-weight: 600;
-  font-size: 15px;
-}
+/* ---- What 알림 and 반복 open (§4.1.1) ----
 
-/* Balances the back button so the title is centred on the panel, not on the
- * space left over beside it. */
-.sched-panel-spacer {
-  width: 26px;
-}
-
-.sched-panel-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+   It COVERS the rows under it; it does not push them down. The width is the
+   row's, near enough — the editor is a fixed 320px and the surface sits inside
+   its 12px of padding. */
+.ff-layer.sched-rowsurface {
+  padding: 6px;
+  width: 296px;
+  max-width: calc(100vw - 24px);
 }
 
 .sched-time-field {
@@ -433,30 +456,156 @@
   color: var(--text-tertiary);
 }
 
-.sched-time-field input {
-  width: 100%;
-  padding: 9px 12px;
+/* ---- Time field and its list (SCHEDULE_TIME_FIELD_DESIGN.md §3.4, §4.1) ----
+
+   The box that used to be a bare `<input type="time">`. It looks the same as
+   the control it replaced on purpose — the border and radius are the panel's
+   other fields — because what changed is that pressing it now opens something.
+
+   The icon and the ✕ sit INSIDE the border, so the row reads as one field
+   rather than as a field with two buttons beside it (observation 2). */
+.sched-timefield {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   background: var(--bg-surface);
+}
+
+/* The ring goes on the box, because the thing focused is the bare input in the
+   middle of it and an outline there would draw inside the border. */
+.sched-timefield:focus-within {
+  border-color: var(--accent);
+}
+
+.sched-timefield-icon {
+  display: flex;
+  color: var(--text-tertiary);
+}
+
+.sched-timefield-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
   color: var(--text-primary);
   font: inherit;
 }
 
-.sched-time-presets {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+.sched-timefield-input:focus {
+  outline: none;
 }
 
-.sched-time-presets button {
-  padding: 9px 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--bg-surface);
+.sched-timefield-hint {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.sched-timefield-clear {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sched-timefield-clear:hover:not(:disabled) {
+  background: var(--bg-surface-muted);
+  color: var(--text-primary);
+}
+
+/* Invisible rather than gone: an empty field has nothing to clear, and a
+   control that appears with the first keystroke would move the caret's
+   surroundings while it is being typed in. */
+.sched-timefield-clear:disabled {
+  visibility: hidden;
+}
+
+/* The list scrolls inside the child, not inside `.ff-layer` itself, so the
+   4px of surface padding stays put while the 48 rows move under it. */
+/* No `min-width` of its own: the inner list is given the field's measured
+   width (§4.1), and `.ff-layer`'s default 180px would override a field
+   narrower than that. */
+.ff-layer.sched-timelist {
+  padding: 4px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.sched-timelist-scroll {
+  display: flex;
+  flex-direction: column;
+  /* §3.1 keeps all 48; this is what keeps all 48 from being a full-height
+     column. About eight rows, which is enough to show that there is more. */
+  max-height: 264px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sched-timelist-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: var(--text-primary);
   font: inherit;
   font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Two different things, and they can be true at once: `is-selected` is the
+   value the field holds, `is-active` is where the arrow keys are. Colouring
+   only the selected one would leave keyboard navigation invisible. */
+.sched-timelist-option.is-selected {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sched-timelist-option.is-active {
+  background: var(--bg-surface-muted);
+}
+
+.sched-timelist-check {
+  width: 12px;
+  flex: none;
+  color: var(--accent);
+}
+
+/* Four across rather than two-by-two. In the old panel this had a screen to
+   itself; inside the row it sits between two fields, and two rows of buttons
+   there push 알림 and 반복 further than the answer is worth. */
+.sched-time-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sched-time-presets button {
+  padding: 7px 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -464,37 +613,6 @@
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
-}
-
-.sched-note {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--accent-soft);
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.sched-panel-foot {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.sched-panel-clear {
-  border: 0;
-  border-radius: 8px;
-  padding: 6px 10px;
-  background: transparent;
-  color: var(--danger);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.sched-panel-clear:disabled {
-  color: var(--text-tertiary);
-  cursor: default;
 }
 
 .sched-choices {
@@ -569,6 +687,98 @@
 .sched-reminder-custom button:disabled {
   color: var(--text-muted);
   cursor: default;
+}
+
+/* ---- 사용자 지정 알림 (§6) ----
+
+   The one builder in this editor, and the one thing in it with a Save: a
+   count, a unit and sometimes an hour are a middle state, where every other
+   control here lands on the draft as it is pressed (§5). */
+.sched-reminder-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px;
+}
+
+.sched-reminder-amount {
+  display: flex;
+  gap: 8px;
+}
+
+.sched-reminder-count {
+  width: 72px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.sched-reminder-unit {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+/* §6.2: present for 일 and 주, absent for 분 and 시간 — which is the same
+   distinction `allDayTime` draws in the data. */
+.sched-reminder-at {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* §6.4. It reads as a sentence rather than as a field's help text, because
+   what it says is what will happen. */
+.sched-reminder-preview {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sched-reminder-builder-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---- The two doors out of the list (§6.3) ---- */
+
+.sched-reminder-more {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.sched-reminder-open {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sched-reminder-open:hover {
+  background: var(--bg-surface-muted);
+  color: var(--text-primary);
 }
 
 /* §6.40's state line. Not an error colour: the reminder WAS saved, and

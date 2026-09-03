@@ -63,9 +63,75 @@ export const ALL_DAY_OFFERS: readonly ReminderOffer[] = [
   { id: "1w", offsetMinutes: 7 * MINUTES_PER_DAY, allDayTime: ALL_DAY_REMINDER_TIME },
 ];
 
+/**
+ * The units 사용자 지정 offers (SCHEDULE_TIME_FIELD_DESIGN.md §6.1).
+ *
+ * Four, and the fifth one that is NOT here is the point (§6.3): an absolute
+ * reminder is not a longer offset, it is a different question, and folding it
+ * in would make one select answer both "how long before" and "when".
+ */
+export type ReminderUnit = "minute" | "hour" | "day" | "week";
+
+export const REMINDER_UNITS: readonly ReminderUnit[] = ["minute", "hour", "day", "week"];
+
+const UNIT_MINUTES: Record<ReminderUnit, number> = {
+  minute: 1,
+  hour: 60,
+  day: MINUTES_PER_DAY,
+  week: 7 * MINUTES_PER_DAY,
+};
+
+/**
+ * §6.2: whether the unit has to be told an hour.
+ *
+ * Minutes and hours count backwards from the Task's own moment, so the answer
+ * is already fixed. Days and weeks land on a day and nothing in them says
+ * where in it — which is exactly the distinction `allDayTime` already draws,
+ * so the form and the data cannot disagree.
+ */
+export function unitNeedsTime(unit: ReminderUnit): boolean {
+  return unit === "day" || unit === "week";
+}
+
+/**
+ * A unit and a count as one of the two shapes this domain already has (§6.1).
+ *
+ * No new field: a week is 10080 minutes, and because `reminderMoment` takes
+ * the DAY with `floor(offset / 1440)`, a multiple of seven lands on the same
+ * weekday by arithmetic rather than by a rule someone has to maintain.
+ */
+export function customReminderSpec(
+  unit: ReminderUnit,
+  count: number,
+  at: LocalTime = ALL_DAY_REMINDER_TIME,
+): ReminderSpec {
+  return {
+    type: "relative",
+    offsetMinutes: Math.max(0, Math.round(count)) * UNIT_MINUTES[unit],
+    absoluteAt: null,
+    allDayTime: unitNeedsTime(unit) ? at : null,
+    enabled: true,
+  };
+}
+
 /** Which list this schedule gets (§6.11). */
 export function offersFor(schedule: Schedule): readonly ReminderOffer[] {
   return isTimed(schedule) ? TIMED_OFFERS : ALL_DAY_OFFERS;
+}
+
+/**
+ * Which units 사용자 지정 may offer for THIS schedule.
+ *
+ * The same rule as `offersFor`, and for the same reason §6.11 gives: an
+ * all-day Task has no moment for "30 minutes before" to count back from, so
+ * the offset would be resolved against a 09:00 the Task does not have.
+ *
+ * It is not only misleading — `reconcileReminders` would DROP such a reminder
+ * on the next edit (§6.33), so the form would accept a choice, show a preview
+ * for it, and then lose it without saying so.
+ */
+export function unitsFor(schedule: Schedule): readonly ReminderUnit[] {
+  return isTimed(schedule) ? REMINDER_UNITS : REMINDER_UNITS.filter(unitNeedsTime);
 }
 
 /** The spec an offer stands for. */

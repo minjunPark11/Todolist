@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { EMPTY_SCHEDULE } from "../../domain/schedule";
 import { I18nProvider } from "../../i18n";
+import { FloatingLayerProvider } from "../floating";
 import { ScheduleEditor } from "./ScheduleEditor";
 
 afterEach(cleanup);
@@ -22,14 +23,19 @@ const PICTOGRAPHS = /\p{Extended_Pictographic}/u;
 function setup() {
   const { container } = render(
     <I18nProvider lang="en">
-      <ScheduleEditor
-        taskId="t1"
-        locale="en-US"
-        schedule={EMPTY_SCHEDULE}
-        today="2026-08-29"
-        onCommit={() => []}
-        onClose={() => {}}
-      />
+      {/* The 알림 and 반복 rows hang their lists off the layer system now
+          (SCHEDULE_TIME_FIELD_DESIGN.md §4.1), so the editor needs the
+          provider its own popover already gives it in the app. */}
+      <FloatingLayerProvider>
+        <ScheduleEditor
+          taskId="t1"
+          locale="en-US"
+          schedule={EMPTY_SCHEDULE}
+          today="2026-08-29"
+          onCommit={() => []}
+          onClose={() => {}}
+        />
+      </FloatingLayerProvider>
     </I18nProvider>,
   );
   return container;

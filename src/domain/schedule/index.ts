@@ -44,23 +44,27 @@ export {
   specOf,
 } from "./reminderRows";
 
-export type { ReminderMoment, ReminderOffer } from "./reminders";
+export type { ReminderMoment, ReminderOffer, ReminderUnit } from "./reminders";
 export {
   absoluteSpec,
   addReminder,
   ALL_DAY_OFFERS,
   ALL_DAY_REMINDER_TIME,
   containsReminder,
+  customReminderSpec,
   isReminderSpec,
   offersFor,
   reconcileReminders,
   reminderMoment,
+  REMINDER_UNITS,
   removeReminder,
   sameReminder,
   sortReminders,
   specFromOffer,
   TIMED_OFFERS,
   toggleReminder,
+  unitNeedsTime,
+  unitsFor,
 } from "./reminders";
 
 export type { DueReminder, LocalMoment, ReminderSweep, ReminderTaskSource } from "./reminderQueue";
@@ -102,6 +106,8 @@ export { isConfirmable, isValidSchedule, validateDraft, validateSchedule } from 
 export { isDirty, schedulesEqual } from "./scheduleEquality";
 
 export { formatLocalTime, formatScheduleTrigger, formatTimeSummary } from "./scheduleFormatting";
+
+export { nextWholeHour, parseTimeInput, TIME_STEP_MINUTES, timeOptions } from "./timeOptions";
 
 export type { ScheduleUpdatePlan } from "./updateTaskSchedule";
 export { planScheduleUpdate } from "./updateTaskSchedule";

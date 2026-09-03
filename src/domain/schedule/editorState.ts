@@ -35,18 +35,25 @@ import type {
 } from "./types";
 import type { ScheduleIssue } from "./validateSchedule";
 
-/** Which sub-panel the editor is showing (design §2.4). */
 /**
  * Which surface the editor is showing.
  *
  * `start` and `end` are the same month grid as `calendar`, opened for ONE end
  * of a range and returning as soon as a day is picked
- * (TASK_DETAIL_SCHEDULE_BODY_DESIGN.md §11.2). They are panels rather than a
- * flag on `calendar` because that is what the reader sees: a surface with a
- * title, a way back, and one question on it — the shape `time`, `reminder`
- * and `repeat` already have.
+ * (TASK_DETAIL_SCHEDULE_BODY_DESIGN.md §11.2). They are panels because that is
+ * what the reader sees: a surface with a title, a way back, and one question.
+ *
+ * `time`, `reminder` and `repeat` used to be here too, and are not any more
+ * (SCHEDULE_TIME_FIELD_DESIGN.md §4.2). Those three answer their question
+ * WHERE THEY ARE ASKED — the row opens under itself and the calendar stays
+ * put — so there is no surface to be on and nothing to go back from. What is
+ * left is the three that genuinely replace the screen.
+ *
+ * Which row is open is not here either, deliberately: it is a fact about the
+ * view and not about the schedule, and this reducer exists to say which
+ * SCHEDULES are reachable.
  */
-export type EditorPanel = "calendar" | "time" | "reminder" | "repeat" | "start" | "end";
+export type EditorPanel = "calendar" | "start" | "end";
 
 export type ScheduleEditorState =
   | { status: "closed" }

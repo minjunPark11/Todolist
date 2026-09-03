@@ -5,7 +5,22 @@
 // — the popover owns being open and where it sits, the editor owns the draft —
 // so that opening this from somewhere other than the task detail later means
 // giving it a different trigger and nothing else.
-import { useEffect, useReducer, type ReactNode } from "react";
+//
+// 시간 · 알림 · 반복 used to be SCREENS here, each replacing the calendar and
+// each with a `‹` to come back from (§2.15). SCHEDULE_TIME_FIELD_DESIGN.md §4
+// makes all three open UNDER THE ROW THAT ASKED, over the rows below rather
+// than pushing them down, and the calendar stays where it is. Three things
+// went with that change:
+//
+//   - `EditorPanel` lost those three members (§4.2). What is left is the grid
+//     and the two range ends, which genuinely do replace the screen.
+//   - The hand-rolled Escape capture listener is gone. It existed to make
+//     Escape mean "back to the calendar" rather than "close the editor", and
+//     the layer stack already peels exactly one level at a time (§19.24).
+//   - 반복 came along even though the user only asked for two (§4.3): three
+//     identical-looking rows behaving in two different ways is worse than
+//     either behaviour.
+import { useReducer, useState, type ReactNode } from "react";
 import {
   ALL_DAY_OFFERS,
   sortReminders,
@@ -18,18 +33,20 @@ import {
   isAllDay,
   isConfirmable,
   isDirty,
+  nextWholeHour,
   QUICK_DATES,
   REPEAT_PRESETS,
   scheduleEditorReducer,
   type QuickDateKey,
+  type RepeatPreset,
   type Schedule,
   type ScheduleIssue,
 } from "../../domain/schedule";
 import type { ReminderSpec } from "../../domain/schedule";
-import { ChoicePanel } from "./ChoicePanel";
-import { ReminderPanel } from "./ReminderPanel";
+import { ReminderList } from "./ReminderList";
 import { MonthCalendar } from "./MonthCalendar";
-import { TimePanel } from "./TimePanel";
+import { TimeRow } from "./TimeRow";
+import { Popover, PopoverContent, PopoverTrigger } from "../floating";
 import {
   BellIcon,
   CalendarPlus7Icon,
@@ -69,34 +86,25 @@ const QUICK_ICONS: Record<QuickDateKey, () => ReactNode> = {
   nextMonth: () => <CalendarNextMonthIcon size={20} />,
 };
 
-/* `nowTime` stood here — the wall clock, read at press time for 오늘 밤 and
-   never stored. The fourth shortcut is 다음 달 now and answers with a day, so
-   none of the four asks what time it is. */
+/** The wall clock, read once when 시간 is opened on an empty start (§3.3). */
+function nowTime(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
 
 export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onClose, onCancel }: ScheduleEditorProps) {
   const { t } = useT();
   const [state, dispatch] = useReducer(scheduleEditorReducer, undefined, () =>
     scheduleEditorReducer(CLOSED, { type: "OPEN", taskId, schedule, today }),
   );
-
-  // Escape in a subpanel goes back to the calendar rather than closing the
-  // editor (design §2.16). Capture phase on the document, because the popover
-  // closes from its own document-level listener (`useOutsideClose`) and the
-  // only way to get there first — regardless of where focus happens to be —
-  // is to catch the key on the way down and stop it.
+  // 시간 is the one row that becomes a FIELD rather than opening a list
+  // (§4.1.2), so it is the one whose openness this component has to hold.
+  // 알림 and 반복 hang their lists off their own `Popover`, which already
+  // knows whether it is open.
   //
-  // Read outside the early return below, since hooks cannot be conditional.
-  const openPanel = state.status === "open" ? state.panel : "calendar";
-  useEffect(() => {
-    if (openPanel === "calendar") return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      dispatch({ type: "SET_PANEL", panel: "calendar" });
-    }
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [openPanel]);
+  // View state, not draft state, which is why it is here and not in the
+  // reducer: the reducer answers which SCHEDULES are reachable.
+  const [timeOpen, setTimeOpen] = useState(false);
 
   if (state.status !== "open") return null;
 
@@ -115,39 +123,22 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
     else dispatch({ type: "REJECT", issues: found });
   }
 
-  // The subpanels replace the calendar rather than sitting beside it (§2.15).
-  // Back returns here with the draft intact — each panel edits a different
-  // part of one draft, not a draft of its own (§2.37).
-  if (panel === "time") {
-    return (
-      <div className="sched-editor">
-        <TimePanel
-          draft={draft}
-          locale={locale}
-          onStartTime={(time) => dispatch({ type: "SET_START_TIME", time })}
-          onEndTime={(time) => dispatch({ type: "SET_END_TIME", time })}
-          onClear={() => dispatch({ type: "CLEAR_TIME" })}
-          onBack={() => dispatch({ type: "SET_PANEL", panel: "calendar" })}
-        />
-      </div>
-    );
-  }
-
-  if (panel === "reminder") {
-    return (
-      <div className="sched-editor">
-        {/* Not a `ChoicePanel` any more: §6.15 lets a Task hold several of
-            these, and a radiogroup would drop the previous one on every
-            choice. The offers themselves depend on the draft — §6.11 gives an
-            all-day Task different units, not the timed list with rows
-            removed. */}
-        <ReminderPanel
-          draft={draft}
-          onToggle={(reminder) => dispatch({ type: "TOGGLE_REMINDER", reminder })}
-          onBack={() => dispatch({ type: "SET_PANEL", panel: "calendar" })}
-        />
-      </div>
-    );
+  /**
+   * §3.3: the clock fills an EMPTY start, and only an empty one.
+   *
+   * This is the one place in this editor that reads a clock, and it is worth
+   * naming why that is allowed here when `quickDate.ts` refuses it: what the
+   * clock makes is a SUGGESTION in an empty field, which the user then
+   * confirms or replaces. A value that is already set is never touched, so
+   * reopening the editor an hour later cannot quietly move a time someone had
+   * chosen.
+   */
+  function openTime() {
+    if (state.status !== "open") return;
+    if (state.draft.startTime === null) {
+      dispatch({ type: "SET_START_TIME", time: nextWholeHour(nowTime()) });
+    }
+    setTimeOpen(true);
   }
 
   // One end of the range, on the same grid the Date tab uses (§11.2). It is
@@ -180,21 +171,6 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
     );
   }
 
-  if (panel === "repeat") {
-    return (
-      <div className="sched-editor">
-        <ChoicePanel
-          title={t("schedule.repeat")}
-          options={REPEAT_PRESETS}
-          value={draft.repeat}
-          label={(option) => t(`schedule.repeat.${option}`)}
-          onChoose={(repeat) => dispatch({ type: "SET_REPEAT", repeat })}
-          onBack={() => dispatch({ type: "SET_PANEL", panel: "calendar" })}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="sched-editor">
       <div className="sched-tabs" role="tablist">
@@ -213,7 +189,7 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
       </div>
 
       {/* The Date tab's two: shortcuts and a grid. Neither is on the Duration
-          tab (§11.2) — `오늘`, `내일`, `7일 후` and `오늘 밤` each answer with
+          tab (§11.2) — `오늘`, `내일`, `7일 후` and `다음 달` each answer with
           ONE day, which is not an answer to a span, and the grid moves behind
           the two fields that say which end they are setting. */}
       {draft.mode === "date" ? (
@@ -267,8 +243,8 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
             onClick={() => dispatch({ type: "SET_PANEL", panel: "end" })}
           />
           {/* Derived, not stored (§11.3): "all day" IS both times being empty.
-              Turning it on clears them; turning it off opens the panel that
-              sets them, because picking is the only way to make the state the
+              Turning it on clears them; turning it off opens the row that sets
+              them, because picking is the only way to make the state the
               switch would be claiming. */}
           <div className="sched-row is-switch">
             <span className="sched-row-label">{t("schedule.allDay")}</span>
@@ -279,11 +255,7 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
               aria-checked={isAllDay(draft)}
               aria-label={t("schedule.allDay")}
               disabled={!dated}
-              onClick={() =>
-                isAllDay(draft)
-                  ? dispatch({ type: "SET_PANEL", panel: "time" })
-                  : dispatch({ type: "CLEAR_TIME" })
-              }
+              onClick={() => (isAllDay(draft) ? openTime() : dispatch({ type: "CLEAR_TIME" }))}
             >
               <span className="tm-switch-knob" aria-hidden="true" />
             </button>
@@ -296,18 +268,39 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
       <div className="sched-rows">
         {/* On the Duration tab the switch above owns this question, and the row
             appears only once there is something to show — a second door to the
-            same panel, standing open beside a switch that says "all day", is
+            same list, standing open beside a switch that says "all day", is
             two controls disagreeing. */}
         {draft.mode === "date" || !isAllDay(draft) ? (
-        <SummaryRow
-          icon={<ClockIcon />}
-          label={t("schedule.time")}
-          value={formatTimeSummary(draft, locale) || t("schedule.noTime")}
-          disabled={!dated}
-          onClick={() => dispatch({ type: "SET_PANEL", panel: "time" })}
-        />
+          timeOpen ? (
+            // §4.1.2: the row IS the field, because this is the one of the
+            // three that can be typed into as well as chosen from.
+            <TimeRow
+              draft={draft}
+              locale={locale}
+              onStartTime={(time) => dispatch({ type: "SET_START_TIME", time })}
+              onEndTime={(time) => dispatch({ type: "SET_END_TIME", time })}
+              onClear={() => {
+                dispatch({ type: "CLEAR_TIME" });
+                setTimeOpen(false);
+              }}
+              onCollapse={() => setTimeOpen(false)}
+            />
+          ) : (
+            <SummaryRow
+              icon={<ClockIcon />}
+              label={t("schedule.time")}
+              value={formatTimeSummary(draft, locale) || t("schedule.noTime")}
+              disabled={!dated}
+              onClick={openTime}
+            />
+          )
         ) : null}
-        <SummaryRow
+
+        {/* Not a `ChoicePanel` any more, and not a panel at all: §6.15 lets a
+            Task hold several of these, and the offers themselves depend on the
+            draft — §6.11 gives an all-day Task different units, not the timed
+            list with rows removed. */}
+        <ExpandingRow
           icon={<BellIcon />}
           label={t("schedule.reminder")}
           /* §6.34: a summary, because there may be more than one. The earliest
@@ -315,15 +308,25 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
              would be wider than the popover. */
           value={reminderSummary(draft, t)}
           disabled={!dated}
-          onClick={() => dispatch({ type: "SET_PANEL", panel: "reminder" })}
-        />
-        <SummaryRow
+        >
+          <ReminderList
+            draft={draft}
+            locale={locale}
+            onToggle={(reminder) => dispatch({ type: "TOGGLE_REMINDER", reminder })}
+          />
+        </ExpandingRow>
+
+        <ExpandingRow
           icon={<RepeatIcon />}
           label={t("schedule.repeat")}
           value={t(`schedule.repeat.${draft.repeat}`)}
           disabled={!dated}
-          onClick={() => dispatch({ type: "SET_PANEL", panel: "repeat" })}
-        />
+        >
+          <RepeatChoices
+            value={draft.repeat}
+            onChoose={(repeat) => dispatch({ type: "SET_REPEAT", repeat })}
+          />
+        </ExpandingRow>
       </div>
 
       {/* Not an error. A half-picked range is a waypoint, and §2.9 keeps the
@@ -365,10 +368,42 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
 }
 
 /**
+ * 반복's six, as the radiogroup they have always been.
+ *
+ * One of these is always in force, which is what makes it a radiogroup and not
+ * the checkbox list above it — a screen reader should say "없음, selected"
+ * rather than announce six unrelated controls.
+ */
+function RepeatChoices({ value, onChoose }: { value: RepeatPreset; onChoose: (repeat: RepeatPreset) => void }) {
+  const { t } = useT();
+  return (
+    <div className="sched-choices" role="radiogroup" aria-label={t("schedule.repeat")}>
+      {REPEAT_PRESETS.map((option) => (
+        <button
+          type="button"
+          key={option}
+          role="radio"
+          aria-checked={option === value}
+          className={option === value ? "sched-choice is-active" : "sched-choice"}
+          onClick={() => onChoose(option)}
+        >
+          <span>{t(`schedule.repeat.${option}`)}</span>
+          {option === value ? (
+            <span className="sched-check" aria-hidden="true">
+              ✓
+            </span>
+          ) : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
  * §6.34's summary line: the earliest reminder, and how many more there are.
  *
  * The earliest rather than the first added, because §6.49 orders them that way
- * everywhere else and a row that disagreed with the panel under it would read
+ * everywhere else and a row that disagreed with the list under it would read
  * as a bug. An absolute reminder has no preset label, so it shows its own
  * moment.
  */
@@ -405,6 +440,55 @@ interface SummaryRowProps {
 function SummaryRow({ icon, label, value, disabled, onClick }: SummaryRowProps) {
   return (
     <button type="button" className="sched-row" disabled={disabled} onClick={onClick}>
+      <RowFace icon={icon} label={label} value={value} />
+    </button>
+  );
+}
+
+/**
+ * A row that opens its answer underneath itself (§4.1).
+ *
+ * A nested `Popover` and not a block in the flow, for the reason §4.1.1 gives:
+ * the list COVERS the rows below rather than pushing them down, so the
+ * calendar above does not move while a question below it is being answered.
+ * The stack does the rest — Escape peels this layer and leaves the editor,
+ * which is the behaviour the editor used to hand-roll with a capture listener.
+ */
+function ExpandingRow({
+  icon,
+  label,
+  value,
+  disabled,
+  children,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  disabled: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Popover placement="bottom-start" offset={4}>
+      <PopoverTrigger className="sched-row" disabled={disabled}>
+        <RowFace icon={icon} label={label} value={value} />
+      </PopoverTrigger>
+      <PopoverContent label={label} className="sched-rowsurface">
+        {children}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * What every row looks like, open or shut.
+ *
+ * Shared so that a row that opens a list and a row that replaces the screen
+ * cannot drift apart — they are the same sentence with different consequences,
+ * and §4.3 is about exactly that.
+ */
+function RowFace({ icon, label, value }: { icon?: ReactNode; label: string; value: string }) {
+  return (
+    <>
       {/* The range's two rows carry no icon: `시작`/`종료` are a pair and the
           words are the distinction, where the three rows below are each a
           different KIND of thing and the glyph is what separates them. */}
@@ -415,9 +499,11 @@ function SummaryRow({ icon, label, value, disabled, onClick }: SummaryRowProps) 
       ) : null}
       <span className="sched-row-label">{label}</span>
       <span className="sched-row-value">{value}</span>
+      {/* §4 turns this a quarter turn when the row is open, which the
+          stylesheet does from the trigger's own `aria-expanded`. */}
       <span className="sched-row-chevron" aria-hidden="true">
         ›
       </span>
-    </button>
+    </>
   );
 }

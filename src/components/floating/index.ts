@@ -13,6 +13,7 @@ export {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  usePopoverAnchor,
   usePopoverSurface,
   type PopoverContentProps,
   type PopoverProps,

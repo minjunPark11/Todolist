@@ -37,7 +37,15 @@ interface PopoverContextValue {
   close: (reason: DismissReason) => void;
   placement: Placement;
   offset?: number;
-  triggerRef: React.MutableRefObject<HTMLButtonElement | null>;
+  /**
+   * The element the surface hangs from.
+   *
+   * `HTMLElement` and not `HTMLButtonElement`, because `PopoverTrigger` is not
+   * the only thing that can be one: a combobox anchors its list to the text
+   * field the caret is in, and moving focus to a button to open that list is
+   * exactly what a combobox exists not to do (`usePopoverAnchor`).
+   */
+  triggerRef: React.MutableRefObject<HTMLElement | null>;
   surfaceRef: React.MutableRefObject<HTMLDivElement | null>;
   openedByKeyboard: React.MutableRefObject<boolean>;
   restoreFocusTo?: () => HTMLElement | null;
@@ -107,7 +115,7 @@ export function Popover({
   const parentId = useContext(ParentLayerContext);
   const id = useId();
   const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const openedByKeyboard = useRef(false);
 
@@ -205,6 +213,50 @@ export function Popover({
   return <PopoverContext.Provider value={value}>{children}</PopoverContext.Provider>;
 }
 
+/**
+ * The same layer, hung from something that is not a `PopoverTrigger`.
+ *
+ * A combobox needs it: the anchor is the text field, the field keeps focus
+ * while its list is open, and the list is opened by typing or by an arrow key
+ * rather than by pressing the anchor. `PopoverTrigger` is a button that takes
+ * focus on click, which is the one thing that widget cannot do
+ * (SCHEDULE_TIME_FIELD_DESIGN.md §3.4).
+ *
+ * Everything else the layer system does is unchanged — Escape peels one level,
+ * an outside click dismisses, and a surface opened inside another registers as
+ * its child — which is the reason to reach for this rather than to portal a
+ * list by hand.
+ */
+export function usePopoverAnchor(): {
+  /** Attach to the element the surface should hang from and return focus to. */
+  ref: React.MutableRefObject<HTMLElement | null>;
+  open: boolean;
+  /** The surface's id, for the anchor's `aria-controls`. */
+  surfaceId: string;
+  openSurface: () => void;
+  close: (reason?: DismissReason) => void;
+  toggle: () => void;
+} {
+  const context = usePopoverContext("usePopoverAnchor");
+  const { id, open, toggle, close, triggerRef } = context;
+  return useMemo(
+    () => ({
+      ref: triggerRef,
+      open,
+      surfaceId: `${id}-surface`,
+      // Always "not from the keyboard": a combobox's surface never takes
+      // focus, whichever key opened it, and `focusOnOpen="never"` says so on
+      // the content side too.
+      openSurface: () => {
+        if (!open) toggle(false);
+      },
+      close: (reason: DismissReason = "selection") => close(reason),
+      toggle: () => toggle(false),
+    }),
+    [id, open, toggle, close, triggerRef],
+  );
+}
+
 export interface PopoverTriggerProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
 }
@@ -221,7 +273,9 @@ export function PopoverTrigger({ children, onClick, ...rest }: PopoverTriggerPro
   return (
     <button
       {...rest}
-      ref={triggerRef}
+      ref={(node) => {
+        triggerRef.current = node;
+      }}
       type="button"
       aria-haspopup="dialog"
       aria-expanded={open}
@@ -257,8 +311,14 @@ export interface PopoverContentProps {
    * A picker whose first control is a search field needs it — §13.27 says
    * typing filters, and a field that must be clicked before it will accept
    * what someone is already typing is a search field in name only.
+   *
+   * `never` is for a surface whose controls are not focus targets at all. A
+   * combobox's list is one: the caret stays in the field and the option the
+   * arrows are on is announced through `aria-activedescendant`, so moving
+   * focus into the list would take the keyboard away from the typing that
+   * steers it.
    */
-  focusOnOpen?: "auto" | "always";
+  focusOnOpen?: "auto" | "always" | "never";
 }
 
 export function PopoverContent({
@@ -301,6 +361,7 @@ export function PopoverContent({
   // could not see it.
   useEffect(() => {
     if (!open || !position) return;
+    if (focusOnOpen === "never") return;
     if (focusOnOpen === "auto" && !openedByKeyboard.current) return;
     const candidates = surfaceRef.current?.querySelectorAll<HTMLElement>(
       "button, [href], input, select, textarea, [tabindex]",
