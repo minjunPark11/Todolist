@@ -14,6 +14,7 @@ import {
   type TodayBucketId,
   type TodayEntry,
 } from "../../utils/todayView";
+import { Caret } from "../common/Caret";
 import { useT } from "../../i18n";
 import { formatDate } from "../../utils/date";
 import { listDisplayName } from "../../domain/spaces/hierarchy";
@@ -237,7 +238,7 @@ function TodayGroup({
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
         >
-          <span className="tdy-bucket-caret" aria-hidden="true">{open ? "⌄" : "›"}</span>
+          <Caret open={open} />
           <span className={`tdy-bucket-dot tdy-bucket-dot-${group.id}`} aria-hidden="true" />
           <strong>{t(todayGroupLabelKey(group.id))}</strong>
           <span className="tdy-bucket-count">{group.rows.length}</span>

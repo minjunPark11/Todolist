@@ -703,10 +703,10 @@
   gap: 6px;
 }
 
-.eis-group-caret {
-  width: 12px;
-  color: var(--text-tertiary);
-}
+/* `.eis-group-caret` stood here — a 12px box holding one of two different
+   characters. Both are `.ff-caret` now (21-components.css), which is one
+   drawing turned a quarter, so the two states are the same shape and the turn
+   can be animated (components/common/Caret.tsx). */
 
 /* --- Calendar right task panel (Eisenhower list) --- */
 

@@ -25,9 +25,7 @@
 // hide rather than to disable.
 import { useT } from "../../i18n";
 import {
-  SCOPE_DATE_BY,
   SCOPE_KANBAN_SIZES,
-  type ScopeDateBy,
   type ScopeKanbanSize,
   type ScopeViewOptions,
 } from "../../domain/view/scopeViewOptions";
@@ -71,24 +69,30 @@ export function ScopeViewOptionsDialog({
         </header>
 
         <div className="tm-view-options">
+          {/* A switch, not a two-option `<select>`
+              (SCOPE_VIEW_OPTIONS_DESIGN.md §14.5): a dropdown holding exactly
+              two values is a switch drawn as a menu, and the reader has to
+              open it to learn what the other one even is.
+
+              The state stays VISIBLE here, unlike the same setting in a menu.
+              That is the split §14.5 draws: in a dialog the control carries
+              the state, because the rows are read side by side; in a menu the
+              label carries it, because the surface is pressed once and shut. */}
           <div className="tm-view-group">
             <div className="tm-view-option">
-              <span className="tm-view-option-label">{t("tasks.showDateBy")}</span>
-              {/* A `<select>` and not a popover: two choices, no icons, and the
-                  platform's own control already says "there are other values
-                  behind this one". */}
-              <select
-                className="tm-view-option-value"
-                value={options.dateBy}
-                aria-label={t("tasks.showDateBy")}
-                onChange={(event) => onChange({ dateBy: event.target.value as ScopeDateBy })}
+              <span className="tm-view-option-label">{t("tasks.showCountdown")}</span>
+              <button
+                type="button"
+                className={`tm-switch${options.dateBy === "countdown" ? " is-on" : ""}`}
+                role="switch"
+                aria-checked={options.dateBy === "countdown"}
+                aria-label={t("tasks.showCountdown")}
+                onClick={() =>
+                  onChange({ dateBy: options.dateBy === "countdown" ? "taskTime" : "countdown" })
+                }
               >
-                {SCOPE_DATE_BY.map((value) => (
-                  <option key={value} value={value}>
-                    {t(`tasks.dateBy.${value}`)}
-                  </option>
-                ))}
-              </select>
+                <span className="tm-switch-knob" aria-hidden="true" />
+              </button>
             </div>
           </div>
 

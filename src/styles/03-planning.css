@@ -1046,11 +1046,10 @@
   border-radius: var(--radius-sm, 6px);
 }
 .ff-matrix-group-head:hover { color: var(--text-secondary); }
-.ff-matrix-group-caret {
-  width: 12px;
-  text-align: center;
-  flex: 0 0 auto;
-}
+/* `.ff-matrix-group-caret` stood here — a 12px box holding one of two different
+   characters. Both are `.ff-caret` now (21-components.css), which is one
+   drawing turned a quarter, so the two states are the same shape and the turn
+   can be animated (components/common/Caret.tsx). */
 .ff-matrix-group-name { flex: 1 1 auto; min-width: 0; }
 .ff-matrix-group-count { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .ff-matrix-group-body {

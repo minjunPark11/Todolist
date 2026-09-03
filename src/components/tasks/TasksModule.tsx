@@ -409,8 +409,19 @@ export function TasksModule(props: TasksModuleProps) {
   // difference matters — "this List has no tasks" and "this List is gone" ask
   // the reader to do different things.
   const missing = namedRecordMissing(scope, lists, folders, sidebarFolders, tags, savedFilters);
-  /** A menu row that is a state says so with the same mark everywhere. */
-  const prefix = (on: boolean) => (on ? String.fromCharCode(10003) + " " : "");
+  /*
+   * `prefix()` stood here — a `✓ ` glued to the front of a row's LABEL.
+   *
+   * Two things were wrong with it and they are the same thing twice
+   * (SCOPE_VIEW_OPTIONS_DESIGN.md §14.2). A menu row that means "on" was
+   * saying so with a decorative character inside its text, while the element
+   * stayed a plain `menuitem` with no `aria-checked` — so the state was
+   * announced to nobody. And a two-state setting drawn as a state needs the
+   * reader to work out what pressing it does.
+   *
+   * Both rows say what pressing them WILL DO now, and flip when it is done.
+   * That makes them actions, which is what `menuitem` already claimed.
+   */
   /**
    * What a List can be told, or nothing for every other Scope.
    *
@@ -468,13 +479,13 @@ export function TasksModule(props: TasksModuleProps) {
     ...(state.view === "board"
       ? [
           {
-            label: prefix(viewOptions.hideCompleted) + t("tasks.hideCompleted"),
+            label: t(viewOptions.hideCompleted ? "tasks.showCompleted" : "tasks.hideCompleted"),
             onClick: () => patchViewOptions({ hideCompleted: !viewOptions.hideCompleted }),
           } as MoreMenuItem,
         ]
       : []),
     {
-      label: prefix(viewOptions.showDetails) + t("tasks.showDetails"),
+      label: t(viewOptions.showDetails ? "tasks.hideDetails" : "tasks.showDetails"),
       onClick: () => patchViewOptions({ showDetails: !viewOptions.showDetails }),
     },
     { separator: true },
@@ -1225,6 +1236,7 @@ export function TasksModule(props: TasksModuleProps) {
         {!missing && !props.loading ? (
           <TaskQuickAdd
             scope={scope}
+            lists={lists}
             inboxListId={lists.find(isInboxList)?.id ?? ""}
             today={today}
             folderLists={

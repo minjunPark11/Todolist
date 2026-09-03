@@ -25,6 +25,7 @@ function setup(scope: TaskScopeRef = { kind: "upcoming" }) {
       <FloatingLayerProvider>
         <TaskQuickAdd
           scope={scope}
+          lists={[{ id: INBOX, name: "Inbox", kind: "inbox" } as never]}
           inboxListId={INBOX}
           today={TODAY}
           folderLists={[]}
@@ -38,7 +39,10 @@ function setup(scope: TaskScopeRef = { kind: "upcoming" }) {
       </FloatingLayerProvider>
     </I18nProvider>,
   );
-  return { onCreate, field: screen.getByRole("textbox", { name: "Add a task" }) as HTMLInputElement };
+  // The field's name carries the List the task will land in now
+  // (TICKTICK_COMPONENT_10 §10.3), so this matches the head of it rather than
+  // the whole string.
+  return { onCreate, field: screen.getByRole("textbox", { name: /^Add a task/ }) as HTMLInputElement };
 }
 
 describe("Upcoming's quick add", () => {
@@ -97,3 +101,53 @@ describe("leaving the field", () => {
     expect(onCreate).toHaveBeenCalledTimes(1);
   });
 });
+
+// The row's own shape (TICKTICK_COMPONENT_10_QUICK_ADD.md §10).
+describe("the quick add as one quiet row", () => {
+  it("offers no button until there is something to commit", () => {
+    // Three things commit this form and two of them are not buttons — Enter,
+    // and a click outside it. A button standing there while the field is empty
+    // opens nothing and takes the eye first (§10.4).
+    const { field } = setup({ kind: "inbox" });
+    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+
+    fireEvent.change(field, { target: { value: "Something" } });
+    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
+
+    fireEvent.change(field, { target: { value: "" } });
+    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+  });
+
+  it("says which List the task will land in", () => {
+    // The one thing this screen never said. Today, a Tag and a Filter all
+    // resolve to a List the reader cannot see (§10.3).
+    const { field } = setup({ kind: "inbox" });
+    expect(field.getAttribute("placeholder")).toBe("Add a task to Inbox");
+    expect(field.getAttribute("aria-label")).toBe("Add a task to Inbox");
+  });
+
+  it("keeps the leading + as a fixture, hidden rather than removed", () => {
+    // Removing it would pull the first letter typed to the left.
+    const { field } = setup({ kind: "inbox" });
+    const icon = document.querySelector(".tm-quickadd-icon") as HTMLElement;
+    expect(icon.className).not.toContain("is-typing");
+
+    fireEvent.change(field, { target: { value: "Typing" } });
+    expect(document.querySelector(".tm-quickadd-icon")?.className).toContain("is-typing");
+  });
+
+  it("draws nothing under the row when the Scope needs nothing", () => {
+    setup({ kind: "inbox" });
+    expect(document.querySelector(".tm-quickadd-extras")?.children.length).toBe(0);
+  });
+
+  it("puts the Folder's List question under the row, not in it", () => {
+    // A Folder must be asked which List (§12.4), and that is not a question
+    // that belongs on the line where a title is typed.
+    setup({ kind: "folder", id: "f1" });
+    const extras = document.querySelector(".tm-quickadd-extras") as HTMLElement;
+    expect(extras.querySelector("select")).toBeTruthy();
+    expect(document.querySelector(".tm-quickadd-box select")).toBeNull();
+  });
+});
+

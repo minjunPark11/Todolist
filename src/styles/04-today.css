@@ -398,13 +398,10 @@
   cursor: pointer;
 }
 
-.tdy-bucket-caret {
-  display: inline-grid;
-  place-items: center;
-  width: 14px;
-  color: var(--text-tertiary);
-  font-size: 13px;
-}
+/* `.tdy-bucket-caret` stood here — a 12px box holding one of two different
+   characters. Both are `.ff-caret` now (21-components.css), which is one
+   drawing turned a quarter, so the two states are the same shape and the turn
+   can be animated (components/common/Caret.tsx). */
 
 .tdy-bucket-head strong {
   font-size: 15px;

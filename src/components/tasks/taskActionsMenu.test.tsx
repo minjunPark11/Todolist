@@ -567,6 +567,62 @@ describe("the Scope's menu", () => {
     ]);
   });
 
+  // SCOPE_VIEW_OPTIONS_DESIGN.md §14: a two-state setting is ONE row that says
+  // what pressing it will do, and flips when it is done.
+  describe("a setting with two states", () => {
+    it("names the change, not the state, and flips after it", async () => {
+      const user = userEvent.setup();
+      const options = { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, showDetails: false } };
+      renderModule({}, { url: "/list/l1", scopeViewOptions: options });
+
+      await openScopeMenu(user);
+      expect(rows()).toContain("Show details");
+      expect(rows()).not.toContain("Hide details");
+      cleanup();
+
+      renderModule(
+        {},
+        {
+          url: "/list/l1",
+          scopeViewOptions: { "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, showDetails: true } },
+        },
+      );
+      await openScopeMenu(user);
+      expect(rows()).toContain("Hide details");
+      expect(rows()).not.toContain("Show details");
+    });
+
+    it("puts no tick in any label", async () => {
+      // The `✓` used to be glued to the front of the label text, where a
+      // screen reader meets a decorative character and no `aria-checked`.
+      const user = userEvent.setup();
+      renderModule(
+        {},
+        {
+          url: "/list/l1?view=board",
+          scopeViewOptions: {
+            "list:l1": { ...DEFAULT_SCOPE_VIEW_OPTIONS, hideCompleted: true, showDetails: true },
+          },
+        },
+      );
+
+      await openScopeMenu(user);
+      for (const row of rows()) expect(row).not.toContain("✓");
+    });
+
+    it("leaves the settings with three answers alone", async () => {
+      // The rule is for PAIRS. Group by and Sort by have no opposite to flip
+      // to, and they stay "current value + submenu" (§14.3).
+      const user = userEvent.setup();
+      renderModule({}, { url: "/list/l1?view=board" });
+
+      await openScopeMenu(user);
+      // The view picker is the one closed choice in this menu, and it is drawn
+      // as a set rather than as a flip.
+      expect(screen.getAllByRole("menuitemradio").length).toBe(3);
+    });
+  });
+
   // Q4's two `Task Time` rows are gone with the Scope they were for: they
   // existed because a Scope with no Board would have opened a modal to show
   // one line, and there is no such Scope left (§2). `Task Time` has one door
@@ -576,9 +632,10 @@ describe("the Scope's menu", () => {
     renderModule({}, { url: "/today" });
 
     await openScopeMenu(user);
-    // `Hide Completed` is absent: it is a Board row and this Scope opened on
-    // the list.
-    expect(rows()).toEqual(["Show Details", "View Options"]);
+    // `Hide completed` is absent: it is a Board row and this Scope opened on
+    // the list. The rows say what pressing them does now, with no `✓` in the
+    // words (SCOPE_VIEW_OPTIONS_DESIGN.md §14.2).
+    expect(rows()).toEqual(["Show details", "View Options"]);
   });
 
   it("opens the dialog on a Scope that gathers several Lists", async () => {
@@ -677,11 +734,16 @@ describe("View Options", () => {
     const groups = [...dialog.querySelectorAll(".tm-view-group")];
     expect(groups).toHaveLength(3);
 
+
     // The switch is not sharing with `Kanban Size`, which is the grouping
     // this replaced getting it wrong by accident rather than on purpose.
+    // Two switch cards since §14.5 — `Task Time` was a two-option `<select>`
+    // and a dropdown holding exactly two values is a switch drawn as a menu.
+    // Neither shares with `Kanban Size`, which is the grouping this replaced
+    // getting wrong by accident rather than on purpose.
     const withSwitch = groups.filter((g) => g.querySelector("[role=\"switch\"]"));
-    expect(withSwitch).toHaveLength(1);
-    expect(withSwitch[0].querySelectorAll("select")).toHaveLength(0);
+    expect(withSwitch).toHaveLength(2);
+    for (const group of withSwitch) expect(group.querySelectorAll("select")).toHaveLength(0);
 
     // And every row still sits inside one — a row loose in the dialog would
     // have no card at all now that the row is not one.
@@ -723,10 +785,8 @@ describe("View Options", () => {
     renderModule({}, { url: "/list/l1?view=board", onSetScopeViewOptions });
 
     const dialog = await openDialog(user, "/list/l1?view=board");
-    await user.selectOptions(
-      within(dialog).getByRole("combobox", { name: "Show Date by" }),
-      "countdown",
-    );
+    // A switch, not a two-option dropdown (§14.5).
+    await user.click(within(dialog).getByRole("switch", { name: "Show countdown" }));
     expect(onSetScopeViewOptions.mock.calls[0][0]["list:l1"].dateBy).toBe("countdown");
   });
 

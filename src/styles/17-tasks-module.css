@@ -462,25 +462,95 @@
 
 /* --- quick add (§8.6, §11.57) --- */
 
+/* The quick add, as the row the reference draws
+   (TICKTICK_COMPONENT_10_QUICK_ADD.md §10).
+   ==========================================================================
+   It was a bordered field beside a filled accent button — a FORM at the top of
+   every list, and the brightest thing on a screen someone opened to read. The
+   reference draws the same job as a quiet band: a fill instead of a border, a
+   `+` and words instead of a button, and nothing at the trailing edge until
+   there is something to commit. */
 .tm-quickadd {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-.tm-quickadd-title {
-  flex: 1;
-  min-width: 200px;
+.tm-quickadd-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* 32, not the reference's 39: §4.86 puts the create row on the 32 grid and
+     `e2e/verticalRhythm.spec.ts` holds it. The impression this change is after
+     comes from the fill and the missing border, not from seven pixels. */
   height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--border, #e5e5e7);
-  border-radius: 8px;
-  background: var(--bg, #fff);
+  /* The reference's 3% foreground fill, as the token that already means "a
+     quiet filled surface" in both themes. A hard-coded 3% is a dark-theme
+     measurement. */
+  background: var(--surface-2, rgba(25, 25, 25, 0.05));
+  /* Reserved, not drawn — the reference keeps a transparent 1px here so that
+     colouring it later moves nothing. It colours on FOCUS, which the reference
+     does not do at all (Appendix A 1): a field with no focus state is a field
+     a keyboard cannot find. */
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: text;
+}
+
+.tm-quickadd-box:focus-within {
+  border-color: var(--accent, #007aff);
+}
+
+.tm-quickadd-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--text-tertiary, #8e8e93);
+}
+
+/* Hidden, not removed: it keeps its width so the first letter typed does not
+   pull the whole line left. */
+.tm-quickadd-icon.is-typing {
+  visibility: hidden;
+}
+
+.tm-quickadd-title {
+  flex: 1;
+  min-width: 120px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text, #1c1c1e);
   font: inherit;
   font-size: 14px;
+}
+
+.tm-quickadd-title:focus {
+  outline: none;
+}
+
+/* The placeholder is the app's own tertiary, not the reference's 20% white:
+   that number is a dark-theme measurement and this app draws a light theme
+   too (Appendix A 3). */
+.tm-quickadd-title::placeholder {
+  color: var(--text-tertiary, #8e8e93);
+}
+
+/* Only in the row while the extras are needed — a Folder's List question, the
+   template menu, the two hints. On Today, the Inbox and a List with no
+   templates saved, this element is not rendered at all. */
+.tm-quickadd-extras:empty {
+  display: none;
+}
+
+.tm-quickadd-extras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .tm-quickadd-field {
@@ -494,9 +564,12 @@
   font-size: 13px;
 }
 
+/* Inside the box and only while there is a title (§10.4), so it is 24 rather
+   than the 32 a standalone control gets — it sits IN a 32px row. */
 .tm-quickadd-submit {
-  height: 32px;
-  padding: 0 14px;
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 10px;
   border: 0;
   border-radius: 8px;
   background: var(--accent, #007aff);
@@ -3330,11 +3403,10 @@
   color: var(--text-secondary, #48484a);
 }
 
-.tm-column-done-caret {
-  flex: 0 0 auto;
-  width: 12px;
-  text-align: center;
-}
+/* `.tm-column-done-caret` stood here — a 12px box holding one of two different
+   characters. Both are `.ff-caret` now (21-components.css), which is one
+   drawing turned a quarter, so the two states are the same shape and the turn
+   can be animated (components/common/Caret.tsx). */
 
 .tm-column-done-name {
   flex: 1 1 auto;

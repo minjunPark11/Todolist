@@ -655,3 +655,31 @@ textarea {
 .overlay-scrollbar.is-visible {
   opacity: 1;
 }
+
+/* The group caret (components/common/Caret.tsx).
+   ==========================================================================
+   One box for every collapsible group in the app, so the label beside it sits
+   at the same place on all of them. The SIZE is the box, not the glyph: the
+   drawing inside is 12px on a 24 grid, and turning it must not move anything,
+   which is why the rotation is on the `svg` and the `span` keeps the layout.
+
+   A quarter turn, and the direction is not arbitrary — clockwise from
+   right-pointing lands on down-pointing, which is the direction the contents
+   arrive from. */
+.ff-caret {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  color: inherit;
+}
+
+.ff-caret svg {
+  display: block;
+  transition: transform 140ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ff-caret.is-open svg {
+  transform: rotate(90deg);
+}

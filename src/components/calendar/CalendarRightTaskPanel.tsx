@@ -5,6 +5,7 @@ import { DragEvent, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import type { Task } from "../../types";
 import { priorityForQuadrant, quadrantOf, type MatrixQuadrant } from "../../utils/eisenhower";
+import { Caret } from "../common/Caret";
 import { useT } from "../../i18n";
 import { MotionCollapse } from "../motion/MotionCollapse";
 import { MotionTaskRow } from "../motion/MotionTaskRow";
@@ -131,7 +132,7 @@ function PanelSection({
   return (
     <section className="gcal-taskpanel-section">
       <button type="button" className="gcal-taskpanel-section-head" onClick={() => setOpen((value) => !value)}>
-        <span className="eis-group-caret">{open ? "⌄" : "›"}</span>
+        <Caret open={open} />
         <span className={`eis-cell-roman eis-q-${quadrant}`}>{quadrant}</span>
         {/* The priority's own name, not a fourth invented one. These sections
             had labels of their own ("지금 집중", "계획 필요") back when a

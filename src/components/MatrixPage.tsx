@@ -61,6 +61,7 @@ import {
 } from "../domain/view/viewGroups";
 import { MatrixQuadrantEditor } from "./MatrixQuadrantEditor";
 import { listColorHex } from "../domain/tasks/listColor";
+import { Caret } from "./common/Caret";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./common/ContextMenu";
 import { listIdFor } from "../domain/spaces/membership";
 import { LIFECYCLE, isCompleted } from "../domain/tasks/taskState";
@@ -259,12 +260,14 @@ export function MatrixPage({
           items: [
             {
               id: "hideCompleted",
-              label: t("matrix.menu.hideCompleted"),
-              // A tick and not just the selected row's tint: this is a switch
-              // with two states, and "on" has to be readable without a second
-              // row beside it to compare against.
-              icon: hideCompleted ? "✓" : null,
-              selected: hideCompleted,
+              // The row says what pressing it will do, and flips when it is
+              // done (SCOPE_VIEW_OPTIONS_DESIGN.md §14.2). No tick: a `✓` in
+              // a label is a state announced by a decorative character, and
+              // the two-state row does not need one once it is an action.
+              //
+              // The same two words the Tasks Module uses. The same switch
+              // under two names reads as two features.
+              label: t(hideCompleted ? "tasks.showCompleted" : "tasks.hideCompleted"),
               run: () => onToggleHideCompleted?.(),
             },
           ],
@@ -713,9 +716,7 @@ function UnmatchedStrip({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="ff-matrix-group-caret" aria-hidden>
-          {open ? "⌄" : "›"}
-        </span>
+        <Caret open={open} />
         {/* The count is over what the picker is showing, not over the account.
             Saying "12" while a List is selected and "40" a click later, with
             no word about why, is a number that cannot be trusted twice. */}
@@ -853,9 +854,7 @@ function MatrixGroupSection({
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
         >
-          <span className="ff-matrix-group-caret" aria-hidden>
-            {open ? "⌄" : "›"}
-          </span>
+          <Caret open={open} />
           <span className="ff-matrix-group-name">{t(`view.group.${group.id}`)}</span>
           <span className="ff-matrix-group-count">{group.tasks.length}</span>
         </button>

@@ -14,6 +14,7 @@
 import { useRef, useState } from "react";
 import type { Task } from "../../types";
 import { COLUMN_NAME_MAX, type BoardColumn } from "../../domain/tasks/board";
+import { Caret } from "../common/Caret";
 import { useT } from "../../i18n";
 import { COMPLETED_PAGE } from "../../domain/view/viewGroups";
 import { TaskRowContent } from "./TaskRowContent";
@@ -598,9 +599,7 @@ function BoardColumnFinished({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="tm-column-done-caret" aria-hidden>
-          {open ? "⌄" : "›"}
-        </span>
+        <Caret open={open} />
         <span className="tm-column-done-name">{t("tasks.completed")}</span>
         <span className="tm-column-done-count">{tasks.length}</span>
       </button>

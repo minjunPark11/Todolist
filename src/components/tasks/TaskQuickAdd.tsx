@@ -9,11 +9,20 @@ import { useEffect, useState } from "react";
 import type { List, SavedFilter, Tag, TaskTemplate } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { canCommit, resolveCreateContext, type CreateResolution } from "../../domain/tasks/createResolver";
+import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "../floating";
 import { useT } from "../../i18n";
 
 interface TaskQuickAddProps {
   scope: TaskScopeRef;
+  /**
+   * Every live List, so the field can say WHERE the task will land.
+   *
+   * The resolver already answers that (`targetListId`) and nothing here
+   * decides it — this is only the name to put in the words
+   * (TICKTICK_COMPONENT_10 §10.3).
+   */
+  lists: List[];
   inboxListId: string;
   today: string;
   /** The Lists inside the current Folder — the only ones it may offer (§12.4). */
@@ -39,6 +48,7 @@ interface TaskQuickAddProps {
 
 export function TaskQuickAdd({
   scope,
+  lists,
   inboxListId,
   today,
   folderLists,
@@ -71,6 +81,23 @@ export function TaskQuickAdd({
 
   if (!resolution.enabled) return null;
 
+  /**
+   * "기본함에 할 일 추가", or the plain words where no List is settled yet.
+   *
+   * Where a task goes was the one thing this screen never said. Today, a Tag
+   * and a Filter all resolve to a List the reader cannot see, and the answer
+   * arrives after the task exists. Now it is in the field they are about to
+   * type in (Appendix A 4).
+   */
+  const target = resolution.targetListId
+    ? lists.find((list) => list.id === resolution.targetListId)
+    : undefined;
+  const label = target
+    ? t("tasks.addPlaceholderIn", {
+        list: listDisplayName(target, t("tasks.defaultList"), t("tasks.inbox")),
+      })
+    : t("tasks.addPlaceholder");
+
   const needsDate = resolution.requiredBeforeCommit.includes("date");
   const needsList = resolution.requiredBeforeCommit.includes("list");
   const ready = Boolean(title.trim()) && canCommit(resolution);
@@ -90,12 +117,35 @@ export function TaskQuickAdd({
 
   return (
     <form className="tm-quickadd" onSubmit={submit}>
+      {/* One quiet row, which is what the reference draws and what this was
+          not (TICKTICK_COMPONENT_10 §10.1): a bordered field beside a filled
+          accent button made the top of every list a FORM, and the brightest
+          thing on a screen someone came to read was "type here".
+
+          The box is the row. What the Scope additionally needs — a Folder's
+          List question, templates, the hints — is under it, so the common
+          case (Today, the Inbox, a List, no templates) is this line alone. */}
+      <div className="tm-quickadd-box">
+        {/* Hidden rather than removed while typing: it keeps its width, so the
+            words the reader is typing do not jump left as the first letter
+            lands. */}
+        <span className={`tm-quickadd-icon${title ? " is-typing" : ""}`} aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14" focusable="false">
+            <path
+              d="M12 5.5v13M5.5 12h13"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </span>
       <input
         className="tm-quickadd-title"
         value={title}
         onChange={(event) => setTitle(event.target.value)}
-        placeholder={t("tasks.addPlaceholder")}
-        aria-label={t("tasks.addPlaceholder")}
+        placeholder={label}
+        aria-label={label}
         /**
          * Leaving the field commits what is in it. Typing a task and clicking
          * away is not a change of mind — it reads as "done", and asking for a
@@ -113,6 +163,19 @@ export function TaskQuickAdd({
           commit();
         }}
       />
+
+        {/* The reference's trailing slot is 0 wide until there is something to
+            do (§3). Ours is the same: three things commit this form — Enter,
+            a click outside it, and this — so a button standing there while the
+            field is empty offers nothing and takes the eye first (§10.4). */}
+        {title.trim() ? (
+          <button className="tm-quickadd-submit" type="submit" disabled={!ready}>
+            {t("common.add")}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="tm-quickadd-extras">
 
       {/* No date field. It was here because §12.6 refused to commit without
           one, and that refusal is gone — Upcoming defaults to the first day it
@@ -136,10 +199,6 @@ export function TaskQuickAdd({
           ))}
         </select>
       ) : null}
-
-      <button className="tm-quickadd-submit" type="submit" disabled={!ready}>
-        {t("common.add")}
-      </button>
 
       {/* §25.8's other end. Absent until there is a template to offer: a
           control that appears and then has nothing behind it is the shape
@@ -181,6 +240,7 @@ export function TaskQuickAdd({
             .join(", ")}
         </p>
       ) : null}
+      </div>
     </form>
   );
 }

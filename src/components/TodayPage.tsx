@@ -439,7 +439,9 @@ export function TodayPage({
   const headMenuItems: MoreMenuItem[] = [
     { label: t("todayv.searchPlaceholder"), onClick: openSearch },
     {
-      label: showCompleted ? t("todayv.hideCompleted") : t("todayv.showCompleted"),
+      // The words are the app's, not this screen's: the same switch under two
+      // names reads as two features (SCOPE_VIEW_OPTIONS_DESIGN.md §14.4).
+      label: t(showCompleted ? "tasks.hideCompleted" : "tasks.showCompleted"),
       onClick: onToggleShowCompleted,
     },
     /**
