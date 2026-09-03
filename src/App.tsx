@@ -1424,6 +1424,13 @@ export default function App() {
             if (taskId && resolution.dailyPlan) {
               planner.planTaskForDay(taskId, resolution.dailyPlan.planDate);
             }
+            // The schedule's FIELDS went in with the create; its reminders are
+            // rows, and rows need the id that only exists now
+            // (QUICK_ADD_INPUT_BOX_DESIGN.md §6.4). Same shape as the plan
+            // above: a second write, for the same reason.
+            if (taskId && resolution.reminders?.length) {
+              planner.addTaskReminders(taskId, resolution.reminders);
+            }
           }}
           // The same bundle these pages' own Detail takes (§6). One
           // assembly, so the two surfaces cannot come to hold different

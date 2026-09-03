@@ -235,3 +235,40 @@ describe("what the quick add can be told before the task exists", () => {
     expect(field).toBe(note);
   });
 });
+
+// The chip opens the app's own schedule editor, with 취소 where the Detail has
+// 일정 지우기 (QUICK_ADD_INPUT_BOX_DESIGN.md §6.4).
+describe("the date chip", () => {
+  it("opens the same editor the Task Detail opens", () => {
+    setup({ kind: "inbox" });
+    fireEvent.click(screen.getByRole("button", { name: "Date" }));
+
+    // The editor's own tabs and shortcuts, not a stand-in built for here.
+    expect(screen.getByRole("button", { name: "Today" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tomorrow" })).toBeTruthy();
+    expect(document.querySelector(".sched-editor, .sched-surface")).toBeTruthy();
+  });
+
+  it("offers ‘Cancel’ rather than ‘Clear date’ — there is no schedule to empty", () => {
+    setup({ kind: "inbox" });
+    fireEvent.click(screen.getByRole("button", { name: "Date" }));
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Clear date" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy();
+  });
+
+  it("carries what was confirmed into the created task", () => {
+    const { onCreate, field } = setup({ kind: "inbox" });
+    fireEvent.click(screen.getByRole("button", { name: "Date" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tomorrow" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+    fireEvent.change(field, { target: { value: "Dated" } });
+    fireEvent.submit(field.closest("form")!);
+
+    expect(onCreate).toHaveBeenCalledWith("Dated", expect.objectContaining({
+      patch: expect.objectContaining({ dueDate: "2026-08-30" }),
+    }));
+  });
+});

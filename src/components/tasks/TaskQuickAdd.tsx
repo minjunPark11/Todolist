@@ -13,6 +13,7 @@ import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "../floating";
 import { QuickAddMenu } from "./QuickAddMenu";
 import { QuickAddDate } from "./QuickAddDate";
+import { normalizeSchedule, scheduleToTaskPatch, type Schedule } from "../../domain/schedule";
 import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
 
@@ -87,14 +88,21 @@ export function TaskQuickAdd({
    * nothing — leave it alone and Enter behaves exactly as it did.
    */
   const [chosenListId, setChosenListId] = useState("");
-  const [chosenDate, setChosenDate] = useState("");
+  /**
+   * The whole schedule, not a day (§6.4).
+   *
+   * The chip opens the app's own editor, so what comes back can carry a start
+   * date, a block of time, a repeat and reminders. Null while nobody has
+   * opened it — which is what keeps the Scope's own answer in charge.
+   */
+  const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [priority, setPriority] = useState<TaskPriority>("none");
   const [tagNames, setTagNames] = useState<string[]>([]);
   const [isNote, setIsNote] = useState(false);
 
   const resolution = resolveCreateContext(scope, {
     inboxListId,
-    chosenDate,
+    chosenDate: schedule?.dueDate ?? "",
     today,
     folderListIds: folderLists.map((list) => list.id),
     chosenListId,
@@ -132,7 +140,19 @@ export function TaskQuickAdd({
    * planning the day. This is that answer, said out loud, in the place where
    * it can also be changed.
    */
-  const plannedDate = resolution.dailyPlan?.planDate || resolution.patch.dueDate || chosenDate || "";
+  const plannedDate =
+    schedule?.dueDate || resolution.dailyPlan?.planDate || resolution.patch.dueDate || "";
+
+  /**
+   * What the editor's answer becomes on the record (§6.4).
+   *
+   * `scheduleToTaskPatch` is the same conversion `updateTaskSchedule` uses, so
+   * a schedule set here and a schedule set in the Detail write the same fields
+   * — including the repeat, which lives on the Task. Reminders do not: they
+   * are rows of their own, so they travel beside the patch and are written
+   * once the task has an id.
+   */
+  const scheduleWrite = schedule ? normalizeSchedule(schedule) : null;
 
   function commit() {
     if (!ready) return;
@@ -144,11 +164,14 @@ export function TaskQuickAdd({
       targetListId: chosenListId || resolution.targetListId,
       patch: {
         ...resolution.patch,
-        ...(chosenDate ? { dueDate: chosenDate } : {}),
+        ...(scheduleWrite ? scheduleToTaskPatch(scheduleWrite) : {}),
         ...(priority !== "none" ? { priority } : {}),
         ...(isNote ? { kind: "note" as const } : {}),
       },
       ...(tagNames.length > 0 ? { applyTagNames: tagNames } : {}),
+      ...(scheduleWrite && scheduleWrite.reminders.length > 0
+        ? { reminders: scheduleWrite.reminders }
+        : {}),
     });
     // The date, the List, the priority, the tags and the mode stay: capturing
     // several tasks into the same day or the same List is the common case, and
@@ -235,10 +258,11 @@ export function TaskQuickAdd({
             the way to change everything else about it. */}
         <div className="tm-quickadd-trailing">
           <QuickAddDate
+            schedule={schedule}
             value={plannedDate}
             today={today}
             lang={lang}
-            onChange={setChosenDate}
+            onChange={setSchedule}
           />
 
           <QuickAddMenu

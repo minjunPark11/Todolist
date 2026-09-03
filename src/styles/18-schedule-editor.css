@@ -633,6 +633,15 @@
   color: var(--danger);
 }
 
+/* The quick add's corner (QUICK_ADD_INPUT_BOX_DESIGN.md §6.4). Quiet rather
+   than red: Clear destroys a schedule that exists, Cancel walks away from one
+   that was never written, and the two must not look alike. */
+.sched-cancel {
+  border: 1px solid var(--border, #e5e5e7);
+  background: var(--surface-2, rgba(25, 25, 25, 0.05));
+  color: var(--text, #1c1c1e);
+}
+
 .sched-confirm {
   border: 1px solid var(--accent);
   background: var(--accent);

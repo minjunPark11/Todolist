@@ -2,33 +2,38 @@
 //
 // It says the day the task is already going to get — Upcoming writes
 // `dueDate: today` and Today plans the day, both without ever showing it — and
-// it offers the four shortcuts to change that.
+// pressing it opens the app's OWN schedule editor, the same one the Task
+// Detail opens. Not a smaller stand-in: a second date UI would be a second
+// answer to what picking a day means, and the two would drift the first time
+// either changed.
 //
-// Four shortcuts and a Clear, and NOT the Task's schedule editor. That editor
-// also holds reminders and a repeat rule, and both of those are records that
-// hang off a Task id: offering them here would mean showing controls whose
-// answers could not be kept, which is the shape §16.28 refuses. The Task's own
-// schedule is edited in the Task, where all of it can be written.
+// Two things differ, and both come from there being no Task yet:
 //
-// What IS shared is the arithmetic. `quickTargetDate` is the same function the
-// editor's four buttons call, so "next month" means the same day in both
-// places — including the clamp that keeps 1월 31일 from landing in March.
+//   - The footer's left button is 취소, not 일정 지우기. There is no stored
+//     schedule to empty; what is needed in that corner is the way out without
+//     choosing.
+//   - The draft is held HERE until the task is created. `onCommit` writes to
+//     the caller's state instead of the store, and returns no issues because
+//     the editor has already validated everything it hands over.
+import { useState } from "react";
 import type { Language } from "../../types";
-import { QUICK_DATES, quickTargetDate } from "../../domain/schedule/quickDate";
+import { EMPTY_SCHEDULE, type Schedule } from "../../domain/schedule";
+import { ScheduleEditor } from "../schedule/ScheduleEditor";
 import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "../floating";
 import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
 
 export interface QuickAddDateProps {
+  /** The draft's schedule, or null while the Scope's answer still stands. */
+  schedule: Schedule | null;
   /** The day as resolved — the Scope's answer, or the draft's override. */
   value: string;
   today: string;
   lang: Language;
-  /** "" clears the override and hands the day back to the Scope. */
-  onChange: (date: string) => void;
+  onChange: (next: Schedule) => void;
 }
 
-export function QuickAddDate({ value, today, lang, onChange }: QuickAddDateProps) {
+export function QuickAddDate({ schedule, value, today, lang, onChange }: QuickAddDateProps) {
   const { t } = useT();
   const label = value
     ? value === today
@@ -46,61 +51,59 @@ export function QuickAddDate({ value, today, lang, onChange }: QuickAddDateProps
         {label}
       </PopoverTrigger>
 
-      <PopoverContent label={t("tasks.quickAdd.noDate")} className="ff-context-menu tm-quickadd-dates">
-        <DateChoices value={value} today={today} onChange={onChange} />
+      <PopoverContent label={t("taskDetail.schedule")} className="sched-surface">
+        <QuickAddScheduleSurface
+          schedule={schedule}
+          value={value}
+          today={today}
+          lang={lang}
+          onChange={onChange}
+        />
       </PopoverContent>
     </Popover>
   );
 }
 
-/** Separate so a chosen day can close the surface it is inside (§19.90). */
-function DateChoices({
+/** Separated so 확인 and 취소 can close the surface they are inside (§19.90). */
+function QuickAddScheduleSurface({
+  schedule,
   value,
   today,
+  lang,
   onChange,
 }: {
+  schedule: Schedule | null;
   value: string;
   today: string;
-  onChange: (date: string) => void;
+  lang: Language;
+  onChange: (next: Schedule) => void;
 }) {
-  const { t } = useT();
   const { close } = usePopoverSurface();
-
-  function pick(date: string) {
-    close();
-    onChange(date);
-  }
+  /* Seeded ONCE, from whatever the chip is currently saying (§3.1). Without
+     the seed the calendar would open on an empty schedule while the chip said
+     "Today", and 확인 would then be disabled until the reader picked the day
+     that was already showing — the editor's `dirty` check comparing a draft
+     against a schedule the chip never had. */
+  const [seed] = useState<Schedule>(
+    () => schedule ?? (value ? { ...EMPTY_SCHEDULE, dueDate: value } : EMPTY_SCHEDULE),
+  );
 
   return (
-    <>
-      {QUICK_DATES.map((key) => {
-        const date = quickTargetDate(key, today);
-        return (
-          <button
-            key={key}
-            type="button"
-            role="menuitem"
-            aria-current={date === value || undefined}
-            className={`ff-context-menu-item${date === value ? " is-current" : ""}`}
-            onClick={() => pick(date)}
-          >
-            <span className="ff-context-menu-label">{t(`schedule.quick.${key}`)}</span>
-          </button>
-        );
-      })}
-
-      {/* Clearing hands the day back to the Scope rather than writing an empty
-          one — on Upcoming and Today that means the chip goes straight back to
-          the date it had, which is correct: those Scopes ARE a day. */}
-      <div className="ff-context-menu-divider" role="separator" />
-      <button
-        type="button"
-        role="menuitem"
-        className="ff-context-menu-item"
-        onClick={() => pick("")}
-      >
-        <span className="ff-context-menu-label">{t("schedule.clear")}</span>
-      </button>
-    </>
+    <ScheduleEditor
+      // No Task, and the editor only ever hands this back to `onCommit`.
+      taskId=""
+      locale={lang}
+      schedule={seed}
+      today={today}
+      onCommit={(_taskId, next) => {
+        onChange(next);
+        // Nothing to report: the editor validated before calling, and there is
+        // no store here to refuse the write (§5.51's issues are the store's).
+        return [];
+      }}
+      onClose={() => close("selection")}
+      // §6.4: 취소 where the Detail has 일정 지우기.
+      onCancel={() => close("escape")}
+    />
   );
 }

@@ -114,6 +114,7 @@ import {
   planScheduleUpdate,
   scheduleFromTask,
   scheduleToTaskPatch,
+  type ReminderSpec,
   type Schedule,
   type ScheduleIssue,
 } from "../domain/schedule";
@@ -1062,6 +1063,28 @@ export function usePlannerData() {
       });
     }
     return plan.issues;
+  }
+
+  /**
+   * The reminder rows for a task that has just been created
+   * (QUICK_ADD_INPUT_BOX_DESIGN.md §6.4).
+   *
+   * `updateTaskSchedule` cannot do this job: it looks the Task up in `data`
+   * first, and a Task created a line earlier is not in that closure yet. This
+   * needs no lookup — the schedule's FIELDS went in with the create, and what
+   * is left is rows that hang off an id.
+   *
+   * Through `planReminderRows` like every other reminder write, so the ids and
+   * the timestamps come from the one place that makes them.
+   */
+  function addTaskReminders(taskId: string, specs: readonly ReminderSpec[]) {
+    if (specs.length === 0) return;
+    const now = new Date().toISOString();
+    setData((current) => {
+      const rows = planReminderRows(taskId, specs, current.reminders, () => createId("reminder"), now);
+      if (rows.added.length === 0) return current;
+      return { ...current, reminders: [...current.reminders, ...rows.added] };
+    });
   }
 
   /**
@@ -2186,6 +2209,7 @@ export function usePlannerData() {
     createTask,
     updateTask,
     updateTaskSchedule,
+    addTaskReminders,
     completeTask,
     deleteTask,
     permanentlyDeleteTask,

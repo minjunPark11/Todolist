@@ -12,6 +12,7 @@
 // caller commits; §12.16's last line is that `createTask()` must never be
 // handed `targetListId = null`.
 import type { SavedFilter, Task } from "../../types";
+import type { ReminderSpec } from "../schedule";
 import type { TaskScopeRef } from "./scopeRegistry";
 import { scopeRegistry } from "./scopeRegistry";
 import { resolveFilterCreatePatch } from "./filters";
@@ -48,6 +49,16 @@ export interface CreateResolution {
    * caller lays its own choices over the answer (§5.1).
    */
   applyTagNames?: string[];
+  /**
+   * Reminders the quick add's schedule editor asked for
+   * (QUICK_ADD_INPUT_BOX_DESIGN.md §6.4).
+   *
+   * Not in `patch`, because a reminder is not a field — it is a row with an
+   * id, and rows can only be written once the task they hang off exists
+   * (§6.3). So they ride here and the caller writes them after the create,
+   * the same way `dailyPlan` is a second write rather than a patched field.
+   */
+  reminders?: ReminderSpec[];
   /** The day this task is planned for, if the Scope means one (§12.5.3). */
   dailyPlan?: { planDate: string };
   /** False for the two read-only Scopes (§12.4). */

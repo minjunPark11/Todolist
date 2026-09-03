@@ -50,6 +50,16 @@ interface ScheduleEditorProps {
   /** Returns whatever was wrong; empty means it was written. */
   onCommit: (taskId: string, next: Schedule) => ScheduleIssue[];
   onClose: () => void;
+  /**
+   * Replaces 일정 지우기 with 취소
+   * (QUICK_ADD_INPUT_BOX_DESIGN.md §6.4).
+   *
+   * The quick add opens this editor for a task that does not exist yet, and
+   * there Clear has nothing to clear — the schedule it would empty has never
+   * been written. What the reader needs in that corner is the way back out
+   * without choosing, which is what this is.
+   */
+  onCancel?: () => void;
 }
 
 const QUICK_ICONS: Record<QuickDateKey, () => ReactNode> = {
@@ -63,7 +73,7 @@ const QUICK_ICONS: Record<QuickDateKey, () => ReactNode> = {
    never stored. The fourth shortcut is 다음 달 now and answers with a day, so
    none of the four asks what time it is. */
 
-export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onClose }: ScheduleEditorProps) {
+export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onClose, onCancel }: ScheduleEditorProps) {
   const { t } = useT();
   const [state, dispatch] = useReducer(scheduleEditorReducer, undefined, () =>
     scheduleEditorReducer(CLOSED, { type: "OPEN", taskId, schedule, today }),
@@ -330,9 +340,15 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
       ) : null}
 
       <div className="sched-actions">
-        <button type="button" className="sched-clear" onClick={() => dispatch({ type: "CLEAR_SCHEDULE" })}>
-          {t("schedule.clear")}
-        </button>
+        {onCancel ? (
+          <button type="button" className="sched-cancel" onClick={onCancel}>
+            {t("common.cancel")}
+          </button>
+        ) : (
+          <button type="button" className="sched-clear" onClick={() => dispatch({ type: "CLEAR_SCHEDULE" })}>
+            {t("schedule.clear")}
+          </button>
+        )}
         <button
           type="button"
           className="sched-confirm"
