@@ -1,5 +1,5 @@
-// The four shortcuts above the calendar (design §5, mockup: 오늘 / 내일 /
-// 7일 후 / 오늘 밤).
+// The four shortcuts above the calendar (design §5: 오늘 / 내일 / 7일 후 /
+// 다음 달).
 //
 // They are not a fifth schedule mode. Each one is exactly the click the user
 // could have made in the grid, which is why every path below ends in
@@ -8,18 +8,16 @@
 // picking a date means, and Date/Duration would drift apart the first time
 // either rule changed (design §5.3).
 //
-// One of the four is different: 오늘 밤 sets a TIME as well, because that is
-// what the word means. The other three leave any existing time alone
-// (design §5.10).
-import { addDays, daysBetween, selectDate, setEndTime, setStartTime, shiftSchedule } from "./scheduleCommands";
+// All four now answer with a DAY and nothing else. The fourth used to be
+// 오늘 밤, which also set a time — the word names an hour, so it had to. It is
+// 다음 달 instead, and with it the last reason any shortcut touched the clock
+// is gone: none of them changes a time that is already there (design §5.10).
+import { addDays, daysBetween, selectDate, shiftSchedule } from "./scheduleCommands";
 import { getRangeStage } from "./scheduleQueries";
-import type { LocalDate, LocalTime, ScheduleDraft } from "./types";
+import type { LocalDate, ScheduleDraft } from "./types";
 
-export const QUICK_DATES = ["today", "tomorrow", "plus7", "tonight"] as const;
+export const QUICK_DATES = ["today", "tomorrow", "plus7", "nextMonth"] as const;
 export type QuickDateKey = (typeof QUICK_DATES)[number];
-
-/** The evening a bare 오늘 밤 means, before the clock is consulted. */
-export const DEFAULT_TONIGHT_TIME: LocalTime = "18:00";
 
 /**
  * Which day a shortcut targets (design §5.5–5.7).
@@ -33,37 +31,42 @@ export const DEFAULT_TONIGHT_TIME: LocalTime = "18:00";
 export function quickTargetDate(key: QuickDateKey, today: LocalDate): LocalDate {
   switch (key) {
     case "today":
-    case "tonight":
       return today;
     case "tomorrow":
       return addDays(today, 1);
     case "plus7":
       return addDays(today, 7);
+    case "nextMonth":
+      return addMonthClamped(today);
   }
 }
 
 /**
- * The time 오늘 밤 resolves to, given the current wall clock (design §5.9).
+ * The same day next month, or that month's last day when there is no such day.
  *
- *   before 18:00   18:00
- *   18:00–22:59    the next half hour
- *   23:00 onward   23:59
+ * The clamp is the whole reason this is not two lines of `Date`: adding a
+ * month to 1월 31일 with `setMonth` gives **3월 3일**, because February
+ * overflows and the overflow spills forward. A shortcut that answers "next
+ * month" with a date two months out is worse than one that does not exist.
  *
- * The rounding exists so the shortcut cannot produce a moment that has already
- * passed. A button that sets a task to 18:00 at 20:42 has scheduled something
- * for two hours ago, and the reminder attached to it would be due on arrival.
+ * 31일 → 30일 (or 28/29) is the reading every calendar app takes, and it is
+ * the only one that keeps the answer inside the month the button names.
  */
-export function tonightTime(now: LocalTime): LocalTime {
-  if (now < DEFAULT_TONIGHT_TIME) return DEFAULT_TONIGHT_TIME;
-  if (now >= "23:00") return "23:59";
-
-  const minutes = Number(now.slice(0, 2)) * 60 + Number(now.slice(3, 5));
-  const rounded = Math.ceil(minutes / 30) * 30;
-  if (rounded >= 23 * 60 + 60) return "23:59";
-  const hh = String(Math.floor(rounded / 60)).padStart(2, "0");
-  const mm = String(rounded % 60).padStart(2, "0");
-  return `${hh}:${mm}`;
+function addMonthClamped(date: LocalDate): LocalDate {
+  const [year, month, day] = date.split("-").map(Number);
+  if (!year || !month || !day) return date;
+  const targetMonth = month === 12 ? 1 : month + 1;
+  const targetYear = month === 12 ? year + 1 : year;
+  // Day 0 of the month after is the last day of the target month.
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth, 0)).getUTCDate();
+  const clamped = Math.min(day, lastDay);
+  return `${targetYear}-${String(targetMonth).padStart(2, "0")}-${String(clamped).padStart(2, "0")}`;
 }
+
+/* `tonightTime` stood here — 18:00, or the next half hour once the evening had
+   started, so that pressing 오늘 밤 at 20:42 could not schedule something for
+   two hours ago. It went with the button: 다음 달 names a day, and a day needs
+   no clock. */
 
 /**
  * Apply a shortcut to a draft (design §5.43–5.46).
@@ -84,11 +87,8 @@ export function applyQuickDate(
   draft: ScheduleDraft,
   key: QuickDateKey,
   today: LocalDate,
-  now: LocalTime,
 ): ScheduleDraft {
-  const target = quickTargetDate(key, today);
-  const rescheduled = reschedule(draft, target);
-  return key === "tonight" ? withTonightTime(rescheduled, tonightTime(now)) : rescheduled;
+  return reschedule(draft, quickTargetDate(key, today));
 }
 
 function reschedule(draft: ScheduleDraft, target: LocalDate): ScheduleDraft {
@@ -96,22 +96,4 @@ function reschedule(draft: ScheduleDraft, target: LocalDate): ScheduleDraft {
     return shiftSchedule(draft, daysBetween(draft.startDate, target));
   }
   return selectDate(draft, target);
-}
-
-/**
- * Put the evening time on the draft.
- *
- * The end is dropped when it would now precede the start on the same day —
- * moving a 09:00–11:00 block to 18:00 cannot keep an 11:00 end, and INV-05
- * would reject the result. Dropping the end rather than sliding it keeps the
- * block's start where the shortcut promised; the length is a guess, the start
- * is not.
- */
-function withTonightTime(draft: ScheduleDraft, time: LocalTime): ScheduleDraft {
-  const withStart = setStartTime(draft, time);
-  const sameDay = withStart.startDate === null || withStart.startDate === withStart.dueDate;
-  if (sameDay && withStart.endTime !== null && withStart.endTime < time) {
-    return setEndTime(withStart, null);
-  }
-  return withStart;
 }

@@ -87,11 +87,20 @@ export function CalendarPlus7Icon({ size }: IconProps) {
   );
 }
 
-/** 오늘 밤 — the moon. */
-export function MoonIcon({ size }: IconProps) {
+/**
+ * 다음 달 — the same calendar as `+7`, with a month's step instead of a number.
+ *
+ * It is the calendar and not a moon (which is what 오늘 밤 wore) because the
+ * shortcut answers with a DAY now, and the three buttons beside it are days
+ * too. The chevron says which way: the four shortcuts run today → tomorrow →
+ * a week → a month, all forward.
+ */
+export function CalendarNextMonthIcon({ size }: IconProps) {
   return (
     <Frame size={size}>
-      <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" {...STROKE} />
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" {...STROKE} />
+      <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3" {...STROKE} />
+      <path d="M10.5 12.5l3 3-3 3" {...STROKE} />
     </Frame>
   );
 }

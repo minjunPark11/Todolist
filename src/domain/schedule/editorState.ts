@@ -93,11 +93,15 @@ export type ScheduleEditorAction =
   | { type: "STEP_MONTH"; delta: number }
   | { type: "SHOW_MONTH"; date: LocalDate }
   /**
-   * One of the four shortcuts. Carries `today` and `now` rather than reading a
-   * clock, so that the reducer stays pure and a test can press 오늘 밤 at
-   * 22:51 without owning the machine's time (design §5.40).
+   * One of the four shortcuts. Carries `today` rather than reading a clock, so
+   * that the reducer stays pure and a test can press 내일 without owning the
+   * machine's date (design §5.40).
+   *
+   * It carried `now` as well while the fourth shortcut was 오늘 밤 and set a
+   * time. 다음 달 names a day, so there is no hour left for any of the four to
+   * ask about.
    */
-  | { type: "QUICK_DATE"; key: QuickDateKey; today: LocalDate; now: LocalTime }
+  | { type: "QUICK_DATE"; key: QuickDateKey; today: LocalDate }
   | { type: "TOGGLE_REMINDER"; reminder: ReminderSpec }
   | { type: "SET_REPEAT"; repeat: RepeatPreset }
   | { type: "REJECT"; issues: ScheduleIssue[] };
@@ -239,7 +243,7 @@ export function scheduleEditorReducer(
       return { ...state, visibleMonth: monthOf(action.date) };
 
     case "QUICK_DATE": {
-      const draft = applyQuickDate(state.draft, action.key, action.today, action.now);
+      const draft = applyQuickDate(state.draft, action.key, action.today);
       const next = edited(state, draft);
       // Follow the result (design §5.34). A shortcut that set a date three
       // months out while the grid stayed put would look like it did nothing.

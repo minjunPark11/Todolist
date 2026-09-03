@@ -30,7 +30,7 @@ export {
 } from "./types";
 
 export type { QuickDateKey } from "./quickDate";
-export { applyQuickDate, QUICK_DATES, quickTargetDate, tonightTime } from "./quickDate";
+export { applyQuickDate, QUICK_DATES, quickTargetDate } from "./quickDate";
 
 export { presetToSpec } from "./reminder";
 

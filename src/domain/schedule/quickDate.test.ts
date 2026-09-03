@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { applyQuickDate, quickTargetDate, tonightTime } from "./quickDate";
+import { applyQuickDate, quickTargetDate } from "./quickDate";
 import { EMPTY_SCHEDULE, type Schedule, type ScheduleDraft, type ScheduleMode } from "./types";
 
 const TODAY = "2026-08-19";
-const AFTERNOON = "14:20";
 
 function draft(mode: ScheduleMode, patch: Partial<Schedule> = {}): ScheduleDraft {
   return { ...EMPTY_SCHEDULE, ...patch, mode };
@@ -14,76 +13,56 @@ describe("quickTargetDate", () => {
     expect(quickTargetDate("today", TODAY)).toBe(TODAY);
     expect(quickTargetDate("tomorrow", TODAY)).toBe("2026-08-20");
     expect(quickTargetDate("plus7", TODAY)).toBe("2026-08-26");
-    expect(quickTargetDate("tonight", TODAY)).toBe(TODAY);
+    expect(quickTargetDate("nextMonth", TODAY)).toBe("2026-09-19");
+  });
+
+  // The trap `Date.setMonth` walks into: adding a month to the 31st overflows
+  // into the month after next. 다음 달 must stay inside the month it names.
+  it("clamps the day to the length of the month it lands in", () => {
+    expect(quickTargetDate("nextMonth", "2026-01-31")).toBe("2026-02-28");
+    expect(quickTargetDate("nextMonth", "2028-01-31")).toBe("2028-02-29");
+    expect(quickTargetDate("nextMonth", "2026-03-31")).toBe("2026-04-30");
+  });
+
+  it("carries the year over from December", () => {
+    expect(quickTargetDate("nextMonth", "2026-12-15")).toBe("2027-01-15");
   });
 });
 
-describe("tonightTime", () => {
-  it("is 18:00 for most of the day", () => {
-    expect(tonightTime("09:00")).toBe("18:00");
-    expect(tonightTime("14:20")).toBe("18:00");
-    expect(tonightTime("17:59")).toBe("18:00");
-  });
-
-  // The whole point of the rounding: pressing 오늘 밤 must never produce a
-  // time that has already gone.
-  it("rounds up to the next half hour once the evening has started", () => {
-    expect(tonightTime("18:10")).toBe("18:30");
-    expect(tonightTime("20:42")).toBe("21:00");
-    expect(tonightTime("22:51")).toBe("23:00");
-  });
-
-  it("stops at 23:59 rather than rolling into tomorrow", () => {
-    expect(tonightTime("23:00")).toBe("23:59");
-    expect(tonightTime("23:40")).toBe("23:59");
-  });
-});
+/* `tonightTime`'s three tests stood here — 18:00 through the day, the next
+   half hour once the evening had started, and 23:59 rather than rolling into
+   tomorrow. They went with the shortcut: 다음 달 answers with a day. */
 
 describe("applyQuickDate — date mode", () => {
   it("sets the date and leaves an existing time alone", () => {
-    const next = applyQuickDate(draft("date", { dueDate: "2026-01-01", startTime: "09:00" }), "tomorrow", TODAY, AFTERNOON);
+    const next = applyQuickDate(draft("date", { dueDate: "2026-01-01", startTime: "09:00" }), "tomorrow", TODAY);
     expect(next.dueDate).toBe("2026-08-20");
     expect(next.startTime).toBe("09:00");
   });
 
-  it("tonight sets the time too, because that is what the word means", () => {
-    const next = applyQuickDate(draft("date", { dueDate: "2026-01-01", startTime: "09:00" }), "tonight", TODAY, AFTERNOON);
-    expect(next.dueDate).toBe(TODAY);
-    expect(next.startTime).toBe("18:00");
-  });
-
-  // 09:00–11:00 moved to the evening cannot keep an 11:00 end (INV-05).
-  it("tonight drops an end that would now precede the start", () => {
+  // What replaced the three 오늘 밤 tests: the fourth shortcut is a date like
+  // the other three, and leaves the clock alone like the other three.
+  it("next month moves the date and keeps the hours", () => {
     const next = applyQuickDate(
-      draft("date", { dueDate: TODAY, startTime: "09:00", endTime: "11:00" }),
-      "tonight",
+      draft("date", { dueDate: "2026-01-01", startTime: "09:00", endTime: "11:00" }),
+      "nextMonth",
       TODAY,
-      AFTERNOON,
     );
-    expect(next.startTime).toBe("18:00");
-    expect(next.endTime).toBeNull();
-  });
-
-  it("tonight keeps an end that still follows the start", () => {
-    const next = applyQuickDate(
-      draft("date", { dueDate: TODAY, startTime: "09:00", endTime: "20:00" }),
-      "tonight",
-      TODAY,
-      AFTERNOON,
-    );
-    expect(next.endTime).toBe("20:00");
+    expect(next.dueDate).toBe("2026-09-19");
+    expect(next.startTime).toBe("09:00");
+    expect(next.endTime).toBe("11:00");
   });
 });
 
 describe("applyQuickDate — duration mode", () => {
   it("starts a range when there is nothing yet", () => {
-    const next = applyQuickDate(draft("duration"), "today", TODAY, AFTERNOON);
+    const next = applyQuickDate(draft("duration"), "today", TODAY);
     expect(next.startDate).toBe(TODAY);
     expect(next.dueDate).toBeNull();
   });
 
   it("closes a half-picked range", () => {
-    const next = applyQuickDate(draft("duration", { startDate: "2026-08-17" }), "plus7", TODAY, AFTERNOON);
+    const next = applyQuickDate(draft("duration", { startDate: "2026-08-17" }), "plus7", TODAY);
     expect(next.startDate).toBe("2026-08-17");
     expect(next.dueDate).toBe("2026-08-26");
   });
@@ -95,14 +74,13 @@ describe("applyQuickDate — duration mode", () => {
       draft("duration", { startDate: "2026-08-24", dueDate: "2026-08-28" }),
       "tomorrow",
       TODAY,
-      AFTERNOON,
     );
     expect(next.startDate).toBe("2026-08-20");
     expect(next.dueDate).toBe("2026-08-24");
   });
 
   it("restarts the range when the target falls before an existing start", () => {
-    const next = applyQuickDate(draft("duration", { startDate: "2026-09-01" }), "today", TODAY, AFTERNOON);
+    const next = applyQuickDate(draft("duration", { startDate: "2026-09-01" }), "today", TODAY);
     expect(next.startDate).toBe(TODAY);
     expect(next.dueDate).toBeNull();
   });

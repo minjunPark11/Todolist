@@ -446,7 +446,7 @@ export const en: Dictionary = {
   "schedule.quick.today": "Today",
   "schedule.quick.tomorrow": "Tomorrow",
   "schedule.quick.plus7": "In 7 days",
-  "schedule.quick.tonight": "Tonight",
+  "schedule.quick.nextMonth": "Next month",
   "schedule.reminder": "Reminder",
   "schedule.reminder.none": "None",
   "schedule.reminder.at-time": "On time",

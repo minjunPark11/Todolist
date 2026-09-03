@@ -443,7 +443,7 @@ export const ko: Dictionary = {
   "schedule.quick.today": "오늘",
   "schedule.quick.tomorrow": "내일",
   "schedule.quick.plus7": "7일 후",
-  "schedule.quick.tonight": "오늘 밤",
+  "schedule.quick.nextMonth": "다음 달",
   "schedule.reminder": "알림",
   "schedule.reminder.none": "없음",
   "schedule.reminder.at-time": "정시",

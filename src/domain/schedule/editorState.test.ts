@@ -253,9 +253,18 @@ describe("draftSchedule", () => {
 });
 
 describe("QUICK_DATE (design §5)", () => {
+  // The fourth shortcut is 다음 달 rather than 오늘 밤, so the action no longer
+  // carries a clock — none of the four sets a time.
+  it("moves the grid a month on when the shortcut names one", () => {
+    const state = opened(run(open(), { type: "QUICK_DATE", key: "nextMonth", today: "2026-08-19" }));
+    expect(state.draft.dueDate).toBe("2026-09-19");
+    expect(state.visibleMonth).toBe("2026-09-01");
+    expect(state.draft.startTime).toBeNull();
+  });
+
   it("sets the date and follows it with the visible month", () => {
     const state = opened(
-      run(open(), { type: "QUICK_DATE", key: "plus7", today: "2026-08-28", now: "10:00" }),
+      run(open(), { type: "QUICK_DATE", key: "plus7", today: "2026-08-28" }),
     );
     expect(state.draft.dueDate).toBe("2026-09-04");
     // The grid must move with it, or the shortcut looks like it did nothing.
@@ -269,7 +278,7 @@ describe("QUICK_DATE (design §5)", () => {
         { type: "SET_MODE", mode: "duration" },
         { type: "SELECT_DATE", date: "2026-08-20" },
         { type: "HOVER_DATE", date: "2026-08-25" },
-        { type: "QUICK_DATE", key: "plus7", today: TODAY, now: "10:00" },
+        { type: "QUICK_DATE", key: "plus7", today: TODAY },
       ),
     );
     expect(state.hoverDate).toBeNull();

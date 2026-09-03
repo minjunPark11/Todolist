@@ -34,7 +34,7 @@ import {
   BellIcon,
   CalendarPlus7Icon,
   ClockIcon,
-  MoonIcon,
+  CalendarNextMonthIcon,
   RepeatIcon,
   SunIcon,
   SunriseIcon,
@@ -56,14 +56,12 @@ const QUICK_ICONS: Record<QuickDateKey, () => ReactNode> = {
   today: () => <SunIcon size={20} />,
   tomorrow: () => <SunriseIcon size={20} />,
   plus7: () => <CalendarPlus7Icon size={20} />,
-  tonight: () => <MoonIcon size={20} />,
+  nextMonth: () => <CalendarNextMonthIcon size={20} />,
 };
 
-/** The wall clock, as the domain's `HH:mm`. Read at press time, never stored. */
-function nowTime(): string {
-  const now = new Date();
-  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-}
+/* `nowTime` stood here — the wall clock, read at press time for 오늘 밤 and
+   never stored. The fourth shortcut is 다음 달 now and answers with a day, so
+   none of the four asks what time it is. */
 
 export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onClose }: ScheduleEditorProps) {
   const { t } = useT();
@@ -219,7 +217,7 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
                 type="button"
                 key={key}
                 className="sched-quick-item"
-                onClick={() => dispatch({ type: "QUICK_DATE", key, today, now: nowTime() })}
+                onClick={() => dispatch({ type: "QUICK_DATE", key, today })}
               >
                 <span className="sched-quick-icon" aria-hidden="true">
                   {QUICK_ICONS[key]()}
