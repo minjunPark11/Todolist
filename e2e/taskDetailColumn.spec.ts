@@ -71,11 +71,16 @@ test.describe("the Task Detail column", () => {
     expect({ before, after }).toEqual({ before, after: before });
   });
 
-  // The Board is where the reservation buys nothing and costs everything: its
-  // columns are a fixed width and it scrolls sideways, so nothing on it moves
-  // when a Task is opened — there is no jump to prevent, and the 480px is
-  // simply taken away from a surface that can always use more.
-  test("is not reserved on the Board, which uses the width instead", async ({ page }) => {
+  // The Board keeps every pixel it has, opened Task or not
+  // (BOARD_TASK_POPUP_DESIGN.md §4).
+  //
+  // This asserted the opposite until that design landed: the Board gave the
+  // Detail a 480px column and kept 438 of a possible 918, with its second
+  // column clipped. The reason it was written that way still holds — a Board's
+  // columns are `flex: none`, so what a column takes is not each card's width
+  // but the NUMBER of columns left on screen — and the popup is the answer to
+  // it. The surface underneath cannot give up width, so it is not asked to.
+  test("keeps its full width on the Board, where the Detail is a popup", async ({ page }) => {
     await openApp(page, { lists: [LIST] });
     // Added from the list, where the quick-add field lives, then read on the
     // Board — this test is about the Board's width, not its capture.
@@ -87,17 +92,18 @@ test.describe("the Task Detail column", () => {
     await expect(board).toBeVisible();
     await expect(page.locator(".tm-drawer.is-empty")).toHaveCount(0);
 
-    const wide = Math.round((await board.boundingBox())?.width ?? 0);
+    const before = Math.round((await board.boundingBox())?.width ?? 0);
 
-    // And when a Task IS open, the Board gives the column up and keeps its
-    // scroll — which is the same thing that happens when the window narrows.
     await page.getByRole("button", { name: "Open Measure the board width" }).click();
     await expect(page).toHaveURL(/task=/);
+    // Drawn OVER the Board rather than beside it, which is what makes the
+    // width answer possible.
+    await expect(page.locator(".tm-drawer.is-center-modal")).toBeVisible();
 
-    const narrow = Math.round((await board.boundingBox())?.width ?? 0);
-    expect(narrow).toBeLessThan(wide);
-    // Measured at 1280 before this changed: 438 of a possible 918.
-    expect(wide - narrow).toBeGreaterThan(400);
+    const after = Math.round((await board.boundingBox())?.width ?? 0);
+    // Exact, not approximate: a pixel of movement here would mean the popup is
+    // taking layout space, which is the whole thing it exists not to do.
+    expect({ before, after }).toEqual({ before, after: before });
   });
 
   test("Escape closes the Detail and the list still does not move", async ({ page }) => {

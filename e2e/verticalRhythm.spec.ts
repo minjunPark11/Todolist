@@ -41,6 +41,12 @@ const ALLOWED_OFF_GRID = [
   // because the row's 1px border is its own. It measured 32 until §10.10 —
   // as a field, drawing a second box inside the first.
   ".tm-quickadd-title",
+  // The same clause, for the two controls that sit BESIDE that input inside
+  // the same 32px box (QUICK_ADD_INPUT_BOX_DESIGN.md §8): the row is the
+  // control on the grid, and the date chip and the caret are what it holds.
+  // A 32px chip inside a 32px row would have to overflow it.
+  ".tm-quickadd-date",
+  ".tm-quickadd-more",
   // The Matrix box header. Its two icon buttons are 28px section actions
   // (§4.87), sized against the 22px badge they sit beside rather than against
   // the 32px grid — the same clause `.ff-btn-sm` above is listed under.
