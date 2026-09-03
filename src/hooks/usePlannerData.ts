@@ -2051,21 +2051,15 @@ export function usePlannerData() {
     });
   }
 
-  /**
-   * Make one day's plan say exactly `overrides` (§6.18).
-   *
-   * The whole map, not one task, because every caller on the Today page —
-   * moving a row, planning the day, clearing it, and the undo that follows
-   * each — deals in complete snapshots. `applyBucketOverrides` is what keeps
-   * that from meaning a rewrite of every row.
-   */
-  function setTodayBuckets(overrides: Record<string, DailyPlanBucket>, planDate: string) {
-    setData((current) => {
-      const now = new Date().toISOString();
-      const dailyPlans = applyBucketOverrides(current.dailyPlans, planDate, overrides, now);
-      return dailyPlans === current.dailyPlans ? current : { ...current, dailyPlans };
-    });
-  }
+  /* `setTodayBuckets` stood here — the whole day's plan as one snapshot, for
+     the Today page's moves, its "plan the day", its clear, and the undo after
+     each. Every one of those callers was on that page, and the page is gone
+     (P0-2). What is NOT gone is the records: `planTaskForDay` still writes a
+     plan for a day, `hasTodayPlan` still reads one into the Tasks Module's
+     Today Scope, and the server's `todayTasks` query still buckets them. A
+     plan made before this release keeps working; the bucket it was put in is
+     simply no longer editable, because the screen that arranged buckets was
+     the only thing that ever arranged them. */
 
   /**
    * Put a task on a day without saying where in it (§12.5.3).
@@ -2224,7 +2218,6 @@ export function usePlannerData() {
     moveListToFolder,
     moveTaskToList,
     toggleTaskTag,
-    setTodayBuckets,
     planTaskForDay,
     createFolder,
     updateFolder,

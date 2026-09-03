@@ -522,17 +522,12 @@
    P0-10; none of these class names appears in any component. */
 
 /* --- Page titles: unified Display 22/700 (reference type scale) --- */
-.tdy-head-title h1,
 .foc-header h1,
 .ff-page-title {
   font-size: 22px;
   line-height: 30px;
   font-weight: 700;
   letter-spacing: -0.02em;
-}
-
-.tdy-head-title p {
-  font-size: 13px;
 }
 
 .gcal-day-title strong {
@@ -545,12 +540,9 @@
   color: var(--text-tertiary);
 }
 
-/* --- Today: navy CTAs → accent primary (reference button language) --- */
-.tdy-page {
-  --tdy-navy: var(--accent);
-  --tdy-navy-hover: color-mix(in srgb, var(--accent) 88%, #000);
-  --tdy-blue-soft: var(--accent-soft);
-}
+/* The Today page's navy CTAs were mapped onto the accent here. The page is
+   gone (P0-2: the Tasks Module's Today is the one that survived), and its
+   three variables with it. */
 .eis-q-I { color: var(--danger); }
 .eis-q-II { color: var(--accent); }
 .eis-q-III { color: var(--warning); }

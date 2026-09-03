@@ -143,7 +143,7 @@ function ConsentScreen() {
         <section className="auth-card consent-card">
           <h1>{t("oauth.problemTitle")}</h1>
           <p className="auth-message error">{phase.message}</p>
-          <a className="consent-link" href="/app">
+          <a className="consent-link" href="/today">
             {t("oauth.backToApp")}
           </a>
         </section>
@@ -205,7 +205,7 @@ function ConsentScreen() {
         </div>
 
         {blocked ? (
-          <a className="consent-link" href="/app">
+          <a className="consent-link" href="/today">
             {t("oauth.openAppToSync")}
           </a>
         ) : null}

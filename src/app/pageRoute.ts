@@ -18,16 +18,18 @@
 import type { AppSettings, PageId } from "../types";
 import { parseSearchUrl, parseTaskScope } from "./taskScopeUrl";
 
+/** Where the Tasks Module opens when nothing more specific is asked for. */
+export const TASKS_HOME = "/today";
+
 /**
  * D-04's table. One path per page, exact match, no parameters.
  *
- * `today` keeps `/app` rather than `/today`: the Tasks Module already owns
- * `/today` and shows its own Today there. Which of the two Todays survives is
- * a P0-2 question — this file only has to stop them fighting over an address.
- *
+ * `today` and its `/app` used to head this list. **P0-2 is answered**: the
+ * app had two Today screens — this page and the Tasks Module's Scope at
+ * `/today` — and the Module's is the one that survives. The page is gone, and
+ * with it the last address that was not either one of these four or a Scope.
  */
 export const PAGE_ROUTES: Record<PageId, string> = {
-  today: "/app",
   calendar: "/calendar",
   board: "/board",
   focus: "/focus",
@@ -37,18 +39,28 @@ export const PAGE_ROUTES: Record<PageId, string> = {
 /**
  * Addresses that no longer name a page, and where they go instead.
  *
- * All four are the Projects and Goals feature, which is gone: Projects were a
+ * Three are the Projects and Goals feature, which is gone: Projects were a
  * second way to group work beside Lists, and Goals a planner of their own, and
- * neither survived the move to a List-shaped app. Links to them exist — in
- * bookmarks, in anyone's history, in a stored start-page setting — so they
- * land on Today rather than on a dead address. `/archive` came here first,
- * when D-20 retired the standalone Archive into the Space that owned it.
+ * neither survived the move to a List-shaped app. `/archive` came here when
+ * D-20 retired the standalone Archive into the Space that owned it. `/app` is
+ * the fifth and the newest — the Today PAGE, which had the same name as the
+ * Tasks Module's Today Scope and half of its job.
+ *
+ * Links to all five exist, in bookmarks, in anyone's history, in a stored
+ * start-page setting, and in a desktop client that remembers where it was. So
+ * they land on the Tasks Module's Today rather than on a dead address, and
+ * `bootRedirectFor` MOVES them there rather than drawing something else at an
+ * address that says otherwise.
  */
 export const RETIRED_ROUTES: Record<string, string> = {
-  "/archive": PAGE_ROUTES.today,
-  "/spaces": PAGE_ROUTES.today,
-  "/projects": PAGE_ROUTES.today,
-  "/goals": PAGE_ROUTES.today,
+  // The Today page's own address. It is retired rather than deleted because
+  // links to it exist — the consent screen sends people there, and a desktop
+  // client remembers where it was.
+  "/app": TASKS_HOME,
+  "/archive": TASKS_HOME,
+  "/spaces": TASKS_HOME,
+  "/projects": TASKS_HOME,
+  "/goals": TASKS_HOME,
 };
 
 const ROUTE_TO_PAGE = new Map<string, PageId>(
@@ -72,7 +84,7 @@ export function pathForPage(page: PageId): string {
  * `?task=` on their address would be a promise the page cannot keep, so it is
  * not written and not read.
  */
-const PAGES_WITH_DETAIL = new Set<PageId>(["today", "board", "focus"]);
+const PAGES_WITH_DETAIL = new Set<PageId>(["board", "focus"]);
 
 /**
  * A page's address with the open Task written into it (§6.6).
@@ -109,11 +121,17 @@ export function taskIdForPageUrl(url: string): string {
  * packaged build, a stale bookmark. A 404 screen would be worse than the
  * landing page for an app whose whole surface is behind one origin.
  */
-export function pageForPath(path: string): PageId {
-  const normalized = normalize(path);
-  const retired = RETIRED_ROUTES[normalized];
-  if (retired) return pageForPath(retired);
-  return ROUTE_TO_PAGE.get(normalized) ?? "today";
+/**
+ * Which of the four pages an address names, or `null` for everything else.
+ *
+ * It used to fall back to `today` — which meant every unrecognised address
+ * drew the Today page at whatever URL it was given. There is no page left to
+ * fall back TO: the Tasks Module owns every other address, and one that names
+ * neither a page nor a Scope is redirected (`bootRedirectFor`) rather than
+ * answered with a screen that does not match the bar.
+ */
+export function pageForPath(path: string): PageId | null {
+  return ROUTE_TO_PAGE.get(normalize(path)) ?? null;
 }
 
 /**
@@ -130,7 +148,9 @@ export function pageForPath(path: string): PageId {
  */
 export function namesAPage(path: string): boolean {
   const normalized = normalize(path);
-  if (RETIRED_ROUTES[normalized]) return true;
+  // A retired address does NOT name a page any more: it names a redirect, and
+  // saying otherwise here is what would leave the reader parked on it.
+  if (RETIRED_ROUTES[normalized]) return false;
   if (parseTaskScope(normalized) || parseSearchUrl(normalized) !== null) return true;
   return ROUTE_TO_PAGE.has(normalized);
 }
@@ -155,7 +175,10 @@ export function pathForDefaultView(defaultView: AppSettings["defaultView"]): str
     case "/focus":
       return PAGE_ROUTES.focus;
     default:
-      return PAGE_ROUTES.today;
+      // `/today`, `/inbox`, `/projects` and anything else stored by an older
+      // build all mean the Tasks Module, which is where the Today that
+      // survived P0-2 lives.
+      return TASKS_HOME;
   }
 }
 
@@ -174,7 +197,13 @@ export function pathForDefaultView(defaultView: AppSettings["defaultView"]): str
  */
 export function bootRedirectFor(path: string, defaultView: AppSettings["defaultView"]): string {
   const normalized = normalize(path);
-  if (normalized === "/login" || namesAPage(normalized)) return "";
+  if (normalized === "/login") return "";
+  // A retired address is answered with its replacement, whatever the start
+  // page is set to: the reader asked for something specific, and the thing
+  // that replaced it is more specific than their default.
+  const retired = RETIRED_ROUTES[normalized];
+  if (retired) return retired;
+  if (namesAPage(normalized)) return "";
   const target = pathForDefaultView(defaultView);
   return target === normalized ? "" : target;
 }

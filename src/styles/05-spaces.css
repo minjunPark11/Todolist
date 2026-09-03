@@ -6,11 +6,12 @@
  * living underneath it. The grid is gone; what is left is the Focus page, and
  * the filename now outlives what it was named for. */
 
-/* Focus sits in the same grid as Today and the Matrix so the Detail can be a
-   column beside it. `no-detail`'s 980px cap is the one thing it does not want
-   — the page's own margins are meant to match Calendar and Today, which the
-   cap would pull in by a couple of hundred pixels the moment nothing is
-   selected. Today buys itself out of the cap the same way (`.tdy-grid`). */
+/* Focus sits in the same grid as the Matrix so the Detail can be a column
+   beside it. `no-detail`'s 980px cap is the one thing it does not want — the
+   page's own margins are meant to match the Calendar's, which the cap would
+   pull in by a couple of hundred pixels the moment nothing is selected. (The
+   Today page bought itself out of the cap the same way, with `.tdy-grid`; that
+   page is gone.) */
 .page-grid.no-detail.foc-grid {
   grid-template-columns: minmax(0, 1fr);
 }

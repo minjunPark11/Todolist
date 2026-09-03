@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   PAGE_ROUTES,
+  TASKS_HOME,
   bootRedirectFor,
   namesAPage,
   pageForPath,
@@ -13,7 +14,11 @@ import {
 import { parseTaskScope } from "./taskScopeUrl";
 import type { PageId } from "../types";
 
-const PAGES: PageId[] = ["today", "calendar", "board", "focus", "settings"];
+// Four, not five. The Today PAGE and its `/app` are gone: the app had two
+// Today screens and P0-2 is closed — the Tasks Module's Scope is the one that
+// survived, so every address that is not one of these four belongs to the
+// Module.
+const PAGES: PageId[] = ["calendar", "board", "focus", "settings"];
 
 describe("pageRoute", () => {
   it("round-trips every page through its address", () => {
@@ -38,16 +43,18 @@ describe("pageRoute", () => {
 
   // The Space tree's own addresses went with the Projects feature. They are
   // not in RETIRED_ROUTES — those are exact paths and these carry ids — so
-  // they take the same fallback as any unknown address.
-  it("lands an old tree selection on Today", () => {
-    expect(pageForPath("/s/space-1")).toBe("today");
-    expect(pageForPath("/s/space-1/p/project-1/l/list-1")).toBe("today");
+  // they are simply not pages, and the boot redirect moves them.
+  it("names no page for an old tree selection", () => {
+    expect(pageForPath("/s/space-1")).toBeNull();
+    expect(pageForPath("/s/space-1/p/project-1/l/list-1")).toBeNull();
   });
 
-  it("falls back to Today for an address it does not know", () => {
-    expect(pageForPath("/")).toBe("today");
-    expect(pageForPath("/index.html")).toBe("today");
-    expect(pageForPath("/whatever-this-was")).toBe("today");
+  it("names no page for an address it does not know", () => {
+    // It used to answer `today` here, which drew the Today page at whatever
+    // address it was handed. There is no page to fall back to now.
+    expect(pageForPath("/")).toBeNull();
+    expect(pageForPath("/index.html")).toBeNull();
+    expect(pageForPath("/whatever-this-was")).toBeNull();
   });
 
   it("ignores a trailing slash", () => {
@@ -56,7 +63,7 @@ describe("pageRoute", () => {
   });
 
   it("separates naming a page from falling back to one", () => {
-    expect(namesAPage(PAGE_ROUTES.today)).toBe(true);
+    expect(namesAPage(PAGE_ROUTES.calendar)).toBe(true);
     expect(namesAPage("/")).toBe(false);
     expect(namesAPage("/index.html")).toBe(false);
     expect(namesAPage("/s/space-1")).toBe(false);
@@ -67,14 +74,14 @@ describe("pageRoute", () => {
       expect(pathForDefaultView("/calendar")).toBe(PAGE_ROUTES.calendar);
       expect(pathForDefaultView("/board")).toBe(PAGE_ROUTES.board);
       expect(pathForDefaultView("/focus")).toBe(PAGE_ROUTES.focus);
-      expect(pathForDefaultView("/today")).toBe(PAGE_ROUTES.today);
+      expect(pathForDefaultView("/today")).toBe(TASKS_HOME);
     });
 
     // Both are stored by installs that predate the current page set.
-    it("lands the retired values on Today", () => {
+    it("lands the retired values on the Tasks Module", () => {
       expect(pathForDefaultView("/planning")).toBe(PAGE_ROUTES.board);
-      expect(pathForDefaultView("/projects")).toBe(PAGE_ROUTES.today);
-      expect(pathForDefaultView("/inbox")).toBe(PAGE_ROUTES.today);
+      expect(pathForDefaultView("/projects")).toBe(TASKS_HOME);
+      expect(pathForDefaultView("/inbox")).toBe(TASKS_HOME);
     });
   });
 
@@ -90,29 +97,29 @@ describe("pageRoute", () => {
 
     it("lets a deep link outrank the setting", () => {
       expect(bootRedirectFor("/board", "/calendar")).toBe("");
-      expect(bootRedirectFor(PAGE_ROUTES.today, "/calendar")).toBe("");
+      expect(bootRedirectFor("/today", "/calendar")).toBe("");
     });
 
     it("leaves the auth screen alone", () => {
       expect(bootRedirectFor("/login", "/calendar")).toBe("");
     });
 
-    // A retired address still names somewhere, so it must not be treated as
-    // "the user asked for nothing" and replaced by the start page.
-    it("respects a retired address", () => {
-      expect(bootRedirectFor("/archive", "/calendar")).toBe("");
-      expect(namesAPage("/archive")).toBe(true);
-      expect(pageForPath("/archive")).toBe("today");
+    // A retired address is a REDIRECT now, not a page drawn at someone else's
+    // URL. It outranks the start page — the reader asked for something
+    // specific, and what replaced it is more specific than their default.
+    it("moves a retired address to what replaced it", () => {
+      expect(bootRedirectFor("/archive", "/calendar")).toBe(TASKS_HOME);
+      expect(namesAPage("/archive")).toBe(false);
+      expect(pageForPath("/archive")).toBeNull();
     });
 
-    // Every address the Projects and Goals feature owned still names
-    // somewhere, so a bookmark opens Today rather than being swept to the
-    // start page as if the user had asked for nothing.
-    it("lands the retired Projects and Goals addresses on Today", () => {
-      for (const retired of ["/projects", "/goals", "/spaces", "/archive"]) {
-        expect(pageForPath(retired)).toBe("today");
-        expect(namesAPage(retired)).toBe(true);
-        expect(bootRedirectFor(retired, "/calendar")).toBe("");
+    // `/app` is the newest of them: the Today PAGE's own address. Links to it
+    // are in bookmarks, in the consent screen, and in a desktop client that
+    // remembers where it was.
+    it("moves every retired address to the Tasks Module", () => {
+      for (const retired of ["/app", "/projects", "/goals", "/spaces", "/archive"]) {
+        expect(bootRedirectFor(retired, "/calendar")).toBe(TASKS_HOME);
+        expect(pageForPath(retired)).toBeNull();
       }
     });
 
@@ -141,7 +148,7 @@ describe("pageRoute", () => {
   // TASK_DETAIL_PANEL_MERGE_DESIGN.md §8. The Detail used to live in
   // `usePlannerData`, where a reload lost it and Back walked past it.
   describe("the open Task in a page's address", () => {
-    const HOLDERS: PageId[] = ["today", "board", "focus"];
+    const HOLDERS: PageId[] = ["board", "focus"];
 
     it("round-trips on every page that draws a Detail", () => {
       for (const page of HOLDERS) {

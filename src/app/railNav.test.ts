@@ -6,7 +6,9 @@ describe("railNav", () => {
   // §2.47's Route-to-Rail matrix, rewritten for this repo's routes (audit D-03).
   it("lights Tasks for everything that is not a Global Module", () => {
     for (const path of [
-      PAGE_ROUTES.today,
+      // `/app` was the Today page's address and is a redirect now; the Rail
+      // still has to light Tasks for the frame it is drawn in.
+      "/app",
       "/projects",
       "/today",
       "/upcoming",

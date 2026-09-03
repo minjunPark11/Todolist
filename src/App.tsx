@@ -14,7 +14,6 @@ import { SettingsRow } from "./components/SettingsPage";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
-import type { TodayIntent } from "./components/TodayPage";
 import { TasksModule } from "./components/tasks/TasksModule";
 import { canonicalizeTaskUrl, listUrlFor, parseSearchUrl, parseTaskScope } from "./app/taskScopeUrl";
 import {
@@ -138,19 +137,15 @@ export default function App() {
   // seeding a page variable the URL would then contradict — `activePage` is
   // read from the path now. Computed here, at the first render the old
   // `activePage` initializer used to run in, and applied by the effect below.
-  // /inbox opens Today with the triage drawer, which `todayIntent` handles.
   const [bootRedirect] = useState(() =>
     bootRedirectFor(window.location.pathname, appSettings.defaultView),
   );
-  // Inbox is folded into Today's triage drawer (no standalone page). This
-  // covers the legacy /inbox route, a ?triage=inbox deep link, and the
-  // "default start page" setting all landing on the same Today intent.
-  const [todayIntent, setTodayIntent] = useState<TodayIntent>(() => {
-    const hasInboxRedirect =
-      window.location.pathname === "/inbox" ||
-      new URLSearchParams(window.location.search).get("triage") === "inbox";
-    return hasInboxRedirect || appSettings.defaultView === "/inbox" ? "triage" : "";
-  });
+  /* `todayIntent` stood here. It carried three things into the Today PAGE —
+     open the triage drawer, open the quick-add modal, or neither — and that
+     page is gone (P0-2 closed: the Tasks Module's Today is the one that
+     survived). The Inbox it used to open a drawer for is a Scope with a
+     screen of its own now (`/inbox`), which is where the legacy route and the
+     `?triage=inbox` link both land. */
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState("");
   const [pendingResetAllData, setPendingResetAllData] = useState(false);
   const [toasts, setToasts] = useState<QueuedToast[]>([]);
@@ -319,8 +314,14 @@ export default function App() {
      * They have one now, so the link is the page the reader is actually on:
      * copying from the Matrix hands back the Matrix, with that Task open.
      */
+    // Only a PAGE reaches this: the Module hands the commands its own
+    // `linkFor` (a Scope address with `?task=`). The fallback is the address
+    // the reader is on, which is what a copied link should be when the page
+    // cannot name itself.
     linkFor: (taskId) =>
-      `${window.location.origin.replace(/\/$/, "")}${pageUrlFor(activePage, taskId)}`,
+      `${window.location.origin.replace(/\/$/, "")}${
+        activePage ? pageUrlFor(activePage, taskId) : window.location.pathname
+      }`,
   });
   const focusNow = useNowTick(Boolean(planner.activeFocusSession && planner.activeFocusSession.status === "running"));
   const activeFocusTask = planner.activeFocusSession
@@ -409,16 +410,16 @@ export default function App() {
         openGlobalSearch();
       } else if (event.key.toLowerCase() === "t") {
         event.preventDefault();
-        navigate(PAGE_ROUTES.today);
+        navigate(TASKS_HOME);
       } else if (event.key.toLowerCase() === "i") {
+        // The Inbox was a drawer inside the Today page; it is a Scope with a
+        // screen now, so the key names the screen rather than an intent.
         event.preventDefault();
-        navigate(PAGE_ROUTES.today);
-        setTodayIntent("triage");
-      } else if (event.key.toLowerCase() === "n") {
-        event.preventDefault();
-        navigate(PAGE_ROUTES.today);
-        setTodayIntent("quickAdd");
+        navigate("/inbox");
       }
+      /* `n` opened the Today page's own quick-add modal. Every Scope in the
+         Module has its capture field in the page itself, so there is no modal
+         to open and no second way in to shortcut to. */
     }
 
     window.addEventListener("keydown", handleKeyDown);
@@ -606,11 +607,12 @@ export default function App() {
    * a keystroke that changed nothing.
    */
   function openTaskOnPage(taskId: string) {
+    if (!activePage) return;
     navigateUrl(pageUrlFor(activePage, taskId));
   }
 
   function closeTaskOnPage() {
-    if (!openedTaskId) return;
+    if (!openedTaskId || !activePage) return;
     navigateUrl(pageUrlFor(activePage));
   }
 
@@ -1084,7 +1086,7 @@ export default function App() {
     setPendingResetAllData(false);
     // Replace rather than push: a reset is not a place to go Back to, and the
     // `?task=` left behind names a Task that no longer exists.
-    if (openedTaskId) navigateUrl(pageUrlFor(activePage), "replace");
+    if (openedTaskId && activePage) navigateUrl(pageUrlFor(activePage), "replace");
     try {
       localStorage.removeItem("todo-planner-space-hub-v1");
       localStorage.removeItem("todo-planner-local-spaces-v1");
@@ -1476,14 +1478,18 @@ export default function App() {
   }
 
   function renderPage() {
+    // Nothing to draw for an address that is neither a page nor a Scope. The
+    // boot redirect moves the reader to the Tasks Module's Today
+    // (`bootRedirectFor`); this is what renders in the frame or two before it
+    // lands, and drawing one of the four pages there instead would show a
+    // screen the address does not name.
+    if (!activePage) return null;
     return (
       <AppPages
         activePage={activePage}
         planner={planner}
         visibleTasks={visibleTasks}
         appSettings={appSettings}
-        todayIntent={todayIntent}
-        onTodayIntentHandled={() => setTodayIntent("")}
         renderTaskDetail={renderTaskDetail}
         openedTaskId={openedTaskId}
         onOpenTask={openTaskOnPage}
@@ -1493,6 +1499,7 @@ export default function App() {
         handleArchiveTasks={handleArchiveTasks}
         requestDeleteTask={requestDeleteTask}
         viewTaskInCalendar={viewTaskInCalendar}
+        onGoToTasks={() => navigateUrl(TASKS_HOME)}
         onNavigate={navigateSection}
         exportJson={exportJson}
         handleImport={handleImport}

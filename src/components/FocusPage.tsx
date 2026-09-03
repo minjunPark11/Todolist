@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FocusSession, PageId, Tag, Task, TaskTag } from "../types";
+import type { FocusSession, Tag, Task, TaskTag } from "../types";
 import { tagNamesForTask } from "../domain/tags/tags";
 import { formatDate, isOverdue, todayValue } from "../utils/date";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
@@ -24,7 +24,14 @@ interface FocusPageProps {
   onUpdateFocusNote: (sessionId: string, note: string) => void;
   onCompleteTask: (taskId: string) => void;
   onOpenTask: (taskId: string) => void;
-  onNavigate: (page: PageId) => void;
+  /**
+   * The way out of an empty queue.
+   *
+   * It was `onNavigate("today")` — the Today PAGE, which is gone (P0-2). The
+   * destination is the Tasks Module now, and it is an address rather than a
+   * page id, so this asks for the trip instead of naming the screen.
+   */
+  onGoToTasks: () => void;
 }
 
 type FocusGroup = {
@@ -62,7 +69,7 @@ export function FocusPage({
   onUpdateFocusNote,
   onCompleteTask,
   onOpenTask,
-  onNavigate,
+  onGoToTasks,
 }: FocusPageProps) {
   const { t, lang } = useT();
   const today = todayValue();
@@ -175,7 +182,7 @@ export function FocusPage({
             <div className="foc-empty">
               <strong>{t("focus.emptyTitle")}</strong>
               <p>{t("focus.emptyBody")}</p>
-              <button type="button" onClick={() => onNavigate("today")}>{t("focus.goToday")}</button>
+              <button type="button" onClick={onGoToTasks}>{t("focus.goToday")}</button>
             </div>
           ) : (
             groups.map((group) => (

@@ -31,11 +31,16 @@ const ALLOWED_OFF_GRID = [
   // The small size, 28px. Not a stray: §4.87 gives a section action exactly
   // that number, and V-6 made one `-sm` out of the three the families had.
   ".ff-btn-sm",
-  ".tdy-btn-sm",
   ".sdv-btn-sm",
   ".foc-task-main", // a task row carrying a title AND a meta line: the grid is for single-line rows
   ".motion-task-row", // the same two-line row, on the Matrix
   ".tm-task-open", // a Task row is content: its hit target is as tall as the row, not as the grid
+  // The quick add's input, which stopped being a CONTROL when the row became
+  // one (TICKTICK_COMPONENT_10_QUICK_ADD.md §10): the 32px box around it is
+  // what sits on the grid, and the input is the text inside it, 30 tall
+  // because the row's 1px border is its own. It measured 32 until §10.10 —
+  // as a field, drawing a second box inside the first.
+  ".tm-quickadd-title",
   // The Matrix box header. Its two icon buttons are 28px section actions
   // (§4.87), sized against the 22px badge they sit beside rather than against
   // the 32px grid — the same clause `.ff-btn-sm` above is listed under.

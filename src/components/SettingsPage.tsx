@@ -242,12 +242,12 @@ export function SettingsPage({
               <option value="/inbox">{t("settings.defaultStartPageInboxOption")}</option>
             </select>
           </SettingsRow>
-          <Toggle
-            label={t("settings.showCompletedTasks")}
-            hint={t("settings.showCompletedTasksHint")}
-            value={settings.showCompletedInToday}
-            onChange={(v) => onUpdate({ showCompletedInToday: v })}
-          />
+          {/* `Show completed tasks in Today` stood here. The only screen that
+              read it was the Today PAGE, and that page is gone (P0-2). The
+              stored field is left alone — an M0 setting is not deleted from
+              anyone's account because a screen stopped asking about it — and
+              the Tasks Module's own Scopes answer the same question per Scope
+              (`⋯ → 완료 숨기기`). */}
           <Toggle
             label={t("settings.confirmBeforeDelete")}
             hint={t("settings.confirmBeforeDeleteHint")}

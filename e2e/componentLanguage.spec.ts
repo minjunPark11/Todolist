@@ -40,17 +40,21 @@ import { openApp } from "./addList.helpers";
  * in this file, which builds a screen out of the canonical names and checks
  * that each one draws something.
  */
-const CARDS = ["ff-card", "tdy-card", "foc-card", "sdv-metric-card"];
+const CARDS = ["ff-card", "foc-card", "sdv-metric-card"];
 
 /** Same claim, for the button — base, primary and the small size. */
 const BUTTONS = {
-  base: ["ff-btn", "tdy-btn", "sdv-btn"],
-  primary: ["ff-btn ff-btn-primary", "tdy-btn tdy-btn-navy", "sdv-btn sdv-btn-primary"],
-  small: ["ff-btn ff-btn-sm", "tdy-btn tdy-btn-sm", "sdv-btn sdv-btn-sm"],
+  base: ["ff-btn", "sdv-btn"],
+  primary: ["ff-btn ff-btn-primary", "sdv-btn sdv-btn-primary"],
+  small: ["ff-btn ff-btn-sm", "sdv-btn sdv-btn-sm"],
 };
 
 /** And for the field. `.ff-field` on a div proves the class alone carries it. */
-const FIELDS = ["ff-field", "tdy-capture-input", "tm-quickadd-title", "tm-modal-input"];
+// `tm-quickadd-title` left this list: the quick add stopped being a field and
+// became a filled ROW with text in it (TICKTICK_COMPONENT_10_QUICK_ADD.md
+// §10), so holding it to the field's surface would be holding it to a shape it
+// deliberately does not have.
+const FIELDS = ["ff-field", "tm-modal-input"];
 
 /**
  * The computed appearance of one class, with no content and no page around it.
@@ -127,8 +131,9 @@ test.describe("the component language (§V.3, V-6)", () => {
 
     // Today's primary used to be `--tdy-navy`. Two primaries in two colours
     // is the thing this stage exists to end, and the accent is the one the
-    // user can change (§11.3).
-    const appearance = await appearanceOf(page, ["ff-btn ff-btn-primary", "tdy-btn tdy-btn-navy"], "button");
+    // user can change (§11.3). The `tdy-` half of that comparison went with
+    // the Today page (P0-2); what is left is the rule it was made to hold.
+    const appearance = await appearanceOf(page, ["ff-btn ff-btn-primary", "sdv-btn sdv-btn-primary"], "button");
     const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim());
     expect(accent).not.toBe("");
     for (const value of Object.values(appearance)) {

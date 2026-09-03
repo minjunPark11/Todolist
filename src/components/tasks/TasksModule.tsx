@@ -389,9 +389,12 @@ export function TasksModule(props: TasksModuleProps) {
    * (§2.1), so on those the menu is empty and does not appear at all — which
    * is the same rule the header applied, one level up.
    *
-   * Rows with a ✓ rather than the reference's row of icons: this app's menus
-   * are rows, the Today axis picker chose the same shape, and a new menu
-   * primitive is not what this phase is for (§5 Q6).
+   * Two shapes, and the difference is how many answers the setting has
+   * (SCOPE_VIEW_OPTIONS_DESIGN.md §14). The views are a SET of three, drawn as
+   * one row of icons that says which is in force. Everything else here has two
+   * states, and a two-state row says what pressing it will DO — `Hide
+   * completed` becomes `Show completed` once it is hidden — with no tick,
+   * because a tick in a label is a state announced by a decorative character.
    */
   /** This Scope's five, or the defaults where nobody has set any (§3.3). */
   const viewOptions = viewOptionsFor(props.scopeViewOptions, scope);

@@ -3,7 +3,6 @@ import { MatrixPage } from "../components/MatrixPage";
 import { CalendarView } from "../components/CalendarView";
 import { FocusPage } from "../components/FocusPage";
 import { SettingsPage } from "../components/SettingsPage";
-import { TodayPage, type TodayIntent } from "../components/TodayPage";
 import type { ToastState } from "../components/kit";
 import type { usePlannerData } from "../hooks/usePlannerData";
 import type { CalendarShareState } from "../lib/calendarShare";
@@ -11,7 +10,6 @@ import type { AutoBackupState } from "./useAutoBackup";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import type { AppUpdateStatus } from "../platform";
 import type { TaskDetailPresentation } from "../domain/tasks/responsive";
-import { DEFAULT_TODAY_AXIS } from "../domain/view/todayGroups";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Task } from "../types";
 
 type Planner = ReturnType<typeof usePlannerData>;
@@ -30,8 +28,6 @@ type AppPagesProps = {
   visibleTasks: Task[];
   planner: Planner;
   appSettings: AppSettings;
-  todayIntent: TodayIntent;
-  onTodayIntentHandled: () => void;
   renderTaskDetail: () => ReactNode;
   /**
    * The open Task, and how to open one — read from and written to `?task=`
@@ -58,6 +54,8 @@ type AppPagesProps = {
   requestDeleteTask: (taskId: string) => void;
   viewTaskInCalendar: (taskId: string) => void;
   onNavigate: (page: PageId) => void;
+  /** The Focus queue's way out, now that Today is a Scope and not a page. */
+  onGoToTasks: () => void;
   exportJson: () => void;
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
   importMessage: string;
@@ -90,8 +88,6 @@ export function AppPages({
   planner,
   visibleTasks,
   appSettings,
-  todayIntent,
-  onTodayIntentHandled,
   renderTaskDetail,
   openedTaskId,
   onOpenTask,
@@ -102,6 +98,7 @@ export function AppPages({
   requestDeleteTask,
   viewTaskInCalendar,
   onNavigate,
+  onGoToTasks,
   exportJson,
   handleImport,
   importMessage,
@@ -152,42 +149,10 @@ export function AppPages({
    */
   const gridStyle = { ["--tm-detail-w"]: `${detailWidth}px` } as CSSProperties;
 
-  if (activePage === "today") {
-    // Today had no side-by-side Detail: the grid was pinned to the full-width
-    // layout and a click opened the legacy panel inside a scrim of this page's
-    // own (`.tdy-detail-overlay`). That scrim was a fifth presentation of a
-    // component that already had four, and it is gone — Today's Detail is now
-    // the same column, overlay, sheet or full screen every other Task gets.
-    return (
-      <section className={pageGridClass("tdy-grid")} style={gridStyle}>
-        <TodayPage
-          tasks={visibleTasks}
-          dailyPlans={planner.dailyPlans}
-          lists={planner.lists}
-          onSetBuckets={planner.setTodayBuckets}
-          onOpenTask={onOpenTask}
-          openedTaskId={openedTaskId}
-          onToggleDone={planner.toggleTaskDone}
-          onUpdateTask={planner.updateTask}
-          onCreateTask={planner.createTask}
-          onArchiveTasks={handleArchiveTasks}
-          onNavigate={onNavigate}
-          onScheduleInCalendar={viewTaskInCalendar}
-          showCompleted={appSettings.showCompletedInToday}
-          onToggleShowCompleted={() =>
-            planner.updateAppSettings({ showCompletedInToday: !appSettings.showCompletedInToday })
-          }
-          detailIsColumn={detailIsColumn}
-          groupAxis={appSettings.todayGroupAxis ?? DEFAULT_TODAY_AXIS}
-          onSetGroupAxis={(todayGroupAxis) => planner.updateAppSettings({ todayGroupAxis })}
-          intent={todayIntent}
-          onIntentHandled={onTodayIntentHandled}
-          showToast={showToast}
-        />
-        {renderTaskDetail()}
-      </section>
-    );
-  }
+  /* The Today page's branch stood here, and it is gone with the page (P0-2:
+     the Tasks Module's Today is the one that survived). What left with it was
+     that page's own vocabulary — the plan buckets, the inbox triage drawer,
+     the capture modal — none of which any other screen reads. */
 
   if (activePage === "board") {
     return (
@@ -265,7 +230,7 @@ export function AppPages({
           onUpdateFocusNote={planner.updateFocusSessionNote}
           onCompleteTask={planner.completeTask}
           onOpenTask={onOpenTask}
-          onNavigate={onNavigate}
+          onGoToTasks={onGoToTasks}
         />
         {renderTaskDetail()}
       </section>
