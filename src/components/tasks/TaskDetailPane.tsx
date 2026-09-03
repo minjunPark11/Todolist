@@ -14,6 +14,7 @@
 // (TASK_DETAIL_PANEL_MERGE_DESIGN.md §5).
 import type { List, SidebarFolder, Tag, Task, TaskTag } from "../../types";
 import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
+import type { Rect } from "../../domain/floating";
 import type { TaskDetailWidthState } from "../../hooks/useTaskDetailWidth";
 import type { TaskCommands } from "../../hooks/useTaskCommands";
 import type { TaskActionId } from "../../domain/tasks/actions";
@@ -37,6 +38,8 @@ export interface TaskDetailPaneProps {
   task: Task;
   /** Where this is drawn (§15.17) — the surface's decision, not this one's. */
   presentation: TaskDetailPresentation;
+  /** And, for the popup, what it opens beside (§3.4). Rides through untouched. */
+  anchor?: Rect | null;
   /** §1.12–§1.14. The surface owns the width; the handle's behaviour rides in. */
   resize: TaskDetailWidthState;
   /** Today as `YYYY-MM-DD`, for the schedule trigger's wording. */
@@ -68,6 +71,7 @@ export interface TaskDetailPaneProps {
 export function TaskDetailPane({
   task,
   presentation,
+  anchor,
   resize,
   today,
   tasks,
@@ -96,6 +100,7 @@ export function TaskDetailPane({
          what holds the state, not the surface around it. */
       task={task}
       presentation={presentation}
+      anchor={anchor}
       resize={resize}
       today={today}
       lists={lists}

@@ -6,17 +6,17 @@
 // strip of another program's chrome bolted to the top of ours.
 //
 // So the window is undecorated now (`decorations: false`, tauri.conf.json) and
-// this draws what it replaced. Two things make it read as part of the app
-// rather than as a bar:
+// this draws what it replaced — which, after WINDOW_TOP_ROW_DESIGN.md §3, is
+// three buttons and nothing else:
 //
-//   1. It paints nothing of its own. `.window-titlebar-fill` continues the
-//      columns underneath it — the Rail's own background reaches the top edge
-//      by itself (it is `height: 100dvh` from y=0), and the fill draws the
-//      Context Sidebar's colour and the page's colour in the same places the
-//      columns below it draw them (19-app-shell.css).
-//   2. It has no border, no shadow and no title text. What is left is the drag
-//      region and the three window buttons, which is the only part the OS was
-//      actually giving us.
+//   1. It paints nothing, and reserves nothing. The caption row is the app's
+//      own first row — the Rail's top, the sidebar's first item, the page's
+//      title — so the colours up there are the columns' own rather than a
+//      gradient imitating them, and the 48px of empty band that used to sit
+//      above the app is gone.
+//   2. What is left is the three window buttons at the right, and the 138px
+//      the rows underneath them keep clear (`--titlebar-buttons-w`). Dragging
+//      belongs to those rows, through `data-tauri-drag-region` on each.
 //
 // It mounts at the ROOT, beside <App/>, and not inside AppShell: the login and
 // recovery gates return before the frame exists, and a window you cannot close
@@ -26,7 +26,7 @@ import type { Window as TauriWindow } from "@tauri-apps/api/window";
 import { translate } from "../../i18n";
 import type { Language } from "../../types";
 
-/** Windows' caption metrics: a 32px band, 46x32 buttons. */
+/** Windows' caption metrics: 46x32 buttons in a 32px band. */
 const TITLEBAR_HEIGHT = 32;
 
 /** App.tsx writes the language onto <html lang>; this is downstream of that.
@@ -142,16 +142,17 @@ export function WindowTitleBar() {
       className="window-titlebar"
       style={{ "--titlebar-h": `${TITLEBAR_HEIGHT}px` } as CSSProperties}
     >
-      {/* The paint, separated from the controls on purpose. It sits at the
-          bottom of the stack so a modal's backdrop dims it like the rest of
-          the app, while the buttons stay on top and stay clickable — a dialog
-          that takes away the close button is how an app gets force-quit. */}
-      <div className="window-titlebar-fill" aria-hidden="true" />
+      {/* The fill and the drag strip stood here (WINDOW_TOP_ROW_DESIGN.md §3).
+          The fill painted the caption row by continuing the columns beneath it,
+          because the row was EMPTY — and continuing a colour is only ever an
+          imitation of the thing it continues, which is how the Tasks module
+          ended up with a white band over a grey page. The row is not empty any
+          more: the app's own first row lives there and paints itself.
 
-      {/* Tauri reads this attribute off the element under the pointer, so the
-          buttons — which do not carry it — are not drag handles. Double-click
-          to maximize comes with it. */}
-      <div className="window-titlebar-drag" data-tauri-drag-region />
+          The 32px strip that carried `data-tauri-drag-region` went with it for
+          the same reason — spanning the window at z-index 70, it would now sit
+          on top of the sidebar's first item and the title, eating their
+          clicks. The rows that are up there carry the attribute themselves. */}
 
       <div className="window-titlebar-buttons">
         <button

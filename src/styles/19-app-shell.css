@@ -511,157 +511,84 @@
    on `[data-window-chrome="custom"]`, which only the desktop bar sets, so the
    browser build and the e2e suite lay out exactly as before.
 
-   The point of the whole block is that the caption row must not be a BAR. It
-   reserves 32px at the top and then lets the columns underneath paint it:
-   the Rail already does (it is `height: 100dvh` starting at y=0, so its own
-   background reaches the window edge), and `.window-titlebar-fill` continues
-   the other two.
+   The caption row is not a bar, and after WINDOW_TOP_ROW_DESIGN.md §3 it is
+   not a RESERVATION either. It used to be 32px of nothing at the top of the
+   window, painted by a gradient that imitated the columns underneath — which
+   is how the Tasks module ended up with a white band over a grey page (§2),
+   and why the app's first row began 48px down the window while the reference
+   app's begins at 0.
+
+   Now the app's own first row IS the caption row: the Rail's top, the
+   sidebar's first item, the page's title. They paint their own colours, so
+   there is nothing left to imitate; what the row owes the OS is the 138px the
+   three window buttons sit in, and a way to drag the window.
    ============================================================================ */
 
 :root {
-  /* 0 by default so every `calc()` below is a no-op wherever the app is not
-     drawing its own caption. The bar itself sets 32px on the element and the
-     root copy here is what the layout rules read. */
+  /* The band the buttons occupy. 0 wherever the app is not drawing its own
+     caption, which keeps every rule below a no-op in the browser build. */
   --titlebar-h: 0px;
-  /* The colour the caption row continues to the right of the Context Sidebar.
-     Two shells, two page surfaces: the Tasks Module's `.tm-shell` is
-     `var(--bg)` and the legacy `.app-shell > main` is `var(--bg-app)`.
-     The sidebar MODE does not answer which is on screen — measured in the
-     running app, /app renders the legacy shell with the Tasks sidebar in it —
-     so the rule below asks the document which shell it actually has. */
-  --titlebar-surface: var(--bg-app);
+  /* What the rows at the top keep clear at the right: 46 x 3 (Windows' own
+     caption metrics). Only the rows that reach the window's right edge read
+     it — see the four rules below. */
+  --titlebar-buttons-w: 0px;
 }
 
 :root[data-window-chrome="custom"] {
   --titlebar-h: 32px;
+  --titlebar-buttons-w: 138px;
 }
 
-:root:has(.tm-shell) {
-  --titlebar-surface: var(--bg);
+/* --- what the caption row costs the layout: nothing ---------------------- */
+
+/* Five rules stood here, and together they were the 48px: the Rail's extra
+   padding, the body's padding, and three height/min-height corrections paying
+   it back so the page did not grow a scrollbar. All of it existed to keep
+   content OUT of a band nothing was drawing in. `--titlebar-h` is still read
+   by `03-planning.css` for the matrix page's height — it is 32px there and
+   the page is measured against the window, so that one stays honest. */
+
+/* --- the rows that meet the buttons -------------------------------------- */
+
+/* The four surfaces whose first row reaches the window's right edge
+   (WINDOW_TOP_ROW_DESIGN.md §3.4), measured rather than guessed. Each keeps
+   the buttons' width clear so nothing of the app's sits under them.
+
+   `data-tauri-drag-region` goes on these same elements in the TSX: Tauri reads
+   the attribute off the element the pointer is on, so the buttons and inputs
+   inside them keep working and the space between them drags the window. */
+[data-window-chrome="custom"] .ff-page-head,
+[data-window-chrome="custom"] .foc-header,
+[data-window-chrome="custom"] .gcal-toolbar,
+[data-window-chrome="custom"] .tm-drawer.is-inline-drawer .tm-drawer-head {
+  padding-right: calc(16px + var(--titlebar-buttons-w));
 }
 
-/* --- what the caption row costs the layout ------------------------------- */
-
-/* The Rail keeps its 16px of air ABOVE its first item, measured from the
-   window edge as before — the caption is added to it rather than replacing
-   it, or the first icon ends up under the drag region. */
-[data-window-chrome="custom"] .app-frame .global-rail {
-  padding-top: calc(16px + var(--titlebar-h));
+/* The Tasks module's own header reaches that edge only where there is no
+   Detail column beside it. At >= 1280 the module reserves that column whether
+   or not a Task is open (audit D1-1), so the buttons are above the column and
+   the title needs nothing. */
+@media (max-width: 1279px) {
+  [data-window-chrome="custom"] .tm-header {
+    padding-right: var(--titlebar-buttons-w);
+  }
 }
-
-/* Everything that is not the Rail starts below the caption. The body is the
-   one place to say it: both shells hang off it. */
-[data-window-chrome="custom"] .app-frame-body {
-  padding-top: var(--titlebar-h);
-}
-
-/* ...and both shells size themselves against the viewport, so both have to
-   give the same 32px back. Without this the Tasks Module is 100dvh tall
-   inside a body pushed 32px down and the whole page grows a scrollbar. */
-[data-window-chrome="custom"] .app-frame .tm-shell {
-  height: calc(100dvh - var(--titlebar-h));
-}
-
-[data-window-chrome="custom"] .app-frame .app-shell {
-  min-height: calc(100vh - var(--titlebar-h));
-}
-
-[data-window-chrome="custom"] .app-frame .app-shell > main {
-  min-height: calc(100vh - var(--titlebar-h));
-}
-
-/* --- the caption row itself ---------------------------------------------- */
 
 .window-titlebar {
-  /* `display: contents` and not a fixed box of its own: a positioned parent
-     would be a stacking context, and the fill and the buttons have to land on
-     OPPOSITE sides of the modal backdrop (z 60) — dimmed with the app, and
-     clickable above it. Boxed into one layer they cannot. The element is left
-     in the tree only to carry `--titlebar-h` down to the three children. */
+  /* `display: contents` and not a box of its own: a positioned parent would be
+     a stacking context, and the buttons have to be above the modal backdrop
+     (z 60) — a dialog that covered the close button leaves a window that can
+     only be shut from the taskbar. The element is left in the tree to carry
+     `--titlebar-h` down to the buttons. */
   display: contents;
 }
 
-/* The paint. Below the app's own layers, so a dialog dims it with everything
-   else; there is never any content up here for it to cover, because the rules
-   above moved it all down. */
-.window-titlebar-fill {
-  position: fixed;
-  top: 0;
-  right: 0;
-  left: 0;
-  z-index: 1;
-  height: var(--titlebar-h);
-  pointer-events: none;
-  /* Where the columns are, in the caption row's own terms. The Rail is off
-     screen below 768px (§2.39) and the persistent sidebar exists at >=1024px
-     only (§3.33), so the fill has to lose the same segments at the same
-     widths — a column it draws that is not there is exactly the seam this
-     whole block exists to remove. `--frame-sidebar-w` is published on the
-     root by AppShell, from the number the grid tracks use. */
-  --tb-rail-w: var(--rail-w);
-  --tb-sidebar-w: var(--frame-sidebar-w, 0px);
-  --tb-divider-w: 1px;
-  /* The seam that used to be a title bar, in one declaration: transparent
-     over the Rail (which paints itself, being 100dvh from y=0), the sidebar's
-     colour over the sidebar, its 1px divider exactly where the divider is,
-     and the page's surface over the page. Hard stops throughout, so nothing
-     fades between two column colours. */
-  background: linear-gradient(
-    to right,
-    transparent 0 var(--tb-rail-w),
-    var(--bg-context-sidebar) var(--tb-rail-w) calc(var(--tb-rail-w) + var(--tb-sidebar-w)),
-    var(--ff-border) calc(var(--tb-rail-w) + var(--tb-sidebar-w))
-      calc(var(--tb-rail-w) + var(--tb-sidebar-w) + var(--tb-divider-w)),
-    var(--titlebar-surface) calc(var(--tb-rail-w) + var(--tb-sidebar-w) + var(--tb-divider-w))
-      100%
-  );
-}
-
-/* Below 1024 the Tasks Module's sidebar is an overlay sheet, not a column
-   (sidebarPresentationFor: mobile and tablet), so there is nothing at the left
-   for the caption to continue. */
-@media (max-width: 1023px) {
-  .window-titlebar-fill {
-    --tb-sidebar-w: 0px;
-    /* No sidebar means no divider either — at 375px it was drawing a 1px
-       line down the left edge of the caption with nothing under it. */
-    --tb-divider-w: 0px;
-  }
-}
-
-/* ...except on the legacy shell, which keeps its column down to 900px, at the
-   200px 02-calendar.css narrows it to rather than the resizable width — the
-   `.app-frame .app-shell` track rule that reads `--context-sidebar-w` starts
-   at 1024. The desktop window's minimum is 980px wide, so this band is 44px of
-   window widths and reachable: a caption that drew no sidebar in it would put
-   the seam back exactly where a person is dragging the window edge. */
-@media (min-width: 901px) and (max-width: 1023px) {
-  :root:has(.app-shell) .window-titlebar-fill {
-    --tb-sidebar-w: 200px;
-    --tb-divider-w: 1px;
-  }
-}
-
-@media (max-width: 767px) {
-  .window-titlebar-fill {
-    --tb-rail-w: 0px;
-  }
-}
-
-.window-titlebar-drag {
-  position: fixed;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: var(--titlebar-h);
-  /* Above the content, below the buttons. Dragging is the only thing the row
-     does with the space the buttons do not use. */
-  z-index: 70;
-  /* A caption is chrome: dragging across it must not select the text of a
-     header that ends up beside it. */
-  user-select: none;
-  -webkit-user-select: none;
-}
+/* `.window-titlebar-fill` and its three media queries stood here, and
+   `.window-titlebar-drag` after them. The fill continued the columns' colours
+   across an empty band; the columns reach the top edge themselves now. The
+   drag strip spanned the window at z-index 70, which is exactly where the
+   sidebar's first item and the page title now are — it would have eaten their
+   clicks. §3.3-3's per-row attribute replaces it. */
 
 .window-titlebar-buttons {
   position: fixed;

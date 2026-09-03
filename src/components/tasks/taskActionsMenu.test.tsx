@@ -90,10 +90,7 @@ function renderModule(
     onEmptyTrash?: () => { tasks: number; lists: number; tasksWithLists: number };
     scopeViewOptions?: Record<string, ScopeViewOptions>;
     onSetScopeViewOptions?: (next: Record<string, ScopeViewOptions>) => void;
-    onDuplicate?: (taskId: string) => (() => void) | null;
     activityFor?: (taskId: string) => TaskActivityEntry[];
-    onSaveAsTemplate?: (taskId: string) => string;
-    onDeleteTemplate?: (templateId: string) => void;
     /** Q7 moved the List actions into the ⋯, so a test has to see them fire. */
     onTrashList?: (listId: string) => void;
     lists?: List[];
@@ -130,7 +127,6 @@ function renderModule(
           onEmptyTrash={extra.onEmptyTrash ?? (() => ({ tasks: 0, lists: 0, tasksWithLists: 0 }))}
           scopeViewOptions={extra.scopeViewOptions}
           onSetScopeViewOptions={extra.onSetScopeViewOptions ?? (() => {})}
-          onDuplicate={extra.onDuplicate ?? (() => null)}
           focusBusy={extra.focusBusy ?? false}
           onCreate={() => {}}
           draftTitle=""
@@ -161,10 +157,6 @@ function renderModule(
             onRestoreList: () => {},
             onPermanentlyDeleteList: () => {},
           }}
-          onSaveAsTemplate={extra.onSaveAsTemplate ?? (() => "tpl-1")}
-          onDeleteTemplate={extra.onDeleteTemplate ?? (() => {})}
-          templates={[]}
-          onUseTemplate={() => {}}
           onMutate={onMutate}
         />
       </FloatingLayerProvider>
@@ -214,10 +206,8 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
       "Tags",
       "Waiting on",
       "Notes",
-      "Pin",
-      "Duplicate",
-      "Save as template",
-      "Copy link",
+      // Pin, Duplicate, Save as template and Copy link stood here — the whole
+      // `quick` group, gone with TASK_MENU_TRIM_DESIGN.md.
       "Start focus",
       "Task activities",
       "Mark won't do",
@@ -236,30 +226,10 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     expect(screen.getByRole("checkbox", { name: "Done" })).toBeTruthy();
   });
 
-  it("pins the Task, and offers the way back once it is pinned", async () => {
-    const user = userEvent.setup();
-    const { onMutate } = renderModule();
-    await openMore(user);
-    await user.click(screen.getByRole("menuitem", { name: "Pin" }));
-
-    expect(onMutate).toHaveBeenCalledTimes(1);
-    const [taskId, patch] = onMutate.mock.calls[0];
-    expect(taskId).toBe("t1");
-    // §15.7: one field. A Pin that also wrote a status or a List would be the
-    // rule that section states, broken quietly.
-    expect(Object.keys(patch)).toEqual(["pinnedAt"]);
-    expect(patch.pinnedAt).toBeTruthy();
-  });
-
-  it("says so in the header while the Task is pinned", async () => {
-    const user = userEvent.setup();
-    renderModule({ pinnedAt: NOW });
-    expect(screen.getByText("Pinned")).toBeTruthy();
-
-    await openMore(user);
-    expect(rows()).toContain("Unpin");
-    expect(rows()).not.toContain("Pin");
-  });
+  // The two Pin tests stood here. Nothing pins a Task any more, and the
+  // `고정됨` badge they checked for went with them (TASK_MENU_TRIM_DESIGN.md
+  // D1) — `domain/tasks/actions.test.ts` holds what is left: a record that
+  // still carries `pinnedAt` gets the same menu as any other.
 
   it("offers a trashed Task the way back instead of a second trip to the Trash", async () => {
     const user = userEvent.setup();
@@ -275,7 +245,7 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     // them, and §15 took them away. They were the back door around §14's
     // freeze: the Detail beside this menu drew the same two as facts.
     // `Close` is the context menu's own last row, not the registry's.
-    expect(rows()).toEqual(["Copy link", "Task activities", "Restore", "Delete forever", "Close"]);
+    expect(rows()).toEqual(["Task activities", "Restore", "Delete forever", "Close"]);
 
     await user.click(screen.getByRole("menuitem", { name: "Restore" }));
     expect(onMutate.mock.calls[0][1]).toEqual({ deletedAt: "" });
@@ -368,79 +338,10 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     expect(onDeleteForever).not.toHaveBeenCalled();
   });
 
-  it("saves a template without changing the Task, and offers to take it back (§25.8)", async () => {
-    const user = userEvent.setup();
-    const onSaveAsTemplate = vi.fn(() => "tpl-9");
-    const onDeleteTemplate = vi.fn();
-    const { onMutate } = renderModule({}, { onSaveAsTemplate, onDeleteTemplate });
-    await openMore(user);
-    await user.click(screen.getByRole("menuitem", { name: "Save as template" }));
-
-    expect(onSaveAsTemplate).toHaveBeenCalledWith("t1");
-    // §25.8: "current Task 자체는 유지" — nothing about the Task changes, which
-    // is also why the way back deletes the template rather than patching.
-    expect(onMutate).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Undo" }));
-    expect(onDeleteTemplate).toHaveBeenCalledWith("tpl-9");
-  });
-
-  it("duplicates, and offers the way to take the copy back (§15.55)", async () => {
-    const user = userEvent.setup();
-    const discard = vi.fn();
-    const onDuplicate = vi.fn(() => discard);
-    renderModule({}, { onDuplicate });
-    await openMore(user);
-    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
-
-    expect(onDuplicate).toHaveBeenCalledWith("t1");
-    await user.click(screen.getByRole("button", { name: "Undo" }));
-    expect(discard).toHaveBeenCalledTimes(1);
-  });
-
-  it("offers no Undo when there was nothing to copy (§15.67)", async () => {
-    const user = userEvent.setup();
-    renderModule({}, { onDuplicate: () => null });
-    await openMore(user);
-    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
-
-    // A toast offering to undo something that did not happen is worse than no
-    // toast: pressing it would look like it had failed.
-    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
-  });
-
-  it("copies the Task's link and says so, with nothing to undo (§15.21, §15.58)", async () => {
-    const user = userEvent.setup();
-    const writeText = vi.fn(() => Promise.resolve());
-    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
-    const { onMutate } = renderModule();
-    await openMore(user);
-    await user.click(screen.getByRole("menuitem", { name: "Copy link" }));
-
-    await screen.findByText("Link copied.");
-    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("/list/l1?task=t1"));
-    // §15.58: Copy Link is not a mutation, so there is no patch and no Undo.
-    expect(onMutate).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
-    vi.unstubAllGlobals();
-  });
-
-  it("shows the URL to copy by hand when the clipboard refuses (§15.22)", async () => {
-    const user = userEvent.setup();
-    vi.stubGlobal("navigator", {
-      ...navigator,
-      clipboard: { writeText: () => Promise.reject(new Error("denied")) },
-    });
-    // The `execCommand` fallback is not implemented in jsdom either, so this
-    // exercises both refusals at once — which is the case §15.22 is about.
-    renderModule();
-    await openMore(user);
-    await user.click(screen.getByRole("menuitem", { name: "Copy link" }));
-
-    await screen.findByText("Couldn't copy the link.");
-    const field = document.querySelector(".tm-undo-value") as HTMLInputElement;
-    expect(field.value).toContain("/list/l1?task=t1");
-    vi.unstubAllGlobals();
-  });
+  // Five tests stood here — one per row of the `quick` group, plus the
+  // clipboard's two outcomes. All five actions are gone
+  // (TASK_MENU_TRIM_DESIGN.md), and with them the only callers of the hook
+  // inputs they exercised.
 
   it("hands Start Focus the Task id and nothing else (§25.6)", async () => {
     const user = userEvent.setup();
@@ -1007,13 +908,15 @@ describe("the row's menu (§15.63)", () => {
     const labels = rows();
     // Registry rows on both sides of the priority and date sets — §15.42's
     // order. Complete is here because a row has no checkbox to promote it to.
-    expect(labels).toContain("Pin");
     expect(labels).toContain("Start focus");
     expect(labels).toContain("Complete");
     expect(labels).toContain("Mark won't do");
     expect(labels).toContain("Move to trash");
-    expect(labels).toContain("Save as template");
-    expect(labels.indexOf("Pin")).toBeLessThan(labels.indexOf("High"));
+    // `work` still leads the registry's half; the four rows that used to come
+    // before it are gone (TASK_MENU_TRIM_DESIGN.md).
+    expect(labels).not.toContain("Pin");
+    expect(labels).not.toContain("Save as template");
+    expect(labels.indexOf("Start focus")).toBeLessThan(labels.indexOf("High"));
     expect(labels.indexOf("High")).toBeLessThan(labels.indexOf("Move to trash"));
   });
 });

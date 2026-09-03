@@ -35,10 +35,20 @@ import type { ScopeDateBy } from "../../domain/view/scopeViewOptions";
 import { formatDate, formatWeekday, todayValue } from "../../utils/date";
 import { getWeekStartPref } from "../../utils/appPrefs";
 import { TaskCheck } from "./TaskCheck";
+import { rectOfElement } from "../floating";
+import type { Rect } from "../../domain/floating";
 
 interface TaskRowContentProps {
   task: Task;
-  onOpen: (taskId: string) => void;
+  /**
+   * Opens the Task — and says where the row is, for the surfaces that draw
+   * the Detail as a popup beside it
+   * (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §3.4).
+   *
+   * The rect is the row's own, measured at the click. A caller that draws the
+   * Detail as a column ignores it.
+   */
+  onOpen: (taskId: string, anchor?: Rect) => void;
   onToggleDone: (task: Task) => void;
   /**
    * The List's name, where the row sits somewhere its List does not.
@@ -167,6 +177,22 @@ export function TaskRowContent({
   const bodyLine = showDetails ? body : "";
   const hasTips =
     Boolean(listName) || Boolean(parentTitle) || repeats || hasBody || Boolean(dueLabel);
+  // The level this row is allowed to say — the matrix's cards say `none`
+  // because their box already is the priority.
+  const level = showPriority ? task.priority : "none";
+  // The box's name carries the level now the flag is gone
+  // (TASK_ROW_TWO_LINES_DESIGN.md §2.2). The flag was the only thing on the
+  // row that said the priority in something other than colour, and it said it
+  // to screen readers and in forced-colours mode, where the border colour is
+  // thrown away entirely. A name costs no width, which is what the flag cost.
+  //
+  // Not on a finished task: a ticked box is grey whatever the level was, and a
+  // name that still announced `High` would be describing a colour that is not
+  // on screen.
+  const checkLabel =
+    !done && level !== "none"
+      ? t("tasks.completeTaskPriority", { title: task.title, priority: t(`priority.${level}`) })
+      : t(done ? "tasks.reopenTask" : "tasks.completeTask", { title: task.title });
   return (
     <>
       {/* A 17px box with the row's full height as its hit area. That is the
@@ -185,43 +211,40 @@ export function TaskRowContent({
         </span>
       ) : (
       <label className="tm-task-check">
-        {/* The box carries the priority as its colour now (§4.1). Gated on the
-            same `showPriority` the flag below is: one switch for the two
-            channels, so a view that has said the level another way — the
-            matrix's quadrants — is not made to say it twice more. */}
+        {/* The box is where the priority is said now — as its colour, and as
+            part of its name (§4.1, and TASK_ROW_TWO_LINES_DESIGN.md §2.2).
+            `showPriority` gates both together, so a view that has already said
+            the level another way — the matrix's quadrants — is not made to say
+            it twice more. */}
         <TaskCheck
-          priority={showPriority ? task.priority : "none"}
+          priority={level}
           checked={done}
-          label={t(done ? "tasks.reopenTask" : "tasks.completeTask", { title: task.title })}
+          label={checkLabel}
           onToggle={() => onToggleDone(task)}
         />
       </label>
       )}
       <button
         type="button"
-        className="tm-task-open"
+        // `has-body` where a second line is drawn, and only there
+        // (TASK_ROW_TWO_LINES_DESIGN.md §3.3). The row is one flex line that
+        // does not wrap; a body asking for 100% of it left the title at its
+        // own basis of 0 and the row read as a body with no title. The
+        // component that decides there IS a second line is the one that says
+        // so — a stylesheet would have to ask.
+        className={`tm-task-open${bodyLine ? " has-body" : ""}`}
         // §16.34: a row opens a Task, and a screen reader should say so rather
         // than reading the title as if it were a heading.
         aria-label={t("tasks.openTask", { title: task.title })}
-        onClick={() => onOpen(task.id)}
+        onClick={(event) => onOpen(task.id, rectOfElement(event.currentTarget) ?? undefined)}
       >
         <span className={`tm-task-title${done ? " is-done" : ""}`}>{task.title}</span>
-        {/* Priority was stored and never drawn (audit §3.1): a Task could be
-            High and look like every other row. The reference puts it in the
-            checkbox's colour instead, which is one signal doing two jobs and
-            unreadable to anyone who cannot separate the two colours
-            (TICKTICK_COMPONENT_06 §6.1), so the flag stays. */}
-        {showPriority && task.priority !== "none" ? (
-          <span
-            className={`tm-task-priority is-${task.priority}`}
-            aria-label={t(`priority.${task.priority}`)}
-            title={t(`priority.${task.priority}`)}
-          >
-            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-              <path d="M6 21V4h11l-2.2 4L17 12H6" fill="currentColor" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-            </svg>
-          </span>
-        ) : null}
+        {/* The flag that was here is gone (TASK_ROW_TWO_LINES_DESIGN.md §2).
+            It was the second channel the priority colour needed — shape as
+            well as hue — and TASK_PRIORITY_CHECKBOX_DESIGN.md Q1 kept it for
+            exactly that reason. The reference app draws no flag; the ask was
+            for its picture, and the level is now in the checkbox's colour and
+            in its accessible NAME, which costs no width. */}
         {/* §1.5: under the title, quiet, one line. Cut to one because a card
             that grows with its body turns a column of three into a column of
             one, which is the question `Kanban Size` is for — the card does not

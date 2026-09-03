@@ -26,6 +26,18 @@ async function openTheTask(page: Page): Promise<void> {
   await expect(page.locator(".tm-drawer")).toBeVisible();
 }
 
+/**
+ * The way out, which is the same gesture on every width again.
+ *
+ * It was not, for a week: the Matrix's Detail opened as a centred modal with a
+ * scrim and no ✕, so this spec had to ask the surface how it closed. The popup
+ * is a popover now — no scrim, and the ✕ is back on every presentation
+ * (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §3.2).
+ */
+async function closeTheTask(page: Page): Promise<void> {
+  await page.locator(".tm-drawer-close").click();
+}
+
 test.describe("a page's address carries its open Task", () => {
   test("opening writes it, closing takes it away", async ({ page }) => {
     await openApp(page);
@@ -37,7 +49,7 @@ test.describe("a page's address carries its open Task", () => {
     expect(taskId).toBeTruthy();
     expect(new URL(page.url()).pathname).toBe("/board");
 
-    await page.locator(".tm-drawer-close").click();
+    await closeTheTask(page);
     await expect(page.locator(".tm-drawer")).toHaveCount(0);
     expect(new URL(page.url()).search).toBe("");
   });
@@ -112,12 +124,20 @@ test.describe("a page's address carries its open Task", () => {
 
     await openApp(page);
     await addTaskOnBoard(page);
+
+    // Back on the Matrix, where this test started. It moved to Focus while the
+    // popup was a modal whose scrim covered the Rail; the popup dims nothing
+    // now (§3.2), so the Rail is reachable with a Task open and the trip is a
+    // trip again — which is also the sharpest way to assert that the scrim is
+    // gone.
     await openTheTask(page);
 
     await page.locator(".global-rail").getByRole("button", { name: "Calendar", exact: true }).click();
     expect(new URL(page.url()).pathname).toBe("/calendar");
-    // The Calendar draws no Detail, so it must not inherit one — neither in
-    // the address nor on screen.
+    // The Calendar draws a Detail of its own now
+    // (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §5) — which makes this
+    // assertion sharper, not weaker: a Task open on one page must not follow
+    // the reader to the next, even to a page that could have shown it.
     expect(new URL(page.url()).search).toBe("");
     await expect(page.locator(".tm-drawer")).toHaveCount(0);
   });

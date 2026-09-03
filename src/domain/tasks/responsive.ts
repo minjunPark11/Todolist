@@ -44,7 +44,14 @@ export const TASK_DETAIL_PRESENTATION = {
 
 /**
  * The fifth presentation, and the only one the map above cannot produce
- * (BOARD_TASK_POPUP_DESIGN.md §4).
+ * (BOARD_TASK_POPUP_DESIGN.md §4; renamed and resized by
+ * CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §3).
+ *
+ * It was `center-modal` — 720x640 in the middle of a dimmed screen. The name
+ * said where it went, and where it goes has changed: beside the row that
+ * opened it, at 440x360, with nothing dimmed behind it. A popup that covers
+ * the board it was opened from answers "show me this task" by taking the
+ * board away.
  *
  * Every entry in that map answers one question — how much room is there — and
  * a centred popup is not an answer to it. It is an answer to a different one:
@@ -57,7 +64,7 @@ export const TASK_DETAIL_PRESENTATION = {
  */
 export type TaskDetailPresentation =
   | (typeof TASK_DETAIL_PRESENTATION)[ResponsiveMode]
-  | "center-modal";
+  | "anchored-popover";
 
 /**
  * Where the Detail was opened FROM — not how it should be drawn (§4.1).
@@ -65,10 +72,19 @@ export type TaskDetailPresentation =
  * Deliberately not the view key. `state.view` grows (`list`, `board`,
  * `timeline`, whatever comes next) and this function must not grow with it:
  * the one fact it needs is whether the surface can yield width, and that is
- * these two words. A future surface that wants the popup joins this union
- * rather than being folded into `"board"`.
+ * these words. A surface that wants the popup joins this union rather than
+ * being folded into `"board"`.
+ *
+ * `matrix` is the second to join. Its four quadrants are one grid that has to
+ * stay four boxes: what a Detail column takes there is not each card's width
+ * but the grid's, and at 1280 the two right-hand quadrants were what paid for
+ * it. The same fact as the Board's columns, arrived at from a different shape,
+ * which is why it is a word of its own rather than a rename.
+ *
+ * `calendar` is the third, and the plainest: a week grid is seven columns of
+ * an hour scale, and a column taken off the right takes a DAY with it.
  */
-export type TaskDetailSurface = "list" | "board";
+export type TaskDetailSurface = "list" | "board" | "matrix" | "calendar";
 
 export function taskDetailPresentationFor(
   mode: ResponsiveMode,
@@ -79,7 +95,7 @@ export function taskDetailPresentationFor(
      Detail owns the screen — is already the right one there. `detail-full`
      hangs off it too, so leaving mobile alone is what keeps that class's
      value unchanged by this whole change. */
-  if (surface === "board" && mode !== "mobile") return "center-modal";
+  if (surface !== "list" && mode !== "mobile") return "anchored-popover";
   return TASK_DETAIL_PRESENTATION[mode];
 }
 

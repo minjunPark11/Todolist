@@ -8,6 +8,7 @@ import { useTaskCommands } from "./hooks/useTaskCommands";
 import { useTaskDetailWidth } from "./hooks/useTaskDetailWidth";
 import { useResponsiveMode } from "./components/tasks/useResponsiveMode";
 import { taskDetailPresentationFor } from "./domain/tasks/responsive";
+import type { Rect } from "./domain/floating";
 import { GlobalFocusBar } from "./components/GlobalFocusBar";
 import { UpdateChecker } from "./components/UpdateChecker";
 import { SettingsRow } from "./components/SettingsPage";
@@ -255,7 +256,18 @@ export default function App() {
    * Declared above every conditional return below, because these are hooks.
    */
   const detailWidth = useTaskDetailWidth();
-  const detailPresentation = taskDetailPresentationFor(useResponsiveMode());
+  /** Where the popup opens from (§3.4). View state: no link carries a rect. */
+  const [taskAnchor, setTaskAnchor] = useState<Rect | null>(null);
+  /* The Matrix opens its Tasks in the popup, the way the Board does
+     (`responsive.ts`, `TaskDetailSurface`). `activePage === "board"` IS the
+     Eisenhower page — the id predates the Board view and has stayed for the
+     sake of the addresses people have kept. The Focus page, the other caller
+     of `renderTaskDetail`, is a single column of its own and can still give up
+     the width, so it keeps the column. */
+  const detailPresentation = taskDetailPresentationFor(
+    useResponsiveMode(),
+    activePage === "board" ? "matrix" : activePage === "calendar" ? "calendar" : "list",
+  );
   const taskDetailBundle: TaskDetailBundle = {
     // Both kinds of child, through the reader that already knows there are
     // two: legacy `Subtask` rows and the child Tasks `addSubtask` has been
@@ -294,35 +306,8 @@ export default function App() {
     tasks: planner.tasks,
     focusBusy: Boolean(planner.activeFocusSession),
     onMutate: planner.updateTask,
-    onDuplicate: (taskId) => {
-      const plan = planner.duplicateTask(taskId);
-      if (!plan) return null;
-      // The copy takes the Detail, which is what `duplicateTask` used to do
-      // for itself by setting the planner's selection. That selection is gone;
-      // the address does it instead, and only where there is a Detail to take.
-      if (openedTaskId) openTaskOnPage(plan.rootId);
-      return () => planner.discardDuplicate(plan);
-    },
-    onSaveAsTemplate: (taskId) => planner.saveTaskAsTemplate(taskId)?.id ?? "",
-    onDeleteTemplate: planner.deleteTaskTemplate,
     onStartFocus: (taskId) => planner.startFocusSession(taskId, "today_page"),
     onDeleteForever: planner.permanentlyDeleteTask,
-    /**
-     * §15.19's link — now this page's own address.
-     *
-     * It used to point at the Module (`/today?task=…`) because these pages
-     * kept the open Task in memory and had no address that would reopen it.
-     * They have one now, so the link is the page the reader is actually on:
-     * copying from the Matrix hands back the Matrix, with that Task open.
-     */
-    // Only a PAGE reaches this: the Module hands the commands its own
-    // `linkFor` (a Scope address with `?task=`). The fallback is the address
-    // the reader is on, which is what a copied link should be when the page
-    // cannot name itself.
-    linkFor: (taskId) =>
-      `${window.location.origin.replace(/\/$/, "")}${
-        activePage ? pageUrlFor(activePage, taskId) : window.location.pathname
-      }`,
   });
   const focusNow = useNowTick(Boolean(planner.activeFocusSession && planner.activeFocusSession.status === "running"));
   const activeFocusTask = planner.activeFocusSession
@@ -607,12 +592,15 @@ export default function App() {
    * closing so Escape on a page with nothing open does not stack an entry for
    * a keystroke that changed nothing.
    */
-  function openTaskOnPage(taskId: string) {
+  /** §3.4: the popup opens beside what was clicked, so the click says where. */
+  function openTaskOnPage(taskId: string, anchor?: Rect) {
     if (!activePage) return;
+    setTaskAnchor(anchor ?? null);
     navigateUrl(pageUrlFor(activePage, taskId));
   }
 
   function closeTaskOnPage() {
+    setTaskAnchor(null);
     if (!openedTaskId || !activePage) return;
     navigateUrl(pageUrlFor(activePage));
   }
@@ -1023,20 +1011,6 @@ export default function App() {
     });
   }
 
-  function handleDuplicateTask(taskId: string) {
-    const plan = planner.duplicateTask(taskId);
-    showToast({
-      message: t("app.toastTaskDuplicated"),
-      // `discardDuplicate` and not `deleteTask`: the copy can be a subtree
-      // now (§15.13), and `deleteTask` promotes a deleted parent's children
-      // to the top level — which would leave the copies behind as loose root
-      // Tasks after an Undo that claimed to remove them.
-      ...(plan
-        ? { actionLabel: t("app.undo"), onAction: () => planner.discardDuplicate(plan) }
-        : {}),
-    });
-  }
-
   // Deletion is permanent in the store, so the rows are captured first and the
   // toast hands back a targeted restore — undoing one delete never rolls back
   // whatever else the user did while the toast was up.
@@ -1388,25 +1362,6 @@ export default function App() {
           onEmptyTrash={planner.emptyTrash}
           scopeViewOptions={appSettings.scopeViewOptions}
           onSetScopeViewOptions={(scopeViewOptions) => planner.updateAppSettings({ scopeViewOptions })}
-          onDuplicate={(taskId) => {
-            const plan = planner.duplicateTask(taskId);
-            return plan ? () => planner.discardDuplicate(plan) : null;
-          }}
-          onSaveAsTemplate={(taskId) => planner.saveTaskAsTemplate(taskId)?.id ?? ""}
-          onDeleteTemplate={planner.deleteTaskTemplate}
-          templates={planner.taskTemplates}
-          // §25.8 through §12.16: the template says what to make and the
-          // resolver has already said where. Same owner, same status rule and
-          // same tag application as a Task typed into the field beside it.
-          onUseTemplate={(templateId, resolution) => {
-            if (!resolution.targetListId) return;
-            const owner = planner.lists.find((list) => list.id === resolution.targetListId);
-            planner.createTaskFromTemplate(templateId, {
-              listId: resolution.targetListId,
-              projectId: owner?.projectId ?? "",
-              status: owner?.kind === "inbox" ? "inbox" : "todo",
-            });
-          }}
           focusBusy={Boolean(planner.activeFocusSession)}
           error={planner.auth.syncError}
           draftTitle={capturedTitle}
@@ -1492,6 +1447,7 @@ export default function App() {
       <TaskDetailPane
         task={openedTask}
         presentation={detailPresentation}
+        anchor={taskAnchor}
         resize={detailWidth}
         today={today}
         tasks={planner.tasks}

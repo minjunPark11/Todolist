@@ -135,9 +135,11 @@ test.describe("what a Task row can do", () => {
     await page.goto(`/list/${LIST.id}`);
     await addTask(page, "Urgent thing");
 
-    // Nothing is flagged until something is High: a flag on every row is the
-    // same as no flag at all.
+    // The row says the level in its checkbox and nowhere else
+    // (TASK_ROW_TWO_LINES_DESIGN.md §2) — the flag that used to sit after the
+    // title is gone. Until something is set, the box is the plain one.
     await expect(page.locator(".tm-task-priority")).toHaveCount(0);
+    await expect(page.locator(".tm-task .tm-check")).toHaveClass(/is-none/);
 
     await page.getByRole("button", { name: "Open Urgent thing" }).click();
     // Priority is a flag that opens a popover now, not a `<select>` (§8.2,
@@ -146,10 +148,75 @@ test.describe("what a Task row can do", () => {
     await page.getByRole("button", { name: "Set priority" }).click();
     await page.getByRole("listbox", { name: "Priority" }).getByRole("option", { name: "High" }).click();
 
-    const flag = page.locator(".tm-task-priority");
-    await expect(flag).toHaveCount(1);
-    await expect(flag).toHaveClass(/is-high/);
-    await expect(flag).toHaveAttribute("aria-label", "High");
+    // Two channels, both on the box: the colour, and the accessible name —
+    // which is what a screen reader and a forced-colours display are left with
+    // now that the flag has gone.
+    const box = page.locator(".tm-task .tm-check");
+    await expect(box).toHaveClass(/is-high/);
+    await expect(box).toHaveAttribute("aria-label", "Complete Urgent thing (High)");
+    await expect(page.locator(".tm-task-priority")).toHaveCount(0);
+  });
+
+  // TASK_ROW_TWO_LINES_DESIGN.md §3. `Show details` drew the body's first line
+  // under the title — except the row is one flex line that does not wrap, so a
+  // body asking for 100% of it left the title at its own basis of 0. The row
+  // rendered as a grey body with NO TITLE, and every existing assertion passed:
+  // they ask whether the span is in the document, and it was.
+  //
+  // So this one measures. A title that is in the DOM and 0px wide is the bug.
+  test("Show details puts the body under the title, not over it", async ({ page }) => {
+    await openApp(page, { lists: [LIST] });
+    await page.goto(`/list/${LIST.id}`);
+    await addTask(page, "Has a body");
+
+    await page.getByRole("button", { name: "Open Has a body" }).click();
+    const body = page.getByRole("textbox", { name: "Description" });
+    await body.fill("the first line");
+    await body.blur();
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: "View and options" }).click();
+    await page.getByRole("menuitem", { name: "Show details" }).click();
+
+    const title = page.locator(".tm-task-title");
+    const line = page.locator(".tm-task-body");
+    await expect(line).toHaveText("the first line");
+
+    const titleBox = await title.boundingBox();
+    const lineBox = await line.boundingBox();
+    expect(titleBox, "the title is still drawn").not.toBeNull();
+    expect(titleBox!.width, "the title kept its width").toBeGreaterThan(0);
+    // Under it, and starting at the same edge — not beside it, and not
+    // indented under the checkbox.
+    expect(lineBox!.y).toBeGreaterThan(titleBox!.y + titleBox!.height - 1);
+    expect(Math.abs(lineBox!.x - titleBox!.x)).toBeLessThan(2);
+  });
+});
+
+// TASK_ROW_TWO_LINES_DESIGN.md §1. A Folder's screen is divided by its Lists,
+// and both the last row of a group and the next group's heading were drawing a
+// line — one boundary with two owners, 12px apart.
+test.describe("a Folder's groups", () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 1024, "the desktop list is where the groups are drawn");
+
+  test("are divided by one line, not two", async ({ page }) => {
+    await openApp(page, {
+      folders: [{ id: "folder-1", name: "School" }],
+      lists: [
+        { id: "list-a", name: "A", sidebarFolderId: "folder-1" },
+        { id: "list-b", name: "B", sidebarFolderId: "folder-1" },
+      ],
+    });
+    await page.goto("/folder/folder-1");
+    // A Folder with nothing in it draws its empty state instead of its groups,
+    // and one task is enough to put every group on screen — a group exists
+    // because the List does, not because it has work in it.
+    await addTask(page, "Something to hold the screen open");
+
+    const second = page.locator(".tm-listgroup").nth(1);
+    await expect(second).toBeVisible();
+    // The line that stays is the row's `border-bottom`; the group draws none.
+    await expect(second).toHaveCSS("border-top-width", "0px");
   });
 });
 
@@ -185,5 +252,54 @@ test.describe("the row under a finger", () => {
     expect(geometry.box).toBeLessThan(17);
     // A handle revealed on hover is useless where there is no hover.
     expect(geometry.handleShown).toBe(false);
+  });
+});
+
+// CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §3. The popup was a centred modal
+// over a scrim for a week; what it is now — a popover beside the row, dimming
+// nothing — is a geometry claim, and geometry is what a browser is for.
+test.describe("the Task popup", () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 1024, "the popup is a desktop presentation");
+
+  test("opens beside the card it was opened from, and dims nothing", async ({ page }) => {
+    await openApp(page, { lists: [LIST] });
+    await page.goto(`/list/${LIST.id}?view=board`);
+    await addTask(page, "Beside me");
+
+    // The anchor is the row's own button — the element the click landed on,
+    // which is inset from the card by its padding (§3.4).
+    const opener = page.getByRole("button", { name: "Open Beside me" });
+    const openerBox = (await opener.boundingBox())!;
+    await opener.click();
+
+    const popup = page.locator(".tm-drawer.is-anchored-popover");
+    await expect(popup).toBeVisible();
+    const box = (await popup.boundingBox())!;
+
+    // §3.3's measured size, and §3.4's placement: to the right of the card,
+    // not over the middle of the screen.
+    expect(Math.round(box.width)).toBe(440);
+    expect(Math.round(box.height)).toBeLessThanOrEqual(360);
+    expect(box.x).toBeGreaterThanOrEqual(openerBox.x + openerBox.width);
+
+    // No scrim: the board behind it is not dimmed, and the ✕ is back because
+    // there is no scrim to press instead.
+    await expect(page.locator(".tm-drawer-scrim")).toHaveCount(0);
+    await expect(popup.locator(".tm-drawer-close")).toBeVisible();
+  });
+
+  test("leaves the rest of the page clickable", async ({ page }) => {
+    await openApp(page, { lists: [LIST] });
+    await page.goto(`/list/${LIST.id}?view=board`);
+    await addTask(page, "First");
+    await addTask(page, "Second");
+
+    await page.getByRole("button", { name: "Open First" }).click();
+    await expect(page.locator(".tm-drawer.is-anchored-popover")).toBeVisible();
+
+    // The modal's scrim ate this click. Straight from one Task to the next is
+    // what a popover allows and a modal does not.
+    await page.getByRole("button", { name: "Open Second" }).click();
+    await expect(page.locator(".tm-drawer .tm-drawer-title")).toHaveValue("Second");
   });
 });

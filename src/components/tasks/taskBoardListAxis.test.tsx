@@ -79,7 +79,6 @@ function renderBoard(
           onDeleteForever={() => {}}
           onEmptyTrash={() => ({ tasks: 0, lists: 0, tasksWithLists: 0 })}
           onSetScopeViewOptions={() => {}}
-          onDuplicate={() => null}
           focusBusy={false}
           onCreate={() => {}}
           draftTitle=""
@@ -110,10 +109,6 @@ function renderBoard(
             onRestoreList: () => {},
             onPermanentlyDeleteList: () => {},
           }}
-          onSaveAsTemplate={() => "tpl-1"}
-          onDeleteTemplate={() => {}}
-          templates={[]}
-          onUseTemplate={() => {}}
           onMutate={onMutate}
         />
       </FloatingLayerProvider>

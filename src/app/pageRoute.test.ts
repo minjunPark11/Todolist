@@ -148,7 +148,7 @@ describe("pageRoute", () => {
   // TASK_DETAIL_PANEL_MERGE_DESIGN.md §8. The Detail used to live in
   // `usePlannerData`, where a reload lost it and Back walked past it.
   describe("the open Task in a page's address", () => {
-    const HOLDERS: PageId[] = ["board", "focus"];
+    const HOLDERS: PageId[] = ["board", "focus", "calendar"];
 
     it("round-trips on every page that draws a Detail", () => {
       for (const page of HOLDERS) {
@@ -162,12 +162,12 @@ describe("pageRoute", () => {
       }
     });
 
-    // Calendar and Settings render no pane, so a `?task=` on either would be a
-    // promise the page cannot keep. It is neither written nor read.
+    // Settings renders no pane, so a `?task=` on it would be a promise the
+    // page cannot keep. It is neither written nor read. The Calendar left this
+    // list when its blocks began opening the app's own Detail
+    // (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §5).
     it("refuses the pages that draw no Detail", () => {
-      expect(pageUrlFor("calendar", "t1")).toBe(PAGE_ROUTES.calendar);
       expect(pageUrlFor("settings", "t1")).toBe(PAGE_ROUTES.settings);
-      expect(taskIdForPageUrl("/calendar?task=t1")).toBe("");
       expect(taskIdForPageUrl("/settings?task=t1")).toBe("");
     });
 

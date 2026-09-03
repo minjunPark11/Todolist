@@ -98,7 +98,7 @@ test.describe("the Task Detail column", () => {
     await expect(page).toHaveURL(/task=/);
     // Drawn OVER the Board rather than beside it, which is what makes the
     // width answer possible.
-    await expect(page.locator(".tm-drawer.is-center-modal")).toBeVisible();
+    await expect(page.locator(".tm-drawer.is-anchored-popover")).toBeVisible();
 
     const after = Math.round((await board.boundingBox())?.width ?? 0);
     // Exact, not approximate: a pixel of movement here would mean the popup is

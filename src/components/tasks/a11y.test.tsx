@@ -146,16 +146,11 @@ function renderModule(url: string) {
             onRestoreList: () => {},
             onPermanentlyDeleteList: () => {},
           }}
-          onSaveAsTemplate={() => "tpl-1"}
-          onDeleteTemplate={() => {}}
-          templates={[]}
-          onUseTemplate={() => {}}
           onMutate={() => {}}
           onStartFocus={() => {}}
           onDeleteForever={() => {}}
           onEmptyTrash={() => ({ tasks: 0, lists: 0, tasksWithLists: 0 })}
           onSetScopeViewOptions={() => {}}
-          onDuplicate={() => null}
           focusBusy={false}
         />
       </FloatingLayerProvider>

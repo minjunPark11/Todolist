@@ -147,3 +147,82 @@ describe("Escape peels one layer at a time (§4.2)", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 });
+
+// SCHEDULE_TIME_FIELD_DESIGN.md §13. Three asks that are one behaviour: a time
+// you choose is a time you are finished choosing.
+describe("choosing a time is the end of it (§13.2)", () => {
+  it("folds the row and writes what was chosen", async () => {
+    const { user } = setup();
+    await user.click(row(/^Time/));
+
+    const options = screen.getAllByRole("option");
+    await user.click(options.find((option) => option.textContent === "1:00 PM")!);
+
+    // The field is gone: the row is a summary again, and the summary is the
+    // value. Before §13.2 the field stayed open and grew a second one.
+    expect(screen.queryByRole("combobox", { name: "Starts" })).toBeNull();
+    expect(row(/1:00 PM/)).toBeTruthy();
+  });
+
+  it("asks no second question — no 종료 field appears", async () => {
+    const { user } = setup();
+    await user.click(row(/^Time/));
+
+    const options = screen.getAllByRole("option");
+    await user.click(options.find((option) => option.textContent === "1:00 PM")!);
+    // ...and not even after reopening the row: an end is drawn only where one
+    // already exists (D1-B).
+    await user.click(row(/1:00 PM/));
+
+    expect(screen.getByRole("combobox", { name: "Starts" })).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Ends" })).toBeNull();
+  });
+
+  it("keeps an end that is already there editable", async () => {
+    const { user } = setup({ ...DATED, startTime: "09:00", endTime: "17:00" });
+    await user.click(row(/9:00 AM/));
+
+    expect(screen.getByRole("combobox", { name: "Ends" })).toHaveProperty("value", "5:00 PM");
+  });
+
+  it("draws none of the four preset times (§13.1)", async () => {
+    const { user } = setup();
+    await user.click(row(/^Time/));
+
+    expect(document.querySelector(".sched-time-presets")).toBeNull();
+    expect(screen.queryByRole("button", { name: "9:00 AM" })).toBeNull();
+  });
+});
+
+// §13.3. The stylesheet paints the colour; what this file can hold is which
+// rows are told they have an answer in them.
+describe("a row the reader has answered says so (§13.3)", () => {
+  const isSet = (name: RegExp) => row(name).className.includes("is-set");
+
+  it("marks none of the three on an empty schedule", () => {
+    setup();
+    expect(isSet(/^Time/)).toBe(false);
+    expect(isSet(/^Reminder/)).toBe(false);
+    expect(isSet(/^Repeat/)).toBe(false);
+  });
+
+  it("marks the time once there is one", () => {
+    setup({ ...DATED, startTime: "13:00" });
+    expect(isSet(/1:00 PM/)).toBe(true);
+    expect(isSet(/^Reminder/)).toBe(false);
+  });
+
+  it("marks the reminder once one is set", () => {
+    setup({ ...DATED, reminders: [{ type: "relative", offsetMinutes: 0, absoluteAt: null, allDayTime: null, enabled: true }] });
+    expect(isSet(/^Reminder/)).toBe(true);
+  });
+
+  it("marks the repeat, but not for `없음`", () => {
+    setup({ ...DATED, repeat: "weekly" });
+    expect(isSet(/^Repeat/)).toBe(true);
+
+    cleanup();
+    setup({ ...DATED, repeat: "none" });
+    expect(isSet(/^Repeat/)).toBe(false);
+  });
+});

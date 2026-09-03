@@ -162,7 +162,8 @@ export function FocusPage({
 
   return (
     <div className="foc-page">
-      <header className="foc-header">
+      {/* Doubles as the window caption on the desktop build (§3.3). */}
+      <header className="foc-header" data-tauri-drag-region>
         <div>
           <h1>Focus</h1>
           <p>{t("focus.subtitle")}</p>

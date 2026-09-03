@@ -24,7 +24,21 @@ export function anchorFromRect(rect: DOMRect): PopoverAnchor {
   return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
 }
 
-const POPOVER_WIDTH = 280;
+/**
+ * Two sizes, because two things use this shell
+ * (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §2.2).
+ *
+ * `summary` is the event card — a title, a date, one button. `form` is the new
+ * task form, which is five rows and two buttons and did not fit: the shell's
+ * 340px cap cut its Confirm button off the bottom, and the reader had to
+ * scroll a popover to reach the control that finishes what they started.
+ *
+ * The width lives here rather than in CSS because the placement below reads
+ * it — a stylesheet that widened the form alone would leave it hanging 40px
+ * off the right edge on a card near the window's edge.
+ */
+const POPOVER_WIDTH = { summary: 280, form: 320 } as const;
+export type CalendarPopoverSize = keyof typeof POPOVER_WIDTH;
 const MARGIN = 8;
 
 export function CalendarPopover({
@@ -32,11 +46,13 @@ export function CalendarPopover({
   onClose,
   children,
   label,
+  size = "summary",
 }: {
   anchor: PopoverAnchor;
   onClose: () => void;
   children: ReactNode;
   label: string;
+  size?: CalendarPopoverSize;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
@@ -51,13 +67,14 @@ export function CalendarPopover({
     function place() {
       if (!el) return;
       const height = el.offsetHeight;
+      const width = POPOVER_WIDTH[size];
       let left = anchor.right + MARGIN;
-      if (left + POPOVER_WIDTH > window.innerWidth - MARGIN) {
-        left = anchor.left - POPOVER_WIDTH - MARGIN;
+      if (left + width > window.innerWidth - MARGIN) {
+        left = anchor.left - width - MARGIN;
       }
       let top = anchor.top;
       if (left < MARGIN) {
-        left = Math.min(Math.max(anchor.left, MARGIN), window.innerWidth - POPOVER_WIDTH - MARGIN);
+        left = Math.min(Math.max(anchor.left, MARGIN), window.innerWidth - width - MARGIN);
         top = anchor.bottom + MARGIN;
       }
       left = Math.max(left, MARGIN);
@@ -68,7 +85,7 @@ export function CalendarPopover({
     const observer = new ResizeObserver(place);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [anchor]);
+  }, [anchor, size]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -93,7 +110,7 @@ export function CalendarPopover({
   return (
     <motion.div
       ref={ref}
-      className="gcal-popover"
+      className={`gcal-popover is-${size}`}
       role="dialog"
       aria-label={label}
       data-calendar-interactive="true"
@@ -103,7 +120,7 @@ export function CalendarPopover({
       exit={motionEnabled ? "exit" : undefined}
       transition={motionEnabled ? transitions.fast : reducedTransition}
       style={{
-        width: POPOVER_WIDTH,
+        width: POPOVER_WIDTH[size],
         left: position?.left ?? -9999,
         top: position?.top ?? -9999,
         visibility: position ? "visible" : "hidden",

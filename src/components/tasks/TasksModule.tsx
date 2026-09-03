@@ -18,7 +18,6 @@ import type {
   Task,
   TaskDailyPlan,
   TaskTag,
-  TaskTemplate,
 } from "../../types";
 import type { TaskScopeRef, TaskViewKind } from "../../domain/tasks/scopeRegistry";
 import { scopeRegistry } from "../../domain/tasks/scopeRegistry";
@@ -34,6 +33,7 @@ import { taskLinkFor } from "../../app/taskLink";
 import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { namedRecordMissing, titleFor } from "../../domain/tasks/scopeTitle";
 import { useT } from "../../i18n";
+import type { Rect } from "../../domain/floating";
 import { TasksSidebarSlot } from "../shell/TasksSidebarSlot";
 import { TaskQuickAdd } from "./TaskQuickAdd";
 import { TaskDetailPane } from "./TaskDetailPane";
@@ -246,26 +246,6 @@ interface TasksModuleProps {
   collapsedFolderIds?: string[];
   onToggleFolder?: (folderId: string) => void;
   /**
-   * §15.9's Duplicate. Makes the copy and hands back the way to take it back.
-   *
-   * A callback rather than the new id, because undoing a Duplicate is not a
-   * patch to one Task: it removes a whole copied subtree with its checklist
-   * and its Tag relations, and only the store knows which records those were
-   * (§15.57). Null when there was nothing to copy.
-   */
-  onDuplicate: (taskId: string) => (() => void) | null;
-  /**
-   * §25.8. Saves the Task's shape and answers with the template's id.
-   *
-   * An id rather than a callback, unlike Duplicate above, because taking this
-   * back is one record by one id — there is no subtree to work out.
-   */
-  onSaveAsTemplate: (taskId: string) => string;
-  onDeleteTemplate: (templateId: string) => void;
-  /** §25.8's saved shapes, offered by Quick Add. */
-  templates: TaskTemplate[];
-  onUseTemplate: (templateId: string, resolution: CreateResolution) => void;
-  /**
    * True while a focus session is already running or paused.
    *
    * `startFocusSession` returns without doing anything when one is, so the
@@ -329,6 +309,8 @@ export function TasksModule(props: TasksModuleProps) {
 
   /** The row being dragged, so the ones under it know a drop is coming. */
   const [dragTaskId, setDragTaskId] = useState("");
+  /** Where the popup opens from (§3.4) — the rect of the row that was clicked. */
+  const [taskAnchor, setTaskAnchor] = useState<Rect | null>(null);
   /** The open context menu, or none. One at a time, like the notice above it. */
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   /**
@@ -530,11 +512,22 @@ export function TasksModule(props: TasksModuleProps) {
 
   // Opening the Drawer is a push and closing it is a pop, which is what makes
   // one Back close it (§16.28 Gate 5) rather than leave the Scope behind.
-  function openTask(taskId: string) {
+  /**
+   * §3.4: the popup opens beside what was clicked, so what was clicked says
+   * where it is.
+   *
+   * View state and not URL state, deliberately. The address answers "which
+   * Task"; a rectangle is where the reader's pointer happened to be, which
+   * belongs in no link and survives no reload — and does not need to: with no
+   * anchor the popup centres itself.
+   */
+  function openTask(taskId: string, anchor?: Rect) {
+    setTaskAnchor(anchor ?? null);
     onNavigate(taskUrlFor({ ...state, taskId }));
   }
 
   function closeTask() {
+    setTaskAnchor(null);
     onNavigate(taskUrlFor({ ...state, taskId: "" }));
   }
 
@@ -605,12 +598,8 @@ export function TasksModule(props: TasksModuleProps) {
     tasks,
     focusBusy: props.focusBusy,
     onMutate: props.onMutate,
-    onDuplicate: props.onDuplicate,
-    onSaveAsTemplate: props.onSaveAsTemplate,
-    onDeleteTemplate: props.onDeleteTemplate,
     onStartFocus: props.onStartFocus,
     onDeleteForever: props.onDeleteForever,
-    linkFor: (taskId) => taskLinkFor(window.location.origin, state, taskId),
   });
   // Pulled out by name because the rows and the two menus below call them on
   // every line; the Detail takes `commands` whole.
@@ -1270,7 +1259,12 @@ export function TasksModule(props: TasksModuleProps) {
           />
         ) : (
         <>
-        <header className="tm-header">
+        {/* The window's caption row on the desktop build, and an ordinary
+            header everywhere else (WINDOW_TOP_ROW_DESIGN.md §3.3). Tauri reads
+            the attribute off the element under the pointer, so the title's ⋯
+            and the buttons inside still take their own clicks — what drags the
+            window is the space between them. */}
+        <header className="tm-header" data-tauri-drag-region>
           {/* §15.23: the way back to navigation, where the Sidebar is not a
               column. Absent on desktop, where it would open what is already
               open. */}
@@ -1354,8 +1348,6 @@ export function TasksModule(props: TasksModuleProps) {
             folders={sidebarFolders}
             tags={tags}
             savedFilters={savedFilters}
-            templates={props.templates}
-            onUseTemplate={props.onUseTemplate}
             draftTitle={props.draftTitle}
             onCreate={(title, resolution) => {
               props.onDraftConsumed();
@@ -1572,6 +1564,7 @@ export function TasksModule(props: TasksModuleProps) {
       {openedTask ? (
         <TaskDetailPane
           task={openedTask}
+          anchor={taskAnchor}
           /* The one line the Board popup changes (BOARD_TASK_POPUP_DESIGN.md
              §8, step 2). The surface, not the view key: what the registry
              needs to know is whether what is underneath can give up width,

@@ -70,6 +70,7 @@ import { MotionDropZone } from "./motion/MotionDropZone";
 import { MotionTaskRow } from "./motion/MotionTaskRow";
 import { TaskRowContent } from "./tasks/TaskRowContent";
 import { useT } from "../i18n";
+import type { Rect } from "../domain/floating";
 
 const ALL_LISTS = "";
 
@@ -78,7 +79,7 @@ interface MatrixPageProps {
   tasks: Task[];
   lists: List[];
   selectedTaskId: string;
-  onOpenTask: (id: string) => void;
+  onOpenTask: (id: string, anchor?: Rect) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: { title: string; listId?: string; priority?: TaskPriority; dueDate?: string; status?: Task["status"] }) => string;
   onToggleDone: (id: string) => void;
@@ -387,7 +388,8 @@ export function MatrixPage({
 
   return (
     <div className="ff-page ff-matrix-page">
-      <header className="ff-page-head">
+      {/* Doubles as the window caption on the desktop build (§3.3). */}
+      <header className="ff-page-head" data-tauri-drag-region>
         {/* No subtitle. It described the rule — "priority decides the box,
             dragging changes priority" — which §23 made editable and therefore
             made it a sentence that can be false about the boxes below it. */}
@@ -529,7 +531,7 @@ function QuadrantCell({
   today: string;
   selectedTaskId: string;
   draggingId: string;
-  onOpenTask: (id: string) => void;
+  onOpenTask: (id: string, anchor?: Rect) => void;
   onToggleDone: (id: string) => void;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
@@ -693,7 +695,7 @@ function UnmatchedStrip({
   today: string;
   selectedTaskId: string;
   draggingId: string;
-  onOpenTask: (id: string) => void;
+  onOpenTask: (id: string, anchor?: Rect) => void;
   onToggleDone: (id: string) => void;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
@@ -734,7 +736,7 @@ function UnmatchedStrip({
               today={today}
               selected={task.id === selectedTaskId}
               isDragging={task.id === draggingId}
-              onOpen={() => onOpenTask(task.id)}
+              onOpen={(_id, anchor) => onOpenTask(task.id, anchor)}
               onToggleDone={() => onToggleDone(task.id)}
               onDragStart={() => onDragStart(task.id)}
               onDragEnd={onDragEnd}
@@ -828,7 +830,7 @@ function MatrixGroupSection({
   today: string;
   selectedTaskId: string;
   draggingId: string;
-  onOpenTask: (id: string) => void;
+  onOpenTask: (id: string, anchor?: Rect) => void;
   onToggleDone: (id: string) => void;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
@@ -874,7 +876,7 @@ function MatrixGroupSection({
                 today={today}
                 selected={task.id === selectedTaskId}
                 isDragging={task.id === draggingId}
-                onOpen={() => onOpenTask(task.id)}
+                onOpen={(_id, anchor) => onOpenTask(task.id, anchor)}
                 onToggleDone={() => onToggleDone(task.id)}
                 onDragStart={() => onDragStart(task.id)}
                 onDragEnd={onDragEnd}
@@ -923,7 +925,7 @@ function MatrixCard({
   today: string;
   selected: boolean;
   isDragging: boolean;
-  onOpen: () => void;
+  onOpen: (taskId: string, anchor?: Rect) => void;
   onToggleDone: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
@@ -958,7 +960,7 @@ function MatrixCard({
         today={today}
         listName={list?.name}
         showPriority={false}
-        onOpen={() => onOpen()}
+        onOpen={onOpen}
         onToggleDone={() => onToggleDone()}
       />
     </MotionTaskRow>

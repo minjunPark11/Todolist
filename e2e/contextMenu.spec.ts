@@ -56,10 +56,11 @@ test.describe("the context menu", () => {
       // Everything but the priorities and the dates comes from the registry
       // in `domain/tasks/actions`, which is also what fills the Detail's ⋯ —
       // §15.63's point being that the two cannot drift apart.
-      "Pin",
-      "Duplicate",
-      "Save as template",
-      "Copy link",
+      //
+      // Pin, Duplicate, Save as template and Copy link led this list until
+      // TASK_MENU_TRIM_DESIGN.md removed the whole `quick` group. Writing the
+      // list out in full is what makes that a test: one of them coming back
+      // breaks this line.
       "Start focus",
       "Task activities",
       "High",
@@ -102,7 +103,9 @@ test.describe("the context menu", () => {
     await page.locator(".tm-task").first().click({ button: "right" });
     await menu(page).getByRole("menuitem", { name: "High" }).click();
     await expect.poll(async () => (await storedTask(page, "Do the thing"))?.priority).toBe("high");
-    await expect(page.locator(".tm-task-priority.is-high")).toBeVisible();
+    // The checkbox is where the row says the level now (the flag is gone,
+    // TASK_ROW_TWO_LINES_DESIGN.md §2).
+    await expect(page.locator(".tm-task .tm-check.is-high")).toBeVisible();
 
     await page.locator(".tm-task").first().click({ button: "right" });
     await menu(page).getByRole("menuitem", { name: "Due today" }).click();

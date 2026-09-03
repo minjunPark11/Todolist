@@ -27,7 +27,8 @@ export function CalendarToolbar({
 }: CalendarToolbarProps) {
   const { t } = useT();
   return (
-    <div className="gcal-toolbar">
+    // Doubles as the window caption on the desktop build (§3.3).
+    <div className="gcal-toolbar" data-tauri-drag-region>
       <div className="gcal-toolbar-left">
         <button
           type="button"

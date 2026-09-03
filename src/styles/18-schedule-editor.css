@@ -11,11 +11,15 @@
  * themes, and a hardcoded white here is the one thing that would make it a
  * bright rectangle in the dark one. */
 
+/* A coloured sentence with an icon, not a chip in a box (§4). The border and
+   the fill made it the loudest thing in a header whose job is to be quiet
+   until something is late — and `is-late` below still says that, in red, with
+   the same words. */
 .sched-trigger {
-  border: 1px solid var(--accent);
+  border: 1px solid transparent;
   border-radius: 8px;
-  padding: 5px 12px;
-  background: var(--accent-soft);
+  padding: 5px 8px;
+  background: transparent;
   color: var(--accent);
   font: inherit;
   font-weight: 500;
@@ -29,8 +33,6 @@
    the counter's alone: the date and the number are one statement, and
    colouring half of it would read as two. */
 .sched-trigger.is-late {
-  border-color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
   color: var(--danger);
 }
 
@@ -42,16 +44,15 @@
 /* `:not(.is-readonly)` because the read-only twin is a `<span>` carrying
    the same class, and a class selector does not care which element it is on
    (Trash §14). */
+/* The surface appears on hover — where "this opens something" is the question
+   being asked, and the same answer the title and the body give (§4). */
 .sched-trigger:not(.is-readonly):hover {
-  background: var(--accent-active);
+  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
 }
 
 /* Nothing set yet: the chip recedes to a placeholder rather than advertising
  * an accent colour for a field that holds nothing. */
 .sched-trigger.is-empty {
-  border-color: var(--border-subtle);
-  border-style: dashed;
-  background: transparent;
   color: var(--text-tertiary);
   font-weight: 400;
 }
@@ -361,6 +362,20 @@
   color: var(--text-tertiary);
 }
 
+/* A row the reader has answered (§13.3).
+   ==========================================================================
+   Every value was `--text-tertiary` whatever it said, so `없음` and `매주` and
+   `오후 11:00` were the same grey — the editor could not be read at a glance
+   for what had been set on this task.
+
+   The icon and the value, not the label: the label is this row's fixed
+   question and the value is the reader's own answer, and the colour means
+   "there is something of mine in here". */
+.sched-row.is-set .sched-row-icon,
+.sched-row.is-set .sched-row-value {
+  color: var(--accent);
+}
+
 .sched-row-chevron {
   color: var(--text-tertiary);
   transition: transform 120ms ease-out;
@@ -592,28 +607,9 @@
 /* Four across rather than two-by-two. In the old panel this had a screen to
    itself; inside the row it sits between two fields, and two rows of buttons
    there push 알림 and 반복 further than the answer is worth. */
-.sched-time-presets {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.sched-time-presets button {
-  padding: 7px 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.sched-time-presets button.is-active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
+/* `.sched-time-presets` (09:00 · 13:00 · 18:00 · 21:00) was here — see §13.1.
+   The list under the field offers every one of them and now ends the same way:
+   one press, and the row closes. */
 
 .sched-choices {
   display: flex;

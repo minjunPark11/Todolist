@@ -16,16 +16,13 @@ import type { TaskMutation } from "../domain/tasks/mutations";
 import {
   completeTask,
   markWontDo,
-  pinTask,
   reopenTask,
   restoreTask,
   trashTask,
   unmarkWontDo,
-  unpinTask,
 } from "../domain/tasks/mutations";
 import { canRunTaskAction, type TaskActionId } from "../domain/tasks/actions";
 import { isCompleted } from "../domain/tasks/taskState";
-import { copyText } from "../lib/copyText";
 
 /**
  * What just happened, and the way back from it if there is one.
@@ -56,11 +53,6 @@ export interface TaskCommandsInput {
   /** True while a focus session is already running or paused (§15.5). */
   focusBusy: boolean;
   onMutate: (taskId: string, patch: Partial<Task>) => void;
-  /** §15.9. Makes the copy and hands back the way to take it back (§15.57). */
-  onDuplicate: (taskId: string) => (() => void) | null;
-  /** §25.8. Saves the Task's shape and answers with the template's id. */
-  onSaveAsTemplate: (taskId: string) => string;
-  onDeleteTemplate: (templateId: string) => void;
   /** §25.6's entry point, and only that — the engine owns everything after. */
   onStartFocus: (taskId: string) => void;
   /**
@@ -71,14 +63,6 @@ export interface TaskCommandsInput {
    * the only thing standing between a menu row and a hard delete.
    */
   onDeleteForever: (taskId: string) => void;
-  /**
-   * This Task's deep link, as the surface addresses it (§15.19).
-   *
-   * Handed in because the address is the SURFACE's, not this hook's: the Tasks
-   * module writes `?task=` under a Scope, and a page that keeps the open Task
-   * in memory has a different one to offer. Nothing here can work that out.
-   */
-  linkFor: (taskId: string) => string;
 }
 
 export interface TaskCommands {
@@ -147,22 +131,6 @@ export function useTaskCommands(input: TaskCommandsInput): TaskCommands {
   }
 
   /**
-   * §15.19: the Task's deep link, on the clipboard.
-   *
-   * Not a mutation (§15.58) — nothing about the Task changes, so there is no
-   * patch and nothing to undo, and the strip says so by drawing no Undo
-   * button. §15.21 asks for both outcomes to be reported and §15.22 refuses to
-   * let a refusal end in silence, which is what the URL in the failure notice
-   * is for: it can still be selected and copied by hand.
-   */
-  function copyTaskLink(taskId: string) {
-    const link = input.linkFor(taskId);
-    void copyText(link).then((copied) =>
-      setNotice(copied ? { labelKey: "tasks.linkCopied" } : { labelKey: "tasks.linkCopyFailed", text: link }),
-    );
-  }
-
-  /**
    * The Task is read from the store again rather than taken from the menu that
    * was clicked. §15.67 is the reason: a menu is a picture of the state it
    * opened in, and a sync landing while it hangs there can trash the Task,
@@ -182,10 +150,6 @@ export function useTaskCommands(input: TaskCommandsInput): TaskCommands {
     const now = new Date().toISOString();
 
     switch (id) {
-      case "pin":
-        return mutate(task, pinTask(task, now));
-      case "unpin":
-        return mutate(task, unpinTask(task));
       case "complete":
         return mutate(task, completeTask(task, now));
       case "reopen":
@@ -198,25 +162,6 @@ export function useTaskCommands(input: TaskCommandsInput): TaskCommands {
         return mutate(task, trashTask(task, now));
       case "restore":
         return mutate(task, restoreTask(task));
-      case "saveAsTemplate": {
-        // §25.8: the Task is not changed, so the way back is to delete the
-        // template rather than to patch anything.
-        const template = input.onSaveAsTemplate(task.id);
-        if (template) {
-          setNotice({ labelKey: "tasks.templateSaved", run: () => input.onDeleteTemplate(template) });
-        }
-        return;
-      }
-      case "duplicate": {
-        // §15.54's double-trigger cannot happen from here: the menu closes on
-        // the click that chose the row, and the copy is one synchronous store
-        // write rather than a request that could still be in flight.
-        const discard = input.onDuplicate(task.id);
-        if (discard) setNotice({ labelKey: "tasks.undoDuplicated", run: discard });
-        return;
-      }
-      case "copyLink":
-        return copyTaskLink(task.id);
       case "activities":
         return setActivityTaskId(task.id);
       case "startFocus":

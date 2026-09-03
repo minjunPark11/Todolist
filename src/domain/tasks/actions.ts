@@ -14,7 +14,7 @@
 // `canRunTaskAction` re-asks the availability question at execute time, and a
 // registry made of closures has nothing left to re-ask.
 import type { TaskStateFields } from "./taskState";
-import { isCompleted, isNote, isPinned, isTaskOpen, isTrashed, isWontDo } from "./taskState";
+import { isCompleted, isNote, isTaskOpen, isTrashed, isWontDo } from "./taskState";
 
 /**
  * One id per COMMAND, not per menu row.
@@ -43,11 +43,6 @@ export type TaskActionId =
   | "addTag"
   | "setBlocker"
   | "addNote"
-  | "pin"
-  | "unpin"
-  | "duplicate"
-  | "saveAsTemplate"
-  | "copyLink"
   | "startFocus"
   | "activities"
   | "complete"
@@ -65,10 +60,14 @@ export type TaskActionId =
  * point is that it does not move: a menu whose rows change places between two
  * openings costs the reader the muscle memory that made the menu fast.
  */
-export type TaskActionGroupId = "add" | "quick" | "work" | "status" | "danger";
+/* `quick` was here, and it held all five of the rows this menu no longer has
+   — Pin, Unpin, Duplicate, Save as template, Copy link
+   (TASK_MENU_TRIM_DESIGN.md §1). A group with no members left is a name the
+   next reader would go looking for members of. */
+export type TaskActionGroupId = "add" | "work" | "status" | "danger";
 
 // `add` leads, which is where the reference app's `하위 할일 추가` sits.
-const GROUP_ORDER: readonly TaskActionGroupId[] = ["add", "quick", "work", "status", "danger"];
+const GROUP_ORDER: readonly TaskActionGroupId[] = ["add", "work", "status", "danger"];
 
 export interface TaskAction {
   id: TaskActionId;
@@ -138,11 +137,9 @@ const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
   { id: "addTag", labelKey: "tasks.tags", group: "add" },
   { id: "setBlocker", labelKey: "taskDetail.blockedBy", group: "add" },
   { id: "addNote", labelKey: "taskDetail.notes", group: "add" },
-  { id: "pin", labelKey: "tasks.menu.pin", group: "quick" },
-  { id: "unpin", labelKey: "tasks.menu.unpin", group: "quick" },
-  { id: "duplicate", labelKey: "tasks.menu.duplicate", group: "quick" },
-  { id: "saveAsTemplate", labelKey: "tasks.menu.saveAsTemplate", group: "quick" },
-  { id: "copyLink", labelKey: "tasks.menu.copyLink", group: "quick" },
+  /* Five definitions stood here and the whole `quick` group with them
+     (TASK_MENU_TRIM_DESIGN.md). They were the first thing the menu offered
+     about a Task and none of them was about doing the Task. */
   { id: "startFocus", labelKey: "tasks.menu.startFocus", group: "work" },
   { id: "activities", labelKey: "tasks.menu.activities", group: "work" },
   { id: "complete", labelKey: "tasks.menu.complete", group: "status" },
@@ -168,14 +165,16 @@ const DEFINITIONS: ReadonlyArray<Omit<TaskAction, "disabledReasonKey">> = [
  * possible effect was to rewrite the timestamp that had put it there.
  *
  * Two things are left to do with it — get it back, or stop keeping it — so
- * those are what is offered, together with the two that change nothing. Copy
- * Link survives
- * because §15.58 says it is not a mutation, and a link to a trashed Task is
- * how one person shows another what they are about to restore; Activities
- * survives because it is the surface that says when the Task was thrown away.
+ * those are what is offered, together with the one that changes nothing:
+ * Activities, the surface that says when the Task was thrown away.
+ *
+ * Copy Link was the fourth, kept because a link to a trashed Task is how one
+ * person shows another what they are about to restore. The action is gone
+ * everywhere now (TASK_MENU_TRIM_DESIGN.md §D3) and the address is not — the
+ * URL in the bar still opens the Task; there is no longer a button that puts
+ * it on the clipboard.
  */
 const TRASHED_ACTIONS: readonly TaskActionId[] = [
-  "copyLink",
   "activities",
   "restore",
   "deleteForever",
@@ -204,10 +203,6 @@ function availabilityOf(id: TaskActionId, ctx: TaskActionContext): Availability 
     case "restore":
     case "deleteForever":
       return "hidden";
-    case "pin":
-      return isPinned(task) ? "hidden" : "enabled";
-    case "unpin":
-      return isPinned(task) ? "enabled" : "hidden";
     // A note has nothing to finish (QUICK_ADD_INPUT_BOX_DESIGN.md §7.1), so
     // both halves of the toggle are absent rather than offered and refused.
     case "complete":

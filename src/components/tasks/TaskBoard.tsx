@@ -18,6 +18,7 @@ import { Caret } from "../common/Caret";
 import { useT } from "../../i18n";
 import { COMPLETED_PAGE } from "../../domain/view/viewGroups";
 import { TaskRowContent } from "./TaskRowContent";
+import type { Rect } from "../../domain/floating";
 import type { ScopeDateBy, ScopeKanbanSize } from "../../domain/view/scopeViewOptions";
 
 interface TaskBoardProps {
@@ -27,7 +28,7 @@ interface TaskBoardProps {
   /** Which column a Task is in now — so a drop inside it can be a reorder. */
   columnOf: (task: Task) => string;
   openTaskId: string;
-  onOpen: (taskId: string) => void;
+  onOpen: (taskId: string, anchor?: Rect) => void;
   /** The Board finishes a Task the same way the List does (TICKTICK_COMPONENT_13 §3). */
   onToggleDone: (task: Task) => void;
   /**
@@ -580,7 +581,7 @@ function BoardColumnFinished({
   dateBy?: ScopeDateBy;
   showDetails?: boolean;
   today?: string;
-  onOpen: (taskId: string) => void;
+  onOpen: (taskId: string, anchor?: Rect) => void;
   onToggleDone: (task: Task) => void;
 }) {
   const { t } = useT();

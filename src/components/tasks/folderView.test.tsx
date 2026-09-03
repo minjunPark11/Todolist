@@ -95,7 +95,6 @@ function renderModule(
           onEmptyTrash={() => ({ tasks: 0, lists: 0, tasksWithLists: 0 })}
           scopeViewOptions={extra.scopeViewOptions}
           onSetScopeViewOptions={extra.onSetScopeViewOptions ?? (() => {})}
-          onDuplicate={() => null}
           focusBusy={false}
           onCreate={onCreate}
           draftTitle=""
@@ -126,10 +125,6 @@ function renderModule(
             onRestoreList: () => {},
             onPermanentlyDeleteList: () => {},
           }}
-          onSaveAsTemplate={() => "tpl-1"}
-          onDeleteTemplate={() => {}}
-          templates={[]}
-          onUseTemplate={() => {}}
           onMutate={vi.fn()}
         />
       </FloatingLayerProvider>

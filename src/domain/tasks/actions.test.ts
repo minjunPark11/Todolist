@@ -11,10 +11,8 @@ const OPEN: TaskStateFields = { status: "open" };
 describe("taskActions", () => {
   it("offers an open Task the actions §15.4 lists for one", () => {
     expect(ids(OPEN)).toEqual([
-      "pin",
-      "duplicate",
-      "saveAsTemplate",
-      "copyLink",
+      // Pin, Duplicate, Save as template and Copy link led this list until
+      // TASK_MENU_TRIM_DESIGN.md took the whole `quick` group.
       "startFocus",
       "activities",
       "complete",
@@ -25,7 +23,7 @@ describe("taskActions", () => {
 
   it("keeps the groups in §15.42's order, with Delete alone at the end", () => {
     const groups = taskActions({ task: OPEN });
-    expect(groups.map((group) => group.id)).toEqual(["quick", "work", "status", "danger"]);
+    expect(groups.map((group) => group.id)).toEqual(["work", "status", "danger"]);
     // §15.29: its own group, and §15.30's destructive marking travels with it
     // so a surface does not have to know which id is the dangerous one.
     expect(groups[groups.length - 1].items).toEqual([
@@ -54,19 +52,23 @@ describe("taskActions", () => {
     expect(ids({ status: "archived" })).toContain("restart");
   });
 
-  it("swaps Pin for Unpin, and reads the timestamp rather than a flag", () => {
-    expect(ids(OPEN)).toContain("pin");
+  // Pin/Unpin, Duplicate, Save as template and Copy link were the whole of the
+  // `quick` group, and it is gone (TASK_MENU_TRIM_DESIGN.md §1). The two tests
+  // that stood here read the pin toggle off `pinnedAt`; what replaces them is
+  // the one fact left to hold — the menu never offers any of the five, in any
+  // state, including the state that used to be the reason for half of them.
+  it("offers none of the five the menu no longer has", () => {
+    const gone = ["pin", "unpin", "duplicate", "saveAsTemplate", "copyLink"];
     const pinned = ids({ status: "open", pinnedAt: "2026-08-25T10:00:00.000Z" });
-    expect(pinned).toContain("unpin");
-    expect(pinned).not.toContain("pin");
+    for (const state of [ids(OPEN), pinned, ids({ status: "completed" })]) {
+      expect(state.filter((id) => gone.includes(id))).toEqual([]);
+    }
   });
 
-  it("pinning does not change which other actions are offered (§15.7)", () => {
-    const plain = ids(OPEN).filter((id) => id !== "pin");
-    const pinned = ids({ status: "open", pinnedAt: "2026-08-25T10:00:00.000Z" }).filter(
-      (id) => id !== "unpin",
-    );
-    expect(pinned).toEqual(plain);
+  it("leaves a pinned Task the same menu as any other (§15.7)", () => {
+    // The record still carries `pinnedAt` — nothing migrates it away — and it
+    // must not change what the menu says.
+    expect(ids({ status: "open", pinnedAt: "2026-08-25T10:00:00.000Z" })).toEqual(ids(OPEN));
   });
 
   it("leaves a trashed Task only what still means something", () => {
@@ -74,7 +76,6 @@ describe("taskActions", () => {
     // here. The Detail used to draw "Move to trash" for a Task already in the
     // Trash, where its only effect was to rewrite the timestamp.
     expect(ids({ status: "open", deletedAt: "2026-08-25T10:00:00.000Z" })).toEqual([
-      "copyLink",
       "activities",
       "restore",
       "deleteForever",

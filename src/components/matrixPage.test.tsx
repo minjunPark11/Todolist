@@ -397,12 +397,15 @@ describe("what a card says", () => {
   });
 
   it("says nothing about the priority the box already names", () => {
-    // D1: every card in Ⅰ is high. A flag on each of them would be the header
-    // repeated once per row.
+    // D1: every card in Ⅰ is high. Said on each of them, it would be the
+    // header repeated once per row. The flag this used to look for is gone
+    // everywhere now (TASK_ROW_TWO_LINES_DESIGN.md §2) — what `showPriority`
+    // still switches off here is the checkbox's colour and its name.
     renderMatrix([task({ title: "Urgent", priority: "high" })]);
 
-    expect(card().querySelector(".tm-task-priority")).toBeNull();
+    expect(card().querySelector(".tm-check")?.className).toBe("tm-check is-none");
     expect(within(card()).queryByText("High")).toBeNull();
+    expect(within(card()).queryByRole("checkbox", { name: /High/ })).toBeNull();
   });
 
   it("shows the tick on a card that is done, and offers to undo it", () => {
@@ -426,7 +429,10 @@ describe("what a card says", () => {
 
     expect(card().getAttribute("role")).toBeNull();
     await userEvent.click(within(card()).getByRole("button", { name: "Open Write it up" }));
-    expect(onOpenTask).toHaveBeenCalledWith("t1");
+    // The rect rides along so the popup can open beside the card
+    // (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §3.4). jsdom measures every
+    // element as 0x0, so what is asserted is that the card HANDS one over.
+    expect(onOpenTask).toHaveBeenCalledWith("t1", expect.objectContaining({ x: 0, y: 0 }));
   });
 });
 

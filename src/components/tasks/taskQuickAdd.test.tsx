@@ -38,8 +38,6 @@ function setup(scope: TaskScopeRef = { kind: "upcoming" }, folderLists: never[] 
           folders={[]}
           tags={[]}
           savedFilters={[]}
-          templates={[]}
-          onUseTemplate={() => {}}
           draftTitle=""
           onCreate={onCreate}
         />

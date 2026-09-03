@@ -54,6 +54,7 @@ import {
   type ScheduleIssue,
 } from "../domain/schedule";
 import { useT } from "../i18n";
+import type { Rect } from "../domain/floating";
 import { isTaskOpen, LIFECYCLE } from "../domain/tasks/taskState";
 
 type CalendarMode = "month" | "week" | "day" | "year";
@@ -93,6 +94,19 @@ interface CalendarViewProps {
   onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   onCreateTask: (draft: TaskDraft) => string;
   onDeleteTask?: (taskId: string) => void;
+  /**
+   * Opens a TASK — the app's own Detail, beside the block that was clicked
+   * (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §5).
+   *
+   * The calendar used to answer that click with a card of its own: a title, a
+   * date, and a two-field quick edit. Which meant the same Task showed
+   * different fields depending on the screen it was opened from — the thing
+   * TASK_DETAIL_PANEL_MERGE_DESIGN.md §2 exists to have removed.
+   *
+   * External events and focus sessions are NOT tasks and keep the card: there
+   * is no Task Detail to open for them.
+   */
+  onOpenTask?: (taskId: string, anchor?: Rect) => void;
   showToast?: (toast: ToastState) => void;
 }
 
@@ -110,6 +124,7 @@ export function CalendarView({
   onUpdateTaskSchedule,
   onCreateTask,
   onDeleteTask,
+  onOpenTask,
   showToast,
 }: CalendarViewProps) {
   const { t, lang } = useT();
@@ -641,9 +656,15 @@ export function CalendarView({
       setActiveCategory(itemCategory.id);
       ensureCategoryVisible(itemCategory.id);
     }
-    // Task/external events open the same popover in every view; the quick-edit
-    // form inside it replaces the old jump into the day-view detail panel.
     setSelected(item);
+    // A task opens the app's Detail beside the block (§5); everything else —
+    // an external event, a focus session — keeps the calendar's own card,
+    // because there is no Task behind it to open.
+    if (item.sourceType === "task" && onOpenTask) {
+      setPopover(null);
+      onOpenTask(item.sourceId, { x: anchor.left, y: anchor.top, width: anchor.right - anchor.left, height: anchor.bottom - anchor.top });
+      return;
+    }
     setPopover({ kind: "event", item, anchor });
   }
 
@@ -930,7 +951,7 @@ export function CalendarView({
         />
       ) : null}
       {isTimeGrid && draft && draftAnchor ? (
-        <CalendarPopover anchor={draftAnchor} onClose={handleCancelDraft} label={t("calendar.newTask")}>
+        <CalendarPopover anchor={draftAnchor} onClose={handleCancelDraft} label={t("calendar.newTask")} size="form">
           <NewTaskForm
             key={`${draft.date}-${draft.startTime}-${draft.endTime}`}
             draft={draft}

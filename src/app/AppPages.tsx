@@ -202,8 +202,12 @@ export function AppPages({
           onUpdateTaskSchedule={planner.updateTaskSchedule}
           onCreateTask={planner.createTask}
           onDeleteTask={requestDeleteTask}
+          onOpenTask={onOpenTask}
           showToast={showToast}
         />
+        {/* §5: the Calendar draws the Detail now, so it renders the pane like
+            the other two pages that do. */}
+        {renderTaskDetail()}
       </section>
     );
   }

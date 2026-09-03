@@ -57,6 +57,7 @@ import {
   SunriseIcon,
 } from "./icons";
 import { useT } from "../../i18n";
+import { useTimeFormat } from "../../utils/appPrefs";
 
 interface ScheduleEditorProps {
   taskId: string;
@@ -77,6 +78,18 @@ interface ScheduleEditorProps {
    * without choosing, which is what this is.
    */
   onCancel?: () => void;
+  /**
+   * A day, and nothing else
+   * (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §2.3, D1-A).
+   *
+   * The calendar's new-task form opens this editor for a task whose TIME is
+   * already decided — the reader dragged it out on the grid. A second time
+   * asked for here would be a second answer to the same question, with no
+   * rule on screen saying which one wins, so the three rows that qualify a
+   * time are shut in that one caller. What is left is the calendar, which is
+   * what the reader came for.
+   */
+  dateOnly?: boolean;
 }
 
 const QUICK_ICONS: Record<QuickDateKey, () => ReactNode> = {
@@ -92,8 +105,23 @@ function nowTime(): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
-export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onClose, onCancel }: ScheduleEditorProps) {
+export function ScheduleEditor({
+  taskId,
+  locale,
+  schedule,
+  today,
+  onCommit,
+  onClose,
+  onCancel,
+  dateOnly = false,
+}: ScheduleEditorProps) {
   const { t } = useT();
+  // §13.4: the collapsed row writes the time too, and it was writing it in the
+  // locale's convention rather than the app's setting — `23:00` in the field
+  // and `오후 11:00` on the row above it. The row it feeds is now the first
+  // thing a reader sees after choosing (§13.2), so it reads the same setting
+  // the field does.
+  const timeFormat = useTimeFormat();
   const [state, dispatch] = useReducer(scheduleEditorReducer, undefined, () =>
     scheduleEditorReducer(CLOSED, { type: "OPEN", taskId, schedule, today }),
   );
@@ -112,6 +140,8 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
   const stage = getRangeStage(draft);
   const dirty = isDirty(draft, state.saved);
   const dated = hasSchedule(draft);
+  // §2.3: the three rows that qualify a date are the ones `dateOnly` shuts.
+  const qualifiable = dated && !dateOnly;
 
   function confirm() {
     if (state.status !== "open") return;
@@ -277,7 +307,15 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
             <TimeRow
               draft={draft}
               locale={locale}
-              onStartTime={(time) => dispatch({ type: "SET_START_TIME", time })}
+              /* Chosen is finished (§13.2). The row used to stay open and
+                 grow an end field, so one answer asked the next question;
+                 now the time is set, the row folds, and what the reader sees
+                 is the value they just picked. Typing commits by the same
+                 path (`TimeField.commit`), so all three ways in end here. */
+              onStartTime={(time) => {
+                dispatch({ type: "SET_START_TIME", time });
+                if (time !== null) setTimeOpen(false);
+              }}
               onEndTime={(time) => dispatch({ type: "SET_END_TIME", time })}
               onClear={() => {
                 dispatch({ type: "CLEAR_TIME" });
@@ -289,8 +327,11 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
             <SummaryRow
               icon={<ClockIcon />}
               label={t("schedule.time")}
-              value={formatTimeSummary(draft, locale) || t("schedule.noTime")}
-              disabled={!dated}
+              value={formatTimeSummary(draft, locale, timeFormat) || t("schedule.noTime")}
+              /* §13.3: the colour says "there is something of mine in here".
+                 A start is the whole of it — an end cannot exist without one. */
+              isSet={draft.startTime !== null}
+              disabled={!qualifiable}
               onClick={openTime}
             />
           )
@@ -307,7 +348,8 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
              is named and the rest are counted — a row that listed all four
              would be wider than the popover. */
           value={reminderSummary(draft, t)}
-          disabled={!dated}
+          isSet={draft.reminders.length > 0}
+          disabled={!qualifiable}
         >
           <ReminderList
             draft={draft}
@@ -320,7 +362,8 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
           icon={<RepeatIcon />}
           label={t("schedule.repeat")}
           value={t(`schedule.repeat.${draft.repeat}`)}
-          disabled={!dated}
+          isSet={draft.repeat !== "none"}
+          disabled={!qualifiable}
         >
           <RepeatChoices
             value={draft.repeat}
@@ -433,13 +476,20 @@ interface SummaryRowProps {
   icon?: ReactNode;
   label: string;
   value: string;
+  /** §13.3 — whether the value is the reader's own, or this row's word for nothing. */
+  isSet?: boolean;
   disabled: boolean;
   onClick: () => void;
 }
 
-function SummaryRow({ icon, label, value, disabled, onClick }: SummaryRowProps) {
+function SummaryRow({ icon, label, value, isSet, disabled, onClick }: SummaryRowProps) {
   return (
-    <button type="button" className="sched-row" disabled={disabled} onClick={onClick}>
+    <button
+      type="button"
+      className={`sched-row${isSet ? " is-set" : ""}`}
+      disabled={disabled}
+      onClick={onClick}
+    >
       <RowFace icon={icon} label={label} value={value} />
     </button>
   );
@@ -458,18 +508,20 @@ function ExpandingRow({
   icon,
   label,
   value,
+  isSet,
   disabled,
   children,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
+  isSet?: boolean;
   disabled: boolean;
   children: ReactNode;
 }) {
   return (
     <Popover placement="bottom-start" offset={4}>
-      <PopoverTrigger className="sched-row" disabled={disabled}>
+      <PopoverTrigger className={`sched-row${isSet ? " is-set" : ""}`} disabled={disabled}>
         <RowFace icon={icon} label={label} value={value} />
       </PopoverTrigger>
       <PopoverContent label={label} className="sched-rowsurface">

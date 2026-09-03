@@ -80,11 +80,15 @@ export function pathForPage(page: PageId): string {
 /**
  * The pages that draw a Task Detail (TASK_DETAIL_PANEL_MERGE_DESIGN.md §7).
  *
- * Calendar and Settings are not here because neither renders the pane. A
- * `?task=` on their address would be a promise the page cannot keep, so it is
- * not written and not read.
+ * Settings is not here because it renders no pane. A `?task=` on its address
+ * would be a promise the page cannot keep, so it is not written and not read.
+ *
+ * The Calendar joined when clicking a block stopped opening the calendar's own
+ * little event card and started opening the app's Task Detail
+ * (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §5) — the same detail, and
+ * therefore the same address, as everywhere else a Task can be opened.
  */
-const PAGES_WITH_DETAIL = new Set<PageId>(["board", "focus"]);
+const PAGES_WITH_DETAIL = new Set<PageId>(["board", "focus", "calendar"]);
 
 /**
  * A page's address with the open Task written into it (§6.6).

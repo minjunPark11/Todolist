@@ -8,7 +8,7 @@
 // §16.28 hides Repeat and Reminder for the MVP, and is explicit that a control
 // must not appear as a disabled placeholder before the model behind it exists.
 // So they are absent, not greyed out.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   CheckItem,
   List,
@@ -42,6 +42,8 @@ import { useFocusTrap } from "../../hooks/useFocusTrap";
 import type { TaskDetailWidthState } from "../../hooks/useTaskDetailWidth";
 import { TASK_DETAIL_MAX_WIDTH, TASK_DETAIL_MIN_WIDTH } from "../../app/taskDetailWidth";
 import { DeferredInput, DeferredTextarea } from "../kit";
+import { useFloatingPosition } from "../floating";
+import type { Rect } from "../../domain/floating";
 
 export interface TaskDrawerProps {
   task: Task;
@@ -53,6 +55,15 @@ export interface TaskDrawerProps {
    * does, which is why the same Drawer serves all four.
    */
   presentation: TaskDetailPresentation;
+  /**
+   * Where the popup opens FROM — the rect of the row, card or block that was
+   * clicked (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §3.4).
+   *
+   * Read only by `anchored-popover`, and optional even there: a link opened
+   * from the address bar has no click behind it, and then the popup falls back
+   * to the middle of the screen rather than guessing.
+   */
+  anchor?: Rect | null;
   lists: List[];
   /** The sidebar groups the List picker draws as headings (§13.9, §13.10). */
   folders: SidebarFolder[];
@@ -129,6 +140,7 @@ export interface TaskDrawerProps {
 
 export function TaskDrawer({
   presentation,
+  anchor,
   task,
   lists,
   folders,
@@ -193,7 +205,12 @@ export function TaskDrawer({
    * Drawer is a column beside the list — trapping focus there would stop the
    * user tabbing back to the rows it belongs to.
    */
-  useFocusTrap(root, { enabled: presentation !== "inline-drawer" });
+  /* Not the popup: a trap is what a MODAL does, and §3.2 stopped this being
+     one. The column is not trapped for the same reason — it sits beside the
+     rows it belongs to. */
+  useFocusTrap(root, {
+    enabled: presentation !== "inline-drawer" && presentation !== "anchored-popover",
+  });
 
   /**
    * Escape closes it — in every presentation, including the inline column.
@@ -223,6 +240,41 @@ export function TaskDrawer({
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
+
+  /**
+   * A press outside closes the popup (§3.2).
+   *
+   * The scrim used to do this by being the pane's parent — "outside" was
+   * "the scrim was the target", one comparison. There is no scrim now, so the
+   * question is asked of the document, and the two things that are outside the
+   * pane but must NOT close it have to be named:
+   *
+   *   - the floating layer root, where the schedule editor, Priority, the List
+   *     picker and the ⋯ menu are portalled (z 100, `<body>`'s child). A press
+   *     on one of those is a press inside this Detail as the reader sees it.
+   *   - a press that lands on nothing (`target` already detached), which is
+   *     what a click on a row that has just been re-rendered looks like.
+   *
+   * `mousedown`, not `click`: selecting text in the body and releasing outside
+   * is a drag, not a dismissal.
+   */
+  useEffect(() => {
+    if (presentation !== "anchored-popover") return;
+    function onDown(event: MouseEvent) {
+      const target = event.target as Node | null;
+      if (!target || !target.isConnected) return;
+      if (root.current?.contains(target)) return;
+      if ((target as HTMLElement).closest?.("#floating-layer-root")) return;
+      onClose();
+    }
+    // Deferred by a frame: the click that OPENED the popup is still being
+    // dispatched, and a listener added synchronously would catch it.
+    const timer = window.setTimeout(() => document.addEventListener("mousedown", onDown), 0);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [presentation, onClose]);
 
   const progress = childProgress(children);
   const checklist = isChecklistMode(task);
@@ -302,25 +354,57 @@ export function TaskDrawer({
   const resizable = presentation === "inline-drawer";
 
   /**
-   * The Board's popup (BOARD_TASK_POPUP_DESIGN.md §5.1).
+   * The popup (BOARD_TASK_POPUP_DESIGN.md §5.1, remade by
+   * CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §3.2).
    *
-   * The only presentation that needs a parent: the other four are placed
-   * against the viewport or a grid track, and this one is centred inside a
-   * scrim. Nothing INSIDE the pane changes for it — the header, the scroll
+   * It was a MODAL: centred, over a scrim, with focus trapped inside it. It is
+   * a POPOVER now — it opens beside the row it belongs to and dims nothing, so
+   * the board behind it stays readable and its other cards stay clickable.
+   * That one change is what takes the scrim, the trap and `aria-modal` away
+   * and gives the ✕ back (§3.2's table).
+   *
+   * Nothing INSIDE the pane changes for it either way: the header, the scroll
    * region and the footer are the same ones the column draws.
    */
-  const modal = presentation === "center-modal";
+  const popover = presentation === "anchored-popover";
+
+  /**
+   * §3.4: beside the anchor, flipped and clamped by the app's own placement.
+   *
+   * `useFloatingPosition` rather than arithmetic of its own — §19.9's rule is
+   * that an anchor is a RECT and not an element, which is exactly what a click
+   * on a card can hand over. Null anchor, null position: the stylesheet's
+   * centred fallback stands.
+   */
+  /* Both closures are memoized, and they have to be: the hook re-measures
+     whenever they change identity, and a measurement sets state — so a fresh
+     closure per render is an infinite loop (seen once, in this file). */
+  const anchorRect = useCallback(() => anchor ?? null, [anchor]);
+  const surfaceEl = useCallback(() => root.current, []);
+  const position = useFloatingPosition({
+    open: popover && Boolean(anchor),
+    anchorRect,
+    surface: surfaceEl,
+    placement: "right-start",
+    offset: 8,
+    collisionPadding: 8,
+  });
 
   const pane = (
     <aside
       ref={root}
       className={`tm-drawer is-${presentation}${resize.isResizing ? " is-resizing" : ""}`}
       aria-label={t("tasks.drawerLabel")}
-      /* Said out loud only where it is true. The popup covers the Board and
-         traps focus, so it is a dialog; the inline column sits beside the list
-         and is not. (The overlay and the sheet arguably are too — that is a
-         separate change, §11.) */
-      {...(modal ? { role: "dialog" as const, "aria-modal": true } : {})}
+      /* A dialog, but not a modal one (§3.2): it names itself for a screen
+         reader and takes Escape, and it does not claim to have made the rest
+         of the page inert — because it has not. */
+      {...(popover ? { role: "dialog" as const } : {})}
+      /* Only where it goes. The hook also computes a `maxHeight` from the
+         space left in the viewport, and applying it here would OVERRIDE the
+         stylesheet's 360 — the size §3.3 measured — with whatever the window
+         happened to allow. The CSS cap is the smaller of the two by design,
+         and the placement is computed against the element already wearing it. */
+      style={popover && position ? { left: position.x, top: position.y } : undefined}
     >
       {/* §1.13: a 1px divider with an 8px hit area, which is why the visible
           line is a pseudo-element and this element is wider than it looks.
@@ -358,7 +442,9 @@ export function TaskDrawer({
           Sticky rather than fixed: the pane is the scroll container's parent,
           so this stays put as the content moves under it without being taken
           out of the flow. */}
-      <header className="tm-drawer-head">
+      {/* The right-most column, so on the desktop build this row is under the
+          window buttons (§3.3): it keeps their width clear and drags with them. */}
+      <header className="tm-drawer-head" data-tauri-drag-region>
         {/* §4: completion is one control and it is the first one. ST-I5 lets a
             parent finish with subtasks still open — they are not a gate. */}
         {/* Disabled rather than absent, which is the opposite of §15.5 and
@@ -413,12 +499,11 @@ export function TaskDrawer({
             popover is open, and focus would otherwise land on the body. */}
         <PriorityPicker task={task} onChange={onSetPriority} restoreFocusTo={() => root.current} readOnly={frozen} />
 
-        {/* §15.6, §15.8: the one canonical value, said out loud.
-            Without it Pin would be a state with no visible effect anywhere in
-            the Detail — the reader would have to open the menu again and read
-            which way the label had flipped. A word rather than a glyph, for
-            §15.44's reason. */}
-        {isPinned(task) ? <span className="tm-drawer-pinned">{t("tasks.pinned")}</span> : null}
+        {/* The `고정됨` badge stood here (TASK_MENU_TRIM_DESIGN.md D1). It
+            existed so that Pin would not be a state with no visible effect —
+            and Pin is gone, so what it said was a state nothing could put a
+            Task into and nothing could take it out of. `pinnedAt` stays in the
+            record, unread: nothing migrates a user's data for a menu row. */}
 
         {/* The ⋯ used to stand here. It is in the footer now, beside the List
             — which is where the reference app puts both
@@ -434,11 +519,14 @@ export function TaskDrawer({
 
             Escape closes all five regardless, and the focus trap still has
             plenty to hold: the completion box, the schedule, the flag. */}
-        {modal ? null : (
-          <button type="button" className="tm-drawer-close" onClick={onClose} aria-label={t("common.close")}>
-            ×
-          </button>
-        )}
+        {/* On every presentation now, including the popup (§3.2). It was
+            dropped there because the scrim gave a pointer another way out;
+            without a scrim the only other way out is a press on the page
+            behind — which is also how you press something you did not mean
+            to. A ✕ costs 24px and no accidents. */}
+        <button type="button" className="tm-drawer-close" onClick={onClose} aria-label={t("common.close")}>
+          ×
+        </button>
       </header>
 
       {/* §1.17, §1.18: the pane does not scroll — this does. That is what lets
@@ -789,38 +877,7 @@ export function TaskDrawer({
     </aside>
   );
 
-  if (!modal) return pane;
-
-  /* §5.1, §5.2. The scrim is the pane's parent, so "outside" is simply
-     "the scrim was the target" — one comparison instead of a document-wide
-     listener.
-
-     Being the TARGET, not merely being outside the pane, is what makes this
-     safe next to the floating layers. The schedule, Priority, List and ⋯
-     surfaces are portalled to a root under `<body>` at z-index 100, so they
-     are outside the scrim entirely: a press on one lands on the layer and
-     never reaches this handler. (A press on the scrim WHILE such a layer is
-     open does close both at once — the layer manager dismisses its surface and
-     this closes the Detail. Escape still peels one at a time.)
-
-     `mousedown` rather than `click`: selecting text in the body and releasing
-     the button out over the scrim is a drag, not a dismissal.
-
-     And unlike `.tm-modal-scrim`, this one DOES dismiss. That scrim withholds
-     the gesture to protect a draft; here every field is a draft that flushes
-     when it unmounts (§9), and Escape already closes by the same path — so
-     there is nothing left for a click to lose. */
-  return (
-    <div
-      className="tm-drawer-scrim"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      {pane}
-    </div>
-  );
+  return pane;
 }
 
 /**

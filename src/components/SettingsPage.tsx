@@ -131,7 +131,8 @@ export function SettingsPage({
 
   return (
     <div className="ff-page ff-settings-page">
-      <header className="ff-page-head">
+      {/* Doubles as the window caption on the desktop build (§3.3). */}
+      <header className="ff-page-head" data-tauri-drag-region>
         <div>
           <h1 className="ff-page-title">{t("settings.title")}</h1>
           <p className="ff-page-sub">{t("settings.subtitle")}</p>

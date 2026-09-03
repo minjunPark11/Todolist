@@ -41,10 +41,11 @@ export function TaskCheck({ priority, checked, disabled, label, onToggle }: Task
       checked={checked}
       disabled={disabled}
       aria-label={label}
-      /* Not the level. The flag beside it already carries that for assistive
-         tech (`aria-label={t('priority.high')}`), and a reader told the
-         priority twice in one row has to work out whether it heard two facts
-         or one. */
+      /* Whether the level is IN that name is the caller's to decide, and the
+         two callers differ (TASK_ROW_TWO_LINES_DESIGN.md §2.2): a row has
+         nothing else that says it, so the name carries it; the Detail header
+         has the flag trigger beside this box, and a reader told the priority
+         twice in one place has to work out whether it heard two facts or one. */
       onChange={onToggle}
     />
   );

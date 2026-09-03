@@ -6,6 +6,9 @@ import { useAutoFocus } from "../kit";
 import { useT } from "../../i18n";
 import { formatClockRange } from "../../utils/clock";
 import { useTimeFormat } from "../../utils/appPrefs";
+import { EMPTY_SCHEDULE, type Schedule } from "../../domain/schedule";
+import { ScheduleEditor } from "../schedule/ScheduleEditor";
+import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "../floating";
 
 export interface NewTaskFormResult {
   title: string;
@@ -45,6 +48,13 @@ export function NewTaskForm({ draft, categoryGroups, initialCategoryId, onCancel
       className="gcal-newtask-form"
       onSubmit={submit}
       onKeyDown={(event) => {
+        /* Only keys pressed in the form itself. The date button below opens a
+           surface that React portals out of this DOM subtree but still bubbles
+           events through — without this check, Escape inside the calendar
+           would cancel the whole form and Enter would submit it from under the
+           reader (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §2.3). */
+        if (!event.currentTarget.contains(event.target as Node)) return;
+        if (event.defaultPrevented) return;
         // Enter creates the task from any field, not just the submit button.
         // isComposing: an Enter that commits Korean IME composition must not
         // submit — only the next real Enter does.
@@ -97,15 +107,28 @@ export function NewTaskForm({ draft, categoryGroups, initialCategoryId, onCancel
         </select>
       </label>
 
-      <label>
+      {/* §2.3: the app's own calendar, not the OS's `mm/dd/yyyy`. It was the
+          one control on this form that belonged to no screen in this app, and
+          we already have the picker — the Task Detail and the quick add both
+          open it. `dateOnly` shuts its 시간·알림·반복 rows: this task's time
+          is the block the reader just dragged, and the editor must not offer
+          a second answer to it. */}
+      <div className="gcal-newtask-due">
         <span>{t("common.dueDate")}</span>
-        <input
-          type="date"
-          value={dueDate}
-          onChange={(event) => setDueDate(event.target.value)}
-          placeholder={t("calendar.optional")}
-        />
-      </label>
+        <Popover placement="bottom-start">
+          <PopoverTrigger className={`gcal-newtask-duebtn${dueDate ? " is-set" : ""}`}>
+            {dueDate ? formatDate(dueDate, lang) : t("calendar.optional")}
+          </PopoverTrigger>
+          <PopoverContent label={t("common.dueDate")} className="sched-surface">
+            <DueDateSurface
+              dueDate={dueDate}
+              today={draft.date}
+              locale={lang}
+              onPick={setDueDate}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
 
       <div className="gcal-newtask-actions">
         <button type="button" className="ff-btn" onClick={onCancel}>
@@ -116,5 +139,43 @@ export function NewTaskForm({ draft, categoryGroups, initialCategoryId, onCancel
         </button>
       </div>
     </form>
+  );
+}
+
+/** Separated so 확인 and 취소 can close the surface they are inside (§19.90). */
+function DueDateSurface({
+  dueDate,
+  today,
+  locale,
+  onPick,
+}: {
+  dueDate: string;
+  today: string;
+  locale: string;
+  onPick: (date: string) => void;
+}) {
+  const { close } = usePopoverSurface();
+  // Seeded once, from whatever the button is currently saying — the same
+  // reason `QuickAddDate` seeds: an editor that opened empty beside a button
+  // that says a date would disable 확인 until the reader re-picked that date.
+  const [seed] = useState<Schedule>(() =>
+    dueDate ? { ...EMPTY_SCHEDULE, dueDate } : EMPTY_SCHEDULE,
+  );
+
+  return (
+    <ScheduleEditor
+      // No Task yet; the editor only hands this back to `onCommit`.
+      taskId=""
+      locale={locale}
+      schedule={seed}
+      today={today}
+      dateOnly
+      onCommit={(_taskId, next) => {
+        onPick(next.dueDate ?? "");
+        return [];
+      }}
+      onClose={() => close("selection")}
+      onCancel={() => close("escape")}
+    />
   );
 }

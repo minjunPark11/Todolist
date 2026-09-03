@@ -327,11 +327,16 @@
   white-space: nowrap;
 }
 
-/* A line under the name rather than around the group: the rows below already
-   have their own separators, and a boxed group would read as a card — which is
-   what the Board is for. */
+/* Space between the groups, and no line of their own
+   (TASK_ROW_TWO_LINES_DESIGN.md §1).
+
+   The rule above this one already said the reason and then drew the line
+   anyway: the rows below have their own separators, so a group whose last row
+   ends in a line was being closed twice — that line, 12px of `gap`, and then a
+   `border-top` above the next heading. Two lines for one boundary, which is
+   what the screenshots showed. The line belongs to the ROW, everywhere in the
+   app; what divides the groups is the space and the heading. */
 .tm-listgroup + .tm-listgroup {
-  border-top: 1px solid var(--border-subtle);
   padding-top: 8px;
 }
 
@@ -472,30 +477,12 @@
   }
 }
 
-/* Stored since the beginning, drawn since V-P1: a flag at the end of the title
-   rather than a coloured row, so a list of High tasks still reads as a list. */
-.tm-task-priority {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  color: var(--text-tertiary);
-}
-
-/* All four levels read `--priority-*` now, here and in the three other places
-   that draw them (TASK_PRIORITY_CHECKBOX_DESIGN.md §3). The flag and the
-   checkbox beside it say the same level, so they cannot be allowed to say it
-   in two different reds. */
-.tm-task-priority.is-high {
-  color: var(--priority-high);
-}
-
-.tm-task-priority.is-medium {
-  color: var(--priority-medium);
-}
-
-.tm-task-priority.is-low {
-  color: var(--priority-low);
-}
+/* The row's flag was here, in four rules
+   (TASK_ROW_TWO_LINES_DESIGN.md §2.3). The box above is the only thing on a
+   row that says the priority now — the flag was the same fact in a second
+   channel, and the reference app draws none. The `--priority-*` tokens it read
+   are unchanged; three other places still draw them, and all of them are
+   CONTROLS that change the level rather than marks that repeat it. */
 
 .tm-task-title {
   flex: 1;
@@ -533,13 +520,6 @@
   align-items: center;
   gap: 4px;
   color: var(--text-muted, #8e8e93);
-}
-
-/* Where the flag is what pushed the group across (a wrapped card), the group
-   must not push itself again: two auto margins on one line split the free
-   space between them and leave both stranded in the middle. */
-.tm-task-priority + .tm-task-tips {
-  margin-left: 4px;
 }
 
 .tm-task-tip {
@@ -581,13 +561,6 @@
   align-items: baseline;
   column-gap: 8px;
   row-gap: 2px;
-}
-
-/* On a wrapped card the flag would sit alone at the left of the second line,
-   which reads as a bullet for the tips rather than as the title's own mark.
-   Pushed across, it stays what it is on a row: the last thing on the title. */
-.tm-task.is-card .tm-task-priority {
-  margin-left: auto;
 }
 
 .tm-task.is-card .tm-task-title {
@@ -949,6 +922,49 @@
   cursor: pointer;
 }
 
+/* --- the row that is two lines (TASK_ROW_TWO_LINES_DESIGN.md §3) --- */
+
+/* `Show details` puts the first line of the body under the title. On a CARD
+   that worked, because a card's row already wraps; on a ROW it did not, and
+   the failure was total rather than cosmetic: `.tm-task-body` asks for
+   `width: 100%` of a flex line that does not wrap, the free space goes
+   negative, `flex-grow` stops applying — and the title, whose basis is `0%`,
+   is drawn 0px wide and clipped away. The row read as a grey body with no
+   title at all.
+
+   Letting the line wrap is the whole fix: the body takes the second line and
+   the title keeps the first. Only where there IS a body, so the hundreds of
+   one-line rows keep the layout they have.
+
+   `row-gap: 0` because the body carries its own `margin-top: 2px`; the row's
+   12px `gap` would otherwise be added to it. */
+.tm-task-open.has-body {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+
+/* What the checkbox is pointing at is the TITLE, so on a two-line row it goes
+   to the title's line. Centred in the row, it sits ~10px below the word it
+   belongs to and reads as being about both lines equally. */
+.tm-task:has(.tm-task-body) {
+  align-items: flex-start;
+  padding-block: 4px;
+}
+
+/* 3px = (21 − 15) / 2 — a 15px box (`--check-size`) standing in the middle of
+   the title's 21px line (14px × 1.5). The label keeps the row's full width as
+   its hit area; it is only the box inside it that stops stretching. */
+.tm-task:has(.tm-task-body) .tm-task-check {
+  align-self: flex-start;
+  align-items: flex-start;
+  padding-top: 3px;
+}
+
+.tm-task:has(.tm-task-body) .tm-task-handle,
+.tm-task:has(.tm-task-body) .tm-task-menu {
+  align-self: flex-start;
+}
+
 .tm-task.is-open {
   background: var(--selected, rgba(0, 122, 255, 0.08));
 }
@@ -1132,15 +1148,6 @@
 
 /* §15.6's state, said in a word (§15.44). In the property row rather than
    beside the title, so that pinning a Task does not move its title. */
-.tm-drawer-pinned {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--bg-selected, rgba(0, 122, 255, 0.12));
-  color: var(--accent, #007aff);
-  font-size: 11px;
-  font-weight: 650;
-  white-space: nowrap;
-}
 
 .tm-drawer-more ~ .tm-drawer-close {
   margin-left: 0;
@@ -1148,10 +1155,17 @@
 
 /* Size and weight only. The border is 21-components.css's to give up — see
    the note beside the field rule there. */
+/* The task's NAME, not a field the reader fills in
+   (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §4). The frame is declared here
+   and transparent: the border still exists so hover and focus have something
+   to colour, and at rest the title reads as writing rather than as a form. */
 .tm-drawer-title {
   width: 100%;
   padding: 6px 8px;
+  border: 1px solid transparent;
   border-radius: 6px;
+  background: transparent;
+  color: var(--text, #1c1c1e);
   font: inherit;
   font-size: 17px;
   font-weight: 600;
@@ -1625,17 +1639,28 @@
 /* Full width, and it wraps: this is a second body, not a property value.
    `field-sizing` is progressive — where it is unsupported the two rows stand
    and the box scrolls, which is what a textarea does anyway. */
+/* Frameless at rest, like the body above it (§4). It was a filled box with a
+   1px border — a second empty form field under a title that was another one,
+   which is what made the popup read as four boxes rather than one card. */
 .tm-drawer-notes textarea {
   width: 100%;
   min-width: 0;
   padding: 6px 8px;
-  border: 1px solid var(--border, #e5e5e7);
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: var(--bg, #fff);
+  background: transparent;
   color: var(--text, #1c1c1e);
   font: inherit;
   font-size: 13px;
-  resize: vertical;
+  resize: none;
+}
+
+.tm-drawer-notes textarea:hover {
+  border-color: var(--border-subtle, rgba(25, 25, 25, 0.08));
+}
+
+.tm-drawer-notes textarea:focus {
+  border-color: var(--border, #e5e5e7);
 }
 
 /* `.tm-drawer-trash` stood here — see the note in 19-app-shell.css. Trash is
@@ -2516,54 +2541,58 @@
    That presentation leaves the Main clickable on purpose because it sits
    beside it; this one is centred over the thing it came from, and a popup with
    nothing behind it reads as a panel that lost its anchor. */
-.tm-drawer-scrim {
-  position: fixed;
-  inset: 0;
-  /* Between the sidebar overlay (40) and the detail tier (45), so it covers
-     the shell and the pane above still covers it. The 60 and 70 tiers — the
-     List manager and the modal dialogs — stay above the popup, which is right:
-     those are questions asked ON TOP of an open Task. */
-  z-index: 44;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.32);
-  animation: tm-drawer-scrim-in 120ms ease;
-}
+/* The popup, beside the row that opened it
+   (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §3).
+   ==========================================================================
+   `.tm-drawer-scrim` stood here and is gone with the modal it dimmed for. The
+   popup covers nothing now: the board behind it stays readable and its other
+   cards stay clickable, which is what the reference app does and what the
+   centred 720x640 could not.
 
-.tm-drawer.is-center-modal {
+   `position: fixed` with the coordinates set inline by `useFloatingPosition`
+   (§19.9's placement, flipped and clamped like every other surface in the
+   app). The rules here are the ones that do not depend on where it landed. */
+.tm-drawer.is-anchored-popover {
+  position: fixed;
   z-index: 45;
-  width: min(720px, calc(100vw - 96px));
-  /* The screen sets the height, not the content. Sized to its content, a Task
-     with a title only would open a 200px window and one with a long checklist
-     an 800px one — so walking from card to card on the same Board would make
-     the window jump on every click. That is the same thing §1.26 refuses when
-     it forbids keying the pane by Task id. `.tm-drawer-scroll` takes the
-     overflow, which is what it is already for (§1.17). */
-  height: min(640px, calc(100vh - 96px));
+  /* 440x360 — measured off the reference popup ([관찰] ⑤, §3.3) rather than
+     chosen. Half the area of the modal it replaces: what the reader asked to
+     see is one task, and the modal was mostly empty space around it.
+
+     The height is a MAXIMUM, not a size: a task with a title and nothing else
+     should not open a 360px window with 300px of nothing in it. The scroll
+     region inside takes the overflow (§1.17), and the placement hook lowers
+     this again when the anchor sits near the bottom of the window. */
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(360px, calc(100vh - 32px));
   /* The base rule gives every pane a `border-left`, for a column welded to a
      list. A popup is a card and needs all four. */
   border: 1px solid var(--border, #e5e5e7);
   border-radius: 12px;
   background: var(--surface, #fff);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
-  /* Crops the header and footer into the rounded corners. The pane already
-     refuses to scroll itself (§1.17); this is about the radius. */
+  /* Crops the header and footer into the rounded corners. */
   overflow: hidden;
   animation: tm-drawer-modal-in 140ms ease;
 }
 
-@keyframes tm-drawer-scrim-in {
-  from {
-    opacity: 0;
-  }
+/* No anchor — a link opened from the address bar, or a reload (§3.4). The
+   popup has nothing to sit beside, so it sits in the middle rather than
+   guessing at a row. */
+.tm-drawer.is-anchored-popover:not([style*="left"]) {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
+
+/* Opacity only. It used to scale from 0.98, which is fine for a surface
+   placed by `left`/`top` — and wrong for the centred fallback (§3.4), whose
+   position IS a transform: the animation would fight it for 140ms and the
+   popup would arrive from the corner. */
 @keyframes tm-drawer-modal-in {
   from {
     opacity: 0;
-    transform: scale(0.98);
   }
 }
 
@@ -2571,8 +2600,7 @@
    (the app's own motion setting is honoured by the JS surfaces; this is the
    OS-level ask, which CSS answers on its own). */
 @media (prefers-reduced-motion: reduce) {
-  .tm-drawer-scrim,
-  .tm-drawer.is-center-modal {
+  .tm-drawer.is-anchored-popover {
     animation: none;
   }
 }
@@ -3537,7 +3565,10 @@
   color: var(--text, #1c1c1e);
   font: inherit;
   font-size: 13px;
-  resize: vertical;
+  /* No handle (§4). It is the one piece of chrome that is visible at rest even
+     with the frame gone — a corner of hatching in the middle of a card — and
+     what it offers is a height the popup has no room to give. */
+  resize: none;
 }
 
 .tm-drawer-content textarea:hover {
@@ -4050,6 +4081,9 @@
   width: 100%;
   margin-top: 2px;
   font-size: 12px;
+  /* Tighter than the page's 1.5. One line of 12px text needs no leading of its
+     own, and on a row this is what the second line costs in height. */
+  line-height: 1.35;
   color: var(--text-tertiary, #8e8e93);
   overflow: hidden;
   white-space: nowrap;

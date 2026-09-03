@@ -181,22 +181,18 @@
    with nothing around it, and a box there turns an ordinary Detail into a form
    (TICKTICK_DETAIL_ANATOMY_DESIGN.md §1). The border comes back on hover and
    on focus, which is when "can I type here" is the reader's question. */
-/* Four classes, because three lose. The field rule below matches this input
-   as `input:not([type="checkbox"]):not([type="radio"]):not([type="range"])` —
-   (0,3,1) — and no shorter chain of `.tm-drawer-*` names outranks it. This one
-   is (0,4,0) and it spells out the nesting that actually exists rather than
-   reaching for `!important`, which the next person would have to fight
-   without being told why it was there. */
-.tm-drawer > .tm-drawer-scroll > .tm-drawer-title-row > .tm-drawer-title {
-  border-color: transparent;
-  background: transparent;
-}
-
-.tm-drawer > .tm-drawer-scroll > .tm-drawer-title-row > .tm-drawer-title:hover {
+/* This block used to be four classes deep, to outrank the field rule below —
+   and it LOST anyway: a fourth `:not()` was added to that rule for the quick
+   add's title, taking it to (0,4,1), and the Detail's title has been drawing a
+   box ever since (measured 2026-09-04: `1px solid`, white). The fix is the one
+   that rule already uses for the same case — the title is excused by name
+   below — so what is left here is the two states, at the specificity they
+   actually need (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §4). */
+.tm-drawer-title:hover {
   border-color: var(--border-subtle);
 }
 
-.tm-drawer > .tm-drawer-scroll > .tm-drawer-title-row > .tm-drawer-title:focus {
+.tm-drawer-title:focus {
   border-color: var(--border);
 }
 
@@ -224,7 +220,7 @@
    up — which is the whole reason §4.86 gives both the same number. `textarea`
    takes the surface and keeps its own height. */
 .ff-field,
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.tm-quickadd-title),
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.tm-quickadd-title):not(.tm-drawer-title),
 select,
 textarea,
 .tm-modal-input {
@@ -238,7 +234,7 @@ textarea,
 }
 
 .ff-field,
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.tm-quickadd-title),
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.tm-quickadd-title):not(.tm-drawer-title),
 select,
 .tm-modal-input {
   height: var(--density-control-h);
@@ -249,6 +245,16 @@ select,
 textarea {
   padding: 8px var(--density-control-pad-x);
 }
+
+/* The Detail's title is the second field to leave this rule, for the same
+   reason the quick add's did: it is not a FIELD the reader fills in, it is the
+   task's name, and a name in a box is a form
+   (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §4). 17-tasks-module.css has drawn
+   it frameless since the anatomy work — the rule was there and losing, because
+   four `:not()`s outweigh four class names.
+
+   The border comes back on hover and focus, where "this is editable" is the
+   question being asked. */
 
 /* --- the row -------------------------------------------------------------
    Three kinds of row exist in this app and only one of them is this one. The

@@ -79,7 +79,6 @@ function renderModule(url: string) {
           onDeleteForever={() => {}}
           onEmptyTrash={() => ({ tasks: 0, lists: 0, tasksWithLists: 0 })}
           onSetScopeViewOptions={() => {}}
-          onDuplicate={() => null}
           focusBusy={false}
           onCreate={() => {}}
           draftTitle=""
@@ -110,10 +109,6 @@ function renderModule(url: string) {
             onRestoreList: () => {},
             onPermanentlyDeleteList: () => {},
           }}
-          onSaveAsTemplate={() => "tpl-1"}
-          onDeleteTemplate={() => {}}
-          templates={[]}
-          onUseTemplate={() => {}}
           onMutate={() => {}}
         />
       </FloatingLayerProvider>
@@ -122,27 +117,30 @@ function renderModule(url: string) {
   return { onNavigate };
 }
 
-const scrim = () => document.querySelector(".tm-drawer-scrim");
 const pane = () => document.querySelector(".tm-drawer") as HTMLElement;
 
 // jsdom reports 1024px, which is `compactDesktop` — so the List's answer here
 // is the overlay drawer. That is the comparison the Board is being measured
 // against: same width, same Task, different surface.
 describe("a Task opened from the Board", () => {
-  it("is a centred popup rather than a drawer", () => {
+  it("is a popup rather than a drawer", () => {
     renderModule("/today?view=board&task=t1");
 
-    expect(pane().classList.contains("is-center-modal")).toBe(true);
+    expect(pane().classList.contains("is-anchored-popover")).toBe(true);
     expect(pane().classList.contains("is-overlay-drawer")).toBe(false);
   });
 
-  it("is a dialog, and sits inside the scrim that centres it", () => {
+  // CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §3.2: a dialog, and NOT a modal
+  // one. It dims nothing and traps nothing, so claiming `aria-modal` would be
+  // telling a screen reader the rest of the page had gone inert when it has
+  // not — and there is no scrim to be a parent of.
+  it("is a dialog, but not a modal one, and has no scrim", () => {
     renderModule("/today?view=board&task=t1");
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toBe(pane());
-    expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(dialog.parentElement).toBe(scrim());
+    expect(dialog.getAttribute("aria-modal")).toBeNull();
+    expect(document.querySelector(".tm-drawer-scrim")).toBeNull();
   });
 
   // §7: the popup is not resizable, for the reason the sheet is not — its
@@ -153,32 +151,52 @@ describe("a Task opened from the Board", () => {
     expect(screen.queryByRole("separator", { name: "Resize the task detail" })).toBeNull();
   });
 
-  // TASK_PRIORITY_CHECKBOX_DESIGN.md §5. The × goes because the scrim is
-  // already a way out for a pointer — and the corner it was holding is where
-  // the flag now stands.
-  it("drops the close button, which the scrim has made redundant", () => {
+  // §3.2 reverses TASK_PRIORITY_CHECKBOX_DESIGN.md §5: the × went because the
+  // scrim was another way out for a pointer, and the scrim is gone. What is
+  // left outside the popup is the page itself, and pressing the page to close
+  // a panel is also how you press something you did not mean to.
+  it("keeps its close button, now that there is no scrim", () => {
     renderModule("/today?view=board&task=t1");
 
-    expect(pane().querySelector(".tm-drawer-close")).toBeNull();
+    expect(pane().querySelector(".tm-drawer-close")).not.toBeNull();
   });
 
-  // §5.2. Every field is a draft that flushes on unmount, and Escape already
+  // §3.2. Every field is a draft that flushes on unmount, and Escape already
   // closes by this same path, so there is nothing for the gesture to lose.
-  it("closes when the scrim is pressed", () => {
+  it("closes when the press lands outside it", async () => {
     const { onNavigate } = renderModule("/today?view=board&task=t1");
 
-    fireEvent.mouseDown(scrim()!);
+    // The listener is added a frame late on purpose — the click that OPENED
+    // the popup is still being dispatched when it mounts.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fireEvent.mouseDown(document.body);
 
     expect(onNavigate).toHaveBeenCalledWith("/today?view=board");
   });
 
-  it("stays open when the press lands on the popup itself", () => {
+  it("stays open when the press lands on the popup itself", async () => {
     const { onNavigate } = renderModule("/today?view=board&task=t1");
 
-    // The same event, one element in. A press that bubbles up from the pane
-    // is a press INSIDE the popup — selecting text, aiming at a control —
-    // and dismissing on it would close the panel the user is working in.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // A press inside the popup — selecting text, aiming at a control — must
+    // not dismiss the panel the reader is working in.
     fireEvent.mouseDown(pane());
+
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  // The surfaces this panel opens — the schedule editor, Priority, the List
+  // picker — are portalled to the layer root, which is OUTSIDE the popup in
+  // the DOM. Pressing one of them is pressing inside the Detail as far as the
+  // reader is concerned (§3.2).
+  it("stays open when the press lands on a floating layer it opened", async () => {
+    const { onNavigate } = renderModule("/today?view=board&task=t1");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const layerRoot = document.getElementById("floating-layer-root")!;
+    const surface = document.createElement("div");
+    layerRoot.appendChild(surface);
+    fireEvent.mouseDown(surface);
 
     expect(onNavigate).not.toHaveBeenCalled();
   });
@@ -189,18 +207,18 @@ describe("the same Task opened from the list", () => {
     renderModule("/today?task=t1");
 
     expect(pane().classList.contains("is-overlay-drawer")).toBe(true);
-    expect(pane().classList.contains("is-center-modal")).toBe(false);
+    expect(pane().classList.contains("is-anchored-popover")).toBe(false);
   });
 
-  it("draws no scrim and claims no dialog role", () => {
+  it("claims no dialog role", () => {
     renderModule("/today?task=t1");
 
-    expect(scrim()).toBeNull();
+    expect(document.querySelector(".tm-drawer-scrim")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  // The other half of §5: with no scrim to press, the × is the only way out
-  // for a pointer, so it stays.
+  // The column never had a scrim either, so the × has always been its way out
+  // for a pointer.
   it("keeps its close button", () => {
     renderModule("/today?task=t1");
 

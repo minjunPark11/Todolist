@@ -11,6 +11,8 @@
 // yesterday.
 import { scheduleSpan } from "./scheduleQueries";
 import type { Schedule } from "./types";
+import { formatClock } from "../../utils/clock";
+import type { TimeFormat } from "../../types";
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "UTC" };
 const WITH_YEAR: Intl.DateTimeFormatOptions = { ...DATE_FORMAT, year: "numeric" };
@@ -69,11 +71,26 @@ export function formatScheduleTrigger(schedule: Schedule, today: string, locale 
  * finishing. Writing them as a single "09:00 – 17:00" would read as one
  * afternoon rather than as the shape of a multi-day block.
  */
-export function formatTimeSummary(schedule: Schedule, locale = "en-US"): string {
+export function formatTimeSummary(
+  schedule: Schedule,
+  locale = "en-US",
+  /**
+   * The app's clock setting, where the caller has one
+   * (SCHEDULE_TIME_FIELD_DESIGN.md §13.4).
+   *
+   * Optional and locale-shaped by default, because two of the three callers
+   * are formatting for a place with no setting to read. Given, it wins: a
+   * reader who chose 24 hours was being told `오후 11:00` by this row while
+   * the field one line below said `23:00`.
+   */
+  timeFormat?: TimeFormat,
+): string {
   if (schedule.startTime === null) return "";
-  const start = formatLocalTime(schedule.startTime, locale);
+  const write = (time: string) =>
+    timeFormat ? formatClock(time, timeFormat, locale) : formatLocalTime(time, locale);
+  const start = write(schedule.startTime);
   if (schedule.endTime === null) return start;
-  const end = formatLocalTime(schedule.endTime, locale);
+  const end = write(schedule.endTime);
   const sameDay = schedule.startDate === null || schedule.startDate === schedule.dueDate;
   return sameDay ? `${start} – ${end}` : `${start} → ${end}`;
 }

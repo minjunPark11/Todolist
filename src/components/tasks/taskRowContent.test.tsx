@@ -191,16 +191,17 @@ describe("what the caller decides", () => {
     expect(screen.queryByText("School")).toBeNull();
   });
 
-  it("leaves the flag off where the row's place is already the priority", () => {
-    // D1: every card in a matrix box has that box's priority, so the flag
-    // would be the header repeated once per card. The task is unchanged —
-    // this is the view declining to draw it, not the record losing it.
-    draw({ priority: "high" }, { showPriority: false });
-    expect(screen.queryByLabelText("High")).toBeNull();
+  it("draws no priority flag, at either setting", () => {
+    // TASK_ROW_TWO_LINES_DESIGN.md §2: the flag is gone. It said in a second
+    // channel what the checkbox says in colour and in its name, and the
+    // reference app draws none — so `showPriority` now switches those two and
+    // nothing else. The record is untouched either way.
+    draw({ priority: "high" });
+    expect(document.querySelector(".tm-task-priority")).toBeNull();
 
     cleanup();
-    draw({ priority: "high" });
-    expect(screen.getByLabelText("High")).toBeTruthy();
+    draw({ priority: "high" }, { showPriority: false });
+    expect(document.querySelector(".tm-task-priority")).toBeNull();
   });
 
   it("offers a checkbox that reports the record, and asks rather than deciding", () => {
@@ -236,11 +237,30 @@ describe("the checkbox says the priority (§4.1)", () => {
     expect(box().className).toBe("tm-check is-none");
   });
 
-  it("leaves the priority out of the box's name", () => {
-    // The flag beside it already carries the level for a screen reader. Said
-    // twice, a reader has to work out whether they heard two facts or one.
+  // Reversed by TASK_ROW_TWO_LINES_DESIGN.md §2.2. This test used to hold the
+  // opposite — the level was left OUT of the name because the flag beside the
+  // box carried it. The flag is gone, so colour is all that is left on the
+  // row, and colour is exactly what a screen reader and a forced-colours
+  // display do not get.
+  it("puts the level in the box's name, where the row says it at all", () => {
     draw({ priority: "high" });
+    expect(screen.getByRole("checkbox", { name: "Complete Read ch. 4 (High)" })).toBe(box());
+
+    cleanup();
+    draw({ priority: "none" });
     expect(screen.getByRole("checkbox", { name: "Complete Read ch. 4" })).toBe(box());
+
+    // The same one switch: no colour, no name (the matrix's cards).
+    cleanup();
+    draw({ priority: "high" }, { showPriority: false });
+    expect(screen.getByRole("checkbox", { name: "Complete Read ch. 4" })).toBe(box());
+  });
+
+  it("says nothing about the priority of work that is already done", () => {
+    // A ticked box is grey whatever the level was (§16), so a name that still
+    // announced `High` would be describing a colour that is not on screen.
+    draw({ priority: "high", status: "completed", completedAt: "2026-08-27T10:00:00.000Z" });
+    expect(screen.getByRole("checkbox", { name: "Reopen Read ch. 4" })).toBe(box());
   });
 });
 
@@ -257,5 +277,35 @@ describe("a note among the tasks", () => {
     // Everything else a task has, a note has: a List, a date, tags, a body.
     draw({ kind: "note" } as never);
     expect(screen.getByRole("button", { name: "Open Read ch. 4" })).toBeTruthy();
+  });
+});
+
+// TASK_ROW_TWO_LINES_DESIGN.md §3. The layout itself is the stylesheet's —
+// what this file can hold is that the row TELLS it when there is a second
+// line, because that is the switch the stylesheet turns the wrap on with.
+describe("the row that is two lines", () => {
+  const open = () => document.querySelector(".tm-task-open") as HTMLElement;
+
+  it("says it has a body, where a body is drawn", () => {
+    draw({ notes: "the first line\nand the rest" }, { showDetails: true });
+
+    expect(open().classList.contains("has-body")).toBe(true);
+    expect(document.querySelector(".tm-task-body")?.textContent).toBe("the first line");
+  });
+
+  it("says nothing where the body is only reported", () => {
+    // `Show details` off: the body is a 12px mark in the tips, and the row is
+    // one line — the wrap would have nothing to wrap.
+    draw({ notes: "the first line" });
+
+    expect(open().classList.contains("has-body")).toBe(false);
+    expect(screen.getByRole("img", { name: "Has notes" })).toBeTruthy();
+  });
+
+  it("says nothing where there is no body to draw", () => {
+    draw({}, { showDetails: true });
+
+    expect(open().classList.contains("has-body")).toBe(false);
+    expect(document.querySelector(".tm-task-body")).toBeNull();
   });
 });

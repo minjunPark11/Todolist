@@ -39,14 +39,37 @@ describe("the presentation registries — §15.17/§15.14", () => {
   });
 
   // BOARD_TASK_POPUP_DESIGN.md §4.2, all eight cells.
-  it("opens the Board's Detail as a centred popup everywhere but mobile", () => {
+  it("opens the Board's Detail as an anchored popup everywhere but mobile", () => {
     expect(RESPONSIVE_MODES.map((mode) => taskDetailPresentationFor(mode, "board"))).toEqual([
       // Mobile keeps the screen-owning surface: a popup at 375px is a
       // full-screen one with wasted margins, and `detail-full` hangs off this.
       "full-screen",
-      "center-modal",
-      "center-modal",
-      "center-modal",
+      "anchored-popover",
+      "anchored-popover",
+      "anchored-popover",
+    ]);
+  });
+
+  // The Matrix asked for the same thing, for the same reason worn differently:
+  // its four quadrants are one grid, and a Detail column is paid for by the
+  // two on the right.
+  it("opens the Matrix's Detail as an anchored popup everywhere but mobile", () => {
+    expect(RESPONSIVE_MODES.map((mode) => taskDetailPresentationFor(mode, "matrix"))).toEqual([
+      "full-screen",
+      "anchored-popover",
+      "anchored-popover",
+      "anchored-popover",
+    ]);
+  });
+
+  // The Calendar's week grid is seven columns of an hour scale; a Detail
+  // column taken off its right takes a day with it.
+  it("opens the Calendar's Detail as an anchored popup everywhere but mobile", () => {
+    expect(RESPONSIVE_MODES.map((mode) => taskDetailPresentationFor(mode, "calendar"))).toEqual([
+      "full-screen",
+      "anchored-popover",
+      "anchored-popover",
+      "anchored-popover",
     ]);
   });
 

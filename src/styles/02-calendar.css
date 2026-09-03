@@ -720,9 +720,17 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  border: 1.5px dashed var(--color-primary);
+  /* Solid, not dashed (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §1). A dashed
+     edge says "not settled yet", and by the time this block is drawn the
+     times ARE settled — the form beside it is asking for the title. */
+  border: 2px solid var(--color-primary);
   border-radius: var(--rounded-xs);
-  background: var(--color-primary-tint);
+  /* Mixed from the accent rather than read from `--color-primary-tint`, which
+     is a `rgba(0, 102, 204, .1)` literal that never learned about the accent
+     setting: with an orange accent this block was an orange border around a
+     blue fill. 22% is where the shape reads over the grid and the label
+     inside it — the same blue — still has its contrast. */
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent);
   padding: 4px 6px;
   z-index: 26;
   overflow: hidden;
@@ -855,19 +863,33 @@
   width: 56px;
   display: flex;
   justify-content: flex-end;
-  padding-right: 4px;
+  /* 3px rather than 4: the pill below is one line now and needs the width.
+     What is on the other side of this gap is a grid line, not content. */
+  padding-right: 3px;
   transform: translateY(-50%);
   box-sizing: border-box;
 }
 
+/* The clock, on ONE line.
+   ==========================================================================
+   `오후 11:28` wants 56px at this size and the gutter offers 52, so it wrapped
+   — a two-line pill twice the height of the line it marks, with `오후` sitting
+   above the time it belongs to. English never showed it (`11:28 PM` fits),
+   which is how it survived.
+
+   The 4px padding is what buys the last of the width back: 52.1px of pill in
+   the 53 this leaves. A language that still does not fit now overhangs the
+   gutter by a pixel or two instead of folding in half, which is the better of
+   the two failures — the badge stays a clock. */
 .gcal-now-badge span {
   background: var(--calendar-now-color);
   color: #fff;
   font-size: 0.66rem;
   font-weight: 600;
   line-height: 1;
-  padding: 3px 6px;
+  padding: 3px 4px;
   border-radius: var(--rounded-pill);
+  white-space: nowrap;
 }
 
 .gcal-now-track {
@@ -934,6 +956,35 @@
   font-size: 0.9rem;
   background: var(--color-canvas);
   color: var(--color-ink);
+}
+
+/* The due-date row (§2.3). A label and a button rather than a label and an
+   input, because what opens is a surface and not a field — but it keeps the
+   shape of the rows above it, so the form still reads as one column. */
+.gcal-newtask-due {
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--color-ink-muted-80);
+}
+
+.gcal-newtask-duebtn {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-sm);
+  padding: 8px 10px;
+  background: var(--color-canvas);
+  color: var(--color-ink-muted-48);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gcal-newtask-duebtn.is-set {
+  color: var(--color-ink);
+}
+
+.gcal-newtask-duebtn:hover {
+  border-color: var(--color-primary);
 }
 
 .gcal-newtask-when {
@@ -1072,7 +1123,18 @@
 
 .gcal-popover {
   position: fixed;
-  z-index: 1300;
+  /* 50, not 1300 (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §2.3).
+     ==========================================================================
+     1300 predates the floating layer system, whose portal root sits at 100 —
+     so anything this popover OPENS was drawn underneath it. That did not
+     matter while it only held a date and a memo; it matters now that the new
+     task form inside it opens the schedule editor, which appeared behind the
+     form that asked for it (seen, 2026-09-04).
+
+     50 puts it in the same band as the app's own covering surfaces (the Detail
+     popup is 45) and clear of everything the calendar itself draws — the
+     highest is the all-day resizer at 40. */
+  z-index: 50;
   display: grid;
   gap: 10px;
   align-content: start;
@@ -1250,6 +1312,14 @@
 .gcal-popover .gcal-newtask-form {
   border: 0;
   padding: 0;
+}
+
+/* The form is not a summary card (§2.2). 340px cut its Confirm button off, so
+   the reader had to scroll a popover to finish what they had started; this is
+   as tall as the form ever gets, and the scroll is left in place for a window
+   too short to hold it. */
+.gcal-popover.is-form {
+  max-height: min(560px, calc(100vh - 32px));
 }
 
 /* --- Year view (spec §8): 4x3 months, date numbers only --- */

@@ -127,12 +127,8 @@ function Harness({
     tasks,
     focusBusy: false,
     onMutate,
-    onDuplicate: () => null,
-    onSaveAsTemplate: () => "",
-    onDeleteTemplate: () => {},
     onDeleteForever: () => {},
     onStartFocus: () => {},
-    linkFor: (taskId) => `https://example.test/#${taskId}`,
   });
   const open = tasks.find((row) => row.id === openId);
   if (!open) return null;

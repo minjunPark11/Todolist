@@ -821,12 +821,14 @@
    the foot of this file stacks the four boxes into one scrolling column, and
    there is no grid there to hold still.
 
-   `--titlebar-h` is 0px everywhere except the desktop build's own caption
-   (19-app-shell.css), so this one line is correct in the browser and in Tauri.
+   `100dvh` and not `calc(100dvh - var(--titlebar-h))`: the caption row stopped
+   reserving space at the top of the window (WINDOW_TOP_ROW_DESIGN.md §3), so
+   this page starts at the window edge like every other one and subtracting the
+   band would leave 32px of nothing at the bottom.
    -------------------------------------------------------------------------- */
 @media (min-width: 901px) {
   .app-shell > main:has(.ff-matrix-page) {
-    height: calc(100dvh - var(--titlebar-h));
+    height: 100dvh;
     min-height: 0;
     /* `auto` down the page and not `hidden`: the window can be shorter than
        the smallest honest matrix, and then something has to give. What gives

@@ -20,7 +20,6 @@
 // reader who takes that for "09:00–17:00 every day" has been misled by the
 // layout rather than by the data. Hence the dates beside the fields.
 import { type LocalDate, type LocalTime, type ScheduleDraft } from "../../domain/schedule";
-import { formatClock } from "../../utils/clock";
 import { useTimeFormat } from "../../utils/appPrefs";
 import { useT } from "../../i18n";
 import { TimeField } from "./TimeField";
@@ -36,14 +35,12 @@ interface TimeRowProps {
   onCollapse: () => void;
 }
 
-/**
- * The four times most blocks start at.
- *
- * Kept beside the list rather than replaced by it: the list is 48 rows and
- * these are one press. They set the START only — an end is a length, and
- * guessing one would put a block on the calendar the user never sized.
- */
-const PRESETS: readonly LocalTime[] = ["09:00", "13:00", "18:00", "21:00"];
+/* The four preset times (09:00 · 13:00 · 18:00 · 21:00) stood here
+   (§13.1). They were kept "beside the list rather than replaced by it"
+   because the list is 48 rows and a preset was one press — and §13.2 gave the
+   list the same ending: choosing from it now closes the row and commits. What
+   was left was four rows of chrome duplicating four rows of the list, in half
+   the editor's height. The reference app draws none. */
 
 function dayLabel(date: LocalDate | null, locale: string): string {
   if (date === null) return "";
@@ -88,24 +85,13 @@ export function TimeRow({ draft, locale, onStartTime, onEndTime, onClear, onColl
         openOnMount
       />
 
-      <div className="sched-time-presets">
-        {PRESETS.map((preset) => (
-          <button
-            type="button"
-            key={preset}
-            className={draft.startTime === preset ? "is-active" : ""}
-            aria-pressed={draft.startTime === preset}
-            onClick={() => onStartTime(preset)}
-          >
-            {formatClock(preset, timeFormat, locale)}
-          </button>
-        ))}
-      </div>
-
-      {/* An end needs a start to measure from (`setEndTime` refuses one
-          otherwise), so the field appears with it rather than sitting there
-          inert. */}
-      {draft.startTime !== null ? (
+      {/* Only where there IS an end, and never as a consequence of picking a
+          start (§13.2, D1-B). The condition used to be `startTime !== null`,
+          so choosing a time asked a second question in the same breath — the
+          reader wanted one answer and got a form. A block that already has an
+          end keeps it editable here; new ones are drawn on the calendar, which
+          is where a LENGTH is a gesture rather than two more fields. */}
+      {draft.endTime !== null ? (
         <TimeField
           value={draft.endTime}
           onChange={onEndTime}
