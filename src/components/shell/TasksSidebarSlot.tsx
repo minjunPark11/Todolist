@@ -29,7 +29,6 @@ import { resolveListView } from "../../domain/tasks/listView";
 import { listUrlFor, taskUrlFor } from "../../app/taskScopeUrl";
 import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
 import { TasksSidebar, type SidebarDrawer } from "../tasks/TasksSidebar";
-import { ListManager } from "../tasks/ListManager";
 import { CreateListModal } from "../tasks/CreateListModal";
 
 export interface TasksSidebarSlotProps {
@@ -57,8 +56,6 @@ export interface TasksSidebarSlotProps {
     sidebarFolderId?: string;
   }) => Promise<string> | string;
   onCreateSidebarFolder: (name: string) => Promise<string> | string;
-  onRestoreList: (listId: string) => void;
-  onPermanentlyDeleteList: (listId: string) => void;
 }
 
 export function TasksSidebarSlot({
@@ -77,12 +74,11 @@ export function TasksSidebarSlot({
   onBeforeNavigate,
   onCreateList,
   onCreateSidebarFolder,
-  onRestoreList,
-  onPermanentlyDeleteList,
 }: TasksSidebarSlotProps) {
-  // §13.25: a management surface, not a Scope — so it is state here and not a
-  // tenth route.
-  const [managing, setManaging] = useState(false);
+  // The List manager's `managing` state stood here. Its dialog was the only
+  // door to archived and deleted Lists, and that door is the Trash now
+  // (TRASH_PERMANENT_DELETE_DESIGN.md §16.7) — a Scope, which is what §13.25
+  // said a management surface was not, and the reason nobody could find it.
   // §0.7 R0-3: the dialog is UI state and nothing about it is in the URL, the
   // same treatment §10.23 gives the Command Menu. `null` is §1.5's S1 (CLOSED);
   // a string is the Folder it was started from, "" for the Lists header.
@@ -132,7 +128,6 @@ export function TasksSidebarSlot({
         sidebarFolders={sidebarFolders}
         tags={tags}
         savedFilters={savedFilters}
-        onManageLists={() => openFromSidebar(() => setManaging(true))}
         onCreateList={(contextFolderId) => openFromSidebar(() => setCreatingListIn(contextFolderId))}
         current={current}
         onNavigate={go}
@@ -168,15 +163,6 @@ export function TasksSidebarSlot({
         />
       ) : null}
 
-      {managing ? (
-        <ListManager
-          lists={lists}
-          tasks={tasks}
-          onRestore={onRestoreList}
-          onPermanentlyDelete={onPermanentlyDeleteList}
-          onClose={() => setManaging(false)}
-        />
-      ) : null}
     </>
   );
 }

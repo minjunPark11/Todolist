@@ -208,7 +208,7 @@ describe("emptyTrash", () => {
 
     let removed = -1;
     act(() => {
-      removed = result.current.emptyTrash();
+      removed = result.current.emptyTrash().tasks;
     });
 
     expect(removed).toBe(1);
@@ -224,7 +224,7 @@ describe("emptyTrash", () => {
 
     let removed = -1;
     act(() => {
-      removed = result.current.emptyTrash();
+      removed = result.current.emptyTrash().tasks;
     });
 
     expect(removed).toBe(0);

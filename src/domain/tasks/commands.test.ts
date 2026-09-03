@@ -37,7 +37,9 @@ describe("availableCommands", () => {
   // Gate 8, third line, and §10.33's own example.
   it("offers the Board only where the Scope has one", () => {
     expect(availableCommands("board", ctx({ scope: { kind: "inbox" } }), t).map((c) => c.id)).toEqual(["viewBoard"]);
-    expect(availableCommands("board", ctx({ scope: { kind: "today" } }), t)).toEqual([]);
+    // Today has one now (TASK_VIEWS_EVERYWHERE_DESIGN.md §2). The Trash does
+    // not, and that is the half of this test still doing work.
+    expect(availableCommands("board", ctx({ scope: { kind: "today" } }), t).map((c) => c.id)).toEqual(["viewBoard"]);
     expect(availableCommands("board", ctx({ scope: { kind: "trash" } }), t)).toEqual([]);
   });
 
@@ -49,7 +51,7 @@ describe("availableCommands", () => {
 
 describe("canRunCommand — the same question at execution time", () => {
   it("refuses what it would not have offered", () => {
-    expect(canRunCommand("viewBoard", ctx({ scope: { kind: "today" } }))).toBe(false);
+    expect(canRunCommand("viewBoard", ctx({ scope: { kind: "trash" } }))).toBe(false);
     expect(canRunCommand("viewBoard", ctx({ scope: { kind: "inbox" } }))).toBe(true);
     expect(canRunCommand("goInbox", ctx({ scope: { kind: "inbox" } }))).toBe(false);
   });

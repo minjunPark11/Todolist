@@ -121,6 +121,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   reduceMotion: false,
   timezone: detectTimezone(),
   aiModel: "",
+  matrixHideCompleted: false,
 };
 
 const repeatTypes = ["none", "daily", "weekly", "monthly", "yearly"] as const;
@@ -405,6 +406,11 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
     // saved value survives untouched if sidebar counts are ever built.
     sidebarCollapsed: settings?.sidebarCollapsed ?? DEFAULT_APP_SETTINGS.sidebarCollapsed,
     reduceMotion: settings?.reduceMotion ?? DEFAULT_APP_SETTINGS.reduceMotion,
+    // Not `...(x ? {} : {})` like its matrix neighbours below: this one is a
+    // boolean, so a stored `false` must survive as a value rather than be
+    // spread away as "absent". Absent and `false` mean the same thing anyway
+    // (§33.2.5) — finished work stays in its box.
+    matrixHideCompleted: settings?.matrixHideCompleted ?? DEFAULT_APP_SETTINGS.matrixHideCompleted,
     // A stored value wins here even when it disagrees with this device: the
     // refresh effect owns correcting it, and doing it here instead would
     // rewrite the field on every single load.

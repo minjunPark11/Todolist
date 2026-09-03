@@ -27,12 +27,24 @@ export type TaskScopeKind =
   | "trash";
 
 /**
- * MVP allows Board on Inbox and a real List only (§5.45), and Gantt with it.
+ * The three Views, and every WORKING Scope now offers all three
+ * (TASK_VIEWS_EVERYWHERE_DESIGN.md §1, §2).
  *
- * Gantt joins on the same terms rather than on its own: §5.45's rule is about
- * which Scopes are ONE List's screen, and a timeline over a Scope that gathers
- * several Lists would draw bars whose rows belong to different places. The two
- * Scopes that pass that test are the two that already offer Board.
+ * §5.45 used to allow Board and Gantt on the Inbox and a real List only, and
+ * its reason was that a Scope gathering several Lists "would draw bars whose
+ * rows belong to different places". Two things retired it:
+ *
+ *   - the timeline already answers that. Its `groupBy` is `"list"`
+ *     (`domain/view/spaceViews.ts`), so a bar sits under a heading naming the
+ *     List it belongs to — the very context §5.45 said was missing;
+ *   - the Board's columns now have an answer for those Scopes too. They are
+ *     the Lists (`domain/tasks/boardAxis.ts`), which makes a drop a move
+ *     between Lists rather than a statement about a Section that cannot exist.
+ *
+ * What stays List-only is the finished work: Completed, Won't Do and Trash.
+ * A board there would let a card be dragged into a different List — a write to
+ * a record that is over — and those three Scopes are the ones with no `⋯` menu
+ * at all (`domain/view/scopeViewOptions.ts`). §2.4 has the rest of the reason.
  *
  * This is the Tasks Module's set, not the whole app's. `List.defaultViewKey`
  * stores a free string on purpose (Add List design §13.7) — a key this build
@@ -96,14 +108,15 @@ export interface TaskScopePolicy {
 }
 
 const LIST_ONLY = ["list"] as const;
-const ONE_LIST_VIEWS = ["list", "board", "gantt"] as const;
+/** Every View, for every Scope whose work is still live. */
+const ALL_VIEWS = ["list", "board", "gantt"] as const;
 
 export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
   today: {
     kind: "today",
     segment: "today",
     hasId: false,
-    allowedViews: LIST_ONLY,
+    allowedViews: ALL_VIEWS,
     defaultView: "list",
     canCreate: true,
     // §7.5 keeps free reorder out of the MVP so that dragging a due-only Task
@@ -116,7 +129,7 @@ export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
     kind: "upcoming",
     segment: "upcoming",
     hasId: false,
-    allowedViews: LIST_ONLY,
+    allowedViews: ALL_VIEWS,
     defaultView: "list",
     canCreate: true,
     canManualReorder: false,
@@ -127,7 +140,7 @@ export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
     kind: "inbox",
     segment: "inbox",
     hasId: false,
-    allowedViews: ONE_LIST_VIEWS,
+    allowedViews: ALL_VIEWS,
     defaultView: "list",
     canCreate: true,
     canManualReorder: true,
@@ -138,7 +151,7 @@ export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
     kind: "list",
     segment: "list",
     hasId: true,
-    allowedViews: ONE_LIST_VIEWS,
+    allowedViews: ALL_VIEWS,
     defaultView: "list",
     canCreate: true,
     canManualReorder: true,
@@ -149,7 +162,7 @@ export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
     kind: "folder",
     segment: "folder",
     hasId: true,
-    allowedViews: LIST_ONLY,
+    allowedViews: ALL_VIEWS,
     defaultView: "list",
     canCreate: true,
     canManualReorder: false,
@@ -160,7 +173,7 @@ export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
     kind: "tag",
     segment: "tag",
     hasId: true,
-    allowedViews: LIST_ONLY,
+    allowedViews: ALL_VIEWS,
     defaultView: "list",
     canCreate: true,
     canManualReorder: false,
@@ -171,7 +184,7 @@ export const scopeRegistry: Readonly<Record<TaskScopeKind, TaskScopePolicy>> = {
     kind: "filter",
     segment: "filter",
     hasId: true,
-    allowedViews: LIST_ONLY,
+    allowedViews: ALL_VIEWS,
     defaultView: "list",
     canCreate: true,
     canManualReorder: false,

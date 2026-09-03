@@ -42,14 +42,13 @@ import { TaskDeleteForeverGate } from "./TaskDeleteForeverGate";
 import { TrashEmptyGate } from "./TrashEmptyGate";
 import { MoreMenu, type MoreMenuItem } from "../kit";
 import {
-  SCOPE_DATE_BY,
   scopeHasViewOptions,
   scopeOptionKey,
   viewOptionsFor,
   type ScopeViewOptions,
 } from "../../domain/view/scopeViewOptions";
 import { ScopeViewOptionsDialog } from "./ScopeViewOptionsDialog";
-import { trashedTaskIds } from "../../domain/tasks/trash";
+import { emptyTrash as emptyTrashSummary, trashedTaskIds, type TrashSummary } from "../../domain/tasks/trash";
 import type { TaskDetailBundle } from "./taskDetailBundle";
 import { useTaskCommands } from "../../hooks/useTaskCommands";
 import type { CreateResolution } from "../../domain/tasks/createResolver";
@@ -73,10 +72,21 @@ import {
   type InboxBucket,
   type InboxColumnNames,
 } from "../../domain/tasks/board";
+import {
+  NO_LIST_COLUMN,
+  boardAxisFor,
+  createInListColumn,
+  listAxisColumnOf,
+  listAxisColumns,
+  moveToListColumn,
+} from "../../domain/tasks/boardAxis";
 import { canCommit, resolveCreateContext } from "../../domain/tasks/createResolver";
 import { placeTask, sortByManualOrder } from "../../domain/tasks/sortKey";
 import { sectionIdFor } from "../../domain/tasks/sections";
 import { TaskBoard } from "./TaskBoard";
+import { TrashLists } from "./TrashLists";
+import { binnedLists } from "../../domain/spaces/lifecycle";
+import { ListDeleteForeverGate } from "./ListDeleteForeverGate";
 import { TaskRowContent } from "./TaskRowContent";
 import { TaskGanttView } from "../TaskGanttView";
 import { projectItems } from "../../domain/view/item";
@@ -193,7 +203,6 @@ interface TasksModuleProps {
   onCreateSidebarFolder: (name: string) => Promise<string> | string;
   /** §13.23/§6.56: restoring a List, and the one hard delete in the app. */
   lifecycle: {
-    onArchiveList: (listId: string) => void;
     onTrashList: (listId: string) => void;
     onRestoreList: (listId: string) => void;
     onPermanentlyDeleteList: (listId: string) => void;
@@ -220,7 +229,8 @@ interface TasksModuleProps {
    */
   onDeleteForever: (taskId: string) => void;
   /** §3.3's whole Trash, gone. Answers with how many actually went. */
-  onEmptyTrash: () => number;
+  /** Returns what it removed, which is what the confirmation said (§16.5). */
+  onEmptyTrash: () => TrashSummary;
   /**
    * What each Scope shows, and how to change one (§3.3).
    *
@@ -400,15 +410,21 @@ export function TasksModule(props: TasksModuleProps) {
   // the reader to do different things.
   const missing = namedRecordMissing(scope, lists, folders, sidebarFolders, tags, savedFilters);
   /** A menu row that is a state says so with the same mark everywhere. */
-  const hasBoard = policy.allowedViews.includes("board");
   const prefix = (on: boolean) => (on ? String.fromCharCode(10003) + " " : "");
-  /** The two a List can be told, or nothing for every other Scope. */
+  /**
+   * What a List can be told, or nothing for every other Scope.
+   *
+   * `Archive list` stood above `Delete` until §16.6. It was a SECOND soft
+   * state whose only door back was the same hidden dialog `Delete`'s was — so
+   * it was the weaker copy of its neighbour, and the reader had to choose
+   * between two words for one outcome. Delete is the one that survives,
+   * because it is the one the Trash now shows and takes back.
+   */
   function listActionsFor(ref: TaskScopeRef): MoreMenuItem[] | null {
     if (ref.kind !== "list" || missing) return null;
     if (isInboxList(lists.find((list) => list.id === ref.id) ?? { kind: "regular" })) return null;
     return [
       { separator: true },
-      { label: t("tasks.archiveList"), onClick: () => props.lifecycle.onArchiveList(ref.id) },
       { label: t("tasks.deleteList"), danger: true, onClick: () => props.lifecycle.onTrashList(ref.id) },
     ];
   }
@@ -426,6 +442,25 @@ export function TasksModule(props: TasksModuleProps) {
   }
 
   const scopeMenuItems: MoreMenuItem[] = [
+    // The views, first and as icons (§3.2). Absent where there is nothing to
+    // choose — §16.26 Gate 3, one level up from where it used to live: a
+    // single-option selector is not a choice, and the three finished-work
+    // Scopes have one view (and no menu to put it in either).
+    ...(policy.allowedViews.length > 1
+      ? [
+          {
+            heading: t("tasks.viewLabel"),
+            choices: policy.allowedViews.map((view) => ({
+              id: view,
+              label: t(`tasks.view.${view}`),
+              icon: <ViewIcon view={view} />,
+              selected: view === state.view,
+              onClick: () => setView(view),
+            })),
+          } as MoreMenuItem,
+          { separator: true } as MoreMenuItem,
+        ]
+      : []),
     // Only on the Board: the list view already leaves finished work out of
     // its query (`isActive`), so there is nothing on that screen for this to
     // hide. §15.5 again — the same clause that took `Kanban Size` off the
@@ -444,21 +479,16 @@ export function TasksModule(props: TasksModuleProps) {
     },
     { separator: true },
     /**
-     * The dialog, or the one setting that would have been alone in it (Q4).
+     * The dialog. Q4's other half is gone with the Scope it was for.
      *
-     * Two of its three rows act on columns, so on a Scope with no Board the
-     * dialog would open a scrim and a modal to show a single line. The line
-     * comes to the menu instead — as two rows with a mark, which is the shape
-     * this app already uses for a small closed choice (the views above, and
-     * Today’s axis picker). Their labels say what they are FOR, because a
-     * menu has no heading to say it for them.
+     * Two of the dialog's three rows act on COLUMNS, so a Scope with no Board
+     * would have opened a scrim and a modal to show a single line — and Q4
+     * brought that line into the menu as two marked rows instead. There is no
+     * such Scope left: every Scope that has this menu has a Board now
+     * (TASK_VIEWS_EVERYWHERE_DESIGN.md §2), so the two rows served nobody and
+     * `Task Time` has one door again rather than two.
      */
-    ...(hasBoard
-      ? [{ label: t("tasks.viewOptions"), onClick: () => setViewOptionsOpen(true) } as MoreMenuItem]
-      : SCOPE_DATE_BY.map((value) => ({
-          label: prefix(viewOptions.dateBy === value) + t("tasks.dateByMenu." + value),
-          onClick: () => patchViewOptions({ dateBy: value }),
-        }))),
+    { label: t("tasks.viewOptions"), onClick: () => setViewOptionsOpen(true) },
     /**
      * §13.21/§13.22, at the bottom (Q7).
      *
@@ -531,9 +561,26 @@ export function TasksModule(props: TasksModuleProps) {
    * be deleted.
    */
   const [emptyingTrash, setEmptyingTrash] = useState(false);
+  /** Which List the second ask is open for, or "" (§16.4). */
+  const [deletingList, setDeletingList] = useState("");
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
 
+  /**
+   * What the Trash holds, as the two numbers the header reads (§16.5).
+   *
+   * The count comes from the domain rather than from the Scope's row count,
+   * and that is not pedantry: the Trash list hides child Tasks, so a reader
+   * could be shown "3" and lose five. The List half is here for the same
+   * reason — the header's button has to appear when the only thing in the
+   * Trash is a List, and the question has to say what that costs.
+   */
   const trashedCount = trashedTaskIds(tasks).length;
+  const binnedListIds = binnedLists(lists).map((list) => list.id);
+  const trashSummary = useMemo(
+    () => emptyTrashSummary({ tasks, subtasks: [], checkItems: [], taskTags: [], reminders: [] }, binnedListIds).summary,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tasks, binnedListIds.join(",")],
+  );
 
   const commands = useTaskCommands({
     tasks,
@@ -700,8 +747,18 @@ export function TasksModule(props: TasksModuleProps) {
   );
 
   const boardListId = scope.kind === "list" ? scope.id : "";
+  /**
+   * Which question this Scope's columns answer
+   * (TASK_VIEWS_EVERYWHERE_DESIGN.md §2.1).
+   *
+   * Read once and branched on everywhere below, rather than five separate
+   * `scope.kind === "inbox"` tests: the columns, the card's column, the drop
+   * and the create are FOUR HALVES OF ONE ANSWER, and a screen that asks the
+   * question four times is a screen where three of them can drift.
+   */
+  const axis = boardAxisFor(scope);
   const columns =
-    scope.kind === "inbox"
+    axis === "inboxRules"
       ? // The Board draws columns; the Inbox's are a list the user arranged, so
         // they are translated into that shape here rather than the Board being
         // taught a second model. `requiresDate` is derived from the rule now —
@@ -712,7 +769,13 @@ export function TasksModule(props: TasksModuleProps) {
           ...(column.name ? { name: column.name } : {}),
           requiresDate: columnAsksForDate(column),
         }))
-      : listBoardColumns(boardListId, listSections);
+      : axis === "sections"
+        ? listBoardColumns(boardListId, listSections)
+        : // The Lists this Scope gathered, which is the only column model that
+          // means anything where the rows come from several of them. Built from
+          // `rows` — the Scope's own answer — so a column cannot appear for
+          // work the screen is not showing.
+          listAxisColumns(scope, rows, { lists }, { defaultList: t("list.defaultName"), inbox: t("tasks.inbox") });
 
   // The timeline's three arguments, built from the rows the Scope already
   // chose.
@@ -749,9 +812,11 @@ export function TasksModule(props: TasksModuleProps) {
   const ruleContext = (task: Task) => ({ today, listId: listIdFor(task, lists) });
 
   const columnOf = (task: Task) =>
-    scope.kind === "inbox"
+    axis === "inboxRules"
       ? (columnOfTask(task, inboxColumns, ruleContext(task)) ?? "")
-      : sectionIdFor(task, lists, listSections);
+      : axis === "sections"
+        ? sectionIdFor(task, lists, listSections)
+        : listAxisColumnOf(task, columns, lists);
   const tasksIn = (columnId: string) => sortByManualOrder(rows.filter((task) => columnOf(task) === columnId));
 
   /**
@@ -885,7 +950,11 @@ export function TasksModule(props: TasksModuleProps) {
    * is the same one.
    */
   function boardDropOutcome(taskId: string, columnId: string) {
-    if (scope.kind !== "inbox") return null;
+    // The List axis has exactly one refusal, and it is the one column that is
+    // not a place: `리스트 없음` reports rows whose List is archived or gone,
+    // and there is no field to write that would put a card there on purpose.
+    if (axis === "lists") return columnId === NO_LIST_COLUMN ? "noList" : null;
+    if (axis !== "inboxRules") return null;
     const target = tasks.find((task) => task.id === taskId);
     if (!target) return null;
     const outcome = dropOutcomeForColumnId(target, inboxColumns, columnId, ruleContext(target));
@@ -965,9 +1034,11 @@ export function TasksModule(props: TasksModuleProps) {
     const mutation =
       from === columnId
         ? null
-        : scope.kind === "inbox"
+        : axis === "inboxRules"
           ? inboxDropMutation(target, columnId, date)
-          : moveTaskToSection(target, columnId, lists, listSections);
+          : axis === "sections"
+            ? moveTaskToSection(target, columnId, lists, listSections)
+            : moveToListColumn(target, columnId, { lists, sections: listSections });
     // Null means the domain refused the drop — a date that was never supplied,
     // or a Section belonging to another List. Nothing is written, and the card
     // stays where it was rather than moving to a column it does not belong in.
@@ -1011,9 +1082,14 @@ export function TasksModule(props: TasksModuleProps) {
     });
     if (!base.enabled) return;
     const resolution =
-      scope.kind === "inbox"
+      axis === "inboxRules"
         ? createInInboxBucket(base, columnId as InboxBucket, date)
-        : createInListSection(base, columnId);
+        : axis === "sections"
+          ? createInListSection(base, columnId)
+          : // The column names the List, which is how a Folder's "ask which
+            // List" (`createOwner: "requiresList"`) gets answered by typing
+            // rather than by a dialog.
+            createInListColumn(base, columnId);
     // §12.16's last line, restated where it can actually be violated: a
     // resolution still missing something is not committed. The form does not
     // let this happen; the check is here because the form is not the rule.
@@ -1064,8 +1140,6 @@ export function TasksModule(props: TasksModuleProps) {
         onBeforeNavigate={() => setSidebarOpen(false)}
         onCreateList={props.onCreateList}
         onCreateSidebarFolder={props.onCreateSidebarFolder}
-        onRestoreList={props.lifecycle.onRestoreList}
-        onPermanentlyDeleteList={props.lifecycle.onPermanentlyDeleteList}
       />
 
       <main className="tm-main">
@@ -1108,7 +1182,7 @@ export function TasksModule(props: TasksModuleProps) {
               and nowhere else. Absent while the Trash is empty — a button
               whose whole job is to remove things has nothing to say when
               there is nothing to remove. */}
-          {scope.kind === "trash" && trashedCount > 0 ? (
+          {scope.kind === "trash" && (trashedCount > 0 || binnedListIds.length > 0) ? (
             <div className="tm-scope-actions">
               <button
                 type="button"
@@ -1127,31 +1201,12 @@ export function TasksModule(props: TasksModuleProps) {
             </div>
           ) : null}
 
-          {/* §16.26 Gate 3: only the views the Scope allows are offered, and
-              the selector is absent where there is nothing to choose rather
-              than shown with one option.
-
-              Icons rather than words, and the header rather than the ⋯
-              (§13.4 corrects §3.2). Switching view is the one thing here
-              that is done often enough to be worth its own room, and three
-              32px squares cost less of the header than three words did. */}
-          {policy.allowedViews.length > 1 ? (
-            <div className="tm-views" role="group" aria-label={t("tasks.viewLabel")}>
-              {policy.allowedViews.map((view) => (
-                <button
-                  key={view}
-                  type="button"
-                  className={`tm-view is-icon${view === state.view ? " is-current" : ""}`}
-                  aria-pressed={view === state.view}
-                  aria-label={t(`tasks.view.${view}`)}
-                  title={t(`tasks.view.${view}`)}
-                  onClick={() => setView(view)}
-                >
-                  <ViewIcon view={view} />
-                </button>
-              ))}
-            </div>
-          ) : null}
+          {/* The view selector was here, as three 32px squares (§13.4). It is
+              in the ⋯ menu now (TASK_VIEWS_EVERYWHERE_DESIGN.md §3.1): the
+              squares used to appear on two Scopes out of nine and now qualify
+              on seven, which is the condition §13.4's "icons cost the header
+              nothing" argument was making. The cost is real and taken
+              knowingly — switching view is two presses now, not one. */}
 
           {/* The Scope's own menu (SCOPE_VIEW_OPTIONS_DESIGN.md §3.2).
               Everything that says what this Scope SHOWS lives behind it,
@@ -1189,6 +1244,18 @@ export function TasksModule(props: TasksModuleProps) {
           />
         ) : null}
 
+        {/* The Trash's other half (§16.3). Above the Tasks because restoring a
+            List brings back everything inside it — the bigger undo is the one
+            to see before picking rows out of the smaller one. */}
+        {scope.kind === "trash" && !props.loading ? (
+          <TrashLists
+            lists={lists}
+            tasks={tasks}
+            onRestore={props.lifecycle.onRestoreList}
+            onDeleteForever={setDeletingList}
+          />
+        ) : null}
+
         {props.error ? (
           <p className="tm-state is-error" role="status">
             {props.error}
@@ -1203,7 +1270,11 @@ export function TasksModule(props: TasksModuleProps) {
           <p className="tm-state" role="status">
             {t("tasks.missingHint")}
           </p>
-        ) : rows.length === 0 && state.view === "list" ? (
+        ) : rows.length === 0 && state.view === "list" && !(scope.kind === "trash" && binnedListIds.length > 0) ? (
+          /* "휴지통이 비어 있습니다" over a Trash holding two Lists is a
+             sentence the screen above it contradicts (§16.3). The Lists are
+             the content in that case, and an empty state belongs to a screen
+             with nothing on it. */
           <p className="tm-state" role="status">
             {t(emptyKeyFor(scope.kind))}
           </p>
@@ -1434,13 +1505,21 @@ export function TasksModule(props: TasksModuleProps) {
       {viewOptionsOpen ? (
         <ScopeViewOptionsDialog
           options={viewOptions}
-          hasBoard={hasBoard}
           onChange={patchViewOptions}
           onClose={() => setViewOptionsOpen(false)}
         />
       ) : null}
+      <ListDeleteForeverGate
+        list={lists.find((list) => list.id === deletingList) ?? null}
+        tasks={tasks}
+        onCancel={() => setDeletingList("")}
+        onConfirm={() => {
+          props.lifecycle.onPermanentlyDeleteList(deletingList);
+          setDeletingList("");
+        }}
+      />
       <TrashEmptyGate
-        count={emptyingTrash ? trashedCount : 0}
+        summary={emptyingTrash ? trashSummary : null}
         onCancel={() => setEmptyingTrash(false)}
         onConfirm={() => {
           setEmptyingTrash(false);

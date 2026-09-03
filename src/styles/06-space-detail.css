@@ -286,9 +286,11 @@
   cursor: pointer;
 }
 
+/* Grey and no line, like every other finished TASK in the app (TICKTICK_COMPONENT_06 §16). A
+   subtask is a Task (domain/tasks/children.ts), so it reads the way one does;
+   the line is kept for checklist items, which are lines inside a task. */
 .sdv-subtask-list li.done button {
   color: var(--text-secondary);
-  text-decoration: line-through;
 }
 
 .sdv-subtask-list li small {
@@ -617,8 +619,8 @@
 }
 
 .sdv-check-row input {
-  width: 16px;
-  height: 16px;
+  width: var(--check-size);
+  height: var(--check-size);
   accent-color: var(--accent);
 }
 

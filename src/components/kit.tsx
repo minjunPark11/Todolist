@@ -4,6 +4,7 @@ import {
   ReactNode,
   TextareaHTMLAttributes,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -200,12 +201,66 @@ export function MoreMenu({
 /** Separated so the items can close the surface they are inside (§19.90). */
 function MoreMenuItems({ items }: { items: MoreMenuItem[] }) {
   const { close } = usePopoverSurface();
+  const surfaceId = useId();
   return (
     <>
-      {items.map((item, index) =>
-        item.separator ? (
-          <div key={index} className="ff-menu-sep" role="separator" />
-        ) : (
+      {items.map((item, index) => {
+        if (item.separator) return <div key={index} className="ff-menu-sep" role="separator" />;
+
+        // A row of icons instead of a row of words
+        // (TASK_VIEWS_EVERYWHERE_DESIGN.md §3.2). The heading is what makes it
+        // readable — three unlabelled squares in a list of sentences need a
+        // word saying what they are a choice OF — and it is the group's
+        // accessible name too, rather than a second string saying the same
+        // thing in a place only some readers get.
+        if (item.choices) {
+          const headingId = `${surfaceId}-${index}`;
+          return (
+            <div key={index} className="ff-menu-group">
+              {item.heading ? (
+                <p className="ff-menu-heading" id={headingId}>
+                  {item.heading}
+                </p>
+              ) : null}
+              <div
+                className="ff-menu-choices"
+                role="group"
+                aria-labelledby={item.heading ? headingId : undefined}
+              >
+                {item.choices.map((choice) => (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    // `menuitemradio` and not `menuitem`: this is one closed
+                    // choice with one answer in force, and that is the role
+                    // that can say which. `moveMenuFocus` walks it.
+                    role="menuitemradio"
+                    aria-checked={choice.selected}
+                    aria-label={choice.label}
+                    title={choice.label}
+                    className={`ff-menu-choice${choice.selected ? " is-on" : ""}`}
+                    onClick={() => {
+                      close();
+                      choice.onClick();
+                    }}
+                  >
+                    {choice.icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        if (item.heading) {
+          return (
+            <p key={index} className="ff-menu-heading">
+              {item.heading}
+            </p>
+          );
+        }
+
+        return (
           <button
             key={index}
             type="button"
@@ -221,8 +276,8 @@ function MoreMenuItems({ items }: { items: MoreMenuItem[] }) {
           >
             {item.label}
           </button>
-        ),
-      )}
+        );
+      })}
     </>
   );
 }
@@ -232,6 +287,31 @@ export interface MoreMenuItem {
   onClick?: () => void;
   danger?: boolean;
   separator?: boolean;
+  /**
+   * A quiet line naming what follows — the reference app's `View`.
+   *
+   * On its own it is a heading row; with `choices` it is the group's own name
+   * and its accessible label.
+   */
+  heading?: string;
+  /**
+   * One closed choice drawn as a row of icons rather than as a row of rows.
+   *
+   * For a setting that is a SHAPE — three views, three sizes — where the icon
+   * says what a word would have to spell out, and where seeing the options
+   * side by side is how the reader picks. Everything else stays a labelled
+   * row: this is not a general-purpose way to make a menu smaller.
+   */
+  choices?: MoreMenuChoice[];
+}
+
+export interface MoreMenuChoice {
+  id: string;
+  /** Never drawn, always announced — the icon carries the meaning visually. */
+  label: string;
+  icon: ReactNode;
+  selected: boolean;
+  onClick: () => void;
 }
 
 // ============================================================================

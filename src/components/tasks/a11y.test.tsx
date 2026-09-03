@@ -142,7 +142,6 @@ function renderModule(url: string) {
             remindersFor: () => [],
           }}
           lifecycle={{
-            onArchiveList: () => {},
             onTrashList: () => {},
             onRestoreList: () => {},
             onPermanentlyDeleteList: () => {},
@@ -154,7 +153,7 @@ function renderModule(url: string) {
           onMutate={() => {}}
           onStartFocus={() => {}}
           onDeleteForever={() => {}}
-          onEmptyTrash={() => 0}
+          onEmptyTrash={() => ({ tasks: 0, lists: 0, tasksWithLists: 0 })}
           onSetScopeViewOptions={() => {}}
           onDuplicate={() => null}
           focusBusy={false}
@@ -263,12 +262,14 @@ describe("the Lists section header", () => {
     expect(heading.querySelector("button")).toBeNull();
   });
 
-  it("gives every control a name of its own", () => {
+  it("gives its one control a name of its own", () => {
     renderModule("/today");
 
     expect(screen.getByRole("button", { name: "리스트 추가" })).toBeTruthy();
-    // "관리" as bare text is a label, not a description of what it manages.
-    expect(screen.getByRole("button", { name: "리스트 관리" })).toBeTruthy();
+    // `관리` stood beside it and opened the only door to archived and deleted
+    // Lists. That door is the Trash now (§16.7), so the header is a heading
+    // and a `+`.
+    expect(screen.queryByRole("button", { name: "리스트 관리" })).toBeNull();
   });
 });
 

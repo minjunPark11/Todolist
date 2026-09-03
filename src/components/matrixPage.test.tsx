@@ -807,8 +807,14 @@ describe("the List picker beside the boxes' own conditions", () => {
     I: { listIds: ["list-work"], tagIds: [], dateBuckets: [], priorities: ["high"] },
   };
 
+  // The picker is two clicks now, not one: it lives in the header's ⋯ menu
+  // rather than in a `<select>` that stood there saying "All lists" all day
+  // (§33.2.1). Every test below reaches it through this one helper, which is
+  // the reason the move cost one line here instead of four.
   async function viewList(name: string) {
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: /List/ }), name);
+    await userEvent.click(screen.getByRole("button", { name: /^View settings/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /^List/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name }));
   }
 
   it("says which List a count was taken within", async () => {
@@ -868,5 +874,108 @@ describe("the List picker beside the boxes' own conditions", () => {
 
     expect(screen.getAllByRole("button", { name: /^Add a task to / })).toHaveLength(4);
     expect(document.querySelector(".ff-matrix-cell-refusal")).toBeNull();
+  });
+});
+
+describe("the header's ⋯, and the one switch on it", () => {
+  const finished = () =>
+    task({
+      id: "shipped",
+      title: "Shipped it",
+      status: "completed" as TaskStatus,
+      completedAt: "2026-08-27T09:00:00.000Z",
+      dueDate: "2026-08-01",
+    });
+
+  it("shows finished work by default, which is what D2 decided", () => {
+    // Pinned because it is now a DEFAULT and not a fact about the code: the
+    // setting exists, so "off" has to be the answer an untouched account gets.
+    renderMatrix([finished(), task({ id: "open", dueDate: TODAY })]);
+
+    expect(groupNames(boxOne())).toEqual(["Today", "Completed"]);
+    expect(within(boxOne()).getByText("Shipped it")).toBeTruthy();
+  });
+
+  it("hides it from the boxes and from the remainder line together", () => {
+    // Both, or neither. Filtering inside the boxes alone would leave a
+    // finished task that matches no rule sitting under the grid, which is
+    // completed work half-hidden — not hidden (§33.2.4).
+    renderMatrix(
+      [
+        finished(),
+        task({ id: "open", title: "Still going", dueDate: TODAY }),
+        task({
+          id: "orphan",
+          title: "Orphan, done",
+          priority: "medium",
+          status: "completed" as TaskStatus,
+          completedAt: "2026-08-27T09:00:00.000Z",
+        }),
+      ],
+      {
+        hideCompleted: true,
+        // Ⅱ takes overdue only, so the finished medium task matches no box.
+        quadrantRules: { II: { listIds: [], tagIds: [], dateBuckets: ["overdue"], priorities: [] } },
+      },
+    );
+
+    expect(groupNames(boxOne())).toEqual(["Today"]);
+    expect(screen.queryByText("Shipped it")).toBeNull();
+    expect(screen.queryByText("Orphan, done")).toBeNull();
+    expect(screen.queryByRole("button", { name: /tasks in no box/ })).toBeNull();
+    expect(within(boxOne()).getByText("Still going")).toBeTruthy();
+  });
+
+  it("asks for the switch rather than reading it, so the account owns it", async () => {
+    const onToggleHideCompleted = vi.fn();
+    renderMatrix([finished()], { onToggleHideCompleted });
+
+    await userEvent.click(screen.getByRole("button", { name: /^View settings/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Hide completed" }));
+
+    expect(onToggleHideCompleted).toHaveBeenCalledTimes(1);
+    // Nothing moved on its own: the setting is stored, and the page draws what
+    // it is handed on the next render.
+    expect(within(boxOne()).getByText("Shipped it")).toBeTruthy();
+  });
+
+  it("says on the button itself that something is being held back", async () => {
+    // The one thing the `<select>` did for free: a narrowed screen LOOKED
+    // narrowed, without opening anything (§33.2.3).
+    const twoLists = [{ id: "list-work", name: "Work" } as List];
+    const { rerender } = renderMatrix([finished()], { lists: twoLists });
+
+    const menuButton = () => screen.getByRole("button", { name: /^View settings/ });
+    expect(menuButton().className).not.toContain("is-filtered");
+
+    rerender(
+      <I18nProvider lang="en">
+        <FloatingLayerProvider>
+          <MatrixPage
+            tasks={[finished()]}
+            lists={twoLists}
+            selectedTaskId=""
+            onOpenTask={() => {}}
+            onUpdateTask={() => {}}
+            onCreateTask={() => ""}
+            onToggleDone={() => {}}
+            hideCompleted
+          />
+        </FloatingLayerProvider>
+      </I18nProvider>,
+    );
+
+    expect(menuButton().className).toContain("is-filtered");
+    expect(screen.getByRole("button", { name: "View settings — filters on" })).toBeTruthy();
+
+    // ...and the same dot for the other switch, because a reader who cannot
+    // find a task does not care which of the two hid it.
+    cleanup();
+    renderMatrix([finished()], { lists: twoLists });
+    await userEvent.click(menuButton());
+    await userEvent.click(screen.getByRole("menuitem", { name: /^List/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Work" }));
+
+    expect(menuButton().className).toContain("is-filtered");
   });
 });

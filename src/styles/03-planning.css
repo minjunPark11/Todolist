@@ -62,24 +62,27 @@
 .ff-task-row:last-child { border-bottom: none; }
 .ff-task-row:hover { background: var(--bg-surface-muted); }
 .ff-task-row.is-selected { background: var(--accent-soft); }
-.ff-task-row.is-done .ff-task-title { color: var(--text-tertiary); text-decoration: line-through; }
+.ff-task-row.is-done .ff-task-title { color: var(--text-tertiary); }
 
 .ff-check {
-  width: 22px;
-  height: 22px;
+  width: var(--check-size);
+  height: var(--check-size);
   border-radius: 50%;
-  border: 2px solid var(--border-strong);
+  border: 1.6px solid var(--border-strong);
   background: var(--bg-surface);
   flex-shrink: 0;
   color: #fff;
-  font-size: 13px;
+  font-size: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 .ff-check:hover { border-color: var(--accent); }
-.ff-check.checked { background: var(--success); border-color: var(--success); }
+/* Finished work is grey, not green: the tick says it is done and a colour
+   saying it a second time makes the completed rows the brightest thing in a
+   list of what is left (TICKTICK_COMPONENT_06 §16). */
+.ff-check.checked { background: var(--text-tertiary); border-color: var(--text-tertiary); }
 
 .ff-task-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
 .ff-task-title {
@@ -186,6 +189,40 @@
 .ff-menu-item:hover { background: var(--bg-hover-content); }
 .ff-menu-item.danger { color: var(--danger); }
 .ff-menu-sep { height: 1px; background: var(--border-subtle); margin: 4px 0; }
+
+/* A menu that holds a SET rather than a list of actions
+   (TASK_VIEWS_EVERYWHERE_DESIGN.md §3.2). The heading is what makes three
+   unlabelled icons legible in a column of sentences, and the row is what makes
+   the three readable against each other — which is the reason this one setting
+   is not three more rows. */
+.ff-menu-heading {
+  margin: 4px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+.ff-menu-choices {
+  display: flex;
+  gap: 2px;
+  padding: 2px 6px 4px;
+}
+.ff-menu-choice {
+  flex: 1 1 0;
+  display: inline-grid;
+  place-items: center;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.ff-menu-choice:hover,
+.ff-menu-choice:focus-visible { background: var(--bg-hover-content); color: var(--text-primary); }
+/* The one in force reads as chosen without a tick: it is a row of shapes, and
+   a tick beside a shape is a second mark saying what the colour already
+   says. */
+.ff-menu-choice.is-on { background: var(--accent-soft); color: var(--accent); }
 
 .ff-datepicker { display: flex; flex-direction: column; gap: 8px; padding: 4px; min-width: 200px; }
 .ff-datepicker input { padding: 6px 8px; border: 1px solid var(--border-subtle); border-radius: 8px; }
@@ -473,7 +510,7 @@
   color: var(--text-secondary);
 }
 .ff-board-chip.is-warn { background: var(--accent-soft); color: var(--accent); }
-.ff-board-card.is-done .ff-board-card-title { text-decoration: line-through; color: var(--text-tertiary); }
+.ff-board-card.is-done .ff-board-card-title { color: var(--text-tertiary); }
 
 .ff-board-col {
   background: var(--bg-surface-muted);
@@ -753,11 +790,77 @@
   grid-template-areas:
     "qI    qII"
     "qIII  qIV";
-  /* Neither row falls below a card or two of height. */
-  grid-template-rows: minmax(240px, 1fr) minmax(240px, 1fr);
+  /* No 240px floor on the rows any more (§33.1.2). The floor was free while
+     the page could grow; now that the page is the window, two rows demanding
+     480px is what brings the document scrollbar back — which is the whole bug
+     this block was written to end. `minmax(0, 1fr)` lets the two rows divide
+     whatever the window has; the floor that stops them dividing something too
+     small to hold a card is on the grid now, in the block below. */
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 12px;
   flex: 1 1 auto;
-  min-height: 0;
+}
+
+/* ---- The height contract (TICKTICK_MATRIX_DESIGN.md §33.1) ----------------
+   `.ff-matrix-cell-body` below has scrolled its own cards since the day it was
+   written — `overflow-y: auto` and `min-height: 0`, with a comment promising
+   exactly that. It never happened, because `overflow` needs an ancestor with a
+   DEFINITE height and this screen had none: `main` is `min-height: 100vh` with
+   no cap, `.page-grid` is `align-items: start`, and `.ff-page` has no height at
+   all. A `1fr` inside an auto-height parent is just the content's height, so
+   the grid grew, the page grew, and Ⅲ and Ⅳ went off the bottom of a 2x2 whose
+   entire argument is that you can see all four at once (§0).
+
+   So nothing here is a new scroll mechanism. It is the missing height, and it
+   is spelled on the three ancestors that were missing it.
+
+   Scoped twice over. `:has()` keeps it on this page — the same way
+   09-calendar-redesign.css:144 gives the calendar its own `main` — so every
+   other view keeps document scrolling, which is right for a view that is a
+   document. And `min-width: 901px` keeps it on the 2x2: below 900 the block at
+   the foot of this file stacks the four boxes into one scrolling column, and
+   there is no grid there to hold still.
+
+   `--titlebar-h` is 0px everywhere except the desktop build's own caption
+   (19-app-shell.css), so this one line is correct in the browser and in Tauri.
+   -------------------------------------------------------------------------- */
+@media (min-width: 901px) {
+  .app-shell > main:has(.ff-matrix-page) {
+    height: calc(100dvh - var(--titlebar-h));
+    min-height: 0;
+    /* `auto` down the page and not `hidden`: the window can be shorter than
+       the smallest honest matrix, and then something has to give. What gives
+       is this scrollbar — by the few pixels that do not fit, with the boxes
+       still scrolling their own cards inside (§33.1.3). It appears at no other
+       time, because nothing else on this page can exceed the height. */
+    overflow: hidden auto;
+  }
+  .app-shell > main:has(.ff-matrix-page) > .page-grid {
+    height: 100%;
+    min-height: 0;
+    /* The Task Detail column is not stretched by this: the inline Drawer sets
+       its own `align-self: start` and its own max-height (17-tasks-module.css),
+       so it stays the sticky card it already was. */
+    align-items: stretch;
+  }
+  .ff-matrix-page {
+    height: 100%;
+    min-height: 0;
+    /* NOT `overflow: hidden`. The grid has a floor (below) and on a window
+       shorter than that floor the grid is taller than this page — clipping it
+       here would cut the bottom two boxes off with no way to reach them. Left
+       visible, the overflow reaches `main`'s scrollbar instead. */
+    /* 80px of bottom padding is two rows of cards taken from a page that can
+       no longer grow to make up for them. */
+    padding-bottom: 0;
+    gap: 16px;
+  }
+  /* The floor is on the GRID, not on the rows as it used to be (§33.1.2). On
+     the rows it was a floor under each box's CONTENT and it fought the window;
+     here it is one floor under the whole 2x2, and the rows still divide
+     whatever the grid gets. Two boxes of ~220 and the gap between them: below
+     that a box is a header with no room for a card, which is not a layout. */
+  .ff-matrix { min-height: 452px; }
 }
 
 .ff-matrix-cell {
@@ -781,6 +884,47 @@
 .ff-matrix-cell-II { --q-color: var(--accent); grid-area: qII; }
 .ff-matrix-cell-III { --q-color: var(--warning); grid-area: qIII; }
 .ff-matrix-cell-IV { --q-color: var(--text-tertiary); grid-area: qIV; }
+
+/* The page's own ⋯, where the List `<select>` used to be (§33.2).
+
+   Built on the box's ⋯ rather than beside it: they are the same control at two
+   altitudes, and a header whose settings button looked different from the four
+   below it would be claiming a difference that isn't there. 32px and not the
+   box's 28, because this one sits against a 38px page title rather than a 22px
+   badge. */
+.ff-page-menu {
+  position: relative;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.ff-page-menu:hover,
+.ff-page-menu:focus-visible {
+  background: var(--bg-hover-content);
+  color: var(--text-primary);
+}
+/* §33.2.3: the one thing a menu cannot do is what an always-visible `<select>`
+   did for free — say, without being opened, that the screen is not showing
+   everything. A dot is the smallest honest version of that sentence. */
+.ff-page-menu.is-filtered { color: var(--text-primary); }
+.ff-page-menu.is-filtered::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
 
 .ff-matrix-cell-head { display: flex; align-items: flex-start; gap: 8px; }
 .ff-matrix-roman {
@@ -1032,7 +1176,10 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 220px;
+  /* 220 was a cap against a page that could grow. Against a page that is the
+     window it is half the screen on a laptop, taken from the grid this strip
+     is only a report about (§33.1.4). */
+  max-height: min(220px, 26vh);
   overflow-y: auto;
   padding: 2px;
 }

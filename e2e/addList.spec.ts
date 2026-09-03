@@ -350,9 +350,11 @@ test.describe("Add List", () => {
     // decision and never a write (§13.9, listView.ts).
     expect((await readStore(page)).lists.find((list) => list.name === "Timeline list")?.defaultViewKey).toBe("gantt");
 
-    // Today gathers several Lists and forbids a timeline; going there resolves
+    // The Trash is finished work and forbids a timeline; going there resolves
     // to something it can draw WITHOUT changing what the List asked for.
-    await page.goto("/today?view=gantt");
+    // (Today allows all three now — TASK_VIEWS_EVERYWHERE_DESIGN.md §2 — so
+    // the Scope that still makes this point is one of the terminal three.)
+    await page.goto("/trash?view=gantt");
     await expect(page.locator(".tgv")).toHaveCount(0);
     expect((await readStore(page)).lists.find((list) => list.name === "Timeline list")?.defaultViewKey).toBe("gantt");
   });

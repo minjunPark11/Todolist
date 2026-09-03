@@ -1,4 +1,18 @@
 :root {
+  /* The tick a task is finished with, everywhere it is drawn.
+     ==========================================================================
+     One number, because it was five: the shared task row drew 17 (22 under a
+     coarse pointer), Today's own row 22, the kit's circle 22, and three native
+     inputs 16. A control that means the same thing on six screens cannot be
+     six sizes, and the reference app's is SMALLER than the title beside it —
+     ours was 1.2× the 14px title and read as the loudest thing in the row.
+
+     The touch target is not this number. `.tm-task-check` is a label with the
+     row's full height and its own horizontal padding, so a finger gets 44px
+     while the box stays the size the eye wants (§4.86's rule, applied without
+     growing the drawing). */
+  --check-size: 15px;
+
   /* === Apple design tokens (from DESIGN-apple.md) === */
   /* Colors */
   --color-primary: #0066cc;

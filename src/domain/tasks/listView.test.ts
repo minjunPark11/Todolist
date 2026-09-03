@@ -23,11 +23,13 @@ describe("resolveListView (§13.9)", () => {
     expect(resolveListView("timeline-3d", listPolicy)).toBe("list");
   });
 
-  it("falls back where the Scope forbids the View (§5.45)", () => {
-    // Today gathers several Lists, so a board and a timeline are not offered
-    // there whatever any single List prefers.
-    expect(resolveListView("board", todayPolicy)).toBe("list");
-    expect(resolveListView("gantt", todayPolicy)).toBe("list");
+  it("falls back where the Scope forbids the View", () => {
+    // Today's board and timeline are offered now
+    // (TASK_VIEWS_EVERYWHERE_DESIGN.md §2); finished work's are not, and that
+    // is the case this test exists to hold.
+    expect(resolveListView("board", todayPolicy)).toBe("board");
+    expect(resolveListView("board", scopeRegistry.trash)).toBe("list");
+    expect(resolveListView("gantt", scopeRegistry.completed)).toBe("list");
   });
 
   it("never answers with a View the Scope does not allow, for any Scope or key", () => {

@@ -108,14 +108,60 @@ export function permanentlyDeleteTask(
 }
 
 /**
- * Everything in the Trash, gone (§3.3).
+ * What emptying the Trash is about to take (§16.5).
  *
- * `removed` is the count the confirmation has to say out loud — the fact the
- * word "empty" hides, the way `ListManager` says how many Tasks go with a
- * List. Counted here so the screen cannot count it differently from what this
- * is about to delete.
+ * Three numbers and not one, because the Trash holds two kinds of thing now
+ * and the second kind brings a third number with it:
+ *
+ *   - `tasks` — thrown away one at a time, and the rows the screen draws;
+ *   - `lists` — thrown away as containers;
+ *   - `tasksWithLists` — the work inside those Lists, which is NOT in the
+ *     first number and never was. A trashed List does not stamp its Tasks
+ *     (§13.22): they leave the active Scopes because their owner did, which
+ *     is what makes restoring a List one field. So a reader told "12 tasks"
+ *     would agree to losing seventeen.
  */
-export function emptyTrash(rows: TaskRows): { rows: TaskRows; removed: number } {
-  const doomed = trashedTaskIds(rows.tasks);
-  return { rows: removeTasksForever(rows, doomed), removed: doomed.length };
+export interface TrashSummary {
+  tasks: number;
+  lists: number;
+  tasksWithLists: number;
+}
+
+/**
+ * Everything in the Trash, gone (§3.3, widened by §16.5).
+ *
+ * The Lists arrive as IDS rather than as records, which keeps this file's
+ * blast radius where its type says it is: it can count and remove Tasks, and
+ * it cannot touch a List row. Dropping those Lists is the caller's line, and
+ * `binnedListIds` is what the caller already had to compute to ask.
+ *
+ * Counted here so the screen cannot count it differently from what this is
+ * about to delete — the rule §7.1 set when the count was one number.
+ */
+export function emptyTrash(
+  rows: TaskRows,
+  binnedListIds: readonly string[] = [],
+): { rows: TaskRows; summary: TrashSummary } {
+  const binned = new Set(binnedListIds);
+  const thrownAway = trashedTaskIds(rows.tasks);
+  const inBinnedLists = rows.tasks.filter(
+    (task) => !task.deletedAt && binned.has(task.listId ?? "") && !task.parentTaskId,
+  );
+  // Children of a doomed Task are promoted rather than removed
+  // (`removeTasksForever`), but a child inside a doomed LIST has nowhere to be
+  // promoted to — its List is going. So the ids include every Task the List
+  // owns, while the COUNT the reader is shown stays top-level, which is the
+  // number `taskCountInList` shows beside a List everywhere else.
+  const doomed = [
+    ...thrownAway,
+    ...rows.tasks.filter((task) => !task.deletedAt && binned.has(task.listId ?? "")).map((task) => task.id),
+  ];
+  return {
+    rows: removeTasksForever(rows, doomed),
+    summary: {
+      tasks: thrownAway.length,
+      lists: binned.size,
+      tasksWithLists: inBinnedLists.length,
+    },
+  };
 }

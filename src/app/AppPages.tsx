@@ -203,6 +203,10 @@ export function AppPages({
           quadrantViews={appSettings.matrixQuadrantViews}
           quadrantRules={appSettings.matrixQuadrantRules}
           tags={planner.tags}
+          hideCompleted={appSettings.matrixHideCompleted}
+          onToggleHideCompleted={() =>
+            planner.updateAppSettings({ matrixHideCompleted: !appSettings.matrixHideCompleted })
+          }
           onChangeQuadrantRule={(quadrant, rule) =>
             planner.updateAppSettings({
               matrixQuadrantRules: { ...appSettings.matrixQuadrantRules, [quadrant]: rule },

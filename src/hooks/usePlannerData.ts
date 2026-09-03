@@ -90,7 +90,12 @@ import { childDraft, promoteDraft } from "../domain/tasks/children";
 import { canAddChild } from "../domain/tasks/hierarchy";
 import { listMovePlan } from "../domain/tasks/listPicker";
 import { LIFECYCLE, isCompleted, isTaskOpen } from "../domain/tasks/taskState";
-import { emptyTrash as emptyTrashRows, permanentlyDeleteTask as removeTaskForever, removeTasksForever } from "../domain/tasks/trash";
+import {
+  emptyTrash as emptyTrashRows,
+  permanentlyDeleteTask as removeTaskForever,
+  removeTasksForever,
+  type TrashSummary,
+} from "../domain/tasks/trash";
 import { countPlannerDataItems } from "../domain/migrations/plannerDataMigration";
 import { persistPlannerData, PLANNER_STORAGE_KEY } from "../domain/migrations/persistPlannerData";
 import { recoverStaleFocusSessions } from "../domain/focus/selectors";
@@ -1102,12 +1107,27 @@ export function usePlannerData() {
    * §3.3's whole Trash, gone. Returns the count for the confirmation that
    * already happened — the caller asked before calling.
    */
-  function emptyTrash(): number {
-    const { removed } = emptyTrashRows(data);
-    if (removed > 0) {
-      setData((current) => ({ ...current, ...emptyTrashRows(current).rows }));
-    }
-    return removed;
+  /**
+   * Empties both halves of the Trash (§16.5).
+   *
+   * The Lists are dropped HERE rather than inside `emptyTrash`, which is given
+   * their ids and cannot reach a List record — the boundary that file's own
+   * type states. What it returns is the three numbers the confirmation says.
+   */
+  function emptyTrash(): TrashSummary {
+    const binned = lifecycle.binnedLists(data.lists).map((list) => list.id);
+    const { summary } = emptyTrashRows(data, binned);
+    if (summary.tasks === 0 && summary.lists === 0) return summary;
+    setData((current) => {
+      const ids = lifecycle.binnedLists(current.lists).map((list) => list.id);
+      const doomed = new Set(ids);
+      return {
+        ...current,
+        ...emptyTrashRows(current, ids).rows,
+        lists: current.lists.filter((list) => !doomed.has(list.id)),
+      };
+    });
+    return summary;
   }
 
   /**
@@ -1910,13 +1930,12 @@ export function usePlannerData() {
     });
   }
 
-  function archiveList(listId: string) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const lists = hierarchy.archiveList(current.lists, listId, now);
-      return lists === current.lists ? current : { ...current, lists };
-    });
-  }
+  /* `archiveList` stood here. Nothing calls it: archiving a List is not a verb
+     the app offers any more (TRASH_PERMANENT_DELETE_DESIGN.md §16.6), because
+     its only door back was the same hidden dialog `delete`'s was — one soft
+     state is enough when the Trash shows it. The domain function survives so
+     an account that archived Lists in an older build can still READ them; the
+     Trash draws those rows and gives them the way out. */
 
   /**
    * The container lifecycle (§13.21-§13.24). Soft, every one of them: the
@@ -2199,7 +2218,6 @@ export function usePlannerData() {
     createList,
     createSidebarFolder,
     updateList,
-    archiveList,
     trashList,
     restoreList,
     permanentlyDeleteList,

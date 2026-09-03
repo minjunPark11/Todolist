@@ -26,10 +26,21 @@ describe("the registry says what the matrix says", () => {
     ]);
   });
 
-  // 5.45: Board belongs to Inbox and a real List only, for the MVP.
-  it("allows Board on Inbox and List alone", () => {
+  // Was §5.45's "Inbox and a real List only". Widened to every Scope whose
+  // work is still live (TASK_VIEWS_EVERYWHERE_DESIGN.md §2): those Scopes now
+  // have columns — the Lists they gather — and a drop that means something.
+  it("allows Board everywhere the work is still live", () => {
     const withBoard = TASK_SCOPE_KINDS.filter((kind) => isViewAllowed(kind, "board"));
-    expect(withBoard.sort()).toEqual(["inbox", "list"]);
+    expect(withBoard.sort()).toEqual(["filter", "folder", "inbox", "list", "tag", "today", "upcoming"]);
+  });
+
+  // The other half of the same rule, and the half a future widening is most
+  // likely to break by accident: finished work is READ on this module, and a
+  // board there is a drag that rewrites a record that is over (§2.4).
+  it("keeps finished work to the list", () => {
+    for (const kind of ["completed", "wontDo", "trash"] as const) {
+      expect(scopeRegistry[kind].allowedViews).toEqual(["list"]);
+    }
   });
 
   it("defaults every Scope to List (5.46)", () => {
@@ -85,7 +96,8 @@ describe("resolveView", () => {
   it("keeps an allowed view and falls back for anything else (5.65)", () => {
     expect(resolveView("inbox", "board")).toBe("board");
     expect(resolveView("inbox", "banana")).toBe("list");
-    expect(resolveView("today", "board")).toBe("list");
+    expect(resolveView("today", "board")).toBe("board");
+    expect(resolveView("trash", "board")).toBe("list");
     expect(resolveView("list", undefined)).toBe("list");
   });
 
@@ -98,17 +110,20 @@ describe("resolveView", () => {
   });
 });
 
-// Add List design Phase 3 (§R.6). Gantt joins on §5.45's terms, not its own.
-describe("Gantt is offered where a Scope is one List's screen", () => {
+// Add List design Phase 3 (§R.6). Gantt joined on §5.45's terms and stays
+// bound to the Board's set now that both have widened.
+describe("Gantt is offered wherever the Board is", () => {
   it("is allowed exactly where Board is", () => {
     const withGantt = TASK_SCOPE_KINDS.filter((kind) => scopeRegistry[kind].allowedViews.includes("gantt"));
     const withBoard = TASK_SCOPE_KINDS.filter((kind) => scopeRegistry[kind].allowedViews.includes("board"));
 
-    // Not a coincidence to be kept in step by hand: both answer "is this one
-    // List's screen", and a timeline over a Scope gathering several Lists
-    // would draw bars whose rows belong to different places.
+    // Not a coincidence to be kept in step by hand: both draw the same Scope
+    // arranged by the same axis — the Board's columns are the Lists and the
+    // timeline's group headings are the Lists — so a Scope that has one and
+    // not the other would be showing the same arrangement twice under one
+    // name and once under another.
     expect(withGantt).toEqual(withBoard);
-    expect(withGantt).toEqual(["inbox", "list"]);
+    expect(withGantt).toEqual(["today", "upcoming", "inbox", "list", "folder", "tag", "filter"]);
   });
 
   it("never becomes a Scope's default — the List is still what opens", () => {

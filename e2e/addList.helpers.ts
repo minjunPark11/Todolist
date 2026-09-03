@@ -161,8 +161,9 @@ async function revealSidebar(page: Page): Promise<void> {
 /** §1.1: the Lists header's entry. */
 export async function openFromHeader(page: Page): Promise<void> {
   await revealSidebar(page);
-  // By its own name. `[aria-label]` alone used to be unique here; Manage has
-  // one now, so the selector has to say which button it means.
+  // By its own name. It is the header's only button again — `Manage` left
+  // with the dialog it opened (TRASH_PERMANENT_DELETE_DESIGN.md §16.7) — but
+  // naming the button is what the selector should have said all along.
   await page.getByRole("button", { name: "Add list", exact: true }).click();
   await expect(dialog(page)).toBeVisible();
 }

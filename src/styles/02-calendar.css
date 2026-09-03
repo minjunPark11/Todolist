@@ -469,7 +469,6 @@
 .gcal-chip.is-done {
   opacity: 0.68;
   cursor: pointer;
-  text-decoration: line-through;
   background: rgba(52, 199, 89, 0.12);
 }
 
@@ -800,8 +799,10 @@
   filter: saturate(0.72);
 }
 
+/* No line through a finished block's title either (TICKTICK_COMPONENT_06 §16): the block is
+   already dimmed and desaturated, which is the same statement drawn once. */
 .gcal-time-block.is-done .gcal-tb-title {
-  text-decoration: line-through;
+  color: var(--text-muted, #8e8e93);
 }
 
 /* Pointer-move overlay: the only visual while a block is being dragged. */

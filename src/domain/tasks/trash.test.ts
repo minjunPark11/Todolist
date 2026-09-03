@@ -127,7 +127,7 @@ describe("emptyTrash", () => {
 
     const result = emptyTrash(before);
 
-    expect(result.removed).toBe(2);
+    expect(result.summary.tasks).toBe(2);
     expect(result.rows.tasks.map((row) => row.id)).toEqual(["t2"]);
     expect(result.rows.checkItems.map((row) => row.id)).toEqual(["c2"]);
   });
@@ -138,7 +138,7 @@ describe("emptyTrash", () => {
   it("counts what it removes, and nothing when the Trash is empty", () => {
     const before = rowsOf({ tasks: [task("t1"), task("t2")] });
     const result = emptyTrash(before);
-    expect(result.removed).toBe(0);
+    expect(result.summary.tasks).toBe(0);
     expect(result.rows).toBe(before);
   });
 
@@ -151,9 +151,61 @@ describe("emptyTrash", () => {
 
     const result = emptyTrash(before);
 
-    expect(result.removed).toBe(1);
+    expect(result.summary.tasks).toBe(1);
     expect(result.rows.tasks.map((row) => row.id)).toEqual(["child"]);
     expect(result.rows.tasks[0].parentTaskId).toBe("");
+  });
+});
+
+describe("emptying the Trash with Lists in it (§16.5)", () => {
+  const at = "2026-09-01T00:00:00.000Z";
+
+  it("takes the work inside a binned List, which was never in the task count", () => {
+    // The Tasks of a trashed List carry no `deletedAt` — the List's own state
+    // is what hides them (§13.22) — so they are invisible to the first number
+    // and would have survived an "empty" that claimed to remove everything.
+    const before = rowsOf({
+      tasks: [
+        task("thrown", { deletedAt: at, listId: "list-a" }),
+        task("inside", { listId: "list-gone" }),
+        task("kept", { listId: "list-a" }),
+      ],
+    });
+
+    const result = emptyTrash(before, ["list-gone"]);
+
+    expect(result.rows.tasks.map((row) => row.id)).toEqual(["kept"]);
+    expect(result.summary).toEqual({ tasks: 1, lists: 1, tasksWithLists: 1 });
+  });
+
+  it("counts the work top-level, and still removes the children with it", () => {
+    // A child of a doomed Task is promoted; a child inside a doomed LIST has
+    // nowhere to be promoted to. The count stays top-level because that is the
+    // number shown beside a List everywhere else (`taskCountInList`).
+    const before = rowsOf({
+      tasks: [
+        task("parent", { listId: "list-gone" }),
+        task("child", { listId: "list-gone", parentTaskId: "parent" }),
+      ],
+    });
+
+    const result = emptyTrash(before, ["list-gone"]);
+
+    expect(result.rows.tasks).toEqual([]);
+    expect(result.summary.tasksWithLists).toBe(1);
+  });
+
+  it("changes nothing when both halves are empty", () => {
+    const before = rowsOf({ tasks: [task("kept")] });
+    const result = emptyTrash(before, []);
+
+    expect(result.rows).toBe(before);
+    expect(result.summary).toEqual({ tasks: 0, lists: 0, tasksWithLists: 0 });
+  });
+
+  it("counts a List with nothing in it, because the List itself goes", () => {
+    const result = emptyTrash(rowsOf({ tasks: [task("kept")] }), ["list-empty"]);
+    expect(result.summary).toEqual({ tasks: 0, lists: 1, tasksWithLists: 0 });
   });
 });
 

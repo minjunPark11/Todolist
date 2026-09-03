@@ -63,7 +63,7 @@ import { MatrixQuadrantEditor } from "./MatrixQuadrantEditor";
 import { listColorHex } from "../domain/tasks/listColor";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./common/ContextMenu";
 import { listIdFor } from "../domain/spaces/membership";
-import { LIFECYCLE } from "../domain/tasks/taskState";
+import { LIFECYCLE, isCompleted } from "../domain/tasks/taskState";
 import { todayValue } from "../utils/date";
 import { MotionDropZone } from "./motion/MotionDropZone";
 import { MotionTaskRow } from "./motion/MotionTaskRow";
@@ -91,6 +91,15 @@ interface MatrixPageProps {
   onApplyRulePreset?: (rules: MatrixQuadrantRules) => void;
   /** Offered as conditions a box can be narrowed to. */
   tags?: Tag[];
+  /**
+   * Whether finished work is left out of the boxes (§33.2.4).
+   *
+   * Stored on the account rather than held here, unlike the List scope: the
+   * scope is "for the next five minutes" and this is "this is how I read my
+   * matrix" (§27.1's table, and §33.2.5).
+   */
+  hideCompleted?: boolean;
+  onToggleHideCompleted?: () => void;
 }
 
 export function MatrixPage({
@@ -107,6 +116,8 @@ export function MatrixPage({
   onChangeQuadrantRule,
   onApplyRulePreset,
   tags: allTags = [],
+  hideCompleted = false,
+  onToggleHideCompleted,
 }: MatrixPageProps) {
   const { t } = useT();
   const today = todayValue();
@@ -127,6 +138,16 @@ export function MatrixPage({
   const scope = pickableLists.some((list) => list.id === listId) ? listId : ALL_LISTS;
   const scopeName = pickableLists.find((list) => list.id === scope)?.name ?? "";
 
+  /**
+   * Whether anything is being held back from the four boxes right now.
+   *
+   * The one thing the header lost when the `<select>` became a `⋯` is that a
+   * narrowed screen looked narrowed. This is what buys it back (§33.2.3), and
+   * it counts BOTH switches — a reader who cannot see a task does not care
+   * which of the two hid it.
+   */
+  const filtered = Boolean(scope) || hideCompleted;
+
   const { byQuadrant, unmatched } = useMemo(() => {
     const groups = new Map<MatrixQuadrant, Task[]>(
       MATRIX_QUADRANTS.map((quadrant) => [quadrant, [] as Task[]]),
@@ -140,6 +161,14 @@ export function MatrixPage({
       // put it in (D2) and lands in that box's "완료" group — because a card
       // that vanishes the instant it is ticked takes with it the only evidence
       // of what was just ticked, and the way back is another screen.
+      //
+      // ...unless the reader has asked for it to be, which is the ⋯ menu's one
+      // switch. Filtered HERE, before the quadrant is decided, and not by
+      // dropping the "완료" group inside each box: a finished task that matches
+      // no rule would then still be sitting in the remainder line under the
+      // grid, and completed work half-hidden on one screen is not hidden
+      // (§33.2.4).
+      if (hideCompleted && isCompleted(task)) continue;
       const listId = listIdFor(task, lists);
       if (scope && listId !== scope) continue;
       const quadrant = quadrantForTask(task, rules, { today, listId });
@@ -151,7 +180,7 @@ export function MatrixPage({
     // Not sorted here: the order is per GROUP now, and each box does its own
     // grouping-and-sorting in one pass (`groupTasks`).
     return { byQuadrant: groups, unmatched: orphans };
-  }, [tasks, lists, scope, rules, today]);
+  }, [tasks, lists, scope, rules, today, hideCompleted]);
 
   /**
    * Whether the List picker and this box's own List condition rule each other
@@ -205,6 +234,70 @@ export function MatrixPage({
     // An empty patch means the drop would change nothing; writing it anyway
     // would touch `updatedAt` and put a no-op row on the wire.
     if (Object.keys(outcome.patch).length > 0) onUpdateTask(taskId, outcome.patch);
+  }
+
+  /**
+   * The screen's own settings, as a menu (§33.2.2).
+   *
+   * This replaced a `<select>` that sat in the header at all times to say one
+   * word, "전체 리스트", which is what it says in almost every session. The
+   * picker itself is NOT gone — §27.1's reason for keeping it (a five-minute
+   * narrowing is one click here and eight edits through the rules) is
+   * untouched by where the control lives. It moved.
+   *
+   * Two sections, because they are two kinds of answer: what the screen draws,
+   * and what it is looking at.
+   */
+  function pageMenuAt(x: number, y: number): ContextMenuState {
+    return {
+      x,
+      y,
+      label: t("matrix.pageMenuAria"),
+      sections: [
+        {
+          id: "display",
+          items: [
+            {
+              id: "hideCompleted",
+              label: t("matrix.menu.hideCompleted"),
+              // A tick and not just the selected row's tint: this is a switch
+              // with two states, and "on" has to be readable without a second
+              // row beside it to compare against.
+              icon: hideCompleted ? "✓" : null,
+              selected: hideCompleted,
+              run: () => onToggleHideCompleted?.(),
+            },
+          ],
+        },
+        {
+          id: "scope",
+          items: [
+            {
+              id: "scope",
+              label: t("matrix.list"),
+              // The current answer on the row itself, so the menu says what
+              // the `<select>` used to say without being opened twice.
+              value: scopeName || t("matrix.allLists"),
+              submenu: [
+                {
+                  id: "list-all",
+                  label: t("matrix.allLists"),
+                  selected: scope === ALL_LISTS,
+                  run: () => setListId(ALL_LISTS),
+                },
+                ...pickableLists.map((list) => ({
+                  id: `list-${list.id}`,
+                  label: list.name,
+                  selected: scope === list.id,
+                  run: () => setListId(list.id),
+                })),
+              ],
+              run: () => {},
+            },
+          ],
+        },
+      ],
+    };
   }
 
   /**
@@ -298,19 +391,32 @@ export function MatrixPage({
         <div>
           <h1 className="ff-page-title">{t("matrix.title")}</h1>
         </div>
-        <div className="ff-board-controls">
-          <label className="ff-board-control">
-            <span>{t("matrix.list")}</span>
-            <select value={scope} onChange={(event) => setListId(event.target.value)}>
-              <option value={ALL_LISTS}>{t("matrix.allLists")}</option>
-              {pickableLists.map((list) => (
-                <option key={list.id} value={list.id}>
-                  {list.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        {/* One button where a labelled `<select>` used to stand. What it costs
+            is a click: narrowing to a List is two now, not one.
+
+            What it must NOT cost is §27.1's other half — "the picker's hiding
+            explains itself, because the control is at the top of the screen
+            with its name on it". A menu cannot say that, so the button says
+            it: a dot while anything is being held back, and an aria-label that
+            reads the state out (§33.2.3). The two sentences §27.2 added — the
+            box that says which List is in the way, and the remainder line that
+            names it — are untouched and still do the explaining that matters
+            most. */}
+        <button
+          type="button"
+          className={`ff-page-menu${filtered ? " is-filtered" : ""}`}
+          aria-label={t(filtered ? "matrix.pageMenuAriaFiltered" : "matrix.pageMenuAria")}
+          aria-haspopup="menu"
+          onClick={(event) => {
+            const box = event.currentTarget.getBoundingClientRect();
+            // Anchored to the button's RIGHT edge: it sits at the end of the
+            // header, and a menu opening from its left edge would hang off the
+            // window on every screen.
+            setMenu(pageMenuAt(box.right, box.bottom));
+          }}
+        >
+          ⋯
+        </button>
       </header>
 
       <div className="ff-matrix">

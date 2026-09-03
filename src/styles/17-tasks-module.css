@@ -179,10 +179,20 @@
   margin-bottom: 16px;
   /* §16.34's browser zoom. At 400% the viewport is about 320 CSS px and this
      row stops fitting on one line. Without wrapping, `margin-left: auto` keeps
-     pushing the view toggle right until it passes the edge, where the shell's
-     `overflow-x: hidden` CLIPS it — so Board is not cramped, it is
-     unreachable. Wrapping drops the toggle to its own line instead. */
+     pushing the trailing control right until it passes the edge, where the
+     shell's `overflow-x: hidden` CLIPS it — so the ⋯ is not cramped, it is
+     unreachable. Wrapping drops it to its own line instead. */
   flex-wrap: wrap;
+}
+
+/* The ⋯ sits at the END of the header, and it has to say so itself now.
+   `margin-left: auto` used to be on `.tm-views`, which stood in front of it —
+   when the view selector moved into the menu
+   (TASK_VIEWS_EVERYWHERE_DESIGN.md §3.1) the only thing pushing this row's
+   trailing control to the right went with it, and the ⋯ fell back against the
+   title with the whole header empty to its right. */
+.tm-header > .ff-anchor {
+  margin-left: auto;
 }
 
 /* A long Scope title must wrap rather than push its neighbours out of the
@@ -226,17 +236,10 @@
   cursor: pointer;
 }
 
-/* The header's selector is icons (§13.4). Square, on the 32px control grid,
-   and the padding that made room for words is gone with them. The `.tm-view`
-   above still dresses the Create List modal's text version, which is why
-   this is a modifier rather than a rewrite. */
-.tm-view.is-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-}
+/* `.tm-view.is-icon` stood here for the header's icon selector (§13.4). The
+   selector is in the ⋯ menu now and wears `.ff-menu-choice`
+   (TASK_VIEWS_EVERYWHERE_DESIGN.md §3.2); `.tm-view` above keeps dressing the
+   Create List modal's text version, which is why that one stays. */
 
 .tm-view.is-current {
   background: var(--bg, #fff);
@@ -308,13 +311,21 @@
 }
 
 .tm-task-check input {
-  width: 17px;
-  height: 17px;
+  width: var(--check-size);
+  height: var(--check-size);
   min-height: 0;
   margin: 0;
   padding: 0;
   accent-color: var(--accent);
   cursor: pointer;
+}
+
+/* A ticked box is a finished task, so the state needs no class to be read off
+   the DOM — and finished work is GREY. The accent belongs to what is still to
+   be done; painting the done rows with it makes them the loudest thing in a
+   list of what is left. */
+.tm-task-check input:checked {
+  accent-color: var(--text-tertiary);
 }
 
 /* Stored since the beginning, drawn since V-P1: a flag at the end of the title
@@ -346,9 +357,13 @@
   white-space: nowrap;
 }
 
+/* Grey, and no line through it. The strike was a second way of saying what
+   the grey and the ticked box already say, and it is the one that costs
+   legibility — a struck title is a title you have to read twice to be sure
+   of. Kept for CHECKLIST items further down this file: a line inside a task
+   is not a task, and crossing one out is what a paper list does. */
 .tm-task-title.is-done {
   color: var(--text-muted, #8e8e93);
-  text-decoration: line-through;
 }
 
 .tm-task-due {
@@ -669,11 +684,15 @@
    it tints the native widget with the app's accent and follows the theme,
    without replacing the control (which would cost its keyboard behaviour). */
 .tm-drawer-done input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+  width: var(--check-size);
+  height: var(--check-size);
   margin: 0;
   accent-color: var(--accent);
   cursor: pointer;
+}
+
+.tm-drawer-done input[type="checkbox"]:checked {
+  accent-color: var(--text-tertiary);
 }
 
 .tm-drawer-close {
@@ -1168,7 +1187,6 @@
 
 .tm-drawer-subtasks li .is-done {
   color: var(--text-muted, #8e8e93);
-  text-decoration: line-through;
 }
 
 .tm-drawer-subtasks li button {
@@ -1827,6 +1845,51 @@
   font-size: 12px;
 }
 
+/* The Trash's List section (TRASH_PERMANENT_DELETE_DESIGN.md §16.3).
+
+   It borrows the Task row (`.tm-task`) and the Detail footer's two controls
+   (`.tm-drawer-restore`, `.tm-drawer-delete-forever`) rather than dressing new
+   ones: the gestures are the same gestures, and a second look for them would
+   say there is a difference where there is none. */
+.tm-trash-lists {
+  margin-bottom: 18px;
+}
+
+.tm-trash-lists-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  color: var(--text-muted, #8e8e93);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The row is not a link to anywhere — a List in the bin has no screen to open
+   — so it does not light up under the pointer the way a Task row does. */
+.tm-trash-list {
+  gap: 8px;
+  cursor: default;
+}
+
+.tm-trash-list .tm-task-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A leftover state, said quietly: it explains a row the reader does not
+   remember deleting, and nothing more (§16.6). */
+.tm-trash-list-tag {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: var(--rounded-pill, 999px);
+  background: var(--surface-2, rgba(25, 25, 25, 0.05));
+  color: var(--text-muted, #8e8e93);
+  font-size: 11px;
+}
+
 .tm-scope-actions {
   display: flex;
   gap: 6px;
@@ -2076,16 +2139,18 @@
   }
 
   /* The checkbox stretches to the row, so the row is what has to clear the
-     floor — and the box itself grows, because 17px of visible target is a
-     desktop measurement. The handle goes: a finger has no hover to reveal it
-     with, and drag-to-reorder on touch needs its own gesture (not this one). */
+     floor. The BOX no longer grows with it: a 22px tick beside a 14px title
+     was the thing that read as too big, and the target does not need the
+     drawing to carry it — the label is the target, so it takes the width in
+     padding instead. 15 + 2×14 = 43, plus the row's own leading edge. The
+     handle goes: a finger has no hover to reveal it with, and drag-to-reorder
+     on touch needs its own gesture (not this one). */
   .tm-task {
     min-height: 44px;
   }
 
-  .tm-task-check input {
-    width: 22px;
-    height: 22px;
+  .tm-task-check {
+    padding: 0 14px;
   }
 
   .tm-task-handle {
@@ -3029,6 +3094,9 @@
   outline: none;
 }
 
+/* The one line that stays (TICKTICK_COMPONENT_06 §16). A checklist item is not a Task — it is a
+   line inside one — and crossing it out is what a paper list does. Every
+   finished TASK in the app is grey and unstruck. */
 .tm-checklist-items li.is-checked .tm-checklist-text {
   color: var(--text-muted, #8e8e93);
   text-decoration: line-through;
@@ -3128,7 +3196,6 @@
 
 .tm-drawer-subtask-open.is-done {
   color: var(--text-muted, #8e8e93);
-  text-decoration: line-through;
 }
 
 /* --- the column's own `+` and what it opens (INBOX_COLUMNS §6, phase 1) ----

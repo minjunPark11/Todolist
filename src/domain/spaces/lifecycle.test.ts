@@ -5,6 +5,7 @@ import {
   archiveProject,
   archiveSpace,
   archivedLists,
+  binnedLists,
   canPermanentlyDeleteSpace,
   deletedLists,
   permanentlyDeleteList,
@@ -270,5 +271,37 @@ describe("the management surfaces (§13.25)", () => {
     lists = trashList(lists, "l2", LATER);
     expect(archivedLists(lists).map((list) => list.id)).toEqual(["l1"]);
     expect(deletedLists(lists).map((list) => list.id)).toEqual(["l2"]);
+  });
+});
+
+// §16.3: the Trash draws both, and the ORDER is the decision — what the user
+// threw away is what they came for; what they archived is a leftover from a
+// verb that no longer exists (§16.6).
+describe("what the Trash's List section holds", () => {
+  it("puts the thrown-away first and the archived after", () => {
+    let lists = archiveList([inboxList, workList, { ...workList, id: "l2", name: "Home" }], "l1", LATER);
+    lists = trashList(lists, "l2", LATER);
+
+    expect(binnedLists(lists).map((list) => list.id)).toEqual(["l2", "l1"]);
+  });
+
+  it("holds nothing while every List is live", () => {
+    expect(binnedLists([inboxList, workList])).toEqual([]);
+  });
+
+  it("can permanently delete an archived List, not only a deleted one", () => {
+    // The guard was `deletedAt` alone, which would have made an archived List
+    // something the Trash could show and never remove (§16.6).
+    const lists = archiveList([inboxList, workList], "l1", LATER);
+    const result = permanentlyDeleteList(lists, [task({ listId: "l1" })], "l1");
+
+    expect(result.done).toBe(true);
+    expect(result.lists.map((list) => list.id)).toEqual(["list-inbox"]);
+    expect(result.tasks).toEqual([]);
+  });
+
+  it("still refuses a List that is live", () => {
+    const result = permanentlyDeleteList([inboxList, workList], [], "l1");
+    expect(result.done).toBe(false);
   });
 });

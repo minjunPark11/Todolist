@@ -81,8 +81,11 @@ describe("canonicalization", () => {
   // Gate 1: an unknown view must not reach a screen, and must not throw.
   it("replaces a view the Scope does not allow with its default", () => {
     expect(canonicalizeTaskUrl("/inbox?view=banana")).toBe("/inbox");
-    expect(canonicalizeTaskUrl("/today?view=board")).toBe("/today");
-    expect(canonicalizeTaskUrl("/tag/tag_x?view=board")).toBe("/tag/tag_x");
+    // Today and a Tag keep their board now
+    // (TASK_VIEWS_EVERYWHERE_DESIGN.md §2); finished work still has none.
+    expect(canonicalizeTaskUrl("/today?view=board")).toBe("/today?view=board");
+    expect(canonicalizeTaskUrl("/tag/tag_x?view=board")).toBe("/tag/tag_x?view=board");
+    expect(canonicalizeTaskUrl("/trash?view=board")).toBe("/trash");
   });
 
   // Gate 1: an open Drawer survives the tidying.
@@ -121,7 +124,8 @@ describe("taskUrlFor", () => {
   });
 
   it("refuses to write a view the Scope does not allow", () => {
-    expect(taskUrlFor({ scope: { kind: "today" }, view: "board", taskId: "" })).toBe("/today");
+    expect(taskUrlFor({ scope: { kind: "today" }, view: "board", taskId: "" })).toBe("/today?view=board");
+    expect(taskUrlFor({ scope: { kind: "trash" }, view: "board", taskId: "" })).toBe("/trash");
   });
 });
 

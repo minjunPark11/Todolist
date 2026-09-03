@@ -1258,8 +1258,6 @@ export default function App() {
             planner.createList("", name, undefined, { color, defaultViewKey, sidebarFolderId })
           }
           onCreateSidebarFolder={planner.createSidebarFolder}
-          onRestoreList={planner.restoreList}
-          onPermanentlyDeleteList={planner.permanentlyDeleteList}
         />
       );
     }
@@ -1440,7 +1438,6 @@ export default function App() {
           // confirmation for what cannot be taken back, which a soft delete
           // with an Undo beside it is not.
           lifecycle={{
-            onArchiveList: planner.archiveList,
             onTrashList: planner.trashList,
             onRestoreList: planner.restoreList,
             onPermanentlyDeleteList: planner.permanentlyDeleteList,

@@ -19,7 +19,15 @@ import type { KeyboardEvent } from "react";
  */
 export function moveMenuFocus(container: HTMLElement | null, event: KeyboardEvent): boolean {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return false;
-  const items = Array.from(container?.querySelectorAll<HTMLElement>("[role='menuitem']") ?? []);
+  // All three menu-item roles, not just the plain one: a menu that holds a
+  // set of choices draws them as `menuitemradio`, and walking only
+  // `menuitem` would step straight over the very row a keyboard reader came
+  // to change (the Tasks Module's View picker).
+  const items = Array.from(
+    container?.querySelectorAll<HTMLElement>(
+      "[role='menuitem'],[role='menuitemradio'],[role='menuitemcheckbox']",
+    ) ?? [],
+  );
   if (items.length === 0) return false;
   event.preventDefault();
   const at = items.indexOf(document.activeElement as HTMLElement);

@@ -87,7 +87,7 @@ function renderModule(
     onStartFocus?: (taskId: string) => void;
     onDeleteForever?: (taskId: string) => void;
     onNavigate?: (url: string, mode?: "push" | "replace") => void;
-    onEmptyTrash?: () => number;
+    onEmptyTrash?: () => { tasks: number; lists: number; tasksWithLists: number };
     scopeViewOptions?: Record<string, ScopeViewOptions>;
     onSetScopeViewOptions?: (next: Record<string, ScopeViewOptions>) => void;
     onDuplicate?: (taskId: string) => (() => void) | null;
@@ -95,7 +95,6 @@ function renderModule(
     onSaveAsTemplate?: (taskId: string) => string;
     onDeleteTemplate?: (templateId: string) => void;
     /** Q7 moved the List actions into the ⋯, so a test has to see them fire. */
-    onArchiveList?: (listId: string) => void;
     onTrashList?: (listId: string) => void;
     lists?: List[];
     /**
@@ -128,7 +127,7 @@ function renderModule(
           onNavigate={extra.onNavigate ?? (() => {})}
           onStartFocus={extra.onStartFocus ?? (() => {})}
           onDeleteForever={extra.onDeleteForever ?? (() => {})}
-          onEmptyTrash={extra.onEmptyTrash ?? (() => 0)}
+          onEmptyTrash={extra.onEmptyTrash ?? (() => ({ tasks: 0, lists: 0, tasksWithLists: 0 }))}
           scopeViewOptions={extra.scopeViewOptions}
           onSetScopeViewOptions={extra.onSetScopeViewOptions ?? (() => {})}
           onDuplicate={extra.onDuplicate ?? (() => null)}
@@ -158,7 +157,6 @@ function renderModule(
             remindersFor: () => [],
           }}
           lifecycle={{
-            onArchiveList: extra.onArchiveList ?? (() => {}),
             onTrashList: extra.onTrashList ?? (() => {}),
             onRestoreList: () => {},
             onPermanentlyDeleteList: () => {},
@@ -513,15 +511,19 @@ describe("the Scope's menu", () => {
     return screen.getByRole("menu");
   };
 
-  // §13.4 put the selector back in the header, as icons. The menu holds what
-  // a Scope SHOWS; switching view is done often enough to be worth its room.
-  it("draws the views in the header, with the current one pressed", () => {
+  // §13.4 had put the selector back in the HEADER, as icons. It is in this
+  // menu again (TASK_VIEWS_EVERYWHERE_DESIGN.md §3.1), as one row of icons
+  // under a heading, and as a closed choice rather than three pressed buttons.
+  it("holds the views as one closed choice, with the current one checked", async () => {
+    const user = userEvent.setup();
     renderModule({}, { url: "/list/l1?view=board" });
 
-    const views = document.querySelector(".tm-header .tm-views");
-    expect(views).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Board" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("button", { name: "List" }).getAttribute("aria-pressed")).toBe("false");
+    expect(document.querySelector(".tm-header .tm-views")).toBeNull();
+
+    await openScopeMenu(user);
+    expect(screen.getByRole("menuitemradio", { name: "Board" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("menuitemradio", { name: "List" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("group", { name: "View" })).toBeTruthy();
   });
 
   it("switches the view when one is chosen", async () => {
@@ -529,7 +531,8 @@ describe("the Scope's menu", () => {
     const onNavigate = vi.fn();
     renderModule({}, { url: "/list/l1?view=board", onNavigate });
 
-    await user.click(screen.getByRole("button", { name: "Timeline" }));
+    await openScopeMenu(user);
+    await user.click(screen.getByRole("menuitemradio", { name: "Timeline" }));
 
     // Asserted on the address rather than on the render: the view is a reading
     // of the URL (§15.9), and this harness hands the module a `onNavigate`
@@ -538,65 +541,77 @@ describe("the Scope's menu", () => {
     expect(onNavigate).toHaveBeenCalledTimes(1);
     expect(onNavigate.mock.calls[0][0]).toContain("/list/l1");
     expect(onNavigate.mock.calls[0][0]).toContain("view=gantt");
+    // And the menu is gone: the view IS the screen, so leaving the surface
+    // open over the new one would be a menu about something else.
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  // §16.26 Gate 3: six of the eight Scopes have one view, and a single-option
-  // selector is not a choice.
-  it("draws no selector where there is nothing to choose", () => {
-    renderModule({}, { url: "/today" });
+  // §16.26 Gate 3: a single-option selector is not a choice. The Scopes with
+  // one view are the finished-work three (TASK_VIEWS_EVERYWHERE_DESIGN.md §2),
+  // and they have no menu either — so this asserts both halves at once.
+  it("offers nothing to choose where there is one view", () => {
+    renderModule({}, { url: "/trash" });
     expect(document.querySelector(".tm-header .tm-views")).toBeNull();
+    expect(screen.queryByRole("button", { name: "View and options" })).toBeNull();
   });
 
-  // §16.26 Gate 3, one level up from where it used to live: six of the eight
-  // Scopes have one view, and a single-row radio is not a choice. The MENU
-  // still opens — §3.1 gives it to every Scope that is not finished work, and
-  // since phase 3 it carries `View Options` — but the view section is absent.
-  it("holds what the Scope shows, and no views", async () => {
+  it("offers all three on a Scope that gathers several Lists", async () => {
     const user = userEvent.setup();
     renderModule({}, { url: "/today" });
 
     await openScopeMenu(user);
-    // `Hide Completed` is absent too: this Scope has no Board to hide any in.
-    // And there is no `View Options` — Q4: the dialog would have held one row,
-    // so that row is here instead.
-    expect(rows()).toEqual([
-      "Show Details",
-      "✓ Show date as the day",
-      "Show date as a countdown",
+    expect(screen.getAllByRole("menuitemradio").map((node) => node.getAttribute("aria-label"))).toEqual([
+      "List",
+      "Board",
+      "Timeline",
     ]);
   });
 
-  // Q4. A scrim and a modal to show a single line is a door for a doorway.
-  it("opens no dialog where the dialog would hold one row", async () => {
+  // Q4's two `Task Time` rows are gone with the Scope they were for: they
+  // existed because a Scope with no Board would have opened a modal to show
+  // one line, and there is no such Scope left (§2). `Task Time` has one door
+  // again — the dialog — rather than two that could disagree.
+  it("holds what the Scope shows, and sends the column settings to the dialog", async () => {
+    const user = userEvent.setup();
+    renderModule({}, { url: "/today" });
+
+    await openScopeMenu(user);
+    // `Hide Completed` is absent: it is a Board row and this Scope opened on
+    // the list.
+    expect(rows()).toEqual(["Show Details", "View Options"]);
+  });
+
+  it("opens the dialog on a Scope that gathers several Lists", async () => {
     const user = userEvent.setup();
     const onSetScopeViewOptions = vi.fn();
     renderModule({}, { url: "/today", onSetScopeViewOptions });
 
     await openScopeMenu(user);
-    await user.click(screen.getByRole("menuitem", { name: "Show date as a countdown" }));
+    await user.click(screen.getByRole("menuitem", { name: "View Options" }));
 
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(onSetScopeViewOptions.mock.calls[0][0].today.dateBy).toBe("countdown");
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
-  // §13.5 (Q7). The two used to be words in the header, 152px in front of
-  // the view icons, for something a List is told once in its life.
+  // §13.5 (Q7). The words used to be in the header, 152px in front of the view
+  // icons, for something a List is told once in its life. There were two of
+  // them until §16.6 — `Archive list` was a second soft state whose only door
+  // back was the same hidden dialog, so it was the weaker copy of its
+  // neighbour.
   it("offers a List what to do with itself, at the bottom", async () => {
     const user = userEvent.setup();
-    const onArchiveList = vi.fn();
     const onTrashList = vi.fn();
-    renderModule({}, { url: "/list/l1", onArchiveList, onTrashList });
+    renderModule({}, { url: "/list/l1", onTrashList });
 
     await openScopeMenu(user);
     // Last, under the separator: the rows above act on what the screen
-    // SHOWS, and these two act on the List.
-    expect(rows().slice(-2)).toEqual(["Archive list", "Delete list"]);
+    // SHOWS, and this one acts on the List.
+    expect(rows().slice(-1)).toEqual(["Delete list"]);
+    expect(rows()).not.toContain("Archive list");
 
     await user.click(screen.getByRole("menuitem", { name: "Delete list" }));
-    // Straight through, no second question — the List is recoverable from
-    // Manage and its Tasks are not touched (§13.5).
+    // Straight through, no second question — the List is in the Trash, where
+    // it can be brought back, and its Tasks are not touched (§13.5, §16.3).
     expect(onTrashList).toHaveBeenCalledWith("l1");
-    expect(onArchiveList).not.toHaveBeenCalled();
   });
 
   // The Inbox is the floor a Task falls back to (§6.5). Putting it away
@@ -898,7 +913,7 @@ describe("emptying the Trash", () => {
 
   it("asks with the number, and empties nothing until it is answered", async () => {
     const user = userEvent.setup();
-    const onEmptyTrash = vi.fn(() => 1);
+    const onEmptyTrash = vi.fn(() => ({ tasks: 1, lists: 0, tasksWithLists: 0 }));
     renderModule({ deletedAt: NOW }, { url: "/trash?task=t1", onEmptyTrash });
 
     await user.click(screen.getByRole("button", { name: "Empty trash" }));
@@ -914,7 +929,7 @@ describe("emptying the Trash", () => {
 
   it("empties nothing when the question is answered no", async () => {
     const user = userEvent.setup();
-    const onEmptyTrash = vi.fn(() => 0);
+    const onEmptyTrash = vi.fn(() => ({ tasks: 0, lists: 0, tasksWithLists: 0 }));
     renderModule({ deletedAt: NOW }, { url: "/trash?task=t1", onEmptyTrash });
 
     await user.click(screen.getByRole("button", { name: "Empty trash" }));

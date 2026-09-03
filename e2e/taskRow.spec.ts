@@ -66,9 +66,13 @@ test.describe("what a Task row can do", () => {
     await page.goto(`/list/${LIST.id}`);
     await addTask(page, "Aim at me");
 
-    // §3.1: the reference draws 17px and accepts a click anywhere down the
-    // row's height. A 17px target in a 36px row is the version of this that
-    // looks right and misses.
+    // §3.1: the reference accepts a click anywhere down the row's height while
+    // drawing a small box. A box-sized target in a 36px row is the version of
+    // this that looks right and misses.
+    //
+    // The box is `--check-size` now (TICKTICK_COMPONENT_06 §16) — one number for the six sizes the
+    // app had — and this reads it rather than repeating it, so tuning the
+    // token does not fail a test about the TARGET.
     const geometry = await page.locator(".tm-task").first().evaluate((row) => {
       const label = row.querySelector(".tm-task-check") as HTMLElement;
       const input = row.querySelector(".tm-task-check input") as HTMLElement;
@@ -78,10 +82,14 @@ test.describe("what a Task row can do", () => {
         rowContent: row.clientHeight,
         target: Math.round(label.getBoundingClientRect().height),
         box: Math.round(input.getBoundingClientRect().width),
+        token: getComputedStyle(document.documentElement).getPropertyValue("--check-size").trim(),
       };
     });
     expect(geometry.target).toBe(geometry.rowContent);
-    expect(geometry.box).toBe(17);
+    expect(geometry.box).toBe(Number.parseInt(geometry.token, 10));
+    // Smaller than the 14px title it sits beside, which is the proportion the
+    // reference draws and the thing 17px got wrong.
+    expect(geometry.box).toBeLessThan(17);
   });
 
   test("completing can be undone, and the undo is what the account keeps", async ({ page }) => {
@@ -156,13 +164,25 @@ test.describe("the row under a finger", () => {
     await page.goto(`/list/${LIST.id}`);
     await addTask(page, "Tap me");
 
-    const geometry = await page.locator(".tm-task").first().evaluate((row) => ({
-      row: Math.round(row.getBoundingClientRect().height),
-      target: Math.round((row.querySelector(".tm-task-check") as HTMLElement).getBoundingClientRect().height),
-      handleShown: getComputedStyle(row.querySelector(".tm-task-handle") as HTMLElement).display !== "none",
-    }));
+    const geometry = await page.locator(".tm-task").first().evaluate((row) => {
+      const label = row.querySelector(".tm-task-check") as HTMLElement;
+      return {
+        row: Math.round(row.getBoundingClientRect().height),
+        target: Math.round(label.getBoundingClientRect().height),
+        // Both dimensions, because the box stopped growing here (TICKTICK_COMPONENT_06 §16): the
+        // label takes the width in padding instead, and a 15px-wide target
+        // would clear the floor in one direction and miss in the other.
+        targetWidth: Math.round(label.getBoundingClientRect().width),
+        box: Math.round((label.querySelector("input") as HTMLElement).getBoundingClientRect().width),
+        handleShown: getComputedStyle(row.querySelector(".tm-task-handle") as HTMLElement).display !== "none",
+      };
+    });
     expect(geometry.row).toBeGreaterThanOrEqual(44);
     expect(geometry.target).toBeGreaterThanOrEqual(43);
+    expect(geometry.targetWidth).toBeGreaterThanOrEqual(43);
+    // The drawing does not grow with the target: a 22px tick beside a 14px
+    // title is what read as too big.
+    expect(geometry.box).toBeLessThan(17);
     // A handle revealed on hover is useless where there is no hover.
     expect(geometry.handleShown).toBe(false);
   });

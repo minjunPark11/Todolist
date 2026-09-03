@@ -47,7 +47,6 @@ interface TasksSidebarProps {
   tags: Tag[];
   savedFilters: SavedFilter[];
   /** §13.25's management surface, opened from the Lists section. */
-  onManageLists: () => void;
   /**
    * §1.1/§1.2: opens the Add List dialog. Opening changes nothing else.
    *
@@ -74,7 +73,6 @@ export function TasksSidebar({
   sidebarFolders,
   tags,
   savedFilters,
-  onManageLists,
   onCreateList,
   current,
   onNavigate,
@@ -180,10 +178,13 @@ export function TasksSidebar({
       </div>
 
       <div className="tm-section">
-        {/* The two buttons used to sit INSIDE the `<h2>`, which made the
-            heading's accessible name "Lists + Manage" — a screen reader read
-            the controls as part of the title. They are beside it now, in a
-            row the heading shares. */}
+        {/* One button, and it used to be two. `Manage` opened the dialog that
+            was the only door to archived and deleted Lists; the Trash is that
+            door now (§16.7), so the row is the heading and the `+`.
+
+            The `+` sits BESIDE the `<h2>` rather than inside it: buttons in
+            the heading made its accessible name "Lists + Manage", which a
+            screen reader read as part of the title. */}
         <div className="tm-section-head">
           <h2 className="tm-section-title">{t("tasks.sectionLists")}</h2>
           {/* §1.1. `Lists +` opens the dialog with no Folder context; the
@@ -195,14 +196,6 @@ export function TasksSidebar({
             aria-label={t("tasks.createList")}
           >
             +
-          </button>
-          <button
-            type="button"
-            className="tm-section-action"
-            onClick={onManageLists}
-            aria-label={t("tasks.manageListsAria")}
-          >
-            {t("tasks.manageLists")}
           </button>
         </div>
         {groups.map((folder) => {

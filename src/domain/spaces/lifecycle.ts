@@ -84,10 +84,15 @@ export function restoreList(lists: List[], listId: string, now: string): List[] 
  * §6.56's one permitted hard cascade, and the reason it is permitted: the
  * user asked for this from a surface that spelled out what it would take.
  *
- * Only a List already in the deleted state can be permanently deleted — the
- * two-step is the guard, so nothing reaches this from a single click. The
+ * Only a List that is already OUT of the sidebar can be permanently deleted —
+ * the two-step is the guard, so nothing reaches this from a single click. The
  * Tasks go with it because leaving them would be Gate 9's first line failing
  * in the other direction: rows owned by a List that no longer exists.
+ *
+ * The guard was `deletedAt` alone. It is "not live" now (§16.6): archiving is
+ * going away, and an archived List whose only door was the Manage dialog would
+ * otherwise be a record that can be seen in the Trash and never removed. Both
+ * states are two steps from a click, which is what the guard is for.
  */
 export function permanentlyDeleteList(
   lists: List[],
@@ -95,7 +100,7 @@ export function permanentlyDeleteList(
   listId: string,
 ): { lists: List[]; tasks: Task[]; done: boolean } {
   const list = lists.find((item) => item.id === listId);
-  if (!list || !list.deletedAt) return { lists, tasks, done: false };
+  if (!list || isLive(list)) return { lists, tasks, done: false };
   return {
     lists: lists.filter((item) => item.id !== listId),
     tasks: tasks.filter((task) => task.listId !== listId),
@@ -228,10 +233,18 @@ export function permanentlyDeleteSpace(
 /**
  * The two management lists, which are NOT Scopes.
  *
- * §13.25 is explicit that these do not join §12's registry of nine: a deleted
- * List is not a row in the Task Trash, because the Trash is a list of Tasks
- * the user threw away and mixing containers into it would make "restore"
- * mean two different things on one screen.
+ * §13.25 said these do not join §12's registry of nine: "a deleted List is not
+ * a row in the Task Trash, because the Trash is a list of Tasks the user threw
+ * away and mixing containers into it would make restore mean two different
+ * things on one screen."
+ *
+ * §16.2 reversed it, on evidence rather than on taste. `restore` does not mean
+ * two things — it means "get this back" in both cases, and the screen keeps
+ * them in two labelled sections so a reader never has to tell them apart by
+ * eye. What the separation actually bought was a screen NOBODY COULD FIND: the
+ * only door to these Lists was a dialog behind a `Manage` button in the
+ * sidebar, and a deleted List was the one thing in the app that could be
+ * thrown away and not be in the Trash.
  */
 export function archivedLists(lists: List[]): List[] {
   return lists.filter((list) => isArchived(list)).sort((a, b) => a.name.localeCompare(b.name));
@@ -239,6 +252,19 @@ export function archivedLists(lists: List[]): List[] {
 
 export function deletedLists(lists: List[]): List[] {
   return lists.filter((list) => isDeleted(list)).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Everything the Trash's List section draws (§16.3), thrown away first.
+ *
+ * One function rather than the screen concatenating two, because the ORDER is
+ * a decision: a List the user deleted is what they came looking for, and one
+ * they archived back when archiving existed is a leftover they are being given
+ * a way to clear. Archiving is gone (§16.6), so the second group only ever
+ * shrinks.
+ */
+export function binnedLists(lists: List[]): List[] {
+  return [...deletedLists(lists), ...archivedLists(lists)];
 }
 
 /** How much goes with a permanent delete, for the confirmation to say out loud. */

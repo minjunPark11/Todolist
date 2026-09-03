@@ -103,7 +103,7 @@
 
 .tlv-row:hover { background: var(--bg-hover-content); }
 .tlv-row.is-selected { background: var(--surface-selected, #eff6ff); }
-.tlv-row.is-done .tlv-link { color: var(--text-muted, #6b7280); text-decoration: line-through; }
+.tlv-row.is-done .tlv-link { color: var(--text-muted, #6b7280); }
 
 .tlv-link {
   display: inline-flex;

@@ -646,6 +646,20 @@ export interface AppSettings {
    */
   matrixQuadrantViews?: Partial<Record<MatrixQuadrant, MatrixQuadrantView>>;
   /**
+   * Whether the matrix leaves finished work out of its boxes
+   * (TICKTICK_MATRIX_DESIGN.md §33.2.5).
+   *
+   * Absent and `false` both mean "show it", which is D2 — a card that vanishes
+   * the instant it is ticked takes with it the only evidence of what was just
+   * ticked. So a new setting cannot quietly change what an existing account
+   * sees; it has to be asked for.
+   *
+   * NOT merged with `showCompletedInToday`: two screens, and switching one
+   * must not switch the other — the same reason `matrixQuadrantViews` and
+   * `todayGroupAxis` are two fields.
+   */
+  matrixHideCompleted?: boolean;
+  /**
    * Which question the day's list is grouped by
    * (TODAY_TICKTICK_REDESIGN.md §3.4).
    *

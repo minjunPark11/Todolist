@@ -1812,3 +1812,252 @@ judged yet`, ko는 `둘 다 아닌 일 · 아직 판단하지 않은 일`. 죽�
 - 실제 앱(dev, ko): `/app` · `/today` · `/inbox` · `/board` · `/calendar` · `/focus` ·
   `/settings` · `/next7` · `/completed` · `/trash` 열 화면에서 **`[i18n] Missing
   translation key` 경고 0건**, 화면에 키 이름이 그대로 나온 자리 0곳
+
+---
+
+## 33. 화면은 고정, 카드가 스크롤한다 · 헤더의 `<select>`가 ⋯ 하나로 (2026-09-03)
+
+요구는 둘이다.
+
+1. **네 칸이 항상 화면 안에 있다.** 항목이 많아지면 칸 **안에서** 스크롤한다. 지금은
+   Ⅱ가 길어지면 페이지 전체가 자라고, Ⅲ·Ⅳ는 화면 밖으로 밀린다 — 2x2를 그려 놓고
+   한 번에 두 칸만 보여 주면 §0이 네 칸으로 만든 이유가 사라진다.
+2. **우측 상단의 리스트 `<select>`를 없앤다.** 자리에 `⋯` 하나를 두고, 그 메뉴에서
+   완료 항목을 숨길 수 있게 한다.
+
+### 33.1 스크롤은 이미 구현돼 있었다 — 없던 것은 높이 계약이다
+
+칸의 본문은 이미 스스로 스크롤하도록 쓰여 있다. `03-planning.css:871`:
+
+```css
+/* The cards scroll, the box does not: a full quadrant must not push the grid
+   taller than the screen and take the other three with it. */
+.ff-matrix-cell-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+```
+
+주석이 약속하는 것이 정확히 이번 요구다. 그런데 화면에서는 일어나지 않는다. `overflow`가
+일할 수 있으려면 **조상 어딘가에 확정된 높이**가 있어야 하고, 이 화면에는 위에서 아래까지
+그런 곳이 하나도 없다:
+
+| 층 | 지금 | 결과 |
+|---|---|---|
+| `.app-shell > main` (`01-base.css:504`) | `min-height: 100vh`, 상한 없음 | 콘텐츠만큼 자란다 |
+| `.page-grid` (`01-base.css:557`) | `align-items: start` | 행 높이 = 콘텐츠 |
+| `.ff-page` (`03-planning.css:4`) | flex column, 높이 없음 | 자란다 |
+| `.ff-matrix` (`03-planning.css:750`) | `flex: 1 1 auto; min-height: 0` | **auto 높이의 `1fr`은 콘텐츠 높이다** |
+
+`.ff-matrix`는 자기 몫을 이미 다 했다(`min-height: 0`까지 있다). 다만 나눠 가질 높이를
+아무도 주지 않으므로 `1fr`이 그냥 콘텐츠가 된다. 그 위에 `grid-template-rows:
+minmax(240px, 1fr)`이 두 행에 480px의 **바닥**을 박아 두어, 높이를 주더라도 낮은 창에서는
+넘친다.
+
+**따라서 고칠 곳은 칸이 아니라 조상의 높이 계약이고, `MatrixPage.tsx`는 이 요구 때문에는
+한 줄도 바뀌지 않는다.**
+
+#### 33.1.1 계약 — CSS만, 매트릭스 화면에만
+
+```css
+@media (min-width: 901px) {
+  .app-shell > main:has(.ff-matrix-page) {
+    height: calc(100dvh - var(--titlebar-h));
+    min-height: 0;
+    overflow: hidden auto;
+  }
+  .app-shell > main:has(.ff-matrix-page) > .page-grid {
+    height: 100%; min-height: 0; align-items: stretch;
+  }
+  .ff-matrix-page { height: 100%; min-height: 0; padding-bottom: 0; gap: 16px; }
+  .ff-matrix { min-height: 452px; }
+}
+.ff-matrix { grid-template-rows: repeat(2, minmax(0, 1fr)); }
+```
+
+`--titlebar-h`는 기본이 `0px`이고 데스크톱의 자체 캡션에서만 32px이 된다
+(`19-app-shell.css:520`). 그래서 웹 빌드와 Tauri 빌드가 **한 줄로** 같이 맞는다 —
+`[data-window-chrome="custom"]` 분기를 새로 만들지 않는다.
+
+`:has(.ff-matrix-page)`는 이미 이 저장소가 쓰는 방법이다(`09-calendar-redesign.css:144`).
+
+**`min-width: 901px`으로 한 번 더 좁힌 것은 설계가 아니라 구현 중 실제 앱에서 잡은
+것이다.** 이 파일 끝의 `@media (max-width: 900px)`이 네 칸을 **한 열로 세워** 스크롤하는
+목록으로 만든다. 거기엔 붙잡아 둘 2x2가 없으므로 계약도 걸지 않는다 — 좁은 화면은 이번
+변경 전과 같다.
+
+#### 33.1.2 왜 행의 `240px` 바닥을 버리는가
+
+바닥의 목적은 "칸이 카드 한두 장보다 얇아지지 않게"였다. 그건 페이지가 자랄 수 있을 때
+공짜였다. 이제는 아니다 — 480px + 헤더가 창보다 크면 **바닥이 스크롤을 되살린다**. 그러면
+이번 작업이 없앤 문제가 정확히 그대로 돌아온다.
+
+바닥은 사라진 게 아니라 **행에서 그리드로 옮겼다**(`.ff-matrix { min-height: 452px }`).
+행에 있을 때는 칸의 *내용*을 떠받치며 창과 싸웠고, 그리드에 있으면 2x2 전체를 떠받치는 선
+하나이며 행은 여전히 받은 높이를 나눈다.
+
+#### 33.1.3 창이 정말 낮을 때 — `main`이 모자란 만큼만 스크롤한다
+
+처음 설계는 "창 높이 640 아래에서는 문서 스크롤을 돌려준다"였다. **실제 앱에서 재 보고
+버렸다.** 높이를 돌려주는 순간 `1fr`이 다시 max-content가 되어 카드 23장이 든 칸이
+1110px로 자라고 네 칸이 전부 그 높이를 따라갔다 — **고치기 전 상태로 완전히 되돌아갔다.**
+낮은 창에서만 다른 레이아웃이 되는 것도 비용이었다.
+
+지금의 답은 두 줄이다: 그리드에 452px의 바닥(§33.1.2)을 두고 `main`을
+`overflow: hidden auto`로 둔다. 창이 그보다 낮으면 **모자란 픽셀만큼만** `main`이
+스크롤하고, 그 와중에도 **칸은 자기 카드를 스크롤한다.** 측정(1100×430): 네 칸 220px씩,
+`main` 524/430. 스크롤 모델이 하나로 유지된다.
+
+그리고 `.ff-matrix-page`에는 `overflow: hidden`을 **걸지 않는다.** 걸면 창이 바닥보다
+낮을 때 아래 두 칸이 잘리고, 잘린 것에는 닿을 방법이 없다.
+
+#### 33.1.4 곁의 둘 — Detail 열과 나머지 줄
+
+- **Detail 열은 이 변경이 닿지 않는다.** 인라인 Drawer는 `align-self: start`와 자기
+  `max-height`를 이미 갖고 있어(`17-tasks-module.css:1979`) `align-items: stretch`를
+  스스로 무시한다. 즉 지금처럼 sticky 카드로 남는다.
+- **나머지 줄(§23.3)** 은 이미 `flex: 0 0 auto` + 본문 `max-height: 220px`
+  (`03-planning.css:1005,1031`)이라 그리드를 밀지 않는다. 다만 낮은 창에서 220px은
+  화면의 절반일 수 있으므로 `min(220px, 26vh)`로 바꾼다.
+
+### 33.2 헤더 — `<select>` 하나가 `⋯` 하나로
+
+#### 33.2.1 피커는 삭제가 아니라 이사다 (§27과 정면으로)
+
+§27.1은 리스트 피커를 **남기기로** 끝냈고, 근거는 시간이었다: "5분만 일 리스트만 보자"는
+피커로 클릭 하나, 규칙으로 하면 칸 넷을 고치고 넷을 되돌리는 일이다. 그 근거는 이번에도
+유효하다. **그래서 기능은 남기고 표면만 옮긴다** — `<select>`가 늘 차지하던 헤더 오른쪽
+한 덩어리가 28px 버튼 하나가 된다. 비용은 정직하게 적는다: **범위를 바꾸는 데 클릭이
+하나에서 둘이 된다.**
+
+§27.1의 **두 번째** 근거는 이번 변경이 깨뜨린다 — "피커의 숨김은 스스로를 설명한다. 그
+컨트롤이 화면 맨 위에 있고 이름이 적혀 있다." 메뉴 뒤로 들어가면 그 문장은 거짓이 된다.
+그 빚은 33.2.3에서 갚는다.
+
+#### 33.2.2 메뉴의 내용 — 새 부품은 없다
+
+`⋯`(헤더) → 두 구획:
+
+```
+보기
+  [✓] 완료 항목 숨기기
+범위
+  리스트                    전체 리스트 ›
+```
+
+`ContextMenu`가 이미 `selected`(체크), `value`(현재 답), `submenu`(드릴인)를 전부 갖고
+있다(`common/ContextMenu.tsx:24–61`). `MatrixPage`에는 이미 `menu` 상태와 `<ContextMenu>`
+렌더가 있으므로(`MatrixPage.tsx:117,362`) **칸의 `⋯`와 같은 상태를 그대로 공유한다.**
+새 컴포넌트도, 새 팝오버도 없다.
+
+#### 33.2.3 숨기는 컨트롤은 자기가 숨기고 있다고 말해야 한다
+
+§25/§27이 이 문서에 심어 둔 원칙이다. 메뉴 뒤로 들어간 필터가 그 원칙을 어기지 않도록,
+**`⋯` 버튼이 필터가 걸려 있을 때 점 하나를 단다**(`is-filtered`). 조건은 둘 중 하나라도
+참일 때: 스코프가 "전체 리스트"가 아니거나, 완료 숨기기가 켜져 있거나. 스크린 리더에는
+`aria-label`이 갈린다(`matrix.pageMenuAria` / `matrix.pageMenuAriaFiltered`).
+
+그리고 §27.2가 만든 **두 문장은 그대로 남는다**: 서로를 배제하는 칸의 "'집' 리스트를 보는
+중입니다…"와, 나머지 줄의 "**'일'에서** 어느 칸에도 맞지 않는 작업 2개". 즉 "왜 비었나"에
+답하던 자리는 하나도 잃지 않고, 늘 켜져 있던 `<select>`만 사라진다.
+
+**기각한 대안 — 칩.** 스코프가 걸렸을 때 헤더에 "일 ×" 칩을 그리는 안. 설명은 가장
+확실하지만, **컨트롤을 없애 달라는 요구에 컨트롤을 도로 그리는 답**이고 완료 숨김까지
+칩이 되면 헤더에 늘 두 개가 떠 있게 된다. 점 하나 + 메뉴 안의 현재값으로 충분하다.
+
+#### 33.2.4 완료는 어디서 걸러지는가 — 한 곳에서
+
+`byQuadrant`의 그 한 번의 루프(`MatrixPage.tsx:127–149`), **사분면 판정보다 앞에서**:
+
+```ts
+if (hideCompleted && isCompleted(task)) continue;
+```
+
+`groupTasks` 쪽에서 "완료" 그룹만 빼지 않는 이유: 그러면 **규칙에 맞지 않는 완료 작업이
+나머지 줄에는 그대로 남는다.** 한 화면에서 완료가 반만 숨는 것은 숨김이 아니라 버그다.
+판정 앞에서 한 번 거르면 네 칸과 나머지 줄이 같은 집합을 본다.
+
+"완료" 그룹의 5개 상한과 "추가 보기"(`MatrixPage.tsx:726–734`)는 **그대로 둔다** — 숨기면
+그룹 자체가 없고, 켜면 지금 동작 그대로다. 드래그·`+`·규칙은 아무것도 안 바뀐다.
+
+#### 33.2.5 저장하는가 — 그렇다, 계정에
+
+`AppSettings.matrixHideCompleted?: boolean`, 기본 `false`.
+
+- **기본이 `false`인 이유**: D2가 "끝낸 일은 자기 칸에 남는다"로 정했고, 새 설정이 기존
+  계정의 화면을 말없이 바꿔서는 안 된다.
+- **`showCompletedInToday`(`types.ts:562`)와 합치지 않는 이유**: 두 화면이고, 한쪽을 켜는
+  것이 다른 쪽을 켜서는 안 된다. `matrixQuadrantViews`/`todayGroupAxis`가 이미 같은
+  원칙으로 갈라져 있다(`types.ts:647,654`).
+- **M0 추가**: `normalize.ts`에 `?? DEFAULT`  한 줄. 예전 클라이언트가 쓴 레코드는
+  그대로 통과하고, 이 필드를 모르는 클라이언트는 M0 스프레드로 값을 보존한다.
+- **스코프(`listId`)는 지금처럼 세션 상태로 남는다** — §27.1의 표(수명: "세션 동안")가
+  그렇게 정했고 이번 변경은 그 이유를 건드리지 않는다.
+
+배선은 `AppPages.tsx:194`의 기존 패턴 그대로다(`showCompleted` / `onToggleShowCompleted`가
+Today에서 이미 하는 일).
+
+### 33.3 문자열
+
+새 키 셋, 두 언어:
+
+| 키 | en | ko |
+|---|---|---|
+| `matrix.pageMenuAria` | View settings | 화면 설정 |
+| `matrix.pageMenuAriaFiltered` | View settings — filters on | 화면 설정 — 필터 적용됨 |
+| `matrix.menu.hideCompleted` | Hide completed | 완료 항목 숨기기 |
+
+`matrix.list`와 `matrix.allLists`는 **살아남는다** — `<select>`의 라벨이던 것이 메뉴 행의
+라벨과 현재값이 된다. §32.4가 붙인 고아 키 0 시험이 있으므로, 안 쓰는 키를 남기거나
+새로 넣으면 카탈로그 시험이 먼저 잡는다.
+
+`.ff-board-controls`/`.ff-board-control` CSS(`03-planning.css:458–466`)는 **지우지
+않는다** — `TaskGanttView.tsx:159`가 아직 쓴다.
+
+### 33.4 깨질 시험과, 새로 붙일 시험
+
+`matrixPage.test.tsx:810`의 헬퍼 하나가 `<select>`를 안다:
+
+```ts
+await userEvent.selectOptions(screen.getByRole("combobox", { name: /List/ }), name);
+```
+
+이 헬퍼를 "⋯ 열기 → List 행 → 리스트 이름"으로 바꾸면, 그것을 통과하는 그 describe의
+네 시험(`:814`, `:848`, `:864` …)이 **한 곳 수정으로** 같이 산다. 그게 헬퍼가 있던
+이유다.
+
+새로 붙인 것 넷 (`describe("the header's ⋯, and the one switch on it")`):
+
+1. 기본값에서 완료 카드가 칸에 남는다 (D2를 시험으로 고정 — 지금까지 아무것도 안 지켰다)
+2. 숨기기를 켜면 그 카드가 **칸에서도 나머지 줄에서도** 사라진다 (33.2.4의 한 곳 필터)
+3. 메뉴 행은 상태를 저장소에 올려 보내고 스스로 감추지 않는다 (33.2.5)
+4. 숨김이든 스코프든 `⋯`가 필터 표식을 갖는다 (33.2.3)
+
+**레이아웃은 유닛으로 안 잡힌다** — jsdom에는 레이아웃이 없어 `overflow`도 `1fr`도
+관측되지 않는다. 33.1은 실제 앱에서 검증한다.
+
+### 33.5 검증 (실제 앱, dev)
+
+측정은 눈이 아니라 `getBoundingClientRect`/`scrollHeight`로 읽었다.
+
+| 창 | 결과 |
+|---|---|
+| 1280×800 | 네 칸 346px씩, `main` 800/800 — **페이지 스크롤 0**. Ⅱ의 본문만 1044/280으로 스크롤 |
+| 1280×800 + Detail 열 | 네 칸 그대로, Drawer는 sticky 카드(275px)로 남고 그리드는 안 움직임 |
+| 1280×600 | 네 칸 246px씩, 페이지 스크롤 0 |
+| 1100×430 | 바닥이 잡아 네 칸 220px씩, `main`만 524/430으로 스크롤, 칸 본문은 계속 스크롤 |
+| 860×700 (≤900) | 한 열 레이아웃 그대로, 계약이 닿지 않음 |
+
+- ⋯ 메뉴: "Hide completed" / "List › All lists" 두 구획, 켜면 그 행에 `✓`와
+  `aria-checked="true"`
+- 숨기기 on: Ⅱ가 23장 → 18장, "Completed" 그룹이 사라지고
+  `appSettings.matrixHideCompleted: true`가 저장됨
+- 표식: 숨기기만 켜도, 리스트만 골라도 `ff-page-menu is-filtered` + aria-label이
+  "View settings — filters on"으로 바뀜
+- 한국어: "화면 설정" · "완료 항목 숨기기" · "리스트 / 전체 리스트",
+  `[i18n] Missing translation key` 경고 0건
+- 유닛 **2,355개 통과**(신규 4개) · `npx tsc -b` 통과
+
+### 33.6 이번에 하지 않는 것
+
+- **칸별 완료 숨기기** (칸 `⋯` 안에). 화면 하나로 충분하고, 필요해지면 그때
+  `MatrixQuadrantView`에 붙일 자리가 이미 있다.
+- **다른 화면의 전체 높이화.** 이 계약은 `:has(.ff-matrix-page)`로 이 화면에만 건다.
+- **리스트 피커 삭제.** §27.1의 근거는 아직 유효하다 — 옮기는 것과 없애는 것은 다르다.
