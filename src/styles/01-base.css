@@ -121,6 +121,31 @@
   --danger-soft: #ffecec;
   --warning: #ff9500;
   --warning-soft: #fff4e6;
+
+  /* The four priority levels, in one place
+     (TASK_PRIORITY_CHECKBOX_DESIGN.md §3).
+
+     There were five places drawing these and three vocabularies between them:
+     the row's flag said `--danger`/`--warning`/`--accent`, the Detail's flag
+     and the popover said `--color-danger`/`--color-warning`/`--color-primary`,
+     and two of those three were never defined — they had been rendering from
+     their fallback literal all along.
+
+     Low is a FIXED blue rather than `--accent`, and that is the point of the
+     token rather than a detail of it. `--color-primary` resolves to `--accent`,
+     which the user chooses; with `[data-accent="orange"]` the accent is
+     `#ff9500` and so is `--warning`, so Low and Medium became the same colour.
+     That was survivable while a flag's SHAPE carried the level too. It stops
+     being survivable the moment a checkbox says the level in colour alone
+     (§2.2b). The value is the reference app's own measured Low
+     (TICKTICK_COMPONENT_06 §6.1, `rgb(71,114,250)`).
+
+     None is `--text-tertiary` — the same grey the unchecked box already had, so
+     "no priority" keeps looking like an absence rather than a fourth choice. */
+  --priority-high: #ff3b30;
+  --priority-medium: #ff9500;
+  --priority-low: #4772fa;
+  --priority-none: var(--text-tertiary);
   --success: #34c759;
   --success-soft: #edfaf2;
   --purple: #af52de;

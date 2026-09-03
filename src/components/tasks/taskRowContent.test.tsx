@@ -214,3 +214,48 @@ describe("what the caller decides", () => {
     expect(onToggleDone).toHaveBeenCalledTimes(1);
   });
 });
+
+// TASK_PRIORITY_CHECKBOX_DESIGN.md §4. The colour itself is the stylesheet's;
+// what this file can hold is that the box is TOLD which level it is drawing,
+// and that it is told by the same switch the flag listens to.
+describe("the checkbox says the priority (§4.1)", () => {
+  const box = () => document.querySelector(".tm-check") as HTMLElement;
+
+  it("carries the level as a class, for each of the four", () => {
+    for (const level of ["high", "medium", "low", "none"] as const) {
+      draw({ priority: level });
+      expect(box().className).toBe(`tm-check is-${level}`);
+      cleanup();
+    }
+  });
+
+  it("says nothing where the row's place is already the priority", () => {
+    // The same rule the flag follows — one switch, so the matrix's quadrants
+    // are not repeated in two channels per card rather than none.
+    draw({ priority: "high" }, { showPriority: false });
+    expect(box().className).toBe("tm-check is-none");
+  });
+
+  it("leaves the priority out of the box's name", () => {
+    // The flag beside it already carries the level for a screen reader. Said
+    // twice, a reader has to work out whether they heard two facts or one.
+    draw({ priority: "high" });
+    expect(screen.getByRole("checkbox", { name: "Complete Read ch. 4" })).toBe(box());
+  });
+});
+
+// A note is an item with no completion (QUICK_ADD_INPUT_BOX_DESIGN.md §7.1).
+describe("a note among the tasks", () => {
+  it("draws no checkbox, and keeps the slot so the titles still line up", () => {
+    draw({ kind: "note" } as never);
+
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(document.querySelector(".tm-task-check.is-note")).toBeTruthy();
+  });
+
+  it("is still a row that opens", () => {
+    // Everything else a task has, a note has: a List, a date, tags, a body.
+    draw({ kind: "note" } as never);
+    expect(screen.getByRole("button", { name: "Open Read ch. 4" })).toBeTruthy();
+  });
+});

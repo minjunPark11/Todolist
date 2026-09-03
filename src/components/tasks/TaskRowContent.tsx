@@ -27,13 +27,14 @@
 // select, the matrix card's drag-to-a-day. Those are not a row; they are what
 // the view does with a row.
 import type { Language, Task } from "../../types";
-import { isCompleted } from "../../domain/tasks/taskState";
+import { isCompleted, isNote } from "../../domain/tasks/taskState";
 import { useT } from "../../i18n";
 import { countdownLabel } from "../../domain/view/countdown";
 import { taskTimeLabel, type TaskTimeLabel } from "../../domain/view/taskTime";
 import type { ScopeDateBy } from "../../domain/view/scopeViewOptions";
 import { formatDate, formatWeekday, todayValue } from "../../utils/date";
 import { getWeekStartPref } from "../../utils/appPrefs";
+import { TaskCheck } from "./TaskCheck";
 
 interface TaskRowContentProps {
   task: Task;
@@ -171,14 +172,31 @@ export function TaskRowContent({
       {/* A 17px box with the row's full height as its hit area. That is the
           reference's own design (audit §3.1), and the reason this is a label
           around the input rather than a bare input. */}
+      {/* A note has nothing to tick (QUICK_ADD_INPUT_BOX_DESIGN.md §7.1), and
+          the slot stays anyway: an icon where the box would be keeps every
+          title on the same left edge, and says what kind of item this is in
+          the one place the eye is already going. */}
+      {isNote(task) ? (
+        <span className="tm-task-check is-note" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14" focusable="false">
+            <rect x="4.5" y="4" width="15" height="16" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.9" />
+            <path d="M8 9h8M8 12.5h8M8 16h5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+          </svg>
+        </span>
+      ) : (
       <label className="tm-task-check">
-        <input
-          type="checkbox"
+        {/* The box carries the priority as its colour now (§4.1). Gated on the
+            same `showPriority` the flag below is: one switch for the two
+            channels, so a view that has said the level another way — the
+            matrix's quadrants — is not made to say it twice more. */}
+        <TaskCheck
+          priority={showPriority ? task.priority : "none"}
           checked={done}
-          aria-label={t(done ? "tasks.reopenTask" : "tasks.completeTask", { title: task.title })}
-          onChange={() => onToggleDone(task)}
+          label={t(done ? "tasks.reopenTask" : "tasks.completeTask", { title: task.title })}
+          onToggle={() => onToggleDone(task)}
         />
       </label>
+      )}
       <button
         type="button"
         className="tm-task-open"

@@ -14,7 +14,7 @@
 // `canRunTaskAction` re-asks the availability question at execute time, and a
 // registry made of closures has nothing left to re-ask.
 import type { TaskStateFields } from "./taskState";
-import { isCompleted, isPinned, isTaskOpen, isTrashed, isWontDo } from "./taskState";
+import { isCompleted, isNote, isPinned, isTaskOpen, isTrashed, isWontDo } from "./taskState";
 
 /**
  * One id per COMMAND, not per menu row.
@@ -208,10 +208,12 @@ function availabilityOf(id: TaskActionId, ctx: TaskActionContext): Availability 
       return isPinned(task) ? "hidden" : "enabled";
     case "unpin":
       return isPinned(task) ? "enabled" : "hidden";
+    // A note has nothing to finish (QUICK_ADD_INPUT_BOX_DESIGN.md §7.1), so
+    // both halves of the toggle are absent rather than offered and refused.
     case "complete":
-      return isCompleted(task) ? "hidden" : "enabled";
+      return isNote(task) || isCompleted(task) ? "hidden" : "enabled";
     case "reopen":
-      return isCompleted(task) ? "enabled" : "hidden";
+      return !isNote(task) && isCompleted(task) ? "enabled" : "hidden";
     case "wontDo":
       return isWontDo(task) ? "hidden" : "enabled";
     case "restart":

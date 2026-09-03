@@ -71,7 +71,16 @@ export function ListPicker({ task, lists, folders, onMove, restoreFocusTo }: Lis
   );
 }
 
-function ListOptions({
+/**
+ * The chooser itself, which knows nothing about Tasks
+ * (QUICK_ADD_INPUT_BOX_DESIGN.md §6).
+ *
+ * Exported because the quick add has no Task to move — it has a draft with a
+ * List id in it, and that is exactly what this already takes. Drawing a second
+ * chooser there is how the folder grouping and the search would come to differ
+ * between the two places a List is picked.
+ */
+export function ListOptions({
   currentId,
   lists,
   folders,

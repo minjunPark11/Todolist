@@ -42,9 +42,44 @@ export const TASK_DETAIL_PRESENTATION = {
   mobile: "full-screen",
 } as const;
 
-export type TaskDetailPresentation = (typeof TASK_DETAIL_PRESENTATION)[ResponsiveMode];
+/**
+ * The fifth presentation, and the only one the map above cannot produce
+ * (BOARD_TASK_POPUP_DESIGN.md §4).
+ *
+ * Every entry in that map answers one question — how much room is there — and
+ * a centred popup is not an answer to it. It is an answer to a different one:
+ * can the surface underneath give up width at all. A list's rows can (they
+ * reflow, and the reserved empty column keeps them from jumping); a Board's
+ * columns cannot — they are `flex: none` at a fixed width, so what a Detail
+ * column takes is not each card's width but the NUMBER of columns still on
+ * screen. Measured at 1280: the shell became `248px 502px 480px` and the Board
+ * kept 438 of the 982 it could have had, with its second column clipped.
+ */
+export type TaskDetailPresentation =
+  | (typeof TASK_DETAIL_PRESENTATION)[ResponsiveMode]
+  | "center-modal";
 
-export function taskDetailPresentationFor(mode: ResponsiveMode): TaskDetailPresentation {
+/**
+ * Where the Detail was opened FROM — not how it should be drawn (§4.1).
+ *
+ * Deliberately not the view key. `state.view` grows (`list`, `board`,
+ * `timeline`, whatever comes next) and this function must not grow with it:
+ * the one fact it needs is whether the surface can yield width, and that is
+ * these two words. A future surface that wants the popup joins this union
+ * rather than being folded into `"board"`.
+ */
+export type TaskDetailSurface = "list" | "board";
+
+export function taskDetailPresentationFor(
+  mode: ResponsiveMode,
+  surface: TaskDetailSurface = "list",
+): TaskDetailPresentation {
+  /* Mobile is the exception, and not an oversight. At 375px a centred popup is
+     a full-screen surface with wasted margins, and §15.21's answer — the
+     Detail owns the screen — is already the right one there. `detail-full`
+     hangs off it too, so leaving mobile alone is what keeps that class's
+     value unchanged by this whole change. */
+  if (surface === "board" && mode !== "mobile") return "center-modal";
   return TASK_DETAIL_PRESENTATION[mode];
 }
 

@@ -64,14 +64,20 @@ function task(overrides: Partial<Task> = {}): Task {
  * Stands in for the Module, which owns the width so the reserved empty column
  * can be exactly as wide as the real pane.
  */
-function Harness({ presentation }: { presentation: "inline-drawer" | "right-sheet" }) {
+function Harness({
+  presentation,
+  priority = "none",
+}: {
+  presentation: "inline-drawer" | "right-sheet";
+  priority?: Task["priority"];
+}) {
   const resize = useTaskDetailWidth();
   const noop = () => {};
   return (
     <div style={{ ["--tm-detail-w" as string]: `${resize.width}px` }}>
         <TaskDrawer
           presentation={presentation}
-          task={task()}
+          task={task({ priority })}
           lists={[inbox]}
           folders={[]}
           tags={[]}
@@ -92,7 +98,7 @@ function Harness({ presentation }: { presentation: "inline-drawer" | "right-shee
           onToggleSubtask={noop}
           onDeleteSubtask={noop}
           reminders={[]}
-          actions={taskActions({ task: task() })}
+          actions={taskActions({ task: task({ priority }) })}
           onRunAction={noop}
           activity={null}
           onCloseActivity={noop}
@@ -111,11 +117,14 @@ function Harness({ presentation }: { presentation: "inline-drawer" | "right-shee
   );
 }
 
-function renderDrawer(presentation: "inline-drawer" | "right-sheet" = "inline-drawer") {
+function renderDrawer(
+  presentation: "inline-drawer" | "right-sheet" = "inline-drawer",
+  priority: Task["priority"] = "none",
+) {
   render(
     <I18nProvider lang="en">
       <FloatingLayerProvider>
-        <Harness presentation={presentation} />
+        <Harness presentation={presentation} priority={priority} />
       </FloatingLayerProvider>
     </I18nProvider>,
   );
@@ -214,5 +223,22 @@ describe("the property header (§1.7)", () => {
     expect(header.querySelector("input[type='checkbox']")).not.toBeNull();
     expect(header.querySelector(".sched-trigger")).not.toBeNull();
     expect(header.querySelector(".tm-priority-trigger")).not.toBeNull();
+  });
+
+  // TASK_PRIORITY_CHECKBOX_DESIGN.md §4.1. The Detail is opened FROM a card,
+  // and a header box that disagreed with the card's would be the same level
+  // said twice in two colours.
+  it("draws the same priority-coloured box the rows draw", () => {
+    renderDrawer("inline-drawer", "medium");
+    const header = pane().querySelector(".tm-drawer-head") as HTMLElement;
+    expect(header.querySelector(".tm-check")?.className).toBe("tm-check is-medium");
+  });
+
+  // §4.1 again, from the other side: the subtask and checklist ticks are not
+  // a Task's completion and have no priority to report.
+  it("leaves the checklist's own ticks alone", () => {
+    renderDrawer("inline-drawer", "high");
+    const scroller = pane().querySelector(".tm-drawer-scroll") as HTMLElement;
+    expect(scroller.querySelector(".tm-check")).toBeNull();
   });
 });

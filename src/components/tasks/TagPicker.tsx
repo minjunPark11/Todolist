@@ -9,7 +9,7 @@
 // opening anything, which is the common case once the tagging is done.
 import { useId, useMemo, useState } from "react";
 import type { Tag, Task, TaskTag } from "../../types";
-import { tagCreateOffer, tagNameRefusal, tagPickerOptions } from "../../domain/tags/tagPicker";
+import { tagCreateOffer, tagNameRefusal, tagOptionsFor } from "../../domain/tags/tagPicker";
 import { tagsForTask } from "../../domain/tags/tags";
 import { isRovingKey, rovingNext } from "../../domain/tasks/rovingChoice";
 import { Popover, PopoverContent, PopoverTrigger } from "../floating";
@@ -69,22 +69,30 @@ export function TagPicker({ task, tags, taskTags, onToggle, restoreFocusTo }: Ta
              and §13.57 says typing filters. */
           focusOnOpen="always"
         >
-          <TagOptions task={task} tags={tags} taskTags={taskTags} onToggle={onToggle} />
+          {/* Names, not the Task: the chooser below is shared with the quick
+              add, which has no Task to look tags up for (§6). */}
+          <TagOptions selectedNames={held.map((tag) => tag.name)} tags={tags} onToggle={onToggle} />
         </PopoverContent>
       </Popover>
     </div>
   );
 }
 
-function TagOptions({
-  task,
+/**
+ * The chooser itself, over a list of NAMES
+ * (QUICK_ADD_INPUT_BOX_DESIGN.md §6).
+ *
+ * Exported for the quick add, whose draft holds names — a tag typed there may
+ * not exist yet. Names are already this picker's currency (§13.42's inline
+ * create hands one over), so nothing had to be invented for it.
+ */
+export function TagOptions({
+  selectedNames,
   tags,
-  taskTags,
   onToggle,
 }: {
-  task: Task;
+  selectedNames: string[];
   tags: Tag[];
-  taskTags: TaskTag[];
   onToggle: (name: string) => void;
 }) {
   const { t } = useT();
@@ -92,8 +100,8 @@ function TagOptions({
   const id = useId();
 
   const options = useMemo(
-    () => tagPickerOptions(task.id, tags, taskTags, query),
-    [task.id, tags, taskTags, query],
+    () => tagOptionsFor(selectedNames, tags, query),
+    [selectedNames, tags, query],
   );
   const offer = tagCreateOffer(query, tags);
   // Only worth saying once something has been typed. "A tag needs a name" is

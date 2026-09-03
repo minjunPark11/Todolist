@@ -6,11 +6,14 @@
 // §12.16 exists because there are many `+ 작업` entry points and each one that
 // works the owner out for itself is a copy of the rule that can drift.
 import { useEffect, useState } from "react";
-import type { List, SavedFilter, Tag, TaskTemplate } from "../../types";
+import type { List, SavedFilter, SidebarFolder, Tag, TaskPriority, TaskTemplate } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { canCommit, resolveCreateContext, type CreateResolution } from "../../domain/tasks/createResolver";
 import { listDisplayName } from "../../domain/spaces/hierarchy";
 import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "../floating";
+import { QuickAddMenu } from "./QuickAddMenu";
+import { QuickAddDate } from "./QuickAddDate";
+import { formatDate } from "../../utils/date";
 import { useT } from "../../i18n";
 
 interface TaskQuickAddProps {
@@ -27,6 +30,9 @@ interface TaskQuickAddProps {
   today: string;
   /** The Lists inside the current Folder — the only ones it may offer (§12.4). */
   folderLists: List[];
+  /** The sidebar's groups, so the List submenu draws the same headings the
+      Detail's picker does (§13.9). */
+  folders: SidebarFolder[];
   tags: Tag[];
   /** Read by the Filter Scope to decide the owner List and the patch (§12.11). */
   savedFilters: SavedFilter[];
@@ -52,6 +58,7 @@ export function TaskQuickAdd({
   inboxListId,
   today,
   folderLists,
+  folders,
   tags,
   savedFilters,
   draftTitle,
@@ -59,20 +66,35 @@ export function TaskQuickAdd({
   templates,
   onUseTemplate,
 }: TaskQuickAddProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [title, setTitle] = useState("");
   // Only when a NEW draft arrives, so typing over a captured title is not
   // undone by the next render.
   useEffect(() => {
     if (draftTitle) setTitle(draftTitle);
   }, [draftTitle]);
-  // No `chosenDate`. Nothing here asks for a day any more, and the resolver
-  // still takes one for callers that have one of their own (the Board's
-  // `일정` column does).
+
+  /**
+   * The draft (QUICK_ADD_INPUT_BOX_DESIGN.md §5).
+   *
+   * Every field here is something the Scope was already deciding SILENTLY
+   * through `resolveCreateContext` — which List, which day, which tags. The
+   * draft does not replace that answer, it is laid OVER it at commit time
+   * (§5.1), so a value nobody touched still comes from the Scope.
+   *
+   * `chosenDate` is back after being removed. The control that went was the
+   * one that BLOCKED the form (§12.6's required date); this one blocks
+   * nothing — leave it alone and Enter behaves exactly as it did.
+   */
   const [chosenListId, setChosenListId] = useState("");
+  const [chosenDate, setChosenDate] = useState("");
+  const [priority, setPriority] = useState<TaskPriority>("none");
+  const [tagNames, setTagNames] = useState<string[]>([]);
+  const [isNote, setIsNote] = useState(false);
 
   const resolution = resolveCreateContext(scope, {
     inboxListId,
+    chosenDate,
     today,
     folderListIds: folderLists.map((list) => list.id),
     chosenListId,
@@ -102,11 +124,35 @@ export function TaskQuickAdd({
   const needsList = resolution.requiredBeforeCommit.includes("list");
   const ready = Boolean(title.trim()) && canCommit(resolution);
 
+  /**
+   * The day this task will get, as the resolution already decided it (§3.1).
+   *
+   * The chip is not a new decision — Upcoming has been writing
+   * `dueDate: today` on its own since §12.6 was lifted, and Today has been
+   * planning the day. This is that answer, said out loud, in the place where
+   * it can also be changed.
+   */
+  const plannedDate = resolution.dailyPlan?.planDate || resolution.patch.dueDate || chosenDate || "";
+
   function commit() {
     if (!ready) return;
-    onCreate(title.trim(), resolution);
-    // The date and the List stay: capturing several tasks into the same day or
-    // the same List is the common case, and re-answering per row is a tax.
+    // §5.1: the Scope first, the person second. The Scope's own patch — a
+    // Filter's fields, Upcoming's date — survives everything the draft does
+    // not explicitly say.
+    onCreate(title.trim(), {
+      ...resolution,
+      targetListId: chosenListId || resolution.targetListId,
+      patch: {
+        ...resolution.patch,
+        ...(chosenDate ? { dueDate: chosenDate } : {}),
+        ...(priority !== "none" ? { priority } : {}),
+        ...(isNote ? { kind: "note" as const } : {}),
+      },
+      ...(tagNames.length > 0 ? { applyTagNames: tagNames } : {}),
+    });
+    // The date, the List, the priority, the tags and the mode stay: capturing
+    // several tasks into the same day or the same List is the common case, and
+    // re-answering per row is a tax (§5.2).
     setTitle("");
   }
 
@@ -125,27 +171,43 @@ export function TaskQuickAdd({
           The box is the row. What the Scope additionally needs — a Folder's
           List question, templates, the hints — is under it, so the common
           case (Today, the Inbox, a List, no templates) is this line alone. */}
-      <div className="tm-quickadd-box">
+      <div className={`tm-quickadd-box${isNote ? " is-note" : ""}`}>
+        <div className="tm-quickadd-line">
         {/* Hidden rather than removed while typing: it keeps its width, so the
             words the reader is typing do not jump left as the first letter
-            lands. */}
-        <span className={`tm-quickadd-icon${title ? " is-typing" : ""}`} aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="14" height="14" focusable="false">
-            <path
-              d="M12 5.5v13M5.5 12h13"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
+            lands.
+
+            A note gets a different glyph and keeps it while typing (§7.2):
+            the `+` is a promise that pressing here adds a row, and the note
+            icon is a statement about what KIND of thing is being written —
+            which stays true after the first letter. */}
+        <span
+          className={`tm-quickadd-icon${title && !isNote ? " is-typing" : ""}`}
+          aria-hidden="true"
+        >
+          {isNote ? (
+            <svg viewBox="0 0 24 24" width="14" height="14" focusable="false">
+              <rect x="4.5" y="4" width="15" height="16" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.9" />
+              <path d="M8 9h8M8 12.5h8M8 16h5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="14" height="14" focusable="false">
+              <path
+                d="M12 5.5v13M5.5 12h13"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
         </span>
       <input
         className="tm-quickadd-title"
         value={title}
         onChange={(event) => setTitle(event.target.value)}
-        placeholder={label}
-        aria-label={label}
+        placeholder={isNote ? t("tasks.quickAdd.notePlaceholder") : label}
+        aria-label={isNote ? t("tasks.quickAdd.notePlaceholder") : label}
         /**
          * Leaving the field commits what is in it. Typing a task and clicking
          * away is not a change of mind — it reads as "done", and asking for a
@@ -164,23 +226,54 @@ export function TaskQuickAdd({
         }}
       />
 
-        {/* The reference's trailing slot is 0 wide until there is something to
-            do (§3). Ours is the same: three things commit this form — Enter,
-            a click outside it, and this — so a button standing there while the
-            field is empty offers nothing and takes the eye first (§10.4). */}
-        {title.trim() ? (
-          <button className="tm-quickadd-submit" type="submit" disabled={!ready}>
-            {t("common.add")}
-          </button>
-        ) : null}
+        </div>
+
+        {/* The trailing slot (QUICK_ADD_INPUT_BOX_DESIGN.md §3).
+            It is no longer 0 wide when empty, and the reason it used to be no
+            longer holds: what stands here is not a commit button competing
+            with Enter, it is what the task will BE — the day it lands on, and
+            the way to change everything else about it. */}
+        <div className="tm-quickadd-trailing">
+          <QuickAddDate
+            value={plannedDate}
+            today={today}
+            lang={lang}
+            onChange={setChosenDate}
+          />
+
+          <QuickAddMenu
+            priority={priority}
+            onPriority={setPriority}
+            listId={chosenListId || resolution.targetListId || inboxListId}
+            /* §12.4: a Folder may offer only its own Lists. The submenu is a
+               second door onto the same question the select below asks, so it
+               has to refuse the same answers. */
+            lists={scope.kind === "folder" ? folderLists : lists}
+            folders={folders}
+            onList={setChosenListId}
+            tags={tags}
+            tagNames={tagNames}
+            onToggleTag={(name) =>
+              setTagNames((current) =>
+                current.includes(name) ? current.filter((held) => held !== name) : [...current, name],
+              )
+            }
+            isNote={isNote}
+            onToggleNote={() => setIsNote((current) => !current)}
+          />
+
+          {/* Only a note gets a button. Its field is a place to write several
+              lines, so Enter belongs to the text — which leaves the commit
+              with no key of its own and makes the button the way out (§3.2). */}
+          {isNote ? (
+            <button className="tm-quickadd-submit" type="submit" disabled={!ready}>
+              {t("common.add")}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="tm-quickadd-extras">
-
-      {/* No date field. It was here because §12.6 refused to commit without
-          one, and that refusal is gone — Upcoming defaults to the first day it
-          covers. A control whose only job was to unblock the form has nothing
-          left to do, and the Task's own date is edited in the Task. */}
 
       {/* §12.4: a Folder holds several Lists and the app must not pick one
           silently, so the question is asked instead of answered. */}

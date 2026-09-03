@@ -28,12 +28,32 @@ describe("responsiveModeFor — §15.3's table", () => {
 
 describe("the presentation registries — §15.17/§15.14", () => {
   it("gives every mode a Task Detail presentation", () => {
-    expect(RESPONSIVE_MODES.map(taskDetailPresentationFor)).toEqual([
+    // Called with the mode alone, which is also how the surface's default is
+    // exercised: a caller that says nothing is a List (§4.1).
+    expect(RESPONSIVE_MODES.map((mode) => taskDetailPresentationFor(mode))).toEqual([
       "full-screen",
       "right-sheet",
       "overlay-drawer",
       "inline-drawer",
     ]);
+  });
+
+  // BOARD_TASK_POPUP_DESIGN.md §4.2, all eight cells.
+  it("opens the Board's Detail as a centred popup everywhere but mobile", () => {
+    expect(RESPONSIVE_MODES.map((mode) => taskDetailPresentationFor(mode, "board"))).toEqual([
+      // Mobile keeps the screen-owning surface: a popup at 375px is a
+      // full-screen one with wasted margins, and `detail-full` hangs off this.
+      "full-screen",
+      "center-modal",
+      "center-modal",
+      "center-modal",
+    ]);
+  });
+
+  it("leaves the List's presentations exactly where they were", () => {
+    expect(RESPONSIVE_MODES.map((mode) => taskDetailPresentationFor(mode, "list"))).toEqual(
+      RESPONSIVE_MODES.map((mode) => taskDetailPresentationFor(mode)),
+    );
   });
 
   it("makes the Sidebar a sheet below the desktop widths", () => {

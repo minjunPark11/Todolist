@@ -59,6 +59,13 @@ export type LegacyTaskStatus =
 
 export type TaskStatus = TaskLifecycle | LegacyTaskStatus;
 export type TaskPriority = "none" | "low" | "medium" | "high";
+/**
+ * What kind of item this is (QUICK_ADD_INPUT_BOX_DESIGN.md §7.1).
+ *
+ * Two words rather than a boolean: `isNote` would make "task" the absence of
+ * something, and a Task is not the absence of a note.
+ */
+export type TaskKind = "task" | "note";
 // "yearly" joined the set with the schedule editor's 반복 panel, which
 // offers it alongside the four that already existed.
 export type RepeatType = "none" | "daily" | "weekly" | "monthly" | "yearly";
@@ -75,6 +82,19 @@ export interface Task {
    */
   contentMode?: TaskContentMode;
   status: TaskStatus;
+  /**
+   * A task, or a note (QUICK_ADD_INPUT_BOX_DESIGN.md §7).
+   *
+   * A note is an item with no completion — it is written, not finished — so
+   * it draws no checkbox and never appears among completed work. Everything
+   * else it has: a List, a date, tags, a priority, a body.
+   *
+   * Absent means `"task"`, which is what every record written before this
+   * field existed is. Additive only, like `startDate`: it rides inside the
+   * `data` jsonb, so no table changes and an older client carries it through
+   * rather than erasing it.
+   */
+  kind?: TaskKind;
   priority: TaskPriority;
   // Dates use "" as the "not set" sentinel (kept as string for legacy callers).
   dueDate: string; // deadline (YYYY-MM-DD)

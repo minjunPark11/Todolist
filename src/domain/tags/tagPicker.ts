@@ -82,12 +82,33 @@ export function tagPickerOptions(
   links: TaskTag[],
   query = "",
 ): TagOption[] {
+  return tagOptionsFor(
+    tagsForTask(taskId, tags, links).map((tag) => tag.name),
+    tags,
+    query,
+  );
+}
+
+/**
+ * The same list, for a selection that is not a Task's yet
+ * (QUICK_ADD_INPUT_BOX_DESIGN.md §5, §6).
+ *
+ * The quick add holds tag NAMES — a tag typed there may not exist yet, so it
+ * has no id and no `TaskTag` row to be found through. Names are what §13.42
+ * already treats as the currency of a selection, and `tagKeyFor` is what makes
+ * the comparison the same one the rest of this file makes.
+ *
+ * `tagPickerOptions` delegates here rather than the other way round: the
+ * filtering, the ordering and the "ticked ones stay in place" rule are written
+ * once, and a Task's tags are simply one way of arriving at a list of names.
+ */
+export function tagOptionsFor(selectedNames: readonly string[], tags: Tag[], query = ""): TagOption[] {
   const needle = tagKeyFor(normalizeTagName(query));
-  const selected = new Set(tagsForTask(taskId, tags, links).map((tag) => tag.id));
+  const selected = new Set(selectedNames.map((name) => tagKeyFor(name)));
   return activeTags(tags)
     .filter((tag) => isUserTag(tag.name))
     .filter((tag) => !needle || tagKeyFor(tag.name).includes(needle))
-    .map((tag) => ({ tag, selected: selected.has(tag.id) }));
+    .map((tag) => ({ tag, selected: selected.has(tagKeyFor(tag.name)) }));
 }
 
 /**

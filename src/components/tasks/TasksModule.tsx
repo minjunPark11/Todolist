@@ -1247,6 +1247,7 @@ export function TasksModule(props: TasksModuleProps) {
                 ? lists.filter((list) => folderIdFor(list) === scope.id && !list.archivedAt && !list.deletedAt)
                 : []
             }
+            folders={sidebarFolders}
             tags={tags}
             savedFilters={savedFilters}
             templates={props.templates}
@@ -1473,7 +1474,11 @@ export function TasksModule(props: TasksModuleProps) {
       {openedTask ? (
         <TaskDetailPane
           task={openedTask}
-          presentation={taskDetailPresentationFor(mode)}
+          /* The one line the Board popup changes (BOARD_TASK_POPUP_DESIGN.md
+             §8, step 2). The surface, not the view key: what the registry
+             needs to know is whether what is underneath can give up width,
+             and the Board's columns cannot (§4.1). */
+          presentation={taskDetailPresentationFor(mode, state.view === "board" ? "board" : "list")}
           resize={detailWidth}
           today={today}
           tasks={tasks}

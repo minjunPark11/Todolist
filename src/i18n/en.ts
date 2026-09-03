@@ -751,6 +751,13 @@ export const en: Dictionary = {
   "tasks.needDate": "Pick a date before saving.",
   "tasks.needList": "Choose which list this goes in.",
   "tasks.willTag": "Will be tagged:",
+  // The quick add's trailing slot and its menu
+  // (QUICK_ADD_INPUT_BOX_DESIGN.md §3, §4).
+  "tasks.quickAdd.more": "More options",
+  "tasks.quickAdd.noDate": "Date",
+  "tasks.quickAdd.toNote": "Convert to Note",
+  "tasks.quickAdd.toTask": "Convert to Task",
+  "tasks.quickAdd.notePlaceholder": "Record inspiration and time",
   "tasks.drawerLabel": "Task detail",
   "tasks.drawerEmpty": "Select a task to see its details.",
   "tasks.titleLabel": "Title",

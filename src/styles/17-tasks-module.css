@@ -310,22 +310,88 @@
   cursor: pointer;
 }
 
-.tm-task-check input {
+/* --- The completion box, in four colours (TASK_PRIORITY_CHECKBOX_DESIGN.md §4)
+   ---
+
+   One rule set for both places a Task's completion is drawn: the row's box and
+   the Detail header's. They had two near-identical `accent-color` rules before,
+   which is how the Detail ended up 13×13 with the browser's own blue for a
+   while (see the note this replaces at `.tm-drawer-done`).
+
+   `accent-color` could not do this job. It tints the CHECKED widget, and the
+   colour asked for is on the UNCHECKED box's border — so the picture has to be
+   ours. `appearance: none` takes only the picture: Space, `:checked`, the
+   wrapping `<label>`, and "checkbox, not checked" all still come from the
+   `<input>` underneath. */
+.tm-check {
+  appearance: none;
+  -webkit-appearance: none;
   width: var(--check-size);
   height: var(--check-size);
   min-height: 0;
+  flex: none;
   margin: 0;
   padding: 0;
-  accent-color: var(--accent);
+  border: 1.5px solid var(--priority-none);
+  /* A rounded square, like the reference's (TICKTICK_COMPONENT_06 §6) and like
+     the native control this replaces — not a circle, which is what the app's
+     other check (`.ff-check`) is and would read as a different control. */
+  border-radius: 4px;
+  background: transparent;
   cursor: pointer;
 }
 
+.tm-check.is-high {
+  border-color: var(--priority-high);
+}
+
+.tm-check.is-medium {
+  border-color: var(--priority-medium);
+}
+
+.tm-check.is-low {
+  border-color: var(--priority-low);
+}
+
 /* A ticked box is a finished task, so the state needs no class to be read off
-   the DOM — and finished work is GREY. The accent belongs to what is still to
-   be done; painting the done rows with it makes them the loudest thing in a
-   list of what is left. */
-.tm-task-check input:checked {
-  accent-color: var(--text-tertiary);
+   the DOM — and finished work is GREY, whatever it was before. The priority
+   colour is a statement about work still to be done; leaving it on the done
+   rows would make what is already finished the loudest thing in a list of what
+   is left (§16, and §4.2 of the popup design's sibling).
+
+   The tick is a background image rather than `::after` because Firefox creates
+   no pseudo-elements on an `<input>`. White on the grey fill reads in both
+   themes without a second rule. */
+.tm-check:checked {
+  border-color: var(--text-tertiary);
+  background-color: var(--text-tertiary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.8 8.4l2.9 2.9L12.2 5.4' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+}
+
+/* `appearance: none` takes the UA's focus ring with it. Put the app's back. */
+.tm-check:focus-visible {
+  outline: 2px solid var(--ff-focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+
+.tm-check:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Forced colours ignore our palette by design, and what has to survive there
+   is not the level but the CONTROL — a 1.5px border in a colour the mode has
+   thrown away would leave no box at all. */
+@media (forced-colors: active) {
+  .tm-check {
+    border-color: CanvasText;
+  }
+
+  .tm-check:checked {
+    border-color: Highlight;
+    background-color: Highlight;
+  }
 }
 
 /* Stored since the beginning, drawn since V-P1: a flag at the end of the title
@@ -337,16 +403,20 @@
   color: var(--text-tertiary);
 }
 
+/* All four levels read `--priority-*` now, here and in the three other places
+   that draw them (TASK_PRIORITY_CHECKBOX_DESIGN.md §3). The flag and the
+   checkbox beside it say the same level, so they cannot be allowed to say it
+   in two different reds. */
 .tm-task-priority.is-high {
-  color: var(--danger);
+  color: var(--priority-high);
 }
 
 .tm-task-priority.is-medium {
-  color: var(--warning, #ff9f0a);
+  color: var(--priority-medium);
 }
 
 .tm-task-priority.is-low {
-  color: var(--accent);
+  color: var(--priority-low);
 }
 
 .tm-task-title {
@@ -564,6 +634,176 @@
   font-size: 13px;
 }
 
+/* A note stands in the checkbox's slot so every title keeps one left edge
+   (QUICK_ADD_INPUT_BOX_DESIGN.md §7.1). Not a control: nothing to press,
+   nothing to tick. */
+.tm-task-check.is-note {
+  color: var(--text-tertiary, #8e8e93);
+  cursor: default;
+  pointer-events: none;
+}
+
+/* --- The trailing slot (QUICK_ADD_INPUT_BOX_DESIGN.md §3, §8) --- */
+
+/* The first row of the box. In task mode it IS the box; in note mode the box
+   becomes a column and this is its top line. */
+.tm-quickadd-line {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.tm-quickadd-trailing {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+/* The day the task is already going to get, said out loud (§3.1). Accent
+   when there is one, quiet when the Scope contributes none — the difference
+   between a fact and an empty slot. */
+.tm-quickadd-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-tertiary, #8e8e93);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tm-quickadd-date.is-set {
+  color: var(--accent, #007aff);
+}
+
+.tm-quickadd-date:hover,
+.tm-quickadd-date[aria-expanded="true"],
+.tm-quickadd-more:hover,
+.tm-quickadd-more[aria-expanded="true"] {
+  background: var(--surface-2, rgba(25, 25, 25, 0.05));
+}
+
+.tm-quickadd-more {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-tertiary, #8e8e93);
+  cursor: pointer;
+}
+
+/* --- The `⌄` menu (§4) --- */
+
+.tm-quickadd-menu {
+  min-width: 208px;
+}
+
+.tm-quickadd-menu-head {
+  padding: 2px 10px;
+  font-size: 12px;
+  color: var(--text-muted, #8e8e93);
+}
+
+.tm-quickadd-priority {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0 6px;
+}
+
+.tm-quickadd-flags {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+/* The same four colours the flag and the checkbox use
+   (TASK_PRIORITY_CHECKBOX_DESIGN.md §3) — one palette, six places. */
+.tm-quickadd-flag {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--priority-none);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tm-quickadd-flag.is-high { color: var(--priority-high); }
+.tm-quickadd-flag.is-medium { color: var(--priority-medium); }
+.tm-quickadd-flag.is-low { color: var(--priority-low); }
+
+.tm-quickadd-flag:hover {
+  background: var(--surface-2, rgba(25, 25, 25, 0.05));
+}
+
+/* The chosen one keeps a border rather than a fill: the fill would compete
+   with the flag's own colour, which is the thing being chosen. */
+.tm-quickadd-flag.is-current {
+  border-color: var(--border, #e5e5e7);
+  background: var(--surface-2, rgba(25, 25, 25, 0.05));
+}
+
+/* A row that opens a surface of its own, with the chevron that says so. */
+.tm-quickadd-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tm-quickadd-row-more {
+  flex: none;
+  color: var(--text-tertiary, #8e8e93);
+}
+
+.tm-quickadd-dates {
+  min-width: 168px;
+}
+
+/* --- Note mode (§7.2) --- */
+
+/* Two rows: what is being written, and what it will be. The box stops being a
+   32px line because a note is a place to write more than one. */
+.tm-quickadd-box.is-note {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  height: auto;
+  min-height: 64px;
+  padding: 6px 10px;
+}
+
+.tm-quickadd-box.is-note .tm-quickadd-line {
+  flex: 1;
+}
+
+/* The toolbar takes the whole width, and the commit button goes to the far
+   end of it — the one place in this component where a button is drawn. */
+.tm-quickadd-box.is-note .tm-quickadd-trailing {
+  justify-content: flex-start;
+}
+
+.tm-quickadd-box.is-note .tm-quickadd-submit {
+  margin-left: auto;
+}
+
 /* Inside the box and only while there is a title (§10.4), so it is 24 rather
    than the 32 a standalone control gets — it sits IN a 32px row. */
 .tm-quickadd-submit {
@@ -722,10 +962,27 @@
   border-bottom: 1px solid var(--border-subtle, rgba(25, 25, 25, 0.08));
 }
 
-/* The close button goes to the trailing edge; everything before it is the
-   property row §1.7 draws as `□ │ date │ ⚑`. */
+/* The trailing edge belongs to the flag now
+   (TASK_PRIORITY_CHECKBOX_DESIGN.md §5). The reference's header is
+   `□ │ date ……… ⚑`: the free space opens after the date, and Priority stands
+   at the end of it — which is also where the popup has no × to share the
+   corner with.
+
+   The close button used to carry this margin. Both carrying it would split the
+   free space in two and strand the flag in the middle, which is the mistake
+   `.tm-drawer-more`'s note below already records. */
+.tm-drawer-head .tm-priority-trigger {
+  margin-left: auto;
+}
+
 .tm-drawer-close {
   margin-left: auto;
+}
+
+/* …so where the flag took the space, the × simply follows it. `~` rather than
+   `+` because `Pinned` can stand between them. */
+.tm-drawer-head .tm-priority-trigger ~ .tm-drawer-close {
+  margin-left: 0;
 }
 
 .tm-drawer-scroll {
@@ -751,22 +1008,10 @@
   color: var(--text-muted, #8e8e93);
 }
 
-/* The one control in the Drawer that was never styled. It measured 13×13 with
-   `border-radius: 0` and no colour of ours — the browser's own checkbox,
-   drawn in the browser's own blue, on a dark panel. `accent-color` is enough:
-   it tints the native widget with the app's accent and follows the theme,
-   without replacing the control (which would cost its keyboard behaviour). */
-.tm-drawer-done input[type="checkbox"] {
-  width: var(--check-size);
-  height: var(--check-size);
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.tm-drawer-done input[type="checkbox"]:checked {
-  accent-color: var(--text-tertiary);
-}
+/* The Drawer's own copy of the checkbox rules is gone: this box is `.tm-check`
+   now, the same element the rows draw (TASK_PRIORITY_CHECKBOX_DESIGN.md §4.3).
+   Two rule sets for one control is what let this one drift to 13×13 in the
+   browser's own blue in the first place. */
 
 .tm-drawer-close {
   border: 0;
@@ -867,15 +1112,15 @@
 }
 
 .tm-priority-trigger.is-high {
-  color: var(--color-danger, #ff3b30);
+  color: var(--priority-high);
 }
 
 .tm-priority-trigger.is-medium {
-  color: var(--color-warning, #ff9500);
+  color: var(--priority-medium);
 }
 
 .tm-priority-trigger.is-low {
-  color: var(--color-primary, #0066cc);
+  color: var(--priority-low);
 }
 
 .tm-priority-surface {
@@ -923,19 +1168,19 @@
 }
 
 .tm-priority-option.is-high .tm-priority-glyph {
-  color: var(--color-danger, #ff3b30);
+  color: var(--priority-high);
 }
 
 .tm-priority-option.is-medium .tm-priority-glyph {
-  color: var(--color-warning, #ff9500);
+  color: var(--priority-medium);
 }
 
 .tm-priority-option.is-low .tm-priority-glyph {
-  color: var(--color-primary, #0066cc);
+  color: var(--priority-low);
 }
 
 .tm-priority-option.is-none .tm-priority-glyph {
-  color: var(--text-tertiary, #8e8e93);
+  color: var(--priority-none);
 }
 
 /* List picker (spec §13.8–§13.11, §13.26). */
@@ -2083,7 +2328,7 @@
   cursor: pointer;
 }
 
-/* --- Task Detail, one component in four presentations (§15.17) --- */
+/* --- Task Detail, one component in five presentations (§15.17) --- */
 
 /* Wide desktop: its own column beside the list, sharing no scroll with it.
 
@@ -2179,6 +2424,79 @@
      double it. */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
+}
+
+/* The Board, at every width above mobile: a centred popup
+   (BOARD_TASK_POPUP_DESIGN.md §5.3).
+
+   A column would not narrow the cards — they are a fixed width — it would take
+   away one of them, so opening a Task on the Board costs a column of the Board
+   itself. The popup costs nothing: it is out of the flow entirely, and what is
+   behind it is the Board exactly as it was.
+
+   This scrim DOES dim, unlike the overlay drawer's absence of one (§15.19).
+   That presentation leaves the Main clickable on purpose because it sits
+   beside it; this one is centred over the thing it came from, and a popup with
+   nothing behind it reads as a panel that lost its anchor. */
+.tm-drawer-scrim {
+  position: fixed;
+  inset: 0;
+  /* Between the sidebar overlay (40) and the detail tier (45), so it covers
+     the shell and the pane above still covers it. The 60 and 70 tiers — the
+     List manager and the modal dialogs — stay above the popup, which is right:
+     those are questions asked ON TOP of an open Task. */
+  z-index: 44;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.32);
+  animation: tm-drawer-scrim-in 120ms ease;
+}
+
+.tm-drawer.is-center-modal {
+  z-index: 45;
+  width: min(720px, calc(100vw - 96px));
+  /* The screen sets the height, not the content. Sized to its content, a Task
+     with a title only would open a 200px window and one with a long checklist
+     an 800px one — so walking from card to card on the same Board would make
+     the window jump on every click. That is the same thing §1.26 refuses when
+     it forbids keying the pane by Task id. `.tm-drawer-scroll` takes the
+     overflow, which is what it is already for (§1.17). */
+  height: min(640px, calc(100vh - 96px));
+  /* The base rule gives every pane a `border-left`, for a column welded to a
+     list. A popup is a card and needs all four. */
+  border: 1px solid var(--border, #e5e5e7);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  /* Crops the header and footer into the rounded corners. The pane already
+     refuses to scroll itself (§1.17); this is about the radius. */
+  overflow: hidden;
+  animation: tm-drawer-modal-in 140ms ease;
+}
+
+@keyframes tm-drawer-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tm-drawer-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+/* One frame, not none: the popup still ARRIVES, it just does not travel
+   (the app's own motion setting is honoured by the JS surfaces; this is the
+   OS-level ask, which CSS answers on its own). */
+@media (prefers-reduced-motion: reduce) {
+  .tm-drawer-scrim,
+  .tm-drawer.is-center-modal {
+    animation: none;
+  }
 }
 
 /* §15.13: the full-screen detail owns the screen. What is behind it is not
@@ -3043,9 +3361,9 @@
   border-radius: 3px;
 }
 
-.tm-menu-flag.is-high { background: var(--danger); }
-.tm-menu-flag.is-medium { background: var(--warning); }
-.tm-menu-flag.is-low { background: var(--accent); }
+.tm-menu-flag.is-high { background: var(--priority-high); }
+.tm-menu-flag.is-medium { background: var(--priority-medium); }
+.tm-menu-flag.is-low { background: var(--priority-low); }
 
 /* Task Content: prose or a checklist, one at a time (spec §11.4, §11.5).
    The header carries the mode toggle, so the two contents share one place in

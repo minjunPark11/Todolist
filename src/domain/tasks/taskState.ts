@@ -35,6 +35,8 @@ import type { Task, TaskLifecycle } from "../../types";
  */
 export interface TaskStateFields {
   status?: Task["status"] | string;
+  /** `"note"` for an item with no completion (§7.1); absent means a task. */
+  kind?: Task["kind"] | string;
   completedAt?: string;
   deletedAt?: string;
   wontDoAt?: string;
@@ -49,6 +51,22 @@ export interface TaskStateFields {
  * this reads nothing but `pinnedAt`. A pinned Task can be completed, dated,
  * in any List, and none of those answers changes because it is pinned.
  */
+/**
+ * A note rather than a task (QUICK_ADD_INPUT_BOX_DESIGN.md §7.1).
+ *
+ * A note is written, not finished: there is nothing to tick, so no surface
+ * offers a way to complete one and `Completed` never fills with them. It is
+ * still an item in a List with a date, tags and a priority, and it is counted
+ * and sorted like one — a count that disagreed with the rows on screen would
+ * be worse than the distinction it was trying to draw.
+ *
+ * The field is optional, so every record written before it existed answers
+ * false, which is what they are.
+ */
+export function isNote(task: TaskStateFields): boolean {
+  return task.kind === "note";
+}
+
 export function isPinned(task: TaskStateFields): boolean {
   return Boolean(task.pinnedAt);
 }

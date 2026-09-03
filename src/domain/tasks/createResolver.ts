@@ -34,6 +34,20 @@ export interface CreateResolution {
    * tagged `tag-work`.
    */
   applyTagIds?: string[];
+  /**
+   * Tags the PERSON chose in the quick add, by name
+   * (QUICK_ADD_INPUT_BOX_DESIGN.md §5.3).
+   *
+   * Beside `applyTagIds` rather than merged into it, and the two are different
+   * facts: that one is what a Scope requires of everything created inside it,
+   * this one is what someone asked for. They are also different currencies —
+   * a tag typed into the quick add may not exist yet, so it has a name and no
+   * id, which is the same reason §13.42's inline create hands over a name.
+   *
+   * Nothing in this file ever sets it. The resolver answers for the Scope; a
+   * caller lays its own choices over the answer (§5.1).
+   */
+  applyTagNames?: string[];
   /** The day this task is planned for, if the Scope means one (§12.5.3). */
   dailyPlan?: { planDate: string };
   /** False for the two read-only Scopes (§12.4). */

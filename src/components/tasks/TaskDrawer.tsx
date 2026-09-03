@@ -26,7 +26,7 @@ import { DETAIL_REVEAL_ACTIONS } from "../../domain/tasks/actions";
 import { tagsForTask } from "../../domain/tags/tags";
 import type { TaskActivityEntry } from "../../domain/tasks/activity";
 import { childProgress } from "../../domain/tasks/children";
-import { isCompleted, isPinned, isTrashed } from "../../domain/tasks/taskState";
+import { isCompleted, isNote, isPinned, isTrashed } from "../../domain/tasks/taskState";
 import { checklistProgress, isChecklistMode } from "../../domain/tasks/checkItems";
 import { ChecklistEditor } from "./ChecklistEditor";
 import type { ReminderSpec, Schedule, ScheduleIssue } from "../../domain/schedule";
@@ -36,6 +36,7 @@ import { SchedulePicker } from "./SchedulePicker";
 import { TagPicker } from "./TagPicker";
 import { TaskActionsMenu } from "./TaskActionsMenu";
 import { TaskActivityPanel } from "./TaskActivityPanel";
+import { TaskCheck } from "./TaskCheck";
 import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import type { TaskDetailWidthState } from "../../hooks/useTaskDetailWidth";
@@ -300,11 +301,26 @@ export function TaskDrawer({
    */
   const resizable = presentation === "inline-drawer";
 
-  return (
+  /**
+   * The Board's popup (BOARD_TASK_POPUP_DESIGN.md §5.1).
+   *
+   * The only presentation that needs a parent: the other four are placed
+   * against the viewport or a grid track, and this one is centred inside a
+   * scrim. Nothing INSIDE the pane changes for it — the header, the scroll
+   * region and the footer are the same ones the column draws.
+   */
+  const modal = presentation === "center-modal";
+
+  const pane = (
     <aside
       ref={root}
       className={`tm-drawer is-${presentation}${resize.isResizing ? " is-resizing" : ""}`}
       aria-label={t("tasks.drawerLabel")}
+      /* Said out loud only where it is true. The popup covers the Board and
+         traps focus, so it is a dialog; the inline column sits beside the list
+         and is not. (The overlay and the sheet arguably are too — that is a
+         separate change, §11.) */
+      {...(modal ? { role: "dialog" as const, "aria-modal": true } : {})}
     >
       {/* §1.13: a 1px divider with an 8px hit area, which is why the visible
           line is a pseudo-element and this element is wider than it looks.
@@ -349,15 +365,27 @@ export function TaskDrawer({
             deliberately so: that rule is for an action with nothing to do
             here, and this is a FACT that cannot be changed. The reference
             draws a checkbox on this screen too (§1.4). */}
+        {/* A note has no completion (QUICK_ADD_INPUT_BOX_DESIGN.md §7.1). The
+            header keeps its other two controls; nothing stands where the box
+            was, because a disabled tick would say the note COULD be finished
+            and simply is not. */}
+        {isNote(task) ? null : (
         <label className={`tm-drawer-done${frozen ? " is-frozen" : ""}`}>
-          <input
-            type="checkbox"
+          {/* The same box a row draws, priority colour and all
+              (TASK_PRIORITY_CHECKBOX_DESIGN.md §4.1) — the reference app
+              colours this one too, and a Detail whose checkbox disagreed with
+              the card it was opened from would be saying the level twice in
+              two colours. */}
+          <TaskCheck
+            priority={task.priority}
             checked={isCompleted(task)}
             disabled={frozen}
-            onChange={onComplete}
+            label={t("tasks.markDone")}
+            onToggle={onComplete}
           />
           <span>{t("tasks.markDone")}</span>
         </label>
+        )}
 
         {/* The whole schedule, not a due date (§5, audit §6).
             `<input type="date">` could write one field, so a Task's start,
@@ -397,9 +425,20 @@ export function TaskDrawer({
             (TICKTICK_DETAIL_ANATOMY_DESIGN.md §1): the header is Complete, the
             date and Priority, and nothing else. */}
 
-        <button type="button" className="tm-drawer-close" onClick={onClose} aria-label={t("common.close")}>
-          ×
-        </button>
+        {/* Everywhere except the popup (TASK_PRIORITY_CHECKBOX_DESIGN.md §5).
+            The condition is not "does the reference draw one" but "is there
+            another way out with a pointer": the popup has a scrim, and a press
+            anywhere outside it closes. The column, the overlay and the sheet
+            have none, so there the × is the ONLY way to close without a
+            keyboard — which is why it cannot simply be dropped everywhere.
+
+            Escape closes all five regardless, and the focus trap still has
+            plenty to hold: the completion box, the schedule, the flag. */}
+        {modal ? null : (
+          <button type="button" className="tm-drawer-close" onClick={onClose} aria-label={t("common.close")}>
+            ×
+          </button>
+        )}
       </header>
 
       {/* §1.17, §1.18: the pane does not scroll — this does. That is what lets
@@ -748,6 +787,39 @@ export function TaskDrawer({
         )}
       </footer>
     </aside>
+  );
+
+  if (!modal) return pane;
+
+  /* §5.1, §5.2. The scrim is the pane's parent, so "outside" is simply
+     "the scrim was the target" — one comparison instead of a document-wide
+     listener.
+
+     Being the TARGET, not merely being outside the pane, is what makes this
+     safe next to the floating layers. The schedule, Priority, List and ⋯
+     surfaces are portalled to a root under `<body>` at z-index 100, so they
+     are outside the scrim entirely: a press on one lands on the layer and
+     never reaches this handler. (A press on the scrim WHILE such a layer is
+     open does close both at once — the layer manager dismisses its surface and
+     this closes the Detail. Escape still peels one at a time.)
+
+     `mousedown` rather than `click`: selecting text in the body and releasing
+     the button out over the scrim is a drag, not a dismissal.
+
+     And unlike `.tm-modal-scrim`, this one DOES dismiss. That scrim withholds
+     the gesture to protect a draft; here every field is a draft that flushes
+     when it unmounts (§9), and Escape already closes by the same path — so
+     there is nothing left for a click to lose. */
+  return (
+    <div
+      className="tm-drawer-scrim"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      {pane}
+    </div>
   );
 }
 

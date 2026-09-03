@@ -29,6 +29,7 @@ function setup(scope: TaskScopeRef = { kind: "upcoming" }) {
           inboxListId={INBOX}
           today={TODAY}
           folderLists={[]}
+          folders={[]}
           tags={[]}
           savedFilters={[]}
           templates={[]}
@@ -84,19 +85,18 @@ describe("leaving the field", () => {
   });
 
   it("is not a commit when focus stays inside the form", () => {
-    // The Add button is part of answering the same question. Committing on the
-    // way to it would write the task twice — once on blur, once on click.
+    // The trailing slot is part of answering the same question — reaching for
+    // the date or the menu is not walking away from the task being typed.
     const { onCreate, field } = setup({ kind: "inbox" });
     fireEvent.change(field, { target: { value: "Still deciding" } });
-    fireEvent.blur(field, { relatedTarget: screen.getByRole("button", { name: "Add" }) });
+    fireEvent.blur(field, { relatedTarget: screen.getByRole("button", { name: "More options" }) });
     expect(onCreate).not.toHaveBeenCalled();
   });
 
-  it("commits once, not twice, when the button is then pressed", () => {
+  it("commits once, not twice, when the form is then submitted", () => {
     const { onCreate, field } = setup({ kind: "inbox" });
     fireEvent.change(field, { target: { value: "One task" } });
-    const add = screen.getByRole("button", { name: "Add" });
-    fireEvent.blur(field, { relatedTarget: add });
+    fireEvent.blur(field, { relatedTarget: screen.getByRole("button", { name: "More options" }) });
     fireEvent.submit(field.closest("form")!);
     expect(onCreate).toHaveBeenCalledTimes(1);
   });
@@ -104,18 +104,26 @@ describe("leaving the field", () => {
 
 // The row's own shape (TICKTICK_COMPONENT_10_QUICK_ADD.md §10).
 describe("the quick add as one quiet row", () => {
-  it("offers no button until there is something to commit", () => {
-    // Three things commit this form and two of them are not buttons — Enter,
-    // and a click outside it. A button standing there while the field is empty
-    // opens nothing and takes the eye first (§10.4).
+  it("offers no commit button at all — typing does not summon one", () => {
+    // QUICK_ADD_INPUT_BOX_DESIGN.md §3.2. Two things commit this form and
+    // neither is a button: Enter, and a click outside it. The reference draws
+    // no button beside a typed title either.
     const { field } = setup({ kind: "inbox" });
     expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
 
     fireEvent.change(field, { target: { value: "Something" } });
-    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
-
-    fireEvent.change(field, { target: { value: "" } });
     expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+  });
+
+  it("stands the day and the menu at the trailing edge, typed or not (§3)", () => {
+    const { field } = setup({ kind: "inbox" });
+    const trailing = document.querySelector(".tm-quickadd-trailing") as HTMLElement;
+    expect(trailing).toBeTruthy();
+    expect(trailing.querySelector(".tm-quickadd-date")).toBeTruthy();
+    expect(trailing.querySelector(".tm-quickadd-more")).toBeTruthy();
+
+    fireEvent.change(field, { target: { value: "Something" } });
+    expect(document.querySelectorAll(".tm-quickadd-trailing").length).toBe(1);
   });
 
   it("says which List the task will land in", () => {
@@ -151,3 +159,79 @@ describe("the quick add as one quiet row", () => {
   });
 });
 
+// The trailing slot and its menu (QUICK_ADD_INPUT_BOX_DESIGN.md §3–§5).
+//
+// What these hold is the layering rule: the draft goes OVER the Scope's
+// answer, and a field nobody touched still comes from the Scope.
+describe("what the quick add can be told before the task exists", () => {
+  function open() {
+    fireEvent.click(screen.getByRole("button", { name: "More options" }));
+  }
+
+  it("says the day the Scope already decided (§3.1)", () => {
+    // Upcoming has been writing `dueDate: today` on its own since §12.6 was
+    // lifted — without ever showing it.
+    setup({ kind: "upcoming" });
+    expect(screen.getByRole("button", { name: "Today" })).toBeTruthy();
+
+    cleanup();
+    // The Inbox contributes no day, so the slot says it has none rather than
+    // inventing one.
+    setup({ kind: "inbox" });
+    expect(screen.getByRole("button", { name: "Date" })).toBeTruthy();
+  });
+
+  it("carries a chosen priority into the patch, and leaves the Scope's alone", () => {
+    const { onCreate, field } = setup({ kind: "inbox" });
+    open();
+    fireEvent.click(screen.getByRole("radio", { name: "High" }));
+    fireEvent.change(field, { target: { value: "Urgent thing" } });
+    fireEvent.submit(field.closest("form")!);
+
+    expect(onCreate).toHaveBeenCalledWith("Urgent thing", expect.objectContaining({
+      patch: expect.objectContaining({ priority: "high" }),
+    }));
+  });
+
+  it("sends no priority at all when nobody chose one (§8.9)", () => {
+    const { onCreate, field } = setup({ kind: "inbox" });
+    fireEvent.change(field, { target: { value: "Plain" } });
+    fireEvent.submit(field.closest("form")!);
+
+    const [, resolution] = onCreate.mock.calls[0];
+    expect("priority" in resolution.patch).toBe(false);
+  });
+
+  it("keeps the choices after a commit and clears only the title (§5.2)", () => {
+    const { onCreate, field } = setup({ kind: "inbox" });
+    open();
+    fireEvent.click(screen.getByRole("radio", { name: "Medium" }));
+    fireEvent.change(field, { target: { value: "One" } });
+    fireEvent.submit(field.closest("form")!);
+    expect(field.value).toBe("");
+
+    fireEvent.change(field, { target: { value: "Two" } });
+    fireEvent.submit(field.closest("form")!);
+    expect(onCreate).toHaveBeenLastCalledWith("Two", expect.objectContaining({
+      patch: expect.objectContaining({ priority: "medium" }),
+    }));
+  });
+
+  it("turns into a note, and a note is the only thing with a button (§3.2, §7.2)", () => {
+    const { onCreate, field } = setup({ kind: "inbox" });
+    open();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Convert to Note" }));
+
+    const note = screen.getByRole("textbox", { name: "Record inspiration and time" }) as HTMLInputElement;
+    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
+
+    fireEvent.change(note, { target: { value: "An idea" } });
+    fireEvent.submit(note.closest("form")!);
+    expect(onCreate).toHaveBeenCalledWith("An idea", expect.objectContaining({
+      patch: expect.objectContaining({ kind: "note" }),
+    }));
+    // `field` is the same element — the mode changes what it says, not which
+    // control it is.
+    expect(field).toBe(note);
+  });
+});

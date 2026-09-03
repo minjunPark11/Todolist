@@ -1401,9 +1401,16 @@ export default function App() {
             const owner = planner.lists.find((list) => list.id === resolution.targetListId);
             // §12.4's Auto Apply, resolved here rather than in the resolver:
             // `Task.tags` holds names and the Scope knows an id.
-            const tagNames = (resolution.applyTagIds ?? [])
+            //
+            // The union with `applyTagNames` is QUICK_ADD_INPUT_BOX_DESIGN.md
+            // §5.3: the Scope's requirement and the person's choice are two
+            // different facts about the same task, so neither replaces the
+            // other. De-duplicated because a Tag Scope and a tag picked by
+            // hand can name the same tag, and `Task.tags` is a set.
+            const scopeTagNames = (resolution.applyTagIds ?? [])
               .map((id) => planner.tags.find((tag) => tag.id === id)?.name)
               .filter((name): name is string => Boolean(name));
+            const tagNames = [...new Set([...scopeTagNames, ...(resolution.applyTagNames ?? [])])];
             const taskId = planner.createTask({
               title,
               listId: resolution.targetListId,
