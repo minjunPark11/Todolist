@@ -8,15 +8,29 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./addList.helpers";
 
-/** Drag the third day's column from y+240 to y+320 — an hour or so, mid-morning. */
+/**
+ * Drag out an hour or so on the third day's column.
+ *
+ * The grid opens scrolled to the current time, so the column's own top sits
+ * above the viewport by an amount that changes with the clock — an offset from
+ * it lands on the sticky day header at some hours and inside the grid at
+ * others, and the header starts no selection. The band that is actually
+ * draggable is the scroller below its sticky head, so the gesture is measured
+ * from there instead.
+ */
 async function dragOutABlock(page: Page): Promise<void> {
   const column = page.locator(".gcal-time-col").nth(2);
   const box = (await column.boundingBox())!;
+  const scroller = (await page.locator(".gcal-time-scroll").boundingBox())!;
+  const sticky = await page.locator(".gcal-timegrid-sticky").boundingBox();
+  const top = Math.max(box.y, sticky ? sticky.y + sticky.height : scroller.y);
+  const bottom = Math.min(box.y + box.height, scroller.y + scroller.height);
   const x = box.x + box.width / 2;
-  const y = box.y + 240;
+  const y = top + 24;
+  const end = Math.min(y + 80, bottom - 4);
   await page.mouse.move(x, y);
   await page.mouse.down();
-  await page.mouse.move(x, y + 80, { steps: 8 });
+  await page.mouse.move(x, end, { steps: 8 });
   await page.mouse.up();
 }
 
