@@ -15,6 +15,7 @@ import {
   formatTimeSummary,
   getRangeStage,
   hasSchedule,
+  isAllDay,
   isConfirmable,
   isDirty,
   QUICK_DATES,
@@ -141,6 +142,36 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
     );
   }
 
+  // One end of the range, on the same grid the Date tab uses (§11.2). It is
+  // the whole calendar rather than a stripped one on purpose: the other end
+  // stays painted, so the reader picks a day while seeing the span it makes.
+  if (panel === "start" || panel === "end") {
+    return (
+      <div className="sched-editor">
+        <div className="sched-panel-head">
+          <button
+            type="button"
+            className="sched-back"
+            onClick={() => dispatch({ type: "SET_PANEL", panel: "calendar" })}
+          >
+            {t("schedule.back")}
+          </button>
+          <h3>{t(panel === "start" ? "schedule.rangeStart" : "schedule.rangeEnd")}</h3>
+        </div>
+        <MonthCalendar
+          visibleMonth={visibleMonth}
+          draft={draft}
+          hoverDate={hoverDate}
+          today={today}
+          onSelect={(date) => dispatch({ type: "SET_RANGE_DATE", which: panel, date })}
+          onHover={(date) => dispatch({ type: "HOVER_DATE", date })}
+          onStepMonth={(delta) => dispatch({ type: "STEP_MONTH", delta })}
+          onShowMonth={(date) => dispatch({ type: "SHOW_MONTH", date })}
+        />
+      </div>
+    );
+  }
+
   if (panel === "repeat") {
     return (
       <div className="sched-editor">
@@ -173,39 +204,93 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
         ))}
       </div>
 
-      {/* Shortcuts, not a mode (§5.3). Each is a date the user could have
-          clicked in the grid below, which is why pressing one leaves the
-          editor open and the calendar showing where it landed. */}
-      <div className="sched-quick">
-        {QUICK_DATES.map((key) => (
-          <button
-            type="button"
-            key={key}
-            className="sched-quick-item"
-            onClick={() => dispatch({ type: "QUICK_DATE", key, today, now: nowTime() })}
-          >
-            <span className="sched-quick-icon" aria-hidden="true">
-              {QUICK_ICONS[key]()}
-            </span>
-            <span className="sched-quick-label">{t(`schedule.quick.${key}`)}</span>
-          </button>
-        ))}
-      </div>
+      {/* The Date tab's two: shortcuts and a grid. Neither is on the Duration
+          tab (§11.2) — `오늘`, `내일`, `7일 후` and `오늘 밤` each answer with
+          ONE day, which is not an answer to a span, and the grid moves behind
+          the two fields that say which end they are setting. */}
+      {draft.mode === "date" ? (
+        <>
+          {/* Shortcuts, not a mode (§5.3). Each is a date the user could have
+              clicked in the grid below, which is why pressing one leaves the
+              editor open and the calendar showing where it landed. */}
+          <div className="sched-quick">
+            {QUICK_DATES.map((key) => (
+              <button
+                type="button"
+                key={key}
+                className="sched-quick-item"
+                onClick={() => dispatch({ type: "QUICK_DATE", key, today, now: nowTime() })}
+              >
+                <span className="sched-quick-icon" aria-hidden="true">
+                  {QUICK_ICONS[key]()}
+                </span>
+                <span className="sched-quick-label">{t(`schedule.quick.${key}`)}</span>
+              </button>
+            ))}
+          </div>
 
-      <MonthCalendar
-        visibleMonth={visibleMonth}
-        draft={draft}
-        hoverDate={hoverDate}
-        today={today}
-        onSelect={(date) => dispatch({ type: "SELECT_DATE", date })}
-        onHover={(date) => dispatch({ type: "HOVER_DATE", date })}
-        onStepMonth={(delta) => dispatch({ type: "STEP_MONTH", delta })}
-        onShowMonth={(date) => dispatch({ type: "SHOW_MONTH", date })}
-      />
+          <MonthCalendar
+            visibleMonth={visibleMonth}
+            draft={draft}
+            hoverDate={hoverDate}
+            today={today}
+            onSelect={(date) => dispatch({ type: "SELECT_DATE", date })}
+            onHover={(date) => dispatch({ type: "HOVER_DATE", date })}
+            onStepMonth={(delta) => dispatch({ type: "STEP_MONTH", delta })}
+            onShowMonth={(date) => dispatch({ type: "SHOW_MONTH", date })}
+          />
+        </>
+      ) : (
+        <div className="sched-rows sched-range">
+          {/* The two ends, each saying which one it is before it says a date.
+              Both are always offered: a range with no start is what this tab
+              opens as, and there is nothing to qualify yet (unlike the three
+              rows below, which need a date to attach to). */}
+          <SummaryRow
+            label={t("schedule.rangeStart")}
+            value={draft.startDate ?? t("schedule.noDate")}
+            disabled={false}
+            onClick={() => dispatch({ type: "SET_PANEL", panel: "start" })}
+          />
+          <SummaryRow
+            label={t("schedule.rangeEnd")}
+            value={draft.dueDate ?? t("schedule.noDate")}
+            disabled={false}
+            onClick={() => dispatch({ type: "SET_PANEL", panel: "end" })}
+          />
+          {/* Derived, not stored (§11.3): "all day" IS both times being empty.
+              Turning it on clears them; turning it off opens the panel that
+              sets them, because picking is the only way to make the state the
+              switch would be claiming. */}
+          <div className="sched-row is-switch">
+            <span className="sched-row-label">{t("schedule.allDay")}</span>
+            <button
+              type="button"
+              className={`tm-switch${isAllDay(draft) ? " is-on" : ""}`}
+              role="switch"
+              aria-checked={isAllDay(draft)}
+              aria-label={t("schedule.allDay")}
+              disabled={!dated}
+              onClick={() =>
+                isAllDay(draft)
+                  ? dispatch({ type: "SET_PANEL", panel: "time" })
+                  : dispatch({ type: "CLEAR_TIME" })
+              }
+            >
+              <span className="tm-switch-knob" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* All three qualify a date, so none is offered until there is one
           (INV-03, INV-06, INV-07). */}
       <div className="sched-rows">
+        {/* On the Duration tab the switch above owns this question, and the row
+            appears only once there is something to show — a second door to the
+            same panel, standing open beside a switch that says "all day", is
+            two controls disagreeing. */}
+        {draft.mode === "date" || !isAllDay(draft) ? (
         <SummaryRow
           icon={<ClockIcon />}
           label={t("schedule.time")}
@@ -213,6 +298,7 @@ export function ScheduleEditor({ taskId, locale, schedule, today, onCommit, onCl
           disabled={!dated}
           onClick={() => dispatch({ type: "SET_PANEL", panel: "time" })}
         />
+        ) : null}
         <SummaryRow
           icon={<BellIcon />}
           label={t("schedule.reminder")}
@@ -295,7 +381,7 @@ function offerIdOf(reminder: ReminderSpec): string {
 }
 
 interface SummaryRowProps {
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   value: string;
   disabled: boolean;
@@ -305,9 +391,14 @@ interface SummaryRowProps {
 function SummaryRow({ icon, label, value, disabled, onClick }: SummaryRowProps) {
   return (
     <button type="button" className="sched-row" disabled={disabled} onClick={onClick}>
-      <span className="sched-row-icon" aria-hidden="true">
-        {icon}
-      </span>
+      {/* The range's two rows carry no icon: `시작`/`종료` are a pair and the
+          words are the distinction, where the three rows below are each a
+          different KIND of thing and the glyph is what separates them. */}
+      {icon ? (
+        <span className="sched-row-icon" aria-hidden="true">
+          {icon}
+        </span>
+      ) : null}
       <span className="sched-row-label">{label}</span>
       <span className="sched-row-value">{value}</span>
       <span className="sched-row-chevron" aria-hidden="true">

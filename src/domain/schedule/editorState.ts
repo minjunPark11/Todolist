@@ -21,7 +21,7 @@
 //                         draft, which is the only way they cannot drift.
 import { applyQuickDate, type QuickDateKey } from "./quickDate";
 import { reconcileReminders, toggleReminder } from "./reminders";
-import { clearSchedule, clearTime, selectDate, setEndTime, setStartTime } from "./scheduleCommands";
+import { clearSchedule, clearTime, selectDate, setEndTime, setRangeDate, setStartTime } from "./scheduleCommands";
 import { draftFromSchedule, setScheduleMode } from "./scheduleMode";
 import { getRangeStage } from "./scheduleQueries";
 import type {
@@ -36,7 +36,17 @@ import type {
 import type { ScheduleIssue } from "./validateSchedule";
 
 /** Which sub-panel the editor is showing (design §2.4). */
-export type EditorPanel = "calendar" | "time" | "reminder" | "repeat";
+/**
+ * Which surface the editor is showing.
+ *
+ * `start` and `end` are the same month grid as `calendar`, opened for ONE end
+ * of a range and returning as soon as a day is picked
+ * (TASK_DETAIL_SCHEDULE_BODY_DESIGN.md §11.2). They are panels rather than a
+ * flag on `calendar` because that is what the reader sees: a surface with a
+ * title, a way back, and one question on it — the shape `time`, `reminder`
+ * and `repeat` already have.
+ */
+export type EditorPanel = "calendar" | "time" | "reminder" | "repeat" | "start" | "end";
 
 export type ScheduleEditorState =
   | { status: "closed" }
@@ -67,6 +77,13 @@ export type ScheduleEditorAction =
   | { type: "CLOSE" }
   | { type: "SELECT_DATE"; date: LocalDate }
   | { type: "SET_MODE"; mode: ScheduleMode }
+  /**
+   * One end of a range, named rather than inferred (§11.2).
+   *
+   * Closes the panel it was answered on: the field asked one question and has
+   * its answer, so keeping the grid up would be waiting for something.
+   */
+  | { type: "SET_RANGE_DATE"; which: "start" | "end"; date: LocalDate }
   | { type: "SET_START_TIME"; time: LocalTime | null }
   | { type: "SET_END_TIME"; time: LocalTime | null }
   | { type: "CLEAR_TIME" }
@@ -177,6 +194,11 @@ export function scheduleEditorReducer(
 
     case "SET_MODE":
       return edited(state, setScheduleMode(state.draft, action.mode));
+
+    case "SET_RANGE_DATE": {
+      const next = edited(state, setRangeDate(state.draft, action.which, action.date));
+      return { ...next, panel: "calendar", hoverDate: null };
+    }
 
     case "SET_START_TIME":
       return edited(state, setStartTime(state.draft, action.time));

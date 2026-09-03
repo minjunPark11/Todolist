@@ -78,6 +78,7 @@ export {
   daysBetween,
   selectDate,
   setEndTime,
+  setRangeDate,
   setStartTime,
   shiftSchedule,
 } from "./scheduleCommands";

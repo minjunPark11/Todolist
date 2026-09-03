@@ -155,6 +155,30 @@ describe("panels and navigation", () => {
     expect(opened(paged).draft.startDate).toBe("2026-08-17");
   });
 
+  // The Duration tab's fields open the same grid for ONE end and return with
+  // it (TASK_DETAIL_SCHEDULE_BODY_DESIGN.md §11.2).
+  it("closes the end's panel as soon as the end is picked", () => {
+    const state = run(
+      open(),
+      { type: "SET_MODE", mode: "duration" },
+      { type: "SET_PANEL", panel: "start" },
+      { type: "SET_RANGE_DATE", which: "start", date: "2026-08-17" },
+    );
+
+    expect(opened(state).draft.startDate).toBe("2026-08-17");
+    // Back on the tab, not left on a grid waiting for something.
+    expect(opened(state).panel).toBe("calendar");
+    expect(opened(state).hoverDate).toBeNull();
+  });
+
+  it("counts a range field as an edit", () => {
+    const state = run(
+      open(schedule({ startDate: "2026-08-17", dueDate: "2026-08-20" })),
+      { type: "SET_RANGE_DATE", which: "end", date: "2026-08-25" },
+    );
+    expect(isDirty(opened(state).draft, opened(state).saved)).toBe(true);
+  });
+
   it("jumps to the month holding a date", () => {
     expect(opened(run(open(), { type: "SHOW_MONTH", date: "2027-03-14" })).visibleMonth).toBe("2027-03-01");
   });

@@ -331,6 +331,28 @@
   opacity: 0.45;
 }
 
+/* The Duration tab's own block: the two ends and the switch that says whether
+   they carry hours (TASK_DETAIL_SCHEDULE_BODY_DESIGN.md §11.2). It is the same
+   row as the three below it, so the tab reads as one column of rows rather
+   than as two lists that happen to be stacked. */
+.sched-range {
+  margin-top: 4px;
+}
+
+/* A row that ENDS in a control rather than opening a panel: no chevron, and
+   the switch takes the place the value would have had. */
+.sched-row.is-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: default;
+}
+
+.sched-row.is-switch .sched-row-label {
+  flex: 1 1 auto;
+}
+
 .sched-row-label {
   flex: 1;
 }

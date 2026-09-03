@@ -6,6 +6,7 @@ import {
   daysBetween,
   selectDate,
   setEndTime,
+  setRangeDate,
   setStartTime,
   shiftSchedule,
 } from "./scheduleCommands";
@@ -92,6 +93,73 @@ describe("selectDate — duration mode", () => {
   it("keeps times when only the end is being added", () => {
     const midway = draft("duration", { startDate: "2026-08-27", startTime: "09:00" });
     expect(selectDate(midway, "2026-08-30").startTime).toBe("09:00");
+  });
+});
+
+// The Duration tab's two fields (TASK_DETAIL_SCHEDULE_BODY_DESIGN.md §11.2).
+// They say WHICH end before they say the date, so none of `selectDate`'s
+// stage-reading applies — and the differences are what these pin down.
+describe("setRangeDate", () => {
+  it("sets one end and leaves the other alone", () => {
+    const both = draft("duration", { startDate: "2026-09-06", dueDate: "2026-09-09" });
+
+    expect(setRangeDate(both, "start", "2026-09-07")).toMatchObject({
+      startDate: "2026-09-07",
+      dueDate: "2026-09-09",
+    });
+    expect(setRangeDate(both, "end", "2026-09-12")).toMatchObject({
+      startDate: "2026-09-06",
+      dueDate: "2026-09-12",
+    });
+  });
+
+  // The difference from `selectDate`, and the reason this exists: a click on
+  // the grid while a range is complete restarts it, dropping the end. A field
+  // that was pointed at cannot do that to the field that was not.
+  it("does not drop the end the way a grid click does", () => {
+    const complete = draft("duration", { startDate: "2026-09-06", dueDate: "2026-09-09" });
+
+    expect(selectDate(complete, "2026-09-07").dueDate).toBeNull();
+    expect(setRangeDate(complete, "start", "2026-09-07").dueDate).toBe("2026-09-09");
+  });
+
+  it("drags the other end along when the two cross", () => {
+    // Refusing would leave the field showing a date it did not take; clearing
+    // the other end would throw away an earlier choice without asking.
+    const both = draft("duration", { startDate: "2026-09-06", dueDate: "2026-09-09" });
+
+    expect(setRangeDate(both, "start", "2026-09-20")).toMatchObject({
+      startDate: "2026-09-20",
+      dueDate: "2026-09-20",
+    });
+    expect(setRangeDate(both, "end", "2026-09-01")).toMatchObject({
+      startDate: "2026-09-01",
+      dueDate: "2026-09-01",
+    });
+  });
+
+  it("keeps the times, which belong to the ends by position", () => {
+    const timed = draft("duration", {
+      startDate: "2026-09-06",
+      dueDate: "2026-09-09",
+      startTime: "09:00",
+      endTime: "17:00",
+    });
+
+    expect(setRangeDate(timed, "end", "2026-09-12")).toMatchObject({
+      startTime: "09:00",
+      endTime: "17:00",
+    });
+  });
+
+  it("fills one end of an empty range without inventing the other", () => {
+    const empty = draft("duration");
+
+    expect(setRangeDate(empty, "start", "2026-09-06")).toMatchObject({
+      startDate: "2026-09-06",
+      dueDate: null,
+    });
+    expect(getRangeStage(setRangeDate(empty, "start", "2026-09-06"))).toBe("start-selected");
   });
 });
 

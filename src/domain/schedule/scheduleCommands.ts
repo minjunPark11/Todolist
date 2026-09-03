@@ -47,6 +47,42 @@ export function selectDate(draft: ScheduleDraft, date: LocalDate): ScheduleDraft
 }
 
 /**
+ * Set ONE end of a range, said by name (TASK_DETAIL_SCHEDULE_BODY_DESIGN.md
+ * §11.2).
+ *
+ * `selectDate` above infers which end the next click means from how far along
+ * the selection is. That is the right reading for a grid, where the only thing
+ * the user can say is "this day"; it is the wrong one for the Start and End
+ * fields, which say WHICH end before they say the date.
+ *
+ * The inference has a cost this does not pay: clicking a day while a range is
+ * complete silently drops the end (`selectDate`'s last line). A field cannot
+ * do that — the user pointed at Start, so End must survive.
+ *
+ * What happens when the two cross: the other end is DRAGGED to meet the one
+ * just set, making a single-day span. The alternatives are worse — refusing
+ * leaves the field showing a date it did not take, and clearing the other end
+ * throws away something the user chose earlier without being asked.
+ *
+ * Times are not touched. They belong to the ends by position (start time to
+ * the first day, end time to the last), and moving a day does not move which
+ * end its hours describe — which is exactly what `selectDate` cannot assume
+ * when it restarts a range from scratch.
+ */
+export function setRangeDate(
+  draft: ScheduleDraft,
+  which: "start" | "end",
+  date: LocalDate,
+): ScheduleDraft {
+  if (which === "start") {
+    const end = draft.dueDate !== null && draft.dueDate < date ? date : draft.dueDate;
+    return { ...draft, startDate: date, dueDate: end };
+  }
+  const start = draft.startDate !== null && date < draft.startDate ? date : draft.startDate;
+  return { ...draft, startDate: start, dueDate: date };
+}
+
+/**
  * Set the block start, or clear it with null (design §7).
  *
  * Clearing the start clears the end with it. An end alone is the invalid shape
