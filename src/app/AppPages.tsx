@@ -194,6 +194,7 @@ export function AppPages({
       <section className="gcal-page-shell">
         <CalendarView
           tasks={visibleTasks}
+          lists={planner.lists}
           externalCalendars={externalCalendars}
           externalCalendarEvents={externalCalendarEvents}
           focusSessions={planner.focusSessions}
@@ -204,6 +205,8 @@ export function AppPages({
           onDeleteTask={requestDeleteTask}
           onOpenTask={onOpenTask}
           onToggleTaskDone={planner.toggleTaskDone}
+          onUpdateList={planner.updateList}
+          onMoveTaskToList={planner.moveTaskToList}
           showToast={showToast}
         />
         {/* §5: the Calendar draws the Detail now, so it renders the pane like

@@ -1,39 +1,32 @@
-// Calendar category model (FOCUSFLOW_CALENDAR_CATEGORY_MANAGEMENT_SPEC).
+// The little the calendar's left column has to store for itself.
 //
-// Three-level structure: Group > Category > Event. Personal categories are
-// user-managed and stored here; external categories are derived live from the
-// subscribed calendars so their names and colors never drift from the source.
+// It used to store a whole taxonomy — personal categories, their names, their
+// colours, their order, which one was default. All of that is a List now
+// (CALENDAR_COLOR_SOURCE_AND_VIEW_OPTIONS_DESIGN.md §4), and a List belongs to
+// the account, not to this localStorage blob. What is left is three answers
+// that are genuinely about this screen: which List new calendar tasks go into,
+// which sources are switched off, and the focus recording's colour.
 //
-// A `project` group sat beside them, one category per Project. Projects are
-// gone from the app, and a category nothing can be filed under is a filter
-// row that only ever hides things.
-//
-// Visibility: the spec models visibility as `visibleCategoryIds` on calendar
-// state. Because derived categories appear over time (new project = new
-// category that must default to visible), we persist the inverse —
-// `hiddenCategoryIds` — and expose visible ids / isVisible helpers computed
-// from it. Categories themselves never store an isVisible flag (§15.2).
+// Visibility is still stored as the INVERSE — what is hidden. Sources appear
+// over time (a new List, a new subscription) and a new one must default to
+// visible; a list of what is shown would silently hide everything made after
+// it was written (§15.2).
 import { useSyncExternalStore } from "react";
 import { platform } from "../platform";
 // The model moved to ./calendar/categoryModel so that code with no browser
 // under it can read the ids and colours (§7.2). Re-exported here because this
 // module was the door to them and every call site still knocks.
-import {
-  DEFAULT_PERSONAL_CATEGORY_ID,
-  FOCUS_ACTUAL_COLOR,
-  type CalendarCategoryState,
-  type StoredPersonalCategory,
-} from "./calendar/categoryModel";
+import { type CalendarCategoryState } from "./calendar/categoryModel";
 
 export {
   CATEGORY_COLOR_PALETTE,
-  DEFAULT_PERSONAL_CATEGORY_ID,
   FOCUS_ACTUAL_CATEGORY_ID,
   FOCUS_ACTUAL_COLOR,
   buildCalendarCategories,
+  calendarLists,
   externalCategoryId,
   flattenCategories,
-  isCategoryVisible,
+  isSourceVisible,
   type CalendarCategory,
   type CalendarCategoryGroup,
   type CalendarGroupType,
@@ -45,39 +38,39 @@ function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function seedPersonalCategories(): StoredPersonalCategory[] {
-  const now = new Date().toISOString();
-  return [
-    { id: DEFAULT_PERSONAL_CATEGORY_ID, name: "기본 일정", color: "#0066cc", order: 0, isDefault: true, createdAt: now, updatedAt: now },
-    { id: createId("cat-personal"), name: "개인", color: "#34c759", order: 1, createdAt: now, updatedAt: now },
-    { id: createId("cat-personal"), name: "약속", color: "#ff2d55", order: 2, createdAt: now, updatedAt: now },
-  ];
-}
-
-// Migration (§15.6): the default category must always exist; the ids the
-// state references must stay resolvable.
-function sanitizeState(raw: Partial<CalendarCategoryState> | null): CalendarCategoryState {
-  let personal = Array.isArray(raw?.personal)
-    ? raw.personal.filter((item): item is StoredPersonalCategory => Boolean(item && item.id && item.name))
-    : [];
-  if (personal.length === 0) personal = seedPersonalCategories();
-
-  let defaultCategoryId = typeof raw?.defaultCategoryId === "string" ? raw.defaultCategoryId : "";
-  if (!personal.some((category) => category.id === defaultCategoryId)) {
-    const flagged = personal.find((category) => category.isDefault);
-    defaultCategoryId = flagged?.id ?? personal[0].id;
-  }
-  personal = personal.map((category) => ({ ...category, isDefault: category.id === defaultCategoryId }));
+/**
+ * A stored blob, as this build reads it.
+ *
+ * The old shape had `personal`, `defaultCategoryId`, `activeCategoryId` and
+ * `hiddenCategoryIds`. Two of those are gone with the taxonomy; the other two
+ * are read once under their old names so nobody loses a hidden calendar or the
+ * List their calendar creates into.
+ *
+ * `personal` and `defaultCategoryId` are deliberately NOT carried forward.
+ * They named categories that nothing resolves any more (E3-A) — keeping them
+ * would preserve a set of ids no screen can turn back into a colour.
+ */
+function sanitizeState(raw: Record<string, unknown> | null): CalendarCategoryState {
+  const hidden = Array.isArray(raw?.hiddenSourceIds)
+    ? raw.hiddenSourceIds
+    : Array.isArray(raw?.hiddenCategoryIds)
+      ? raw.hiddenCategoryIds
+      : [];
 
   return {
-    personal: [...personal].sort((a, b) => a.order - b.order).map((category, index) => ({ ...category, order: index })),
-    defaultCategoryId,
-    activeCategoryId: typeof raw?.activeCategoryId === "string" ? raw.activeCategoryId : defaultCategoryId,
-    hiddenCategoryIds: Array.isArray(raw?.hiddenCategoryIds) ? raw.hiddenCategoryIds.filter((id): id is string => typeof id === "string") : [],
+    // An id that no longer resolves simply means "no default", and the caller
+    // falls back to the Inbox — which is where an unfiled task goes anyway.
+    activeListId:
+      typeof raw?.activeListId === "string"
+        ? raw.activeListId
+        : typeof raw?.activeCategoryId === "string"
+          ? ""
+          : "",
+    hiddenSourceIds: hidden.filter((id): id is string => typeof id === "string"),
     focusColor: typeof raw?.focusColor === "string" ? raw.focusColor : "",
     // Absent means an account that predates the setting, and those accounts
     // have never seen a finished block. `true` is what the design ships
-    // (§1, D1-B); only an explicit `false` hides them.
+    // (CALENDAR_TASK_CHECKBOX_DESIGN.md §1, D1-B).
     showCompleted: typeof raw?.showCompleted === "boolean" ? raw.showCompleted : true,
   };
 }
@@ -85,7 +78,7 @@ function sanitizeState(raw: Partial<CalendarCategoryState> | null): CalendarCate
 function loadState(): CalendarCategoryState {
   try {
     const raw = platform.storage.getSync(STORAGE_KEY);
-    return sanitizeState(raw ? (JSON.parse(raw) as Partial<CalendarCategoryState>) : null);
+    return sanitizeState(raw ? (JSON.parse(raw) as Record<string, unknown>) : null);
   } catch {
     return sanitizeState(null);
   }
@@ -115,105 +108,37 @@ export function useCalendarCategoryState(): CalendarCategoryState {
 
 // ---- state mutations (shared by sidebar / popover / settings) ----
 
-export function setActiveCategory(categoryId: string) {
-  if (state.activeCategoryId === categoryId) return;
-  setState({ ...state, activeCategoryId: categoryId });
+/** Which List a task made on the calendar goes into. */
+export function setActiveList(listId: string) {
+  if (state.activeListId === listId) return;
+  setState({ ...state, activeListId: listId });
 }
 
-export function ensureCategoryVisible(categoryId: string) {
-  if (!state.hiddenCategoryIds.includes(categoryId)) return;
-  setState({ ...state, hiddenCategoryIds: state.hiddenCategoryIds.filter((id) => id !== categoryId) });
+/** Un-hide a source, so something written into it is not written out of view. */
+export function ensureSourceVisible(sourceId: string) {
+  if (!state.hiddenSourceIds.includes(sourceId)) return;
+  setState({ ...state, hiddenSourceIds: state.hiddenSourceIds.filter((id) => id !== sourceId) });
 }
 
-export function toggleCategoryVisibility(categoryId: string) {
-  // Never touches activeCategoryId (§16.2).
+export function toggleSourceVisibility(sourceId: string) {
+  // Never touches activeListId (§16.2): hiding a List does not stop it being
+  // the one new tasks go into, and silently moving that would be worse.
   setState({
     ...state,
-    hiddenCategoryIds: state.hiddenCategoryIds.includes(categoryId)
-      ? state.hiddenCategoryIds.filter((id) => id !== categoryId)
-      : [...state.hiddenCategoryIds, categoryId],
+    hiddenSourceIds: state.hiddenSourceIds.includes(sourceId)
+      ? state.hiddenSourceIds.filter((id) => id !== sourceId)
+      : [...state.hiddenSourceIds, sourceId],
   });
 }
 
 /**
- * Show or hide finished work on the grid (§1, D1-B).
- *
- * Not a category — a category answers "whose calendar is this" and this
- * answers "is it still to do". They share the sidebar and this store because
- * they share the question underneath both: what gets drawn.
+ * Show or hide finished work on the grid
+ * (CALENDAR_TASK_CHECKBOX_DESIGN.md §1, D1-B).
  */
 export function toggleShowCompleted() {
   setState({ ...state, showCompleted: !state.showCompleted });
 }
 
-export function addPersonalCategory(name: string, color: string): string {
-  const now = new Date().toISOString();
-  const id = createId("cat-personal");
-  setState({
-    ...state,
-    personal: [...state.personal, { id, name: name.trim(), color, order: state.personal.length, createdAt: now, updatedAt: now }],
-  });
-  return id;
-}
-
-export function updatePersonalCategory(categoryId: string, patch: Partial<Pick<StoredPersonalCategory, "name" | "color">>) {
-  setState({
-    ...state,
-    personal: state.personal.map((category) =>
-      category.id === categoryId ? { ...category, ...patch, updatedAt: new Date().toISOString() } : category,
-    ),
-  });
-}
-
-export function movePersonalCategory(categoryId: string, direction: -1 | 1) {
-  const sorted = [...state.personal].sort((a, b) => a.order - b.order);
-  const index = sorted.findIndex((category) => category.id === categoryId);
-  const target = index + direction;
-  if (index === -1 || target < 0 || target >= sorted.length) return;
-  [sorted[index], sorted[target]] = [sorted[target], sorted[index]];
-  setState({ ...state, personal: sorted.map((category, order) => ({ ...category, order })) });
-}
-
-// Drag & drop reorder: drops the category at targetIndex in the sorted list.
-export function movePersonalCategoryTo(categoryId: string, targetIndex: number) {
-  const sorted = [...state.personal].sort((a, b) => a.order - b.order);
-  const from = sorted.findIndex((category) => category.id === categoryId);
-  if (from === -1) return;
-  const to = Math.max(0, Math.min(sorted.length - 1, targetIndex));
-  if (from === to) return;
-  const [moved] = sorted.splice(from, 1);
-  sorted.splice(to, 0, moved);
-  setState({ ...state, personal: sorted.map((category, order) => ({ ...category, order })) });
-}
-
 export function setFocusColor(color: string) {
   setState({ ...state, focusColor: color });
 }
-
-export function setDefaultCategory(categoryId: string) {
-  if (!state.personal.some((category) => category.id === categoryId)) return;
-  setState({
-    ...state,
-    defaultCategoryId: categoryId,
-    personal: state.personal.map((category) => ({ ...category, isDefault: category.id === categoryId })),
-  });
-}
-
-// Deletes a personal category and cleans up every reference (§8.4). Event
-// migration (task.categoryId rewrites) is the caller's job — this only
-// handles the category store's own state.
-export function deletePersonalCategory(categoryId: string): boolean {
-  if (categoryId === state.defaultCategoryId) return false;
-  if (!state.personal.some((category) => category.id === categoryId)) return false;
-  setState({
-    ...state,
-    personal: state.personal
-      .filter((category) => category.id !== categoryId)
-      .sort((a, b) => a.order - b.order)
-      .map((category, order) => ({ ...category, order })),
-    hiddenCategoryIds: state.hiddenCategoryIds.filter((id) => id !== categoryId),
-    activeCategoryId: state.activeCategoryId === categoryId ? state.defaultCategoryId : state.activeCategoryId,
-  });
-  return true;
-}
-

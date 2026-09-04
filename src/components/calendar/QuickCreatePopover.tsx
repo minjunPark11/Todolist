@@ -97,19 +97,17 @@ export function QuickCreatePopover({ defaults, categoryGroups, initialCategoryId
         ) : null}
 
         <label>
-          <span>{t("calendar.categoryLabel")}</span>
+          <span>{t("calendar.listLabel")}</span>
           <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-            {categoryGroups.map((group) =>
-              group.categories.length === 0 ? null : (
-                <optgroup key={group.type} label={t(`calendar.group.${group.type}`)}>
-                  {group.categories.map((category) => (
-                    <option key={category.id} value={category.id} disabled={category.isReadOnly}>
-                      {category.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ),
-            )}
+            {/* Only the user's own Lists. A subscribed calendar and the focus
+                recording were listed here too, greyed out — options that could
+                never be chosen, answering a question ("which List does this go
+                into") they are not answers to. */}
+            {(categoryGroups.find((group) => group.type === "personal")?.categories ?? []).map((list) => (
+              <option key={list.id} value={list.id}>
+                {list.name}
+              </option>
+            ))}
           </select>
         </label>
       </form>

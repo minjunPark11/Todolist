@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { CATEGORY_COLOR_PALETTE, type CalendarCategory, type CalendarCategoryGroup } from "../../lib/calendarCategories";
+import { LIST_COLOR_PRESETS } from "../../domain/tasks/listColor";
 import { getDayNumber, getMonthGrid, getMonthLabel, rotateWeekdays, todayValue } from "../../utils/date";
 import { useWeekStart } from "../../utils/appPrefs";
 import { useT } from "../../i18n";
@@ -43,6 +44,12 @@ export function CalendarLeftSidebar({
 }: CalendarLeftSidebarProps) {
   const { t, lang } = useT();
   const weekStart = useWeekStart();
+  // A List is recoloured with the LIST palette — the same eight the Tasks
+  // module offers for that same List. Offering a different eight here would
+  // mean one List with two sets of colours to pick from, and a colour picked
+  // on this screen showing as "custom" on the other.
+  const swatchesFor = (category: CalendarCategory) =>
+    category.group === "personal" ? LIST_COLOR_PRESETS.map((preset) => preset.hex) : CATEGORY_COLOR_PALETTE;
   const today = todayValue();
   // Category id whose inline recolor palette is open ("" = none).
   const [paletteFor, setPaletteFor] = useState("");
@@ -146,7 +153,7 @@ export function CalendarLeftSidebar({
                   </button>
                   {paletteFor === category.id ? (
                     <div className="gcal-cat-palette" role="radiogroup" aria-label={t("calendar.recolorAria", { name: category.name })} onClick={(event) => event.stopPropagation()}>
-                      {CATEGORY_COLOR_PALETTE.map((color) => (
+                      {swatchesFor(category).map((color) => (
                         <button
                           key={color}
                           type="button"

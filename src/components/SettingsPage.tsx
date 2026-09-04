@@ -305,8 +305,6 @@ export function SettingsPage({
 
           <section className="ff-settings-card ff-cal-card">
             <CalendarCategorySettings
-              tasks={tasks}
-              onUpdateTask={onUpdateTask}
               externalCalendars={externalCalendars}
               onUpdateExternalCalendar={onUpdateExternalCalendar}
             />

@@ -23,6 +23,11 @@ import { scheduleSpan } from "../domain/schedule/scheduleQueries";
 import { scheduleFromTask } from "../domain/schedule/taskSchedule";
 import { addDays, todayValue } from "./date";
 import { isTaskAlive } from "../domain/tasks/taskState";
+import {
+  colorForTask,
+  DEFAULT_COLOR_BY,
+  type CalendarColorBy,
+} from "../domain/calendar/itemColor";
 
 // "deadline" is gone: it named the marker a task drew from `dueDate`, and a
 // task draws one chip now (audit §6, 1-e). `project-deadline` went with the
@@ -73,16 +78,12 @@ export interface CalendarItem {
   repeating?: boolean;
 }
 
-// Every item takes its category's colour; the layer tone below is only the
-// fallback for items whose category has none (CALENDAR_APPLE_DESIGN.md D1).
-// Hue answers "which calendar is this?" and nothing else — the layer is read
-// from the item's *shape* instead, so recolouring a category can no longer
-// make two chips of different kinds collide on the same orange.
-const LAYER_COLOR: Record<CalendarLayer, string> = {
-  task: "#0066cc",
-  external: "#4f73ff",
-  "focus-actual": FOCUS_ACTUAL_COLOR,
-};
+// There is no per-layer colour table any more. Every layer already had its own
+// answer — an external event takes its calendar's colour, a focus block takes
+// `focusColor` — and the one entry that was really used, `task`, is now the
+// List's (CALENDAR_COLOR_SOURCE_AND_VIEW_OPTIONS_DESIGN.md §3). Hue still says
+// only "which calendar is this?"; the layer is read from the item's shape
+// (CALENDAR_APPLE_DESIGN.md D1).
 
 // A focus segment is wall-clock time, so it can cross midnight: split it
 // into per-day parts in *local* time (calendar dates/times are local).
@@ -176,13 +177,17 @@ function bumpMinute(time: string): string {
 export interface BuildCalendarItemsInput {
   tasks: Task[];
   /**
-   * Resolves each Item's List and Folder. Optional, and no caller passes it
-   * yet, because nothing the calendar draws reads them — it is the input a
-   * List- or Folder-scoped calendar would need (§16), and passing it is the
-   * whole of that change. Absent, every Item's `listId` resolves to "" and is
-   * simply unused.
+   * Resolves each Item's List, which is now what a task block's colour is read
+   * from (CALENDAR_COLOR_SOURCE_AND_VIEW_OPTIONS_DESIGN.md §3).
+   *
+   * It was optional and unpassed while the colour came from a calendar-only
+   * `categoryId`. It stays optional because the AI context builder calls this
+   * without one and does not draw anything; absent, every Item's `listId`
+   * resolves to "" and every task block comes out neutral.
    */
   lists?: List[];
+  /** Which axis the fill reads (§7). Defaults to the List. */
+  colorBy?: CalendarColorBy;
   externalCalendars?: ExternalCalendar[];
   externalCalendarEvents?: ExternalCalendarEvent[];
   /**
@@ -218,6 +223,7 @@ export interface BuildCalendarItemsInput {
 export function buildCalendarItems({
   tasks,
   lists = [],
+  colorBy = DEFAULT_COLOR_BY,
   externalCalendars = [],
   externalCalendarEvents = [],
   externalCalendarRange,
@@ -233,10 +239,22 @@ export function buildCalendarItems({
   // Explicit categoryId wins; everything else lands in the default personal
   // category (§15.6 migration applied at display time so legacy data needs no
   // rewrite).
-  function resolveTaskCategoryId(task: Task): string {
+  /**
+   * Which row in the left column governs this task
+   * (CALENDAR_COLOR_SOURCE_AND_VIEW_OPTIONS_DESIGN.md §4).
+   *
+   * Its List. This read `task.categoryId` — a field only the calendar could
+   * write — and fell back to a default category, which is why hiding a row
+   * hid a set of tasks nobody could describe.
+   *
+   * A List that is not in `categories` is archived or deleted (§13.19 keeps
+   * those out of `calendarLists`), and its tasks go with it. A task whose List
+   * cannot be resolved at all answers "" and is drawn — an item we cannot file
+   * is better on the grid than silently missing from it.
+   */
+  function resolveTaskSourceId(listId: string): string {
     if (!categories) return "";
-    if (task.categoryId && categories.has(task.categoryId)) return task.categoryId;
-    return defaultCategoryId;
+    return listId;
   }
 
   function resolveCategoryId(id: string): string {
@@ -246,6 +264,8 @@ export function buildCalendarItems({
 
   function categoryAllowed(categoryId: string): boolean {
     if (!visibleCategoryIds) return true;
+    // "" is "we could not file this", not "this is hidden".
+    if (!categoryId) return true;
     return visibleCategoryIds.has(categoryId);
   }
 
@@ -259,6 +279,7 @@ export function buildCalendarItems({
   // `taskById` carries the fields no view needs but this renderer does —
   // repeat, category, the raw status for the popover.
   const taskById = new Map(tasks.map((entry) => [entry.id, entry]));
+  const listsById = new Map(lists.map((entry) => [entry.id, entry]));
   const viewItems = projectItems({
     tasks,
     lists,
@@ -273,9 +294,8 @@ export function buildCalendarItems({
     if (!isTaskAlive(task)) continue;
     const done = item.done;
     const repeating = task.repeatType !== "none";
-    const taskCategoryId = resolveTaskCategoryId(task);
+    const taskCategoryId = resolveTaskSourceId(item.listId);
     if (!categoryAllowed(taskCategoryId)) continue;
-    const taskCategory = categories?.get(taskCategoryId);
 
     // One Task, one chip per day it covers (audit §6, 1-e).
     //
@@ -324,7 +344,11 @@ export function buildCalendarItems({
         startTime: startTime ?? undefined,
         endTime: endTime ?? undefined,
         allDay: startTime === null,
-        color: taskCategory?.color ?? LAYER_COLOR.task,
+        // §3: the List, not a calendar-only category. `item.listId` is
+        // already resolved through `listIdFor` by `projectItems`, so this
+        // reads a decision the user made in the Tasks module rather than one
+        // they could only have made from inside this screen.
+        color: colorForTask({ colorBy, listId: item.listId, priority: item.priority, listsById }),
         categoryId: taskCategoryId,
         priority: item.priority,
         done,

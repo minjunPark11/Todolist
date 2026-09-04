@@ -1,5 +1,5 @@
 import { DragEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, Task, TaskDraft } from "../types";
+import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Task, TaskDraft } from "../types";
 import {
   addDays,
   addMonths,
@@ -18,17 +18,18 @@ import {
 import { toDateInputValue } from "../utils/date";
 import {
   buildCalendarCategories,
-  ensureCategoryVisible,
+  ensureSourceVisible,
   flattenCategories,
-  isCategoryVisible,
-  setActiveCategory,
+  isSourceVisible,
+  setActiveList,
   setFocusColor,
-  toggleCategoryVisibility,
   toggleShowCompleted,
-  updatePersonalCategory,
+  toggleSourceVisibility,
   useCalendarCategoryState,
   type CalendarCategory,
 } from "../lib/calendarCategories";
+import { inboxListId } from "../domain/spaces/membership";
+import { LIST_COLOR_PRESETS } from "../domain/tasks/listColor";
 import {
   DAY_END,
   TIME_SNAP_MINUTES,
@@ -85,6 +86,16 @@ type PopoverState =
 
 interface CalendarViewProps {
   tasks: Task[];
+  /**
+   * What a task block is coloured by
+   * (CALENDAR_COLOR_SOURCE_AND_VIEW_OPTIONS_DESIGN.md §3).
+   *
+   * The colour used to come from a calendar-only `categoryId` that only three
+   * controls inside this screen could set, so every task made in the Tasks
+   * module came out the same colour. It reads the List now, which is a
+   * decision the user already makes.
+   */
+  lists: List[];
   externalCalendars: ExternalCalendar[];
   externalCalendarEvents: ExternalCalendarEvent[];
   focusSessions: FocusSession[];
@@ -120,6 +131,10 @@ interface CalendarViewProps {
    * the series instead of rolling it to the next occurrence.
    */
   onToggleTaskDone?: (taskId: string) => void;
+  /** Recolouring a List from the calendar's left column (design §4). */
+  onUpdateList?: (listId: string, patch: Partial<List>) => void;
+  /** Changing a block's colour now means moving the task (design §5.1). */
+  onMoveTaskToList?: (taskId: string, listId: string) => void;
   showToast?: (toast: ToastState) => void;
 }
 
@@ -129,6 +144,7 @@ function pad(value: number) {
 
 export function CalendarView({
   tasks,
+  lists,
   externalCalendars,
   externalCalendarEvents,
   focusSessions,
@@ -139,6 +155,8 @@ export function CalendarView({
   onDeleteTask,
   onOpenTask,
   onToggleTaskDone,
+  onUpdateList,
+  onMoveTaskToList,
   showToast,
 }: CalendarViewProps) {
   const { t, lang } = useT();
@@ -194,32 +212,35 @@ export function CalendarView({
   const today = todayValue();
   const anchorDate = new Date(`${anchor}T00:00:00`);
 
-  // Category spec §15: groups/categories derived from stored personal
-  // categories + external calendars.
+  // The left column's rows: the account's Lists, the subscribed calendars, and
+  // the focus recording (COLOR_SOURCE design §4).
   const categoryState = useCalendarCategoryState();
   const categoryGroups = useMemo(
     () =>
       buildCalendarCategories({
         state: categoryState,
+        lists,
         externalCalendars,
         focusCategoryName: t("calendar.focusActualCategory"),
       }),
-    [categoryState, externalCalendars, t],
+    [categoryState, lists, externalCalendars, t],
   );
   const categoriesById = useMemo(() => flattenCategories(categoryGroups), [categoryGroups]);
-  const defaultCategoryId = categoryState.defaultCategoryId;
-  // Invalid persisted ids fall back to the default category (§15.6).
-  const activeCategoryId = categoriesById.has(categoryState.activeCategoryId)
-    ? categoryState.activeCategoryId
+  // Where a task made on the calendar goes when nothing else says. The Inbox is
+  // where an unfiled task lands everywhere else in the app, so it is also the
+  // answer for a stored List that has since been archived or deleted.
+  const defaultCategoryId = useMemo(() => inboxListId(lists), [lists]);
+  const activeCategoryId = categoriesById.has(categoryState.activeListId)
+    ? categoryState.activeListId
     : defaultCategoryId;
   const visibleCategoryIds = useMemo(
     () =>
       new Set(
         [...categoriesById.keys()].filter((id) =>
-          isCategoryVisible(id, categoryState.hiddenCategoryIds, externalCalendars),
+          isSourceVisible(id, categoryState.hiddenSourceIds, externalCalendars),
         ),
       ),
-    [categoriesById, categoryState.hiddenCategoryIds, externalCalendars],
+    [categoriesById, categoryState.hiddenSourceIds, externalCalendars],
   );
   /**
    * What the grid draws (CALENDAR_TASK_CHECKBOX_DESIGN.md §1).
@@ -255,6 +276,7 @@ export function CalendarView({
     () =>
       buildCalendarItems({
         tasks,
+        lists,
         focusSessions,
         externalCalendars,
         externalCalendarEvents,
@@ -266,6 +288,7 @@ export function CalendarView({
       }),
     [
       tasks,
+      lists,
       focusSessions,
       externalCalendars,
       externalCalendarEvents,
@@ -427,8 +450,8 @@ export function CalendarView({
       showToast?.({ message: t("calendar.readOnlyCategoryToast") });
       return;
     }
-    ensureCategoryVisible(category.id);
-    setActiveCategory(category.id);
+    ensureSourceVisible(category.id);
+    setActiveList(category.id);
   }
 
   // §16.2: checkbox only flips visibility — never the active category.
@@ -439,15 +462,27 @@ export function CalendarView({
       if (calendar) onUpdateExternalCalendar(calendar.id, { visible: !calendar.visible });
       return;
     }
-    toggleCategoryVisibility(category.id);
+    toggleSourceVisibility(category.id);
   }
 
-  // Sidebar inline recolor: same write-back targets as the settings modal —
-  // derived categories mutate their source entity so nothing drifts.
+  /**
+   * Sidebar inline recolour. Every row writes back to whatever owns it, so the
+   * colour here and the colour on that thing's own screen cannot drift.
+   *
+   * A List stores its colour as a preset KEY when the swatch is one of the
+   * eight, and a hex otherwise (`domain/tasks/listColor`). Storing the hex for
+   * a preset would work — `parseListColor` reads it — but it would come back
+   * as a "custom" colour in the Tasks picker, with no swatch selected.
+   */
   function handleRecolorCategory(category: CalendarCategory, color: string) {
-    if (category.group === "personal") updatePersonalCategory(category.id, { color });
-    else if (category.group === "external" && category.sourceId) onUpdateExternalCalendar(category.sourceId, { color });
-    else if (category.group === "focus") setFocusColor(color);
+    if (category.group === "personal") {
+      const preset = LIST_COLOR_PRESETS.find((entry) => entry.hex === color.toLowerCase());
+      onUpdateList?.(category.id, { color: preset ? preset.key : color });
+    } else if (category.group === "external" && category.sourceId) {
+      onUpdateExternalCalendar(category.sourceId, { color });
+    } else if (category.group === "focus") {
+      setFocusColor(color);
+    }
   }
 
   function handleDragStart(event: DragEvent, taskId: string) {
@@ -676,12 +711,12 @@ export function CalendarView({
   function handleClickItem(item: CalendarItem, anchor: PopoverAnchor) {
     setDraft(null);
     setDraftAnchor(null);
-    // §16.5: clicking an event highlights its category in the sidebar and
-    // makes it the default for the next new event (readOnly ones excluded).
+    // §16.5: clicking an event highlights its row in the left column and makes
+    // it the default for the next new one (read-only sources excluded).
     const itemCategory = item.categoryId ? categoriesById.get(item.categoryId) : undefined;
     if (itemCategory && !itemCategory.isReadOnly) {
-      setActiveCategory(itemCategory.id);
-      ensureCategoryVisible(itemCategory.id);
+      setActiveList(itemCategory.id);
+      ensureSourceVisible(itemCategory.id);
     }
     setSelected(item);
     // A task opens the app's Detail beside the block (§5); everything else —
@@ -728,11 +763,11 @@ export function CalendarView({
       title: result.title,
       status: LIFECYCLE.open,
       ...scheduleToTaskPatch(scheduleFor(result.date, result.startTime, result.endTime)),
-      categoryId: result.categoryId,
+      listId: result.categoryId,
     });
     // §16.4: creating in a category re-shows it and keeps it active.
-    ensureCategoryVisible(result.categoryId);
-    setActiveCategory(result.categoryId);
+    ensureSourceVisible(result.categoryId);
+    setActiveList(result.categoryId);
     setQuickCreate(null);
   }
 
@@ -776,10 +811,10 @@ export function CalendarView({
         reminders: [],
         repeat: "none",
       }),
-      categoryId: result.categoryId,
+      listId: result.categoryId,
     });
-    ensureCategoryVisible(result.categoryId);
-    setActiveCategory(result.categoryId);
+    ensureSourceVisible(result.categoryId);
+    setActiveList(result.categoryId);
     setDraft(null);
     setDraftAnchor(null);
     showToast?.({ message: t("calendar.createdToast", { title: result.title }) });
@@ -787,15 +822,22 @@ export function CalendarView({
 
   // §13.3: changing an event's category from the popover updates the task,
   // recolors the block, and moves the sidebar highlight.
-  function handleChangeItemCategory(item: CalendarItem, categoryId: string) {
-    const category = categoriesById.get(categoryId);
+  /**
+   * Moving a task to another List from the calendar (design §5.1).
+   *
+   * This wrote `task.categoryId` — a field only this screen could set, and
+   * which nothing reads any more. Moving the task is what changing its colour
+   * actually means now, and it is the same move the Tasks module makes.
+   */
+  function handleChangeItemCategory(item: CalendarItem, listId: string) {
+    const category = categoriesById.get(listId);
     if (!category || category.isReadOnly) {
       showToast?.({ message: t("calendar.readOnlyCategoryToast") });
       return;
     }
-    onUpdateTask(item.sourceId, { categoryId });
-    setActiveCategory(categoryId);
-    ensureCategoryVisible(categoryId);
+    onMoveTaskToList?.(item.sourceId, listId);
+    setActiveList(listId);
+    ensureSourceVisible(listId);
     setPopover(null);
   }
 

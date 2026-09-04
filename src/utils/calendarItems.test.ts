@@ -3,7 +3,7 @@
 // no test at all, so "the refactor changed nothing" was not a claim anyone
 // could check. These pin the answers first; the move has to leave them alone.
 import { describe, expect, it } from "vitest";
-import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, Project, Task } from "../types";
+import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Project, Task } from "../types";
 import { buildCalendarItems, defaultCalendarLayers, splitFocusSegmentByDay } from "./calendarItems";
 
 const NOW = "2026-08-15T00:00:00.000Z";
@@ -166,12 +166,44 @@ describe("task chips", () => {
     expect(items.every((item) => item.repeating)).toBe(true);
   });
 
-  // The colour came from the task's Project when no category map was given.
-  // Projects are gone; the layer's own tone is the fallback now.
-  it("falls back to the task layer's colour when there is no category map", () => {
+  // The colour has moved twice. It came from the task's Project, then from a
+  // calendar-only category, and is the task's LIST now
+  // (CALENDAR_COLOR_SOURCE_AND_VIEW_OPTIONS_DESIGN.md §3). A caller that
+  // passes no Lists — the AI context builder, which draws nothing — leaves
+  // every task unresolvable, and an unresolvable List is neutral rather than
+  // a guess (`colorForList`).
+  it("is neutral for a task whose List cannot be resolved", () => {
     const items = build({ tasks: [task({ dueDate: "2026-08-17" })] });
-    expect(items[0].color).toBe("#0066cc");
+    expect(items[0].color).toBe("#8e8e93");
     expect(items[0].categoryId).toBe("");
+  });
+
+  it("takes the colour of the List the task is in", () => {
+    const list = {
+      id: "list-work",
+      projectId: "",
+      kind: "regular",
+      name: "Work",
+      order: 0,
+      isDefault: false,
+      color: "purple",
+      createdAt: "",
+      updatedAt: "",
+    } as unknown as List;
+    const items = build({
+      tasks: [task({ dueDate: "2026-08-17", listId: "list-work" })],
+      lists: [list],
+    });
+    expect(items[0].color).toBe("#8e4ec6");
+  });
+
+  // §7: the axis is a view option, and the block reads whichever one is on.
+  it("takes the priority colour when asked to colour by priority", () => {
+    const items = build({
+      tasks: [task({ dueDate: "2026-08-17", priority: "high" })],
+      colorBy: "priority",
+    });
+    expect(items[0].color).toBe("#ff3b30");
   });
 });
 
