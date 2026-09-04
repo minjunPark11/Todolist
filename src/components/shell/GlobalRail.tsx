@@ -33,9 +33,9 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { RailNavItem } from "../../app/railNav";
 import { useT } from "../../i18n";
 
-type RailIconName = RailNavItem | "search";
+type RailIconName = RailNavItem | "search" | "sync" | "bell";
 
-function RailIcon({ name }: { name: RailIconName }) {
+export function RailIcon({ name }: { name: RailIconName }) {
   const common = {
     // 28, from §7: the reference's icon fills 70% of its 40px hit area and
     // ours filled 50%, which is what made the Rail read as empty rather than
@@ -87,6 +87,22 @@ function RailIcon({ name }: { name: RailIconName }) {
         <line x1="15.8" y1="15.8" x2="20" y2="20" />
       </>
     ),
+    // Two arrows chasing each other — the shape everything from a browser
+    // reload to a cloud client uses for "bring the two sides level".
+    sync: (
+      <>
+        <path d="M20 11a8 8 0 0 0-13.7-5.3L3 9" />
+        <path d="M4 13a8 8 0 0 0 13.7 5.3L21 15" />
+        <path d="M3 4.5V9h4.5" />
+        <path d="M21 19.5V15h-4.5" />
+      </>
+    ),
+    bell: (
+      <>
+        <path d="M18 8.5a6 6 0 1 0-12 0c0 6-2 7.5-2 7.5h16s-2-1.5-2-7.5" />
+        <path d="M13.7 19.5a2 2 0 0 1-3.4 0" />
+      </>
+    ),
     settings: (
       <>
         <circle cx="12" cy="12" r="3" />
@@ -108,14 +124,26 @@ interface RailButtonProps {
   open?: boolean;
   /** What `open` refers to, for the items that open one (§2.33). */
   haspopup?: "menu" | "dialog";
+  /**
+   * A count worth interrupting for, drawn on the icon
+   * (RAIL_SYNC_AND_NOTIFICATIONS_DESIGN.md §3.3). 0 draws nothing.
+   *
+   * The number is NOT left to the badge alone: `label` carries it too, because
+   * a badge is a picture and a screen reader is owed the fact.
+   */
+  badge?: number;
+  /** Extra class for an item that draws its own state (the sync spinner). */
+  variant?: string;
+  busy?: boolean;
   onClick: () => void;
 }
 
-function RailButton({ label, shortcut, icon, active, open, haspopup, onClick }: RailButtonProps) {
+function RailButton({ label, shortcut, icon, active, open, haspopup, badge, variant, busy, onClick }: RailButtonProps) {
   return (
     <button
       type="button"
-      className={`rail-item${active ? " is-active" : ""}${open ? " is-open" : ""}`}
+      className={`rail-item${active ? " is-active" : ""}${open ? " is-open" : ""}${variant ? ` ${variant}` : ""}`}
+      aria-busy={busy || undefined}
       // §2.30: these are buttons, not links — the destination of Tasks depends
       // on history, so there is no one href to give it.
       aria-label={label}
@@ -125,6 +153,11 @@ function RailButton({ label, shortcut, icon, active, open, haspopup, onClick }: 
       onClick={onClick}
     >
       <RailIcon name={icon} />
+      {badge ? (
+        <span className="rail-badge" aria-hidden="true">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      ) : null}
       <span className="rail-tip" role="tooltip">
         {label}
         {shortcut ? <kbd className="rail-tip-key">{shortcut}</kbd> : null}
@@ -139,6 +172,23 @@ interface GlobalRailProps {
   onOpenSearch: () => void;
   /** §11.24's open-utility state: the button that opened the menu says so. */
   searchOpen: boolean;
+  /**
+   * The sync button, or nothing (F2).
+   *
+   * Absent while the account is local-only: a sync button with no account to
+   * sync to answers a press with silence, and in a column of unlabelled icons
+   * a disabled one cannot explain itself either.
+   */
+  sync?: { state: "idle" | "syncing" | "failed"; onSync: () => void };
+  /**
+   * The bell, rendered whole by whoever owns the panel it opens.
+   *
+   * `PopoverTrigger` draws its own `<button>` and wires `aria-expanded` to the
+   * surface, so the Rail cannot supply that button without the panel's
+   * context. It supplies the space instead, and `RailIcon` above is exported
+   * so what lands here still looks like a Rail item.
+   */
+  notificationSlot?: ReactNode;
 }
 
 export function GlobalRail({
@@ -146,6 +196,8 @@ export function GlobalRail({
   onNavigate,
   onOpenSearch,
   searchOpen,
+  sync,
+  notificationSlot,
 }: GlobalRailProps) {
   const { t } = useT();
 
@@ -198,6 +250,22 @@ export function GlobalRail({
       <div className="rail-spacer" />
 
       <div className="rail-utilities">
+        {sync ? (
+          <RailButton
+            icon="sync"
+            label={
+              sync.state === "syncing"
+                ? t("rail.syncing")
+                : sync.state === "failed"
+                  ? t("rail.syncFailed")
+                  : t("rail.sync")
+            }
+            variant={`rail-sync is-${sync.state}`}
+            busy={sync.state === "syncing"}
+            onClick={sync.onSync}
+          />
+        ) : null}
+        {notificationSlot ?? null}
         <RailButton
           icon="settings"
           label={t("sidebar.settings")}

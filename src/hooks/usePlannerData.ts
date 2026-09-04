@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pushUndo } from "../lib/undoStack";
+import { recordNotification } from "../lib/notificationStore";
+import { translate } from "../i18n";
 import { platform } from "../platform";
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
 import type {
@@ -337,7 +339,22 @@ export function usePlannerData() {
           return;
         }
         console.error("[Supabase] save failed:", error);
-        setSyncError(error instanceof Error ? error.message : "Could not save Supabase data.");
+        const reason = error instanceof Error ? error.message : "Could not save Supabase data.";
+        setSyncError(reason);
+        // §3.2. Only a retry that gave up is worth a notification: a queued
+        // one is going to be uploaded, and telling the user their work failed
+        // when it has not is how someone comes to re-enter it.
+        if (!willRetry) {
+          // The store is device-local and so is the language setting, so the
+          // saved text can be the reader's. `dataRef` and not `data`: this
+          // callback was built once and closed over the first render's state.
+          const lang = dataRef.current.appSettings.language;
+          recordNotification({
+            kind: "syncFailed",
+            title: translate(lang, "notifications.syncFailedTitle"),
+            body: translate(lang, "notifications.syncFailedBody", { reason }),
+          });
+        }
         // A queued retry is a different state from a save that gave up: the
         // edit is still going to be uploaded, and saying "failed" would push
         // the user toward re-entering work that is not lost.
@@ -2199,5 +2216,23 @@ export function usePlannerData() {
     updatePassword,
     uploadLocalDataToSupabase,
     refreshSupabaseData: loadSupabaseData,
+    /**
+     * The Rail's sync button (RAIL_SYNC_AND_NOTIFICATIONS_DESIGN.md §2.2, F1-B).
+     *
+     * Sync has two directions and only one of them is automatic: edits go up
+     * through the save queue, and the account comes down exactly once, at
+     * sign-in. Pressing "sync" and only downloading would pull the account
+     * over edits that had not been sent yet — a race the user created with
+     * their own click, which is not what `reapplyLocalEdits` is there to
+     * absorb. So the upload finishes first.
+     *
+     * A failed upload does not stop the download: the queue keeps its retry,
+     * and refusing to refresh would leave the reader with neither half.
+     */
+    syncNow: async () => {
+      if (!isSupabaseConfigured || !userEmailRef.current) return;
+      await saveQueueRef.current?.drain();
+      await loadSupabaseData();
+    },
   };
 }

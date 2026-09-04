@@ -639,3 +639,222 @@
   outline: 2px solid var(--ff-blue);
   outline-offset: -2px;
 }
+
+/* ============================================================================
+   Rail utilities: sync and the bell
+   (RAIL_SYNC_AND_NOTIFICATIONS_DESIGN.md §2.3, §3.3, §5)
+   ========================================================================== */
+
+/* The bell is a `PopoverTrigger`, which draws its own `<button>` — it wears
+   `.rail-item` rather than being one, so it needs the same box the class
+   assumes it is in. */
+.rail-bell {
+  position: relative;
+}
+
+/* §3.3: unread count. Sits on the icon's top-right, clear of the 40px hit
+   area's edge so it is not clipped by the Rail's 4px side padding. */
+.rail-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--danger, #ff3b30);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  /* The Rail is a dark surface and the badge is a bright dot on it; a hairline
+     of the Rail's own colour keeps the two from bleeding into each other. */
+  border: 1.5px solid var(--bg-rail);
+  pointer-events: none;
+}
+
+/* §2.3. The spin says "working"; the dot says "this did not finish". Neither
+   is the only carrier — the tooltip and `aria-label` say both in words. */
+.rail-sync.is-syncing svg {
+  animation: rail-sync-spin 1.1s linear infinite;
+}
+
+@keyframes rail-sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Reduced motion keeps the state without the movement: dimmed rather than
+   spinning, which still separates "working" from "idle". */
+@media (prefers-reduced-motion: reduce) {
+  .rail-sync.is-syncing svg {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+
+.rail-sync.is-failed::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger, #ff3b30);
+  border: 1.5px solid var(--bg-rail);
+}
+
+/* --- the panel ----------------------------------------------------------- */
+
+.ntf-panel {
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.ntf-body {
+  display: flex;
+  flex-direction: column;
+  /* The list scrolls, the tabs do not: a header that scrolls away takes the
+     way back to the other tab with it. */
+  max-height: min(70vh, 520px);
+}
+
+.ntf-tabs {
+  display: flex;
+  gap: 4px;
+  flex: none;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ntf-tabs button {
+  flex: 1;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ntf-tabs button:hover {
+  background: var(--bg-hover-content);
+}
+
+.ntf-tabs button.is-selected {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.ntf-tabs button:focus-visible {
+  outline: 2px solid var(--ff-focus-ring, var(--accent));
+  outline-offset: -2px;
+}
+
+.ntf-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.ntf-list ol {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* One shape for both kinds of row, whether or not it is pressable — the
+   difference between them is what happens on click, not how they are read. */
+.ntf-row > button,
+.ntf-row > div {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.ntf-row > button {
+  cursor: pointer;
+}
+
+.ntf-row > button:hover {
+  background: var(--bg-hover-content);
+}
+
+.ntf-row > button:focus-visible {
+  outline: 2px solid var(--ff-focus-ring, var(--accent));
+  outline-offset: -2px;
+}
+
+.ntf-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ntf-text {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  /* A reminder's body is a task title and can be long; three lines is enough
+     to recognise it and short enough that one notice cannot fill the panel. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ntf-row time {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A failure is the one kind worth marking: the others are things that went
+   right, and colouring all five would say nothing about any of them. */
+.ntf-row.is-syncFailed .ntf-title,
+.ntf-row.is-calendarFailed .ntf-title {
+  color: var(--danger, #ff3b30);
+}
+
+.ntf-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  text-align: center;
+  padding: 36px 24px;
+}
+
+.ntf-empty strong {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ntf-empty p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  max-width: 30ch;
+}

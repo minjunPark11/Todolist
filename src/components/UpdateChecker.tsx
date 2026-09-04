@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { isTauriRuntime } from "../platform/tauri";
 import { useT } from "../i18n";
+import { recordNotification } from "../lib/notificationStore";
 
 type UpdateState =
   | { phase: "idle" }
@@ -54,6 +55,14 @@ export function UpdateChecker() {
           }
         };
 
+        // §3.2: the banner is dismissible and the check runs once per launch,
+        // so a dismissed update was previously unreachable until the next
+        // start. The bell keeps it.
+        recordNotification({
+          kind: "updateAvailable",
+          title: t("notifications.updateTitle"),
+          body: t("notifications.updateBody", { version: update.version }),
+        });
         setState({
           phase: "available",
           version: update.version,

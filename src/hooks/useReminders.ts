@@ -19,6 +19,7 @@ import {
   type ReminderTaskSource,
 } from "../domain/schedule/reminderQueue";
 import { platform } from "../platform";
+import { recordNotification } from "../lib/notificationStore";
 
 /**
  * How often to look.
@@ -103,6 +104,17 @@ export function useReminders({ tasks, describe, onFallback }: RemindersOptions) 
 
       for (const reminder of due) {
         const { title, body } = latest.current.describe(reminder);
+        // Kept as well as fired (RAIL_SYNC_AND_NOTIFICATIONS_DESIGN.md §3.2).
+        // This poll only runs while the app is open, so a reminder that came
+        // due overnight is one nobody will ever see unless it is written down
+        // — which is the whole reason the bell has something to show.
+        recordNotification({
+          kind: "reminder",
+          title,
+          body,
+          at: new Date().toISOString(),
+          targetId: reminder.taskId,
+        });
         void platform.notify({ title, body }).then((sent) => {
           if (!sent) latest.current.onFallback?.(`${title}: ${body}`);
         });

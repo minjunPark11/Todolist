@@ -54,6 +54,8 @@ import { useDataPortability } from "./app/useDataPortability";
 import { dismissToast, enqueueToast, type QueuedToast } from "./lib/toastQueue";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
 import { popUndo, pushUndo } from "./lib/undoStack";
+import { recordNotification } from "./lib/notificationStore";
+import { NotificationCenter } from "./components/shell/NotificationCenter";
 import { reducedTransition, transitions } from "./motion/transitions";
 import { pageVariants } from "./motion/variants";
 import { useMotionEnabled } from "./motion/reducedMotion";
@@ -795,6 +797,9 @@ export default function App() {
       time: formatFocusDuration(getDisplayedFocusSeconds(session), true),
       title: task?.title || session.title || t("focus.notificationTaskFallback"),
     });
+    // §3.2: kept as well as fired. A session finished while the window was
+    // behind something else left nothing behind before this.
+    recordNotification({ kind: "focusCompleted", title, body, targetId: session.taskId });
     void platform.notify({ title, body }).then((sent) => {
       if (!sent) showToast({ message: `${title}: ${body}` });
     });
@@ -893,6 +898,15 @@ export default function App() {
       }));
     } catch (error) {
       const failedAt = new Date().toISOString();
+      const reason = error instanceof Error ? error.message : "Sync failed";
+      // §3.2: this failure used to live only on the calendar's own row in
+      // Settings, which is a screen nobody is on when a background refresh
+      // fails.
+      recordNotification({
+        kind: "calendarFailed",
+        title: t("notifications.calendarFailedTitle"),
+        body: t("notifications.calendarFailedBody", { name: calendar.name, reason }),
+      });
       saveExternalState((current) => ({
         ...current,
         calendars: current.calendars.map((item) =>
@@ -901,7 +915,7 @@ export default function App() {
                 ...item,
                 syncStatus: "failed",
                 lastAttemptedAt: attemptedAt,
-                lastError: error instanceof Error ? error.message : "Sync failed",
+                lastError: reason,
                 updatedAt: failedAt,
               }
             : item,
@@ -1262,6 +1276,32 @@ export default function App() {
         onNavigate={navigateRail}
         onOpenSearch={openGlobalSearch}
         searchOpen={menuOpen}
+        /* F2: no button at all without an account. A sync control that answers
+           a press with silence is worse than an absent one, and in a column of
+           unlabelled icons a disabled one cannot explain itself. */
+        sync={
+          planner.auth.isSignedIn
+            ? {
+                state:
+                  planner.auth.syncStatus === "sync.syncing"
+                    ? "syncing"
+                    : planner.auth.syncStatus === "sync.syncFailed" || planner.auth.syncStatus === "sync.retrying"
+                      ? "failed"
+                      : "idle",
+                onSync: () => {
+                  void planner.syncNow();
+                },
+              }
+            : undefined
+        }
+        notificationSlot={
+          <NotificationCenter
+            tasks={planner.tasks}
+            checkItems={planner.checkItems}
+            focusSessions={planner.focusSessions}
+            onOpenTask={openTaskOnPage}
+          />
+        }
       />
     );
   }

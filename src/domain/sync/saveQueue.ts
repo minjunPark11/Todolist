@@ -36,6 +36,18 @@ export type SaveQueue<T> = {
    * payload belongs to an account this queue is no longer saving for.
    */
   reset: () => void;
+  /**
+   * Settles when there is nothing left to upload
+   * (RAIL_SYNC_AND_NOTIFICATIONS_DESIGN.md §2.2, F1-B).
+   *
+   * The manual sync button downloads, and downloading on top of unsent edits
+   * is how a user's own click loses their work. So it waits here first.
+   *
+   * `{ ok: false }` when a save failed while draining. The queue still has its
+   * retry scheduled — the caller is told not to keep waiting for it, which is
+   * a different thing from the upload being abandoned.
+   */
+  drain: () => Promise<{ ok: boolean }>;
   readonly isRunning: boolean;
   readonly hasPending: boolean;
 };
@@ -56,6 +68,16 @@ export function createSaveQueue<T>(options: SaveQueueOptions<T>): SaveQueue<T> {
   let hasPending = false;
   let pending: T | undefined;
   let retryDelay = retryDelayMs;
+  // Everyone currently awaiting drain(). Settled together, then dropped: a
+  // waiter that has been answered must not be answered again by the next run.
+  let waiters: Array<(result: { ok: boolean }) => void> = [];
+
+  function settleWaiters(result: { ok: boolean }) {
+    if (waiters.length === 0) return;
+    const current = waiters;
+    waiters = [];
+    for (const resolve of current) resolve(result);
+  }
   // Bumped by reset(). A run started under an older generation may still be in
   // flight; it must not schedule a retry or start the queue's next run.
   let generation = 0;
@@ -75,6 +97,9 @@ export function createSaveQueue<T>(options: SaveQueueOptions<T>): SaveQueue<T> {
         if (startedGeneration !== generation) return;
         retryDelay = retryDelayMs;
         onSettled?.({ ok: true, willRetry: false });
+        // Only once the queue is actually empty: a payload that arrived
+        // mid-flight has not been uploaded yet, so this is not drained.
+        if (!hasPending) settleWaiters({ ok: true });
         run();
       },
       (error: unknown) => {
@@ -87,6 +112,7 @@ export function createSaveQueue<T>(options: SaveQueueOptions<T>): SaveQueue<T> {
           hasPending = true;
         }
         onSettled?.({ ok: false, error, willRetry: true });
+        settleWaiters({ ok: false });
         const delay = retryDelay;
         retryDelay = Math.min(retryDelay * 2, retryMaxDelayMs);
         scheduleRetry(() => {
@@ -110,6 +136,15 @@ export function createSaveQueue<T>(options: SaveQueueOptions<T>): SaveQueue<T> {
       hasPending = false;
       pending = undefined;
       retryDelay = retryDelayMs;
+      // A drain awaiting THIS account's queue must not hang after the account
+      // has gone. Nothing is left to upload, which is what it asked about.
+      settleWaiters({ ok: true });
+    },
+    drain() {
+      if (!running && !hasPending) return Promise.resolve({ ok: true });
+      return new Promise<{ ok: boolean }>((resolve) => {
+        waiters.push(resolve);
+      });
     },
     get isRunning() {
       return running;

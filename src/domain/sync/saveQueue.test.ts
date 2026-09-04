@@ -179,4 +179,96 @@ describe("createSaveQueue", () => {
       { ok: true, willRetry: false },
     ]);
   });
+
+  // What the manual sync button waits on before it downloads
+  // (RAIL_SYNC_AND_NOTIFICATIONS_DESIGN.md §2.2, F1-B): pulling the account
+  // on top of unsent edits is how a user's own click loses their work.
+  describe("drain", () => {
+    it("settles immediately when there is nothing to upload", async () => {
+      const { perform } = deferredPerform();
+      const queue = createSaveQueue({ perform });
+      await expect(queue.drain()).resolves.toEqual({ ok: true });
+    });
+
+    it("waits for the run in flight", async () => {
+      const { calls, perform } = deferredPerform();
+      const queue = createSaveQueue({ perform });
+      queue.request("a");
+
+      let settled = false;
+      const drained = queue.drain().then((result) => {
+        settled = true;
+        return result;
+      });
+      await flush();
+      expect(settled).toBe(false);
+
+      calls[0].resolve();
+      await expect(drained).resolves.toEqual({ ok: true });
+    });
+
+    // The queue coalesces, so a payload that arrived mid-flight has NOT been
+    // uploaded when the first run finishes. Settling there would hand the
+    // caller a false "everything is up".
+    it("keeps waiting for work that arrived mid-flight", async () => {
+      const { calls, perform } = deferredPerform();
+      const queue = createSaveQueue({ perform });
+      queue.request("a");
+
+      let settled = false;
+      const drained = queue.drain().then((result) => {
+        settled = true;
+        return result;
+      });
+      queue.request("b");
+
+      calls[0].resolve();
+      await flush();
+      expect(settled).toBe(false);
+      expect(calls[1].payload).toBe("b");
+
+      calls[1].resolve();
+      await expect(drained).resolves.toEqual({ ok: true });
+    });
+
+    // The retry is still scheduled; the caller is told not to keep waiting on
+    // it, which is not the same as the upload being abandoned.
+    it("reports failure rather than waiting out the backoff", async () => {
+      const { calls, perform } = deferredPerform();
+      const queue = createSaveQueue({ perform, scheduleRetry: () => {} });
+      queue.request("a");
+      const drained = queue.drain();
+
+      calls[0].reject(new Error("offline"));
+      await expect(drained).resolves.toEqual({ ok: false });
+    });
+
+    it("does not hang when the account it was saving for goes away", async () => {
+      const { perform } = deferredPerform();
+      const queue = createSaveQueue({ perform });
+      queue.request("a");
+      const drained = queue.drain();
+      queue.reset();
+      await expect(drained).resolves.toEqual({ ok: true });
+    });
+
+    it("answers a waiter once, not again on the next run", async () => {
+      const { calls, perform } = deferredPerform();
+      const queue = createSaveQueue({ perform });
+      queue.request("a");
+
+      let settlements = 0;
+      void queue.drain().then(() => {
+        settlements += 1;
+      });
+      calls[0].resolve();
+      await flush();
+
+      queue.request("b");
+      calls[1].resolve();
+      await flush();
+
+      expect(settlements).toBe(1);
+    });
+  });
 });
