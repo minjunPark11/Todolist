@@ -824,13 +824,18 @@
   padding: 0 2px 12px;
 }
 
+/* 32, not 34: `--density-control-h` is what a control is tall on this app's
+   grid (§4.86), and `e2e/verticalRhythm` measures every button on every route
+   against it. This one shipped at 34 and took the release with it — CI is red
+   on `/calendar draws a control off the grid`, which is the gate doing exactly
+   what it is for. */
 .gcal-create-btn {
   flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 34px;
+  min-height: var(--density-control-h, 32px);
   padding: 0 12px;
   border: 0;
   border-radius: var(--radius-sm, 8px);
@@ -854,6 +859,18 @@
 .gcal-create-btn span {
   font-size: 15px;
   line-height: 1;
+}
+
+/* Its neighbour, the one that collapses the column. `.gcal-icon-btn` is 28
+   everywhere it appears, and 28 is a section action (§4.87) — a size this
+   button would be entitled to if it sat beside a heading. It sits beside a
+   32px Create instead, so on this row it is a control and takes the control's
+   height. Scoped to the row rather than raised on the class, because the
+   toolbar's icon buttons are still section actions and were never the
+   complaint. */
+.gcal-sidebar-head .gcal-icon-btn {
+  min-width: var(--density-control-h, 32px);
+  min-height: var(--density-control-h, 32px);
 }
 
 /* The collapsed rail holds two buttons now, so it needs to be a column. */
