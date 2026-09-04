@@ -19,6 +19,9 @@ interface CalendarLeftSidebarProps {
   onToggleCategory: (category: CalendarCategory) => void;
   onSelectCategory: (category: CalendarCategory) => void;
   onRecolorCategory: (category: CalendarCategory, color: string) => void;
+  /** Whether finished work stays on the grid (§1, D1-B). */
+  showCompleted: boolean;
+  onToggleShowCompleted: () => void;
   collapsed: boolean;
   onExpand: () => void;
 }
@@ -33,6 +36,8 @@ export function CalendarLeftSidebar({
   onToggleCategory,
   onSelectCategory,
   onRecolorCategory,
+  showCompleted,
+  onToggleShowCompleted,
   collapsed,
   onExpand,
 }: CalendarLeftSidebarProps) {
@@ -171,6 +176,28 @@ export function CalendarLeftSidebar({
           })}
         </div>
       ))}
+
+      {/* What the grid draws, as opposed to whose calendar it comes from
+          (CALENDAR_TASK_CHECKBOX_DESIGN.md §1, D1-B).
+
+          The design put this above the calendar list; it sits below instead,
+          because the comment under it already settled that order — the list is
+          what the sidebar is for. A view switch is not a calendar, so it gets
+          its own heading rather than joining theirs. */}
+      <div className="gcal-sidebar-section">
+        <h3>{t("calendar.viewSection")}</h3>
+        {/* Wears `gcal-cat-row` so the box is the same box the calendars use —
+            it answers the same kind of question and should not look like a
+            different control. `--cat-color` is the only thing it overrides. */}
+        <label className="gcal-cat-row gcal-view-row">
+          <input
+            type="checkbox"
+            checked={showCompleted}
+            onChange={onToggleShowCompleted}
+          />
+          <span className="gcal-cat-name">{t("calendar.layerCompleted")}</span>
+        </label>
+      </div>
 
       {/* The calendar list is what this sidebar is for, so it comes first.
           The mini month is a date jumper — Calendar.app has no such thing in

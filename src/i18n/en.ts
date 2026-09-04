@@ -519,6 +519,12 @@ export const en: Dictionary = {
   "calendar.allDay": "All day",
   "calendar.allDayResize": "Resize all-day area",
   "calendar.group.personal": "My Calendars",
+  // CALENDAR_TASK_CHECKBOX_DESIGN.md §1, §10 — what the grid draws, as
+  // opposed to whose calendar it comes from.
+  "calendar.viewSection": "View",
+  "calendar.layerCompleted": "Completed work",
+  "calendar.checkAria": "Mark {{title}} complete",
+  "calendar.uncheckAria": "Mark {{title}} not complete",
   "calendar.group.project": "Projects",
   "calendar.group.external": "External Calendars",
   "calendar.group.focus": "Activity",

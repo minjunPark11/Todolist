@@ -47,6 +47,17 @@ export interface CalendarCategoryState {
   hiddenCategoryIds: string[];
   // User override for the focus-time category color ("" = FOCUS_ACTUAL_COLOR).
   focusColor: string;
+  /**
+   * Whether finished work stays on the grid
+   * (CALENDAR_TASK_CHECKBOX_DESIGN.md §1, D1-B).
+   *
+   * It lives beside the category toggles because it answers the same question
+   * they do — what is drawn — and the sidebar row that flips it sits with
+   * theirs. Shipped ON: `defaultCalendarLayers.completed` was `false` and
+   * nothing could turn it on, so completing a task emptied its slot and the
+   * `is-done` styling that already existed had never once been on screen.
+   */
+  showCompleted: boolean;
 }
 
 // Shared swatch palette for category recoloring (settings modal + sidebar).

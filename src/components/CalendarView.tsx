@@ -13,6 +13,7 @@ import {
   buildCalendarItems,
   defaultCalendarLayers,
   type CalendarItem,
+  type CalendarLayerToggles,
 } from "../utils/calendarItems";
 import { toDateInputValue } from "../utils/date";
 import {
@@ -23,6 +24,7 @@ import {
   setActiveCategory,
   setFocusColor,
   toggleCategoryVisibility,
+  toggleShowCompleted,
   updatePersonalCategory,
   useCalendarCategoryState,
   type CalendarCategory,
@@ -107,6 +109,17 @@ interface CalendarViewProps {
    * is no Task Detail to open for them.
    */
   onOpenTask?: (taskId: string, anchor?: Rect) => void;
+  /**
+   * Finish a task from a block or a chip
+   * (CALENDAR_TASK_CHECKBOX_DESIGN.md §7).
+   *
+   * This is `planner.toggleTaskDone` and deliberately not `onUpdateTask`
+   * above. The shortcut would write `status` and leave `completedAt` behind
+   * (§12.12 recorded what happens when those two disagree), and it knows
+   * nothing about repeats — ticking a repeating task on the grid would finish
+   * the series instead of rolling it to the next occurrence.
+   */
+  onToggleTaskDone?: (taskId: string) => void;
   showToast?: (toast: ToastState) => void;
 }
 
@@ -125,6 +138,7 @@ export function CalendarView({
   onCreateTask,
   onDeleteTask,
   onOpenTask,
+  onToggleTaskDone,
   showToast,
 }: CalendarViewProps) {
   const { t, lang } = useT();
@@ -207,6 +221,18 @@ export function CalendarView({
       ),
     [categoriesById, categoryState.hiddenCategoryIds, externalCalendars],
   );
+  /**
+   * What the grid draws (CALENDAR_TASK_CHECKBOX_DESIGN.md §1).
+   *
+   * This was `defaultCalendarLayers` written straight into the call below, so
+   * `completed: false` was the whole app's answer and no screen could change
+   * it. Only the completed layer is a setting; the other two stay at their
+   * defaults until something asks otherwise.
+   */
+  const layers = useMemo<CalendarLayerToggles>(
+    () => ({ ...defaultCalendarLayers, completed: categoryState.showCompleted }),
+    [categoryState.showCompleted],
+  );
 
   /**
    * A month either side of the one on screen.
@@ -233,7 +259,7 @@ export function CalendarView({
         externalCalendars,
         externalCalendarEvents,
         externalCalendarRange,
-        layers: defaultCalendarLayers,
+        layers,
         categories: categoriesById,
         defaultCategoryId,
         visibleCategoryIds,
@@ -244,6 +270,7 @@ export function CalendarView({
       externalCalendars,
       externalCalendarEvents,
       externalCalendarRange,
+      layers,
       categoriesById,
       defaultCategoryId,
       visibleCategoryIds,
@@ -814,6 +841,8 @@ export function CalendarView({
           onToggleCategory={handleToggleCategory}
           onSelectCategory={handleSelectCategory}
           onRecolorCategory={handleRecolorCategory}
+          showCompleted={categoryState.showCompleted}
+          onToggleShowCompleted={toggleShowCompleted}
           collapsed={sidebarCollapsed}
           onExpand={() => setSidebarCollapsed(false)}
         />
@@ -856,6 +885,7 @@ export function CalendarView({
                 onLeaveCell={leave}
                 onDropCell={dropCell}
                 onClickItem={handleClickItem}
+                onToggleDone={onToggleTaskDone}
                 onClickCell={(date) => {
                   setPopover(null);
                   setAnchor(date);
@@ -883,6 +913,7 @@ export function CalendarView({
                 onDropTime={dropTime}
                 onDropAllDay={dropAllDay}
                 onClickItem={handleClickItem}
+                onToggleDone={onToggleTaskDone}
                 onClickAllDaySlot={(day) => setQuickCreate({ date: day, allDay: true })}
                 onResizeItem={handleResizeItem}
                 onMoveItem={handleMoveItem}

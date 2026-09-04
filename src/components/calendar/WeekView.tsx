@@ -22,6 +22,9 @@ import { dayHeadFormatter, dayHeadParts } from "../../utils/calendarHeader";
 import { formatClock, formatClockRange, formatHourLabel } from "../../utils/clock";
 import { useHoursAtATime, useTimeFormat } from "../../utils/appPrefs";
 import { blockIsTight, blockShowsTime } from "../../utils/eventBlock";
+import { eventColorVars } from "./eventColorVars";
+import { activateOnKey } from "./blockActivation";
+import { CalendarItemCheck } from "./CalendarItemCheck";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
 import { OverlayScrollbar } from "../common/OverlayScrollbar";
 import { useT } from "../../i18n";
@@ -154,6 +157,15 @@ interface WeekViewProps {
   onDropTime: (event: DragEvent, day: string, startTime: string) => void;
   onDropAllDay: (event: DragEvent, day: string) => void;
   onClickItem: (item: CalendarItem, anchor: PopoverAnchor) => void;
+  /**
+   * Finish a task from the grid (CALENDAR_TASK_CHECKBOX_DESIGN.md §7).
+   *
+   * `planner.toggleTaskDone`, not a `status` patch: it writes `completedAt`
+   * alongside the status, rolls a repeating task to its next occurrence, and
+   * arrives through `setData` so Ctrl+Z picks it up. A shortcut through
+   * `onUpdateTask` would silently drop all three.
+   */
+  onToggleDone?: (taskId: string) => void;
   onClickAllDaySlot: (day: string) => void;
   onResizeItem: (sourceId: string, day: string, startTime: string, endTime: string) => void;
   onMoveItem: (sourceId: string, day: string, startTime: string, endTime: string) => void;
@@ -191,6 +203,7 @@ export function WeekView({
   onDropTime,
   onDropAllDay,
   onClickItem,
+  onToggleDone,
   onClickAllDaySlot,
   onResizeItem,
   onMoveItem,
@@ -683,7 +696,7 @@ export function WeekView({
                 {isMoveTarget && move ? (
                   <span
                     className="gcal-chip gcal-chip-task is-move-preview"
-                    style={{ ["--ev-color"]: move.color } as CSSProperties}
+                    style={eventColorVars(move.color)}
                   >
                     <span className="gcal-chip-label">
                       {move.repeating ? "↺ " : null}
@@ -693,9 +706,10 @@ export function WeekView({
                 ) : null}
                 <AnimatePresence initial={false}>
                 {allDayItems.map((item) => (
-                  <motion.button
+                  <motion.div
                     key={item.key}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     data-calendar-interactive="true"
                     variants={motionEnabled ? calendarBlockVariants : undefined}
                     initial={motionEnabled ? "initial" : false}
@@ -717,14 +731,18 @@ export function WeekView({
                       if (suppressClickRef.current) return;
                       onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
                     }}
-                    style={{ ["--ev-color"]: item.color } as CSSProperties}
+                    onKeyDown={activateOnKey<HTMLDivElement>((event) => {
+                      onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
+                    })}
+                    style={eventColorVars(item.color)}
                   >
+                    <CalendarItemCheck item={item} onToggleDone={onToggleDone} size="chip" />
                     <span className="gcal-chip-label">
                       {item.layer === "external" ? "• " : null}
                       {item.repeating ? "↺ " : null}
                       {item.title}
                     </span>
-                  </motion.button>
+                  </motion.div>
                 ))}
                 </AnimatePresence>
               </MotionDropZone>
@@ -878,7 +896,7 @@ export function WeekView({
                     style={{
                       top: topFor(move.startMin),
                       height: heightFor(move.startMin, move.endMin),
-                      ["--ev-color"]: move.color,
+                      ...eventColorVars(move.color),
                     } as CSSProperties}
                   >
                     <span className="gcal-tb-title">
@@ -921,9 +939,12 @@ export function WeekView({
                   const { col, cols } = overlapLayout.get(item.key) ?? { col: 0, cols: 1 };
                   const widthPct = 100 / cols;
                   return (
-                    <motion.button
+                    <motion.div
                       key={item.key}
-                      type="button"
+                      // §2.1/D2-A: a div, not a button — §4 puts a real
+                      // checkbox inside, and a <button> may not contain one.
+                      role="button"
+                      tabIndex={0}
                       data-calendar-interactive="true"
                       variants={motionEnabled ? calendarBlockVariants : undefined}
                       initial={motionEnabled ? "initial" : false}
@@ -945,6 +966,9 @@ export function WeekView({
                         if (suppressClickRef.current) return;
                         onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
                       }}
+                      onKeyDown={activateOnKey<HTMLDivElement>((event) => {
+                        onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
+                      })}
                       // The category colour is handed to CSS as a variable and
                       // every derived colour — tint, left bar, title and time —
                       // is mixed there. A hard-coded `${color}22` could not vary
@@ -957,24 +981,30 @@ export function WeekView({
                         left: `${col * widthPct}%`,
                         width: cols > 1 ? `calc(${widthPct}% - 2px)` : "100%",
                         zIndex: 10 + col,
-                        ["--ev-color"]: item.color,
+                        ...eventColorVars(item.color),
                       } as CSSProperties}
                     >
-                      <span className="gcal-tb-title">
-                        {item.repeating ? "↺ " : null}
-                        {item.title}
-                      </span>
-                      {/* R1 made the row height follow the window, so a short
-                          event can be shorter than its own two lines. §2.4:
-                          Calendar.app draws the time "only when the block is
-                          tall enough". */}
-                      {blockShowsTime(height) ? (
-                        <span className="gcal-tb-time">
-                          {resize?.key === item.key
-                            ? formatClockRange(minutesToTime(startMin), minutesToTime(endMin), timeFormat, clockLocale)
-                            : formatClockRange(item.startTime, item.endTime, timeFormat, clockLocale)}
+                      {/* §4.1-A: the box is drawn even on a 24px block. The
+                          alternative was "some events cannot be ticked", a
+                          rule with nothing on screen to explain it. */}
+                      <CalendarItemCheck item={item} onToggleDone={onToggleDone} size="block" />
+                      <span className="gcal-tb-text">
+                        <span className="gcal-tb-title">
+                          {item.repeating ? "↺ " : null}
+                          {item.title}
                         </span>
-                      ) : null}
+                        {/* R1 made the row height follow the window, so a short
+                            event can be shorter than its own two lines. §2.4:
+                            Calendar.app draws the time "only when the block is
+                            tall enough". */}
+                        {blockShowsTime(height) ? (
+                          <span className="gcal-tb-time">
+                            {resize?.key === item.key
+                              ? formatClockRange(minutesToTime(startMin), minutesToTime(endMin), timeFormat, clockLocale)
+                              : formatClockRange(item.startTime, item.endTime, timeFormat, clockLocale)}
+                          </span>
+                        ) : null}
+                      </span>
                       {item.draggable ? (
                         <>
                           <span
@@ -999,7 +1029,7 @@ export function WeekView({
                           />
                         </>
                       ) : null}
-                    </motion.button>
+                    </motion.div>
                   );
                   });
                 })()}

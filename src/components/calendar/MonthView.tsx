@@ -6,6 +6,9 @@ import { formatClock } from "../../utils/clock";
 import { useTimeFormat, useWeekStart } from "../../utils/appPrefs";
 import { chipCapFor, MONTH_CELL_MIN_HEIGHT } from "../../utils/monthCell";
 import { anchorFromRect, type PopoverAnchor } from "./EventPopover";
+import { eventColorVars } from "./eventColorVars";
+import { activateOnKey } from "./blockActivation";
+import { CalendarItemCheck } from "./CalendarItemCheck";
 import { useT } from "../../i18n";
 import { MotionDropZone } from "../motion/MotionDropZone";
 import { reducedTransition, transitions } from "../../motion/transitions";
@@ -35,6 +38,15 @@ interface MonthViewProps {
   onLeaveCell: (id: string) => () => void;
   onDropCell: (event: DragEvent, date: string) => void;
   onClickItem: (item: CalendarItem, anchor: PopoverAnchor) => void;
+  /**
+   * Finish a task from the grid (CALENDAR_TASK_CHECKBOX_DESIGN.md §7).
+   *
+   * `planner.toggleTaskDone`, not a `status` patch: it writes `completedAt`
+   * alongside the status, rolls a repeating task to its next occurrence, and
+   * arrives through `setData` so Ctrl+Z picks it up. A shortcut through
+   * `onUpdateTask` would silently drop all three.
+   */
+  onToggleDone?: (taskId: string) => void;
   onClickCell: (date: string) => void;
   onOpenDay: (date: string) => void;
   onShowAgenda: (date: string, anchor: PopoverAnchor) => void;
@@ -50,6 +62,7 @@ export function MonthView({
   onLeaveCell,
   onDropCell,
   onClickItem,
+  onToggleDone,
   onClickCell,
   onOpenDay,
   onShowAgenda,
@@ -114,9 +127,11 @@ export function MonthView({
         <div className="gcal-month-chip-list">
           <AnimatePresence initial={false}>
           {visible.map((item) => (
-            <motion.button
+            <motion.div
               key={item.key}
-              type="button"
+              // §2.1/D2-A — see WeekView: a chip holds a checkbox now.
+              role="button"
+              tabIndex={0}
               variants={motionEnabled ? calendarBlockVariants : undefined}
               initial={motionEnabled ? "initial" : false}
               animate={motionEnabled ? "animate" : undefined}
@@ -143,10 +158,17 @@ export function MonthView({
                 event.stopPropagation();
                 onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
               }}
+              onKeyDown={activateOnKey<HTMLDivElement>((event) => {
+                onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
+              })}
               // Hue now comes from the category for every layer, so the colour
               // is handed to CSS the same way for all of them.
-              style={{ ["--ev-color"]: item.color } as CSSProperties}
+              style={eventColorVars(item.color)}
             >
+              {/* §8: the same box at the month's smaller size. A timed chip
+                  is a dot + title on the cell's own ground (D4/B2), and the
+                  box sits before the dot the way it sits before a pill. */}
+              <CalendarItemCheck item={item} onToggleDone={onToggleDone} size="month" />
               <span className="gcal-chip-label">
                 {layerPrefix(item.layer)}
                 {item.repeating ? "↺ " : null}
@@ -155,7 +177,7 @@ export function MonthView({
               {!item.allDay && item.startTime ? (
                 <span className="gcal-chip-time">{formatClock(item.startTime ?? "", timeFormat, clockLocale)}</span>
               ) : null}
-            </motion.button>
+            </motion.div>
           ))}
           </AnimatePresence>
           {dayItems.length > cap ? (

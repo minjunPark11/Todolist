@@ -203,6 +203,7 @@ export function AppPages({
           onCreateTask={planner.createTask}
           onDeleteTask={requestDeleteTask}
           onOpenTask={onOpenTask}
+          onToggleTaskDone={planner.toggleTaskDone}
           showToast={showToast}
         />
         {/* §5: the Calendar draws the Detail now, so it renders the pane like

@@ -898,3 +898,17 @@
     flex-wrap: wrap;
   }
 }
+
+/* The "Completed work" switch (CALENDAR_TASK_CHECKBOX_DESIGN.md §1, D1-B).
+
+   It borrows `.gcal-cat-row` for the box, because it asks the same kind of
+   question the calendar rows do — what gets drawn. What it is NOT is a
+   calendar, so it takes the app's own accent rather than a category colour,
+   and it has no active state: there is nothing here to file an event under. */
+.gcal-view-row {
+  --cat-color: var(--accent);
+}
+
+.gcal-view-row .gcal-cat-name {
+  color: var(--text-secondary);
+}

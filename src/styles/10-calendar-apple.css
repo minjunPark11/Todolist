@@ -425,3 +425,273 @@
    rail icons keep the sizes their controls were drawn for. Event blocks are
    already Subheadline/Footnote (09-calendar-redesign.css:400) and the 18px
    chip's line height is its height, not its rhythm.                        */
+
+/* ============================================================================
+   D3-D — the strength of the colour says whether the work is still to do
+   (CALENDAR_TASK_CHECKBOX_DESIGN.md §3.4).
+
+   Everything above fills an event with a 14% (light) / 30% (dark) tint of its
+   category colour, which is what the user described as 흐리다: at 14% over
+   white, #0066cc lands on #dbeaf8 — the memory of a colour rather than one.
+
+   The reference they brought fills blocks at full strength. Copying it
+   directly does not work here: with white text fixed, six of the eight
+   palette colours miss 4.5:1, and block text is 11px/10px so the large-text
+   exception is not available (§3.3). What makes the fill viable is choosing
+   the ink per colour, which CSS cannot do — `--ev-ink-auto` arrives from
+   `readableInk.ts` through `eventColorVars.ts`.
+
+   So the fill is spent where it means something. Work still to do is filled;
+   finished work keeps the quiet tint above, and so do the two kinds of block
+   that are not work at all — an external event is someone else's, and a focus
+   recording is time already spent. The tint above is not dead code: it is
+   what all three of those now use.
+   ========================================================================== */
+
+.gcal-time-block:not(.is-done):not(.is-external):not(.is-focus-actual),
+.gcal-move-block:not(.is-done):not(.is-external):not(.is-focus-actual),
+.gcal-chip:not(.is-done):not(.gcal-chip-external):not(.gcal-chip-focus-actual):not(.is-timed) {
+  background: var(--ev-color, var(--accent));
+  color: var(--ev-ink-auto, #ffffff);
+}
+
+/* The 2px bar existed to give a tinted block one edge of the true colour.
+   A filled block IS the colour, so the bar has nothing left to say and would
+   only read as a seam. It stays on everything still drawn as a tint. */
+.gcal-time-block:not(.is-done):not(.is-external):not(.is-focus-actual)::before,
+.gcal-move-block:not(.is-done):not(.is-external):not(.is-focus-actual)::before {
+  display: none;
+}
+
+.gcal-time-block:not(.is-done):not(.is-external):not(.is-focus-actual) {
+  padding-left: 8px;
+}
+
+/* Hover deepens by mixing the block's own ink into its fill — one rule that
+   darkens a light colour and lightens a dark one, so all eight behave the
+   same way without a per-colour table. The tint's `--ev-tint-hover` still
+   serves the quiet blocks. */
+.gcal-time-block:not(.is-done):not(.is-external):not(.is-focus-actual):hover {
+  background: color-mix(in srgb, var(--ev-color, var(--accent)) 90%, var(--ev-ink-auto, #ffffff));
+}
+
+/* The title and the time are the ink, not a mix of the hue — on a filled
+   block the mixed colour is the fill's own hue and disappears into it. */
+.gcal-time-block:not(.is-done):not(.is-external):not(.is-focus-actual) .gcal-tb-title,
+.gcal-time-block:not(.is-done):not(.is-external):not(.is-focus-actual) .gcal-tb-time,
+.gcal-move-block:not(.is-done):not(.is-external):not(.is-focus-actual) .gcal-tb-title,
+.gcal-move-block:not(.is-done):not(.is-external):not(.is-focus-actual) .gcal-tb-time {
+  color: inherit;
+}
+
+/* Month cells keep §B2: a timed item there is a dot and a title on the cell's
+   own ground, so it has no fill to make solid, and filling four of them would
+   rebuild exactly the block of colour B2 removed. Only the all-day pills —
+   which are an occupation of the day — take the fill, via the `:not(.is-timed)`
+   above. */
+
+/* D6 — the block you drag out is the same statement, so it gets the same
+   strength. It was 22% of the accent, which is the pale rectangle in the
+   screenshot; the accent is dark in both themes, so its ink is white. */
+.gcal-draft-block {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.gcal-draft-block .gcal-draft-label,
+.gcal-draft-block .gcal-draft-time {
+  color: inherit;
+}
+
+/* --- D2-A: the blocks are divs now, and a div is not a button -------------
+   `<button>` gave four things away for free that the grid was relying on:
+   `font: inherit` (the UA would otherwise use its own control font, but a div
+   inherits, so that one comes back on its own), a pointer cursor, a focus
+   ring, and no text selection while dragging. The last three are set here.
+
+   `user-select` matters more than it looks: a block is dragged by pointer,
+   and without this a drag across the grid paints a text selection through
+   every title it crosses. `.gcal-time-block` already had it; the chips did
+   not need it while they were buttons.                                     */
+
+.gcal-chip[role="button"],
+.gcal-month-chip[role="button"] {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* The ring the button used to draw. `:focus-visible` so a pointer click does
+   not leave one behind, and an offset so it clears the block's own fill
+   rather than sitting inside it. */
+.gcal-time-block[role="button"]:focus-visible,
+.gcal-chip[role="button"]:focus-visible,
+.gcal-month-chip[role="button"]:focus-visible {
+  outline: 2px solid var(--ff-focus-ring, var(--accent));
+  outline-offset: 2px;
+  /* The grid clips at the column edge, so an outline drawn outside the block
+     would be cut on the left and right. Raising it above its neighbours is
+     what makes it fully visible. */
+  z-index: 30;
+}
+
+/* ============================================================================
+   §4, §5 — the box that finishes a task from the grid
+   ========================================================================== */
+
+/* The block was a column (title over time) and is now a row: box, then the
+   two text lines beside it. `align-items: stretch` is what lets the label
+   below reach the block's full height. */
+.gcal-time-block {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.gcal-tb-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+/* A 15px box is not a finger. The label is the hit area and takes the block's
+   height, the same way `.tm-task-check` takes a row's — 27px wide at the
+   block, narrower on the chips, where the row itself is the touch target. */
+.gcal-check {
+  display: flex;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  justify-content: center;
+  cursor: pointer;
+  /* The block sets `touch-action: none` so a pointer drag moves it. A tap on
+     the box is not a drag, so the box takes its own behaviour back. */
+  touch-action: manipulation;
+}
+
+.gcal-check.is-block { width: 27px; margin-left: -4px; }
+.gcal-check.is-chip { width: 22px; }
+.gcal-check.is-month { width: 18px; }
+
+/* D5-B: the border is `currentColor` — the ink the block already chose. The
+   row's box says the task's PRIORITY in its border, and repeating that here
+   would put two colour systems in one 15px square: the category fill it sits
+   on, and a priority it does not otherwise mention. CALENDAR_APPLE_DESIGN.md
+   §D1 already settled that on this screen colour answers "which calendar",
+   and the layer is read from shape. */
+.gcal-check-box {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  min-height: 0;
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: background var(--motion-fast, 120ms), opacity var(--motion-fast, 120ms);
+}
+
+.gcal-check.is-chip .gcal-check-box { width: 13px; height: 13px; border-radius: 3.5px; }
+.gcal-check.is-month .gcal-check-box { width: 12px; height: 12px; border-radius: 3px; border-width: 1.4px; }
+
+/* State 2: the box answers the hover, the block does not. Two surfaces
+   lighting up together would make it unclear which one the click lands on. */
+.gcal-check:hover .gcal-check-box {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+
+/* State 5. */
+.gcal-check:active .gcal-check-box {
+  background: color-mix(in srgb, currentColor 28%, transparent);
+}
+
+/* State 6: finished work is GREY, whatever colour it was — the same judgement
+   `.tm-check:checked` makes, and for the same reason. The tick is a
+   background image because Firefox draws no pseudo-elements on an `<input>`. */
+.gcal-check-box:checked {
+  opacity: 1;
+  border-color: var(--text-tertiary);
+  background-color: var(--text-tertiary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.8 8.4l2.9 2.9L12.2 5.4' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+}
+
+/* State 8: a ticked box can be un-ticked, and the hover is what says so. */
+.gcal-check-box:checked:hover {
+  border-color: var(--text-secondary);
+  background-color: var(--text-secondary);
+}
+
+/* State 4. `appearance: none` takes the UA's ring with it. */
+.gcal-check-box:focus-visible {
+  outline: 2px solid var(--ff-focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+
+/* Forced colours throw the palette away, and what has to survive is the
+   CONTROL — a border in a colour the mode discarded leaves no box at all. */
+@media (forced-colors: active) {
+  .gcal-check-box {
+    border-color: CanvasText;
+  }
+
+  .gcal-check-box:checked {
+    border-color: Highlight;
+    background-color: Highlight;
+  }
+}
+
+/* The month's timed chip: the box REPLACES the dot rather than joining it.
+
+   Found while implementing §8. `::before` renders ahead of the children, so a
+   box added to a timed chip came out as "● ☐ Jogging" — two marks, 6px apart,
+   in the densest place on the screen. That is the thing §B2 removed the pill
+   for; putting it back one glyph at a time is not an improvement.
+
+   One mark does both jobs. The dot said WHICH CALENDAR by its colour; the box
+   says that with the same colour and also says whether the work is finished.
+   This is the one place the box is not `currentColor` (D5-B) — a timed chip
+   has no fill, so its ink is the cell's own text and would carry no calendar
+   at all. The rule D5-B was protecting is that a block never shows two colour
+   systems at once, and here there is only ever one.
+
+   External events and focus recordings keep their dot and their ring: they
+   take no box, so nothing has replaced anything. */
+.gcal-month-cell .gcal-chip.is-timed.gcal-chip-task::before {
+  display: none;
+}
+
+.gcal-month-cell .gcal-chip.is-timed .gcal-check-box {
+  border-color: var(--ev-color, var(--accent));
+}
+
+.gcal-month-cell .gcal-chip.is-timed .gcal-check-box:checked {
+  border-color: var(--text-tertiary);
+}
+
+/* The two lines each keep their own height and their own line.
+
+   The box took 27px off the text column, and in a narrow week column that was
+   enough to wrap "8:00 AM – 9:00 AM" onto a second line — which then ate the
+   title, because a flex column shrinks its items before it overflows. The
+   block was 44px tall and drew a 3px title.
+
+   `blockShowsTime` decides whether there is room for the time by HEIGHT; the
+   width is the ellipsis's job here, the same way it always was for the
+   title. `flex: none` is what stops one line from paying for the other. */
+.gcal-tb-text > .gcal-tb-title,
+.gcal-tb-text > .gcal-tb-time {
+  flex: none;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

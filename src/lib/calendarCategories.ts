@@ -75,6 +75,10 @@ function sanitizeState(raw: Partial<CalendarCategoryState> | null): CalendarCate
     activeCategoryId: typeof raw?.activeCategoryId === "string" ? raw.activeCategoryId : defaultCategoryId,
     hiddenCategoryIds: Array.isArray(raw?.hiddenCategoryIds) ? raw.hiddenCategoryIds.filter((id): id is string => typeof id === "string") : [],
     focusColor: typeof raw?.focusColor === "string" ? raw.focusColor : "",
+    // Absent means an account that predates the setting, and those accounts
+    // have never seen a finished block. `true` is what the design ships
+    // (§1, D1-B); only an explicit `false` hides them.
+    showCompleted: typeof raw?.showCompleted === "boolean" ? raw.showCompleted : true,
   };
 }
 
@@ -129,6 +133,17 @@ export function toggleCategoryVisibility(categoryId: string) {
       ? state.hiddenCategoryIds.filter((id) => id !== categoryId)
       : [...state.hiddenCategoryIds, categoryId],
   });
+}
+
+/**
+ * Show or hide finished work on the grid (§1, D1-B).
+ *
+ * Not a category — a category answers "whose calendar is this" and this
+ * answers "is it still to do". They share the sidebar and this store because
+ * they share the question underneath both: what gets drawn.
+ */
+export function toggleShowCompleted() {
+  setState({ ...state, showCompleted: !state.showCompleted });
 }
 
 export function addPersonalCategory(name: string, color: string): string {
