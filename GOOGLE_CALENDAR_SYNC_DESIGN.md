@@ -394,7 +394,7 @@ serverless는 이미 쓰는 Vercel 안이다.
 | 4a | 딥링크 수신 경로 (§4.4) | **완료** — `src-tauri/src/main.rs` · `platform/{types,tauri,web}.ts` |
 | 4b | 토큰 테이블 (§4.4.1) | **완료** — `supabase/migrations/017_google_calendar.sql` |
 | 4c | OAuth 엔드포인트 5개 | **완료** — `src/integrations/google/*` · `api/google/*` |
-| 4d | 연결 · 해제 UI, 전용 캘린더 생성 (§4.1) | 4c 배포 확인 후 |
+| 4d | 연결 · 해제 UI, 전용 캘린더 생성 (§4.1) | **완료** — `domain/calendar/googleSync/connectFlow.ts` · `lib/googleCalendar.ts` · `components/calendar/GoogleCalendarCard.tsx` |
 | 5 | `events.insert/patch/delete` 실행기 | |
 | 6 | 실패 시 재시도 — `googleEventId` 없는 레코드를 다음 패스가 집는다 | 3의 `outboundAction`이 이미 답한다 |
 
@@ -446,6 +446,12 @@ https://<supabase-project-ref>.supabase.co/auth/v1/callback
 | `GOOGLE_CLIENT_SECRET` | **비밀 — 빌드에 절대 넣지 않는다** |
 | `GOOGLE_REDIRECT_URI` | `https://todolist-three-gray-92.vercel.app/api/google/callback` |
 | `SUPABASE_SERVICE_ROLE_KEY` | 이미 있다 (`api/calendar/[token].js`가 쓴다) |
+| `APP_URL` | `https://todolist-three-gray-92.vercel.app` |
+
+`APP_URL`은 초안에 없었고, **없으면 웹 연결이 콜백에서 500으로 끝난다.** `callback.ts`가
+돌아갈 주소를 `readAppUrl()`로 읽는데, 그것이 비면 `VERCEL_URL`로 떨어지고 그 값은 배포마다
+바뀌는 일회성 호스트다. 같은 이유로 `/.well-known/oauth-protected-resource`도 MCP 커넥터에게
+매번 다른 `resource`를 광고한다 — 배포 확인 중에 실제로 그렇게 나왔다.
 
 `VITE_GOOGLE_CLIENT_ID`는 **필요 없다.** 동의 URL을 `/api/google/start`가 서버에서
 만들기 때문에 앱은 그 주소로 이동만 하면 된다. `.env`·`release.yml`·GitHub Secrets 세
