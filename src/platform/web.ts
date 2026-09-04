@@ -136,6 +136,17 @@ export const webPlatform: PlatformAdapter = {
     },
   },
 
+  // The web build's OAuth callback is an ordinary redirect back into the page,
+  // so there is no scheme to catch (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.4).
+  deepLink: {
+    async take() {
+      return null;
+    },
+    async subscribe() {
+      return () => undefined;
+    },
+  },
+
   async openExternal(url) {
     window.open(url, "_blank", "noopener,noreferrer");
   },

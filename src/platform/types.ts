@@ -99,4 +99,26 @@ export interface PlatformAdapter {
   };
   openExternal(url: string): Promise<void>;
   backups: PlatformBackups;
+  deepLink: PlatformDeepLink;
+}
+
+/**
+ * `focusflow://` URLs the OS hands this app
+ * (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.4).
+ *
+ * Desktop only. The web build never needs one — its OAuth callback is an
+ * ordinary https redirect back into the page — so `take` answers null and
+ * `subscribe` unsubscribes nothing.
+ *
+ * Note what `subscribe` does NOT deliver: the URL. It fires with no payload,
+ * and the handler is expected to call `take`. One consumption point, because
+ * the same link can arrive by several roads (argv, a single-instance forward,
+ * the platform's own event) and an OAuth code spent twice reads as a failed
+ * connection.
+ */
+export interface PlatformDeepLink {
+  /** The waiting URL, handed over once. Null when there is none. */
+  take(): Promise<string | null>;
+  /** Called when one arrives while the app is already up. Returns an unsubscribe. */
+  subscribe(handler: () => void): Promise<() => void>;
 }

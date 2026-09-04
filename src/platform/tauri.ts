@@ -139,6 +139,20 @@ export const tauriPlatform: PlatformAdapter = {
     },
   },
 
+  // GOOGLE_CALENDAR_SYNC_DESIGN.md §4.4. The URL comes from a Rust command and
+  // not from the event payload: `main.rs` parks it in one slot so that a link
+  // arriving by two roads at once is still consumed once.
+  deepLink: {
+    async take() {
+      return (await invoke<string | null>("take_pending_deep_link")) ?? null;
+    },
+    async subscribe(handler) {
+      return listen("deep-link", () => {
+        handler();
+      });
+    },
+  },
+
   async openExternal(url) {
     await openUrl(url);
   },

@@ -23,3 +23,6 @@ tauri-plugin-process = "2"
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-single-instance = "2"
+# Registers the focusflow:// scheme with the OS so the Google OAuth callback
+# page can hand the result back to this app (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.4).
+tauri-plugin-deep-link = "2"

@@ -39,6 +39,22 @@ struct FocusTrayActionPayload {
 struct AppState {
     focus_snapshot: Mutex<Option<FocusTraySnapshot>>,
     force_quit: Mutex<bool>,
+    /// The last `focusflow://` URL handed to the frontend
+    /// (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.4).
+    ///
+    /// A deep link can reach us by more than one road at once — argv on a cold
+    /// start, argv again through the single-instance forward, and the plugin's
+    /// own `on_open_url` where the platform has one. Delivering the same URL
+    /// twice would make the frontend spend a single-use OAuth code and then
+    /// report the second attempt as a failed connection.
+    last_deep_link: Mutex<Option<String>>,
+    /// The URL waiting for the frontend to come and get it.
+    ///
+    /// A cold start from a link runs `setup` long before any JavaScript has
+    /// subscribed to anything, so an event emitted there lands on an empty
+    /// room. The URL is parked here instead and the frontend drains it on
+    /// mount; the event is only a nudge for the case where it is already up.
+    pending_deep_link: Mutex<Option<String>>,
 }
 
 fn has_active_focus(snapshot: &FocusTraySnapshot) -> bool {
@@ -161,6 +177,60 @@ fn refresh_tray(app: &tauri::AppHandle, snapshot: Option<&FocusTraySnapshot>) {
 
 fn emit_focus_update(app: &tauri::AppHandle, snapshot: Option<&FocusTraySnapshot>) {
     let _ = app.emit("focus-tray-update", snapshot.cloned());
+}
+
+const DEEP_LINK_SCHEME: &str = "focusflow://";
+const DEEP_LINK_EVENT: &str = "deep-link";
+
+/// Hands one `focusflow://` URL to the frontend, at most once
+/// (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.4).
+///
+/// The window is shown first: the user is coming back from a browser where
+/// they just approved something, and an app that finishes the job behind the
+/// browser looks like it did nothing.
+fn deliver_deep_link(app: &tauri::AppHandle, url: &str) {
+    if !url.starts_with(DEEP_LINK_SCHEME) {
+        return;
+    }
+
+    {
+        let state = app.state::<AppState>();
+        let Ok(mut last) = state.last_deep_link.lock() else {
+            return;
+        };
+        if last.as_deref() == Some(url) {
+            return;
+        }
+        *last = Some(url.to_string());
+        if let Ok(mut pending) = state.pending_deep_link.lock() {
+            *pending = Some(url.to_string());
+        };
+    }
+
+    show_main_window(app);
+    // A nudge, not the delivery. The frontend always reads the URL through
+    // `take_pending_deep_link` so there is exactly one place it can be
+    // consumed — an OAuth code spent twice reads as a failed connection.
+    let _ = app.emit(DEEP_LINK_EVENT, ());
+}
+
+/// The URL a deep link brought, handed over once.
+///
+/// Called on mount (for a cold start, where the link arrived before there was
+/// anything listening) and again on the `deep-link` event.
+#[tauri::command]
+fn take_pending_deep_link(state: State<AppState>) -> Option<String> {
+    let mut pending = state.pending_deep_link.lock().ok()?;
+    pending.take()
+}
+
+/// The scheme URL out of a process argument list, if it carries one.
+///
+/// How Windows and Linux deliver a deep link: the OS launches the app with the
+/// URL as an argument. macOS does not — it sends an Apple Event, which is what
+/// the plugin's `on_open_url` is for.
+fn deep_link_from_args<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    args.into_iter().find(|arg| arg.starts_with(DEEP_LINK_SCHEME))
 }
 
 fn show_main_window(app: &tauri::AppHandle) {
@@ -476,15 +546,54 @@ fn main() {
         // a duplicate window whose WebView2 fails to init against the locked
         // user-data dir, showing an empty black window. Instead, focus the
         // existing window and let the second process exit.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            show_main_window(app);
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // A deep link while the app is already running arrives HERE, not in
+            // `setup`: the OS starts a second process with the URL in argv, and
+            // this plugin forwards it before that process exits.
+            match deep_link_from_args(argv) {
+                Some(url) => deliver_deep_link(app, &url),
+                None => show_main_window(app),
+            }
         }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            // Deep links (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.4).
+            //
+            // `register_all` matters in DEVELOPMENT. An installed build gets
+            // the scheme written by the installer from `tauri.conf.json`, but
+            // `tauri dev` never runs one, so without this the browser has
+            // nowhere to send focusflow:// and the OAuth round trip cannot be
+            // tested until release — the same class of gap that made the
+            // Supabase env break only in the installed build (v0.1.4).
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let _ = app.deep_link().register_all();
+
+                let handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    // macOS's only road in. On Windows and Linux this may also
+                    // fire alongside argv, which is what the dedupe in
+                    // `deliver_deep_link` is for.
+                    for url in event.urls() {
+                        deliver_deep_link(&handle, url.as_str());
+                    }
+                });
+            }
+
+            // A COLD start from the link: the app was not running, so no
+            // single-instance forward happens and the URL is simply in our own
+            // argv. Deferred behind the window setup below is not necessary —
+            // the frontend has not subscribed yet either way, which is why the
+            // dedupe slot holds the URL for it to ask for later.
+            if let Some(url) = deep_link_from_args(std::env::args()) {
+                deliver_deep_link(app.handle(), &url);
+            }
+
             let menu = build_tray_menu(app.handle(), None)?;
             #[allow(unused_mut)]
             let mut tray = TrayIconBuilder::with_id(TRAY_ID)
@@ -562,7 +671,8 @@ fn main() {
             get_backups_dir,
             list_backups,
             read_backup,
-            write_backup
+            write_backup,
+            take_pending_deep_link
         ])
         .build(tauri::generate_context!())
         .expect("error while running FocusFlow desktop app")

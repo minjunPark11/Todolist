@@ -17,6 +17,7 @@
     "opener:default",
     "opener:allow-reveal-item-in-dir",
     "updater:default",
-    "process:default"
+    "process:default",
+    "deep-link:default"
   ]
 }
