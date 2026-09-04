@@ -123,6 +123,11 @@ function checkFor(page: Page, title: string) {
   return page.getByLabel(`Mark ${title} complete`, { exact: true });
 }
 
+async function openViewOptions(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "View options" }).click();
+  await expect(page.locator(".gcal-viewopts")).toBeVisible();
+}
+
 test.describe("finishing a task from the grid", () => {
   test.skip(({ viewport }) => (viewport?.width ?? 0) < 1024, "the week grid wants a desktop window");
 
@@ -214,12 +219,61 @@ test.describe("what the grid does with finished work", () => {
     await expect(page.getByLabel("Mark Yoga not complete", { exact: true })).toBeChecked();
   });
 
-  test("and the sidebar switch takes it away again", async ({ page }) => {
+  test("and the View Options switch takes it away again", async ({ page }) => {
     await openCalendar(page);
-    await page.locator(".gcal-view-row input[type='checkbox']").click();
+    await openViewOptions(page);
+    await page.getByRole("checkbox", { name: "Completed work" }).click();
     await expect(blockFor(page, "Yoga")).toHaveCount(0);
     // The open work is untouched — the switch is about finished work only.
     await expect(blockFor(page, "Jogging")).toBeVisible();
+  });
+});
+
+// The `⋯` panel (CALENDAR_COLOR_SOURCE_AND_VIEW_OPTIONS_DESIGN.md §6).
+//
+// Two of these switches were rows in the left column, beside the calendars,
+// which put two different questions under the same kind of checkbox: "whose
+// calendar is this" and "draw this layer at all".
+test.describe("View Options", () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 1024, "the week grid wants a desktop window");
+
+  test("opens from the toolbar and names what it holds", async ({ page }) => {
+    await openCalendar(page);
+    await openViewOptions(page);
+    await expect(page.getByRole("radio", { name: "List" })).toBeChecked();
+    await expect(page.getByRole("radio", { name: "Priority" })).not.toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Completed work" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Focus records" })).toBeChecked();
+  });
+
+  test("colouring by priority repaints the grid", async ({ page }) => {
+    await openCalendar(page);
+    // Every fixture is `none`, so the whole grid goes to one neutral — which
+    // is the point: the axis changed, and the blocks stopped saying which List
+    // they are in.
+    const before = await blockFor(page, "Jogging").evaluate((el) => getComputedStyle(el).backgroundColor);
+    await openViewOptions(page);
+    await page.getByRole("radio", { name: "Priority" }).click();
+    await expect
+      .poll(() => blockFor(page, "Jogging").evaluate((el) => getComputedStyle(el).backgroundColor))
+      .toBe("rgb(142, 142, 147)");
+    expect(before).toBe("rgb(153, 213, 42)");
+  });
+
+  test("keeps its answers on the account, not the device", async ({ page }) => {
+    await openCalendar(page);
+    await openViewOptions(page);
+    await page.getByRole("radio", { name: "Priority" }).click();
+    await page.reload();
+    await expect(page.locator(".gcal-time-block").first()).toBeVisible();
+    // `appSettings`, where the app already keeps `matrixHideCompleted` and
+    // `todayGroupAxis` — not the calendar's own localStorage blob, which does
+    // not follow the reader to another device (§6.3).
+    const stored = await page.evaluate((key) => {
+      const data = JSON.parse(window.localStorage.getItem(key as string) ?? "{}");
+      return data.appSettings?.calendarViewOptions;
+    }, STORAGE_KEY);
+    expect(stored).toMatchObject({ colorBy: "priority" });
   });
 });
 

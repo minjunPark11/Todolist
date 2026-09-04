@@ -1,5 +1,14 @@
 import { DragEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Task, TaskDraft } from "../types";
+import type {
+  AppSettings,
+  CalendarViewOptions,
+  ExternalCalendar,
+  ExternalCalendarEvent,
+  FocusSession,
+  List,
+  Task,
+  TaskDraft,
+} from "../types";
 import {
   addDays,
   addMonths,
@@ -30,6 +39,8 @@ import {
 } from "../lib/calendarCategories";
 import { inboxListId } from "../domain/spaces/membership";
 import { LIST_COLOR_PRESETS } from "../domain/tasks/listColor";
+import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "../domain/calendar/viewOptions";
+import { CalendarViewOptionsMenu } from "./calendar/CalendarViewOptions";
 import {
   DAY_END,
   TIME_SNAP_MINUTES,
@@ -131,6 +142,9 @@ interface CalendarViewProps {
    * the series instead of rolling it to the next occurrence.
    */
   onToggleTaskDone?: (taskId: string) => void;
+  /** Where the `⋯` panel's answers are kept (design §6.3). */
+  appSettings: AppSettings;
+  onUpdateAppSettings?: (patch: Partial<AppSettings>) => void;
   /** Recolouring a List from the calendar's left column (design §4). */
   onUpdateList?: (listId: string, patch: Partial<List>) => void;
   /** Changing a block's colour now means moving the task (design §5.1). */
@@ -155,6 +169,8 @@ export function CalendarView({
   onDeleteTask,
   onOpenTask,
   onToggleTaskDone,
+  appSettings,
+  onUpdateAppSettings,
   onUpdateList,
   onMoveTaskToList,
   showToast,
@@ -215,6 +231,24 @@ export function CalendarView({
   // The left column's rows: the account's Lists, the subscribed calendars, and
   // the focus recording (COLOR_SOURCE design §4).
   const categoryState = useCalendarCategoryState();
+  /**
+   * The `⋯` panel's three answers (design §6).
+   *
+   * `showCompleted` used to live in the calendar's own localStorage blob
+   * (CALENDAR_TASK_CHECKBOX_DESIGN.md D1-B). It is read from there once, for
+   * an account that set it before this release — after which the account's
+   * copy wins and the old one is never consulted again.
+   */
+  const viewOptions = useMemo<CalendarViewOptions>(
+    () => ({
+      ...DEFAULT_CALENDAR_VIEW_OPTIONS,
+      showCompleted: categoryState.showCompleted,
+      ...(appSettings.calendarViewOptions ?? {}),
+    }),
+    [appSettings.calendarViewOptions, categoryState.showCompleted],
+  );
+  const setViewOptions = (patch: Partial<CalendarViewOptions>) =>
+    onUpdateAppSettings?.({ calendarViewOptions: { ...viewOptions, ...patch } });
   const categoryGroups = useMemo(
     () =>
       buildCalendarCategories({
@@ -251,8 +285,12 @@ export function CalendarView({
    * defaults until something asks otherwise.
    */
   const layers = useMemo<CalendarLayerToggles>(
-    () => ({ ...defaultCalendarLayers, completed: categoryState.showCompleted }),
-    [categoryState.showCompleted],
+    () => ({
+      ...defaultCalendarLayers,
+      completed: viewOptions.showCompleted,
+      focusActual: viewOptions.showFocusRecords,
+    }),
+    [viewOptions.showCompleted, viewOptions.showFocusRecords],
   );
 
   /**
@@ -282,6 +320,7 @@ export function CalendarView({
         externalCalendarEvents,
         externalCalendarRange,
         layers,
+        colorBy: viewOptions.colorBy,
         categories: categoriesById,
         defaultCategoryId,
         visibleCategoryIds,
@@ -294,6 +333,7 @@ export function CalendarView({
       externalCalendarEvents,
       externalCalendarRange,
       layers,
+      viewOptions.colorBy,
       categoriesById,
       defaultCategoryId,
       visibleCategoryIds,
@@ -866,6 +906,7 @@ export function CalendarView({
         onCreate={() =>
           setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
         }
+        viewOptions={<CalendarViewOptionsMenu options={viewOptions} onChange={setViewOptions} />}
       />
 
       <div className="gcal-body-container">
@@ -883,8 +924,6 @@ export function CalendarView({
           onToggleCategory={handleToggleCategory}
           onSelectCategory={handleSelectCategory}
           onRecolorCategory={handleRecolorCategory}
-          showCompleted={categoryState.showCompleted}
-          onToggleShowCompleted={toggleShowCompleted}
           collapsed={sidebarCollapsed}
           onExpand={() => setSidebarCollapsed(false)}
         />

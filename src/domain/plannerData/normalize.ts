@@ -61,6 +61,7 @@ import { isTodayGroupAxis } from "../view/todayGroups";
 import { pruneScopeViewOptions, sanitizeScopeViewOptions } from "../view/scopeViewOptions";
 import { sanitizeInboxColumnRules } from "../view/inboxColumnRules";
 import { sanitizeInboxColumnNames } from "../tasks/board";
+import { sanitizeCalendarViewOptions } from "../calendar/viewOptions";
 import { resolveInboxColumns } from "../view/inboxColumns";
 
 // Every value `status` may hold on disk: the three lifecycle values written
@@ -466,6 +467,11 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
       : {}),
     // The list supersedes the two keys above and does not replace them: both
     // are carried, so a build that predates this one still finds what it wrote.
+    // The calendar's View Options, on the same terms as the three above: an
+    // unrecognised value reads as absent, and absent is the shipped default.
+    ...(settings?.calendarViewOptions
+      ? { calendarViewOptions: sanitizeCalendarViewOptions(settings.calendarViewOptions) }
+      : {}),
     ...(Array.isArray(settings?.inboxColumns)
       ? { inboxColumns: resolveInboxColumns(settings.inboxColumns) }
       : {}),

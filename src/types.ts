@@ -570,6 +570,15 @@ export type Language = "ko" | "en";
 export type TimeFormat = "locale" | "12h" | "24h";
 export type WeekStart = "sunday" | "monday";
 
+/** §7: which axis a task block's fill reads. Tag is deliberately absent. */
+export type CalendarColorBy = "list" | "priority";
+
+export interface CalendarViewOptions {
+  colorBy: CalendarColorBy;
+  showCompleted: boolean;
+  showFocusRecords: boolean;
+}
+
 export interface AppSettings {
   theme: ThemeMode;
   accentColor: AccentColor;
@@ -775,6 +784,20 @@ export interface AppSettings {
    * second thing to keep in step with the first.
    */
   inboxColumns?: InboxColumn[];
+  /**
+   * What the calendar draws, and what it reads the colour from
+   * (CALENDAR_COLOR_SOURCE_AND_VIEW_OPTIONS_DESIGN.md §6).
+   *
+   * These sat in two other places before: `showCompleted` in the calendar's
+   * own localStorage blob, and the focus layer as a category-visibility
+   * toggle. Both are view options, and view options live here with
+   * `matrixHideCompleted` and `todayGroupAxis` — which also means they follow
+   * the account to another device, where a localStorage blob does not.
+   *
+   * Absent until somebody opens the panel, like every other optional record
+   * in this settings object.
+   */
+  calendarViewOptions?: CalendarViewOptions;
 }
 
 export type ExternalCalendarSyncStatus = "idle" | "syncing" | "success" | "failed" | "hidden" | "disabled";

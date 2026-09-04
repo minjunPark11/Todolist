@@ -205,6 +205,8 @@ export function AppPages({
           onDeleteTask={requestDeleteTask}
           onOpenTask={onOpenTask}
           onToggleTaskDone={planner.toggleTaskDone}
+          appSettings={appSettings}
+          onUpdateAppSettings={planner.updateAppSettings}
           onUpdateList={planner.updateList}
           onMoveTaskToList={planner.moveTaskToList}
           showToast={showToast}

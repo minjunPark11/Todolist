@@ -1,6 +1,6 @@
 # 색은 리스트가 정하고, 무엇을 그릴지는 한 패널이 정한다
 
-> 상태: **구현 중** · 2026-09-04 (E1 = C · E2 = A · E3 = A · E4 = 아니오 · E5 = A, 사용자 승인)
+> 상태: **구현됨** · 2026-09-04 (E1 = C · E2 = A · E3 = A · E4 = 아니오 · E5 = A, 사용자 승인 — §9.1은 구현하며 알게 된 것)
 > 사용자 결정: **2번** — "색 근거를 List로 + TickTick식 View Options 패널".
 > 대상: `utils/calendarItems.ts` · `components/CalendarView.tsx` ·
 > `components/calendar/{CalendarToolbar,CalendarLeftSidebar,NewTaskForm,QuickCreatePopover,EventPopover,CalendarCategorySettings}.tsx` ·
@@ -350,6 +350,27 @@ calendarViewOptions?: {
 
 1~2만 해도 "왜 전부 같은 파랑인가"는 사라진다. 3~4가 없으면 사이드바가 이제 존재하지
 않는 카테고리를 계속 보여주므로, **3은 2와 같은 릴리스에 나가야 한다.**
+
+---
+
+### 9.1 구현하며 알게 된 것
+
+**`LAYER_COLOR`가 통째로 죽어 있었다.** `task` 항목을 리스트 색으로 바꾸고 나니 남은
+두 항목(`external`·`focus-actual`)을 아무도 읽지 않았다 — 외부 일정은 구독 캘린더의
+`calendar.color`를, 집중 블록은 `focusColor`를 각자 직접 쓰고 있었다. 표 전체를 지웠다.
+
+**`resolveTaskCategoryId`를 안 고치면 색만 바뀌고 필터는 안 바뀐다.** 색은 리스트에서
+오는데 가시성은 여전히 `task.categoryId`로 판단하니, 사이드바에서 리스트를 꺼도 블록이
+남았다. 두 경로가 같은 답을 써야 한다 — 지금은 `item.listId` 하나다.
+
+**빈 소스 id는 "숨김"이 아니라 "분류 못 함"이다.** `categoryAllowed("")`가 `false`를
+반환하면 리스트를 못 찾은 항목이 조용히 사라진다. 분류하지 못한 항목은 격자에 있는
+편이 없는 편보다 낫다 — 명시적으로 통과시킨다.
+
+**개발 중 HMR 잔상에 세 번 속았다.** 필터·완료 토글이 안 먹는 것처럼 보였는데 전부
+전체 새로고침 후에는 정상이었다. 캘린더는 모듈 수준 스토어(`calendarCategories.ts`의
+`let state`)를 쓰고 `useSyncExternalStore`로 읽으므로, 이 파일들을 고친 뒤에는 HMR이
+아니라 새로고침으로 확인할 것.
 
 ---
 

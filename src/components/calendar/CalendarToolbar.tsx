@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useT } from "../../i18n";
 
 type CalendarMode = "month" | "week" | "day" | "year";
@@ -9,6 +10,8 @@ interface CalendarToolbarProps {
   onModeChange: (mode: CalendarMode) => void;
   /** Create lives in the toolbar, not as a block button atop the sidebar. */
   onCreate: () => void;
+  /** The `⋯` panel (design §6). Passed in so the toolbar stays presentational. */
+  viewOptions?: ReactNode;
 }
 
 const MODES: Array<{ id: CalendarMode; labelKey: string }> = [
@@ -24,6 +27,7 @@ export function CalendarToolbar({
   onToggleSidebar,
   onModeChange,
   onCreate,
+  viewOptions,
 }: CalendarToolbarProps) {
   const { t } = useT();
   return (
@@ -64,9 +68,11 @@ export function CalendarToolbar({
           ))}
         </div>
       </div>
-      {/* R2: the segmented control is centred, and centring needs a matching
-          weight on the other side rather than a nudge. */}
-      <div className="gcal-toolbar-spacer" aria-hidden="true" />
+      {/* R2 put an empty spacer here because centring the segmented control
+          needs a matching weight on the other side rather than a nudge. The
+          weight is a real control now (COLOR_SOURCE design §6.1), which is
+          what R2's note was describing the absence of. */}
+      <div className="gcal-toolbar-spacer">{viewOptions}</div>
     </div>
   );
 }

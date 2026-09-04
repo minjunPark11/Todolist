@@ -500,7 +500,12 @@ export const en: Dictionary = {
   "calendar.group.personal": "My Calendars",
   // CALENDAR_TASK_CHECKBOX_DESIGN.md §1, §10 — what the grid draws, as
   // opposed to whose calendar it comes from.
-  "calendar.viewSection": "View",
+  "calendar.viewOptions": "View options",
+  "calendar.colorBy": "Colour by",
+  "calendar.colorBy.list": "List",
+  "calendar.colorBy.priority": "Priority",
+  "calendar.showHeading": "Show",
+  "calendar.layerFocusRecords": "Focus records",
   "calendar.layerCompleted": "Completed work",
   "calendar.checkAria": "Mark {{title}} complete",
   "calendar.uncheckAria": "Mark {{title}} not complete",

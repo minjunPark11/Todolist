@@ -494,7 +494,12 @@ export const ko: Dictionary = {
   "calendar.allDayResize": "종일 영역 크기 조절",
   "calendar.group.personal": "내 캘린더",
   // CALENDAR_TASK_CHECKBOX_DESIGN.md §1, §10
-  "calendar.viewSection": "보기",
+  "calendar.viewOptions": "보기 옵션",
+  "calendar.colorBy": "색 기준",
+  "calendar.colorBy.list": "리스트",
+  "calendar.colorBy.priority": "우선순위",
+  "calendar.showHeading": "표시",
+  "calendar.layerFocusRecords": "집중 기록",
   "calendar.layerCompleted": "완료한 일",
   "calendar.checkAria": "{{title}} 완료로 표시",
   "calendar.uncheckAria": "{{title}} 완료 취소",

@@ -10,11 +10,13 @@
 // TickTick answers this by not having the taxonomy at all: the colour is read
 // from an axis the user already maintains, and which axis is a view option.
 // This is that, with our two axes.
-import type { List, TaskPriority } from "../../types";
+import type { CalendarColorBy, List, TaskPriority } from "../../types";
 import { LIST_COLOR_PRESETS, listColorHex } from "../tasks/listColor";
 
-/** Which axis the fill reads. Tag is deliberately absent — design §7.3. */
-export type CalendarColorBy = "list" | "priority";
+// `CalendarColorBy` is declared in types.ts beside `CalendarViewOptions`, the
+// record that stores it. Re-exported here because this is where the axis is
+// resolved and every caller of `colorForTask` already imports from this file.
+export type { CalendarColorBy };
 
 export const DEFAULT_COLOR_BY: CalendarColorBy = "list";
 

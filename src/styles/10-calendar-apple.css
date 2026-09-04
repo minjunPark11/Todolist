@@ -695,3 +695,81 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ============================================================================
+   The `⋯` panel (CALENDAR_COLOR_SOURCE_AND_VIEW_OPTIONS_DESIGN.md §6)
+
+   Two switches used to sit in the left column beside the calendars, which put
+   two different questions under the same kind of checkbox: "whose calendar is
+   this" and "draw this layer at all". They are here now, with the axis the
+   fill reads.
+   ========================================================================== */
+
+/* R2's spacer held nothing and existed to balance the centred segmented
+   control. It holds the control it was standing in for. */
+.gcal-toolbar-spacer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.gcal-viewopts {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 14px;
+  min-width: 200px;
+}
+
+.gcal-viewopts-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gcal-viewopts-group h4 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* One row shape for both groups: a radio and a checkbox answer different
+   questions, but they are the same size of decision and should not read as
+   two kinds of list. */
+.gcal-viewopts-radio,
+.gcal-viewopts-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 6px;
+  margin: 0 -6px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gcal-viewopts-radio:hover,
+.gcal-viewopts-check:hover {
+  background: var(--bg-hover-content);
+}
+
+.gcal-viewopts-radio input,
+.gcal-viewopts-check input {
+  width: 15px;
+  height: 15px;
+  min-height: 0;
+  flex: none;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.gcal-viewopts-radio input:focus-visible,
+.gcal-viewopts-check input:focus-visible {
+  outline: 2px solid var(--ff-focus-ring, var(--accent));
+  outline-offset: 2px;
+}
