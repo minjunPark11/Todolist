@@ -318,3 +318,102 @@ export function todayColumn(window: TimelineWindow, today: string): number | nul
   const index = columnOf(today, window);
   return index === -1 ? null : index + 1;
 }
+
+/**
+ * Where `at` falls across the window, 0 to 1 — or null when it is outside
+ * (TIMELINE_V2_DESIGN.md §6).
+ *
+ * The column band and the heading's pill both answer "which column is today",
+ * and neither can say where inside it the moment is. The line drawn from this
+ * can, and that is what makes "has this bar been passed?" a glance rather than
+ * a comparison: the bar and the line are placed by the same arithmetic, so a
+ * bar whose end is left of the line is late, exactly.
+ *
+ * Milliseconds, like `placeBar`'s own coordinate — the column index would put
+ * the line on a boundary, which at the hour zoom is up to an hour away from
+ * now and at the month zoom is up to a week.
+ */
+export function windowFraction(window: TimelineWindow, at: number): number | null {
+  const { from, to } = windowBounds(window);
+  if (!Number.isFinite(at) || at < from || at >= to) return null;
+  return (at - from) / (to - from);
+}
+
+// ---------------------------------------------------------------------------
+// What is written inside a bar (TIMELINE_V2_DESIGN.md §4 — I1-B, I9-C)
+//
+// It was the title, and GANTT §11.2 chose that while writing down the reason
+// not to: "라벨 열이 언제나 읽히는 제목이므로, 중복은 반대쪽에서 없앤다." The
+// label column already says the name on every row, so the copy inside the bar
+// was the same word twice — and the one that broke first, because a bar under
+// 80px drops its text and a title is what the reader loses.
+//
+// The bar says what only the bar can say instead: WHEN. Which unit that is in
+// depends on the zoom, because the zoom is what a column already measures.
+// ---------------------------------------------------------------------------
+
+/** `2026-08-31` → `8.31`. Unpadded, as the reference screen writes it. */
+function shortDate(date: string): string {
+  return `${Number(date.slice(5, 7))}.${Number(date.slice(8, 10))}`;
+}
+
+/** En dash with spaces, the range separator the reference uses. */
+const RANGE = " – ";
+
+/**
+ * The line inside a bar.
+ *
+ * `allDay` is passed in rather than looked up: this module is pure and has no
+ * language. The caller hands it `calendar.allDay` — the same word the calendar
+ * puts on its own all-day row, so the two screens say one thing one way.
+ *
+ * At the hour zoom the bar's WIDTH is already the length of the work, and the
+ * clock is the one fact that zoom can show and no other can (`ZOOM_SPEC.day`
+ * says as much). A record with no times fills the window there, and `allDay`
+ * is the only line that explains why — a date would repeat the heading, and
+ * nothing at all would leave the one silent bar in a row of times.
+ *
+ * A span crossing midnight keeps its DATES even at the hour zoom: its two
+ * clock values belong to different days, so `14:00 – 16:00` would describe a
+ * bar that is neither, and the range says why the bar runs off both edges.
+ *
+ * An open end is written as one — `14:00 –` — because that is what the record
+ * holds. `spanBounds` runs such a bar to the end of the day, and a bar labelled
+ * `14:00` alone would read as a moment rather than as the rest of an afternoon.
+ */
+export function barText(span: Span, zoom: TimelineZoom, allDay: string): string {
+  if (columnUnitOf(zoom) === "hour" && span.start === span.end) {
+    if (!span.startTime && !span.endTime) return allDay;
+    if (!span.endTime) return `${span.startTime}${RANGE}`.trimEnd();
+    if (!span.startTime) return `${RANGE}${span.endTime}`.trimStart();
+    return `${span.startTime}${RANGE}${span.endTime}`;
+  }
+  const from = shortDate(span.start);
+  const to = shortDate(span.end);
+  return from === to ? from : `${from}${RANGE}${to}`;
+}
+
+/**
+ * The same line with only its leading half, for a bar too narrow for both.
+ *
+ * §4 said to re-measure the 80px threshold the title used, and measuring is
+ * what produced this: at 12px/600 the widest range — `12.31 – 12.31`, plus the
+ * `✓` a finished bar carries and the 12px of handles — needs 103px, while a
+ * two-hour meeting at the hour zoom is about 40 [실측]. One threshold set
+ * honestly at 104 would take the text off more bars than the old wrong one
+ * did, so there are two, and this is what the middle one says.
+ *
+ * The leading value with an open dash after it: `8.31 –` says the work starts
+ * there and runs on, which the bar's own width then measures. A bare `8.31`
+ * would say the opposite — one day — and that is the one reading a squeezed
+ * label must not produce.
+ */
+export function barTextShort(span: Span, zoom: TimelineZoom, allDay: string): string {
+  const full = barText(span, zoom, allDay);
+  if (columnUnitOf(zoom) === "hour" && span.start === span.end) {
+    // Only the both-times case has a half to drop; `14:00 –` and `종일` are
+    // already as short as they get.
+    return span.startTime && span.endTime ? `${span.startTime}${RANGE}`.trimEnd() : full;
+  }
+  return span.start === span.end ? full : `${shortDate(span.start)}${RANGE}`.trimEnd();
+}

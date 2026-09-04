@@ -90,6 +90,7 @@ import { ListDeleteForeverGate } from "./ListDeleteForeverGate";
 import { TaskRowContent } from "./TaskRowContent";
 import { TaskGanttView } from "../TaskGanttView";
 import { projectItems } from "../../domain/view/item";
+import { colorForList } from "../../domain/calendar/itemColor";
 import { specForSpaceView } from "../../domain/view/spaceViews";
 import { groupRank, type GroupContext, type ViewSpec } from "../../domain/view/viewSpec";
 import { DEFAULT_GROUP_VIEW, groupTasks } from "../../domain/view/viewGroups";
@@ -548,6 +549,24 @@ export function TasksModule(props: TasksModuleProps) {
   const detailWidth = useTaskDetailWidth();
 
   /**
+   * What the Detail opens over, in the one term the registry understands
+   * (BOARD_TASK_POPUP_DESIGN.md §4.1 · TIMELINE_V2_DESIGN.md §2).
+   *
+   * The question is not which view is on screen, it is whether what is on
+   * screen can give up 480px. The list can — its rows reflow. The Board's
+   * columns are `flex: none`, and the timeline's column count is fixed with no
+   * horizontal scroll (D3/D11), so on both of those the width comes out of the
+   * content itself: fewer columns, or fewer days.
+   *
+   * One value, read twice below, because the two readings have to agree. They
+   * were written separately and did not: the timeline got the popup while the
+   * empty column was still reserved beside it, so the grid sat 480px narrow
+   * until a bar was clicked and then jumped WIDER — the opposite of what
+   * reserving a column is for.
+   */
+  const detailSurface = state.view === "list" ? "list" : "board";
+
+  /**
    * Everything a Task can be told to do, and the strip that says what just
    * happened (`hooks/useTaskCommands`).
    *
@@ -807,11 +826,30 @@ export function TasksModule(props: TasksModuleProps) {
           // work the screen is not showing.
           listAxisColumns(scope, rows, { lists }, { defaultList: t("list.defaultName"), inbox: t("tasks.inbox") });
 
-  // The timeline's three arguments, built from the rows the Scope already
-  // chose.
+  /**
+   * The timeline's rows, which are NOT `rows`.
+   *
+   * `rows` is `queryScopeTasks(scope, ctx)`, and that drops finished work
+   * before anything sees it (`scopeQuery.ts` — `isActive`'s last clause). The
+   * Gantt has a `Show completed` switch of its own, so with `rows` underneath
+   * it that switch governed a set the finished tasks had already been removed
+   * from: ticking and unticking it changed nothing, in any Scope. A control
+   * that does nothing is worse than an absent one.
+   *
+   * So the timeline asks for the Scope's finished work too — the same request
+   * the Board makes for its own 완료 column — and `showDone` decides what to do
+   * with it. Only while the timeline is on screen: the extra query is a walk
+   * over every task, and the list and the board have no use for the answer.
+   */
+  const listsById = useMemo(() => new Map(lists.map((entry) => [entry.id, entry])), [lists]);
+  const ganttRows = useMemo(
+    () => (missing || state.view !== "gantt" ? [] : queryScopeTasks(scope, ctx, { finished: true })),
+    [missing, state.view, scope, ctx],
+  );
+  // The timeline's three arguments, built from the rows above.
   const ganttItems = useMemo(
-    () => projectItems({ tasks: rows, lists, today, tags, taskTags }),
-    [rows, lists, today, tags, taskTags],
+    () => projectItems({ tasks: ganttRows, lists, today, tags, taskTags }),
+    [ganttRows, lists, today, tags, taskTags],
   );
   const ganttSpec: ViewSpec = useMemo(
     // The scope is passed empty on purpose: `queryScopeTasks` has already
@@ -1407,7 +1445,15 @@ export function TasksModule(props: TasksModuleProps) {
               return owner ? listDisplayName(owner, t("list.defaultName")) : t("timeline.ungrouped");
             }}
             selectedTaskId={state.taskId}
-            onOpenItem={(item) => openTask(item.sourceId)}
+            /* §2: with the bar's rect, so the Detail opens beside what was
+               clicked. Without it the Task took a column off the right, and on
+               this screen a column off the right is days off the window. */
+            onOpenItem={(item, anchor) => openTask(item.sourceId, anchor)}
+            /* §1: the bars were all one colour because `--bar-color` was read
+               by the stylesheet and set by nobody. The List answers it — the
+               same function the calendar paints its blocks with, so a List is
+               one colour across the app. */
+            barColorOf={(item) => colorForList(listsById.get(item.listId))}
             /* §3.4: through `mutate`, so a drag on the timeline can be
                taken back like everything on the row's menu. It was
                `props.drawer.onUpdate` — a raw patch, no undo. */
@@ -1546,7 +1592,7 @@ export function TasksModule(props: TasksModuleProps) {
        * have had, with the second column clipped at the edge. Opening a Task
        * narrows the Board's viewport instead, which is the same thing that
        * happens when the window is resized and is what its scroll is for. */}
-      {!openedTask && state.view !== "board" && taskDetailPresentationFor(mode) === "inline-drawer" ? (
+      {!openedTask && detailSurface === "list" && taskDetailPresentationFor(mode) === "inline-drawer" ? (
         <aside
           className="tm-drawer is-inline-drawer is-empty"
           aria-label={t("tasks.drawerLabel")}
@@ -1568,8 +1614,14 @@ export function TasksModule(props: TasksModuleProps) {
           /* The one line the Board popup changes (BOARD_TASK_POPUP_DESIGN.md
              §8, step 2). The surface, not the view key: what the registry
              needs to know is whether what is underneath can give up width,
-             and the Board's columns cannot (§4.1). */
-          presentation={taskDetailPresentationFor(mode, state.view === "board" ? "board" : "list")}
+             and the Board's columns cannot (§4.1).
+             The timeline joined it (TIMELINE_V2_DESIGN.md §2) for a stronger
+             version of the same reason: D3/D11 fixed its column count and
+             refused horizontal scrolling, so width taken off the right is not
+             a narrower board — it is fewer days.
+             `detailSurface` rather than the view key, and the same value the
+             empty column above is decided by. */
+          presentation={taskDetailPresentationFor(mode, detailSurface)}
           resize={detailWidth}
           today={today}
           tasks={tasks}

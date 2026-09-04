@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { CATEGORY_COLOR_PALETTE } from "../../lib/calendar/categoryModel";
+import { LIST_COLOR_PRESETS } from "../tasks/listColor";
+import { NEUTRAL_LIST_COLOR } from "./itemColor";
 import {
   BLOCK_INK_DARK,
   BLOCK_INK_LIGHT,
   contrastRatio,
   darkenForWhiteInk,
+  DARK_INK_TARGET,
   readableInkOn,
   relativeLuminance,
+  tintForDarkInk,
   WHITE_INK_TARGET,
 } from "./readableInk";
 
@@ -137,5 +141,66 @@ describe("making a colour safe for white text", () => {
   it("hands back a colour it cannot read, for the ink rule to deal with", () => {
     expect(darkenForWhiteInk("rebeccapurple")).toBe("rebeccapurple");
     expect(darkenForWhiteInk("")).toBe("");
+  });
+});
+
+// The other direction (TIMELINE_V2_DESIGN.md §5, I2-C). The timeline tints
+// instead of filling, so the guarantee it needs is the mirror of the one
+// above: dark text on a pale version of the same colour.
+describe("tinting a colour for dark ink", () => {
+  // Every colour a timeline bar can be: the eight a List can be given, plus
+  // the grey the Inbox and an unknown List fall back to.
+  const LIST_COLORS = [...LIST_COLOR_PRESETS.map((preset) => preset.hex), NEUTRAL_LIST_COLOR];
+
+  /** Which channel is the largest — a coarse stand-in for "the same hue". */
+  function dominant(hex: string): number {
+    const channels = [hex.slice(1, 3), hex.slice(3, 5), hex.slice(5, 7)].map((pair) =>
+      Number.parseInt(pair, 16),
+    );
+    return channels.indexOf(Math.max(...channels));
+  }
+
+  it("clears 4.5:1 under dark ink for every List colour", () => {
+    for (const color of LIST_COLORS) {
+      const ratio = contrastRatio(tintForDarkInk(color), BLOCK_INK_DARK);
+      expect(ratio, `${color} tinted`).toBeGreaterThanOrEqual(DARK_INK_TARGET);
+    }
+  });
+
+  // The floor alone would not have produced a tint: most of these pass 4.5:1
+  // at the strength their owner picked, so a rule that stopped there would
+  // have left solid bars beside pale ones (the reason §5 sets a lightness).
+  it("is a tint, not the colour it was given", () => {
+    for (const color of LIST_COLORS) {
+      const before = relativeLuminance(color) ?? 0;
+      const after = relativeLuminance(tintForDarkInk(color)) ?? 0;
+      expect(after, `${color} tinted`).toBeGreaterThan(before);
+      // Well clear of the 4.5 floor, which is what makes it read as a tint
+      // rather than as a colour that merely passed.
+      expect(contrastRatio(tintForDarkInk(color), BLOCK_INK_DARK)).toBeGreaterThan(10);
+    }
+  });
+
+  it("keeps the hue, so a List is the same List on both screens", () => {
+    for (const color of LIST_COLORS) {
+      expect(dominant(tintForDarkInk(color)), `${color} tinted`).toBe(dominant(color));
+    }
+  });
+
+  it("changes nothing the second time", () => {
+    for (const color of LIST_COLORS) {
+      const once = tintForDarkInk(color);
+      expect(tintForDarkInk(once)).toBe(once);
+    }
+  });
+
+  it("stops short of white, so the palest colour is still a bar", () => {
+    expect(tintForDarkInk("#ffffff")).not.toBe("#ffffff");
+    expect(relativeLuminance(tintForDarkInk("#ffffff"))).toBeLessThan(1);
+  });
+
+  it("hands back a colour it cannot parse", () => {
+    expect(tintForDarkInk("rebeccapurple")).toBe("rebeccapurple");
+    expect(tintForDarkInk("")).toBe("");
   });
 });

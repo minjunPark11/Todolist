@@ -188,3 +188,76 @@ export function darkenForWhiteInk(hex: string, target = WHITE_INK_TARGET): strin
   // function has a value on every path rather than a bare fallthrough.
   return remember(fromHsl(hue, saturation, 0.02));
 }
+
+// ---------------------------------------------------------------------------
+// Making a colour safe for the OTHER ink (TIMELINE_V2_DESIGN.md §5, I2-C)
+//
+// The timeline paints the same List colours as the calendar and paints them
+// the opposite way round: a pale tint under dark text. The two screens differ
+// because their densities do — a calendar block is stacked among others and
+// has to hold its own edge, while a timeline row has exactly one bar on it and
+// is already separated by the row. Twelve solid bars there lose the quiet the
+// reference screen has.
+//
+// Same trade as `darkenForWhiteInk`, mirrored: only lightness moves, so a List
+// is the same hue on both screens even though one fills it and one tints it.
+// ---------------------------------------------------------------------------
+
+/**
+ * How pale a tint is, as an HSL lightness.
+ *
+ * A fixed lightness rather than "lighten until it clears the target": most of
+ * the eight presets already clear 4.5:1 against dark ink at their own
+ * lightness — a `#0a84ff` bar would come back untouched — and a solid blue bar
+ * beside a pale amber one is not one family of bars, it is two. Lightness is
+ * what makes them read as a set; saturation is what keeps them apart, and this
+ * leaves saturation where its owner put it.
+ */
+export const TINT_LIGHTNESS = 0.9;
+
+/** Stop short of white: a bar the colour of the page has no edge to find. */
+const CEILING = 0.97;
+
+/** 4.5:1. Bar text is 12px, so the large-text exception is not available. */
+export const DARK_INK_TARGET = 4.5;
+
+const tinted = new Map<string, string>();
+
+/**
+ * The same colour, pale enough for dark text.
+ *
+ * The floor is a guarantee, not a hope: the loop keeps lightening while the
+ * candidate is under the target, so a colour that is somehow dark at
+ * `TINT_LIGHTNESS` still comes back readable. For today's palette it passes on
+ * the first candidate, which is the point — the contrast is a bound on the
+ * tint, not the thing that chooses it.
+ *
+ * `Math.max` rather than the constant outright, so a List colour already paler
+ * than the band is not dragged DOWN into it, and so running this twice returns
+ * what it returned the first time.
+ *
+ * A colour this build cannot parse comes back as it arrived, the same way its
+ * sibling does; the stylesheet's own fallback is what draws that bar.
+ */
+export function tintForDarkInk(hex: string, target = DARK_INK_TARGET): string {
+  const cacheKey = `${hex}|${target}`;
+  const cached = tinted.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const remember = (value: string) => {
+    tinted.set(cacheKey, value);
+    return value;
+  };
+
+  const rgb = parseHex(hex);
+  if (!rgb) return remember(hex);
+
+  const [hue, saturation, lightness] = toHsl(rgb);
+  for (let next = Math.max(lightness, TINT_LIGHTNESS); next < CEILING; next += 0.004) {
+    const candidate = fromHsl(hue, saturation, next);
+    if (contrastRatio(candidate, BLOCK_INK_DARK) >= target) return remember(candidate);
+  }
+  // White is 18.9:1 against `#111`, so this is unreachable for any real target.
+  // Here so every path has a value rather than a bare fallthrough.
+  return remember(fromHsl(hue, saturation, CEILING));
+}

@@ -29,6 +29,7 @@ import {
 } from "../domain/view/timeline";
 import { TimelineView, TRAY_DRAG_MIME } from "./TimelineView";
 import { EmptyState } from "./kit";
+import type { Rect } from "../domain/floating";
 import { useT } from "../i18n";
 
 const ZOOMS: TimelineZoom[] = ["day", "week", "month", "halfYear", "year"];
@@ -43,7 +44,10 @@ interface TaskGanttViewProps {
   tasks: Task[];
   groupLabel: (groupId: string) => string;
   selectedTaskId?: string;
-  onOpenItem: (item: Item) => void;
+  /** The bar's rect rides along so the Detail can open beside it (§2). */
+  onOpenItem: (item: Item, anchor?: Rect) => void;
+  /** Passed straight through — the timeline paints, the caller knows Lists. */
+  barColorOf?: (item: Item) => string;
   /**
    * Omit to leave the timeline read-only.
    *
@@ -64,6 +68,7 @@ export function TaskGanttView({
   groupLabel,
   selectedTaskId = "",
   onOpenItem,
+  barColorOf,
   onMutateTask,
 }: TaskGanttViewProps) {
   const { t, lang } = useT();
@@ -193,6 +198,7 @@ export function TaskGanttView({
           columnLabels={columnLabels}
           selectedTaskId={selectedTaskId}
           onOpenItem={onOpenItem}
+          barColorOf={barColorOf}
           onDragItem={onMutateTask ? handleDrag : undefined}
           trayDragging={draggingChip}
           onDropTray={onMutateTask ? handleTrayDrop : undefined}
@@ -257,6 +263,10 @@ export function TaskGanttView({
   );
 }
 
+/** The same names the calendar's month grid uses, so a `일` is a `일`. */
+const WEEKDAYS_KO = ["일", "월", "화", "수", "목", "금", "토"];
+const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 /** Narrow screens get a shorter label, never a shorter window (D11). */
 function columnLabel(edge: string, zoom: TimelineZoom, lang: string): string {
   // The UNIT, not the id (§12): `6개월` and `1년` are both months and label the
@@ -270,6 +280,15 @@ function columnLabel(edge: string, zoom: TimelineZoom, lang: string): string {
   if (unit === "month") {
     return lang === "ko" ? `${Number(edge.slice(5, 7))}월` : edge.slice(0, 7);
   }
-  // Day and week columns are both identified by their first day.
-  return `${edge.slice(5, 7)}.${edge.slice(8, 10)}`;
+  // Day and week columns are both identified by their first day. Unpadded,
+  // like the dates inside the bars (TIMELINE_V2_DESIGN.md §4) — `08.30` and
+  // `8.31 – 9.3` on one screen are two ways of writing one thing.
+  const date = `${Number(edge.slice(5, 7))}.${Number(edge.slice(8, 10))}`;
+  // I7: only a DAY column has a weekday. A week column covers seven of them
+  // and a month column thirty, so naming one would be naming the first and
+  // implying the rest — and it is the week zoom where the reader is deciding
+  // between a Tuesday and a Saturday in the first place.
+  if (unit !== "day") return date;
+  const weekday = new Date(`${edge.slice(0, 10)}T00:00:00`).getDay();
+  return `${date} (${(lang === "ko" ? WEEKDAYS_KO : WEEKDAYS_EN)[weekday]})`;
 }

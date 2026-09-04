@@ -132,25 +132,34 @@ describe("Arrange tasks", () => {
 
 // §4 (phase 3): the drag, and the drop target that belongs to a column
 // rather than to an Item's row.
-// GANTT_TIMELINE_DESIGN.md §11. The title is drawn twice on a row — in the
-// label column and inside the bar — and at the default zoom half the bars are
-// too narrow to hold it. The bar's copy gives way; the tooltip is what a
-// narrow bar has left to say what it is.
-describe("a bar that cannot hold its title", () => {
+// GANTT §11 drew the title twice on a row — in the label column and inside
+// the bar — and TIMELINE_V2_DESIGN.md §4 followed §11.2's own reasoning to the
+// end: the label column is the copy that is always readable, so the bar says
+// the thing only it can say. What a narrow bar gives up is now a date, and the
+// name never leaves the row.
+describe("what a bar says", () => {
   it("names itself in the tooltip, ahead of its dates", () => {
     draw([task({ id: "b1", title: "Project A", startDate: "2026-09-08", dueDate: "2026-09-15" })]);
 
     const bar = document.querySelector(".ff-timeline-bar");
-    // The name first: the dates alone do not say which task this is, and on a
-    // narrow bar they would be all there is.
+    // Full dates here, abbreviated ones inside: the tooltip has room and is
+    // where a reader goes when the bar's own line is not enough.
     expect(bar?.getAttribute("title")).toBe("Project A · 2026-09-08 → 2026-09-15");
   });
 
-  // The hiding itself is a container query on the bar's own width, which jsdom
-  // has no layout to answer — measured in the running app instead (§11.3).
-  it("keeps the text in the DOM for the widths that can show it", () => {
+  // Which of the two is shown is a container query on the bar's own width,
+  // which jsdom has no layout to answer — the thresholds were measured in the
+  // running app (§4). What this asserts is that both forms are there to pick
+  // from, and that the name did not go with the title.
+  it("writes the dates inside, in both the widths it may be given", () => {
     draw([task({ id: "b1", title: "Project A", startDate: "2026-09-08", dueDate: "2026-09-15" })]);
-    expect(document.querySelector(".ff-timeline-bar-text")?.textContent).toContain("Project A");
+
+    const text = document.querySelector(".ff-timeline-bar-text");
+    expect(text?.querySelector(".ff-timeline-bar-long")?.textContent).toBe("9.8 – 9.15");
+    expect(text?.querySelector(".ff-timeline-bar-short")?.textContent).toBe("9.8 –");
+    // The button is what a screen reader lands on, and dates alone would not
+    // say which task it had reached.
+    expect(text?.getAttribute("aria-label")).toBe("Project A · 9.8 – 9.15");
   });
 });
 
@@ -315,5 +324,52 @@ describe("dropping a chip on a day", () => {
   it("does not offer the drag where the view cannot write", () => {
     draw([task({ id: "bare" })]);
     expect(chip().draggable).toBe(false);
+  });
+});
+// The column heads, and the marks that say which one is today
+// (TIMELINE_V2_DESIGN.md §6 · I7). The `today` here is the prop, not the
+// clock, so these hold whenever the suite runs; the line itself is placed from
+// a real clock and is asserted in `e2e/ganttBars.spec.ts`.
+describe("the heading of a column", () => {
+  const labels = () => [...document.querySelectorAll(".ff-timeline-col")].map((col) => col.textContent ?? "");
+  const zoomTo = (value: string) => fireEvent.change(screen.getByRole("combobox"), { target: { value } });
+
+  it("names the weekday where a column IS a day (I7)", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    zoomTo("week");
+
+    // 2026-09-02 is a Wednesday, and the window starts on the day itself.
+    expect(labels()[0]).toBe("9.2 (Wed)");
+    expect(labels()[1]).toBe("9.3 (Thu)");
+  });
+
+  // A week column covers seven weekdays and a month column thirty: naming the
+  // first would be implying the rest.
+  it("says none where a column is a week or a month", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    zoomTo("month");
+    // The week the 2nd falls in, which starts on the Sunday before it.
+    expect(labels()[0]).toBe("8.30");
+
+    zoomTo("halfYear");
+    expect(labels()[0]).toBe("2026-09");
+  });
+
+  it("marks the column today falls in", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    zoomTo("week");
+
+    expect(document.querySelectorAll(".ff-timeline-col.is-today")).toHaveLength(1);
+    expect(document.querySelector(".ff-timeline-col.is-today")?.textContent).toBe("9.2 (Wed)");
+  });
+
+  // A day window is 24 columns of one date: `columnOf` puts today in the first
+  // of them, so a mark there would badge midnight and call it now.
+  it("marks none of them at the hour zoom, where every column is today", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    zoomTo("day");
+
+    expect(labels()[0]).toBe("00");
+    expect(document.querySelectorAll(".ff-timeline-col.is-today")).toHaveLength(0);
   });
 });

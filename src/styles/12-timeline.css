@@ -47,7 +47,21 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* §6, I3 — today is said three ways, and this is the first: a pill around the
+   date in the heading. The same badge the calendar's week view puts on its own
+   date, so the two screens mark the day with one shape.
+   The pill is on the INNER span: the column is a seventh of the track and a
+   pill that wide is a bar, not a badge. */
 .ff-timeline-col.is-today { color: var(--accent); font-weight: 800; }
+.ff-timeline-col-mark {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.ff-timeline-col.is-today .ff-timeline-col-mark {
+  background: var(--accent);
+  color: #fff;
+}
 
 /* The date lanes (TIMELINE_ARRANGE_TASKS_DESIGN.md §4, phase 3).
 
@@ -66,6 +80,37 @@
   /* Above the bars, so the drop is the lane's and not a bar's. Below the
      sticky header's 2, which has to stay readable while aiming. */
   z-index: 1;
+}
+
+/* §6's third mark: one line down the grid at the current moment.
+
+   The pill and the column band both answer "which column is today", and the
+   question this screen exists for is the other one — has this bar been passed?
+   A bar and this line are placed by the same arithmetic (`windowFraction`
+   beside `placeBar`), so an end left of the line is late, exactly.
+
+   It lives in the same absolutely-positioned box the drag lanes use, offset by
+   the label column, and at the same z-index — under the sticky heading, whose
+   opaque background is what stops the line from crossing the dates. */
+.ff-timeline-now {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: calc(var(--timeline-label-width) + 8px);
+  pointer-events: none;
+  z-index: 1;
+}
+.ff-timeline-now-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  /* Centred on the instant rather than starting at it. */
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0.55;
 }
 
 /* Quiet until aimed at. A grid painted with a dozen boxes the moment a drag
@@ -106,6 +151,17 @@
 /* A child is indented only when its parent is on screen (D9) — the mark is
    the whole of the hierarchy shown here; nothing is rolled up or moved. */
 .ff-timeline-label.is-child { padding-left: 16px; }
+/* I6 — which List, before the name. The same 8px round the Tasks sidebar puts
+   beside a List (`.tm-dot`), so a coloured dot means one thing in the app; at
+   full strength, not the bar's tint, because 8px of a 90% lightness is not a
+   colour. */
+.ff-timeline-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bar-color, var(--accent));
+}
 .ff-timeline-child-mark { color: var(--text-tertiary); font-size: 11px; }
 .ff-timeline-label-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ff-timeline-label:hover .ff-timeline-label-text { color: var(--accent); }
@@ -174,11 +230,57 @@
    A container query rather than a media query, because what decides this is
    the BAR's width, and that comes from how many columns the task spans as
    much as from the window. */
+/* The bar is a TINT of its List's colour under dark text
+   (TIMELINE_V2_DESIGN.md §1, §5 — I2-C).
+
+   `--bar-color` was read here and set by nobody, so every bar was drawn in the
+   fallback accent [실측] — twelve blue rectangles where the reference has one
+   colour per List. The row sets it now, and sets `--bar-tint` beside it.
+
+   Pale rather than the calendar's solid fill because the densities differ: a
+   calendar block is stacked among others and has to hold its own edge, while a
+   timeline row carries exactly one bar and is already separated by the row.
+   `tintForDarkInk` guarantees 4.5:1 for the ink below.
+
+   The MARKER keeps the solid fill above — a 14px diamond has no text over it,
+   and at 90% lightness it would read as a hole in the row rather than a date.
+
+   The fallback is a tint too, not the raw accent: a row handed no colour must
+   not come out a dark block with dark text on it. */
 .ff-timeline-bar {
   container-type: inline-size;
+  background: var(--bar-tint, color-mix(in srgb, var(--accent) 16%, var(--surface)));
+  /* `BLOCK_INK_DARK`, which is the ink `tintForDarkInk`'s target is measured
+     against. Two copies of one hex, the same trade `--ev-ink-auto` makes. */
+  color: #111111;
+  /* A pale bar on a pale row needs an edge, and the edge is the colour at
+     strength — which also carries the identity a 90% tint gives away. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bar-color, var(--accent)) 30%, transparent);
 }
 
-@container (max-width: 80px) {
+/* Two thresholds, both measured rather than guessed (§4).
+   At 12px/600 the widest line the bar can hold — `12.31 – 12.31`, plus the
+   `✓` of a finished bar and the 12px the two handles take — is 103px, and the
+   shortest form of the same line is 69. So: the full range above 104, its
+   leading half between there and 72, and nothing below that, where any text
+   would be an ellipsis with one character in front of it.
+   The old single threshold was 80px and was set for a TITLE, which had no
+   predictable width to measure at all — that is what §11 could only guess at
+   and this can compute. */
+.ff-timeline-bar-short {
+  display: none;
+}
+
+@container (max-width: 104px) {
+  .ff-timeline-bar-long {
+    display: none;
+  }
+  .ff-timeline-bar-short {
+    display: inline;
+  }
+}
+
+@container (max-width: 72px) {
   .ff-timeline-bar-text {
     display: none;
   }
@@ -221,8 +323,12 @@
   background: transparent;
   transition: background var(--motion-fast);
 }
+/* The colour, not white: white was a grip on a solid accent, and on a tint it
+   is the bar with a piece missing. */
 .ff-timeline-bar:hover .ff-timeline-handle,
-.ff-timeline-bar:focus-within .ff-timeline-handle { background: rgba(255, 255, 255, 0.55); }
+.ff-timeline-bar:focus-within .ff-timeline-handle {
+  background: color-mix(in srgb, var(--bar-color, var(--accent)) 45%, transparent);
+}
 .ff-timeline-bar.is-inferred:hover .ff-timeline-handle,
 .ff-timeline-bar.is-inferred:focus-within .ff-timeline-handle {
   /* The inferred bar is an outline on the page's own background, so white
@@ -237,9 +343,16 @@
   background: transparent;
   border: 1px dashed var(--bar-color, var(--accent));
   color: var(--text-secondary);
+  /* Its dashes ARE its edge; the tint's ring behind them would draw a second,
+     solid one. */
+  box-shadow: none;
 }
 
-.ff-timeline-bar.is-done,
+/* Quieter, not gone. 0.45 was set when a bar was a solid accent; a tint at
+   0.45 is barely a shape, and finished work is on this grid by default now
+   (D12, and the `Show completed` switch that governs it finally reaches the
+   query). The marker is still solid, so it keeps the old value. */
+.ff-timeline-bar.is-done { opacity: 0.62; }
 .ff-timeline-marker.is-done { opacity: 0.45; }
 .ff-timeline-bar.is-blocked { outline: 2px solid var(--warning); outline-offset: -2px; }
 
@@ -426,4 +539,27 @@
   .tgv-arrange {
     flex-basis: 100%;
   }
+}
+
+/* --- Dark theme ------------------------------------------------------------
+   A 90% tint is a lantern on a dark canvas. Same hue, arrangement inverted:
+   the pale value becomes the INK and the fill is that value held down to the
+   canvas — which is what the calendar does to its own blocks in this theme
+   (10-calendar-apple.css, `--ev-tint: 30%`), so the two screens stay one app.
+   Contrast comes out of the arrangement rather than out of a second table: a
+   24% mix over the canvas is always dark, and the ink is always the pale tint.
+   ========================================================================== */
+/* `:not(.is-inferred)` because that bar is an outline on the page's own
+   ground in either theme, and this rule would fill it back in — it sits at
+   the end of the file, so a tie on specificity goes to it. */
+[data-theme="dark"] .ff-timeline-bar:not(.is-inferred) {
+  /* The fill mixes `--bar-color`, NOT the tint: a 90% lightness holds very
+     little chroma, and a quarter of that over the canvas came out four shades
+     of the same grey [실측]. The colour at strength keeps its hue through the
+     mix, which is the whole point of colouring the bar. */
+  background: color-mix(in srgb, var(--bar-color, var(--accent)) 34%, transparent);
+  /* `--text-primary` for the fallback, not the tint's own fallback: a row with
+     no List colour gets a plain readable bar rather than accent on accent. */
+  color: var(--bar-tint, var(--text-primary));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bar-color, var(--accent)) 55%, transparent);
 }

@@ -4,6 +4,8 @@ import { addDays } from "../../utils/date";
 import { spanBounds } from "./span";
 import {
   alignToZoom,
+  barText,
+  windowFraction,
   columnUnitOf,
   dateAtColumnOffset,
   instantAtColumnOffset,
@@ -253,5 +255,92 @@ describe("spanBounds with times", () => {
   it("falls back to the whole day when the hours are backwards", () => {
     const s = { start: "2026-09-02", end: "2026-09-02", inferredStart: false, startTime: "18:00", endTime: "09:00" };
     expect(spanBounds(s)).toEqual({ from: at("2026-09-02", "00:00"), to: at("2026-09-03", "00:00") });
+  });
+});
+
+// What the bar itself says (TIMELINE_V2_DESIGN.md §4). The title moved out
+// because the label column was already carrying it; these are about the fact
+// that took its place.
+describe("barText", () => {
+  const timed = (start: string, end: string, startTime: string, endTime: string): Span => ({
+    start,
+    end,
+    inferredStart: false,
+    startTime,
+    endTime,
+  });
+
+  it("is one date when the work is one day", () => {
+    expect(barText(span("2026-09-03"), "week", "All day")).toBe("9.3");
+  });
+
+  it("is the range when it is more than one", () => {
+    expect(barText(span("2026-08-31", "2026-09-03"), "week", "All day")).toBe("8.31 – 9.3");
+  });
+
+  // The coarse zooms cut into weeks and months, and none of them can draw a
+  // clock — so they all say what the week zoom says.
+  it("says dates at every zoom above a day", () => {
+    for (const zoom of ["week", "month", "halfYear", "year"] as const) {
+      expect(barText(timed("2026-09-03", "2026-09-03", "14:00", "16:00"), zoom, "All day")).toBe("9.3");
+    }
+  });
+
+  it("says the clock at the hour zoom, where the column is an hour", () => {
+    expect(barText(timed("2026-09-03", "2026-09-03", "14:00", "16:00"), "day", "All day")).toBe(
+      "14:00 – 16:00",
+    );
+  });
+
+  // I9-C. The bar fills all 24 columns, and this is the only line that says
+  // why; a date would repeat the heading the window already carries.
+  it("says all-day for a task with no times, in the caller's language", () => {
+    expect(barText(span("2026-09-03"), "day", "All day")).toBe("All day");
+    expect(barText(span("2026-09-03"), "day", "종일")).toBe("종일");
+  });
+
+  it("writes an open end as an open end", () => {
+    expect(barText(timed("2026-09-03", "2026-09-03", "14:00", ""), "day", "All day")).toBe("14:00 –");
+    expect(barText(timed("2026-09-03", "2026-09-03", "", "16:00"), "day", "All day")).toBe("– 16:00");
+  });
+
+  // Two clock values from two different days describe neither. The range does,
+  // and it also says why the bar runs off both edges of a one-day window.
+  it("falls back to dates at the hour zoom when the span crosses midnight", () => {
+    expect(barText(timed("2026-09-02", "2026-09-03", "22:00", "02:00"), "day", "All day")).toBe(
+      "9.2 – 9.3",
+    );
+  });
+});
+
+// §6's line: where "now" falls across the whole window, not which column it
+// lands in. The pill and the band already answer the column.
+describe("windowFraction", () => {
+  const at = (value: string) => new Date(value).getTime();
+
+  it("is 0 at the window's first instant and just under 1 at its last", () => {
+    const w = timelineWindow("week", "2026-09-07");
+    expect(windowFraction(w, at("2026-09-07T00:00:00"))).toBe(0);
+    expect(windowFraction(w, at("2026-09-13T23:59:00"))).toBeCloseTo(1, 2);
+  });
+
+  it("puts midday of the fourth of seven days near the middle", () => {
+    const w = timelineWindow("week", "2026-09-07");
+    expect(windowFraction(w, at("2026-09-10T12:00:00"))).toBeCloseTo(0.5, 3);
+  });
+
+  // The hour zoom is the reason this reads a clock at all: every column of it
+  // shares one date, so a date-shaped answer would be the same for all 24.
+  it("reads the clock at the hour zoom", () => {
+    const w = timelineWindow("day", "2026-09-07");
+    expect(windowFraction(w, at("2026-09-07T06:00:00"))).toBeCloseTo(0.25, 3);
+    expect(windowFraction(w, at("2026-09-07T18:00:00"))).toBeCloseTo(0.75, 3);
+  });
+
+  it("is null outside the window, so nothing is drawn", () => {
+    const w = timelineWindow("week", "2026-09-07");
+    expect(windowFraction(w, at("2026-09-06T23:59:00"))).toBeNull();
+    expect(windowFraction(w, at("2026-09-14T00:00:00"))).toBeNull();
+    expect(windowFraction(w, Number.NaN)).toBeNull();
   });
 });

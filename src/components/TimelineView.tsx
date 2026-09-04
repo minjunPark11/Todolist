@@ -8,7 +8,7 @@
 // There is no horizontal scrolling and no virtualisation, because the window
 // is a fixed column count and `placeBar` returns grid lines. The whole layout
 // is one CSS Grid per row.
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Project, Task } from "../types";
 import { timelineLinks, type TimelineBadge } from "../domain/view/connectors";
 import { TimelineConnectors } from "./TimelineConnectors";
@@ -16,17 +16,30 @@ import type { Item } from "../domain/view/item";
 import { applyView, type GroupContext, type ViewSpec } from "../domain/view/viewSpec";
 import { spanForItem } from "../domain/view/span";
 import {
+  barText,
+  barTextShort,
   columnOf,
+  columnUnitOf,
   dateAtColumnOffset,
   instantAtColumnOffset,
   type Instant,
   placeBar,
   todayColumn,
+  windowFraction,
   ZOOM_COLUMNS,
   type TimelineWindow,
 } from "../domain/view/timeline";
 import type { SpanDrag } from "../domain/view/board";
 import { useT } from "../i18n";
+import type { Rect } from "../domain/floating";
+import { tintForDarkInk } from "../domain/calendar/readableInk";
+
+/** The floating layer's shape, from whatever was clicked. */
+function rectOf(element: Element | null): Rect | undefined {
+  if (!element) return undefined;
+  const box = element.getBoundingClientRect();
+  return { x: box.left, y: box.top, width: box.width, height: box.height };
+}
 /** Two instants apart, in minutes. Midnight stands in for "no clock". */
 function minutesBetween(from: Instant, to: Instant): number {
   const at = (i: Instant) => new Date(`${i.date}T${i.time || "00:00"}:00`).getTime();
@@ -72,7 +85,29 @@ interface TimelineViewProps {
   /** Column headings, already abbreviated for the viewport (D11). */
   columnLabels: string[];
   selectedTaskId?: string;
-  onOpenItem: (item: Item) => void;
+  /**
+   * Opens the Task, and says where from
+   * (TIMELINE_V2_DESIGN.md §2).
+   *
+   * The rect is the bar's or the label's, and it is what turns the Detail
+   * into a popover beside what was clicked instead of a column taken off the
+   * right. On a timeline that column is not free: D3/D11 fixed the number of
+   * date columns and refused horizontal scrolling, so every pixel the Detail
+   * takes is a narrower day.
+   */
+  onOpenItem: (item: Item, anchor?: Rect) => void;
+  /**
+   * What colour this row belongs to — its List's
+   * (TIMELINE_V2_DESIGN.md §1, §5).
+   *
+   * A function rather than a field on `Item`: `Item` is the projection every
+   * view shares, and which colour to paint a bar is this view's question, not
+   * the projection's. The caller has the Lists; this file does not want them.
+   *
+   * Absent leaves every bar on the accent, which is what the whole screen did
+   * before — `--bar-color` was read by the stylesheet and set by nobody.
+   */
+  barColorOf?: (item: Item) => string;
   /** Absent makes the timeline read-only, which is what P1 shipped. */
   onDragItem?: (item: Item, drag: SpanDrag) => void;
   /**
@@ -98,13 +133,32 @@ export function TimelineView({
   columnLabels,
   selectedTaskId = "",
   onOpenItem,
+  barColorOf,
   onDragItem,
   trayDragging = false,
   onDropTray,
 }: TimelineViewProps) {
   const { t } = useT();
   const columns = ZOOM_COLUMNS[window.zoom];
-  const nowColumn = todayColumn(window, today);
+  /**
+   * Which column carries today's marks — none, at the hour zoom.
+   *
+   * `columnOf` compares dates, and the 24 columns of a day window all share
+   * one: today lands in column 0 and the band and the pill go on `00:00`,
+   * whatever the time is. Marking midnight as "today" on a window that IS
+   * today says nothing and points at the wrong hour; the line (§6) is what
+   * carries the moment on that zoom, and it is placed from a clock.
+   */
+  const nowColumn = columnUnitOf(window.zoom) === "hour" ? null : todayColumn(window, today);
+  /**
+   * Where the line goes (§6, I3).
+   *
+   * Read at render rather than kept on a timer: this is a planning grid, not a
+   * clock, and the nearest thing it draws is a bar a day wide. A ticking
+   * interval would re-render every row of the timeline to move a line by a
+   * pixel an hour.
+   */
+  const nowAt = windowFraction(window, Date.now());
   const [dragKey, setDragKey] = useState("");
   // Which lane the pointer is over, so the reader can see the day before
   // letting go. A drop with no aim is a date chosen by accident.
@@ -188,6 +242,17 @@ export function TimelineView({
         </div>
       ) : null}
 
+      {/* §6, the third of the three: the heading's pill says which column is
+          today and the column's band says it again, but only a line crossing
+          the grid answers the question this screen is for — whether a bar has
+          been passed. It is `aria-hidden` and takes no pointer: everything it
+          says, the bars' own dates say to a reader who cannot see it. */}
+      {nowAt === null ? null : (
+        <div className="ff-timeline-now" aria-hidden="true">
+          <span className="ff-timeline-now-line" style={{ left: `${nowAt * 100}%` }} />
+        </div>
+      )}
+
       <header className="ff-timeline-head">
         <div className="ff-timeline-rowhead" />
         <div className="ff-timeline-columns">
@@ -196,7 +261,9 @@ export function TimelineView({
               key={`${label}-${index}`}
               className={`ff-timeline-col${nowColumn === index + 1 ? " is-today" : ""}`}
             >
-              {label}
+              {/* The label in its own box, because §6's pill is drawn around
+                  the DATE and the cell is a whole column wide. */}
+              <span className="ff-timeline-col-mark">{label}</span>
             </span>
           ))}
         </div>
@@ -216,7 +283,8 @@ export function TimelineView({
               columns={columns}
               nowColumn={nowColumn}
               selected={item.source === "task" && item.sourceId === selectedTaskId}
-              onOpen={() => onOpenItem(item)}
+              onOpen={(anchor) => onOpenItem(item, anchor)}
+              barColor={barColorOf?.(item) ?? ""}
               // Only tasks carry the date fields a drag writes; a goal's
               // schedule is edited where it lives.
               draggable={Boolean(onDragItem) && item.source === "task"}
@@ -242,6 +310,7 @@ function TimelineRowView({
   nowColumn,
   selected,
   onOpen,
+  barColor,
   draggable,
   badges,
   isDragging,
@@ -254,7 +323,8 @@ function TimelineRowView({
   columns: number;
   nowColumn: number | null;
   selected: boolean;
-  onOpen: () => void;
+  onOpen: (anchor?: Rect) => void;
+  barColor: string;
   draggable: boolean;
   badges: TimelineBadge["kind"][];
   isDragging: boolean;
@@ -318,14 +388,33 @@ function TimelineRowView({
   }
 
   return (
-    <div className={`ff-timeline-row${selected ? " is-selected" : ""}`}>
+    <div
+      className={`ff-timeline-row${selected ? " is-selected" : ""}`}
+      /* One declaration for the whole row: the dot beside the name and the bar
+         out on the track are the same List saying so twice.
+
+         Two values because the row paints the colour two ways (§5, I2-C). The
+         bar is a PALE tint under dark text — one bar to a row, so it does not
+         have to shout the way a calendar block stacked among others does — and
+         the dot and the inferred bar's dashed outline are the colour at full
+         strength, because an 8px dot at 90% lightness is not a colour, it is a
+         smudge. */
+      style={
+        barColor
+          ? ({ ["--bar-color"]: barColor, ["--bar-tint"]: tintForDarkInk(barColor) } as CSSProperties)
+          : undefined
+      }
+    >
       <button
         type="button"
         className={`ff-timeline-label${indented ? " is-child" : ""}`}
-        onClick={onOpen}
+        onClick={(event) => onOpen(rectOf(event.currentTarget))}
         title={item.title}
       >
         {indented ? <span className="ff-timeline-child-mark" aria-hidden="true">↳</span> : null}
+        {/* I6: which List, before the name — the Tasks sidebar marks a List
+            with the same dot, so the two screens agree on what a colour is. */}
+        {barColor ? <span className="ff-timeline-dot" aria-hidden="true" /> : null}
         <span className="ff-timeline-label-text">{item.title}</span>
       </button>
 
@@ -412,9 +501,35 @@ function TimelineRowView({
             </span>
           ) : null}
 
-          <button type="button" className="ff-timeline-bar-text" onClick={onOpen}>
+          <button
+            type="button"
+            className="ff-timeline-bar-text"
+            /* The name, which the bar stopped saying out loud (§4). Sighted
+               readers have it one column to the left; a screen reader walking
+               the bars would otherwise hear four dates and no work. */
+            aria-label={`${item.title} · ${barText(span, window.zoom, t("calendar.allDay"))}`}
+            /* The BAR's rect, not the text's: the text is an inset label and a
+               popover hung off it would sit inside the bar it belongs to. */
+            onClick={(event) => onOpen(rectOf(event.currentTarget.closest(".ff-timeline-bar")))}
+          >
             {item.done ? "✓ " : ""}
-            {item.title}
+            {/* WHEN, not what (§4 — I1-B). The name is in the label column on
+                every row, so a title here was the same word twice, and it was
+                the copy that broke first: under 80px the text is dropped and
+                what the reader loses is the name. The dates are the fact only
+                this side of the row holds.
+
+                Both forms are rendered and the container query shows one of
+                them (12-timeline.css). Which one to draw is a question about
+                the BAR's width in pixels, and this component knows the bar as
+                a fraction of a track it never measures — CSS is where that
+                number exists. */}
+            <span className="ff-timeline-bar-long">
+              {barText(span, window.zoom, t("calendar.allDay"))}
+            </span>
+            <span className="ff-timeline-bar-short" aria-hidden="true">
+              {barTextShort(span, window.zoom, t("calendar.allDay"))}
+            </span>
           </button>
 
           {badges.includes("dependent") ? (
