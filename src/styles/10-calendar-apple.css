@@ -773,3 +773,93 @@
   outline: 2px solid var(--ff-focus-ring, var(--accent));
   outline-offset: 2px;
 }
+
+/* ============================================================================
+   V4 layout (CALENDAR_LAYOUT_V4_DESIGN.md)
+
+   The right-hand task panel is gone, the range came back into the toolbar, and
+   Create moved to the top of the left column.
+   ========================================================================== */
+
+/* §3: one row — where you are on the left, how you look at it on the right.
+   `gcal-toolbar-left` was a flex spacer balancing a centred segment; it holds
+   the navigation and the period now, so it stops growing and the segment stops
+   being centred. */
+.gcal-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gcal-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* R2's real rule was the SIZE, not the line. It keeps 22/28 here rather than
+   the 26/32 it had on a line of its own — the row is 52px, and 32px of line
+   box inside 52 leaves nothing above or below it. It is still the largest
+   glyph on the screen, which is what R2 was protecting. */
+.gcal-toolbar .gcal-range-label {
+  margin: 0;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* §4: Create, named. The one button on this screen that says what it does in
+   a word, because it is the thing people came to do. */
+.gcal-sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 12px;
+}
+
+.gcal-create-btn {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.gcal-create-btn:hover {
+  filter: brightness(1.06);
+}
+
+.gcal-create-btn:focus-visible {
+  outline: 2px solid var(--ff-focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+
+.gcal-create-btn span {
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* The collapsed rail holds two buttons now, so it needs to be a column. */
+.gcal-sidebar.is-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}

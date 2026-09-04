@@ -15,26 +15,11 @@
 
 /* R2: the range moved out of the toolbar onto its own line above the grid, at
    the size Calendar.app gives it. 26/32 is macOS Large Title; the previous 15px
-   put the page's heading below its own date cells. */
-.gcal-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 2px 2px 10px;
-}
+   put the page's heading below its own date cells. *
 
 /* The date navigation came out of the toolbar, where it rendered at 32px, and
    landed at the 28px its own rules ask for. This row is in Main, and §4.86 puts
-   a control there at 32 — `verticalRhythm.spec.ts` reads it as one. */
-.gcal-title-row .gcal-nav button {
-  min-width: 32px;
-  min-height: 32px;
-}
-
-.gcal-title-row .gcal-today-btn {
-  height: 32px;
-}
+   a control there at 32 — `verticalRhythm.spec.ts` reads it as one. *
 
 .gcal-range-label {
   margin: 0;
@@ -45,11 +30,7 @@
 }
 
 /* One child in, one child out: the column is now a title row over a grid that
-   takes what is left, rather than a single stretched child. */
-.gcal-main-column:has(> .gcal-title-row) {
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 0;
-}
+   takes what is left, rather than a single stretched child. *
 
 /* The segmented control sits in the middle of the bar. A flex spacer of equal
    weight on the right is what makes "middle" mean the bar's middle rather than
@@ -166,10 +147,6 @@
 
 .gcal-body {
   column-gap: 0;
-}
-
-.gcal-taskpanel {
-  margin-left: 16px;
 }
 
 /* --- Left sidebar: denser mini month, DS labels --- */
@@ -469,52 +446,7 @@
   border-color: var(--grid-line, rgba(0, 0, 0, 0.05));
 }
 
-/* --- Right task panel: reference task cards --- */
-.gcal-taskpanel {
-  border-radius: var(--radius-lg);
-}
-
-.gcal-taskpanel-head strong {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.gcal-taskpanel-hint {
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.gcal-taskpanel-section-head {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.gcal-taskpanel-row {
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-xs);
-  background: var(--bg-surface);
-  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
-}
-
-.gcal-taskpanel-row:hover {
-  background: var(--bg-surface);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
-}
-
-.gcal-taskpanel-row-title {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.gcal-taskpanel-row-meta {
-  font-size: 10px;
-}
-
-.gcal-taskpanel-empty {
-  font-size: 11px;
-}
+/* --- Right task panel: reference task cards --- *
 
 /* The Global Sidebar's rules stood here — `.side-item`, `.side-item-badge`,
    `.side-section-title`, `.brand-mark`, `.side-avatar`. That component was

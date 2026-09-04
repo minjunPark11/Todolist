@@ -150,12 +150,6 @@ interface WeekViewProps {
   items: CalendarItem[];
   /** Key of the item carrying the selection ring; "" when nothing is picked. */
   selectedKey: string;
-  dragOverId: string;
-  onOverSlot: (id: string) => (event: DragEvent) => void;
-  onLeaveSlot: (id: string) => () => void;
-  onDragHover: (day: string, startTime: string) => void;
-  onDropTime: (event: DragEvent, day: string, startTime: string) => void;
-  onDropAllDay: (event: DragEvent, day: string) => void;
   onClickItem: (item: CalendarItem, anchor: PopoverAnchor) => void;
   /**
    * Finish a task from the grid (CALENDAR_TASK_CHECKBOX_DESIGN.md §7).
@@ -172,14 +166,6 @@ interface WeekViewProps {
   onMoveItemToAllDay: (sourceId: string, day: string) => void;
   durationForSource: (sourceId: string) => number;
   draft: CalendarDraftBlock | null;
-  dragPreview: {
-    taskId: string;
-    day: string;
-    startTime: string;
-    endTime: string;
-    isValid: boolean;
-  } | null;
-  draggingTaskTitle: string;
   aiPlacements: Array<{
     taskId: string;
     day: string;
@@ -196,12 +182,6 @@ export function WeekView({
   anchor,
   items,
   selectedKey,
-  dragOverId,
-  onOverSlot,
-  onLeaveSlot,
-  onDragHover,
-  onDropTime,
-  onDropAllDay,
   onClickItem,
   onToggleDone,
   onClickAllDaySlot,
@@ -210,8 +190,6 @@ export function WeekView({
   onMoveItemToAllDay,
   durationForSource,
   draft,
-  dragPreview,
-  draggingTaskTitle,
   aiPlacements,
   onSelectionStart,
   onDraftCreate,
@@ -682,13 +660,13 @@ export function WeekView({
               <MotionDropZone
                 as="div"
                 key={day}
-                isOver={dragOverId === id || isMoveTarget}
-                className={
-                  dragOverId === id || isMoveTarget ? "gcal-allday-cell is-drop" : "gcal-allday-cell"
-                }
-                onDragOver={onOverSlot(id)}
-                onDragLeave={onLeaveSlot(id)}
-                onDrop={(event) => onDropAllDay(event, day)}
+                /* The only thing that can be over this now is a block being
+                   moved by pointer (`startMove` with `fromAllDay`). The HTML5
+                   drop path went with the task panel — it was the only thing
+                   that could start one over the week grid
+                   (CALENDAR_LAYOUT_V4_DESIGN.md §1). */
+                isOver={isMoveTarget}
+                className={isMoveTarget ? "gcal-allday-cell is-drop" : "gcal-allday-cell"}
                 onClick={(event) => {
                   if (event.target === event.currentTarget) onClickAllDaySlot(day);
                 }}
@@ -798,24 +776,19 @@ export function WeekView({
               <MotionDropZone
                 as="div"
                 key={day}
-                isOver={dragOverId === id}
+                /* Nothing can be dragged onto the time grid any more: the
+                   task panel was the only source, and a block moved inside the
+                   grid moves by pointer, not by HTML5 drag. The zone stays for
+                   the pointer handlers below. */
+                isOver={false}
                 animateTransform={false}
                 className={[
                   "gcal-time-col",
-                  dragOverId === id ? "is-drop" : "",
                   weekend && !isDay ? "is-weekend" : "",
                   day === today && !isDay ? "is-today" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                onDragOver={(event) => {
-                  onOverSlot(id)(event);
-                  onDragHover(day, dragStartTimeFromEvent(event as DragEvent<HTMLDivElement>));
-                }}
-                onDragLeave={onLeaveSlot(id)}
-                onDrop={(event) =>
-                  onDropTime(event, day, dragStartTimeFromEvent(event as DragEvent<HTMLDivElement>))
-                }
                 onPointerDown={(event) => handlePointerDown(event as ReactPointerEvent<HTMLDivElement>, day)}
                 onPointerMove={(event) => handlePointerMove(event as ReactPointerEvent<HTMLDivElement>)}
                 onPointerUp={(event) => handlePointerUp(event as ReactPointerEvent<HTMLDivElement>)}
@@ -848,23 +821,6 @@ export function WeekView({
                     <span className="gcal-draft-time">
                       {formatClockRange(draftHere.startTime, draftHere.endTime, timeFormat, clockLocale)}
                     </span>
-                  </div>
-                ) : null}
-                {dragPreview && dragPreview.day === day ? (
-                  <div
-                    className={dragPreview.isValid ? "gcal-drop-preview" : "gcal-drop-preview is-invalid"}
-                    style={{
-                      top: topFor(timeToMinutesOrNull(dragPreview.startTime) ?? gridStartMin),
-                      height: heightFor(
-                        timeToMinutesOrNull(dragPreview.startTime) ?? gridStartMin,
-                        timeToMinutesOrNull(dragPreview.endTime) ?? (gridStartMin + 30),
-                      ),
-                    }}
-                  >
-                    <span>{draggingTaskTitle || "Task"}</span>
-                    <small>
-                      {formatClockRange(dragPreview.startTime, dragPreview.endTime, timeFormat, clockLocale)}
-                    </small>
                   </div>
                 ) : null}
                 {aiPlacements

@@ -686,193 +686,21 @@
   transition: padding 0.28s cubic-bezier(0.2, 0, 0, 1);
 }
 
-.gcal-sidebar,
-.gcal-taskpanel {
-  transition: width 0.28s cubic-bezier(0.2, 0, 0, 1), padding 0.28s cubic-bezier(0.2, 0, 0, 1);
-}
-
-/* Fixed rail width so the collapse can animate (auto cannot transition). */
-.gcal-taskpanel.is-rail {
-  width: 48px;
-}
+/* Fixed rail width so the collapse can animate (auto cannot transition). *
 
 /* Rows sit inside the MotionCollapse wrapper, so the section's grid gap
-   no longer reaches them; restore it here. */
-.gcal-taskpanel-section-body {
-  display: grid;
-  gap: 6px;
-}
+   no longer reaches them; restore it here. *
 
 /* `.eis-group-caret` stood here — a 12px box holding one of two different
    characters. Both are `.ff-caret` now (21-components.css), which is one
    drawing turned a quarter, so the two states are the same shape and the turn
    can be animated (components/common/Caret.tsx). */
 
-/* --- Calendar right task panel (Eisenhower list) --- */
+/* --- Calendar right task panel (Eisenhower list) --- *
 
-.gcal-taskpanel {
-  width: 264px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background: var(--bg-surface);
-  overflow-y: auto;
-  min-height: 0;
-}
+/* Collapsed rail: fixed narrow track (grid auto column sizes to content). *
 
-.gcal-taskpanel.is-rail {
-  width: auto;
-  padding: 10px 8px;
-  align-items: center;
-}
-
-/* Collapsed rail: fixed narrow track (grid auto column sizes to content). */
-.gcal-taskpanel.is-rail {
-  width: 48px;
-}
-
-/* Collapsed rail: vertical icon + waiting-count badge + expand caret. */
-.gcal-taskpanel-rail-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  width: 32px;
-  padding: 6px 2px;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: background var(--motion-fast), color var(--motion-fast);
-}
-
-.gcal-taskpanel-rail-btn:hover {
-  background: var(--bg-hover-content);
-  color: var(--text-primary);
-}
-
-.gcal-taskpanel-rail-icon {
-  font-size: 18px;
-  line-height: 1;
-}
-
-.gcal-taskpanel-rail-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
-  background: var(--accent);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 20px;
-  font-variant-numeric: tabular-nums;
-}
-
-.gcal-taskpanel-rail-caret {
-  font-size: 16px;
-  line-height: 1;
-}
-
-.gcal-taskpanel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.gcal-taskpanel-head strong {
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.gcal-taskpanel-hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.gcal-taskpanel-section {
-  display: grid;
-  gap: 6px;
-}
-
-.gcal-taskpanel-section-head {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: none;
-  border: none;
-  padding: 4px 2px;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--text-secondary);
-  cursor: pointer;
-  text-align: left;
-}
-
-.gcal-taskpanel-section-name {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.gcal-taskpanel-empty {
-  margin: 0 0 2px 20px;
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.gcal-taskpanel-row {
-  display: grid;
-  gap: 3px;
-  padding: 8px 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--bg-surface);
-  cursor: grab;
-  transition: background var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast);
-}
-
-.gcal-taskpanel-row:hover {
-  background: var(--bg-hover-content);
-  border-color: var(--border-strong);
-}
-
-.gcal-taskpanel-row:active {
-  cursor: grabbing;
-  opacity: 0.7;
-}
-
-.gcal-taskpanel-row.is-dragging {
-  opacity: 1;
-}
-
-.gcal-taskpanel-row-title {
-  font-size: 14px;
-  font-weight: 550;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.gcal-taskpanel-row-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
-}
+/* Collapsed rail: vertical icon + waiting-count badge + expand caret. *
 
 /* SETTINGS_REVIEW.md 2, at the breakpoint Phase 7 measured. The card head is
    one flex line — icon, text, actions — and `flex-shrink: 0` on the actions

@@ -20,7 +20,18 @@ interface CalendarLeftSidebarProps {
   onToggleCategory: (category: CalendarCategory) => void;
   onSelectCategory: (category: CalendarCategory) => void;
   onRecolorCategory: (category: CalendarCategory, color: string) => void;
+  /**
+   * Making a new event, named rather than an icon
+   * (CALENDAR_LAYOUT_V4_DESIGN.md §4).
+   *
+   * It was a `+` in the toolbar with its name only in a tooltip. The toolbar's
+   * left belongs to the navigation and the period now, and this is the thing
+   * people do most on this screen — so it gets the top of the column and a
+   * word.
+   */
+  onCreate: () => void;
   collapsed: boolean;
+  onCollapse: () => void;
   onExpand: () => void;
 }
 
@@ -34,7 +45,9 @@ export function CalendarLeftSidebar({
   onToggleCategory,
   onSelectCategory,
   onRecolorCategory,
+  onCreate,
   collapsed,
+  onCollapse,
   onExpand,
 }: CalendarLeftSidebarProps) {
   const { t, lang } = useT();
@@ -87,12 +100,40 @@ export function CalendarLeftSidebar({
         >
           »
         </button>
+        {/* Create follows the column when it narrows. It left the toolbar
+            (§4), so without this there would be no way to make an event while
+            the sidebar is a rail. */}
+        <button
+          type="button"
+          className="gcal-icon-btn gcal-create-icon-btn"
+          aria-label={t("calendar.createAria")}
+          title={t("calendar.createAria")}
+          onClick={onCreate}
+        >
+          +
+        </button>
       </aside>
     );
   }
 
   return (
     <aside className="gcal-sidebar">
+      <div className="gcal-sidebar-head">
+        <button type="button" className="gcal-create-btn" onClick={onCreate}>
+          <span aria-hidden="true">+</span>
+          {t("calendar.createEvent")}
+        </button>
+        <button
+          type="button"
+          className="gcal-icon-btn"
+          aria-label={t("calendar.hideSidebar")}
+          title={t("calendar.hideSidebar")}
+          onClick={onCollapse}
+        >
+          «
+        </button>
+      </div>
+
       {groups.map((group) => (
         <div key={group.type} className="gcal-sidebar-section">
           <h3>{t(`calendar.group.${group.type}`)}</h3>

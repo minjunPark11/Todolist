@@ -50,9 +50,7 @@ import {
 } from "../utils/calendarTime";
 import type { ToastState } from "./kit";
 import { CalendarToolbar } from "./calendar/CalendarToolbar";
-import { CalendarTitleRow } from "./calendar/CalendarTitleRow";
 import { CalendarLeftSidebar } from "./calendar/CalendarLeftSidebar";
-import { CalendarRightTaskPanel } from "./calendar/CalendarRightTaskPanel";
 import { WeekView } from "./calendar/WeekView";
 import { useWeekStart } from "../utils/appPrefs";
 import { MonthView } from "./calendar/MonthView";
@@ -72,14 +70,6 @@ import type { Rect } from "../domain/floating";
 import { isTaskOpen, LIFECYCLE } from "../domain/tasks/taskState";
 
 type CalendarMode = "month" | "week" | "day" | "year";
-
-type DragPreview = {
-  taskId: string;
-  day: string;
-  startTime: string;
-  endTime: string;
-  isValid: boolean;
-};
 
 type AiPlacement = {
   taskId: string;
@@ -199,18 +189,7 @@ export function CalendarView({
     // leaves the choice to the user (they can re-pick "week" any time).
     if (isNarrow) setMode((current) => (current === "week" ? "day" : current));
   }, [isNarrow]);
-  // Default collapsed; remembered across sessions (origin-scoped localStorage).
-  const [taskPanelCollapsed, setTaskPanelCollapsed] = useState(() => {
-    try {
-      const raw = localStorage.getItem("focusflow-caltasks-collapsed");
-      return raw === null ? true : raw === "1";
-    } catch {
-      return true;
-    }
-  });
   const [dragOverId, setDragOverId] = useState("");
-  const [draggingTaskId, setDraggingTaskId] = useState("");
-  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [quickCreate, setQuickCreate] = useState<QuickCreateDefaults | null>(null);
   const [popover, setPopover] = useState<PopoverState>(null);
   // The keyboard Delete has to have a visible target: nothing may be deleted
@@ -525,10 +504,17 @@ export function CalendarView({
     }
   }
 
+  /**
+   * A month chip picked up to be dropped on another day.
+   *
+   * This was shared with the right-hand task panel, which is gone
+   * (CALENDAR_LAYOUT_V4_DESIGN.md §1) — the `text/plain` contract stays because
+   * the month view moves its own chips over it. The week grid never used HTML5
+   * drag for anything of its own: a block there moves by pointer.
+   */
   function handleDragStart(event: DragEvent, taskId: string) {
     event.dataTransfer.setData("text/plain", taskId);
     event.dataTransfer.effectAllowed = "move";
-    setDraggingTaskId(taskId);
     setPopover(null);
   }
 
@@ -542,7 +528,6 @@ export function CalendarView({
   function leave(id: string) {
     return () => {
       setDragOverId((current) => (current === id ? "" : current));
-      setDragPreview(null);
     };
   }
 
@@ -574,23 +559,8 @@ export function CalendarView({
     });
   }
 
-  function handleDragHover(day: string, startTime: string) {
-    if (!draggingTaskId) return;
-    const task = tasks.find((item) => item.id === draggingTaskId);
-    const duration = getTaskDuration(task);
-    const start = timeToMinutes(startTime);
-    const end = Math.min(DAY_END * 60, start + duration);
-    const endTime = minutesToTime(end);
-    // Overlap no longer blocks the drop, so the preview only rejects
-    // zero-length targets (e.g. dropping at the grid's very end).
-    const isValid = end > start;
-    setDragPreview({ taskId: draggingTaskId, day, startTime, endTime, isValid });
-  }
-
   function handleDragEnd() {
-    setDraggingTaskId("");
     setDragOverId("");
-    setDragPreview(null);
   }
 
   // Every calendar write goes through here (SCHEDULE_EDITOR_PHASE0_AUDIT.md §6).
@@ -629,42 +599,6 @@ export function CalendarView({
   function moveToDay(taskId: string, day: string) {
     const current = scheduleFromTask(tasks.find((item) => item.id === taskId) ?? {});
     onUpdateTaskSchedule(taskId, { ...current, startDate: null, dueDate: day });
-  }
-
-  function dropTime(event: DragEvent, day: string, startTime: string) {
-    event.preventDefault();
-    const taskId = event.dataTransfer.getData("text/plain");
-    if (taskId) {
-      const task = tasks.find((item) => item.id === taskId);
-      const duration = getTaskDuration(task);
-      const start = timeToMinutes(startTime);
-      const end = Math.min(DAY_END * 60, start + duration);
-      const endTime = minutesToTime(end);
-      if (end <= start) {
-        showToast?.({ message: t("calendar.dropInvalid") });
-        handleDragEnd();
-        return;
-      }
-      // Overlaps are allowed (spec §10.5 option A) — the grid renders
-      // overlapping blocks side by side; the toast just calls it out.
-      const overlaps = hasConflict(day, startTime, endTime, taskId);
-      placeOn(taskId, day, startTime, endTime);
-      showToast?.({
-        message: overlaps
-          ? t("calendar.dropScheduledOverlap", { title: task?.title ?? "", time: startTime })
-          : t("calendar.dropScheduled", { title: task?.title ?? "", time: startTime }),
-      });
-    }
-    handleDragEnd();
-  }
-
-  function dropAllDay(event: DragEvent, day: string) {
-    event.preventDefault();
-    const taskId = event.dataTransfer.getData("text/plain");
-    if (taskId) {
-      placeOn(taskId, day);
-    }
-    handleDragEnd();
   }
 
   function dropCell(event: DragEvent, day: string) {
@@ -900,12 +834,14 @@ export function CalendarView({
     <div className="gcal-shell" ref={shellRef}>
       <CalendarToolbar
         mode={mode}
-        sidebarCollapsed={sidebarCollapsed}
-        onToggleSidebar={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        rangeLabel={rangeLabel}
+        onToday={() => {
+          clearTransient();
+          setAnchor(today);
+        }}
+        onPrev={() => shift(-1)}
+        onNext={() => shift(1)}
         onModeChange={switchMode}
-        onCreate={() =>
-          setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
-        }
         viewOptions={<CalendarViewOptionsMenu options={viewOptions} onChange={setViewOptions} />}
       />
 
@@ -924,20 +860,15 @@ export function CalendarView({
           onToggleCategory={handleToggleCategory}
           onSelectCategory={handleSelectCategory}
           onRecolorCategory={handleRecolorCategory}
+          onCreate={() =>
+            setQuickCreate({ date: anchor, startTime: "09:00", endTime: "10:00", allDay: false })
+          }
           collapsed={sidebarCollapsed}
+          onCollapse={() => setSidebarCollapsed(true)}
           onExpand={() => setSidebarCollapsed(false)}
         />
 
         <div className="gcal-main-column">
-          <CalendarTitleRow
-            rangeLabel={rangeLabel}
-            onToday={() => {
-              clearTransient();
-              setAnchor(today);
-            }}
-            onPrev={() => shift(-1)}
-            onNext={() => shift(1)}
-          />
           <section className={isTimeGrid ? "gcal-main is-timegrid" : "gcal-main"}>
             {aiStatus === "preview" ? (
               <div className="gcal-suggestion-bar">
@@ -987,12 +918,6 @@ export function CalendarView({
                 anchor={anchor}
                 items={items}
                 selectedKey={selected?.key ?? ""}
-                dragOverId={dragOverId}
-                onOverSlot={over}
-                onLeaveSlot={leave}
-                onDragHover={handleDragHover}
-                onDropTime={dropTime}
-                onDropAllDay={dropAllDay}
                 onClickItem={handleClickItem}
                 onToggleDone={onToggleTaskDone}
                 onClickAllDaySlot={(day) => setQuickCreate({ date: day, allDay: true })}
@@ -1001,8 +926,6 @@ export function CalendarView({
                 onMoveItemToAllDay={handleMoveItemToAllDay}
                 durationForSource={(sourceId) => getTaskDuration(tasks.find((task) => task.id === sourceId))}
                 draft={draft}
-                dragPreview={dragPreview}
-                draggingTaskTitle={tasks.find((task) => task.id === draggingTaskId)?.title ?? ""}
                 aiPlacements={aiPlacements.map((placement) => ({
                   ...placement,
                   title: tasks.find((task) => task.id === placement.taskId)?.title ?? "Suggested task",
@@ -1014,26 +937,6 @@ export function CalendarView({
           </section>
         </div>
 
-        {mode !== "year" ? (
-          <CalendarRightTaskPanel
-            tasks={tasks}
-            today={today}
-            collapsed={taskPanelCollapsed}
-            onToggleCollapsed={() =>
-              setTaskPanelCollapsed((value) => {
-                const next = !value;
-                try {
-                  localStorage.setItem("focusflow-caltasks-collapsed", next ? "1" : "0");
-                } catch {
-                  /* ignore storage failures */
-                }
-                return next;
-              })
-            }
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          />
-        ) : null}
       </div>
       </div>
 

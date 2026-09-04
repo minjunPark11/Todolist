@@ -407,9 +407,9 @@ export const en: Dictionary = {
   "calendar.memoLabel": "Memo",
   "calendar.noUnscheduled": "No unscheduled tasks to suggest.",
   "calendar.hideSidebar": "Hide sidebar",
-  "calendar.showSidebar": "Show sidebar",
   "calendar.expandSidebar": "Expand sidebar",
   "calendar.createAria": "Create",
+  "calendar.createEvent": "New event",
   "calendar.suggestionCount": "{{n}} suggested placements",
   "calendar.suggestionPreview": "Previewed on the week grid.",
   "calendar.apply": "Apply",
@@ -533,20 +533,10 @@ export const en: Dictionary = {
   "calendar.groupEmpty.focus": "No activity yet.",
   "calendar.focusActualCategory": "Actual focus time",
   "calendar.focusSourceLine": "Actual focus time recorded by the focus timer.",
-  "calendar.dropScheduled": "\"{{title}}\" scheduled at {{time}}.",
-  "calendar.dropScheduledOverlap": "\"{{title}}\" scheduled at {{time}} — it overlaps an existing block.",
-  "calendar.dropInvalid": "Can't place a block here.",
-  "caltasks.title": "Eisenhower Tasks",
-  "caltasks.hint": "Drag a task onto the grid to schedule it.",
-  "caltasks.expand": "Open task panel",
-  "caltasks.collapse": "Collapse task panel",
-  "caltasks.empty": "Nothing to place.",
-  "caltasks.dragHint": "Drag onto the calendar to schedule",
   // The Eisenhower matrix screen (MatrixPage). Its own vocabulary rather than
   // the shared `eis.*` one: those labels are also read by the task detail's
   // quadrant picker and by the calendar panel, where Q4 still gathers parked
   // and finished work. On this screen it cannot — done and parked tasks are
-  // filtered out — so here the four boxes can say what Eisenhower says.
   "matrix.title": "Eisenhower Matrix",
   // The two questions no longer decide the box (TICKTICK_MATRIX_DESIGN.md D1).
   "matrix.list": "List",
@@ -606,8 +596,6 @@ export const en: Dictionary = {
   "matrix.refuse.list": "This box only takes tasks from another List, and a drop will not move them",
   "matrix.refuse.tag": "This box only takes tasks with another tag, and a drop will not add one",
   "matrix.refuse.dueDate": "This box only takes undated tasks, and a drop will not erase a deadline",
-  "eis.today": "Today",
-  "eis.minutes": "{{n}}m",
   "calendar.groupEmpty.personal": "No categories yet.",
   "calendar.groupEmpty.project": "No projects yet.",
   "calendar.groupEmpty.external": "No external calendars added.",
