@@ -10,7 +10,7 @@
 // dependency of this project. What is used of the request is its method, its
 // headers and its body; adding a package to name those would be the tail
 // wagging the dog.
-import { serveMcp } from "../../src/server/mcp";
+import { serveMcp } from "../../server/mcp";
 
 interface AdapterRequest {
   method?: string;

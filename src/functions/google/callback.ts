@@ -12,8 +12,8 @@
 // This is also the only reason `focusflow://` works at all. Google will not
 // redirect to a custom scheme for a desktop client (§4.4, chain step 1); it
 // redirects to this https address, and this hands off to the scheme.
-import { decodeOAuthState } from "../../src/integrations/google";
-import { readAppUrl } from "../../src/server/mcp";
+import { decodeOAuthState } from "../../integrations/google";
+import { readAppUrl } from "../../server/mcp";
 
 interface AdapterRequest {
   method?: string;

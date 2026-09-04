@@ -22,7 +22,7 @@ import {
   requireUser,
   revokeToken,
   UnauthorizedError,
-} from "../../src/integrations/google";
+} from "../../integrations/google";
 
 interface AdapterRequest {
   method?: string;

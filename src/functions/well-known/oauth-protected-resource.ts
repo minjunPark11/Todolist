@@ -5,8 +5,8 @@
 // the Supabase project from the environment; a static file would have to be
 // rebuilt for every environment, and a preview deployment would advertise the
 // production host.
-import { protectedResourceMetadata, readAppUrl } from "../../src/server/mcp";
-import { readSupabaseEnv } from "../../src/server/data/repository";
+import { protectedResourceMetadata, readAppUrl } from "../../server/mcp";
+import { readSupabaseEnv } from "../../server/data/repository";
 
 interface AdapterRequest {
   method?: string;

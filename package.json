@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --configLoader runner",
-    "build": "tsc -b && vite build --configLoader runner",
+    "build": "tsc -b && vite build --configLoader runner && node scripts/buildFunctions.mjs",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:e2e": "playwright test",
@@ -37,6 +37,7 @@
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "axe-core": "^4.13.0",
+    "esbuild": "^0.25.12",
     "jsdom": "^29.1.1",
     "vitest": "^4.1.10"
   }

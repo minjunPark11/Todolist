@@ -16,7 +16,7 @@ import {
   refreshAccessToken,
   requireUser,
   UnauthorizedError,
-} from "../../src/integrations/google";
+} from "../../integrations/google";
 
 interface AdapterRequest {
   method?: string;

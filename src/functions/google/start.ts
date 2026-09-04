@@ -9,7 +9,7 @@
 // definition and appears in the browser's address bar a moment later — and
 // requiring a bearer token here is impossible anyway: this is a top-level
 // navigation, not a fetch, so no header comes with it.
-import { authorizeUrl, decodeOAuthState, readGoogleOAuthEnv } from "../../src/integrations/google";
+import { authorizeUrl, decodeOAuthState, readGoogleOAuthEnv } from "../../integrations/google";
 
 interface AdapterRequest {
   method?: string;
