@@ -21,11 +21,17 @@ const NOW = "2026-08-18T00:00:00.000Z";
  * bug `readableInkOn` exists to prevent.
  */
 const LISTS = [
-  { id: "list-indigo", name: "Indigo", color: "indigo", hex: "#5b5bd6", ink: "rgb(255, 255, 255)" },
-  { id: "list-purple", name: "Purple", color: "purple", hex: "#8e4ec6", ink: "rgb(255, 255, 255)" },
-  { id: "list-lime", name: "Lime", color: "lime", hex: "#99d52a", ink: "rgb(17, 17, 17)" },
-  { id: "list-orange", name: "Orange", color: "orange", hex: "#f76b15", ink: "rgb(17, 17, 17)" },
+  // `fill` is what the block is actually painted: the picked colour after
+  // `darkenForWhiteInk` (CALENDAR_FILL_READABILITY_DESIGN.md §3). Indigo and
+  // purple already cleared white text and come through untouched; lime and
+  // orange are the two that move, and are here to prove that they do.
+  { id: "list-indigo", name: "Indigo", color: "indigo", fill: "rgb(91, 91, 214)" },
+  { id: "list-purple", name: "Purple", color: "purple", fill: "rgb(142, 78, 198)" },
+  { id: "list-lime", name: "Lime", color: "lime", fill: "rgb(87, 121, 24)" },
+  { id: "list-orange", name: "Orange", color: "orange", fill: "rgb(188, 76, 6)" },
 ];
+
+const WHITE = "rgb(255, 255, 255)";
 
 /** The grid opens on the real today, so the fixtures have to live there. */
 function todayValue(): string {
@@ -254,10 +260,12 @@ test.describe("View Options", () => {
     const before = await blockFor(page, "Jogging").evaluate((el) => getComputedStyle(el).backgroundColor);
     await openViewOptions(page);
     await page.getByRole("radio", { name: "Priority" }).click();
+    // Both values are post-darkening: `#8e8e93` -> `#6e6e73` for the priority
+    // neutral, `#99d52a` -> `#577918` for lime.
     await expect
       .poll(() => blockFor(page, "Jogging").evaluate((el) => getComputedStyle(el).backgroundColor))
-      .toBe("rgb(142, 142, 147)");
-    expect(before).toBe("rgb(153, 213, 42)");
+      .toBe("rgb(110, 110, 115)");
+    expect(before).toBe("rgb(87, 121, 24)");
   });
 
   test("keeps its answers on the account, not the device", async ({ page }) => {
@@ -322,21 +330,56 @@ test.describe("the fill and the ink", () => {
     for (const fixture of FIXTURES.filter((entry) => !entry.done)) {
       const paint = await blockFor(page, fixture.title).evaluate((el) => getComputedStyle(el).backgroundColor);
       const list = LISTS.find((entry) => entry.id === fixture.listId)!;
-      const [r, g, b] = [1, 3, 5].map((index) => Number.parseInt(list.hex.slice(index, index + 2), 16));
-      expect(paint, fixture.title).toBe(`rgb(${r}, ${g}, ${b})`);
+      expect(paint, fixture.title).toBe(list.fill);
     }
   });
 
-  test("and its title takes the ink that reads on it", async ({ page }) => {
+  test("takes white on every block, and is dark enough to carry it", async ({ page }) => {
     await openCalendar(page);
-    // The wiring `readableInkOn` exists for: white on indigo and purple, black
-    // on lime and orange. Fixing the ink to white — which is what copying the
-    // reference app would have meant — fails the last two (§3.3).
+    // The change this replaced: the ink used to be picked per colour, which
+    // cleared 4.5:1 and still left a grey block reading as disabled. One ink
+    // now, and the colour gives way instead
+    // (CALENDAR_FILL_READABILITY_DESIGN.md §2).
     for (const fixture of FIXTURES.filter((entry) => !entry.done)) {
-      const ink = await blockFor(page, fixture.title).evaluate((el) => getComputedStyle(el).color);
-      const list = LISTS.find((entry) => entry.id === fixture.listId)!;
-      expect(ink, fixture.title).toBe(list.ink);
+      const measured = await blockFor(page, fixture.title).evaluate((el) => {
+        const style = getComputedStyle(el);
+        const parse = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+        const channel = (c: number) => {
+          const v = c / 255;
+          return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        };
+        const luminance = ([r, g, b]: number[]) =>
+          0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+        const back = luminance(parse(style.backgroundColor));
+        const front = luminance(parse(style.color));
+        return {
+          ink: style.color,
+          ratio: (Math.max(back, front) + 0.05) / (Math.min(back, front) + 0.05),
+        };
+      });
+      expect(measured.ink, fixture.title).toBe(WHITE);
+      // 5, not 4.5: block text is 11px and the bar leaves nothing spare (§3.1).
+      expect(measured.ratio, fixture.title).toBeGreaterThanOrEqual(5);
     }
+  });
+
+  test("the unfiled block is dark grey, not the mid grey that started this", async ({ page }) => {
+    await openCalendar(page);
+    // The screenshot that opened the report: quick-added tasks land in the
+    // Inbox, the Inbox is neutral, and `#8e8e93` under black text read as
+    // disabled. G3 kept the grey and darkened it.
+    await page.evaluate((key) => {
+      const store = JSON.parse(window.localStorage.getItem(key as string) ?? "{}");
+      store.tasks = (store.tasks ?? []).map((task: { id: string; listId?: string }) =>
+        task.id === "t-lime" ? { ...task, listId: "" } : task,
+      );
+      window.localStorage.setItem(key as string, JSON.stringify(store));
+    }, STORAGE_KEY);
+    await page.reload();
+
+    const block = blockFor(page, "Jogging");
+    await expect(block).toHaveCSS("background-color", "rgb(110, 110, 115)");
+    await expect(block).toHaveCSS("color", WHITE);
   });
 
   test("finished work steps back to a tint", async ({ page }) => {

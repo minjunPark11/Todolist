@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Project, Task } from "../types";
 import { buildCalendarItems, defaultCalendarLayers, splitFocusSegmentByDay } from "./calendarItems";
+import { darkenForWhiteInk } from "../domain/calendar/readableInk";
 
 const NOW = "2026-08-15T00:00:00.000Z";
 
@@ -174,7 +175,10 @@ describe("task chips", () => {
   // a guess (`colorForList`).
   it("is neutral for a task whose List cannot be resolved", () => {
     const items = build({ tasks: [task({ dueDate: "2026-08-17" })] });
-    expect(items[0].color).toBe("#8e8e93");
+    // The neutral, then darkened: a fill carries white text
+    // (CALENDAR_FILL_READABILITY_DESIGN.md §3), and the mid grey under black
+    // text is exactly the screenshot that change came from.
+    expect(items[0].color).toBe(darkenForWhiteInk("#8e8e93"));
     expect(items[0].categoryId).toBe("");
   });
 
@@ -203,7 +207,7 @@ describe("task chips", () => {
       tasks: [task({ dueDate: "2026-08-17", priority: "high" })],
       colorBy: "priority",
     });
-    expect(items[0].color).toBe("#ff3b30");
+    expect(items[0].color).toBe(darkenForWhiteInk("#ff3b30"));
   });
 });
 

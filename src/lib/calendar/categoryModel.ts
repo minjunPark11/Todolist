@@ -14,6 +14,7 @@
 // them (§7.2 of FOCUSFLOW_EXTERNAL_AI_ACCESS_ARCHITECTURE.md).
 import type { ExternalCalendar, List } from "../../types";
 import { colorForList } from "../../domain/calendar/itemColor";
+import { darkenForWhiteInk } from "../../domain/calendar/readableInk";
 
 export type CalendarGroupType = "personal" | "external" | "focus";
 
@@ -115,9 +116,16 @@ export function buildCalendarCategories(input: {
     group: "personal" as const,
     name: list.name,
     // The same colour the grid paints, including the one made up for a List
-    // nobody painted — otherwise the swatch beside a name would disagree with
-    // every block that name owns.
-    color: colorForList(list),
+    // nobody painted AND the darkening the fill takes to carry white text
+    // (CALENDAR_FILL_READABILITY_DESIGN.md §6) — otherwise the swatch beside a
+    // name would disagree with every block that name owns, and these two sit
+    // side by side on one screen.
+    //
+    // This is where G4's line actually falls. The Tasks sidebar's dot and the
+    // colour picker's swatch keep the raw colour: they are on other screens,
+    // with no block beside them to match, and a bright 8px dot is easier to
+    // see than a dark one.
+    color: darkenForWhiteInk(colorForList(list)),
     order,
     isDefault: list.kind === "inbox",
   }));

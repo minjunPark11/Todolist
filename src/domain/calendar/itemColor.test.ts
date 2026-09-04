@@ -8,7 +8,14 @@ import {
   PRIORITY_COLOR,
   sanitizeColorBy,
 } from "./itemColor";
-import { BLOCK_INK_DARK, BLOCK_INK_LIGHT, contrastRatio, readableInkOn } from "./readableInk";
+import {
+  BLOCK_INK_DARK,
+  BLOCK_INK_LIGHT,
+  contrastRatio,
+  darkenForWhiteInk,
+  readableInkOn,
+  WHITE_INK_TARGET,
+} from "./readableInk";
 
 function list(patch: Partial<List> & { id: string }): List {
   return {
@@ -62,23 +69,40 @@ describe("the colour a List gives its blocks", () => {
   });
 });
 
+// `colorForTask` is the fill, and a fill carries white text
+// (CALENDAR_FILL_READABILITY_DESIGN.md §7), so what comes out of here has been
+// through `darkenForWhiteInk`. These assert the axis it read, not the raw hex
+// — the darkening has its own tests in `readableInk.test.ts`.
 describe("which axis the fill reads", () => {
   const listsById = new Map([["l1", list({ id: "l1", color: "purple" })]]);
 
   it("reads the List by default", () => {
+    // Purple already clears white text, so it comes through untouched and the
+    // axis is visible in the value.
     expect(colorForTask({ colorBy: "list", listId: "l1", priority: "high", listsById })).toBe("#8e4ec6");
   });
 
   it("reads the priority when asked to", () => {
     expect(colorForTask({ colorBy: "priority", listId: "l1", priority: "high", listsById })).toBe(
-      PRIORITY_COLOR.high,
+      darkenForWhiteInk(PRIORITY_COLOR.high),
     );
   });
 
   it("treats a task with no priority as `none` rather than as an error", () => {
     expect(colorForTask({ colorBy: "priority", listId: "l1", priority: undefined, listsById })).toBe(
-      PRIORITY_COLOR.none,
+      darkenForWhiteInk(PRIORITY_COLOR.none),
     );
+  });
+
+  it("hands back a fill white text can be read on, whichever axis it read", () => {
+    const cases = [
+      colorForTask({ colorBy: "list", listId: "l1", priority: "none", listsById }),
+      colorForTask({ colorBy: "list", listId: "missing", priority: "none", listsById }),
+      colorForTask({ colorBy: "priority", listId: "l1", priority: "medium", listsById }),
+    ];
+    for (const fill of cases) {
+      expect(contrastRatio(fill, BLOCK_INK_LIGHT), fill).toBeGreaterThanOrEqual(WHITE_INK_TARGET);
+    }
   });
 
   it("falls back to the List for a stored value that never was", () => {

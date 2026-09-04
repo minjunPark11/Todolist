@@ -4,8 +4,10 @@ import {
   BLOCK_INK_DARK,
   BLOCK_INK_LIGHT,
   contrastRatio,
+  darkenForWhiteInk,
   readableInkOn,
   relativeLuminance,
+  WHITE_INK_TARGET,
 } from "./readableInk";
 
 // The claim D3-D rests on: a filled block is readable for EVERY colour the
@@ -52,5 +54,88 @@ describe("the ink a filled block gets", () => {
 
   it("reports 1 for a ratio it cannot compute", () => {
     expect(contrastRatio("nope", "#ffffff")).toBe(1);
+  });
+});
+
+// One ink on every fill (CALENDAR_FILL_READABILITY_DESIGN.md §3).
+//
+// Picking the ink per colour cleared 4.5:1 and still produced the screenshot
+// that started this: a grey block whose black text read as disabled. So the
+// text is white everywhere and the colour is what gives way.
+describe("making a colour safe for white text", () => {
+  const PALETTE = [
+    "#e5484d",
+    "#f76b15",
+    "#ffb224",
+    "#99d52a",
+    "#30a46c",
+    "#0a84ff",
+    "#5b5bd6",
+    "#8e4ec6",
+    // The Inbox grey — the colour actually on screen in the report.
+    "#8e8e93",
+  ];
+
+  it("clears the target for every colour the app can fill with", () => {
+    for (const colour of PALETTE) {
+      const safe = darkenForWhiteInk(colour);
+      expect(contrastRatio(safe, BLOCK_INK_LIGHT), `${colour} -> ${safe}`).toBeGreaterThanOrEqual(
+        WHITE_INK_TARGET,
+      );
+    }
+  });
+
+  // The point of moving lightness rather than swapping in a new palette: a
+  // colour typed into the colour input is covered by the same rule.
+  it("covers a colour nobody put in a palette", () => {
+    for (const colour of ["#ffffff", "#fffb00", "#c0ffee", "#ff00ff"]) {
+      expect(contrastRatio(darkenForWhiteInk(colour), BLOCK_INK_LIGHT)).toBeGreaterThanOrEqual(
+        WHITE_INK_TARGET,
+      );
+    }
+  });
+
+  it("keeps the hue, so a yellow List is still the yellow one", () => {
+    const hueOf = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      if (max === min) return 0;
+      const delta = max - min;
+      const raw =
+        max === r ? (g - b) / delta + (g < b ? 6 : 0) : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+      return (raw * 60 + 360) % 360;
+    };
+    for (const colour of PALETTE) {
+      const safe = darkenForWhiteInk(colour);
+      const drift = Math.abs(hueOf(safe) - hueOf(colour));
+      expect(Math.min(drift, 360 - drift), `${colour} -> ${safe}`).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it("leaves a colour that is already dark enough exactly as it was", () => {
+    // Indigo and purple were the two that passed white text before any of this.
+    expect(darkenForWhiteInk("#5b5bd6")).toBe("#5b5bd6");
+    expect(darkenForWhiteInk("#8e4ec6")).toBe("#8e4ec6");
+  });
+
+  it("is idempotent — running it twice is running it once", () => {
+    for (const colour of PALETTE) {
+      const once = darkenForWhiteInk(colour);
+      expect(darkenForWhiteInk(once)).toBe(once);
+    }
+  });
+
+  // The safety net §7 keeps: if darkening ever failed, the ink would still
+  // adapt rather than the title disappearing.
+  it("always leaves the automatic ink on white", () => {
+    for (const colour of [...PALETTE, "#ffffff", "#fffb00"]) {
+      expect(readableInkOn(darkenForWhiteInk(colour))).toBe("light");
+    }
+  });
+
+  it("hands back a colour it cannot read, for the ink rule to deal with", () => {
+    expect(darkenForWhiteInk("rebeccapurple")).toBe("rebeccapurple");
+    expect(darkenForWhiteInk("")).toBe("");
   });
 });

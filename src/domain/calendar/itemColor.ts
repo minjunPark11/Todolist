@@ -12,6 +12,7 @@
 // This is that, with our two axes.
 import type { CalendarColorBy, List, TaskPriority } from "../../types";
 import { LIST_COLOR_PRESETS, listColorHex } from "../tasks/listColor";
+import { darkenForWhiteInk } from "./readableInk";
 
 // `CalendarColorBy` is declared in types.ts beside `CalendarViewOptions`, the
 // record that stores it. Re-exported here because this is where the axis is
@@ -85,7 +86,23 @@ export interface TaskColorInput {
   listsById: Map<string, List>;
 }
 
+/**
+ * What a block is filled with (CALENDAR_FILL_READABILITY_DESIGN.md §7).
+ *
+ * Everything goes through `darkenForWhiteInk` on the way out. The fill carries
+ * white text now — one ink, because picking the ink per colour cleared the
+ * contrast bar and still left a grey block reading as disabled — and a colour
+ * that white cannot be read on is darkened until it can. Hue is kept, so which
+ * List a block belongs to is still legible from across the grid.
+ *
+ * The one call site, so nothing can reach the raw colour by accident: the
+ * List's own dot and the colour picker's swatch DO use the raw value, and they
+ * get it from `listColorHex`, not from here (G4 — they carry no text).
+ */
 export function colorForTask({ colorBy, listId, priority, listsById }: TaskColorInput): string {
-  if (colorBy === "priority") return PRIORITY_COLOR[priority ?? "none"] ?? PRIORITY_COLOR.none;
-  return colorForList(listsById.get(listId));
+  const raw =
+    colorBy === "priority"
+      ? PRIORITY_COLOR[priority ?? "none"] ?? PRIORITY_COLOR.none
+      : colorForList(listsById.get(listId));
+  return darkenForWhiteInk(raw);
 }
