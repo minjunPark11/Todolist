@@ -236,6 +236,34 @@ export interface Task {
    * Nothing delivers these yet — see `domain/schedule/reminder.ts`.
    */
   reminder?: string;
+  /**
+   * The Google Calendar event this Task is (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.2).
+   *
+   * Absent or "" means NO event has ever been created for it — which is a
+   * different fact from "the event is gone", and keeping the two apart is what
+   * §5.1 rejects the "date ⟺ event" biconditional over. Without it, one failed
+   * API call reads as "the user deleted this in Google" and the Task goes to
+   * the trash.
+   *
+   * It doubles as the outbound queue's state: a Task that is eligible (§5.1)
+   * and has no id is simply one the next pass creates, so a failed write
+   * retries itself with no separate `pending` flag to keep honest.
+   *
+   * Deliberately NOT in `normalizeTask`'s explicit list. Every field there is
+   * written on every load, and an empty string on every Task in every account
+   * that never connects Google is a column's worth of nothing. The M0 spread
+   * carries it instead — see the comment at the top of that return.
+   */
+  googleEventId?: string;
+  /**
+   * What the account held when we last agreed with it (§4.2).
+   *
+   * The remote half of the LWW comparison: `updatedAt` says whether WE changed,
+   * this says whether THEY did. It is also the `If-Match` value on a write, so
+   * a change we have not seen cannot be silently clobbered, and the echo guard
+   * (§6.3) — an inbound event carrying this etag is our own write coming back.
+   */
+  googleEtag?: string;
 }
 
 export interface Subtask {
@@ -674,8 +702,31 @@ export interface AppSettings {
    * time, so anything reading the account WITHOUT a browser attached cannot
    * tell what "today" means. Nothing does yet; the external-AI design
    * (FOCUSFLOW_EXTERNAL_AI_ACCESS_ARCHITECTURE.md M1) is what needs it.
+   *
+   * Google Calendar sync is the second reader, and the first one that WRITES
+   * against it — see GOOGLE_CALENDAR_SYNC_DESIGN.md §9. §9.3 records what the
+   * refresh above costs there: the zone follows the device, so a person who
+   * flies makes the wall time and Google's absolute time disagree.
    */
   timezone: string;
+  /**
+   * Google events whose Task is gone, and which nobody has managed to delete
+   * yet (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.3).
+   *
+   * `emptyTrash` and `permanentlyDeleteTask` remove the record outright, and
+   * `googleEventId` goes with it. If the delete call has not landed by then —
+   * offline, an expired token, a 500 — the event is orphaned in the account
+   * with nothing left anywhere that knows it should go. This is that "nothing
+   * left", written down before the record is dropped.
+   *
+   * On the account rather than on the device so any device can finish the job;
+   * the one that emptied the trash may not come back online first.
+   *
+   * Absent stays absent, like `collapsedFolderIds`: an empty array in every
+   * account that never connects Google is a preference nobody expressed. It
+   * does not accumulate — an id is removed the moment its delete succeeds.
+   */
+  googleDeletedEventIds?: string[];
   // Dead field from the removed AI assistant (LOCAL_AI_REMOVAL_DESIGN.md).
   // No UI reads or writes it. Kept for one more release so settings synced
   // from a client that still has the feature normalize cleanly instead of

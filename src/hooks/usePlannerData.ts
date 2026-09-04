@@ -125,6 +125,7 @@ import {
   normalizeSettings,
   normalizeTask,
 } from "../domain/plannerData/normalize";
+import { tombstonesAfterRemoval } from "../domain/calendar/googleSync/tombstones";
 
 const STORAGE_KEY = PLANNER_STORAGE_KEY;
 const LEGACY_STORAGE_KEY = "todo-planner-data";
@@ -132,6 +133,25 @@ const LEGACY_STORAGE_KEY = "todo-planner-data";
 // quota does not clear on its own the way a dropped connection does.
 const LOCAL_SAVE_RETRY_MS = 5000;
 const LOCAL_SAVE_RETRY_MAX_MS = 120000;
+/**
+ * Carries orphaned Google events out of a permanent delete
+ * (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.3).
+ *
+ * Wraps the three reducers that drop Task records outright, rather than living
+ * inside `domain/tasks/trash`: what that module returns is row patches, and
+ * whether an event is orphaned is a question about `appSettings`, which it is
+ * deliberately not given.
+ *
+ * Returns `next` untouched when nothing was orphaned — the helper preserves
+ * the array's identity, so an account that has never seen Google does not get
+ * its settings pushed to the server on every delete.
+ */
+function withGoogleTombstones(current: PlannerData, next: PlannerData): PlannerData {
+  const ids = tombstonesAfterRemoval(current.appSettings.googleDeletedEventIds, current.tasks, next.tasks);
+  if (ids === current.appSettings.googleDeletedEventIds) return next;
+  return { ...next, appSettings: { ...next.appSettings, googleDeletedEventIds: ids } };
+}
+
 function isMissingRemoteTableError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const record = error as { code?: unknown; message?: unknown };
@@ -1120,7 +1140,7 @@ export function usePlannerData() {
    * of the Trash.
    */
   function deleteTask(taskId: string) {
-    setData((current) => ({ ...current, ...removeTasksForever(current, [taskId]) }));
+    setData((current) => withGoogleTombstones(current, { ...current, ...removeTasksForever(current, [taskId]) }));
   }
 
   /**
@@ -1132,7 +1152,7 @@ export function usePlannerData() {
   function permanentlyDeleteTask(taskId: string) {
     setData((current) => {
       const result = removeTaskForever(current, taskId);
-      return result.done ? { ...current, ...result.rows } : current;
+      return result.done ? withGoogleTombstones(current, { ...current, ...result.rows }) : current;
     });
   }
 
@@ -1154,11 +1174,11 @@ export function usePlannerData() {
     setData((current) => {
       const ids = lifecycle.binnedLists(current.lists).map((list) => list.id);
       const doomed = new Set(ids);
-      return {
+      return withGoogleTombstones(current, {
         ...current,
         ...emptyTrashRows(current, ids).rows,
         lists: current.lists.filter((list) => !doomed.has(list.id)),
-      };
+      });
     });
     return summary;
   }

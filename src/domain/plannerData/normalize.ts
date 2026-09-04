@@ -426,6 +426,17 @@ export function normalizeAppSettings(settings?: Partial<AppSettings>): AppSettin
     // rewrite the field on every single load.
     timezone:
       typeof settings?.timezone === "string" && settings.timezone ? settings.timezone : DEFAULT_APP_SETTINGS.timezone,
+    // Absent stays absent, like `collapsedFolderIds` above and for the same
+    // reason (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.3). Filtered rather than taken
+    // whole: this list is the only remaining evidence that an orphaned event
+    // exists, and a non-string in it is an id that can never be deleted.
+    ...(Array.isArray(settings?.googleDeletedEventIds)
+      ? {
+          googleDeletedEventIds: settings.googleDeletedEventIds.filter(
+            (id): id is string => typeof id === "string" && id.length > 0,
+          ),
+        }
+      : {}),
     aiModel: typeof settings?.aiModel === "string" ? settings.aiModel : DEFAULT_APP_SETTINGS.aiModel,
     // Absent stays absent: a box nobody has arranged reads as the default, and
     // writing four full view records into every account that never opened the
