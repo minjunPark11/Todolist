@@ -16,9 +16,12 @@
 // The output is the same shape as `api/ics.js`, which has served correctly
 // throughout: a single file with no relative imports left to resolve.
 //
-// Runs from `npm run build`, which Vercel executes BEFORE it collects
-// functions from `api/` — the build log's ordering is what makes generating
-// them here work at all.
+// The output is COMMITTED, and that is not an oversight. Vercel discovers
+// functions from the repository it clones, not from what the build leaves on
+// disk: generated-and-ignored, every one of them deployed as a 404 while the
+// hand-written `api/ics.js` beside them served fine. So the bundles are
+// tracked, `.gitattributes` marks them as output, and CI rebuilds and fails if
+// the tree moves — committed generated code goes stale in silence otherwise.
 import { build } from "esbuild";
 import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";

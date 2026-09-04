@@ -44,6 +44,19 @@ jobs:
       - name: Test
         run: npm test
 
+      # The functions under api/ are bundles generated from src/functions and
+      # committed, because Vercel reads them out of the repository. Committed
+      # output goes stale in silence, so the build runs here and the tree has
+      # to come back unchanged — a domain edit that nobody rebuilt for is a
+      # production endpoint running last week's code.
+      - name: Build
+        run: npm run build
+
+      - name: Bundled functions match their sources
+        run: |
+          git diff --exit-code -- api
+          test -z "$(git status --porcelain -- api)"
+
       # Add List design §17.3 asks for Desktop / Tablet / Mobile E2E as a
       # release condition, so it runs here rather than being something someone
       # remembers to run. Chromium only: the three are viewports, not engines

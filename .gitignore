@@ -18,11 +18,3 @@ docs/.obsidian/workspace.json
 /blob-report/
 /playwright/.cache/
 
-# Serverless functions, bundled from src/functions by scripts/buildFunctions.mjs.
-# One entry per top-level source name; a new function shows up as untracked
-# until its line is added here, which is the intended nudge. Hand-written
-# functions (api/ics.js, api/calendar/) are committed and never generated.
-api/google/
-api/mcp/
-api/well-known/
-api/health.js

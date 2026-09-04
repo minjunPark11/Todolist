@@ -1,0 +1,14 @@
+# The functions under api/ are bundles written by scripts/buildFunctions.mjs
+# and committed, because Vercel discovers functions from the repository rather
+# than from what the build leaves on disk. They are output, not source: marking
+# them keeps a domain change from arriving as five hundred kilobytes of diff,
+# and points a reader at src/functions/ instead. `eol=lf` keeps the checkout
+# byte-identical to what esbuild writes, so CI's drift check cannot fail over
+# line endings on a Windows working copy.
+#
+# api/ics.js and api/calendar/[token].js are NOT listed. Those are hand-written
+# and are the real thing to read.
+api/google/*.js    -diff linguist-generated=true text eol=lf
+api/mcp/*.js       -diff linguist-generated=true text eol=lf
+api/well-known/*.js -diff linguist-generated=true text eol=lf
+api/health.js      -diff linguist-generated=true text eol=lf
