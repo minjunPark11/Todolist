@@ -21,6 +21,7 @@ import { platform } from "../platform";
 import type { AppUpdateStatus } from "../platform";
 import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, Task, ThemeMode } from "../types";
 import { CalendarCategorySettings } from "./calendar/CalendarCategorySettings";
+import { GoogleCalendarCard } from "./calendar/GoogleCalendarCard";
 import { ConfirmModal, SegmentedTabs } from "./kit";
 import { useT } from "../i18n";
 
@@ -374,6 +375,13 @@ export function SettingsPage({
               </div>
             ) : null}
           </section>
+
+          {/* Two-way Google Calendar (GOOGLE_CALENDAR_SYNC_DESIGN.md M1-4d).
+              Above the ICS card because it is the same subject done properly:
+              that one subscribes to somebody else's calendar and can only
+              read, this one writes. It draws itself and finishes the OAuth
+              round trip, which is why the callback lands on this page. */}
+          <GoogleCalendarCard />
 
           <section className="ff-settings-card ff-cal-card">
             <div className="ff-cal-card-head">

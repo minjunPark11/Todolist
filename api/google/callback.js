@@ -1,3 +1,7 @@
+// src/domain/calendar/googleSync/connectFlow.ts
+var CALLBACK_ROUTE = "google-calendar";
+var CALLBACK_LANDING_PATH = "/settings";
+
 // src/server/mcp/auth.ts
 var UnauthorizedError = class extends Error {
   /** What goes in `WWW-Authenticate`, so a connector starts an OAuth flow. */
@@ -3100,7 +3104,7 @@ function handler(req, res) {
   else params.set("error", "no_code");
   if (state.platform === "desktop") {
     res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Location", `focusflow://google-calendar?${params.toString()}`);
+    res.setHeader("Location", `focusflow://${CALLBACK_ROUTE}?${params.toString()}`);
     res.status(302).end();
     return;
   }
@@ -3110,7 +3114,7 @@ function handler(req, res) {
     return;
   }
   res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Location", `${appUrl}/#google-calendar?${params.toString()}`);
+  res.setHeader("Location", `${appUrl}${CALLBACK_LANDING_PATH}#${CALLBACK_ROUTE}?${params.toString()}`);
   res.status(302).end();
 }
 export {

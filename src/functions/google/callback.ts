@@ -12,6 +12,7 @@
 // This is also the only reason `focusflow://` works at all. Google will not
 // redirect to a custom scheme for a desktop client (§4.4, chain step 1); it
 // redirects to this https address, and this hands off to the scheme.
+import { CALLBACK_LANDING_PATH, CALLBACK_ROUTE } from "../../domain/calendar/googleSync/connectFlow";
 import { decodeOAuthState } from "../../integrations/google";
 import { readAppUrl } from "../../server/mcp";
 
@@ -63,7 +64,7 @@ export default function handler(req: AdapterRequest, res: AdapterResponse): void
     // Registered by the installer from tauri.conf.json, and by
     // `register_all()` in development (src-tauri/src/main.rs).
     res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Location", `focusflow://google-calendar?${params.toString()}`);
+    res.setHeader("Location", `focusflow://${CALLBACK_ROUTE}?${params.toString()}`);
     res.status(302).end();
     return;
   }
@@ -78,6 +79,6 @@ export default function handler(req: AdapterRequest, res: AdapterResponse): void
   // logs, `Referer` headers and browser history. In the fragment it stays in
   // the tab, and the app strips it as soon as it has read it.
   res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Location", `${appUrl}/#google-calendar?${params.toString()}`);
+  res.setHeader("Location", `${appUrl}${CALLBACK_LANDING_PATH}#${CALLBACK_ROUTE}?${params.toString()}`);
   res.status(302).end();
 }
