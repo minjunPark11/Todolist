@@ -1,4 +1,35 @@
 {
+  // The solution file. It builds nothing itself — the two references below do
+  // the work — but it is ALSO the config Vercel's function builder finds when
+  // it compiles `api/**/*.ts`, and that is why it carries compilerOptions it
+  // does not use.
+  //
+  // Left empty, those options get inferred, and `"type": "module"` in
+  // package.json makes the inference node16/nodenext: every relative import in
+  // `api/` and everything it reaches under `src/` would need an explicit `.js`
+  // extension, and `../../src/integrations/google` could not resolve to that
+  // directory's index at all. That is TS2834, and it is what has failed every
+  // deployment since the MCP endpoint landed — the first `.ts` file under
+  // `api/`. The `.js` functions beside it kept serving from the last build that
+  // succeeded, which is why the site went stale without an obvious break.
+  //
+  // Bundler, not node16, because that is what actually runs the code: Vite for
+  // the app and esbuild for the functions, both of which resolve extensionless
+  // and directory imports. It matches tsconfig.app.json, which already
+  // typechecks `api/` on every `npm run build` — so the two agree instead of
+  // one quietly disagreeing at deploy time.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "strict": true
+  },
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },
