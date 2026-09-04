@@ -152,7 +152,12 @@ test.describe("what the removed panel did NOT take with it", () => {
     await expect(page.locator(".gcal-chip").filter({ hasText: "Unscheduled thing" })).toBeVisible();
   });
 
-  test("dragging out a new block on the week grid still works", async ({ page }) => {
+  test("dragging out a new block on the week grid still works", async ({ page, viewport }) => {
+    // Its two neighbours are about the month view and an all-day chip, which
+    // both survive a phone; this one drags on the week grid, and below 1024
+    // there is no week grid to drag on — the same clause the two describes
+    // above carry.
+    test.skip((viewport?.width ?? 0) < 1024, "the week grid wants a desktop window");
     await openCalendar(page);
     const column = page.locator(".gcal-time-col").nth(2);
     const box = (await column.boundingBox())!;

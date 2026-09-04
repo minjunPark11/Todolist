@@ -8,6 +8,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openApp, STORAGE_KEY } from "./addList.helpers";
 
+// §2.39: below 768 the Rail is `display: none` — a column of icons would eat a
+// sixth of a phone, and the legacy hamburger and the Tasks overlay sidebar
+// already reach every destination. Everything in this file is the Rail's, so
+// on that viewport there is no bell to ring and no sync button to draw.
+test.skip(({ viewport }) => (viewport?.width ?? 0) < 768, "the Rail steps aside on mobile (§2.39)");
+
 const NOTIFICATIONS_KEY = "focusflow.notifications.v1";
 
 function minutesAgo(minutes: number): string {
