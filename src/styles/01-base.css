@@ -102,7 +102,11 @@
   --product-shadow: 0 5px 30px rgba(0, 0, 0, 0.22);
 
   /* === FocusFlow design system (Redesign reference) — canonical tokens === */
-  --bg-app: #f2f2f7;
+  /* 표면 세 개가 한 면으로 읽히고 있었다: 바닥과 사이드바의 대비가 1.012로,
+     1.00(구별 불가)에서 거의 움직이지 않는다. 세 개의 회색이 하나의 일을
+     하고 있었고, "밋밋하다"의 정체가 액센트가 아니라 이것이었다.
+     1.07씩 벌린다 — 1.01은 안 보이고 1.15는 계단이 눈에 띈다. */
+  --bg-app: #eff1f5;
   --bg-sidebar: #ffffff;
   --bg-surface: #ffffff;
   --bg-surface-muted: #f5f5f7;
@@ -155,9 +159,17 @@
   --surface-2: rgba(25, 25, 25, 0.06);
 
   /* Accent is overridable per [data-accent]; default blue. */
-  --accent: #007aff;
-  --accent-soft: rgba(0, 122, 255, 0.1);
-  --accent-active: rgba(0, 122, 255, 0.11);
+  /* 4.02 → 5.59. `#007aff`는 흰 면 위에서 4.02:1이라 글자로 쓰이는 자리
+     (링크 · "Sign up" · 날짜 배지)가 WCAG AA 4.5에 미달했다. 색상은 같은
+     파랑에 두고 명도만 내린다 — 정체성을 바꾸는 것이 아니라 읽히게 하는 것이다.
+
+     다크는 같은 값을 쓸 수 없다. `#0064d2`는 어두운 카드 위에서 3.04로
+     오히려 나빠진다. 다크 블록이 `#0a84ff`를 세우는데, 그 값은 원래부터
+     `--accent-soft: rgba(10, 132, 255, …)`가 가리키고 있던 것이다 —
+     soft만 다크용으로 맞춰져 있고 정작 `--accent`는 재정의된 적이 없었다. */
+  --accent: #0064d2;
+  --accent-soft: rgba(0, 100, 210, 0.1);
+  --accent-active: rgba(0, 100, 210, 0.11);
 
   --danger: #ff3b30;
   --danger-soft: #ffecec;
@@ -387,8 +399,8 @@
      declarations): `getComputedStyle(root)` resolved --text, --surface, --bg,
      --hover, --selected, --border, --text-muted and --surface-muted to
      nothing at all. */
-  --bg-rail: #eceef1;
-  --bg-context-sidebar: #f0f1f4;
+  --bg-rail: #dfe3ea;
+  --bg-context-sidebar: #e7eaf0;
   /* V-P2: selected is an alpha, not a fixed grey. TickTick draws selection at
      8% of the foreground in both themes (Component 01 §4, 04 §11, 06 §8), which
      is why the same value reads on the Rail, the sidebar and an elevated menu.
@@ -496,7 +508,7 @@ body {
 }
 
 /* Accent themes (spec §4.7 AppSettings.accentColor) */
-[data-accent="blue"] { --accent: #007aff; --accent-soft: rgba(0, 122, 255, 0.1); }
+[data-accent="blue"] { --accent: #0064d2; --accent-soft: rgba(0, 100, 210, 0.1); }
 [data-accent="purple"] { --accent: #af52de; --accent-soft: rgba(175, 82, 222, 0.12); }
 [data-accent="green"] { --accent: #34c759; --accent-soft: rgba(52, 199, 89, 0.12); }
 [data-accent="pink"] { --accent: #ff2d55; --accent-soft: rgba(255, 45, 85, 0.1); }
@@ -512,12 +524,15 @@ body {
 
      Selection is an alpha here, matching `--bg-hover`'s idiom, so it reads
      the same on the Rail, the Sidebar and an elevated menu. */
-  --bg-rail: #0a0a0c;
-  --bg-context-sidebar: #0d0d0f;
+  /* 라이트와 같은 문제였다 — 1.019와 1.022로, 세 면이 한 면이었다.
+     여기서는 1.07까지 못 벌린다: 카드가 `#1c1c1e`로 고정이라 그 아래 남은
+     명도 폭이 좁다. 1.04/1.05/1.08이 그 안에서의 최대치이고, 현행의 두 배다. */
+  --bg-rail: #08080a;
+  --bg-context-sidebar: #0e0e11;
   --bg-selected: rgba(255, 255, 255, 0.08);
   --bg-selected-hover: rgba(255, 255, 255, 0.1);
   --bg-pressed: rgba(255, 255, 255, 0.12);
-  --bg-app: #101012;
+  --bg-app: #141417;
   --bg-sidebar: #1c1c1e;
   --bg-surface: #1c1c1e;
   --bg-surface-muted: #232325;
@@ -535,6 +550,8 @@ body {
   --text-tertiary: #8e8e93;
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.16);
+  /* soft/active가 처음부터 이 값을 가리키고 있었다. 이제 액센트 본체도 온다. */
+  --accent: #0a84ff;
   --accent-soft: rgba(10, 132, 255, 0.18);
   --accent-active: rgba(10, 132, 255, 0.2);
   --danger-soft: rgba(255, 69, 58, 0.16);

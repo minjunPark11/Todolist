@@ -134,10 +134,21 @@ test.describe("the component language (§V.3, V-6)", () => {
     // user can change (§11.3). The `tdy-` half of that comparison went with
     // the Today page (P0-2); what is left is the rule it was made to hold.
     const appearance = await appearanceOf(page, ["ff-btn ff-btn-primary", "sdv-btn sdv-btn-primary"], "button");
-    const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim());
+    // 액센트의 값이 아니라 "주 버튼이 액센트다"가 이 테스트의 문장이다. 숫자를
+    // 박아두면 액센트가 움직일 때마다 이 스펙이 그 뒤를 따라다닌다 — 실제로
+    // `#007aff`가 흰 면 위 4.02:1로 AA에 미달해 `#0064d2`로 내려올 때 그랬다.
+    const accent = await page.evaluate(() => {
+      const hex = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+      const probe = document.createElement("span");
+      probe.style.color = hex;
+      document.body.appendChild(probe);
+      const rgb = getComputedStyle(probe).color;
+      probe.remove();
+      return rgb;
+    });
     expect(accent).not.toBe("");
     for (const value of Object.values(appearance)) {
-      expect(value).toContain("rgb(0, 122, 255)");
+      expect(value).toContain(accent);
     }
   });
 
@@ -176,6 +187,15 @@ test.describe("the component language (§V.3, V-6)", () => {
         // 실제로 한 번 그랬다). 이 테스트가 묻는 것은 "이름이 무언가를 그리는가"이지
         // "그것이 10px인가"가 아니었다.
         scaleRadius: getComputedStyle(document.documentElement).getPropertyValue("--radius-sm").trim(),
+        // 액센트도 같은 이유로 토큰에서 읽는다 (아래 §V.3의 "주 버튼은 액센트다").
+        accent: (() => {
+          const probe = document.createElement("span");
+          probe.style.color = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+          document.body.appendChild(probe);
+          const rgb = getComputedStyle(probe).color;
+          probe.remove();
+          return rgb;
+        })(),
         card: read(".ff-card"),
         row: read(".ff-row"),
         field: read(".ff-field"),
@@ -192,7 +212,7 @@ test.describe("the component language (§V.3, V-6)", () => {
     expect(drawn.field.height).toBe(32);
     expect(drawn.button.height).toBe(32);
     // The primary is the only one of the five that is allowed to be loud.
-    expect(drawn.primary.background).toBe("rgb(0, 122, 255)");
+    expect(drawn.primary.background).toBe(drawn.accent);
     expect(drawn.button.background).not.toBe(drawn.primary.background);
   });
 
