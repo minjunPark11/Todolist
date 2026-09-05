@@ -18,7 +18,7 @@
   padding: 24px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 22px;
+  border-radius: var(--radius-sm);
   box-shadow: var(--shadow-card);
 }
 
@@ -36,16 +36,16 @@
   justify-content: center;
   width: 52px;
   height: 52px;
-  border-radius: 15px;
+  border-radius: var(--radius-sm);
   color: #fff;
-  font-size: 17px;
+  font-size: var(--type-xl);
   font-weight: 700;
   letter-spacing: 0.5px;
 }
 
 .sdv-header-identity h1 {
   margin: 0;
-  font-size: 27px;
+  font-size: var(--type-2xl);
   font-weight: 700;
   line-height: 1.15;
 }
@@ -53,7 +53,7 @@
 .sdv-header-subtitle {
   margin: 2px 0 0;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--type-md);
 }
 
 .sdv-header-counts {
@@ -79,15 +79,16 @@
   width: 44px;
   min-height: 38px;
   padding: 7px 0;
-  font-weight: 900;
+  font-weight: var(--weight-bold);
   border-color: var(--border-strong);
 }
 
 .sdv-more-dots {
   display: inline-block;
-  margin-top: -8px;
-  font-size: 28px;
-  font-weight: 900;
+  /* 28px짜리 ⋯를 광학 정렬하려던 보정. 글리프가 16px로 내려오면서
+     line-height: 1 만으로 맞으므로 보정할 것이 없다. */
+  font-size: var(--icon-glyph);
+  font-weight: var(--weight-bold);
   line-height: 1;
   letter-spacing: 0;
 }
@@ -97,7 +98,7 @@
   padding: 6px 12px;
   border-radius: var(--radius-pill);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--weight-bold);
 }
 
 .sdv-status-on_track { background: #e5f6ec; color: #15803d; }
@@ -133,15 +134,15 @@
 .sdv-metric-card h3 {
   margin: 0;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: var(--text-tertiary);
 }
 
 .sdv-metric-title {
-  font-size: 16px;
-  font-weight: 680;
+  font-size: var(--type-lg);
+  font-weight: var(--weight-bold);
   line-height: 1.3;
 }
 
@@ -196,7 +197,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 550;
+  font-weight: var(--weight-medium);
 }
 
 .sdv-upcoming-kind {
@@ -232,7 +233,7 @@
   border: 0;
   background: transparent;
   padding: 13px 16px;
-  font-size: 14px;
+  font-size: var(--type-md);
   font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
@@ -253,7 +254,7 @@
 .sdv-subtask-progress {
   flex: none;
   font-size: 11px;
-  font-weight: 650;
+  font-weight: var(--weight-bold);
   color: var(--text-secondary);
   background: var(--bg-surface-muted);
   border-radius: var(--radius-pill);
@@ -338,7 +339,7 @@
   background: transparent;
   text-align: left;
   padding: 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--text-primary);
   min-width: 0;
@@ -358,7 +359,7 @@
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  font-weight: 570;
+  font-weight: var(--weight-medium);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -387,7 +388,7 @@
 
 .sdv-actual-row strong {
   font-size: 13px;
-  font-weight: 570;
+  font-weight: var(--weight-medium);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -420,7 +421,7 @@
   max-height: min(84vh, 720px);
   overflow-y: auto;
   background: var(--bg-surface);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   padding: 20px;
   box-shadow: var(--shadow-raised);
   display: grid;
@@ -438,7 +439,7 @@
 .sdv-modal-head h2,
 .sdv-drawer-head h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--type-xl);
   font-weight: 700;
 }
 
@@ -456,7 +457,7 @@
 
 .sdv-modal-copy {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--type-md);
   color: var(--text-secondary);
   line-height: 1.5;
 }
@@ -470,7 +471,7 @@
   display: grid;
   gap: 5px;
   font-size: 12px;
-  font-weight: 620;
+  font-weight: var(--weight-bold);
   color: var(--text-secondary);
 }
 
@@ -478,9 +479,9 @@
 .sdv-form select,
 .sdv-form textarea {
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 9px 11px;
-  font-size: 14px;
+  font-size: var(--type-md);
   font-family: inherit;
   background: var(--bg-surface);
   color: var(--text-primary);
@@ -497,7 +498,7 @@
 .sdv-form h4 {
   margin: 8px 0 0;
   font-size: 13px;
-  font-weight: 680;
+  font-weight: var(--weight-bold);
   color: var(--text-primary);
 }
 
@@ -559,14 +560,14 @@
 
 .sdv-drawer-title {
   margin: 0;
-  font-size: 19px;
+  font-size: var(--type-xl);
   font-weight: 700;
   line-height: 1.3;
 }
 
 .sdv-drawer-notes {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--type-md);
   line-height: 1.55;
   color: var(--text-secondary);
   white-space: pre-wrap;
@@ -575,7 +576,7 @@
 .sdv-drawer-body h4 {
   margin: 4px 0 0;
   font-size: 13px;
-  font-weight: 680;
+  font-weight: var(--weight-bold);
 }
 
 .sdv-detail-list {
@@ -588,7 +589,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 14px;
+  font-size: var(--type-md);
 }
 
 .sdv-detail-list dt {
@@ -597,7 +598,7 @@
 
 .sdv-detail-list dd {
   margin: 0;
-  font-weight: 570;
+  font-weight: var(--weight-medium);
   text-align: right;
 }
 
@@ -614,7 +615,7 @@
   flex-direction: row;
   align-items: center;
   gap: 9px;
-  font-size: 14px !important;
+  font-size: var(--type-md) !important;
   color: var(--text-primary) !important;
 }
 
@@ -657,7 +658,7 @@
   align-items: center;
   gap: 8px;
   margin: 0 0 10px;
-  font-size: 0.82rem;
+  font-size: var(--type-md);
   color: var(--text-secondary, #6b7280);
 }
 
@@ -666,7 +667,7 @@
   background: none;
   padding: 0;
   color: var(--accent, #0066cc);
-  font-size: 0.8rem;
+  font-size: var(--type-md);
   cursor: pointer;
 }
 
@@ -702,9 +703,9 @@
   gap: 6px;
   min-width: 260px;
   border: 1px solid var(--border, #e5e7eb);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface, #fff);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-panel);
   padding: 10px;
 }
 

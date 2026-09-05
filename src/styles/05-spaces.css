@@ -39,7 +39,7 @@
 
 .foc-header h1 {
   margin: 0;
-  font-size: 40px;
+  font-size: var(--display-md);
   line-height: 1;
   letter-spacing: 0;
 }
@@ -47,7 +47,7 @@
 .foc-header p {
   margin: 8px 0 0;
   color: var(--text-secondary);
-  font-size: 16px;
+  font-size: var(--type-lg);
 }
 
 .foc-header-chips {
@@ -64,11 +64,11 @@
   align-items: center;
   min-height: 42px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 0 16px;
   background: var(--bg-surface);
   box-shadow: var(--shadow-card);
-  font-size: 14px;
+  font-size: var(--type-md);
 }
 
 .foc-layout {
@@ -133,7 +133,7 @@
 .foc-card h2,
 .foc-card-head h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--type-xl);
   letter-spacing: 0;
 }
 
@@ -141,7 +141,7 @@
   width: 32px;
   height: 32px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   font-weight: 700;
@@ -155,7 +155,7 @@
 .foc-group-title {
   justify-content: flex-start;
   color: var(--text-primary);
-  font-weight: 750;
+  font-weight: var(--weight-bold);
 }
 
 .foc-group-title small {
@@ -180,7 +180,7 @@
   align-items: center;
   min-height: 74px;
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   padding: 10px;
   background: var(--bg-surface);
 }
@@ -196,10 +196,10 @@
   width: 32px;
   height: 32px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--bg-surface);
   color: var(--text-secondary);
-  font-weight: 800;
+  font-weight: var(--weight-bold);
 }
 
 .foc-task.is-active .foc-play,
@@ -249,12 +249,12 @@
   display: inline-flex;
   align-items: center;
   min-height: 26px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0 9px;
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: var(--weight-bold);
 }
 
 .foc-red .foc-tag { color: #b42318; background: #ffe8e5; }
@@ -272,7 +272,7 @@
   justify-self: stretch;
   justify-content: flex-start;
   color: var(--accent);
-  font-weight: 750;
+  font-weight: var(--weight-bold);
   font-size: 13px;
 }
 
@@ -297,16 +297,16 @@
 .foc-timer h2 {
   max-width: 100%;
   margin: 10px 0 0;
-  font-size: 22px;
+  font-size: var(--display-sm);
   overflow-wrap: anywhere;
 }
 
 .foc-clock {
   margin-top: 10px;
   color: var(--text-primary);
-  font-size: clamp(46px, 5.5vw, 62px);
+  font-size: var(--display-lg);
   line-height: 1;
-  font-weight: 800;
+  font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }
@@ -314,8 +314,8 @@
 .foc-note {
   width: 100%;
   min-height: 70px;
-  border-radius: 10px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--type-md);
 }
 
 .foc-controls {
@@ -330,10 +330,10 @@
 .foc-global-actions button {
   min-height: 32px;
   border: 1px solid var(--accent-soft);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: var(--bg-surface);
   color: var(--accent);
-  font-weight: 800;
+  font-weight: var(--weight-bold);
 }
 
 .foc-controls button.danger,
@@ -352,7 +352,7 @@
 .foc-meta {
   width: 100%;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 12px;
   background: var(--bg-surface-muted);
 }
@@ -366,7 +366,7 @@
 
 .foc-meta strong {
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: var(--type-lg);
 }
 
 .foc-no-session,
@@ -383,10 +383,10 @@
   place-items: center;
   width: 66px;
   height: 66px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   color: var(--accent);
   background: var(--accent-soft);
-  font-size: 34px;
+  font-size: var(--display-md);
 }
 
 .foc-stat-grid {
@@ -400,7 +400,7 @@
   gap: 6px;
   min-height: 84px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 14px;
   background: var(--bg-surface-muted);
 }
@@ -410,7 +410,7 @@
 }
 
 .foc-stat-grid strong {
-  font-size: 22px;
+  font-size: var(--display-sm);
 }
 
 .foc-project-bars {
@@ -487,7 +487,7 @@
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--success);
   background: #e7f8ee;
 }
@@ -507,7 +507,7 @@
   gap: 14px;
   width: min(420px, 100%);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   padding: 22px;
   background: var(--bg-surface);
   box-shadow: var(--shadow-panel);
@@ -536,7 +536,7 @@
   align-items: center;
   min-height: 76px;
   border: 1px solid var(--border-subtle);
-  border-radius: 22px;
+  border-radius: var(--radius-sm);
   padding: 12px 18px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow-panel);
@@ -579,8 +579,8 @@
 }
 
 .foc-global-time {
-  font-size: 28px;
-  font-weight: 800;
+  font-size: var(--display-sm);
+  font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -600,8 +600,8 @@
 }
 
 .foc-global-actions .foc-global-icon-action {
-  border-radius: 8px;
-  font-weight: 900;
+  border-radius: var(--radius-sm);
+  font-weight: var(--weight-bold);
 }
 
 @media (max-width: 1240px) {

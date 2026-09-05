@@ -20,7 +20,7 @@
 
 .tcv-range {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--type-md);
   min-width: 8ch;
   text-align: center;
 }

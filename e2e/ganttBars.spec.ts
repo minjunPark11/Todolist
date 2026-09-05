@@ -207,6 +207,11 @@ test.describe("the mark for today", () => {
     await expect(head).toHaveCount(1);
     // A weekday in the label is I7; a filled pill around it is §6.
     await expect(head).toHaveText(/\(\w+\)$/);
-    await expect(head).toHaveCSS("border-radius", "999px");
+    // 알약이라는 것이 요점이지 999라는 숫자가 아니었다. 자가 움직여도 이 문장은
+    // 같은 것을 묻는다 (SWISS_MINIMAL_DESIGN.md I1-B).
+    const pill = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--radius-pill").trim(),
+    );
+    await expect(head).toHaveCSS("border-radius", pill);
   });
 });

@@ -96,6 +96,7 @@ test.describe("the page scrollbar", () => {
       return {
         width: box.width,
         radius: style.borderTopLeftRadius,
+        pill: getComputedStyle(document.documentElement).getPropertyValue("--radius-pill").trim(),
         fromRight: window.innerWidth - box.right,
         position: style.position,
         pointerEvents: style.pointerEvents,
@@ -106,7 +107,9 @@ test.describe("the page scrollbar", () => {
     }, BAR);
 
     expect(shape.width).toBe(6);
-    expect(shape.radius).toBe("7px");
+    // 폭 6px에 반경 7px이었다 — 모서리가 아니라 캡슐이다. 7이라는 숫자는 그 형태를
+    // 적는 한 가지 방법이었을 뿐이고, 자를 세운 뒤로는 알약 토큰이 그 이름이다.
+    expect(shape.radius).toBe(shape.pill);
     expect(shape.fromRight).toBe(2);
     expect(shape.position).toBe("fixed");
     // Nothing to grab: §4.1 kept the bar invisible under the pointer, so it

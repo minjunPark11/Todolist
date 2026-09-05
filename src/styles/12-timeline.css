@@ -107,11 +107,11 @@
    date, so the two screens mark the day with one shape.
    The pill is on the INNER span: the column is a seventh of the track and a
    pill that wide is a bar, not a badge. */
-.ff-timeline-col.is-today { color: var(--accent); font-weight: 800; }
+.ff-timeline-col.is-today { color: var(--accent); font-weight: var(--weight-bold); }
 .ff-timeline-col-mark {
   display: inline-block;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 .ff-timeline-col.is-today .ff-timeline-col-mark {
   background: var(--accent);
@@ -184,7 +184,7 @@
   width: 2px;
   /* Centred on the instant rather than starting at it. */
   margin-left: -1px;
-  border-radius: 1px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
   opacity: 0.55;
 }
@@ -527,7 +527,7 @@
    three-day task (D4). */
 .ff-timeline-bar.is-clipped-start { border-top-left-radius: 2px; border-bottom-left-radius: 2px; }
 .ff-timeline-bar.is-clipped-end { border-top-right-radius: 2px; border-bottom-right-radius: 2px; }
-.ff-timeline-clip { font-size: 9px; opacity: 0.85; flex: none; }
+.ff-timeline-clip { font-size: var(--type-xs); opacity: 0.85; flex: none; }
 
 /* One date and no width to describe (D8).
 
@@ -542,7 +542,7 @@
   height: 14px;
   margin-left: -7px;
   padding: 0;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   transform: rotate(45deg);
 }
 .ff-timeline-bar.is-marker .ff-timeline-bar-text,

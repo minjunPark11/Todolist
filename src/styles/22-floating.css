@@ -35,7 +35,7 @@
   border: 1px solid var(--border-subtle);
   /* §19.58: enough separation to read as above the page, not so much that it
      reads as a modal. */
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-panel);
   /* §19.17: the surface scrolls inside its own max-height, which the layer
      system measures. Both axes, because a Tag picker with long names overflows
      sideways too — and `auto`, so the bar appears only when it is needed. */

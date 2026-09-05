@@ -46,7 +46,7 @@
 
   .gcal-range-label {
     width: 100%;
-    font-size: 1rem;
+    font-size: var(--type-lg);
   }
 
   .gcal-toolbar-right {
@@ -82,7 +82,7 @@
   border-radius: var(--rounded-pill);
   background: transparent;
   color: var(--color-ink);
-  font-size: 0.95rem;
+  font-size: var(--type-lg);
 }
 
 .gcal-icon-btn:hover:not(:disabled) {
@@ -115,7 +115,7 @@
   border-radius: var(--rounded-pill);
   background: transparent;
   color: var(--color-ink);
-  font-size: 1rem;
+  font-size: var(--type-lg);
 }
 
 .gcal-nav button:hover {
@@ -124,7 +124,7 @@
 
 .gcal-range-label {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--type-xl);
   font-weight: 400;
 }
 
@@ -197,7 +197,7 @@
 }
 
 .gcal-mini-month-head {
-  font-size: 0.82rem;
+  font-size: var(--type-md);
   font-weight: 600;
   color: var(--color-ink-muted-80);
 }
@@ -210,7 +210,7 @@
 
 .gcal-mini-weekday {
   text-align: center;
-  font-size: 0.62rem;
+  font-size: var(--type-xs);
   color: var(--color-ink-muted-48);
   padding-bottom: 2px;
 }
@@ -223,7 +223,7 @@
   min-height: 24px;
   background: transparent;
   color: var(--color-ink);
-  font-size: 0.72rem;
+  font-size: var(--type-sm);
 }
 
 .gcal-mini-day:hover {
@@ -263,7 +263,7 @@
 
 .gcal-sidebar-section h3 {
   margin: 0 0 2px;
-  font-size: 0.72rem;
+  font-size: var(--type-sm);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   color: var(--color-ink-muted-48);
@@ -272,7 +272,7 @@
 .gcal-sidebar-empty {
   margin: 0;
   color: var(--color-ink-muted-48);
-  font-size: 0.78rem;
+  font-size: var(--type-sm);
   line-height: 1.4;
 }
 
@@ -317,7 +317,7 @@
 
 .gcal-month-weekdays span {
   color: var(--color-ink-muted-48);
-  font-size: 0.78rem;
+  font-size: var(--type-sm);
   font-weight: 600;
   text-align: center;
   text-transform: uppercase;
@@ -386,7 +386,7 @@
   border-radius: var(--rounded-pill);
   padding: 0 5px;
   color: var(--color-ink-muted-80);
-  font-size: 0.8rem;
+  font-size: var(--type-md);
   font-weight: 600;
 }
 
@@ -423,7 +423,7 @@
   height: 18px;
   border: 0;
   border-left: 3px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 0 6px;
   color: var(--color-ink);
   background: var(--color-primary-tint);
@@ -512,13 +512,13 @@
 }
 
 .gcal-day-title strong {
-  font-size: 28px;
+  font-size: var(--type-2xl);
   font-weight: 600;
   line-height: 1.2;
 }
 
 .gcal-day-title span {
-  font-size: 16px;
+  font-size: var(--type-lg);
   color: var(--color-ink-muted-80);
 }
 
@@ -541,7 +541,7 @@
 .gcal-time-corner.small {
   display: flex;
   align-items: center;
-  font-size: 0.68rem;
+  font-size: var(--type-xs);
   color: var(--color-ink-muted-48);
   padding: 4px 6px;
 }
@@ -555,13 +555,13 @@
 }
 
 .gcal-col-weekday {
-  font-size: 0.7rem;
+  font-size: var(--type-xs);
   text-transform: uppercase;
   color: var(--color-ink-muted-48);
 }
 
 .gcal-col-date {
-  font-size: 0.95rem;
+  font-size: var(--type-lg);
   font-weight: 600;
 }
 
@@ -630,7 +630,7 @@
 .gcal-allday-resizer span {
   width: 36px;
   height: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: var(--color-divider-soft);
   transition: background 120ms ease;
 }
@@ -664,7 +664,7 @@
   justify-content: flex-end;
   padding: 0 6px;
   transform: translateY(-7px);
-  font-size: 0.68rem;
+  font-size: var(--type-xs);
   color: var(--color-ink-muted-48);
 }
 
@@ -694,7 +694,7 @@
   right: 0;
   text-align: center;
   color: var(--color-ink-muted-48);
-  font-size: 0.86rem;
+  font-size: var(--type-md);
   pointer-events: none;
   z-index: 1;
 }
@@ -707,7 +707,7 @@
   border-radius: var(--rounded-xs);
   background: var(--color-primary-tint);
   padding: 4px 6px;
-  font-size: 0.72rem;
+  font-size: var(--type-sm);
   color: var(--color-primary);
   pointer-events: none;
   z-index: 25;
@@ -737,13 +737,13 @@
 }
 
 .gcal-draft-label {
-  font-size: 0.68rem;
+  font-size: var(--type-xs);
   font-weight: 600;
   color: var(--color-primary);
 }
 
 .gcal-draft-time {
-  font-size: 0.7rem;
+  font-size: var(--type-xs);
   color: var(--color-primary);
 }
 
@@ -769,7 +769,7 @@
 }
 
 .gcal-tb-time {
-  font-size: 0.66rem;
+  font-size: var(--type-xs);
   color: var(--color-ink-muted-48);
 }
 
@@ -832,7 +832,7 @@
 }
 
 .gcal-tb-title {
-  font-size: 0.78rem;
+  font-size: var(--type-sm);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -884,7 +884,7 @@
 .gcal-now-badge span {
   background: var(--calendar-now-color);
   color: #fff;
-  font-size: 0.66rem;
+  font-size: var(--type-xs);
   font-weight: 600;
   line-height: 1;
   padding: 3px 4px;
@@ -938,13 +938,13 @@
 
 .gcal-newtask-head h2 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--type-xl);
 }
 
 .gcal-newtask-form label {
   display: grid;
   gap: 4px;
-  font-size: 0.82rem;
+  font-size: var(--type-md);
   color: var(--color-ink-muted-80);
 }
 
@@ -953,7 +953,7 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--rounded-sm);
   padding: 8px 10px;
-  font-size: 0.9rem;
+  font-size: var(--type-lg);
   background: var(--color-canvas);
   color: var(--color-ink);
 }
@@ -964,7 +964,7 @@
 .gcal-newtask-due {
   display: grid;
   gap: 4px;
-  font-size: 0.82rem;
+  font-size: var(--type-md);
   color: var(--color-ink-muted-80);
 }
 
@@ -974,7 +974,7 @@
   padding: 8px 10px;
   background: var(--color-canvas);
   color: var(--color-ink-muted-48);
-  font-size: 0.9rem;
+  font-size: var(--type-lg);
   text-align: left;
   cursor: pointer;
 }
@@ -995,12 +995,12 @@
   border-radius: var(--rounded-sm);
   padding: 8px 10px;
   background: var(--color-primary-tint);
-  font-size: 0.86rem;
+  font-size: var(--type-md);
   color: var(--color-primary);
 }
 
 .gcal-newtask-when-label {
-  font-size: 0.68rem;
+  font-size: var(--type-xs);
   text-transform: uppercase;
   color: var(--color-ink-muted-48);
 }
@@ -1026,7 +1026,7 @@
   padding: 1px 6px;
   color: #4b42c5;
   background: rgba(88, 86, 214, 0.12);
-  font-size: 0.62rem;
+  font-size: var(--type-xs);
   font-weight: 700;
 }
 
@@ -1051,12 +1051,12 @@
 }
 
 .gcal-suggestion-bar strong {
-  font-size: 0.78rem;
+  font-size: var(--type-sm);
 }
 
 .gcal-suggestion-bar span {
   color: var(--color-ink-muted-64);
-  font-size: 0.7rem;
+  font-size: var(--type-xs);
 }
 
 .gcal-suggestion-bar button {
@@ -1066,14 +1066,14 @@
   padding: 0 10px;
   background: var(--color-canvas);
   color: var(--color-ink);
-  font-size: 0.74rem;
+  font-size: var(--type-sm);
 }
 
 .gcal-alert {
   margin: 0;
   padding: 9px 10px;
   color: var(--danger);
-  font-size: 0.78rem;
+  font-size: var(--type-sm);
 }
 
 /* --- Event / agenda popovers (spec §5.7, §6.8) --- */
@@ -1099,10 +1099,10 @@
   max-height: 340px;
   overflow-y: auto;
   border: 1px solid var(--color-hairline);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 16px;
   background: var(--color-canvas);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-panel);
 }
 
 .gcal-popover-head {
@@ -1124,7 +1124,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.95rem;
+  font-size: var(--type-xl);
 }
 
 .gcal-popover-close {
@@ -1132,7 +1132,7 @@
   border: 0;
   background: transparent;
   color: var(--color-ink-muted-48);
-  font-size: 0.8rem;
+  font-size: var(--type-md);
   padding: 2px 4px;
   cursor: pointer;
 }
@@ -1155,7 +1155,7 @@
 .gcal-popover-when {
   margin: 0;
   color: var(--color-ink-muted-80);
-  font-size: 0.82rem;
+  font-size: var(--type-md);
 }
 
 .gcal-popover-memo {
@@ -1163,7 +1163,7 @@
   background: transparent;
   color: var(--color-primary);
   text-align: left;
-  font-size: 0.82rem;
+  font-size: var(--type-md);
   padding: 0;
   cursor: pointer;
 }
@@ -1177,7 +1177,7 @@
 .gcal-popover-edit label {
   display: grid;
   gap: 3px;
-  font-size: 0.72rem;
+  font-size: var(--type-sm);
   color: var(--color-ink-muted-80);
 }
 
@@ -1192,12 +1192,12 @@
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.3));
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 5px 8px;
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--type-md);
 }
 
 .gcal-popover-edit textarea {
@@ -1213,11 +1213,11 @@
 
 .gcal-popover-edit-actions button {
   border: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.3));
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 4px 12px;
   background: transparent;
   color: inherit;
-  font-size: 0.8rem;
+  font-size: var(--type-md);
   cursor: pointer;
 }
 
@@ -1241,11 +1241,11 @@
   gap: 8px;
   width: 100%;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   padding: 6px;
   text-align: left;
-  font-size: 0.82rem;
+  font-size: var(--type-md);
   color: var(--color-ink);
 }
 
@@ -1314,7 +1314,7 @@
   background: transparent;
   padding: 0;
   text-align: left;
-  font-size: 16px;
+  font-size: var(--type-xl);
   font-weight: 600;
   color: var(--color-primary);
   cursor: pointer;
@@ -1373,7 +1373,7 @@
 .gcal-quick-create-form label {
   display: grid;
   gap: 4px;
-  font-size: 0.82rem;
+  font-size: var(--type-md);
   color: var(--color-ink-muted-80);
 }
 
@@ -1382,7 +1382,7 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--rounded-sm);
   padding: 8px 10px;
-  font-size: 0.9rem;
+  font-size: var(--type-lg);
   background: var(--color-canvas);
   color: var(--color-ink);
 }
@@ -1436,9 +1436,9 @@
 .board-inline-add input {
   min-height: 38px;
   border-color: transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-surface-muted);
-  font-size: 0.86rem;
+  font-size: var(--type-md);
 }
 
 .board-inline-add input:focus {
@@ -1448,7 +1448,7 @@
 
 .board-column-header h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--type-xl);
 }
 
 .board-column-header span {
@@ -1477,7 +1477,7 @@
 .board-card h3 {
   margin: 0;
   overflow-wrap: anywhere;
-  font-size: 0.98rem;
+  font-size: var(--type-lg);
 }
 
 .board-card select {
@@ -1578,7 +1578,7 @@
 .auth-brand p {
   margin: 0;
   color: #8390a8;
-  font-size: 1.05rem;
+  font-size: var(--type-xl);
 }
 
 .auth-gate-form {
@@ -1590,7 +1590,7 @@
   display: grid;
   gap: 9px;
   color: #16213a;
-  font-size: 0.94rem;
+  font-size: var(--type-lg);
   font-weight: 700;
 }
 
@@ -1614,7 +1614,7 @@
 .auth-input-wrap > span {
   width: 28px;
   color: #8e9bb3;
-  font-size: 0.9rem;
+  font-size: var(--type-lg);
   font-weight: 800;
 }
 
@@ -1638,7 +1638,7 @@
   padding: 7px 8px;
   color: #7e8aa2;
   background: transparent;
-  font-size: 0.78rem;
+  font-size: var(--icon-glyph);
   font-weight: 700;
 }
 
@@ -1657,7 +1657,7 @@
   justify-content: space-between;
   gap: 12px;
   color: #4e5d78;
-  font-size: 0.92rem;
+  font-size: var(--type-lg);
 }
 
 .auth-check {
@@ -1687,7 +1687,7 @@
   color: #ffffff;
   background: linear-gradient(135deg, #4677ff, #2761ff);
   box-shadow: 0 16px 28px rgba(39, 97, 255, 0.24);
-  font-size: 1.06rem;
+  font-size: var(--type-xl);
   font-weight: 750;
 }
 
@@ -1713,7 +1713,7 @@
 
 .auth-divider em {
   font-style: normal;
-  font-size: 0.9rem;
+  font-size: var(--type-lg);
 }
 
 .auth-switch {
@@ -1726,7 +1726,7 @@
   margin: -8px 0 0;
   color: var(--accent);
   text-align: center;
-  font-size: 0.9rem;
+  font-size: var(--type-lg);
   font-weight: 650;
 }
 
@@ -1882,7 +1882,7 @@ main {
   gap: 12px;
   min-height: 48px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   padding: 0 14px 0 16px;
   color: #fff;
   background: rgba(29, 29, 31, 0.94);
@@ -1897,15 +1897,15 @@ main {
 
 .toast button {
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 7px 10px;
   color: #fff;
   background: rgba(0, 122, 255, 0.9);
-  font-weight: 650;
+  font-weight: var(--weight-bold);
 }
 
 .legend span {
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-surface);
 }
 

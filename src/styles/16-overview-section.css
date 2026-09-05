@@ -24,7 +24,7 @@
   min-height: 84px;
   padding: 14px 16px;
   border: 1px solid var(--border, #e5e7eb);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface, #fff);
 }
 
@@ -63,7 +63,7 @@
 .ovs-card {
   padding: 14px 16px;
   border: 1px solid var(--border, #e5e7eb);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface, #fff);
 }
 

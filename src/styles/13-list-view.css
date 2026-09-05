@@ -33,7 +33,7 @@
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface, #fff);
   color: inherit;
   font: inherit;
@@ -50,7 +50,7 @@
 .tlv-scroll {
   overflow-x: auto;
   border: 1px solid var(--border, #e5e7eb);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
 }
 
 .tlv-table {
@@ -68,7 +68,7 @@
 
 .tlv-table thead th {
   height: 34px;
-  font-weight: 500;
+  font-weight: var(--weight-normal);
   color: var(--text-muted, #6b7280);
   border-bottom: 1px solid var(--border, #e5e7eb);
   position: sticky;
@@ -144,7 +144,7 @@
   margin: 0;
   padding: 9px 10px;
   border: 1px dashed var(--border, #e5e7eb);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--text-muted, #6b7280);
   font-size: 13px;
 }
@@ -154,7 +154,7 @@
   height: 34px;
   padding: 0 10px;
   border: 1px dashed var(--border, #e5e7eb);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   font: inherit;
   font-size: 13px;

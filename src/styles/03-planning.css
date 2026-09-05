@@ -22,7 +22,7 @@
   gap: 16px;
 }
 .ff-page-title {
-  font-size: 30px;
+  font-size: var(--type-2xl);
   line-height: 38px;
   font-weight: 700;
   margin: 0;
@@ -42,7 +42,7 @@
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: var(--icon-glyph);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -87,7 +87,7 @@
 .ff-task-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
 .ff-task-title {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: var(--weight-normal);
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -179,7 +179,7 @@
   background: transparent;
   text-align: left;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   color: var(--text-primary);
   display: flex;
@@ -212,7 +212,7 @@
   place-items: center;
   height: 32px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-tertiary);
   cursor: pointer;
@@ -225,13 +225,13 @@
 .ff-menu-choice.is-on { background: var(--accent-soft); color: var(--accent); }
 
 .ff-datepicker { display: flex; flex-direction: column; gap: 8px; padding: 4px; min-width: 200px; }
-.ff-datepicker input { padding: 6px 8px; border: 1px solid var(--border-subtle); border-radius: 8px; }
+.ff-datepicker input { padding: 6px 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); }
 .ff-datepicker-quick { display: flex; gap: 6px; }
 .ff-datepicker-quick button {
   flex: 1;
   border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 5px;
   font-size: 12px;
 }
@@ -250,9 +250,9 @@
   border-radius: var(--radius-lg);
   color: var(--text-secondary);
 }
-.ff-empty-icon { font-size: 32px; }
-.ff-empty strong { font-size: 16px; color: var(--text-primary); }
-.ff-empty p { margin: 0; font-size: 14px; max-width: 360px; }
+.ff-empty-icon { font-size: var(--display-sm); }
+.ff-empty strong { font-size: var(--type-lg); color: var(--text-primary); }
+.ff-empty p { margin: 0; font-size: var(--type-md); max-width: 360px; }
 
 /* Segmented tabs */
 /* Segmented control (reference view switcher: bg 4% · p3 · active = white + xs) */
@@ -270,14 +270,14 @@
   height: 32px;
   border-radius: var(--radius-sm);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: var(--weight-normal);
   color: var(--text-tertiary);
   transition: background var(--motion-fast), color var(--motion-fast);
 }
 .ff-segmented button.active {
   background: var(--bg-surface);
   color: var(--text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
 }
 
 /* Modals */
@@ -307,11 +307,11 @@
 }
 .ff-modal-wide { max-width: 720px; }
 .ff-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.ff-modal-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
-.ff-modal h2 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+.ff-modal-head h2 { margin: 0; font-size: var(--type-xl); font-weight: 600; }
+.ff-modal h2 { margin: 0 0 12px; font-size: var(--type-xl); font-weight: 600; }
 .ff-modal-body { display: flex; flex-direction: column; gap: 14px; }
 .ff-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
-.ff-confirm-body { color: var(--text-secondary); font-size: 14px; }
+.ff-confirm-body { color: var(--text-secondary); font-size: var(--type-md); }
 
 .ff-form label {
   display: flex;
@@ -327,7 +327,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   padding: 9px 10px;
-  font-size: 14px;
+  font-size: var(--type-md);
   font-weight: 400;
   color: var(--text-primary);
   background: var(--bg-surface);
@@ -346,7 +346,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  font-size: 14px;
+  font-size: var(--type-md);
   box-shadow: var(--shadow-raised);
   z-index: 200;
 }
@@ -378,7 +378,7 @@
     width: 42px;
     height: 42px;
     border: 1px solid var(--border-subtle);
-    border-radius: 12px;
+    border-radius: var(--radius-sm);
     padding: 0 10px;
     background: var(--bg-surface);
     box-shadow: var(--shadow-card);
@@ -455,7 +455,7 @@
   }
 
   .ff-page-title {
-    font-size: clamp(1.75rem, 8vw, 2.25rem);
+    font-size: var(--type-2xl);
     line-height: 1.08;
   }
 
@@ -525,7 +525,7 @@
 }
 .ff-board-col.is-over { border-color: var(--accent); background: var(--accent-soft); }
 .ff-board-col-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px; }
-.ff-board-col-head strong { font-size: 14px; }
+.ff-board-col-head strong { font-size: var(--type-md); }
 .ff-board-count { background: var(--surface-2); border-radius: var(--radius-pill); padding: 1px 8px; font-size: 12px; font-weight: 700; color: var(--text-secondary); }
 .ff-board-col-body { display: flex; flex-direction: column; gap: 8px; }
 
@@ -543,7 +543,7 @@
 .ff-board-card:active { cursor: grabbing; }
 .ff-board-card.is-selected { border-color: var(--accent); }
 .ff-board-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.ff-board-card-title { font-size: 14px; color: var(--text-primary); line-height: 1.4; }
+.ff-board-card-title { font-size: var(--type-md); color: var(--text-primary); line-height: 1.4; }
 .ff-board-card-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* ===== Planning: Matrix ===== */
@@ -574,7 +574,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 8px 12px;
-  font-size: 14px;
+  font-size: var(--type-md);
   background: var(--bg-surface);
   color: var(--text-primary);
 }
@@ -770,7 +770,7 @@
   height: 22px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: none;
   transition: transform var(--motion-fast);
 }
 .ff-toggle.on .ff-toggle-knob { transform: translateX(18px); }
@@ -971,7 +971,7 @@
   color: var(--text-primary);
 }
 /* A `+` at the menu's font size reads as a hyphen with ambitions. */
-.ff-matrix-cell-add { font-size: 17px; }
+.ff-matrix-cell-add { font-size: var(--icon-glyph); }
 .ff-matrix-cell-add[aria-expanded="true"] { background: var(--bg-hover-content); color: var(--q-color); }
 
 /* The box's input, at the top of the body and outlined in the box's own
@@ -1009,7 +1009,7 @@
   cursor: pointer;
 }
 .ff-matrix-quick-add button:disabled { opacity: 0.45; cursor: default; }
-.ff-matrix-cell-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.ff-matrix-cell-title { font-size: var(--type-md); font-weight: 600; color: var(--text-primary); }
 .ff-matrix-cell-hint { font-size: 11px; color: var(--text-tertiary); }
 
 /* The cards scroll, the box does not: a full quadrant must not push the grid

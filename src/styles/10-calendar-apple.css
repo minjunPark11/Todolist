@@ -40,7 +40,7 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  border-radius: 1px;
+  border-radius: var(--radius-sm);
   background: var(--ev-color, var(--accent));
 }
 
@@ -578,8 +578,8 @@
   transition: background var(--motion-fast, 120ms), opacity var(--motion-fast, 120ms);
 }
 
-.gcal-check.is-chip .gcal-check-box { width: 13px; height: 13px; border-radius: 3.5px; }
-.gcal-check.is-month .gcal-check-box { width: 12px; height: 12px; border-radius: 3px; border-width: 1.4px; }
+.gcal-check.is-chip .gcal-check-box { width: 13px; height: 13px; border-radius: var(--radius-sm); }
+.gcal-check.is-month .gcal-check-box { width: 12px; height: 12px; border-radius: var(--radius-sm); border-width: 1.4px; }
 
 /* State 2: the box answers the hover, the block does not. Two surfaces
    lighting up together would make it unclear which one the click lands on. */
@@ -727,7 +727,7 @@
   min-height: 30px;
   padding: 0 6px;
   margin: 0 -6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   cursor: pointer;
 }
@@ -786,7 +786,7 @@
    glyph on the screen, which is what R2 was protecting. */
 .gcal-toolbar .gcal-range-label {
   margin: 0;
-  font-size: 22px;
+  font-size: var(--type-2xl);
   line-height: 28px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -823,7 +823,7 @@
   color: #fff;
   font: inherit;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: var(--weight-bold);
   cursor: pointer;
 }
 
