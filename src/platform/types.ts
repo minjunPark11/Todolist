@@ -12,6 +12,21 @@ export type AppUpdateStatus =
   | { status: "unavailable"; message?: string };
 
 /**
+ * What the settings row shows, which is the platform answer plus the two
+ * states that only exist while someone is looking at the row.
+ *
+ * One name, because the union was spelled out at three call sites — App, the
+ * page router and the screen — and adding `idle` to two of them typechecked
+ * for exactly as long as it took to reach the third.
+ */
+export type SettingsUpdateStatus =
+  | AppUpdateStatus
+  /** Nothing has asked yet. `<UpdateChecker />` owns the check at startup. */
+  | { status: "idle" }
+  | { status: "checking" }
+  | { status: "installing"; latestVersion?: string };
+
+/**
  * Where notification permission stands (§6.38, §6.40).
  *
  * Four values and not a boolean, because the three ways of "no" call for

@@ -28,40 +28,13 @@ import {
   exchangeCodeForAccess,
   GoogleCalendarError,
   readConnection,
+  readPendingConnect,
+  writePendingConnect,
   type GoogleConnection,
 } from "../../lib/googleCalendar";
 import { platform } from "../../platform";
 import { supabase } from "../../services/supabaseClient";
 import { ConfirmModal } from "../kit";
-
-/**
- * The flow this client started, kept where a full page navigation cannot lose
- * it — the web half leaves the app entirely and comes back to a fresh mount.
- */
-const PENDING_KEY = "focusflow.google.pendingConnect";
-
-function readPending(): PendingConnect | null {
-  try {
-    const raw = window.localStorage.getItem(PENDING_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<PendingConnect>;
-    if (typeof parsed?.nonce !== "string" || (parsed.platform !== "web" && parsed.platform !== "desktop")) return null;
-    return { nonce: parsed.nonce, platform: parsed.platform };
-  } catch {
-    return null;
-  }
-}
-
-function writePending(pending: PendingConnect | null): void {
-  try {
-    if (pending) window.localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
-    else window.localStorage.removeItem(PENDING_KEY);
-  } catch {
-    // A browser that refuses storage cannot hold a nonce, and without one the
-    // callback is unverifiable. Better to fail on the way back, where there is
-    // something to say, than to pretend the flow started.
-  }
-}
 
 type Status =
   | { kind: "loading" }
@@ -95,11 +68,11 @@ export function GoogleCalendarCard() {
       try {
         const accessToken = await exchangeCodeForAccess(code);
         const connection = await ensureDedicatedCalendar(accessToken);
-        writePending(null);
+        writePendingConnect(null);
         setStatus({ kind: "connected", connection });
         setNotice(t("settings.google.connected"));
       } catch (thrown) {
-        writePending(null);
+        writePendingConnect(null);
         setStatus({ kind: "disconnected" });
         setError(describe(thrown));
       }
@@ -117,7 +90,7 @@ export function GoogleCalendarCard() {
   const consume = useCallback(
     async (raw: string | null) => {
       if (consuming.current) return;
-      const outcome = resolveCallback(readPending(), parseCallback(raw));
+      const outcome = resolveCallback(readPendingConnect(), parseCallback(raw));
       if (outcome.kind === "ignored") return;
 
       consuming.current = true;
@@ -127,7 +100,7 @@ export function GoogleCalendarCard() {
 
       if (outcome.kind === "code") await finish(outcome.code);
       else {
-        writePending(null);
+        writePendingConnect(null);
         setStatus({ kind: "disconnected" });
         if (outcome.kind === "cancelled") setNotice(t("settings.google.cancelled"));
         else setError(t("settings.google.error.google"));
@@ -137,15 +110,38 @@ export function GoogleCalendarCard() {
     [finish, t],
   );
 
-  // What is already true, before anything is pressed.
+  /**
+   * What is already true, before anything is pressed — and what becomes true
+   * afterwards.
+   *
+   * The sign-in question is asked first, because the answer changes what the
+   * card OFFERS rather than only what it says: the connection is stored per
+   * FocusFlow account, so with nobody signed in there is no account to attach
+   * a Google one to. The share card above says the same thing.
+   *
+   * Three things were wrong with asking it once.
+   *
+   * It was asked once. `getSession()` on mount with no `onAuthStateChange`
+   * beside it, while `usePlannerData` — the state the rest of the app calls
+   * "signed in" — has both. So the card could hold a `false` the app had
+   * already moved past, and show "sign in to use this" with the button dead
+   * to a reader who was demonstrably signed in, with no way back but leaving
+   * the tab and returning.
+   *
+   * The read could reject. `getSession()` refreshes an expired access token,
+   * which is a network round trip; a rejection escaped the async function,
+   * `setStatus` was never reached, and `status` stayed `loading` — which
+   * renders NOTHING. A slow network did not degrade this card, it deleted it.
+   *
+   * And `consume` can leave `loading` on its own. A callback that lands before
+   * the session read returns draws the card at `signedIn === false`, which is
+   * the "please sign in" line, on the one screen the user reached BY signing
+   * in to Google. It is transient, and it was the first thing they saw.
+   */
   useEffect(() => {
     let alive = true;
-    void (async () => {
-      // Asked first, because the answer changes what the card offers rather
-      // than only what it says: the connection is stored per FocusFlow
-      // account, so with nobody signed in there is no account to attach a
-      // Google one to. The share card above says the same thing.
-      const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+
+    async function readFor(session: unknown) {
       if (!alive) return;
       setSignedIn(Boolean(session));
       if (!session) {
@@ -159,9 +155,33 @@ export function GoogleCalendarCard() {
       } catch {
         if (alive) setStatus({ kind: "disconnected" });
       }
+    }
+
+    void (async () => {
+      try {
+        const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+        await readFor(session);
+      } catch {
+        // Whatever went wrong, the card still has to appear. Treated as
+        // signed out, which is the state a reader can act on — the button
+        // says so and the note says where to go.
+        if (alive) {
+          setSignedIn(false);
+          setStatus({ kind: "disconnected" });
+        }
+      }
     })();
+
+    // The same channel `usePlannerData` listens on, so the two cannot
+    // disagree about whether there is an account. It also carries
+    // `INITIAL_SESSION`, which is the answer arriving late rather than never.
+    const listener = supabase?.auth.onAuthStateChange((_event, session) => {
+      void readFor(session);
+    });
+
     return () => {
       alive = false;
+      listener?.data.subscription.unsubscribe();
     };
   }, []);
 
@@ -199,7 +219,7 @@ export function GoogleCalendarCard() {
       nonce: newNonce((size) => crypto.getRandomValues(new Uint8Array(size))),
       platform: platform.kind,
     };
-    writePending(pending);
+    writePendingConnect(pending);
     setStatus({ kind: "connecting" });
 
     const url = consentUrl(pending);

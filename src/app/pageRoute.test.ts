@@ -7,6 +7,7 @@ import {
   pageForPath,
   pageUrlFor,
   pathForDefaultView,
+  TASKS_INBOX,
   pathForPage,
   returnToFromSearch,
   taskIdForPageUrl,
@@ -77,11 +78,19 @@ describe("pageRoute", () => {
       expect(pathForDefaultView("/today")).toBe(TASKS_HOME);
     });
 
+    // The bug this replaced: `/inbox` fell through to Today, so the picker had
+    // two options that went to the same place and the one that said Inbox was
+    // the one that did not go there.
+    it("opens the Inbox on its own address, not on Today", () => {
+      expect(pathForDefaultView("/inbox")).toBe(TASKS_INBOX);
+      expect(pathForDefaultView("/inbox")).not.toBe(pathForDefaultView("/today"));
+      expect(namesAPage(TASKS_INBOX)).toBe(true);
+    });
+
     // Both are stored by installs that predate the current page set.
     it("lands the retired values on the Tasks Module", () => {
       expect(pathForDefaultView("/planning")).toBe(PAGE_ROUTES.board);
       expect(pathForDefaultView("/projects")).toBe(TASKS_HOME);
-      expect(pathForDefaultView("/inbox")).toBe(TASKS_HOME);
     });
   });
 

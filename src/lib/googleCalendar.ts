@@ -10,6 +10,7 @@
 // access token good for an hour and asks for another when it expires
 // (`api/google/token`), which is what lets the long-lived credential stay on
 // the server where no browser can read it.
+import type { PendingConnect } from "../domain/calendar/googleSync/connectFlow";
 import { supabase } from "../services/supabaseClient";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
@@ -213,4 +214,39 @@ export async function ensureDedicatedCalendar(
 /** What the settings card draws before anything is pressed. */
 export async function readConnection(deps: GoogleCalendarDeps = defaultDeps): Promise<GoogleConnection | null> {
   return deps.readConnection();
+}
+
+/**
+ * The flow this client started, kept where a full page navigation cannot lose
+ * it — the web half leaves the app entirely and comes back to a fresh mount.
+ *
+ * It lives here rather than inside the settings card because two screens need
+ * it now. The card spends it, and the settings page READS it to decide which
+ * tab to open on: a code that comes back to a screen with nobody listening is
+ * a connection that silently does not happen, and the card is only listening
+ * while the Calendar tab is the one drawn.
+ */
+const PENDING_KEY = "focusflow.google.pendingConnect";
+
+export function readPendingConnect(): PendingConnect | null {
+  try {
+    const raw = window.localStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PendingConnect>;
+    if (typeof parsed?.nonce !== "string" || (parsed.platform !== "web" && parsed.platform !== "desktop")) return null;
+    return { nonce: parsed.nonce, platform: parsed.platform };
+  } catch {
+    return null;
+  }
+}
+
+export function writePendingConnect(pending: PendingConnect | null): void {
+  try {
+    if (pending) window.localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+    else window.localStorage.removeItem(PENDING_KEY);
+  } catch {
+    // A browser that refuses storage cannot hold a nonce, and without one the
+    // callback is unverifiable. Better to fail on the way back, where there is
+    // something to say, than to pretend the flow started.
+  }
 }

@@ -8,7 +8,7 @@ import type { usePlannerData } from "../hooks/usePlannerData";
 import type { CalendarShareState } from "../lib/calendarShare";
 import type { AutoBackupState } from "./useAutoBackup";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
-import type { AppUpdateStatus } from "../platform";
+import type { SettingsUpdateStatus } from "../platform";
 import type { TaskDetailPresentation } from "../domain/tasks/responsive";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Task } from "../types";
 
@@ -60,7 +60,7 @@ type AppPagesProps = {
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
   importMessage: string;
   appVersion: string;
-  updateStatus: AppUpdateStatus | { status: "checking" } | { status: "installing"; latestVersion?: string };
+  updateStatus: SettingsUpdateStatus;
   onCheckUpdate: () => void;
   onInstallUpdate: () => void;
   requestResetAllData: () => void;

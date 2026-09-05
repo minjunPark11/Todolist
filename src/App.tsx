@@ -65,7 +65,7 @@ import {
   saveFocusUserSettings,
   type FocusUserSettings,
 } from "./lib/focusSettingsStorage";
-import { platform, type AppUpdateStatus } from "./platform";
+import { platform, type SettingsUpdateStatus } from "./platform";
 import {
   buildCalendarShareSnapshot,
   createShareToken,
@@ -166,7 +166,12 @@ export default function App() {
   const [externalCalendarState, setExternalCalendarState] = useState<ExternalCalendarState>(() => loadExternalCalendarState());
   const [calendarShare, setCalendarShare] = useState<CalendarShareState>(emptyCalendarShareState);
   const [appVersion, setAppVersion] = useState(__APP_VERSION__);
-  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | { status: "checking" } | { status: "installing"; latestVersion?: string }>({ status: "checking" });
+  /* `idle` and not `checking`, because nothing checks at boot any more. Two
+     things did: this, and `<UpdateChecker />`, which is the one that belongs
+     there — it runs the Tauri updater once per launch, shows the banner and
+     files the bell notification. This row is the manual door beside it, so it
+     waits to be pressed instead of firing a second `check()` at every start. */
+  const [updateStatus, setUpdateStatus] = useState<SettingsUpdateStatus>({ status: "idle" });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   // The Tasks Module reads path AND query — `?view=` and `?task=` are part of
@@ -363,11 +368,6 @@ export default function App() {
   }
 
   useEffect(() => {
-    void checkAppUpdate(appVersion);
-  }, [appVersion]);
-
-
-  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       const isTyping =
@@ -456,10 +456,15 @@ export default function App() {
         : appSettings.theme;
     root.dataset.theme = resolvedTheme;
     root.dataset.accent = appSettings.accentColor;
-    root.dataset.font = appSettings.fontSize;
+    /* `root.dataset.font` stood here. It is not written any more: the setting
+       that drove it is off the Appearance tab, because it moved nothing
+       outside the Calendar (see SettingsPage). Nothing keys on the attribute
+       any more either — the `[data-font]` blocks went with it, in
+       01-base.css and 10-calendar-apple.css. `appSettings.fontSize` is still
+       stored and still normalised; nothing reads it. */
     root.dataset.reduceMotion = appSettings.reduceMotion ? "true" : "false";
-    // Same channel the theme, accent and font size use: settings that deep
-    // components read without every layer between them carrying a prop.
+    // Same channel the theme and accent use: settings that deep components
+    // read without every layer between them carrying a prop.
     root.dataset.timeFormat = appSettings.timeFormat;
     root.dataset.weekStart = appSettings.weekStart;
     root.dataset.hoursAtATime = String(appSettings.hoursAtATime);
@@ -472,7 +477,6 @@ export default function App() {
   }, [
     appSettings.theme,
     appSettings.accentColor,
-    appSettings.fontSize,
     appSettings.reduceMotion,
     appSettings.timeFormat,
     appSettings.weekStart,

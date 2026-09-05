@@ -16,10 +16,12 @@ import {
   sanitizeBackupKeep,
 } from "../domain/backup/schedule";
 import type { AutoBackupState } from "../app/useAutoBackup";
+import { initialSettingsTab, type SettingsTab } from "../app/settingsTab";
+import { readPendingConnect } from "../lib/googleCalendar";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { platform } from "../platform";
-import type { AppUpdateStatus } from "../platform";
-import type { AccentColor, AppSettings, ExternalCalendar, FontSize, Language, Task, ThemeMode } from "../types";
+import type { SettingsUpdateStatus } from "../platform";
+import type { AccentColor, AppSettings, ExternalCalendar, Language, Task, ThemeMode } from "../types";
 import { CalendarCategorySettings } from "./calendar/CalendarCategorySettings";
 import { GoogleCalendarCard } from "./calendar/GoogleCalendarCard";
 import { ConfirmModal, SegmentedTabs } from "./kit";
@@ -33,7 +35,7 @@ interface SettingsPageProps {
   onReset: () => void;
   importMessage: string;
   appVersion: string;
-  updateStatus: AppUpdateStatus | { status: "checking" } | { status: "installing"; latestVersion?: string };
+  updateStatus: SettingsUpdateStatus;
   onCheckUpdate: () => void;
   onInstallUpdate: () => void;
   accountSlot: ReactNode;
@@ -100,19 +102,22 @@ export function SettingsPage({
   autoBackup,
 }: SettingsPageProps) {
   const { t, lang } = useT();
-  const [tab, setTab] = useState<
-    | "account"
-    | "appearance"
-    | "behavior"
-    | "notifications"
-    | "calendar"
-    | "focus"
-    | "data"
-  >("account");
+  /* Account, unless the app sent the reader here to finish something. The one
+     case is the Google consent round trip: it lands on this page and the card
+     that spends the code is drawn under Calendar, so opening on Account left
+     the connection hanging on a tab click nothing asked for. */
+  const [tab, setTab] = useState<SettingsTab>(() =>
+    initialSettingsTab({
+      href: typeof window === "undefined" ? null : window.location.href,
+      pendingConnect: typeof window === "undefined" ? null : readPendingConnect(),
+    }),
+  );
   const [calendarDraft, setCalendarDraft] = useState({ name: "", icsUrl: "", color: "#4f73ff" });
   const [externalFormOpen, setExternalFormOpen] = useState(false);
   const [shareCopyKey, setShareCopyKey] = useState("settings.calendar.copy");
   const shareBusy = calendarShare.status === "loading" || calendarShare.status === "saving";
+  /* Only a build with an installer has an update to install. */
+  const updatesSupported = platform.kind === "desktop";
   const lastExternalSyncedAt = externalCalendars.reduce(
     (latest, calendar) => (calendar.lastSyncedAt && calendar.lastSyncedAt > latest ? calendar.lastSyncedAt : latest),
     "",
@@ -142,7 +147,7 @@ export function SettingsPage({
 
       <SegmentedTabs
         tabs={[
-          ["account", t("auth.accountTitle")],
+          ["account", t("settings.tabAccount")],
           ["appearance", t("settings.tabAppearance")],
           ["behavior", t("settings.tabBehavior")],
           ["notifications", t("settings.tabNotifications")],
@@ -181,17 +186,23 @@ export function SettingsPage({
               ))}
             </div>
           </SettingsRow>
-          <SettingsRow title={t("settings.fontSize")} hint={t("settings.fontSizeHint")}>
-            <SegmentedTabs
-              tabs={[
-                ["small", t("settings.fontSmall")],
-                ["medium", t("settings.fontMedium")],
-                ["large", t("settings.fontLarge")],
-              ]}
-              active={settings.fontSize}
-              onChange={(t) => onUpdate({ fontSize: t as FontSize })}
-            />
-          </SettingsRow>
+          {/* `Font Size` stood here and moved almost nothing.
+              It drove `[data-font]`, which set the ROOT font size, so only
+              `rem` text and text that inherits could follow — and
+              `20-density.css` pins `main` to `var(--density-font)`, which cuts
+              that inheritance off at the top of the content area anyway. What
+              is left underneath is 356 hard-coded `px` font sizes across
+              eighteen stylesheets; the `--density-font` tokens meant to be the
+              ladder are referenced in three places, all inside the file that
+              defines them. Measured across a Small/Large switch: `/settings`
+              34 text elements, 0 moved; `/today` 13, 0 moved; `/calendar` 105,
+              97 moved — the Calendar is written in `rem` and was the only
+              screen the control ever reached, and even there the range was one
+              pixel either side of the 14px root.
+              The stored `fontSize` is left in `AppSettings`, the same way
+              `showCompletedInToday` was: an M0 field is not deleted from
+              anyone's account because a screen stopped asking about it. When
+              there is a real type scale, this row comes back. */}
           <SettingsRow title={t("settings.language")} hint={t("settings.languageHint")}>
             <SegmentedTabs
               tabs={[
@@ -241,7 +252,9 @@ export function SettingsPage({
               <option value="/calendar">{t("sidebar.calendar")}</option>
               <option value="/board">{t("sidebar.board")}</option>
               <option value="/focus">{t("sidebar.focus")}</option>
-              <option value="/inbox">{t("settings.defaultStartPageInboxOption")}</option>
+              {/* Named with the Tasks Module's own word, so the picker and the
+                  sidebar do not call one place two things. */}
+              <option value="/inbox">{t("tasks.inbox")}</option>
             </select>
           </SettingsRow>
           {/* `Show completed tasks in Today` stood here. The only screen that
@@ -383,6 +396,15 @@ export function SettingsPage({
               round trip, which is why the callback lands on this page. */}
           <GoogleCalendarCard />
 
+          {/* "Sync status" used to be a seventh card below this one. It carried
+              one line and one button, both about the list drawn here, and it
+              drew them whether or not the list had anything in it — so the
+              default account met two cards about external calendars, one of
+              them reporting that a thing it had never done had never happened
+              and offering to redo it. It also wore the generic name while the
+              Google card above syncs too, which made it read as the tab's sync
+              status rather than this card's. It says the same things here, and
+              only once there is a calendar for them to be about. */}
           <section className="ff-settings-card ff-cal-card">
             <div className="ff-cal-card-head">
               <span className="ff-cal-card-icon" aria-hidden="true">
@@ -390,9 +412,20 @@ export function SettingsPage({
               </span>
               <div className="ff-cal-card-text">
                 <strong>{t("settings.calendar.externalTitle")}</strong>
-                <small>{t("settings.calendar.externalHint")}</small>
+                <small>
+                  {externalCalendars.length === 0
+                    ? t("settings.calendar.externalHint")
+                    : lastExternalSyncedAt
+                      ? t("settings.calendar.lastSynced", { time: new Date(lastExternalSyncedAt).toLocaleString() })
+                      : t("settings.calendar.noLastSync")}
+                </small>
               </div>
               <div className="ff-cal-card-actions">
+                {externalCalendars.length > 0 ? (
+                  <button type="button" className="ff-btn" onClick={onSyncAllExternalCalendars}>
+                    {t("settings.calendar.refreshAll")}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="ff-btn ff-cal-btn-outline"
@@ -476,27 +509,6 @@ export function SettingsPage({
               </div>
             ) : null}
           </section>
-
-          <section className="ff-settings-card ff-cal-card">
-            <div className="ff-cal-card-head">
-              <span className="ff-cal-card-icon" aria-hidden="true">
-                <SyncIcon />
-              </span>
-              <div className="ff-cal-card-text">
-                <strong>{t("settings.calendar.syncStatus")}</strong>
-                <small>
-                  {lastExternalSyncedAt
-                    ? t("settings.calendar.lastSynced", { time: new Date(lastExternalSyncedAt).toLocaleString() })
-                    : t("settings.calendar.noLastSync")}
-                </small>
-              </div>
-              <div className="ff-cal-card-actions">
-                <button type="button" className="ff-btn" onClick={onSyncAllExternalCalendars}>
-                  {t("settings.calendar.refreshAll")}
-                </button>
-              </div>
-            </div>
-          </section>
         </div>
       ) : null}
 
@@ -519,12 +531,20 @@ export function SettingsPage({
               ))}
             </select>
           </SettingsRow>
-          <Toggle
-            label={t("focus.optionTabTitleTimer")}
-            hint={t("settings.focus.tabTitleTimerHint")}
-            value={focusSettings.showTabTitleTimer}
-            onChange={(v) => onUpdateFocusSettings({ showTabTitleTimer: v })}
-          />
+          {/* Where there is a browser tab to write into. The switch drives
+              `document.title`, and the desktop window takes its caption from
+              `tauri.conf.json` and never reads the document's — nothing calls
+              `setTitle` — so on the installed app this was a switch with
+              nowhere to show its result. The stored value is left alone: it is
+              this device's, and the same account in a browser still uses it. */}
+          {platform.kind === "web" ? (
+            <Toggle
+              label={t("focus.optionTabTitleTimer")}
+              hint={t("settings.focus.tabTitleTimerHint")}
+              value={focusSettings.showTabTitleTimer}
+              onChange={(v) => onUpdateFocusSettings({ showTabTitleTimer: v })}
+            />
+          ) : null}
           <Toggle
             label={t("focus.optionCompletionNotification")}
             hint={t("settings.focus.completionNotificationHint")}
@@ -637,22 +657,33 @@ export function SettingsPage({
             <SettingsRow title={t("settings.appInfo")} hint="FocusFlow">
               <strong>{appVersion}</strong>
             </SettingsRow>
-            <SettingsRow title={t("settings.checkUpdates")} hint={formatUpdateStatus(updateStatus, t)}>
-              <div className="ff-settings-actions">
-                {updateStatus.status === "available" ? (
-                  <button type="button" className="ff-btn ff-btn-primary" onClick={onInstallUpdate}>
-                    {t("settings.installUpdate")}
+            {/* Desktop only, and said so rather than shown failing. The web
+                build IS its latest version — there is no installer to run —
+                and the row used to prove it by reporting a cross-origin fetch
+                to github.com that a browser can only reject, so every web user
+                read "Could not check for updates" as a fault in the app. Same
+                shape as Automatic backup on the Data tab. */}
+            <SettingsRow
+              title={t("settings.checkUpdates")}
+              hint={updatesSupported ? formatUpdateStatus(updateStatus, t) : t("settings.updateWebOnly")}
+            >
+              {updatesSupported ? (
+                <div className="ff-settings-actions">
+                  {updateStatus.status === "available" ? (
+                    <button type="button" className="ff-btn ff-btn-primary" onClick={onInstallUpdate}>
+                      {t("settings.installUpdate")}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="ff-btn"
+                    onClick={onCheckUpdate}
+                    disabled={updateStatus.status === "checking" || updateStatus.status === "installing"}
+                  >
+                    {t("settings.checkUpdates")}
                   </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="ff-btn"
-                  onClick={onCheckUpdate}
-                  disabled={updateStatus.status === "checking" || updateStatus.status === "installing"}
-                >
-                  {t("settings.checkUpdates")}
-                </button>
-              </div>
+                </div>
+              ) : null}
             </SettingsRow>
           </div>
         </>
@@ -662,9 +693,12 @@ export function SettingsPage({
 }
 
 function formatUpdateStatus(
-  status: AppUpdateStatus | { status: "checking" } | { status: "installing"; latestVersion?: string },
+  status: SettingsUpdateStatus,
   t: (key: string, vars?: Record<string, string | number>) => string,
 ) {
+  // Nothing runs at boot any more (`<UpdateChecker />` is the startup check),
+  // so the row's first words are the truth: it has not looked yet.
+  if (status.status === "idle") return t("settings.updateIdle");
   if (status.status === "checking") return t("settings.updateChecking");
   if (status.status === "installing") return t("settings.updateInstalling");
   if (status.status === "available") return t("settings.updateAvailable", { version: status.latestVersion });
@@ -697,15 +731,6 @@ function ClockIcon() {
     <svg viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5.2l3.4 2" />
-    </svg>
-  );
-}
-
-function SyncIcon() {
-  return (
-    <svg viewBox="0 0 24 24">
-      <path d="M20 12a8 8 0 11-2.3-5.7" />
-      <path d="M20 4v6h-6" />
     </svg>
   );
 }

@@ -630,6 +630,16 @@ export interface CalendarViewOptions {
 export interface AppSettings {
   theme: ThemeMode;
   accentColor: AccentColor;
+  /**
+   * Stored, normalised, and read by nothing.
+   *
+   * The Appearance row that set it is gone: it drove a root font size, and the
+   * app has 356 hard-coded `px` sizes and no type scale for that to travel
+   * through, so outside the Calendar it moved no text at all. The field stays
+   * for the same reason `showCompletedInToday` does — an M0 value is not
+   * deleted from anyone's account because a screen stopped asking about it —
+   * and it is what the row reads again when there is a scale to move.
+   */
   fontSize: FontSize;
   language: Language;
   // "/planning" is LEGACY: the Planning page became the Board's quadrant

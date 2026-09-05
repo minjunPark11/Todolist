@@ -321,11 +321,7 @@
    the ladder tightens as it climbs (1.23 at the title, 1.30 at the footnote),
    and our flat multiplier made every calendar line 15-25% taller than the
    reference — the thing METRICS §2.9 blamed for half of the 68px header.
-   And the ladder now answers `[data-font]`, which it did not: the setting
-   moved the sidebar's rem text and left the grid's px text where it was, so
-   the two halves of this screen disagreed about how big "large" is. It shifts
-   the whole ladder by one rung instead of multiplying, which is how Dynamic
-   Type moves and is why every value below is still an integer on the table.  */
+   Every value below is an integer on that table.  */
 .gcal-page-shell {
   --cal-large-title: 26px;  --cal-large-title-lh: 32px;
   --cal-title1: 22px;       --cal-title1-lh: 26px;
@@ -336,28 +332,12 @@
   --cal-footnote: 10px;     --cal-footnote-lh: 13px;
 }
 
-/* One rung down. The footnote does not move: 10pt is the floor macOS states,
-   and the badges were already under it. */
-[data-font="small"] .gcal-page-shell {
-  --cal-large-title: 22px;  --cal-large-title-lh: 26px;
-  --cal-title1: 17px;       --cal-title1-lh: 22px;
-  --cal-title3: 13px;       --cal-title3-lh: 16px;
-  --cal-body: 12px;         --cal-body-lh: 15px;
-  --cal-callout: 11px;      --cal-callout-lh: 14px;
-  --cal-subhead: 10px;      --cal-subhead-lh: 13px;
-}
-
-/* One rung up. The title has no rung above it on the macOS table, so it takes
-   the 28px METRICS §2.7 actually measured off Calendar.app's own title. */
-[data-font="large"] .gcal-page-shell {
-  --cal-large-title: 28px;  --cal-large-title-lh: 34px;
-  --cal-title1: 26px;       --cal-title1-lh: 32px;
-  --cal-title3: 17px;       --cal-title3-lh: 22px;
-  --cal-body: 15px;         --cal-body-lh: 20px;
-  --cal-callout: 13px;      --cal-callout-lh: 16px;
-  --cal-subhead: 12px;      --cal-subhead-lh: 15px;
-  --cal-footnote: 11px;     --cal-footnote-lh: 14px;
-}
+/* The one-rung-down and one-rung-up blocks stood here, keyed on
+   `[data-font]`. They were the only part of the font-size setting that worked
+   — this ladder shifts by a rung the way Dynamic Type does, rather than
+   multiplying — and they are gone with the attribute, which App.tsx no longer
+   writes. The ladder above is now the only one. When the app grows a type
+   scale the whole screen can answer, these come back with it.  */
 
 /* Scoped under the shell on purpose: 20-density.css and 21-components.css load
    after this file, so `.gcal-toolbar button` would otherwise still win. This

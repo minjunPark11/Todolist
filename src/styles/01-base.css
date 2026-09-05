@@ -445,8 +445,15 @@ body {
   color-scheme: dark;
 }
 
-[data-font="small"] { font-size: 13px; }
-[data-font="large"] { font-size: 15px; }
+/* The `[data-font]` pair stood here and is gone with the setting that wrote
+   the attribute. It set the ROOT size, so it reached `rem` text and inherited
+   text and nothing else — and `main { font-size: var(--density-font) }` in
+   20-density.css cuts that inheritance off at the top of the content area, so
+   in practice it reached the Calendar and no other screen. The range was one
+   pixel either side of the 14px above — 13 and 15 — so even there it was
+   close to nothing.
+   A real font-size setting needs a type scale first — 356 hard-coded px sizes
+   across eighteen files is what stands in the way. */
 
 /* Motion is off when the app's own setting says so, and when the operating
    system says so — the second half was missing, so someone who had already

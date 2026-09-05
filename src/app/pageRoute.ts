@@ -22,6 +22,15 @@ import { parseSearchUrl, parseTaskScope } from "./taskScopeUrl";
 export const TASKS_HOME = "/today";
 
 /**
+ * The Inbox's own address, for the start page that names it.
+ *
+ * A literal rather than a `taskUrlFor` call: `list` is the Inbox's default
+ * View, and `taskUrlFor` omits a default View, so the two agree by
+ * construction — `taskScopeUrl.test.ts` is where that is held.
+ */
+export const TASKS_INBOX = "/inbox";
+
+/**
  * D-04's table. One path per page, exact match, no parameters.
  *
  * `today` and its `/app` used to head this list. **P0-2 is answered**: the
@@ -163,11 +172,16 @@ export function namesAPage(path: string): boolean {
  * The "default start page" setting, as an address.
  *
  * The setting predates this table and stores paths that no longer all exist.
- * `/inbox` opens Today with the triage drawer (`todayIntent` handles the
- * drawer, this only has to land on the right page), `/planning` is the old
- * name for the quadrant Board, and `/projects` used to open a card grid that
- * was removed — anyone still holding it starts on Today, which is what the
- * previous seeding logic did too.
+ * `/planning` is the old name for the quadrant Board, and `/projects` used to
+ * open a card grid that was removed — anyone still holding it starts on Today,
+ * which is what the previous seeding logic did too.
+ *
+ * `/inbox` was in that second group and should not have been. It meant "open
+ * Today, then open the triage drawer", the drawer went with the Today PAGE
+ * (P0-2), and the value was left falling through to Today — so the picker
+ * offered two options that did the same thing, and the one that said Inbox was
+ * the one that did not go there. The Inbox is a Scope with an address of its
+ * own now, and that is where it goes.
  */
 export function pathForDefaultView(defaultView: AppSettings["defaultView"]): string {
   switch (defaultView) {
@@ -178,10 +192,12 @@ export function pathForDefaultView(defaultView: AppSettings["defaultView"]): str
       return PAGE_ROUTES.board;
     case "/focus":
       return PAGE_ROUTES.focus;
+    case "/inbox":
+      return TASKS_INBOX;
     default:
-      // `/today`, `/inbox`, `/projects` and anything else stored by an older
-      // build all mean the Tasks Module, which is where the Today that
-      // survived P0-2 lives.
+      // `/today`, `/projects` and anything else stored by an older build all
+      // mean the Tasks Module, which is where the Today that survived P0-2
+      // lives.
       return TASKS_HOME;
   }
 }
