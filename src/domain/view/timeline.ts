@@ -1,14 +1,20 @@
-// The fixed window a timeline draws, and where a bar sits inside it
-// (GANTT_TIMELINE_DESIGN D3/D4).
+// The window a timeline draws, and where a bar sits inside it
+// (GANTT_TIMELINE_DESIGN D3/D4, and §17 which reopened D3).
 //
-// There is no horizontal scrolling. The window is a fixed number of columns
-// and the user pages between windows, which is why nothing here virtualises:
-// the worst case is `visible items x 14 columns`, and CSS Grid places every
-// bar from two integers.
+// The window is a fixed number of columns and the user pages between windows,
+// which is why nothing here virtualises: the worst case is
+// `visible items x 24 columns`.
 //
-// Pure, and unaware of pixels. `placeBar` answers in grid column numbers so
-// the same arithmetic can be tested without a DOM and reused if the rendering
-// ever changes.
+// It no longer has to FIT the viewport. D3 fixed the track to the screen, so
+// the scale — pixels per day — fell out of the division and collapsed as the
+// window grew: 17.5px at `1개월`, 3.4 at `6개월`, 1.7 at `1년` [실측]. §17
+// turns that around. The zoom names a FLOOR on the scale (`dayWidth`), the
+// track is as wide as the window needs at that scale, and what does not fit
+// scrolls. `minTrackWidth` is the one number this module answers it with.
+//
+// Pure, and almost unaware of pixels — `dayWidth` is the exception, and it is
+// here because it is a property of the ZOOM and not of the stylesheet: it is
+// what the reader chose when they chose `6개월`.
 import { addDays, addMonths, daysBetween, getWeekStart } from "../../utils/date";
 import { spanBounds, type Span } from "./span";
 
@@ -41,14 +47,31 @@ export type ColumnUnit = "hour" | "day" | "week" | "month";
  * columns is 30 of them at 18px, which is back where we started; four weeks is
  * 28 days and falls short of a month. Five is the nearest cut that covers one.
  */
-export const ZOOM_SPEC: Record<TimelineZoom, { unit: ColumnUnit; columns: number }> = {
+export const ZOOM_SPEC: Record<
+  TimelineZoom,
+  { unit: ColumnUnit; columns: number; dayWidth: number }
+> = {
   // One day, hour by hour (§15). The only zoom where the record's times are
   // legible at all — above it an hour is under a pixel.
-  day: { unit: "hour", columns: 24 },
-  week: { unit: "day", columns: 7 },
-  month: { unit: "week", columns: 5 },
-  halfYear: { unit: "month", columns: 6 },
-  year: { unit: "month", columns: 12 },
+  // 24px an hour: `HH` needs about 18 at 11px/600, and a 15-minute drag step
+  // (§16) is 6px of aim at that width.
+  day: { unit: "hour", columns: 24, dayWidth: 24 * 24 },
+  // A day column wide enough for `12.31 – 12.31`'s short form plus the two
+  // handles — 69 + 12 rounds to 64 once the text's own threshold (40) is what
+  // actually decides whether it is drawn.
+  week: { unit: "day", columns: 7, dayWidth: 64 },
+  // What the default zoom already measured at 1440 was 17.5 [실측] and it
+  // reads well; 16 is that, rounded down so a wide screen still stretches
+  // rather than scrolls.
+  month: { unit: "week", columns: 5, dayWidth: 16 },
+  // Below `1개월` the reader is locating work to the WEEK, not the day, so a
+  // week is what has to survive: 7 x 7 = 49px, about the width of a column at
+  // the old `1년`. A month column comes out ~213px and an eight-day task 56 —
+  // wider than the 20px a single date occupies, which is the inversion §17
+  // was written to end.
+  halfYear: { unit: "month", columns: 6, dayWidth: 7 },
+  // A 28px week, which is the floor at which two of them still read as two.
+  year: { unit: "month", columns: 12, dayWidth: 4 },
 };
 
 /** Fixed by D11 — the window never changes length with the viewport. */
@@ -171,6 +194,55 @@ export function windowBounds(window: TimelineWindow): { from: number; to: number
 /** A `YYYY-MM-DDTHH:mm` boundary as local milliseconds. */
 function instantOf(edge: string): number {
   return new Date(`${edge}:00`).getTime();
+}
+
+/** One day, in milliseconds. The unit `dayWidth` is priced in. */
+const DAY = 86400000;
+
+/**
+ * How long each column is, in HOURS — the one cut everything else follows
+ * (§17, §17.13).
+ *
+ * The columns were `repeat(n, 1fr)`, n equal slices, while a bar was placed by
+ * its share of the window's TIME (`placeBar`). Those two agree only where the
+ * columns are equal in time, and at the month-unit zooms they are not: a
+ * 6개월 window holds a 28-day February beside a 31-day December.
+ *
+ * Hours rather than milliseconds because the numbers go straight out as `fr`
+ * units — an hour column is `1fr` and a week `168fr`, which are readable in a
+ * stylesheet, and `fr` is a ratio so the unit cancels. The gestures divide by
+ * the same array (`instantAtWindowFraction`), which is the point: one cut,
+ * drawn and aimed at.
+ */
+export function columnHours(window: TimelineWindow): number[] {
+  const spans: number[] = [];
+  for (let i = 0; i < ZOOM_COLUMNS[window.zoom]; i += 1) {
+    spans.push((instantOf(window.edges[i + 1]) - instantOf(window.edges[i])) / 3600000);
+  }
+  return spans;
+}
+
+/** How many days the window covers. Rounded — a DST day is 23 or 25 hours. */
+export function windowDays(window: TimelineWindow): number {
+  const { from, to } = windowBounds(window);
+  return Math.max(1, Math.round((to - from) / DAY));
+}
+
+/**
+ * The narrowest the track may be drawn, in pixels (§17).
+ *
+ * The FLOOR, not the width. A track with room to spare still stretches — that
+ * is what keeps `1주` and `1개월` on screens they already fit exactly where
+ * they were — and a track without it scrolls rather than dividing what it has
+ * by 181 days and calling the answer a bar.
+ *
+ * Days rather than columns, because a day is the unit every bar is measured
+ * in and a column is not: the same 6개월 window is 6 columns whether its
+ * months are Februaries or Decembers, and the reader is asking about the work
+ * inside them.
+ */
+export function minTrackWidth(window: TimelineWindow): number {
+  return windowDays(window) * ZOOM_SPEC[window.zoom].dayWidth;
 }
 
 /** Index of the column containing `date`, or -1 when it falls outside. */
@@ -299,6 +371,34 @@ export function instantAtColumnOffset(
     date: `${clock.getFullYear()}-${pad(clock.getMonth() + 1)}-${pad(clock.getDate())}`,
     time: `${pad(clock.getHours())}:${pad(clock.getMinutes())}`,
   };
+}
+
+/**
+ * The instant at `fraction` across the whole TRACK (§17.13).
+ *
+ * The gestures used to find their column with `across * columns`, which is
+ * true only while every column is the same width — and §17 stopped that being
+ * so. The ruler is cut by time now, so a pointer aimed at the first of
+ * February was answered from an even sixth of the window: at `6개월` the two
+ * cuts stand up to **2.2 days** apart, and at `1년` 1.5 [계산]. §13 exists to
+ * stop exactly that — a drop landing somewhere other than the day under it.
+ *
+ * So this walks the same array the grid is drawn from, and hands the leftover
+ * to `instantAtColumnOffset`, which already owns what a column can name.
+ */
+export function instantAtWindowFraction(window: TimelineWindow, fraction: number): Instant {
+  const spans = columnHours(window);
+  const total = spans.reduce((sum, span) => sum + span, 0);
+  if (!(total > 0)) return { date: "", time: "" };
+  // Clamped just inside, so the far edge is the last column and not one past
+  // the end of the window.
+  const safe = Number.isFinite(fraction) ? Math.min(Math.max(fraction, 0), 0.999999) : 0;
+  let at = safe * total;
+  for (let i = 0; i < spans.length; i += 1) {
+    if (at < spans[i]) return instantAtColumnOffset(window, i, at / spans[i]);
+    at -= spans[i];
+  }
+  return instantAtColumnOffset(window, spans.length - 1, 0.999999);
 }
 
 

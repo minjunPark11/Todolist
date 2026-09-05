@@ -5,13 +5,28 @@
 // label and nothing else, so nothing here rolls a parent's dates up from its
 // children or moves them together.
 //
-// There is no horizontal scrolling and no virtualisation, because the window
-// is a fixed column count and `placeBar` returns grid lines. The whole layout
-// is one CSS Grid per row.
-import { useMemo, useRef, useState, type CSSProperties } from "react";
+// There IS horizontal scrolling now (GANTT §17) and still no virtualisation:
+// the window is a fixed column count and the row count is what the scope
+// already handed us. The whole layout is one CSS Grid per row.
+//
+// The scrolling cost this file two boxes and nothing else:
+//
+//   .ff-timeline          the pane. Positioned, so the sideways scrollbar has
+//                         something to hang on that does not scroll with what
+//                         it reports. Still the box everything else selects.
+//     .ff-timeline-scroll the scrollport, one screen wide.
+//       .ff-timeline-canvas the content, as wide as the days need.
+//
+// The overlays are measured and positioned against the CANVAS. On a child of
+// the scrollport `right: 0` resolves to the viewport's edge and not the
+// content's, so the lanes, the now-line and the connectors would each have
+// stopped at the fold. `placeBar` is untouched: a bar is a fraction of the
+// track either way.
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Project, Task } from "../types";
 import { timelineLinks, type TimelineBadge } from "../domain/view/connectors";
 import { TimelineConnectors } from "./TimelineConnectors";
+import { OverlayScrollbar } from "./common/OverlayScrollbar";
 import type { Item } from "../domain/view/item";
 import { applyView, type GroupContext, type ViewSpec } from "../domain/view/viewSpec";
 import { spanForItem } from "../domain/view/span";
@@ -19,10 +34,12 @@ import {
   barText,
   barTextShort,
   columnOf,
+  columnHours,
   columnUnitOf,
   dateAtColumnOffset,
-  instantAtColumnOffset,
+  instantAtWindowFraction,
   type Instant,
+  minTrackWidth,
   placeBar,
   todayColumn,
   windowFraction,
@@ -120,6 +137,17 @@ interface TimelineViewProps {
   trayDragging?: boolean;
   /** Given the Item's id and the day the pointer was over (§13). */
   onDropTray?: (sourceId: string, date: string) => void;
+  /**
+   * Bumped to put the current moment back on screen (§17).
+   *
+   * A number rather than a callback, because the scroll position lives in the
+   * DOM node this component owns and the caller has no handle on it. It is
+   * what `오늘` presses now: the button used to only re-anchor the window, and
+   * with a track two and a half screens wide re-anchoring can leave today
+   * off the fold — the window would contain it and the reader would not see
+   * it, which is the one thing that button promises.
+   */
+  recenterKey?: number;
 }
 
 export function TimelineView({
@@ -137,19 +165,31 @@ export function TimelineView({
   onDragItem,
   trayDragging = false,
   onDropTray,
+  recenterKey = 0,
 }: TimelineViewProps) {
   const { t } = useT();
   const columns = ZOOM_COLUMNS[window.zoom];
   /**
-   * Which column carries today's marks — none, at the hour zoom.
+   * Which column carries today's marks — only where a column IS a day.
    *
-   * `columnOf` compares dates, and the 24 columns of a day window all share
-   * one: today lands in column 0 and the band and the pill go on `00:00`,
-   * whatever the time is. Marking midnight as "today" on a window that IS
-   * today says nothing and points at the wrong hour; the line (§6) is what
-   * carries the moment on that zoom, and it is placed from a clock.
+   * Both of those marks name a COLUMN, so neither can be more precise than
+   * one, and at every other zoom that imprecision turns into a false
+   * statement rather than a vague one.
+   *
+   * Below: `columnOf` compares dates, and the 24 columns of a day window all
+   * share one, so today lands in column 0 and both marks go on `00:00`
+   * whatever the time is.
+   *
+   * Above: the pill is drawn around the column's FIRST day. On a month window
+   * it badged `8.30` while today was `9.5` [실측] — it did not say "this week
+   * contains today", it said the wrong date. The band was worse: a whole week
+   * of `--accent-soft`, 90.8px of a 454px track, the largest colour field on a
+   * screen whose bars are each their own List's colour.
+   *
+   * So everywhere else the line (§6) carries the moment alone. It is placed
+   * from a clock rather than from a column, which is why it can be.
    */
-  const nowColumn = columnUnitOf(window.zoom) === "hour" ? null : todayColumn(window, today);
+  const nowColumn = columnUnitOf(window.zoom) === "day" ? todayColumn(window, today) : null;
   /**
    * Where the line goes (§6, I3).
    *
@@ -163,7 +203,15 @@ export function TimelineView({
   // Which lane the pointer is over, so the reader can see the day before
   // letting go. A drop with no aim is a date chosen by accident.
   const [overLane, setOverLane] = useState<number | null>(null);
+  /**
+   * The canvas, not the scrollport (§17).
+   *
+   * Everything measured against this box — the connectors, and the two
+   * absolutely positioned overlays — has to be measured against the CONTENT.
+   * The scrollport's own box is one screen wide however long the window is.
+   */
   const gridRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
   const groups = useMemo(() => applyView(items, spec, context), [items, spec, context]);
 
@@ -186,6 +234,44 @@ export function TimelineView({
   );
 
   /**
+   * Put the current moment on screen when the window changes (§17).
+   *
+   * A track that is 2.4 screens wide has a left edge that is no longer where
+   * the reader is: `6개월` opens on the 1st of this month and today can be the
+   * 28th, a screen and a half in. So the scroll follows the same fraction the
+   * now-line is drawn at, and the window's own left edge is the answer only
+   * when the window does not contain now at all.
+   *
+   * A THIRD in rather than centred: what a planning grid is read for is what
+   * comes next, so the space in front of today is worth more than the space
+   * behind it — and a third still leaves the days just gone visible, which is
+   * where the overdue work is.
+   *
+   * Layout-effect, so the jump happens before the paint rather than as a
+   * visible slide from wherever the last window left the scrollbar. It reads
+   * the heading's columns because they are the one part of the track that
+   * exists on an empty grid.
+   */
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    const canvas = gridRef.current;
+    const ruler = canvas?.querySelector(".ff-timeline-columns");
+    if (!scroller || !canvas || !ruler) return;
+    if (scroller.scrollWidth <= scroller.clientWidth) return;
+    const base = canvas.getBoundingClientRect();
+    const box = ruler.getBoundingClientRect();
+    // Fractions of the TRACK, offset by wherever the label column ends —
+    // which is a measurement and not `--timeline-label-width + 8`, because
+    // that sum is written in the stylesheet and would be a second copy here.
+    const at = box.left - base.left + (nowAt ?? 0) * box.width;
+    scroller.scrollLeft = Math.max(0, at - scroller.clientWidth / 3);
+    // `nowAt` is deliberately absent: it changes on every render (it is read
+    // from the clock) and this is a jump, not a follow. The window and the
+    // reader's own press are what may move the scroll under them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [window.anchor, window.zoom, recenterKey]);
+
+  /**
    * The day a chip was let go over (§13).
    *
    * A lane IS one column, so the ratio is measured against the lane itself
@@ -201,10 +287,19 @@ export function TimelineView({
     return dateAtColumnOffset(window, index, across);
   }
 
-  const gridStyle = { "--timeline-columns": String(columns) } as React.CSSProperties;
+  const gridStyle = {
+    // The ruler's template, cut by time rather than into equal slices (§17).
+    "--timeline-column-template": columnHours(window)
+      .map((hours) => `${hours}fr`)
+      .join(" "),
+    // The floor the track is drawn at, which is what makes it scroll (§17).
+    "--timeline-track-min": `${minTrackWidth(window)}px`,
+  } as React.CSSProperties;
 
   return (
-    <div className="ff-timeline" style={gridStyle} ref={gridRef}>
+    <div className="ff-timeline" style={gridStyle}>
+      <div className="ff-timeline-scroll" ref={scrollerRef}>
+      <div className="ff-timeline-canvas" ref={gridRef}>
       <TimelineConnectors
         links={links}
         // Anything that can move a bar: the data, the window, and the grouping
@@ -212,6 +307,27 @@ export function TimelineView({
         revision={`${items.length}:${window.anchor}:${window.zoom}:${spec.groupBy}`}
         containerRef={gridRef}
       />
+      {/* The ruler, drawn ONCE (§17.13).
+
+          It used to be `columns` cells inside every row: 384 elements at the
+          year zoom with 32 rows, half of everything in this box [실측],
+          drawing the same twelve lines thirty-two times. They were per-row for
+          two reasons and neither survived — the drop handlers read the pointer
+          against the TRACK and never asked which cell they were in, and the
+          today band is a column, not a row.
+
+          Under the bars, over the row's hover: it comes first in the canvas
+          and takes no z-index, so every positioned thing after it paints on
+          top. */}
+      <div className="ff-timeline-rules" aria-hidden="true">
+        {Array.from({ length: columns }, (_, index) => (
+          <span
+            key={index}
+            className={`ff-timeline-rule${nowColumn === index + 1 ? " is-today" : ""}`}
+          />
+        ))}
+      </div>
+
       {/* The one thing this design had to build: a drop target that belongs
           to a COLUMN and not to a row. Every existing target is a cell in
           some Item's own row, and a chip has no row — what it needs to say
@@ -280,8 +396,6 @@ export function TimelineView({
               item={item}
               indented={Boolean(item.parentId) && visibleIds.has(item.parentId)}
               window={window}
-              columns={columns}
-              nowColumn={nowColumn}
               selected={item.source === "task" && item.sourceId === selectedTaskId}
               onOpen={(anchor) => onOpenItem(item, anchor)}
               barColor={barColorOf?.(item) ?? ""}
@@ -298,6 +412,12 @@ export function TimelineView({
       ))}
 
       {groups.length === 0 ? <p className="ff-timeline-empty">{t("timeline.noBars")}</p> : null}
+      </div>
+      </div>
+      {/* The app hides every native scrollbar (01-base.css), so a track wider
+          than its pane would scroll with nothing at all to say how far along
+          it is. The same thumb the rest of the app uses, lying down. */}
+      <OverlayScrollbar scrollerRef={scrollerRef} horizontal />
     </div>
   );
 }
@@ -306,8 +426,6 @@ function TimelineRowView({
   item,
   indented,
   window,
-  columns,
-  nowColumn,
   selected,
   onOpen,
   barColor,
@@ -320,8 +438,6 @@ function TimelineRowView({
   item: Item;
   indented: boolean;
   window: TimelineWindow;
-  columns: number;
-  nowColumn: number | null;
   selected: boolean;
   onOpen: (anchor?: Rect) => void;
   barColor: string;
@@ -348,6 +464,31 @@ function TimelineRowView({
   // than paint an empty one that reads as "this has no dates".
   if (!placement || !span) return null;
 
+  const unit = columnUnitOf(window.zoom);
+  /**
+   * The bar's text is ONE date rather than a range (§4).
+   *
+   * Which the stylesheet needs to know, because its thresholds are measured
+   * against `12.31 – 12.31` — the widest line a bar can hold — and a bar
+   * holding `9.5` was being silenced at more than twice the width its own
+   * text asks for. At week zoom on a 1280 window a day is 64.9px and the
+   * threshold was 72 [실측], so the most common record in this app said
+   * nothing at any zoom but `day`.
+   */
+  const singleDate = span.start === span.end && unit !== "hour";
+  /**
+   * One date, drawn where a column is coarser than a day — no width to
+   * describe, which is what D8's marker was written for.
+   *
+   * D8 decided the shape and `12-timeline.css` has carried it since P1;
+   * nothing ever rendered the class [실측]. A day at month zoom is 12.97px
+   * beside a 24px height and at year zoom it is under a pixel, so a rectangle
+   * there is not a short span — it is a rectangle that failed to be one. A
+   * diamond on the day is the same fact, drawn as a point because that is
+   * what it is.
+   */
+  const asMarker = singleDate && unit !== "day";
+
   /**
    * The day under the pointer, from anywhere on this row's track (§13).
    *
@@ -361,12 +502,9 @@ function TimelineRowView({
     if (!track) return { date: "", time: "" };
     const box = track.getBoundingClientRect();
     if (box.width <= 0) return { date: "", time: "" };
-    // Clamped just inside, so the far edge is the last column and not one past
-    // the end of the window.
-    const across = Math.min(Math.max((event.clientX - box.left) / box.width, 0), 0.999999);
-    const columnFloat = across * columns;
-    const index = Math.floor(columnFloat);
-    return instantAtColumnOffset(window, index, columnFloat - index);
+    // The window's own cut, not `across * columns` — that was true only while
+    // every column was the same width, and §17 stopped that being so (§17.13).
+    return instantAtWindowFraction(window, (event.clientX - box.left) / box.width);
   }
 
   function handleDropAt(at: Instant, kind: DragKind) {
@@ -418,31 +556,32 @@ function TimelineRowView({
         <span className="ff-timeline-label-text">{item.title}</span>
       </button>
 
-      <div className="ff-timeline-track" ref={trackRef}>
-        {/* Column rules first, so a bar always paints over them. */}
-        {Array.from({ length: columns }, (_, index) => (
-          <span
-            key={index}
-            className={`ff-timeline-cell${nowColumn === index + 1 ? " is-today" : ""}`}
-            style={{ gridColumn: index + 1 }}
-            onDragOver={draggable ? (event) => event.preventDefault() : undefined}
-            onDrop={
-              draggable
-                ? (event) => {
-                    event.preventDefault();
-                    const kind = event.dataTransfer.getData(DRAG_MIME) as DragKind;
-                    if (kind) handleDropAt(instantUnderPointer(event, trackRef.current), kind);
-                  }
-                : undefined
-            }
-          />
-        ))}
+      {/* The whole row is the drop target (§17.13). It was `columns` cells,
+          and every one of them answered by measuring the pointer against THIS
+          box — so the cells were a hit area cut into pieces that nothing read.
+          The ruler behind it is drawn once, for the grid. */}
+      <div
+        className="ff-timeline-track"
+        ref={trackRef}
+        onDragOver={draggable ? (event) => event.preventDefault() : undefined}
+        onDrop={
+          draggable
+            ? (event) => {
+                event.preventDefault();
+                const kind = event.dataTransfer.getData(DRAG_MIME) as DragKind;
+                if (kind) handleDropAt(instantUnderPointer(event, trackRef.current), kind);
+              }
+            : undefined
+        }
+      >
 
         <div
           className={[
             "ff-timeline-bar",
             // The start was derived, not declared: draw it as a guess (D5).
             span.inferredStart ? "is-inferred" : "",
+            singleDate ? "is-single" : "",
+            asMarker ? "is-marker" : "",
             item.done ? "is-done" : "",
             item.blocked ? "is-blocked" : "",
             placement.clippedStart ? "is-clipped-start" : "",
@@ -452,14 +591,22 @@ function TimelineRowView({
           ]
             .filter(Boolean)
             .join(" ")}
-          style={{
-            // §14: a fraction of the track, so the bar is as long as its dates
-            // are. `minWidth` keeps a one-day task from vanishing at the coarse
-            // zooms, where a day can be three pixels.
-            left: `${placement.left * 100}%`,
-            width: `${placement.width * 100}%`,
-            minWidth: "6px",
-          }}
+          style={
+            asMarker
+              ? // A marker has one date and no width, so it is placed by its
+                // CENTRE and takes its 14px from the stylesheet — an inline
+                // `width` here would win over the shape.
+                { left: `${(placement.left + placement.width / 2) * 100}%` }
+              : {
+                  // §14: a fraction of the track, so the bar is as long as its
+                  // dates are. `minWidth` keeps a short multi-day task from
+                  // vanishing at the coarse zooms; the one-day case it was
+                  // written for is a marker now.
+                  left: `${placement.left * 100}%`,
+                  width: `${placement.width * 100}%`,
+                  minWidth: "6px",
+                }
+          }
           // How TimelineConnectors finds this bar to measure it.
           data-bar-key={item.key}
           // The name first: a bar too narrow for its text (§11) has nothing

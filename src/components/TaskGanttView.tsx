@@ -74,6 +74,21 @@ export function TaskGanttView({
   const { t, lang } = useT();
   // Five weeks: long enough to hold a piece of work end to end, short
   // enough that a column is ~114px and a one-column bar carries its name.
+  //
+  // It was briefly a WEEK, on the argument that a day is 12.97px here [실측]
+  // and the standard record in this app is one day long — a bar taller than it
+  // is wide, which reads as a tick and not as time occupied. The marker (D8)
+  // is the answer to that: a day with no width is drawn as a point rather than
+  // as a rectangle that failed to be one.
+  //
+  // And a week default would have cost more than it bought. `alignToZoom`
+  // starts a day-cut window ON its anchor, so a week window is today and the
+  // six days after it — no past at all, which puts every overdue task off the
+  // default screen. A month window starts on its anchor's SUNDAY, so the days
+  // just gone are on it. That is the property worth keeping; a week window
+  // that showed the past would have to become the calendar week containing
+  // today, which is a change to a domain rule with its own decision behind it
+  // (`timelineWindow`, "starts a day-cut window on the date itself").
   const [zoom, setZoom] = useState<TimelineZoom>("month");
   const [anchor, setAnchor] = useState<string>(today);
   // Whether a chip is in the air. The lanes only exist while it is (§4):
@@ -82,6 +97,14 @@ export function TaskGanttView({
   const [draggingChip, setDraggingChip] = useState(false);
   // D12: shown by default, and one click from gone.
   const [showDone, setShowDone] = useState(true);
+  /**
+   * Pressed `오늘`, so put today back on screen (§17).
+   *
+   * Counted rather than flagged: the window may already be the one today is
+   * in — the button is no longer disabled then — and a boolean set to `true`
+   * twice is one change React would not see. Every press is a new number.
+   */
+  const [recenterKey, setRecenterKey] = useState(0);
 
   const window = useMemo(() => timelineWindow(zoom, anchor), [zoom, anchor]);
   const visible = useMemo(
@@ -106,8 +129,6 @@ export function TaskGanttView({
     () => window.edges.slice(0, ZOOM_COLUMNS[zoom]).map((edge) => columnLabel(edge, zoom, lang)),
     [window, zoom, lang],
   );
-
-  const isCurrentWindow = today >= window.from && today <= window.to;
 
   function handleDrag(item: Item, drag: SpanDrag) {
     if (!onMutateTask) return;
@@ -144,13 +165,20 @@ export function TaskGanttView({
           <button type="button" className="ff-btn ff-btn-sm" onClick={() => setAnchor(shiftWindow(window, -1))}>
             ‹ {t("timeline.prev")}
           </button>
-          {/* The cost of dropping horizontal scrolling: there is no scrollbar
-              to say where you are, so the way back has to be one click (D3). */}
+          {/* Two things at once since §17, and never disabled.
+              It sets the window back to the one today is in — which is what it
+              always did — and asks the grid to scroll to the moment, which is
+              new and is why `isCurrentWindow` no longer switches it off: a
+              `6개월` track is about two and a half screens wide, so "today is
+              in this window" and "today is on this screen" stopped being the
+              same sentence the moment the track outgrew the fold. */}
           <button
             type="button"
             className="ff-btn ff-btn-sm"
-            onClick={() => setAnchor(today)}
-            disabled={isCurrentWindow}
+            onClick={() => {
+              setAnchor(today);
+              setRecenterKey((key) => key + 1);
+            }}
           >
             {t("timeline.today")}
           </button>
@@ -178,11 +206,12 @@ export function TaskGanttView({
       </div>
 
       {/* §3.1: the panel takes a COLUMN beside the grid rather than lying
-          over it, which is what the reference does. It scrolls sideways and
-          we deliberately do not (D3) — the `Today` button is the only way
-          back precisely because there is no scrollbar — so a column hidden
-          under a panel here would be unreachable rather than scrolled past.
-          Copying the picture would have cost the days it covers. */}
+          over it. The reference lies over the days it does not need; it can,
+          because it scrolls sideways — and since §17 so do we, which removes
+          the reason this was written but not the preference. A panel over the
+          grid hides days that are on screen; a panel beside it narrows the
+          track, and a narrower track is now scrolled rather than crushed. The
+          column stays because the reader can see both at once. */}
       <div className="tgv-body">
       {onWindow.length === 0 && undated.length === 0 ? (
         <EmptyState icon="📆" title={t("timeline.empty")} text={t("timeline.emptyHint")} />
@@ -202,6 +231,7 @@ export function TaskGanttView({
           onDragItem={onMutateTask ? handleDrag : undefined}
           trayDragging={draggingChip}
           onDropTray={onMutateTask ? handleTrayDrop : undefined}
+          recenterKey={recenterKey}
         />
       )}
 

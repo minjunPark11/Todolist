@@ -257,6 +257,11 @@ describe("dropping a chip on a day", () => {
     const onMutateTask = vi.fn();
     draw([task({ id: "bare", title: "Has neither" })], vi.fn(), onMutateTask);
 
+    // Said out loud rather than relied on. §13 is only visible where a column
+    // holds more than one day, so this test is about the month zoom whether or
+    // not that is the zoom the view happens to open on.
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "month" } });
+
     const transfer = dataTransfer(TRAY_DRAG_MIME, "bare");
     fireEvent.dragStart(chip(), { dataTransfer: transfer });
     standUp(lanes()[3]);
@@ -275,9 +280,9 @@ describe("dropping a chip on a day", () => {
     // the field's PREVIOUS value — empty, because this Task had no deadline.
     expect(mutation.undo).toEqual({ dueDate: "" });
     expect(mutation.labelKey).toBe("tasks.undoDateChanged");
-    // The view opens on `1개월`, cut into WEEKS — and the day written is the
-    // one under the pointer, three days into that week rather than the Sunday
-    // it starts on. That difference is the whole of §13.
+    // A month window is cut into WEEKS — and the day written is the one under
+    // the pointer, three days into that week rather than the Sunday it starts
+    // on. That difference is the whole of §13.
     const window = timelineWindow("month", TODAY);
     expect(patch).toEqual({ dueDate: dateAtColumnOffset(window, 3, 0.5) });
     expect(patch.dueDate).not.toBe(window.edges[3]);
@@ -371,5 +376,122 @@ describe("the heading of a column", () => {
 
     expect(labels()[0]).toBe("00");
     expect(document.querySelectorAll(".ff-timeline-col.is-today")).toHaveLength(0);
+  });
+
+  // The other end, and the same clause. A pill is drawn around the column's
+  // FIRST day, so on a month window it badged `8.30` while today was `9.2` —
+  // not a vaguer statement than the line's, a wrong one. Above the day column
+  // the line carries the moment alone.
+  it("marks none of them where a column is a week or a month", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+
+    zoomTo("month");
+    expect(labels()[0]).toBe("8.30");
+    expect(document.querySelectorAll(".ff-timeline-col.is-today")).toHaveLength(0);
+
+    zoomTo("year");
+    expect(document.querySelectorAll(".ff-timeline-col.is-today")).toHaveLength(0);
+  });
+});
+
+// The shape a bar takes when it has no width to describe (D8, 재검토 §1-2).
+describe("a bar with one date", () => {
+  const zoomTo = (value: string) => fireEvent.change(screen.getByRole("combobox"), { target: { value } });
+  const bar = () => document.querySelector(".ff-timeline-bar");
+
+  // A column IS a day here, so the bar is a day wide and a rectangle is what
+  // that means.
+  it("stays a rectangle where a column is a day", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    zoomTo("week");
+
+    expect(bar()?.classList.contains("is-single")).toBe(true);
+    expect(bar()?.classList.contains("is-marker")).toBe(false);
+  });
+
+  // Coarser than a day and there is no width left to read: 12.97px at month
+  // zoom, under a pixel at year [실측].
+  it("becomes a marker where a column is a week or a month", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+
+    zoomTo("month");
+    expect(bar()?.classList.contains("is-marker")).toBe(true);
+    // Placed by its CENTRE, which is what the stylesheet's -7px pulls back.
+    // Half a day into the window: the 2nd is the fourth day of a window that
+    // opens on 8.30 and runs 35, so 3.5/35.
+    expect((bar() as HTMLElement).style.left).toBe("10%");
+    expect((bar() as HTMLElement).style.width).toBe("");
+
+    zoomTo("year");
+    expect(bar()?.classList.contains("is-marker")).toBe(true);
+  });
+
+  // Two dates that differ have a width, and a width is the thing a Gantt draws.
+  it("leaves a range as a bar at every zoom", () => {
+    draw([task({ id: "b1", startDate: "2026-09-02", dueDate: "2026-09-15" })]);
+
+    zoomTo("week");
+    expect(bar()?.classList.contains("is-marker")).toBe(false);
+
+    zoomTo("month");
+    expect(bar()?.classList.contains("is-single")).toBe(false);
+    expect(bar()?.classList.contains("is-marker")).toBe(false);
+    expect((bar() as HTMLElement).style.width).not.toBe("");
+  });
+});
+
+// The track carries its own width now (§17), and jsdom can read the two custom
+// properties that say so even though it cannot lay anything out. What is
+// asserted here is the CONTRACT between this component and the stylesheet: a
+// floor in pixels, and a ruler cut by time.
+describe("a track as wide as its days", () => {
+  const zoomTo = (value: string) =>
+    fireEvent.change(screen.getByRole("combobox"), { target: { value } });
+  const pane = () => document.querySelector(".ff-timeline") as HTMLElement;
+  const varOf = (name: string) => pane().style.getPropertyValue(name);
+
+  it("hands the stylesheet the floor the zoom asks for", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+
+    zoomTo("month");
+    expect(varOf("--timeline-track-min")).toBe("560px");
+
+    // The two that scroll. 181 days at 7px and 365 at 4 — against a pane that
+    // measured 842px in the running app [실측], about 1.8 and 2.0 screens.
+    zoomTo("halfYear");
+    expect(varOf("--timeline-track-min")).toBe("1267px");
+    zoomTo("year");
+    expect(varOf("--timeline-track-min")).toBe("1460px");
+  });
+
+  it("cuts the ruler by time rather than into equal slices", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+
+    // Seven day columns of 24 hours each.
+    zoomTo("week");
+    expect(varOf("--timeline-column-template")).toBe("24fr 24fr 24fr 24fr 24fr 24fr 24fr");
+    // Six month columns, and September is not December. `repeat(6, 1fr)` drew
+    // those the same width while the bars inside them were placed by time.
+    zoomTo("halfYear");
+    expect(varOf("--timeline-column-template")).toBe("720fr 744fr 720fr 744fr 744fr 672fr");
+  });
+
+  // The scrollport and the canvas are separate boxes, and which one the
+  // overlays live in is the whole reason they are (§17): a `right: 0` measured
+  // against the scrollport stops at the fold.
+  it("puts the overlays inside the canvas and not the scrollport", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    const canvas = document.querySelector(".ff-timeline-canvas");
+    expect(document.querySelector(".ff-timeline-scroll > .ff-timeline-canvas")).toBe(canvas);
+    expect(canvas?.querySelector(".ff-timeline-now")).not.toBeNull();
+    expect(canvas?.querySelector(".ff-timeline-head")).not.toBeNull();
+  });
+
+  // It scrolls as well as re-anchoring now, so "the window already holds
+  // today" stopped being a reason to switch it off.
+  it("leaves Today pressable inside the window it returns to", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    const today = screen.getByRole("button", { name: "Today" }) as HTMLButtonElement;
+    expect(today.disabled).toBe(false);
   });
 });

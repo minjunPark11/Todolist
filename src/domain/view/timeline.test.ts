@@ -9,11 +9,16 @@ import {
   columnUnitOf,
   dateAtColumnOffset,
   instantAtColumnOffset,
+  columnHours,
+  instantAtWindowFraction,
+  minTrackWidth,
   placeBar,
   shiftWindow,
   timelineWindow,
   todayColumn,
+  windowDays,
   ZOOM_COLUMNS,
+  ZOOM_SPEC,
 } from "./timeline";
 
 const span = (start: string, end = start): Span => ({ start, end, inferredStart: false, startTime: "", endTime: "" });
@@ -342,5 +347,100 @@ describe("windowFraction", () => {
     expect(windowFraction(w, at("2026-09-06T23:59:00"))).toBeNull();
     expect(windowFraction(w, at("2026-09-14T00:00:00"))).toBeNull();
     expect(windowFraction(w, Number.NaN)).toBeNull();
+  });
+});
+
+// The track is as wide as its days, not as wide as the screen (§17).
+//
+// D3 fixed the track to the viewport, so the scale fell out of a division and
+// collapsed as the window grew: on a 614px track a day was 17.5px at `1개월`,
+// 3.4 at `6개월` and 1.7 at `1년` [실측]. What that cost is the thing a Gantt
+// is for — an eight-day task came out 27.1px at `6개월` and 13.5 at `1년`,
+// NARROWER than the 19.8px a task with a single date occupies. Duration had
+// stopped being something the length of a bar could say.
+describe("the width a window asks for", () => {
+  it("counts the days the window covers, not its columns", () => {
+    // Five weeks, and it says 35 rather than 5.
+    expect(windowDays(timelineWindow("month", "2026-09-05"))).toBe(35);
+    // Six months from September is 181 days; the same six from March is 184.
+    // A column count could not tell those apart, which is the point.
+    expect(windowDays(timelineWindow("halfYear", "2026-09-05"))).toBe(181);
+    expect(windowDays(timelineWindow("halfYear", "2026-03-05"))).toBe(184);
+    // The hour window is one day, cut 24 ways.
+    expect(windowDays(timelineWindow("day", "2026-09-05"))).toBe(1);
+  });
+
+  // The two the reader complained about, in pixels: about 1.8 and 2.0 screens
+  // of a 842px pane [실측], where before they were one screen with the days
+  // crushed into it.
+  it("prices the window at the zoom's own floor per day", () => {
+    expect(minTrackWidth(timelineWindow("halfYear", "2026-09-05"))).toBe(181 * 7);
+    expect(minTrackWidth(timelineWindow("year", "2026-09-05"))).toBe(365 * 4);
+    expect(minTrackWidth(timelineWindow("month", "2026-09-05"))).toBe(35 * 16);
+  });
+
+  // The whole of the complaint, as one comparison. A bar with a length has to
+  // be longer than a bar with none, at every zoom.
+  it("leaves a week wider than a single date at every zoom", () => {
+    // The marker is 14px on the diagonal, which is 19.8 across (12-timeline).
+    const MARKER = 19.8;
+    for (const zoom of ["month", "halfYear", "year"] as const) {
+      expect(7 * ZOOM_SPEC[zoom].dayWidth).toBeGreaterThan(MARKER);
+    }
+  });
+
+  // The ruler and the bars are cut by the same thing now.
+  it("gives each column the time it actually covers", () => {
+    // Days, all equal.
+    expect(columnHours(timelineWindow("week", "2026-09-06"))).toEqual([24, 24, 24, 24, 24, 24, 24]);
+    // Months, and they are NOT: September has 30 days and October 31, so the
+    // rule for October moved when this stopped being `repeat(n, 1fr)`.
+    expect(columnHours(timelineWindow("halfYear", "2026-09-05"))).toEqual([
+      720, 744, 720, 744, 744, 672,
+    ]);
+    // One per column, never one more.
+    expect(columnHours(timelineWindow("year", "2026-09-05"))).toHaveLength(ZOOM_COLUMNS.year);
+  });
+});
+
+// The gesture reads the cut the ruler is drawn from (§17.13).
+//
+// `across * columns` was true only while every column was the same width. §17
+// stopped that, and nothing noticed — a drop is a date written to a record,
+// and the record does not say which pixel it came from.
+describe("the instant under a fraction of the track", () => {
+  it("agrees with the boundary the ruler draws, where columns differ in length", () => {
+    const w = timelineWindow("halfYear", "2026-09-01");
+    // The five boundaries, as fractions of the 181-day window. Each is the
+    // first day of a month, and each is where a rule is drawn.
+    const cuts = [30, 61, 91, 122, 153].map((days) => days / 181);
+    const firsts = ["2026-10-01", "2026-11-01", "2026-12-01", "2027-01-01", "2027-02-01"];
+    cuts.forEach((cut, index) => {
+      expect(instantAtWindowFraction(w, cut).date).toBe(firsts[index]);
+    });
+  });
+
+  // What the even split answered instead, at the widest gap between the two
+  // cuts: an even sixth lands on 2027-01-27, five days short of February.
+  it("is what the even split was not", () => {
+    const w = timelineWindow("halfYear", "2026-09-01");
+    const even = 5 / 6;
+    expect(instantAtWindowFraction(w, even).date).not.toBe("2027-02-01");
+    expect(instantAtWindowFraction(w, 153 / 181).date).toBe("2027-02-01");
+  });
+
+  it("stays inside the window at both ends", () => {
+    const w = timelineWindow("week", "2026-09-06");
+    expect(instantAtWindowFraction(w, 0).date).toBe("2026-09-06");
+    expect(instantAtWindowFraction(w, 1).date).toBe("2026-09-12");
+    expect(instantAtWindowFraction(w, -5).date).toBe("2026-09-06");
+    expect(instantAtWindowFraction(w, Number.NaN).date).toBe("2026-09-06");
+  });
+
+  // A column still names only what it is made of (§13, §16): an hour column
+  // can say a clock, a day column cannot.
+  it("names a time only where a column is shorter than a day", () => {
+    expect(instantAtWindowFraction(timelineWindow("day", "2026-09-06"), 0.5).time).toBe("12:00");
+    expect(instantAtWindowFraction(timelineWindow("week", "2026-09-06"), 0.5).time).toBe("");
   });
 });

@@ -665,6 +665,20 @@ textarea {
   z-index: 300;
 }
 
+/* The same thumb lying down (GANTT_TIMELINE_DESIGN §17).
+   Only the axis is turned: 6px thick, the same radius and the same colour, and
+   the length is written inline by the component from the same `thumbGeometry`
+   the upright one uses. Nothing here is a second set of values — a sideways
+   bar that read differently from the one above it would be a second component
+   pretending to be this one. */
+.overlay-scrollbar.is-horizontal {
+  top: auto;
+  right: auto;
+  bottom: 2px;
+  left: 0;
+  height: 6px;
+}
+
 .overlay-scrollbar.is-visible {
   opacity: 1;
 }

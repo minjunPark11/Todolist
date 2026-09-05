@@ -46,9 +46,20 @@ interface OverlayScrollbarProps {
    * to fill it, or the bar will be beside the wrong box.
    */
   scrollerRef?: RefObject<HTMLElement | null>;
+  /**
+   * Lie the bar down (GANTT_TIMELINE_DESIGN §17).
+   *
+   * `thumbGeometry` never knew it was measuring a height: its three inputs are
+   * a position, a content length and a viewport length, and the formula §4
+   * fitted to the reference holds whichever axis they are read from. So the
+   * sideways bar is the same arithmetic and the same 6px shape turned — not a
+   * second component, which is what would have made two rules to keep in step
+   * for one behaviour.
+   */
+  horizontal?: boolean;
 }
 
-export function OverlayScrollbar({ scrollerRef }: OverlayScrollbarProps) {
+export function OverlayScrollbar({ scrollerRef, horizontal = false }: OverlayScrollbarProps) {
   const thumb = useRef<HTMLDivElement | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const redraw = useRef<() => void>(() => {});
@@ -81,16 +92,17 @@ export function OverlayScrollbar({ scrollerRef }: OverlayScrollbarProps) {
     // every scroll event, and a re-render per frame to move one element is the
     // kind of cost that makes scrolling feel worse than having no bar at all.
     const draw = () => {
+      // The three numbers, read off whichever axis this bar reports.
       const geometry = thumbGeometry({
-        scrollTop: scroller.scrollTop,
-        scrollHeight: scroller.scrollHeight,
-        clientHeight: scroller.clientHeight,
+        scrollTop: horizontal ? scroller.scrollLeft : scroller.scrollTop,
+        scrollHeight: horizontal ? scroller.scrollWidth : scroller.scrollHeight,
+        clientHeight: horizontal ? scroller.clientWidth : scroller.clientHeight,
       });
       setNeeded(geometry.needed);
       const node = thumb.current;
       if (!node || !geometry.needed) return;
-      node.style.height = `${geometry.height}px`;
-      node.style.transform = `translateY(${geometry.offset}px)`;
+      node.style[horizontal ? "width" : "height"] = `${geometry.height}px`;
+      node.style.transform = `translate${horizontal ? "X" : "Y"}(${geometry.offset}px)`;
     };
 
     // Whether the pointer is over the scroller. Only an element can answer
@@ -146,7 +158,7 @@ export function OverlayScrollbar({ scrollerRef }: OverlayScrollbarProps) {
       observer.disconnect();
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };
-  }, [element, isPage]);
+  }, [element, isPage, horizontal]);
 
   // The first measurement happens before there is a thumb to write it to — it
   // is what decides whether one gets rendered at all — so the sizes it
@@ -161,7 +173,9 @@ export function OverlayScrollbar({ scrollerRef }: OverlayScrollbarProps) {
   return (
     <div
       ref={thumb}
-      className={`overlay-scrollbar${isPage ? " is-page" : ""}${visible ? " is-visible" : ""}`}
+      className={`overlay-scrollbar${isPage ? " is-page" : ""}${
+        horizontal ? " is-horizontal" : ""
+      }${visible ? " is-visible" : ""}`}
       // Decoration: the position it reports is already in the scroll position,
       // and there is nothing here to operate.
       aria-hidden="true"

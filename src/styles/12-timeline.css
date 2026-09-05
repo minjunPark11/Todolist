@@ -1,16 +1,65 @@
-/* ===== Timeline (GANTT_TIMELINE_DESIGN P1) =====
-   Fixed window, no horizontal scrolling: every track is one CSS Grid of
-   --timeline-columns equal columns, and a bar is placed by grid-column. That
-   is why nothing here needs virtualisation or scroll synchronisation. */
+/* ===== Timeline (GANTT_TIMELINE_DESIGN P1, §17) =====
+   Fixed window, and since §17 a track that is as wide as that window needs
+   rather than as wide as the screen. Three boxes:
+
+     .ff-timeline          the pane. Positioned, because the sideways scrollbar
+                           has to hang on something that does NOT scroll with
+                           what it reports.
+       .ff-timeline-scroll the scrollport — one screen wide, scrolls
+         .ff-timeline-canvas the content — as wide as the days require
+
+   Everything absolutely positioned belongs to the CANVAS. On a child of the
+   scrollport `right: 0` resolves to the viewport's edge, so the lanes, the
+   now-line and the connector overlay would each have stopped at the fold. */
 
 .ff-timeline {
+  display: flex;
+  flex-direction: column;
   --timeline-label-width: 220px;
-  --timeline-row-height: 30px;
+  /* 32, and the rules between rows are drawn rather than left as air — see
+     `.ff-timeline-row`. The pitch is unchanged: it was 30 plus a 2px gap. */
+  --timeline-row-height: 32px;
+  /* What the frozen label column is painted on, so the track cannot be seen
+     sliding beneath the names. It is the page's own ground rather than
+     `--bg-surface`: the rows sit directly on `.tm-main` [실측] and a white
+     column down a grey grid would be a panel nobody asked for. */
+  --timeline-ground: var(--bg-app);
+  /* Where the names end and the track begins: the label column plus the row
+     grid's own 8px gap. Three overlays are offset by it and the canvas is
+     sized from it, so it is written once. */
+  --timeline-track-left: calc(var(--timeline-label-width) + 8px);
+  position: relative;
+}
+
+.ff-timeline-scroll {
+  /* Takes the pane's height so the heading has something to stick to.
+     `min-height: 0` or a flex item refuses to shrink below its content, and an
+     overflow that never triggers is not an overflow. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  /* A sideways flick belongs to this grid and not to whatever is behind it —
+     on a trackpad the alternative is a horizontal scroll that walks the app's
+     history back a page. */
+  overscroll-behavior-x: contain;
+  /* The thumb sits 2px off the bottom edge and is 6px tall; without this it
+     would lie on the last row's rule. */
+  padding-bottom: 10px;
+}
+
+.ff-timeline-canvas {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  /* The connector overlay is absolutely positioned against this box. */
+  /* The connector overlay and the two grid-wide overlays are positioned
+     against this box. */
   position: relative;
+  /* The floor, and the whole of §17 in one line.
+     `100%` is the scrollport, so a window with room to spare still STRETCHES
+     to fill it and `1주`/`1개월` are drawn exactly where they were. Below that
+     the days keep their width and what does not fit is scrolled to.
+     The 8px is `.ff-timeline-row`'s own gap: label, gap, track. */
+  min-width: max(100%, calc(var(--timeline-track-left) + var(--timeline-track-min, 0px)));
 }
 
 .ff-timeline-head,
@@ -30,10 +79,16 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* The ruler, cut by TIME rather than into equal slices (§17).
+   `1fr` per hour the column covers, from the same boundaries `placeBar`
+   measures against — so a 28-day February and a 31-day December are drawn the
+   width they are, the rule for a month lands exactly under the bar that starts
+   on its 1st, and a gesture aimed at that rule writes that day (§17.13). */
 .ff-timeline-columns,
-.ff-timeline-track {
+.ff-timeline-rules,
+.ff-timeline-lanes {
   display: grid;
-  grid-template-columns: repeat(var(--timeline-columns), minmax(0, 1fr));
+  grid-template-columns: var(--timeline-column-template);
 }
 
 .ff-timeline-col {
@@ -66,21 +121,42 @@
 /* The date lanes (TIMELINE_ARRANGE_TASKS_DESIGN.md §4, phase 3).
 
    One transparent column per day, over the whole grid, live only while a chip
-   is being dragged. `.ff-timeline` is already the positioning context — the
-   connector overlay uses it too — and the left offset is the label column plus
-   the row's own 8px gap, which is where the track begins. */
+   is being dragged. `.ff-timeline-canvas` is the positioning context — the
+   connector overlay and the rules use it too — and `--timeline-track-left` is
+   where the track begins. */
 .ff-timeline-lanes {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
-  left: calc(var(--timeline-label-width) + 8px);
-  display: grid;
-  grid-template-columns: repeat(var(--timeline-columns), minmax(0, 1fr));
+  left: var(--timeline-track-left);
   /* Above the bars, so the drop is the lane's and not a bar's. Below the
      sticky header's 2, which has to stay readable while aiming. */
   z-index: 1;
 }
+
+/* The column rules and the today band, for the WHOLE grid (§17.13).
+   Same box as the lanes above and no z-index of its own: it is the first thing
+   in the canvas, so every positioned thing after it — the bars, the now-line,
+   the frozen names — paints over it, and the row's hover tint sits behind it
+   the way the per-row cells used to. */
+.ff-timeline-rules {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--timeline-track-left);
+  pointer-events: none;
+}
+.ff-timeline-rule {
+  border-left: 1px solid var(--border-subtle);
+}
+/* The boundary the track draws IS this rule's left edge; two there is one line
+   drawn twice, in two weights. */
+.ff-timeline-rule:first-child { border-left: none; }
+/* Only ever drawn where a column is a day — the view decides that, and the
+   reason is written on `nowColumn` in `TimelineView`. */
+.ff-timeline-rule.is-today { background: var(--accent-soft); }
 
 /* §6's third mark: one line down the grid at the current moment.
 
@@ -97,7 +173,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  left: calc(var(--timeline-label-width) + 8px);
+  left: var(--timeline-track-left);
   pointer-events: none;
   z-index: 1;
 }
@@ -124,22 +200,84 @@
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-.ff-timeline-group { display: flex; flex-direction: column; gap: 2px; }
+/* No gap: what separates two rows is a RULE now, not air.
+   A 12.97px mark 454px away from the name it belongs to had nothing to travel
+   along [실측] — no row line, no row hover, and a label/track boundary drawn
+   in the same hairline as the column rules — so the eye had to count rows to
+   find out whose bar it was looking at. That is the one thing a Gantt is for. */
+.ff-timeline-group { display: flex; flex-direction: column; }
+/* Frozen like the names under it (§17).
+   `width: max-content` is what makes that possible: a heading as wide as the
+   canvas has no room to slide inside its own box, and `position: sticky` on a
+   full-width block does nothing at all. */
 .ff-timeline-group-head {
   font-size: 12px;
   font-weight: 700;
   color: var(--text-secondary);
   margin: 10px 0 2px;
+  position: sticky;
+  left: 0;
+  width: max-content;
+  padding-right: 8px;
+  background: var(--timeline-ground);
 }
 
-.ff-timeline-row { min-height: var(--timeline-row-height); }
+.ff-timeline-row {
+  min-height: var(--timeline-row-height);
+  /* An inset shadow rather than a border: the rule must not add a pixel to the
+     row, or the pitch stops being the variable that names it. */
+  box-shadow: inset 0 -1px 0 var(--border-subtle);
+}
+/* The leader. It covers the label AND the track, which is the whole point —
+   the row is what joins a name to its bar, so the row is what lights up. */
+.ff-timeline-row:hover { background: var(--bg-hover-content); }
 .ff-timeline-row.is-selected .ff-timeline-label-text { color: var(--accent); font-weight: 700; }
+
+/* The names are FROZEN, which is what makes a scrolling track readable (§17).
+
+   The one thing a Gantt is for is joining a name to a bar, and a track two and
+   a half screens wide would otherwise carry its bars away from the column that
+   says whose they are. Sticky on the grid item itself — the label IS the first
+   cell of `.ff-timeline-row`'s grid — so nothing had to be re-nested for it.
+
+   It needs an opaque ground of its own: the row's background is painted across
+   the whole canvas and scrolls with it, so without this the bars would be seen
+   travelling under the names. The `z-index` is what puts it over the track,
+   which is a positioned box that comes later in the DOM. */
+.ff-timeline-label,
+.ff-timeline-rowhead {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+.ff-timeline-label {
+  /* Stretched, so the ground covers the whole row height. The bar is 24 of a
+     32px row and would otherwise be seen above and below a cell sized to its
+     own text. The label's own `align-items: center` still centres the name. */
+  align-self: stretch;
+  background: var(--timeline-ground);
+  /* The row draws the rule between rows as an inset shadow, and an opaque
+     child paints over it. Repeated here rather than moved, because the rule
+     has to run the full width of a canvas the row still owns. */
+  box-shadow: inset 0 -1px 0 var(--border-subtle);
+}
+/* The corner. It belongs to the heading and takes the heading's ground, and
+   it is frozen on both axes because the heading is already frozen on one. */
+.ff-timeline-rowhead {
+  align-self: stretch;
+  background: var(--bg-surface);
+}
+/* The hover tint is translucent, so it goes on as an IMAGE over the ground
+   rather than replacing it — the same composite the row paints, which is what
+   keeps the frozen column and the track it sits beside one colour. */
+.ff-timeline-row:hover .ff-timeline-label {
+  background-image: linear-gradient(var(--bg-hover-content), var(--bg-hover-content));
+}
 
 .ff-timeline-label {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: none;
   border: none;
   padding: 0 4px;
   text-align: left;
@@ -166,14 +304,20 @@
 .ff-timeline-label-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ff-timeline-label:hover .ff-timeline-label-text { color: var(--accent); }
 
-.ff-timeline-track { position: relative; align-items: center; min-height: var(--timeline-row-height); }
+/* Not a grid any more (§17.13): the bars are placed by percentage and the
+   rules moved to one overlay, so all this has to be is the box a bar is a
+   fraction of — and the box a drop is measured against. */
+.ff-timeline-track { position: relative; min-height: var(--timeline-row-height); }
 
-.ff-timeline-cell {
-  grid-row: 1;
-  height: 100%;
-  border-left: 1px solid var(--border-subtle);
+/* Where the names end and the dates begin, said once and heavier than a column
+   rule. An INSET shadow, not a border: the bars are placed as fractions of the
+   track's padding box and the two overlays are offset by
+   `--timeline-label-width + 8px`, so a border here would move the ruler a
+   pixel out from under everything measured against it. */
+.ff-timeline-columns,
+.ff-timeline-track {
+  box-shadow: inset 1px 0 0 var(--border-strong);
 }
-.ff-timeline-cell.is-today { background: var(--accent-soft); }
 
 /* A filled rectangle, not a pill (§12).
    [관찰] The reference draws a bar as a solid block that fills most of its
@@ -185,9 +329,7 @@
    reference is squarer still, but going below 8 means an entry on
    `radiusScale`'s allow list, and that list exists to stop a scale of five
    becoming a scale of eight. */
-.ff-timeline-bar,
-.ff-timeline-marker {
-  grid-row: 1;
+.ff-timeline-bar {
   /* Positioned, not grid-placed (§14). A bar's geometry comes from its dates
      now — `left` and `width` are fractions of the track — so it no longer
      snaps to the column lines it used to be laid into. The track is already
@@ -272,32 +414,49 @@
 }
 
 @container (max-width: 104px) {
-  .ff-timeline-bar-long {
+  .ff-timeline-bar:not(.is-single) .ff-timeline-bar-long {
     display: none;
   }
-  .ff-timeline-bar-short {
+  .ff-timeline-bar:not(.is-single) .ff-timeline-bar-short {
     display: inline;
   }
 }
 
 @container (max-width: 72px) {
-  .ff-timeline-bar-text {
+  .ff-timeline-bar:not(.is-single) .ff-timeline-bar-text {
+    display: none;
+  }
+}
+
+/* A bar holding ONE date is measured against what it actually holds.
+   The two thresholds above are the width of `12.31 – 12.31`, and they were
+   applied to every bar — including the ones saying `9.5`, which needs about
+   28px and has no shorter form to fall back to. At week zoom on a 1280 window
+   a day is 64.9px [실측]: under 72, so every single-day bar on the app's most
+   ordinary screen came out blank, at more than twice the width its own text
+   asks for. Below 40 there is genuinely no room, and that is where it stops. */
+@container (max-width: 40px) {
+  .ff-timeline-bar.is-single .ff-timeline-bar-text {
     display: none;
   }
 }
 
 .ff-timeline-bar-text {
   flex: 1;
-  /* The inset the bar used to carry — here it cannot become a floor on how
-     short a bar may be (§15). */
-  padding: 0 6px;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   background: none;
   border: none;
-  padding: 0;
+  /* The inset the bar used to carry — here it cannot become a floor on how
+     short a bar may be (§15).
+     It was written twice, and the button reset below it cancelled it: the
+     computed value was 0px [실측], so §15's sentence was true of the comment
+     and not of the screen. A draggable bar's 6px handle stood in for it by
+     accident; a read-only one, and either end of a clipped bar, put the text
+     against the corner. */
+  padding: 0 6px;
   color: inherit;
   font: inherit;
   text-align: left;
@@ -329,31 +488,39 @@
 .ff-timeline-bar:focus-within .ff-timeline-handle {
   background: color-mix(in srgb, var(--bar-color, var(--accent)) 45%, transparent);
 }
-.ff-timeline-bar.is-inferred:hover .ff-timeline-handle,
-.ff-timeline-bar.is-inferred:focus-within .ff-timeline-handle {
-  /* The inferred bar is an outline on the page's own background, so white
-     would vanish into it. */
-  background: var(--bar-color, var(--accent));
-  opacity: 0.5;
-}
-.ff-timeline-marker .ff-timeline-handle { display: none; }
+/* The inferred bar had a handle colour of its own while it was an outline on
+   the page's ground. It is a filled bar now, so it takes the same one. */
+.ff-timeline-bar.is-marker .ff-timeline-handle { display: none; }
 
-/* The start was derived rather than declared, so the bar says so (D5). */
+/* The start was derived rather than declared, so the bar says so (D5) — on the
+   EDGE that was derived, and nowhere else.
+
+   D5 wrote this as an exception and it was styled like one: no fill, a dashed
+   outline all the way round. Then a real account turned out to be made of it —
+   eight of the ten bars on the Inbox carry a due date and no start [실측] — and
+   an exception that is the majority is not a mark on a bar, it is what the
+   screen looks like. At month zoom, 12.97px wide, they were red dashed ticks
+   and the grid read as unfinished.
+   The fill and the ring come back; the dash keeps the one thing it was for.
+   The LEFT end of this bar is a guess. The right end is the due date, which
+   was declared, and always was. */
 .ff-timeline-bar.is-inferred {
-  background: transparent;
-  border: 1px dashed var(--bar-color, var(--accent));
-  color: var(--text-secondary);
-  /* Its dashes ARE its edge; the tint's ring behind them would draw a second,
-     solid one. */
-  box-shadow: none;
+  border-left: 2px dashed var(--bar-color, var(--accent));
 }
+/* Nothing was guessed about a single date: the start it "inferred" IS the due
+   date, so no width stands on an assumption and there is no edge to mark — and
+   on a 14px diamond a dashed side reads as a rendering fault. */
+.ff-timeline-bar.is-single.is-inferred { border-left: none; }
+/* A clipped start is the WINDOW's edge, not the task's. Dashing it would put
+   the guess where what actually sits there is the first day on screen. */
+.ff-timeline-bar.is-clipped-start.is-inferred { border-left: none; }
 
 /* Quieter, not gone. 0.45 was set when a bar was a solid accent; a tint at
    0.45 is barely a shape, and finished work is on this grid by default now
    (D12, and the `Show completed` switch that governs it finally reaches the
-   query). The marker is still solid, so it keeps the old value. */
+   query). The marker takes the same value — it is the same fill in a smaller
+   shape, not a second material. */
 .ff-timeline-bar.is-done { opacity: 0.62; }
-.ff-timeline-marker.is-done { opacity: 0.45; }
 .ff-timeline-bar.is-blocked { outline: 2px solid var(--warning); outline-offset: -2px; }
 
 /* Cut ends carry an arrow: a clipped bar that looked whole would read as a
@@ -362,17 +529,24 @@
 .ff-timeline-bar.is-clipped-end { border-top-right-radius: 2px; border-bottom-right-radius: 2px; }
 .ff-timeline-clip { font-size: 9px; opacity: 0.85; flex: none; }
 
-/* A milestone has one date and no width to describe (D8). */
-.ff-timeline-marker {
-  justify-self: center;
+/* One date and no width to describe (D8).
+
+   D8 decided this shape and the file has carried it since P1 under a class
+   nothing ever rendered [실측]; the row draws it now, wherever a column is
+   coarser than a day. `margin-left` is half the width because the row sets
+   `left` to the MIDDLE of the day — a diamond hung off its own left edge would
+   sit half a column late. 14px is under the 20px floor at which §11.39 calls a
+   shape a decoration, which is why the 3px corner stays off the radius scale. */
+.ff-timeline-bar.is-marker {
   width: 14px;
   height: 14px;
+  margin-left: -7px;
   padding: 0;
   border-radius: 3px;
   transform: rotate(45deg);
 }
-.ff-timeline-marker .ff-timeline-bar-text,
-.ff-timeline-marker .ff-timeline-clip { display: none; }
+.ff-timeline-bar.is-marker .ff-timeline-bar-text,
+.ff-timeline-bar.is-marker .ff-timeline-clip { display: none; }
 
 /* Dependency arrows (P3). Purely decorative — every line restates a relation
    the bars and badges already carry — so it must never intercept a click. */
@@ -416,18 +590,49 @@
 .ff-timeline-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .ff-timeline-toggle input { width: auto; }
 
-.ff-timeline-empty { color: var(--text-tertiary); font-size: 13px; padding: 16px 4px; }
+.ff-timeline-empty {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  padding: 16px 4px;
+  /* Same reason as the group heading: a sentence about an empty grid should
+     not be scrolled off the side of it. */
+  position: sticky;
+  left: 0;
+  width: max-content;
+}
 
 /* The grid and the panel, side by side
    (TIMELINE_ARRANGE_TASKS_DESIGN.md §3.1, phase 1).
 
    The panel NARROWS the grid rather than covering it. The reference lies over
-   the days it does not need; it can, because it scrolls sideways. Ours does
-   not (D3), so a covered column would be a day with no way to reach it. */
+   the days it does not need; it can, because it scrolls sideways — and since
+   §17 so do we. What is left of the reason is a preference rather than a
+   constraint: a panel over the grid hides days that are on screen, and a panel
+   beside it costs a narrower track, which is now scrolled rather than crushed.
+
+   `.tgv` above it is what hands this box a height, so the grid inside can
+   bound its own scrolling. */
+.tgv {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .tgv-body {
   display: flex;
   align-items: flex-start;
   gap: 16px;
+  /* Takes what `.tm-main` has left, so the grid can bound its own scrolling
+     and keep its column headings on screen (§17). Making the scrollport the
+     box that scrolls moved the headings' sticky anchor off the page and onto
+     it — a pane with no height of its own would have had no range for them to
+     stick in, so the heading would simply have ridden up with the rows. */
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Lines take their content's height rather than an equal share of the box.
+     Without it a wrapped panel holding one chip would be given half the
+     screen, because `stretch` is what `align-content` does by default. */
+  align-content: flex-start;
   /* Wraps rather than squeezes. Beside the grid is where the panel belongs,
      but not at any price: the timeline area is 438px wide at 1280 with the
      Detail column reserved [실측], and 220 of that left the grid 202px — less
@@ -455,6 +660,11 @@
      the whole line anyway (see the narrow block). `min-width: 0` would let the
      grid vanish instead of wrapping. */
   min-width: min(100%, calc(var(--timeline-label-width) + 200px));
+  /* The bound, and it is a `max-` so a short grid is still only as tall as its
+     rows. `100%` of a flex container with a definite height, which is what the
+     rule above gives `.tgv-body` — so this holds whether the panel is beside
+     the grid or wrapped under it, where a stretched flex item would not. */
+  max-height: 100%;
 }
 
 .tgv-arrange {
@@ -470,6 +680,16 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--surface-2, rgba(25, 25, 25, 0.04));
+  /* The queue is as long as the pile is, and the pile has no bound. Fifteen
+     chips made this panel 791.5px beside a 387.5px grid — it ran 404px past
+     the bottom of the timeline it stands next to [실측], and that overhang is
+     the empty half of the screen. It stops and scrolls its own list instead.
+     `100%` rather than the `60vh` this first shipped as: §17 gave `.tgv-body`
+     a definite height, so the panel can be bounded by the box it stands in
+     rather than by a fraction of the window that has no relation to it. */
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
 }
 
 /* Name and count together, then the hint. §13.6.4's rule from the Board's
@@ -498,6 +718,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* The part that scrolls, so the name, the count and the hint stay put.
+     `min-height: 0` because a flex item will not shrink below its content
+     otherwise, and an overflow that never triggers is not an overflow. */
+  min-height: 0;
+  overflow-y: auto;
+  /* So the scrollbar does not sit on the chips' right edge. */
+  padding-right: 2px;
 }
 
 .tgv-arrange li { list-style: none; }
@@ -549,10 +776,10 @@
    Contrast comes out of the arrangement rather than out of a second table: a
    24% mix over the canvas is always dark, and the ink is always the pale tint.
    ========================================================================== */
-/* `:not(.is-inferred)` because that bar is an outline on the page's own
-   ground in either theme, and this rule would fill it back in — it sits at
-   the end of the file, so a tie on specificity goes to it. */
-[data-theme="dark"] .ff-timeline-bar:not(.is-inferred) {
+/* The `:not(.is-inferred)` guard went with the outline it was protecting: an
+   inferred bar is a filled bar with one dashed edge now, so it wants this fill
+   like every other one. */
+[data-theme="dark"] .ff-timeline-bar {
   /* The fill mixes `--bar-color`, NOT the tint: a 90% lightness holds very
      little chroma, and a quarter of that over the canvas came out four shades
      of the same grey [실측]. The colour at strength keeps its hue through the
@@ -562,4 +789,17 @@
      no List colour gets a plain readable bar rather than accent on accent. */
   color: var(--bar-tint, var(--text-primary));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bar-color, var(--accent)) 55%, transparent);
+}
+
+/* The marker is SOLID in either theme, which is why this sits past the dark
+   block rather than up with the shape.
+   §5 said it when the class was still unrendered and the reason has not
+   changed: a 14px diamond carries no text, so it needs no pale ground to be
+   read over, and at 90% lightness it comes out as a hole in the row instead of
+   a date. It is the one place on this grid where the List's colour is at full
+   strength beside the dot — which is the point of a point. */
+.ff-timeline-bar.is-marker,
+[data-theme="dark"] .ff-timeline-bar.is-marker {
+  background: var(--bar-color, var(--accent));
+  box-shadow: none;
 }
