@@ -13,6 +13,7 @@ import { GlobalFocusBar } from "./components/GlobalFocusBar";
 import { UpdateChecker } from "./components/UpdateChecker";
 import { SettingsRow } from "./components/SettingsPage";
 import { usePlannerData } from "./hooks/usePlannerData";
+import { useGoogleOutboundSync } from "./hooks/useGoogleOutboundSync";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
 import { TasksModule } from "./components/tasks/TasksModule";
@@ -732,6 +733,21 @@ export default function App() {
       cancelled = true;
     };
   }, [planner.auth.isSignedIn]);
+
+  // Google Calendar, outbound (GOOGLE_CALENDAR_SYNC_DESIGN.md M1-5).
+  //
+  // Beside the ICS republish below rather than inside it, because they are two
+  // different promises: that one rewrites a file Google reads every eight to
+  // twenty-four hours, this one writes events the account has within seconds.
+  // The ICS feed stays — it is what anyone who is NOT the account holder
+  // subscribes to.
+  useGoogleOutboundSync({
+    tasks: planner.tasks,
+    timezone: appSettings.timezone,
+    tombstones: appSettings.googleDeletedEventIds,
+    signedIn: planner.auth.isSignedIn,
+    onResult: planner.applyGoogleSync,
+  });
 
   useEffect(() => {
     if (!calendarShare.enabled || !calendarShare.token) return;

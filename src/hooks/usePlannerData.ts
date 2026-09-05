@@ -125,7 +125,7 @@ import {
   normalizeSettings,
   normalizeTask,
 } from "../domain/plannerData/normalize";
-import { tombstonesAfterRemoval } from "../domain/calendar/googleSync/tombstones";
+import { tombstonesAfterRemoval, withoutTombstone } from "../domain/calendar/googleSync/tombstones";
 
 const STORAGE_KEY = PLANNER_STORAGE_KEY;
 const LEGACY_STORAGE_KEY = "todo-planner-data";
@@ -1048,6 +1048,68 @@ export function usePlannerData() {
         };
       }),
     }));
+  }
+
+  /**
+   * Writes back what an outbound Google pass earned
+   * (GOOGLE_CALENDAR_SYNC_DESIGN.md M1-5).
+   *
+   * Its own writer rather than `updateTask`, for one reason: `updateTask` sets
+   * `updatedAt` on every call, and these three fields are not an edit. Bumping
+   * it here would be wrong twice over — the Task would look newer than the
+   * Google event we just wrote it FROM, which is the input to LWW (§5.3), and
+   * `googleSyncedAt` could never catch up with `updatedAt`, so every pass would
+   * rewrite every event forever.
+   *
+   * The account still receives it: `diffChangedRecords` compares object
+   * identity, not timestamps, so a new Task object is pushed whether or not its
+   * `updatedAt` moved. That matters — a second device without the mapping would
+   * create a DUPLICATE event rather than update ours.
+   */
+  function applyGoogleSync(result: {
+    mapped?: readonly { taskId: string; googleEventId: string; googleEtag: string; googleSyncedAt: string }[];
+    unlinked?: readonly string[];
+    clearedOrphans?: readonly string[];
+  }) {
+    const mapped = new Map((result.mapped ?? []).map((row) => [row.taskId, row]));
+    const unlinked = new Set(result.unlinked ?? []);
+    const cleared = result.clearedOrphans ?? [];
+    if (mapped.size === 0 && unlinked.size === 0 && cleared.length === 0) return;
+
+    setData((current) => {
+      const tasks =
+        mapped.size === 0 && unlinked.size === 0
+          ? current.tasks
+          : current.tasks.map((task) => {
+              const row = mapped.get(task.id);
+              if (row) {
+                return {
+                  ...task,
+                  googleEventId: row.googleEventId,
+                  googleEtag: row.googleEtag,
+                  googleSyncedAt: row.googleSyncedAt,
+                };
+              }
+              if (!unlinked.has(task.id)) return task;
+              // The event is gone. The Task is untouched otherwise: if it still
+              // qualifies, the next pass creates it again (§5.1).
+              const { googleEventId, googleEtag, googleSyncedAt, ...rest } = task;
+              void googleEventId;
+              void googleEtag;
+              void googleSyncedAt;
+              return rest;
+            });
+
+      let ids = current.appSettings.googleDeletedEventIds;
+      for (const eventId of cleared) ids = withoutTombstone(ids, eventId);
+
+      if (tasks === current.tasks && ids === current.appSettings.googleDeletedEventIds) return current;
+      return {
+        ...current,
+        tasks,
+        appSettings: ids === current.appSettings.googleDeletedEventIds ? current.appSettings : { ...current.appSettings, googleDeletedEventIds: ids },
+      };
+    });
   }
 
   /**
@@ -2183,6 +2245,7 @@ export function usePlannerData() {
     addTask,
     createTask,
     updateTask,
+    applyGoogleSync,
     updateTaskSchedule,
     addTaskReminders,
     completeTask,

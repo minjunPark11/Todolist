@@ -264,6 +264,26 @@ export interface Task {
    * (§6.3) — an inbound event carrying this etag is our own write coming back.
    */
   googleEtag?: string;
+  /**
+   * What `updatedAt` said when this Task was last written to Google
+   * successfully (M1-5).
+   *
+   * P7 said three mapping fields, and this is the fourth. It is here because
+   * without it there is no way to tell a Task that has changed since the last
+   * push from one that has not, and the pass would PATCH every dated Task in
+   * the account every time it ran — hundreds of requests on a window focus, to
+   * write what is already there.
+   *
+   * It is NOT the state machine §4.2 refused. There is no `pending`, no
+   * `failed` and nothing to keep honest: it is a copy of a value that already
+   * exists, written only after Google has answered, and a Task whose write
+   * failed simply keeps the older one and is picked up again next pass.
+   *
+   * Absent means "never pushed", which is the same answer an absent
+   * `googleEventId` gives, so the two cannot disagree about a Task that has
+   * never been out.
+   */
+  googleSyncedAt?: string;
 }
 
 export interface Subtask {
