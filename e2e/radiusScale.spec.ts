@@ -44,7 +44,21 @@ const ALLOWED_OFF_SCALE = [
   '[class*="tm-preview-"]', // a thumbnail of a layout, drawn at a fraction of the size
 ];
 
-const SCALE = [6, 8, 10, 12];
+/**
+ * 이행 중인 스케일 (SWISS_MINIMAL_DESIGN.md I1-B).
+ *
+ * 목적지는 `[4]` 하나다 — 8/10/12는 세 개의 값이 아니라 세 개의 '거의 같은'
+ * 값이었고, 스위스는 그것을 하나로 접는다. 6은 애초에 §11.39가 세운 다섯 중
+ * 하나였다.
+ *
+ * 지금 다섯을 다 받는 이유는 이행이 파일 단위로 진행 중이기 때문이다. 토큰을 부르는
+ * 자리는 이미 4로 왔고 리터럴을 박은 자리는 아직 옛 값에 있으니, 이행이 끝나기 전에
+ * `[4]`로 좁히면 아직 손대지 않은 파일이 이 스펙을 빨갛게 만든다 — 잘못된 것을 잡는
+ * 게 아니라 순서를 잡는 실패다.
+ *
+ * `src/styles/scale.test.ts`의 CEILING이 비는 날 이 배열을 `[4]`로 좁힌다.
+ */
+const SCALE = [4, 6, 8, 10, 12];
 
 interface Offender {
   cls: string;
@@ -106,7 +120,7 @@ test.describe("the radius scale (§11.39)", () => {
       await expect(page.locator(".global-rail")).toBeVisible();
 
       const offenders = await offScaleShapes(page, SCALE, ALLOWED_OFF_SCALE);
-      expect(offenders, `${route} draws a shape outside {6, 8, 10, 12}`).toEqual([]);
+      expect(offenders, `${route} draws a shape outside {${SCALE.join(", ")}}`).toEqual([]);
     }
   });
 

@@ -171,6 +171,11 @@ test.describe("the component language (§V.3, V-6)", () => {
         };
       };
       const result = {
+        // 카드가 그리는 값이 아니라, 자가 정한 값. 여기 숫자를 박아두면 스케일이
+        // 움직일 때마다 이 스펙이 그 뒤를 따라다녀야 한다 (SWISS_MINIMAL_DESIGN.md I1-B에서
+        // 실제로 한 번 그랬다). 이 테스트가 묻는 것은 "이름이 무언가를 그리는가"이지
+        // "그것이 10px인가"가 아니었다.
+        scaleRadius: getComputedStyle(document.documentElement).getPropertyValue("--radius-sm").trim(),
         card: read(".ff-card"),
         row: read(".ff-row"),
         field: read(".ff-field"),
@@ -181,7 +186,7 @@ test.describe("the component language (§V.3, V-6)", () => {
       return result;
     });
 
-    expect(drawn.card.radius).toBe("10px");
+    expect(drawn.card.radius).toBe(drawn.scaleRadius);
     expect(drawn.card.padded).toBe(true);
     expect(drawn.row.height).toBe(32);
     expect(drawn.field.height).toBe(32);
