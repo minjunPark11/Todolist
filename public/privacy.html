@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FocusFlow 개인정보처리방침</title>
+    <meta name="description" content="FocusFlow가 어떤 데이터를 어디에 두고, 무엇을 하지 않는지." />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #1c1c1e;
+        --muted: #6b6b70;
+        --bg: #ffffff;
+        --line: #e5e5ea;
+        --accent: #4f73ff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #f2f2f7;
+          --muted: #98989f;
+          --bg: #16161a;
+          --line: #2c2c31;
+          --accent: #8ea4ff;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+          "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 56px 24px 96px;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.3;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+      h2 {
+        font-size: 19px;
+        margin: 44px 0 10px;
+        letter-spacing: -0.01em;
+      }
+      h3 {
+        font-size: 16px;
+        margin: 26px 0 6px;
+      }
+      p,
+      li {
+        color: var(--ink);
+      }
+      .lede,
+      .updated {
+        color: var(--muted);
+      }
+      .updated {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      ul {
+        padding-left: 20px;
+      }
+      li {
+        margin: 6px 0;
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid var(--line);
+        margin: 56px 0;
+      }
+      a {
+        color: var(--accent);
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.9em;
+        background: color-mix(in srgb, var(--ink) 8%, transparent);
+        padding: 1px 5px;
+        border-radius: 5px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 14px 0;
+        font-size: 15px;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .note {
+        border-left: 3px solid var(--accent);
+        padding: 2px 0 2px 14px;
+        margin: 18px 0;
+      }
+      .en {
+        color: var(--muted);
+      }
+      .en h2,
+      .en h1 {
+        color: var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>FocusFlow 개인정보처리방침</h1>
+      <p class="updated">최종 수정: 2026년 9월 5일</p>
+      <p class="lede">
+        FocusFlow는 개인이 만들어 운영하는 할 일 관리 앱입니다. 이 문서는 앱이 어떤 데이터를 어디에 두는지, 그리고
+        무엇을 하지 않는지를 적은 것입니다.
+      </p>
+
+      <h2>1. 데이터는 먼저 기기에 있습니다</h2>
+      <p>
+        FocusFlow는 로컬 우선으로 동작합니다. 할 일, 목록, 캘린더, 집중 세션 기록은 앱을 쓰는 기기의 저장소에 먼저
+        기록되며, 로그인하지 않으면 그 기기를 떠나지 않습니다.
+      </p>
+
+      <h2>2. 로그인하면 계정에 동기화됩니다</h2>
+      <p>
+        계정으로 로그인하면 위 데이터가 <strong>Supabase</strong>에 있는 본인 계정의 행으로 동기화되어, 다른 기기에서도
+        같은 내용을 볼 수 있습니다. 각 행은 행 수준 보안(RLS)으로 본인 계정에만 열려 있습니다.
+      </p>
+      <p>
+        로그인에는 이메일 또는 구글 계정을 쓸 수 있습니다. 구글 계정으로 로그인하는 경우 FocusFlow가 받는 것은 계정
+        식별에 필요한 정보(이메일 주소 등)이며, 비밀번호는 받지도 저장하지도 않습니다.
+      </p>
+
+      <h2>3. 구글 캘린더 연동 (선택)</h2>
+      <p>
+        설정에서 직접 연결했을 때만 동작합니다. 연결하지 않으면 이 절의 내용은 전혀 일어나지 않습니다.
+      </p>
+
+      <h3>무엇이 오가는가</h3>
+      <ul>
+        <li>
+          연결 시 구글 계정에 <strong>"FocusFlow" 전용 캘린더</strong>를 하나 만들고, 그 캘린더만 읽고 씁니다. 회사 일정,
+          생일, 공휴일 등 다른 캘린더는 건드리지 않습니다.
+        </li>
+        <li>
+          내보내는 것은 <strong>날짜가 지정된 할 일</strong>의 제목, 설명, 시작·종료 시각, 종일 여부, 반복 규칙뿐입니다.
+        </li>
+        <li>
+          우선순위, 태그, 목록 구조, 체크리스트, 집중 세션 기록은 구글로 나가지 않습니다.
+        </li>
+      </ul>
+
+      <h3>자격 증명을 어떻게 다루는가</h3>
+      <ul>
+        <li>
+          갱신 토큰(refresh token)은 <strong>서버에만</strong> 저장되며, 어떤 브라우저나 앱도 읽을 수 없는 테이블에
+          들어갑니다. 앱이 받는 것은 한 시간짜리 액세스 토큰뿐입니다.
+        </li>
+        <li>
+          설정에서 <strong>연결 해제</strong>하면 저장된 토큰을 지우고 구글에 권한 회수를 요청합니다. 이미 캘린더에 들어간
+          일정과 캘린더 자체는 사용자의 것이므로 그대로 둡니다. 원하시면 구글 캘린더에서 직접 지우실 수 있습니다.
+        </li>
+      </ul>
+
+      <div class="note">
+        <p>
+          FocusFlow가 구글 API로부터 받은 정보의 사용과 다른 앱으로의 전송은
+          <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noreferrer noopener"
+            >Google API 서비스 사용자 데이터 정책</a
+          >을 따르며, 여기에는 제한적 사용(Limited Use) 요건이 포함됩니다. 구글 사용자 데이터는 위에 적은 캘린더 동기화
+          기능을 제공하기 위해서만 쓰이며, 광고에 쓰지 않고, 판매하지 않으며, 사람이 읽지 않습니다.
+        </p>
+      </div>
+
+      <h2>4. 데이터가 나가는 곳 전부</h2>
+      <table>
+        <tr>
+          <th>대상</th>
+          <th>언제</th>
+          <th>무엇</th>
+        </tr>
+        <tr>
+          <td>Supabase</td>
+          <td>로그인했을 때</td>
+          <td>할 일·목록·설정 등 앱 데이터, 계정 식별 정보</td>
+        </tr>
+        <tr>
+          <td>Google Calendar API</td>
+          <td>구글 캘린더를 연결했을 때</td>
+          <td>날짜가 있는 할 일의 일정 정보 (3절)</td>
+        </tr>
+        <tr>
+          <td>구독한 ICS 주소</td>
+          <td>외부 캘린더를 추가했을 때</td>
+          <td>사용자가 입력한 그 주소를 대신 받아오기 위한 요청 (브라우저 CORS 제약 때문)</td>
+        </tr>
+        <tr>
+          <td>GitHub Releases</td>
+          <td>데스크톱 앱이 업데이트를 확인할 때</td>
+          <td>버전 정보 요청. 앱 데이터는 보내지 않습니다</td>
+        </tr>
+        <tr>
+          <td>Google Fonts</td>
+          <td>웹에서 화면을 그릴 때</td>
+          <td>글꼴 파일 요청</td>
+        </tr>
+      </table>
+      <p>이 표에 없는 곳으로는 아무것도 보내지 않습니다.</p>
+
+      <h2>5. 하지 않는 것</h2>
+      <ul>
+        <li>광고를 싣지 않습니다.</li>
+        <li>분석·트래킹 도구를 넣지 않습니다.</li>
+        <li>데이터를 제3자에게 판매하거나 제공하지 않습니다.</li>
+        <li>할 일의 내용을 사람이 열어보지 않습니다.</li>
+      </ul>
+
+      <h2>6. 보관과 삭제</h2>
+      <ul>
+        <li>삭제한 항목은 휴지통에 머물다가 완전 삭제 시 기기와 계정 양쪽에서 지워집니다.</li>
+        <li>설정에서 언제든 전체 데이터를 JSON으로 <strong>내보낼</strong> 수 있습니다.</li>
+        <li>설정의 <strong>전체 데이터 초기화</strong>로 앱 데이터를 지울 수 있습니다.</li>
+        <li>
+          계정 자체의 삭제나 남은 데이터의 삭제를 원하시면 아래 연락처로 요청해 주세요.
+        </li>
+      </ul>
+
+      <h2>7. 어린이</h2>
+      <p>FocusFlow는 어린이를 대상으로 하지 않으며, 어린이의 정보를 의도적으로 수집하지 않습니다.</p>
+
+      <h2>8. 변경</h2>
+      <p>
+        이 방침이 바뀌면 이 페이지의 내용과 위의 최종 수정일이 함께 갱신됩니다.
+      </p>
+
+      <h2>9. 연락처</h2>
+      <p>문의: <a href="mailto:minjun3164@gmail.com">minjun3164@gmail.com</a></p>
+
+      <hr />
+
+      <section class="en" lang="en">
+        <h1>FocusFlow Privacy Policy</h1>
+        <p class="updated">Last updated: 5 September 2026</p>
+        <p>
+          FocusFlow is a personal task app built and run by an individual. This is a plain summary of the Korean text
+          above.
+        </p>
+
+        <h2>Where your data lives</h2>
+        <p>
+          FocusFlow is local-first: tasks, lists, calendars and focus sessions are written to the device you are using,
+          and stay there unless you sign in. Signing in syncs them to rows in <strong>Supabase</strong> that only your
+          own account can read.
+        </p>
+
+        <h2>Google Calendar (optional)</h2>
+        <p>
+          Only if you connect it in Settings. Connecting creates one dedicated <strong>"FocusFlow" calendar</strong> in
+          your Google account, and that is the only calendar read or written. What leaves is the schedule slice of dated
+          tasks — title, description, start and end, all-day flag and repeat rule. Priorities, tags, list structure,
+          checklists and focus sessions never go to Google.
+        </p>
+        <p>
+          The refresh token is stored only on the server, in a table no browser can read; the app itself holds nothing
+          but an access token good for one hour. Disconnecting deletes the stored token and asks Google to revoke the
+          grant. Events already in your calendar, and the calendar itself, are yours and are left alone.
+        </p>
+        <p>
+          FocusFlow's use and transfer of information received from Google APIs adheres to the
+          <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noreferrer noopener"
+            >Google API Services User Data Policy</a
+          >, including the Limited Use requirements. Google user data is used only to provide the calendar sync described
+          above; it is never used for advertising, never sold, and not read by humans.
+        </p>
+
+        <h2>Everywhere data goes</h2>
+        <p>
+          Supabase (when signed in), the Google Calendar API (when connected), any ICS address you subscribe to — fetched
+          through the app's own proxy because browsers block cross-origin calendar requests — GitHub Releases (the
+          desktop app checking for updates; no app data is sent), and Google Fonts (font files). Nowhere else.
+        </p>
+
+        <h2>What FocusFlow does not do</h2>
+        <p>No ads. No analytics or tracking. No selling or sharing your data. Nobody reads your tasks.</p>
+
+        <h2>Keeping and deleting</h2>
+        <p>
+          Deleted items sit in the Trash before being removed from both the device and the account. You can export
+          everything as JSON, or erase the app's data, from Settings at any time. For account deletion, write to the
+          address below.
+        </p>
+
+        <h2>Children</h2>
+        <p>FocusFlow is not directed at children and does not knowingly collect their information.</p>
+
+        <h2>Contact</h2>
+        <p><a href="mailto:minjun3164@gmail.com">minjun3164@gmail.com</a></p>
+      </section>
+    </main>
+  </body>
+</html>
