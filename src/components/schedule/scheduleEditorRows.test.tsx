@@ -6,13 +6,38 @@
 // The claim under test is not "a list appears" — it is that the CALENDAR is
 // still there while it does. §2.15's subpanels wiped the grid away to ask for
 // an hour, and §4.1 is the reversal of exactly that.
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EMPTY_SCHEDULE, type Schedule } from "../../domain/schedule";
 import { I18nProvider } from "../../i18n";
 import { FloatingLayerProvider } from "../floating";
 import { ScheduleEditor } from "./ScheduleEditor";
+
+/**
+ * The wall clock, frozen — and it has to be.
+ *
+ * `ScheduleEditor.openTime` fills an EMPTY start with `nextWholeHour(now)`
+ * (§3.3), which is the one place in that component that reads a clock. So what
+ * this file sees when it opens 시간 depends on the hour the suite is run in,
+ * and two of the tests below choose `1:00 PM` — the suggestion between 12:01
+ * and 13:00, where "choose a time" stops being a change at all.
+ *
+ * [실측] It broke exactly there: at 11:53 the field opened on `12:00` and the
+ * file passed; at 12:13 it opened on `1:00 PM`, the option came back already
+ * selected, and both tests failed. 09:20 is an hour with no meaning to any
+ * test here, which is the point — the suggestion is `10:00` and nothing
+ * chooses it.
+ *
+ * `toFake: ["Date"]` and nothing else. Faking the timers would take
+ * `setTimeout` with them, and `userEvent` schedules its own.
+ */
+const FROZEN = new Date("2026-09-03T09:20:00");
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(FROZEN);
+});
 
 afterEach(() => {
   cleanup();
@@ -44,6 +69,21 @@ function setup(schedule: Schedule = DATED) {
 
 const calendar = () => document.querySelector(".sched-cal");
 const row = (name: RegExp) => screen.getByRole("button", { name });
+/**
+ * An option by the time it carries, not by the text it shows.
+ *
+ * The chosen option draws a `✓` inside itself, so an exact match on
+ * `textContent` finds NOTHING precisely when the value looked for is the one
+ * already in the field — and `find` returning `undefined` then reads as "the
+ * click did nothing" rather than as "the lookup missed". `data-time` is on
+ * every option for this, and it is the stored value rather than the locale's
+ * rendering of it.
+ */
+const timeOption = (time: string) => {
+  const found = screen.getAllByRole("option").find((option) => option.dataset.time === time);
+  if (!found) throw new Error(`no time option for ${time}`);
+  return found;
+};
 
 describe("the three rows open in place (§4.1)", () => {
   it("keeps the calendar while 시간 is open", async () => {
@@ -155,8 +195,7 @@ describe("choosing a time is the end of it (§13.2)", () => {
     const { user } = setup();
     await user.click(row(/^Time/));
 
-    const options = screen.getAllByRole("option");
-    await user.click(options.find((option) => option.textContent === "1:00 PM")!);
+    await user.click(timeOption("13:00"));
 
     // The field is gone: the row is a summary again, and the summary is the
     // value. Before §13.2 the field stayed open and grew a second one.
@@ -168,8 +207,7 @@ describe("choosing a time is the end of it (§13.2)", () => {
     const { user } = setup();
     await user.click(row(/^Time/));
 
-    const options = screen.getAllByRole("option");
-    await user.click(options.find((option) => option.textContent === "1:00 PM")!);
+    await user.click(timeOption("13:00"));
     // ...and not even after reopening the row: an end is drawn only where one
     // already exists (D1-B).
     await user.click(row(/1:00 PM/));
