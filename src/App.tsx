@@ -1292,6 +1292,27 @@ export default function App() {
     return null;
   }
 
+  /* 집중 바도 레일과 같은 이유로 분기 위에서 한 번 만든다.
+
+     `GlobalFocusBar`는 아래 두 분기 중 하나에만 있었다 — Tasks 모듈이
+     `/today` · `/list/*` · 검색을 가져가는 분기(§"the module claims it too")에는
+     없어서, 세션이 도는 동안 그 화면들에서 집중 바가 사라졌다 [실측].
+     탭 제목은 계속 돌고 있었으므로 앱이 세션을 모르는 것이 아니라, 바를 그리는
+     자리가 한쪽에만 있었던 것이다. */
+  const globalFocusBar = (
+    <GlobalFocusBar
+      flow={planner.focusFlow}
+      onFlowAction={handleBreakAction}
+      session={planner.activeFocusSession}
+      task={planner.activeFocusSession ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null : null}
+      onOpenFocus={() => navigateSection("focus")}
+      onPause={planner.pauseFocusSession}
+      onResume={planner.resumeFocusSession}
+      onStop={(sessionId) => stopFocusWithNotification(sessionId, false)}
+      settings={focusSettings}
+    />
+  );
+
   function renderRail() {
     return (
       <GlobalRail
@@ -1500,6 +1521,9 @@ export default function App() {
             screen owes nothing to which grid it was rendered inside. */}
         {renderCommandMenu()}
         </AppShell>
+        {/* 이 분기에도 같은 바. 없으면 세션이 도는 동안 Tasks 화면에서만
+            집중 상태가 사라진다. */}
+        {globalFocusBar}
       </I18nProvider>
     );
   }
@@ -1657,17 +1681,7 @@ export default function App() {
       >
         {renderPage()}
       </motion.main>
-      <GlobalFocusBar
-        flow={planner.focusFlow}
-        onFlowAction={handleBreakAction}
-        session={planner.activeFocusSession}
-        task={planner.activeFocusSession ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null : null}
-        onOpenFocus={() => navigateSection("focus")}
-        onPause={planner.pauseFocusSession}
-        onResume={planner.resumeFocusSession}
-        onStop={(sessionId) => stopFocusWithNotification(sessionId, false)}
-        settings={focusSettings}
-      />
+      {globalFocusBar}
       {/* §9.36's strip, for the Detail above. `position: fixed`, so it does
           not care which grid it was rendered inside — the same reason
           `AppModals` sits here. */}
