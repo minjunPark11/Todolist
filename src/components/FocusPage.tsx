@@ -280,6 +280,28 @@ export function FocusPage({
   const queueTasks = useMemo(() => visibleQueue(queue, tasks), [queue, tasks]);
   const queuedIds = useMemo(() => new Set(queueTasks.map((t) => t.id)), [queueTasks]);
   const [dragId, setDragId] = useState("");
+
+  /* 오늘의 세션 요약 (FOCUS_LAYOUT_DESIGN.md Phase 3).
+
+     기록 화면이 이미 같은 셋을 계산한다 — `focusRecords`로 구간을 모으고
+     `ms > 0`인 것만 세는 방식. 여기서는 그 함수에 오늘 하루를 주는 것이
+     전부다. 새 집계 모델을 만들지 않는다(Phase 2의 결정 12와 같은 이유).
+
+     "완료한 작업"만 다른 곳에서 온다: 세션이 아니라 Task의 `completedAt`이고,
+     그것을 타임존의 하루로 접는 것은 `focusDate`가 이미 하는 일이다. */
+  const todaySummary = useMemo(() => {
+    const rows = focusRecords(focusSessions, today, today, timezone, "all").filter((r) => r.ms > 0);
+    const totalSeconds = rows.reduce((sum, r) => sum + r.ms, 0) / 1000;
+    const done = tasks.filter(
+      (t) => !t.deletedAt && t.completedAt && focusDate(Date.parse(t.completedAt), timezone) === today,
+    ).length;
+    return {
+      totalSeconds,
+      sessions: rows.length,
+      done,
+      averageSeconds: rows.length ? totalSeconds / rows.length : 0,
+    };
+  }, [focusSessions, tasks, today, timezone]);
   const queueRef = useRef<HTMLDivElement | null>(null);
   const choices = useMemo(
     () =>
@@ -747,6 +769,7 @@ export function FocusPage({
               보여주는 것이므로. 몰입에서는 사라진다(결정 I7): 큐와 요약을
               몰입에 두면 그 모드가 무엇을 위한 것인지가 무너진다. */}
           {!immersive && (
+              <div className="focus-side">
               <section className="focus-queue" aria-label={l("작업 큐", "Task queue")}>
                 <header>
                   <div>
@@ -840,6 +863,41 @@ export function FocusPage({
                   <OverlayScrollbar scrollerRef={queueRef} />
                 </div>
               </section>
+
+              {/* 오늘의 세션 요약 (Phase 3).
+
+                  차트가 아니라 스탯 타일이다 — 셋 다 하나의 숫자이고, 비교할
+                  기간도 시간축도 없다. 그리고 이 화면의 히어로 숫자는 이미
+                  시계이므로, 타일의 값은 그것과 겨루지 않는 크기로 둔다. */}
+              <section
+                className="focus-summary"
+                aria-label={l("오늘의 세션 요약", "Today at a glance")}
+              >
+                <h2>{l("오늘의 세션 요약", "Today at a glance")}</h2>
+                <dl>
+                  {[
+                    [
+                      l("집중 시간", "Focused"),
+                      todaySummary.totalSeconds
+                        ? formatFocusDuration(todaySummary.totalSeconds, true)
+                        : "—",
+                    ],
+                    [l("완료한 작업", "Tasks done"), String(todaySummary.done)],
+                    [
+                      l("평균 집중 시간", "Average session"),
+                      todaySummary.sessions
+                        ? formatFocusDuration(todaySummary.averageSeconds, true)
+                        : "—",
+                    ],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+              </div>
             )}
         </div>
       ) : (

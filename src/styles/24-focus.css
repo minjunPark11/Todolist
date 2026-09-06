@@ -611,6 +611,16 @@ body.focus-stage-visible .foc-global-bar {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* 오른쪽 열의 두 층: 큐가 남는 전부를 먹고 요약은 바닥에 자기 높이로 선다.
+     여기서도 `minmax(0, 1fr)`의 0이 없으면 큐가 자기 내용 높이로 부풀어
+     요약을 화면 밖으로 밀어낸다. */
+  .focus-side {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: var(--space-md);
+    min-height: 0;
+  }
+
   .focus-layout > .focus-stage {
     margin-top: 0;
     align-self: center;
@@ -714,4 +724,48 @@ body.focus-stage-visible .foc-global-bar {
   margin: var(--space-md) 0 0;
   color: var(--text-tertiary);
   font-size: var(--type-md);
+}
+
+
+/* ==========================================================================
+   오늘의 세션 요약 (FOCUS_LAYOUT_DESIGN.md Phase 3)
+   --------------------------------------------------------------------------
+   차트가 아니라 스탯 타일이다. dataviz 스킬의 첫 단계가 그렇게 말한다 —
+   "때로는 답이 차트가 아니다". 셋 다 하나의 숫자이고 비교할 기간도 시간축도
+   없으므로, 그릴 것이 없는데 그리면 장식이다.
+
+   같은 스킬의 두 규격을 지킨다.
+     · 히어로 숫자는 뷰당 하나. 이 화면의 그것은 시계(66~96px)이므로 타일의
+       값은 그것과 겨루지 않는 크기(--type-xl)에 둔다.
+     · 큰 독립 숫자에 `tabular-nums`를 쓰지 않는다. 그건 칼럼으로 줄맞춤할 때의
+       것이고, 여기 셋은 각자 서 있다.
+   ========================================================================== */
+.focus-side {
+  min-width: 0;
+}
+.focus-summary {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-sm);
+}
+.focus-summary h2 {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--type-md);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+.focus-summary dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+}
+/* 라벨은 문장형이고 콜론을 달지 않는다 (dataviz 스탯 타일 계약). */
+.focus-summary dt {
+  color: var(--text-tertiary);
+  font-size: var(--type-sm);
+}
+.focus-summary dd {
+  margin: 2px 0 0;
+  font-size: var(--type-xl);
+  font-weight: var(--weight-medium);
 }
