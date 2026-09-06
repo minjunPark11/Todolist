@@ -18,6 +18,8 @@ import {
   type FocusCommand,
 } from "../domain/focus/engine";
 import { focusDate, focusRecords } from "../domain/focus/records";
+import { visibleQueue } from "../domain/focus/queue";
+import { OverlayScrollbar } from "./common/OverlayScrollbar";
 import { formatFocusDuration, useNowTick } from "../lib/focusTimer";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { platform } from "../platform";
@@ -40,6 +42,11 @@ interface FocusPageProps {
   onRetry: () => void;
   onCompleteTask: (id: string) => void;
   onOpenTask: (id: string) => void;
+  /** 집중할 순서 — 저장된 taskId 배열 (FOCUS_LAYOUT_DESIGN.md Phase 2). */
+  queue: string[];
+  onAddToQueue: (taskId: string) => void;
+  onRemoveFromQueue: (taskId: string) => void;
+  onMoveInQueue: (taskId: string, targetIndex: number) => void;
   onUpdateSettings: (patch: Partial<FocusUserSettings>) => void;
 }
 export function FocusIcon({
@@ -158,6 +165,10 @@ function FocusDialog({
   );
 }
 export function FocusPage({
+  queue,
+  onAddToQueue,
+  onRemoveFromQueue,
+  onMoveInQueue,
   tasks,
   tags,
   taskTags,
@@ -264,10 +275,19 @@ export function FocusPage({
       )
       .slice(0, 3);
   }, [tasks, tags, taskTags, today]);
+  /* 저장된 순서에서 지금 보여줄 것만. 지우는 경로가 여럿이라 읽을 때 거른다 —
+     이유는 `domain/focus/queue`의 주석에 있다 (결정 9). */
+  const queueTasks = useMemo(() => visibleQueue(queue, tasks), [queue, tasks]);
+  const queuedIds = useMemo(() => new Set(queueTasks.map((t) => t.id)), [queueTasks]);
+  const [dragId, setDragId] = useState("");
+  const queueRef = useRef<HTMLDivElement | null>(null);
   const choices = useMemo(
     () =>
       tasks
-        .filter((t) => !t.deletedAt && (picker !== "start" || isTaskOpen(t)))
+        .filter((t) => !t.deletedAt && (picker === "start" || picker === "queue" ? isTaskOpen(t) : true))
+        // 결정 7: 큐에 이미 있는 것은 고를 수 없다. 고르게 두면 아무 일도
+        // 일어나지 않는 버튼이 되고, 그건 고장과 구별되지 않는다.
+        .filter((t) => picker !== "queue" || !queuedIds.has(t.id))
         .filter((t) =>
           `${t.title} ${lists.find((x) => x.id === t.listId)?.name ?? ""} ${tagNamesForTask(t, tags, taskTags).join(" ")}`
             .toLowerCase()
@@ -721,50 +741,104 @@ export function FocusPage({
           >
             <fieldset disabled={!ready || Boolean(error)}>{stage}</fieldset>
           </section>
-          {!immersive &&
-            !activeSession &&
-            !flow &&
-            !result &&
-            candidates.length > 0 && (
-              <section className="focus-candidates">
+          {/* 집중 큐 (FOCUS_LAYOUT_DESIGN.md Phase 2).
+
+              세션이 도는 동안에도 남는다 — 큐의 요점이 "지금" 말고 "다음"을
+              보여주는 것이므로. 몰입에서는 사라진다(결정 I7): 큐와 요약을
+              몰입에 두면 그 모드가 무엇을 위한 것인지가 무너진다. */}
+          {!immersive && (
+              <section className="focus-queue" aria-label={l("작업 큐", "Task queue")}>
                 <header>
                   <div>
-                    <h2>{l("바로 시작할 일", "Ready when you are")}</h2>
+                    <h2>
+                      {l("작업 큐", "Task queue")}{" "}
+                      <span className="focus-queue-count">{queueTasks.length}</span>
+                    </h2>
                     <p>
                       {l(
-                        "지금 바로 집중하기 좋은 작업이에요.",
-                        "A few tasks to get you started.",
+                        "집중할 순서를 직접 만들어 두세요.",
+                        "Put the work in the order you will do it.",
                       )}
                     </p>
                   </div>
                   <button
                     className="focus-text-button"
-                    onClick={() => openPicker("start")}
+                    onClick={() => openPicker("queue")}
                   >
-                    {l("모두 보기", "View all")} →
+                    + {l("작업 추가", "Add task")}
                   </button>
                 </header>
-                {candidates.map((t) => (
-                  <article key={t.id}>
-                    <button
-                      className="focus-candidate-play"
-                      aria-label={`${l("이 작업으로", "Start")} ${mode === "pomodoro" ? l("포모도로 시작", "pomodoro") : l("스톱워치 시작", "stopwatch")}: ${t.title}`}
-                      onClick={() => start(t.id)}
-                    >
-                      <FocusIcon name="play" />
-                    </button>
-                    <button
-                      className="foc-task-main"
-                      onClick={() => onOpenTask(t.id)}
-                    >
-                      <strong>{t.title}</strong>
-                    </button>
-                    <span className="focus-task-label">
-                      {lists.find((x) => x.id === t.listId)?.name ?? ""}
-                    </span>
-                    <small>{formatFocusDuration(t.actualSeconds, true)}</small>
-                  </article>
-                ))}
+
+                {/* 이 화면에서 흐르는 것은 이 하나다. `position: relative`는
+                    장식이 아니라 OverlayScrollbar의 요구다 — 그 컴포넌트는 엄지를
+                    스크롤러의 가장 가까운 positioned 조상에 대해 놓는다. */}
+                <div className="focus-queue-scroller" ref={queueRef}>
+                  {queueTasks.length === 0 ? (
+                    <p className="focus-queue-empty">
+                      {l(
+                        "아직 큐가 비어 있어요. 작업을 추가해 순서를 만들어 보세요.",
+                        "The queue is empty. Add a task to start building your order.",
+                      )}
+                    </p>
+                  ) : (
+                    queueTasks.map((t, index) => (
+                      <article
+                        key={t.id}
+                        className={dragId === t.id ? "is-dragging" : undefined}
+                        draggable
+                        onDragStart={(event) => {
+                          setDragId(t.id);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/task", t.id);
+                        }}
+                        onDragOver={(event) => {
+                          if (!dragId) return;
+                          event.preventDefault();
+                        }}
+                        onDrop={(event) => {
+                          if (!dragId) return;
+                          event.preventDefault();
+                          onMoveInQueue(dragId, index);
+                          setDragId("");
+                        }}
+                        onDragEnd={() => setDragId("")}
+                      >
+                        {/* 손잡이는 알림이지 기구가 아니다 — 줄 전체가 끌린다.
+                            (17-tasks-module의 `.tm-task-handle`과 같은 규칙) */}
+                        <span className="focus-queue-handle" aria-hidden="true" />
+                        <button
+                          className="focus-candidate-play"
+                          aria-label={`${l("이 작업으로", "Start")} ${mode === "pomodoro" ? l("포모도로 시작", "pomodoro") : l("스톱워치 시작", "stopwatch")}: ${t.title}`}
+                          onClick={() => start(t.id)}
+                        >
+                          <FocusIcon name="play" />
+                        </button>
+                        <button
+                          className="foc-task-main"
+                          onClick={() => onOpenTask(t.id)}
+                        >
+                          <strong>{t.title}</strong>
+                        </button>
+                        <span className="focus-task-label">
+                          {lists.find((x) => x.id === t.listId)?.name ?? ""}
+                        </span>
+                        {/* 결정 12: 새 예상 시간 모델을 만들지 않는다. 이 숫자는
+                            지금까지 이 작업에 **쌓인** 집중 시간이다. */}
+                        <small title={l("지금까지 집중한 시간", "Focused so far")}>
+                          {formatFocusDuration(t.actualSeconds, true)}
+                        </small>
+                        <button
+                          className="focus-queue-remove"
+                          aria-label={`${l("큐에서 빼기", "Remove from queue")}: ${t.title}`}
+                          onClick={() => onRemoveFromQueue(t.id)}
+                        >
+                          ×
+                        </button>
+                      </article>
+                    ))
+                  )}
+                  <OverlayScrollbar scrollerRef={queueRef} />
+                </div>
               </section>
             )}
         </div>
@@ -898,7 +972,11 @@ export function FocusPage({
       )}
       {picker && (
         <FocusDialog
-          title={l("작업 선택", "Choose a task")}
+          title={
+            picker === "queue"
+              ? l("큐에 추가할 작업", "Add a task to the queue")
+              : l("작업 선택", "Choose a task")
+          }
           onClose={() => setPicker(null)}
         >
           <input
@@ -912,11 +990,15 @@ export function FocusPage({
             onChange={(e) => setQuery(e.target.value)}
           />
           <div className="focus-choice-list">
-            {[null, ...choices].map((t) => (
+            {/* "작업 없이 집중"은 시작의 선택지이지 큐의 항목이 아니다 —
+                담을 것이 없는 줄을 큐에 넣을 수는 없다. */}
+            {(picker === "queue" ? choices : [null, ...choices]).map((t) => (
               <button
                 key={t?.id ?? "none"}
                 onClick={() => {
-                  if (picker === "start") setSelectedId(t?.id ?? null);
+                  if (picker === "queue") {
+                    if (t) onAddToQueue(t.id);
+                  } else if (picker === "start") setSelectedId(t?.id ?? null);
                   else {
                     const s = focusSessions.find((s) => s.id === picker);
                     if (

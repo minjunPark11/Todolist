@@ -1293,6 +1293,15 @@ export interface PlannerData {
   checkItems: CheckItem[];
   focusSessions: FocusSession[];
   activeSessionId: string;
+  /**
+   * 집중할 순서 — `Task.order`와 독립인 taskId 배열
+   * (FOCUS_LAYOUT_DESIGN.md Phase 2, 결정 1~3).
+   *
+   * 로컬 전용이다. `buildSyncPlan`의 `collectionTables`는 행의 모음을 옮기는
+   * 목록이고 이것은 한 사람이 자기 앞에 놓은 순서 하나이므로, 그 목록에
+   * 없으면 원격은 이 필드를 모른 채 그대로 돈다.
+   */
+  focusQueue: string[];
   /** Preserved, never read — see StoredGoal. */
   learningPaths: StoredGoal[];
   spaces: Space[];

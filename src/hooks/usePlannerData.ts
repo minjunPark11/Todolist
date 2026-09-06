@@ -1,5 +1,10 @@
 import { reduceFocus, type FocusCommand } from "../domain/focus/engine";
 import { connectFocusHost } from "../lib/focusHost";
+import {
+  addToQueue as addToFocusQueueList,
+  moveInQueue as moveInFocusQueueList,
+  removeFromQueue as removeFromFocusQueueList,
+} from "../domain/focus/queue";
 import { recoverFocusData, unconfirmedFocusGap } from "../domain/focus/recovery";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pushUndo } from "../lib/undoStack";
@@ -1582,6 +1587,39 @@ export function usePlannerData() {
     });
   }
 
+  /* ==========================================================================
+     집중 큐 (FOCUS_LAYOUT_DESIGN.md Phase 2)
+     --------------------------------------------------------------------------
+     셋 다 `domain/focus/queue`의 순수 함수를 부르고, 그 함수들이 모두
+     `compactQueue`를 통과한다 — 큐를 건드리는 어떤 쓰기도 죽은 id를 함께
+     털어낸다는 뜻이다(결정 9). 지우는 경로를 하나씩 고치지 않는 이유는
+     그 파일의 주석에 있다.
+     ========================================================================== */
+
+  /** 큐 끝에 하나 (결정 4 — 자동 삽입은 없다, 사용자가 넣는다). */
+  function addToFocusQueue(taskId: string) {
+    setData((current) => {
+      const next = addToFocusQueueList(current.focusQueue, taskId, current.tasks);
+      return next === current.focusQueue ? current : { ...current, focusQueue: next };
+    });
+  }
+
+  /** 큐에서 하나. Task는 그대로 남는다 (결정 8). */
+  function removeFromFocusQueue(taskId: string) {
+    setData((current) => ({
+      ...current,
+      focusQueue: removeFromFocusQueueList(current.focusQueue, taskId, current.tasks),
+    }));
+  }
+
+  /** 끌어다 놓은 자리로 (결정 10 — 저장되므로 재실행 후에도 남는다). */
+  function moveInFocusQueue(taskId: string, targetIndex: number) {
+    setData((current) => ({
+      ...current,
+      focusQueue: moveInFocusQueueList(current.focusQueue, taskId, targetIndex, current.tasks),
+    }));
+  }
+
   /**
    * A line dropped at `targetIndex` among its Task's lines.
    *
@@ -2186,6 +2224,8 @@ export function usePlannerData() {
     focusCommandError,
     retryFocusSave,
     focusSessions: data.focusSessions,
+    /** 집중할 순서 (Phase 2). 저장된 그대로 — 거르는 것은 화면의 일이다. */
+    focusQueue: data.focusQueue,
     activeSessionId: data.activeSessionId,
     activeFocusSession: (() => {
       const live = data.focusSessions.find(
@@ -2232,6 +2272,9 @@ export function usePlannerData() {
     toggleCheckItem,
     deleteCheckItem,
     moveCheckItem,
+    addToFocusQueue,
+    removeFromFocusQueue,
+    moveInFocusQueue,
     setTaskContentMode,
     addSubtask,
     toggleSubtask,

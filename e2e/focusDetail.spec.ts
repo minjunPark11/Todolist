@@ -33,6 +33,13 @@ test.describe("the Focus page's queue", () => {
     await expect(schedule).toContainText(TASK);
 
     await page.goto("/focus");
+
+    // 큐는 이제 사용자가 담는다 (FOCUS_LAYOUT_DESIGN.md Phase 2, 결정 4).
+    // 예전에는 열린 작업 셋이 저절로 올라와서 이 줄이 그냥 있었지만, 저절로
+    // 오르는 목록은 "내가 정한 순서"가 아니다. 담는 것까지가 사용자의 경로다.
+    await page.getByRole("button", { name: "Add task" }).click();
+    await page.locator(".focus-choice-list button", { hasText: TASK }).click();
+
     const row = page.locator(".foc-task-main", { hasText: TASK });
     await expect(row).toBeVisible();
 
@@ -65,6 +72,11 @@ test.describe("the Focus page's queue", () => {
     await expect(schedule).toContainText(TASK);
 
     await page.goto("/focus");
+
+    // 위 테스트와 같은 이유로 큐에 담고 시작한다 (결정 4).
+    await page.getByRole("button", { name: "Add task" }).click();
+    await page.locator(".focus-choice-list button", { hasText: TASK }).click();
+
     const focusPage = page.locator(".foc-page");
     const before = (await focusPage.boundingBox())?.width ?? 0;
     expect(before).toBeGreaterThan(0);

@@ -513,6 +513,16 @@ export function normalizeData(data: RawPlannerData): PlannerData {
       : [],
     focusFlow: normalizeFocusFlow(data.focusFlow),
     activeSessionId: typeof data.activeSessionId === "string" ? data.activeSessionId : "",
+    // 집중 큐(Phase 2). 여기서는 모양만 본다 — 빈 문자열과 중복을 털어내되,
+    // 완료·삭제로 죽은 id는 남긴다. 그것을 판단하려면 tasks를 함께 봐야 하고,
+    // 그 판단은 `domain/focus/queue`의 `compactQueue` 한 곳에만 있어야 한다.
+    focusQueue: Array.isArray(data.focusQueue)
+      ? Array.from(
+          new Set(
+            data.focusQueue.filter((id: unknown): id is string => typeof id === "string" && id !== ""),
+          ),
+        )
+      : [],
     // Goals are preserved, not read (types.ts StoredGoal): the feature that
     // made and showed them is gone, so the records pass through the load
     // untouched rather than being validated against a shape nothing uses.

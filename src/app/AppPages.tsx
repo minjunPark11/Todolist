@@ -242,6 +242,10 @@ export function AppPages({
           settings={focusSettings}
           onCompleteTask={planner.completeTask}
           onOpenTask={onOpenTask}
+          queue={planner.focusQueue}
+          onAddToQueue={planner.addToFocusQueue}
+          onRemoveFromQueue={planner.removeFromFocusQueue}
+          onMoveInQueue={planner.moveInFocusQueue}
         />
         {renderTaskDetail()}
       </section>

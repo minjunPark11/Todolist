@@ -68,6 +68,8 @@ const appSettings: AppSettings = {
 function data(overrides: Partial<PlannerData> = {}): PlannerData {
   return {
     tasks: [],
+    // 로컬 전용이라 이 파일이 검사하는 동기화 계획에는 나타나지 않는다.
+    focusQueue: [],
     projects: [],
     spaces: [],
     subtasks: [],

@@ -25,6 +25,7 @@ import { persistPlannerData, PLANNER_STORAGE_KEY, FOCUS_V2_BACKUP_KEY } from "./
 function plannerData(): PlannerData {
   return {
     tasks: [],
+  focusQueue: [],
     projects: [],
     spaces: [],
     subtasks: [],

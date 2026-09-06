@@ -56,7 +56,7 @@
   letter-spacing: -0.04em;
 }
 .focus-page-header p,
-.focus-candidates p {
+.focus-queue p {
   color: var(--text-secondary);
   font-size: var(--type-lg);
   margin: 6px 0 0;
@@ -203,37 +203,44 @@
   font-size: 13px;
   color: var(--text-secondary);
 }
-.focus-candidates {
-  max-width: 640px;
-  margin: 42px auto 0;
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 24px;
+/* 한 열이던 시절의 값들(가운데 640px, 위 42px, 윗줄)은 2열에서 틀린다 —
+   그 자리는 이제 열이 정한다. 900 아래에서만 옛 모양으로 돌아간다. */
+.focus-queue {
+  padding-top: var(--space-sm);
 }
-.focus-candidates header {
+@media (max-width: 900px) {
+  .focus-queue {
+    max-width: 640px;
+    margin: 42px auto 0;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: var(--space-lg);
+  }
+}
+.focus-queue header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
 }
-.focus-candidates h2 {
+.focus-queue h2 {
   font-size: var(--type-xl);
   margin: 0;
 }
-.focus-candidates article {
+.focus-queue article {
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 56px;
   border-bottom: 1px solid var(--border-subtle);
 }
-.focus-candidates .focus-candidate-play {
+.focus-queue .focus-candidate-play {
   padding: 10px;
   color: var(--color-primary);
   border: 0;
   background: transparent;
 }
-.focus-candidates .foc-task-main {
+.focus-queue .foc-task-main {
   flex: 1;
   min-width: 0;
   align-items: start;
@@ -242,7 +249,7 @@
   padding: 10px 0;
   text-align: left;
 }
-.focus-candidates .foc-task-main strong {
+.focus-queue .foc-task-main strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -260,7 +267,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.focus-candidates article small {
+.focus-queue article small {
   min-width: 45px;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
@@ -485,7 +492,7 @@ body.focus-stage-visible .foc-global-bar {
     font-size: var(--focus-clock-display);
     min-height: 100px;
   }
-  .focus-candidates {
+  .focus-queue {
     margin-top: 24px;
   }
 }
@@ -600,7 +607,7 @@ body.focus-stage-visible .foc-global-bar {
   /* 세션이 도는 동안에는 후보 목록이 렌더되지 않는다(FocusPage.tsx의 조건).
      그때 두 열을 유지하면 오른쪽이 빈칸으로 남으므로, 한 열로 접고 타이머가
      가운데를 되찾는다. */
-  .focus-layout:not(:has(.focus-candidates)) {
+  .focus-layout:not(:has(.focus-queue)) {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -614,9 +621,97 @@ body.focus-stage-visible .foc-global-bar {
   /* 이 화면에서 흐르는 것은 이것 하나다. `overscroll-behavior: contain`이
      없으면 목록 끝에서의 휠이 `main`으로 넘어가고, 그건 다른 화면에서는 그냥
      스크롤 체이닝이지만 여기서는 "전체 화면이 안 움직인다"는 약속을 깨는 것이다. */
-  .focus-page-v2 .focus-candidates {
+  .focus-page-v2 .focus-queue {
+    min-height: 0;
+    /* 머리는 자기 높이, 목록이 남는 전부. 여기서도 `minmax(0, 1fr)`의 0이
+       없으면 안쪽 스크롤러가 자기 내용 높이로 부풀어 아무것도 흐르지 않는다. */
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .focus-page-v2 .focus-queue-scroller {
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+}
+
+
+/* ==========================================================================
+   집중 큐 (FOCUS_LAYOUT_DESIGN.md Phase 2)
+   ========================================================================== */
+.focus-queue > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.focus-queue h2 {
+  margin: 0;
+  font-size: var(--type-xl);
+  font-weight: var(--weight-bold);
+}
+.focus-queue > header p {
+  margin: 4px 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--type-sm);
+}
+.focus-queue-count {
+  color: var(--text-tertiary);
+  font-weight: var(--weight-normal);
+}
+
+/* `position: relative`가 OverlayScrollbar의 요구다 — 그 컴포넌트는 엄지를
+   스크롤러의 가장 가까운 positioned 조상에 대해 놓고, 스크롤러가 그것을
+   채워야 바가 엉뚱한 상자 옆에 서지 않는다 (OverlayScrollbar.tsx §props). */
+.focus-queue-scroller {
+  position: relative;
+}
+
+.focus-queue-scroller > article {
+  display: grid;
+  grid-template-columns: 10px 32px minmax(0, 1fr) auto auto 28px;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.focus-queue-scroller > article.is-dragging {
+  opacity: 0.5;
+}
+
+/* 손잡이는 끌 수 있다는 **알림**이지 기구가 아니다 — 줄 전체가 끌린다.
+   17-tasks-module.css의 `.tm-task-handle`이 같은 규칙을 같은 모양으로 적었다. */
+.focus-queue-handle {
+  width: 10px;
+  height: 16px;
+  cursor: grab;
+  background-image: radial-gradient(circle, var(--text-tertiary) 1px, transparent 1px);
+  background-size: 4px 4px;
+  background-position: 1px 2px;
+  opacity: 0.55;
+}
+.focus-queue-scroller > article:hover .focus-queue-handle {
+  opacity: 1;
+}
+
+.focus-page-v2 .focus-queue-remove {
+  min-height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: var(--icon-glyph);
+}
+.focus-page-v2 .focus-queue-remove:hover:not(:disabled) {
+  color: var(--danger-ink);
+  background: var(--bg-hover-content);
+}
+
+.focus-queue-empty {
+  margin: var(--space-md) 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--type-md);
 }
