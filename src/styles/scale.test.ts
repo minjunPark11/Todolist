@@ -94,7 +94,11 @@ const EXEMPT: { selector: RegExp; why: string }[] = [
   // §11.3에서 이것을 드리프트로 착각해 -6으로 스냅했다가 되돌렸다.
   // 스피너는 전환이 아니라 루프다 — 1.1s는 한 바퀴 도는 시간이고 사다리와 무관하다.
   { selector: /\.rail-sync\.is-syncing/, why: "루프 애니메이션 (SWISS_MINIMAL_DESIGN.md §15)" },
-  { selector: /\.ff-timeline-bar\.is-marker/, why: "width의 절반, 파생값 (SWISS_MINIMAL_DESIGN.md §11.3)" },
+  // 두 가지가 스케일 밖이고 둘 다 이유가 적혀 있다: `margin-left: -7px`은 위
+  // `width: 14px`의 절반(파생값)이고, `border-radius: 3px`은 §11.39가 형태라고
+  // 부르는 20px 아래의 마름모라 반경 스케일이 다스리는 곳이 아니다. 이행이 그
+  // 3px을 덮었다가 되돌렸다 (§16).
+  { selector: /\.ff-timeline-bar\.is-marker/, why: "파생값과 20px 아래의 마름모 (§11.3 · §16)" },
 ];
 
 /**
