@@ -74,7 +74,8 @@ async function openGantt(page: Page): Promise<void> {
       ];
       window.localStorage.setItem(key as string, JSON.stringify(store));
     },
-    [STORAGE_KEY, NOW, dayOffset(-1), dayOffset(4), dayOffset(-5), dayOffset(-2)] as const,
+    // Keep the completed span in the visible week even when today is Sunday.
+    [STORAGE_KEY, NOW, dayOffset(-1), dayOffset(4), dayOffset(-5), dayOffset(0)] as const,
   );
   await page.goto("/list/l-work?view=gantt");
   await expect(page.locator(".ff-timeline")).toBeVisible();
