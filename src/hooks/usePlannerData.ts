@@ -2308,7 +2308,6 @@ export function usePlannerData() {
     signOut,
     resetPassword,
     updatePassword,
-    uploadLocalDataToSupabase,
     refreshSupabaseData: loadSupabaseData,
     /**
      * The Rail's sync button (RAIL_SYNC_AND_NOTIFICATIONS_DESIGN.md §2.2, F1-B).

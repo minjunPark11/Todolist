@@ -46,7 +46,6 @@ interface SettingsPageProps {
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
   onDeleteExternalCalendar: (calendarId: string) => void;
   onSyncExternalCalendar: (calendarId: string) => void;
-  onSyncAllExternalCalendars: () => void;
   calendarShare: CalendarShareState;
   onEnableCalendarShare: () => void;
   onDisableCalendarShare: () => void;
@@ -91,7 +90,6 @@ export function SettingsPage({
   onUpdateExternalCalendar,
   onDeleteExternalCalendar,
   onSyncExternalCalendar,
-  onSyncAllExternalCalendars,
   calendarShare,
   onEnableCalendarShare,
   onDisableCalendarShare,
@@ -420,12 +418,12 @@ export function SettingsPage({
                       : t("settings.calendar.noLastSync")}
                 </small>
               </div>
+              {/* "Refresh all" used to sit here. §11.5: the Rail's sync button
+                  now refreshes every enabled subscription on each press, so
+                  this was the same call reached by a longer road. The per-
+                  calendar button below is not the same thing — it picks ONE,
+                  which is what you want when one of them is the broken one. */}
               <div className="ff-cal-card-actions">
-                {externalCalendars.length > 0 ? (
-                  <button type="button" className="ff-btn" onClick={onSyncAllExternalCalendars}>
-                    {t("settings.calendar.refreshAll")}
-                  </button>
-                ) : null}
                 <button
                   type="button"
                   className="ff-btn ff-cal-btn-outline"
@@ -771,14 +769,22 @@ function NotificationsTab() {
   );
 }
 
-export function SettingsRow({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
+/**
+ * A settings row.
+ *
+ * `children` is optional because §11.5 left one row with nothing to press: the
+ * local-data notice says a thing is waiting and the next sync merges it, so
+ * the row is the sentence and not a control. An empty control box would still
+ * claim its column, so it is not drawn at all.
+ */
+export function SettingsRow({ title, hint, children }: { title: string; hint: string; children?: ReactNode }) {
   return (
     <div className="ff-settings-row">
       <div className="ff-settings-row-text">
         <strong>{title}</strong>
         <small>{hint}</small>
       </div>
-      <div className="ff-settings-row-control">{children}</div>
+      {children === undefined ? null : <div className="ff-settings-row-control">{children}</div>}
     </div>
   );
 }

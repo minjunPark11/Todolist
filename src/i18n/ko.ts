@@ -150,13 +150,9 @@ export const ko: Dictionary = {
   "auth.accountTitle": "계정",
   "auth.notConfigured": "Supabase 환경변수가 설정되지 않았습니다. 로컬 저장소를 사용 중입니다.",
   "auth.signedInAs": "로그인 계정",
-  "auth.refreshCloud": "클라우드 데이터 새로고침",
   "auth.logOut": "로그아웃",
   "auth.migrationCount": "로컬 항목 {{n}}개를 업로드할 수 있습니다.",
-  "auth.migrationBody": "로컬 데이터를 업로드할 수 있습니다.",
-  "auth.uploadLocal": "로컬 데이터 업로드",
-  "auth.uploadSuccess": "로컬 데이터를 Supabase에 업로드했습니다.",
-  "auth.uploadNoData": "업로드할 로컬 데이터가 없습니다.",
+  "auth.migrationBody": "다음 동기화 때 이 계정으로 합쳐집니다.",
 
   // ---- Sync status ----
   // ---- 레일 유틸리티 + 알림함 (RAIL_SYNC_AND_NOTIFICATIONS_DESIGN.md §7) ----
@@ -312,7 +308,6 @@ export const ko: Dictionary = {
   "settings.calendar.enable": "활성",
   "settings.calendar.refreshNow": "지금 새로고침",
   "settings.calendar.noLastSync": "마지막 동기화 없음",
-  "settings.calendar.refreshAll": "전체 새로고침",
   // Google Calendar, two-way (GOOGLE_CALENDAR_SYNC_DESIGN.md M1-4d).
   "settings.google.title": "구글 캘린더",
   "settings.google.hint": "날짜가 있는 할 일을 구글 계정의 FocusFlow 캘린더로 보내고, 양쪽에서 고칠 수 있습니다.",

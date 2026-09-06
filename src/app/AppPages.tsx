@@ -74,7 +74,6 @@ type AppPagesProps = {
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
   onDeleteExternalCalendar: (calendarId: string) => void;
   onSyncExternalCalendar: (calendarId: string) => void;
-  onSyncAllExternalCalendars: () => void;
   calendarShare: CalendarShareState;
   onEnableCalendarShare: () => void;
   onDisableCalendarShare: () => void;
@@ -117,7 +116,6 @@ export function AppPages({
   onUpdateExternalCalendar,
   onDeleteExternalCalendar,
   onSyncExternalCalendar,
-  onSyncAllExternalCalendars,
   calendarShare,
   onEnableCalendarShare,
   onDisableCalendarShare,
@@ -275,7 +273,6 @@ export function AppPages({
       onUpdateExternalCalendar={onUpdateExternalCalendar}
       onDeleteExternalCalendar={onDeleteExternalCalendar}
       onSyncExternalCalendar={onSyncExternalCalendar}
-      onSyncAllExternalCalendars={onSyncAllExternalCalendars}
       calendarShare={calendarShare}
       onEnableCalendarShare={onEnableCalendarShare}
       onDisableCalendarShare={onDisableCalendarShare}

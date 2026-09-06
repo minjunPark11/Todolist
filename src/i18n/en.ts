@@ -151,13 +151,9 @@ export const en: Dictionary = {
   "auth.accountTitle": "Account",
   "auth.notConfigured": "Supabase env vars are not configured. The app is using localStorage.",
   "auth.signedInAs": "Signed in as",
-  "auth.refreshCloud": "Refresh cloud data",
   "auth.logOut": "Log out",
   "auth.migrationCount": "{{n}} local items can be uploaded.",
-  "auth.migrationBody": "Local data can be uploaded.",
-  "auth.uploadLocal": "Upload local data",
-  "auth.uploadSuccess": "Local data uploaded to Supabase.",
-  "auth.uploadNoData": "No local data to upload.",
+  "auth.migrationBody": "The next sync merges it into this account.",
 
   // ---- Sync status ----
   // ---- Rail utilities + notification centre (RAIL_SYNC_AND_NOTIFICATIONS_DESIGN.md §7) ----
@@ -316,7 +312,6 @@ export const en: Dictionary = {
   "settings.calendar.enable": "Enable",
   "settings.calendar.refreshNow": "Refresh now",
   "settings.calendar.noLastSync": "No sync yet",
-  "settings.calendar.refreshAll": "Refresh all",
   // Google Calendar, two-way (GOOGLE_CALENDAR_SYNC_DESIGN.md M1-4d).
   "settings.google.title": "Google Calendar",
   "settings.google.hint": "Send dated tasks to a FocusFlow calendar in your Google account, and edit them from either side.",

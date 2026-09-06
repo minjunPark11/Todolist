@@ -1624,7 +1624,6 @@ export default function App() {
         onUpdateExternalCalendar={updateExternalCalendar}
         onDeleteExternalCalendar={deleteExternalCalendar}
         onSyncExternalCalendar={(calendarId) => void syncExternalCalendar(calendarId)}
-        onSyncAllExternalCalendars={syncAllExternalCalendars}
         calendarShare={calendarShare}
         onEnableCalendarShare={() => void enableCalendarShare()}
         onDisableCalendarShare={() => void disableCurrentCalendarShare()}
@@ -1635,8 +1634,6 @@ export default function App() {
             auth={planner.auth}
             onOpenLogin={() => navigate("/login")}
             onSignOut={planner.signOut}
-            onUploadLocal={planner.uploadLocalDataToSupabase}
-            onRefresh={planner.refreshSupabaseData}
           />
         }
       />
@@ -2006,21 +2003,28 @@ function formatAuthError(error: string, t: (key: string) => string): string {
   return error;
 }
 
+/*
+ * The account card, after §11.5 took its two buttons away.
+ *
+ * Both were doing what the Rail's sync button now does on every press, and one
+ * of them was doing only HALF of it: "Refresh cloud data" downloaded without
+ * draining the save queue first, which is the race §2.2 chose F1-B to avoid.
+ * A second door to a worse version of the same room.
+ *
+ * What stays is what the Rail cannot say: the account it is signed in as, the
+ * sentence form of `syncStatus` (the Rail draws that state as an icon, and an
+ * icon cannot give a reason), and the fact that there is local data waiting.
+ */
 function AccountSection({
   auth,
   onOpenLogin,
   onSignOut,
-  onUploadLocal,
-  onRefresh,
 }: {
   auth: ReturnType<typeof usePlannerData>["auth"];
   onOpenLogin: () => void;
   onSignOut: () => Promise<void>;
-  onUploadLocal: () => Promise<boolean>;
-  onRefresh: () => Promise<void>;
 }) {
   const { t } = useT();
-  const [message, setMessage] = useState("");
 
   return (
     /* SETTINGS_REVIEW.md 3.1: this card kept the class names the rest of
@@ -2048,14 +2052,9 @@ function AccountSection({
       >
         <div className="ff-settings-actions">
           {auth.isSignedIn ? (
-            <>
-              <button type="button" className="ff-btn" onClick={onRefresh}>
-                {t("auth.refreshCloud")}
-              </button>
-              <button type="button" className="ff-btn" onClick={onSignOut}>
-                {t("auth.logOut")}
-              </button>
-            </>
+            <button type="button" className="ff-btn" onClick={onSignOut}>
+              {t("auth.logOut")}
+            </button>
           ) : (
             <button
               type="button"
@@ -2072,22 +2071,10 @@ function AccountSection({
         <SettingsRow
           title={t("auth.migrationCount", { n: auth.migrationPreviewCount })}
           hint={t("auth.migrationBody")}
-        >
-          <button
-            type="button"
-            className="ff-btn"
-            onClick={async () => {
-              const success = await onUploadLocal();
-              setMessage(success ? t("auth.uploadSuccess") : t("auth.uploadNoData"));
-            }}
-          >
-            {t("auth.uploadLocal")}
-          </button>
-        </SettingsRow>
+        />
       ) : null}
       <p className="ff-settings-msg">{t(auth.syncStatus)}</p>
       {auth.syncError ? <p className="ff-settings-msg is-error">{auth.syncError}</p> : null}
-      {message ? <p className="ff-settings-msg">{message}</p> : null}
     </div>
   );
 }
