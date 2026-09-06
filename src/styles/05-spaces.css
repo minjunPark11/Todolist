@@ -206,7 +206,7 @@
 .foc-play:not(:disabled):hover {
   border-color: transparent;
   color: #fff;
-  background: var(--accent);
+  background: var(--accent-fill);
 }
 
 .foc-play:disabled {
@@ -565,7 +565,7 @@
   height: 44px;
   border-radius: 50%;
   color: #fff;
-  background: var(--accent);
+  background: var(--accent-fill);
 }
 
 .foc-global-main span.is-paused {

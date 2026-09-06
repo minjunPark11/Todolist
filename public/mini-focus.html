@@ -41,6 +41,9 @@
            `src/styles/*.css`만 읽으므로 이 파일은 그 자가 닿지 않는 곳에 있다.
            (같은 창의 React 구현은 09-calendar-redesign.css가 그리고, 그쪽은 닿는다.) */
         --radius-sm: 4px;
+        --bg-app: #eff1f5;
+        --bg-surface: #ffffff;
+        --text-primary: #1c1c1e;
         --type-md: 13px;
         --display-lg: 48px;
         --weight-bold: 700;
@@ -56,8 +59,8 @@
         min-width: 320px;
         min-height: 280px;
         overflow: hidden;
-        background: #f5f7fb;
-        color: #111827;
+        background: var(--bg-app);
+        color: var(--text-primary);
       }
 
       main {

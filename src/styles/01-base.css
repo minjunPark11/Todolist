@@ -143,7 +143,17 @@
 
   --text-primary: #1c1c1e;
   --text-secondary: #3c3c43;
-  --text-tertiary: #8e8e93;
+  /* `#8e8e93`은 흰 면에서 3.26:1이었다 — 6개 라우트에서 139곳이 AA 4.5에
+     미달했고, 카운트·기한·요일 라벨·빈 상태 문구처럼 읽으라고 쓴 글자들이다.
+     이 작업 이전부터 그랬고, §10에서 표면을 벌리며 사이드바 위에서 2.71까지
+     더 내려갔다.
+
+     값은 tertiary 글자가 실제로 앉는 네 면 중 가장 어두운 것(사이드바
+     #e7eaf0)에서 4.5를 넘도록 잡았다: 카드 5.54 · 바닥 4.90 · muted 4.79 ·
+     사이드바 4.60. secondary(10.94)와는 두 배 차이라 위계는 남는다.
+
+     다크는 건드리지 않는다 — 어두운 카드 위에서 이미 5.22다. */
+  --text-tertiary: #68686d;
 
   --border-subtle: rgba(25, 25, 25, 0.08);
   --border-strong: rgba(0, 0, 0, 0.12);
@@ -168,6 +178,12 @@
      `--accent-soft: rgba(10, 132, 255, …)`가 가리키고 있던 것이다 —
      soft만 다크용으로 맞춰져 있고 정작 `--accent`는 재정의된 적이 없었다. */
   --accent: #0064d2;
+  /* 액센트를 '면'으로 칠하고 그 위에 흰 글자를 얹는 자리.
+     라이트에서는 한 값이 둘 다 만족한다(글자로 5.59, 면으로도 5.59). 다크는
+     그렇지 않다 — 아래 블록의 주석 참조. 이름을 나누는 것은 두 번째 브랜드
+     색을 들이는 것이 아니라, 한 색의 두 용도가 서로 반대 방향을 요구한다는
+     사실을 적어두는 것이다(§13). */
+  --accent-fill: var(--accent);
   --accent-soft: rgba(0, 100, 210, 0.1);
   --accent-active: rgba(0, 100, 210, 0.11);
 
@@ -201,6 +217,18 @@
   --priority-low: #4772fa;
   --priority-none: var(--text-tertiary);
   --success: #34c759;
+  /* 위의 셋(--danger · --warning · --success)은 '면'의 색이다. 글자로 쓰면
+     흰 면에서 3.55 · 2.20 · 2.22로 전부 AA에 미달한다 — 액센트가 글자와 면
+     사이에서 반대 방향을 요구했던 것과 같은 자리다(§13.1).
+     읽기용 짝은 이미 있었다: 아래 tint 계열의 `-text`가 그것이고, 각각
+     5.92 · 4.84 · 5.07이다. 이름을 세워 그 사실을 적어둔다. */
+  --danger-ink: var(--tint-red-text);
+  /* tint 계열보다 한 단 더 내렸다. `--tint-orange-text`(#b85500)는 흰 면에서
+     4.84로 통과하지만 `--bg-surface-muted`(#f5f5f7) 위에서 4.45로 떨어진다 —
+     사분면 III의 로마숫자가 정확히 그 바탕에 앉는다. */
+  --warning-ink: #a84e00;
+  --success-ink: var(--tint-green-text);
+  --accent-ink: var(--accent);
   --success-soft: #edfaf2;
   --purple: #af52de;
   --purple-soft: #f3eeff;
@@ -227,6 +255,11 @@
      14(40) · 16(16) · 15(16)이고, 앱이 실제로 쓰는 폭은 11~16이며 나머지는
      꼬리였다. 아래는 그 폭에 제목 두 단을 얹은 것이다.
      14는 13이나 15로, 10과 9는 11로, 12.5는 12로 흡수된다(Phase 3). */
+  /* 10px을 §5.1이 "--label-size의 기록된 예외"로 미뤄뒀고, 그 주석은 "Phase 3에서
+     실제로 재보고 결정한다"고 적었다. 재봤다: 열한 자리가 이 크기를 쓰는데 대문자
+     라벨은 그중 하나뿐이고 나머지는 체크박스 글리프·미니월 요일·시간 라벨·배지다.
+     이름이 틀렸던 것이지 예외였던 것이 아니다 — 6단이 아니라 7단이다. */
+  --type-2xs: 10px;   /* 조밀한 크롬의 최소 단 */
   --type-xs: 11px;    /* 캡션 · 메타 · 배지 */
   --type-sm: 12px;    /* 보조 라벨 */
   --type-md: 13px;    /* 기본 UI 텍스트 — 최다 사용 */
@@ -267,10 +300,9 @@
   /* 위 두 스케일로 다시 쓴 기존 축약형. 22/16은 스케일에 없던 값이었다. */
   --font-page-title: var(--weight-bold) var(--type-2xl) / 32px var(--font-sans, inherit);
   --font-section-title: var(--weight-medium) var(--type-xl) / 24px var(--font-sans, inherit);
-  /* 10px은 --type-xs 아래다. 대문자 라벨이라 x-height가 벌어 읽히던 값이고,
-     11px로 올리면 자간(0.08em)과 함께 폭이 늘어 헤더가 깨진다. Phase 3에서
-     실제로 재보고 결정한다. */
-  --label-size: 10px;
+  /* 스케일의 최소 단을 가리킨다. 이름은 한 곳(09-calendar-redesign.css)이
+     아직 부르고 있어 남긴다. */
+  --label-size: var(--type-2xs);
   --label-tracking: 0.08em;
 
   /* Radius — SWISS_MINIMAL_DESIGN.md I1-B: 한 값이다.
@@ -378,7 +410,6 @@
   --density-control-pad-x: 12px;
   --density-tap: 24px;
   --density-icon: var(--icon-glyph);
-  --density-icon-lg: 18px;
   --density-radius: var(--radius-sm);
 
   /* === §11 Visual System — the shell's role tokens (P0-10) ==================
@@ -553,7 +584,22 @@ body {
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.16);
   /* soft/active가 처음부터 이 값을 가리키고 있었다. 이제 액센트 본체도 온다. */
+  /* 잉크는 '더 어두운 색'이 아니라 '읽히는 색'이다. 라이트에서 그 방향은
+     아래쪽이었지만 다크에서는 위쪽이다 — `--danger-ink`의 #c0271d는 어두운
+     카드 위에서 2.65로, 고치려던 면색보다도 안 보인다. 같은 의미색이 테마마다
+     반대 방향을 요구하는 것은 `--accent`/`--accent-fill`과 같은 자리다(§13.1).
+     값은 Apple의 다크 시맨틱 색이고, 사분면 바탕(#232325)에서도 4.6 이상이다. */
+  --danger-ink: #ff453a;
+  --warning-ink: #ff9f0a;
+  --success-ink: #30d158;
+  --accent-ink: var(--color-primary-on-dark);
   --accent: #0a84ff;
+  /* 글자로 쓰면 4.66이지만 그 위에 흰 글자를 얹으면 3.65로 AA에 미달한다.
+     §10이 액센트를 '글자'로만 재고 '면'으로는 재지 않아서 놓친 자리다.
+     `#0071e3`은 흰 글자 4.70이면서 카드(#1c1c1e)와도 3.62로 갈라진다 —
+     한 값이 두 조건을 다 넘는 유일한 구간이고, 이미 `--color-primary-focus`
+     라는 이름으로 리포에 있던 값이다. */
+  --accent-fill: #0071e3;
   --accent-soft: rgba(10, 132, 255, 0.18);
   --accent-active: rgba(10, 132, 255, 0.2);
   --danger-soft: rgba(255, 69, 58, 0.16);

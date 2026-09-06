@@ -882,7 +882,12 @@
    gutter by a pixel or two instead of folding in half, which is the better of
    the two failures — the badge stays a clock. */
 .gcal-now-badge span {
-  background: var(--calendar-now-color);
+  /* 같은 `--calendar-now-color`가 선과 알약 둘 다를 칠하는데, 요구가 반대다:
+     선은 밝아야 눈에 띄고 알약은 흰 글자를 얹으니 어두워야 한다. 그대로 쓰면
+     3.55:1이라 AA에 미달했다. 검정과 78% 섞어 어느 now 색이 오든 한 방향으로
+     내린다 — 값을 박지 않는 것은 이 토큰이 레이어마다 다른 색을 받기 때문이다
+     (09는 액센트, 10은 danger). */
+  background: color-mix(in srgb, var(--calendar-now-color) 78%, #000);
   color: #fff;
   font-size: var(--type-xs);
   font-weight: 600;
@@ -1688,7 +1693,7 @@ label.auth-check {
   border: 0;
   border-radius: var(--radius-sm);
   color: var(--color-on-dark);
-  background: var(--accent);
+  background: var(--accent-fill);
   font-size: var(--type-lg);
   font-weight: var(--weight-medium);
 }

@@ -202,7 +202,7 @@
 
 .sdv-upcoming-kind {
   flex: none;
-  font-size: 10px;
+  font-size: var(--type-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;

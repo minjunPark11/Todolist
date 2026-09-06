@@ -619,7 +619,7 @@
 
 .expandable-add-input-row button {
   border: 1px solid var(--accent);
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #fff;
   border-radius: var(--radius-sm);
   padding: 6px 12px;

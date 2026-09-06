@@ -114,7 +114,7 @@
   border-radius: var(--radius-pill);
 }
 .ff-timeline-col.is-today .ff-timeline-col-mark {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #fff;
 }
 
@@ -572,7 +572,7 @@
 
 .ff-timeline-badge {
   flex: none;
-  font-size: 10px;
+  font-size: var(--type-2xs);
   line-height: 1;
   opacity: 0.9;
   cursor: help;
@@ -761,7 +761,7 @@
 
 @media (max-width: 900px) {
   .ff-timeline { --timeline-label-width: 130px; }
-  .ff-timeline-col { font-size: 10px; }
+  .ff-timeline-col { font-size: var(--type-2xs); }
 
   /* Once it has wrapped, 220px of panel with empty space beside it is a
      column pretending it still has a neighbour. It takes the line. */

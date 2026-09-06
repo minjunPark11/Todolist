@@ -863,7 +863,7 @@
   padding: 0 10px;
   border: 0;
   border-radius: var(--radius-sm);
-  background: var(--accent, #007aff);
+  background: var(--accent-fill, #007aff);
   color: #fff;
   font: inherit;
   font-size: 13px;
@@ -2834,7 +2834,7 @@
 }
 
 .tm-modal-submit {
-  background: var(--accent, #0a84ff);
+  background: var(--accent-fill, #0a84ff);
   color: #fff;
 }
 
@@ -3130,7 +3130,7 @@
 }
 
 .tm-folder-create-actions button:last-child {
-  background: var(--accent, #0a84ff);
+  background: var(--accent-fill, #0a84ff);
   color: #fff;
 }
 
@@ -3805,7 +3805,7 @@
   padding: 0 12px;
   border: 0;
   border-radius: var(--radius-sm);
-  background: var(--accent, #0a84ff);
+  background: var(--accent-fill, #0a84ff);
   color: #fff;
   font: inherit;
   font-weight: 600;

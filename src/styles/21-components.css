@@ -112,7 +112,7 @@
 .ff-btn-primary,
 .sdv-btn-primary {
   border-color: var(--accent);
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #fff;
 }
 

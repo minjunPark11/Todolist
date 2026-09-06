@@ -101,7 +101,7 @@
 }
 
 .sched-tabs button.is-active {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #fff;
 }
 
@@ -257,7 +257,7 @@
 .sched-cell.is-single,
 .sched-cell.is-start,
 .sched-cell.is-end {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #fff;
   font-weight: 600;
   box-shadow: none;
@@ -850,7 +850,7 @@
 
 .sched-confirm {
   border: 1px solid var(--accent);
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #fff;
 }
 

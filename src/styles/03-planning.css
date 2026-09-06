@@ -72,7 +72,7 @@
   background: var(--bg-surface);
   flex-shrink: 0;
   color: #fff;
-  font-size: 10px;
+  font-size: var(--type-2xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -579,8 +579,8 @@
   color: var(--text-primary);
 }
 .ff-import-btn { cursor: pointer; }
-.ff-settings-msg { color: var(--success); font-size: 13px; padding: 8px 0; }
-.ff-settings-msg.is-error { color: var(--danger, #d11); }
+.ff-settings-msg { color: var(--success-ink); font-size: 13px; padding: 8px 0; }
+.ff-settings-msg.is-error { color: var(--danger-ink); }
 
 /* SETTINGS_REVIEW.md Phase 2: a settings row is read left to right, and at
    1326px the label and its control sat 1100px apart — the eye crossed an empty
@@ -882,10 +882,13 @@
   border-color: var(--q-color);
   background: color-mix(in srgb, var(--q-color) 10%, var(--bg-surface-muted));
 }
-.ff-matrix-cell-I { --q-color: var(--danger); grid-area: qI; }
-.ff-matrix-cell-II { --q-color: var(--accent); grid-area: qII; }
-.ff-matrix-cell-III { --q-color: var(--warning); grid-area: qIII; }
-.ff-matrix-cell-IV { --q-color: var(--text-tertiary); grid-area: qIV; }
+/* `--q-color`는 테두리와 틴트를 칠하는 면의 색이고, `--q-ink`는 그 위에 얹는
+   글자의 색이다. 로마숫자가 `--q-color`를 그대로 쓰면서 III이 2.02:1로
+   읽히지 않고 있었다. */
+.ff-matrix-cell-I { --q-color: var(--danger); --q-ink: var(--danger-ink); grid-area: qI; }
+.ff-matrix-cell-II { --q-color: var(--accent); --q-ink: var(--accent-ink); grid-area: qII; }
+.ff-matrix-cell-III { --q-color: var(--warning); --q-ink: var(--warning-ink); grid-area: qIII; }
+.ff-matrix-cell-IV { --q-color: var(--text-tertiary); --q-ink: var(--text-tertiary); grid-area: qIV; }
 
 /* The page's own ⋯, where the List `<select>` used to be (§33.2).
 
@@ -937,7 +940,7 @@
   height: 22px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--q-color) 16%, transparent);
-  color: var(--q-color);
+  color: var(--q-ink, var(--q-color));
   font-size: 11px;
   font-weight: 700;
 }
@@ -1002,7 +1005,7 @@
   padding: 3px 10px;
   border: 0;
   border-radius: var(--radius-sm, 6px);
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #fff;
   font: inherit;
   font-size: 12px;

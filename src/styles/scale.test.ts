@@ -22,12 +22,35 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-/** §5.1의 6단. 10px은 --label-size의 기록된 예외(01-base.css). */
+/** §5.1의 스케일. 10px은 예외가 아니라 최소 단이다(--type-2xs, §14). */
 const SIZE_OK = new Set(["11px", "12px", "13px", "15px", "18px", "24px", "10px", "inherit", "0", "100%"]);
 /** §5.2의 3단. 로드되는 페이스가 셋뿐이다. */
 const WEIGHT_OK = new Set(["400", "600", "700", "inherit", "normal", "bold", "initial"]);
 /** I1-B의 단일값. 50%/100%/9999px은 모서리가 아니라 원이다. */
 const RADIUS_OK = new Set(["0", "4px", "50%", "100%", "9999px", "inherit", "initial", "unset"]);
+
+/**
+ * 간격의 사다리 (§11).
+ *
+ * 6과 10이 여기 있는 것은 드리프트를 봐주는 것이 아니라 §11.1의 결정이다 — 이 앱은
+ * 2px 단위로 돌고 `20-density.css`가 그 위에 서 있으며, 8/12로 올리면 태스크 행이
+ * 14% 높아져 문서가 정한 "compact productivity density"에서 멀어진다.
+ *
+ * 1·2·3은 헤어라인과 광학 보정이다. `--icon-glyph`와 `--display-*`를 타입 스케일에서
+ * 뺀 것과 같은 자리 — "얼마나 떨어뜨릴까"가 아니라 "선이 몇 px인가"의 문제다.
+ */
+const SPACE_OK = new Set([
+  "0", "1px", "2px", "3px", "4px", "6px", "8px", "10px", "12px", "16px", "24px", "32px", "48px",
+  "auto", "inherit", "initial", "unset", "100%", "50%",
+]);
+
+/**
+ * 리듬이 아니라 다른 요소의 높이에 묶인 값들 (§11.2).
+ *
+ * 떠 있는 바를 피하는 여백과 고정 헤더 상쇄, 그리고 뷰포트를 따라 자라는 페이지
+ * 패딩이다. 사다리에 얹으면 콘텐츠가 그 바 뒤로 들어간다.
+ */
+const SPACE_ANCHORED = new Set(["40px", "42px", "44px", "52px", "64px", "68px", "80px", "90px", "110px"]);
 
 // offset도 blur도 0인 box-shadow는 그림자가 아니라 링이다 — 포커스 링과
 // 헤어라인이 이 모양으로 그려진다. I2-B가 걷어내는 것은 흐림이 만든 가짜
@@ -53,6 +76,10 @@ const EXEMPT: { selector: RegExp; why: string }[] = [
   // "온전해 보이는 막대는 3일짜리 작업으로 읽힌다". 2px은 모서리를 둥글게 하는
   // 값이 아니라 반대로 각지게 만드는 신호이고, 화살표 글리프와 짝이다.
   { selector: /\.ff-timeline-bar\.is-clipped-/, why: "잘린 끝은 각진다 (12-timeline.css §D4)" },
+  // `margin-left: -7px`은 바로 위 `width: 14px`의 절반이다 — 45° 회전한 마커를
+  // 오늘 선 위에 앉히는 파생값이고, 사다리가 아니라 그 width를 따라간다.
+  // §11.3에서 이것을 드리프트로 착각해 -6으로 스냅했다가 되돌렸다.
+  { selector: /\.ff-timeline-bar\.is-marker/, why: "width의 절반, 파생값 (SWISS_MINIMAL_DESIGN.md §11.3)" },
 ];
 
 /**
@@ -143,6 +170,16 @@ function scan(css: string): Violation[] {
       if (value !== "none" && !value.includes("var(") && !RING.test(value)) {
         found.push({ line: at, kind: "shadow", text: value });
       }
+    }
+
+    // 간격. §11이 스냅한 133곳이 다시 흘러가는 것을 막는다 — 그 전까지 이 축에는
+    // 가드가 없었고, §7이 "문서만으로는 안 지켜진다"고 적어둔 그대로였다.
+    const space = /(?<![-\w])(?:padding|margin|gap|row-gap|column-gap|(?:padding|margin)-(?:top|right|bottom|left|inline|block))\s*:\s*([^;{}]+)/.exec(line);
+    if (space) {
+      const bad = literals(space[1]).filter(
+        (value) => /^-?[\d.]+(px|rem|em)$/.test(value) && !SPACE_OK.has(value.replace(/^-/, "")) && !SPACE_ANCHORED.has(value.replace(/^-/, "")),
+      );
+      if (bad.length) found.push({ line: at, kind: "space", text: `${space[0].trim().slice(0, 46)}  ← ${bad.join(" ")}` });
     }
 
     // 토큰의 정의 자체. 값이 한 덩어리인 것만 본다 — `600 24px/32px …` 같은 축약형은
