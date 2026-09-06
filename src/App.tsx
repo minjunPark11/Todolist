@@ -54,6 +54,8 @@ import { childrenOf } from "./domain/tasks/children";
 import { checkItemsForTask } from "./domain/tasks/checkItems";
 import { taskActivity } from "./domain/tasks/activity";
 import { useAutoBackup } from "./app/useAutoBackup";
+import { railSyncState } from "./app/railSync";
+import { isBackupDue } from "./domain/backup/schedule";
 import { useDataPortability } from "./app/useDataPortability";
 import { dismissToast, enqueueToast, type QueuedToast } from "./lib/toastQueue";
 import { formatFocusDuration, useNowTick } from "./lib/focusTimer";
@@ -1314,26 +1316,55 @@ export default function App() {
   );
 
   function renderRail() {
+    const syncState = railSyncState({
+      signedIn: planner.auth.isSignedIn,
+      accountStatus: planner.auth.syncStatus,
+      calendars: externalCalendarState.calendars,
+    });
+
     return (
       <GlobalRail
         active={railItem}
         onNavigate={navigateRail}
         onOpenSearch={openGlobalSearch}
         searchOpen={menuOpen}
-        /* F2: no button at all without an account. A sync control that answers
-           a press with silence is worse than an absent one, and in a column of
-           unlabelled icons a disabled one cannot explain itself. */
+        /* F2 lives in `railSyncState` now, unchanged in principle: a sync
+           control that answers a press with silence is worse than an absent
+           one, and in a column of unlabelled icons a disabled one cannot
+           explain itself. What changed is what counts as silence — an ICS
+           subscription is refreshable without an account (§11).
+
+           The press is three owners' work, which is why it is assembled here
+           and not inside one of them: the account is `usePlannerData`, the
+           subscriptions are this component's state, and the backup is
+           `useAutoBackup`. Only the button's FACE is a shared judgement, and
+           that part is the pure function. */
         sync={
-          planner.auth.isSignedIn
+          syncState
             ? {
-                state:
-                  planner.auth.syncStatus === "sync.syncing"
-                    ? "syncing"
-                    : planner.auth.syncStatus === "sync.syncFailed" || planner.auth.syncStatus === "sync.retrying"
-                      ? "failed"
-                      : "idle",
+                state: syncState,
                 onSync: () => {
                   void planner.syncNow();
+                  syncAllExternalCalendars();
+                  /* The backup rides along, but only when the schedule says so.
+                     `backupNow()` writes a NEW file per call — `backupStamp` is
+                     per-second — and `platform.backups.write` prunes to `keep`.
+                     Wired unconditionally, a reader who taps sync ten times in
+                     an afternoon would evict every historical copy and keep ten
+                     of the same hour, which is the opposite of what a backup is
+                     for. `isBackupDue` is the check the hourly timer already
+                     uses, so the rail press means "keep backups current", and
+                     "off" still means off. */
+                  if (
+                    isBackupDue({
+                      interval: appSettings.autoBackup,
+                      lastAt: autoBackup.lastAt,
+                      now: Date.now(),
+                      supported: autoBackup.supported,
+                    })
+                  ) {
+                    void autoBackup.backupNow();
+                  }
                 },
               }
             : undefined

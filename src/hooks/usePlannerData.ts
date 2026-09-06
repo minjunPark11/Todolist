@@ -2322,9 +2322,19 @@ export function usePlannerData() {
      *
      * A failed upload does not stop the download: the queue keeps its retry,
      * and refusing to refresh would leave the reader with neither half.
+     *
+     * §11: the migration upload runs FIRST, before the queue is drained. It is
+     * the same button's job — Settings' "Upload local data" was a second door
+     * to it, and one that only appeared if the reader happened to walk to the
+     * account tab while `migrationPreviewCount` was still above zero. It is a
+     * no-op with nothing to migrate (`localMigrationData` is null) and a MERGE
+     * when there is, never a replace, so pressing sync cannot cost records.
+     * It goes first because it writes through the same save queue: draining
+     * before it would leave what it just wrote sitting unsent.
      */
     syncNow: async () => {
       if (!isSupabaseConfigured || !userEmailRef.current) return;
+      await uploadLocalDataToSupabase();
       await saveQueueRef.current?.drain();
       await loadSupabaseData();
     },

@@ -197,3 +197,83 @@ test.describe("the sync button", () => {
     await expect(bell(page)).toBeVisible();
   });
 });
+
+const CALENDARS_KEY = "focusflow.externalCalendars.v1";
+const ICS_PATH = "/fixtures/rail-sync.ics";
+const ICS_BODY = [
+  "BEGIN:VCALENDAR",
+  "VERSION:2.0",
+  "BEGIN:VEVENT",
+  "UID:rail-sync-1",
+  "DTSTART:20260907T090000Z",
+  "DTEND:20260907T100000Z",
+  "SUMMARY:Refreshed by the rail",
+  "END:VEVENT",
+  "END:VCALENDAR",
+].join("\r\n");
+
+/**
+ * One enabled ICS subscription, freshly synced.
+ *
+ * `lastSyncedAt` is now on purpose: `shouldSyncExternalCalendar` only fires the
+ * automatic passes after 30 minutes, so a fetch seen after this returns is the
+ * BUTTON's, not the mount's. Without that the test would pass with the button
+ * disconnected.
+ */
+async function openWithSubscription(page: Page): Promise<{ fetched: () => number }> {
+  let fetched = 0;
+  await page.route(`**${ICS_PATH}`, async (route) => {
+    fetched += 1;
+    await route.fulfill({ status: 200, contentType: "text/calendar", body: ICS_BODY });
+  });
+  await page.addInitScript(
+    ([key, value]) => {
+      if (!window.localStorage.getItem(key as string)) {
+        window.localStorage.setItem(key as string, value as string);
+      }
+    },
+    [
+      CALENDARS_KEY,
+      JSON.stringify({
+        calendars: [
+          {
+            id: "cal-rail",
+            name: "Team",
+            icsUrl: ICS_PATH,
+            color: "#0066cc",
+            visible: true,
+            enabled: true,
+            syncStatus: "success",
+            eventCount: 1,
+            lastSyncedAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+        events: [],
+      }),
+    ] as const,
+  );
+  await openApp(page);
+  return { fetched: () => fetched };
+}
+
+test.describe("the sync button reaches what the app syncs (§11)", () => {
+  test("is drawn without an account when there is a subscription to refresh", async ({ page }) => {
+    // F2 unchanged in principle — no button that answers a press with silence.
+    // What changed is what counts as silence: an ICS subscription is
+    // refreshable with no account behind it.
+    await openWithSubscription(page);
+    await expect(page.locator(".rail-sync")).toHaveCount(1);
+  });
+
+  test("refreshes the subscription, not only the account", async ({ page }) => {
+    const ics = await openWithSubscription(page);
+    // The mount's automatic pass is held off by `lastSyncedAt` (see the helper),
+    // so this is the floor the press has to clear.
+    expect(ics.fetched()).toBe(0);
+
+    await page.locator(".rail-sync").click();
+    await expect.poll(() => ics.fetched()).toBeGreaterThan(0);
+  });
+});
