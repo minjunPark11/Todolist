@@ -13,7 +13,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 24px;
   flex-wrap: wrap;
   padding: 24px;
   background: var(--bg-surface);
@@ -78,7 +78,7 @@
 .sdv-btn-icon {
   width: 44px;
   min-height: 38px;
-  padding: 7px 0;
+  padding: 6px 0;
   font-weight: var(--weight-bold);
   border-color: var(--border-strong);
 }
@@ -180,7 +180,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .sdv-upcoming-list li {
@@ -206,7 +206,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: var(--radius-pill);
 }
 
@@ -232,7 +232,7 @@
 .sdv-tab-nav button {
   border: 0;
   background: transparent;
-  padding: 13px 16px;
+  padding: 12px 16px;
   font-size: var(--type-md);
   font-weight: 600;
   color: var(--text-secondary);
@@ -413,7 +413,7 @@
 .sdv-modal-backdrop {
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 24px;
 }
 
 .sdv-modal {
@@ -422,10 +422,10 @@
   overflow-y: auto;
   background: var(--bg-surface);
   border-radius: var(--radius-sm);
-  padding: 20px;
+  padding: 24px;
   box-shadow: var(--shadow-raised);
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .sdv-modal-head,
@@ -469,7 +469,7 @@
 
 .sdv-form label {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   font-size: 12px;
   font-weight: var(--weight-bold);
   color: var(--text-secondary);
@@ -480,7 +480,7 @@
 .sdv-form textarea {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  padding: 9px 11px;
+  padding: 8px 10px;
   font-size: var(--type-md);
   font-family: inherit;
   background: var(--bg-surface);
@@ -546,15 +546,15 @@
 }
 
 .sdv-drawer-head {
-  padding: 18px 20px;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .sdv-drawer-body {
-  padding: 18px 20px 28px;
+  padding: 16px 24px 32px;
   overflow-y: auto;
   display: grid;
-  gap: 14px;
+  gap: 16px;
   align-content: start;
 }
 
@@ -614,7 +614,7 @@
   display: flex !important;
   flex-direction: row;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   font-size: var(--type-md) !important;
   color: var(--text-primary) !important;
 }

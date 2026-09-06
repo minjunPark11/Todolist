@@ -18,7 +18,7 @@
 .sched-trigger {
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 5px 8px;
+  padding: 4px 8px;
   background: transparent;
   color: var(--accent);
   font: inherit;
@@ -92,7 +92,7 @@
 .sched-tabs button {
   border: 0;
   border-radius: var(--radius-sm);
-  padding: 7px 0;
+  padding: 6px 0;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
@@ -575,7 +575,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 8px;
+  padding: 6px 8px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -623,7 +623,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 11px 12px;
+  padding: 10px 12px;
   border: 0;
   border-bottom: 1px solid var(--border-subtle);
   background: transparent;
@@ -659,7 +659,7 @@
 }
 
 .sched-reminder-custom input {
-  padding: 7px 8px;
+  padding: 6px 8px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--bg);
@@ -826,7 +826,7 @@
 }
 
 .sched-actions button {
-  padding: 9px 0;
+  padding: 8px 0;
   border-radius: var(--radius-sm);
   font: inherit;
   font-weight: var(--weight-normal);

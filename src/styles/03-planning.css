@@ -12,7 +12,7 @@
   padding: 0 0 80px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 32px;
 }
 
 .ff-page-head {
@@ -53,8 +53,8 @@
 .ff-task-row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 13px 16px;
+  gap: 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
   transition: background var(--motion-fast);
@@ -133,7 +133,7 @@
   font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   background: var(--surface-2);
   color: var(--text-secondary);
   white-space: nowrap;
@@ -232,7 +232,7 @@
   border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   border-radius: var(--radius-sm);
-  padding: 5px;
+  padding: 4px;
   font-size: 12px;
 }
 .ff-datepicker-quick button.danger { color: var(--danger); }
@@ -303,13 +303,13 @@
   max-width: 460px;
   max-height: 86vh;
   overflow: auto;
-  padding: 22px;
+  padding: 24px;
 }
 .ff-modal-wide { max-width: 720px; }
-.ff-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.ff-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .ff-modal-head h2 { margin: 0; font-size: var(--type-xl); font-weight: 600; }
 .ff-modal h2 { margin: 0 0 12px; font-size: var(--type-xl); font-weight: 600; }
-.ff-modal-body { display: flex; flex-direction: column; gap: 14px; }
+.ff-modal-body { display: flex; flex-direction: column; gap: 16px; }
 .ff-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .ff-confirm-body { color: var(--text-secondary); font-size: var(--type-md); }
 
@@ -326,7 +326,7 @@
 .ff-form textarea {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  padding: 9px 10px;
+  padding: 8px 10px;
   font-size: var(--type-md);
   font-weight: 400;
   color: var(--text-primary);
@@ -342,10 +342,10 @@
   background: var(--text-primary);
   color: var(--bg-surface);
   border-radius: var(--radius-pill);
-  padding: 11px 18px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   font-size: var(--type-md);
   box-shadow: var(--shadow-raised);
   z-index: 200;
@@ -353,7 +353,7 @@
 .ff-toast button { border: none; background: transparent; color: var(--accent); font-weight: 700; }
 
 @media (max-width: 900px) {
-  .ff-page { padding: 20px 16px 64px; }
+  .ff-page { padding: 24px 16px 64px; }
 }
 
 @media (max-width: 900px) {
@@ -433,7 +433,7 @@
 
   main {
     width: 100%;
-    padding: 68px clamp(12px, 4vw, 22px) 28px;
+    padding: 68px clamp(12px, 4vw, 24px) 32px;
   }
 
   .page-grid,
@@ -445,8 +445,8 @@
 
   .ff-page {
     max-width: none;
-    padding: 18px 0 52px;
-    gap: 20px;
+    padding: 16px 0 52px;
+    gap: 24px;
   }
 
   .ff-page-head {
@@ -487,7 +487,7 @@
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(260px, 1fr);
-  gap: 14px;
+  gap: 16px;
   overflow-x: auto;
   align-items: start;
   padding-bottom: 8px;
@@ -534,7 +534,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
-  padding: 11px 12px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -556,14 +556,14 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  padding: 8px 20px;
+  padding: 8px 24px;
 }
 .ff-settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 18px 0;
+  gap: 24px;
+  padding: 16px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 .ff-settings-row:last-child { border-bottom: none; }
@@ -685,7 +685,7 @@
   min-width: 0;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 9px 12px;
+  padding: 8px 12px;
   background: var(--bg-surface-muted);
   color: var(--text-primary);
   font-size: 13px;
@@ -1187,7 +1187,7 @@
 
 /* The box editor (§20.6). Three fields and a way back to the defaults — what
    a box is CALLED, never what it means. */
-.ff-matrix-edit { display: flex; flex-direction: column; gap: 14px; }
+.ff-matrix-edit { display: flex; flex-direction: column; gap: 16px; }
 .ff-matrix-edit-field { display: flex; flex-direction: column; gap: 6px; }
 .ff-matrix-edit-field > span {
   font-size: 12px;
@@ -1241,7 +1241,7 @@
    second half can hide a task, so the dialog says where that half starts. */
 .ff-matrix-edit-divider {
   margin: 4px 0 0;
-  padding-top: 14px;
+  padding-top: 16px;
   border-top: 1px solid var(--border-subtle);
   color: var(--text-tertiary);
   font-size: 11px;
@@ -1263,7 +1263,7 @@
 .ff-matrix-edit-choice {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   font-size: 12px;
   color: var(--text-primary);
   cursor: pointer;

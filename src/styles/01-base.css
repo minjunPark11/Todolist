@@ -364,7 +364,9 @@
   /* Padding is where most of the room goes, so it gives up the most. */
   --density-page-y: 24px;
   --density-page-x: 32px;
-  --density-card-pad: 14px;
+  /* 16, 14가 아니라. `--density-title: 20px`과 같은 자리였다 — 이름 뒤에 있어서
+     간격 스캔에 잡히지 않은 채 자를 벗어나 있었다 (§11.2). */
+  --density-card-pad: 16px;
   --density-card-gap: 12px;
 
   /* Controls. `--density-control-h` is the drawn height; `--density-tap` is
@@ -758,7 +760,7 @@ main {
   align-items: center;
   min-height: 34px;
   border-radius: var(--rounded-pill);
-  padding: 0 14px;
+  padding: 0 16px;
   color: var(--color-ink);
   background: var(--color-canvas);
   border: 1px solid var(--color-hairline);
@@ -785,7 +787,7 @@ textarea {
   min-height: 44px;
   border: 0;
   border-radius: var(--rounded-pill);
-  padding: 11px 22px;
+  padding: 10px 24px;
   color: var(--color-on-dark);
   background: var(--color-primary);
   font-weight: 400;

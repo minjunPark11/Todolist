@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px;
+  padding: 4px 8px;
   min-height: 32px;
   border-radius: var(--radius-sm);
   font-size: var(--type-md);
@@ -174,7 +174,7 @@
   border: 1px solid var(--color-divider-soft);
   border-radius: var(--radius-sm);
   background: transparent;
-  padding: 2px 5px;
+  padding: 2px 4px;
   cursor: pointer;
   font-size: var(--type-xs);
   color: var(--color-ink-muted-80, #6b7280);
@@ -214,12 +214,12 @@
 .gcal-popover-category-item {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   width: 100%;
   border: none;
   background: transparent;
   border-radius: var(--radius-sm);
-  padding: 5px 6px;
+  padding: 4px 6px;
   font-size: var(--type-md);
   cursor: pointer;
   text-align: left;
@@ -261,14 +261,14 @@
 
 .ff-cal-card {
   display: grid;
-  gap: 14px;
-  padding: 20px;
+  gap: 16px;
+  padding: 24px;
 }
 
 .ff-cal-card-head {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 .ff-cal-card-icon {
@@ -328,7 +328,7 @@
 }
 
 .ff-cal-chip {
-  padding: 8px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   font-size: 13px;
@@ -362,7 +362,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 14px;
+  padding: 10px 16px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
@@ -409,7 +409,7 @@
 .ff-cat-default-badge {
   font-style: normal;
   font-size: 11px;
-  padding: 2px 9px;
+  padding: 2px 8px;
   border-radius: var(--radius-pill);
   background: var(--accent-soft, rgba(0, 102, 204, 0.1));
   color: var(--accent);
@@ -514,7 +514,7 @@
 /* 카테고리 추가/수정 모달 */
 .ff-cat-editor {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .ff-cat-editor-field {
@@ -526,7 +526,7 @@
 }
 
 .ff-cat-editor-field input:not([type="color"]) {
-  padding: 9px 12px;
+  padding: 8px 12px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   font-size: var(--type-md);
@@ -611,7 +611,7 @@
   border: none;
   background: transparent;
   color: var(--text-primary);
-  padding: 7px 8px;
+  padding: 6px 8px;
   font: inherit;
   font-weight: var(--weight-normal);
   outline: none;
@@ -622,7 +622,7 @@
   background: var(--accent);
   color: #fff;
   border-radius: var(--radius-sm);
-  padding: 7px 12px;
+  padding: 6px 12px;
   font-size: 13px;
   font-weight: 700;
   min-height: 30px;

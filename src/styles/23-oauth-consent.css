@@ -124,7 +124,7 @@ a.auth-submit.consent-link {
    note this card needs and nothing else has asked for one. */
 .ff-settings-note {
   margin: 0;
-  padding: 0 16px 14px;
+  padding: 0 16px 16px;
   color: var(--text-tertiary);
   font-size: 13px;
   line-height: 1.5;
@@ -134,7 +134,7 @@ a.auth-submit.consent-link {
   display: grid;
   gap: 0.5rem;
   margin: 0;
-  padding: 0 16px 14px;
+  padding: 0 16px 16px;
   list-style: none;
 }
 

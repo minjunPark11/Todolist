@@ -18,11 +18,11 @@
 
 .foc-page {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   /* No horizontal inset — align left/right margins with Calendar/Today.
      No top inset so the "Focus" title lines up with the other pages' titles
      (flush against main's top padding) instead of dropping ~28px. */
-  padding: 0 0 28px;
+  padding: 0 0 32px;
   min-height: 100vh;
   background: var(--bg-app);
   /* A grid item's floor is its content, so without this the page refuses to
@@ -34,7 +34,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
 }
 
 .foc-header h1 {
@@ -91,8 +91,8 @@
    shares the top row with the timer and the middle divider lines up). */
 .foc-summary {
   display: grid;
-  gap: 14px;
-  padding: 18px;
+  gap: 16px;
+  padding: 16px;
 }
 
 /* Match the top-row card heights so the middle divider is a single clean line
@@ -116,7 +116,7 @@
 
 .foc-insights .foc-card {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .foc-card-head,
@@ -250,7 +250,7 @@
   align-items: center;
   min-height: 26px;
   border-radius: var(--radius-sm);
-  padding: 0 9px;
+  padding: 0 8px;
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 12px;
@@ -374,7 +374,7 @@
   display: grid;
   justify-items: center;
   gap: 10px;
-  padding: 26px 10px;
+  padding: 24px 10px;
   color: var(--text-secondary);
 }
 
@@ -401,7 +401,7 @@
   min-height: 84px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  padding: 14px;
+  padding: 16px;
   background: var(--bg-surface-muted);
 }
 
@@ -415,7 +415,7 @@
 
 .foc-project-bars {
   display: grid;
-  gap: 13px;
+  gap: 12px;
 }
 
 .foc-project-bars p {
@@ -504,11 +504,11 @@
 
 .foc-modal {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   width: min(420px, 100%);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  padding: 22px;
+  padding: 24px;
   background: var(--bg-surface);
   box-shadow: var(--shadow-panel);
 }
@@ -537,7 +537,7 @@
   min-height: 76px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  padding: 12px 18px;
+  padding: 12px 16px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow-panel);
   backdrop-filter: blur(18px);
@@ -631,7 +631,7 @@
 
 @media (max-width: 768px) {
   .foc-page {
-    padding: 18px;
+    padding: 16px;
   }
 
   .foc-header,

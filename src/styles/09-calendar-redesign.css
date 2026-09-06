@@ -360,7 +360,7 @@
 /* Event blocks: tinted fill + accent bar (colors stay inline per category) */
 .gcal-time-block {
   border-radius: var(--radius-sm);
-  padding: 5px 8px;
+  padding: 4px 8px;
   box-shadow: none;
   transition: filter var(--motion-fast), box-shadow var(--motion-fast);
 }
@@ -505,8 +505,8 @@ body:has(.mini-focus-window) {
   box-sizing: border-box;
   width: min(100%, 288px);
   display: grid;
-  gap: 14px;
-  padding: 18px;
+  gap: 16px;
+  padding: 16px;
   border: 1px solid #e5e7eb;
   border-radius: var(--radius-sm);
   background: #fff;

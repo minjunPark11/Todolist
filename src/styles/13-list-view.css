@@ -82,7 +82,7 @@
 .tlv-table .tlv-title { width: auto; min-width: 260px; white-space: normal; }
 
 .tlv-group th {
-  padding-top: 14px;
+  padding-top: 16px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text, #111827);
@@ -142,7 +142,7 @@
    control: there is nothing to click, and the point is to say so. */
 .tlv-add-unavailable {
   margin: 0;
-  padding: 9px 10px;
+  padding: 8px 10px;
   border: 1px dashed var(--border, #e5e7eb);
   border-radius: var(--radius-sm);
   color: var(--text-muted, #6b7280);
