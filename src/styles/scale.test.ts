@@ -48,7 +48,12 @@ const RING = /^(inset\s+)?0\s+0\s+0\s/;
  * 셀렉터에 붙으므로, 정말 다른 언어로 그려야 하는 화면이 생기면 이유와 함께
  * 여기 한 줄을 적는 것이 옳은 답이다.
  */
-const EXEMPT: { selector: RegExp; why: string }[] = [];
+const EXEMPT: { selector: RegExp; why: string }[] = [
+  // 잘린 막대의 끝은 각져야 한다 — 12-timeline.css가 §D4의 이유를 적어놨다:
+  // "온전해 보이는 막대는 3일짜리 작업으로 읽힌다". 2px은 모서리를 둥글게 하는
+  // 값이 아니라 반대로 각지게 만드는 신호이고, 화살표 글리프와 짝이다.
+  { selector: /\.ff-timeline-bar\.is-clipped-/, why: "잘린 끝은 각진다 (12-timeline.css §D4)" },
+];
 
 /**
  * 아직 0이 아닌 파일과, 그 숫자.
@@ -122,6 +127,14 @@ function scan(css: string): Violation[] {
       if (hit && literals(hit[1]).some((value) => !allowed.has(value))) {
         found.push({ line: at, kind, text: hit[1].trim() });
       }
+    }
+
+    // 롱핸드도 본다. `border-top-left-radius`에는 `border-radius`라는 문자열이
+    // 없어서 위 루프가 지나친다 — 타임라인의 잘린 막대가 그 틈으로 2px을 그리고
+    // 있었고, 화면을 재다가 나왔다(§12). 노출은 네 곳이었지만 틈은 틈이다.
+    const longhand = /(?<![-\w])border-(?:top|bottom)-(?:left|right)-radius\s*:\s*([^;{}]+)/.exec(line);
+    if (longhand && literals(longhand[1]).some((value) => !RADIUS_OK.has(value))) {
+      found.push({ line: at, kind: "radius", text: longhand[0].trim() });
     }
 
     const shadow = /(?<![-\w])box-shadow\s*:\s*([^;{}]+)/.exec(line);
