@@ -32,3 +32,4 @@
 /* Last: a floating surface sits above everything above it, and the z-index
    scale it declares (§19.5) is what the layers below are measured against. */
 @import "./styles/22-floating.css";
+@import "./styles/24-focus.css";

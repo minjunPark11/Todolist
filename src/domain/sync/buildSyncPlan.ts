@@ -67,6 +67,7 @@ export type SyncTableOperation = {
 export type AppStateRow = {
   appSettings: AppSettings;
   activeSessionId: string;
+  focusFlow?: PlannerData["focusFlow"];
 };
 
 export type SyncPlan = {
@@ -115,7 +116,7 @@ export function buildSyncPlan(
   const appStateChanged =
     !baseline ||
     next.appSettings !== baseline.appSettings ||
-    next.activeSessionId !== baseline.activeSessionId;
+    next.activeSessionId !== baseline.activeSessionId || next.focusFlow !== baseline.focusFlow;
 
   return {
     tables,
@@ -124,6 +125,7 @@ export function buildSyncPlan(
       ? {
           appSettings: next.appSettings,
           activeSessionId: next.activeSessionId,
+          ...(next.focusFlow || baseline?.focusFlow ? { focusFlow: next.focusFlow ?? null } : {}),
         }
       : null,
   };

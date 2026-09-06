@@ -32,10 +32,10 @@ const startMs = Date.parse("2026-08-12T22:00:00.000Z");
 const minutes = (n: number) => n * 60 * 1000;
 
 describe("recoverStaleFocusSessions", () => {
-  it("caps an overnight quit at the planned duration instead of billing wall-clock hours", () => {
+  it("retains only checkpointed time after an overnight quit", () => {
     // The bug: a 25-minute timer left running while the app was closed for
     // nine hours reported nine hours of focus on next launch.
-    const [recovered] = recoverStaleFocusSessions([session()], startMs + minutes(540));
+    const [recovered] = recoverStaleFocusSessions([session({ checkpointAt: "2026-08-12T22:25:00.000Z" })], startMs + minutes(540));
 
     expect(recovered.status).toBe("paused");
     expect(recovered.accumulatedSeconds).toBe(25 * 60);
@@ -44,14 +44,14 @@ describe("recoverStaleFocusSessions", () => {
     ]);
   });
 
-  it("credits the real elapsed time when the quit was shorter than the plan", () => {
-    const [recovered] = recoverStaleFocusSessions([session()], startMs + minutes(10));
+  it("credits the saved checkpoint, not the time the app was closed", () => {
+    const [recovered] = recoverStaleFocusSessions([session({ checkpointAt: "2026-08-12T22:10:00.000Z" })], startMs + minutes(10));
 
     expect(recovered.accumulatedSeconds).toBe(10 * 60);
     expect(recovered.pausedAt).toBe("2026-08-12T22:10:00.000Z");
   });
 
-  it("counts already-accumulated time against the planned budget", () => {
+  it("preserves accumulated time and excludes an uncheckpointed gap", () => {
     // 20 of the 25 planned minutes were banked before the last resume, so at
     // most 5 more may be credited no matter how long the app was shut.
     const [recovered] = recoverStaleFocusSessions(
@@ -59,7 +59,7 @@ describe("recoverStaleFocusSessions", () => {
       startMs + minutes(540),
     );
 
-    expect(recovered.accumulatedSeconds).toBe(25 * 60);
+    expect(recovered.accumulatedSeconds).toBe(20 * 60);
   });
 
   it("never adds a zero-length segment when nothing can be credited", () => {

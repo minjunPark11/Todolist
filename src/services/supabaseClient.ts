@@ -21,5 +21,5 @@ export const supabaseUrl = normalizeSupabaseUrl(rawSupabaseUrl);
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey!)
+  ? createClient(supabaseUrl, supabaseAnonKey!, { global: { headers: { "x-focusflow-focus-schema": "2" } } })
   : null;

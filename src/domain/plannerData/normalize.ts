@@ -15,6 +15,7 @@
 // account holds nothing. A server must not use them as answers — the machine's
 // own zone is not the user's — and does not: it reads the stored value and
 // refuses when there is none (M1's "no guessing").
+import { normalizeFocusFlow } from "../focus/engine";
 import type {
   AppSettings,
   CheckItem,
@@ -292,30 +293,15 @@ function normalizeFocusSession(session: Partial<FocusSession>): FocusSession {
       : Math.max(0, Math.round((session.durationMinutes ?? 0) * 60));
   const status = session.status ?? (session.completed ? "completed" : "completed");
 
-  // Segment migration: records saved before segments existed get one span
-  // covering the whole session, so past focus time still shows on the
-  // calendar. Sessions that already carry the field keep it as-is (an empty
-  // array on a fresh running session is valid, not legacy).
-  let segments = Array.isArray(session.segments)
-    ? session.segments.filter(
-        (segment): segment is FocusSegment =>
-          Boolean(segment) &&
-          typeof segment.startAt === "string" &&
-          typeof segment.endAt === "string" &&
-          segment.startAt < segment.endAt,
-      )
-    : undefined;
-  if (segments === undefined) {
-    segments =
-      status === "completed" && startedAt && endedAt && startedAt < endedAt
-        ? [{ startAt: startedAt, endAt: endedAt }]
-        : [];
-  }
+  // Missing historical segments cannot prove uninterrupted work.
+  const segments = Array.isArray(session.segments) ? session.segments.filter(
+    (segment): segment is FocusSegment => Boolean(segment) && typeof segment.startAt === "string" && typeof segment.endAt === "string" && segment.startAt < segment.endAt,
+  ) : [];
 
   return {
     ...session, // M0 — see normalizeTask
     id: session.id ?? createId("focus"),
-    taskId: session.taskId ?? "",
+    taskId: session.taskId || null,
     title: session.title ?? "",
     mode: oneOf(session.mode, focusModes, "focus"),
     status: oneOf(status, focusStatuses, "completed"),
@@ -525,6 +511,7 @@ export function normalizeData(data: RawPlannerData): PlannerData {
     focusSessions: Array.isArray(data.focusSessions)
       ? data.focusSessions.map(normalizeFocusSession)
       : [],
+    focusFlow: normalizeFocusFlow(data.focusFlow),
     activeSessionId: typeof data.activeSessionId === "string" ? data.activeSessionId : "",
     // Goals are preserved, not read (types.ts StoredGoal): the feature that
     // made and showed them is gone, so the records pass through the load

@@ -1,10 +1,10 @@
+import { elapsedMs } from "../domain/focus/engine";
 import { useEffect, useState } from "react";
 import type { FocusSession } from "../types";
 
 export function getDisplayedFocusSeconds(session: FocusSession | null, nowMs = Date.now()) {
   if (!session) return 0;
-  if (session.status !== "running") return session.accumulatedSeconds;
-  return session.accumulatedSeconds + Math.max(0, Math.floor((nowMs - new Date(session.startAt).getTime()) / 1000));
+  return Math.floor(elapsedMs(session, nowMs) / 1000);
 }
 
 export function formatFocusDuration(seconds: number, compact = false) {

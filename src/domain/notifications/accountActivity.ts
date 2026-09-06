@@ -52,6 +52,7 @@ export function accountActivity({
 
   const sessionsByTask = new Map<string, FocusSession[]>();
   for (const session of focusSessions) {
+    if (!session.taskId) continue;
     const bucket = sessionsByTask.get(session.taskId);
     if (bucket) bucket.push(session);
     else sessionsByTask.set(session.taskId, [session]);

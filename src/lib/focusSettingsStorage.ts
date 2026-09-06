@@ -1,12 +1,20 @@
 import { platform } from "../platform";
+import type { PomodoroSettings } from "../types";
+import { DEFAULT_POMODORO, sanitizePomodoro } from "../domain/focus/engine";
 
 export type FocusUserSettings = {
+  pomodoro?: PomodoroSettings;
+  soundEnabled?: boolean;
+  soundVolume?: number;
   showTabTitleTimer: boolean;
   enableCompletionNotification: boolean;
   showMiniTimerButton: boolean;
 };
 
 export const DEFAULT_FOCUS_USER_SETTINGS: FocusUserSettings = {
+  pomodoro: DEFAULT_POMODORO,
+  soundEnabled: true,
+  soundVolume: 0.4,
   showTabTitleTimer: true,
   enableCompletionNotification: true,
   showMiniTimerButton: true,
@@ -18,6 +26,9 @@ export function sanitizeFocusUserSettings(value: unknown): FocusUserSettings {
   if (!value || typeof value !== "object") return DEFAULT_FOCUS_USER_SETTINGS;
   const record = value as Partial<Record<keyof FocusUserSettings, unknown>>;
   return {
+    pomodoro: sanitizePomodoro(typeof record.pomodoro === "object" && record.pomodoro ? record.pomodoro as PomodoroSettings : {}),
+    soundEnabled: record.soundEnabled !== false,
+    soundVolume: typeof record.soundVolume === "number" ? Math.max(0, Math.min(1, record.soundVolume)) : 0.4,
     showTabTitleTimer:
       typeof record.showTabTitleTimer === "boolean"
         ? record.showTabTitleTimer

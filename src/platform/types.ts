@@ -5,6 +5,7 @@ export type FocusTrayAction = "pause" | "resume" | "finish";
 export type FocusTrayActionPayload = {
   action: FocusTrayAction;
   sessionId: string;
+  revision?: number;
 };
 export type AppUpdateStatus =
   | { status: "current"; latestVersion?: string }

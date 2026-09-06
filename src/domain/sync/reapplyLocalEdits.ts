@@ -84,6 +84,10 @@ export function reapplyLocalEdits(
     merged.activeSessionId = localNow.activeSessionId;
     touchedAnything = true;
   }
+  if (localNow.focusFlow !== localBefore.focusFlow) {
+    merged.focusFlow = localNow.focusFlow;
+    touchedAnything = true;
+  }
 
   return touchedAnything ? merged : loaded;
 }

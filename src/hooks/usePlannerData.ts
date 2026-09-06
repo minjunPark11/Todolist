@@ -1,3 +1,6 @@
+import { reduceFocus, type FocusCommand } from "../domain/focus/engine";
+import { connectFocusHost } from "../lib/focusHost";
+import { recoverFocusData, unconfirmedFocusGap } from "../domain/focus/recovery";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pushUndo } from "../lib/undoStack";
 import { recordNotification } from "../lib/notificationStore";
@@ -9,8 +12,6 @@ import type {
   TaskContentMode,
   AppSettings,
   ExternalCalendar,
-  FocusMode,
-  FocusSegment,
   FocusSession,
   Folder,
   Language,
@@ -53,7 +54,7 @@ import { toggleTaskTag as toggleTagOnTask } from "../domain/tags/tagPicker";
 import { sanitizeListSection } from "../domain/tasks/sections";
 import { duplicateTaskPlan, type DuplicatePlan } from "../domain/tasks/duplicate";
 import { clampHoursAtATime, HOURS_AT_A_TIME } from "../utils/calendarTime";
-import { focusSessionMinutes, sanitizeFocusDefaultLength } from "../domain/focus/sessionLength";
+import { sanitizeFocusDefaultLength } from "../domain/focus/sessionLength";
 import { DEFAULT_BACKUP_KEEP, sanitizeBackupInterval, sanitizeBackupKeep } from "../domain/backup/schedule";
 import {
   migrateReminders,
@@ -170,6 +171,10 @@ function isMissingRemoteTableError(error: unknown): boolean {
 function adoptLoadedData(data: PlannerData): PlannerData {
   const now = new Date().toISOString();
   const focusSessions = recoverStaleFocusSessions(data.focusSessions);
+  if (data.focusFlow?.phase === "break_running") {
+    const flow = data.focusFlow;
+    data = { ...data, focusFlow: { ...flow, phase: "break_paused", breakElapsedMs: flow.breakElapsedMs + Math.max(0, Date.parse(flow.checkpointAt) - Date.parse(flow.startedAt)) } };
+  }
   const legacyAdopted = adoptLegacyLocalSpaces(data.projects);
   // STEP 5 (§40 M2/M4): one Space, and every Project filed under it. This is
   // the whole Space migration's write budget — Projects number in the tens,
@@ -263,7 +268,8 @@ function readStorage(): PlannerData {
 
   if (raw) {
     try {
-      return adoptLoadedData(normalizeData(JSON.parse(raw) as Partial<PlannerData>));
+      const parsed = normalizeData(JSON.parse(raw) as Partial<PlannerData>);
+      return typeof navigator !== "undefined" && navigator.locks ? parsed : adoptLoadedData(parsed);
     } catch {
       return emptyData();
     }
@@ -296,6 +302,8 @@ export function usePlannerData() {
   // while it was in flight (domain/sync/reapplyLocalEdits).
   const dataRef = useRef(data);
   dataRef.current = data;
+  const focusHostRef = useRef<ReturnType<typeof connectFocusHost> | null>(null);
+  const [focusReady, setFocusReady] = useState(false);
   // Bumped whenever a system path replaces the store wholesale — a remote load
   // adopting the account's records, a migration. User edits do not bump it:
   // they are what undo exists to walk back.
@@ -423,6 +431,17 @@ export function usePlannerData() {
 
     function attempt() {
       try {
+        if (!focusHostRef.current?.owned) {
+          const raw = platform.storage.getSync(STORAGE_KEY);
+          if (raw) {
+            const latest = normalizeData(JSON.parse(raw));
+            // A follower editing a task must not overwrite the host's timer.
+            const local = dataRef.current;
+            const contribution = (snapshot: PlannerData, id: string) => snapshot.focusSessions.reduce((sum,s)=>sum+(s.taskId===id && s.status==="completed"?s.accumulatedSeconds:0),0);
+            dataRef.current = { ...local, focusSessions: latest.focusSessions, activeSessionId: latest.activeSessionId, focusFlow: latest.focusFlow,
+              tasks: local.tasks.map(t => { const live=latest.tasks.find(n=>n.id===t.id); return live ? {...t,actualSeconds:Math.max(0,t.actualSeconds+contribution(latest,t.id)-contribution(local,t.id)),activeSessionId:live.activeSessionId,lastFocusedAt:live.lastFocusedAt} : t; }) };
+          }
+        }
         persistPlannerData(dataRef.current);
         setStorageError(false);
         localSaveDelayRef.current = LOCAL_SAVE_RETRY_MS;
@@ -446,7 +465,7 @@ export function usePlannerData() {
         localSaveRetryRef.current = null;
       }
     };
-  }, [data]);
+  }, [data, focusReady]);
 
   /** Try the local write again now — what the banner's Retry button calls. */
   const retryLocalSave = useCallback(() => {
@@ -656,12 +675,13 @@ export function usePlannerData() {
         throw new Error(`Failed to load 'app_settings' row: ${appSettingsError.message}`);
       }
       const appState = appSettingsRow?.data as
-        | { appSettings?: Partial<AppSettings>; activeSessionId?: unknown }
+        | { appSettings?: Partial<AppSettings>; activeSessionId?: unknown; focusFlow?: PlannerData["focusFlow"] }
         | undefined;
       // Fall back to the current local values when no remote row exists yet, so
       // an existing device's preferences aren't wiped on first sync after this
       // change; the next save pushes them to the account.
       partial.appSettings = appState?.appSettings ? normalizeAppSettings(appState.appSettings) : data.appSettings;
+      partial.focusFlow = appState?.focusFlow ?? null;
       partial.activeSessionId = appState
         ? typeof appState.activeSessionId === "string"
           ? appState.activeSessionId
@@ -669,6 +689,17 @@ export function usePlannerData() {
         : data.activeSessionId;
 
       const loaded = adoptLoadedData(normalizeData(partial));
+      const localActive = dataRef.current.focusSessions.find(s => s.id === dataRef.current.activeSessionId && (s.status === "running" || s.status === "paused"));
+      if (localActive && focusHostRef.current?.owned) {
+        const remoteActive = loaded.focusSessions.find(s => s.id === localActive.id);
+        if ((loaded.activeSessionId && loaded.activeSessionId !== localActive.id) || (remoteActive && ((remoteActive.revision ?? 0) > (localActive.revision ?? 0) || remoteActive.status === "completed"))) {
+          throw new Error("다른 기기의 집중 기록과 충돌했습니다. 현재 기록을 마친 뒤 동기화를 다시 시도해 주세요. / Focus changed on another device. Finish local focus before retrying sync.");
+        }
+        // A refresh of this account is not a new process taking over this host.
+        loaded.focusSessions = [localActive, ...loaded.focusSessions.filter(s => s.id !== localActive.id)];
+        loaded.activeSessionId = localActive.id;
+        loaded.focusFlow = dataRef.current.focusFlow;
+      }
       // A newer load has started since this one began; its answer is the one
       // that should win, and this one has nothing to add.
       if (isStale()) return;
@@ -1652,186 +1683,115 @@ export function usePlannerData() {
 
 
 
-  function getSessionSeconds(session: FocusSession, nowMs = Date.now()) {
-    if (session.status !== "running") return session.accumulatedSeconds;
-    return session.accumulatedSeconds + Math.max(0, Math.floor((nowMs - new Date(session.startAt).getTime()) / 1000));
+  const [focusCommandError, setFocusCommandError] = useState("");
+  const pendingFocusRef = useRef<PlannerData | null>(null);
+  const pendingFocusBaseRef = useRef<PlannerData | null>(null);
+  const focusFailureAtRef = useRef(0);
+  const focusCommandRef = useRef<(command: FocusCommand) => boolean>(() => false);
+  const focusClockRef = useRef({wall:Date.now(), mono:performance.now()});
+  function focusCommand(command: FocusCommand): boolean {
+    return focusHostRef.current?.send(command) ?? false;
   }
-
-  // While running, `startAt` marks the open segment's start (resume resets
-  // it). Pausing or stopping closes that segment; a paused session has no
-  // open segment to close.
-  function closeOpenSegment(session: FocusSession, endAt: string): FocusSegment[] {
-    if (session.status !== "running" || session.startAt >= endAt) return session.segments;
-    return [...session.segments, { startAt: session.startAt, endAt }];
+  function applyFocusCommand(command: FocusCommand): boolean {
+    if (pendingFocusRef.current) return false;
+    try {
+      let current = dataRef.current;
+      const wall = Date.now(), mono = performance.now();
+      if (unconfirmedFocusGap(focusClockRef.current.wall, wall, focusClockRef.current.mono, mono)) current = recoverFocusData(current, wall);
+      focusClockRef.current = {wall,mono};
+      if (current.focusSessions.some(s => (s.schemaVersion ?? 1) > 2 && s.status === "running")) throw new Error("Update required / 업데이트가 필요합니다.");
+      const next = reduceFocus(current, command);
+      if (next === dataRef.current) return true;
+      try { persistPlannerData(next); }
+      catch (error) {
+        const failedAt = Date.now();
+        let held = next;
+        if (current.focusFlow?.phase === "break_running" && !current.activeSessionId && next.activeSessionId) {
+          // Auto-focus was not committed. Retry must return to preparation,
+          // not retroactively record the time spent waiting for storage.
+          held = { ...next, activeSessionId: "", focusSessions: next.focusSessions.filter(s => s.id !== next.activeSessionId),
+            focusFlow: next.focusFlow ? {...next.focusFlow,phase:"next_ready"} : null,
+            tasks: next.tasks.map(t=>t.activeSessionId===next.activeSessionId?{...t,activeSessionId:""}:t) };
+        } else if (next.activeSessionId) held = reduceFocus(next,{type:"pause",id:next.activeSessionId},failedAt);
+        if (held.focusFlow?.phase === "break_running") held = reduceFocus(held,{type:"break_pause",id:held.focusFlow.id},failedAt);
+        pendingFocusRef.current = held; pendingFocusBaseRef.current = current; focusFailureAtRef.current = failedAt; throw error;
+      }
+      dataRef.current = next;
+      setDataState(next);
+      setFocusCommandError("");
+      emitFocusTransitions(current, next);
+      // A focus transition cannot be undone by restoring an older whole-store snapshot.
+      storeRevisionRef.current += 1;
+      return true;
+    } catch (error) {
+      setFocusCommandError(error instanceof Error ? error.message : "기록 저장 실패 / Could not save focus");
+      return false;
+    }
   }
-
-  function startFocusSession(
-    taskId: string,
-    source: FocusSession["source"] = "focus_page",
-    requestedDurationMinutes?: number,
-  ) {
-    const now = new Date().toISOString();
-
-    setData((current) => {
-      const active = current.focusSessions.find((session) => session.id === current.activeSessionId);
-      if (active && (active.status === "running" || active.status === "paused")) return current;
-
-      const task = current.tasks.find((item) => item.id === taskId);
-      if (!task) return current;
-      const project = current.projects.find((item) => item.id === task.projectId);
-      // SETTINGS_REVIEW.md 4.5: this used to be the whole rule, written here and
-      // untested — the task's span, else 50 minutes for high priority and 30 for
-      // everything else, with the two numbers visible nowhere in the interface.
-      const durationMinutes = focusSessionMinutes({
-        requestedMinutes: requestedDurationMinutes,
-        startTime: task.startTime,
-        endTime: task.endTime,
-        priority: task.priority,
-        preference: current.appSettings.focusDefaultMinutes,
+  focusCommandRef.current = applyFocusCommand;
+  function emitFocusTransitions(previous: PlannerData, next: PlannerData) {
+    const completed = next.focusSessions.find(s => s.status === "completed" && previous.focusSessions.some(p => p.id === s.id && p.status !== "completed"));
+    if (completed) window.dispatchEvent(new CustomEvent("focusflow-focus-feedback", { detail: { sessionId: completed.id, kind: completed.endReason === "target_reached" ? "target" : "finish" } }));
+    if (previous.focusFlow?.phase === "break_running" && next.focusFlow?.phase !== "break_running" && (next.focusFlow?.phase === "next_ready" || next.focusFlow?.phase === "focus")) window.dispatchEvent(new CustomEvent("focusflow-focus-feedback", { detail: { kind: "break" } }));
+  }
+  useEffect(() => {
+    const host = connectFocusHost({
+      ready: () => setFocusReady(true),
+      acquired: () => {
+        const raw = platform.storage.getSync(STORAGE_KEY);
+        const current = raw ? normalizeData(JSON.parse(raw)) : dataRef.current;
+        const recovered = adoptLoadedData(current);
+        dataRef.current = recovered; setDataState(recovered);
+      },
+      run: command => focusCommandRef.current(command),
+      error: setFocusCommandError,
+    });
+    focusHostRef.current = host;
+    const receive = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY || !event.newValue || pendingFocusRef.current) return;
+      try { const next = normalizeData(JSON.parse(event.newValue)); dataRef.current = next; setDataState(next); } catch { /* Ignore malformed external storage events. */ }
+    };
+    window.addEventListener("storage", receive);
+    return () => { host.close(); window.removeEventListener("storage", receive); };
+  }, []);
+  function retryFocusSave() {
+    const next = pendingFocusRef.current;
+    if (!next) { setFocusCommandError(""); return; }
+    try {
+      // Preserve unrelated task edits made while the focus write was failing.
+      const current = dataRef.current;
+      const tasks = current.tasks.map(t => {
+        const stored = next.tasks.find(n => n.id === t.id);
+        const before = pendingFocusBaseRef.current?.tasks.find(n => n.id === t.id);
+        return stored && before ? { ...t, actualSeconds: Math.max(0, t.actualSeconds + stored.actualSeconds - before.actualSeconds), activeSessionId: stored.activeSessionId !== before.activeSessionId ? stored.activeSessionId : t.activeSessionId, lastFocusedAt: stored.lastFocusedAt !== before.lastFocusedAt ? stored.lastFocusedAt : t.lastFocusedAt } : t;
       });
-      const session: FocusSession = {
-        id: createId("focus"),
-        taskId,
-        title: task.title,
-        mode: "focus",
-        status: "running",
-        durationMinutes,
-        accumulatedSeconds: 0,
-        completed: false,
-        startAt: now,
-        endAt: "",
-        startedAt: now,
-        endedAt: "",
-        pausedAt: "",
-        segments: [],
-        source,
-        projectId: task.projectId,
-        projectName: project?.name ?? "",
-        focusNote: "",
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      return {
-        ...current,
-        activeSessionId: session.id,
-        focusSessions: [session, ...current.focusSessions],
-        tasks: current.tasks.map((item) =>
-          item.id === taskId ? { ...item, activeSessionId: session.id, lastFocusedAt: now, updatedAt: now } : item,
-        ),
-      };
-    });
+      const retried = { ...current, tasks, focusSessions: next.focusSessions, activeSessionId: next.activeSessionId, focusFlow: next.focusFlow ? { ...next.focusFlow, phase: next.focusFlow.phase === "break_running" ? "break_ready" as const : next.focusFlow.phase } : null };
+      persistPlannerData(retried); pendingFocusRef.current = null; pendingFocusBaseRef.current = null;
+      dataRef.current = retried; setDataState(retried); setFocusCommandError(""); emitFocusTransitions(current, retried);
+    } catch { setFocusCommandError("기록 저장 실패 · 다시 시도해 주세요 / Could not save. Retry."); }
   }
-
-  function pauseFocusSession(sessionId: string) {
-    const now = new Date().toISOString();
-    const nowMs = Date.now();
-    setData((current) => ({
-      ...current,
-      focusSessions: current.focusSessions.map((session) =>
-        session.id === sessionId && session.status === "running"
-          ? {
-              ...session,
-              status: "paused",
-              accumulatedSeconds: getSessionSeconds(session, nowMs),
-              pausedAt: now,
-              segments: closeOpenSegment(session, now),
-              updatedAt: now,
-            }
-          : session,
-      ),
-    }));
+  useEffect(() => {
+    let ticks = 0;
+    const timer = window.setInterval(() => {
+      const current = dataRef.current;
+      if (!focusHostRef.current?.owned || (!current.activeSessionId && !current.focusFlow)) return;
+      focusCommandRef.current({ type: ++ticks % 10 === 0 ? "checkpoint" : "tick" });
+    }, 1000);
+    const checkpoint = () => { if (focusHostRef.current?.owned) focusCommandRef.current({ type: "checkpoint" }); };
+    window.addEventListener("pagehide", checkpoint);
+    document.addEventListener("visibilitychange", checkpoint);
+    return () => { clearInterval(timer); window.removeEventListener("pagehide", checkpoint); document.removeEventListener("visibilitychange", checkpoint); };
+  }, []);
+  function startFocusSession(taskId: string | null, source: FocusSession["source"] = "focus_page", _durationMinutes?: number) { focusCommand({ type: "start", taskId, source }); }
+  function pauseFocusSession(id: string) { focusCommand({ type: "pause", id }); }
+  function resumeFocusSession(id: string) { focusCommand({ type: "resume", id }); }
+  function stopFocusSession(id: string, completeTask = false) {
+    const taskId = dataRef.current.focusSessions.find(s => s.id === id)?.taskId;
+    if (focusCommand({ type: "finish", id }) && completeTask && taskId) completeTaskById(taskId);
   }
-
-  function resumeFocusSession(sessionId: string) {
-    const now = new Date().toISOString();
-    setData((current) => ({
-      ...current,
-      activeSessionId: sessionId,
-      focusSessions: current.focusSessions.map((session) =>
-        session.id === sessionId && session.status === "paused"
-          ? { ...session, status: "running", startAt: now, pausedAt: "", updatedAt: now }
-          : session,
-      ),
-    }));
-  }
-
-  function stopFocusSession(sessionId: string, completeTask = false) {
-    const now = new Date().toISOString();
-    const nowMs = Date.now();
-    setData((current) => {
-      const session = current.focusSessions.find((item) => item.id === sessionId);
-      if (!session || (session.status !== "running" && session.status !== "paused")) return current;
-      const finalSeconds = getSessionSeconds(session, nowMs);
-      return {
-        ...current,
-        activeSessionId: current.activeSessionId === sessionId ? "" : current.activeSessionId,
-        focusSessions: current.focusSessions.map((item) =>
-          item.id === sessionId
-            ? {
-                ...item,
-                status: "completed",
-                completed: true,
-                accumulatedSeconds: finalSeconds,
-                endAt: now,
-                endedAt: now,
-                pausedAt: "",
-                segments: closeOpenSegment(item, now),
-                updatedAt: now,
-              }
-            : item,
-        ),
-        tasks: current.tasks.map((task) =>
-          task.id === session.taskId
-            ? {
-                ...task,
-                actualSeconds: task.actualSeconds + finalSeconds,
-                activeSessionId: "",
-                lastFocusedAt: now,
-                status: completeTask ? "done" : task.status,
-                completedAt: completeTask ? now : task.completedAt,
-                updatedAt: now,
-              }
-            : task,
-        ),
-      };
-    });
-  }
-
-
-  function deleteFocusSession(sessionId: string) {
-    const now = new Date().toISOString();
-    setData((current) => {
-      const session = current.focusSessions.find((item) => item.id === sessionId);
-      if (!session) return current;
-
-      return {
-        ...current,
-        activeSessionId: current.activeSessionId === sessionId ? "" : current.activeSessionId,
-        focusSessions: current.focusSessions.filter((item) => item.id !== sessionId),
-        tasks: current.tasks.map((task) =>
-          task.id === session.taskId
-            ? {
-                ...task,
-                actualSeconds: Math.max(0, task.actualSeconds - session.accumulatedSeconds),
-                activeSessionId: task.activeSessionId === sessionId ? "" : task.activeSessionId,
-                updatedAt: now,
-              }
-            : task,
-        ),
-      };
-    });
-  }
-
-  function updateFocusSessionNote(sessionId: string, focusNote: string) {
-    const now = new Date().toISOString();
-    setData((current) => ({
-      ...current,
-      focusSessions: current.focusSessions.map((session) =>
-        session.id === sessionId ? { ...session, focusNote, updatedAt: now } : session,
-      ),
-    }));
-  }
+  function completeTaskById(id: string) { completeTask(id); }
+  function deleteFocusSession(id: string) { focusCommand({ type: "delete", id }); }
+  function updateFocusSessionNote(id: string, note: string) { focusCommand({ type: "note", id, note }); }
 
   /**
    * Completing a legacy Subtask promotes it, because this is the moment its
@@ -2220,13 +2180,21 @@ export function usePlannerData() {
     taskTags: data.taskTags,
     checkItems: data.checkItems,
     reminders: data.reminders,
+    focusFlow: pendingFocusRef.current && data.focusFlow?.phase === "break_running" ? { ...data.focusFlow, phase: "break_paused" as const, breakElapsedMs: data.focusFlow.breakElapsedMs + Math.max(0, focusFailureAtRef.current - Date.parse(data.focusFlow.startedAt)) } : data.focusFlow ?? null,
+    focusCommand,
+    focusReady,
+    focusCommandError,
+    retryFocusSave,
     focusSessions: data.focusSessions,
     activeSessionId: data.activeSessionId,
-    activeFocusSession:
-      data.focusSessions.find(
+    activeFocusSession: (() => {
+      const live = data.focusSessions.find(
         (session) =>
           session.id === data.activeSessionId && (session.status === "running" || session.status === "paused"),
-      ) ?? null,
+      ) ?? null;
+      const frozen = pendingFocusRef.current?.focusSessions.find(s => s.id === live?.id);
+      return frozen ? { ...frozen, status: "paused" as const } : live;
+    })(),
     settings: data.settings,
     appSettings: data.appSettings,
     storageError,

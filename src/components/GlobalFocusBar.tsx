@@ -1,5 +1,6 @@
+import { breakRemaining, focusDisplaySeconds } from "../domain/focus/engine";
 import { AnimatePresence, motion } from "framer-motion";
-import type { FocusSession, Task } from "../types";
+import type { FocusFlow, FocusSession, Task } from "../types";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "../lib/focusTimer";
 import { reducedTransition, transitions } from "../motion/transitions";
@@ -9,6 +10,8 @@ import { platform } from "../platform";
 import { useT } from "../i18n";
 
 interface GlobalFocusBarProps {
+  flow?: FocusFlow | null;
+  onFlowAction?: (id: string, action: string) => void;
   session: FocusSession | null;
   task: Task | null;
   onOpenFocus: () => void;
@@ -18,10 +21,11 @@ interface GlobalFocusBarProps {
   settings: FocusUserSettings;
 }
 
-export function GlobalFocusBar({ session, task, ...rest }: GlobalFocusBarProps) {
+export function GlobalFocusBar({ session, task, flow, onFlowAction, ...rest }: GlobalFocusBarProps) {
+  const now = useNowTick(flow?.phase === "break_running");
   return (
     <AnimatePresence>
-      {session && task ? <FocusBarContent key="focus-bar" session={session} task={task} {...rest} /> : null}
+      {session ? <FocusBarContent key="focus-bar" session={session} task={task} {...rest} /> : flow?.phase.startsWith("break_") ? <aside className="foc-global-bar"><button onClick={rest.onOpenFocus}>Break · {formatFocusDuration(breakRemaining(flow, now))}</button><button onClick={() => onFlowAction?.(flow.id, flow.phase === "break_running" ? "pause" : "resume")}>{flow.phase === "break_running" ? "Pause" : "Resume"}</button><button onClick={() => onFlowAction?.(flow.id, "finish")}>End break</button></aside> : null}
     </AnimatePresence>
   );
 }
@@ -34,9 +38,9 @@ function FocusBarContent({
   onResume,
   onStop,
   settings,
-}: Omit<GlobalFocusBarProps, "session" | "task"> & { session: FocusSession; task: Task }) {
+}: Omit<GlobalFocusBarProps, "session" | "task"> & { session: FocusSession; task: Task | null }) {
   const now = useNowTick(session.status === "running");
-  const elapsed = getDisplayedFocusSeconds(session, now);
+  const elapsed = focusDisplaySeconds(session, now);
   const motionEnabled = useMotionEnabled();
   const canOpenMiniTimer = settings.showMiniTimerButton && platform.miniFocusTimer.supported();
   const { t } = useT();
@@ -44,16 +48,18 @@ function FocusBarContent({
   function openMiniTimer() {
     void platform.miniFocusTimer.open({
       sessionId: session.id,
-      title: task.title,
+      title: (task?.title || session.title || "Focus"),
       time: formatFocusDuration(elapsed),
       status: session.status,
+      phase: "focus",
+      revision: session.revision ?? 0,
     });
   }
 
   return (
     <motion.aside
       className="foc-global-bar"
-      aria-label={t("focus.globalAria", { title: task.title, time: formatFocusDuration(elapsed, true) })}
+      aria-label={t("focus.globalAria", { title: (task?.title || session.title || "Focus"), time: formatFocusDuration(elapsed, true) })}
       variants={motionEnabled ? toastVariants : undefined}
       initial={motionEnabled ? "initial" : false}
       animate={motionEnabled ? "animate" : undefined}
@@ -62,7 +68,7 @@ function FocusBarContent({
     >
       <button type="button" className="foc-global-main" onClick={onOpenFocus}>
         <span className={session.status === "paused" ? "is-paused" : ""}>{session.status === "paused" ? "▶" : "||"}</span>
-        <strong>{session.status === "paused" ? t("focus.pause") : t("focus.runningShort")} · {task.title}</strong>
+        <strong>{session.status === "paused" ? t("focus.pause") : t("focus.runningShort")} · {(task?.title || session.title || "Focus")}</strong>
       </button>
       <button type="button" className="foc-global-time" onClick={onOpenFocus}>
         {formatFocusDuration(elapsed)}

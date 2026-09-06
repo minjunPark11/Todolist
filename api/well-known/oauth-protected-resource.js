@@ -19,6 +19,29 @@ var collectionTables = [
   ["taskTemplates", "task_templates"]
 ];
 
+// src/domain/tasks/taskState.ts
+function isTrashed(task) {
+  return Boolean(task.deletedAt);
+}
+function isWontDo(task) {
+  return Boolean(task.wontDoAt) || task.status === "wont_do" || task.status === "archived";
+}
+function isCompleted(task) {
+  return task.status === "completed" || task.status === "done";
+}
+function isTaskAlive(task) {
+  return !isTrashed(task) && !isWontDo(task);
+}
+function isTaskOpen(task) {
+  return isTaskAlive(task) && !isCompleted(task);
+}
+function isInProgress(task) {
+  return task.status === "doing";
+}
+function isWaiting(task) {
+  return task.status === "waiting";
+}
+
 // src/domain/spaces/hierarchy.ts
 function activeLists(lists, projectId) {
   if (!projectId) return [];
@@ -372,29 +395,6 @@ function scheduleFromTask(task) {
   }
 }
 
-// src/domain/tasks/taskState.ts
-function isTrashed(task) {
-  return Boolean(task.deletedAt);
-}
-function isWontDo(task) {
-  return Boolean(task.wontDoAt) || task.status === "wont_do" || task.status === "archived";
-}
-function isCompleted(task) {
-  return task.status === "completed" || task.status === "done";
-}
-function isTaskAlive(task) {
-  return !isTrashed(task) && !isWontDo(task);
-}
-function isTaskOpen(task) {
-  return isTaskAlive(task) && !isCompleted(task);
-}
-function isInProgress(task) {
-  return task.status === "doing";
-}
-function isWaiting(task) {
-  return task.status === "waiting";
-}
-
 // src/domain/schedule/scheduleFormatting.ts
 var DATE_FORMAT = { month: "short", day: "numeric", timeZone: "UTC" };
 var WITH_YEAR = { ...DATE_FORMAT, year: "numeric" };
@@ -709,7 +709,7 @@ var PRIORITY_COLOR = {
   high: "#ff3b30",
   medium: "#ff9500",
   low: "#4772fa",
-  none: "#8e8e93"
+  none: "#68686d"
 };
 var NEUTRAL_LIST_COLOR = "#8e8e93";
 function hashId(id) {
@@ -2116,12 +2116,12 @@ function buildCalendarItems({
               layer: "focus-actual",
               sourceType: "focus",
               sourceId: session.id,
-              title: session.title || session.projectName || "Focus",
+              title: session.title || session.projectName || "Focus \xB7 Unassigned",
               date: part.date,
               startTime: part.startTime,
               endTime: part.endTime,
               allDay: false,
-              color: focusColor,
+              color: session.taskId ? focusColor : "#737373",
               categoryId: focusCategoryId,
               draggable: false,
               readOnly: true
@@ -2370,7 +2370,7 @@ async function getFocusSummary(ctx, range = {}) {
     })),
     recentSessions: [...sessions].sort((a, b) => focusSessionStartOf(b).localeCompare(focusSessionStartOf(a))).slice(0, 10).map((session) => ({
       ...session.taskId ? { taskId: session.taskId } : {},
-      title: session.title || titleById.get(session.taskId) || "Focus session",
+      title: session.title || titleById.get(session.taskId ?? "") || "Focus session",
       startedAt: focusSessionStartOf(session),
       minutes: sessionMinutes(session),
       completed: session.status === "completed"
@@ -2618,7 +2618,7 @@ async function getCurrentContext(ctx) {
   const active = slice.data.activeSessionId ? slice.data.focusSessions.find((session) => session.id === slice.data.activeSessionId) : void 0;
   if (active && active.status === "running") {
     context.focus.activeSession = {
-      taskId: active.taskId,
+      taskId: active.taskId ?? "",
       title: active.title || slice.data.tasks.find((task) => task.id === active.taskId)?.title || "Focus session",
       startedAt: focusSessionStartOf(active)
     };

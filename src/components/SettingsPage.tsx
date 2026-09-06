@@ -517,19 +517,8 @@ export function SettingsPage({
           {/* The one row here that is an AppSettings value. The three below it
               are per-device and stay in their own store; the reader is not
               shown that seam because it is not theirs. */}
-          <SettingsRow title={t("settings.focus.defaultLength")} hint={t("settings.focus.defaultLengthHint")}>
-            <select
-              value={String(settings.focusDefaultMinutes)}
-              onChange={(e) => onUpdate({ focusDefaultMinutes: sanitizeFocusDefaultLength(e.target.value) })}
-            >
-              {FOCUS_LENGTH_CHOICES.map((choice) => (
-                <option key={String(choice)} value={String(choice)}>
-                  {choice === "auto"
-                    ? t("settings.focus.lengthAuto")
-                    : t("settings.focus.lengthMinutes", { count: choice })}
-                </option>
-              ))}
-            </select>
+          <SettingsRow title={lang === "ko" ? "타이머 측정 방식" : "Timer mode"} hint={lang === "ko" ? "집중 화면에서 스톱워치 또는 포모도로를 선택하세요. 포모도로 시간과 휴식은 집중 화면의 설정에서 변경할 수 있습니다." : "Choose Stopwatch or Pomodoro on the Focus page. Configure focus and break lengths in Focus settings."}>
+            <span>{lang === "ko" ? "기본: 스톱워치" : "Default: Stopwatch"}</span>
           </SettingsRow>
           {/* Where there is a browser tab to write into. The switch drives
               `document.title`, and the desktop window takes its caption from

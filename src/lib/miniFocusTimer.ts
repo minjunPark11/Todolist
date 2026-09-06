@@ -1,12 +1,15 @@
 export type MiniFocusTimerSnapshot = {
   sessionId: string;
   title: string;
-  // Elapsed focus time (count-up) — the planned-duration concept was removed.
+  // The host supplies the mode-aware display; this window never finalizes time.
   time: string;
   status: "running" | "paused" | "completed" | "cancelled";
+  phase?: "focus" | "break";
+  revision?: number;
 };
 
 let miniWindow: Window | null = null;
+export function isMiniFocusTimerSource(source: MessageEventSource | null) { return Boolean(miniWindow && source === miniWindow); }
 
 export function supportsMiniFocusTimer() {
   return typeof window !== "undefined" && typeof window.open === "function";
@@ -47,18 +50,37 @@ function renderMiniTimerDocument(target: Window) {
       </section>
     </main>
     <script>
-      let snapshot = null;
+      let snapshot = null, lastUpdate = Date.now(), pending = null;
       function post(action) {
-        if (!snapshot || !window.opener) return;
-        window.opener.postMessage({ type: "focusflow-mini-timer", action, sessionId: snapshot.sessionId }, "*");
+        if (!snapshot || !snapshot.sessionId || !window.opener || window.opener.closed) return;
+        pending = { id: crypto.randomUUID(), revision: snapshot.revision, at: Date.now() };
+        document.getElementById("toggle").disabled = true;
+        document.getElementById("finish").disabled = true;
+        window.opener.postMessage({ type: "focusflow-mini-timer", action, sessionId: snapshot.sessionId, revision: snapshot.revision, commandId: pending.id }, window.location.origin);
       }
       window.updateFocusTimer = function(next) {
+        lastUpdate = Date.now();
+        if (pending && (next.revision !== pending.revision || next.sessionId !== snapshot.sessionId)) pending = null;
         snapshot = next;
+        document.getElementById("toggle").disabled = !next.sessionId || !!pending;
+        document.getElementById("finish").disabled = !next.sessionId || !!pending;
         document.getElementById("time").textContent = next.time;
         document.getElementById("title").textContent = next.title || "Focus session";
-        document.getElementById("status").textContent = next.status === "paused" ? "Paused" : next.status === "completed" ? "Completed" : "Running";
+        document.getElementById("status").textContent = !next.sessionId ? "Idle" : next.phase === "break" ? (next.status === "paused" ? "Break paused" : "Taking a break") : next.status === "paused" ? "Paused" : "Running";
         document.getElementById("toggle").textContent = next.status === "paused" ? "Resume" : "Pause";
+        document.getElementById("finish").textContent = next.phase === "break" ? "End break" : "Finish";
       };
+      window.addEventListener("message", function(event) {
+        if (event.origin !== window.location.origin || event.source !== window.opener || event.data?.type !== "focusflow-mini-ack" || event.data.commandId !== pending?.id) return;
+        if (event.data.ok) pending = null;
+      });
+      setInterval(function() {
+        if (!window.opener || window.opener.closed || Date.now() - lastUpdate > 45000 || (pending && Date.now() - pending.at > 5000)) {
+          document.getElementById("status").textContent = "Connection lost · last known state";
+          document.getElementById("toggle").disabled = true;
+          document.getElementById("finish").disabled = true;
+        }
+      }, 1000);
       document.getElementById("toggle").addEventListener("click", function() {
         post(snapshot && snapshot.status === "paused" ? "resume" : "pause");
       });

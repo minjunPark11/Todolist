@@ -37,7 +37,7 @@ export const PRIORITY_COLOR: Record<TaskPriority, string> = {
   high: "#ff3b30",
   medium: "#ff9500",
   low: "#4772fa",
-  none: "#8e8e93",
+  none: "#68686d",
 };
 
 /** The Inbox is one system List nobody named, so its colour says nothing. */

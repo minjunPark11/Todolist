@@ -110,10 +110,8 @@ export const tauriPlatform: PlatformAdapter = {
       return true;
     },
     async open(snapshot) {
-      await invoke("open_focus_mini_timer", { snapshot }).catch(() => {
-        void tauriPlatform.miniFocusTimer.update(snapshot);
-      });
-      return true;
+      try { await invoke("open_focus_mini_timer", { snapshot }); return true; }
+      catch { return false; }
     },
     async update(snapshot) {
       await invoke("update_focus_tray", { snapshot }).catch(() => undefined);
@@ -125,7 +123,7 @@ export const tauriPlatform: PlatformAdapter = {
       return invoke<MiniFocusTimerSnapshot | null>("get_focus_tray_snapshot").catch(() => null);
     },
     async dispatchAction(payload) {
-      await invoke("dispatch_focus_tray_action", { action: payload.action, sessionId: payload.sessionId }).catch(() => undefined);
+      await invoke("dispatch_focus_tray_action", { action: payload.action, sessionId: payload.sessionId, expectedRevision: payload.revision });
     },
     async subscribeSnapshot(handler) {
       return listen<MiniFocusTimerSnapshot | null>("focus-tray-update", (event) => {

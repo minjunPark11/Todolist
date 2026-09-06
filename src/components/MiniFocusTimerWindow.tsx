@@ -26,6 +26,7 @@ async function closeMiniFocusWindow() {
 
 export function MiniFocusTimerWindow() {
   const [snapshot, setSnapshot] = useState<MiniFocusTimerSnapshot | null>(null);
+  const [connectionError, setConnectionError] = useState(false);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -36,6 +37,7 @@ export function MiniFocusTimerWindow() {
     });
     platform.miniFocusTimer.subscribeSnapshot((next) => {
       setSnapshot(next);
+      setConnectionError(false);
     }).then((nextUnlisten) => {
       if (cancelled) {
         nextUnlisten();
@@ -55,7 +57,7 @@ export function MiniFocusTimerWindow() {
 
   function dispatch(action: "pause" | "resume" | "finish") {
     if (!snapshot?.sessionId) return;
-    void platform.miniFocusTimer.dispatchAction({ action, sessionId: snapshot.sessionId });
+    void platform.miniFocusTimer.dispatchAction({ action, sessionId: snapshot.sessionId, revision: snapshot.revision }).catch(() => setConnectionError(true));
   }
 
   return (
@@ -64,7 +66,7 @@ export function MiniFocusTimerWindow() {
         <header>
           <span>FocusFlow</span>
           <div className="mini-focus-head-actions">
-            <strong>{hasSession ? (isPaused ? "Paused" : "Running") : "Idle"}</strong>
+            <strong>{connectionError ? "Connection lost" : hasSession ? snapshot?.phase === "break" ? (isPaused ? "Break paused" : "Taking a break") : (isPaused ? "Paused" : "Running") : "Idle"}</strong>
             <button type="button" className="mini-focus-close" aria-label="Close" onClick={() => void closeMiniFocusWindow()}>
               x
             </button>
@@ -75,13 +77,13 @@ export function MiniFocusTimerWindow() {
         <div className="mini-focus-actions">
           <button
             type="button"
-            disabled={!hasSession}
+            disabled={!hasSession || connectionError}
             onClick={() => dispatch(isPaused ? "resume" : "pause")}
           >
             {isPaused ? "Resume" : "Pause"}
           </button>
-          <button type="button" className="danger" disabled={!hasSession} onClick={() => dispatch("finish")}>
-            Finish
+          <button type="button" className="danger" disabled={!hasSession || connectionError} onClick={() => dispatch("finish")}>
+            {snapshot?.phase === "break" ? "End break" : "Finish"}
           </button>
         </div>
       </section>

@@ -19,6 +19,64 @@ var collectionTables = [
   ["taskTemplates", "task_templates"]
 ];
 
+// src/domain/tasks/taskState.ts
+function isTrashed(task) {
+  return Boolean(task.deletedAt);
+}
+function isWontDo(task) {
+  return Boolean(task.wontDoAt) || task.status === "wont_do" || task.status === "archived";
+}
+function isCompleted(task) {
+  return task.status === "completed" || task.status === "done";
+}
+function isTaskAlive(task) {
+  return !isTrashed(task) && !isWontDo(task);
+}
+function isTaskOpen(task) {
+  return isTaskAlive(task) && !isCompleted(task);
+}
+function isInProgress(task) {
+  return task.status === "doing";
+}
+function isWaiting(task) {
+  return task.status === "waiting";
+}
+
+// src/domain/focus/engine.ts
+function normalizeFocusFlow(value2) {
+  if (!value2?.id || !value2.settings || !["focus", "break_ready", "break_running", "break_paused", "next_ready"].includes(value2.phase ?? "")) return null;
+  const finite = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : 0;
+  return {
+    ...value2,
+    id: value2.id,
+    revision: finite(value2.revision),
+    settings: sanitizePomodoro(value2.settings),
+    completedBlocks: Math.floor(finite(value2.completedBlocks)),
+    taskId: typeof value2.taskId === "string" ? value2.taskId : null,
+    phase: value2.phase,
+    lastSessionId: value2.lastSessionId ?? "",
+    breakSeconds: Math.min(3600, finite(value2.breakSeconds)),
+    breakElapsedMs: finite(value2.breakElapsedMs),
+    startedAt: typeof value2.startedAt === "string" && Number.isFinite(Date.parse(value2.startedAt)) ? value2.startedAt : (/* @__PURE__ */ new Date()).toISOString(),
+    checkpointAt: typeof value2.checkpointAt === "string" && Number.isFinite(Date.parse(value2.checkpointAt)) ? value2.checkpointAt : value2.startedAt ?? (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+function sanitizePomodoro(value2 = {}) {
+  const number = (v, fallback, min2, max2) => typeof v === "number" && Number.isFinite(v) ? Math.max(min2, Math.min(max2, Math.round(v))) : fallback;
+  const shortBreakMinutes = number(value2.shortBreakMinutes, 5, 1, 60);
+  return {
+    focusMinutes: number(value2.focusMinutes, 25, 1, 180),
+    shortBreakMinutes,
+    longBreakMinutes: Math.max(
+      shortBreakMinutes,
+      number(value2.longBreakMinutes, 15, 1, 60)
+    ),
+    longBreakEvery: number(value2.longBreakEvery, 4, 2, 8),
+    autoBreak: typeof value2.autoBreak === "boolean" ? value2.autoBreak : true,
+    autoFocus: value2.autoFocus === true
+  };
+}
+
 // src/domain/spaces/spaces.ts
 function asString(value2) {
   return typeof value2 === "string" ? value2 : "";
@@ -748,29 +806,6 @@ function scheduleToTaskPatch(schedule) {
   };
 }
 
-// src/domain/tasks/taskState.ts
-function isTrashed(task) {
-  return Boolean(task.deletedAt);
-}
-function isWontDo(task) {
-  return Boolean(task.wontDoAt) || task.status === "wont_do" || task.status === "archived";
-}
-function isCompleted(task) {
-  return task.status === "completed" || task.status === "done";
-}
-function isTaskAlive(task) {
-  return !isTrashed(task) && !isWontDo(task);
-}
-function isTaskOpen(task) {
-  return isTaskAlive(task) && !isCompleted(task);
-}
-function isInProgress(task) {
-  return task.status === "doing";
-}
-function isWaiting(task) {
-  return task.status === "waiting";
-}
-
 // src/domain/schedule/scheduleFormatting.ts
 var DATE_FORMAT = { month: "short", day: "numeric", timeZone: "UTC" };
 var WITH_YEAR = { ...DATE_FORMAT, year: "numeric" };
@@ -1256,7 +1291,7 @@ var PRIORITY_COLOR = {
   high: "#ff3b30",
   medium: "#ff9500",
   low: "#4772fa",
-  none: "#8e8e93"
+  none: "#68686d"
 };
 var NEUTRAL_LIST_COLOR = "#8e8e93";
 function hashId(id) {
@@ -1504,17 +1539,14 @@ function normalizeFocusSession(session) {
   const endedAt = session.endedAt ?? session.endAt ?? "";
   const accumulatedSeconds = Number.isFinite(session.accumulatedSeconds) ? Number(session.accumulatedSeconds) : Math.max(0, Math.round((session.durationMinutes ?? 0) * 60));
   const status = session.status ?? (session.completed ? "completed" : "completed");
-  let segments = Array.isArray(session.segments) ? session.segments.filter(
+  const segments = Array.isArray(session.segments) ? session.segments.filter(
     (segment) => Boolean(segment) && typeof segment.startAt === "string" && typeof segment.endAt === "string" && segment.startAt < segment.endAt
-  ) : void 0;
-  if (segments === void 0) {
-    segments = status === "completed" && startedAt && endedAt && startedAt < endedAt ? [{ startAt: startedAt, endAt: endedAt }] : [];
-  }
+  ) : [];
   return {
     ...session,
     // M0 — see normalizeTask
     id: session.id ?? createId("focus"),
-    taskId: session.taskId ?? "",
+    taskId: session.taskId || null,
     title: session.title ?? "",
     mode: oneOf(session.mode, focusModes, "focus"),
     status: oneOf(status, focusStatuses, "completed"),
@@ -1675,6 +1707,7 @@ function normalizeData(data) {
     projects: Array.isArray(data.projects) ? data.projects.map(normalizeProject) : [],
     subtasks: Array.isArray(data.subtasks) ? data.subtasks.map(normalizeSubtask).filter((subtask) => subtask.taskId) : [],
     focusSessions: Array.isArray(data.focusSessions) ? data.focusSessions.map(normalizeFocusSession) : [],
+    focusFlow: normalizeFocusFlow(data.focusFlow),
     activeSessionId: typeof data.activeSessionId === "string" ? data.activeSessionId : "",
     // Goals are preserved, not read (types.ts StoredGoal): the feature that
     // made and showed them is gone, so the records pass through the load
@@ -3623,12 +3656,12 @@ function buildCalendarItems({
               layer: "focus-actual",
               sourceType: "focus",
               sourceId: session.id,
-              title: session.title || session.projectName || "Focus",
+              title: session.title || session.projectName || "Focus \xB7 Unassigned",
               date: part.date,
               startTime: part.startTime,
               endTime: part.endTime,
               allDay: false,
-              color: focusColor,
+              color: session.taskId ? focusColor : "#737373",
               categoryId: focusCategoryId,
               draggable: false,
               readOnly: true
@@ -3877,7 +3910,7 @@ async function getFocusSummary(ctx, range = {}) {
     })),
     recentSessions: [...sessions].sort((a, b) => focusSessionStartOf(b).localeCompare(focusSessionStartOf(a))).slice(0, 10).map((session) => ({
       ...session.taskId ? { taskId: session.taskId } : {},
-      title: session.title || titleById.get(session.taskId) || "Focus session",
+      title: session.title || titleById.get(session.taskId ?? "") || "Focus session",
       startedAt: focusSessionStartOf(session),
       minutes: sessionMinutes(session),
       completed: session.status === "completed"
@@ -4125,7 +4158,7 @@ async function getCurrentContext(ctx) {
   const active = slice.data.activeSessionId ? slice.data.focusSessions.find((session) => session.id === slice.data.activeSessionId) : void 0;
   if (active && active.status === "running") {
     context.focus.activeSession = {
-      taskId: active.taskId,
+      taskId: active.taskId ?? "",
       title: active.title || slice.data.tasks.find((task) => task.id === active.taskId)?.title || "Focus session",
       startedAt: focusSessionStartOf(active)
     };

@@ -26,6 +26,10 @@ struct FocusTraySnapshot {
     title: String,
     time: String,
     status: String,
+    #[serde(default)]
+    phase: Option<String>,
+    #[serde(default)]
+    revision: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -33,6 +37,7 @@ struct FocusTraySnapshot {
 struct FocusTrayActionPayload {
     action: String,
     session_id: String,
+    revision: Option<u64>,
 }
 
 #[derive(Default)]
@@ -311,6 +316,7 @@ fn emit_focus_action(app: &tauri::AppHandle, action: &str) {
     let payload = FocusTrayActionPayload {
         action: action.to_string(),
         session_id: snapshot.session_id,
+        revision: snapshot.revision,
     };
     let _ = app.emit("focus-tray-action", payload);
 }
@@ -380,14 +386,14 @@ fn open_focus_mini_timer(
 }
 
 #[tauri::command]
-fn dispatch_focus_tray_action(app: tauri::AppHandle, action: String, session_id: String) {
+fn dispatch_focus_tray_action(app: tauri::AppHandle, action: String, session_id: String, expected_revision: Option<u64>) {
     let state = app.state::<AppState>();
     let matches_current = state
         .focus_snapshot
         .lock()
         .ok()
         .and_then(|snapshot| snapshot.clone())
-        .map(|snapshot| has_active_focus(&snapshot) && snapshot.session_id == session_id)
+        .map(|snapshot| has_active_focus(&snapshot) && snapshot.session_id == session_id && (expected_revision.is_none() || expected_revision == snapshot.revision))
         .unwrap_or(false);
 
     if matches_current {

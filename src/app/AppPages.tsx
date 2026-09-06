@@ -226,21 +226,22 @@ export function AppPages({
     return (
       <section className={pageGridClass("foc-grid")} style={gridStyle}>
         <FocusPage
-          tasks={visibleTasks}
+          tasks={planner.tasks}
+          lists={planner.lists}
+          timezone={appSettings.timezone}
+          flow={planner.focusFlow}
+          command={planner.focusCommand}
+          ready={planner.focusReady}
+          error={planner.focusCommandError}
+          onRetry={planner.retryFocusSave}
+          onUpdateSettings={onUpdateFocusSettings}
           tags={planner.tags}
           taskTags={planner.taskTags}
           focusSessions={planner.focusSessions}
           activeSession={planner.activeFocusSession}
           settings={focusSettings}
-          onStartFocus={planner.startFocusSession}
-          onPauseFocus={planner.pauseFocusSession}
-          onResumeFocus={planner.resumeFocusSession}
-          onStopFocus={onStopFocus}
-          onDeleteFocusSession={planner.deleteFocusSession}
-          onUpdateFocusNote={planner.updateFocusSessionNote}
           onCompleteTask={planner.completeTask}
           onOpenTask={onOpenTask}
-          onGoToTasks={onGoToTasks}
         />
         {renderTaskDetail()}
       </section>

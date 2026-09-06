@@ -578,9 +578,40 @@ export interface FocusSegment {
   endAt: string;
 }
 
+export interface PomodoroSettings {
+  focusMinutes: number;
+  shortBreakMinutes: number;
+  longBreakMinutes: number;
+  longBreakEvery: number;
+  autoBreak: boolean;
+  autoFocus: boolean;
+}
+
+export interface FocusFlow {
+  id: string;
+  revision: number;
+  settings: PomodoroSettings;
+  completedBlocks: number;
+  taskId: string | null;
+  phase: "focus" | "break_ready" | "break_running" | "break_paused" | "next_ready";
+  lastSessionId: string;
+  breakSeconds: number;
+  breakElapsedMs: number;
+  startedAt: string;
+  checkpointAt: string;
+}
+
 export interface FocusSession {
   id: string;
-  taskId: string;
+  taskId: string | null;
+  schemaVersion?: number;
+  measurementMode?: "stopwatch" | "pomodoro";
+  targetSeconds?: number | null;
+  accumulatedMs?: number;
+  checkpointAt?: string;
+  recoveryRequired?: boolean;
+  revision?: number;
+  endReason?: "user_end" | "target_reached" | "recovery_end";
   title: string;
   mode: FocusMode;
   status: "running" | "paused" | "completed" | "cancelled";
@@ -1254,6 +1285,7 @@ export interface ListSection {
 }
 
 export interface PlannerData {
+  focusFlow?: FocusFlow | null;
   tasks: Task[];
   projects: Project[];
   subtasks: Subtask[];

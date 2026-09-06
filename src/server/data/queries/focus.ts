@@ -86,7 +86,7 @@ export async function getFocusSummary(
       .slice(0, 10)
       .map((session) => ({
         ...(session.taskId ? { taskId: session.taskId } : {}),
-        title: session.title || titleById.get(session.taskId) || "Focus session",
+        title: session.title || titleById.get(session.taskId ?? "") || "Focus session",
         startedAt: focusSessionStartOf(session),
         minutes: sessionMinutes(session),
         completed: session.status === "completed",

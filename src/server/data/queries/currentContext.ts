@@ -133,7 +133,7 @@ export async function getCurrentContext(ctx: QueryContext): Promise<CurrentConte
     : undefined;
   if (active && active.status === "running") {
     context.focus.activeSession = {
-      taskId: active.taskId,
+      taskId: active.taskId ?? "",
       title: active.title || slice.data.tasks.find((task) => task.id === active.taskId)?.title || "Focus session",
       startedAt: focusSessionStartOf(active),
     };

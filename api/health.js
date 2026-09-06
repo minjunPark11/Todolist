@@ -199,6 +199,21 @@ var init_buildSyncPlan = __esm({
   }
 });
 
+// src/domain/tasks/taskState.ts
+var init_taskState = __esm({
+  "src/domain/tasks/taskState.ts"() {
+    "use strict";
+  }
+});
+
+// src/domain/focus/engine.ts
+var init_engine = __esm({
+  "src/domain/focus/engine.ts"() {
+    "use strict";
+    init_taskState();
+  }
+});
+
 // src/domain/spaces/spaces.ts
 var init_spaces = __esm({
   "src/domain/spaces/spaces.ts"() {
@@ -377,13 +392,6 @@ var init_taskSchedule = __esm({
     init_normalizeSchedule();
     init_recurrence();
     init_reminder();
-  }
-});
-
-// src/domain/tasks/taskState.ts
-var init_taskState = __esm({
-  "src/domain/tasks/taskState.ts"() {
-    "use strict";
   }
 });
 
@@ -847,6 +855,7 @@ var DEFAULT_APP_SETTINGS;
 var init_normalize = __esm({
   "src/domain/plannerData/normalize.ts"() {
     "use strict";
+    init_engine();
     init_spaces();
     init_hierarchy();
     init_tags();

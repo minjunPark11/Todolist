@@ -1,3 +1,6 @@
+import { isMiniFocusTimerSource } from "./lib/miniFocusTimer";
+import { playFocusSound, prepareFocusSound } from "./lib/focusSound";
+import { breakRemaining, focusDisplaySeconds } from "./domain/focus/engine";
 ﻿import { FormEvent, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { TaskDetailPane } from "./components/tasks/TaskDetailPane";
@@ -53,7 +56,7 @@ import { taskActivity } from "./domain/tasks/activity";
 import { useAutoBackup } from "./app/useAutoBackup";
 import { useDataPortability } from "./app/useDataPortability";
 import { dismissToast, enqueueToast, type QueuedToast } from "./lib/toastQueue";
-import { formatFocusDuration, getDisplayedFocusSeconds, useNowTick } from "./lib/focusTimer";
+import { formatFocusDuration, useNowTick } from "./lib/focusTimer";
 import { popUndo, pushUndo } from "./lib/undoStack";
 import { recordNotification } from "./lib/notificationStore";
 import { NotificationCenter } from "./components/shell/NotificationCenter";
@@ -243,7 +246,6 @@ export default function App() {
     [planner.tasks, planner.lists],
   );
   const originalTitleRef = useRef(document.title || "FocusFlow");
-  const completedNotificationRef = useRef<Set<string>>(new Set());
   const syncingExternalCalendarsRef = useRef<Set<string>>(new Set());
   const initialExternalCalendarSyncRef = useRef(false);
   const externalCalendarCloudHydratedRef = useRef(false);
@@ -312,16 +314,16 @@ export default function App() {
   };
   const taskCommands = useTaskCommands({
     tasks: planner.tasks,
-    focusBusy: Boolean(planner.activeFocusSession),
+    focusBusy: Boolean(planner.activeFocusSession || planner.focusFlow?.phase.startsWith("break_")),
     onMutate: planner.updateTask,
     onStartFocus: (taskId) => planner.startFocusSession(taskId, "today_page"),
     onDeleteForever: planner.permanentlyDeleteTask,
   });
-  const focusNow = useNowTick(Boolean(planner.activeFocusSession && planner.activeFocusSession.status === "running"));
+  const focusNow = useNowTick(Boolean(planner.activeFocusSession || planner.focusFlow));
   const activeFocusTask = planner.activeFocusSession
     ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null
     : null;
-  const activeFocusElapsed = getDisplayedFocusSeconds(planner.activeFocusSession, focusNow);
+  const activeFocusElapsed = planner.activeFocusSession ? focusDisplaySeconds(planner.activeFocusSession, focusNow) : 0;
   const { importMessage, exportJson, handleImport } = useDataPortability({
     today,
     exportData: planner.exportData,
@@ -486,32 +488,28 @@ export default function App() {
 
   useEffect(() => {
     const session = planner.activeFocusSession;
-    if (!session || !activeFocusTask || !focusSettings.showTabTitleTimer) {
+    if (!session || !focusSettings.showTabTitleTimer) {
       document.title = originalTitleRef.current;
       return;
     }
 
     if (session.status === "paused") {
-      document.title = `Paused · ${activeFocusTask.title}`;
+      document.title = `Paused · ${activeFocusTask?.title || session.title || "Focus"}`;
       return;
     }
 
-    document.title = `${formatFocusDuration(activeFocusElapsed)} · ${activeFocusTask.title}`;
+    document.title = `${formatFocusDuration(activeFocusElapsed)} · ${activeFocusTask?.title || session.title || "Focus"}`;
   }, [activeFocusTask, activeFocusElapsed, focusSettings.showTabTitleTimer, planner.activeFocusSession]);
 
   useEffect(() => {
-    const session = planner.activeFocusSession;
-    if (!session || !activeFocusTask) {
-      void platform.miniFocusTimer.clear();
-      return;
-    }
-    void platform.miniFocusTimer.update({
-      sessionId: session.id,
-      title: activeFocusTask.title,
-      time: formatFocusDuration(activeFocusElapsed),
-      status: session.status,
-    });
-  }, [activeFocusTask, activeFocusElapsed, planner.activeFocusSession]);
+    const session = planner.activeFocusSession, flow = planner.focusFlow;
+    if (session) {
+      void platform.miniFocusTimer.update({ sessionId: session.id, title: activeFocusTask?.title || session.title || (appSettings.language === "ko" ? "작업 미지정" : "No task assigned"), time: formatFocusDuration(activeFocusElapsed), status: session.status, phase: "focus", revision: session.revision ?? 0 });
+    } else if (flow && flow.phase.startsWith("break_")) {
+      void platform.miniFocusTimer.update({ sessionId: flow.id, title: appSettings.language === "ko" ? "휴식" : "Break", time: formatFocusDuration(breakRemaining(flow, focusNow)), status: flow.phase === "break_running" ? "running" : "paused", phase: "break", revision: flow.revision });
+      if (focusSettings.showTabTitleTimer) document.title = formatFocusDuration(breakRemaining(flow, focusNow)) + " · Break";
+    } else void platform.miniFocusTimer.clear();
+  }, [activeFocusTask, activeFocusElapsed, planner.activeFocusSession, planner.focusFlow, focusNow, appSettings.language, focusSettings.showTabTitleTimer]);
 
   // Global Ctrl/Cmd+Z: undo the latest user edit across all data stores.
   // Typing fields keep their native text undo.
@@ -528,27 +526,24 @@ export default function App() {
     return () => window.removeEventListener("keydown", onUndoKey);
   }, [t]);
 
-  useEffect(() => {
-    const session = planner.activeFocusSession;
-    if (!session || !focusSettings.enableCompletionNotification) return;
-    platform.requestNotificationPermission().catch(() => undefined);
-  }, [focusSettings.enableCompletionNotification, planner.activeFocusSession?.id]);
+
 
   useEffect(() => {
     function handleMiniTimerMessage(event: MessageEvent) {
-      if (event.source === window) return;
-      const data = event.data as { type?: string; action?: string; sessionId?: string };
+      if (event.origin !== window.location.origin || !isMiniFocusTimerSource(event.source)) return;
+      const data = event.data as { type?: string; action?: string; sessionId?: string; revision?: number; commandId?: string };
       if (data?.type !== "focusflow-mini-timer" || !data.sessionId) return;
       const session = planner.activeFocusSession;
-      if (!session || session.id !== data.sessionId) return;
-      if (data.action === "pause") planner.pauseFocusSession(session.id);
-      if (data.action === "resume") planner.resumeFocusSession(session.id);
-      if (data.action === "finish") stopFocusWithNotification(session.id, false);
+      if (!session) { handleBreakAction(data.sessionId, data.action); return; }
+      if (session.id !== data.sessionId) return;
+      if (data.action !== "pause" && data.action !== "resume" && data.action !== "finish") return;
+      const ok = planner.focusCommand({ type: data.action, id: session.id, revision: data.revision });
+      (event.source as Window)?.postMessage({ type: "focusflow-mini-ack", commandId: data.commandId, ok }, event.origin);
     }
 
     window.addEventListener("message", handleMiniTimerMessage);
     return () => window.removeEventListener("message", handleMiniTimerMessage);
-  }, [planner.activeFocusSession, planner.pauseFocusSession, planner.resumeFocusSession]);
+  }, [planner.activeFocusSession, planner.focusFlow, planner.pauseFocusSession, planner.resumeFocusSession]);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -556,10 +551,9 @@ export default function App() {
 
     platform.miniFocusTimer.subscribeAction((payload) => {
       const session = planner.activeFocusSession;
-      if (!session || session.id !== payload.sessionId) return;
-      if (payload.action === "pause") planner.pauseFocusSession(session.id);
-      if (payload.action === "resume") planner.resumeFocusSession(session.id);
-      if (payload.action === "finish") stopFocusWithNotification(session.id, false);
+      if (!session) { handleBreakAction(payload.sessionId, payload.action); return; }
+      if (session.id !== payload.sessionId) return;
+      planner.focusCommand({type:payload.action, id:session.id, revision:payload.revision});
     }).then((nextUnlisten) => {
       if (cancelled) {
         nextUnlisten();
@@ -572,7 +566,7 @@ export default function App() {
       cancelled = true;
       unlisten?.();
     };
-  }, [planner.activeFocusSession, planner.pauseFocusSession, planner.resumeFocusSession]);
+  }, [planner.activeFocusSession, planner.focusFlow, planner.pauseFocusSession, planner.resumeFocusSession]);
 
   function navigate(path: string, mode: "push" | "replace" = "push") {
     if (window.location.pathname === path) {
@@ -805,25 +799,28 @@ export default function App() {
     });
   }
 
-  function notifyFocusCompleted(sessionId: string) {
-    const session = planner.focusSessions.find((item) => item.id === sessionId);
-    const task = session ? planner.tasks.find((item) => item.id === session.taskId) : null;
-    if (!session || completedNotificationRef.current.has(sessionId)) return;
-    completedNotificationRef.current.add(sessionId);
-    if (!focusSettings.enableCompletionNotification) return;
-
-    const title = t("focus.notificationTitle");
-    const body = t("focus.notificationBody", {
-      time: formatFocusDuration(getDisplayedFocusSeconds(session), true),
-      title: task?.title || session.title || t("focus.notificationTaskFallback"),
-    });
-    // §3.2: kept as well as fired. A session finished while the window was
-    // behind something else left nothing behind before this.
-    recordNotification({ kind: "focusCompleted", title, body, targetId: session.taskId });
-    void platform.notify({ title, body }).then((sent) => {
-      if (!sent) showToast({ message: `${title}: ${body}` });
-    });
-  }
+  useEffect(() => {
+    const unlock = () => { if (focusSettings.soundEnabled !== false) prepareFocusSound(); };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    return () => window.removeEventListener("pointerdown", unlock);
+  }, [focusSettings.soundEnabled]);
+  useEffect(() => {
+    const feedback = (event: Event) => {
+      const { kind } = (event as CustomEvent<{kind:string;sessionId?:string}>).detail;
+      const title = kind === "break" ? t("focus.resume") : t("focus.notificationTitle");
+      const body = appSettings.language === "ko"
+        ? kind === "break" ? "휴식이 끝났어요. 다음 집중을 준비하세요." : kind === "target" ? "집중 목표를 채웠어요. 기록이 저장되었습니다." : "집중 기록이 저장되었습니다."
+        : kind === "break" ? "Your break has ended. Get ready for your next focus." : kind === "target" ? "Focus target reached. Your session is saved." : "Your focus session is saved.";
+      if (kind !== "finish" && focusSettings.soundEnabled !== false) playFocusSound(focusSettings.soundVolume ?? .4);
+      if (kind === "finish" && document.visibilityState === "visible" && document.body.classList.contains("focus-stage-visible")) return;
+      if (!focusSettings.enableCompletionNotification) return;
+      recordNotification({kind:"focusCompleted",title,body});
+      if (document.visibilityState === "hidden") void platform.notify({title,body}).then(sent=>{if(!sent)showToast({message:body});});
+      else showToast({message:body});
+    };
+    window.addEventListener("focusflow-focus-feedback", feedback);
+    return () => window.removeEventListener("focusflow-focus-feedback", feedback);
+  }, [focusSettings, appSettings.language, t]);
 
   // Every Task with its own reminders attached, which is what the sweep reads.
   // Recomputed only when either collection changes: the hook holds this in a
@@ -855,9 +852,15 @@ export default function App() {
     onFallback: (message) => showToast({ message }),
   });
 
+  function handleBreakAction(id: string, action?: string) {
+    const flow = planner.focusFlow;
+    if (!flow || flow.id !== id) return;
+    const type = action === "finish" ? "break_end" : action === "pause" ? "break_pause" : flow.phase === "break_ready" ? "break_start" : "break_resume";
+    planner.focusCommand({ type, id });
+  }
   function stopFocusWithNotification(sessionId: string, completeTask = false) {
     planner.stopFocusSession(sessionId, completeTask);
-    notifyFocusCompleted(sessionId);
+    // Completion feedback is emitted after the persisted transition below.
   }
 
   function saveExternalState(updater: (current: ExternalCalendarState) => ExternalCalendarState) {
@@ -1422,7 +1425,7 @@ export default function App() {
           onEmptyTrash={planner.emptyTrash}
           scopeViewOptions={appSettings.scopeViewOptions}
           onSetScopeViewOptions={(scopeViewOptions) => planner.updateAppSettings({ scopeViewOptions })}
-          focusBusy={Boolean(planner.activeFocusSession)}
+          focusBusy={Boolean(planner.activeFocusSession || planner.focusFlow?.phase.startsWith("break_"))}
           error={planner.auth.syncError}
           draftTitle={capturedTitle}
           onDraftConsumed={() => setCapturedTitle("")}
@@ -1517,7 +1520,7 @@ export default function App() {
         taskTags={planner.taskTags}
         bundle={taskDetailBundle}
         commands={taskCommands}
-        focusBusy={Boolean(planner.activeFocusSession)}
+        focusBusy={Boolean(planner.activeFocusSession || planner.focusFlow?.phase.startsWith("break_"))}
         onClose={closeTaskOnPage}
         onOpenTask={openTaskOnPage}
       />
@@ -1655,6 +1658,8 @@ export default function App() {
         {renderPage()}
       </motion.main>
       <GlobalFocusBar
+        flow={planner.focusFlow}
+        onFlowAction={handleBreakAction}
         session={planner.activeFocusSession}
         task={planner.activeFocusSession ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null : null}
         onOpenFocus={() => navigateSection("focus")}
@@ -2041,5 +2046,4 @@ function AccountSection({
     </div>
   );
 }
-
 

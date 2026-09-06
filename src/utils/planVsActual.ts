@@ -77,8 +77,8 @@ export function buildPlanVsActual(
         if (part.date < from || part.date > to) continue;
         const minutes = minutesOf(part.endTime) - minutesOf(part.startTime);
         if (minutes <= 0) continue;
-        const title = titleByTaskId.get(session.taskId) ?? session.title;
-        tally(part.date, session.taskId, title).actualMinutes += minutes;
+        const title = titleByTaskId.get(session.taskId ?? "") ?? (session.title || "Focus · Unassigned");
+        tally(part.date, session.taskId ?? "", title).actualMinutes += minutes;
       }
     }
   }

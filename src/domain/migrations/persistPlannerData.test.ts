@@ -20,7 +20,7 @@ import {
   LEGACY_LOCAL_SPACES_MIGRATED_KEY,
 } from "../../lib/spaces/legacyLocalSpaces";
 import type { PlannerData } from "../../types";
-import { persistPlannerData, PLANNER_STORAGE_KEY } from "./persistPlannerData";
+import { persistPlannerData, PLANNER_STORAGE_KEY, FOCUS_V2_BACKUP_KEY } from "./persistPlannerData";
 
 function plannerData(): PlannerData {
   return {
@@ -51,6 +51,14 @@ describe("persistPlannerData", () => {
   beforeEach(() => {
     storage.clear();
     failPlannerWrite = false;
+  });
+  it("backs up the exact legacy snapshot only once before rewriting focus data", () => {
+    const original = JSON.stringify({focusSessions:[{id:"old",accumulatedSeconds:73}]});
+    storage.set(PLANNER_STORAGE_KEY, original);
+    persistPlannerData(plannerData());
+    expect(storage.get(FOCUS_V2_BACKUP_KEY)).toBe(original);
+    persistPlannerData(plannerData());
+    expect(storage.get(FOCUS_V2_BACKUP_KEY)).toBe(original);
   });
 
   // This was written for the legacy GOAL blob, which went with the Goals
