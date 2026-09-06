@@ -622,21 +622,35 @@ body.focus-stage-visible .foc-global-bar {
   }
 
   /* 왼쪽도 두 층 — 타이머가 남는 전부, 메모는 바닥에 자기 높이로.
-     오른쪽과 같은 모양이라 두 열의 바닥선이 맞는다. */
+     오른쪽과 같은 모양이라 두 열의 바닥선이 맞는다.
+
+     오른쪽과 달리 여기 첫 줄은 `minmax(0, 1fr)`이 아니라 `1fr`이다. 그 0은
+     안쪽에 스크롤러를 두려고 넣는 것인데(§3의 교훈 3), 왼쪽 열에는 흐르는
+     것이 없다. 대신 0을 넣으면 줄이 내용보다 작아질 수 있고, 실제로 복구된
+     세션의 "저장되지 않은 구간" 카드가 붙은 상태에서 타이머 내용이 621px,
+     줄이 447px이 되어 카드가 줄 밖으로 174px 삐져나와 페이지 머리글을 덮었다
+     [실측]. `1fr`의 자동 최소값은 그 상황에서 줄을 늘리고, 그때는 `main`이
+     흐른다 — 화면을 덮는 것보다는 낫다. */
   .focus-main {
     display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: 1fr auto;
     gap: var(--space-md);
     min-height: 0;
   }
-  .focus-main > .focus-stage {
-    align-self: center;
-  }
 
+  /* 카드가 눈에 보이게 된 뒤로 타이머는 줄을 채운다(§14). 내용은 카드 안에서
+     가운데를 잡으므로(place-items) 예전 `align-self: center`가 하던 일은
+     그대로고, 두 열의 위아래 선이 맞는다.
+
+     `min-height`를 자동으로 되돌리는 것이 위 `1fr`이 실제로 작동하기 위한
+     조건이다. 격자 항목에 min-height가 **명시돼** 있으면 내용 기반 자동
+     최소값이 적용되지 않는다 — 360px이 적힌 동안에는 줄이 447px에 머물렀고,
+     594px짜리 내용이 그 위아래로 삐져나와 페이지 머리글을 덮었다 [실측]. */
   .focus-main > .focus-stage {
     margin-top: 0;
     justify-self: center;
     width: 100%;
+    min-height: auto;
   }
 
   /* 이 화면에서 흐르는 것은 이것 하나다. `overscroll-behavior: contain`이
@@ -821,4 +835,64 @@ body.focus-stage-visible .foc-global-bar {
   text-align: right;
   color: var(--text-tertiary);
   font-size: var(--type-xs);
+}
+
+
+/* ==========================================================================
+   면 — 시안의 카드, 자를 열지 않고 (FOCUS_LAYOUT_DESIGN.md §14)
+   --------------------------------------------------------------------------
+   시안은 네 영역을 카드로 그린다. 처음에 그것을 "스위스 결정을 다시 여는 일"로
+   적었는데, 쪼개보니 부정확했다.
+
+     · 둥근 12~16px 모서리 — 반전이다 (I1-B는 4px 하나)
+     · 부드러운 그림자      — 반전이다 (I2-B는 떠 있는 것만)
+     · 면과 테두리          — 반전이 아니다. 스위스는 면을 쓰고, §11.2가
+                              "경계는 헤어라인이 만든다"고 적었다
+     · 알약 태그 칩         — 반전이 아니다. I1이 pill을 형태로 남겨뒀다
+
+   그래서 뒤의 둘만 한다. 그리고 발명하지 않는다 — 카드는 매트릭스 상자가 쓰는
+   그 관용구(헤어라인 + --radius-lg + --bg-surface-muted)이고, 칩은
+   `.ff-projbadge`가 쓰는 그것이다. 같은 앱 안에서 같은 것은 같게 생겨야 한다.
+   ========================================================================== */
+@media (min-width: 901px) {
+  .focus-stage,
+  .focus-note,
+  .focus-queue,
+  .focus-summary {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface-muted);
+    padding: var(--space-sm);
+  }
+
+  /* 카드가 경계를 갖게 됐으므로 안쪽의 윗줄은 두 번 그리는 선이 된다. */
+  .focus-note,
+  .focus-summary {
+    border-top: 1px solid var(--border-subtle);
+  }
+  .focus-queue > header {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* 카드가 줄을 채우므로 내용은 카드 안에서 가운데를 잡는다. */
+  .focus-main > .focus-stage {
+    display: grid;
+    place-items: center;
+    align-content: center;
+  }
+}
+
+/* 리스트 이름은 칩이다 — `.ff-projbadge`와 같은 모양, 같은 이유(§14).
+   알약은 I1이 "모서리가 아니라 형태"로 남겨둔 것이라 자 밖이 아니다. */
+.focus-queue-scroller .focus-task-label {
+  flex: none;
+  padding: 2px var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: var(--type-xs);
+  white-space: nowrap;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
