@@ -537,3 +537,86 @@ body.focus-stage-visible .foc-global-bar {
     --focus-clock-display: clamp(48px, 12vw, 80px);
   }
 }
+
+/* ==========================================================================
+   타이머는 자리를 지키고, 목록만 흐른다 (FOCUS_LAYOUT_DESIGN.md Phase 1)
+   --------------------------------------------------------------------------
+   요청은 "리스트가 있는 쪽만 스크롤하고 전체 화면은 안 움직이게"였다. 재보니
+   이 앱은 문서가 통째로 스크롤되고 있었다 — 내부 스크롤러가 0개다 [실측].
+
+   그런데 이 문제는 이 리포가 이미 한 번 풀었다. `03-planning.css`의 매트릭스
+   페이지가 `main:has(.ff-matrix-page)`에 `height: 100dvh`를 주고 상자마다
+   자기 카드를 스크롤시킨다. 발명하지 않고 그 관례를 그대로 따른다 — 셀렉터
+   모양도, 미디어 경계도, 그리고 그 파일이 적어둔 네 가지 교훈도.
+
+     1. `main`은 `hidden`이 아니라 `hidden auto`다. 창이 최소 높이보다 짧을 수
+        있고, 그때 무언가는 양보해야 한다. 양보하는 것이 이 스크롤바다.
+     2. 페이지 자체는 자르지 않는다. 자르면 넘친 내용에 닿을 길이 사라진다 —
+        넘침은 `main`의 스크롤바로 간다.
+     3. 그리드에 바닥을 준다. 바닥이 없으면 창이 짧아질 때 목록이 헤더만 남는다.
+     4. `padding-bottom`을 걷는다. 더 자랄 수 없는 페이지의 아래 여백은 빈칸이다.
+
+   900 아래에서는 이 전부가 풀린다. 두 열이 각자의 최소 폭(420 + 320)을 지킬 수
+   없는 지점이고, 한 열이 되면 화면 높이에 다 들어가지 않으므로 붙잡을 격자가
+   없다 — 매트릭스가 901에서 같은 이유로 같은 선을 그었다.
+   ========================================================================== */
+.focus-layout {
+  display: grid;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+@media (min-width: 901px) {
+  .app-shell > main:has(.focus-page-v2) {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden auto;
+  }
+  .app-shell > main:has(.focus-page-v2) > .page-grid {
+    height: 100%;
+    min-height: 0;
+    align-items: stretch;
+  }
+  .focus-page-v2 {
+    height: 100%;
+    min-height: 0;
+    padding-bottom: 0;
+    /* 헤더는 자기 높이, 나머지 전부가 배치다. `minmax(0, 1fr)`의 0이 핵심이다 —
+       그리드 항목의 기본 `min-height: auto`는 내용 높이를 바닥으로 삼아서,
+       그것을 0으로 내리지 않으면 안쪽의 `overflow-y`가 아무 일도 하지 않는다. */
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  /* 왼쪽은 시계가 주인이라 줄어들면 안 되고, 오른쪽은 목록이라 줄어들어도
+     읽힌다. 그래서 고정 비율이 아니라 최소 폭이다. */
+  .focus-layout {
+    grid-template-columns: minmax(420px, 1.35fr) minmax(320px, 1fr);
+    align-items: stretch;
+    min-height: 0;
+    /* §3의 교훈 3. 두 카드가 각자 머리와 한 줄을 가질 수 있는 높이. */
+    min-height: 420px;
+  }
+
+  /* 세션이 도는 동안에는 후보 목록이 렌더되지 않는다(FocusPage.tsx의 조건).
+     그때 두 열을 유지하면 오른쪽이 빈칸으로 남으므로, 한 열로 접고 타이머가
+     가운데를 되찾는다. */
+  .focus-layout:not(:has(.focus-candidates)) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .focus-layout > .focus-stage {
+    margin-top: 0;
+    align-self: center;
+    justify-self: center;
+    width: 100%;
+  }
+
+  /* 이 화면에서 흐르는 것은 이것 하나다. `overscroll-behavior: contain`이
+     없으면 목록 끝에서의 휠이 `main`으로 넘어가고, 그건 다른 화면에서는 그냥
+     스크롤 체이닝이지만 여기서는 "전체 화면이 안 움직인다"는 약속을 깨는 것이다. */
+  .focus-page-v2 .focus-candidates {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}

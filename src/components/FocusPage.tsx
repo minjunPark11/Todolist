@@ -714,7 +714,7 @@ export function FocusPage({
         </p>
       )}
       {view === "timer" ? (
-        <>
+        <div className="focus-layout">
           <section
             className="focus-stage"
             aria-label={l("집중 타이머", "Focus timer")}
@@ -767,7 +767,7 @@ export function FocusPage({
                 ))}
               </section>
             )}
-        </>
+        </div>
       ) : (
         <section className="focus-records">
           <div className="focus-filters">
