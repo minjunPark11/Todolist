@@ -559,6 +559,7 @@
    inside them keep working and the space between them drags the window. */
 [data-window-chrome="custom"] .ff-page-head,
 [data-window-chrome="custom"] .foc-header,
+[data-window-chrome="custom"] .focus-page-header,
 [data-window-chrome="custom"] .gcal-toolbar,
 [data-window-chrome="custom"] .tm-drawer.is-inline-drawer .tm-drawer-head {
   padding-right: calc(16px + var(--titlebar-buttons-w));

@@ -80,7 +80,7 @@ test.describe("the desktop build's caption row", () => {
     for (const [path, selector] of [
       ["/board", ".ff-page-head"],
       ["/calendar", ".gcal-toolbar"],
-      ["/focus", ".foc-header"],
+      ["/focus", ".focus-page-header"],
       ["/settings", ".ff-page-head"],
     ] as const) {
       await page.goto(path);
