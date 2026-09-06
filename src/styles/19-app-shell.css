@@ -201,6 +201,26 @@
   min-width: 0;
 }
 
+/* Pages without a sidebar always occupy the available width. Between 901
+   and 1023px the legacy 200px sidebar track otherwise captures the main
+   content, compressing the entire page when the desktop window shrinks. */
+.app-frame[data-sidebar-mode="none"] .app-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-frame[data-sidebar-mode="none"] .app-shell > main {
+  grid-column: 1;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  /* The fixed navigation button occupies the first 54px on small windows. */
+  .app-frame .app-shell > main {
+    padding-top: 64px;
+  }
+}
+
 /* D-10: the density `zoom` on `.app-shell > main` must not reach the Rail, or
    56px renders as 50.4px and §2.3.3 is broken on the first paint. The Rail is
    a sibling of `.app-shell`, so it is outside that scope by construction —

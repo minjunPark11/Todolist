@@ -10,7 +10,8 @@
 // access token good for an hour and asks for another when it expires
 // (`api/google/token`), which is what lets the long-lived credential stay on
 // the server where no browser can read it.
-import type { PendingConnect } from "../domain/calendar/googleSync/connectFlow";
+import { DEPLOYED_WEB_ORIGIN, type PendingConnect } from "../domain/calendar/googleSync/connectFlow";
+import { isTauriRuntime } from "../platform/tauri";
 import { supabase } from "../services/supabaseClient";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
@@ -81,8 +82,22 @@ async function supabaseWriteConnection(connection: GoogleConnection): Promise<vo
   if (error) throw new GoogleCalendarError("store", error.message);
 }
 
+/** Native HTTP reaches the deployed API instead of the desktop asset origin. */
+export async function googleCalendarFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  if (!isTauriRuntime()) return fetch(input, init);
+  const { fetch: nativeFetch } = await import("@tauri-apps/plugin-http");
+  const url = typeof input === "string" ? new URL(input, DEPLOYED_WEB_ORIGIN).href : input;
+  return nativeFetch(url, init);
+}
+
+export const GOOGLE_CONNECTION_CHANGED = "focusflow:google-connection-changed";
+
+export function notifyGoogleConnectionChanged() {
+  window.dispatchEvent(new Event(GOOGLE_CONNECTION_CHANGED));
+}
+
 export const defaultDeps: GoogleCalendarDeps = {
-  fetch: (input, init) => fetch(input, init),
+  fetch: googleCalendarFetch,
   authToken: supabaseToken,
   readConnection: supabaseReadConnection,
   writeConnection: supabaseWriteConnection,

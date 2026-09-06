@@ -14,7 +14,7 @@
 // nothing and stops.
 import { useCallback, useEffect, useRef } from "react";
 import { isEmptyPlan, planOutbound, type IdentifiedTask } from "../domain/calendar/googleSync/outboundPlan";
-import { currentAccessToken, readConnection } from "../lib/googleCalendar";
+import { currentAccessToken, GOOGLE_CONNECTION_CHANGED, readConnection } from "../lib/googleCalendar";
 import { runOutbound, type OutboundOutcome } from "../lib/googleCalendarOutbound";
 import type { Task } from "../types";
 
@@ -38,8 +38,6 @@ export function useGoogleOutboundSync({ tasks, timezone, tombstones, signedIn, o
   const latest = useRef({ tasks, timezone, tombstones, signedIn, onResult });
   latest.current = { tasks, timezone, tombstones, signedIn, onResult };
 
-  /** The connection, once found. Null until looked up; false when there is none. */
-  const calendarId = useRef<string | null | false>(null);
   const running = useRef(false);
 
   const run = useCallback(async () => {
@@ -51,20 +49,15 @@ export function useGoogleOutboundSync({ tasks, timezone, tombstones, signedIn, o
 
     running.current = true;
     try {
-      if (calendarId.current === null) {
-        const connection = await readConnection();
-        calendarId.current = connection?.calendarId ?? false;
-      }
-      if (!calendarId.current) return;
+      // Re-read per pass: a cached absence survived connecting in Settings,
+      // and a cached ID survived disconnecting or switching accounts.
+      const connection = await readConnection();
+      if (!connection) return;
 
       const accessToken = await currentAccessToken();
       if (!accessToken) return;
 
-      const outcome = await runOutbound({ plan, calendarId: calendarId.current, timezone: zone, accessToken });
-      // A dead grant is not a transient failure. Forgetting the calendar makes
-      // the next pass look the connection up again, which is what reconnecting
-      // in Settings restores.
-      if (outcome.expired) calendarId.current = null;
+      const outcome = await runOutbound({ plan, calendarId: connection.calendarId, timezone: zone, accessToken });
       report(outcome);
     } catch {
       // Whatever went wrong, nothing was written down, so the next trigger
@@ -85,6 +78,10 @@ export function useGoogleOutboundSync({ tasks, timezone, tombstones, signedIn, o
   useEffect(() => {
     const onFocus = () => void run();
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    window.addEventListener(GOOGLE_CONNECTION_CHANGED, onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener(GOOGLE_CONNECTION_CHANGED, onFocus);
+    };
   }, [run]);
 }

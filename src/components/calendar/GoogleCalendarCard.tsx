@@ -27,6 +27,7 @@ import {
   ensureDedicatedCalendar,
   exchangeCodeForAccess,
   GoogleCalendarError,
+  notifyGoogleConnectionChanged,
   readConnection,
   readPendingConnect,
   writePendingConnect,
@@ -38,6 +39,7 @@ import { ConfirmModal } from "../kit";
 
 type Status =
   | { kind: "loading" }
+  | { kind: "error" }
   | { kind: "disconnected" }
   | { kind: "connecting" }
   | { kind: "connected"; connection: GoogleConnection };
@@ -49,6 +51,10 @@ export function GoogleCalendarCard() {
   const [error, setError] = useState("");
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const readVersion = useRef(0);
   /** One consumption point, on both platforms — a code spent twice reads as a
    * failed connection (see `platform/types.ts`, PlatformDeepLink). */
   const consuming = useRef(false);
@@ -71,6 +77,7 @@ export function GoogleCalendarCard() {
         writePendingConnect(null);
         setStatus({ kind: "connected", connection });
         setNotice(t("settings.google.connected"));
+        notifyGoogleConnectionChanged();
       } catch (thrown) {
         writePendingConnect(null);
         setStatus({ kind: "disconnected" });
@@ -94,6 +101,7 @@ export function GoogleCalendarCard() {
       if (outcome.kind === "ignored") return;
 
       consuming.current = true;
+      readVersion.current += 1;
       if (typeof window !== "undefined" && window.location.hash) {
         window.history.replaceState(null, "", hrefWithoutCallback(window.location.href));
       }
@@ -144,16 +152,22 @@ export function GoogleCalendarCard() {
     async function readFor(session: unknown) {
       if (!alive) return;
       setSignedIn(Boolean(session));
+      const version = ++readVersion.current;
       if (!session) {
         setStatus({ kind: "disconnected" });
         return;
       }
+      if (consuming.current || statusRef.current.kind === "connecting") return;
       try {
         const connection = await readConnection();
-        if (!alive) return;
+        if (!alive || version !== readVersion.current || consuming.current) return;
+        setError("");
         setStatus(connection ? { kind: "connected", connection } : { kind: "disconnected" });
-      } catch {
-        if (alive) setStatus({ kind: "disconnected" });
+      } catch (thrown) {
+        if (alive && version === readVersion.current && !consuming.current) {
+          setStatus({ kind: "error" });
+          setError(describe(thrown));
+        }
       }
     }
 
@@ -166,8 +180,8 @@ export function GoogleCalendarCard() {
         // signed out, which is the state a reader can act on — the button
         // says so and the note says where to go.
         if (alive) {
-          setSignedIn(false);
-          setStatus({ kind: "disconnected" });
+          setStatus({ kind: "error" });
+          setError(t("settings.google.error.network"));
         }
       }
     })();
@@ -175,58 +189,45 @@ export function GoogleCalendarCard() {
     // The same channel `usePlannerData` listens on, so the two cannot
     // disagree about whether there is an account. It also carries
     // `INITIAL_SESSION`, which is the answer arriving late rather than never.
+    // Supabase queries must run after the auth callback releases its lock.
     const listener = supabase?.auth.onAuthStateChange((_event, session) => {
-      void readFor(session);
+      window.setTimeout(() => { if (alive) void readFor(session); }, 0);
     });
 
     return () => {
       alive = false;
       listener?.data.subscription.unsubscribe();
     };
-  }, []);
+  }, [refresh, describe, t]);
 
-  // The web road back: the code is in this page's fragment.
+  // Both platforms arrive as a fragment; the root bridge owns native delivery.
   useEffect(() => {
-    void consume(typeof window === "undefined" ? null : window.location.href);
-  }, [consume]);
-
-  // The desktop road back. `take` drains a link that arrived before this
-  // mounted — a cold start from the browser — and the subscription catches one
-  // that arrives while the app is already open.
-  useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
-    let alive = true;
-
-    void (async () => {
-      void consume(await platform.deepLink.take());
-      const off = await platform.deepLink.subscribe(() => {
-        void (async () => consume(await platform.deepLink.take()))();
-      });
-      if (alive) unsubscribe = off;
-      else off();
-    })();
-
-    return () => {
-      alive = false;
-      unsubscribe?.();
-    };
+    const onReturn = () => { void consume(window.location.href); };
+    onReturn();
+    window.addEventListener("hashchange", onReturn);
+    return () => window.removeEventListener("hashchange", onReturn);
   }, [consume]);
 
   async function connect() {
     setError("");
     setNotice("");
-    const pending: PendingConnect = {
-      nonce: newNonce((size) => crypto.getRandomValues(new Uint8Array(size))),
-      platform: platform.kind,
-    };
-    writePendingConnect(pending);
-    setStatus({ kind: "connecting" });
+    readVersion.current += 1;
+    try {
+      const pending: PendingConnect = {
+        nonce: newNonce((size) => crypto.getRandomValues(new Uint8Array(size))),
+        platform: platform.kind,
+      };
+      writePendingConnect(pending);
+      setStatus({ kind: "connecting" });
 
-    const url = consentUrl(pending);
-    // The desktop opens the system browser and waits for `focusflow://`; the
-    // web leaves this page and comes back to CALLBACK_LANDING_PATH.
-    if (platform.kind === "desktop") await platform.openExternal(url);
-    else window.location.assign(url);
+      const url = consentUrl(pending);
+      if (platform.kind === "desktop") await platform.openExternal(url);
+      else window.location.assign(url);
+    } catch (thrown) {
+      writePendingConnect(null);
+      setStatus({ kind: "disconnected" });
+      setError(describe(thrown));
+    }
   }
 
   async function confirmDisconnect() {
@@ -236,17 +237,15 @@ export function GoogleCalendarCard() {
     try {
       const { revoked } = await disconnectGoogle();
       setStatus({ kind: "disconnected" });
+      notifyGoogleConnectionChanged();
       setNotice(revoked ? t("settings.google.disconnected") : t("settings.google.disconnectedNotRevoked"));
     } catch (thrown) {
       setError(describe(thrown));
     }
   }
 
-  // Nothing at all until the answer is known: a card that says "not connected"
-  // and then flips to connected reads as a connection that just dropped.
-  if (status.kind === "loading") return null;
-
-  const busy = status.kind === "connecting";
+  // Keep the card visible while checking, without claiming it is disconnected.
+  const busy = status.kind === "connecting" || status.kind === "loading";
 
   return (
     <section className="ff-settings-card ff-cal-card">
@@ -257,9 +256,25 @@ export function GoogleCalendarCard() {
         <div className="ff-cal-card-text">
           <strong>{t("settings.google.title")}</strong>
           <small>{t("settings.google.hint")}</small>
+          <small role="status" aria-live="polite" data-connection-status={status.kind}>
+            {t(`settings.google.status.${status.kind}`)}
+          </small>
         </div>
         <div className="ff-cal-card-actions">
-          {status.kind === "connected" ? (
+          {status.kind === "connecting" ? (
+            <button type="button" className="ff-btn ff-cal-btn-outline" onClick={() => {
+              if (consuming.current) return;
+              writePendingConnect(null);
+              setStatus({ kind: "disconnected" });
+              setNotice(t("settings.google.cancelled"));
+            }}>{t("settings.google.cancelConnect")}</button>
+          ) : null}
+          {status.kind === "error" ? (
+            <button type="button" className="ff-btn ff-cal-btn-outline" onClick={() => {
+              setStatus({ kind: "loading" });
+              setRefresh((value) => value + 1);
+            }}>{t("settings.google.retry")}</button>
+          ) : status.kind === "connected" ? (
             <button type="button" className="ff-btn ff-btn-danger" onClick={() => setConfirmingDisconnect(true)}>
               {t("settings.google.disconnect")}
             </button>
@@ -270,7 +285,7 @@ export function GoogleCalendarCard() {
               disabled={busy || !signedIn}
               onClick={() => void connect()}
             >
-              {busy ? t("settings.google.connecting") : t("settings.google.connect")}
+              {status.kind === "loading" ? t("settings.google.status.loading") : busy ? t("settings.google.connecting") : t("settings.google.connect")}
             </button>
           )}
         </div>
@@ -284,7 +299,7 @@ export function GoogleCalendarCard() {
         </p>
       ) : null}
 
-      {!signedIn ? <p className="ff-settings-note">{t("settings.google.signedOut")}</p> : null}
+      {!signedIn && status.kind === "disconnected" ? <p className="ff-settings-note">{t("settings.google.signedOut")}</p> : null}
 
       {/* §8 asks for this to be said once, at the moment of connecting: a
           repeating event edited in Google is overwritten on the next write, and
@@ -292,7 +307,7 @@ export function GoogleCalendarCard() {
       <p className="ff-settings-note">{t("settings.google.repeatWarning")}</p>
 
       {notice ? <p className="ff-settings-note">{notice}</p> : null}
-      {error ? <p className="auth-message error">{error}</p> : null}
+      {error ? <p className="auth-message error" role="alert">{error}</p> : null}
 
       {confirmingDisconnect ? (
         <ConfirmModal

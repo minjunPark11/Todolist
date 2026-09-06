@@ -4,6 +4,7 @@ import App from "./App";
 import { FloatingLayerProvider } from "./components/floating";
 import { MiniFocusTimerWindow } from "./components/MiniFocusTimerWindow";
 import { WindowTitleBar } from "./components/shell/WindowTitleBar";
+import { GoogleCalendarReturn } from "./components/calendar/GoogleCalendarReturn";
 import { isTauriRuntime } from "./platform/tauri";
 import { dropAiStorage } from "./domain/migrations/dropAiStorage";
 import { CONSENT_PATH, OAuthConsentPage } from "./components/oauth/OAuthConsentPage";
@@ -53,6 +54,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             gets one. */}
         {isTauriRuntime() ? <WindowTitleBar /> : null}
         <App />
+        <GoogleCalendarReturn />
       </FloatingLayerProvider>
     )}
   </React.StrictMode>,

@@ -249,7 +249,7 @@ fn show_main_window(app: &tauri::AppHandle) {
     let Ok(window) = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("FocusFlow")
         .inner_size(1280.0, 820.0)
-        .min_inner_size(980.0, 680.0)
+        .min_inner_size(640.0, 480.0)
         // Matches tauri.conf.json: the app draws its own caption row
         // (WindowTitleBar.tsx), so a window rebuilt on this fallback path must
         // not come back wearing the system one.

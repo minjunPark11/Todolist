@@ -18,6 +18,7 @@ import {
 import type { AutoBackupState } from "../app/useAutoBackup";
 import { initialSettingsTab, type SettingsTab } from "../app/settingsTab";
 import { readPendingConnect } from "../lib/googleCalendar";
+import { parseCallback } from "../domain/calendar/googleSync/connectFlow";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import { platform } from "../platform";
 import type { SettingsUpdateStatus } from "../platform";
@@ -110,6 +111,13 @@ export function SettingsPage({
       pendingConnect: typeof window === "undefined" ? null : readPendingConnect(),
     }),
   );
+  useEffect(() => {
+    const onReturn = () => {
+      if (parseCallback(window.location.href)) setTab("calendar");
+    };
+    window.addEventListener("hashchange", onReturn);
+    return () => window.removeEventListener("hashchange", onReturn);
+  }, []);
   const [calendarDraft, setCalendarDraft] = useState({ name: "", icsUrl: "", color: "#4f73ff" });
   const [externalFormOpen, setExternalFormOpen] = useState(false);
   const [shareCopyKey, setShareCopyKey] = useState("settings.calendar.copy");

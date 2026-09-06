@@ -23,6 +23,8 @@
 // while it is asking you to sign in is worse than a visible seam.
 import { useEffect, useState, type CSSProperties } from "react";
 import type { Window as TauriWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { installWindowDragging } from "./windowDragging";
 import { translate } from "../../i18n";
 import type { Language } from "../../types";
 
@@ -83,6 +85,11 @@ function CloseIcon() {
 export function WindowTitleBar() {
   const lang = useRootLang();
   const [isMaximized, setIsMaximized] = useState(false);
+
+  useEffect(() => installWindowDragging(
+    () => getCurrentWindow().startDragging(),
+    () => getCurrentWindow().toggleMaximize(),
+  ), []);
 
   // The stylesheet only offsets the app for a caption row that actually
   // exists: everything keyed on `[data-window-chrome="custom"]` is inert in
