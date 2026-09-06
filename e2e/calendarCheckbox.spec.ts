@@ -260,11 +260,11 @@ test.describe("View Options", () => {
     const before = await blockFor(page, "Jogging").evaluate((el) => getComputedStyle(el).backgroundColor);
     await openViewOptions(page);
     await page.getByRole("radio", { name: "Priority" }).click();
-    // Both values are post-darkening: `#8e8e93` -> `#6e6e73` for the priority
-    // neutral, `#99d52a` -> `#577918` for lime.
+    // The priority neutral follows the accessible text-tertiary token;
+    // lime is darkened from `#99d52a` to `#577918` for white ink.
     await expect
       .poll(() => blockFor(page, "Jogging").evaluate((el) => getComputedStyle(el).backgroundColor))
-      .toBe("rgb(110, 110, 115)");
+      .toBe("rgb(104, 104, 109)");
     expect(before).toBe("rgb(87, 121, 24)");
   });
 
