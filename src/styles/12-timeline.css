@@ -480,7 +480,7 @@
      hover. Square rather than pill for the same reason: a rounded cap inside
      a rounded rectangle reads as a second object. */
   background: transparent;
-  transition: background var(--motion-fast);
+  transition: background var(--motion-fast) ease-out;
 }
 /* The colour, not white: white was a grip on a solid accent, and on a tint it
    is the bar with a piece missing. */

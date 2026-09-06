@@ -92,7 +92,7 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--motion-fast), border-color var(--motion-fast);
+  transition: background var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
 }
 
 .ff-btn:not(:disabled):hover,
@@ -633,7 +633,7 @@ textarea {
 
 /* --- the overlay scrollbar -----------------------------------------------
    Every value here is measured (TICKTICK_COMPONENT_02 §4): 6px wide, radius 7,
-   the foreground at 30%, `right: 2px`, and `transition: opacity 0.3s` — which
+   the foreground at 30%, `right: 2px`, and `transition: opacity var(--motion-slow) ease-out` — which
    §4 notes was the only transition anywhere in that shell. There is no track
    and there are no arrows; the reference's bar has zero child elements.
 
@@ -652,7 +652,7 @@ textarea {
   background: var(--scrollbar-thumb);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s;
+  transition: opacity var(--motion-slow) ease-out;
 }
 
 /* The page's own bar. `fixed` because its scroller is the window rather than
@@ -704,7 +704,7 @@ textarea {
 
 .ff-caret svg {
   display: block;
-  transition: transform 140ms cubic-bezier(0.2, 0, 0, 1);
+  transition: transform var(--motion-base) cubic-bezier(0.2, 0, 0, 1);
 }
 
 .ff-caret.is-open svg {

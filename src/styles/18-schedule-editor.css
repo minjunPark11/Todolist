@@ -378,7 +378,7 @@
 
 .sched-row-chevron {
   color: var(--text-tertiary);
-  transition: transform 120ms ease-out;
+  transition: transform var(--motion-fast) ease-out;
 }
 
 /* §4: `›` becomes `⌄` — the same glyph, a quarter turn. Driven by the

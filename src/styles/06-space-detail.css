@@ -172,7 +172,7 @@
   height: 100%;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  transition: width 0.3s ease;
+  transition: width var(--motion-slow) ease-out;
 }
 
 .sdv-upcoming-list {
@@ -537,7 +537,7 @@
   box-shadow: var(--shadow-panel);
   display: flex;
   flex-direction: column;
-  animation: sdv-drawer-in 0.2s ease;
+  animation: sdv-drawer-in var(--motion-base) ease-out;
 }
 
 @keyframes sdv-drawer-in {

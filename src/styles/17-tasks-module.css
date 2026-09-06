@@ -374,7 +374,7 @@
   background-position: 1px 2px;
   color: var(--text-tertiary);
   cursor: grab;
-  transition: opacity var(--motion-fast);
+  transition: opacity var(--motion-fast) ease-out;
 }
 
 .tm-task:hover .tm-task-handle,
@@ -2176,7 +2176,7 @@
   text-transform: none;
   letter-spacing: 0;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background var(--motion-fast) ease-out, color var(--motion-fast) ease-out;
 }
 
 /* They were styled exactly like the label they sat next to — same size, same
@@ -2402,7 +2402,7 @@
      leaves, and instant on the way in. */
   transform: translateX(-100%);
   visibility: hidden;
-  transition: transform 160ms ease, visibility 0s linear 160ms;
+  transition: transform var(--motion-base) ease-out, visibility 0s linear var(--motion-base);
   background: var(--bg, #fff);
   padding-left: max(8px, env(safe-area-inset-left));
 }
@@ -2410,7 +2410,7 @@
 .tm-shell.sidebar-open .tm-sidebar {
   transform: translateX(0);
   visibility: visible;
-  transition: transform 160ms ease, visibility 0s;
+  transition: transform var(--motion-base) ease-out, visibility 0s;
 }
 
 .tm-scrim {
@@ -2573,7 +2573,7 @@
   box-shadow: var(--shadow-panel);
   /* Crops the header and footer into the rounded corners. */
   overflow: hidden;
-  animation: tm-drawer-modal-in 140ms ease;
+  animation: tm-drawer-modal-in var(--motion-base) ease-out;
 }
 
 /* No anchor — a link opened from the address bar, or a reload (§3.4). The
@@ -3464,7 +3464,7 @@
   line-height: 1;
   opacity: 0;
   cursor: pointer;
-  transition: opacity var(--motion-fast);
+  transition: opacity var(--motion-fast) ease-out;
 }
 
 /* Same rule as the drag handle: at rest a list of rows is a list of titles.
@@ -4127,7 +4127,7 @@
   border-radius: var(--radius-pill, 999px);
   background: var(--border-strong, rgba(25, 25, 25, 0.22));
   cursor: pointer;
-  transition: background var(--motion-fast);
+  transition: background var(--motion-fast) ease-out;
 }
 
 .tm-switch.is-on {
@@ -4140,7 +4140,7 @@
   height: 20px;
   border-radius: 50%;
   background: #fff;
-  transition: transform var(--motion-fast);
+  transition: transform var(--motion-fast) ease-out;
 }
 
 .tm-switch.is-on .tm-switch-knob {

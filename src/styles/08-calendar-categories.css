@@ -33,7 +33,7 @@
   background: color-mix(in srgb, var(--cat-color, #8e8e93) 22%, transparent);
   position: relative;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--motion-base) ease-out;
 }
 
 .gcal-cat-row input[type="checkbox"]::after {
@@ -88,7 +88,7 @@
   cursor: pointer;
   border-radius: var(--radius-sm);
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--motion-fast) ease-out;
 }
 
 .gcal-cat-row:hover .gcal-cat-menu-btn,
@@ -590,7 +590,7 @@
 .expandable-add > button {
   width: 100%;
   padding: 0 16px;
-  transition: background var(--motion-fast), border-color var(--motion-fast);
+  transition: background var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
 }
 
 .expandable-add > button:hover {
@@ -679,11 +679,11 @@
    `.app-frame .app-shell`, which wins, and the shell is never outside
    `.app-frame`. This declaration survives for `.sidebar`. */
 .app-shell {
-  transition: grid-template-columns 0.28s cubic-bezier(0.2, 0, 0, 1);
+  transition: grid-template-columns var(--motion-slow) cubic-bezier(0.2, 0, 0, 1);
 }
 
 .sidebar {
-  transition: padding 0.28s cubic-bezier(0.2, 0, 0, 1);
+  transition: padding var(--motion-slow) cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* Fixed rail width so the collapse can animate (auto cannot transition). *

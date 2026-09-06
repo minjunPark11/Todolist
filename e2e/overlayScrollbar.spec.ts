@@ -97,6 +97,8 @@ test.describe("the page scrollbar", () => {
         width: box.width,
         radius: style.borderTopLeftRadius,
         pill: getComputedStyle(document.documentElement).getPropertyValue("--radius-pill").trim(),
+        // 지속시간도 같은 이유로 토큰에서 읽는다 (§15).
+        slow: getComputedStyle(document.documentElement).getPropertyValue("--motion-slow").trim(),
         fromRight: window.innerWidth - box.right,
         position: style.position,
         pointerEvents: style.pointerEvents,
@@ -115,7 +117,8 @@ test.describe("the page scrollbar", () => {
     // Nothing to grab: §4.1 kept the bar invisible under the pointer, so it
     // was never something a reader could aim at.
     expect(shape.pointerEvents).toBe("none");
-    expect(shape.transition).toBe("opacity 0.3s");
+    // 바가 사라지는 데 걸리는 시간이 요점이지 0.3이라는 숫자가 아니었다.
+    expect(shape.transition).toBe(`opacity ${(parseFloat(shape.slow) / 1000).toString()}s ease-out`);
     // No track, no arrows — the reference's bar has no children either.
     expect(shape.children).toBe(0);
     expect(shape.top).toBe(2);

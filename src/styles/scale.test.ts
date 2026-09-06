@@ -50,6 +50,19 @@ const SPACE_OK = new Set([
  * 떠 있는 바를 피하는 여백과 고정 헤더 상쇄, 그리고 뷰포트를 따라 자라는 페이지
  * 패딩이다. 사다리에 얹으면 콘텐츠가 그 바 뒤로 들어간다.
  */
+/**
+ * 모션의 자 (§15).
+ *
+ * 지속시간은 토큰에서만 온다. `0s`는 지속시간이 아니라 `visibility`를 전환이
+ * 끝난 뒤로 미루는 장치이므로 남는다.
+ *
+ * 이징은 `ease-out` 하나다 — 맨 `ease`가 16곳에 있었는데 토큰은 처음부터
+ * `ease-out`이었다. 셸 레이아웃의 `cubic-bezier(0.2, 0, 0, 1)`와 스피너의
+ * `linear`는 각자 이유가 있는 곡선이라 남긴다.
+ */
+const MOTION_DUR_OK = new Set(["0s"]);
+const MOTION_EASE_OK = new Set(["ease-out", "linear", "cubic-bezier(0.2,0,0,1)"]);
+
 const SPACE_ANCHORED = new Set(["40px", "42px", "44px", "52px", "64px", "68px", "80px", "90px", "110px"]);
 
 // offset도 blur도 0인 box-shadow는 그림자가 아니라 링이다 — 포커스 링과
@@ -79,6 +92,8 @@ const EXEMPT: { selector: RegExp; why: string }[] = [
   // `margin-left: -7px`은 바로 위 `width: 14px`의 절반이다 — 45° 회전한 마커를
   // 오늘 선 위에 앉히는 파생값이고, 사다리가 아니라 그 width를 따라간다.
   // §11.3에서 이것을 드리프트로 착각해 -6으로 스냅했다가 되돌렸다.
+  // 스피너는 전환이 아니라 루프다 — 1.1s는 한 바퀴 도는 시간이고 사다리와 무관하다.
+  { selector: /\.rail-sync\.is-syncing/, why: "루프 애니메이션 (SWISS_MINIMAL_DESIGN.md §15)" },
   { selector: /\.ff-timeline-bar\.is-marker/, why: "width의 절반, 파생값 (SWISS_MINIMAL_DESIGN.md §11.3)" },
 ];
 
@@ -180,6 +195,24 @@ function scan(css: string): Violation[] {
         (value) => /^-?[\d.]+(px|rem|em)$/.test(value) && !SPACE_OK.has(value.replace(/^-/, "")) && !SPACE_ANCHORED.has(value.replace(/^-/, "")),
       );
       if (bad.length) found.push({ line: at, kind: "space", text: `${space[0].trim().slice(0, 46)}  ← ${bad.join(" ")}` });
+    }
+
+    // 모션.
+    const motion = /(?<![-\w])(?:transition|animation)(?:-duration)?\s*:\s*([^;{}]+)/.exec(line);
+    if (motion) {
+      const value = motion[1];
+      const durations = [...value.matchAll(/(?<![\w.])([\d.]+m?s)/g)].map((m) => m[1]);
+      const bad = durations.filter((d) => !MOTION_DUR_OK.has(d));
+      const eases = [...value.matchAll(/(?<![-\w])(ease-in-out|ease-out|ease-in|ease|linear|cubic-bezier\([^)]*\))/g)]
+        .map((m) => m[1].replace(/\s+/g, ""));
+      const badEase = eases.filter((e) => !MOTION_EASE_OK.has(e));
+      // 이징을 적지 않으면 CSS 기본값이 `ease`다 — 적어둔 `ease`를 걷어내면서
+      // 생략을 놔두면 같은 곡선이 이름 없이 남는다. `.overlay-scrollbar`가
+      // 정확히 그렇게 통과하고 있었다 (§15).
+      const omitted = durations.length > 0 && eases.length === 0 ? ["이징 생략"] : [];
+      if (bad.length || badEase.length || omitted.length) {
+        found.push({ line: at, kind: "motion", text: `${value.trim().slice(0, 40)}  ← ${[...bad, ...badEase, ...omitted].join(" ")}` });
+      }
     }
 
     // 토큰의 정의 자체. 값이 한 덩어리인 것만 본다 — `600 24px/32px …` 같은 축약형은

@@ -69,7 +69,7 @@
      driving it — a transition during a drag lags the cursor. */
   .app-frame .app-shell,
   .app-frame .tm-shell {
-    transition: grid-template-columns 0.16s cubic-bezier(0.2, 0, 0, 1);
+    transition: grid-template-columns var(--motion-base) cubic-bezier(0.2, 0, 0, 1);
   }
 
   .app-frame.is-sidebar-resizing .app-shell,
@@ -139,7 +139,7 @@
   left: 5px;
   width: 2px;
   background: transparent;
-  transition: background 0.12s ease;
+  transition: background var(--motion-fast) ease-out;
 }
 
 .context-sidebar-handle:hover::after,
@@ -240,7 +240,7 @@
   color: var(--ff-muted);
   background: transparent;
   cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: background var(--motion-base) ease-out, color var(--motion-base) ease-out;
 }
 
 .rail-item:hover {
@@ -293,7 +293,7 @@
   box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.14));
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--motion-fast) ease-out;
 }
 
 /* show delay 450ms on hover, hide 0ms — the delay lives on the transition so
@@ -616,7 +616,7 @@
   background: transparent;
   color: var(--ff-text, #1c1c1e);
   cursor: default;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background var(--motion-fast) ease-out, color var(--motion-fast) ease-out;
 }
 
 .window-button:hover {

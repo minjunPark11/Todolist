@@ -632,7 +632,7 @@
   height: 3px;
   border-radius: var(--radius-sm);
   background: var(--color-divider-soft);
-  transition: background 120ms ease;
+  transition: background var(--motion-fast) ease-out;
 }
 
 .gcal-allday-resizer:hover span,
@@ -1605,7 +1605,7 @@
   border-radius: var(--radius-sm);
   padding: 0 var(--space-md);
   background: var(--bg-surface);
-  transition: border-color var(--motion-fast), box-shadow var(--motion-fast), background var(--motion-fast);
+  transition: border-color var(--motion-fast) ease-out, box-shadow var(--motion-fast) ease-out, background var(--motion-fast) ease-out;
 }
 
 .auth-input-wrap:focus-within {

@@ -575,7 +575,7 @@
   background: transparent;
   cursor: pointer;
   opacity: 0.85;
-  transition: background var(--motion-fast, 120ms), opacity var(--motion-fast, 120ms);
+  transition: background var(--motion-fast) ease-out, opacity var(--motion-fast) ease-out;
 }
 
 .gcal-check.is-chip .gcal-check-box { width: 13px; height: 13px; border-radius: var(--radius-sm); }

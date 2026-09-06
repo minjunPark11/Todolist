@@ -350,11 +350,19 @@
      방향만 다르고 날카로움은 --shadow-panel과 같은 값이다. */
   --shadow-panel-x: -2px 0 8px rgba(0, 0, 0, 0.22);
 
-  /* Motion — I8-C. CSV 두 행이 어긋난다: Minimalism & Swiss는 200-250ms,
-     Productivity Tool은 150ms. 둘 다 맞다, 대상이 다르다. 하루에 수십 번
-     누르는 체크박스는 150이어야 하고, 열리는 레이어가 150이면 튄다. */
-  --motion-fast: 150ms ease-out;
-  --motion-base: 200ms ease-out;
+  /* Motion — §15.
+     I8-C는 CSV의 두 행(Swiss 200-250 · Productivity 150)만 보고 150/200으로
+     절충했는데, **앱이 이미 답을 갖고 있었다는 것을 보지 않았다.** 재보니
+     리터럴이 120ms(11곳)와 160ms(6곳)에 몰려 있다 — 이 앱은 그 둘보다 빠르게
+     돌고 있었고, I8은 토큰을 쓰는 19곳만 느리게 만든 셈이었다. 앱의 숫자로
+     돌아온다. (CSV는 세 갈래로 갈린다: 150-300 · 200-250 · 50-100.)
+
+     이징을 담지 않는다. 한 이름에 두 가지를 넣으면 셸 레이아웃의 의도된
+     `cubic-bezier(0.2, 0, 0, 1)`가 토큰을 쓸 수 없게 된다 — 이 작업이 내내
+     걷어낸 그 모양이다. 이징은 선언이 각자 적는다. */
+  --motion-fast: 120ms;
+  --motion-base: 160ms;
+  --motion-slow: 280ms;
 
   /* === Responsive breakpoints (Responsive_Audit.md) ===
      13종 → 5종 표준. CSS 변수는 @media 조건식에 직접 못 쓰므로
