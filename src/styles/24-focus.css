@@ -621,9 +621,20 @@ body.focus-stage-visible .foc-global-bar {
     min-height: 0;
   }
 
-  .focus-layout > .focus-stage {
-    margin-top: 0;
+  /* 왼쪽도 두 층 — 타이머가 남는 전부, 메모는 바닥에 자기 높이로.
+     오른쪽과 같은 모양이라 두 열의 바닥선이 맞는다. */
+  .focus-main {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: var(--space-md);
+    min-height: 0;
+  }
+  .focus-main > .focus-stage {
     align-self: center;
+  }
+
+  .focus-main > .focus-stage {
+    margin-top: 0;
     justify-self: center;
     width: 100%;
   }
@@ -768,4 +779,46 @@ body.focus-stage-visible .foc-global-bar {
   margin: 2px 0 0;
   font-size: var(--type-xl);
   font-weight: var(--weight-medium);
+}
+
+
+/* ==========================================================================
+   작업 메모 (FOCUS_LAYOUT_DESIGN.md Phase 3.5)
+   ========================================================================== */
+.focus-main {
+  min-width: 0;
+}
+.focus-note {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-sm);
+}
+.focus-note > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+.focus-note h2 {
+  margin: 0;
+  font-size: var(--type-md);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+.focus-note-scope {
+  color: var(--text-tertiary);
+  font-size: var(--type-sm);
+}
+.focus-page-v2 .focus-note textarea {
+  width: 100%;
+  min-height: 0;
+  resize: vertical;
+}
+/* 숫자는 세는 것이지 읽는 것이 아니다 — 그래서 작고, 그래서 `aria-hidden`이다
+   (textarea의 `maxLength`가 보조기술에 같은 사실을 이미 말한다). */
+.focus-note-count {
+  margin: 4px 0 0;
+  text-align: right;
+  color: var(--text-tertiary);
+  font-size: var(--type-xs);
 }

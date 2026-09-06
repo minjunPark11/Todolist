@@ -164,6 +164,9 @@ function FocusDialog({
     </div>
   );
 }
+/** 시안의 `0 / 500`. 입력의 상한이지 저장의 규칙이 아니다 (§11.2). */
+const NOTE_LIMIT = 500;
+
 export function FocusPage({
   queue,
   onAddToQueue,
@@ -280,6 +283,22 @@ export function FocusPage({
   const queueTasks = useMemo(() => visibleQueue(queue, tasks), [queue, tasks]);
   const queuedIds = useMemo(() => new Set(queueTasks.map((t) => t.id)), [queueTasks]);
   const [dragId, setDragId] = useState("");
+
+  /* 인라인 작업 메모 (FOCUS_LAYOUT_DESIGN.md Phase 3.5).
+
+     저장 모델을 새로 만들지 않는다 — 메모는 예전부터 세션의 것이고
+     (`FocusSession.focusNote`), 이 카드는 그 값을 다이얼로그 대신 자리에서
+     편집할 뿐이다. 대상은 다이얼로그를 열던 세 진입점과 같은 규칙이다:
+     지금 도는 세션, 없으면 방금 끝난 것. 둘 다 없으면 적을 곳이 없다. */
+  const noteTargetId = activeSession?.id ?? flow?.lastSessionId ?? result?.id ?? null;
+  const noteTarget = useMemo(
+    () => (noteTargetId ? focusSessions.find((s) => s.id === noteTargetId) ?? null : null),
+    [focusSessions, noteTargetId],
+  );
+  const [inlineNote, setInlineNote] = useState("");
+  useEffect(() => {
+    setInlineNote(noteTarget?.focusNote ?? "");
+  }, [noteTargetId, noteTarget?.focusNote]);
 
   /* 오늘의 세션 요약 (FOCUS_LAYOUT_DESIGN.md Phase 3).
 
@@ -757,12 +776,52 @@ export function FocusPage({
       )}
       {view === "timer" ? (
         <div className="focus-layout">
-          <section
-            className="focus-stage"
-            aria-label={l("집중 타이머", "Focus timer")}
-          >
-            <fieldset disabled={!ready || Boolean(error)}>{stage}</fieldset>
-          </section>
+          <div className="focus-main">
+            <section
+              className="focus-stage"
+              aria-label={l("집중 타이머", "Focus timer")}
+            >
+              <fieldset disabled={!ready || Boolean(error)}>{stage}</fieldset>
+            </section>
+
+            {/* 작업 메모 — 다이얼로그가 아니라 자리에서 (Phase 3.5).
+                `focus-note-dialog`는 남는다: 기록 줄에서 지난 세션의 메모를
+                여는 길은 여기가 아니다. */}
+            {!immersive && (
+              <section className="focus-note" aria-label={l("작업 메모", "Session note")}>
+                <header>
+                  <h2>{l("작업 메모", "Session note")}</h2>
+                  <span className="focus-note-scope">
+                    {noteTarget
+                      ? activeSession
+                        ? l("이번 세션", "This session")
+                        : l("방금 끝난 세션", "Last session")
+                      : l("집중을 시작하면 적을 수 있어요", "Start a session to write")}
+                  </span>
+                </header>
+                <textarea
+                  aria-label={l("작업 메모", "Session note")}
+                  placeholder={l(
+                    "지금 떠오른 생각을 간단히 메모해 보세요…",
+                    "Jot down what just came to mind…",
+                  )}
+                  value={inlineNote}
+                  maxLength={NOTE_LIMIT}
+                  disabled={!noteTarget}
+                  onChange={(e) => {
+                    setInlineNote(e.target.value);
+                    if (noteTarget) run({ type: "note", id: noteTarget.id, note: e.target.value });
+                  }}
+                  rows={3}
+                />
+                {/* 상한은 입력에만 건다. 저장 검증을 조이면 이 카드보다 먼저
+                    쓰인 긴 메모가 갈 곳을 잃는다. */}
+                <p className="focus-note-count" aria-hidden="true">
+                  {inlineNote.length} / {NOTE_LIMIT}
+                </p>
+              </section>
+            )}
+          </div>
           {/* 집중 큐 (FOCUS_LAYOUT_DESIGN.md Phase 2).
 
               세션이 도는 동안에도 남는다 — 큐의 요점이 "지금" 말고 "다음"을
