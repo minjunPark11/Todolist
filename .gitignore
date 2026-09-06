@@ -13,7 +13,7 @@ vite.config.d.ts
 docs/.obsidian/workspace.json
 
 # Playwright
-/test-results/
+/test-results*/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
