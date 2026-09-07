@@ -182,7 +182,9 @@ test.describe("finishing a task from the grid", () => {
     // The regression the box could have caused: `shouldStartTimeSelection`
     // rejects a gesture that starts on an `input`, and the boxes are inputs.
     // The empty grid must still answer a drag.
-    const column = page.locator(".gcal-time-col").nth(1);
+    // Fixtures live on today, which can be any weekday. Select a genuinely
+    // empty column rather than assuming the second day contains no tasks.
+    const column = page.locator(".gcal-time-col").filter({ hasNot: page.locator(".gcal-time-block") }).first();
     const box = (await column.boundingBox())!;
     const scroller = (await page.locator(".gcal-time-scroll").boundingBox())!;
     const sticky = await page.locator(".gcal-timegrid-sticky").boundingBox();
