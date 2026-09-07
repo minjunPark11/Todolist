@@ -20,15 +20,35 @@ export function GoogleCalendarReturn() {
     if (platform.kind !== "desktop") return;
     let alive = true;
     let off: (() => void) | undefined;
-    const take = async () => routeGoogleCalendarReturn(await platform.deepLink.take());
+    let taking = false;
+    const take = async () => {
+      if (!alive || taking) return;
+      taking = true;
+      try {
+        const raw = await platform.deepLink.take();
+        if (alive) routeGoogleCalendarReturn(raw);
+      } finally { taking = false; }
+    };
+    const recover = () => {
+      if (readPendingConnect()) void take().catch(console.error);
+    };
+    // Native delivery stores the URL before focusing this window. Recover on
+    // focus and while a connection is pending even if its event was missed.
+    window.addEventListener("focus", recover);
+    const timer = window.setInterval(recover, 1000);
     void (async () => {
       // Subscribe first so a callback cannot arrive between draining and listening.
       const unsubscribe = await platform.deepLink.subscribe(() => { void take().catch(console.error); });
       if (!alive) { unsubscribe(); return; }
       off = unsubscribe;
       await take();
-    })().catch(console.error);
-    return () => { alive = false; off?.(); };
+    })().catch((error) => { console.error(error); recover(); });
+    return () => {
+      alive = false;
+      off?.();
+      window.removeEventListener("focus", recover);
+      window.clearInterval(timer);
+    };
   }, []);
   return null;
 }

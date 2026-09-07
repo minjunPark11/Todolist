@@ -1,6 +1,6 @@
 [package]
 name = "focusflow"
-version = "0.22.10"
+version = "0.22.11"
 description = "FocusFlow desktop app"
 authors = ["FocusFlow"]
 license = ""

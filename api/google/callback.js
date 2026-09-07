@@ -3103,9 +3103,26 @@ function handler(req, res) {
   else if (code) params.set("code", code);
   else params.set("error", "no_code");
   if (state.platform === "desktop") {
+    const link = `focusflow://${CALLBACK_ROUTE}?${params.toString()}`.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Location", `focusflow://${CALLBACK_ROUTE}?${params.toString()}`);
-    res.status(302).end();
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'");
+    res.status(200).end(req.method === "HEAD" ? void 0 : `<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FocusFlow\uB85C \uB3CC\uC544\uAC00\uAE30</title><style>
+:root{font-family:system-ui,sans-serif;color:#202334;background:#f4f5fa}
+body{margin:0;min-height:100vh;display:grid;place-items:center}
+main{box-sizing:border-box;width:min(480px,calc(100% - 32px));padding:32px;background:white;border:1px solid #dfe2ec;border-radius:16px}
+h1{font-size:24px;line-height:1.4;margin:12px 0}p{line-height:1.7;color:#50566a}
+a{display:inline-block;background:#5058c9;color:white;padding:14px 24px;border-radius:8px;text-decoration:none;font-weight:600}
+a:hover{background:#3d44a8}a:focus-visible{outline:3px solid #202334;outline-offset:4px}
+</style></head><body><main><strong>FocusFlow</strong><h1>\uC571\uC73C\uB85C \uB3CC\uC544\uAC00 \uC5F0\uACB0\uC744 \uB9C8\uBB34\uB9AC\uD558\uC138\uC694</h1>
+<p>\uC544\uB798 \uBC84\uD2BC\uC744 \uB20C\uB7EC FocusFlow\uB85C \uB3CC\uC544\uAC00\uC138\uC694. \uC5F0\uACB0 \uACB0\uACFC\uB294 \uC571\uC5D0\uC11C \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.</p>
+<a href="${link}">FocusFlow \uC5F4\uAE30</a>
+<p>\uC571\uC774 \uC5F4\uB9AC\uC9C0 \uC54A\uC73C\uBA74 FocusFlow\uAC00 \uC124\uCE58\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD55C \uB4A4 \uBC84\uD2BC\uC744 \uB2E4\uC2DC \uB20C\uB7EC \uC8FC\uC138\uC694.</p>
+</main></body></html>`);
     return;
   }
   const appUrl = readAppUrl();
