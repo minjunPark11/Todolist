@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FocusFlow — 할 일과 캘린더, 한 화면에</title>
+    <meta name="description" content="FocusFlow는 할 일, 캘린더, 집중 타이머를 한 화면에 두는 개인용 플래너입니다. 구글 캘린더 연동은 선택이며, 전용 캘린더 하나만 씁니다." />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #1c1c1e;
+        --muted: #6b6b70;
+        --bg: #ffffff;
+        --line: #e5e5ea;
+        --accent: #4f73ff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #f2f2f7;
+          --muted: #98989f;
+          --bg: #16161a;
+          --line: #2c2c31;
+          --accent: #8ea4ff;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+          "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 56px 24px 96px;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.3;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+      h2 {
+        font-size: 19px;
+        margin: 44px 0 10px;
+        letter-spacing: -0.01em;
+      }
+      h3 {
+        font-size: 16px;
+        margin: 26px 0 6px;
+      }
+      p,
+      li {
+        color: var(--ink);
+      }
+      .lede,
+      .updated {
+        color: var(--muted);
+      }
+      .updated {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      ul {
+        padding-left: 20px;
+      }
+      li {
+        margin: 6px 0;
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid var(--line);
+        margin: 56px 0;
+      }
+      a {
+        color: var(--accent);
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.9em;
+        background: color-mix(in srgb, var(--ink) 8%, transparent);
+        padding: 1px 5px;
+        border-radius: 5px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 14px 0;
+        font-size: 15px;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .note {
+        border-left: 3px solid var(--accent);
+        padding: 2px 0 2px 14px;
+        margin: 18px 0;
+      }
+      .en {
+        color: var(--muted);
+      }
+      .en h2,
+      .en h1 {
+        color: var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>FocusFlow</h1>
+      <p class="updated">할 일 · 캘린더 · 집중 타이머를 한 화면에 두는 개인용 플래너</p>
+
+      <h2>무엇을 하는 앱인가</h2>
+      <p>
+        FocusFlow는 할 일 목록과 캘린더를 따로 열지 않게 만드는 플래너입니다. 웹에서 바로 쓰거나
+        윈도우 데스크톱 앱으로 설치해 쓸 수 있고, 로그인 없이도 기기 안에서 그대로 동작합니다.
+      </p>
+      <ul>
+        <li><strong>할 일</strong> — 목록·폴더, 우선순위, 반복, 체크리스트, 칸반 보드와 타임라인 보기</li>
+        <li><strong>캘린더</strong> — 날짜가 잡힌 할 일을 주·월 단위로 보고 드래그로 옮기기</li>
+        <li><strong>집중</strong> — 작업에 붙는 타이머와 미니 창, 세션 기록</li>
+        <li><strong>동기화</strong> — 로그인하면 기기 사이에서 같은 데이터를 보고, 원하면 구글 캘린더와 연동</li>
+      </ul>
+
+      <h2>구글 계정 데이터를 어떻게 쓰는가</h2>
+      <p>
+        구글 캘린더 연동은 <strong>선택</strong>입니다. 설정에서 직접 연결할 때만 시작하고, 연결하면
+        구글 계정에 <strong>"FocusFlow" 전용 캘린더</strong>를 하나 만들어 그 캘린더만 읽고 씁니다.
+        회사 일정, 생일, 공휴일 같은 기존 캘린더는 건드리지 않습니다.
+      </p>
+      <ul>
+        <li>내보내는 것은 <strong>날짜가 지정된 할 일</strong>의 제목, 설명, 시작·종료 시각, 종일 여부, 반복 규칙뿐입니다.</li>
+        <li>우선순위, 태그, 목록 구조, 체크리스트, 집중 세션 기록은 구글로 나가지 않습니다.</li>
+        <li>갱신 토큰은 서버에만 저장되며, 설정에서 연결을 해제하면 지우고 구글에 권한 회수를 요청합니다.</li>
+        <li>구글 사용자 데이터는 이 캘린더 동기화에만 쓰이고, 광고에 쓰거나 제3자에게 팔지 않습니다.</li>
+      </ul>
+      <div class="note">
+        <p>
+          FocusFlow가 구글 API로부터 받은 정보의 사용과 다른 앱으로의 전송은
+          <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noreferrer noopener"
+            >Google API 서비스 사용자 데이터 정책</a
+          >의 제한적 사용(Limited Use) 요건을 포함하여 해당 정책을 따릅니다.
+        </p>
+      </div>
+
+      <h2>시작하기</h2>
+      <p>
+        <a href="/">웹에서 FocusFlow 열기</a> · <a href="/privacy.html">개인정보처리방침</a>
+      </p>
+
+      <h2>연락처</h2>
+      <p>만든 사람: 유민준 · <a href="mailto:minjun3164@gmail.com">minjun3164@gmail.com</a></p>
+
+      <hr />
+
+      <section class="en" lang="en">
+        <h1>FocusFlow</h1>
+        <p class="updated">A personal planner that keeps tasks, calendar and a focus timer on one screen.</p>
+
+        <h2>What the app does</h2>
+        <p>
+          FocusFlow puts your task lists and your calendar in the same window, so you stop switching between
+          two apps. It runs in the browser and as a Windows desktop app, and it works on the device without
+          an account; signing in syncs the same data across devices.
+        </p>
+        <ul>
+          <li><strong>Tasks</strong> — lists and folders, priorities, repeats, checklists, board and timeline views</li>
+          <li><strong>Calendar</strong> — see dated tasks by week or month and drag them to reschedule</li>
+          <li><strong>Focus</strong> — a timer attached to a task, a mini window, and a session history</li>
+        </ul>
+
+        <h2>How Google user data is used</h2>
+        <p>
+          Google Calendar sync is <strong>optional</strong> and starts only when you connect it in Settings.
+          Connecting creates one dedicated <strong>"FocusFlow" calendar</strong> in your Google account, and
+          that is the only calendar read or written — your existing calendars are left alone. What leaves the
+          app is the schedule slice of dated tasks: title, description, start and end, all-day flag and repeat
+          rule. Priorities, tags, list structure, checklists and focus sessions never go to Google. Refresh
+          tokens are stored server-side only, and disconnecting in Settings deletes them and asks Google to
+          revoke access. Google user data is used solely to provide this calendar sync — never for advertising
+          and never sold.
+        </p>
+        <p>
+          FocusFlow's use and transfer of information received from Google APIs adheres to the
+          <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noreferrer noopener"
+            >Google API Services User Data Policy</a
+          >, including the Limited Use requirements.
+        </p>
+
+        <h2>Get started</h2>
+        <p><a href="/">Open FocusFlow</a> · <a href="/privacy.html">Privacy policy</a></p>
+
+        <h2>Contact</h2>
+        <p><a href="mailto:minjun3164@gmail.com">minjun3164@gmail.com</a></p>
+      </section>
+    </main>
+  </body>
+</html>
