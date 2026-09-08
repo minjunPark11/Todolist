@@ -643,7 +643,11 @@ export function TaskDrawer({
           /* Not single-line: Enter here is a paragraph break (spec §10.4). */
           <DeferredTextarea
             value={task.description}
-            rows={3}
+            // One line, and then as many as the writing needs. Three was a box
+            // that an empty description still spent (§6.1): the tags under it
+            // were pushed down by nothing.
+            rows={1}
+            autoGrow
             placeholder={t("taskDetail.addDescription")}
             onCommit={(description) => onUpdate({ description })}
             resetKey={task.id}
@@ -814,7 +818,8 @@ export function TaskDrawer({
           <h3>{t("taskDetail.notes")}</h3>
           <DeferredTextarea
             value={task.notes}
-            rows={2}
+            rows={1}
+            autoGrow
             placeholder={t("taskDetail.addNotes")}
             onCommit={(notes) => onUpdate({ notes })}
             resetKey={task.id}

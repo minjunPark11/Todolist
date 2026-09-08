@@ -1739,6 +1739,8 @@
    one thing filling it — so a note stays as tall as the two rows it asks for
    and grows only when the panel has nothing else to give. */
 .tm-drawer-notes textarea {
+  /* Same as the body above: the global floor is not this field's height. */
+  min-height: 0;
   width: 100%;
   min-width: 0;
   padding: 6px 8px;
@@ -3668,6 +3670,14 @@
    moment later: an edge that snaps in under the pointer is the thing that
    makes this read as a control. It is gone in all three states now. */
 .tm-drawer-content textarea {
+  /* `01-base.css` gives every textarea a 90px floor — three lines an empty
+     description was spending, and everything under it started 90px lower than
+     it had any reason to (TASK_DETAIL_TAG_INPUT_DESIGN.md §6.1). The height is
+     `autoGrow`'s to write here.
+
+     Not zero: the placeholder is the only thing that says a description can be
+     written at all, and a box collapsed past it takes that line away (§11 D5). */
+  min-height: 0;
   padding: 6px 8px;
   border: 0;
   border-radius: var(--radius-sm);

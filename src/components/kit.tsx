@@ -102,12 +102,39 @@ export function DeferredTextarea({
   // Never single-line: Enter in a textarea is a paragraph break, and taking it
   // for "commit" would make multi-line text unwritable (spec §10.4).
   required,
+  autoGrow = false,
   ...rest
-}: DeferredFieldProps & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange">) {
+}: DeferredFieldProps &
+  Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange"> & {
+    /**
+     * The box is the text (TASK_DETAIL_TAG_INPUT_DESIGN.md §6).
+     *
+     * A textarea cannot state its content's height in CSS, so the height is
+     * written from `scrollHeight` after every change. The alternative — a
+     * fixed `rows` — is a box the writing sits inside, and what sits under it
+     * is pushed down by the empty part of that box.
+     */
+    autoGrow?: boolean;
+  }) {
   const field = useDeferredTextField(value, onCommit, { resetKey, delayMs, required });
+  const box = useRef<HTMLTextAreaElement | null>(null);
+
+  // Layout, not effect: the measured height has to be in place before the
+  // browser paints, or every keystroke that adds a line shows the old height
+  // for one frame.
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!autoGrow || !el) return;
+    // `auto` first, or `scrollHeight` can only ever report the height it
+    // already has — the box never shrinks when a line is deleted.
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [autoGrow, field.value]);
+
   return (
     <textarea
       {...rest}
+      ref={box}
       value={field.value}
       onChange={(event) => field.onChange(event.target.value)}
       onBlur={field.onBlur}
