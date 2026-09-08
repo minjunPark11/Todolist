@@ -115,9 +115,11 @@ async function fetchKeys(url, fetchImpl, now) {
   try {
     response = await fetchImpl(url, { headers: { Accept: "application/json" } });
   } catch {
-    throw new UnauthorizedError("invalid_token", "The signing keys could not be read right now.");
+    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} could not be reached.`);
   }
-  if (!response.ok) throw new UnauthorizedError("invalid_token", "The signing keys could not be read right now.");
+  if (!response.ok) {
+    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} came back ${response.status}.`);
+  }
   const body = await response.json();
   const keys = /* @__PURE__ */ new Map();
   for (const key of body.keys ?? []) {
@@ -908,6 +910,21 @@ var init_errors = __esm({
   }
 });
 
+// src/server/supabaseOrigin.ts
+function supabaseOrigin(value) {
+  const trimmed = value.trim();
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, "");
+  }
+}
+var init_supabaseOrigin = __esm({
+  "src/server/supabaseOrigin.ts"() {
+    "use strict";
+  }
+});
+
 // src/server/data/repository.ts
 function assertNotServiceRole(key) {
   const payload = key.split(".")[1];
@@ -932,7 +949,7 @@ function readSupabaseEnv(env = process.env) {
     throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set for the server data layer.");
   }
   assertNotServiceRole(anonKey);
-  return { url, anonKey };
+  return { url: supabaseOrigin(url), anonKey };
 }
 var TABLE_TO_KEY;
 var init_repository = __esm({
@@ -941,6 +958,7 @@ var init_repository = __esm({
     init_buildSyncPlan();
     init_normalize();
     init_errors();
+    init_supabaseOrigin();
     TABLE_TO_KEY = new Map(
       collectionTables.map(([key, table]) => [table, key])
     );
@@ -969,12 +987,13 @@ function readServiceRoleEnv(env = process.env) {
     const missing = [!url && "SUPABASE_URL", !serviceRoleKey && "SUPABASE_SERVICE_ROLE_KEY"].filter(Boolean).join(", ");
     throw new Error(`Google Calendar sync needs Supabase service access (missing env: ${missing}).`);
   }
-  return { url: url.replace(/\/+$/, ""), serviceRoleKey };
+  return { url: supabaseOrigin(url), serviceRoleKey };
 }
 var GOOGLE_CALENDAR_SCOPE;
 var init_env = __esm({
   "src/integrations/google/env.ts"() {
     "use strict";
+    init_supabaseOrigin();
     GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
   }
 });
@@ -1179,6 +1198,14 @@ async function deleteConnection(userId, fetchImpl = fetch, env = readServiceRole
     fetchImpl
   );
 }
+async function deleteSources(userId, fetchImpl = fetch, env = readServiceRoleEnv()) {
+  await request(
+    env,
+    `google_calendar_sources?user_id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: headers(env, { Prefer: "return=minimal" }) },
+    fetchImpl
+  );
+}
 var TokenStoreError;
 var init_store = __esm({
   "src/integrations/google/store.ts"() {
@@ -1205,6 +1232,7 @@ __export(google_exports, {
   decodeOAuthState: () => decodeOAuthState,
   deleteConnection: () => deleteConnection,
   deleteRefreshToken: () => deleteRefreshToken,
+  deleteSources: () => deleteSources,
   encodeOAuthState: () => encodeOAuthState,
   exchangeCode: () => exchangeCode,
   readGoogleOAuthEnv: () => readGoogleOAuthEnv,

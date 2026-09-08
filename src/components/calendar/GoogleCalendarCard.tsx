@@ -36,6 +36,7 @@ import {
 import { platform } from "../../platform";
 import { supabase } from "../../services/supabaseClient";
 import { ConfirmModal } from "../kit";
+import { GoogleCalendarSourceList } from "./GoogleCalendarSourceList";
 
 type Status =
   | { kind: "loading" }
@@ -59,10 +60,22 @@ export function GoogleCalendarCard() {
    * failed connection (see `platform/types.ts`, PlatformDeepLink). */
   const consuming = useRef(false);
 
+  /**
+   * The sentence to show for a failure — and, for one reason, the detail too.
+   *
+   * The catalogue can say what every other reason means, because every other
+   * reason has one meaning. `rejected` has several: the signing algorithm, an
+   * unpublished key, the wrong Supabase project. They are one sentence to the
+   * reader and three different fixes to whoever deploys this, and the server
+   * already names which one — so that name travels with it rather than being
+   * dropped on the floor, which is what left this card saying "sign in first"
+   * to someone who was signed in.
+   */
   const describe = useCallback(
     (thrown: unknown): string => {
-      if (thrown instanceof GoogleCalendarError) return t(`settings.google.error.${thrown.reason}`);
-      return t("settings.google.error.google");
+      if (!(thrown instanceof GoogleCalendarError)) return t("settings.google.error.google");
+      const sentence = t(`settings.google.error.${thrown.reason}`);
+      return thrown.reason === "rejected" && thrown.message ? `${sentence} (${thrown.message})` : sentence;
     },
     [t],
   );
@@ -292,11 +305,14 @@ export function GoogleCalendarCard() {
       </div>
 
       {status.kind === "connected" ? (
-        <p className="ff-settings-note">
-          {status.connection.accountEmail
-            ? t("settings.google.connectedAs", { email: status.connection.accountEmail })
-            : t("settings.google.connectedNoEmail")}
-        </p>
+        <>
+          <p className="ff-settings-note">
+            {status.connection.accountEmail
+              ? t("settings.google.connectedAs", { email: status.connection.accountEmail })
+              : t("settings.google.connectedNoEmail")}
+          </p>
+          <GoogleCalendarSourceList />
+        </>
       ) : null}
 
       {!signedIn && status.kind === "disconnected" ? <p className="ff-settings-note">{t("settings.google.signedOut")}</p> : null}

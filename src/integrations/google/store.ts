@@ -128,3 +128,23 @@ export async function deleteConnection(
     fetchImpl,
   );
 }
+
+/**
+ * The chosen calendars, removed with the rest of the connection (§6.1).
+ *
+ * A source list outliving its grant is a settings screen offering to sync
+ * calendars the account can no longer reach, with cursors pointing into a
+ * history nothing may read. Reconnecting re-lists them in a second.
+ */
+export async function deleteSources(
+  userId: string,
+  fetchImpl: typeof fetch = fetch,
+  env: ServiceRoleEnv = readServiceRoleEnv(),
+): Promise<void> {
+  await request(
+    env,
+    `google_calendar_sources?user_id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: headers(env, { Prefer: "return=minimal" }) },
+    fetchImpl,
+  );
+}

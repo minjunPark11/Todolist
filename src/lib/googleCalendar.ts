@@ -31,8 +31,15 @@ export interface GoogleConnection {
  *
  * A reason and not a message: the strings belong in the catalogue, and a
  * message from Google is rarely in the user's language.
+ *
+ * `signedOut` and `rejected` are both 401s and are deliberately two reasons,
+ * because they are two different repairs. `signedOut` is "there is no session"
+ * and signing in fixes it. `rejected` is "there IS a session and the server
+ * would not take it" — which signing in again cannot fix, because the token it
+ * mints is refused for the same reason the last one was. Telling that reader to
+ * sign in sends them round a loop they cannot leave.
  */
-export type FailureReason = "signedOut" | "network" | "google" | "store";
+export type FailureReason = "signedOut" | "rejected" | "network" | "google" | "store";
 
 export class GoogleCalendarError extends Error {
   constructor(
@@ -103,6 +110,27 @@ export const defaultDeps: GoogleCalendarDeps = {
   writeConnection: supabaseWriteConnection,
 };
 
+/**
+ * What a refusal from one of our own endpoints means to the card.
+ *
+ * Every 401 used to read as `signedOut`, and that was wrong for all but one of
+ * them. `requireUser` refuses for two quite different reasons and says which in
+ * `code`: `missing_token` is a request that carried no bearer at all, and
+ * `invalid_token` is a bearer the verifier would not accept — a token signed
+ * with an algorithm this deployment refuses, signed with a key its JWKS does
+ * not publish, or issued by a different Supabase project than the one the
+ * functions are configured for (`server/mcp/jwks.ts`).
+ *
+ * Only the first is a session problem. The rest are deployment problems that
+ * every future sign-in reproduces exactly, and a card that answers them with
+ * "sign in first" hides the one fact that would end the search — which is why
+ * the server's own words travel with this (see `describe` in the card).
+ */
+function failureFor(status: number, code: string | undefined): FailureReason {
+  if (status !== 401) return "google";
+  return code === "invalid_token" ? "rejected" : "signedOut";
+}
+
 /** One of our own endpoints, called as the signed-in user. */
 async function callOwnApi(path: string, deps: GoogleCalendarDeps, body?: unknown): Promise<unknown> {
   const token = await deps.authToken();
@@ -119,12 +147,12 @@ async function callOwnApi(path: string, deps: GoogleCalendarDeps, body?: unknown
     throw new GoogleCalendarError("network", "Could not reach the FocusFlow server.");
   }
 
-  const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+  const payload = (await response.json().catch(() => null)) as { error?: string; code?: string } | null;
   if (!response.ok) {
-    // 401 from these endpoints means the FocusFlow session is gone, which is a
-    // different repair from "Google said no" — the card sends them to sign in.
-    const reason: FailureReason = response.status === 401 ? "signedOut" : "google";
-    throw new GoogleCalendarError(reason, payload?.error || `Request failed (${response.status}).`);
+    throw new GoogleCalendarError(
+      failureFor(response.status, payload?.code),
+      payload?.error || `Request failed (${response.status}).`,
+    );
   }
   return payload;
 }

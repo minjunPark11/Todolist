@@ -17,6 +17,10 @@ import { UpdateChecker } from "./components/UpdateChecker";
 import { SettingsRow } from "./components/SettingsPage";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { useGoogleOutboundSync } from "./hooks/useGoogleOutboundSync";
+import { useGoogleInboundSync } from "./hooks/useGoogleInboundSync";
+import { currentAccessToken, googleCalendarFetch } from "./lib/googleCalendar";
+import { deleteExternalEvent, writeExternalEvent } from "./lib/googleCalendarEventWrite";
+import { withExternalEdit, type ExternalEventEdit } from "./domain/calendar/googleSync/externalEventShape";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
 import { TasksModule } from "./components/tasks/TasksModule";
@@ -90,6 +94,7 @@ import {
 } from "./lib/externalCalendars";
 import type {
   ExternalCalendar,
+  ExternalCalendarEvent,
   PageId,
   Project,
   Task,
@@ -107,7 +112,9 @@ function cloudExternalCalendarSnapshot(calendar: ExternalCalendar): ExternalCale
   return {
     id: calendar.id,
     name: calendar.name,
-    icsUrl: calendar.icsUrl,
+    source: calendar.source ?? "ics",
+    ...(calendar.icsUrl ? { icsUrl: calendar.icsUrl } : {}),
+    ...(calendar.googleCalendarId ? { googleCalendarId: calendar.googleCalendarId } : {}),
     color: calendar.color,
     visible: calendar.visible,
     enabled: calendar.enabled,
@@ -749,6 +756,11 @@ export default function App() {
     onResult: planner.applyGoogleSync,
   });
 
+  // Google Calendar, inbound (§6). The other direction, and a different kind of
+  // record: what comes back is an ExternalCalendarEvent and not a Task, so a
+  // colleague's meeting never lands in the inbox (§6.2).
+  useGoogleInboundSync({ signedIn: planner.auth.isSignedIn, apply: saveExternalState });
+
   useEffect(() => {
     if (!calendarShare.enabled || !calendarShare.token) return;
     if (sharePublishTimerRef.current) {
@@ -887,6 +899,105 @@ export default function App() {
       });
       return next;
     });
+  }
+
+  /**
+   * The calendar and event a grid action is really about, or null.
+   *
+   * Both have to be writable and the calendar has to be a Google one: an ICS
+   * subscription is a file, and there is nowhere to send an edit to it.
+   */
+  function writableExternal(eventId: string) {
+    const event = externalCalendarState.events.find((item) => item.id === eventId);
+    if (!event || event.readOnly) return null;
+    const calendar = externalCalendarState.calendars.find((item) => item.id === event.externalCalendarId);
+    if (!calendar?.googleCalendarId) return null;
+    return { event, googleCalendarId: calendar.googleCalendarId };
+  }
+
+  function replaceExternalEvent(eventId: string, next: ExternalCalendarEvent | null) {
+    saveExternalState((current) => ({
+      calendars: current.calendars,
+      events: next
+        ? current.events.map((item) => (item.id === eventId ? next : item))
+        : current.events.filter((item) => item.id !== eventId),
+    }));
+  }
+
+  /**
+   * An edit made on the grid, sent to Google (§6.2).
+   *
+   * Drawn immediately and put back if the write does not land. The alternative
+   * — waiting for the round trip — makes every edit feel broken on a slow
+   * connection; the alternative to putting it back is a grid showing an edit
+   * that never happened until the next poll silently undoes it.
+   */
+  async function updateExternalEvent(eventId: string, edit: ExternalEventEdit) {
+    const target = writableExternal(eventId);
+    if (!target) return;
+
+    const optimistic = withExternalEdit(target.event, edit);
+    if (optimistic === target.event) return;
+    replaceExternalEvent(eventId, optimistic);
+
+    const accessToken = await currentAccessToken();
+    if (!accessToken) {
+      replaceExternalEvent(eventId, target.event);
+      return;
+    }
+
+    const result = await writeExternalEvent(
+      { event: target.event, edit, googleCalendarId: target.googleCalendarId, accessToken },
+      { fetch: googleCalendarFetch },
+    );
+
+    if (result.kind === "written") {
+      // The new etag matters as much as the edit: without it the next inbound
+      // pass reads our own write as somebody else's news (§6.3).
+      replaceExternalEvent(eventId, {
+        ...optimistic,
+        ...(result.etag ? { etag: result.etag } : {}),
+        ...(result.updated ? { updatedAt: result.updated } : {}),
+      });
+      return;
+    }
+    if (result.kind === "gone") {
+      replaceExternalEvent(eventId, null);
+      return;
+    }
+    // Superseded, expired or failed: Google does not hold what we just drew.
+    replaceExternalEvent(eventId, {
+      ...target.event,
+      ...(result.kind === "superseded" && result.etag ? { etag: result.etag } : {}),
+    });
+  }
+
+  async function deleteExternalCalendarEvent(eventId: string) {
+    const target = writableExternal(eventId);
+    if (!target) return;
+
+    replaceExternalEvent(eventId, null);
+
+    const accessToken = await currentAccessToken();
+    if (!accessToken) {
+      replaceExternalEvent(eventId, target.event);
+      return;
+    }
+
+    const result = await deleteExternalEvent(
+      { event: target.event, googleCalendarId: target.googleCalendarId, accessToken },
+      { fetch: googleCalendarFetch },
+    );
+    // `gone` is the success. Anything else means it is still in the account,
+    // and a grid that has already forgotten it would never show it again.
+    if (result.kind !== "gone") {
+      saveExternalState((current) => ({
+        calendars: current.calendars,
+        events: current.events.some((item) => item.id === eventId)
+          ? current.events
+          : [...current.events, target.event],
+      }));
+    }
   }
 
   async function syncExternalCalendar(calendarId: string, calendarOverride?: ExternalCalendar) {
@@ -1622,6 +1733,8 @@ export default function App() {
         externalCalendarEvents={externalCalendarState.events}
         onAddExternalCalendar={addExternalCalendar}
         onUpdateExternalCalendar={updateExternalCalendar}
+        onUpdateExternalEvent={updateExternalEvent}
+        onDeleteExternalEvent={deleteExternalCalendarEvent}
         onDeleteExternalCalendar={deleteExternalCalendar}
         onSyncExternalCalendar={(calendarId) => void syncExternalCalendar(calendarId)}
         calendarShare={calendarShare}

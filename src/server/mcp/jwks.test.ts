@@ -234,3 +234,31 @@ describe("the JWKS address", () => {
 // Keeps the unused-import lint honest about `vi`, which the fetch stubs above
 // deliberately do not need.
 void vi;
+
+// Four rounds of diagnosis went into a 401 that said only "could not be read
+// right now". It is never the reader's session — it is this deployment looking
+// at the wrong project, or unable to reach the right one — and neither is
+// visible without the address it tried.
+describe("a key set that cannot be read", () => {
+  it("names the address it tried when the key set comes back an error", async () => {
+    const subject = supabaseTokenVerifier({
+      issuer: "https://wrong-ref.supabase.co/auth/v1",
+      now: () => NOW,
+      fetchImpl: (async () => new Response("nope", { status: 404 })) as unknown as typeof fetch,
+    });
+    await expect(subject.verify(await sign(goodClaims()))).rejects.toThrow(
+      "The signing keys at https://wrong-ref.supabase.co/auth/v1/.well-known/jwks.json came back 404.",
+    );
+  });
+
+  it("names it when the host cannot be reached at all", async () => {
+    const subject = supabaseTokenVerifier({
+      issuer: "https://unreachable.supabase.co/auth/v1",
+      now: () => NOW,
+      fetchImpl: (() => Promise.reject(new TypeError("fetch failed"))) as unknown as typeof fetch,
+    });
+    await expect(subject.verify(await sign(goodClaims()))).rejects.toThrow(
+      "The signing keys at https://unreachable.supabase.co/auth/v1/.well-known/jwks.json could not be reached.",
+    );
+  });
+});

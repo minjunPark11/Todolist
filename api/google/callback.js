@@ -102,9 +102,11 @@ async function fetchKeys(url, fetchImpl, now) {
   try {
     response = await fetchImpl(url, { headers: { Accept: "application/json" } });
   } catch {
-    throw new UnauthorizedError("invalid_token", "The signing keys could not be read right now.");
+    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} could not be reached.`);
   }
-  if (!response.ok) throw new UnauthorizedError("invalid_token", "The signing keys could not be read right now.");
+  if (!response.ok) {
+    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} came back ${response.status}.`);
+  }
   const body = await response.json();
   const keys = /* @__PURE__ */ new Map();
   for (const key of body.keys ?? []) {
@@ -924,6 +926,16 @@ function notFound() {
   return new ServerError("NOT_FOUND", "No such record.");
 }
 
+// src/server/supabaseOrigin.ts
+function supabaseOrigin(value2) {
+  const trimmed = value2.trim();
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, "");
+  }
+}
+
 // src/server/data/repository.ts
 var TABLE_TO_KEY = new Map(
   collectionTables.map(([key, table]) => [table, key])
@@ -951,7 +963,7 @@ function readSupabaseEnv(env = process.env) {
     throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set for the server data layer.");
   }
   assertNotServiceRole(anonKey);
-  return { url, anonKey };
+  return { url: supabaseOrigin(url), anonKey };
 }
 
 // src/integrations/google/state.ts
@@ -1055,7 +1067,9 @@ function localDateTimeParts(value2, timezone, fallbackTimezone) {
           day: "2-digit",
           hour: "2-digit",
           minute: "2-digit",
-          hour12: false,
+          // No `hour12: false`. On older engines it overrides `hourCycle` and
+          // reports midnight as "24", so an event at midnight in a named zone
+          // was drawn at 24:00 — a time no clock has.
           hourCycle: "h23"
         }).formatToParts(date).reduce((acc, part) => {
           if (part.type !== "literal") acc[part.type] = part.value;
@@ -1063,7 +1077,9 @@ function localDateTimeParts(value2, timezone, fallbackTimezone) {
         }, {});
         return {
           date: `${parts.year}-${parts.month}-${parts.day}`,
-          time: `${parts.hour}:${parts.minute}`
+          // Belt to the braces above: an engine that still hands back 24
+          // should show midnight, not a time no clock has.
+          time: `${String(Number(parts.hour) % 24).padStart(2, "0")}:${parts.minute}`
         };
       } catch {
       }
@@ -1232,7 +1248,9 @@ var TOTAL_BUDGET_MS = 12e3;
 var cache = /* @__PURE__ */ new Map();
 async function loadExternalEvents(calendars, options = {}) {
   const { now = /* @__PURE__ */ new Date(), cacheTtlMs = CACHE_TTL_MS, ...fetchOptions } = options;
-  const enabled = calendars.filter((calendar) => calendar.enabled).slice(0, MAX_SUBSCRIPTIONS);
+  const enabled = calendars.filter(
+    (calendar) => calendar.enabled && (calendar.source ?? "ics") === "ics" && Boolean(calendar.icsUrl)
+  ).slice(0, MAX_SUBSCRIPTIONS);
   if (enabled.length === 0) {
     return { events: [], statuses: [], partial: false };
   }
@@ -2233,8 +2251,10 @@ function buildCalendarItems({
         allDay: event.allDay,
         color: calendar.color,
         categoryId: eventCategoryId,
-        draggable: false,
-        readOnly: true
+        // A Google event the account may write is an event this app may move.
+        // An ICS subscription stays exactly as fixed as it was (§6.2).
+        draggable: !event.readOnly,
+        readOnly: event.readOnly
       });
     }
   }

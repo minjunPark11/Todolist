@@ -92,9 +92,11 @@ async function fetchKeys(url, fetchImpl, now) {
   try {
     response = await fetchImpl(url, { headers: { Accept: "application/json" } });
   } catch {
-    throw new UnauthorizedError("invalid_token", "The signing keys could not be read right now.");
+    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} could not be reached.`);
   }
-  if (!response.ok) throw new UnauthorizedError("invalid_token", "The signing keys could not be read right now.");
+  if (!response.ok) {
+    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} came back ${response.status}.`);
+  }
   const body = await response.json();
   const keys = /* @__PURE__ */ new Map();
   for (const key of body.keys ?? []) {
@@ -384,6 +386,16 @@ var DEFAULT_APP_SETTINGS = {
   matrixHideCompleted: false
 };
 
+// src/server/supabaseOrigin.ts
+function supabaseOrigin(value) {
+  const trimmed = value.trim();
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, "");
+  }
+}
+
 // src/server/data/repository.ts
 var TABLE_TO_KEY = new Map(
   collectionTables.map(([key, table]) => [table, key])
@@ -411,7 +423,7 @@ function readSupabaseEnv(env = process.env) {
     throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set for the server data layer.");
   }
   assertNotServiceRole(anonKey);
-  return { url, anonKey };
+  return { url: supabaseOrigin(url), anonKey };
 }
 
 // src/integrations/google/env.ts

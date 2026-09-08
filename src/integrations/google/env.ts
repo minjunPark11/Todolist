@@ -5,6 +5,8 @@
 // a serverless function that throws during import is a blank 500 with nothing
 // in it, and the same problem read here is a message naming the variable.
 
+import { supabaseOrigin } from "../../server/supabaseOrigin";
+
 export interface GoogleOAuthEnv {
   clientId: string;
   clientSecret: string;
@@ -72,5 +74,5 @@ export function readServiceRoleEnv(env: NodeJS.ProcessEnv = process.env): Servic
       .join(", ");
     throw new Error(`Google Calendar sync needs Supabase service access (missing env: ${missing}).`);
   }
-  return { url: url.replace(/\/+$/, ""), serviceRoleKey };
+  return { url: supabaseOrigin(url), serviceRoleKey };
 }

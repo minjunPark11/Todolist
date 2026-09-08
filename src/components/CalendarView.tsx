@@ -109,6 +109,15 @@ interface CalendarViewProps {
   onCreateTask: (draft: TaskDraft) => string;
   onDeleteTask?: (taskId: string) => void;
   /**
+   * A writable external event, edited or removed here (§6.2).
+   *
+   * Separate from `onUpdateTask` because the record is a different one and the
+   * write goes somewhere else — routing both through one callback would mean a
+   * handler that has to ask what it was given before it can act.
+   */
+  onUpdateExternalEvent?: (eventId: string, edit: { title?: string; description?: string; startTime?: string; endTime?: string }) => void;
+  onDeleteExternalEvent?: (eventId: string) => void;
+  /**
    * Opens a TASK — the app's own Detail, beside the block that was clicked
    * (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §5).
    *
@@ -157,6 +166,8 @@ export function CalendarView({
   onUpdateTaskSchedule,
   onCreateTask,
   onDeleteTask,
+  onUpdateExternalEvent,
+  onDeleteExternalEvent,
   onOpenTask,
   onToggleTaskDone,
   appSettings,
@@ -420,9 +431,13 @@ export function CalendarView({
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       if (event.key === "Delete" || event.key === "Backspace") {
-        // Only tasks can be deleted; an external event is a marker derived
-        // from another record.
-        if (!selected || selected.sourceType !== "task" || !onDeleteTask) return;
+        // A read-only external event is a marker derived from another record
+        // and has nothing to delete. A writable one reaches Google, so the key
+        // works on it exactly as the popover's button does.
+        if (!selected || selected.readOnly) return;
+        if (selected.sourceType === "external" && !onDeleteExternalEvent) return;
+        if (selected.sourceType === "task" && !onDeleteTask) return;
+        if (selected.sourceType !== "task" && selected.sourceType !== "external") return;
         event.preventDefault();
         handleDeleteFromPopover(selected);
         return;
@@ -707,6 +722,18 @@ export function CalendarView({
   // Quick edit from the popover: start/end time + memo only (§ user request);
   // anything deeper still goes through the task detail drawer.
   function handleQuickEditSave(item: CalendarItem, input: { startTime: string; endTime: string; memo: string }) {
+    if (item.sourceType === "external") {
+      // The memo field is the event's description on this side. Same box, same
+      // meaning; only the record it lands on differs.
+      if (item.readOnly || !onUpdateExternalEvent) return;
+      onUpdateExternalEvent(item.sourceId, {
+        startTime: input.startTime,
+        endTime: input.endTime,
+        description: input.memo,
+      });
+      setPopover(null);
+      return;
+    }
     if (item.sourceType !== "task") return;
     onUpdateTask(item.sourceId, { startTime: input.startTime, endTime: input.endTime, notes: input.memo });
     setPopover(null);
@@ -715,6 +742,12 @@ export function CalendarView({
   // Delete flows through the app-level requestDeleteTask, so the global
   // confirm-before-delete setting and toast apply here too.
   function handleDeleteFromPopover(item: CalendarItem) {
+    if (item.sourceType === "external") {
+      if (item.readOnly || !onDeleteExternalEvent) return;
+      setPopover(null);
+      onDeleteExternalEvent(item.sourceId);
+      return;
+    }
     if (item.sourceType !== "task") return;
     setPopover(null);
     // The ring deliberately stays put: onDeleteTask opens the app's confirm
@@ -947,7 +980,7 @@ export function CalendarView({
           categoryGroups={categoryGroups}
           onChangeCategory={handleChangeItemCategory}
           onClose={() => setPopover(null)}
-          onDelete={onDeleteTask ? handleDeleteFromPopover : undefined}
+          onDelete={onDeleteTask || onDeleteExternalEvent ? handleDeleteFromPopover : undefined}
           initialMemo={
             popover.item.sourceType === "task"
               ? tasks.find((task) => task.id === popover.item.sourceId)?.notes ?? ""

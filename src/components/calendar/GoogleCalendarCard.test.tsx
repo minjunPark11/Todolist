@@ -86,3 +86,26 @@ it("routes a verified return from another page, but ignores a mismatched nonce",
   expect(location.pathname).toBe("/settings");
   expect(location.hash).toContain("google-calendar?");
 });
+
+// The card used to answer every 401 with "Sign in to FocusFlow first." — to a
+// reader whose session was fine and whose token the server had refused. The
+// advice was a loop: the next sign-in mints a token refused for the same
+// reason. What ends the loop is the server's own sentence, which names which
+// check refused and is the only thing here that points at the fix.
+it("does not tell a signed-in reader to sign in when the server refused the session", async () => {
+  const { GoogleCalendarError } = await vi.importActual<typeof import("../../lib/googleCalendar")>(
+    "../../lib/googleCalendar",
+  );
+  mocks.exchange.mockRejectedValueOnce(
+    new GoogleCalendarError("rejected", "Tokens signed with HS256 are not accepted here."),
+  );
+  mount();
+  await waitFor(() => expect(mocks.read).toHaveBeenCalled());
+  localStorage.setItem("focusflow.google.pendingConnect", JSON.stringify({ nonce: "abc", platform: "desktop" }));
+  act(() => routeGoogleCalendarReturn("focusflow://google-calendar?state=abc&code=one"));
+
+  const alert = await screen.findByRole("alert");
+  expect(alert.textContent).toContain("Tokens signed with HS256 are not accepted here.");
+  expect(alert.textContent).not.toContain("Sign in to FocusFlow first.");
+  expect(screen.getByRole("status").textContent).toBe("Not connected");
+});

@@ -40,6 +40,7 @@ export {
   writeRefreshToken,
   deleteRefreshToken,
   deleteConnection,
+  deleteSources,
   TokenStoreError,
 } from "./store";
 

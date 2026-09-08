@@ -17,6 +17,7 @@
 // theirs to delete if they want it gone.
 import {
   deleteConnection,
+  deleteSources,
   deleteRefreshToken,
   readRefreshToken,
   requireUser,
@@ -57,6 +58,7 @@ export default async function handler(req: AdapterRequest, res: AdapterResponse)
 
     await deleteRefreshToken(user.userId);
     await deleteConnection(user.userId);
+    await deleteSources(user.userId);
 
     // `revoked: false` is reported rather than hidden: the local disconnect
     // succeeded, but a grant Google still holds is something the user may want
@@ -64,7 +66,10 @@ export default async function handler(req: AdapterRequest, res: AdapterResponse)
     res.status(200).json({ disconnected: true, revoked });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      res.status(401).json({ error: error.message });
+      // `reason` and not just the sentence: the client turns "no bearer at all"
+      // and "this bearer was refused" into two different repairs, and the
+      // sentence is prose it must not have to match on.
+      res.status(401).json({ error: error.message, code: error.reason });
       return;
     }
     res.status(500).json({ error: error instanceof Error ? error.message : "Could not disconnect Google Calendar." });

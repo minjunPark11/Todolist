@@ -72,6 +72,9 @@ type AppPagesProps = {
   externalCalendarEvents: ExternalCalendarEvent[];
   onAddExternalCalendar: (input: { name: string; icsUrl: string; color: string }) => void;
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
+  /** A writable Google event, edited or removed from the grid (§6.2). */
+  onUpdateExternalEvent?: (eventId: string, edit: { title?: string; description?: string; startTime?: string; endTime?: string }) => void;
+  onDeleteExternalEvent?: (eventId: string) => void;
   onDeleteExternalCalendar: (calendarId: string) => void;
   onSyncExternalCalendar: (calendarId: string) => void;
   calendarShare: CalendarShareState;
@@ -114,6 +117,8 @@ export function AppPages({
   externalCalendarEvents,
   onAddExternalCalendar,
   onUpdateExternalCalendar,
+  onUpdateExternalEvent,
+  onDeleteExternalEvent,
   onDeleteExternalCalendar,
   onSyncExternalCalendar,
   calendarShare,
@@ -197,6 +202,8 @@ export function AppPages({
           externalCalendarEvents={externalCalendarEvents}
           focusSessions={planner.focusSessions}
           onUpdateExternalCalendar={onUpdateExternalCalendar}
+          onUpdateExternalEvent={onUpdateExternalEvent}
+          onDeleteExternalEvent={onDeleteExternalEvent}
           onUpdateTask={planner.updateTask}
           onUpdateTaskSchedule={planner.updateTaskSchedule}
           onCreateTask={planner.createTask}
