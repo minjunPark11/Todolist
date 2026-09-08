@@ -30,7 +30,8 @@
 // what the task belongs to.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence } from "framer-motion";
-import type { List, Tag, Task, TaskPriority } from "../types";
+import type { List, Tag, Task, TaskPriority, TaskTag } from "../types";
+import { tagsByTaskId } from "../domain/tags/tags";
 import { MATRIX_QUADRANTS, type MatrixQuadrant } from "../utils/eisenhower";
 import {
   MATRIX_RULE_PRESETS,
@@ -91,8 +92,15 @@ interface MatrixPageProps {
   onChangeQuadrantRule?: (quadrant: MatrixQuadrant, rule: ViewRule) => void;
   /** Replaces all four at once — the only control here that does (§23.2). */
   onApplyRulePreset?: (rules: MatrixQuadrantRules) => void;
-  /** Offered as conditions a box can be narrowed to. */
+  /** Offered as conditions a box can be narrowed to, and drawn on the cards. */
   tags?: Tag[];
+  /**
+   * Which tags are on which task (TASK_TAG_CHIPS_DESIGN.md §7.5).
+   *
+   * The cards drew no tags at all until this arrived — not a layout decision,
+   * a missing prop: the page had the vocabulary (`tags`) and not the links.
+   */
+  taskTags?: TaskTag[];
   /**
    * Whether finished work is left out of the boxes (§33.2.4).
    *
@@ -118,6 +126,7 @@ export function MatrixPage({
   onChangeQuadrantRule,
   onApplyRulePreset,
   tags: allTags = [],
+  taskTags = [],
   hideCompleted = false,
   onToggleHideCompleted,
 }: MatrixPageProps) {
@@ -128,6 +137,8 @@ export function MatrixPage({
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [editing, setEditing] = useState<MatrixQuadrant | "">("");
   const rules = useMemo(() => resolveMatrixRules(quadrantRules), [quadrantRules]);
+  // Indexed once for every card the four boxes draw (§7.5).
+  const tagsOf = useMemo(() => tagsByTaskId(allTags, taskTags), [allTags, taskTags]);
 
   const pickableLists = useMemo(
     () => lists.filter((list) => !list.archivedAt && !list.deletedAt),
@@ -437,6 +448,7 @@ export function MatrixPage({
             refusal={draggingId ? refusalFor(draggingId, quadrant) : null}
             scopedOutBy={scopeConflict(quadrant) ? scopeName : ""}
             tasks={byQuadrant.get(quadrant) ?? []}
+            tagsOf={tagsOf}
             view={quadrantViews?.[quadrant] ?? DEFAULT_MATRIX_VIEW}
             lists={lists}
             today={today}
@@ -467,6 +479,7 @@ export function MatrixPage({
           tasks={unmatched}
           scopeName={scopeName}
           lists={lists}
+          tagsOf={tagsOf}
           today={today}
           selectedTaskId={selectedTaskId}
           draggingId={draggingId}
@@ -508,6 +521,7 @@ function QuadrantCell({
   tasks,
   view,
   lists,
+  tagsOf,
   today,
   selectedTaskId,
   draggingId,
@@ -528,6 +542,7 @@ function QuadrantCell({
   tasks: Task[];
   view: MatrixQuadrantView;
   lists: List[];
+  tagsOf: ReadonlyMap<string, Tag[]>;
   today: string;
   selectedTaskId: string;
   draggingId: string;
@@ -649,6 +664,7 @@ function QuadrantCell({
             key={group.id}
             group={group}
             lists={lists}
+            tagsOf={tagsOf}
             today={today}
             selectedTaskId={selectedTaskId}
             draggingId={draggingId}
@@ -680,6 +696,7 @@ function UnmatchedStrip({
   tasks,
   scopeName,
   lists,
+  tagsOf,
   today,
   selectedTaskId,
   draggingId,
@@ -692,6 +709,8 @@ function UnmatchedStrip({
   /** The List being viewed, or "" for all of them. */
   scopeName: string;
   lists: List[];
+  /** Every card's tags, indexed once by the page (§7.5). */
+  tagsOf: ReadonlyMap<string, Tag[]>;
   today: string;
   selectedTaskId: string;
   draggingId: string;
@@ -733,6 +752,7 @@ function UnmatchedStrip({
               key={task.id}
               task={task}
               lists={lists}
+              tags={tagsOf.get(task.id) ?? []}
               today={today}
               selected={task.id === selectedTaskId}
               isDragging={task.id === draggingId}
@@ -817,6 +837,7 @@ function QuadrantQuickAdd({
 function MatrixGroupSection({
   group,
   lists,
+  tagsOf,
   today,
   selectedTaskId,
   draggingId,
@@ -827,6 +848,7 @@ function MatrixGroupSection({
 }: {
   group: TaskGroup;
   lists: List[];
+  tagsOf: ReadonlyMap<string, Tag[]>;
   today: string;
   selectedTaskId: string;
   draggingId: string;
@@ -873,6 +895,7 @@ function MatrixGroupSection({
                 key={task.id}
                 task={task}
                 lists={lists}
+                tags={tagsOf.get(task.id) ?? []}
                 today={today}
                 selected={task.id === selectedTaskId}
                 isDragging={task.id === draggingId}
@@ -912,6 +935,7 @@ function MatrixGroupSection({
 function MatrixCard({
   task,
   lists,
+  tags,
   today,
   selected,
   isDragging,
@@ -922,6 +946,7 @@ function MatrixCard({
 }: {
   task: Task;
   lists: List[];
+  tags: Tag[];
   today: string;
   selected: boolean;
   isDragging: boolean;
@@ -959,6 +984,10 @@ function MatrixCard({
         // inside a group that has already decided it is not.
         today={today}
         listName={list?.name}
+        tags={tags}
+        // §7.1: in the trailing cluster, not on a line of its own. A card one
+        // quadrant wide cannot spend a line on a word.
+        tagPlacement="tips"
         showPriority={false}
         onOpen={onOpen}
         onToggleDone={() => onToggleDone()}

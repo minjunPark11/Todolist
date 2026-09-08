@@ -39,9 +39,11 @@ const search = () => screen.getByLabelText("Search or create a tag");
 const options = () => screen.getAllByRole("option").map((el) => el.textContent?.replace(/[✓+]/g, "").trim());
 
 describe("the chips (§13.55)", () => {
-  it("shows the Task's tags with the display hash", () => {
+  it("shows the Task's tags as chips", () => {
+    // The `#` went with the coloured pill (TASK_TAG_CHIPS_DESIGN.md §4.2): the
+    // shape says "tag" now, so the mark was spending width to say it twice.
     setup([link("research")]);
-    expect(screen.getByText("#research", { exact: false })).not.toBeNull();
+    expect(screen.getByText("research", { exact: false })).not.toBeNull();
   });
 
   // Taking a tag off should not mean opening the picker and finding it again.

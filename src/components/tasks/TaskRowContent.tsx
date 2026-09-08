@@ -35,6 +35,7 @@ import type { ScopeDateBy } from "../../domain/view/scopeViewOptions";
 import { formatDate, formatWeekday, todayValue } from "../../utils/date";
 import { getWeekStartPref } from "../../utils/appPrefs";
 import { TaskCheck } from "./TaskCheck";
+import { TagChip } from "./TagChip";
 import { rectOfElement } from "../floating";
 import type { Rect } from "../../domain/floating";
 
@@ -102,6 +103,19 @@ interface TaskRowContentProps {
    */
   tags?: Tag[];
   /**
+   * Where the chips go (TASK_TAG_CHIPS_DESIGN.md §7.1).
+   *
+   * `"line"` — a line of their own under the title, which is what the List's
+   * rows and the Board's cards do. `"tips"` — inside the trailing cluster with
+   * the List name and the date, which is what the matrix's cards do: a card
+   * one quadrant wide cannot spend a line on a word.
+   *
+   * A surface, not a state. The body's presence used to decide this and it
+   * does not any more — the two reference screens that seemed to disagree were
+   * two surfaces, not one surface in two moods.
+   */
+  tagPlacement?: "line" | "tips";
+  /**
    * Today, as `YYYY-MM-DD`. A caller that has grouped by date passes the value
    * it grouped with, so a card cannot be drawn late inside a group that says it
    * is not; anyone else gets today.
@@ -150,6 +164,7 @@ export function TaskRowContent({
   showDetails = false,
   showPriority = true,
   tags,
+  tagPlacement = "line",
   today,
 }: TaskRowContentProps) {
   const { t, lang } = useT();
@@ -189,10 +204,14 @@ export function TaskRowContent({
   // task has nothing to say — and the mark it replaces was absent in that case
   // too, so nothing about the quiet card changes.
   const bodyLine = showDetails ? body : "";
+  // The chips are either in this cluster or on their own line, never both.
+  const chips = tags ?? [];
+  const tipChips = tagPlacement === "tips" ? chips : [];
+  const lineChips = tagPlacement === "line" ? chips : [];
   const hasTips =
     Boolean(listName) ||
     Boolean(parentTitle) ||
-    Boolean(tags?.length) ||
+    tipChips.length > 0 ||
     repeats ||
     hasBody ||
     Boolean(dueLabel);
@@ -251,7 +270,7 @@ export function TaskRowContent({
         // own basis of 0 and the row read as a body with no title. The
         // component that decides there IS a second line is the one that says
         // so — a stylesheet would have to ask.
-        className={`tm-task-open${bodyLine ? " has-body" : ""}`}
+        className={`tm-task-open${bodyLine ? " has-body" : ""}${lineChips.length > 0 ? " has-tagline" : ""}`}
         // §16.34: a row opens a Task, and a screen reader should say so rather
         // than reading the title as if it were a heading.
         aria-label={t("tasks.openTask", { title: task.title })}
@@ -264,35 +283,16 @@ export function TaskRowContent({
             exactly that reason. The reference app draws no flag; the ask was
             for its picture, and the level is now in the checkbox's colour and
             in its accessible NAME, which costs no width. */}
-        {/* §1.5: under the title, quiet, one line. Cut to one because a card
-            that grows with its body turns a column of three into a column of
-            one, which is the question `Kanban Size` is for — the card does not
-            get to answer it. */}
-        {bodyLine ? <span className="tm-task-body">{bodyLine}</span> : null}
-        {/* One group at the right edge rather than four things loose in the
-            row: the tips are what the row says about itself after the title,
-            and they have to stay together when the title takes the width. */}
+        {/* Before the body in the markup, because it is before it on screen:
+            the cluster rides the title's line and the body starts the next one
+            (§7.2). Reading order and visual order are the same sentence —
+            "tnrwp, Inbox, Sep 4", then what it says, then what it is like. */}
         {hasTips ? (
           <span className="tm-task-tips">
-            {/* What the Task is LIKE, where the rest of this cluster is where
-                it belongs and when it is due. It was reachable from four
-                places — the drawer, the row menu, quick add, the sidebar's
-                Tags section — and visible from none, so a tag put on a Task
-                could only be found by opening it again.
-
-                `#` because the name alone, sat beside a List's name in the
-                same grey, reads as a second List. It is the mark the tag is
-                written with everywhere else: the sidebar, and the block this
-                app writes into a Google event's description. */}
-            {tags?.map((tag) => (
-              <span
-                key={tag.id}
-                className="tm-task-tag"
-                style={tag.color ? { color: tag.color } : undefined}
-                title={tag.name}
-              >
-                #{tag.name}
-              </span>
+            {/* The matrix's cards only (§7.1). Everywhere else the chips are
+                on their own line below, and this list is empty. */}
+            {tipChips.map((tag) => (
+              <TagChip key={tag.id} tag={tag} />
             ))}
             {/* The List as a name and nothing else. A coloured dot beside it
                 would be a second way of saying one word. */}
@@ -327,6 +327,24 @@ export function TaskRowContent({
             {dueLabel ? (
               <span className={`tm-task-due${overdue ? " is-overdue" : ""}`}>{dueLabel}</span>
             ) : null}
+          </span>
+        ) : null}
+        {/* §1.5: under the title, quiet, one line. Cut to one because a card
+            that grows with its body turns a column of three into a column of
+            one, which is the question `Kanban Size` is for — the card does not
+            get to answer it. */}
+        {bodyLine ? <span className="tm-task-body">{bodyLine}</span> : null}
+        {/* A line of their own (§7.2), under the body when there is one.
+
+            Not appended to the body's line: the body is already cut to its
+            first line (`firstLine`), and a chip after the cut would make the
+            cut unreadable — the reader cannot tell where the sentence ended
+            and the tag began. */}
+        {lineChips.length > 0 ? (
+          <span className="tm-task-tagline">
+            {lineChips.map((tag) => (
+              <TagChip key={tag.id} tag={tag} />
+            ))}
           </span>
         ) : null}
       </button>

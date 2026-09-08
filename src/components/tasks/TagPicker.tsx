@@ -13,6 +13,7 @@ import { tagCreateOffer, tagNameRefusal, tagOptionsFor } from "../../domain/tags
 import { tagsForTask } from "../../domain/tags/tags";
 import { isRovingKey, rovingNext } from "../../domain/tasks/rovingChoice";
 import { Popover, PopoverContent, PopoverTrigger } from "../floating";
+import { TagChip } from "./TagChip";
 import { useT } from "../../i18n";
 
 export interface TagPickerProps {
@@ -43,17 +44,7 @@ export function TagPicker({ task, tags, taskTags, onToggle, restoreFocusTo }: Ta
       <ul className="tm-tag-chips">
         {held.map((tag) => (
           <li key={tag.id}>
-            <span className="tm-tag-chip">
-              {`#${tag.name}`}
-              <button
-                type="button"
-                className="tm-tag-chip-remove"
-                aria-label={t("tasks.removeTag", { value: tag.name })}
-                onClick={() => onToggle(tag.name)}
-              >
-                ×
-              </button>
-            </span>
+            <TagChip tag={tag} onRemove={() => onToggle(tag.name)} />
           </li>
         ))}
       </ul>

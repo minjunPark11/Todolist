@@ -323,19 +323,38 @@ describe("tags", () => {
     // The gap this closes: tags could be put on a task from four places and
     // read back from none of them without opening the task again.
     draw({}, { tags: [tag("tag-urgent", "urgent"), tag("tag-thesis", "thesis")] });
-    expect(screen.getByText("#urgent")).toBeTruthy();
-    expect(screen.getByText("#thesis")).toBeTruthy();
+    expect(screen.getByText("urgent")).toBeTruthy();
+    expect(screen.getByText("thesis")).toBeTruthy();
   });
 
-  it("keeps the colour the user chose", () => {
-    draw({}, { tags: [tag("tag-urgent", "urgent", "#ff3b30")] });
-    // jsdom writes the hex back as rgb().
-    expect((screen.getByText("#urgent") as HTMLElement).style.color).toBe("rgb(255, 59, 48)");
+  it("gives the chips a line of their own", () => {
+    // §7.2: the List's rows put them under the title, not in the trailing
+    // cluster, and the cluster is what the matrix uses instead.
+    draw({}, { tags: [tag("tag-urgent", "urgent")] });
+    const line = document.querySelector(".tm-task-tagline");
+    expect(line?.contains(screen.getByText("urgent"))).toBe(true);
+    expect(document.querySelector(".tm-task-tips")?.contains(screen.getByText("urgent"))).not.toBe(true);
+  });
+
+  it("puts them in the trailing cluster where the surface asks", () => {
+    // The matrix's cards: one quadrant wide, and a line spent on a word is a
+    // line the title needed.
+    draw({}, { tags: [tag("tag-urgent", "urgent")], tagPlacement: "tips" });
+    expect(document.querySelector(".tm-task-tagline")).toBeNull();
+    expect(document.querySelector(".tm-task-tips")?.contains(screen.getByText("urgent"))).toBe(true);
+  });
+
+  it("carries the colour as both themes at once", () => {
+    // The stylesheet picks; the component does not read the theme (§6).
+    draw({}, { tags: [tag("tag-urgent", "urgent", "#e5484d")] });
+    const chip = screen.getByText("urgent").closest(".tm-tag-chip") as HTMLElement;
+    expect(chip.style.getPropertyValue("--tag-fill-light")).not.toBe("");
+    expect(chip.style.getPropertyValue("--tag-fill-dark")).not.toBe("");
   });
 
   it("draws nothing where the caller passes none", () => {
-    // The matrix's cards: one column wide, and the box already says the level.
     draw();
-    expect(document.querySelector(".tm-task-tag")).toBeNull();
+    expect(document.querySelector(".tm-tag-chip")).toBeNull();
+    expect(document.querySelector(".tm-task-tagline")).toBeNull();
   });
 });

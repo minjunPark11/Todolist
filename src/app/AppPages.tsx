@@ -171,6 +171,7 @@ export function AppPages({
           quadrantViews={appSettings.matrixQuadrantViews}
           quadrantRules={appSettings.matrixQuadrantRules}
           tags={planner.tags}
+          taskTags={planner.taskTags}
           hideCompleted={appSettings.matrixHideCompleted}
           onToggleHideCompleted={() =>
             planner.updateAppSettings({ matrixHideCompleted: !appSettings.matrixHideCompleted })
