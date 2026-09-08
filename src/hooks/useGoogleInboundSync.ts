@@ -87,6 +87,23 @@ export function reconcileGoogleCalendars(current: ExternalState, sources: Google
 }
 
 /** What we hold for one calendar, in the shape `planInbound` compares against. */
+/**
+ * Whether this pass may continue from the stored cursor.
+ *
+ * The cursor is the ACCOUNT's — `google_calendar_sources` is keyed by user and
+ * calendar — and the events are this DEVICE's (`lib/externalCalendars` writes
+ * localStorage). A second device therefore opens with an empty store and a
+ * cursor some other device already advanced, and an incremental list from
+ * there answers with the changes SINCE, not with the calendar. Everything that
+ * was already there stays invisible until a 410 happens to clear the cursor.
+ *
+ * Holding nothing for a calendar means there is nothing to continue from. List
+ * it in full — one request — and take the fresh cursor.
+ */
+export function resumeToken(syncToken: string | undefined, heldEvents: number): boolean {
+  return Boolean(syncToken) && heldEvents > 0;
+}
+
 function knownFor(events: readonly ExternalCalendarEvent[], calendarId: string): Map<string, KnownEvent> {
   const known = new Map<string, KnownEvent>();
   for (const event of events) {
@@ -128,14 +145,15 @@ export function useGoogleInboundSync({ signedIn, apply }: GoogleInboundSyncInput
 
       for (const source of chosen) {
         const externalCalendarId = localIdFor(source.calendarId);
+        const known = knownFor(snapshot.events, externalCalendarId);
         const outcome = await runInbound(
           {
             externalCalendarId,
             googleCalendarId: source.calendarId,
             writable: source.writable,
             ...(source.timezone ? { defaultTimezone: source.timezone } : {}),
-            ...(source.syncToken ? { syncToken: source.syncToken } : {}),
-            known: knownFor(snapshot.events, externalCalendarId),
+            ...(resumeToken(source.syncToken, known.size) ? { syncToken: source.syncToken } : {}),
+            known,
             accessToken,
           },
           { fetch: googleCalendarFetch },

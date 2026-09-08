@@ -20,7 +20,7 @@ import {
 
 type Status = "loading" | "ready" | "error";
 
-export function GoogleCalendarSourceList() {
+export function GoogleCalendarSourceList({ ownCalendarId = "" }: { ownCalendarId?: string }) {
   const { t } = useT();
   const [status, setStatus] = useState<Status>("loading");
   const [sources, setSources] = useState<GoogleCalendarSource[]>([]);
@@ -41,7 +41,13 @@ export function GoogleCalendarSourceList() {
       }
       // Refreshed every time, so a calendar created or renamed in Google shows
       // up here without anyone reconnecting.
-      const listed = await listGoogleCalendars(accessToken);
+      // The app's own dedicated calendar is not offered. Reading it back would
+      // draw every synced task twice — once as the task, once as an external
+      // event — because the echo guard knows the events it already holds, not
+      // the tasks they came from (`inboundPlan` §6.3).
+      const listed = (await listGoogleCalendars(accessToken)).filter(
+        (calendar) => calendar.calendarId !== ownCalendarId,
+      );
       await rememberGoogleCalendars(listed);
       const stored = await readGoogleSources();
 

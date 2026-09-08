@@ -4,7 +4,7 @@
 // list that could not be read must not be mistaken for a list of calendars the
 // person turned off, or a timeout deletes their events.
 import { describe, expect, it } from "vitest";
-import { localIdFor, reconcileGoogleCalendars, type ExternalState } from "./useGoogleInboundSync";
+import { localIdFor, reconcileGoogleCalendars, resumeToken, type ExternalState } from "./useGoogleInboundSync";
 import type { GoogleCalendarSource } from "../lib/googleCalendarSources";
 import type { ExternalCalendar, ExternalCalendarEvent } from "../types";
 
@@ -104,5 +104,23 @@ describe("matching the local list to what the account chose", () => {
     const current: ExternalState = { calendars: [googleCalendar("a@example.com")], events: [] };
     const next = reconcileGoogleCalendars(current, [source("a@example.com", true)]);
     expect(next.calendars).toHaveLength(1);
+  });
+});
+
+describe("resumeToken", () => {
+  it("continues from the cursor on a device that holds the calendar", () => {
+    expect(resumeToken("token", 12)).toBe(true);
+  });
+
+  it("re-lists in full where this device holds nothing", () => {
+    // The cursor belongs to the account and the events to the device: a second
+    // device resuming from it would receive the changes since, and never the
+    // events that were already there.
+    expect(resumeToken("token", 0)).toBe(false);
+  });
+
+  it("re-lists in full before there is a cursor at all", () => {
+    expect(resumeToken(undefined, 0)).toBe(false);
+    expect(resumeToken("", 5)).toBe(false);
   });
 });

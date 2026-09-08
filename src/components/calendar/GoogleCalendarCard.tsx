@@ -350,7 +350,7 @@ export function GoogleCalendarCard() {
             setNotice(""); setError("");
             window.dispatchEvent(new Event(GOOGLE_SYNC_REQUESTED));
           }}>{t(syncing ? "settings.google.syncingNow" : "settings.google.syncNow")}</button>
-          <GoogleCalendarSourceList />
+          <GoogleCalendarSourceList ownCalendarId={status.connection.calendarId} />
         </>
       ) : null}
 
