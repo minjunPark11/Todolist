@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
 import { isEmptyPlan, planOutbound } from "../domain/calendar/googleSync/outboundPlan";
-import { outboundTagNames, withTagBlock } from "../domain/calendar/googleSync/tagBlock";
 import {
   currentAccessToken, GOOGLE_CONNECTION_CHANGED, GOOGLE_LABELS_STATUS, GOOGLE_SYNC_REQUESTED,
   readConnection, saveLabelsSupported, googleCalendarFetch, GOOGLE_SYNC_FINISHED,
@@ -26,13 +25,21 @@ const EMPTY_PROJECTS: Project[] = [];
 const EMPTY_TAGS: Tag[] = [];
 const EMPTY_LINKS: TaskTag[] = [];
 
-export function prepareGoogleTasks(tasks: Task[], tags: Tag[], links: TaskTag[], labels: LabelOutcome) {
+/**
+ * The label a task's List resolves to, and a key that says when that changed.
+ *
+ * `metadataKey` exists because a Task can need rewriting without its own
+ * `updatedAt` moving — its List's label is not on the Task. It no longer
+ * carries the tag block: tags stopped going to Google, and the key changing
+ * shape is what cleans the blocks already written there. Every synced task
+ * mismatches once, gets one PATCH, and comes back with a description that is
+ * only what the user wrote.
+ */
+export function prepareGoogleTasks(tasks: Task[], labels: LabelOutcome) {
   const byProject = new Map(labels.mappings.map((m) => [m.projectId, m.googleLabelId]));
   return tasks.map((task) => {
-    const resolvedTags = outboundTagNames(task, tags, links);
     const eventLabelId = labels.supported === true ? byProject.get(task.projectId) ?? null : undefined;
-    return { ...task, resolvedTags, eventLabelId,
-      metadataKey: JSON.stringify([withTagBlock("", resolvedTags), eventLabelId]) };
+    return { ...task, eventLabelId, metadataKey: JSON.stringify(["v2", eventLabelId]) };
   });
 }
 
@@ -61,7 +68,7 @@ export function useGoogleOutboundSync(input: GoogleOutboundSyncInput) {
       const projectKey = JSON.stringify(lists.map((p) => [p.id, p.name, p.color, p.archivedAt, p.deletedAt, p.googleLabelId, p.updatedAt]));
       const cached = labelCache.current;
       if (!forceProbe.current && cached?.projectKey === projectKey) {
-        const prepared = prepareGoogleTasks(snapshot.tasks, snapshot.tags ?? EMPTY_TAGS, snapshot.taskTags ?? EMPTY_LINKS, cached.outcome);
+        const prepared = prepareGoogleTasks(snapshot.tasks, cached.outcome);
         if (isEmptyPlan(planOutbound(prepared, snapshot.tombstones ?? []))) { ok = true; return; }
       }
       const connection = await readConnection();
@@ -85,7 +92,7 @@ export function useGoogleOutboundSync(input: GoogleOutboundSyncInput) {
       if (epoch !== generation.current) return;
       if (labels.supported !== null) labelCache.current = { key, projectKey, outcome: labels };
       window.dispatchEvent(new CustomEvent(GOOGLE_LABELS_STATUS, { detail: labels }));
-      const prepared = prepareGoogleTasks(snapshot.tasks, snapshot.tags ?? EMPTY_TAGS, snapshot.taskTags ?? EMPTY_LINKS, labels);
+      const prepared = prepareGoogleTasks(snapshot.tasks, labels);
       const plan = planOutbound(prepared, snapshot.tombstones ?? []);
       const outcome: OutboundOutcome = isEmptyPlan(plan)
         ? { mapped: [], unlinked: [], clearedOrphans: [], failed: 0, expired: false }

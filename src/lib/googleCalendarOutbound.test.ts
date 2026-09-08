@@ -193,7 +193,7 @@ describe("an empty pass", () => {
 
 it("sends label version only on supported event writes, and records the exact metadata revision", async () => {
   const google = fakeGoogle({ PATCH: [{ body: { id: "event", etag: "new" } }] });
-  const prepared = task({ id: "t", googleEventId: "event", updatedAt: "2026-09-08", resolvedTags: [], eventLabelId: null, metadataKey: "revision" });
+  const prepared = task({ id: "t", googleEventId: "event", updatedAt: "2026-09-08", eventLabelId: null, metadataKey: "revision" });
   const result = await runOutbound({ plan: { ...EMPTY_PLAN, update: [prepared] }, calendarId: CALENDAR, timezone: TZ, accessToken: "token", deps: google.deps, labelsSupported: true });
   expect(google.calls[0].url).toContain("/events/event?eventLabelVersion=1");
   expect(JSON.parse(google.calls[0].body!)).toMatchObject({ summary: "Write it down", description: "", eventLabelId: null });

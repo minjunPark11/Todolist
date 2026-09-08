@@ -27,15 +27,17 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 const tick = async () => { await act(async () => { await vi.advanceTimersByTimeAsync(1800); }); };
 
-it("plans a one-time metadata upgrade and notices tag edits without changing task timestamps", () => {
-  const [prepared] = prepareGoogleTasks([task], [], [], labels);
+it("plans a one-time metadata upgrade and then stops", () => {
+  // The key changed shape when tags stopped going to Google, and that is the
+  // migration: every already-synced task mismatches once, takes one PATCH, and
+  // comes back with a description carrying no `--- FocusFlow ---` block.
+  const [prepared] = prepareGoogleTasks([task], labels);
   expect(planOutbound([prepared]).update).toHaveLength(1);
   const synced = { ...task, googleMetadataKey: prepared.metadataKey };
-  expect(planOutbound(prepareGoogleTasks([synced], [], [], labels)).update).toHaveLength(0);
-  const tags = [{ id: "tag", name: "New name" }] as Tag[];
-  const links = [{ taskId: "t", tagId: "tag" }] as TaskTag[];
-  expect(planOutbound(prepareGoogleTasks([synced], tags, links, labels)).update).toHaveLength(1);
-  expect(prepareGoogleTasks([{ ...synced, projectId: "inbox" }], [], [], labels)[0].eventLabelId).toBeNull();
+  expect(planOutbound(prepareGoogleTasks([synced], labels)).update).toHaveLength(0);
+  // A List's label is not on the Task, so this is what still has to be caught
+  // without `updatedAt` moving.
+  expect(prepareGoogleTasks([{ ...synced, projectId: "inbox" }], labels)[0].eventLabelId).toBeNull();
 });
 
 it("runs labels before events and stops making requests after the metadata is recorded", async () => {
@@ -51,13 +53,12 @@ it("runs labels before events and stops making requests after the metadata is re
   expect(mocks.outbound).toHaveBeenCalledTimes(1);
 });
 
-it("keeps sending tags on unsupported accounts and retries labels on manual sync", async () => {
+it("skips labels on an unsupported account and retries them on manual sync", async () => {
   mocks.read.mockResolvedValue({ calendarId: "cal", labelsSupported: false });
   renderHook(() => useGoogleOutboundSync(input()));
   await tick();
   expect(mocks.labels).not.toHaveBeenCalled();
   expect(mocks.outbound.mock.calls[0][0]).toMatchObject({ labelsSupported: false });
-  expect(mocks.outbound.mock.calls[0][0].plan.update[0].resolvedTags).toContain("urgent");
   await act(async () => { window.dispatchEvent(new Event("manual")); });
   expect(mocks.labels).toHaveBeenCalledTimes(1);
 });

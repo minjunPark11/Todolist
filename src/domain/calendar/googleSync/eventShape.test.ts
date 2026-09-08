@@ -157,3 +157,19 @@ describe("toRrule", () => {
     expect(body.recurrence).toEqual(["RRULE:FREQ=WEEKLY;BYDAY=MO"]);
   });
 });
+
+describe("description", () => {
+  it("goes out as the user wrote it, with nothing appended", () => {
+    // A `--- FocusFlow ---` block of tags used to be added here. Tags live in
+    // the app now; the description field is the user's.
+    const body = toGoogleEventBody(task({ description: "안건 정리\n\n2층 회의실" }), "Asia/Seoul");
+    expect(body.description).toBe("안건 정리\n\n2층 회의실");
+  });
+
+  it("is written even when empty, so clearing it clears it in Google", () => {
+    // A PATCH leaves out what it does not carry: an omitted description would
+    // leave the old text in the account forever.
+    expect(toGoogleEventBody(task({ description: "" }), "Asia/Seoul").description).toBe("");
+    expect(toGoogleEventBody(task(), "Asia/Seoul").description).toBe("");
+  });
+});

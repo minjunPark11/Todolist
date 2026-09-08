@@ -5,7 +5,6 @@
 // shape it takes, and how its repeat reads as an RRULE. What sits above this is
 // left with nothing but I/O and retries (§12 M1-2), which is the same split
 // `server/data/*` already uses.
-import { withTagBlock } from "./tagBlock";
 import { isTaskAlive, type TaskStateFields } from "../../tasks/taskState";
 
 /**
@@ -17,7 +16,6 @@ import { isTaskAlive, type TaskStateFields } from "../../tasks/taskState";
  */
 export interface SyncableTask extends TaskStateFields {
   title: string;
-  resolvedTags?: readonly string[];
   eventLabelId?: string | null;
   metadataKey?: string;
   description?: string;
@@ -171,7 +169,19 @@ export function toGoogleEventBody(task: SyncableTask, timezone: string): GoogleE
   const timed = isTime(task.startTime);
   const body: GoogleEventBody = {
     summary: task.title,
-    ...(task.resolvedTags !== undefined ? { description: withTagBlock(task.description ?? "", task.resolvedTags) } : task.description ? { description: task.description } : {}),
+    // The body as the user wrote it, and nothing appended.
+    //
+    // A `--- FocusFlow ---` block of `#tags` used to be added here. It was a
+    // field holding the user's writing AND our derived data, and everything
+    // that follows from that mixture followed: the line could not be deleted
+    // in Google (the next pass restored it), and a renamed tag arrived twice
+    // because the old name still sat in the legacy `Task.tags` array while the
+    // link resolved the new one. Tags live in the app; the description is the
+    // user's (GOOGLE_CALENDAR_LIST_LABELS_AND_TAGS_DESIGN.md §4, reversed).
+    // ALWAYS sent, empty string included. A PATCH leaves out what it does not
+    // carry, so omitting an emptied description would leave the old text in
+    // Google forever — the field has to be written to be cleared.
+    description: task.description ?? "",
     ...(task.eventLabelId !== undefined ? { eventLabelId: task.eventLabelId } : {}),
     start: {},
     end: {},
