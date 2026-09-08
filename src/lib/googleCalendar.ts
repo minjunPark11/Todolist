@@ -247,6 +247,31 @@ export async function ensureDedicatedCalendar(
     }
   }
 
+  // Reconnecting must not make a SECOND FocusFlow calendar.
+  //
+  // The stored row is the app's memory of which calendar is ours, and it is
+  // not the only place the answer exists — the account itself has a calendar
+  // called FocusFlow, put there by this code. Without this lookup, a
+  // disconnect (or a device that connects before the row is readable) creates
+  // another one, and then the same work is in Google twice: the events written
+  // before the reconnect sit in the old calendar with nothing to update them.
+  //
+  // Matched on the name this file writes and on ownership — a calendar
+  // someone shared with the account happens to be called FocusFlow is not
+  // ours to write into.
+  if (!calendarId) {
+    const list = await callGoogle("/users/me/calendarList?maxResults=250", accessToken, deps);
+    const items = Array.isArray(list.body?.items) ? (list.body.items as Record<string, unknown>[]) : [];
+    const mine = items.find(
+      (item) =>
+        item.summary === DEDICATED_CALENDAR_NAME &&
+        item.accessRole === "owner" &&
+        typeof item.id === "string" &&
+        item.id,
+    );
+    if (mine) calendarId = mine.id as string;
+  }
+
   if (!calendarId) {
     const created = await callGoogle("/calendars", accessToken, deps, {
       method: "POST",

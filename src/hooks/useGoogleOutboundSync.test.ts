@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { prepareGoogleTasks, useGoogleOutboundSync, type GoogleOutboundSyncInput } from "./useGoogleOutboundSync";
+import { withAppliedMappings, prepareGoogleTasks, useGoogleOutboundSync, type GoogleOutboundSyncInput } from "./useGoogleOutboundSync";
 import { planOutbound } from "../domain/calendar/googleSync/outboundPlan";
 import type { Project, Tag, Task, TaskTag } from "../types";
 
@@ -72,4 +72,24 @@ it("does not apply results after signing out during a pass", async () => {
   rerender({ ...props, signedIn: false });
   await act(async () => { resolve(emptyResult); });
   expect(props.onResult).not.toHaveBeenCalled();
+});
+
+it("does not create the event twice when a pass follows one that has not committed", () => {
+  // The duplicate report: four identical events in one calendar. A pass ends
+  // with `onResult`, which is a `setData` that has not committed when the
+  // queued pass reads `latest.current` — so that pass saw no `googleEventId`
+  // and planned another create.
+  const applied = new Map([
+    ["t", { taskId: "t", googleEventId: "event", googleEtag: "etag", googleSyncedAt: "2026-09-08" }],
+  ]);
+  const stale = withAppliedMappings([task], applied);
+  expect(planOutbound(prepareGoogleTasks(stale, labels)).create).toHaveLength(0);
+});
+
+it("stops holding a mapping the moment the store shows it", () => {
+  const applied = new Map([
+    ["t", { taskId: "t", googleEventId: "event", googleEtag: "etag", googleSyncedAt: "2026-09-08" }],
+  ]);
+  withAppliedMappings([{ ...task, googleEventId: "event" }], applied);
+  expect(applied.size).toBe(0);
 });

@@ -148,6 +148,44 @@ describe("the dedicated calendar", () => {
     expect(JSON.parse(String(create?.init?.body))).toEqual({ summary: "FocusFlow" });
   });
 
+  it("reuses the FocusFlow calendar the account already has, rather than making a second one", async () => {
+    // The duplicate report's other half: the same event in blue and in red is
+    // one piece of work in two calendars. A reconnect with no stored row used
+    // to create another FocusFlow, and everything written before it stayed in
+    // a calendar nothing updates any more.
+    const { impl, calls } = fakeFetch({
+      ...primary,
+      "/users/me/calendarList": {
+        body: {
+          items: [
+            { id: "team@group.calendar.google.com", summary: "Team", accessRole: "writer" },
+            { id: "ours@group.calendar.google.com", summary: "FocusFlow", accessRole: "owner" },
+          ],
+        },
+      },
+    });
+
+    const connection = await ensureDedicatedCalendar("ya29.abc", deps({ fetch: impl }));
+
+    expect(connection.calendarId).toBe("ours@group.calendar.google.com");
+    expect(calls.some((call) => call.init?.method === "POST")).toBe(false);
+  });
+
+  it("does not adopt a FocusFlow someone else shared with the account", async () => {
+    const { impl, calls } = fakeFetch({
+      ...primary,
+      "/users/me/calendarList": {
+        body: { items: [{ id: "theirs@group.calendar.google.com", summary: "FocusFlow", accessRole: "reader" }] },
+      },
+      "/calendars": { body: { id: "cal-new" } },
+    });
+
+    const connection = await ensureDedicatedCalendar("ya29.abc", deps({ fetch: impl }));
+
+    expect(connection.calendarId).toBe("cal-new");
+    expect(calls.some((call) => call.init?.method === "POST")).toBe(true);
+  });
+
   it("reuses the stored one rather than leaving empty calendars behind", async () => {
     const { impl, calls } = fakeFetch({ ...primary, "/calendars/cal-known": { body: { id: "cal-known" } } });
 

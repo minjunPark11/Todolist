@@ -35,6 +35,40 @@ const EMPTY_LINKS: TaskTag[] = [];
  * mismatches once, gets one PATCH, and comes back with a description that is
  * only what the user wrote.
  */
+/**
+ * The store's tasks, with mappings a pass has already written but the store
+ * has not shown back yet.
+ *
+ * Exported for its own test: this is the whole defence against duplicate
+ * events, and it is a two-line merge that is easy to get subtly wrong.
+ *
+ * An entry retires itself — once the task carries the id, the map stops being
+ * consulted for it. Nothing here expires on a timer: a mapping that never
+ * arrives means the write never landed, and re-creating the event then is
+ * exactly right.
+ */
+export function withAppliedMappings(
+  tasks: Task[],
+  applied: Map<string, OutboundOutcome["mapped"][number]>,
+): Task[] {
+  if (applied.size === 0) return tasks;
+  return tasks.map((task) => {
+    const row = applied.get(task.id);
+    if (!row) return task;
+    if (task.googleEventId === row.googleEventId) {
+      applied.delete(task.id);
+      return task;
+    }
+    return {
+      ...task,
+      googleEventId: row.googleEventId,
+      googleEtag: row.googleEtag,
+      googleSyncedAt: row.googleSyncedAt,
+      ...(row.googleMetadataKey !== undefined ? { googleMetadataKey: row.googleMetadataKey } : {}),
+    };
+  });
+}
+
 export function prepareGoogleTasks(tasks: Task[], labels: LabelOutcome) {
   const byProject = new Map(labels.mappings.map((m) => [m.projectId, m.googleLabelId]));
   return tasks.map((task) => {
@@ -49,6 +83,21 @@ export function useGoogleOutboundSync(input: GoogleOutboundSyncInput) {
   latest.current = input;
   const running = useRef(false);
   const pending = useRef(false);
+  /**
+   * What the last pass wrote, until the store shows it back.
+   *
+   * `latest.current` is assigned during RENDER, and a pass ends by calling
+   * `onResult` — a `setData` that has not committed by the time the `finally`
+   * below starts the queued pass. That pass therefore reads tasks with no
+   * `googleEventId` on them and plans a CREATE for events that already exist.
+   * Four identical events in one calendar is what that looks like from the
+   * outside; every focus or edit during a pass adds another.
+   *
+   * Holding the mapping here closes the window from both ends: the queued
+   * pass, and a second trigger arriving before React commits. An entry is
+   * dropped the moment the store agrees with it.
+   */
+  const applied = useRef(new Map<string, OutboundOutcome["mapped"][number]>());
   const generation = useRef(0);
   const forceProbe = useRef(false);
   const labelCache = useRef<{ key: string; projectKey: string; outcome: LabelOutcome } | null>(null);
@@ -63,7 +112,7 @@ export function useGoogleOutboundSync(input: GoogleOutboundSyncInput) {
     const epoch = generation.current;
     let ok = false;
     try {
-      const snapshot = latest.current;
+      const snapshot = { ...latest.current, tasks: withAppliedMappings(latest.current.tasks, applied.current) };
       const lists = snapshot.projects ?? EMPTY_PROJECTS;
       const projectKey = JSON.stringify(lists.map((p) => [p.id, p.name, p.color, p.archivedAt, p.deletedAt, p.googleLabelId, p.updatedAt]));
       const cached = labelCache.current;
@@ -99,6 +148,8 @@ export function useGoogleOutboundSync(input: GoogleOutboundSyncInput) {
         : await runOutbound({ plan, calendarId: connection.calendarId, timezone: snapshot.timezone,
             accessToken, labelsSupported: labels.supported === true, deps: { fetch: googleCalendarFetch } });
       if (epoch !== generation.current || !latest.current.signedIn) return;
+      for (const row of outcome.mapped) applied.current.set(row.taskId, row);
+      for (const id of outcome.unlinked) applied.current.delete(id);
       outcome.projectMappings = labels.mappings.filter((m) => lists.find((p) => p.id === m.projectId)?.googleLabelId !== m.googleLabelId);
       latest.current.onResult(outcome);
       ok = outcome.failed === 0 && !outcome.expired;
@@ -114,6 +165,8 @@ export function useGoogleOutboundSync(input: GoogleOutboundSyncInput) {
   useEffect(() => {
     generation.current += 1;
     labelCache.current = null;
+    // Another account's ids answer nothing about this one's tasks.
+    applied.current.clear();
   }, [signedIn, accountKey]);
 
   useEffect(() => {
