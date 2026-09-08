@@ -109,6 +109,7 @@ import {
 import { buildMigrationUpload } from "../domain/sync/buildMigrationUpload";
 import { createSaveQueue, type SaveQueue } from "../domain/sync/saveQueue";
 import { reapplyLocalEdits } from "../domain/sync/reapplyLocalEdits";
+import { PERIODIC_MS, shouldPull, type PullTrigger } from "../domain/sync/pullSchedule";
 import { mergeSettingsFields } from "../domain/sync/mergeSettingsFields";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
@@ -344,6 +345,12 @@ export function usePlannerData() {
   );
   const [syncError, setSyncError] = useState("");
   const [remoteLoaded, setRemoteLoaded] = useState(false);
+  // Read by the pull triggers below, which fire from listeners and timers that
+  // outlive the render they were installed in.
+  const remoteLoadedRef = useRef(false);
+  remoteLoadedRef.current = remoteLoaded;
+  const lastPullAtRef = useRef(0);
+  const lastSaveAtRef = useRef(0);
   const [localMigrationData, setLocalMigrationData] = useState<PlannerData | null>(null);
   // True after the user opens a password-reset link (Supabase PASSWORD_RECOVERY);
   // the UI then shows a "set a new password" form instead of the normal app.
@@ -400,6 +407,7 @@ export function usePlannerData() {
     });
   }
   const saveQueue = saveQueueRef.current;
+  const pullingRef = useRef(false);
 
   // The local snapshot could not be written and the app is running on memory
   // alone. Held as state because the UI has to say so until it clears.
@@ -571,6 +579,82 @@ export function usePlannerData() {
       }
     };
   }, [data, remoteLoaded, userEmail]);
+
+  /**
+   * The three triggers that bring the account down (§3).
+   *
+   * Installed once the first load has landed, because everything here is "read
+   * it AGAIN" — before that, the load in flight is the read.
+   */
+  useEffect(() => {
+    if (!supabase || !userEmail || !remoteLoaded) return;
+
+    const onFocus = () => void pullFromAccount("focus");
+    window.addEventListener("focus", onFocus);
+
+    const timer = window.setInterval(() => {
+      // Nobody is looking at a hidden window, and the focus trigger fires the
+      // moment anyone does. Polling it anyway spends requests on a background
+      // tab left open for a week.
+      if (document.visibilityState === "hidden") return;
+      void pullFromAccount("periodic");
+    }, PERIODIC_MS);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(timer);
+    };
+  }, [userEmail, remoteLoaded]);
+
+  /**
+   * Realtime, used as a doorbell (§3.2).
+   *
+   * The payload is deliberately thrown away. Applying row events would mean a
+   * second merge rule beside `reapplyLocalEdits` — one per row, one per
+   * collection — and the day the two disagree nobody would be able to say
+   * which was right. It would also make a dropped event a permanent hole,
+   * where a missed doorbell only costs the wait until the next focus or tick.
+   *
+   * So every event says the same thing, whatever table it came from: somebody
+   * wrote. Read it all again.
+   */
+  useEffect(() => {
+    if (!supabase || !userEmail || !remoteLoaded) return;
+
+    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | null = null;
+    let ring: number | undefined;
+    let cancelled = false;
+
+    void (async () => {
+      const id = await getUserId().catch(() => "");
+      if (!id || cancelled || !supabase) return;
+
+      const next = supabase.channel(`account-changes:${id}`);
+      // One subscription per table, one channel. `settings` carries the two
+      // singleton rows this feature is most visibly about — theme, language,
+      // week start — and the collections carry everything else.
+      for (const table of ["settings", ...collectionTables.map(([, name]) => name)]) {
+        next.on(
+          "postgres_changes",
+          { event: "*", schema: "public", table, filter: `user_id=eq.${id}` },
+          () => {
+            // Coalesced: one save writes several tables and would otherwise
+            // ring several times.
+            window.clearTimeout(ring);
+            ring = window.setTimeout(() => void pullFromAccount("realtime"), 1_000);
+          },
+        );
+      }
+      next.subscribe();
+      channel = next;
+    })();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(ring);
+      if (channel) void supabase?.removeChannel(channel);
+    };
+  }, [userEmail, remoteLoaded]);
 
   /**
    * Keep `appSettings.timezone` honest.
@@ -971,6 +1055,45 @@ export function usePlannerData() {
     // Only advance the baseline once everything above succeeded; a failed
     // save must stay "not yet uploaded" so the retry resends it.
     syncedSnapshotRef.current = nextData;
+    // Our own writes come back as realtime events. This is how they are told
+    // apart from somebody else's (`shouldPull`).
+    lastSaveAtRef.current = Date.now();
+  }
+
+  /**
+   * Read the account again, on one of the three triggers
+   * (MULTI_DEVICE_SYNC_DESIGN.md §3).
+   *
+   * Uploads first, and that ordering is `syncNow`'s for `syncNow`'s reason:
+   * pulling over edits that have not been sent yet leaves the baseline
+   * describing an account that does not know about them. `reapplyLocalEdits`
+   * would put them back on screen, but the next save would then have to work
+   * out what to send from a baseline that moved underneath it.
+   */
+  async function pullFromAccount(trigger: PullTrigger) {
+    if (!supabase || !userEmailRef.current || !remoteLoadedRef.current) return;
+    if (pullingRef.current) return;
+    if (
+      !shouldPull(trigger, {
+        now: Date.now(),
+        lastPullAt: lastPullAtRef.current,
+        lastSaveAt: lastSaveAtRef.current,
+      })
+    ) {
+      return;
+    }
+
+    pullingRef.current = true;
+    lastPullAtRef.current = Date.now();
+    try {
+      await saveQueueRef.current?.drain();
+      await loadSupabaseData();
+    } catch {
+      // `loadSupabaseData` reports its own failures through `syncError`; a
+      // trigger that could throw would take the timer or the listener with it.
+    } finally {
+      pullingRef.current = false;
+    }
   }
 
   async function signIn(email: string, password: string) {
