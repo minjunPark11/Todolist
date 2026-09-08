@@ -205,6 +205,8 @@ interface TasksModuleProps {
   }) => Promise<string> | string;
   /** Makes a sidebar group and answers its id (Add List design §6.32). */
   onCreateSidebarFolder: (name: string) => Promise<string> | string;
+  /** Writes a tag's name and colour, from the sidebar's editor (§5.4). */
+  onUpdateTag?: (tagId: string, patch: { name: string; color: string }) => void;
   /** §13.23/§6.56: restoring a List, and the one hard delete in the app. */
   lifecycle: {
     onTrashList: (listId: string) => void;
@@ -1291,6 +1293,7 @@ export function TasksModule(props: TasksModuleProps) {
         onBeforeNavigate={() => setSidebarOpen(false)}
         onCreateList={props.onCreateList}
         onCreateSidebarFolder={props.onCreateSidebarFolder}
+        onUpdateTag={props.onUpdateTag}
       />
 
       <main className="tm-main">

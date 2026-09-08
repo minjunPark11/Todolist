@@ -16,6 +16,7 @@ import {
   taskIdsWithTag,
   taskTagIdFor,
 } from "./tags";
+import { toggleTaskTag } from "./tagPicker";
 
 const NOW = "2026-08-18T00:00:00.000Z";
 
@@ -301,5 +302,29 @@ describe("splitInlineTags", () => {
 
   it("does not turn a legacy marker into a tag", () => {
     expect(splitInlineTags("정리 #space:8f2a")).toEqual({ title: "정리 #space:8f2a", tags: [] });
+  });
+});
+
+describe("renaming a tag (TASK_TAG_CHIPS_DESIGN.md §5.5)", () => {
+  it("does not let a later tag of the old name take the renamed one's id", () => {
+    // The id is derived from the name, which was safe until a name could
+    // change. After a rename `tag-work` belongs to a tag called something
+    // else, and the next tag actually named "work" derives that same id.
+    const renamed: Tag = {
+      id: tagIdFor("work"),
+      name: "work 2026",
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    const result = toggleTaskTag(task({ id: "t1" }), "work", [renamed], [], NOW);
+    const created = result?.tags.find((tag) => tag.name === "work");
+    expect(created).toBeDefined();
+    expect(created?.id).not.toBe(renamed.id);
+    expect(new Set(result?.tags.map((tag) => tag.id)).size).toBe(result?.tags.length);
+  });
+
+  it("still derives the plain id when nothing is holding it", () => {
+    const result = toggleTaskTag(task({ id: "t1" }), "work", [], [], NOW);
+    expect(result?.tags[0]?.id).toBe(tagIdFor("work"));
   });
 });

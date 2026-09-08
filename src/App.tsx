@@ -1401,6 +1401,7 @@ export default function App() {
             planner.createList("", name, undefined, { color, defaultViewKey, sidebarFolderId })
           }
           onCreateSidebarFolder={planner.createSidebarFolder}
+          onUpdateTag={planner.updateTag}
           collapsedFolderIds={appSettings.collapsedFolderIds}
           onToggleFolder={toggleSidebarFolder}
         />
@@ -1649,6 +1650,7 @@ export default function App() {
             planner.createList("", name, undefined, { color, defaultViewKey, sidebarFolderId })
           }
           onCreateSidebarFolder={planner.createSidebarFolder}
+          onUpdateTag={planner.updateTag}
           collapsedFolderIds={appSettings.collapsedFolderIds}
           onToggleFolder={toggleSidebarFolder}
           // Straight to the store. The legacy confirmation modal lives in

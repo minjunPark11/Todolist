@@ -152,6 +152,28 @@ export interface TagToggleResult {
  * Returns null for a name §13.35 refuses, so a caller that ignores the refusal
  * writes nothing rather than writing something malformed.
  */
+/**
+ * An id no other Tag is using (TASK_TAG_CHIPS_DESIGN.md §5.5).
+ *
+ * The id is derived from the name, which was safe while a name could not
+ * change. Renaming keeps the id — the links point at it — so `tag-학교` can
+ * belong to a Tag now called something else, and the next Tag actually named
+ * 학교 would derive that same id and produce two records sharing one.
+ *
+ * The suffix is only ever reached by that path: a fresh name whose derived id
+ * is taken. Deterministic, so two devices creating the same tag after the same
+ * rename still land on the same id.
+ */
+function freeTagId(name: string, tags: Tag[]): string {
+  const base = tagIdFor(name);
+  const taken = new Set(tags.map((tag) => tag.id));
+  if (!taken.has(base)) return base;
+  for (let suffix = 2; ; suffix += 1) {
+    const candidate = `${base}-${suffix}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
 export function toggleTaskTag(
   task: Pick<Task, "id" | "tags">,
   rawName: string,
@@ -163,7 +185,7 @@ export function toggleTaskTag(
   const name = normalizeTagName(rawName);
   const key = tagKeyFor(name);
   const existing = tags.find((tag) => tagKeyFor(tag.name) === key);
-  const tagId = existing?.id ?? tagIdFor(name);
+  const tagId = existing?.id ?? freeTagId(name, tags);
   const linkId = taskTagIdFor(task.id, tagId);
   const linked = links.some((link) => link.id === linkId);
 

@@ -63,6 +63,8 @@ interface TasksSidebarProps {
   folders: Folder[];
   sidebarFolders: SidebarFolder[];
   tags: Tag[];
+  /** Opens the tag editor (TASK_TAG_CHIPS_DESIGN.md §5.3). Absent = no ⋯. */
+  onEditTag?: (tag: Tag) => void;
   savedFilters: SavedFilter[];
   /** §13.25's management surface, opened from the Lists section. */
   /**
@@ -98,6 +100,7 @@ export function TasksSidebar({
   folders,
   sidebarFolders,
   tags,
+  onEditTag,
   savedFilters,
   onCreateList,
   collapsedFolderIds,
@@ -127,10 +130,10 @@ export function TasksSidebar({
   function row(
     scope: TaskScopeRef,
     label: string,
-    options: { indent?: boolean; dot?: string; icon?: ReactNode } = {},
+    options: { indent?: boolean; dot?: string; icon?: ReactNode; onEdit?: () => void } = {},
   ) {
     const count = queryScopeCount(scope, ctx);
-    return (
+    const button = (
       <button
         key={`${scope.kind}:${"id" in scope ? scope.id : ""}`}
         type="button"
@@ -156,6 +159,26 @@ export function TasksSidebar({
             column of noughts in the tree is noise (§2.10). */}
         {count > 0 ? <span className="tm-count">{count}</span> : null}
       </button>
+    );
+
+    if (!options.onEdit) return button;
+
+    // A sibling, never a child. The row is a button and a button inside a
+    // button is a control a keyboard cannot describe and a screen reader reads
+    // twice — the same reason the matrix's card stopped being clickable as a
+    // whole (`MatrixPage`).
+    return (
+      <div className="tm-row-slot" key={`${scope.kind}:${"id" in scope ? scope.id : ""}`}>
+        {button}
+        <button
+          type="button"
+          className="tm-row-edit"
+          aria-label={t("tasks.editTag")}
+          onClick={options.onEdit}
+        >
+          ⋯
+        </button>
+      </div>
     );
   }
 
@@ -314,7 +337,10 @@ export function TasksSidebar({
           {visibleTags.map((tag) =>
             row({ kind: "tag", id: tag.id }, tag.name, {
               icon: <TagIcon />,
-              dot: tag.color || "var(--tm-tag-dot)",
+              // The dot reads the same value the chip does, so the sidebar and
+              // the rows cannot disagree about what colour a tag is.
+              dot: listColorHex(tag.color ?? "") || "var(--tm-tag-dot)",
+              ...(onEditTag ? { onEdit: () => onEditTag(tag) } : {}),
             }),
           )}
         </div>

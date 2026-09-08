@@ -30,6 +30,7 @@ import { listUrlFor, taskUrlFor } from "../../app/taskScopeUrl";
 import { createListPayload, type CreateListDraft } from "../../domain/tasks/createListDraft";
 import { TasksSidebar, type SidebarDrawer } from "../tasks/TasksSidebar";
 import { CreateListModal } from "../tasks/CreateListModal";
+import { TagEditModal } from "../tasks/TagEditModal";
 
 export interface TasksSidebarSlotProps {
   /** §3.50: set only where the sidebar is drawn OVER the content. */
@@ -39,6 +40,8 @@ export interface TasksSidebarSlotProps {
   folders: Folder[];
   sidebarFolders: SidebarFolder[];
   tags: Tag[];
+  /** Writes a tag's name and colour (TASK_TAG_CHIPS_DESIGN.md §5.4). */
+  onUpdateTag?: (tagId: string, patch: { name: string; color: string }) => void;
   savedFilters: SavedFilter[];
   dailyPlans: TaskDailyPlan[];
   taskTags: TaskTag[];
@@ -68,6 +71,7 @@ export function TasksSidebarSlot({
   folders,
   sidebarFolders,
   tags,
+  onUpdateTag,
   savedFilters,
   dailyPlans,
   taskTags,
@@ -88,6 +92,7 @@ export function TasksSidebarSlot({
   // same treatment §10.23 gives the Command Menu. `null` is §1.5's S1 (CLOSED);
   // a string is the Folder it was started from, "" for the Lists header.
   const [creatingListIn, setCreatingListIn] = useState<string | null>(null);
+  const [editingTag, setEditingTag] = useState<Tag | null>(null);
 
   const ctx: ScopeContext = { tasks, lists, dailyPlans, taskTags, today, savedFilters };
 
@@ -134,6 +139,7 @@ export function TasksSidebarSlot({
         collapsedFolderIds={collapsedFolderIds}
         onToggleFolder={onToggleFolder}
         tags={tags}
+        {...(onUpdateTag ? { onEditTag: (tag: Tag) => openFromSidebar(() => setEditingTag(tag)) } : {})}
         savedFilters={savedFilters}
         onCreateList={(contextFolderId) => openFromSidebar(() => setCreatingListIn(contextFolderId))}
         current={current}
@@ -170,6 +176,16 @@ export function TasksSidebarSlot({
         />
       ) : null}
 
+      {editingTag && onUpdateTag ? (
+        <TagEditModal
+          tag={editingTag}
+          onClose={() => setEditingTag(null)}
+          onSubmit={(patch) => {
+            onUpdateTag(editingTag.id, patch);
+            setEditingTag(null);
+          }}
+        />
+      ) : null}
     </>
   );
 }

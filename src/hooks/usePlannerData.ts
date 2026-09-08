@@ -2120,6 +2120,24 @@ export function usePlannerData() {
     });
   }
 
+  /**
+   * A tag's own record — its name and its colour (TASK_TAG_CHIPS_DESIGN.md §5.4).
+   *
+   * The id is NOT re-derived from a new name. Every link
+   * (`TaskTag.tagId`) points at the id it was created with, and rewriting it
+   * would orphan them all; `freeTagId` is what keeps a later tag of the old
+   * name from colliding with it (§5.5).
+   */
+  function updateTag(tagId: string, patch: Partial<Pick<Tag, "name" | "color">>) {
+    const now = new Date().toISOString();
+    setData((current) => {
+      const tags = current.tags.map((tag) =>
+        tag.id === tagId ? { ...tag, ...patch, updatedAt: now } : tag,
+      );
+      return { ...current, tags };
+    });
+  }
+
   /* `setTodayBuckets` stood here — the whole day's plan as one snapshot, for
      the Today page's moves, its "plan the day", its clear, and the undo after
      each. Every one of those callers was on that page, and the page is gone
@@ -2293,6 +2311,7 @@ export function usePlannerData() {
     createList,
     createSidebarFolder,
     updateList,
+    updateTag,
     trashList,
     restoreList,
     permanentlyDeleteList,

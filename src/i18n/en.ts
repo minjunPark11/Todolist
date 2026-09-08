@@ -753,6 +753,10 @@ export const en: Dictionary = {
   // and nowhere in these values.
   "tasks.tags": "Tags",
   "tasks.addTag": "Add a tag",
+  "tasks.editTag": "Edit tag",
+  "tasks.editTagTitle": "Edit tag",
+  "tasks.editTagNameLabel": "Name",
+  "tasks.editTagSave": "Save",
   "tasks.removeTag": "Remove {{value}}",
   "tasks.searchOrCreateTag": "Search or create a tag",
   "tasks.createTag": "Create #{{value}}",
