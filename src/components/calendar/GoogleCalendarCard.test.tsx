@@ -109,3 +109,20 @@ it("does not tell a signed-in reader to sign in when the server refused the sess
   expect(alert.textContent).not.toContain("Sign in to FocusFlow first.");
   expect(screen.getByRole("status").textContent).toBe("Not connected");
 });
+
+
+it("explains unsupported labels and reports manual sync progress", async () => {
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email", labelsSupported: false });
+  const { GOOGLE_SYNC_REQUESTED, GOOGLE_SYNC_FINISHED } = await import("../../lib/googleCalendar");
+  const requested = vi.fn();
+  window.addEventListener(GOOGLE_SYNC_REQUESTED, requested);
+  mount();
+  await screen.findByText("This Google account does not support event labels. Events still sync, without list colors.");
+  fireEvent.click(screen.getByRole("button", { name: "Sync now" }));
+  expect(requested).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: "Syncing…" }).hasAttribute("disabled")).toBe(true);
+  act(() => { window.dispatchEvent(new CustomEvent(GOOGLE_SYNC_FINISHED, { detail: { ok: true } })); });
+  expect(screen.getByText("Events synced.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Sync now" }).hasAttribute("disabled")).toBe(false);
+  window.removeEventListener(GOOGLE_SYNC_REQUESTED, requested);
+});

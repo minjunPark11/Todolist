@@ -27,6 +27,7 @@ import {
   ensureDedicatedCalendar,
   exchangeCodeForAccess,
   GoogleCalendarError,
+  GOOGLE_LABELS_STATUS, GOOGLE_SYNC_REQUESTED, GOOGLE_SYNC_FINISHED,
   notifyGoogleConnectionChanged,
   readConnection,
   readPendingConnect,
@@ -53,6 +54,32 @@ export function GoogleCalendarCard() {
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [labelState, setLabelState] = useState<{ supported: boolean | null; overflow: number; failed: boolean } | null>(null);
+  const manualSync = useRef(false);
+  useEffect(() => {
+    if (status.kind === "connected") return;
+    setLabelState(null);
+    setSyncing(false);
+    manualSync.current = false;
+  }, [status.kind]);
+  useEffect(() => {
+    const onLabels = (event: Event) => setLabelState((event as CustomEvent).detail);
+    const onDone = (event: Event) => {
+      if (!manualSync.current) return;
+      manualSync.current = false;
+      setSyncing(false);
+      const ok = (event as CustomEvent<{ ok: boolean }>).detail.ok;
+      setNotice(ok ? t("settings.google.syncDone") : "");
+      setError(ok ? "" : t("settings.google.error.google"));
+    };
+    window.addEventListener(GOOGLE_LABELS_STATUS, onLabels);
+    window.addEventListener(GOOGLE_SYNC_FINISHED, onDone);
+    return () => {
+      window.removeEventListener(GOOGLE_LABELS_STATUS, onLabels);
+      window.removeEventListener(GOOGLE_SYNC_FINISHED, onDone);
+    };
+  }, [t]);
   const statusRef = useRef(status);
   statusRef.current = status;
   const readVersion = useRef(0);
@@ -311,6 +338,18 @@ export function GoogleCalendarCard() {
               ? t("settings.google.connectedAs", { email: status.connection.accountEmail })
               : t("settings.google.connectedNoEmail")}
           </p>
+          <p className="ff-settings-note">{t("settings.google.labelsOwnership")}</p>
+          {(labelState?.supported ?? status.connection.labelsSupported) === false ? (
+            <p className="ff-settings-note" aria-live="polite">{t("settings.google.labelsUnsupported")}</p>
+          ) : null}
+          {labelState?.overflow ? <p className="ff-settings-note">{t("settings.google.labelsOverflow", { count: labelState.overflow })}</p> : null}
+          {labelState?.failed && labelState.supported !== false ? <p className="ff-settings-note" aria-live="polite">{t("settings.google.labelsRetry")}</p> : null}
+          <button type="button" className="ff-btn ff-cal-btn-outline" disabled={syncing} onClick={() => {
+            setSyncing(true);
+            manualSync.current = true;
+            setNotice(""); setError("");
+            window.dispatchEvent(new Event(GOOGLE_SYNC_REQUESTED));
+          }}>{t(syncing ? "settings.google.syncingNow" : "settings.google.syncNow")}</button>
           <GoogleCalendarSourceList />
         </>
       ) : null}

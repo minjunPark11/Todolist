@@ -5,6 +5,7 @@
 // shape it takes, and how its repeat reads as an RRULE. What sits above this is
 // left with nothing but I/O and retries (§12 M1-2), which is the same split
 // `server/data/*` already uses.
+import { withTagBlock } from "./tagBlock";
 import { isTaskAlive, type TaskStateFields } from "../../tasks/taskState";
 
 /**
@@ -16,6 +17,9 @@ import { isTaskAlive, type TaskStateFields } from "../../tasks/taskState";
  */
 export interface SyncableTask extends TaskStateFields {
   title: string;
+  resolvedTags?: readonly string[];
+  eventLabelId?: string | null;
+  metadataKey?: string;
   description?: string;
   /** The day the work is due (YYYY-MM-DD). "" = unset, which is what §5.1 reads. */
   dueDate: string;
@@ -41,6 +45,7 @@ export interface GoogleEventTime {
 
 export interface GoogleEventBody {
   summary: string;
+  eventLabelId?: string | null;
   description?: string;
   start: GoogleEventTime;
   end: GoogleEventTime;
@@ -166,7 +171,8 @@ export function toGoogleEventBody(task: SyncableTask, timezone: string): GoogleE
   const timed = isTime(task.startTime);
   const body: GoogleEventBody = {
     summary: task.title,
-    ...(task.description ? { description: task.description } : {}),
+    ...(task.resolvedTags !== undefined ? { description: withTagBlock(task.description ?? "", task.resolvedTags) } : task.description ? { description: task.description } : {}),
+    ...(task.eventLabelId !== undefined ? { eventLabelId: task.eventLabelId } : {}),
     start: {},
     end: {},
   };

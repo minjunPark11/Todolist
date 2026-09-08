@@ -752,8 +752,12 @@ export default function App() {
     tasks: planner.tasks,
     timezone: appSettings.timezone,
     tombstones: appSettings.googleDeletedEventIds,
-    signedIn: planner.auth.isSignedIn,
+    signedIn: planner.auth.isSignedIn && planner.auth.remoteDataReady,
+    accountKey: planner.auth.userEmail,
     onResult: planner.applyGoogleSync,
+    projects: planner.projects,
+    tags: planner.tags,
+    taskTags: planner.taskTags,
   });
 
   // Google Calendar, inbound (§6). The other direction, and a different kind of

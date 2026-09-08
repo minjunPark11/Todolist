@@ -309,6 +309,13 @@ export const ko: Dictionary = {
   "settings.calendar.refreshNow": "지금 새로고침",
   "settings.calendar.noLastSync": "마지막 동기화 없음",
   // Google Calendar, two-way (GOOGLE_CALENDAR_SYNC_DESIGN.md M1-4d).
+  "settings.google.labelsOwnership": "리스트 라벨과 태그는 FocusFlow에서 관리합니다. Google에서 변경해도 작업을 다음에 편집하면 FocusFlow 값으로 덮어씁니다.",
+  "settings.google.labelsUnsupported": "이 Google 계정은 이벤트 라벨을 지원하지 않아 리스트 색이 표시되지 않습니다. 일정은 정상적으로 동기화됩니다.",
+  "settings.google.labelsOverflow": "리스트 {count}개가 캘린더 라벨 한도를 초과하여 색상 없이 동기화됩니다.",
+  "settings.google.labelsRetry": "리스트 색상을 업데이트하지 못했습니다. 일정과 태그는 계속 동기화됩니다. 다시 동기화해 주세요.",
+  "settings.google.syncNow": "지금 동기화",
+  "settings.google.syncingNow": "동기화 중…",
+  "settings.google.syncDone": "일정을 동기화했습니다.",
   "settings.google.title": "구글 캘린더",
   "settings.google.status.loading": "연결 상태 확인 중…",
   "settings.google.status.disconnected": "연결 안 됨",

@@ -1,87 +1,132 @@
-// Running the outbound pass at the moments §6.4 asks for
-// (GOOGLE_CALENDAR_SYNC_DESIGN.md M1-5).
-//
-// The pass itself is pure planning plus one executor; this is only about WHEN.
-// Two triggers, both cheap: a debounce after the Task collection changes — the
-// same 1.8 seconds the ICS republish uses, so an edit reaches Google in about
-// the time it takes to stop typing — and the window regaining focus, which
-// catches everything that happened while the app was in the background.
-//
-// The safety of running it often rests on one thing: `isEmptyPlan` is checked
-// BEFORE an access token is asked for. A pass with nothing to do costs no
-// request at all, which is what stops the write-back from feeding itself — the
-// mapping it stores changes the Tasks, which re-arms the debounce, which plans
-// nothing and stops.
 import { useCallback, useEffect, useRef } from "react";
-import { isEmptyPlan, planOutbound, type IdentifiedTask } from "../domain/calendar/googleSync/outboundPlan";
-import { currentAccessToken, GOOGLE_CONNECTION_CHANGED, readConnection } from "../lib/googleCalendar";
+import { isEmptyPlan, planOutbound } from "../domain/calendar/googleSync/outboundPlan";
+import { outboundTagNames, withTagBlock } from "../domain/calendar/googleSync/tagBlock";
+import {
+  currentAccessToken, GOOGLE_CONNECTION_CHANGED, GOOGLE_LABELS_STATUS, GOOGLE_SYNC_REQUESTED,
+  readConnection, saveLabelsSupported, googleCalendarFetch, GOOGLE_SYNC_FINISHED,
+} from "../lib/googleCalendar";
+import { runLabels, type LabelOutcome } from "../lib/googleCalendarLabels";
 import { runOutbound, type OutboundOutcome } from "../lib/googleCalendarOutbound";
-import type { Task } from "../types";
+import type { Project, Tag, Task, TaskTag } from "../types";
 
 export interface GoogleOutboundSyncInput {
   tasks: Task[];
-  /** `AppSettings.timezone` — the zone wall-clock times are written in (§9.2). */
+  projects?: Project[];
+  tags?: Tag[];
+  taskTags?: TaskTag[];
   timezone: string;
-  /** `AppSettings.googleDeletedEventIds` (§4.3). */
   tombstones: string[] | undefined;
-  /** No FocusFlow session, no connection to look up. */
   signedIn: boolean;
-  /** Where the earned mapping goes — `planner.applyGoogleSync`. */
+  accountKey?: string;
   onResult: (outcome: OutboundOutcome) => void;
 }
 
 const DEBOUNCE_MS = 1800;
+const EMPTY_PROJECTS: Project[] = [];
+const EMPTY_TAGS: Tag[] = [];
+const EMPTY_LINKS: TaskTag[] = [];
 
-export function useGoogleOutboundSync({ tasks, timezone, tombstones, signedIn, onResult }: GoogleOutboundSyncInput) {
-  // Read through refs so the timer always sends the CURRENT collection, and so
-  // that neither a new callback identity nor a keystroke restarts the pass.
-  const latest = useRef({ tasks, timezone, tombstones, signedIn, onResult });
-  latest.current = { tasks, timezone, tombstones, signedIn, onResult };
+export function prepareGoogleTasks(tasks: Task[], tags: Tag[], links: TaskTag[], labels: LabelOutcome) {
+  const byProject = new Map(labels.mappings.map((m) => [m.projectId, m.googleLabelId]));
+  return tasks.map((task) => {
+    const resolvedTags = outboundTagNames(task, tags, links);
+    const eventLabelId = labels.supported === true ? byProject.get(task.projectId) ?? null : undefined;
+    return { ...task, resolvedTags, eventLabelId,
+      metadataKey: JSON.stringify([withTagBlock("", resolvedTags), eventLabelId]) };
+  });
+}
 
+export function useGoogleOutboundSync(input: GoogleOutboundSyncInput) {
+  const { tasks, projects = EMPTY_PROJECTS, tags = EMPTY_TAGS, taskTags = EMPTY_LINKS, timezone, tombstones, signedIn, accountKey } = input;
+  const latest = useRef(input);
+  latest.current = input;
   const running = useRef(false);
+  const pending = useRef(false);
+  const generation = useRef(0);
+  const forceProbe = useRef(false);
+  const labelCache = useRef<{ key: string; projectKey: string; outcome: LabelOutcome } | null>(null);
 
   const run = useCallback(async () => {
-    const { tasks: current, timezone: zone, tombstones: orphans, signedIn: signed, onResult: report } = latest.current;
-    if (!signed || running.current) return;
-
-    const plan = planOutbound(current as unknown as IdentifiedTask[], orphans ?? []);
-    if (isEmptyPlan(plan)) return;
-
+    if (!latest.current.signedIn) {
+      window.dispatchEvent(new CustomEvent(GOOGLE_SYNC_FINISHED, { detail: { ok: false } }));
+      return;
+    }
+    if (running.current) { pending.current = true; return; }
     running.current = true;
+    const epoch = generation.current;
+    let ok = false;
     try {
-      // Re-read per pass: a cached absence survived connecting in Settings,
-      // and a cached ID survived disconnecting or switching accounts.
+      const snapshot = latest.current;
+      const lists = snapshot.projects ?? EMPTY_PROJECTS;
+      const projectKey = JSON.stringify(lists.map((p) => [p.id, p.name, p.color, p.archivedAt, p.deletedAt, p.googleLabelId, p.updatedAt]));
+      const cached = labelCache.current;
+      if (!forceProbe.current && cached?.projectKey === projectKey) {
+        const prepared = prepareGoogleTasks(snapshot.tasks, snapshot.tags ?? EMPTY_TAGS, snapshot.taskTags ?? EMPTY_LINKS, cached.outcome);
+        if (isEmptyPlan(planOutbound(prepared, snapshot.tombstones ?? []))) { ok = true; return; }
+      }
       const connection = await readConnection();
       if (!connection) return;
-
       const accessToken = await currentAccessToken();
-      if (!accessToken) return;
-
-      const outcome = await runOutbound({ plan, calendarId: connection.calendarId, timezone: zone, accessToken });
-      report(outcome);
+      if (!accessToken || epoch !== generation.current) return;
+      const key = JSON.stringify([connection.calendarId, connection.accountEmail, projectKey]);
+      const forced = forceProbe.current;
+      forceProbe.current = false;
+      let labels: LabelOutcome;
+      if (!forced && labelCache.current?.key === key) labels = labelCache.current.outcome;
+      else if (!forced && connection.labelsSupported === false) labels = { supported: false, mappings: [], overflow: 0, failed: false };
+      else {
+        labels = await runLabels(connection.calendarId, accessToken, lists, googleCalendarFetch);
+        if (epoch !== generation.current) return;
+        if (labels.supported !== null && labels.supported !== connection.labelsSupported) {
+          // A pending DB migration must not prevent ordinary event writes.
+          await saveLabelsSupported(connection.calendarId, labels.supported).catch(() => undefined);
+        }
+      }
+      if (epoch !== generation.current) return;
+      if (labels.supported !== null) labelCache.current = { key, projectKey, outcome: labels };
+      window.dispatchEvent(new CustomEvent(GOOGLE_LABELS_STATUS, { detail: labels }));
+      const prepared = prepareGoogleTasks(snapshot.tasks, snapshot.tags ?? EMPTY_TAGS, snapshot.taskTags ?? EMPTY_LINKS, labels);
+      const plan = planOutbound(prepared, snapshot.tombstones ?? []);
+      const outcome: OutboundOutcome = isEmptyPlan(plan)
+        ? { mapped: [], unlinked: [], clearedOrphans: [], failed: 0, expired: false }
+        : await runOutbound({ plan, calendarId: connection.calendarId, timezone: snapshot.timezone,
+            accessToken, labelsSupported: labels.supported === true, deps: { fetch: googleCalendarFetch } });
+      if (epoch !== generation.current || !latest.current.signedIn) return;
+      outcome.projectMappings = labels.mappings.filter((m) => lists.find((p) => p.id === m.projectId)?.googleLabelId !== m.googleLabelId);
+      latest.current.onResult(outcome);
+      ok = outcome.failed === 0 && !outcome.expired;
     } catch {
-      // Whatever went wrong, nothing was written down, so the next trigger
-      // simply tries again with the same plan.
+      // No successful response is recorded; the next focus or edit retries.
     } finally {
       running.current = false;
+      if (!pending.current && epoch === generation.current) window.dispatchEvent(new CustomEvent(GOOGLE_SYNC_FINISHED, { detail: { ok } }));
+      if (pending.current) { pending.current = false; void run(); }
     }
   }, []);
 
-  // After an edit settles.
+  useEffect(() => {
+    generation.current += 1;
+    labelCache.current = null;
+  }, [signedIn, accountKey]);
+
   useEffect(() => {
     if (!signedIn) return;
     const timer = window.setTimeout(() => void run(), DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [tasks, tombstones, signedIn, run]);
+  }, [tasks, projects, tags, taskTags, timezone, tombstones, signedIn, accountKey, run]);
 
-  // And on the way back to the window (§6.4).
   useEffect(() => {
-    const onFocus = () => void run();
+    const onFocus = () => { if (labelCache.current?.outcome.supported === true) labelCache.current = null; void run(); };
+    const onConnection = () => { generation.current += 1; labelCache.current = null; forceProbe.current = true; void run(); };
+    const onManual = () => { forceProbe.current = true; void run(); };
     window.addEventListener("focus", onFocus);
-    window.addEventListener(GOOGLE_CONNECTION_CHANGED, onFocus);
+    window.addEventListener(GOOGLE_CONNECTION_CHANGED, onConnection);
+    window.addEventListener(GOOGLE_SYNC_REQUESTED, onManual);
     return () => {
+      generation.current += 1;
       window.removeEventListener("focus", onFocus);
-      window.removeEventListener(GOOGLE_CONNECTION_CHANGED, onFocus);
+      window.removeEventListener(GOOGLE_CONNECTION_CHANGED, onConnection);
+      window.removeEventListener(GOOGLE_SYNC_REQUESTED, onManual);
     };
   }, [run]);
 }

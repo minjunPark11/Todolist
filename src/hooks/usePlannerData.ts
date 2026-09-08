@@ -343,6 +343,7 @@ export function usePlannerData() {
   );
   const [syncError, setSyncError] = useState("");
   const [remoteLoaded, setRemoteLoaded] = useState(false);
+  const remoteOwnerRef = useRef("");
   const [localMigrationData, setLocalMigrationData] = useState<PlannerData | null>(null);
   // True after the user opens a password-reset link (Supabase PASSWORD_RECOVERY);
   // the UI then shows a "set a new password" form instead of the normal app.
@@ -716,6 +717,7 @@ export function usePlannerData() {
       // merged state: the difference between the two is exactly the edits put
       // back above, so the next save pushes those and only those.
       syncedSnapshotRef.current = loaded;
+      remoteOwnerRef.current = userEmail;
       setRemoteLoaded(true);
       setSyncStatus("sync.synced");
       // "A device connected and agreed with the account at this moment."
@@ -1103,14 +1105,16 @@ export function usePlannerData() {
    * create a DUPLICATE event rather than update ours.
    */
   function applyGoogleSync(result: {
-    mapped?: readonly { taskId: string; googleEventId: string; googleEtag: string; googleSyncedAt: string }[];
+    mapped?: readonly { taskId: string; googleEventId: string; googleEtag: string; googleSyncedAt: string; googleMetadataKey?: string }[];
+    projectMappings?: readonly { projectId: string; googleLabelId: string }[];
     unlinked?: readonly string[];
     clearedOrphans?: readonly string[];
   }) {
     const mapped = new Map((result.mapped ?? []).map((row) => [row.taskId, row]));
     const unlinked = new Set(result.unlinked ?? []);
     const cleared = result.clearedOrphans ?? [];
-    if (mapped.size === 0 && unlinked.size === 0 && cleared.length === 0) return;
+    const projectMappings = new Map((result.projectMappings ?? []).map((row) => [row.projectId, row.googleLabelId]));
+    if (mapped.size === 0 && unlinked.size === 0 && cleared.length === 0 && projectMappings.size === 0) return;
 
     setData((current) => {
       const tasks =
@@ -1124,6 +1128,7 @@ export function usePlannerData() {
                   googleEventId: row.googleEventId,
                   googleEtag: row.googleEtag,
                   googleSyncedAt: row.googleSyncedAt,
+                  ...(row.googleMetadataKey !== undefined ? { googleMetadataKey: row.googleMetadataKey } : {}),
                 };
               }
               if (!unlinked.has(task.id)) return task;
@@ -1139,10 +1144,15 @@ export function usePlannerData() {
       let ids = current.appSettings.googleDeletedEventIds;
       for (const eventId of cleared) ids = withoutTombstone(ids, eventId);
 
-      if (tasks === current.tasks && ids === current.appSettings.googleDeletedEventIds) return current;
+      const projects = projectMappings.size ? current.projects.map((project) => {
+        const id = projectMappings.get(project.id);
+        return id && id !== project.googleLabelId ? { ...project, googleLabelId: id } : project;
+      }) : current.projects;
+      if (tasks === current.tasks && projects === current.projects && ids === current.appSettings.googleDeletedEventIds) return current;
       return {
         ...current,
         tasks,
+        projects,
         appSettings: ids === current.appSettings.googleDeletedEventIds ? current.appSettings : { ...current.appSettings, googleDeletedEventIds: ids },
       };
     });
@@ -2244,6 +2254,7 @@ export function usePlannerData() {
       isLoading: authLoading,
       userEmail,
       isSignedIn: Boolean(userEmail),
+      remoteDataReady: remoteLoaded && remoteOwnerRef.current === userEmail,
       mode: userEmail ? "supabase" : "localStorage",
       syncStatus,
       syncError,

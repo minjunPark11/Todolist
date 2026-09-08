@@ -252,6 +252,7 @@ function normalizeProject(project: Partial<Project>): Project {
 
   return {
     ...project, // M0 — see normalizeTask
+    googleLabelId: typeof project.googleLabelId === "string" ? project.googleLabelId : undefined,
     id: project.id ?? createId("project"),
     name: project.name ?? "Untitled project",
     description: project.description ?? "",

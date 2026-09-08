@@ -25,6 +25,7 @@ export type IdentifiedTask = SyncableTask &
     updatedAt?: string;
     /** What `updatedAt` said at the last successful write (`types.ts`). */
     googleSyncedAt?: string;
+    googleMetadataKey?: string;
   };
 
 export interface PlannedDelete {
@@ -66,6 +67,7 @@ export const EMPTY_PLAN: OutboundPlan = { create: [], update: [], delete: [], or
  * an edit that never leaves the device.
  */
 export function needsUpdate(task: IdentifiedTask): boolean {
+  if (task.metadataKey !== undefined && task.metadataKey !== task.googleMetadataKey) return true;
   if (!task.googleSyncedAt || !task.updatedAt) return true;
   return task.updatedAt > task.googleSyncedAt;
 }

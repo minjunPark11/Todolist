@@ -24,6 +24,7 @@ export interface GoogleConnection {
   calendarId: string;
   /** Which Google account this is, so the settings screen can name it. */
   accountEmail: string;
+  labelsSupported?: boolean | null;
 }
 
 /**
@@ -69,11 +70,11 @@ async function supabaseReadConnection(): Promise<GoogleConnection | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("google_calendar_connections")
-    .select("calendar_id, account_email")
+    .select("*")
     .maybeSingle();
   if (error) throw new GoogleCalendarError("store", error.message);
   if (!data?.calendar_id) return null;
-  return { calendarId: data.calendar_id as string, accountEmail: (data.account_email as string) || "" };
+  return { calendarId: data.calendar_id as string, accountEmail: (data.account_email as string) || "", labelsSupported: typeof data.labels_supported === "boolean" ? data.labels_supported : null };
 }
 
 async function supabaseWriteConnection(connection: GoogleConnection): Promise<void> {
@@ -95,6 +96,18 @@ export async function googleCalendarFetch(input: RequestInfo | URL, init?: Reque
   const { fetch: nativeFetch } = await import("@tauri-apps/plugin-http");
   const url = typeof input === "string" ? new URL(input, DEPLOYED_WEB_ORIGIN).href : input;
   return nativeFetch(url, init);
+}
+
+export const GOOGLE_LABELS_STATUS = "focusflow:google-labels-status";
+export const GOOGLE_SYNC_FINISHED = "focusflow:google-sync-finished";
+export const GOOGLE_SYNC_REQUESTED = "focusflow:google-sync-requested";
+export async function saveLabelsSupported(calendarId: string, supported: boolean | null): Promise<void> {
+  if (!supabase) return;
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return;
+  const { error } = await supabase.from("google_calendar_connections").update({ labels_supported: supported })
+    .eq("user_id", data.user.id).eq("calendar_id", calendarId);
+  if (error) throw new GoogleCalendarError("store", error.message);
 }
 
 export const GOOGLE_CONNECTION_CHANGED = "focusflow:google-connection-changed";

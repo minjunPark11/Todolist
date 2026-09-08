@@ -33,11 +33,13 @@ export interface EventMapping {
    * a losing edit would raise the same 412 on every pass forever.
    */
   googleSyncedAt: string;
+  googleMetadataKey?: string;
 }
 
 export interface OutboundOutcome {
   /** Tasks that now point at an event, or point at a newer version of one. */
   mapped: EventMapping[];
+  projectMappings?: { projectId: string; googleLabelId: string }[];
   /**
    * Tasks whose mapping should be cleared.
    *
@@ -96,9 +98,9 @@ function events(calendarId: string): string {
 
 function mappingFrom(task: IdentifiedTask, reply: GoogleReply): EventMapping | null {
   const id = reply.body?.id;
-  if (typeof id !== "string" || !id) return null;
+  if (reply.status < 200 || reply.status >= 300 || typeof id !== "string" || !id) return null;
   const etag = typeof reply.body?.etag === "string" ? reply.body.etag : "";
-  return { taskId: task.id, googleEventId: id, googleEtag: etag, googleSyncedAt: task.updatedAt ?? "" };
+  return { taskId: task.id, googleEventId: id, googleEtag: etag, googleSyncedAt: task.updatedAt ?? "", ...(task.metadataKey !== undefined ? { googleMetadataKey: task.metadataKey } : {}) };
 }
 
 /** A delete that finds nothing has done its job — the event is not there. */
@@ -113,6 +115,7 @@ export interface OutboundRequest {
   timezone: string;
   accessToken: string;
   deps?: OutboundDeps;
+  labelsSupported?: boolean;
 }
 
 export async function runOutbound({
@@ -121,9 +124,14 @@ export async function runOutbound({
   timezone,
   accessToken,
   deps = { fetch: (input, init) => fetch(input, init) },
+  labelsSupported = false,
 }: OutboundRequest): Promise<OutboundOutcome> {
   const outcome: OutboundOutcome = { ...EMPTY, mapped: [], unlinked: [], clearedOrphans: [] };
   const base = events(calendarId);
+  const originalFetch = deps.fetch;
+  deps = { fetch: (input, init) => originalFetch(
+    labelsSupported && ["POST", "PATCH", "PUT"].includes(init?.method ?? "GET")
+      ? `${input}?eventLabelVersion=1` : input, init) };
 
   for (const task of plan.create) {
     const reply = await call(base, accessToken, deps, {

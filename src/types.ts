@@ -284,6 +284,8 @@ export interface Task {
    * never been out.
    */
   googleSyncedAt?: string;
+  /** Last reconciled outbound label/tag content; independent of task updatedAt. */
+  googleMetadataKey?: string;
 }
 
 export interface Subtask {
@@ -516,6 +518,7 @@ export interface CustomStatus {
 }
 
 export interface Project {
+  googleLabelId?: string;
   id: string;
   name: string;
   description: string;

@@ -7,7 +7,13 @@ const mocks = vi.hoisted(() => ({ read: vi.fn(), token: vi.fn(), run: vi.fn() })
 vi.mock("../lib/googleCalendar", () => ({
   readConnection: mocks.read, currentAccessToken: mocks.token,
   GOOGLE_CONNECTION_CHANGED: "focusflow:google-connection-changed",
+  GOOGLE_SYNC_REQUESTED: "focusflow:google-sync-requested",
+  GOOGLE_SYNC_FINISHED: "focusflow:google-sync-finished",
+  GOOGLE_LABELS_STATUS: "focusflow:google-labels-status",
+  googleCalendarFetch: vi.fn(),
+  saveLabelsSupported: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock("../lib/googleCalendarLabels", () => ({ runLabels: vi.fn().mockResolvedValue({ supported: null, failed: true, mappings: [], overflow: 0 }) }));
 vi.mock("../lib/googleCalendarOutbound", () => ({ runOutbound: mocks.run }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
@@ -16,7 +22,7 @@ it("starts syncing after connecting without a reload and stops after disconnecti
   mocks.token.mockResolvedValue("access");
   mocks.run.mockResolvedValue({ expired: false });
   renderHook(() => useGoogleOutboundSync({
-    tasks: [{ id: "task", title: "Test", dueDate: "2026-09-06" } as Task],
+    tasks: [{ id: "task", title: "Test", dueDate: "2026-09-06", tags: [] } as unknown as Task],
     timezone: "Asia/Shanghai", tombstones: [], signedIn: true, onResult: vi.fn(),
   }));
   await act(async () => { window.dispatchEvent(new Event("focus")); });

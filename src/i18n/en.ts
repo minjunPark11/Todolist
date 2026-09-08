@@ -313,6 +313,13 @@ export const en: Dictionary = {
   "settings.calendar.refreshNow": "Refresh now",
   "settings.calendar.noLastSync": "No sync yet",
   // Google Calendar, two-way (GOOGLE_CALENDAR_SYNC_DESIGN.md M1-4d).
+  "settings.google.labelsOwnership": "List labels and tags are managed in FocusFlow. Changes to them in Google are replaced the next time you edit the task.",
+  "settings.google.labelsUnsupported": "This Google account does not support event labels. Events still sync, without list colors.",
+  "settings.google.labelsOverflow": "{count} lists exceed the calendar label limit and sync without list colors.",
+  "settings.google.labelsRetry": "List colors could not be updated. Events and tags still sync. Try syncing again.",
+  "settings.google.syncNow": "Sync now",
+  "settings.google.syncingNow": "Syncing…",
+  "settings.google.syncDone": "Events synced.",
   "settings.google.title": "Google Calendar",
   "settings.google.status.loading": "Checking connection…",
   "settings.google.status.disconnected": "Not connected",
