@@ -740,3 +740,66 @@
 .gcal-view-row .gcal-cat-name {
   color: var(--text-secondary);
 }
+
+/* Which Google calendars to read (GOOGLE_CALENDAR_SYNC_DESIGN.md §6.1).
+   Sits inside the connect card, under the account line, so the question
+   "which ones?" is asked where the answer to "connected?" already is. */
+.ff-google-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-separator, rgba(0, 0, 0, 0.08));
+}
+
+.ff-google-sources > strong {
+  font-size: var(--type-md);
+}
+
+.ff-google-source-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ff-google-source-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.ff-google-source-list label:hover {
+  background: var(--color-fill-quaternary, rgba(0, 0, 0, 0.04));
+}
+
+.ff-google-source-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* The name is the part that may be long; everything else keeps its size. */
+.ff-google-source-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ff-google-source-badge {
+  flex-shrink: 0;
+  font-size: var(--type-xs, 11px);
+  color: var(--text-tertiary);
+  border: 1px solid var(--color-separator, rgba(0, 0, 0, 0.12));
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}

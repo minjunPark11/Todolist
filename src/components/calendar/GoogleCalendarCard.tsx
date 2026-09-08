@@ -36,6 +36,7 @@ import {
 import { platform } from "../../platform";
 import { supabase } from "../../services/supabaseClient";
 import { ConfirmModal } from "../kit";
+import { GoogleCalendarSourceList } from "./GoogleCalendarSourceList";
 
 type Status =
   | { kind: "loading" }
@@ -304,11 +305,14 @@ export function GoogleCalendarCard() {
       </div>
 
       {status.kind === "connected" ? (
-        <p className="ff-settings-note">
-          {status.connection.accountEmail
-            ? t("settings.google.connectedAs", { email: status.connection.accountEmail })
-            : t("settings.google.connectedNoEmail")}
-        </p>
+        <>
+          <p className="ff-settings-note">
+            {status.connection.accountEmail
+              ? t("settings.google.connectedAs", { email: status.connection.accountEmail })
+              : t("settings.google.connectedNoEmail")}
+          </p>
+          <GoogleCalendarSourceList />
+        </>
       ) : null}
 
       {!signedIn && status.kind === "disconnected" ? <p className="ff-settings-note">{t("settings.google.signedOut")}</p> : null}
