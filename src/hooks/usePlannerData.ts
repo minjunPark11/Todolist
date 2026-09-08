@@ -109,6 +109,7 @@ import {
 import { buildMigrationUpload } from "../domain/sync/buildMigrationUpload";
 import { createSaveQueue, type SaveQueue } from "../domain/sync/saveQueue";
 import { reapplyLocalEdits } from "../domain/sync/reapplyLocalEdits";
+import { mergeSettingsFields } from "../domain/sync/mergeSettingsFields";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
 import {
@@ -780,6 +781,41 @@ export function usePlannerData() {
   // the queue decides what a failure means — retry, or drop because the account
   // has changed — and a swallowed error is indistinguishable from a save that
   // worked. Ordering, coalescing and retry all live in createSaveQueue.
+  /**
+   * The settings row, as it should be after this save
+   * (MULTI_DEVICE_SYNC_DESIGN.md §4).
+   *
+   * These two rows are written whole, so a blind upsert erases whatever another
+   * device changed since our last load — and our last load may have been at
+   * sign-in, hours ago. Reading the row back immediately before writing it
+   * shrinks that window from hours to the length of one request, and the merge
+   * decides the rest field by field.
+   *
+   * The read failing is not the save failing. Falling back to the local value
+   * is exactly today's behaviour, and refusing to save because a courtesy read
+   * timed out would be worse than the problem.
+   */
+  async function mergeRowBeforeWriting<T extends object>(
+    rowId: string,
+    userId: string,
+    baseline: T | undefined,
+    local: T,
+    parse: (row: unknown) => T,
+  ): Promise<T> {
+    if (!supabase || !baseline) return local;
+    try {
+      const { data: row, error } = await supabase
+        .from("settings")
+        .select("data")
+        .eq("id", rowId)
+        .maybeSingle();
+      if (error || !row?.data) return local;
+      return mergeSettingsFields(baseline, local, parse(row.data));
+    } catch {
+      return local;
+    }
+  }
+
   async function performSave(nextData: PlannerData, ownerEmail: string) {
     if (!supabase) {
       return;
@@ -843,8 +879,15 @@ export function usePlannerData() {
     }
 
     if (plan.settings) {
+      const merged = await mergeRowBeforeWriting(
+        "settings",
+        userId,
+        syncedSnapshotRef.current?.settings,
+        plan.settings,
+        (row) => normalizeSettings(row as Partial<PlannerSettings>),
+      );
       const { error: settingsError } = await supabase.from("settings").upsert(
-        { id: "settings", user_id: userId, data: plan.settings },
+        { id: "settings", user_id: userId, data: merged },
         { onConflict: "id,user_id" },
       );
       if (settingsError) {
@@ -856,8 +899,20 @@ export function usePlannerData() {
     // prefs, active focus session, recent items) are synced too, so a single
     // account looks and behaves the same on app and web.
     if (plan.appState) {
+      // Only `appSettings` is merged. `activeSessionId` and `focusFlow` ride in
+      // the same row but answer to the focus host rules, not to this one.
+      const appSettings =
+        nextData.appSettings === syncedSnapshotRef.current?.appSettings
+          ? plan.appState.appSettings
+          : await mergeRowBeforeWriting(
+              "app_settings",
+              userId,
+              syncedSnapshotRef.current?.appSettings,
+              plan.appState.appSettings,
+              (row) => normalizeAppSettings((row as { appSettings?: Partial<AppSettings> })?.appSettings),
+            );
       const { error: appSettingsError } = await supabase.from("settings").upsert(
-        { id: "app_settings", user_id: userId, data: plan.appState },
+        { id: "app_settings", user_id: userId, data: { ...plan.appState, appSettings } },
         { onConflict: "id,user_id" },
       );
       if (appSettingsError) {

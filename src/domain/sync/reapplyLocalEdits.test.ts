@@ -149,7 +149,7 @@ describe("a load that lands on top of an edit (spec §24.24)", () => {
     expect(reapplyLocalEdits(loaded, before, during).tags[0].name).toBe("renamed");
   });
 
-  it("carries a setting toggled during the load", () => {
+  it("carries a setting toggled during the load, and keeps the account's other fields", () => {
     const before = data();
     const during = data({ appSettings: { ...appSettings, theme: "dark" } });
     const loaded = data({ appSettings: { ...appSettings, accentColor: "purple" } });
@@ -157,9 +157,11 @@ describe("a load that lands on top of an edit (spec §24.24)", () => {
     const merged = reapplyLocalEdits(loaded, before, during);
 
     expect(merged.appSettings.theme).toBe("dark");
-    // And the whole settings record is the local one — it is a single row, so
-    // there is no per-field merge to do.
-    expect(merged.appSettings.accentColor).toBe("blue");
+    // This used to take the local row whole, which threw away every field the
+    // account had changed in the meantime — the accent picked on another
+    // device, here. A settings row is thirty independent answers wearing one
+    // object, so it is merged per field now (MULTI_DEVICE_SYNC_DESIGN.md §4).
+    expect(merged.appSettings.accentColor).toBe("purple");
   });
 
   // A different reference holding equal contents is what a reducer produces

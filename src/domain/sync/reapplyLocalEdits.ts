@@ -37,6 +37,7 @@
 import type { PlannerData } from "../../types";
 import { collectionTables } from "./buildSyncPlan";
 import { diffChangedRecords } from "./diffRecords";
+import { mergeSettingsFields } from "./mergeSettingsFields";
 
 /**
  * `loaded` with the caller's local edits put back on top.
@@ -70,16 +71,25 @@ export function reapplyLocalEdits(
     merged[key] = [...byId.values()] as never;
   }
 
-  // The three that are not collections. A setting toggled while the load was
-  // in flight is an edit like any other.
-  if (localNow.settings !== localBefore.settings) {
-    merged.settings = localNow.settings;
+  // The ones that are not collections. A setting toggled while the load was in
+  // flight is an edit like any other — but taking the whole local object here,
+  // the way a record is taken whole above, throws away every field the account
+  // changed in the meantime (MULTI_DEVICE_SYNC_DESIGN.md §4). Records do not
+  // have that problem because a record IS the unit; a settings row is thirty
+  // independent answers wearing one object.
+  const settings = mergeSettingsFields(localBefore.settings, localNow.settings, loaded.settings);
+  if (settings !== loaded.settings) {
+    merged.settings = settings;
     touchedAnything = true;
   }
-  if (localNow.appSettings !== localBefore.appSettings) {
-    merged.appSettings = localNow.appSettings;
+  const appSettings = mergeSettingsFields(localBefore.appSettings, localNow.appSettings, loaded.appSettings);
+  if (appSettings !== loaded.appSettings) {
+    merged.appSettings = appSettings;
     touchedAnything = true;
   }
+  // Left whole on purpose: which session is active, and the focus flow behind
+  // it, are settled by the focus host rules in `usePlannerData` — merging them
+  // field by field would put a second opinion beside that one (§4.2).
   if (localNow.activeSessionId !== localBefore.activeSessionId) {
     merged.activeSessionId = localNow.activeSessionId;
     touchedAnything = true;
