@@ -71,6 +71,31 @@ it("offers nothing on a read-only subscription", () => {
   expect(onDelete).not.toHaveBeenCalled();
 });
 
+it("renames a Google event, which has no Detail to rename it in", () => {
+  // A task block opens the Task Detail and the name is edited there. An
+  // external event has no such screen, so the popover is where its name lives.
+  const { onSaveQuickEdit } = mount({});
+  fireEvent.click(screen.getByText("Add memo or URL"));
+  const field = screen.getByDisplayValue("Standup") as HTMLInputElement;
+  fireEvent.change(field, { target: { value: "Daily sync" } });
+  fireEvent.submit(document.querySelector(".gcal-popover-edit") as HTMLFormElement);
+  expect(onSaveQuickEdit).toHaveBeenCalledWith(
+    expect.objectContaining({ sourceId: "google:cal:e1" }),
+    expect.objectContaining({ title: "Daily sync" }),
+  );
+});
+
+it("leaves a task's name to its Detail", () => {
+  const { onSaveQuickEdit } = mount({ sourceType: "task", sourceId: "task-1" });
+  fireEvent.click(screen.getByText("Add memo or URL"));
+  expect(screen.queryByDisplayValue("Standup")).toBeNull();
+  fireEvent.submit(document.querySelector(".gcal-popover-edit") as HTMLFormElement);
+  expect(onSaveQuickEdit).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.not.objectContaining({ title: expect.anything() }),
+  );
+});
+
 it("sends the edit as a description, which is what the box means here", () => {
   const { onSaveQuickEdit } = mount({});
   fireEvent.click(screen.getByText("Add memo or URL"));

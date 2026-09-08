@@ -7,6 +7,13 @@
 // that echoed back every field we happened to be holding would overwrite an
 // attendee list, a conference link, a colour, with a stale copy of itself.
 //
+// "When" is a day as well as a clock. The popover could only ever move an event
+// inside its own day, so the day was read off the record and never written; the
+// grid's own gestures — drag across a column, drop on the all-day band, drag a
+// chip down into the time grid — all say a day, and two of them say whether it
+// is an all-day event at all. Those are the same edit expressed three ways, so
+// they land in one place here rather than three at the call sites.
+//
 // Pure. `lib/googleCalendarEventWrite.ts` is the I/O around it.
 import type { ExternalCalendarEvent } from "../../../types";
 
@@ -14,9 +21,20 @@ import type { ExternalCalendarEvent } from "../../../types";
 export interface ExternalEventEdit {
   title?: string;
   description?: string;
+  /** `YYYY-MM-DD`. Absent leaves the event on the day it is already on. */
+  date?: string;
   /** `HH:MM`, or empty to leave the time alone. Ignored for an all-day event. */
   startTime?: string;
   endTime?: string;
+  /**
+   * Which kind of event this becomes.
+   *
+   * Absent means "whatever it already is" — the ordinary case, where an edit
+   * changes when something happens and not what sort of thing it is. The drop
+   * on the all-day band says `true`, the drag from that band into the time grid
+   * says `false` and brings the clock the grid dropped it at.
+   */
+  allDay?: boolean;
 }
 
 export interface GoogleWriteTime {
@@ -34,6 +52,10 @@ export interface GoogleEventPatch {
 
 function isTime(value: string | undefined): value is string {
   return typeof value === "string" && /^\d{2}:\d{2}$/.test(value);
+}
+
+function isDate(value: string | undefined): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 /**
@@ -62,6 +84,61 @@ function dayIn(instant: string, timezone: string | undefined): string {
 }
 
 /**
+ * The clock this event shows, in its own zone — the other half of `dayIn`.
+ *
+ * Needed because a drag across a column says the day and nothing about the
+ * time: keeping the clock means reading it, and reading it off the UTC string
+ * would move a 14:00 meeting to 05:00 for everyone in Seoul.
+ *
+ * `hourCycle: "h23"` and no `hour12`, for the reason spelled out over
+ * `zoneOffsetMs` below: asking two ways reports midnight as hour 24.
+ */
+function clockIn(instant: string, timezone: string | undefined): string {
+  if (!instant.includes("T")) return "";
+  const date = new Date(instant);
+  if (Number.isNaN(date.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      ...(timezone ? { timeZone: timezone } : { timeZone: "UTC" }),
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(date);
+  } catch {
+    return date.toISOString().slice(11, 16);
+  }
+}
+
+/** `date` shifted by `days`, in UTC so the machine's own zone cannot move it. */
+function addDays(date: string, days: number): string {
+  const day = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(day.getTime())) return date;
+  day.setUTCDate(day.getUTCDate() + days);
+  return day.toISOString().slice(0, 10);
+}
+
+/** Whole days from `from` to `to`, negative when `to` is the earlier one. */
+function daysBetween(from: string, to: string): number {
+  const a = Date.parse(`${from}T00:00:00Z`);
+  const b = Date.parse(`${to}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return 0;
+  return Math.round((b - a) / 86_400_000);
+}
+
+/**
+ * How many days an all-day event covers. At least one.
+ *
+ * Google's `end.date` is exclusive, so a single day reads as start + 1. The
+ * span is preserved across a move because a three-day trip dragged onto Friday
+ * is still a three-day trip; collapsing it to one day would be an edit nobody
+ * asked for, made on the way to the one they did.
+ */
+function allDaySpan(event: ExternalCalendarEvent): number {
+  if (!event.end) return 1;
+  return Math.max(1, daysBetween(event.start.slice(0, 10), event.end.slice(0, 10)));
+}
+
+/**
  * A wall-clock time on a day, in a zone, as an offset-free local string.
  *
  * Google accepts `dateTime` + `timeZone` and resolves the offset itself, which
@@ -70,6 +147,83 @@ function dayIn(instant: string, timezone: string | undefined): string {
  */
 function localDateTime(day: string, time: string): string {
   return `${day}T${time}:00`;
+}
+
+/** The event's current position, said the way a patch would say it. */
+function currentWriteTime(
+  instant: string | undefined,
+  allDay: boolean,
+  zone: string | undefined,
+): GoogleWriteTime | undefined {
+  if (!instant) return undefined;
+  if (allDay) return { date: instant.slice(0, 10) };
+  return { dateTime: localDateTime(dayIn(instant, zone), clockIn(instant, zone)), ...(zone ? { timeZone: zone } : {}) };
+}
+
+function sameTime(a: GoogleWriteTime | undefined, b: GoogleWriteTime | undefined): boolean {
+  if (!a || !b) return false;
+  return a.date === b.date && a.dateTime === b.dateTime && a.timeZone === b.timeZone;
+}
+
+/**
+ * Where the event should end up, minus whatever it already says.
+ *
+ * The subtraction is the point. Every grid gesture reports a whole position —
+ * a resize of the bottom edge still names the start it did not touch — and
+ * sending the parts that did not move would bump the etag, come back on the
+ * next poll, and read downstream as somebody else's edit (§6.3).
+ */
+function toGoogleTimes(
+  event: ExternalCalendarEvent,
+  edit: ExternalEventEdit,
+): { start?: GoogleWriteTime; end?: GoogleWriteTime } {
+  const zone = event.timezone;
+  const wantsAllDay = edit.allDay ?? event.allDay;
+  const day = isDate(edit.date) ? edit.date : dayIn(event.start, zone);
+
+  let next: { start?: GoogleWriteTime; end?: GoogleWriteTime };
+  if (wantsAllDay) {
+    const span = event.allDay ? allDaySpan(event) : 1;
+    next = { start: { date: day }, end: { date: addDays(day, span) } };
+  } else {
+    // An all-day event has no clock, so the only thing that can give it one is
+    // an edit that names it. The drag into the time grid does; a drop onto
+    // another day in the month grid does not, and turning that into a timed
+    // event at an invented hour is worse than leaving it all-day.
+    const startClock = isTime(edit.startTime) ? edit.startTime : event.allDay ? "" : clockIn(event.start, zone);
+    if (!startClock) return {};
+
+    const endClock = isTime(edit.endTime)
+      ? edit.endTime
+      : event.allDay || !event.end
+        ? ""
+        : clockIn(event.end, zone);
+    // A move keeps the number of days the event spanned; an explicit end names
+    // its own day, and one at or before the start means "until tomorrow
+    // morning", which Google refuses outright written on a single day.
+    const keepsSpan = !isTime(edit.endTime) && !event.allDay && Boolean(event.end);
+    const endDay = keepsSpan
+      ? addDays(day, daysBetween(dayIn(event.start, zone), dayIn(event.end as string, zone)))
+      : endClock && endClock < startClock
+        ? addDays(day, 1)
+        : day;
+
+    next = {
+      start: { dateTime: localDateTime(day, startClock), ...(zone ? { timeZone: zone } : {}) },
+      ...(endClock
+        ? { end: { dateTime: localDateTime(endDay, endClock), ...(zone ? { timeZone: zone } : {}) } }
+        : {}),
+    };
+  }
+
+  const current = {
+    start: currentWriteTime(event.start, event.allDay, zone),
+    end: currentWriteTime(event.end, event.allDay, zone),
+  };
+  return {
+    ...(next.start && !sameTime(next.start, current.start) ? { start: next.start } : {}),
+    ...(next.end && !sameTime(next.end, current.end) ? { end: next.end } : {}),
+  };
 }
 
 /**
@@ -92,34 +246,11 @@ export function toGoogleEventPatch(
     patch.description = edit.description;
   }
 
-  // An all-day event has no clock to set, and writing one would silently turn
-  // it into a timed event an hour long.
-  if (!event.allDay && (isTime(edit.startTime) || isTime(edit.endTime))) {
-    const zone = event.timezone;
-    const day = dayIn(event.start, zone);
-    if (isTime(edit.startTime)) {
-      patch.start = { dateTime: localDateTime(day, edit.startTime), ...(zone ? { timeZone: zone } : {}) };
-    }
-    if (isTime(edit.endTime)) {
-      const endDay = event.end ? dayIn(event.end, zone) : day;
-      // An end before the start is the reader saying "until tomorrow morning",
-      // which Google refuses outright if written on the same day.
-      const crossesMidnight = isTime(edit.startTime) && edit.endTime < edit.startTime;
-      patch.end = {
-        dateTime: localDateTime(crossesMidnight ? nextDay(day) : endDay, edit.endTime),
-        ...(zone ? { timeZone: zone } : {}),
-      };
-    }
-  }
+  const times = toGoogleTimes(event, edit);
+  if (times.start) patch.start = times.start;
+  if (times.end) patch.end = times.end;
 
   return Object.keys(patch).length > 0 ? patch : null;
-}
-
-/** The day after `date`, in UTC so the machine's own zone cannot move it. */
-function nextDay(date: string): string {
-  const day = new Date(`${date}T00:00:00Z`);
-  day.setUTCDate(day.getUTCDate() + 1);
-  return day.toISOString().slice(0, 10);
 }
 
 /**
@@ -186,7 +317,8 @@ function instantOf(day: string, time: string, zone: string | undefined): string 
  * from the same input, in the same file.
  *
  * The stored form is the one INBOUND writes — a UTC instant with the zone
- * alongside — and not the local string Google is sent. They are the same moment
+ * alongside for a timed event, a bare date for an all-day one — and not the
+ * local string Google is sent. A timed event's two forms are the same moment
  * said two ways, and keeping our own record in the other way would make an
  * edited event jump on the grid of anyone reading it from a different zone,
  * until the next poll quietly moved it back.
@@ -202,10 +334,18 @@ export function withExternalEdit(
   const next: ExternalCalendarEvent = { ...event, updatedAt: now };
   if (patch.summary) next.title = patch.summary;
   if (patch.description !== undefined) next.description = patch.description;
-  if (patch.start?.dateTime) {
+  // The kind of event follows the form the patch writes the start in, because
+  // that is exactly what Google will decide when it reads the same patch.
+  if (patch.start?.date) {
+    next.start = patch.start.date;
+    next.allDay = true;
+  } else if (patch.start?.dateTime) {
     next.start = instantOf(patch.start.dateTime.slice(0, 10), patch.start.dateTime.slice(11, 16), event.timezone);
+    next.allDay = false;
   }
-  if (patch.end?.dateTime) {
+  if (patch.end?.date) {
+    next.end = patch.end.date;
+  } else if (patch.end?.dateTime) {
     next.end = instantOf(patch.end.dateTime.slice(0, 10), patch.end.dateTime.slice(11, 16), event.timezone);
   }
   return next;

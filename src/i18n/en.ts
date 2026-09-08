@@ -392,6 +392,7 @@ export const en: Dictionary = {
   "calendar.yearTitle": "{{year}}",
   "calendar.popoverAddMemo": "Add memo or URL",
   "calendar.deleteEvent": "Delete event",
+  "calendar.eventTitleLabel": "Title",
   "calendar.memoLabel": "Memo",
   "calendar.noUnscheduled": "No unscheduled tasks to suggest.",
   "calendar.hideSidebar": "Hide sidebar",

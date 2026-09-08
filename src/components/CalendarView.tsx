@@ -40,6 +40,7 @@ import {
 import { inboxListId } from "../domain/spaces/membership";
 import { LIST_COLOR_PRESETS } from "../domain/tasks/listColor";
 import { DEFAULT_CALENDAR_VIEW_OPTIONS } from "../domain/calendar/viewOptions";
+import type { ExternalEventEdit } from "../domain/calendar/googleSync/externalEventShape";
 import { CalendarViewOptionsMenu } from "./calendar/CalendarViewOptions";
 import {
   DAY_END,
@@ -115,7 +116,7 @@ interface CalendarViewProps {
    * write goes somewhere else — routing both through one callback would mean a
    * handler that has to ask what it was given before it can act.
    */
-  onUpdateExternalEvent?: (eventId: string, edit: { title?: string; description?: string; startTime?: string; endTime?: string }) => void;
+  onUpdateExternalEvent?: (eventId: string, edit: ExternalEventEdit) => void;
   onDeleteExternalEvent?: (eventId: string) => void;
   /**
    * Opens a TASK — the app's own Detail, beside the block that was clicked
@@ -605,45 +606,82 @@ export function CalendarView({
     };
   }
 
+  /**
+   * The external block a gesture named, if that is what it named (§6.2).
+   *
+   * Every gesture below arrives as a bare source id, and there are two records
+   * it could mean. Asking here rather than at each drop site keeps the question
+   * in one place — and keeps the answer from being "a Task", which is what the
+   * schedule writer would otherwise be handed an event id and asked to do.
+   */
+  function externalItem(sourceId: string): CalendarItem | undefined {
+    return items.find((item) => item.sourceType === "external" && item.sourceId === sourceId);
+  }
+
+  /**
+   * The edit an external block's gesture becomes, or nothing when it may not
+   * be edited — an ICS subscription, or a repeating Google event (§8).
+   *
+   * Returns whether it handled the gesture, so each handler reads as "if this
+   * was an event, it is dealt with" and no event id ever reaches the task path.
+   */
+  function editExternal(sourceId: string, edit: ExternalEventEdit): boolean {
+    const item = externalItem(sourceId);
+    if (!item) return false;
+    if (!item.readOnly) onUpdateExternalEvent?.(sourceId, edit);
+    return true;
+  }
+
   /** Drop a task onto `day` as a single-day schedule. */
   function placeOn(taskId: string, day: string, startTime = "", endTime = "") {
     onUpdateTaskSchedule(taskId, scheduleFor(taskId, day, startTime, endTime));
   }
 
-  /** Move a task's existing schedule onto `day`, keeping whatever times it has. */
-  function moveToDay(taskId: string, day: string) {
-    const current = scheduleFromTask(tasks.find((item) => item.id === taskId) ?? {});
-    onUpdateTaskSchedule(taskId, { ...current, startDate: null, dueDate: day });
+  /** Move an item's existing schedule onto `day`, keeping whatever times it has. */
+  function moveToDay(sourceId: string, day: string) {
+    // A Google event keeps its clock and its kind: this drop names a day, and
+    // an all-day event dropped on another day is still an all-day event.
+    if (editExternal(sourceId, { date: day })) return;
+    const current = scheduleFromTask(tasks.find((item) => item.id === sourceId) ?? {});
+    onUpdateTaskSchedule(sourceId, { ...current, startDate: null, dueDate: day });
   }
 
   function dropCell(event: DragEvent, day: string) {
     event.preventDefault();
-    const taskId = event.dataTransfer.getData("text/plain");
-    if (taskId) {
-      moveToDay(taskId, day);
+    const sourceId = event.dataTransfer.getData("text/plain");
+    if (sourceId) {
+      moveToDay(sourceId, day);
     }
     handleDragEnd();
   }
 
   // Resize commits keep the estimate in sync (spec §8.4): the block length
   // IS the new expected effort. Overlaps are allowed, same as drops.
-  function handleResizeItem(taskId: string, day: string, startTime: string, endTime: string) {
+  function handleResizeItem(sourceId: string, day: string, startTime: string, endTime: string) {
     const duration = timeToMinutes(endTime) - timeToMinutes(startTime);
     if (duration < TIME_SNAP_MINUTES) return;
-    placeOn(taskId, day, startTime, endTime);
-    onUpdateTask(taskId, { estimatedMinutes: duration });
+    // No estimate to keep in sync on the Google side: an event's length is the
+    // event, where a task's block length is a guess about a task.
+    if (editExternal(sourceId, { date: day, startTime, endTime, allDay: false })) return;
+    placeOn(sourceId, day, startTime, endTime);
+    onUpdateTask(sourceId, { estimatedMinutes: duration });
   }
 
   // Pointer-based block move: silently committed (the moving block itself
   // already previews the exact target slot). Overlaps are allowed.
-  function handleMoveItem(taskId: string, day: string, startTime: string, endTime: string) {
-    placeOn(taskId, day, startTime, endTime);
+  function handleMoveItem(sourceId: string, day: string, startTime: string, endTime: string) {
+    // `allDay: false` is the gesture speaking: a chip dragged out of the
+    // all-day band into the grid landed on an hour, and that is what makes it
+    // a timed event.
+    if (editExternal(sourceId, { date: day, startTime, endTime, allDay: false })) return;
+    placeOn(sourceId, day, startTime, endTime);
   }
 
   // Dropping a time block on the all-day band keeps the date but clears the
   // times, turning it into an all-day item.
-  function handleMoveItemToAllDay(taskId: string, day: string) {
-    placeOn(taskId, day);
+  function handleMoveItemToAllDay(sourceId: string, day: string) {
+    if (editExternal(sourceId, { date: day, allDay: true })) return;
+    placeOn(sourceId, day);
   }
 
   function suggestSchedule() {
@@ -719,14 +757,24 @@ export function CalendarView({
     setPopover({ kind: "event", item, anchor });
   }
 
-  // Quick edit from the popover: start/end time + memo only (§ user request);
-  // anything deeper still goes through the task detail drawer.
-  function handleQuickEditSave(item: CalendarItem, input: { startTime: string; endTime: string; memo: string }) {
+  // Quick edit from the popover: start/end time + memo, and the name when the
+  // block is an external event (§6.2). Anything deeper still goes through the
+  // task detail drawer.
+  function handleQuickEditSave(
+    item: CalendarItem,
+    input: { startTime: string; endTime: string; memo: string; title?: string },
+  ) {
     if (item.sourceType === "external") {
       // The memo field is the event's description on this side. Same box, same
       // meaning; only the record it lands on differs.
+      //
+      // The title comes through here for external events only, and that is not
+      // an omission on the task side: a task's title is edited in its Detail,
+      // which is what clicking a task block opens. An external event has no
+      // Detail to open, so the popover is the only place its name can change.
       if (item.readOnly || !onUpdateExternalEvent) return;
       onUpdateExternalEvent(item.sourceId, {
+        ...(input.title ? { title: input.title } : {}),
         startTime: input.startTime,
         endTime: input.endTime,
         description: input.memo,

@@ -160,13 +160,17 @@ export function EventPopover({
   // Quick edit (start/end time + memo) inline in the popover, replacing the
   // jump to the day-view detail panel for task events.
   initialMemo?: string;
-  onSaveQuickEdit?: (item: CalendarItem, input: { startTime: string; endTime: string; memo: string }) => void;
+  onSaveQuickEdit?: (
+    item: CalendarItem,
+    input: { startTime: string; endTime: string; memo: string; title?: string },
+  ) => void;
 }) {
   const { t, lang } = useT();
   const timeFormat = useTimeFormat();
   const clockLocale = lang === "ko" ? "ko" : "en";
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [title, setTitle] = useState(item.title);
   const [startTime, setStartTime] = useState(item.startTime ?? "");
   const [endTime, setEndTime] = useState(item.endTime ?? "");
   const [memo, setMemo] = useState(initialMemo ?? "");
@@ -186,9 +190,14 @@ export function EventPopover({
     onSaveQuickEdit && (item.sourceType === "task" || item.sourceType === "external") && !item.readOnly,
   );
 
+  // A task's name is edited in its Detail, which its block opens. An external
+  // event has no Detail, so this form is the only place its name can change —
+  // hence the field for one kind of event and not the other.
+  const canRename = canQuickEdit && item.sourceType === "external";
+
   function submitQuickEdit(event: FormEvent) {
     event.preventDefault();
-    onSaveQuickEdit!(item, { startTime, endTime, memo });
+    onSaveQuickEdit!(item, { startTime, endTime, memo, ...(canRename ? { title } : {}) });
   }
   // Derived markers (project deadline, review) and read-only external events
   // keep the popover action-free; a writable external event does not, because
@@ -293,6 +302,12 @@ export function EventPopover({
       ) : canQuickEdit ? (
         editOpen ? (
           <form className="gcal-popover-edit" onSubmit={submitQuickEdit}>
+            {canRename ? (
+              <label className="gcal-popover-edit-title">
+                <span>{t("calendar.eventTitleLabel")}</span>
+                <input type="text" value={title} onChange={(event) => setTitle(event.target.value)} />
+              </label>
+            ) : null}
             <div className="gcal-popover-edit-row">
               <label>
                 <span>{t("calendar.startTime")}</span>

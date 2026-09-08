@@ -391,6 +391,15 @@ export function buildCalendarItems({
         cursor = next;
       }
     }
+    // A repeating Google event is not this grid's to change. An occurrence
+    // carries a synthetic id (`recurrence.ts`), the record behind it is the
+    // series, and Google has to be told whether an edit means this one or all
+    // of them — a question no drag can answer. §8 keeps recurrence one-way for
+    // the same reason, and offering a gesture that silently lands nowhere is
+    // worse than not offering it.
+    const seriesBound = Boolean(event.occurrenceOf || event.recurrence);
+    const writable = !event.readOnly && !seriesBound;
+
     for (const date of dates) {
       items.push({
         key: `external:${event.id}:${date}`,
@@ -408,8 +417,13 @@ export function buildCalendarItems({
         categoryId: eventCategoryId,
         // A Google event the account may write is an event this app may move.
         // An ICS subscription stays exactly as fixed as it was (§6.2).
-        draggable: !event.readOnly,
-        readOnly: event.readOnly,
+        //
+        // A multi-day all-day event emits one chip per day it covers, and
+        // dragging one of those would have to mean either "move the whole
+        // thing" or "change this end" — the same ambiguity that keeps a task
+        // range undraggable above, answered the same way.
+        draggable: writable && dates.length === 1,
+        readOnly: !writable,
       });
     }
   }

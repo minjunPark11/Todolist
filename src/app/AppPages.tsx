@@ -10,6 +10,7 @@ import type { AutoBackupState } from "./useAutoBackup";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import type { SettingsUpdateStatus } from "../platform";
 import type { TaskDetailPresentation } from "../domain/tasks/responsive";
+import type { ExternalEventEdit } from "../domain/calendar/googleSync/externalEventShape";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Task } from "../types";
 
 type Planner = ReturnType<typeof usePlannerData>;
@@ -73,7 +74,7 @@ type AppPagesProps = {
   onAddExternalCalendar: (input: { name: string; icsUrl: string; color: string }) => void;
   onUpdateExternalCalendar: (calendarId: string, patch: Partial<ExternalCalendar>) => void;
   /** A writable Google event, edited or removed from the grid (§6.2). */
-  onUpdateExternalEvent?: (eventId: string, edit: { title?: string; description?: string; startTime?: string; endTime?: string }) => void;
+  onUpdateExternalEvent?: (eventId: string, edit: ExternalEventEdit) => void;
   onDeleteExternalEvent?: (eventId: string) => void;
   onDeleteExternalCalendar: (calendarId: string) => void;
   onSyncExternalCalendar: (calendarId: string) => void;

@@ -261,6 +261,28 @@ describe("external events", () => {
     expect(items.map((item) => item.date)).toEqual(["2026-08-17", "2026-08-18", "2026-08-19"]);
   });
 
+  // Which blocks the grid may move (GOOGLE_CALENDAR_SYNC_DESIGN.md §6.2, §8).
+  it("offers the drag on a Google event the account may write", () => {
+    const items = build({
+      externalCalendars: [calendar],
+      externalCalendarEvents: [event({ readOnly: false })],
+    });
+    expect(items[0].draggable).toBe(true);
+    expect(items[0].readOnly).toBe(false);
+  });
+
+  it("refuses the drag on a multi-day event, whoever owns it", () => {
+    // One chip per day it covers, and dragging one would have to mean either
+    // "move the whole thing" or "change this end" — the ambiguity that keeps a
+    // task range undraggable too.
+    const items = build({
+      externalCalendars: [calendar],
+      externalCalendarEvents: [event({ readOnly: false, allDay: true, start: "2026-08-17", end: "2026-08-20" })],
+    });
+    expect(items).toHaveLength(3);
+    expect(items.every((item) => !item.draggable)).toBe(true);
+  });
+
   it("ignores events from a hidden or disabled calendar", () => {
     for (const off of [{ visible: false }, { enabled: false }]) {
       expect(build({ externalCalendars: [{ ...calendar, ...off }], externalCalendarEvents: [event()] })).toEqual([]);
@@ -322,6 +344,19 @@ describe("external events that repeat", () => {
       externalCalendarRange: { from: "2026-08-01", to: "2026-08-31" },
     });
     expect(new Set(keys(items)).size).toBe(items.length);
+  });
+
+  it("leaves a repeating event alone even on a calendar the account owns", () => {
+    // An occurrence has a synthetic id and the record behind it is the series;
+    // Google would also have to be told whether the edit means this one or all
+    // of them. The grid has no gesture for that question, so it does not ask
+    // it — §8 keeps recurrence one-way for the same reason.
+    const items = build({
+      externalCalendars: [calendar],
+      externalCalendarEvents: [{ ...weekly, readOnly: false }],
+      externalCalendarRange: { from: "2026-08-01", to: "2026-08-31" },
+    });
+    expect(items.every((item) => item.readOnly && !item.draggable)).toBe(true);
   });
 
   it("shows one occurrence when the caller gives no range", () => {

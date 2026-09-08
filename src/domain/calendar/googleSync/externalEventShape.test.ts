@@ -115,3 +115,90 @@ describe("what our own record becomes", () => {
     expect(next.description).toBe("room 3");
   });
 });
+
+// The grid's own gestures, which say a day and sometimes say whether the event
+// is an all-day one at all (§6.2).
+describe("what a drag says", () => {
+  it("moves a timed event to another day and keeps its clock", () => {
+    // The month grid's drop names a day and nothing else. Reading the clock off
+    // the UTC string instead of the event's zone would move 14:00 to 05:00.
+    const patch = toGoogleEventPatch(event(), { date: "2026-09-10" });
+    expect(patch?.start).toEqual({ dateTime: "2026-09-10T14:00:00", timeZone: "Asia/Seoul" });
+    expect(patch?.end).toEqual({ dateTime: "2026-09-10T14:30:00", timeZone: "Asia/Seoul" });
+  });
+
+  it("carries an overnight event's second day with it", () => {
+    // 23:00 on the 8th to 01:00 on the 9th, Seoul. Moved to the 10th it is
+    // still two hours long; anchoring the end to the new day would make it
+    // twenty-two hours, or a start after its end.
+    const overnight = event({ start: "2026-09-08T14:00:00.000Z", end: "2026-09-08T16:00:00.000Z" });
+    const patch = toGoogleEventPatch(overnight, { date: "2026-09-10" });
+    expect(patch?.start?.dateTime).toBe("2026-09-10T23:00:00");
+    expect(patch?.end?.dateTime).toBe("2026-09-11T01:00:00");
+  });
+
+  it("sends only the edge a resize moved", () => {
+    // The gesture reports a whole position either way. Sending the start it did
+    // not touch bumps the etag for nothing and comes back on the next poll
+    // looking like an edit somebody else made (§6.3).
+    const patch = toGoogleEventPatch(event(), { date: "2026-09-08", startTime: "14:00", endTime: "15:00" });
+    expect(patch?.start).toBeUndefined();
+    expect(patch?.end?.dateTime).toBe("2026-09-08T15:00:00");
+  });
+
+  it("sends nothing when the drag ends where it began", () => {
+    expect(toGoogleEventPatch(event(), { date: "2026-09-08", startTime: "14:00", endTime: "14:30" })).toBeNull();
+  });
+
+  it("turns a timed event into an all-day one on the day it was dropped", () => {
+    // Google's end date is exclusive, so one day is start + 1.
+    const patch = toGoogleEventPatch(event(), { date: "2026-09-10", allDay: true });
+    expect(patch?.start).toEqual({ date: "2026-09-10" });
+    expect(patch?.end).toEqual({ date: "2026-09-11" });
+  });
+
+  it("keeps an all-day event's span when it moves", () => {
+    // A three-day trip dragged onto Friday is still three days. Collapsing it
+    // would be an edit nobody asked for, made on the way to the one they did.
+    const trip = event({ allDay: true, start: "2026-09-08", end: "2026-09-11" });
+    const patch = toGoogleEventPatch(trip, { date: "2026-09-14" });
+    expect(patch?.start).toEqual({ date: "2026-09-14" });
+    expect(patch?.end).toEqual({ date: "2026-09-17" });
+  });
+
+  it("leaves an all-day event all-day when the drag names no clock", () => {
+    // The month grid moves it to another day; inventing an hour for it there
+    // is worse than leaving it as the kind of event it is.
+    const allDay = event({ allDay: true, start: "2026-09-08", end: "2026-09-09" });
+    const patch = toGoogleEventPatch(allDay, { date: "2026-09-10" });
+    expect(patch?.start).toEqual({ date: "2026-09-10" });
+    expect(patch?.end).toEqual({ date: "2026-09-11" });
+  });
+
+  it("gives an all-day event a clock when the drag into the grid names one", () => {
+    const allDay = event({ allDay: true, start: "2026-09-08", end: "2026-09-09" });
+    const patch = toGoogleEventPatch(allDay, { date: "2026-09-08", startTime: "09:00", endTime: "10:00", allDay: false });
+    expect(patch?.start).toEqual({ dateTime: "2026-09-08T09:00:00", timeZone: "Asia/Seoul" });
+    expect(patch?.end).toEqual({ dateTime: "2026-09-08T10:00:00", timeZone: "Asia/Seoul" });
+  });
+
+  it("stores the kind of event the patch just made it", () => {
+    const now = "2026-09-08T00:00:00.000Z";
+    const toAllDay = withExternalEdit(event(), { date: "2026-09-10", allDay: true }, now);
+    expect(toAllDay.allDay).toBe(true);
+    expect(toAllDay.start).toBe("2026-09-10");
+    expect(toAllDay.end).toBe("2026-09-11");
+
+    // And back: an instant with the zone alongside, the form inbound writes.
+    const back = withExternalEdit(toAllDay, { date: "2026-09-10", startTime: "09:00", endTime: "10:00", allDay: false }, now);
+    expect(back.allDay).toBe(false);
+    expect(back.start).toBe("2026-09-10T00:00:00.000Z");
+    expect(back.end).toBe("2026-09-10T01:00:00.000Z");
+  });
+
+  it("moves our own record the same day it tells Google about", () => {
+    const next = withExternalEdit(event(), { date: "2026-09-10" }, "2026-09-08T00:00:00.000Z");
+    expect(next.start).toBe("2026-09-10T05:00:00.000Z");
+    expect(next.end).toBe("2026-09-10T05:30:00.000Z");
+  });
+});

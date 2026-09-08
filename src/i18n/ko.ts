@@ -388,6 +388,7 @@ export const ko: Dictionary = {
   "calendar.yearTitle": "{{year}}년",
   "calendar.popoverAddMemo": "메모 또는 URL 추가",
   "calendar.deleteEvent": "일정 삭제",
+  "calendar.eventTitleLabel": "제목",
   "calendar.memoLabel": "메모",
   "calendar.noUnscheduled": "추천할 미배정 작업이 없습니다.",
   "calendar.hideSidebar": "사이드바 숨기기",
