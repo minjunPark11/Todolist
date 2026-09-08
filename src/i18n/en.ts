@@ -597,6 +597,7 @@ export const en: Dictionary = {
   "calendar.changeCategoryAria": "Change category",
   "calendar.readOnlyCategoryToast": "This calendar is read-only. New events can't be added to it.",
   "calendar.externalSourceLine": "Source: {{name}} · read-only",
+  "calendar.externalSourceLineWritable": "Source: {{name}} · edits go back to Google",
   "calendar.cancelNewTaskAria": "Cancel new task",
   "calendar.optional": "Optional",
   "calendar.createTask": "Create task",

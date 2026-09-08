@@ -178,15 +178,24 @@ export function EventPopover({
   const canChangeCategory = Boolean(
     categoryGroups && onChangeCategory && item.sourceType === "task" && !item.readOnly,
   );
-  const canQuickEdit = Boolean(onSaveQuickEdit && item.sourceType === "task" && !item.readOnly);
+  // A Google event the account may write is editable here for the same reason
+  // a Task is: the change has somewhere to go (§6.2). What stays task-only is
+  // the CATEGORY above — an external event's category is the calendar it lives
+  // in, and moving it between Google calendars is a different operation.
+  const canQuickEdit = Boolean(
+    onSaveQuickEdit && (item.sourceType === "task" || item.sourceType === "external") && !item.readOnly,
+  );
 
   function submitQuickEdit(event: FormEvent) {
     event.preventDefault();
     onSaveQuickEdit!(item, { startTime, endTime, memo });
   }
-  // Only task-backed events can be deleted; derived markers (project deadline,
-  // review) and read-only external events keep the popover action-free.
-  const canDelete = Boolean(onDelete && item.sourceType === "task" && !item.readOnly);
+  // Derived markers (project deadline, review) and read-only external events
+  // keep the popover action-free; a writable external event does not, because
+  // the delete reaches Google.
+  const canDelete = Boolean(
+    onDelete && (item.sourceType === "task" || item.sourceType === "external") && !item.readOnly,
+  );
 
   // While the popover is open it acts as the selection, so Delete/Backspace
   // deletes the event without a separate selected-block state.
@@ -274,9 +283,12 @@ export function EventPopover({
       </p>
       {item.sourceType === "external" ? (
         <p className="gcal-popover-when">
-          {t("calendar.externalSourceLine", { name: item.externalCalendarName ?? "" })}
+          {item.readOnly
+            ? t("calendar.externalSourceLine", { name: item.externalCalendarName ?? "" })
+            : t("calendar.externalSourceLineWritable", { name: item.externalCalendarName ?? "" })}
         </p>
-      ) : item.sourceType === "focus" ? (
+      ) : null}
+      {item.sourceType === "external" && item.readOnly ? null : item.sourceType === "focus" ? (
         <p className="gcal-popover-when">{t("calendar.focusSourceLine")}</p>
       ) : canQuickEdit ? (
         editOpen ? (

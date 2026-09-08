@@ -590,6 +590,7 @@ export const ko: Dictionary = {
   "calendar.changeCategoryAria": "카테고리 변경",
   "calendar.readOnlyCategoryToast": "이 캘린더는 읽기 전용입니다. 새 일정을 추가할 수 없습니다.",
   "calendar.externalSourceLine": "출처: {{name}} · 읽기 전용",
+  "calendar.externalSourceLineWritable": "출처: {{name}} · 고치면 구글에 반영됩니다",
   "calendar.cancelNewTaskAria": "새 할 일 취소",
   "calendar.optional": "선택 사항",
   "calendar.createTask": "할 일 만들기",
