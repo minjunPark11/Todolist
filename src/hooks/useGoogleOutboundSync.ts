@@ -14,7 +14,13 @@
 // nothing and stops.
 import { useCallback, useEffect, useRef } from "react";
 import { isEmptyPlan, planOutbound, type IdentifiedTask } from "../domain/calendar/googleSync/outboundPlan";
-import { currentAccessToken, GOOGLE_CONNECTION_CHANGED, readConnection } from "../lib/googleCalendar";
+import {
+  currentAccessToken,
+  ensureDedicatedCalendar,
+  GOOGLE_CONNECTION_CHANGED,
+  notifyGoogleConnectionChanged,
+  readConnection,
+} from "../lib/googleCalendar";
 import { runOutbound, type OutboundOutcome } from "../lib/googleCalendarOutbound";
 import type { Task } from "../types";
 
@@ -58,6 +64,20 @@ export function useGoogleOutboundSync({ tasks, timezone, tombstones, signedIn, o
       if (!accessToken) return;
 
       const outcome = await runOutbound({ plan, calendarId: connection.calendarId, timezone: zone, accessToken });
+
+      // The calendar we write to is not in the account any more — deleted in
+      // Google, most likely (§7.3). Nothing in the outcome may be applied: the
+      // pass stopped at the first 404 precisely so that it would not unlink
+      // every Task on the way down. Making the calendar again is the recovery,
+      // and it is the same call the connect flow uses; the ids the Tasks still
+      // hold point into the old one, so each will 404 once against the new
+      // calendar, unlink, and be created afresh.
+      if (outcome.calendarMissing) {
+        await ensureDedicatedCalendar(accessToken);
+        notifyGoogleConnectionChanged();
+        return;
+      }
+
       report(outcome);
     } catch {
       // Whatever went wrong, nothing was written down, so the next trigger

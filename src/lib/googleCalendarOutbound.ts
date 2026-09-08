@@ -13,6 +13,7 @@ import {
   type SyncableTask,
 } from "../domain/calendar/googleSync/eventShape";
 import type { IdentifiedTask, OutboundPlan } from "../domain/calendar/googleSync/outboundPlan";
+import { calendarIsUnreachable, probeCalendar } from "./googleCalendarAccess";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
@@ -60,9 +61,28 @@ export interface OutboundOutcome {
    * and says so instead of spending a hundred requests proving it.
    */
   expired: boolean;
+  /**
+   * The dedicated calendar itself is not there (§7.3).
+   *
+   * Every event in a calendar that is gone answers 404, and reading each of
+   * those as "this event was deleted" unlinks every Task in one pass and then
+   * fails to recreate any of them in the next — forever, because the calendar
+   * the creates go to is the one that is missing. So the first 404 asks about
+   * the calendar, and if THAT is the answer the pass stops here and says so.
+   * The caller's recovery is `ensureDedicatedCalendar`, which already knows how
+   * to make a new one.
+   */
+  calendarMissing: boolean;
 }
 
-const EMPTY: OutboundOutcome = { mapped: [], unlinked: [], clearedOrphans: [], failed: 0, expired: false };
+const EMPTY: OutboundOutcome = {
+  mapped: [],
+  unlinked: [],
+  clearedOrphans: [],
+  failed: 0,
+  expired: false,
+  calendarMissing: false,
+};
 
 interface GoogleReply {
   status: number;
@@ -125,12 +145,27 @@ export async function runOutbound({
   const outcome: OutboundOutcome = { ...EMPTY, mapped: [], unlinked: [], clearedOrphans: [] };
   const base = events(calendarId);
 
+  // Asked at most once, and only when a 404 makes it worth asking (§7.2). The
+  // answer cannot change halfway through a pass, and the probe must never
+  // become a request we spend on every write.
+  let probed: boolean | null = null;
+  async function calendarIsMissing(): Promise<boolean> {
+    if (probed === null) {
+      probed = calendarIsUnreachable(await probeCalendar(calendarId, accessToken, deps));
+    }
+    return probed;
+  }
+
   for (const task of plan.create) {
     const reply = await call(base, accessToken, deps, {
       method: "POST",
       body: JSON.stringify(toGoogleEventBody(task as SyncableTask, timezone)),
     });
     if (reply.status === 401) return { ...outcome, expired: true };
+    // A create into a calendar that is not there fails the same way forever.
+    if (missing(reply.status) && (await calendarIsMissing())) {
+      return { ...outcome, calendarMissing: true };
+    }
 
     const mapping = mappingFrom(task, reply);
     if (mapping) outcome.mapped.push(mapping);
@@ -141,13 +176,20 @@ export async function runOutbound({
     const result = await updateOne(task, base, timezone, accessToken, deps);
     if (result === "expired") return { ...outcome, expired: true };
     if (result === "failed") outcome.failed += 1;
-    else if (result === "gone") outcome.unlinked.push(task.id);
-    else if (result) outcome.mapped.push(result);
+    else if (result === "gone") {
+      // "Not found" is true of an event in a calendar that is gone, too — and
+      // unlinking on that reading would clear every mapping in the account.
+      if (await calendarIsMissing()) return { ...outcome, calendarMissing: true };
+      outcome.unlinked.push(task.id);
+    } else if (result) outcome.mapped.push(result);
   }
 
   for (const { taskId, eventId } of plan.delete) {
     const reply = await call(`${base}/${encodeURIComponent(eventId)}`, accessToken, deps, { method: "DELETE" });
     if (reply.status === 401) return { ...outcome, expired: true };
+    if (missing(reply.status) && (await calendarIsMissing())) {
+      return { ...outcome, calendarMissing: true };
+    }
     if (deleteSucceeded(reply.status)) outcome.unlinked.push(taskId);
     else outcome.failed += 1;
   }
@@ -155,13 +197,22 @@ export async function runOutbound({
   for (const eventId of plan.orphans) {
     const reply = await call(`${base}/${encodeURIComponent(eventId)}`, accessToken, deps, { method: "DELETE" });
     if (reply.status === 401) return { ...outcome, expired: true };
-    // Only a real answer clears the tombstone. A network failure leaves the id
-    // on the list, which is the whole reason the list exists (§4.3).
+    // A tombstone is cleared by a real answer about a real calendar. Clearing
+    // it on a 404 from a calendar we cannot reach would forget the one piece of
+    // work nothing else remembers (§4.3).
+    if (missing(reply.status) && (await calendarIsMissing())) {
+      return { ...outcome, calendarMissing: true };
+    }
     if (deleteSucceeded(reply.status)) outcome.clearedOrphans.push(eventId);
     else outcome.failed += 1;
   }
 
   return outcome;
+}
+
+/** The two statuses that mean "not here", whatever "here" turns out to be. */
+function missing(status: number): boolean {
+  return status === 404 || status === 410;
 }
 
 /**

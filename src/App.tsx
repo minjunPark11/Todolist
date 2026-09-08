@@ -20,6 +20,7 @@ import { useGoogleOutboundSync } from "./hooks/useGoogleOutboundSync";
 import { useGoogleInboundSync } from "./hooks/useGoogleInboundSync";
 import { currentAccessToken, googleCalendarFetch } from "./lib/googleCalendar";
 import { deleteExternalEvent, writeExternalEvent } from "./lib/googleCalendarEventWrite";
+import { calendarErrorMessage, type CalendarAccess } from "./lib/googleCalendarAccess";
 import { withExternalEdit, type ExternalEventEdit } from "./domain/calendar/googleSync/externalEventShape";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
@@ -912,7 +913,28 @@ export default function App() {
     if (!event || event.readOnly) return null;
     const calendar = externalCalendarState.calendars.find((item) => item.id === event.externalCalendarId);
     if (!calendar?.googleCalendarId) return null;
-    return { event, googleCalendarId: calendar.googleCalendarId };
+    return { event, googleCalendarId: calendar.googleCalendarId, calendarId: calendar.id };
+  }
+
+  /**
+   * The calendar is not reachable any more (§7.2).
+   *
+   * Its events stay exactly where they are. They are still in somebody's
+   * account as far as anything here knows, and a grid that quietly dropped them
+   * would be hiding meetings rather than reporting a problem. What changes is
+   * the calendar's own row, which is where a person can act on it.
+   */
+  function markCalendarUnreachable(calendarId: string, access: CalendarAccess) {
+    const message = calendarErrorMessage(access);
+    saveExternalState((current) => ({
+      events: current.events,
+      calendars: current.calendars.map((calendar) =>
+        calendar.id === calendarId
+          ? { ...calendar, syncStatus: "failed", lastError: message, updatedAt: new Date().toISOString() }
+          : calendar,
+      ),
+    }));
+    showToast({ message });
   }
 
   function replaceExternalEvent(eventId: string, next: ExternalCalendarEvent | null) {
@@ -965,6 +987,11 @@ export default function App() {
       replaceExternalEvent(eventId, null);
       return;
     }
+    if (result.kind === "calendarGone") {
+      replaceExternalEvent(eventId, target.event);
+      markCalendarUnreachable(target.calendarId, result.access);
+      return;
+    }
     // Superseded, expired or failed: Google does not hold what we just drew.
     replaceExternalEvent(eventId, {
       ...target.event,
@@ -988,6 +1015,9 @@ export default function App() {
       { event: target.event, googleCalendarId: target.googleCalendarId, accessToken },
       { fetch: googleCalendarFetch },
     );
+    if (result.kind === "calendarGone") {
+      markCalendarUnreachable(target.calendarId, result.access);
+    }
     // `gone` is the success. Anything else means it is still in the account,
     // and a grid that has already forgotten it would never show it again.
     if (result.kind !== "gone") {

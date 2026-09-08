@@ -14,6 +14,7 @@ import {
   type ExternalEventEdit,
 } from "../domain/calendar/googleSync/externalEventShape";
 import type { ExternalCalendarEvent } from "../types";
+import { calendarIsUnreachable, probeCalendar, type CalendarAccess } from "./googleCalendarAccess";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
@@ -28,6 +29,15 @@ export type EventWriteResult =
   | { kind: "superseded"; etag?: string }
   /** The event is not there any more. The next inbound pass will tidy up. */
   | { kind: "gone" }
+  /**
+   * The CALENDAR is not there — the 404 was about the wrong thing (§7).
+   *
+   * Distinct from `gone` because the grid must do the opposite: an event whose
+   * calendar we cannot reach still exists as far as anyone can tell, and
+   * dropping the block would hide a meeting that is still on someone's
+   * calendar. The calendar is marked instead, once, where the person can see it.
+   */
+  | { kind: "calendarGone"; access: CalendarAccess }
   /** The grant is dead. */
   | { kind: "expired" }
   /** Nothing to send — the edit changed nothing. */
@@ -37,6 +47,21 @@ export type EventWriteResult =
 interface Reply {
   status: number;
   body: Record<string, unknown> | null;
+}
+
+/**
+ * What a 404 on this event actually meant (§7.2).
+ *
+ * One extra request, and only on the answer that is ambiguous. Everything else
+ * takes the cheap path it always did.
+ */
+async function missingMeans(
+  googleCalendarId: string,
+  accessToken: string,
+  deps: EventWriteDeps,
+): Promise<EventWriteResult> {
+  const access = await probeCalendar(googleCalendarId, accessToken, deps);
+  return calendarIsUnreachable(access) ? { kind: "calendarGone", access } : { kind: "gone" };
 }
 
 async function call(path: string, accessToken: string, deps: EventWriteDeps, init: RequestInit = {}): Promise<Reply> {
@@ -95,7 +120,7 @@ export async function writeExternalEvent(
     ...(ifMatch ? { headers: ifMatch } : {}),
   });
   if (first.status === 401) return { kind: "expired" };
-  if (first.status === 404 || first.status === 410) return { kind: "gone" };
+  if (first.status === 404 || first.status === 410) return missingMeans(googleCalendarId, accessToken, deps);
   if (first.status === 200) {
     return {
       kind: "written",
@@ -107,7 +132,7 @@ export async function writeExternalEvent(
 
   const remote = await call(path, accessToken, deps);
   if (remote.status === 401) return { kind: "expired" };
-  if (remote.status === 404 || remote.status === 410) return { kind: "gone" };
+  if (remote.status === 404 || remote.status === 410) return missingMeans(googleCalendarId, accessToken, deps);
   if (remote.status !== 200) return { kind: "failed" };
 
   const theirs = textOf(remote.body, "updated") ?? "";
@@ -120,7 +145,7 @@ export async function writeExternalEvent(
 
   const retry = await call(path, accessToken, deps, { method: "PATCH", body });
   if (retry.status === 401) return { kind: "expired" };
-  if (retry.status === 404 || retry.status === 410) return { kind: "gone" };
+  if (retry.status === 404 || retry.status === 410) return missingMeans(googleCalendarId, accessToken, deps);
   if (retry.status !== 200) return { kind: "failed" };
   return {
     kind: "written",
@@ -143,8 +168,10 @@ export async function deleteExternalEvent(
   const path = `/calendars/${encodeURIComponent(googleCalendarId)}/events/${encodeURIComponent(event.externalUid)}`;
   const reply = await call(path, accessToken, deps, { method: "DELETE" });
   if (reply.status === 401) return { kind: "expired" };
-  if (reply.status === 404 || reply.status === 410 || (reply.status >= 200 && reply.status < 300)) {
-    return { kind: "gone" };
-  }
+  if (reply.status >= 200 && reply.status < 300) return { kind: "gone" };
+  // A delete that finds nothing has done its job — unless what it could not
+  // find was the calendar, in which case the event is still in the account and
+  // forgetting it here would be the app losing it, not Google (§7.1).
+  if (reply.status === 404 || reply.status === 410) return missingMeans(googleCalendarId, accessToken, deps);
   return { kind: "failed" };
 }

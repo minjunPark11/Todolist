@@ -80,15 +80,56 @@ describe("when both sides changed (§5.3)", () => {
 });
 
 describe("when the event is not there", () => {
+  // Every case here now asks a second question — was it the EVENT that was not
+  // found, or the calendar? (GOOGLE_SYNC_HARDENING_DESIGN.md §7). The second
+  // step of each fixture is the calendar's answer.
   it("reports it gone rather than failed, so the next pass can tidy up", async () => {
-    const { deps } = fakeFetch([{ status: 404 }]);
+    const { deps, calls } = fakeFetch([{ status: 404 }, { status: 200, body: { id: "work@example.com" } }]);
     await expect(writeExternalEvent({ ...base, event: event(), edit: { title: "X" } }, deps)).resolves.toEqual({
       kind: "gone",
     });
+    expect(calls[1].url).toContain("/calendars/work%40example.com");
   });
 
   it("treats deleting something already deleted as done", async () => {
-    const { deps } = fakeFetch([{ status: 410 }]);
+    const { deps } = fakeFetch([{ status: 410 }, { status: 200, body: { id: "work@example.com" } }]);
+    await expect(deleteExternalEvent({ ...base, event: event() }, deps)).resolves.toEqual({ kind: "gone" });
+  });
+
+  it("does not ask about the calendar when the write succeeded", async () => {
+    // The probe is one request on an ambiguous answer, not a tax on every edit.
+    const { deps, calls } = fakeFetch([{ body: { etag: '"v2"' } }]);
+    await writeExternalEvent({ ...base, event: event(), edit: { title: "X" } }, deps);
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe("when the CALENDAR is not there", () => {
+  // The 404 answered a question we did not ask. Reading it as "this event was
+  // deleted" is how a removed calendar becomes an app that forgets every event
+  // in it, one edit at a time.
+  it("says so instead of reporting the event gone", async () => {
+    const { deps } = fakeFetch([{ status: 404 }, { status: 404 }]);
+    await expect(writeExternalEvent({ ...base, event: event(), edit: { title: "X" } }, deps)).resolves.toEqual({
+      kind: "calendarGone",
+      access: "gone",
+    });
+  });
+
+  it("tells a withdrawn share apart from a deleted calendar", async () => {
+    // Same conclusion for the events, different sentence for the person: one
+    // of these is something somebody else can undo.
+    const { deps } = fakeFetch([{ status: 404 }, { status: 403 }]);
+    await expect(deleteExternalEvent({ ...base, event: event() }, deps)).resolves.toEqual({
+      kind: "calendarGone",
+      access: "forbidden",
+    });
+  });
+
+  it("keeps the old conclusion when the probe itself cannot answer", async () => {
+    // A 500 on the probe says nothing about the calendar, and a flaky network
+    // must not become a way to hold an event on the grid forever.
+    const { deps } = fakeFetch([{ status: 404 }, { status: 500 }]);
     await expect(deleteExternalEvent({ ...base, event: event() }, deps)).resolves.toEqual({ kind: "gone" });
   });
 });

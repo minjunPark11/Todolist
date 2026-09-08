@@ -189,3 +189,61 @@ describe("an empty pass", () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+// The 404 that is not about the event (GOOGLE_SYNC_HARDENING_DESIGN.md §7.3).
+//
+// Every event in a calendar that is gone answers "not found". Reading each of
+// those as "this event was deleted" unlinks every Task in one pass, and then
+// the creates that follow fail against the same missing calendar — forever.
+describe("when the dedicated calendar itself is gone", () => {
+  const linked: IdentifiedTask = {
+    id: "t1",
+    title: "Write it down",
+    dueDate: "2026-09-04",
+    googleEventId: "ev1",
+    googleEtag: '"v1"',
+    updatedAt: "2026-09-04T00:00:00.000Z",
+  };
+
+  it("stops the pass instead of unlinking every task", async () => {
+    const { deps } = fakeGoogle({ PATCH: [{ status: 404, body: null }], GET: [{ status: 404, body: null }] });
+
+    const outcome = await run(planOutbound([linked]), deps);
+
+    expect(outcome.calendarMissing).toBe(true);
+    expect(outcome.unlinked).toEqual([]);
+    expect(outcome.mapped).toEqual([]);
+  });
+
+  it("stops a create that would fail the same way forever", async () => {
+    const { deps } = fakeGoogle({ POST: [{ status: 404, body: null }], GET: [{ status: 404, body: null }] });
+
+    const outcome = await run(planOutbound([task({ id: "t1" })]), deps);
+
+    expect(outcome.calendarMissing).toBe(true);
+    expect(outcome.failed).toBe(0);
+  });
+
+  it("does not clear a tombstone it could not really delete", async () => {
+    // A 404 from a calendar we cannot reach is not evidence the orphan is gone,
+    // and the tombstone list is the only thing that remembers that work.
+    const { deps } = fakeGoogle({ DELETE: [{ status: 404 }], GET: [{ status: 403, body: null }] });
+
+    const outcome = await run(planOutbound([], ["orphan-1"]), deps);
+
+    expect(outcome.calendarMissing).toBe(true);
+    expect(outcome.clearedOrphans).toEqual([]);
+  });
+
+  it("asks about the calendar once, however many events answer 404", async () => {
+    const { deps, calls } = fakeGoogle({
+      PATCH: [{ status: 404, body: null }, { status: 404, body: null }],
+      GET: [{ status: 200, body: { id: CALENDAR } }],
+    });
+
+    await run(planOutbound([linked, { ...linked, id: "t2", googleEventId: "ev2" }]), deps);
+
+    // Alive, so both unlink as before — and the probe is spent once, not twice.
+    expect(calls.filter((call) => call.method === "GET" && !call.url.includes("/events/"))).toHaveLength(1);
+  });
+});
