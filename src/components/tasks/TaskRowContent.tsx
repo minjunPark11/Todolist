@@ -26,7 +26,7 @@
 // views — the List's drag handle and its ⋯ menu, the Board's move-to-column
 // select, the matrix card's drag-to-a-day. Those are not a row; they are what
 // the view does with a row.
-import type { Language, Task } from "../../types";
+import type { Language, Tag, Task } from "../../types";
 import { isCompleted, isNote } from "../../domain/tasks/taskState";
 import { useT } from "../../i18n";
 import { countdownLabel } from "../../domain/view/countdown";
@@ -89,6 +89,19 @@ interface TaskRowContentProps {
    */
   showPriority?: boolean;
   /**
+   * The Tags on this Task, already resolved.
+   *
+   * Resolved by the caller rather than looked up here, for the reason every
+   * other field on this row is: `tagsForTask` walks every link in the store,
+   * and a row doing that is that walk once per row. The caller indexes the
+   * links once and hands over the answer.
+   *
+   * Optional: the matrix's cards do not pass it. A card is one column wide and
+   * its box already carries the priority; tags there would take the width the
+   * title needs, which is `showPriority`'s reason as well.
+   */
+  tags?: Tag[];
+  /**
    * Today, as `YYYY-MM-DD`. A caller that has grouped by date passes the value
    * it grouped with, so a card cannot be drawn late inside a group that says it
    * is not; anyone else gets today.
@@ -136,6 +149,7 @@ export function TaskRowContent({
   dateBy = "taskTime",
   showDetails = false,
   showPriority = true,
+  tags,
   today,
 }: TaskRowContentProps) {
   const { t, lang } = useT();
@@ -176,7 +190,12 @@ export function TaskRowContent({
   // too, so nothing about the quiet card changes.
   const bodyLine = showDetails ? body : "";
   const hasTips =
-    Boolean(listName) || Boolean(parentTitle) || repeats || hasBody || Boolean(dueLabel);
+    Boolean(listName) ||
+    Boolean(parentTitle) ||
+    Boolean(tags?.length) ||
+    repeats ||
+    hasBody ||
+    Boolean(dueLabel);
   // The level this row is allowed to say — the matrix's cards say `none`
   // because their box already is the priority.
   const level = showPriority ? task.priority : "none";
@@ -255,6 +274,26 @@ export function TaskRowContent({
             and they have to stay together when the title takes the width. */}
         {hasTips ? (
           <span className="tm-task-tips">
+            {/* What the Task is LIKE, where the rest of this cluster is where
+                it belongs and when it is due. It was reachable from four
+                places — the drawer, the row menu, quick add, the sidebar's
+                Tags section — and visible from none, so a tag put on a Task
+                could only be found by opening it again.
+
+                `#` because the name alone, sat beside a List's name in the
+                same grey, reads as a second List. It is the mark the tag is
+                written with everywhere else: the sidebar, and the block this
+                app writes into a Google event's description. */}
+            {tags?.map((tag) => (
+              <span
+                key={tag.id}
+                className="tm-task-tag"
+                style={tag.color ? { color: tag.color } : undefined}
+                title={tag.name}
+              >
+                #{tag.name}
+              </span>
+            ))}
             {/* The List as a name and nothing else. A coloured dot beside it
                 would be a second way of saying one word. */}
             {listName ? <span className="tm-task-list">{listName}</span> : null}

@@ -107,6 +107,27 @@ export function tagsForTask(taskId: string, tags: Tag[], links: TaskTag[]): Tag[
 }
 
 /**
+ * Every Task's tags at once, for a screen that draws many rows.
+ *
+ * `tagsForTask` walks every link to answer for one Task, which a list calling
+ * it per row turns into rows × links. This walks them once. Same rules:
+ * archived tags are not drawn, and the order is the name's.
+ */
+export function tagsByTaskId(tags: Tag[], links: TaskTag[]): Map<string, Tag[]> {
+  const byId = new Map(tags.map((tag) => [tag.id, tag]));
+  const found = new Map<string, Tag[]>();
+  for (const link of links) {
+    const tag = byId.get(link.tagId);
+    if (!tag || tag.archivedAt) continue;
+    const held = found.get(link.taskId);
+    if (held) held.push(tag);
+    else found.set(link.taskId, [tag]);
+  }
+  for (const held of found.values()) held.sort((a, b) => a.name.localeCompare(b.name));
+  return found;
+}
+
+/**
  * The names a Task's tags read as — the relation first, the strings second.
  *
  * This is the one read that Chapter 26 makes canonical. `Task.tags` is still

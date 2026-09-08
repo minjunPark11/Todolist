@@ -309,3 +309,33 @@ describe("the row that is two lines", () => {
     expect(document.querySelector(".tm-task-body")).toBeNull();
   });
 });
+
+describe("tags", () => {
+  const tag = (id: string, name: string, color?: string) => ({
+    id,
+    name,
+    ...(color ? { color } : {}),
+    createdAt: "2026-08-01T00:00:00.000Z",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+  });
+
+  it("says what the task is like, not only where it belongs", () => {
+    // The gap this closes: tags could be put on a task from four places and
+    // read back from none of them without opening the task again.
+    draw({}, { tags: [tag("tag-urgent", "urgent"), tag("tag-thesis", "thesis")] });
+    expect(screen.getByText("#urgent")).toBeTruthy();
+    expect(screen.getByText("#thesis")).toBeTruthy();
+  });
+
+  it("keeps the colour the user chose", () => {
+    draw({}, { tags: [tag("tag-urgent", "urgent", "#ff3b30")] });
+    // jsdom writes the hex back as rgb().
+    expect((screen.getByText("#urgent") as HTMLElement).style.color).toBe("rgb(255, 59, 48)");
+  });
+
+  it("draws nothing where the caller passes none", () => {
+    // The matrix's cards: one column wide, and the box already says the level.
+    draw();
+    expect(document.querySelector(".tm-task-tag")).toBeNull();
+  });
+});

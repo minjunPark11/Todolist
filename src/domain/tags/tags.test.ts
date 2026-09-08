@@ -10,6 +10,7 @@ import {
   sanitizeTaskTag,
   tagIdFor,
   tagNamesForTask,
+  tagsByTaskId,
   tagsForTask,
   taskIdsWithTag,
   taskTagIdFor,
@@ -242,5 +243,31 @@ describe("tagNamesForTask", () => {
 
   it("leaves legacy markers out of the fallback", () => {
     expect(tagNamesForTask(task({ id: "t9", tags: ["space:8f2a", "Work"] }), tags, links)).toEqual(["Work"]);
+  });
+});
+
+describe("tagsByTaskId", () => {
+  const tag = (id: string, name: string, archivedAt?: string) => ({
+    id,
+    name,
+    ...(archivedAt ? { archivedAt } : {}),
+    createdAt: "2026-08-01T00:00:00.000Z",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+  });
+  const link = (taskId: string, tagId: string) => ({
+    id: taskTagIdFor(taskId, tagId),
+    taskId,
+    tagId,
+    createdAt: "2026-08-01T00:00:00.000Z",
+  });
+
+  it("answers for every task in one walk, the way tagsForTask does for one", () => {
+    const tags = [tag("tag-b", "beta"), tag("tag-a", "alpha"), tag("tag-old", "gone", "2026-08-02T00:00:00.000Z")];
+    const links = [link("t1", "tag-b"), link("t1", "tag-a"), link("t1", "tag-old"), link("t2", "tag-a")];
+    const index = tagsByTaskId(tags, links);
+    expect(index.get("t1")?.map((item) => item.name)).toEqual(["alpha", "beta"]);
+    expect(index.get("t1")).toEqual(tagsForTask("t1", tags, links));
+    expect(index.get("t2")?.map((item) => item.name)).toEqual(["alpha"]);
+    expect(index.get("t3")).toBeUndefined();
   });
 });

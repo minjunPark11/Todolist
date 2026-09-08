@@ -12,7 +12,7 @@
 // therefore carries a plain "move to" selector that does the same thing,
 // reachable by keyboard and by touch.
 import { useRef, useState } from "react";
-import type { Task } from "../../types";
+import type { Tag, Task } from "../../types";
 import { COLUMN_NAME_MAX, type BoardColumn } from "../../domain/tasks/board";
 import { Caret } from "../common/Caret";
 import { useT } from "../../i18n";
@@ -23,6 +23,11 @@ import type { ScopeDateBy, ScopeKanbanSize } from "../../domain/view/scopeViewOp
 
 interface TaskBoardProps {
   columns: BoardColumn[];
+  /**
+   * Every card's Tags, indexed by Task (`domain/tags/tagsByTaskId`). The Board
+   * passes them through to the row and reads nothing out of them itself.
+   */
+  tagsOf?: ReadonlyMap<string, Tag[]>;
   /** The Tasks of one column, already in the order they should be shown. */
   tasksIn: (columnId: string) => Task[];
   /** Which column a Task is in now — so a drop inside it can be a reorder. */
@@ -128,6 +133,7 @@ interface TaskBoardProps {
 
 export function TaskBoard({
   columns,
+  tagsOf,
   tasksIn,
   columnOf,
   openTaskId,
@@ -461,7 +467,7 @@ export function TaskBoard({
                     onContextMenu(task, event.clientX, event.clientY);
                   }}
                 >
-                  <TaskRowContent task={task} today={today} dateBy={dateBy} showDetails={showDetails} onOpen={onOpen} onToggleDone={onToggleDone} />
+                  <TaskRowContent task={task} today={today} dateBy={dateBy} showDetails={showDetails} tags={tagsOf?.get(task.id)} onOpen={onOpen} onToggleDone={onToggleDone} />
 
                   {/* The non-drag path (§16.30). Same command, no gesture. */}
                   <label className="tm-card-move">
@@ -495,6 +501,7 @@ export function TaskBoard({
                 tasks={finishedIn(column.id)}
                 dateBy={dateBy}
                 showDetails={showDetails}
+                tagsOf={tagsOf}
                 today={today}
                 onOpen={onOpen}
                 onToggleDone={onToggleDone}
@@ -540,7 +547,7 @@ export function TaskBoard({
                 onDragStart={() => startDrag(task.id)}
                 onDragEnd={endDrag}
               >
-                <TaskRowContent task={task} today={today} dateBy={dateBy} showDetails={showDetails} onOpen={onOpen} onToggleDone={onToggleDone} />
+                <TaskRowContent task={task} today={today} dateBy={dateBy} showDetails={showDetails} tags={tagsOf?.get(task.id)} onOpen={onOpen} onToggleDone={onToggleDone} />
               </li>
             ))}
           </ul>
@@ -569,12 +576,14 @@ function BoardColumnFinished({
   openTaskId,
   dateBy,
   showDetails,
+  tagsOf,
   today,
   onOpen,
   onToggleDone,
 }: {
   tasks: Task[];
   openTaskId: string;
+  tagsOf?: ReadonlyMap<string, Tag[]>;
   // Carried down rather than defaulted here: the finished cards are the same
   // rows as the ones above them, and a group that read its dates differently
   // from the column it sits in would be one screen speaking two ways.
@@ -609,7 +618,7 @@ function BoardColumnFinished({
         <ul className="tm-column-cards" aria-label={t("tasks.completed")}>
           {visible.map((task) => (
             <li key={task.id} className={`tm-task is-card is-done${task.id === openTaskId ? " is-open" : ""}`}>
-              <TaskRowContent task={task} today={today} dateBy={dateBy} showDetails={showDetails} onOpen={onOpen} onToggleDone={onToggleDone} />
+              <TaskRowContent task={task} today={today} dateBy={dateBy} showDetails={showDetails} tags={tagsOf?.get(task.id)} onOpen={onOpen} onToggleDone={onToggleDone} />
             </li>
           ))}
           {hidden > 0 ? (

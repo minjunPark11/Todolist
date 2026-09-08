@@ -88,6 +88,7 @@ import { TrashLists } from "./TrashLists";
 import { binnedLists } from "../../domain/spaces/lifecycle";
 import { ListDeleteForeverGate } from "./ListDeleteForeverGate";
 import { TaskRowContent } from "./TaskRowContent";
+import { tagsByTaskId } from "../../domain/tags/tags";
 import { TaskGanttView } from "../TaskGanttView";
 import { projectItems } from "../../domain/view/item";
 import { colorForList } from "../../domain/calendar/itemColor";
@@ -338,6 +339,10 @@ export function TasksModule(props: TasksModuleProps) {
     () => ({ tasks, lists, dailyPlans, taskTags, today, savedFilters }),
     [tasks, lists, dailyPlans, taskTags, today, savedFilters],
   );
+
+  // Indexed once for every row this module draws — the List's and the Board's.
+  // A row resolving its own tags would walk every link, once per row.
+  const tagsOf = useMemo(() => tagsByTaskId(tags, taskTags), [tags, taskTags]);
 
   // §10.19: the Search Page opens inside this shell. It is not a Scope — no
   // registry entry, no allowed views, nothing to count — so it is read from
@@ -1216,6 +1221,7 @@ export function TasksModule(props: TasksModuleProps) {
           /* Only ever non-empty in the Trash: that is the one Scope
              a child is a row in (§13). */
           parentTitle={parentTitleOf(task)}
+          tags={tagsOf.get(task.id)}
           onOpen={openTask}
           onToggleDone={toggleDone}
         />
@@ -1461,6 +1467,7 @@ export function TasksModule(props: TasksModuleProps) {
           />
         ) : state.view === "board" ? (
           <TaskBoard
+            tagsOf={tagsOf}
             columns={columns}
             tasksIn={tasksIn}
             columnOf={columnOf}
