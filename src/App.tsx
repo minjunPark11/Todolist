@@ -20,8 +20,9 @@ import { useGoogleOutboundSync } from "./hooks/useGoogleOutboundSync";
 import { useGoogleInboundSync } from "./hooks/useGoogleInboundSync";
 import { currentAccessToken, googleCalendarFetch } from "./lib/googleCalendar";
 import { deleteExternalEvent, writeExternalEvent } from "./lib/googleCalendarEventWrite";
+import { createEventWriteQueue, type EventWriteQueue } from "./lib/googleEventWriteQueue";
 import { calendarErrorMessage, type CalendarAccess } from "./lib/googleCalendarAccess";
-import { withExternalEdit, type ExternalEventEdit } from "./domain/calendar/googleSync/externalEventShape";
+import type { ExternalEventEdit } from "./domain/calendar/googleSync/externalEventShape";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
 import { TasksModule } from "./components/tasks/TasksModule";
@@ -144,6 +145,24 @@ function mergeExternalCalendars(local: ExternalCalendar[], remote: ExternalCalen
   return [...mergedRemote, ...Array.from(localById.values())];
 }
 
+/**
+ * The calendar and event a grid action is really about, or null.
+ *
+ * Both have to be writable and the calendar has to be a Google one: an ICS
+ * subscription is a file, and there is nowhere to send an edit to it.
+ *
+ * Takes the state rather than reading it, because two callers need it at two
+ * different times — the render, and a queued write that runs later and must ask
+ * again rather than trust what was true when it was enqueued.
+ */
+function writableExternalIn(state: ExternalCalendarState, eventId: string) {
+  const event = state.events.find((item) => item.id === eventId);
+  if (!event || event.readOnly) return null;
+  const calendar = state.calendars.find((item) => item.id === event.externalCalendarId);
+  if (!calendar?.googleCalendarId) return null;
+  return { event, googleCalendarId: calendar.googleCalendarId, calendarId: calendar.id };
+}
+
 export default function App() {
   const planner = usePlannerData();
   const appSettings = planner.appSettings;
@@ -177,6 +196,10 @@ export default function App() {
   }, []);
   const [focusSettings, setFocusSettings] = useState<FocusUserSettings>(() => loadFocusUserSettings());
   const [externalCalendarState, setExternalCalendarState] = useState<ExternalCalendarState>(() => loadExternalCalendarState());
+  // Read by the write queue's jobs, which outlive the render that queued them.
+  const externalCalendarStateRef = useRef(externalCalendarState);
+  externalCalendarStateRef.current = externalCalendarState;
+  const externalWriteQueueRef = useRef<EventWriteQueue | null>(null);
   const [calendarShare, setCalendarShare] = useState<CalendarShareState>(emptyCalendarShareState);
   const [appVersion, setAppVersion] = useState(__APP_VERSION__);
   /* `idle` and not `checking`, because nothing checks at boot any more. Two
@@ -902,18 +925,8 @@ export default function App() {
     });
   }
 
-  /**
-   * The calendar and event a grid action is really about, or null.
-   *
-   * Both have to be writable and the calendar has to be a Google one: an ICS
-   * subscription is a file, and there is nowhere to send an edit to it.
-   */
   function writableExternal(eventId: string) {
-    const event = externalCalendarState.events.find((item) => item.id === eventId);
-    if (!event || event.readOnly) return null;
-    const calendar = externalCalendarState.calendars.find((item) => item.id === event.externalCalendarId);
-    if (!calendar?.googleCalendarId) return null;
-    return { event, googleCalendarId: calendar.googleCalendarId, calendarId: calendar.id };
+    return writableExternalIn(externalCalendarState, eventId);
   }
 
   /**
@@ -937,6 +950,48 @@ export default function App() {
     showToast({ message });
   }
 
+  /**
+   * The one queue, made on first use and kept for the life of the screen.
+   *
+   * Its jobs run long after the render that enqueued them, so everything they
+   * need comes out of a ref rather than out of the closure they were created
+   * in — a lane holding the first render's calendar list would write to the
+   * calendar the account had when the app started.
+   */
+  function externalWrites(): EventWriteQueue {
+    if (!externalWriteQueueRef.current) {
+      externalWriteQueueRef.current = createEventWriteQueue({
+        write: async (base, edit) => {
+          const target = writableExternalIn(externalCalendarStateRef.current, base.id);
+          if (!target) return { kind: "failed" };
+          const accessToken = await currentAccessToken();
+          if (!accessToken) return { kind: "failed" };
+          return writeExternalEvent(
+            { event: base, edit, googleCalendarId: target.googleCalendarId, accessToken },
+            { fetch: googleCalendarFetch },
+          );
+        },
+        remove: async (base) => {
+          const target = writableExternalIn(externalCalendarStateRef.current, base.id);
+          if (!target) return { kind: "failed" };
+          const accessToken = await currentAccessToken();
+          if (!accessToken) return { kind: "failed" };
+          return deleteExternalEvent(
+            { event: base, googleCalendarId: target.googleCalendarId, accessToken },
+            { fetch: googleCalendarFetch },
+          );
+        },
+        apply: (eventId, next) => replaceExternalEvent(eventId, next),
+        report: (eventId, result) => {
+          if (result.kind !== "calendarGone") return;
+          const target = writableExternalIn(externalCalendarStateRef.current, eventId);
+          if (target) markCalendarUnreachable(target.calendarId, result.access);
+        },
+      });
+    }
+    return externalWriteQueueRef.current;
+  }
+
   function replaceExternalEvent(eventId: string, next: ExternalCalendarEvent | null) {
     saveExternalState((current) => ({
       calendars: current.calendars,
@@ -947,87 +1002,29 @@ export default function App() {
   }
 
   /**
-   * An edit made on the grid, sent to Google (§6.2).
+   * An edit made on the grid, sent to Google (§6.2, §6 of the hardening design).
    *
    * Drawn immediately and put back if the write does not land. The alternative
    * — waiting for the round trip — makes every edit feel broken on a slow
    * connection; the alternative to putting it back is a grid showing an edit
    * that never happened until the next poll silently undoes it.
+   *
+   * The writing itself goes through a queue with one lane per event, because a
+   * drag followed by a resize is two edits to one record and sending them at
+   * once means the second carries the etag the first is replacing. What comes
+   * back from that is a 412 settled by comparing two clocks — which is to say,
+   * by luck.
    */
-  async function updateExternalEvent(eventId: string, edit: ExternalEventEdit) {
+  function updateExternalEvent(eventId: string, edit: ExternalEventEdit) {
     const target = writableExternal(eventId);
     if (!target) return;
-
-    const optimistic = withExternalEdit(target.event, edit);
-    if (optimistic === target.event) return;
-    replaceExternalEvent(eventId, optimistic);
-
-    const accessToken = await currentAccessToken();
-    if (!accessToken) {
-      replaceExternalEvent(eventId, target.event);
-      return;
-    }
-
-    const result = await writeExternalEvent(
-      { event: target.event, edit, googleCalendarId: target.googleCalendarId, accessToken },
-      { fetch: googleCalendarFetch },
-    );
-
-    if (result.kind === "written") {
-      // The new etag matters as much as the edit: without it the next inbound
-      // pass reads our own write as somebody else's news (§6.3).
-      replaceExternalEvent(eventId, {
-        ...optimistic,
-        ...(result.etag ? { etag: result.etag } : {}),
-        ...(result.updated ? { updatedAt: result.updated } : {}),
-      });
-      return;
-    }
-    if (result.kind === "gone") {
-      replaceExternalEvent(eventId, null);
-      return;
-    }
-    if (result.kind === "calendarGone") {
-      replaceExternalEvent(eventId, target.event);
-      markCalendarUnreachable(target.calendarId, result.access);
-      return;
-    }
-    // Superseded, expired or failed: Google does not hold what we just drew.
-    replaceExternalEvent(eventId, {
-      ...target.event,
-      ...(result.kind === "superseded" && result.etag ? { etag: result.etag } : {}),
-    });
+    externalWrites().edit(target.event, edit);
   }
 
-  async function deleteExternalCalendarEvent(eventId: string) {
+  function deleteExternalCalendarEvent(eventId: string) {
     const target = writableExternal(eventId);
     if (!target) return;
-
-    replaceExternalEvent(eventId, null);
-
-    const accessToken = await currentAccessToken();
-    if (!accessToken) {
-      replaceExternalEvent(eventId, target.event);
-      return;
-    }
-
-    const result = await deleteExternalEvent(
-      { event: target.event, googleCalendarId: target.googleCalendarId, accessToken },
-      { fetch: googleCalendarFetch },
-    );
-    if (result.kind === "calendarGone") {
-      markCalendarUnreachable(target.calendarId, result.access);
-    }
-    // `gone` is the success. Anything else means it is still in the account,
-    // and a grid that has already forgotten it would never show it again.
-    if (result.kind !== "gone") {
-      saveExternalState((current) => ({
-        calendars: current.calendars,
-        events: current.events.some((item) => item.id === eventId)
-          ? current.events
-          : [...current.events, target.event],
-      }));
-    }
+    externalWrites().remove(target.event);
   }
 
   async function syncExternalCalendar(calendarId: string, calendarOverride?: ExternalCalendar) {
