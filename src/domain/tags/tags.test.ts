@@ -8,6 +8,7 @@ import {
   removeTag,
   sanitizeTag,
   sanitizeTaskTag,
+  splitInlineTags,
   tagIdFor,
   tagNamesForTask,
   tagsByTaskId,
@@ -269,5 +270,36 @@ describe("tagsByTaskId", () => {
     expect(index.get("t1")).toEqual(tagsForTask("t1", tags, links));
     expect(index.get("t2")?.map((item) => item.name)).toEqual(["alpha"]);
     expect(index.get("t3")).toBeUndefined();
+  });
+});
+
+describe("splitInlineTags", () => {
+  it("takes the token out of the title and hands back the name", () => {
+    expect(splitInlineTags("물 사기 #장보기")).toEqual({ title: "물 사기", tags: ["장보기"] });
+  });
+
+  it("reads a token wherever it sits, and closes the gap it leaves", () => {
+    expect(splitInlineTags("#급함 논문 #기획 초고")).toEqual({
+      title: "논문 초고",
+      tags: ["급함", "기획"],
+    });
+  });
+
+  it("leaves a `#` that does not start a word alone", () => {
+    // Otherwise this is a task about the letter C, tagged `#`.
+    expect(splitInlineTags("C# 공부")).toEqual({ title: "C# 공부", tags: [] });
+  });
+
+  it("keeps a title that is nothing but tokens", () => {
+    // Someone naming a task, not tagging one — stripping it commits an empty row.
+    expect(splitInlineTags("#장보기")).toEqual({ title: "#장보기", tags: [] });
+  });
+
+  it("says one tag once, however it was capitalised", () => {
+    expect(splitInlineTags("메일 #Work #work")).toEqual({ title: "메일", tags: ["Work"] });
+  });
+
+  it("does not turn a legacy marker into a tag", () => {
+    expect(splitInlineTags("정리 #space:8f2a")).toEqual({ title: "정리 #space:8f2a", tags: [] });
   });
 });

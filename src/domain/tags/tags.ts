@@ -107,6 +107,40 @@ export function tagsForTask(taskId: string, tags: Tag[], links: TaskTag[]): Tag[
 }
 
 /**
+ * `물 사기 #장보기` → the title without the token, and the tags it named.
+ *
+ * Quick Add's menu could already attach tags; this is the same thing typed,
+ * which is how the reference app does it and how anyone who has used one of
+ * these expects `#` to behave.
+ *
+ * Three rules, and each of them is a thing that goes wrong without it:
+ *
+ * - The `#` has to START a word. Otherwise `C#` is a task about the letter C
+ *   tagged `#`, and a URL fragment eats half its own address.
+ * - A token that would leave NOTHING behind is not a token. `#장보기` alone is
+ *   someone naming a task, and stripping it commits an empty row.
+ * - `space:`/`group:` markers are not user tags (`isUserTag`), so a title that
+ *   happens to contain one does not put a machine string in the sidebar.
+ */
+export function splitInlineTags(text: string): { title: string; tags: string[] } {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const stripped = text.replace(/(^|\s)#(\S+)/g, (whole, lead: string, name: string) => {
+    if (!isUserTag(name)) return whole;
+    const key = tagKeyFor(name);
+    if (!seen.has(key)) {
+      seen.add(key);
+      names.push(name.trim());
+    }
+    return lead;
+  });
+  const title = stripped.replace(/\s+/g, " ").trim();
+  // Everything was a tag: they were writing a title, not tagging one.
+  if (!title) return { title: text.trim(), tags: [] };
+  return { title, tags: names };
+}
+
+/**
  * Every Task's tags at once, for a screen that draws many rows.
  *
  * `tagsForTask` walks every link to answer for one Task, which a list calling

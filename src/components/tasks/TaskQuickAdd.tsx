@@ -15,6 +15,7 @@ import { QuickAddMenu } from "./QuickAddMenu";
 import { QuickAddDate } from "./QuickAddDate";
 import { normalizeSchedule, scheduleToTaskPatch, type Schedule } from "../../domain/schedule";
 import { formatDate } from "../../utils/date";
+import { splitInlineTags, tagKeyFor } from "../../domain/tags/tags";
 import { useT } from "../../i18n";
 
 interface TaskQuickAddProps {
@@ -149,12 +150,25 @@ export function TaskQuickAdd({
    */
   const scheduleWrite = schedule ? normalizeSchedule(schedule) : null;
 
+  /**
+   * `#` in the field, as the title it leaves and the tags it named.
+   *
+   * Read on every keystroke rather than at commit, because the hint under the
+   * field has to say what will happen BEFORE it happens — a token that
+   * silently disappears from the title at Enter is a typo as far as the reader
+   * can tell.
+   */
+  const inline = splitInlineTags(title);
+  const willTag = [...tagNames, ...inline.tags].filter(
+    (name, index, all) => all.findIndex((other) => tagKeyFor(other) === tagKeyFor(name)) === index,
+  );
+
   function commit() {
     if (!ready) return;
     // §5.1: the Scope first, the person second. The Scope's own patch — a
     // Filter's fields, Upcoming's date — survives everything the draft does
     // not explicitly say.
-    onCreate(title.trim(), {
+    onCreate(inline.title, {
       ...resolution,
       targetListId: chosenListId || resolution.targetListId,
       patch: {
@@ -163,7 +177,7 @@ export function TaskQuickAdd({
         ...(priority !== "none" ? { priority } : {}),
         ...(isNote ? { kind: "note" as const } : {}),
       },
-      ...(tagNames.length > 0 ? { applyTagNames: tagNames } : {}),
+      ...(willTag.length > 0 ? { applyTagNames: willTag } : {}),
       ...(scheduleWrite && scheduleWrite.reminders.length > 0
         ? { reminders: scheduleWrite.reminders }
         : {}),
@@ -329,12 +343,18 @@ export function TaskQuickAdd({
         </p>
       ) : null}
 
-      {resolution.applyTagIds?.length ? (
+      {/* The Scope's own tags and the ones typed into the field, in one line:
+          both are answers to "what will this be tagged", and two lines saying
+          it would be the same sentence twice. */}
+      {resolution.applyTagIds?.length || inline.tags.length ? (
         <p className="tm-quickadd-hint">
           {t("tasks.willTag")}{" "}
-          {resolution.applyTagIds
-            .map((id) => tags.find((tag) => tag.id === id)?.name ?? id)
-            .join(", ")}
+          {[
+            ...(resolution.applyTagIds ?? []).map(
+              (id) => tags.find((tag) => tag.id === id)?.name ?? id,
+            ),
+            ...inline.tags,
+          ].join(", ")}
         </p>
       ) : null}
       </div>
