@@ -1,6 +1,7 @@
 import {
   forwardRef,
   InputHTMLAttributes,
+  type MutableRefObject,
   ReactNode,
   TextareaHTMLAttributes,
   useEffect,
@@ -94,6 +95,11 @@ export const DeferredInput = forwardRef<HTMLInputElement, DeferredFieldProps &
   );
 });
 
+/** What a caller may do to a deferred field's draft from outside (§3.7). */
+export interface TextFieldControl {
+  replace: (from: number, to: number, text: string) => void;
+}
+
 export function DeferredTextarea({
   value,
   onCommit,
@@ -103,6 +109,8 @@ export function DeferredTextarea({
   // for "commit" would make multi-line text unwritable (spec §10.4).
   required,
   autoGrow = false,
+  textareaRef,
+  controlRef,
   ...rest
 }: DeferredFieldProps &
   Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange"> & {
@@ -115,6 +123,17 @@ export function DeferredTextarea({
      * is pushed down by the empty part of that box.
      */
     autoGrow?: boolean;
+    /** The element itself, for a caller that has to read its caret. */
+    textareaRef?: MutableRefObject<HTMLTextAreaElement | null>;
+    /**
+     * The door into the draft (TASK_DETAIL_TAG_INPUT_DESIGN.md §3.7).
+     *
+     * Editing from outside is not something a field normally offers, and this
+     * exists for one caller: the `#` menu in the Task body has to take the
+     * token back out once a tag is picked, and the user is not the one who
+     * types that deletion.
+     */
+    controlRef?: MutableRefObject<TextFieldControl | null>;
   }) {
   const field = useDeferredTextField(value, onCommit, { resetKey, delayMs, required });
   const box = useRef<HTMLTextAreaElement | null>(null);
@@ -131,10 +150,15 @@ export function DeferredTextarea({
     el.style.height = `${el.scrollHeight}px`;
   }, [autoGrow, field.value]);
 
+  if (controlRef) controlRef.current = { replace: field.replace };
+
   return (
     <textarea
       {...rest}
-      ref={box}
+      ref={(el) => {
+        box.current = el;
+        if (textareaRef) textareaRef.current = el;
+      }}
       value={field.value}
       onChange={(event) => field.onChange(event.target.value)}
       onBlur={field.onBlur}

@@ -34,6 +34,7 @@ import { ListPicker } from "./ListPicker";
 import { PriorityPicker } from "./PriorityPicker";
 import { SchedulePicker } from "./SchedulePicker";
 import { TagPicker } from "./TagPicker";
+import { TaskBodyField } from "./TaskBodyField";
 import { TaskActionsMenu } from "./TaskActionsMenu";
 import { TaskActivityPanel } from "./TaskActivityPanel";
 import { TaskCheck } from "./TaskCheck";
@@ -640,18 +641,15 @@ export function TaskDrawer({
             focusDraft={convertedId === task.id && checkItems.length === 0}
           />
         ) : (
-          /* Not single-line: Enter here is a paragraph break (spec §10.4). */
-          <DeferredTextarea
-            value={task.description}
-            // One line, and then as many as the writing needs. Three was a box
-            // that an empty description still spent (§6.1): the tags under it
-            // were pushed down by nothing.
-            rows={1}
-            autoGrow
-            placeholder={t("taskDetail.addDescription")}
+          /* Not single-line: Enter here is a paragraph break (spec §10.4).
+             The `#` menu that stands in the text belongs to the field, so the
+             field is its own component now (TASK_DETAIL_TAG_INPUT_DESIGN.md §3). */
+          <TaskBodyField
+            task={task}
+            tags={tags}
+            taskTags={taskTags}
+            onToggleTag={onToggleTag}
             onCommit={(description) => onUpdate({ description })}
-            resetKey={task.id}
-            aria-label={t("tasks.description")}
           />
         )}
       </section>

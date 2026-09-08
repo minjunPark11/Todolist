@@ -50,6 +50,10 @@ export function useDeferredTextField(
 ) {
   const { resetKey = "", delayMs = 400, singleLine = false, required = false } = options;
   const [draft, setDraft] = useState(value);
+  // The draft as of right now, for `replace` — a caller that closed over the
+  // rendered value would splice into the text as it was one keystroke ago.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const timerRef = useRef<number | null>(null);
   const pendingRef = useRef<{ value: string; commit: (next: string) => void } | null>(null);
   // The canonical value, for Escape to come back to. A ref and not the closure
@@ -185,9 +189,30 @@ export function useDeferredTextField(
     composingRef.current = false;
   }, []);
 
+  /**
+   * A slice of the draft, replaced from outside
+   * (TASK_DETAIL_TAG_INPUT_DESIGN.md §3.7).
+   *
+   * The `#` menu in the Task body has to take the token back out once a tag is
+   * picked, and until this there was no door: the hook handed out a value and
+   * event handlers, so the only way to change the text was for the user to
+   * type it.
+   *
+   * It goes through `onChange`, so it is an EDIT and not a write — the usual
+   * debounce carries it. Committing here instead would push a save every time
+   * a tag is chosen, which is a field that saves while someone is mid-sentence.
+   */
+  const replace = useCallback(
+    (from: number, to: number, text: string) => {
+      onChange(`${draftRef.current.slice(0, from)}${text}${draftRef.current.slice(to)}`);
+    },
+    [onChange],
+  );
+
   return {
     value: draft,
     onChange,
+    replace,
     onBlur: flush,
     onKeyDown,
     onPaste,

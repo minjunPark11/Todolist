@@ -1562,6 +1562,15 @@
   min-width: 240px;
 }
 
+/* The `#` menu that opens in the body (TASK_DETAIL_TAG_INPUT_DESIGN.md §3.4).
+   Narrower than the picker's surface: it is filtered by what is already typed,
+   so it carries names and not a search field. */
+.tm-tag-inline-menu {
+  min-width: 160px;
+  max-width: 260px;
+  padding: 4px;
+}
+
 .tm-tag-picker {
   display: flex;
   flex-direction: column;
