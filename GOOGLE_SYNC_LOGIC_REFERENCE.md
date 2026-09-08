@@ -1,6 +1,7 @@
 # 구글 캘린더 동기화 로직 — 지금 코드가 실제로 하는 일
 
-> 상태: **구현 기준 정리** · 2026-09-08 · v0.22.12 + `feat(calendar): 구글 일정을 격자에서 끌고, 늘이고, 이름을 고친다`
+> 상태: **구현 기준 정리** · 2026-09-08 · v0.22.12 + 격자 편집 + 보강 H1~H5
+> (`GOOGLE_SYNC_HARDENING_DESIGN.md`)
 > 성격: `GOOGLE_CALENDAR_SYNC_DESIGN.md`가 **무엇을 하기로 했는지**를 적는다면,
 > 이 문서는 **지금 코드가 무엇을 하는지**를 적는다. 둘이 어긋나는 자리는 §7에 모아 두었다.
 > 대상: `domain/calendar/googleSync/*` · `lib/googleCalendar*` · `hooks/useGoogle*Sync.ts` · `components/CalendarView.tsx`
@@ -79,7 +80,7 @@ ExternalCalendarEvent ◀── B · events.list(syncToken) ── 설정에서 
 
 | # | 더미 | 무엇 |
 |---|---|---|
-| 1 | `create` | 자격 있고 `googleEventId`가 없는 것. **실패한 쓰기의 재시도 경로이기도 하다** — 실패는 아무것도 적지 않으므로 다음 패스가 같은 계획을 다시 세운다 |
+| 1 | `create` | 자격 있고 `googleEventId`가 없는 것. **실패한 쓰기의 재시도 경로이기도 하다** — 실패는 아무것도 적지 않으므로 다음 패스가 같은 계획을 다시 세운다. 보내기 전에 `googleReservedEventId`를 정해 적으므로 그 재시도는 **같은 이벤트를 지목한다**(§1.7) |
 | 2 | `update` | 자격 있고 id도 있고 `updatedAt > googleSyncedAt`인 것 |
 | 3 | `delete` | id는 있는데 자격을 잃은 것 — 휴지통에 갔거나 날짜가 지워졌다 |
 | 4 | `orphans` | 태스크가 완전 삭제돼 물어볼 곳이 없는 이벤트(§4.3 툼스톤) |
@@ -124,7 +125,8 @@ ExternalCalendarEvent ◀── B · events.list(syncToken) ── 설정에서 
 | 응답 | 결론 | 다음 패스 |
 |---|---|---|
 | 200 / 201 | `googleEventId` · `googleEtag` · `googleSyncedAt`을 태스크에 기록 | 안 건드림(`needsUpdate`가 false) |
-| 404 / 410 | 그 이벤트는 없다는 **구글의 명시적 답** → 매핑만 해제. 태스크는 안 건드린다 | **다시 만든다** |
+| 404 / 410 | 캘린더의 생사를 한 번 묻는다. **캘린더가 살아 있으면** 그 이벤트는 없다는 구글의 명시적 답 → 매핑만 해제(태스크는 안 건드림). **캘린더가 죽었으면** 패스를 그 자리에서 멈추고 `calendarMissing`을 보고한다 | 전자는 다시 만든다 · 후자는 전용 캘린더를 새로 만들고 다음 패스로 |
+| 409 | **우리가 예약한 id가 이미 있다** = 지난번 create가 사실은 성공했다 → `status: confirmed`를 붙인 PATCH로 흡수한다. 그 PATCH마저 404면 그 id는 묘비이므로 예약을 놓아준다 | 흡수했으면 안 건드림 · 놓아줬으면 새 id로 |
 | 412 | §1.5의 LWW 판정 | 이긴 쪽에 따라 |
 | 401 | 권한이 죽었다 → 패스 전체 중단 | 재연결 전까지 아무것도 |
 | 그 외 · 네트워크 | **아무것도 기록하지 않음** | 같은 계획을 그대로 다시 |
@@ -132,7 +134,15 @@ ExternalCalendarEvent ◀── B · events.list(syncToken) ── 설정에서 
 404를 "매핑 해제"로 읽는 것과, §7.1이 금지하는 "목록에서의 부재를 삭제로 읽기"는 다르다.
 전자는 지목한 이벤트에 대한 구글의 답이고, 후자는 우리 쪽 침묵을 근거로 삼는 일이다.
 
-### 1.7 삭제 — 두 갈래
+### 1.7 생성은 되풀이해도 안전하다
+
+이벤트를 만들기 전에 `googleReservedEventId`(`ff` + UUID의 hex 32자, 구글의 base32hex
+규격)를 정해 **먼저 적고** 그것을 실어 보낸다. 응답이 유실돼도 다음 패스가 같은 이름을
+부르므로 구글은 409로 답하고, 그 409가 곧 "네가 이미 만들었다"는 영수증이다. 매핑을 지울
+때 예약도 함께 지운다 — 구글이 삭제된 id를 한동안 붙들고 있어서, 복구된 태스크는 새 id를
+받아야 한다.
+
+### 1.8 삭제 — 두 갈래
 
 - **휴지통 · 날짜 삭제** — 태스크는 아직 `googleEventId`를 들고 있으므로 delete 더미가 지운다.
   휴지통에서 복구하면 자격을 되찾아 **새 id로 다시 만들어진다**.
@@ -169,7 +179,11 @@ ExternalCalendarEvent ◀── B · events.list(syncToken) ── 설정에서 
    오래됐다"는 말이고, 유일하게 옳은 복구가 전체 재나열이다.
 3. **응답을 세 갈래로 읽는다.** `status: "cancelled"`는 삭제, 우리가 가진 etag와 같은 것은
    **에코**(우리 자신의 쓰기)라 건너뛰고, 나머지가 upsert다.
-4. **적용한 다음에야 `syncToken`을 저장한다.** 이벤트보다 먼저 저장된 커서는 그 이벤트들을
+4. **완결이 증명된 나열이면 정리한다.** 전체를 요청했고 · 모든 페이지가 200이었고 ·
+   페이지 상한에 잘리지 않았고 · 마지막 페이지가 `nextSyncToken`을 줬을 때만
+   `complete`다. 그때에 한해 응답에서 id를 본 적 없는 **로컬 이벤트를 지운다**
+   (`pruneAfterFullListing`) — 커서가 죽어 있는 동안 구글에서 사라진 것들이다.
+5. **적용한 다음에야 `syncToken`을 저장한다.** 이벤트보다 먼저 저장된 커서는 그 이벤트들을
    영원히 건너뛴다.
 
 ### 2.3 이 설계에서 가장 위험한 한 줄 (§7.1)
@@ -182,6 +196,10 @@ ExternalCalendarEvent ◀── B · events.list(syncToken) ── 설정에서 
 그래서 `planInbound`는 **우리가 가진 이벤트 집합을 인자로 받지 않는다.** "우리 것 중 뭐가 안
 왔나"를 물을 방법 자체가 없고, 묻고 싶은 사람은 먼저 시그니처를 바꿔야 한다 — 그 지점이
 누군가 이 주석을 읽는 자리다. `applyInboundPlan`도 `current`를 **필터링만** 한다.
+
+부재를 물을 수 있는 함수는 `pruneAfterFullListing` 하나뿐이고, 이름이 곧 사전 조건이다.
+그것이 읽는 `plan.seen`에는 **에코도 들어 있다** — 응답에 있었으면서 일부러 아무 일도
+만들지 않은 항목이라, `upsert`에서 재구성하면 우리가 방금 쓴 이벤트부터 지워진다.
 
 ### 2.4 에코 방지 (§6.3)
 
@@ -200,6 +218,8 @@ ExternalCalendarEvent ◀── B · events.list(syncToken) ── 설정에서 
 | `accessRole` | `readOnly` | `owner`/`writer`가 아니면 읽기 전용 |
 | `recurrence` RRULE | `recurrence` + `exdates` | 그리기용으로만 쓴다 — 편집은 열지 않는다 |
 | `recurringEventId` | `recurrenceId` | 시리즈의 한 회차를 대체하는 레코드 |
+| `eventType` | `eventType` + `readOnly` | `default`가 아니면(생일 · Gmail 일정 · focusTime…) 캘린더가 쓰기 가능이어도 읽기 전용. 부재는 `default`로 읽는다 |
+| `status: cancelled` + `recurringEventId` | 마스터의 `exdates` | 회차 하나의 취소. 그 id로 된 override 레코드가 있으면 그것도 지운다 |
 | `updated` | `updatedAt` | 우리 시각이 아니라 **구글의** 것 — LWW 비교의 기준 |
 
 ---
@@ -240,13 +260,24 @@ ExternalCalendarEvent ◀── B · events.list(syncToken) ── 설정에서 
 | `superseded` | 412 → 구글이 더 나중이다 | 원래대로 되돌리고 상대 etag만 저장 |
 | `gone` | 404 / 410 | 그 블록을 지운다 |
 | `unchanged` | 편집이 아무것도 안 바꿨다 | 요청조차 안 나간다 |
+| `calendarGone` | 404였지만 없는 것은 **캘린더**였다 | 이벤트를 **그대로 둔다.** 캘린더 행에 실패를 적고 토스트로 알린다 |
 | `expired` · `failed` | 권한이 죽었거나 실패 | 원래대로 되돌린다 |
 
 삭제는 `If-Match`를 걸지 않는다 — 삭제는 병합이 아니고, 누가 먼저 이름을 고쳤다는 이유로
 거절되는 건 이상한 실패 방식이다. 404와 410도 성공이다(없어졌다는 것이 원하던 결과니까).
 그 외의 답은 "계정에 아직 있다"는 뜻이므로, 이미 잊은 격자에 **되돌려 놓는다**.
 
-### 3.3 격자가 손대지 않는 것
+### 3.3 한 이벤트의 쓰기는 한 줄로 선다
+
+제스처마다 곧바로 나가지 않고 **이벤트별 레인**을 탄다(`googleEventWriteQueue.ts`).
+레인이 두 버전을 든다 — `base`(구글이 들고 있다고 알려진 것, `If-Match`가 여기서 나온다)와
+`drawn`(격자가 보여주는 것, 뒤에 줄 선 편집까지 반영). 성공은 `base`를 앞으로 옮기고
+`drawn`에는 버전 표시만 찍는다. 실패는 `drawn`을 버리고 격자를 `base`로 되돌리며 **뒤에 줄
+선 편집을 포기한다** — 존재한 적 없는 상태 위에서 만들어진 것들이기 때문이다. 삭제도 같은
+레인을 탄다. 레인이 이벤트마다인 이유는 한 회의의 느린 쓰기가 다른 일정의 편집을 막을
+까닭이 없어서다.
+
+### 3.4 격자가 손대지 않는 것
 
 | 무엇 | 왜 |
 |---|---|
@@ -268,9 +299,9 @@ ExternalCalendarEvent ◀── B · events.list(syncToken) ── 설정에서 
 | 충돌 감지 | `If-Match`에 마지막으로 본 etag — **양쪽이 같은 규칙** | 〃 |
 | 412가 왔을 때 | GET으로 상대를 읽고 `updated` vs `updatedAt`, 나중 것이 이긴다 | 〃 |
 | 지면 | 안 덮고 etag와 `googleSyncedAt`만 갱신 → 값이 갈린 채 남는다 | 화면을 되돌리고 etag만 갱신 → **다음 폴링이 구글의 값을 가져온다** |
-| 404 / 410 | 매핑 해제 → 다음 패스가 다시 만든다 | 격자에서 제거 → 다음 폴링이 정리한다 |
+| 404 / 410 | 캘린더가 살아 있으면 매핑 해제 → 다시 만든다. 죽었으면 패스 중단 + 전용 캘린더 재생성 | 캘린더가 살아 있으면 격자에서 제거. 죽었으면 **이벤트를 그대로 두고** 캘린더에 실패를 적는다 |
 | 앱에서 삭제 | `events.delete`. 완전 삭제는 툼스톤 경유 | `events.delete`, `If-Match` 없이 |
-| 구글에서 삭제 | **알지 못한다** — 다음 패치가 404를 만나야 안다 | `cancelled` 행을 보고 격자에서 지운다 |
+| 구글에서 삭제 | **알지 못한다** — 다음 패치가 404를 만나야 안다 | `cancelled` 행을 보고 격자에서 지운다. 커서가 만료된 동안 지워진 것은 다음 전체 나열이 정리한다 |
 | 실패했을 때 | 아무것도 안 적음 → 다음 패스가 같은 계획 | 화면 롤백 → 사용자가 다시 하거나 폴링이 정리 |
 
 한 캘린더 위에서 두 기록기가 다른 충돌 규칙을 쓰면, 나중에 아무도 설명할 수 없는 방식으로
@@ -305,6 +336,8 @@ ExternalCalendarEvent ◀── B · events.list(syncToken) ── 설정에서 
 | `lib/googleCalendarOutbound.ts` | A의 실행기 — 순서 · 412 · 404 |
 | `lib/googleCalendarInbound.ts` | B의 실행기 — 페이지네이션 · 410 재동기화 |
 | `lib/googleCalendarEventWrite.ts` | C의 실행기 — 한 이벤트의 patch/delete |
+| `lib/googleEventWriteQueue.ts` | C의 순서 — 이벤트별 레인, `base`와 `drawn` |
+| `lib/googleCalendarAccess.ts` | 404가 이벤트에 관한 답인지 캘린더에 관한 답인지 |
 | `lib/googleCalendar.ts` | 토큰 · 연결 · 전용 캘린더 생성 |
 | `lib/googleCalendarSources.ts` | 어느 캘린더를 읽을지 · `syncToken` 보관 |
 | `hooks/useGoogleOutboundSync.ts` · `useGoogleInboundSync.ts` | 언제 도는가 |
@@ -329,6 +362,10 @@ ExternalCalendarEvent ◀── B · events.list(syncToken) ── 설정에서 
   다시 이긴다.
 - 구글에서 태스크 이벤트를 지우면 앱은 모른다. 그 태스크를 다시 고쳐 패치가 나갈 때 404를
   만나야 매핑이 풀리고, 그 다음 패스가 새로 만든다.
+
+> H1~H5로 사라진 것들은 여기 없다 — 생성 중복 · 커서 만료 뒤의 좀비 이벤트 · 회차 취소
+> 누락 · 연속 편집 경쟁 · 404 오독 · 편집 불가 이벤트 종류. 그 여섯은
+> `GOOGLE_SYNC_HARDENING_DESIGN.md`에 무엇이 왜 그렇게 됐는지 적혀 있다.
 
 ### 7.2 전용 캘린더를 읽기 소스로 켜면 겹친다
 
