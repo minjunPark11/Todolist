@@ -64,7 +64,10 @@ export default async function handler(req: AdapterRequest, res: AdapterResponse)
     res.status(200).json({ disconnected: true, revoked });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      res.status(401).json({ error: error.message });
+      // `reason` and not just the sentence: the client turns "no bearer at all"
+      // and "this bearer was refused" into two different repairs, and the
+      // sentence is prose it must not have to match on.
+      res.status(401).json({ error: error.message, code: error.reason });
       return;
     }
     res.status(500).json({ error: error instanceof Error ? error.message : "Could not disconnect Google Calendar." });

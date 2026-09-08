@@ -332,6 +332,7 @@ export const ko: Dictionary = {
   "settings.google.disconnectMessage": "FocusFlow가 그 캘린더를 읽지도 쓰지도 않게 됩니다. 이미 들어간 일정도, 캘린더 자체도 그대로 남습니다.",
   "settings.google.repeatWarning": "반복 일정은 한 방향으로만 나갑니다. 구글에서 고치면 다음 동기화가 덮어씁니다.",
   "settings.google.error.signedOut": "먼저 FocusFlow에 로그인해 주세요.",
+  "settings.google.error.rejected": "FocusFlow 서버가 로그인 세션을 확인하지 못했습니다.",
   "settings.google.error.network": "서버에 닿지 못했습니다. 연결을 확인하고 다시 시도해 주세요.",
   "settings.google.error.google": "구글이 연결을 끝내지 못했습니다. 다시 시도해 주세요.",
   "settings.google.error.store": "구글에는 연결됐지만 연결 정보를 저장하지 못했습니다.",

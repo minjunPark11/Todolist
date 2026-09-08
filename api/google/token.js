@@ -582,7 +582,7 @@ async function handler(req, res) {
     res.status(200).json({ connected: true, accessToken: token.accessToken, expiresIn: token.expiresIn });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      res.status(401).json({ error: error.message });
+      res.status(401).json({ error: error.message, code: error.reason });
       return;
     }
     if (error instanceof GoogleOAuthError) {

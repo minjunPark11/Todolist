@@ -65,7 +65,47 @@ describe("spending the code", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("reads a 401 as a lost FocusFlow session, not a Google failure", async () => {
+  it("reads a bearer-less 401 as a lost FocusFlow session, not a Google failure", async () => {
+    const { impl } = fakeFetch({
+      "/api/google/connect": { status: 401, body: { error: "Sign in to FocusFlow first.", code: "missing_token" } },
+    });
+    await expect(exchangeCodeForAccess("code-1", deps({ fetch: impl }))).rejects.toMatchObject({
+      reason: "signedOut",
+    });
+  });
+
+  // The bug this pair exists for: every 401 read as `signedOut`, so a session
+  // the server REFUSED was reported as a session that was missing, and the card
+  // told a signed-in reader to sign in. Signing in again mints the same refused
+  // token, so the advice was a loop with no exit.
+  it("reads a refused token as a rejection, not as being signed out", async () => {
+    const { impl } = fakeFetch({
+      "/api/google/connect": {
+        status: 401,
+        body: { error: "Tokens signed with HS256 are not accepted here.", code: "invalid_token" },
+      },
+    });
+    await expect(exchangeCodeForAccess("code-1", deps({ fetch: impl }))).rejects.toMatchObject({
+      reason: "rejected",
+      message: "Tokens signed with HS256 are not accepted here.",
+    });
+  });
+
+  // Which check refused is the whole diagnosis, and only the server knows it.
+  it("keeps the server's own words, so the reason is not guessed at", async () => {
+    const { impl } = fakeFetch({
+      "/api/google/token": {
+        status: 401,
+        body: { error: "That token was issued for a different service.", code: "invalid_token" },
+      },
+    });
+    await expect(currentAccessToken(deps({ fetch: impl }))).rejects.toMatchObject({
+      reason: "rejected",
+      message: "That token was issued for a different service.",
+    });
+  });
+
+  it("stays with the old reading when a deployment sends no code at all", async () => {
     const { impl } = fakeFetch({ "/api/google/connect": { status: 401, body: { error: "no" } } });
     await expect(exchangeCodeForAccess("code-1", deps({ fetch: impl }))).rejects.toMatchObject({
       reason: "signedOut",

@@ -555,7 +555,7 @@ async function handler(req, res) {
     res.status(200).json({ disconnected: true, revoked });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      res.status(401).json({ error: error.message });
+      res.status(401).json({ error: error.message, code: error.reason });
       return;
     }
     res.status(500).json({ error: error instanceof Error ? error.message : "Could not disconnect Google Calendar." });

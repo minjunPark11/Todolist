@@ -336,6 +336,7 @@ export const en: Dictionary = {
   "settings.google.disconnectMessage": "FocusFlow stops reading and writing that calendar. Events already there stay where they are, and so does the calendar itself.",
   "settings.google.repeatWarning": "Repeating tasks are sent one way. Edit one in Google and the next sync writes over it.",
   "settings.google.error.signedOut": "Sign in to FocusFlow first.",
+  "settings.google.error.rejected": "The FocusFlow server could not verify your sign-in.",
   "settings.google.error.network": "Could not reach the server. Check your connection and try again.",
   "settings.google.error.google": "Google could not complete the connection. Try again.",
   "settings.google.error.store": "Connected to Google, but the connection could not be saved.",
