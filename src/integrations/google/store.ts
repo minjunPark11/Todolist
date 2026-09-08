@@ -148,3 +148,26 @@ export async function deleteSources(
     fetchImpl,
   );
 }
+
+/**
+ * Every device's reading position, removed with the grant
+ * (MULTI_DEVICE_SYNC_DESIGN.md §5).
+ *
+ * Separate from `deleteSources` because the cursors live in their own table
+ * now, and nothing cascades to them: the foreign key is on `user_id`, which
+ * still exists. A cursor outliving its grant is worse than a stale one — it is
+ * a position in a stream the account may no longer read, and reconnecting
+ * would resume from it and skip everything in between.
+ */
+export async function deleteDeviceCursors(
+  userId: string,
+  fetchImpl: typeof fetch = fetch,
+  env: ServiceRoleEnv = readServiceRoleEnv(),
+): Promise<void> {
+  await request(
+    env,
+    `google_calendar_device_cursors?user_id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: headers(env, { Prefer: "return=minimal" }) },
+    fetchImpl,
+  );
+}

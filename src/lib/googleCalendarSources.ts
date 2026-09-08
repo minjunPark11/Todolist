@@ -10,6 +10,7 @@
 // argument so the flow is testable without Supabase or a Google account.
 import { GoogleCalendarError, googleCalendarFetch, type GoogleCalendarDeps } from "./googleCalendar";
 import { supabase } from "../services/supabaseClient";
+import { deviceId } from "./deviceId";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
@@ -87,14 +88,42 @@ function rowToSource(row: Record<string, unknown>): GoogleCalendarSource {
   };
 }
 
-/** What this account chose, last time it was asked. */
+/**
+ * What this account chose, and where THIS DEVICE stopped reading
+ * (MULTI_DEVICE_SYNC_DESIGN.md §5).
+ *
+ * Two tables, because the two halves have different owners. The list and the
+ * ticks belong to the account: pick a calendar on the laptop and the phone
+ * should show it picked. The cursor belongs to the device, because the mirror
+ * it describes is local — sharing one cursor meant whichever app polled first
+ * consumed the changes and the other never saw them.
+ */
 export async function readGoogleSources(): Promise<GoogleCalendarSource[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("google_calendar_sources")
-    .select("calendar_id, summary, color, writable, selected, sync_token");
+    .select("calendar_id, summary, color, writable, selected");
   if (error) throw new GoogleCalendarError("store", error.message);
-  return (data ?? []).map((row) => rowToSource(row as Record<string, unknown>));
+
+  const { data: cursors, error: cursorError } = await supabase
+    .from("google_calendar_device_cursors")
+    .select("calendar_id, sync_token")
+    .eq("device_id", deviceId());
+  // A cursor we cannot read is a full listing, which is correct and costs one
+  // request — not a reason to fail the pass and read nothing at all.
+  const byCalendar = new Map(
+    cursorError
+      ? []
+      : (cursors ?? []).map((row) => {
+          const cursor = row as Record<string, unknown>;
+          return [String(cursor.calendar_id ?? ""), cursor.sync_token];
+        }),
+  );
+
+  return (data ?? []).map((row) => {
+    const source = row as Record<string, unknown>;
+    return rowToSource({ ...source, sync_token: byCalendar.get(String(source.calendar_id ?? "")) });
+  });
 }
 
 async function userId(): Promise<string> {
@@ -147,19 +176,37 @@ export async function setGoogleSourceSelected(calendarId: string, selected: bool
   const id = await userId();
   const { error } = await supabase
     .from("google_calendar_sources")
-    .upsert(
-      { user_id: id, calendar_id: calendarId, selected, ...(selected ? {} : { sync_token: null }) },
-      { onConflict: "user_id,calendar_id" },
-    );
+    .upsert({ user_id: id, calendar_id: calendarId, selected }, { onConflict: "user_id,calendar_id" });
   if (error) throw new GoogleCalendarError("store", error.message);
+
+  // EVERY device's cursor, not just this one. The argument in the comment
+  // above is about nobody reading the stream, and while a calendar is off
+  // nobody is reading it on any device — each of them would resume from a
+  // position whose intervening changes are gone.
+  if (!selected) {
+    const { error: cursorError } = await supabase
+      .from("google_calendar_device_cursors")
+      .delete()
+      .eq("user_id", id)
+      .eq("calendar_id", calendarId);
+    if (cursorError) throw new GoogleCalendarError("store", cursorError.message);
+  }
 }
 
-/** Where the last pass stopped, so the next one asks for changes only. */
+/**
+ * Where THIS DEVICE's last pass stopped, so its next one asks for changes only.
+ *
+ * Another device's cursor is none of this one's business: it is reading the
+ * same stream into a different mirror, and it has to see every change too.
+ */
 export async function saveGoogleSyncToken(calendarId: string, syncToken: string | null): Promise<void> {
   if (!supabase) return;
   const id = await userId();
   const { error } = await supabase
-    .from("google_calendar_sources")
-    .upsert({ user_id: id, calendar_id: calendarId, sync_token: syncToken }, { onConflict: "user_id,calendar_id" });
+    .from("google_calendar_device_cursors")
+    .upsert(
+      { user_id: id, device_id: deviceId(), calendar_id: calendarId, sync_token: syncToken },
+      { onConflict: "user_id,device_id,calendar_id" },
+    );
   if (error) throw new GoogleCalendarError("store", error.message);
 }

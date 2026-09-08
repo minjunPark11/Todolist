@@ -534,6 +534,14 @@ async function deleteSources(userId, fetchImpl = fetch, env = readServiceRoleEnv
     fetchImpl
   );
 }
+async function deleteDeviceCursors(userId, fetchImpl = fetch, env = readServiceRoleEnv()) {
+  await request(
+    env,
+    `google_calendar_device_cursors?user_id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: headers(env, { Prefer: "return=minimal" }) },
+    fetchImpl
+  );
+}
 
 // src/integrations/google/index.ts
 function lazyVerifier() {
@@ -573,6 +581,7 @@ async function handler(req, res) {
     await deleteRefreshToken(user.userId);
     await deleteConnection(user.userId);
     await deleteSources(user.userId);
+    await deleteDeviceCursors(user.userId);
     res.status(200).json({ disconnected: true, revoked });
   } catch (error) {
     if (error instanceof UnauthorizedError) {

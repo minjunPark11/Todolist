@@ -41,6 +41,7 @@ export {
   deleteRefreshToken,
   deleteConnection,
   deleteSources,
+  deleteDeviceCursors,
   TokenStoreError,
 } from "./store";
 
