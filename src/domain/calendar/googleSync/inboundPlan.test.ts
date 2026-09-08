@@ -3,6 +3,7 @@ import {
   applyInboundPlan,
   isEmptyInboundPlan,
   planInbound,
+  pruneAfterFullListing,
   type KnownEvent,
 } from "./inboundPlan";
 import type { GoogleEventResource } from "./inboundShape";
@@ -144,6 +145,31 @@ describe("the record a response produces", () => {
   it("adds an event we did not have", () => {
     const next = applyInboundPlan([held("e1")], CAL, plan([timed, { ...timed, id: "e7", etag: '"z"' }]));
     expect(next.map((event) => event.externalUid).sort()).toEqual(["e1", "e7"]);
+  });
+});
+
+// Reading absence as deletion, in the one place it is allowed
+// (GOOGLE_SYNC_HARDENING_DESIGN.md §4).
+describe("after a listing known to be complete", () => {
+  it("drops what the calendar no longer has", () => {
+    const gone = held("vanished");
+    const stays = held("e1");
+    const next = pruneAfterFullListing([gone, stays], CAL, new Set(["e1"]));
+    expect(next).toEqual([stays]);
+  });
+
+  it("does not touch another calendar's events", () => {
+    // The listing was of one calendar. It says nothing at all about the rest,
+    // and a set of ids from one calendar is not evidence about another.
+    const other = { ...held("e9"), externalCalendarId: "cal-2" };
+    expect(pruneAfterFullListing([other], CAL, new Set())).toEqual([other]);
+  });
+
+  it("keeps an event we saw but could not draw", () => {
+    // `seen` is recorded before any decision, so an item Google sent without a
+    // start — unusable, not absent — protects the record we already hold.
+    const kept = held("broken");
+    expect(pruneAfterFullListing([kept], CAL, new Set(["broken"]))).toEqual([kept]);
   });
 });
 

@@ -126,3 +126,65 @@ describe("cancellations", () => {
     expect(outcome.plan.cancelled).toEqual(["e3"]);
   });
 });
+
+// The listing that is allowed to notice a deletion
+// (GOOGLE_SYNC_HARDENING_DESIGN.md §4.2).
+//
+// Four conditions, and the outcome says so as one boolean because every one of
+// them is a way for a listing to be short of the whole calendar. A pass that
+// gets this wrong deletes events that were merely on the next page.
+describe("whether a listing is complete", () => {
+  it("is complete when a full listing runs to a sync token", async () => {
+    const { deps } = fakeFetch([{ body: { items: [event], nextSyncToken: "tok-1" } }]);
+    const outcome = await runInbound(request(), deps);
+    expect(outcome.complete).toBe(true);
+  });
+
+  it("is never complete on an incremental pass", async () => {
+    // The ordinary case. An incremental response lists what MOVED, so absence
+    // in it is the opposite of deletion.
+    const { deps } = fakeFetch([{ body: { items: [], nextSyncToken: "tok-2" } }]);
+    const outcome = await runInbound(request({ syncToken: "tok-1" }), deps);
+    expect(outcome.complete).toBe(false);
+  });
+
+  it("is not complete when Google gave no sync token", async () => {
+    // No token means Google did not say it had reached the end.
+    const { deps } = fakeFetch([{ body: { items: [event] } }]);
+    const outcome = await runInbound(request(), deps);
+    expect(outcome.complete).toBe(false);
+  });
+
+  it("is not complete when the paginator ran out of pages", async () => {
+    // Every page hands back a nextPageToken, so the cap is hit and the listing
+    // is a prefix of the calendar. Reading absence from it would delete
+    // everything past page forty.
+    const { deps } = fakeFetch([{ body: { items: [event], nextPageToken: "more" } }]);
+    const outcome = await runInbound(request(), deps);
+    expect(outcome.complete).toBe(false);
+    expect(outcome.failed).toBe(true);
+  });
+
+  it("is complete after an expired cursor forces a re-list", async () => {
+    // The whole point: a cursor expires exactly when things may have been
+    // deleted without us hearing about it.
+    const { deps } = fakeFetch([
+      { status: 410, body: null },
+      { body: { items: [event], nextSyncToken: "tok-3" } },
+    ]);
+    const outcome = await runInbound(request({ syncToken: "stale" }), deps);
+    expect(outcome.resynced).toBe(true);
+    expect(outcome.complete).toBe(true);
+  });
+
+  it("counts an echo as seen", async () => {
+    // The trap this design was written around. An echo produces no work, so a
+    // "what did we see" rebuilt from `upsert` would leave out the event we
+    // ourselves just wrote — and pruning would then delete it.
+    const { deps } = fakeFetch([{ body: { items: [event], nextSyncToken: "tok-1" } }]);
+    const outcome = await runInbound(request({ known: new Map([["e1", { etag: '"v1"' }]]) }), deps);
+    expect(outcome.plan.echoes).toBe(1);
+    expect(outcome.plan.upsert).toEqual([]);
+    expect(outcome.plan.seen).toEqual(["e1"]);
+  });
+});

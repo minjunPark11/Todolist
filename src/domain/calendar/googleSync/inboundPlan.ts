@@ -67,6 +67,18 @@ export interface InboundPlan {
   cancelledOccurrences: CancelledOccurrence[];
   /** Items skipped as our own write returning (§6.3). Counted for tests. */
   echoes: number;
+  /**
+   * Every id this response carried, whatever we decided about it
+   * (GOOGLE_SYNC_HARDENING_DESIGN.md §4.3).
+   *
+   * NOT `upsert` with the others added back. An echo is an item that was in the
+   * response and deliberately produced no work, and an item too broken to draw
+   * is another; reconstructing "what we saw" from the work we planned would
+   * leave both out. `pruneAfterFullListing` reads absence from this and
+   * nothing else, so anything missing here is something it would delete —
+   * starting with the events we ourselves just wrote.
+   */
+  seen: string[];
 }
 
 export const EMPTY_INBOUND_PLAN: InboundPlan = {
@@ -74,6 +86,7 @@ export const EMPTY_INBOUND_PLAN: InboundPlan = {
   cancelled: [],
   cancelledOccurrences: [],
   echoes: 0,
+  seen: [],
 };
 
 export interface InboundPlanInput {
@@ -90,11 +103,20 @@ export interface InboundPlanInput {
  * reading our own absence as authority, and that is the habit §7.1 is about.
  */
 export function planInbound({ items, known, options }: InboundPlanInput): InboundPlan {
-  const plan: InboundPlan = { upsert: [], cancelled: [], cancelledOccurrences: [], echoes: 0 };
+  const plan: InboundPlan = {
+    upsert: [],
+    cancelled: [],
+    cancelledOccurrences: [],
+    echoes: 0,
+    seen: [],
+  };
 
   for (const item of items) {
     const id = googleEventId(item);
     if (!id) continue;
+    // Recorded before any decision about the item, because every branch below
+    // is a decision about an id that WAS here (§4.3).
+    plan.seen.push(id);
 
     if (isCancelled(item)) {
       // Both, and not either/or (§5.4). The id removes an occurrence we hold
@@ -125,6 +147,33 @@ export function planInbound({ items, known, options }: InboundPlanInput): Inboun
   }
 
   return plan;
+}
+
+/**
+ * The events to keep after a listing that is known to be COMPLETE
+ * (GOOGLE_SYNC_HARDENING_DESIGN.md §4).
+ *
+ * This is the one function in the feature allowed to read absence as deletion,
+ * and its name is the precondition: `runInbound` proves the listing was full,
+ * ran to the last page, came back 200 throughout, and ended with a
+ * `nextSyncToken` — Google's own statement that there is nothing more. Called
+ * on anything less, it deletes events that merely did not fit in a page.
+ *
+ * `planInbound` still cannot ask this question — it is not handed what we hold,
+ * and that stays true (§7.1). Answering it needed a second function rather than
+ * a second parameter, so that the dangerous read is spelled out at the call
+ * site instead of hidden behind a flag.
+ *
+ * What it removes is the local mirror only. No Task is reachable from here, so
+ * the worst outcome of a wrong call is an event that disappears until the next
+ * poll brings it back — not a record in someone's bin.
+ */
+export function pruneAfterFullListing(
+  events: readonly ExternalCalendarEvent[],
+  calendarId: string,
+  seen: ReadonlySet<string>,
+): ExternalCalendarEvent[] {
+  return events.filter((event) => event.externalCalendarId !== calendarId || seen.has(event.externalUid));
 }
 
 export function isEmptyInboundPlan(plan: InboundPlan): boolean {

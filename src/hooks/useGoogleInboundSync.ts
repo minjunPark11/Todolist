@@ -12,7 +12,7 @@
 // app open, window focus, and the rail's sync button — the first two are here
 // and the third arrives as the same connection event.
 import { useCallback, useEffect, useRef } from "react";
-import { applyInboundPlan, runInbound } from "../lib/googleCalendarInbound";
+import { applyInboundPlan, pruneAfterFullListing, runInbound } from "../lib/googleCalendarInbound";
 import { currentAccessToken, GOOGLE_CONNECTION_CHANGED, googleCalendarFetch } from "../lib/googleCalendar";
 import { readGoogleSources, saveGoogleSyncToken, type GoogleCalendarSource } from "../lib/googleCalendarSources";
 import type { KnownEvent } from "../domain/calendar/googleSync/inboundPlan";
@@ -146,9 +146,17 @@ export function useGoogleInboundSync({ signedIn, apply }: GoogleInboundSyncInput
         if (outcome.failed) continue;
 
         update((current) => {
+          const applied = applyInboundPlan(current.events, externalCalendarId, outcome.plan);
+          // The only place absence is read as deletion, and only on the listing
+          // that proved it carries the whole calendar (§4). This is what clears
+          // an event deleted in Google while our cursor was expired — until
+          // this existed, such an event stayed on the grid forever, and the
+          // only way out was turning the calendar off and on again.
           const next = {
             calendars: current.calendars,
-            events: applyInboundPlan(current.events, externalCalendarId, outcome.plan),
+            events: outcome.complete
+              ? pruneAfterFullListing(applied, externalCalendarId, new Set(outcome.plan.seen))
+              : applied,
           };
           snapshot = next;
           return next;

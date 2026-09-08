@@ -15,6 +15,7 @@
 import {
   applyInboundPlan,
   planInbound,
+  pruneAfterFullListing,
   type InboundPlan,
   type KnownEvent,
 } from "../domain/calendar/googleSync/inboundPlan";
@@ -65,13 +66,29 @@ export interface InboundOutcome {
   expired: boolean;
   /** The pass could not be completed; nothing was concluded from a part of it. */
   failed: boolean;
+  /**
+   * The plan came from a listing that is known to carry the WHOLE calendar
+   * (GOOGLE_SYNC_HARDENING_DESIGN.md §4.2).
+   *
+   * The one thing that licenses `pruneAfterFullListing`, and four conditions
+   * have to hold at once for it to be true: the listing asked for everything
+   * (no `syncToken`), every page came back 200, the paginator was not cut short
+   * by `MAX_PAGES`, and the last page carried a `nextSyncToken` — which is
+   * Google saying, in its own words, that it has shown us the end.
+   *
+   * False on every incremental pass, and that is the ordinary case. An
+   * incremental response is a list of what MOVED; absence in it means the
+   * opposite of deletion.
+   */
+  complete: boolean;
 }
 
 const EMPTY_OUTCOME: InboundOutcome = {
-  plan: { upsert: [], cancelled: [], cancelledOccurrences: [], echoes: 0 },
+  plan: { upsert: [], cancelled: [], cancelledOccurrences: [], echoes: 0, seen: [] },
   resynced: false,
   expired: false,
   failed: false,
+  complete: false,
 };
 
 interface Reply {
@@ -155,6 +172,11 @@ export async function runInbound(request: InboundRequest, deps: InboundDeps): Pr
   let items = first.items;
   let syncToken = first.syncToken;
   let resynced = false;
+  // A listing asked for everything, and finished. `listAll` reports the page
+  // cap and any non-200 page as status 0, and only hands back a `syncToken`
+  // when the last page carried one, so the two checks together are §4.2's four
+  // conditions — asked for everything, every page, all 200, Google said done.
+  let complete = !request.syncToken && first.status === 200 && Boolean(first.syncToken);
 
   if (first.status === 401) return { ...EMPTY_OUTCOME, expired: true };
 
@@ -165,6 +187,10 @@ export async function runInbound(request: InboundRequest, deps: InboundDeps): Pr
     items = full.items;
     syncToken = full.syncToken;
     resynced = true;
+    // The point of the whole exercise: an expired cursor is exactly when
+    // events can have gone in Google without us being told, and this re-list
+    // is the only moment we are allowed to notice.
+    complete = Boolean(full.syncToken);
   } else if (first.status !== 200) {
     return { ...EMPTY_OUTCOME, failed: true };
   }
@@ -179,9 +205,9 @@ export async function runInbound(request: InboundRequest, deps: InboundDeps): Pr
     },
   });
 
-  return { plan, ...(syncToken ? { syncToken } : {}), resynced, expired: false, failed: false };
+  return { plan, ...(syncToken ? { syncToken } : {}), resynced, expired: false, failed: false, complete };
 }
 
 /** What the caller stores. Re-exported so callers need one import, not two. */
-export { applyInboundPlan };
+export { applyInboundPlan, pruneAfterFullListing };
 export type { InboundPlan, KnownEvent, ExternalCalendarEvent };
