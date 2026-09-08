@@ -130,6 +130,14 @@ function nextDay(date: string): string {
  * time inside the hour a DST change removes can be off by that hour — the
  * authoritative value comes back from Google on the next poll regardless, and
  * this only has to be right enough for the grid not to jump in the meantime.
+ *
+ * `hour12: false` is NOT passed, and that is the whole of a day-long bug. On
+ * older engines it overrides `hourCycle` and reports midnight as hour 24 of the
+ * PREVIOUS day's number — except the day number has already rolled over, so
+ * `Date.UTC` reads "the 9th at 24:00", rolls it again, and the offset comes back
+ * a full day too large. Every event at midnight in its own zone moved a day.
+ * `hourCycle: "h23"` alone says the same thing and is honoured everywhere; the
+ * modulo below is the belt to its braces.
  */
 function zoneOffsetMs(instant: number, zone: string): number {
   try {
@@ -141,7 +149,6 @@ function zoneOffsetMs(instant: number, zone: string): number {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
-      hour12: false,
       hourCycle: "h23",
     })
       .formatToParts(new Date(instant))
@@ -153,7 +160,7 @@ function zoneOffsetMs(instant: number, zone: string): number {
       Number(parts.year),
       Number(parts.month) - 1,
       Number(parts.day),
-      Number(parts.hour),
+      Number(parts.hour) % 24,
       Number(parts.minute),
       Number(parts.second),
     );

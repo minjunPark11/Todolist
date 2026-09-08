@@ -897,7 +897,9 @@ function localDateTimeParts(value2, timezone, fallbackTimezone) {
           day: "2-digit",
           hour: "2-digit",
           minute: "2-digit",
-          hour12: false,
+          // No `hour12: false`. On older engines it overrides `hourCycle` and
+          // reports midnight as "24", so an event at midnight in a named zone
+          // was drawn at 24:00 — a time no clock has.
           hourCycle: "h23"
         }).formatToParts(date).reduce((acc, part) => {
           if (part.type !== "literal") acc[part.type] = part.value;
@@ -905,7 +907,9 @@ function localDateTimeParts(value2, timezone, fallbackTimezone) {
         }, {});
         return {
           date: `${parts.year}-${parts.month}-${parts.day}`,
-          time: `${parts.hour}:${parts.minute}`
+          // Belt to the braces above: an engine that still hands back 24
+          // should show midnight, not a time no clock has.
+          time: `${String(Number(parts.hour) % 24).padStart(2, "0")}:${parts.minute}`
         };
       } catch {
       }

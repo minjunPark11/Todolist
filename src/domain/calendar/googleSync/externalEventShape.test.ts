@@ -79,6 +79,31 @@ describe("what our own record becomes", () => {
     expect(next.updatedAt).toBe("2026-09-08T00:00:00.000Z");
   });
 
+  // CI caught this and no local run did: on Node 20 `hour12: false` overrode
+  // `hourCycle` and reported midnight as hour 24 of an already-rolled-over day,
+  // so the offset probe came back a full day too large. Any edit whose result
+  // lands on midnight in the event's own zone moved a day. The engine version
+  // is not the bug — asking two ways for the same thing was.
+  it("does not move an event a day when the edit lands on midnight", () => {
+    // 15:00 UTC is 2026-09-09 00:00 in Seoul: the exact instant that broke.
+    const next = withExternalEdit(event(), { startTime: "00:00" }, "2026-09-08T00:00:00.000Z");
+    expect(next.start).toBe("2026-09-07T15:00:00.000Z");
+  });
+
+  it("agrees with itself across the day, midnight included", () => {
+    for (const time of ["00:00", "00:30", "09:00", "15:00", "23:59"]) {
+      const next = withExternalEdit(event(), { startTime: time }, "2026-09-08T00:00:00.000Z");
+      // Whatever the clock said, reading it back in Seoul must give it again.
+      const shown = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Seoul",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).format(new Date(next.start));
+      expect(shown).toBe(time);
+    }
+  });
+
   it("is the same object when the edit changes nothing", () => {
     const original = event();
     expect(withExternalEdit(original, { title: "Standup" })).toBe(original);
