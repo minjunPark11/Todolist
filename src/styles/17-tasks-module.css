@@ -542,6 +542,18 @@
   white-space: nowrap;
 }
 
+/* A tag is the one thing in this cluster the user chose the colour of, so it
+   is the one thing here allowed to keep it. Same width limit as the names
+   beside it: a long tag ellipses rather than pushing the date off the row. */
+.tm-task-tag {
+  flex: none;
+  max-width: 8em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tm-tag-dot, var(--text-muted, #8e8e93));
+}
+
 /* A deadline already missed is the one thing on the row that has to be acted
    on today, so it is the one thing here that is not grey. */
 .tm-task-due.is-overdue {
@@ -1642,11 +1654,18 @@
 /* Frameless at rest, like the body above it (§4). It was a filled box with a
    1px border — a second empty form field under a title that was another one,
    which is what made the popup read as four boxes rather than one card. */
+/* The same bargain the body above makes, for the same reason: this is writing,
+   not a form field. The heading over it is what says which writing it is, so
+   the box was saying a second time what the word already said.
+
+   It does not take the leftover height the body does — that is one panel with
+   one thing filling it — so a note stays as tall as the two rows it asks for
+   and grows only when the panel has nothing else to give. */
 .tm-drawer-notes textarea {
   width: 100%;
   min-width: 0;
   padding: 6px 8px;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text, #1c1c1e);
@@ -1655,12 +1674,11 @@
   resize: none;
 }
 
-.tm-drawer-notes textarea:hover {
-  border-color: var(--border-subtle, rgba(25, 25, 25, 0.08));
-}
-
-.tm-drawer-notes textarea:focus {
-  border-color: var(--border, #e5e5e7);
+/* 01-base's 2px ring, for the reason it goes on the body: a caret in the words
+   it is about to change is what reports focus here. */
+.tm-drawer-notes textarea:focus,
+.tm-drawer-notes textarea:focus-visible {
+  outline: none;
 }
 
 /* `.tm-drawer-trash` stood here — see the note in 19-app-shell.css. Trash is
@@ -3502,6 +3520,13 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* The body takes the room the Detail has left, the way the reference app's
+     does: a three-row box in the middle of an empty panel is a form field, and
+     what is wanted here is a page to write on. `1 0 auto` — it grows into the
+     slack and never shrinks below its content, so a long body still scrolls
+     the panel rather than being squeezed. The sections under it (subtasks,
+     tags, notes) sit under the grown body, which is where they sat before. */
+  flex: 1 0 auto;
 }
 
 /* The body reads as text until it is being edited — the same bargain the title
@@ -3550,16 +3575,20 @@
   color: var(--accent, #007aff);
 }
 
-/* The body reads as text until it is being edited.
+/* The body is not a field. It is the page the Task is written on.
 
    It was a bordered box on a white fill, under a title that is another one, so
    an ordinary Task's Detail was two empty form fields where the reference app
    has two lines of writing (TICKTICK_DETAIL_ANATOMY_DESIGN.md §1). The border
-   is still there on hover and focus — it says "this is editable" at the moment
-   that is the question. */
+   went at rest and came back on hover and focus, which is the same box one
+   moment later: an edge that snaps in under the pointer is the thing that
+   makes this read as a control. It is gone in all three states now. */
 .tm-drawer-content textarea {
+  /* Fills what `.tm-drawer-content` was given, so the caret lands where the
+     reader clicks anywhere in the empty space below the last line. */
+  flex: 1 0 auto;
   padding: 6px 8px;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text, #1c1c1e);
@@ -3567,16 +3596,18 @@
   font-size: 13px;
   /* No handle (§4). It is the one piece of chrome that is visible at rest even
      with the frame gone — a corner of hatching in the middle of a card — and
-     what it offers is a height the popup has no room to give. */
+     what it offers is a height the panel now gives by itself. */
   resize: none;
 }
 
-.tm-drawer-content textarea:hover {
-  border-color: var(--border-subtle, rgba(25, 25, 25, 0.08));
-}
-
-.tm-drawer-content textarea:focus {
-  border-color: var(--border, #e5e5e7);
+/* The 2px ring 01-base gives every focusable thing, drawn around a box the
+   height of the panel, IS the border this rule set out to remove. A fill in
+   its place was the same rectangle in grey — bigger, if anything. Nothing is
+   drawn: this is the one control whose focus its own caret reports, sitting
+   in the words it is about to change. */
+.tm-drawer-content textarea:focus,
+.tm-drawer-content textarea:focus-visible {
+  outline: none;
 }
 
 .tm-checklist-items {
