@@ -8,6 +8,10 @@
 > `FOCUSFLOW_EXTERNAL_AI_ACCESS_ARCHITECTURE.md`(B3 타임존 — §9가 그 부채를 갚는다) ·
 > `RAIL_SYNC_AND_NOTIFICATIONS_DESIGN.md`(레일 동기화 버튼 — §6.4가 재사용한다)
 
+> 구현이 실제로 무엇을 하는지는 `GOOGLE_SYNC_LOGIC_REFERENCE.md`에 따로 정리돼 있다.
+> 이 문서는 무엇을 하기로 했는지를 적고, 그쪽은 지금 코드가 무엇을 하는지를 적는다 —
+> 둘이 어긋나는 자리(태스크 인바운드 등)는 그 문서 §7에 모여 있다.
+
 ## 0. 근거 수준
 
 | 등급 | 무엇 | 표기 |
