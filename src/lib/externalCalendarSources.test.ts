@@ -61,6 +61,6 @@ describe("the account-synced copy", () => {
     const data = normalizeData({
       settings: { externalCalendars: [ICS, GOOGLE, { id: "c5", name: "Nowhere" }] },
     } as never);
-    expect(data.settings.externalCalendars.map((calendar) => calendar.source)).toEqual(["ics", "google"]);
+    expect((data.settings.externalCalendars ?? []).map((calendar) => calendar.source)).toEqual(["ics", "google"]);
   });
 });
