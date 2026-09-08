@@ -102,9 +102,11 @@ async function fetchKeys(url, fetchImpl, now) {
   try {
     response = await fetchImpl(url, { headers: { Accept: "application/json" } });
   } catch {
-    throw new UnauthorizedError("invalid_token", "The signing keys could not be read right now.");
+    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} could not be reached.`);
   }
-  if (!response.ok) throw new UnauthorizedError("invalid_token", "The signing keys could not be read right now.");
+  if (!response.ok) {
+    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} came back ${response.status}.`);
+  }
   const body = await response.json();
   const keys = /* @__PURE__ */ new Map();
   for (const key of body.keys ?? []) {

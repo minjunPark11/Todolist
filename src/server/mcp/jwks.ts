@@ -137,14 +137,30 @@ export function supabaseTokenVerifier(options: SupabaseVerifierOptions): TokenVe
   };
 }
 
+/**
+ * The key set, and — when it cannot be had — WHERE we looked for it.
+ *
+ * The address is in the message because without it this failure is unreadable.
+ * It says nothing about the token, the user, or the request: the only way it
+ * happens is that this deployment is pointed at the wrong Supabase project, or
+ * cannot reach the right one. Both are answered by seeing the URL, and neither
+ * is answerable without it — a 401 reading only "could not be read right now"
+ * sends the reader to check their session, which is the one thing that is fine.
+ *
+ * Nothing secret is disclosed. The URL is built from `SUPABASE_URL`, which is
+ * the project's own public address — the browser bundle ships it, and the JWKS
+ * it names is served to anonymous callers by design.
+ */
 async function fetchKeys(url: string, fetchImpl: typeof fetch, now: () => Date): Promise<CachedKeys> {
   let response: Response;
   try {
     response = await fetchImpl(url, { headers: { Accept: "application/json" } });
   } catch {
-    throw new UnauthorizedError("invalid_token", "The signing keys could not be read right now.");
+    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} could not be reached.`);
   }
-  if (!response.ok) throw new UnauthorizedError("invalid_token", "The signing keys could not be read right now.");
+  if (!response.ok) {
+    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} came back ${response.status}.`);
+  }
 
   const body = (await response.json()) as { keys?: Array<JsonWebKey & { kid?: string }> };
   const keys = new Map<string, JsonWebKey & { kid?: string }>();
