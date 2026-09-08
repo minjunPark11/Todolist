@@ -33,6 +33,15 @@ export interface GoogleEventResource {
   recurringEventId?: unknown;
   originalStartTime?: GoogleEventTimes;
   updated?: unknown;
+  /**
+   * What KIND of event this is (GOOGLE_SYNC_HARDENING_DESIGN.md §8).
+   *
+   * `default` is an ordinary event. The other five — `birthday`, `fromGmail`,
+   * `focusTime`, `outOfOffice`, `workingLocation` — refuse an ordinary PATCH or
+   * accept only their own fields, and they live on calendars the account owns,
+   * so `accessRole` alone says they are editable when they are not.
+   */
+  eventType?: unknown;
 }
 
 function text(value: unknown): string | undefined {
@@ -50,6 +59,42 @@ export function googleEventId(item: GoogleEventResource): string {
 
 export function googleEtag(item: GoogleEventResource): string | undefined {
   return text(item.etag);
+}
+
+/**
+ * The kind of event, as a value we can compare (§8.2).
+ *
+ * Absent reads as `default`, which is the permissive answer, and deliberately:
+ * treating a missing field as "not editable" would silently lock every event in
+ * the account the day Google stopped sending it. The cost of the other mistake
+ * is one 400 from Google, which surfaces as a failed write and a visible
+ * rollback — loud beats silent.
+ */
+export function googleEventType(item: GoogleEventResource): string {
+  return text(item.eventType) ?? "default";
+}
+
+/**
+ * A cancelled row that names one occurrence of a series, not an event
+ * (GOOGLE_SYNC_HARDENING_DESIGN.md §5.1).
+ *
+ * Google says "this Tuesday's standup is off" with a row whose id is the
+ * INSTANCE (`<masterId>_20260910T010000Z`), and the record we hold is the
+ * series. Deleting by that id therefore finds nothing, which is why cancelling
+ * one occurrence used to do nothing at all. What the series needs is an
+ * exdate, and `originalStartTime` is where it comes from.
+ *
+ * Null when the row is an ordinary event — then the id-based deletion is right.
+ */
+export function cancelledOccurrenceOf(
+  item: GoogleEventResource,
+  defaultTimezone?: string,
+): { masterUid: string; originalStart: string } | null {
+  const masterUid = text(item.recurringEventId);
+  if (!masterUid) return null;
+  const original = moment(item.originalStartTime, defaultTimezone);
+  if (!original) return null;
+  return { masterUid, originalStart: original.value };
 }
 
 /**
@@ -136,6 +181,12 @@ export function toExternalEvent(
   // series — the meeting that moved to Thursday that week (`types.ts`).
   const original = item.recurringEventId ? moment(item.originalStartTime, options.defaultTimezone) : null;
 
+  // §8: the calendar may be writable and this event still not be. A birthday
+  // or a Gmail-derived event sits on a calendar the account owns and refuses
+  // the PATCH anyway, so the grid must not offer the edit.
+  const eventType = googleEventType(item);
+  const editable = options.writable && eventType === "default";
+
   return {
     id: `${options.externalCalendarId}:${id}`,
     externalCalendarId: options.externalCalendarId,
@@ -148,7 +199,10 @@ export function toExternalEvent(
     allDay: start.allDay,
     timezone: start.timezone,
     sourceUrl: text(item.htmlLink),
-    readOnly: !options.writable,
+    readOnly: !editable,
+    // Stored only when it is not the ordinary kind, so absent keeps meaning
+    // `default` wherever it is read back — including out of storage.
+    ...(eventType !== "default" ? { eventType } : {}),
     ...(googleEtag(item) ? { etag: googleEtag(item) } : {}),
     createdAt: options.createdAt ?? now,
     // Google's own `updated`, not ours: it is what the LWW comparison on a

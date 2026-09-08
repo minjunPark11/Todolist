@@ -292,9 +292,14 @@ export function EventPopover({
       </p>
       {item.sourceType === "external" ? (
         <p className="gcal-popover-when">
-          {item.readOnly
-            ? t("calendar.externalSourceLine", { name: item.externalCalendarName ?? "" })
-            : t("calendar.externalSourceLineWritable", { name: item.externalCalendarName ?? "" })}
+          {!item.readOnly
+            ? t("calendar.externalSourceLineWritable", { name: item.externalCalendarName ?? "" })
+            : item.eventType
+              ? // The calendar is fine; this KIND of event is not ours to change
+                // (§8.4). Saying "read-only" here would send the reader to the
+                // calendar's settings to fix something that is not there.
+                t("calendar.externalSourceLineEventType", { name: item.externalCalendarName ?? "" })
+              : t("calendar.externalSourceLine", { name: item.externalCalendarName ?? "" })}
         </p>
       ) : null}
       {item.sourceType === "external" && item.readOnly ? null : item.sourceType === "focus" ? (

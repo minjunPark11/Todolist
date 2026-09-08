@@ -84,6 +84,12 @@ function sanitizeEvent(raw: Partial<ExternalCalendarEvent>): ExternalCalendarEve
     recurrence: raw.recurrence,
     exdates: raw.exdates,
     recurrenceId: raw.recurrenceId,
+    // This function is an ALLOWLIST: a field missing from it is dropped on
+    // every load, which looks like a feature that works until the app is
+    // restarted. `eventType` decides whether the grid offers an edit at all
+    // (GOOGLE_SYNC_HARDENING_DESIGN.md §8.3), so losing it would quietly hand
+    // back the gestures Google is going to refuse.
+    ...(raw.eventType ? { eventType: String(raw.eventType) } : {}),
   };
 }
 

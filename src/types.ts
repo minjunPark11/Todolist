@@ -1018,6 +1018,16 @@ export interface ExternalCalendarEvent {
   recurrenceId?: string;
   /** Set on an expanded occurrence: the UID of the series it came from. */
   occurrenceOf?: string;
+  /**
+   * Google's kind of event, when it is not the ordinary one
+   * (GOOGLE_SYNC_HARDENING_DESIGN.md §8).
+   *
+   * `birthday` · `fromGmail` · `focusTime` · `outOfOffice` · `workingLocation`.
+   * These refuse an ordinary PATCH even on a calendar the account owns, so they
+   * are `readOnly` regardless of `accessRole` — and this field is what lets the
+   * screen say WHICH of the two reasons applies. Absent means the ordinary kind.
+   */
+  eventType?: string;
 }
 
 // Loose shape for seed/imported/persisted data before normalization: every

@@ -2123,7 +2123,10 @@ function buildCalendarItems({
         // thing" or "change this end" — the same ambiguity that keeps a task
         // range undraggable above, answered the same way.
         draggable: writable && dates.length === 1,
-        readOnly: !writable
+        readOnly: !writable,
+        // Why it is read-only, when the reason is the event and not the
+        // calendar (GOOGLE_SYNC_HARDENING_DESIGN.md §8.4).
+        ...event.eventType ? { eventType: event.eventType } : {}
       });
     }
   }

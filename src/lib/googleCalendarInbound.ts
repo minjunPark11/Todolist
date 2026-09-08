@@ -68,7 +68,7 @@ export interface InboundOutcome {
 }
 
 const EMPTY_OUTCOME: InboundOutcome = {
-  plan: { upsert: [], cancelled: [], echoes: 0 },
+  plan: { upsert: [], cancelled: [], cancelledOccurrences: [], echoes: 0 },
   resynced: false,
   expired: false,
   failed: false,

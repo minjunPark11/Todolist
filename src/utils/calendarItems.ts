@@ -76,6 +76,12 @@ export interface CalendarItem {
   done?: boolean;
   draggable: boolean;
   repeating?: boolean;
+  /**
+   * Google's kind of event, when it is not the ordinary one — `birthday`,
+   * `fromGmail`, and the rest. Present only on external items, and only when
+   * that kind is why the item cannot be edited (§8).
+   */
+  eventType?: string;
 }
 
 // There is no per-layer colour table any more. Every layer already had its own
@@ -424,6 +430,9 @@ export function buildCalendarItems({
         // range undraggable above, answered the same way.
         draggable: writable && dates.length === 1,
         readOnly: !writable,
+        // Why it is read-only, when the reason is the event and not the
+        // calendar (GOOGLE_SYNC_HARDENING_DESIGN.md §8.4).
+        ...(event.eventType ? { eventType: event.eventType } : {}),
       });
     }
   }

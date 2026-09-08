@@ -54,6 +54,19 @@ describe("a stored event", () => {
     expect(events[0].readOnly).toBe(false);
     expect(events[0].etag).toBe('"abc123"');
   });
+
+  // GOOGLE_SYNC_HARDENING_DESIGN.md §8.3. `sanitizeEvent` is an allowlist, so a
+  // field left out of it survives until the app is restarted and no longer —
+  // and this one is the difference between a birthday the grid refuses to move
+  // and one it offers to move into a 400 from Google.
+  it("remembers the kind of event across a reload", () => {
+    const { events } = roundTrip([GOOGLE], [{ ...base, readOnly: true, eventType: "birthday" }]);
+    expect(events[0].eventType).toBe("birthday");
+  });
+
+  it("keeps the ordinary kind absent rather than spelled out", () => {
+    expect(roundTrip([GOOGLE], [{ ...base, readOnly: false }]).events[0].eventType).toBeUndefined();
+  });
 });
 
 describe("the account-synced copy", () => {
