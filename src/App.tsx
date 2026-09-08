@@ -17,6 +17,7 @@ import { UpdateChecker } from "./components/UpdateChecker";
 import { SettingsRow } from "./components/SettingsPage";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { useGoogleOutboundSync } from "./hooks/useGoogleOutboundSync";
+import { useGoogleInboundSync } from "./hooks/useGoogleInboundSync";
 import { AppModals } from "./app/AppModals";
 import { AppPages } from "./app/AppPages";
 import { TasksModule } from "./components/tasks/TasksModule";
@@ -107,7 +108,9 @@ function cloudExternalCalendarSnapshot(calendar: ExternalCalendar): ExternalCale
   return {
     id: calendar.id,
     name: calendar.name,
-    icsUrl: calendar.icsUrl,
+    source: calendar.source ?? "ics",
+    ...(calendar.icsUrl ? { icsUrl: calendar.icsUrl } : {}),
+    ...(calendar.googleCalendarId ? { googleCalendarId: calendar.googleCalendarId } : {}),
     color: calendar.color,
     visible: calendar.visible,
     enabled: calendar.enabled,
@@ -748,6 +751,11 @@ export default function App() {
     signedIn: planner.auth.isSignedIn,
     onResult: planner.applyGoogleSync,
   });
+
+  // Google Calendar, inbound (§6). The other direction, and a different kind of
+  // record: what comes back is an ExternalCalendarEvent and not a Task, so a
+  // colleague's meeting never lands in the inbox (§6.2).
+  useGoogleInboundSync({ signedIn: planner.auth.isSignedIn, apply: saveExternalState });
 
   useEffect(() => {
     if (!calendarShare.enabled || !calendarShare.token) return;
