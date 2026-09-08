@@ -179,6 +179,8 @@ export function TaskDrawer({
 }: TaskDrawerProps) {
   const { t } = useT();
   const root = useRef<HTMLElement>(null);
+  /** The body's section, so the filler under everything can find its field. */
+  const content = useRef<HTMLElement>(null);
   /**
    * A Task in the Trash is frozen in what it IS, not in what it says
    * (TRASH_PERMANENT_DELETE_DESIGN.md §14, Q1).
@@ -619,7 +621,7 @@ export function TaskDrawer({
           the description with nothing over it; List is in the footer; Tags is
           a section that appears when the Task has tags; and the heading was
           naming a field the placeholder already names. */}
-      <section className="tm-drawer-content">
+      <section className="tm-drawer-content" ref={content}>
         {checklist ? (
           <ChecklistEditor
             /* §1.26: the Drawer no longer remounts on a Task switch, so the
@@ -821,6 +823,32 @@ export function TaskDrawer({
           />
         </section>
       ) : null}
+
+      {/* The height nothing else asked for.
+
+          The body used to take it (`flex: 1 0 auto`), which pushed every
+          section under it — tags included — to the floor of the panel
+          (TASK_TAG_CHIPS_DESIGN.md §1.1). Sections stack from the top now and
+          the slack collects here, at the end, where it belongs to no one.
+
+          It is a click target because the slack used to be part of the body:
+          clicking below the last line put the caret in it, and a filler that
+          swallowed that would be a regression dressed as a layout fix. Not a
+          button — there is nothing here to press, and a screen reader offered
+          one would be offered a control that does nothing it can describe. */}
+      <div
+        className="tm-drawer-filler"
+        aria-hidden="true"
+        onMouseDown={(event) => {
+          // `mousedown`, not `click`: the caret has to land before the
+          // browser's own focus handling moves it somewhere else.
+          const field = content.current?.querySelector("textarea");
+          if (!field) return;
+          event.preventDefault();
+          field.focus();
+          field.setSelectionRange(field.value.length, field.value.length);
+        }}
+      />
 
       </div>
 

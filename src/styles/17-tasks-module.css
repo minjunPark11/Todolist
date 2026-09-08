@@ -109,6 +109,53 @@
   background: var(--bg-hover-nav);
 }
 
+/* A row that carries a second control (TASK_TAG_CHIPS_DESIGN.md §5.3).
+
+   The ⋯ is a SIBLING of the row, not a child: a button inside a button is a
+   control a keyboard cannot describe. It overlaps the row's right edge instead
+   of taking width from it, so a row with one and a row without still put their
+   labels and counts in the same places. */
+.tm-row-slot {
+  position: relative;
+}
+
+.tm-row-edit {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover-nav);
+  color: var(--text-muted, #8e8e93);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  /* Quiet until the row is reached for. Visible at rest, it would be a column
+     of ⋯ down a sidebar that is read far more often than it is edited. */
+  opacity: 0;
+}
+
+.tm-row-slot:hover .tm-row-edit,
+.tm-row-edit:focus-visible {
+  opacity: 1;
+}
+
+.tm-row-edit:hover {
+  color: var(--text, #1c1c1e);
+}
+
+/* What the chip will look like, under the choice that decides it. */
+.tm-tag-edit-preview {
+  margin: 0;
+}
+
 /* §11.20/§11.28: selected is NEUTRAL, and the label stays at 500.
    The accent tint that used to be here made the current row the loudest thing
    on screen — a sidebar shouting about where you already are, over content
@@ -542,16 +589,17 @@
   white-space: nowrap;
 }
 
-/* A tag is the one thing in this cluster the user chose the colour of, so it
-   is the one thing here allowed to keep it. Same width limit as the names
-   beside it: a long tag ellipses rather than pushing the date off the row. */
-.tm-task-tag {
-  flex: none;
-  max-width: 8em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--tm-tag-dot, var(--text-muted, #8e8e93));
+/* The chips' own line, under the title and under the body (§7.2).
+
+   `width: 100%` is what puts it on a line of its own — the same mechanism the
+   body uses, and the reason `.tm-task-open` has to wrap when either exists. */
+.tm-task-tagline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: 3px;
 }
 
 /* A deadline already missed is the one thing on the row that has to be acted
@@ -950,7 +998,8 @@
 
    `row-gap: 0` because the body carries its own `margin-top: 2px`; the row's
    12px `gap` would otherwise be added to it. */
-.tm-task-open.has-body {
+.tm-task-open.has-body,
+.tm-task-open.has-tagline {
   flex-wrap: wrap;
   row-gap: 0;
 }
@@ -958,7 +1007,8 @@
 /* What the checkbox is pointing at is the TITLE, so on a two-line row it goes
    to the title's line. Centred in the row, it sits ~10px below the word it
    belongs to and reads as being about both lines equally. */
-.tm-task:has(.tm-task-body) {
+.tm-task:has(.tm-task-body),
+.tm-task:has(.tm-task-tagline) {
   align-items: flex-start;
   padding-block: 4px;
 }
@@ -966,7 +1016,8 @@
 /* 3px = (21 − 15) / 2 — a 15px box (`--check-size`) standing in the middle of
    the title's 21px line (14px × 1.5). The label keeps the row's full width as
    its hit area; it is only the box inside it that stops stretching. */
-.tm-task:has(.tm-task-body) .tm-task-check {
+.tm-task:has(.tm-task-body) .tm-task-check,
+.tm-task:has(.tm-task-tagline) .tm-task-check {
   align-self: flex-start;
   align-items: flex-start;
   padding-top: 3px;
@@ -1400,13 +1451,15 @@
 }
 
 /* Tags (spec §13.36, §13.53, §13.55). */
+/* Left, and the full width. It was `flex-end` inside 70% from the days this
+   was a labelled property row with its value on the right; under the content
+   (TASK_TAG_CHIPS_DESIGN.md §3) that alignment put the chips in the middle of
+   the panel, lined up with nothing. */
 .tm-tags-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  justify-content: flex-end;
-  max-width: 70%;
 }
 
 .tm-tag-chips {
@@ -1416,15 +1469,36 @@
   list-style: none;
 }
 
+/* One chip for every surface (TASK_TAG_CHIPS_DESIGN.md §4.1). The Detail's
+   grey pill and the row's coloured `#name` text were the same thing drawn
+   twice; what differs is only whether an × is inside it.
+
+   The four values come from `tagChipColors`, which answers both themes at once
+   so a theme switch is a repaint and not a re-render (§6). */
 .tm-tag-chip {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 2px 4px 2px 8px;
+  max-width: 10em;
+  padding: 1px 8px;
   border-radius: var(--rounded-pill, 999px);
-  background: var(--bg-surface-muted, #f5f5f7);
+  background: var(--tag-fill-light, var(--bg-surface-muted, #f5f5f7));
   font-size: 12px;
-  color: var(--text-secondary, #3c3c43);
+  line-height: 18px;
+  color: var(--tag-ink-light, var(--text-secondary, #3c3c43));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A chip carrying an × keeps room for it on the right. */
+.tm-tag-chip:has(.tm-tag-chip-remove) {
+  padding-right: 3px;
+}
+
+[data-theme="dark"] .tm-tag-chip {
+  background: var(--tag-fill-dark, var(--bg-surface-muted, #2c2c2e));
+  color: var(--tag-ink-dark, var(--text-secondary, #e5e5e7));
 }
 
 /* §13.55: removal lives on the chip, so taking a tag off does not mean
@@ -1441,13 +1515,16 @@
   background: none;
   font-size: 13px;
   line-height: 1;
-  color: var(--text-tertiary, #8e8e93);
+  /* The chip's own ink at less than full strength: a fixed grey was legible on
+     the old grey pill and disappears on a filled one. */
+  color: currentColor;
+  opacity: 0.65;
   cursor: pointer;
 }
 
 .tm-tag-chip-remove:hover {
-  background: var(--bg-hover-content, rgba(25, 25, 25, 0.05));
-  color: var(--text-primary, #1c1c1e);
+  background: rgba(127, 127, 127, 0.25);
+  opacity: 1;
 }
 
 .tm-tag-add {
@@ -3520,13 +3597,20 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* The body takes the room the Detail has left, the way the reference app's
-     does: a three-row box in the middle of an empty panel is a form field, and
-     what is wanted here is a page to write on. `1 0 auto` — it grows into the
-     slack and never shrinks below its content, so a long body still scrolls
-     the panel rather than being squeezed. The sections under it (subtasks,
-     tags, notes) sit under the grown body, which is where they sat before. */
+}
+
+/* The slack, at the end, belonging to no section.
+
+   The body held it for a day (`flex: 1 0 auto`) and that put every section
+   under it — tags included — on the floor of the panel
+   (TASK_TAG_CHIPS_DESIGN.md §1.1). Sections stack from the top now.
+
+   It still takes a click into the body, because that is what the slack did
+   when the body owned it. */
+.tm-drawer-filler {
   flex: 1 0 auto;
+  min-height: 24px;
+  cursor: text;
 }
 
 /* The body reads as text until it is being edited — the same bargain the title
@@ -3584,9 +3668,6 @@
    moment later: an edge that snaps in under the pointer is the thing that
    makes this read as a control. It is gone in all three states now. */
 .tm-drawer-content textarea {
-  /* Fills what `.tm-drawer-content` was given, so the caret lands where the
-     reader clicks anywhere in the empty space below the last line. */
-  flex: 1 0 auto;
   padding: 6px 8px;
   border: 0;
   border-radius: var(--radius-sm);
@@ -3595,8 +3676,8 @@
   font: inherit;
   font-size: 13px;
   /* No handle (§4). It is the one piece of chrome that is visible at rest even
-     with the frame gone — a corner of hatching in the middle of a card — and
-     what it offers is a height the panel now gives by itself. */
+     with the frame gone — a corner of hatching in the middle of a card. The
+     empty room below belongs to `.tm-drawer-filler`, which hands a click here. */
   resize: none;
 }
 
