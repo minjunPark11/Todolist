@@ -77,6 +77,25 @@ export function isSyncEligible(task: SyncableTask): boolean {
 }
 
 /**
+ * An id for an event we are about to create (§3.3).
+ *
+ * Google's charset for a client-supplied id is base32hex — `0-9` and `a-v`,
+ * five to 1024 characters — which hex is a subset of, so a UUID with its
+ * hyphens taken out is already legal. The `ff` in front is for the person
+ * reading their own calendar's API responses one day: it says where the event
+ * came from.
+ *
+ * Random rather than derived from the Task. Google keeps a deleted event's id
+ * out of circulation, so an id computed from `task.id` would make a Task that
+ * was trashed and restored collide with its own gravestone on every pass, with
+ * no way out. What idempotence actually needs is that the RETRY uses the same
+ * id, and storing it gives that.
+ */
+export function newGoogleEventId(uuid: () => string = () => crypto.randomUUID()): string {
+  return `ff${uuid().replace(/-/g, "").toLowerCase()}`;
+}
+
+/**
  * The day AFTER `date` — Google's all-day `end` is exclusive.
  *
  * Built in UTC so the machine's own zone cannot move it: this is date

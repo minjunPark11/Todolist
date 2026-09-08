@@ -25,6 +25,8 @@ export type IdentifiedTask = SyncableTask &
     updatedAt?: string;
     /** What `updatedAt` said at the last successful write (`types.ts`). */
     googleSyncedAt?: string;
+    /** The id the create will use, so a retry uses the same one (§3). */
+    googleReservedEventId?: string;
   };
 
 export interface PlannedDelete {
@@ -112,6 +114,38 @@ export function planOutbound(tasks: readonly IdentifiedTask[], tombstones: reado
   }
 
   return plan;
+}
+
+/** A Task that now knows the id its event will have. */
+export interface EventReservation {
+  taskId: string;
+  googleReservedEventId: string;
+}
+
+/**
+ * The create pile, with every task holding the id it will be created under
+ * (GOOGLE_SYNC_HARDENING_DESIGN.md §3.4).
+ *
+ * Separated from the sending so the ORDER can be got right: the reservations
+ * have to be written down before the requests go out, or a lost response still
+ * leaves nothing behind and the duplicate this exists to prevent happens
+ * anyway. The caller writes `reservations` first and sends `create` second.
+ *
+ * A task that already carries a reservation keeps it — that is the whole point.
+ * The second attempt at a create must name the same event as the first.
+ */
+export function reserveEventIds(
+  create: readonly IdentifiedTask[],
+  makeId: () => string,
+): { create: IdentifiedTask[]; reservations: EventReservation[] } {
+  const reservations: EventReservation[] = [];
+  const next = create.map((task) => {
+    if (task.googleReservedEventId) return task;
+    const googleReservedEventId = makeId();
+    reservations.push({ taskId: task.id, googleReservedEventId });
+    return { ...task, googleReservedEventId };
+  });
+  return { create: next, reservations };
 }
 
 /** Whether a pass would send anything at all — the cheap check before a token. */

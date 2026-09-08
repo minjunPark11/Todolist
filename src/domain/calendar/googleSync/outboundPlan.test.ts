@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { isEmptyPlan, needsUpdate, planOutbound, type IdentifiedTask } from "./outboundPlan";
+import {
+  isEmptyPlan,
+  needsUpdate,
+  planOutbound,
+  reserveEventIds,
+  type IdentifiedTask,
+} from "./outboundPlan";
+import { newGoogleEventId } from "./eventShape";
 
 function task(overrides: Partial<IdentifiedTask> & { id: string }): IdentifiedTask {
   return { title: "Write it down", dueDate: "2026-09-04", ...overrides };
@@ -101,5 +108,39 @@ describe("not writing what is already there", () => {
     const plan = planOutbound([task(pushed)], ["ev1"]);
     expect(plan.update).toHaveLength(0);
     expect(plan.orphans).toEqual([]);
+  });
+});
+
+// Naming the event before making it (GOOGLE_SYNC_HARDENING_DESIGN.md §3).
+describe("reserving an id", () => {
+  it("gives one to every create that has none", () => {
+    let n = 0;
+    const { create, reservations } = reserveEventIds(
+      [{ id: "t1", title: "A", dueDate: "2026-09-04" }, { id: "t2", title: "B", dueDate: "2026-09-05" }],
+      () => `ff${++n}`,
+    );
+    expect(create.map((task) => task.googleReservedEventId)).toEqual(["ff1", "ff2"]);
+    expect(reservations).toEqual([
+      { taskId: "t1", googleReservedEventId: "ff1" },
+      { taskId: "t2", googleReservedEventId: "ff2" },
+    ]);
+  });
+
+  it("keeps the id a retry already has — that IS the fix", () => {
+    // The second attempt at a create must name the same event as the first, or
+    // the duplicate this exists to prevent happens on the retry instead.
+    const { create, reservations } = reserveEventIds(
+      [{ id: "t1", title: "A", dueDate: "2026-09-04", googleReservedEventId: "ffkept" }],
+      () => "ffnew",
+    );
+    expect(create[0].googleReservedEventId).toBe("ffkept");
+    expect(reservations).toEqual([]);
+  });
+
+  it("mints ids Google will accept", () => {
+    // base32hex: 0-9 and a-v, five characters at the very least.
+    const id = newGoogleEventId();
+    expect(id).toMatch(/^[0-9a-v]{5,1024}$/);
+    expect(newGoogleEventId()).not.toBe(id);
   });
 });

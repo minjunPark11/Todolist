@@ -55,6 +55,16 @@ export interface OutboundOutcome {
   /** Writes that failed and will be tried again next pass. */
   failed: number;
   /**
+   * Reservations Google will not accept, and the Tasks that hold them (§3.5).
+   *
+   * A 409 says the id is taken; the PATCH that follows says by what. When even
+   * that comes back "not found", the id belongs to an event Google has already
+   * deleted and keeps out of circulation — a gravestone. The reservation is
+   * cleared so the next pass mints a fresh id rather than arguing with it
+   * forever.
+   */
+  unusableReservations: string[];
+  /**
    * The grant is dead — revoked in the Google account, or never completed.
    *
    * Everything after the first one would fail the same way, so the pass stops
@@ -82,6 +92,7 @@ const EMPTY: OutboundOutcome = {
   failed: 0,
   expired: false,
   calendarMissing: false,
+  unusableReservations: [],
 };
 
 interface GoogleReply {
@@ -142,7 +153,13 @@ export async function runOutbound({
   accessToken,
   deps = { fetch: (input, init) => fetch(input, init) },
 }: OutboundRequest): Promise<OutboundOutcome> {
-  const outcome: OutboundOutcome = { ...EMPTY, mapped: [], unlinked: [], clearedOrphans: [] };
+  const outcome: OutboundOutcome = {
+    ...EMPTY,
+    mapped: [],
+    unlinked: [],
+    clearedOrphans: [],
+    unusableReservations: [],
+  };
   const base = events(calendarId);
 
   // Asked at most once, and only when a 404 makes it worth asking (§7.2). The
@@ -157,14 +174,31 @@ export async function runOutbound({
   }
 
   for (const task of plan.create) {
+    const body = toGoogleEventBody(task as SyncableTask, timezone);
+    // The id the Task reserved before this request was sent (§3.4). Naming the
+    // event is what makes the create safe to repeat.
+    const reserved = task.googleReservedEventId;
     const reply = await call(base, accessToken, deps, {
       method: "POST",
-      body: JSON.stringify(toGoogleEventBody(task as SyncableTask, timezone)),
+      body: JSON.stringify(reserved ? { ...body, id: reserved } : body),
     });
     if (reply.status === 401) return { ...outcome, expired: true };
     // A create into a calendar that is not there fails the same way forever.
     if (missing(reply.status) && (await calendarIsMissing())) {
       return { ...outcome, calendarMissing: true };
+    }
+
+    // 409 is not a failure. It is Google saying this event already exists —
+    // which, since we named it, means OUR earlier create landed and only its
+    // answer was lost. Adopting it is the recovery, and the same PATCH that
+    // adopts it also brings it up to date with whatever the Task says now.
+    if (reply.status === 409 && reserved) {
+      const adopted = await adoptReserved(task, reserved, body, base, accessToken, deps);
+      if (adopted === "expired") return { ...outcome, expired: true };
+      if (adopted === "unusable") outcome.unusableReservations.push(task.id);
+      else if (adopted === "failed") outcome.failed += 1;
+      else outcome.mapped.push(adopted);
+      continue;
     }
 
     const mapping = mappingFrom(task, reply);
@@ -213,6 +247,37 @@ export async function runOutbound({
 /** The two statuses that mean "not here", whatever "here" turns out to be. */
 function missing(status: number): boolean {
   return status === 404 || status === 410;
+}
+
+/**
+ * Taking over the event our own earlier create already made (§3.5).
+ *
+ * A PATCH rather than a GET, because two things have to be true afterwards and
+ * one request settles both: we hold its etag, and it says what the Task says
+ * now. A GET would leave `googleSyncedAt` claiming agreement with a body that
+ * might be a version old.
+ *
+ * `status: "confirmed"` is in the body for the Task that went to the Trash and
+ * came back — its event is cancelled rather than gone, and this revives it.
+ * When even the PATCH cannot find it, the id is a gravestone: Google keeps a
+ * deleted event's id out of circulation, and no number of retries will change
+ * that, so the reservation has to go.
+ */
+async function adoptReserved(
+  task: IdentifiedTask,
+  reserved: string,
+  body: ReturnType<typeof toGoogleEventBody>,
+  base: string,
+  accessToken: string,
+  deps: OutboundDeps,
+): Promise<EventMapping | "failed" | "unusable" | "expired"> {
+  const reply = await call(`${base}/${encodeURIComponent(reserved)}`, accessToken, deps, {
+    method: "PATCH",
+    body: JSON.stringify({ ...body, status: "confirmed" }),
+  });
+  if (reply.status === 401) return "expired";
+  if (missing(reply.status)) return "unusable";
+  return mappingFrom(task, reply) ?? "failed";
 }
 
 /**

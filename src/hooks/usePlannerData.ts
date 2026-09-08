@@ -1106,33 +1106,62 @@ export function usePlannerData() {
     mapped?: readonly { taskId: string; googleEventId: string; googleEtag: string; googleSyncedAt: string }[];
     unlinked?: readonly string[];
     clearedOrphans?: readonly string[];
+    /**
+     * Ids chosen for events that have NOT been created yet
+     * (GOOGLE_SYNC_HARDENING_DESIGN.md §3.4).
+     *
+     * Written before the create is sent, which is the only ordering that helps:
+     * the point is that a retry after a lost response names the same event.
+     * Deliberately does not touch `updatedAt` — moving it would make the pass
+     * that just wrote the mapping look like an edit, and the next pass would
+     * rewrite the event it had only this moment created.
+     */
+    reserved?: readonly { taskId: string; googleReservedEventId: string }[];
+    /** Reserved ids Google will not take, to be minted again (§3.5). */
+    unusableReservations?: readonly string[];
   }) {
     const mapped = new Map((result.mapped ?? []).map((row) => [row.taskId, row]));
     const unlinked = new Set(result.unlinked ?? []);
+    const reserved = new Map((result.reserved ?? []).map((row) => [row.taskId, row.googleReservedEventId]));
+    const unusable = new Set(result.unusableReservations ?? []);
     const cleared = result.clearedOrphans ?? [];
-    if (mapped.size === 0 && unlinked.size === 0 && cleared.length === 0) return;
+    const touchesTasks = mapped.size > 0 || unlinked.size > 0 || reserved.size > 0 || unusable.size > 0;
+    if (!touchesTasks && cleared.length === 0) return;
 
     setData((current) => {
-      const tasks =
-        mapped.size === 0 && unlinked.size === 0
-          ? current.tasks
-          : current.tasks.map((task) => {
+      const tasks = !touchesTasks
+        ? current.tasks
+        : current.tasks.map((task) => {
+              const reservation = reserved.get(task.id);
+              if (reservation) return { ...task, googleReservedEventId: reservation };
               const row = mapped.get(task.id);
               if (row) {
+                // The reservation has done its job the moment the event exists.
+                const { googleReservedEventId, ...rest } = task;
+                void googleReservedEventId;
                 return {
-                  ...task,
+                  ...rest,
                   googleEventId: row.googleEventId,
                   googleEtag: row.googleEtag,
                   googleSyncedAt: row.googleSyncedAt,
                 };
               }
+              if (unusable.has(task.id)) {
+                // Google is holding that id for an event it has deleted. Let go
+                // of it and the next pass mints another.
+                const { googleReservedEventId, ...rest } = task;
+                void googleReservedEventId;
+                return rest;
+              }
               if (!unlinked.has(task.id)) return task;
               // The event is gone. The Task is untouched otherwise: if it still
-              // qualifies, the next pass creates it again (§5.1).
-              const { googleEventId, googleEtag, googleSyncedAt, ...rest } = task;
+              // qualifies, the next pass creates it again (§5.1) — with a NEW
+              // reserved id, because the old one now names a deleted event.
+              const { googleEventId, googleEtag, googleSyncedAt, googleReservedEventId, ...rest } = task;
               void googleEventId;
               void googleEtag;
               void googleSyncedAt;
+              void googleReservedEventId;
               return rest;
             });
 

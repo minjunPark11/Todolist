@@ -13,7 +13,13 @@
 // mapping it stores changes the Tasks, which re-arms the debounce, which plans
 // nothing and stops.
 import { useCallback, useEffect, useRef } from "react";
-import { isEmptyPlan, planOutbound, type IdentifiedTask } from "../domain/calendar/googleSync/outboundPlan";
+import {
+  isEmptyPlan,
+  planOutbound,
+  reserveEventIds,
+  type IdentifiedTask,
+} from "../domain/calendar/googleSync/outboundPlan";
+import { newGoogleEventId } from "../domain/calendar/googleSync/eventShape";
 import {
   currentAccessToken,
   ensureDedicatedCalendar,
@@ -21,7 +27,8 @@ import {
   notifyGoogleConnectionChanged,
   readConnection,
 } from "../lib/googleCalendar";
-import { runOutbound, type OutboundOutcome } from "../lib/googleCalendarOutbound";
+import { runOutbound, type EventMapping } from "../lib/googleCalendarOutbound";
+import type { EventReservation } from "../domain/calendar/googleSync/outboundPlan";
 import type { Task } from "../types";
 
 export interface GoogleOutboundSyncInput {
@@ -32,8 +39,21 @@ export interface GoogleOutboundSyncInput {
   tombstones: string[] | undefined;
   /** No FocusFlow session, no connection to look up. */
   signedIn: boolean;
-  /** Where the earned mapping goes — `planner.applyGoogleSync`. */
-  onResult: (outcome: OutboundOutcome) => void;
+  /**
+   * Where what the pass learned goes — `planner.applyGoogleSync`.
+   *
+   * Called twice in a pass that creates anything: once with the reserved ids
+   * BEFORE the requests go out (§3.4), and once with the outcome after. An
+   * `OutboundOutcome` satisfies this shape, so the second call passes it
+   * whole.
+   */
+  onResult: (result: {
+    mapped?: readonly EventMapping[];
+    unlinked?: readonly string[];
+    clearedOrphans?: readonly string[];
+    reserved?: readonly EventReservation[];
+    unusableReservations?: readonly string[];
+  }) => void;
 }
 
 const DEBOUNCE_MS = 1800;
@@ -50,8 +70,20 @@ export function useGoogleOutboundSync({ tasks, timezone, tombstones, signedIn, o
     const { tasks: current, timezone: zone, tombstones: orphans, signedIn: signed, onResult: report } = latest.current;
     if (!signed || running.current) return;
 
-    const plan = planOutbound(current as unknown as IdentifiedTask[], orphans ?? []);
-    if (isEmptyPlan(plan)) return;
+    const planned = planOutbound(current as unknown as IdentifiedTask[], orphans ?? []);
+    if (isEmptyPlan(planned)) return;
+
+    // Every event this pass creates is named before it is sent, and the names
+    // are written down first (§3.4). That order is the whole of the duplicate
+    // fix: if the response to a create is lost, the id survives on the Task and
+    // the retry names the same event instead of making a second one.
+    //
+    // The ids go into the plan directly rather than being read back out of
+    // state — waiting for a render would split the pass in two and open the
+    // very window this closes.
+    const { create, reservations } = reserveEventIds(planned.create, newGoogleEventId);
+    const plan = { ...planned, create };
+    if (reservations.length > 0) report({ reserved: reservations });
 
     running.current = true;
     try {

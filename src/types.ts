@@ -284,6 +284,27 @@ export interface Task {
    * never been out.
    */
   googleSyncedAt?: string;
+  /**
+   * The id this Task's event will be created under, decided before the create
+   * is sent (GOOGLE_SYNC_HARDENING_DESIGN.md §3).
+   *
+   * Google lets the client name the event, and that is the only way to make a
+   * create idempotent: without it, an insert whose RESPONSE is lost — a tunnel,
+   * a backgrounded app — leaves no id behind, and the next pass makes the same
+   * event a second time. With it, the retry names the same event and Google
+   * answers 409, which is not a failure but a receipt.
+   *
+   * A separate field from `googleEventId` on purpose. That one still means
+   * exactly "the create succeeded" (§4.2), and writing an intention into it
+   * would make `outboundAction` classify an event that does not exist as one to
+   * update. This says only "this is the id we will use".
+   *
+   * Not derived from `id`: Google keeps a deleted event's id reserved, so a
+   * Task that went to the Trash and came back would collide with its own
+   * gravestone forever. Cleared whenever the mapping is cleared, so the next
+   * create mints a fresh one.
+   */
+  googleReservedEventId?: string;
 }
 
 export interface Subtask {

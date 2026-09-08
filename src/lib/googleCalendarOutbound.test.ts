@@ -247,3 +247,68 @@ describe("when the dedicated calendar itself is gone", () => {
     expect(calls.filter((call) => call.method === "GET" && !call.url.includes("/events/"))).toHaveLength(1);
   });
 });
+
+// A create that can be repeated (GOOGLE_SYNC_HARDENING_DESIGN.md §3).
+//
+// The failure this closes has no error in it anywhere: Google makes the event,
+// the response is lost on the way back, and the next pass — seeing a dated Task
+// with no event id — makes a second one. Naming the event turns that retry into
+// a question Google can answer with "you already did that".
+describe("creating with a reserved id", () => {
+  const reserved = "ff0123456789abcdef0123456789abcd";
+
+  it("sends the id the Task reserved", async () => {
+    const { deps, calls } = fakeGoogle({ POST: [{ body: { id: reserved, etag: '"v1"' } }] });
+
+    const outcome = await run(planOutbound([task({ id: "t1", googleReservedEventId: reserved })]), deps);
+
+    expect(JSON.parse(calls[0].body ?? "{}").id).toBe(reserved);
+    expect(outcome.mapped).toEqual([
+      { taskId: "t1", googleEventId: reserved, googleEtag: '"v1"', googleSyncedAt: "" },
+    ]);
+  });
+
+  it("reads 409 as a receipt for a create whose answer was lost", async () => {
+    // Not a failure. The event exists because WE made it, so the PATCH both
+    // adopts it and brings it up to date with what the Task says now.
+    const { deps, calls } = fakeGoogle({
+      POST: [{ status: 409, body: null }],
+      PATCH: [{ status: 200, body: { id: reserved, etag: '"v2"' } }],
+    });
+
+    const outcome = await run(planOutbound([task({ id: "t1", googleReservedEventId: reserved })]), deps);
+
+    expect(outcome.failed).toBe(0);
+    expect(outcome.mapped[0].googleEventId).toBe(reserved);
+    expect(JSON.parse(calls[1].body ?? "{}").status).toBe("confirmed");
+  });
+
+  it("lets go of an id Google is keeping for a deleted event", async () => {
+    // A gravestone: the id is taken and the event behind it is gone, so no
+    // number of retries with this id will ever work.
+    const { deps } = fakeGoogle({
+      POST: [{ status: 409, body: null }],
+      PATCH: [{ status: 404, body: null }],
+    });
+
+    const outcome = await run(planOutbound([task({ id: "t1", googleReservedEventId: reserved })]), deps);
+
+    expect(outcome.unusableReservations).toEqual(["t1"]);
+    expect(outcome.mapped).toEqual([]);
+    expect(outcome.failed).toBe(0);
+  });
+
+  it("keeps the reservation when the adoption merely failed", async () => {
+    // A 500 says nothing about the id. Clearing it here would mint a new one
+    // and make the duplicate by hand.
+    const { deps } = fakeGoogle({
+      POST: [{ status: 409, body: null }],
+      PATCH: [{ status: 500, body: null }],
+    });
+
+    const outcome = await run(planOutbound([task({ id: "t1", googleReservedEventId: reserved })]), deps);
+
+    expect(outcome.unusableReservations).toEqual([]);
+    expect(outcome.failed).toBe(1);
+  });
+});
