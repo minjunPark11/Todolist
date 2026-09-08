@@ -264,7 +264,7 @@ export function expandIcsOccurrences(
       if (override) {
         const movedTo = baseDateOf(override, viewerTimezone);
         if (movedTo >= range.from && movedTo <= range.to) {
-          expanded.push({ ...override, id: key, occurrenceOf: master.externalUid });
+          expanded.push({ ...override, id: key, occurrenceOf: master.externalUid, readOnly: true });
         }
         continue;
       }
@@ -279,6 +279,11 @@ export function expandIcsOccurrences(
         start,
         end,
         occurrenceOf: master.externalUid,
+        // An occurrence has a synthetic id that exists only in this list, so a
+        // write keyed by it finds nothing and vanishes. Editing one instance
+        // means patching it through `events.instances`, which no caller does
+        // yet; until then say so rather than offering a drag that no-ops.
+        readOnly: true,
         // The rule belongs to the master, not to a date it produced.
         recurrence: undefined,
         exdates: undefined,

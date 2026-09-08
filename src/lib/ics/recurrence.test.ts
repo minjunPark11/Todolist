@@ -291,3 +291,35 @@ describe("events that do not repeat", () => {
     expect(dates(expand(text, "2026-03-01", "2026-03-31"))).toEqual(["2026-02-28"]);
   });
 });
+
+describe("a writable series", () => {
+  // A Google calendar the account may write produces `readOnly: false` masters.
+  const master = {
+    id: "evt-1",
+    externalCalendarId: "cal-1",
+    externalUid: "weekly@google",
+    title: "Standup",
+    start: "2026-03-02T14:00:00+09:00",
+    end: "2026-03-02T15:00:00+09:00",
+    allDay: false,
+    timezone: "Asia/Seoul",
+    readOnly: false,
+    createdAt: "2026-03-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z",
+    recurrence: { freq: "WEEKLY" as const, interval: 1 },
+  };
+
+  it("hands back occurrences nobody may write", () => {
+    // Their ids exist only in this list, so a write keyed by one finds no
+    // event and disappears. Offering the edit would be a lie (App.tsx
+    // `writableExternal`).
+    const occurrences = expandIcsOccurrences([master], { from: "2026-03-01", to: "2026-03-16" });
+    expect(occurrences.length).toBeGreaterThan(1);
+    expect(occurrences.every((event) => event.readOnly)).toBe(true);
+  });
+
+  it("leaves a non-repeating event writable", () => {
+    const { recurrence: _rule, ...once } = master;
+    expect(expandIcsOccurrences([once], { from: "2026-03-01", to: "2026-03-16" })[0].readOnly).toBe(false);
+  });
+});
