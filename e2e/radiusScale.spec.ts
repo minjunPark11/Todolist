@@ -41,6 +41,8 @@ const ALLOWED_OFF_SCALE = [
   ".ff-check", // a completion control is a circle; 6px on 22px is a different control
   ".ff-color-swatch", // a colour is a dot, not a control
   ".tm-swatch", // the same dot, in the Add List dialog
+  ".tm-tag-chip", // a tag is a badge — §11.2's pill again, beside the ones above
+  ".tm-tag-add", // and the button that adds one has to be the shape it adds
   '[class*="tm-preview-"]', // a thumbnail of a layout, drawn at a fraction of the size
 ];
 
@@ -101,11 +103,38 @@ async function offScaleShapes(page: Page, scale: number[], allowed: string[]): P
   );
 }
 
+/**
+ * A task, and a tag on it.
+ *
+ * The tag matters: the two pill entries in the allow list above are for shapes
+ * this spec could not see, because an account with no tags draws no chip and
+ * no `+` — the exceptions were being written for something the sweep never
+ * reached. `#` in the quick add attaches one as the title is typed
+ * (`splitInlineTags`), so it costs a token rather than a fixture.
+ */
 async function addTask(page: Page, title: string): Promise<void> {
   const field = page.getByRole("textbox", { name: "Add a task" });
-  await field.fill(title);
+  await field.fill(`${title} #radius`);
   await field.press("Enter");
   await expect(page.getByRole("button", { name: `Open ${title}` })).toBeVisible();
+  await expect(page.locator(".tm-tag-chip").first()).toBeVisible();
+}
+
+/**
+ * An exception is a line that stops the sweep looking, so each one is paired
+ * with a measurement that does.
+ *
+ * Without this, `.tm-tag-chip` could quietly become a 6px rectangle and the
+ * spec would stay green — the allow list would be saying "do not look" where
+ * it was meant to say "this one is a pill".
+ */
+async function expectPill(page: Page, selector: string): Promise<void> {
+  const shape = await page.locator(selector).first().evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { radius: parseFloat(style.borderTopLeftRadius), height: el.getBoundingClientRect().height };
+  });
+  expect(shape.height, `${selector} has a height to measure`).toBeGreaterThan(0);
+  expect(shape.radius, `${selector} is a pill`).toBeGreaterThanOrEqual(shape.height / 2);
 }
 
 test.describe("the radius scale (§11.39)", () => {
@@ -141,6 +170,11 @@ test.describe("the radius scale (§11.39)", () => {
     await page.getByRole("button", { name: "Open Open me" }).click();
     await expect(page.locator(".tm-drawer.is-empty")).toHaveCount(0);
     expect(await offScaleShapes(page, SCALE, ALLOWED_OFF_SCALE), "the Task Detail").toEqual([]);
+
+    // The other half of the two entries added to the allow list: the Detail is
+    // where both are on screen at once.
+    await expectPill(page, ".tm-drawer-tags .tm-tag-chip");
+    await expectPill(page, ".tm-tag-add");
 
     await page.keyboard.press("Control+k");
     await expect(page.locator(".cmd-menu")).toBeVisible();

@@ -1527,18 +1527,23 @@
   opacity: 1;
 }
 
+/* The button that adds one, shaped like what it adds
+   (TASK_DETAIL_TAG_INPUT_DESIGN.md §5.1).
+
+   The contract is the chip's: 20px tall and a pill, so the two stand on one
+   line without it moving. The dashes stay — they are what says "add" where the
+   chip beside them is filled. The 24px is the VISIBLE width; the tap target is
+   `--density-tap`'s job, and merging the two would let a density setting push
+   the chips off the row. */
 .tm-tag-add {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  min-width: 24px;
+  height: 20px;
   padding: 0;
   border: 1px dashed var(--border-subtle, rgba(25, 25, 25, 0.08));
-  /* A circle here was off §11.39's scale, and this is a control rather than a
-     decoration — the allow list in `e2e/radiusScale` exempts dots and badges
-     for exactly the reason that does not apply to a button. */
-  border-radius: var(--radius-sm);
+  border-radius: var(--rounded-pill, 999px);
   background: none;
   font-size: var(--icon-glyph);
   line-height: 1;
