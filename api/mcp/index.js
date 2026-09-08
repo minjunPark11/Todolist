@@ -1784,6 +1784,16 @@ function upstreamUnavailable() {
   return new ServerError("UPSTREAM_UNAVAILABLE", "The account could not be read right now.");
 }
 
+// src/server/supabaseOrigin.ts
+function supabaseOrigin(value2) {
+  const trimmed = value2.trim();
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, "");
+  }
+}
+
 // src/server/data/repository.ts
 var ROW_CAP = 5e3;
 var TABLE_TO_KEY = new Map(
@@ -1879,7 +1889,7 @@ function readSupabaseEnv(env = process.env) {
     throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set for the server data layer.");
   }
   assertNotServiceRole(anonKey);
-  return { url, anonKey };
+  return { url: supabaseOrigin(url), anonKey };
 }
 function supabaseTableReader(ctx, env = readSupabaseEnv()) {
   return {

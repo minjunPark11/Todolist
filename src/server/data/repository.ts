@@ -17,6 +17,7 @@ import type { PlannerData, RawPlannerData } from "../../types";
 import { collectionTables } from "../../domain/sync/buildSyncPlan";
 import { normalizeData } from "../../domain/plannerData/normalize";
 import { upstreamUnavailable } from "../errors";
+import { supabaseOrigin } from "../supabaseOrigin";
 import type { RequestContext } from "./context";
 
 /**
@@ -232,7 +233,7 @@ export function readSupabaseEnv(env: NodeJS.ProcessEnv = process.env): SupabaseE
     throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set for the server data layer.");
   }
   assertNotServiceRole(anonKey);
-  return { url, anonKey };
+  return { url: supabaseOrigin(url), anonKey };
 }
 
 /**
