@@ -406,8 +406,10 @@ export function buildCalendarItems({
         allDay: event.allDay,
         color: calendar.color,
         categoryId: eventCategoryId,
-        draggable: false,
-        readOnly: true,
+        // A Google event the account may write is an event this app may move.
+        // An ICS subscription stays exactly as fixed as it was (§6.2).
+        draggable: !event.readOnly,
+        readOnly: event.readOnly,
       });
     }
   }

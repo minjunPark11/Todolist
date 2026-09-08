@@ -914,10 +914,29 @@ export interface AppSettings {
 
 export type ExternalCalendarSyncStatus = "idle" | "syncing" | "success" | "failed" | "hidden" | "disabled";
 
+/**
+ * Where an external calendar comes from — and therefore what may be done to it.
+ *
+ * An ICS subscription is a file someone else serves: there is no way to write
+ * back to it, so its events stay read-only however the UI feels about them. A
+ * Google calendar is reached through an API that accepts writes, which is what
+ * makes two-way editing possible at all (GOOGLE_CALENDAR_SYNC_DESIGN.md §6.2).
+ *
+ * The discriminant is stored rather than inferred from which id is filled in.
+ * A record that has to be interrogated to find out what it is will eventually
+ * be interrogated wrongly.
+ */
+export type ExternalCalendarSourceKind = "ics" | "google";
+
 export interface ExternalCalendar {
   id: string;
   name: string;
-  icsUrl: string;
+  /** Absent on records written before Google calendars existed: read as "ics". */
+  source?: ExternalCalendarSourceKind;
+  /** ICS subscriptions only. */
+  icsUrl?: string;
+  /** Google sources only: this calendar's id within the connected account. */
+  googleCalendarId?: string;
   color: string;
   visible: boolean;
   enabled: boolean;
@@ -962,7 +981,25 @@ export interface ExternalCalendarEvent {
   allDay: boolean;
   timezone?: string;
   sourceUrl?: string;
-  readOnly: true;
+  /**
+   * Whether this app may change the event.
+   *
+   * Was the literal `true`, because every external event came from an ICS file
+   * and none of them could be written to. A Google calendar can, so the fact
+   * became a value (§6.2). ICS-sourced events still set it, and still `true`.
+   */
+  readOnly: boolean;
+  /**
+   * Google's version marker for this event.
+   *
+   * Two jobs, both of which need the CURRENT value rather than a remembered
+   * one. It is the `If-Match` on a write, so an edit made in Google between our
+   * last read and this write is refused rather than clobbered. And it is how an
+   * echo is recognised: an inbound event carrying the etag our own write
+   * returned is our own write coming back, and applying it would start the loop
+   * §6.3 exists to prevent.
+   */
+  etag?: string;
   createdAt: string;
   updatedAt: string;
   /**

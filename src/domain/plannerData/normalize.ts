@@ -340,13 +340,21 @@ export function normalizeSettings(settings?: Partial<PlannerSettings>): PlannerS
 }
 
 function normalizeExternalCalendar(calendar: Partial<ExternalCalendar>): ExternalCalendar | null {
-  if (!calendar.id || !calendar.name || !calendar.icsUrl) return null;
+  if (!calendar.id || !calendar.name) return null;
+  // Same rule as `lib/externalCalendars.ts`: absent means a subscription,
+  // because every record written before Google calendars existed was one, and
+  // each source must carry the address it is actually reached by.
+  const source = calendar.source === "google" ? "google" : "ics";
+  if (source === "ics" && !calendar.icsUrl) return null;
+  if (source === "google" && !calendar.googleCalendarId) return null;
   const now = new Date().toISOString();
   return {
     ...calendar, // M0 — see normalizeTask
     id: String(calendar.id),
     name: String(calendar.name),
-    icsUrl: String(calendar.icsUrl),
+    source,
+    ...(calendar.icsUrl ? { icsUrl: String(calendar.icsUrl) } : {}),
+    ...(calendar.googleCalendarId ? { googleCalendarId: String(calendar.googleCalendarId) } : {}),
     color: calendar.color || "#4f73ff",
     visible: calendar.visible !== false,
     enabled: calendar.enabled !== false,

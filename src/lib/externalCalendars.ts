@@ -28,12 +28,22 @@ function createId(prefix: string) {
 }
 
 function sanitizeCalendar(raw: Partial<ExternalCalendar>): ExternalCalendar | null {
-  if (!raw.id || !raw.name || !raw.icsUrl) return null;
+  if (!raw.id || !raw.name) return null;
+  // Absent means the record predates Google calendars, and every one of those
+  // was a subscription.
+  const source = raw.source === "google" ? "google" : "ics";
+  // Each source is required to carry the address it is reached by, and only
+  // that one. A subscription without a URL cannot be fetched; a Google calendar
+  // without an id cannot be listed. Both would sit in the sidebar doing nothing.
+  if (source === "ics" && !raw.icsUrl) return null;
+  if (source === "google" && !raw.googleCalendarId) return null;
   const now = new Date().toISOString();
   return {
     id: String(raw.id),
     name: String(raw.name),
-    icsUrl: String(raw.icsUrl),
+    source,
+    ...(raw.icsUrl ? { icsUrl: String(raw.icsUrl) } : {}),
+    ...(raw.googleCalendarId ? { googleCalendarId: String(raw.googleCalendarId) } : {}),
     color: raw.color || "#4f73ff",
     visible: raw.visible !== false,
     enabled: raw.enabled !== false,
@@ -62,7 +72,10 @@ function sanitizeEvent(raw: Partial<ExternalCalendarEvent>): ExternalCalendarEve
     allDay: Boolean(raw.allDay),
     timezone: raw.timezone,
     sourceUrl: raw.sourceUrl,
-    readOnly: true,
+    // Read-only unless the record says otherwise, so anything written before
+    // Google calendars existed stays exactly as unwritable as it was.
+    readOnly: raw.readOnly !== false,
+    ...(raw.etag ? { etag: String(raw.etag) } : {}),
     createdAt: raw.createdAt || now,
     updatedAt: raw.updatedAt || now,
     // Carried through the cache, or a reload would leave every repeating event
@@ -145,6 +158,11 @@ async function readIcsResponse(response: Response) {
 }
 
 export async function fetchExternalCalendarEvents(calendar: ExternalCalendar) {
+  // A Google calendar has no file to read; it is refreshed by the inbound pass
+  // instead. Saying so here beats fetching "" and reporting a parse failure.
+  if ((calendar.source ?? "ics") !== "ics" || !calendar.icsUrl) {
+    throw new Error("That calendar is not an ICS subscription.");
+  }
   const url = normalizeIcsUrl(calendar.icsUrl);
   let text: string;
   if (isSameOrigin(url)) {

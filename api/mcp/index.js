@@ -1580,14 +1580,19 @@ function normalizeSettings(settings) {
   };
 }
 function normalizeExternalCalendar(calendar) {
-  if (!calendar.id || !calendar.name || !calendar.icsUrl) return null;
+  if (!calendar.id || !calendar.name) return null;
+  const source = calendar.source === "google" ? "google" : "ics";
+  if (source === "ics" && !calendar.icsUrl) return null;
+  if (source === "google" && !calendar.googleCalendarId) return null;
   const now = (/* @__PURE__ */ new Date()).toISOString();
   return {
     ...calendar,
     // M0 — see normalizeTask
     id: String(calendar.id),
     name: String(calendar.name),
-    icsUrl: String(calendar.icsUrl),
+    source,
+    ...calendar.icsUrl ? { icsUrl: String(calendar.icsUrl) } : {},
+    ...calendar.googleCalendarId ? { googleCalendarId: String(calendar.googleCalendarId) } : {},
     color: calendar.color || "#4f73ff",
     visible: calendar.visible !== false,
     enabled: calendar.enabled !== false,
@@ -2184,7 +2189,9 @@ var TOTAL_BUDGET_MS = 12e3;
 var cache = /* @__PURE__ */ new Map();
 async function loadExternalEvents(calendars, options = {}) {
   const { now = /* @__PURE__ */ new Date(), cacheTtlMs = CACHE_TTL_MS, ...fetchOptions } = options;
-  const enabled = calendars.filter((calendar) => calendar.enabled).slice(0, MAX_SUBSCRIPTIONS);
+  const enabled = calendars.filter(
+    (calendar) => calendar.enabled && (calendar.source ?? "ics") === "ics" && Boolean(calendar.icsUrl)
+  ).slice(0, MAX_SUBSCRIPTIONS);
   if (enabled.length === 0) {
     return { events: [], statuses: [], partial: false };
   }
@@ -3657,8 +3664,10 @@ function buildCalendarItems({
         allDay: event.allDay,
         color: calendar.color,
         categoryId: eventCategoryId,
-        draggable: false,
-        readOnly: true
+        // A Google event the account may write is an event this app may move.
+        // An ICS subscription stays exactly as fixed as it was (§6.2).
+        draggable: !event.readOnly,
+        readOnly: event.readOnly
       });
     }
   }

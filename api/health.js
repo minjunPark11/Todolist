@@ -1198,6 +1198,14 @@ async function deleteConnection(userId, fetchImpl = fetch, env = readServiceRole
     fetchImpl
   );
 }
+async function deleteSources(userId, fetchImpl = fetch, env = readServiceRoleEnv()) {
+  await request(
+    env,
+    `google_calendar_sources?user_id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: headers(env, { Prefer: "return=minimal" }) },
+    fetchImpl
+  );
+}
 var TokenStoreError;
 var init_store = __esm({
   "src/integrations/google/store.ts"() {
@@ -1224,6 +1232,7 @@ __export(google_exports, {
   decodeOAuthState: () => decodeOAuthState,
   deleteConnection: () => deleteConnection,
   deleteRefreshToken: () => deleteRefreshToken,
+  deleteSources: () => deleteSources,
   encodeOAuthState: () => encodeOAuthState,
   exchangeCode: () => exchangeCode,
   readGoogleOAuthEnv: () => readGoogleOAuthEnv,

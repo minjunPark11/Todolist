@@ -69,7 +69,14 @@ export async function loadExternalEvents(
   options: LoadExternalEventsOptions = {},
 ): Promise<ExternalEventsResult> {
   const { now = new Date(), cacheTtlMs = CACHE_TTL_MS, ...fetchOptions } = options;
-  const enabled = calendars.filter((calendar) => calendar.enabled).slice(0, MAX_SUBSCRIPTIONS);
+  const enabled = calendars
+    // Narrowed here rather than checked later, which is what keeps a Google
+    // calendar — reached through an API, holding no URL to fetch — from ever
+    // arriving in this function's body (`types.ts`, ExternalCalendarSourceKind).
+    .filter((calendar): calendar is ExternalCalendar & { icsUrl: string } =>
+      calendar.enabled && (calendar.source ?? "ics") === "ics" && Boolean(calendar.icsUrl),
+    )
+    .slice(0, MAX_SUBSCRIPTIONS);
 
   if (enabled.length === 0) {
     return { events: [], statuses: [], partial: false };

@@ -17,6 +17,7 @@
 // theirs to delete if they want it gone.
 import {
   deleteConnection,
+  deleteSources,
   deleteRefreshToken,
   readRefreshToken,
   requireUser,
@@ -57,6 +58,7 @@ export default async function handler(req: AdapterRequest, res: AdapterResponse)
 
     await deleteRefreshToken(user.userId);
     await deleteConnection(user.userId);
+    await deleteSources(user.userId);
 
     // `revoked: false` is reported rather than hidden: the local disconnect
     // succeeded, but a grant Google still holds is something the user may want
