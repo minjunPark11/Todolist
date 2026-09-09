@@ -4,7 +4,7 @@
 // could check. These pin the answers first; the move has to leave them alone.
 import { describe, expect, it } from "vitest";
 import type { ExternalCalendar, ExternalCalendarEvent, FocusSession, List, Project, Task } from "../types";
-import { buildCalendarItems, defaultCalendarLayers, splitFocusSegmentByDay } from "./calendarItems";
+import { buildCalendarItems, defaultCalendarLayers, popoverMemo, splitFocusSegmentByDay } from "./calendarItems";
 import { darkenForWhiteInk } from "../domain/calendar/readableInk";
 
 const NOW = "2026-08-15T00:00:00.000Z";
@@ -392,5 +392,34 @@ describe("splitFocusSegmentByDay", () => {
   it("gives a sub-minute stretch a visible sliver", () => {
     const parts = splitFocusSegmentByDay("2026-08-17T09:00:00", "2026-08-17T09:00:20");
     expect(parts).toEqual([{ date: "2026-08-17", startTime: "09:00", endTime: "09:01" }]);
+  });
+});
+
+// The popover memo box reads two different records (§6.2).
+//
+// This is the wiring that was wrong: CalendarView filled the box from `tasks`
+// and handed external events "" — so opening a Google event with a description,
+// nudging its time and saving sent an empty description back and wiped it.
+describe("popoverMemo", () => {
+  const tasks = [{ id: "t1", notes: "Task note" }];
+  const events = [{ id: "google:cal:e1", description: "Agenda: roadmap" }];
+
+  it("reads a task's notes", () => {
+    expect(popoverMemo({ sourceType: "task", sourceId: "t1" }, tasks, events)).toBe("Task note");
+  });
+
+  it("reads an external event's Google description", () => {
+    expect(popoverMemo({ sourceType: "external", sourceId: "google:cal:e1" }, tasks, events))
+      .toBe("Agenda: roadmap");
+  });
+
+  it("is empty when the record has no memo, and for a focus block", () => {
+    expect(popoverMemo({ sourceType: "external", sourceId: "google:cal:gone" }, tasks, events)).toBe("");
+    expect(popoverMemo({ sourceType: "task", sourceId: "missing" }, tasks, events)).toBe("");
+    expect(popoverMemo({ sourceType: "focus", sourceId: "f1" }, tasks, events)).toBe("");
+  });
+
+  it("does not read a task's notes onto an event that shares its id", () => {
+    expect(popoverMemo({ sourceType: "external", sourceId: "t1" }, tasks, events)).toBe("");
   });
 });

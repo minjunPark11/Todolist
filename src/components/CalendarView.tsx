@@ -21,6 +21,7 @@ import {
 import {
   buildCalendarItems,
   defaultCalendarLayers,
+  popoverMemo,
   type CalendarItem,
   type CalendarLayerToggles,
 } from "../utils/calendarItems";
@@ -981,11 +982,7 @@ export function CalendarView({
           onChangeCategory={handleChangeItemCategory}
           onClose={() => setPopover(null)}
           onDelete={onDeleteTask || onDeleteExternalEvent ? handleDeleteFromPopover : undefined}
-          initialMemo={
-            popover.item.sourceType === "task"
-              ? tasks.find((task) => task.id === popover.item.sourceId)?.notes ?? ""
-              : ""
-          }
+          initialMemo={popoverMemo(popover.item, tasks, externalCalendarEvents)}
           onSaveQuickEdit={handleQuickEditSave}
         />
       ) : null}
