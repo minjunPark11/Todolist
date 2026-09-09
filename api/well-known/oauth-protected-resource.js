@@ -1929,11 +1929,17 @@ function expandIcsOccurrences(events, range, options = {}) {
         start,
         end,
         occurrenceOf: master.externalUid,
-        // An occurrence has a synthetic id that exists only in this list, so a
-        // write keyed by it finds nothing and vanishes. Editing one instance
-        // means patching it through `events.instances`, which no caller does
-        // yet; until then say so rather than offering a drag that no-ops.
-        readOnly: true,
+        // The synthetic id exists only in this list, and the record carries the
+        // MASTER's `externalUid` — so a write keyed by either would edit the
+        // whole series rather than this occurrence. That is why this said
+        // read-only from v0.22.13 until M5.
+        //
+        // `lib/googleCalendarInstance` now resolves the occurrence's real id
+        // through `events.instances` before anything is sent
+        // (RECURRING_OCCURRENCE_EDIT_DESIGN.md §7.1), so the master's own
+        // answer decides: a subscribed ICS file is still a file, and a calendar
+        // the account cannot write to is still read-only.
+        readOnly: master.readOnly,
         // The rule belongs to the master, not to a date it produced.
         recurrence: void 0,
         exdates: void 0

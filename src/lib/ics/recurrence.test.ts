@@ -309,11 +309,23 @@ describe("a writable series", () => {
     recurrence: { freq: "WEEKLY" as const, interval: 1 },
   };
 
-  it("hands back occurrences nobody may write", () => {
-    // Their ids exist only in this list, so a write keyed by one finds no
-    // event and disappears. Offering the edit would be a lie (App.tsx
-    // `writableExternal`).
+  it("lets an occurrence be written exactly when its series can be", () => {
+    // This said read-only for everything from v0.22.13 until M5, because an
+    // occurrence's id exists only in this list and the record carries the
+    // MASTER's externalUid — a write keyed by either edited the whole series.
+    // `lib/googleCalendarInstance` resolves the real instance id before
+    // anything is sent now (RECURRING_OCCURRENCE_EDIT_DESIGN.md §7.1), so the
+    // question is once again the ordinary one: may this calendar be written?
     const occurrences = expandIcsOccurrences([master], { from: "2026-03-01", to: "2026-03-16" });
+    expect(occurrences.length).toBeGreaterThan(1);
+    expect(occurrences.every((event) => event.readOnly === false)).toBe(true);
+  });
+
+  it("keeps a read-only series' occurrences read-only", () => {
+    // A subscribed ICS file is still a file; a calendar the account cannot
+    // write to is still read-only. M5 opened one door, not every door.
+    const subscribed = { ...master, readOnly: true };
+    const occurrences = expandIcsOccurrences([subscribed], { from: "2026-03-01", to: "2026-03-16" });
     expect(occurrences.length).toBeGreaterThan(1);
     expect(occurrences.every((event) => event.readOnly)).toBe(true);
   });
