@@ -432,6 +432,20 @@ function readSupabaseEnv(env = process.env) {
 }
 
 // src/integrations/google/env.ts
+function readGoogleOAuthEnv(env = process.env) {
+  const clientId = (env.GOOGLE_CLIENT_ID || "").trim();
+  const clientSecret = (env.GOOGLE_CLIENT_SECRET || "").trim();
+  const redirectUri = (env.GOOGLE_REDIRECT_URI || "").trim();
+  const missing = [
+    !clientId && "GOOGLE_CLIENT_ID",
+    !clientSecret && "GOOGLE_CLIENT_SECRET",
+    !redirectUri && "GOOGLE_REDIRECT_URI"
+  ].filter(Boolean);
+  if (missing.length > 0) {
+    throw new Error(`Google Calendar sync is not configured (missing env: ${missing.join(", ")}).`);
+  }
+  return { clientId, clientSecret, redirectUri };
+}
 function readServiceRoleEnv(env = process.env) {
   const url = (env.SUPABASE_URL || env.VITE_SUPABASE_URL || "").trim();
   const serviceRoleKey = (env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
@@ -443,11 +457,13 @@ function readServiceRoleEnv(env = process.env) {
 }
 
 // src/integrations/google/oauth.ts
+var TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 var REVOKE_ENDPOINT = "https://oauth2.googleapis.com/revoke";
 var GoogleOAuthError = class extends Error {
-  constructor(message, status) {
+  constructor(message, status, remoteOutcomeKnown = false) {
     super(message);
     this.status = status;
+    this.remoteOutcomeKnown = remoteOutcomeKnown;
     this.name = "GoogleOAuthError";
   }
 };
@@ -470,6 +486,25 @@ async function revokeToken(token, fetchImpl = fetch) {
     return false;
   }
 }
+async function confirmGoogleRevocation(token, env, fetchImpl = fetch) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await postForm(TOKEN_ENDPOINT, {
+        client_id: env.clientId,
+        client_secret: env.clientSecret,
+        refresh_token: token,
+        grant_type: "refresh_token"
+      }, fetchImpl);
+      const body = await response.json();
+      if (response.status === 400 && body?.error === "invalid_grant") return true;
+      if (!response.ok) return false;
+    } catch {
+      return false;
+    }
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return false;
+}
 
 // src/integrations/google/store.ts
 var TokenStoreError = class extends Error {
@@ -479,6 +514,30 @@ var TokenStoreError = class extends Error {
     this.name = "TokenStoreError";
   }
 };
+async function readDisconnectSnapshot(userId, fetchImpl = fetch, env = readServiceRoleEnv()) {
+  const response = await request(env, "rpc/read_google_disconnect_snapshot", {
+    method: "POST",
+    headers: headers(env),
+    body: JSON.stringify({ p_user_id: userId })
+  }, fetchImpl);
+  const body = await response.json().catch(() => null);
+  if (!body || ![body.refreshToken, body.grantVersion, body.generation].every((v) => v === null || typeof v === "string") || body.refreshToken === null !== (body.grantVersion === null)) throw new TokenStoreError("Could not verify the connection to disconnect.", 502);
+  return body;
+}
+async function disconnectStoredCalendar(userId, snapshot, fetchImpl = fetch, env = readServiceRoleEnv()) {
+  const response = await request(env, "rpc/disconnect_google_calendar", {
+    method: "POST",
+    headers: headers(env),
+    body: JSON.stringify({
+      p_user_id: userId,
+      p_grant_version: snapshot.grantVersion,
+      p_generation: snapshot.generation
+    })
+  }, fetchImpl);
+  const body = await response.json().catch(() => null);
+  if (body?.disconnected === false) throw new TokenStoreError("The Google connection changed. Check it and retry disconnecting.", 409);
+  if (body?.disconnected !== true) throw new TokenStoreError("Could not confirm Google disconnection.", 502);
+}
 function headers(env, extra = {}) {
   return {
     apikey: env.serviceRoleKey,
@@ -498,41 +557,6 @@ async function request(env, path, init, fetchImpl) {
     throw new TokenStoreError(`Token store request failed (${response.status}).`, 502);
   }
   return response;
-}
-async function readRefreshToken(userId, fetchImpl = fetch, env = readServiceRoleEnv()) {
-  const response = await request(
-    env,
-    `google_calendar_tokens?user_id=eq.${encodeURIComponent(userId)}&select=refresh_token`,
-    { headers: headers(env) },
-    fetchImpl
-  );
-  const rows = await response.json();
-  const token = rows[0]?.refresh_token;
-  return typeof token === "string" && token ? token : null;
-}
-async function deleteRefreshToken(userId, fetchImpl = fetch, env = readServiceRoleEnv()) {
-  await request(
-    env,
-    `google_calendar_tokens?user_id=eq.${encodeURIComponent(userId)}`,
-    { method: "DELETE", headers: headers(env, { Prefer: "return=minimal" }) },
-    fetchImpl
-  );
-}
-async function deleteConnection(userId, fetchImpl = fetch, env = readServiceRoleEnv()) {
-  await request(
-    env,
-    `google_calendar_connections?user_id=eq.${encodeURIComponent(userId)}`,
-    { method: "DELETE", headers: headers(env, { Prefer: "return=minimal" }) },
-    fetchImpl
-  );
-}
-async function deleteSources(userId, fetchImpl = fetch, env = readServiceRoleEnv()) {
-  await request(
-    env,
-    `google_calendar_sources?user_id=eq.${encodeURIComponent(userId)}`,
-    { method: "DELETE", headers: headers(env, { Prefer: "return=minimal" }) },
-    fetchImpl
-  );
 }
 
 // src/integrations/google/index.ts
@@ -554,6 +578,53 @@ async function requireUser(authorization, verify = verifier) {
   return verify.verify(bearer);
 }
 
+// src/integrations/google/lifecycle.ts
+import { randomUUID } from "node:crypto";
+var GoogleLifecycleError = class extends Error {
+  constructor(status = 503) {
+    super(status === 409 ? "Another Google connection operation is running. Try again shortly." : "The Google connection operation needs recovery before reconnecting.");
+    this.status = status;
+    this.name = "GoogleLifecycleError";
+  }
+};
+async function rpc(name, body, fetchImpl, env) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetchImpl(`${env.url}/rest/v1/rpc/${name}`, {
+        method: "POST",
+        headers: { apikey: env.serviceRoleKey, Authorization: `Bearer ${env.serviceRoleKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) {
+        const value = await response.json();
+        if (value && typeof value === "object") return value;
+      }
+    } catch {
+    }
+  }
+  throw new GoogleLifecycleError();
+}
+async function withGoogleLifecycle(userId, kind, work, fetchImpl = fetch, env = readServiceRoleEnv()) {
+  const operationId = randomUUID();
+  const begin = await rpc("begin_google_oauth_operation", { p_operation_id: operationId, p_user_id: userId, p_kind: kind }, fetchImpl, env);
+  if (begin.acquired !== true) throw new GoogleLifecycleError(begin.uncertain === true ? 503 : 409);
+  let unsettled = false;
+  try {
+    return await work({ remoteStarted() {
+      unsettled = true;
+    }, remoteSettled() {
+      unsettled = false;
+    } });
+  } finally {
+    const result = await rpc("finish_google_oauth_operation", {
+      p_operation_id: operationId,
+      p_user_id: userId,
+      p_state: unsettled ? "uncertain" : "completed"
+    }, fetchImpl, env);
+    if (result.finished !== true || unsettled) throw new GoogleLifecycleError();
+  }
+}
+
 // src/functions/google/disconnect.ts
 function header(headers2, name) {
   const value = headers2[name] ?? headers2[name.toLowerCase()];
@@ -568,13 +639,29 @@ async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   try {
     const user = await requireUser(header(req.headers, "authorization"));
-    const refreshToken = await readRefreshToken(user.userId);
-    const revoked = refreshToken ? await revokeToken(refreshToken) : true;
-    await deleteRefreshToken(user.userId);
-    await deleteConnection(user.userId);
-    await deleteSources(user.userId);
-    res.status(200).json({ disconnected: true, revoked });
+    const result = await withGoogleLifecycle(user.userId, "disconnect", async (operation) => {
+      const snapshot = await readDisconnectSnapshot(user.userId);
+      let revoked = true;
+      if (snapshot.refreshToken) {
+        const env = readGoogleOAuthEnv();
+        operation.remoteStarted();
+        revoked = await revokeToken(snapshot.refreshToken);
+        if (!revoked || !await confirmGoogleRevocation(snapshot.refreshToken, env)) throw new GoogleLifecycleError();
+        operation.remoteSettled();
+      }
+      await disconnectStoredCalendar(user.userId, snapshot);
+      return { disconnected: true, revoked };
+    });
+    res.status(200).json(result);
   } catch (error) {
+    if (error instanceof GoogleLifecycleError) {
+      res.status(error.status).json({ error: error.message, code: "google_lifecycle_blocked" });
+      return;
+    }
+    if (error instanceof TokenStoreError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
     if (error instanceof UnauthorizedError) {
       res.status(401).json({ error: error.message, code: error.reason });
       return;

@@ -5,25 +5,25 @@
 // the client can delete its own connection row and nothing else, which would
 // leave the secret behind.
 //
-// Order matters: revoke first, delete after. A revoke that fails is survivable
-// (the user can also remove the app in their Google account screen); a delete
-// that succeeds while the revoke is still pending would leave us with no token
-// to revoke WITH. So the revoke is attempted first and its result ignored —
-// see `revokeToken`, which never throws.
+// Order matters: inspect grant version, revoke, then atomically detach only that
+// snapshot. A concurrent replacement is retained and returns 409. Google revoke
+// is external to this transaction; it cannot be rolled back by the database.
+// An unconfirmed revoke retains the connection and leaves the lifecycle gate
+// pending recovery. The result is never discarded or retried automatically.
 //
 // What this deliberately does NOT do is remove the events already written to
 // the Google calendar. They are the user's, in their account, and a disconnect
 // is not a request to erase their calendar. The dedicated calendar (§4.1) is
 // theirs to delete if they want it gone.
 import {
-  deleteConnection,
-  deleteSources,
-  deleteRefreshToken,
-  readRefreshToken,
   requireUser,
+  readGoogleOAuthEnv,
   revokeToken,
   UnauthorizedError,
 } from "../../integrations/google";
+import { readDisconnectSnapshot, disconnectStoredCalendar, TokenStoreError } from "../../integrations/google/store";
+import { GoogleLifecycleError, withGoogleLifecycle } from "../../integrations/google/lifecycle";
+import { confirmGoogleRevocation } from "../../integrations/google/oauth";
 
 interface AdapterRequest {
   method?: string;
@@ -53,18 +53,30 @@ export default async function handler(req: AdapterRequest, res: AdapterResponse)
   try {
     const user = await requireUser(header(req.headers, "authorization"));
 
-    const refreshToken = await readRefreshToken(user.userId);
-    const revoked = refreshToken ? await revokeToken(refreshToken) : true;
+    const result = await withGoogleLifecycle(user.userId, "disconnect", async operation => {
+      const snapshot = await readDisconnectSnapshot(user.userId);
+      let revoked = true;
+      if (snapshot.refreshToken) {
+        const env = readGoogleOAuthEnv();
+        operation.remoteStarted();
+        revoked = await revokeToken(snapshot.refreshToken);
+        if (!revoked || !await confirmGoogleRevocation(snapshot.refreshToken, env)) throw new GoogleLifecycleError();
+        operation.remoteSettled();
+      }
+      await disconnectStoredCalendar(user.userId, snapshot);
 
-    await deleteRefreshToken(user.userId);
-    await deleteConnection(user.userId);
-    await deleteSources(user.userId);
-
-    // `revoked: false` is reported rather than hidden: the local disconnect
-    // succeeded, but a grant Google still holds is something the user may want
-    // to remove by hand.
-    res.status(200).json({ disconnected: true, revoked });
+      // Only confirmed revocation and atomic detach are reported as success.
+      return { disconnected: true, revoked };
+    });
+    res.status(200).json(result);
   } catch (error) {
+    if (error instanceof GoogleLifecycleError) {
+      res.status(error.status).json({ error: error.message, code: "google_lifecycle_blocked" }); return;
+    }
+    if (error instanceof TokenStoreError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
     if (error instanceof UnauthorizedError) {
       // `reason` and not just the sentence: the client turns "no bearer at all"
       // and "this bearer was refused" into two different repairs, and the

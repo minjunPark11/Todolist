@@ -20,6 +20,8 @@ export type SaveQueueOptions<T> = {
   /** Backoff for the first retry; doubles up to retryMaxDelayMs. */
   retryDelayMs?: number;
   retryMaxDelayMs?: number;
+  /** Conflicts/schema gates require action, not an endless timer retry. */
+  shouldRetry?: (error: unknown) => boolean;
 };
 
 export type SaveQueue<T> = {
@@ -81,9 +83,10 @@ export function createSaveQueue<T>(options: SaveQueueOptions<T>): SaveQueue<T> {
   // Bumped by reset(). A run started under an older generation may still be in
   // flight; it must not schedule a retry or start the queue's next run.
   let generation = 0;
+  let blocked = false;
 
   function run(): void {
-    if (running || !hasPending) return;
+    if (running || !hasPending || blocked) return;
 
     const payload = pending as T;
     const startedGeneration = generation;
@@ -93,8 +96,8 @@ export function createSaveQueue<T>(options: SaveQueueOptions<T>): SaveQueue<T> {
 
     perform(payload).then(
       () => {
-        running = false;
         if (startedGeneration !== generation) return;
+        running = false;
         retryDelay = retryDelayMs;
         onSettled?.({ ok: true, willRetry: false });
         // Only once the queue is actually empty: a payload that arrived
@@ -103,16 +106,19 @@ export function createSaveQueue<T>(options: SaveQueueOptions<T>): SaveQueue<T> {
         run();
       },
       (error: unknown) => {
-        running = false;
         if (startedGeneration !== generation) return;
+        running = false;
         // A newer payload arrived while this one was failing: it supersedes
         // this attempt, so retry that instead of resending what it replaced.
         if (!hasPending) {
           pending = payload;
           hasPending = true;
         }
-        onSettled?.({ ok: false, error, willRetry: true });
+        const willRetry = options.shouldRetry?.(error) !== false;
+        blocked = !willRetry;
+        onSettled?.({ ok: false, error, willRetry });
         settleWaiters({ ok: false });
+        if (!willRetry) return;
         const delay = retryDelay;
         retryDelay = Math.min(retryDelay * 2, retryMaxDelayMs);
         scheduleRetry(() => {
@@ -128,6 +134,7 @@ export function createSaveQueue<T>(options: SaveQueueOptions<T>): SaveQueue<T> {
       pending = payload;
       hasPending = true;
       retryDelay = retryDelayMs;
+      blocked = false;
       run();
     },
     reset() {
@@ -136,11 +143,13 @@ export function createSaveQueue<T>(options: SaveQueueOptions<T>): SaveQueue<T> {
       hasPending = false;
       pending = undefined;
       retryDelay = retryDelayMs;
+      blocked = false;
       // A drain awaiting THIS account's queue must not hang after the account
       // has gone. Nothing is left to upload, which is what it asked about.
       settleWaiters({ ok: true });
     },
     drain() {
+      if (blocked) return Promise.resolve({ ok: false });
       if (!running && !hasPending) return Promise.resolve({ ok: true });
       return new Promise<{ ok: boolean }>((resolve) => {
         waiters.push(resolve);

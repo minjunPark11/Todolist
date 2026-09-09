@@ -6,7 +6,7 @@
 // connection that works for an hour and then dies with nothing to renew from,
 // which is invisible until the next morning.
 import { describe, expect, it } from "vitest";
-import { authorizeUrl, exchangeCode, GoogleOAuthError, refreshAccessToken, revokeToken } from "./oauth";
+import { authorizeUrl, exchangeCode, GoogleOAuthError, refreshAccessToken, revokeToken, confirmGoogleRevocation } from "./oauth";
 import { decodeOAuthState, encodeOAuthState } from "./state";
 import type { GoogleOAuthEnv } from "./env";
 
@@ -98,6 +98,9 @@ describe("exchangeCode", () => {
 });
 
 describe("refreshAccessToken", () => {
+  it.each([undefined, 0, -1, 3601, 1.5, "3600"])("rejects an unbounded or unsupported lifetime %s", async expires_in => {
+    await expect(refreshAccessToken("r1", env, respondWith({ access_token: "a2", expires_in }))).rejects.toMatchObject({ status: 502 });
+  });
   it("returns a short-lived token", async () => {
     const token = await refreshAccessToken("r1", env, respondWith({ access_token: "a2", expires_in: 3599 }));
     expect(token).toEqual({ accessToken: "a2", expiresIn: 3599 });
@@ -123,6 +126,12 @@ describe("refreshAccessToken", () => {
 });
 
 describe("revokeToken", () => {
+  it("confirms propagation only when the old refresh grant is explicitly rejected", async () => {
+    expect(await confirmGoogleRevocation("old", env, respondWith({ error: "invalid_grant" }, 400))).toBe(true);
+    expect(await confirmGoogleRevocation("old", env, respondWith({ error: "invalid_client" }, 400))).toBe(false);
+    expect(await confirmGoogleRevocation("old", env, respondWith({ error: "backend_error" }, 500))).toBe(false);
+    expect(await confirmGoogleRevocation("old", env, respondWith({ access_token: "still-valid" }))).toBe(false);
+  });
   it("never throws, so disconnecting cannot be blocked by Google", async () => {
     const failing = (async () => {
       throw new Error("offline");

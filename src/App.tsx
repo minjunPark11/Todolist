@@ -18,6 +18,7 @@ import { SettingsRow } from "./components/SettingsPage";
 import { usePlannerData } from "./hooks/usePlannerData";
 import { useGoogleOutboundSync } from "./hooks/useGoogleOutboundSync";
 import { useGoogleInboundSync } from "./hooks/useGoogleInboundSync";
+import { useGoogleTaskSync } from "./hooks/useGoogleTaskSync";
 import { currentAccessToken, googleCalendarFetch } from "./lib/googleCalendar";
 import { deleteExternalEvent, writeExternalEvent } from "./lib/googleCalendarEventWrite";
 import { withExternalEdit, type ExternalEventEdit } from "./domain/calendar/googleSync/externalEventShape";
@@ -752,7 +753,7 @@ export default function App() {
     tasks: planner.tasks,
     timezone: appSettings.timezone,
     tombstones: appSettings.googleDeletedEventIds,
-    signedIn: planner.auth.isSignedIn && planner.auth.remoteDataReady,
+    signedIn: planner.auth.isSignedIn && planner.auth.remoteDataReady && planner.auth.taskSyncMode === "legacy",
     accountKey: planner.auth.userEmail,
     onResult: planner.applyGoogleSync,
     projects: planner.projects,
@@ -764,6 +765,9 @@ export default function App() {
   // record: what comes back is an ExternalCalendarEvent and not a Task, so a
   // colleague's meeting never lands in the inbox (§6.2).
   useGoogleInboundSync({ signedIn: planner.auth.isSignedIn, apply: saveExternalState });
+  useGoogleTaskSync({ enabled: planner.auth.isSignedIn && planner.auth.remoteDataReady && planner.auth.taskSyncMode === "revision",
+    accountKey: planner.auth.userEmail, tasks: planner.tasks, bridge: planner.withGoogleTaskSync,
+    conflicts: planner.taskSyncConflicts, resolveConflict: planner.resolveTaskSyncConflict });
 
   useEffect(() => {
     if (!calendarShare.enabled || !calendarShare.token) return;

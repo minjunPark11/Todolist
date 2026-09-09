@@ -17,6 +17,7 @@ import {
   requireUser,
   UnauthorizedError,
 } from "../../integrations/google";
+import { authorizeGoogleToken, GoogleSyncProtocolError, requestedGoogleProtocol } from "../../integrations/google/protocol";
 
 interface AdapterRequest {
   method?: string;
@@ -45,6 +46,8 @@ export default async function handler(req: AdapterRequest, res: AdapterResponse)
 
   try {
     const user = await requireUser(header(req.headers, "authorization"));
+    const protocol = requestedGoogleProtocol(req.headers);
+    await authorizeGoogleToken(user.userId, protocol);
     const refreshToken = await readRefreshToken(user.userId);
     if (!refreshToken) {
       // Not an error state — this is every user who has never connected. The
@@ -54,8 +57,13 @@ export default async function handler(req: AdapterRequest, res: AdapterResponse)
     }
 
     const token = await refreshAccessToken(refreshToken, readGoogleOAuthEnv());
+    await authorizeGoogleToken(user.userId, protocol, token.expiresIn);
     res.status(200).json({ connected: true, accessToken: token.accessToken, expiresIn: token.expiresIn });
   } catch (error) {
+    if (error instanceof GoogleSyncProtocolError) {
+      res.status(error.status).json({ error: error.message, code: error.code, minimumProtocol: error.minimumProtocol });
+      return;
+    }
     if (error instanceof UnauthorizedError) {
       // `reason` and not just the sentence: the client turns "no bearer at all"
       // and "this bearer was refused" into two different repairs, and the

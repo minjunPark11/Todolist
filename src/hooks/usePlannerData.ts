@@ -109,6 +109,9 @@ import {
 import { buildMigrationUpload } from "../domain/sync/buildMigrationUpload";
 import { createSaveQueue, type SaveQueue } from "../domain/sync/saveQueue";
 import { reapplyLocalEdits } from "../domain/sync/reapplyLocalEdits";
+import { createTaskRevisionSession, retryTaskSyncError, sameRevisionData, TaskRevisionBlocked, type RevisionSnapshot } from "../domain/sync/taskRevisionSession";
+import { readTaskRevisionSnapshot, restoreTaskRevisionCheckpoint, taskRevisionEnabled, taskRevisionStorageKey, writeTaskRevision } from "../lib/taskRevisionStore";
+import { acquireTaskRevisionOwnership } from "../lib/taskRevisionOwnership";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
 import {
@@ -317,7 +320,8 @@ export function usePlannerData() {
   // edits back; system paths (remote load, migration) use setDataState so
   // they never land on the undo stack.
   function setData(updater: PlannerData | ((current: PlannerData) => PlannerData)) {
-    setDataState((current) => {
+      // Record user intent synchronously: React may batch the render past a network reply.
+      const current = dataRef.current;
       const next = typeof updater === "function" ? updater(current) : updater;
       if (next !== current) {
         // Which store this snapshot belongs to (§16.19, §16.21). An undo entry
@@ -330,11 +334,12 @@ export function usePlannerData() {
         const revision = storeRevisionRef.current;
         pushUndo(() => {
           if (storeRevisionRef.current !== revision) return false;
+          dataRef.current = current;
           setDataState(current);
         });
       }
-      return next;
-    });
+      dataRef.current = next;
+      setDataState(next);
   }
   const [userEmail, setUserEmail] = useState("");
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
@@ -355,6 +360,12 @@ export function usePlannerData() {
   // Last state we know the account holds; the save diffs against it so an edit
   // uploads the records it touched instead of every row in every table.
   const syncedSnapshotRef = useRef<PlannerData | null>(null);
+  const taskRevisionSessionRef = useRef<ReturnType<typeof createTaskRevisionSession<Task>> | null>(null);
+  const [taskSyncMode, setTaskSyncMode] = useState<"loading" | "legacy" | "revision">(isSupabaseConfigured ? "loading" : "legacy");
+  const googleTaskBridgeBusy = useRef(false);
+  const taskRevisionEpochRef = useRef(0);
+  const mountedRef = useRef(true);
+  const taskRevisionOwnershipRef = useRef<{ userId: string; release: () => void } | null>(null);
   // Which account the writes below belong to, readable from callbacks that were
   // created before the current render (§16.34's account-switch race).
   const userEmailRef = useRef(userEmail);
@@ -366,6 +377,7 @@ export function usePlannerData() {
   if (!saveQueueRef.current) {
     saveQueueRef.current = createSaveQueue<SaveRequest>({
       perform: ({ data: nextData, ownerEmail }) => performSave(nextData, ownerEmail),
+      shouldRetry: retryTaskSyncError,
       onSettled: ({ ok, error, willRetry }) => {
         if (ok) {
           setSyncError("");
@@ -400,6 +412,17 @@ export function usePlannerData() {
     });
   }
   const saveQueue = saveQueueRef.current;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      taskRevisionEpochRef.current += 1;
+      loadTicketRef.current += 1;
+      saveQueue.reset();
+      taskRevisionOwnershipRef.current?.release();
+      taskRevisionOwnershipRef.current = null;
+    };
+  }, []);
 
   // The local snapshot could not be written and the app is running on memory
   // alone. Held as state because the UI has to say so until it clears.
@@ -449,6 +472,9 @@ export function usePlannerData() {
           }
         }
         persistPlannerData(dataRef.current);
+        if (taskRevisionSessionRef.current && remoteOwnerRef.current === userEmailRef.current) {
+          taskRevisionSessionRef.current.capture(dataRef.current.tasks);
+        }
         setStorageError(false);
         localSaveDelayRef.current = LOCAL_SAVE_RETRY_MS;
       } catch (error) {
@@ -484,6 +510,9 @@ export function usePlannerData() {
     localSaveDelayRef.current = LOCAL_SAVE_RETRY_MS;
     try {
       persistPlannerData(dataRef.current);
+      if (taskRevisionSessionRef.current && remoteOwnerRef.current === userEmailRef.current) {
+        taskRevisionSessionRef.current.capture(dataRef.current.tasks);
+      }
       setStorageError(false);
     } catch (error) {
       console.error("[storage] local save retry failed:", error);
@@ -514,11 +543,14 @@ export function usePlannerData() {
         return;
       }
       const user = sessionData.session?.user;
+      userEmailRef.current = user?.email ?? "";
       setUserEmail(user?.email ?? "");
       setAuthLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (userEmailRef.current !== (session?.user.email ?? "")) loadTicketRef.current += 1;
+      userEmailRef.current = session?.user.email ?? "";
       setUserEmail(session?.user.email ?? "");
       if (event === "PASSWORD_RECOVERY") {
         setRecoveryMode(true);
@@ -532,6 +564,16 @@ export function usePlannerData() {
   }, []);
 
   useEffect(() => {
+    // Invalidate loads and session metadata for both sign-out and direct account switches.
+    loadTicketRef.current += 1;
+    setRemoteLoaded(false);
+    syncedSnapshotRef.current = null;
+    taskRevisionEpochRef.current += 1;
+    taskRevisionSessionRef.current = null;
+    setTaskSyncMode("loading");
+    taskRevisionOwnershipRef.current?.release();
+    taskRevisionOwnershipRef.current = null;
+    saveQueue.reset();
     if (!supabase || !userEmail) {
       setRemoteLoaded(false);
       // Signed out, or switching accounts: the old baseline describes someone
@@ -612,7 +654,8 @@ export function usePlannerData() {
     // replace the account's state with what it looked like a moment ago, which
     // is a data-loss bug that only shows up on a slow connection.
     const ticket = (loadTicketRef.current += 1);
-    const isStale = () => loadTicketRef.current !== ticket;
+    const loadOwner = userEmailRef.current;
+    const isStale = () => loadTicketRef.current !== ticket || userEmailRef.current !== loadOwner;
 
     setSyncStatus("sync.syncing");
     setSyncError("");
@@ -623,10 +666,44 @@ export function usePlannerData() {
     const localAtStart = dataRef.current;
 
     try {
+      const userId = await getUserId();
+      if (!userId || isStale()) return;
+      const enabled = await taskRevisionEnabled(supabase, userId);
+      if (isStale()) return;
+      setTaskSyncMode(enabled ? "revision" : "legacy");
+      let storedCheckpoint = platform.storage.getSync(taskRevisionStorageKey(userId));
+      if (!enabled && storedCheckpoint) throw new TaskRevisionBlocked("Task revision sync is unavailable; legacy writes are blocked on this device.");
+      let revisionSession = taskRevisionSessionRef.current;
+      let revisionSnapshot: RevisionSnapshot<Task> | null = null;
+      if (enabled) {
+        if (taskRevisionOwnershipRef.current?.userId !== userId) {
+          const release = await acquireTaskRevisionOwnership(userId);
+          if (isStale() || !mountedRef.current) { release(); return; }
+          taskRevisionOwnershipRef.current = { userId, release };
+        }
+        storedCheckpoint = platform.storage.getSync(taskRevisionStorageKey(userId));
+        if (!revisionSession || revisionSession.userId !== userId) {
+          const revisionEpoch = taskRevisionEpochRef.current;
+          revisionSession = createTaskRevisionSession<Task>(userId, {
+            read: () => readTaskRevisionSnapshot(supabase!, userId),
+            write: (request) => writeTaskRevision(supabase!, userId, request),
+            persist: (checkpoint) => platform.storage.setSync(taskRevisionStorageKey(userId), JSON.stringify(checkpoint)),
+            id: () => crypto.randomUUID(),
+            active: () => mountedRef.current && taskRevisionEpochRef.current === revisionEpoch &&
+              taskRevisionOwnershipRef.current?.userId === userId && userEmailRef.current === loadOwner,
+          }, restoreTaskRevisionCheckpoint(storedCheckpoint, userId));
+        }
+        revisionSnapshot = await readTaskRevisionSnapshot(supabase, userId);
+        if (isStale()) return;
+      }
       const partial: Partial<PlannerData> = {};
       missingRemoteTablesRef.current = new Set();
 
       for (const [key, table] of collectionTables) {
+        if (table === "tasks" && revisionSnapshot) {
+          partial.tasks = revisionSnapshot.rows.map((row) => row.data);
+          continue;
+        }
         const { data: rows, error } = await supabase.from(table).select("data");
         if (error) {
           if (optionalRemoteTables.has(table) && isMissingRemoteTableError(error)) {
@@ -709,23 +786,57 @@ export function usePlannerData() {
       // A newer load has started since this one began; its answer is the one
       // that should win, and this one has nothing to add.
       if (isStale()) return;
+      const merged = reapplyLocalEdits(loaded, localAtStart, dataRef.current);
+      if (revisionSession && revisionSnapshot) {
+        const alreadyActive = revisionSession === taskRevisionSessionRef.current;
+        if (alreadyActive) revisionSession.capture(dataRef.current.tasks);
+        revisionSession.adopt(revisionSnapshot);
+        const visible = new Map(loaded.tasks.map((task) => [task.id, task]));
+        for (const [id, pending] of Object.entries(revisionSession.checkpoint.pending)) {
+          if (pending.data === null) visible.delete(id); else visible.set(id, pending.data);
+        }
+        if (!alreadyActive) {
+          // Edits made during a first load have no known server revision. If
+          // the old visible row differs from remote, preserve both versions.
+          const before = new Map(localAtStart.tasks.map((task) => [task.id, task]));
+          const remote = new Map(loaded.tasks.map((task) => [task.id, task]));
+          for (const task of dataRef.current.tasks) {
+            if (sameRevisionData(task, before.get(task.id))) continue;
+            visible.set(task.id, task);
+            if (remote.has(task.id) && !sameRevisionData(before.get(task.id), remote.get(task.id))) {
+              revisionSession.preserveConflict(task.id, task);
+            }
+          }
+          const currentIds = new Set(dataRef.current.tasks.map((task) => task.id));
+          for (const task of localAtStart.tasks) {
+            if (currentIds.has(task.id) || !remote.has(task.id)) continue;
+            visible.delete(task.id);
+            if (!sameRevisionData(task, remote.get(task.id))) revisionSession.preserveConflict(task.id, null);
+          }
+        }
+        merged.tasks = [...visible.values()];
+        revisionSession.capture(merged.tasks);
+        taskRevisionSessionRef.current = revisionSession;
+      }
       // The store is now the account's, not the one every queued undo entry
       // was taken from; those entries decline rather than restore (see setData).
       storeRevisionRef.current += 1;
-      setDataState(reapplyLocalEdits(loaded, localAtStart, dataRef.current));
+      dataRef.current = merged;
+      setDataState(merged);
       // The baseline is what the ACCOUNT holds, which is `loaded` and not the
       // merged state: the difference between the two is exactly the edits put
       // back above, so the next save pushes those and only those.
-      syncedSnapshotRef.current = loaded;
+      syncedSnapshotRef.current = revisionSession ? { ...loaded, tasks: revisionSession.rows.map((row) => row.data) } : loaded;
       remoteOwnerRef.current = userEmail;
       setRemoteLoaded(true);
-      setSyncStatus("sync.synced");
+      setSyncStatus(revisionSession?.hasConflicts ? "sync.syncFailed" : revisionSession?.hasPending ? "sync.syncing" : "sync.synced");
+      if (revisionSession?.hasConflicts) setSyncError(new TaskRevisionBlocked().message);
       // "A device connected and agreed with the account at this moment."
       // Deliberately not merged into the save path's stamp: this is the half
       // that keeps a quiet week from reading as an offline week (see
       // sync_state above). Fire-and-forget — the load has already succeeded
       // and its result is on screen.
-      void stampLastSeen();
+      if (!revisionSession?.hasPending) void stampLastSeen();
     } catch (error) {
       // A failure from a superseded load is not this load's failure to report:
       // showing it would put an error on screen while a good load is running.
@@ -783,6 +894,7 @@ export function usePlannerData() {
   // has changed — and a swallowed error is indistinguishable from a save that
   // worked. Ordering, coalescing and retry all live in createSaveQueue.
   async function performSave(nextData: PlannerData, ownerEmail: string) {
+    if (googleTaskBridgeBusy.current) throw new Error("Google task sync is adopting revisions; task save will retry.");
     if (!supabase) {
       return;
     }
@@ -795,8 +907,9 @@ export function usePlannerData() {
     // What to write is decided by a pure function (see buildSyncPlan) against
     // the last state known to be on the account — set from the load, advanced
     // only after a fully successful save.
+    const revisionSession = taskRevisionSessionRef.current;
     const plan = buildSyncPlan(nextData, syncedSnapshotRef.current, missingRemoteTablesRef.current);
-    if (isEmptySyncPlan(plan)) {
+    if (isEmptySyncPlan(plan) && !revisionSession) {
       // The edit touched nothing that syncs; don't spend a round trip.
       syncedSnapshotRef.current = nextData;
       return;
@@ -809,11 +922,26 @@ export function usePlannerData() {
     // getUserId answers for whoever is signed in NOW. Signing out and back in
     // as someone else during that round trip used to write the previous
     // account's rows under the new account's user_id.
-    if (ownerEmail !== userEmailRef.current) {
+    if (!mountedRef.current || ownerEmail !== userEmailRef.current) {
       return;
     }
 
+    let taskConflict: unknown;
+    if (revisionSession) {
+      if (revisionSession.userId !== userId) throw new TaskRevisionBlocked("Account changed; task sync stopped.");
+      // The local persistence effect captured edits newer than this queue
+      // payload. Never replace that durable outbox with an older payload.
+      revisionSession.capture(dataRef.current.tasks);
+      try { await revisionSession.flush(); }
+      catch (error) {
+        if (!(error instanceof TaskRevisionBlocked) || !revisionSession.hasConflicts) throw error;
+        taskConflict = error; // Other collections can still save.
+      }
+    }
+
     for (const operation of plan.tables) {
+      if (revisionSession && operation.table === "tasks") continue;
+      if (!mountedRef.current || ownerEmail !== userEmailRef.current) return;
       if (operation.upsert.length > 0) {
         const rows = operation.upsert.map((item) => ({ id: item.id, user_id: userId, data: item }));
         const { error } = await supabase
@@ -894,7 +1022,7 @@ export function usePlannerData() {
      * the safe direction for anything acting on it.
      */
     const now = new Date().toISOString();
-    const { error: syncStateError } = await supabase.from("settings").upsert(
+    const { error: syncStateError } = revisionSession?.hasPending ? { error: null } : await supabase.from("settings").upsert(
       {
         id: "sync_state",
         user_id: userId,
@@ -917,7 +1045,9 @@ export function usePlannerData() {
     }
     // Only advance the baseline once everything above succeeded; a failed
     // save must stay "not yet uploaded" so the retry resends it.
-    syncedSnapshotRef.current = nextData;
+    syncedSnapshotRef.current = revisionSession ? { ...nextData, tasks: revisionSession.rows.map((row) => row.data) } : nextData;
+    if (taskConflict) throw taskConflict;
+    if (revisionSession?.hasPending) saveQueue.request({ data: dataRef.current, ownerEmail });
   }
 
   async function signIn(email: string, password: string) {
@@ -1003,9 +1133,11 @@ export function usePlannerData() {
     // Merge, never replace — see buildMigrationUpload. Saving the local state
     // directly diffed to "delete every record the account holds and this device
     // does not", which is not what a button labelled "upload" may do.
-    const merged = buildMigrationUpload(localMigrationData, syncedSnapshotRef.current ?? data);
+    const merged = buildMigrationUpload(localMigrationData,
+      taskRevisionSessionRef.current ? dataRef.current : syncedSnapshotRef.current ?? data);
     storeRevisionRef.current += 1;
     setDataState(merged);
+    dataRef.current = merged;
     saveQueue.request({ data: merged, ownerEmail: userEmailRef.current });
     setLocalMigrationData(null);
     setRemoteLoaded(true);
@@ -1797,7 +1929,13 @@ export function usePlannerData() {
     focusHostRef.current = host;
     const receive = (event: StorageEvent) => {
       if (event.key !== STORAGE_KEY || !event.newValue || pendingFocusRef.current) return;
-      try { const next = normalizeData(JSON.parse(event.newValue)); dataRef.current = next; setDataState(next); } catch { /* Ignore malformed external storage events. */ }
+      try {
+        const next = normalizeData(JSON.parse(event.newValue));
+        // Task rows from shared local storage have no trusted server revision.
+        // Keep this tab's task drafts; revision loads adopt remote task updates.
+        if (taskRevisionSessionRef.current) next.tasks = dataRef.current.tasks;
+        dataRef.current = next; setDataState(next);
+      } catch { /* Ignore malformed external storage events. */ }
     };
     window.addEventListener("storage", receive);
     return () => { host.close(); window.removeEventListener("storage", receive); };
@@ -2230,7 +2368,58 @@ export function usePlannerData() {
     setData(emptyData());
   }
 
+  async function withGoogleTaskSync<T>(work: (userId: string) => Promise<T>): Promise<T> {
+    const drained = await saveQueueRef.current?.drain();
+    if (drained && !drained.ok) throw new TaskRevisionBlocked();
+    const session = taskRevisionSessionRef.current;
+    if (!session || !supabase || googleTaskBridgeBusy.current) throw new TaskRevisionBlocked("Task revision sync is not ready.");
+    const epoch = taskRevisionEpochRef.current;
+    googleTaskBridgeBusy.current = true;
+    try {
+      session.capture(dataRef.current.tasks); await session.flush();
+      if (session.hasPending || session.hasConflicts) throw new TaskRevisionBlocked();
+      return await work(session.userId);
+    } finally {
+      try {
+        if (epoch === taskRevisionEpochRef.current && session === taskRevisionSessionRef.current) {
+          const snapshot = await readTaskRevisionSnapshot(supabase, session.userId);
+          if (epoch === taskRevisionEpochRef.current && session === taskRevisionSessionRef.current) {
+            // Capture edits made during Google I/O before adopting its new revisions.
+            session.capture(dataRef.current.tasks); session.adopt(snapshot);
+            // A Google cancellation wins lifecycle while preserving unsent content in trash.
+            for (const [id, conflict] of Object.entries(session.checkpoint.conflicts)) {
+              if (conflict.local && conflict.remote?.data.deletedAt && !conflict.local.deletedAt) {
+                session.resolveConflict(id, "local", conflict, { ...conflict.local, deletedAt: conflict.remote.data.deletedAt });
+              }
+            }
+            const tasks = session.visibleTasks();
+            if (!sameRevisionData(tasks, dataRef.current.tasks)) {
+              storeRevisionRef.current += 1;
+              dataRef.current = { ...dataRef.current, tasks }; setDataState(dataRef.current);
+            }
+            if (syncedSnapshotRef.current) syncedSnapshotRef.current = { ...syncedSnapshotRef.current, tasks: session.rows.map(r => r.data) };
+          }
+        }
+      } finally { googleTaskBridgeBusy.current = false; }
+    }
+  }
+
   return {
+    withGoogleTaskSync,
+    taskSyncConflicts: () => Object.entries(taskRevisionSessionRef.current?.checkpoint.conflicts ?? {}).map(([id, value]) => ({ id, ...value })),
+    resolveTaskSyncConflict: async (id: string, choice: "local" | "remote" | "copy", expected: { local: Task | null; remote: { id: string; revision: number; data: Task } | null }) => {
+      const session = taskRevisionSessionRef.current;
+      if (!session || session.busy || googleTaskBridgeBusy.current) throw new TaskRevisionBlocked();
+      session.capture(dataRef.current.tasks); await session.refresh();
+      session.resolveConflict(id, choice === "copy" ? "remote" : choice, { local: expected.local, remote: expected.remote });
+      const tasks = session.visibleTasks();
+      if (choice === "copy" && expected.local) {
+        tasks.push({ ...expected.local, id: createId("task"), googleEventId: undefined, googleEtag: undefined, googleSyncedAt: undefined, updatedAt: new Date().toISOString() });
+        session.capture(tasks);
+      }
+      dataRef.current = { ...dataRef.current, tasks }; storeRevisionRef.current++;
+      setDataState(dataRef.current);
+    },
     tasks: data.tasks,
     projects: data.projects,
     subtasks: data.subtasks,
@@ -2273,6 +2462,7 @@ export function usePlannerData() {
       userEmail,
       isSignedIn: Boolean(userEmail),
       remoteDataReady: remoteLoaded && remoteOwnerRef.current === userEmail,
+      taskSyncMode,
       mode: userEmail ? "supabase" : "localStorage",
       syncStatus,
       syncError,
@@ -2364,7 +2554,8 @@ export function usePlannerData() {
     syncNow: async () => {
       if (!isSupabaseConfigured || !userEmailRef.current) return;
       await uploadLocalDataToSupabase();
-      await saveQueueRef.current?.drain();
+      const drained = await saveQueueRef.current?.drain();
+      if (drained && !drained.ok) return;
       await loadSupabaseData();
     },
   };

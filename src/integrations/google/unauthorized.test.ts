@@ -12,6 +12,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import connect from "../../functions/google/connect";
 import disconnect from "../../functions/google/disconnect";
 import token from "../../functions/google/token";
+import calendar from "../../functions/google/calendar";
+import taskWrite from "../../functions/google/task-write";
 
 beforeEach(() => {
   // Enough for the verifier to be built; none of these requests reach a network.
@@ -42,6 +44,8 @@ async function call(
 }
 
 const endpoints = [
+  { name: "task-write", handler: taskWrite, body: { operationId: "00000000-0000-0000-0000-000000000001" } },
+  { name: "calendar", handler: calendar, body: { calendarId: "cal" } },
   { name: "connect", handler: connect, body: { code: "auth-code" } },
   { name: "token", handler: token, body: undefined },
   { name: "disconnect", handler: disconnect, body: undefined },

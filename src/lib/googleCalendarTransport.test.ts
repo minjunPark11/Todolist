@@ -6,6 +6,16 @@ import { defaultDeps, exchangeCodeForAccess, currentAccessToken, disconnect } fr
 import { DEPLOYED_WEB_ORIGIN } from "../domain/calendar/googleSync/connectFlow";
 
 beforeEach(() => { vi.clearAllMocks(); mocks.desktop.mockReturnValue(true); });
+it("saves a connection through server verification instead of trusting client account metadata", async () => {
+  const auth = vi.spyOn(defaultDeps, "authToken").mockResolvedValue("session");
+  mocks.nativeFetch.mockResolvedValue(new Response(JSON.stringify({ bound: true })));
+  try {
+    await defaultDeps.writeConnection({ calendarId: "cal", accountEmail: "untrusted@example.com" });
+    expect(mocks.nativeFetch).toHaveBeenCalledWith(`${DEPLOYED_WEB_ORIGIN}/api/google/calendar`, expect.objectContaining({
+      body: JSON.stringify({ calendarId: "cal" }),
+    }));
+  } finally { auth.mockRestore(); }
+});
 it("posts all desktop OAuth calls to the deployed server through native HTTP", async () => {
   mocks.nativeFetch.mockImplementation(async () => new Response(JSON.stringify({ accessToken: "access", connected: true, revoked: true })));
   const deps = { ...defaultDeps, authToken: async () => "session" };

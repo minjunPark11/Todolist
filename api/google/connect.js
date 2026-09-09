@@ -456,12 +456,23 @@ function readServiceRoleEnv(env = process.env) {
   return { url: supabaseOrigin(url), serviceRoleKey };
 }
 
+// src/domain/calendar/googleSync/protocol.ts
+var GOOGLE_SYNC_PROTOCOL_HEADER = "x-focusflow-google-sync-protocol";
+var MAX_GOOGLE_ACCESS_TOKEN_SECONDS = 3600;
+
 // src/integrations/google/oauth.ts
 var TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+function tokenLifetime(value) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_GOOGLE_ACCESS_TOKEN_SECONDS) {
+    throw new GoogleOAuthError("Google returned an unsupported access token lifetime.", 502);
+  }
+  return value;
+}
 var GoogleOAuthError = class extends Error {
-  constructor(message, status) {
+  constructor(message, status, remoteOutcomeKnown = false) {
     super(message);
     this.status = status;
+    this.remoteOutcomeKnown = remoteOutcomeKnown;
     this.name = "GoogleOAuthError";
   }
 };
@@ -500,7 +511,11 @@ async function exchangeCode(code, env, fetchImpl = fetch) {
     fetchImpl
   );
   if (!response.ok) {
-    throw new GoogleOAuthError(await describe(response, "Google refused the authorization code."), 400);
+    throw new GoogleOAuthError(
+      await describe(response, "Google refused the authorization code."),
+      400,
+      response.status >= 400 && response.status < 500
+    );
   }
   const body = await response.json();
   if (typeof body.refresh_token !== "string" || !body.refresh_token) {
@@ -515,50 +530,9 @@ async function exchangeCode(code, env, fetchImpl = fetch) {
   return {
     refreshToken: body.refresh_token,
     accessToken: body.access_token,
-    expiresIn: typeof body.expires_in === "number" ? body.expires_in : 3600,
+    expiresIn: tokenLifetime(body.expires_in),
     scope: typeof body.scope === "string" ? body.scope : ""
   };
-}
-
-// src/integrations/google/store.ts
-var TokenStoreError = class extends Error {
-  constructor(message, status) {
-    super(message);
-    this.status = status;
-    this.name = "TokenStoreError";
-  }
-};
-function headers(env, extra = {}) {
-  return {
-    apikey: env.serviceRoleKey,
-    Authorization: `Bearer ${env.serviceRoleKey}`,
-    "Content-Type": "application/json",
-    ...extra
-  };
-}
-async function request(env, path, init, fetchImpl) {
-  let response;
-  try {
-    response = await fetchImpl(`${env.url}/rest/v1/${path}`, init);
-  } catch {
-    throw new TokenStoreError("Could not reach the database.", 502);
-  }
-  if (!response.ok) {
-    throw new TokenStoreError(`Token store request failed (${response.status}).`, 502);
-  }
-  return response;
-}
-async function writeRefreshToken(userId, refreshToken, scope, fetchImpl = fetch, env = readServiceRoleEnv()) {
-  await request(
-    env,
-    "google_calendar_tokens",
-    {
-      method: "POST",
-      headers: headers(env, { Prefer: "resolution=merge-duplicates,return=minimal" }),
-      body: JSON.stringify({ user_id: userId, refresh_token: refreshToken, scope })
-    },
-    fetchImpl
-  );
 }
 
 // src/integrations/google/index.ts
@@ -580,9 +554,149 @@ async function requireUser(authorization, verify = verifier) {
   return verify.verify(bearer);
 }
 
+// src/integrations/google/protocol.ts
+var GoogleSyncProtocolError = class extends Error {
+  constructor(code, status, message, minimumProtocol) {
+    super(message);
+    this.code = code;
+    this.status = status;
+    this.minimumProtocol = minimumProtocol;
+    this.name = "GoogleSyncProtocolError";
+  }
+};
+function requestedGoogleProtocol(headers) {
+  const entries = Object.entries(headers).filter(([key]) => key.toLowerCase() === GOOGLE_SYNC_PROTOCOL_HEADER);
+  const value = entries[0]?.[1];
+  if (entries.length === 0) return 1;
+  if (entries.length === 1 && (value === "1" || value === "2")) return Number(value);
+  throw new GoogleSyncProtocolError("google_sync_update_required", 426, "Update FocusFlow before syncing Google Calendar.");
+}
+async function authorizeGoogleToken(userId, protocol, expiresIn = null, fetchImpl = fetch, env = readServiceRoleEnv()) {
+  const unavailable = () => new GoogleSyncProtocolError(
+    "google_sync_policy_unavailable",
+    503,
+    "Google sync compatibility could not be verified. No access token was released."
+  );
+  if (![1, 2].includes(protocol) || expiresIn !== null && (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > MAX_GOOGLE_ACCESS_TOKEN_SECONDS)) {
+    throw unavailable();
+  }
+  let response;
+  try {
+    response = await fetchImpl(`${env.url}/rest/v1/rpc/authorize_google_token`, {
+      method: "POST",
+      headers: { apikey: env.serviceRoleKey, Authorization: `Bearer ${env.serviceRoleKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_user_id: userId, p_protocol: protocol, p_expires_in: expiresIn })
+    });
+  } catch {
+    throw unavailable();
+  }
+  if (!response.ok) throw unavailable();
+  const body = await response.json().catch(() => null);
+  if (!body || typeof body.allowed !== "boolean" || ![1, 2].includes(Number(body.minimumProtocol)) || typeof body.minimumProtocol !== "number") throw unavailable();
+  if (!body.allowed) throw new GoogleSyncProtocolError(
+    "google_sync_update_required",
+    426,
+    "Update FocusFlow before syncing Google Calendar.",
+    body.minimumProtocol
+  );
+}
+
+// src/integrations/google/identity.ts
+var GoogleIdentityError = class extends Error {
+  constructor(code, status) {
+    super(code === "google_identity_reconnect_required" ? "The existing Google account could not be matched. Disconnect the existing connection before connecting another account." : "Could not verify the Google account. No connection was replaced.");
+    this.code = code;
+    this.status = status;
+    this.name = "GoogleIdentityError";
+  }
+};
+async function verifyGoogleIdentity(accessToken, fetchImpl = fetch) {
+  try {
+    const response = await fetchImpl("https://openidconnect.googleapis.com/v1/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      redirect: "error"
+    });
+    if (!response.ok) throw new Error();
+    const body = await response.json();
+    if (!body || typeof body.sub !== "string" || !body.sub.trim() || body.sub.length > 255 || body.sub !== body.sub.trim()) throw new Error();
+    return { subject: body.sub, email: body.email_verified === true && typeof body.email === "string" ? body.email : "" };
+  } catch {
+    throw new GoogleIdentityError("google_identity_unavailable", 502);
+  }
+}
+async function storeVerifiedGoogleGrant(userId, refreshToken, scope, identity, fetchImpl = fetch, env = readServiceRoleEnv()) {
+  let response;
+  try {
+    response = await fetchImpl(`${env.url}/rest/v1/rpc/store_verified_google_grant`, {
+      method: "POST",
+      headers: { apikey: env.serviceRoleKey, Authorization: `Bearer ${env.serviceRoleKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_user_id: userId,
+        p_refresh_token: refreshToken,
+        p_scope: scope,
+        p_subject: identity.subject,
+        p_email: identity.email
+      })
+    });
+  } catch {
+    throw new GoogleIdentityError("google_identity_unavailable", 502);
+  }
+  if (!response.ok) throw new GoogleIdentityError("google_identity_unavailable", 502);
+  const result = await response.json().catch(() => null);
+  if (result?.stored === false && result.reason === "identity-mismatch") throw new GoogleIdentityError("google_identity_reconnect_required", 409);
+  if (result?.stored !== true) throw new GoogleIdentityError("google_identity_unavailable", 502);
+}
+
+// src/integrations/google/lifecycle.ts
+import { randomUUID } from "node:crypto";
+var GoogleLifecycleError = class extends Error {
+  constructor(status = 503) {
+    super(status === 409 ? "Another Google connection operation is running. Try again shortly." : "The Google connection operation needs recovery before reconnecting.");
+    this.status = status;
+    this.name = "GoogleLifecycleError";
+  }
+};
+async function rpc(name, body, fetchImpl, env) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetchImpl(`${env.url}/rest/v1/rpc/${name}`, {
+        method: "POST",
+        headers: { apikey: env.serviceRoleKey, Authorization: `Bearer ${env.serviceRoleKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) {
+        const value = await response.json();
+        if (value && typeof value === "object") return value;
+      }
+    } catch {
+    }
+  }
+  throw new GoogleLifecycleError();
+}
+async function withGoogleLifecycle(userId, kind, work, fetchImpl = fetch, env = readServiceRoleEnv()) {
+  const operationId = randomUUID();
+  const begin = await rpc("begin_google_oauth_operation", { p_operation_id: operationId, p_user_id: userId, p_kind: kind }, fetchImpl, env);
+  if (begin.acquired !== true) throw new GoogleLifecycleError(begin.uncertain === true ? 503 : 409);
+  let unsettled = false;
+  try {
+    return await work({ remoteStarted() {
+      unsettled = true;
+    }, remoteSettled() {
+      unsettled = false;
+    } });
+  } finally {
+    const result = await rpc("finish_google_oauth_operation", {
+      p_operation_id: operationId,
+      p_user_id: userId,
+      p_state: unsettled ? "uncertain" : "completed"
+    }, fetchImpl, env);
+    if (result.finished !== true || unsettled) throw new GoogleLifecycleError();
+  }
+}
+
 // src/functions/google/connect.ts
-function header(headers2, name) {
-  const value = headers2[name] ?? headers2[name.toLowerCase()];
+function header(headers, name) {
+  const value = headers[name] ?? headers[name.toLowerCase()];
   return Array.isArray(value) ? value[0] : value;
 }
 function readCode(body) {
@@ -611,15 +725,39 @@ async function handler(req, res) {
   }
   try {
     const user = await requireUser(header(req.headers, "authorization"));
+    const protocol = requestedGoogleProtocol(req.headers);
+    await authorizeGoogleToken(user.userId, protocol);
     const env = readGoogleOAuthEnv();
-    const tokens = await exchangeCode(code, env);
-    await writeRefreshToken(user.userId, tokens.refreshToken, tokens.scope);
-    res.status(200).json({
-      accessToken: tokens.accessToken,
-      expiresIn: tokens.expiresIn,
-      scope: tokens.scope
+    const result = await withGoogleLifecycle(user.userId, "connect", async (operation) => {
+      operation.remoteStarted();
+      const tokens = await exchangeCode(code, env).catch((error) => {
+        if (error instanceof GoogleOAuthError && error.remoteOutcomeKnown) operation.remoteSettled();
+        throw error;
+      });
+      operation.remoteSettled();
+      const identity = await verifyGoogleIdentity(tokens.accessToken);
+      await authorizeGoogleToken(user.userId, protocol, tokens.expiresIn);
+      await storeVerifiedGoogleGrant(user.userId, tokens.refreshToken, tokens.scope, identity);
+      return {
+        accessToken: tokens.accessToken,
+        expiresIn: tokens.expiresIn,
+        scope: tokens.scope
+      };
     });
+    res.status(200).json(result);
   } catch (error) {
+    if (error instanceof GoogleLifecycleError) {
+      res.status(error.status).json({ error: error.message, code: "google_lifecycle_blocked" });
+      return;
+    }
+    if (error instanceof GoogleIdentityError) {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    if (error instanceof GoogleSyncProtocolError) {
+      res.status(error.status).json({ error: error.message, code: error.code, minimumProtocol: error.minimumProtocol });
+      return;
+    }
     if (error instanceof UnauthorizedError) {
       res.status(401).json({ error: error.message, code: error.reason });
       return;

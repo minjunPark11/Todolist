@@ -1020,13 +1020,28 @@ var init_state = __esm({
   }
 });
 
+// src/domain/calendar/googleSync/protocol.ts
+var MAX_GOOGLE_ACCESS_TOKEN_SECONDS;
+var init_protocol = __esm({
+  "src/domain/calendar/googleSync/protocol.ts"() {
+    "use strict";
+    MAX_GOOGLE_ACCESS_TOKEN_SECONDS = 3600;
+  }
+});
+
 // src/integrations/google/oauth.ts
+function tokenLifetime(value) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_GOOGLE_ACCESS_TOKEN_SECONDS) {
+    throw new GoogleOAuthError("Google returned an unsupported access token lifetime.", 502);
+  }
+  return value;
+}
 function authorizeUrl(env, state) {
   const params = new URLSearchParams({
     client_id: env.clientId,
     redirect_uri: env.redirectUri,
     response_type: "code",
-    scope: GOOGLE_CALENDAR_SCOPE,
+    scope: `openid email ${GOOGLE_CALENDAR_SCOPE}`,
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true",
@@ -1069,7 +1084,11 @@ async function exchangeCode(code, env, fetchImpl = fetch) {
     fetchImpl
   );
   if (!response.ok) {
-    throw new GoogleOAuthError(await describe(response, "Google refused the authorization code."), 400);
+    throw new GoogleOAuthError(
+      await describe(response, "Google refused the authorization code."),
+      400,
+      response.status >= 400 && response.status < 500
+    );
   }
   const body = await response.json();
   if (typeof body.refresh_token !== "string" || !body.refresh_token) {
@@ -1084,7 +1103,7 @@ async function exchangeCode(code, env, fetchImpl = fetch) {
   return {
     refreshToken: body.refresh_token,
     accessToken: body.access_token,
-    expiresIn: typeof body.expires_in === "number" ? body.expires_in : 3600,
+    expiresIn: tokenLifetime(body.expires_in),
     scope: typeof body.scope === "string" ? body.scope : ""
   };
 }
@@ -1109,7 +1128,7 @@ async function refreshAccessToken(refreshToken, env, fetchImpl = fetch) {
   }
   return {
     accessToken: body.access_token,
-    expiresIn: typeof body.expires_in === "number" ? body.expires_in : 3600
+    expiresIn: tokenLifetime(body.expires_in)
   };
 }
 async function revokeToken(token, fetchImpl = fetch) {
@@ -1125,13 +1144,15 @@ var init_oauth = __esm({
   "src/integrations/google/oauth.ts"() {
     "use strict";
     init_env();
+    init_protocol();
     AUTHORIZE_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
     TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
     REVOKE_ENDPOINT = "https://oauth2.googleapis.com/revoke";
     GoogleOAuthError = class extends Error {
-      constructor(message, status) {
+      constructor(message, status, remoteOutcomeKnown = false) {
         super(message);
         this.status = status;
+        this.remoteOutcomeKnown = remoteOutcomeKnown;
         this.name = "GoogleOAuthError";
       }
     };

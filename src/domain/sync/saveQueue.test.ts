@@ -15,6 +15,27 @@ function deferredPerform() {
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 describe("createSaveQueue", () => {
+  it("retains blocked work without retry timers and answers drain immediately", async () => {
+    const { calls, perform } = deferredPerform();
+    const scheduled: Array<() => void> = [];
+    const outcomes: boolean[] = [];
+    const queue = createSaveQueue({ perform, shouldRetry: () => false,
+      scheduleRetry: (fn) => scheduled.push(fn), onSettled: (r) => outcomes.push(r.willRetry) });
+    queue.request("draft"); calls[0].reject(new Error("conflict")); await flush();
+    expect(queue.hasPending).toBe(true); expect(scheduled).toEqual([]); expect(outcomes).toEqual([false]);
+    await expect(queue.drain()).resolves.toEqual({ ok: false });
+    queue.request("edited draft"); expect(calls[1].payload).toBe("edited draft");
+    calls[1].resolve(); await flush(); await expect(queue.drain()).resolves.toEqual({ ok: true });
+  });
+  it("an old account's late response cannot clear the new account's running flag", async () => {
+    const { calls, perform } = deferredPerform();
+    const queue = createSaveQueue({ perform });
+    queue.request("old"); queue.reset(); queue.request("new");
+    calls[0].resolve(); await flush();
+    expect(queue.isRunning).toBe(true);
+    queue.request("newer"); expect(calls).toHaveLength(2);
+    calls[1].resolve(); await flush(); expect(calls[2].payload).toBe("newer");
+  });
   it("runs one save at a time", async () => {
     const { calls, perform } = deferredPerform();
     const queue = createSaveQueue({ perform });

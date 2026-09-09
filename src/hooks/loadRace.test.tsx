@@ -58,7 +58,10 @@ vi.mock("../services/supabaseClient", () => {
       auth: {
         getSession: async () => ({ data: { session: null } }),
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-        getUser: async () => ({ data: { user: null } }),
+        // Manual refresh now verifies an authenticated account before reading
+        // its revision-mode gate. Keep automatic session loading off so each
+        // test still controls exactly when the table request starts.
+        getUser: async () => ({ data: { user: { id: "load-race-user" } } }),
       },
     },
   };

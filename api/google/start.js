@@ -463,7 +463,7 @@ function authorizeUrl(env, state) {
     client_id: env.clientId,
     redirect_uri: env.redirectUri,
     response_type: "code",
-    scope: GOOGLE_CALENDAR_SCOPE,
+    scope: `openid email ${GOOGLE_CALENDAR_SCOPE}`,
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true",

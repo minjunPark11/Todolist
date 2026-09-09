@@ -17,6 +17,28 @@ export class TokenStoreError extends Error {
   }
 }
 
+export interface DisconnectSnapshot { refreshToken: string | null; grantVersion: string | null; generation: string | null }
+export async function readDisconnectSnapshot(userId: string, fetchImpl: typeof fetch = fetch,
+  env: ServiceRoleEnv = readServiceRoleEnv()): Promise<DisconnectSnapshot> {
+  const response = await request(env, "rpc/read_google_disconnect_snapshot", {
+    method: "POST", headers: headers(env), body: JSON.stringify({ p_user_id: userId }),
+  }, fetchImpl);
+  const body = await response.json().catch(() => null) as DisconnectSnapshot | null;
+  if (!body || ![body.refreshToken, body.grantVersion, body.generation].every(v => v === null || typeof v === "string") ||
+    ((body.refreshToken === null) !== (body.grantVersion === null))) throw new TokenStoreError("Could not verify the connection to disconnect.", 502);
+  return body;
+}
+export async function disconnectStoredCalendar(userId: string, snapshot: DisconnectSnapshot,
+  fetchImpl: typeof fetch = fetch, env: ServiceRoleEnv = readServiceRoleEnv()): Promise<void> {
+  const response = await request(env, "rpc/disconnect_google_calendar", {
+    method: "POST", headers: headers(env), body: JSON.stringify({ p_user_id: userId,
+      p_grant_version: snapshot.grantVersion, p_generation: snapshot.generation }),
+  }, fetchImpl);
+  const body = await response.json().catch(() => null) as { disconnected?: unknown } | null;
+  if (body?.disconnected === false) throw new TokenStoreError("The Google connection changed. Check it and retry disconnecting.", 409);
+  if (body?.disconnected !== true) throw new TokenStoreError("Could not confirm Google disconnection.", 502);
+}
+
 function headers(env: ServiceRoleEnv, extra: Record<string, string> = {}): Record<string, string> {
   return {
     apikey: env.serviceRoleKey,

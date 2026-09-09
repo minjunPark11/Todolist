@@ -35,6 +35,32 @@ beforeEach(() => {
 afterEach(cleanup);
 const mount = () => render(<I18nProvider lang="en"><GoogleCalendarCard /></I18nProvider>);
 
+it("keeps the retained connection's disconnect action after an identity mismatch", async () => {
+  const { GoogleCalendarError } = await import("../../lib/googleCalendar");
+  mocks.read.mockResolvedValue({ calendarId: "old-calendar", accountEmail: "old@example.com" });
+  mocks.exchange.mockRejectedValueOnce(new GoogleCalendarError("identityMismatch", "Mismatch"));
+  mount();
+  await screen.findByRole("button", { name: "Disconnect" });
+  localStorage.setItem("focusflow.google.pendingConnect", JSON.stringify({ nonce: "abc", platform: "desktop" }));
+  act(() => routeGoogleCalendarReturn("focusflow://google-calendar?state=abc&code=one"));
+  await screen.findByText("The existing Google account could not be matched. Disconnect the existing connection before connecting another account.");
+  expect(screen.getByRole("button", { name: "Disconnect" })).toBeTruthy();
+  expect(mocks.ensure).not.toHaveBeenCalled();
+});
+
+it("preserves the upgrade explanation after a failed manual sync", async () => {
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email" });
+  const { GOOGLE_SYNC_FINISHED } = await import("../../lib/googleCalendar");
+  const { GOOGLE_SYNC_POLICY_EVENT } = await import("../../domain/calendar/googleSync/protocol");
+  mount();
+  fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
+  act(() => {
+    window.dispatchEvent(new CustomEvent(GOOGLE_SYNC_POLICY_EVENT, { detail: { reason: "updateRequired" } }));
+    window.dispatchEvent(new CustomEvent(GOOGLE_SYNC_FINISHED, { detail: { ok: false } }));
+  });
+  expect(screen.getByText("Update FocusFlow to continue syncing Google Calendar.").getAttribute("role")).toBe("alert");
+});
+
 it("shows loading, then a persistent connected status and account", async () => {
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "person@example.com" });
   mount();

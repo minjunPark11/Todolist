@@ -11,7 +11,7 @@
 // fragment, and this is the component mounted to spend it. The desktop path is
 // the same code reached by a different road — `platform.deepLink` — because
 // Google will not redirect to a custom scheme (§4.4, chain step 1).
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   CALLBACK_LANDING_PATH,
   consentUrl,
@@ -22,6 +22,7 @@ import {
   type PendingConnect,
 } from "../../domain/calendar/googleSync/connectFlow";
 import { useT } from "../../i18n";
+import { GOOGLE_SYNC_POLICY_EVENT, type GoogleSyncPolicyReason } from "../../domain/calendar/googleSync/protocol";
 import {
   disconnect as disconnectGoogle,
   ensureDedicatedCalendar,
@@ -38,6 +39,8 @@ import { platform } from "../../platform";
 import { supabase } from "../../services/supabaseClient";
 import { ConfirmModal } from "../kit";
 import { GoogleCalendarSourceList } from "./GoogleCalendarSourceList";
+import { GoogleTaskReviewPanel } from "./GoogleTaskReviewPanel";
+import { readGoogleTaskSyncState, subscribeGoogleTaskSync } from "../../lib/googleTaskSyncState";
 
 type Status =
   | { kind: "loading" }
@@ -47,6 +50,7 @@ type Status =
   | { kind: "connected"; connection: GoogleConnection };
 
 export function GoogleCalendarCard() {
+  const taskSync = useSyncExternalStore(subscribeGoogleTaskSync, readGoogleTaskSyncState, readGoogleTaskSyncState);
   const { t } = useT();
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [notice, setNotice] = useState("");
@@ -57,6 +61,7 @@ export function GoogleCalendarCard() {
   const [syncing, setSyncing] = useState(false);
   const [labelState, setLabelState] = useState<{ supported: boolean | null; overflow: number; failed: boolean } | null>(null);
   const manualSync = useRef(false);
+  const policyReason = useRef<GoogleSyncPolicyReason | null>(null);
   useEffect(() => {
     if (status.kind === "connected") return;
     setLabelState(null);
@@ -64,20 +69,30 @@ export function GoogleCalendarCard() {
     manualSync.current = false;
   }, [status.kind]);
   useEffect(() => {
+    const onPolicy = (event: Event) => {
+      const reason = (event as CustomEvent).detail?.reason;
+      if (reason !== null && reason !== "updateRequired" && reason !== "policyUnavailable") return;
+      const previous = policyReason.current;
+      policyReason.current = reason;
+      if (reason) { setError(t(`settings.google.error.${reason}`)); setNotice(""); }
+      else if (previous) setError("");
+    };
     const onLabels = (event: Event) => setLabelState((event as CustomEvent).detail);
     const onDone = (event: Event) => {
       if (!manualSync.current) return;
       manualSync.current = false;
       setSyncing(false);
       const ok = (event as CustomEvent<{ ok: boolean }>).detail.ok;
-      setNotice(ok ? t("settings.google.syncDone") : "");
-      setError(ok ? "" : t("settings.google.error.google"));
+      setNotice(ok && !policyReason.current ? t("settings.google.syncDone") : "");
+      setError(policyReason.current ? t(`settings.google.error.${policyReason.current}`) : ok ? "" : t("settings.google.error.google"));
     };
     window.addEventListener(GOOGLE_LABELS_STATUS, onLabels);
     window.addEventListener(GOOGLE_SYNC_FINISHED, onDone);
+    window.addEventListener(GOOGLE_SYNC_POLICY_EVENT, onPolicy);
     return () => {
       window.removeEventListener(GOOGLE_LABELS_STATUS, onLabels);
       window.removeEventListener(GOOGLE_SYNC_FINISHED, onDone);
+      window.removeEventListener(GOOGLE_SYNC_POLICY_EVENT, onPolicy);
     };
   }, [t]);
   const statusRef = useRef(status);
@@ -120,7 +135,13 @@ export function GoogleCalendarCard() {
         notifyGoogleConnectionChanged();
       } catch (thrown) {
         writePendingConnect(null);
-        setStatus({ kind: "disconnected" });
+        if (thrown instanceof GoogleCalendarError && ["identityMismatch", "identityUnavailable", "calendarVerification", "lifecycleBusy", "lifecycleRecovery"].includes(thrown.reason)) {
+          // The server retained the old grant. Keep its Disconnect action available.
+          try {
+            const connection = await readConnection();
+            setStatus(connection ? { kind: "connected", connection } : { kind: "disconnected" });
+          } catch { setStatus({ kind: "error" }); }
+        } else setStatus({ kind: "disconnected" });
         setError(describe(thrown));
       }
     },
@@ -338,7 +359,7 @@ export function GoogleCalendarCard() {
               ? t("settings.google.connectedAs", { email: status.connection.accountEmail })
               : t("settings.google.connectedNoEmail")}
           </p>
-          <p className="ff-settings-note">{t("settings.google.labelsOwnership")}</p>
+          {!taskSync.enabled && <p className="ff-settings-note">{t("settings.google.labelsOwnership")}</p>}
           {(labelState?.supported ?? status.connection.labelsSupported) === false ? (
             <p className="ff-settings-note" aria-live="polite">{t("settings.google.labelsUnsupported")}</p>
           ) : null}
@@ -351,6 +372,7 @@ export function GoogleCalendarCard() {
             window.dispatchEvent(new Event(GOOGLE_SYNC_REQUESTED));
           }}>{t(syncing ? "settings.google.syncingNow" : "settings.google.syncNow")}</button>
           <GoogleCalendarSourceList ownCalendarId={status.connection.calendarId} />
+          <GoogleTaskReviewPanel />
         </>
       ) : null}
 
@@ -359,7 +381,7 @@ export function GoogleCalendarCard() {
       {/* §8 asks for this to be said once, at the moment of connecting: a
           repeating event edited in Google is overwritten on the next write, and
           Google has no lock that could prevent it. */}
-      <p className="ff-settings-note">{t("settings.google.repeatWarning")}</p>
+      <p className="ff-settings-note">{t(taskSync.enabled ? "googleTask.unsupported" : "settings.google.repeatWarning")}</p>
 
       {notice ? <p className="ff-settings-note">{notice}</p> : null}
       {error ? <p className="auth-message error" role="alert">{error}</p> : null}

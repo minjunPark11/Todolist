@@ -13,6 +13,8 @@
 import { DEPLOYED_WEB_ORIGIN, type PendingConnect } from "../domain/calendar/googleSync/connectFlow";
 import { isTauriRuntime } from "../platform/tauri";
 import { supabase } from "../services/supabaseClient";
+import { readGoogleTaskSyncState } from "./googleTaskSyncState";
+import { GOOGLE_SYNC_PROTOCOL, GOOGLE_SYNC_PROTOCOL_HEADER, GOOGLE_SYNC_POLICY_EVENT, type GoogleSyncPolicyReason } from "../domain/calendar/googleSync/protocol";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
@@ -40,7 +42,7 @@ export interface GoogleConnection {
  * mints is refused for the same reason the last one was. Telling that reader to
  * sign in sends them round a loop they cannot leave.
  */
-export type FailureReason = "signedOut" | "rejected" | "network" | "google" | "store";
+export type FailureReason = "signedOut" | "rejected" | "network" | "google" | "store" | "identityMismatch" | "identityUnavailable" | "calendarVerification" | "lifecycleBusy" | "lifecycleRecovery" | GoogleSyncPolicyReason;
 
 export class GoogleCalendarError extends Error {
   constructor(
@@ -78,16 +80,7 @@ async function supabaseReadConnection(): Promise<GoogleConnection | null> {
 }
 
 async function supabaseWriteConnection(connection: GoogleConnection): Promise<void> {
-  if (!supabase) throw new GoogleCalendarError("signedOut", "Sign in to FocusFlow first.");
-  const { data } = await supabase.auth.getUser();
-  const userId = data.user?.id;
-  if (!userId) throw new GoogleCalendarError("signedOut", "Sign in to FocusFlow first.");
-
-  const { error } = await supabase.from("google_calendar_connections").upsert(
-    { user_id: userId, calendar_id: connection.calendarId, account_email: connection.accountEmail },
-    { onConflict: "user_id" },
-  );
-  if (error) throw new GoogleCalendarError("store", error.message);
+  await callOwnApi("/api/google/calendar", defaultDeps, { calendarId: connection.calendarId });
 }
 
 /** Native HTTP reaches the deployed API instead of the desktop asset origin. */
@@ -140,6 +133,13 @@ export const defaultDeps: GoogleCalendarDeps = {
  * the server's own words travel with this (see `describe` in the card).
  */
 function failureFor(status: number, code: string | undefined): FailureReason {
+  if (code === "google_lifecycle_blocked" && status === 409) return "lifecycleBusy";
+  if (code === "google_lifecycle_blocked" && status === 503) return "lifecycleRecovery";
+  if ((status === 409 || status === 502) && code === "google_calendar_verification_failed") return "calendarVerification";
+  if (status === 409 && code === "google_identity_reconnect_required") return "identityMismatch";
+  if (status === 502 && code === "google_identity_unavailable") return "identityUnavailable";
+  if (status === 426 && code === "google_sync_update_required") return "updateRequired";
+  if (status === 503 && code === "google_sync_policy_unavailable") return "policyUnavailable";
   if (status !== 401) return "google";
   return code === "invalid_token" ? "rejected" : "signedOut";
 }
@@ -153,7 +153,7 @@ async function callOwnApi(path: string, deps: GoogleCalendarDeps, body?: unknown
   try {
     response = await deps.fetch(path, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", [GOOGLE_SYNC_PROTOCOL_HEADER]: deps === defaultDeps && readGoogleTaskSyncState().enabled ? "2" : GOOGLE_SYNC_PROTOCOL },
       body: JSON.stringify(body ?? {}),
     });
   } catch {
@@ -161,6 +161,12 @@ async function callOwnApi(path: string, deps: GoogleCalendarDeps, body?: unknown
   }
 
   const payload = (await response.json().catch(() => null)) as { error?: string; code?: string } | null;
+  if (typeof window !== "undefined" && (path === "/api/google/token" || path === "/api/google/connect")) {
+    const reason = failureFor(response.status, payload?.code);
+    if (response.ok || reason === "updateRequired" || reason === "policyUnavailable") {
+      window.dispatchEvent(new CustomEvent(GOOGLE_SYNC_POLICY_EVENT, { detail: { reason: response.ok ? null : reason } }));
+    }
+  }
   if (!response.ok) {
     throw new GoogleCalendarError(
       failureFor(response.status, payload?.code),

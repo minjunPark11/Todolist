@@ -14,8 +14,10 @@ import {
   readGoogleOAuthEnv,
   requireUser,
   UnauthorizedError,
-  writeRefreshToken,
 } from "../../integrations/google";
+import { authorizeGoogleToken, GoogleSyncProtocolError, requestedGoogleProtocol } from "../../integrations/google/protocol";
+import { GoogleIdentityError, storeVerifiedGoogleGrant, verifyGoogleIdentity } from "../../integrations/google/identity";
+import { GoogleLifecycleError, withGoogleLifecycle } from "../../integrations/google/lifecycle";
 
 interface AdapterRequest {
   method?: string;
@@ -64,21 +66,44 @@ export default async function handler(req: AdapterRequest, res: AdapterResponse)
 
   try {
     const user = await requireUser(header(req.headers, "authorization"));
+    const protocol = requestedGoogleProtocol(req.headers);
+    await authorizeGoogleToken(user.userId, protocol);
     const env = readGoogleOAuthEnv();
-    const tokens = await exchangeCode(code, env);
+    const result = await withGoogleLifecycle(user.userId, "connect", async operation => {
+      operation.remoteStarted();
+      const tokens = await exchangeCode(code, env).catch(error => {
+        if (error instanceof GoogleOAuthError && error.remoteOutcomeKnown) operation.remoteSettled();
+        throw error;
+      });
+      operation.remoteSettled();
+      const identity = await verifyGoogleIdentity(tokens.accessToken);
+      await authorizeGoogleToken(user.userId, protocol, tokens.expiresIn);
 
-    // Stored BEFORE anything is returned. If the write fails the caller is told
-    // the connection failed, which is true — an access token in a browser with
-    // no refresh token behind it is a connection that dies within the hour and
-    // cannot be renewed.
-    await writeRefreshToken(user.userId, tokens.refreshToken, tokens.scope);
+      // Stored BEFORE anything is returned. If the write fails the caller is told
+      // the connection failed, which is true — an access token in a browser with
+      // no refresh token behind it is a connection that dies within the hour and
+      // cannot be renewed.
+      await storeVerifiedGoogleGrant(user.userId, tokens.refreshToken, tokens.scope, identity);
 
-    res.status(200).json({
-      accessToken: tokens.accessToken,
-      expiresIn: tokens.expiresIn,
-      scope: tokens.scope,
+      return {
+        accessToken: tokens.accessToken,
+        expiresIn: tokens.expiresIn,
+        scope: tokens.scope,
+      };
     });
+    res.status(200).json(result);
   } catch (error) {
+    if (error instanceof GoogleLifecycleError) {
+      res.status(error.status).json({ error: error.message, code: "google_lifecycle_blocked" }); return;
+    }
+    if (error instanceof GoogleIdentityError) {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    if (error instanceof GoogleSyncProtocolError) {
+      res.status(error.status).json({ error: error.message, code: error.code, minimumProtocol: error.minimumProtocol });
+      return;
+    }
     if (error instanceof UnauthorizedError) {
       // `reason` and not just the sentence: the client turns "no bearer at all"
       // and "this bearer was refused" into two different repairs, and the

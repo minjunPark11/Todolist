@@ -1,0 +1,63 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { I18nProvider } from "../../i18n";
+import { GoogleTaskReviewPanel } from "./GoogleTaskReviewPanel";
+import { publishGoogleTaskSync, readGoogleTaskSyncState } from "../../lib/googleTaskSyncState";
+import { parseGoogleTaskSnapshot } from "../../lib/googleTaskInboundSnapshot";
+
+const fields = { title: "App title", description: "Local notes", startDate: "", dueDate: "2026-09-09", startTime: "", endTime: "" };
+const source = { id: "event", etag: "etag", summary: "Google title", description: "Google notes", start: { date: "2026-09-09" }, end: { date: "2026-09-10" } };
+const run = vi.fn();
+beforeEach(() => {
+  run.mockReset().mockResolvedValue(undefined);
+  const snapshot = parseGoogleTaskSnapshot({ userId: "u", generation: "g", calendarId: "c", syncRevision: 1,
+    timezone: "Asia/Seoul", inboxListId: "inbox", syncToken: "token", tasks: [{ id: "t", revision: 2, data: fields }],
+    mappings: [{ generation: "g", calendar_id: "c", event_id: "event", task_id: "t", state: "active" }],
+    records: [{ generation: "g", calendar_id: "c", event_id: "event", revision: 3, source, decision: { kind: "conflict", local: fields, remote: { ...fields, title: "Google title" } } }],
+  }, "u", "g");
+  publishGoogleTaskSync({ enabled: true, busy: false, pending: false, error: "", snapshot, run });
+});
+afterEach(() => { cleanup(); publishGoogleTaskSync({ enabled: false, busy: false, pending: false, error: "", snapshot: null }); });
+const mount = () => render(<I18nProvider lang="en"><GoogleTaskReviewPanel /></I18nProvider>);
+it("compares both versions and sends the displayed record and task revisions", () => {
+  mount(); fireEvent.click(screen.getByText(/Google title — Conflicting/));
+  expect(screen.getByText("Local notes")).toBeTruthy(); expect(screen.getByText("Google notes")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Use app content" }));
+  expect(run).toHaveBeenCalledWith({ eventId: "event", generation: "g", recordRevision: 3, taskRevision: 2, source, choice: "app" });
+});
+it("disables choices during submission and offers feedback", () => {
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), busy: true }); mount();
+  fireEvent.click(screen.getByText(/Google title — Conflicting/));
+  expect((screen.getByRole("button", { name: "Use Google content" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText("Syncing…")).toBeTruthy();
+});
+it("keeps a stale selection visible with a refresh action", () => {
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: "changed" }); mount();
+  expect(screen.getByRole("alert").textContent).toContain("Content changed");
+  fireEvent.click(screen.getByRole("button", { name: "Refresh and sync" })); expect(run).toHaveBeenCalledWith();
+});
+it("hides all previous-account content when disabled", () => {
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), enabled: false }); mount();
+  expect(screen.queryByText("Google title")).toBeNull();
+});
+it("shows recurrence differences only after shared-content conflicts are resolved", () => {
+  const state = readGoogleTaskSyncState(), snapshot = state.snapshot!;
+  snapshot.tasks.get("t")!.data.repeatType = "weekly";
+  snapshot.records[0].decision = { kind: "acknowledge" };
+  publishGoogleTaskSync({ ...state, snapshot }); mount();
+  fireEvent.click(screen.getByRole("button", { name: "Apply app repeat rule" }));
+  expect(run).toHaveBeenCalledWith({ choice: "recurrence", generation: "g", eventId: "event", recordRevision: 3, taskRevision: 2, source });
+  expect(screen.getByText(/entire series/)).toBeTruthy();
+  expect(screen.getByText("Every 1 week(s)")).toBeTruthy();
+});
+it("copies only the selected historical task using the displayed generation and revision", () => {
+  const state = readGoogleTaskSyncState(), snapshot = state.snapshot!;
+  snapshot.historicalTaskIds.add("t"); snapshot.snapshots[0].eventId = ""; snapshot.records = [];
+  publishGoogleTaskSync({ ...state, snapshot }); mount();
+  fireEvent.click(screen.getByRole("button", { name: "Copy to this calendar" }));
+  expect(run).toHaveBeenCalledWith({ choice: "transfer", generation: "g", taskId: "t", taskRevision: 2, eventId: "", recordRevision: 0, source: {} });
+  expect(screen.getByText(/original calendar stays/)).toBeTruthy();
+  expect(screen.getByText("Tasks from another connection (1)")).toBeTruthy();
+  expect(screen.getByText(/calendar c\./)).toBeTruthy();
+});

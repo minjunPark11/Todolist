@@ -456,12 +456,23 @@ function readServiceRoleEnv(env = process.env) {
   return { url: supabaseOrigin(url), serviceRoleKey };
 }
 
+// src/domain/calendar/googleSync/protocol.ts
+var GOOGLE_SYNC_PROTOCOL_HEADER = "x-focusflow-google-sync-protocol";
+var MAX_GOOGLE_ACCESS_TOKEN_SECONDS = 3600;
+
 // src/integrations/google/oauth.ts
 var TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+function tokenLifetime(value) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_GOOGLE_ACCESS_TOKEN_SECONDS) {
+    throw new GoogleOAuthError("Google returned an unsupported access token lifetime.", 502);
+  }
+  return value;
+}
 var GoogleOAuthError = class extends Error {
-  constructor(message, status) {
+  constructor(message, status, remoteOutcomeKnown = false) {
     super(message);
     this.status = status;
+    this.remoteOutcomeKnown = remoteOutcomeKnown;
     this.name = "GoogleOAuthError";
   }
 };
@@ -508,7 +519,7 @@ async function refreshAccessToken(refreshToken, env, fetchImpl = fetch) {
   }
   return {
     accessToken: body.access_token,
-    expiresIn: typeof body.expires_in === "number" ? body.expires_in : 3600
+    expiresIn: tokenLifetime(body.expires_in)
   };
 }
 
@@ -571,6 +582,53 @@ async function requireUser(authorization, verify = verifier) {
   return verify.verify(bearer);
 }
 
+// src/integrations/google/protocol.ts
+var GoogleSyncProtocolError = class extends Error {
+  constructor(code, status, message, minimumProtocol) {
+    super(message);
+    this.code = code;
+    this.status = status;
+    this.minimumProtocol = minimumProtocol;
+    this.name = "GoogleSyncProtocolError";
+  }
+};
+function requestedGoogleProtocol(headers2) {
+  const entries = Object.entries(headers2).filter(([key]) => key.toLowerCase() === GOOGLE_SYNC_PROTOCOL_HEADER);
+  const value = entries[0]?.[1];
+  if (entries.length === 0) return 1;
+  if (entries.length === 1 && (value === "1" || value === "2")) return Number(value);
+  throw new GoogleSyncProtocolError("google_sync_update_required", 426, "Update FocusFlow before syncing Google Calendar.");
+}
+async function authorizeGoogleToken(userId, protocol, expiresIn = null, fetchImpl = fetch, env = readServiceRoleEnv()) {
+  const unavailable = () => new GoogleSyncProtocolError(
+    "google_sync_policy_unavailable",
+    503,
+    "Google sync compatibility could not be verified. No access token was released."
+  );
+  if (![1, 2].includes(protocol) || expiresIn !== null && (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > MAX_GOOGLE_ACCESS_TOKEN_SECONDS)) {
+    throw unavailable();
+  }
+  let response;
+  try {
+    response = await fetchImpl(`${env.url}/rest/v1/rpc/authorize_google_token`, {
+      method: "POST",
+      headers: { apikey: env.serviceRoleKey, Authorization: `Bearer ${env.serviceRoleKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_user_id: userId, p_protocol: protocol, p_expires_in: expiresIn })
+    });
+  } catch {
+    throw unavailable();
+  }
+  if (!response.ok) throw unavailable();
+  const body = await response.json().catch(() => null);
+  if (!body || typeof body.allowed !== "boolean" || ![1, 2].includes(Number(body.minimumProtocol)) || typeof body.minimumProtocol !== "number") throw unavailable();
+  if (!body.allowed) throw new GoogleSyncProtocolError(
+    "google_sync_update_required",
+    426,
+    "Update FocusFlow before syncing Google Calendar.",
+    body.minimumProtocol
+  );
+}
+
 // src/functions/google/token.ts
 function header(headers2, name) {
   const value = headers2[name] ?? headers2[name.toLowerCase()];
@@ -585,14 +643,21 @@ async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   try {
     const user = await requireUser(header(req.headers, "authorization"));
+    const protocol = requestedGoogleProtocol(req.headers);
+    await authorizeGoogleToken(user.userId, protocol);
     const refreshToken = await readRefreshToken(user.userId);
     if (!refreshToken) {
       res.status(200).json({ connected: false });
       return;
     }
     const token = await refreshAccessToken(refreshToken, readGoogleOAuthEnv());
+    await authorizeGoogleToken(user.userId, protocol, token.expiresIn);
     res.status(200).json({ connected: true, accessToken: token.accessToken, expiresIn: token.expiresIn });
   } catch (error) {
+    if (error instanceof GoogleSyncProtocolError) {
+      res.status(error.status).json({ error: error.message, code: error.code, minimumProtocol: error.minimumProtocol });
+      return;
+    }
     if (error instanceof UnauthorizedError) {
       res.status(401).json({ error: error.message, code: error.reason });
       return;

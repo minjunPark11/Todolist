@@ -5,15 +5,24 @@
 // tail wagging the dog (the same reasoning `api/mcp/index.ts` gives for typing
 // its request structurally).
 import { GOOGLE_CALENDAR_SCOPE, type GoogleOAuthEnv } from "./env";
+import { MAX_GOOGLE_ACCESS_TOKEN_SECONDS } from "../../domain/calendar/googleSync/protocol";
 
 const AUTHORIZE_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const REVOKE_ENDPOINT = "https://oauth2.googleapis.com/revoke";
 
+function tokenLifetime(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_GOOGLE_ACCESS_TOKEN_SECONDS) {
+    throw new GoogleOAuthError("Google returned an unsupported access token lifetime.", 502);
+  }
+  return value;
+}
+
 export class GoogleOAuthError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly remoteOutcomeKnown = false,
   ) {
     super(message);
     this.name = "GoogleOAuthError";
@@ -39,7 +48,7 @@ export function authorizeUrl(env: GoogleOAuthEnv, state: string): string {
     client_id: env.clientId,
     redirect_uri: env.redirectUri,
     response_type: "code",
-    scope: GOOGLE_CALENDAR_SCOPE,
+    scope: `openid email ${GOOGLE_CALENDAR_SCOPE}`,
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true",
@@ -111,7 +120,8 @@ export async function exchangeCode(
   );
 
   if (!response.ok) {
-    throw new GoogleOAuthError(await describe(response, "Google refused the authorization code."), 400);
+    throw new GoogleOAuthError(await describe(response, "Google refused the authorization code."), 400,
+      response.status >= 400 && response.status < 500);
   }
 
   const body = (await response.json()) as {
@@ -134,7 +144,7 @@ export async function exchangeCode(
   return {
     refreshToken: body.refresh_token,
     accessToken: body.access_token,
-    expiresIn: typeof body.expires_in === "number" ? body.expires_in : 3600,
+    expiresIn: tokenLifetime(body.expires_in),
     scope: typeof body.scope === "string" ? body.scope : "",
   };
 }
@@ -181,7 +191,7 @@ export async function refreshAccessToken(
 
   return {
     accessToken: body.access_token,
-    expiresIn: typeof body.expires_in === "number" ? body.expires_in : 3600,
+    expiresIn: tokenLifetime(body.expires_in),
   };
 }
 
@@ -200,4 +210,19 @@ export async function revokeToken(token: string, fetchImpl: typeof fetch = fetch
   } catch {
     return false;
   }
+}
+
+/** A 200 revoke response can precede propagation. Require the old grant to be refused. */
+export async function confirmGoogleRevocation(token: string, env: GoogleOAuthEnv, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await postForm(TOKEN_ENDPOINT, { client_id: env.clientId, client_secret: env.clientSecret,
+        refresh_token: token, grant_type: "refresh_token" }, fetchImpl);
+      const body = await response.json() as { error?: unknown } | null;
+      if (response.status === 400 && body?.error === "invalid_grant") return true;
+      if (!response.ok) return false;
+    } catch { return false; }
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return false;
 }
