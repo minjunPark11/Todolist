@@ -1318,3 +1318,31 @@
      still carries its own "important, not urgent" line. */
   .ff-matrix-axis { display: none; }
 }
+
+/* The three answers to "which occurrences?" (RECURRING_OCCURRENCE_EDIT_DESIGN.md §8).
+   Rows rather than a segmented control: the labels are sentences, not words,
+   and the third one is the destructive reading — it should not sit a thumb's
+   width from the first. */
+.ff-recurrence-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ff-recurrence-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.ff-recurrence-scope-row:hover {
+  background: var(--surface-hover, rgba(127, 127, 127, 0.08));
+}
+
+.ff-recurrence-scope-row input {
+  margin: 0;
+  flex: none;
+}

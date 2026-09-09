@@ -13,6 +13,7 @@ import {
   toGoogleEventPatch,
   type ExternalEventEdit,
 } from "../domain/calendar/googleSync/externalEventShape";
+import { findGoogleInstance, isExpandedOccurrence } from "./googleCalendarInstance";
 import type { ExternalCalendarEvent } from "../types";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
@@ -85,9 +86,32 @@ export async function writeExternalEvent(
   const patch = toGoogleEventPatch(event, edit);
   if (!patch) return { kind: "unchanged" };
 
-  const path = `/calendars/${encodeURIComponent(googleCalendarId)}/events/${encodeURIComponent(event.externalUid)}`;
+  // One occurrence of a series is not addressable by the series' id. An
+  // expanded occurrence carries the MASTER's `externalUid` — writing to it
+  // would edit every occurrence, which is the opposite of what a click on one
+  // of them means. So the real instance id is fetched first, and only then is
+  // anything sent (§7.1, M5).
+  let targetId = event.externalUid;
+  let targetEtag = event.etag;
+  if (isExpandedOccurrence(event)) {
+    const found = await findGoogleInstance({
+      masterId: event.externalUid,
+      // Where it WAS. `recurrenceId` is that date on an override; on a plain
+      // expanded occurrence the start it was generated at is the same instant.
+      originalStart: event.recurrenceId || event.start,
+      googleCalendarId,
+      accessToken,
+    }, deps);
+    if (found.kind !== "found") return found.kind === "gone" ? { kind: "gone" } : { kind: found.kind };
+    targetId = found.instanceId;
+    // The instance's own etag, not the master's. The master's would fail the
+    // If-Match against a record it does not describe.
+    targetEtag = found.etag;
+  }
+
+  const path = `/calendars/${encodeURIComponent(googleCalendarId)}/events/${encodeURIComponent(targetId)}`;
   const body = JSON.stringify(patch);
-  const ifMatch = event.etag ? { "If-Match": event.etag } : undefined;
+  const ifMatch = targetEtag ? { "If-Match": targetEtag } : undefined;
 
   const first = await call(path, accessToken, deps, {
     method: "PATCH",

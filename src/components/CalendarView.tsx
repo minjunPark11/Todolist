@@ -18,6 +18,8 @@ import {
   getMonthLabel,
   todayValue,
 } from "../utils/date";
+import { RecurrenceScopeDialog } from "./calendar/RecurrenceScopeDialog";
+import type { OccurrenceScope } from "../domain/tasks/occurrenceEdit";
 import {
   buildCalendarItems,
   defaultCalendarLayers,
@@ -108,6 +110,23 @@ interface CalendarViewProps {
   /** The canonical schedule write (design §13). Every drop goes through it. */
   onUpdateTaskSchedule: (taskId: string, next: Schedule) => ScheduleIssue[];
   onCreateTask: (draft: TaskDraft) => string;
+  /**
+   * Edit ONE occurrence of a repeating task, or the series
+   * (RECURRING_OCCURRENCE_EDIT_DESIGN.md §6, M3).
+   *
+   * Separate from `onUpdateTask` for the same reason `onUpdateExternalEvent`
+   * is: the id may name no stored row at all — a virtual occurrence is
+   * `series::date` — so the write has to resolve what it was given before it
+   * can act, and `onUpdateTask` would silently do nothing.
+   *
+   * Returns false when the id is not an occurrence, which is this view's
+   * signal to fall back to the plain write it always did.
+   */
+  onEditOccurrence?: (occurrenceId: string, patch: Partial<Task>, scope: OccurrenceScope) => boolean;
+  /** Skip or delete one occurrence, or the series (§6.2). */
+  onSkipOccurrence?: (occurrenceId: string, scope: OccurrenceScope) => boolean;
+  /** Whether an id from this view names an occurrence, so the scope can be asked for first. */
+  isOccurrence?: (id: string) => boolean;
   onDeleteTask?: (taskId: string) => void;
   /**
    * A writable external event, edited or removed here (§6.2).
@@ -166,6 +185,9 @@ export function CalendarView({
   onUpdateTask,
   onUpdateTaskSchedule,
   onCreateTask,
+  onEditOccurrence,
+  onSkipOccurrence,
+  isOccurrence,
   onDeleteTask,
   onUpdateExternalEvent,
   onDeleteExternalEvent,
@@ -292,7 +314,7 @@ export function CalendarView({
    * its leading and trailing days, and the mini month beside it. Wider costs
    * only the occurrences nobody looks at; narrower leaves gaps in the grid.
    */
-  const externalCalendarRange = useMemo(() => {
+  const visibleRange = useMemo(() => {
     const year = anchorDate.getFullYear();
     const month = anchorDate.getMonth();
     return {
@@ -309,7 +331,7 @@ export function CalendarView({
         focusSessions,
         externalCalendars,
         externalCalendarEvents,
-        externalCalendarRange,
+        visibleRange,
         layers,
         colorBy: viewOptions.colorBy,
         categories: categoriesById,
@@ -322,7 +344,7 @@ export function CalendarView({
       focusSessions,
       externalCalendars,
       externalCalendarEvents,
-      externalCalendarRange,
+      visibleRange,
       layers,
       viewOptions.colorBy,
       categoriesById,
@@ -606,14 +628,40 @@ export function CalendarView({
     };
   }
 
+  /**
+   * An edit waiting on "this occurrence, this and after, or all?" (§8).
+   *
+   * The patch is held rather than applied because the answer decides which
+   * record it lands on — the occurrence, a new series, or the series itself.
+   */
+  const [scopeRequest, setScopeRequest] = useState<
+    { occurrenceId: string; intent: "edit" | "delete"; patch: Partial<Task> } | null
+  >(null);
+
+  /**
+   * Route a task write through the occurrence question when it is one.
+   *
+   * Returns true when it was taken over. Every caller below falls back to the
+   * plain write it always did, so a task that does not repeat is untouched by
+   * any of this — and is not asked a question it has no answer for.
+   */
+  function askScope(taskId: string, patch: Partial<Task>, intent: "edit" | "delete" = "edit"): boolean {
+    if (!isOccurrence?.(taskId)) return false;
+    if (intent === "edit" ? !onEditOccurrence : !onSkipOccurrence) return false;
+    setScopeRequest({ occurrenceId: taskId, intent, patch });
+    return true;
+  }
+
   /** Drop a task onto `day` as a single-day schedule. */
   function placeOn(taskId: string, day: string, startTime = "", endTime = "") {
+    if (askScope(taskId, { dueDate: day, startDate: "", startTime, endTime })) return;
     onUpdateTaskSchedule(taskId, scheduleFor(taskId, day, startTime, endTime));
   }
 
   /** Move a task's existing schedule onto `day`, keeping whatever times it has. */
   function moveToDay(taskId: string, day: string) {
     const current = scheduleFromTask(tasks.find((item) => item.id === taskId) ?? {});
+    if (askScope(taskId, { dueDate: day, startDate: "" })) return;
     onUpdateTaskSchedule(taskId, { ...current, startDate: null, dueDate: day });
   }
 
@@ -736,8 +784,10 @@ export function CalendarView({
       return;
     }
     if (item.sourceType !== "task") return;
-    onUpdateTask(item.sourceId, { startTime: input.startTime, endTime: input.endTime, notes: input.memo });
+    const patch = { startTime: input.startTime, endTime: input.endTime, notes: input.memo };
     setPopover(null);
+    if (askScope(item.sourceId, patch)) return;
+    onUpdateTask(item.sourceId, patch);
   }
 
   // Delete flows through the app-level requestDeleteTask, so the global
@@ -751,6 +801,10 @@ export function CalendarView({
     }
     if (item.sourceType !== "task") return;
     setPopover(null);
+    // A repeating task asks which occurrences the deletion reaches before the
+    // app's own confirm gets involved — "delete this one" and "delete the
+    // series" are not the same question with a different answer.
+    if (askScope(item.sourceId, {}, "delete")) return;
     // The ring deliberately stays put: onDeleteTask opens the app's confirm
     // dialog, and dropping the ring first would leave the user confirming a
     // deletion with nothing on screen to say which event it is. The effect
@@ -984,6 +1038,18 @@ export function CalendarView({
           onDelete={onDeleteTask || onDeleteExternalEvent ? handleDeleteFromPopover : undefined}
           initialMemo={popoverMemo(popover.item, tasks, externalCalendarEvents)}
           onSaveQuickEdit={handleQuickEditSave}
+        />
+      ) : null}
+      {scopeRequest ? (
+        <RecurrenceScopeDialog
+          intent={scopeRequest.intent}
+          onCancel={() => setScopeRequest(null)}
+          onChoose={(scope) => {
+            const { occurrenceId, intent, patch } = scopeRequest;
+            setScopeRequest(null);
+            if (intent === "delete") onSkipOccurrence?.(occurrenceId, scope);
+            else onEditOccurrence?.(occurrenceId, patch, scope);
+          }}
         />
       ) : null}
       {popover?.kind === "agenda" ? (
