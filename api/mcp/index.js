@@ -1394,6 +1394,7 @@ var projectTypes = ["project", "area"];
 var projectStatuses = ["active", "paused", "completed", "archived"];
 var accentColors = ["blue", "purple", "green", "pink", "orange"];
 var themeModes = ["light", "dark", "system"];
+var timezoneModes = ["auto", "manual"];
 var fontSizes = ["small", "medium", "large"];
 var languages = ["ko", "en"];
 function detectTimezone() {
@@ -1424,6 +1425,7 @@ var DEFAULT_APP_SETTINGS = {
   sidebarCollapsed: false,
   reduceMotion: false,
   timezone: detectTimezone(),
+  timezoneMode: "auto",
   aiModel: "",
   matrixHideCompleted: false
 };
@@ -1659,7 +1661,12 @@ function normalizeAppSettings(settings) {
     // A stored value wins here even when it disagrees with this device: the
     // refresh effect owns correcting it, and doing it here instead would
     // rewrite the field on every single load.
+    // Still not validated against a zone database, and the picker does not
+    // change that — see appSettingsTimezone.test.ts. The list moves, the
+    // account holds the only copy of the choice, and a name this build has not
+    // heard of is likelier a zone added since than a corrupt record.
     timezone: typeof settings?.timezone === "string" && settings.timezone ? settings.timezone : DEFAULT_APP_SETTINGS.timezone,
+    timezoneMode: oneOf(settings?.timezoneMode, timezoneModes, "auto"),
     // Absent stays absent, like `collapsedFolderIds` above and for the same
     // reason (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.3). Filtered rather than taken
     // whole: this list is the only remaining evidence that an orphaned event

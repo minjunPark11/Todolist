@@ -897,6 +897,7 @@ var init_normalize = __esm({
       sidebarCollapsed: false,
       reduceMotion: false,
       timezone: detectTimezone(),
+      timezoneMode: "auto",
       aiModel: "",
       matrixHideCompleted: false
     };

@@ -766,6 +766,7 @@ var DEFAULT_APP_SETTINGS = {
   sidebarCollapsed: false,
   reduceMotion: false,
   timezone: detectTimezone(),
+  timezoneMode: "auto",
   aiModel: "",
   matrixHideCompleted: false
 };

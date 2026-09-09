@@ -8,6 +8,8 @@ import {
   notificationHintKey,
 } from "../utils/notificationCopy";
 import { clampHoursAtATime, HOURS_AT_A_TIME_CHOICES } from "../utils/calendarTime";
+import { detectTimezone } from "../domain/plannerData/normalize";
+import { listTimezones, timezoneChoicePatch, timezoneLabel } from "../domain/plannerData/timezones";
 import { FOCUS_LENGTH_CHOICES, sanitizeFocusDefaultLength } from "../domain/focus/sessionLength";
 import {
   BACKUP_INTERVALS,
@@ -242,6 +244,7 @@ export function SettingsPage({
               onChange={(value) => onUpdate({ weekStart: value })}
             />
           </SettingsRow>
+          <TimezoneRow settings={settings} onUpdate={onUpdate} />
         </div>
       ) : null}
 
@@ -785,6 +788,55 @@ function NotificationsTab() {
  * the row is the sentence and not a control. An empty control box would still
  * claim its column, so it is not drawn at all.
  */
+/**
+ * Which zone this account's wall-clock times are read in.
+ *
+ * A select and not a segmented control for the obvious reason, and its first
+ * option is the automatic one rather than a checkbox beside the list: "follow
+ * the device" and "always Asia/Seoul" are two answers to one question, and
+ * splitting them across two controls makes the second one look editable while
+ * the first is on.
+ *
+ * What this does NOT reach is Google sync. That zone is pinned per connection
+ * at bind time and refuses to be re-bound to a different one (025 line 57,
+ * 026 line 42); the hint says so rather than letting a reader conclude from a
+ * settings screen that their calendar has been fixed.
+ *
+ * Exported for its own test. It is the only screen this feature has, and the
+ * part worth proving — that a manual account's select shows the zone it holds
+ * rather than falling back to "Automatic" — is a fact about the option list
+ * and the value together, which neither half proves alone.
+ */
+export function TimezoneRow({ settings, onUpdate }: { settings: AppSettings; onUpdate: (patch: Partial<AppSettings>) => void }) {
+  const { t } = useT();
+  const manual = settings.timezoneMode === "manual";
+  const detected = detectTimezone();
+  // The list is four hundred options and the offsets only move on a DST
+  // boundary, so it is built once per mount rather than per render. `detected`
+  // and the stored value are folded in so the selection is always showable.
+  const zones = useMemo(
+    () => listTimezones([settings.timezone, detected]).map((zone) => [zone, timezoneLabel(zone)] as const),
+    [settings.timezone, detected],
+  );
+  return (
+    <SettingsRow title={t("settings.timezone")} hint={t("settings.timezoneHint")}>
+      <select
+        value={manual ? settings.timezone : "auto"}
+        onChange={(event) => onUpdate(timezoneChoicePatch(event.target.value, detected))}
+      >
+        <option value="auto">
+          {detected ? t("settings.timezoneAutoNamed").replace("{zone}", detected) : t("settings.timezoneAuto")}
+        </option>
+        {zones.map(([zone, label]) => (
+          <option key={zone} value={zone}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </SettingsRow>
+  );
+}
+
 export function SettingsRow({ title, hint, children }: { title: string; hint: string; children?: ReactNode }) {
   return (
     <div className="ff-settings-row">

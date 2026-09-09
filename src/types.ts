@@ -779,11 +779,14 @@ export interface AppSettings {
   collapsedFolderIds?: string[];
   reduceMotion: boolean;
   /**
-   * The device's IANA time zone, e.g. "Asia/Seoul". "" = not detected.
+   * The IANA time zone this account's wall-clock times are read in,
+   * e.g. "Asia/Seoul". "" = the device could not say and nobody has chosen.
    *
-   * Not a preference — a fact about where the app is running, refreshed on
-   * every start when it changes (usePlannerData). A person who flies keeps
-   * one time zone at a time, so the device used last is the best answer.
+   * A fact by default and a preference on request: `timezoneMode` below says
+   * which. Under "auto" this is the device's zone, refreshed on every start
+   * when it changes (usePlannerData) — a person who flies keeps one zone at a
+   * time, so the device used last is the best answer. Under "manual" it is
+   * whatever the person picked and nothing overwrites it.
    *
    * Here rather than in device-local storage on purpose, and it is the one
    * exception to the rule that path- and device-shaped values stay off the
@@ -798,6 +801,23 @@ export interface AppSettings {
    * flies makes the wall time and Google's absolute time disagree.
    */
   timezone: string;
+  /**
+   * Where `timezone` comes from. Absent reads as "auto", which is what every
+   * account held before this field existed.
+   *
+   * The device is right almost always and wrong in the two cases that hurt:
+   * a machine whose clock zone does not match where its owner plans (a VPN,
+   * a work laptop imaged elsewhere), and a trip during which the planner
+   * should NOT slide. Both are the same request — "stop guessing, it is this
+   * one" — and neither can be expressed by a value alone, because the next
+   * start would overwrite it. Hence a mode beside the value rather than a
+   * sentinel inside it.
+   *
+   * NOT the zone Google sync reads. That one is pinned per connection in
+   * `google_calendar_connections.sync_timezone` at bind time (025) and this
+   * setting cannot reach it — see GOOGLE_CALENDAR_SYNC_DESIGN.md §9.
+   */
+  timezoneMode?: "auto" | "manual";
   /**
    * Google events whose Task is gone, and which nobody has managed to delete
    * yet (GOOGLE_CALENDAR_SYNC_DESIGN.md §4.3).
