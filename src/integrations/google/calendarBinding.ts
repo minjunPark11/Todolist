@@ -3,7 +3,17 @@ import { refreshAccessToken } from "./oauth";
 import { verifyGoogleIdentity } from "./identity";
 
 export class CalendarBindingError extends Error {
-  constructor(readonly status: 409 | 502, message = "Could not verify the dedicated calendar. The existing connection was kept.") {
+  /**
+   * `reason` is the server's own word for the refusal, when it gave one.
+   *
+   * Re-pinning the sync time zone (036) refuses for four reasons that are all
+   * temporary and all fixable by the person asking — a pass in flight, a write
+   * in flight, a review still open, a generation that moved. One sentence for
+   * all of them ("could not verify the calendar") sends someone to look at
+   * their Google account for a problem that is in their own review list.
+   */
+  constructor(readonly status: 409 | 502, message = "Could not verify the dedicated calendar. The existing connection was kept.",
+    readonly reason = "") {
     super(message); this.name = "CalendarBindingError";
   }
 }
@@ -37,7 +47,20 @@ export async function verifyDedicatedCalendar(calendarId: string, accessToken: s
   } catch (error) { if (error instanceof CalendarBindingError) throw error; throw new CalendarBindingError(502); }
 }
 
-export async function bindDedicatedCalendar(userId: string, calendarId: string,
+/**
+ * @param timezone The zone this account reads wall-clock times in, when the
+ * client named one. It becomes `sync_timezone`, which is the single value both
+ * directions of task sync use — inbound converts Google's instants into it
+ * (021 line 231), outbound writes it back alongside every `dateTime`
+ * (029 line 157). Absent, the calendar's own zone stands in, which is what
+ * every client sent before there was a setting to send.
+ *
+ * The calendar's zone is a poor default and this is why the parameter exists:
+ * it is a property of a calendar object, while what a reader sees in Google's
+ * grid is their ACCOUNT's display zone. A calendar created while those two
+ * disagree pins the difference into every event that ever syncs.
+ */
+export async function bindDedicatedCalendar(userId: string, calendarId: string, timezone = "",
   fetchImpl: typeof fetch = fetch, env: ServiceRoleEnv = readServiceRoleEnv()): Promise<void> {
   const snapshot = await rpc("read_google_binding_snapshot", { p_user_id: userId }, fetchImpl, env) as {
     refreshToken?: unknown; subject?: unknown; generation?: unknown; grantVersion?: unknown; boundCalendarId?: unknown; historicalCalendarIds?: unknown;
@@ -55,7 +78,9 @@ export async function bindDedicatedCalendar(userId: string, calendarId: string,
   const result = await rpc("bind_verified_google_calendar", {
     p_user_id: userId, p_refresh_token: snapshot.refreshToken, p_subject: identity.subject,
     p_grant_version: snapshot.grantVersion, p_expected_generation: snapshot.generation, p_calendar_id: calendar.calendarId,
-    p_timezone: calendar.timezone, p_email: identity.email,
-  }, fetchImpl, env) as { bound?: unknown } | null;
-  if (result?.bound !== true) throw new CalendarBindingError(409);
+    p_timezone: timezone || calendar.timezone, p_email: identity.email,
+  }, fetchImpl, env) as { bound?: unknown; reason?: unknown } | null;
+  if (result?.bound !== true) {
+    throw new CalendarBindingError(409, undefined, typeof result?.reason === "string" ? result.reason : "");
+  }
 }

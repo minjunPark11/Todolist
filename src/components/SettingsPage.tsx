@@ -403,7 +403,7 @@ export function SettingsPage({
               that one subscribes to somebody else's calendar and can only
               read, this one writes. It draws itself and finishes the OAuth
               round trip, which is why the callback lands on this page. */}
-          <GoogleCalendarCard />
+          <GoogleCalendarCard timezone={settings.timezone} />
 
           {/* "Sync status" used to be a seventh card below this one. It carried
               one line and one button, both about the list drawn here, and it

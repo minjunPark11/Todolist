@@ -59,7 +59,7 @@ export interface GoogleCalendarDeps {
   /** The Supabase session's token, or null when nobody is signed in. */
   authToken: () => Promise<string | null>;
   readConnection: () => Promise<GoogleConnection | null>;
-  writeConnection: (connection: GoogleConnection) => Promise<void>;
+  writeConnection: (connection: GoogleConnection, timezone: string) => Promise<void>;
 }
 
 async function supabaseToken(): Promise<string | null> {
@@ -79,8 +79,11 @@ async function supabaseReadConnection(): Promise<GoogleConnection | null> {
   return { calendarId: data.calendar_id as string, accountEmail: (data.account_email as string) || "", labelsSupported: typeof data.labels_supported === "boolean" ? data.labels_supported : null };
 }
 
-async function supabaseWriteConnection(connection: GoogleConnection): Promise<void> {
-  await callOwnApi("/api/google/calendar", defaultDeps, { calendarId: connection.calendarId });
+async function supabaseWriteConnection(connection: GoogleConnection, timezone: string): Promise<void> {
+  await callOwnApi("/api/google/calendar", defaultDeps, {
+    calendarId: connection.calendarId,
+    ...(timezone ? { timezone } : {}),
+  });
 }
 
 /** Native HTTP reaches the deployed API instead of the desktop asset origin. */
@@ -240,6 +243,7 @@ export async function disconnect(deps: GoogleCalendarDeps = defaultDeps): Promis
  */
 export async function ensureDedicatedCalendar(
   accessToken: string,
+  timezone = "",
   deps: GoogleCalendarDeps = defaultDeps,
 ): Promise<GoogleConnection> {
   const stored = await deps.readConnection();
@@ -279,9 +283,14 @@ export async function ensureDedicatedCalendar(
   }
 
   if (!calendarId) {
+    // The zone is sent at creation, not left to Google's default, because the
+    // default is the account's setting AT THAT MOMENT and the calendar keeps
+    // it forever. A calendar made on a machine that disagreed with its owner
+    // — travelling, on a VPN — pins that disagreement into every event that
+    // ever syncs through it, and 025 refuses to re-bind a different zone.
     const created = await callGoogle("/calendars", accessToken, deps, {
       method: "POST",
-      body: JSON.stringify({ summary: DEDICATED_CALENDAR_NAME }),
+      body: JSON.stringify({ summary: DEDICATED_CALENDAR_NAME, ...(timezone ? { timeZone: timezone } : {}) }),
     });
     const id = created.body?.id;
     if (!created.ok || typeof id !== "string" || !id) {
@@ -294,7 +303,7 @@ export async function ensureDedicatedCalendar(
   const email = typeof primary.body?.id === "string" ? primary.body.id : (stored?.accountEmail ?? "");
 
   const connection: GoogleConnection = { calendarId, accountEmail: email };
-  await deps.writeConnection(connection);
+  await deps.writeConnection(connection, timezone);
   return connection;
 }
 

@@ -616,9 +616,19 @@ async function verifyGoogleIdentity(accessToken, fetchImpl = fetch) {
 
 // src/integrations/google/calendarBinding.ts
 var CalendarBindingError = class extends Error {
-  constructor(status, message = "Could not verify the dedicated calendar. The existing connection was kept.") {
+  /**
+   * `reason` is the server's own word for the refusal, when it gave one.
+   *
+   * Re-pinning the sync time zone (036) refuses for four reasons that are all
+   * temporary and all fixable by the person asking — a pass in flight, a write
+   * in flight, a review still open, a generation that moved. One sentence for
+   * all of them ("could not verify the calendar") sends someone to look at
+   * their Google account for a problem that is in their own review list.
+   */
+  constructor(status, message = "Could not verify the dedicated calendar. The existing connection was kept.", reason = "") {
     super(message);
     this.status = status;
+    this.reason = reason;
     this.name = "CalendarBindingError";
   }
 };
@@ -652,7 +662,7 @@ async function verifyDedicatedCalendar(calendarId, accessToken, verifiedEmail, f
     throw new CalendarBindingError(502);
   }
 }
-async function bindDedicatedCalendar(userId, calendarId, fetchImpl = fetch, env = readServiceRoleEnv()) {
+async function bindDedicatedCalendar(userId, calendarId, timezone = "", fetchImpl = fetch, env = readServiceRoleEnv()) {
   const snapshot = await rpc("read_google_binding_snapshot", { p_user_id: userId }, fetchImpl, env);
   if (!snapshot || typeof snapshot.refreshToken !== "string" || !snapshot.refreshToken || typeof snapshot.subject !== "string" || !snapshot.subject || typeof snapshot.grantVersion !== "string" || !snapshot.grantVersion || snapshot.generation !== null && typeof snapshot.generation !== "string") throw new CalendarBindingError(409);
   const token = await refreshAccessToken(snapshot.refreshToken, readGoogleOAuthEnv(), fetchImpl);
@@ -667,10 +677,12 @@ async function bindDedicatedCalendar(userId, calendarId, fetchImpl = fetch, env 
     p_grant_version: snapshot.grantVersion,
     p_expected_generation: snapshot.generation,
     p_calendar_id: calendar.calendarId,
-    p_timezone: calendar.timezone,
+    p_timezone: timezone || calendar.timezone,
     p_email: identity.email
   }, fetchImpl, env);
-  if (result?.bound !== true) throw new CalendarBindingError(409);
+  if (result?.bound !== true) {
+    throw new CalendarBindingError(409, void 0, typeof result?.reason === "string" ? result.reason : "");
+  }
 }
 
 // src/functions/google/calendar.ts
@@ -694,12 +706,21 @@ async function handler(req, res) {
         body = null;
       }
     }
-    const calendarId = body && typeof body === "object" ? body.calendarId : null;
+    const payload = body && typeof body === "object" ? body : {};
+    const calendarId = payload.calendarId;
     if (typeof calendarId !== "string" || !calendarId.trim()) {
       res.status(400).json({ error: "Missing calendar ID." });
       return;
     }
-    await bindDedicatedCalendar(user.userId, calendarId);
+    let timezone = typeof payload.timezone === "string" ? payload.timezone.trim() : "";
+    if (timezone) {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone: timezone }).format(0);
+      } catch {
+        timezone = "";
+      }
+    }
+    await bindDedicatedCalendar(user.userId, calendarId, timezone);
     res.status(200).json({ bound: true });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
@@ -712,7 +733,8 @@ async function handler(req, res) {
     }
     res.status(error instanceof CalendarBindingError ? error.status : 502).json({
       code: "google_calendar_verification_failed",
-      error: "Could not verify the dedicated calendar. The existing connection was kept."
+      error: "Could not verify the dedicated calendar. The existing connection was kept.",
+      ...error instanceof CalendarBindingError && error.reason ? { reason: error.reason } : {}
     });
   }
 }

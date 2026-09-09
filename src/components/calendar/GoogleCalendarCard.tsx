@@ -49,7 +49,15 @@ type Status =
   | { kind: "connecting" }
   | { kind: "connected"; connection: GoogleConnection };
 
-export function GoogleCalendarCard() {
+/**
+ * @param timezone The account's own zone, which becomes `sync_timezone` — the
+ * single value both directions of task sync read. Passed in rather than
+ * detected here so the connection is pinned to what the SETTING says: the
+ * device's zone is exactly the thing that is wrong when someone is travelling
+ * or behind a VPN, and a connection pinned to it stays wrong afterwards
+ * (025 line 57 refuses to re-bind a different one; 036 is the only way back).
+ */
+export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
   const taskSync = useSyncExternalStore(subscribeGoogleTaskSync, readGoogleTaskSyncState, readGoogleTaskSyncState);
   const { t } = useT();
   const [status, setStatus] = useState<Status>({ kind: "loading" });
@@ -128,7 +136,7 @@ export function GoogleCalendarCard() {
       setError("");
       try {
         const accessToken = await exchangeCodeForAccess(code);
-        const connection = await ensureDedicatedCalendar(accessToken);
+        const connection = await ensureDedicatedCalendar(accessToken, timezone);
         writePendingConnect(null);
         setStatus({ kind: "connected", connection });
         setNotice(t("settings.google.connected"));
@@ -145,7 +153,7 @@ export function GoogleCalendarCard() {
         setError(describe(thrown));
       }
     },
-    [describe, t],
+    [describe, t, timezone],
   );
 
   /**

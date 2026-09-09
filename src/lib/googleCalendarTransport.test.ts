@@ -10,7 +10,7 @@ it("saves a connection through server verification instead of trusting client ac
   const auth = vi.spyOn(defaultDeps, "authToken").mockResolvedValue("session");
   mocks.nativeFetch.mockResolvedValue(new Response(JSON.stringify({ bound: true })));
   try {
-    await defaultDeps.writeConnection({ calendarId: "cal", accountEmail: "untrusted@example.com" });
+    await defaultDeps.writeConnection({ calendarId: "cal", accountEmail: "untrusted@example.com" }, "");
     expect(mocks.nativeFetch).toHaveBeenCalledWith(`${DEPLOYED_WEB_ORIGIN}/api/google/calendar`, expect.objectContaining({
       body: JSON.stringify({ calendarId: "cal" }),
     }));

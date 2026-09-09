@@ -42,7 +42,7 @@ function response() {
 it("binds only the authenticated user's calendar and never accepts client credentials", async () => {
   const res = response();
   await calendar({ method: "POST", headers: {}, body: { userId: "other", calendarId: "cal", accessToken: "untrusted" } }, res);
-  expect(bindDedicatedCalendar).toHaveBeenCalledWith("user", "cal");
+  expect(bindDedicatedCalendar).toHaveBeenCalledWith("user", "cal", "");
   expect(res.json).toHaveBeenCalledWith({ bound: true });
 });
 it("blocks calendar binding when the protocol gate fails", async () => {
@@ -89,4 +89,43 @@ it.each([token, connect])("withholds a minted token if the final check fails", a
   expect(res.status).toHaveBeenCalledWith(426);
   expect(JSON.stringify(res.json.mock.calls)).not.toContain("private-token");
   expect(mocks.write).not.toHaveBeenCalled();
+});
+
+it("forwards the account's zone to the binding", async () => {
+  const res = response();
+  await calendar({ method: "POST", headers: {}, body: { calendarId: "cal", timezone: "America/Denver" } }, res);
+  expect(bindDedicatedCalendar).toHaveBeenCalledWith("user", "cal", "America/Denver");
+});
+
+it("drops a zone this runtime cannot build rather than letting the RPC raise on it", async () => {
+  // The RPC does reject a name that is not a zone — as an exception, which is
+  // a 502 by the time it reaches the reader. A client typo is not an outage.
+  const res = response();
+  await calendar({ method: "POST", headers: {}, body: { calendarId: "cal", timezone: "Mars/Olympus_Mons" } }, res);
+  expect(bindDedicatedCalendar).toHaveBeenCalledWith("user", "cal", "");
+});
+
+it.each([[42], [null], [{}], ["   "]])("ignores a zone that is not a name at all: %j", async (zone) => {
+  const res = response();
+  await calendar({ method: "POST", headers: {}, body: { calendarId: "cal", timezone: zone } }, res);
+  expect(bindDedicatedCalendar).toHaveBeenCalledWith("user", "cal", "");
+});
+
+it("passes the refusal's reason back to the client", async () => {
+  // Without it the card says "could not verify the calendar" for a re-pin that
+  // failed because a review is open — sending someone to the wrong screen.
+  const { CalendarBindingError } = await import("./calendarBinding");
+  vi.mocked(bindDedicatedCalendar).mockRejectedValueOnce(new CalendarBindingError(409, undefined, "reviews-unresolved"));
+  const res = response();
+  await calendar({ method: "POST", headers: {}, body: { calendarId: "cal", timezone: "Asia/Seoul" } }, res);
+  expect(res.status).toHaveBeenCalledWith(409);
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: "reviews-unresolved" }));
+});
+
+it("says nothing extra when the refusal had no reason", async () => {
+  const { CalendarBindingError } = await import("./calendarBinding");
+  vi.mocked(bindDedicatedCalendar).mockRejectedValueOnce(new CalendarBindingError(409));
+  const res = response();
+  await calendar({ method: "POST", headers: {}, body: { calendarId: "cal" } }, res);
+  expect(res.json).toHaveBeenCalledWith(expect.not.objectContaining({ reason: expect.anything() }));
 });

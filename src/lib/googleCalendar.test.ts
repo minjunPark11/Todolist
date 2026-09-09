@@ -139,6 +139,7 @@ describe("the dedicated calendar", () => {
 
     const connection = await ensureDedicatedCalendar(
       "ya29.abc",
+      "",
       deps({ fetch: impl, writeConnection: async (row) => void written.push(row) }),
     );
 
@@ -165,7 +166,7 @@ describe("the dedicated calendar", () => {
       },
     });
 
-    const connection = await ensureDedicatedCalendar("ya29.abc", deps({ fetch: impl }));
+    const connection = await ensureDedicatedCalendar("ya29.abc", "", deps({ fetch: impl }));
 
     expect(connection.calendarId).toBe("ours@group.calendar.google.com");
     expect(calls.some((call) => call.init?.method === "POST")).toBe(false);
@@ -180,10 +181,45 @@ describe("the dedicated calendar", () => {
       "/calendars": { body: { id: "cal-new" } },
     });
 
-    const connection = await ensureDedicatedCalendar("ya29.abc", deps({ fetch: impl }));
+    const connection = await ensureDedicatedCalendar("ya29.abc", "", deps({ fetch: impl }));
 
     expect(connection.calendarId).toBe("cal-new");
     expect(calls.some((call) => call.init?.method === "POST")).toBe(true);
+  });
+
+  it("creates the calendar in the account's zone rather than leaving it to Google", async () => {
+    // Google gives a new calendar the account's display zone AT THAT MOMENT,
+    // and the calendar keeps it forever. One made while travelling or behind a
+    // VPN pins that difference into every event that ever syncs through it,
+    // and 025 refuses to re-bind a different zone afterwards.
+    const { impl, calls } = fakeFetch({ ...primary, "/calendars": { body: { id: "cal-new" } } });
+
+    await ensureDedicatedCalendar("ya29.abc", "Asia/Seoul", deps({ fetch: impl }));
+
+    const created = calls.find((call) => call.init?.method === "POST");
+    expect(JSON.parse(String(created?.init?.body))).toEqual({ summary: "FocusFlow", timeZone: "Asia/Seoul" });
+  });
+
+  it("leaves the zone out entirely when the account has not said", async () => {
+    // Not "UTC" and not the device's: an absent key lets Google keep doing what
+    // it did before there was a setting, which is the behaviour every existing
+    // installation already depends on.
+    const { impl, calls } = fakeFetch({ ...primary, "/calendars": { body: { id: "cal-new" } } });
+
+    await ensureDedicatedCalendar("ya29.abc", "", deps({ fetch: impl }));
+
+    const created = calls.find((call) => call.init?.method === "POST");
+    expect(JSON.parse(String(created?.init?.body))).toEqual({ summary: "FocusFlow" });
+  });
+
+  it("sends the zone on to the binding, which is where it becomes sync_timezone", async () => {
+    const { impl } = fakeFetch({ ...primary, "/calendars": { body: { id: "cal-new" } } });
+    const written: unknown[] = [];
+
+    await ensureDedicatedCalendar("ya29.abc", "Asia/Seoul",
+      deps({ fetch: impl, writeConnection: async (connection, zone) => void written.push([connection.calendarId, zone]) }));
+
+    expect(written).toEqual([["cal-new", "Asia/Seoul"]]);
   });
 
   it("reuses the stored one rather than leaving empty calendars behind", async () => {
@@ -191,6 +227,7 @@ describe("the dedicated calendar", () => {
 
     const connection = await ensureDedicatedCalendar(
       "ya29.abc",
+      "",
       deps({ fetch: impl, readConnection: async () => ({ calendarId: "cal-known", accountEmail: "" }) }),
     );
 
@@ -207,6 +244,7 @@ describe("the dedicated calendar", () => {
 
     const connection = await ensureDedicatedCalendar(
       "ya29.abc",
+      "",
       deps({ fetch: impl, readConnection: async () => ({ calendarId: "cal-gone", accountEmail: "" }) }),
     );
 
@@ -223,6 +261,7 @@ describe("the dedicated calendar", () => {
     await expect(
       ensureDedicatedCalendar(
         "ya29.abc",
+        "",
         deps({ fetch: impl, readConnection: async () => ({ calendarId: "cal-known", accountEmail: "" }) }),
       ),
     ).rejects.toMatchObject({ reason: "google" });
@@ -236,6 +275,7 @@ describe("the dedicated calendar", () => {
 
     const connection = await ensureDedicatedCalendar(
       "ya29.abc",
+      "",
       deps({ fetch: impl, readConnection: async () => ({ calendarId: "cal-known", accountEmail: "old@example.com" }) }),
     );
 
