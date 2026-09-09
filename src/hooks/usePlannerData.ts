@@ -114,6 +114,14 @@ import { readTaskRevisionSnapshot, restoreTaskRevisionCheckpoint, taskRevisionEn
 import { acquireTaskRevisionOwnership } from "../lib/taskRevisionOwnership";
 import { addDays, addMonths, todayValue } from "../utils/date";
 import { planRecurringCompletion } from "../utils/planner";
+import { resolveOccurrence } from "../utils/taskOccurrences";
+import {
+  applyOccurrenceEdit,
+  applyOccurrenceSkip,
+  planOccurrenceEdit,
+  planOccurrenceSkip,
+  type OccurrenceScope,
+} from "../domain/tasks/occurrenceEdit";
 import {
   planScheduleUpdate,
   scheduleFromTask,
@@ -1302,6 +1310,52 @@ export function usePlannerData() {
    * beside the field that caused them, and a drag handler wants to ignore
    * them and leave the task where it was.
    */
+  /**
+   * Edit ONE occurrence of a repeating task, or the series, as `scope` says.
+   *
+   * RECURRING_OCCURRENCE_EDIT_DESIGN.md §6, M3/M4. The calendar hands ids it
+   * got from `buildCalendarItems`, and a virtual occurrence's id
+   * (`series::date`) names no row — so every write keyed by it used to find
+   * nothing and vanish, which is the silent no-op v0.22.13 removed for external
+   * occurrences and M2 reintroduced here by drawing them at all.
+   *
+   * Returns false when the id is not an occurrence, which is the caller's
+   * signal to do what it always did.
+   */
+  function editOccurrence(occurrenceId: string, patch: Partial<Task>, scope: OccurrenceScope): boolean {
+    const found = resolveOccurrence(data.tasks, occurrenceId);
+    if (!found) return false;
+    const now = new Date().toISOString();
+    const plan = planOccurrenceEdit({
+      series: found.series,
+      occurrenceDate: found.occurrenceDate,
+      patch,
+      scope,
+      existing: found.existing,
+      newTaskId: createId("task"),
+      now,
+    });
+    if (plan.kind === "refuse") return false;
+    setData((current) => ({ ...current, tasks: applyOccurrenceEdit(current.tasks, plan, now) }));
+    return true;
+  }
+
+  /** Skip or delete one occurrence, or the series, as `scope` says (§6.2). */
+  function skipOccurrence(occurrenceId: string, scope: OccurrenceScope): boolean {
+    const found = resolveOccurrence(data.tasks, occurrenceId);
+    if (!found) return false;
+    const now = new Date().toISOString();
+    const plan = planOccurrenceSkip({
+      series: found.series,
+      occurrenceDate: found.occurrenceDate,
+      scope,
+      existing: found.existing,
+    });
+    if (plan.kind === "refuse") return false;
+    setData((current) => ({ ...current, tasks: applyOccurrenceSkip(current.tasks, plan, now) }));
+    return true;
+  }
+
   function updateTaskSchedule(taskId: string, next: Schedule): ScheduleIssue[] {
     const task = data.tasks.find((entry) => entry.id === taskId);
     if (!task) return [];
@@ -2474,6 +2528,8 @@ export function usePlannerData() {
     updateTask,
     applyGoogleSync,
     updateTaskSchedule,
+    editOccurrence,
+    skipOccurrence,
     addTaskReminders,
     completeTask,
     deleteTask,

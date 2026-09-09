@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandTaskOccurrences, occurrenceIdFor, seriesIdOf } from "./taskOccurrences";
+import { expandTaskOccurrences, occurrenceIdFor, resolveOccurrence, seriesIdOf } from "./taskOccurrences";
 import type { Task } from "../types";
 
 const TODAY = "2026-09-09"; // A Wednesday.
@@ -135,5 +135,45 @@ describe("expandTaskOccurrences — bounds", () => {
   it("leaves a series alone once it is trashed or given up on", () => {
     expect(dates([task({ deletedAt: "2026-09-08T00:00:00.000Z" })])).toEqual([]);
     expect(dates([task({ wontDoAt: "2026-09-08T00:00:00.000Z" })])).toEqual([]);
+  });
+});
+
+describe("resolveOccurrence", () => {
+  const series = task();
+  const stored = task({
+    id: "occ-1", repeatType: "none", dueDate: "2026-09-24",
+    recurrenceId: "2026-09-23", occurrenceOf: "series-1",
+  });
+
+  it("reads a virtual occurrence out of its id", () => {
+    const found = resolveOccurrence([series], occurrenceIdFor("series-1", "2026-09-16"));
+    expect(found?.series.id).toBe("series-1");
+    expect(found?.occurrenceDate).toBe("2026-09-16");
+    expect(found?.existing).toBeNull();
+  });
+
+  it("reads a materialised occurrence out of its row", () => {
+    const found = resolveOccurrence([series, stored], "occ-1");
+    expect(found?.occurrenceDate).toBe("2026-09-23");
+    expect(found?.existing?.id).toBe("occ-1");
+  });
+
+  it("says nothing about a plain task", () => {
+    expect(resolveOccurrence([task({ id: "plain", repeatType: "none" })], "plain")).toBeNull();
+  });
+
+  it("says nothing about a series' own record", () => {
+    // The series draws on its own date and is edited the way it always was.
+    expect(resolveOccurrence([series], "series-1")).toBeNull();
+  });
+
+  it("treats a row whose series is gone as a plain task", () => {
+    // Offering "this occurrence or the whole series?" would be a choice with
+    // nothing behind it.
+    expect(resolveOccurrence([stored], "occ-1")).toBeNull();
+  });
+
+  it("says nothing when the id names a series that is not here", () => {
+    expect(resolveOccurrence([], occurrenceIdFor("gone", "2026-09-16"))).toBeNull();
   });
 });

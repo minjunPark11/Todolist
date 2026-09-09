@@ -136,3 +136,43 @@ function shift(date: string, from: string, to: string): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + Math.round(moved / day) * day)
     .toISOString().slice(0, 10);
 }
+
+export interface ResolvedOccurrence {
+  /** The series the occurrence belongs to. */
+  series: Task;
+  /** The date it stands for. */
+  occurrenceDate: string;
+  /** Its stored row, when it has one. */
+  existing: Task | null;
+}
+
+/**
+ * What an id from the calendar actually refers to.
+ *
+ * Three things arrive through the same callbacks, and only this can tell them
+ * apart: a virtual occurrence (`series::date`, no row), a materialised one (a
+ * real row carrying `recurrenceId`), and a plain task. The first two are
+ * occurrences and need §6's three-way choice; the last is not and must not be
+ * asked about.
+ *
+ * Returns null for a plain task, which is the caller's signal to do what it
+ * always did.
+ */
+export function resolveOccurrence(tasks: readonly Task[], id: string): ResolvedOccurrence | null {
+  const seriesId = seriesIdOf(id);
+  if (seriesId) {
+    const series = tasks.find((task) => task.id === seriesId);
+    if (!series) return null;
+    const occurrenceDate = id.slice(seriesId.length + OCCURRENCE_ID_SEPARATOR.length);
+    return { series, occurrenceDate, existing: null };
+  }
+
+  const stored = tasks.find((task) => task.id === id);
+  if (!stored?.recurrenceId || !stored.occurrenceOf) return null;
+  const series = tasks.find((task) => task.id === stored.occurrenceOf);
+  // A row whose series is gone is on its own now — a plain task, not an
+  // occurrence of anything. Asking "this or the whole series?" about it would
+  // offer a choice with nothing behind it.
+  if (!series) return null;
+  return { series, occurrenceDate: stored.recurrenceId, existing: stored };
+}
