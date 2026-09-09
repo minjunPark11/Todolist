@@ -84,6 +84,15 @@ interface MatrixPageProps {
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
   onCreateTask: (draft: { title: string; listId?: string; priority?: TaskPriority; dueDate?: string; status?: Task["status"] }) => string;
   onToggleDone: (id: string) => void;
+  /**
+   * Delete the selected card with Delete/Backspace (§23).
+   *
+   * This is `App`'s `requestDeleteTask`, the same one the calendar's key uses —
+   * so the confirm-before-delete setting and the undo toast apply here too.
+   * Absent, the key does nothing, which is what a caller that cannot delete
+   * should get rather than a card that vanishes with no way back.
+   */
+  onDeleteTask?: (id: string) => void;
   /** How each box is grouped and ordered. Absent boxes read as the default. */
   quadrantViews?: Partial<Record<MatrixQuadrant, MatrixQuadrantView>>;
   onChangeQuadrantView?: (quadrant: MatrixQuadrant, view: MatrixQuadrantView) => void;
@@ -120,6 +129,7 @@ export function MatrixPage({
   onUpdateTask,
   onCreateTask,
   onToggleDone,
+  onDeleteTask,
   quadrantViews,
   onChangeQuadrantView,
   quadrantRules,
@@ -136,6 +146,43 @@ export function MatrixPage({
   const [draggingId, setDraggingId] = useState("");
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [editing, setEditing] = useState<MatrixQuadrant | "">("");
+  /**
+   * Delete the selected card with Delete/Backspace.
+   *
+   * The same shape as the calendar's key (`CalendarView`), because it is the
+   * same promise: what the card's own menu does, the key does. It goes through
+   * `requestDeleteTask` rather than a direct write, so the confirm dialog and
+   * the undo toast are not something this page has to remember.
+   *
+   * A card is "selected" here when the Task Detail is open on it — the matrix
+   * has no selection of its own — so the key acts on what the reader is
+   * looking at, and does nothing when they are looking at nothing.
+   */
+  useEffect(() => {
+    const remove = onDeleteTask;
+    if (!remove) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      // Typing a title is not asking to delete a task.
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" ||
+          target?.tagName === "SELECT" || target?.isContentEditable) return;
+      // Modifier combos belong to the browser and the OS (App.tsx's rule).
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      // A menu or the box editor owns the keyboard while it is open.
+      if (menu || editing) return;
+      if (!selectedTaskId) return;
+      // Only a card that is actually on screen. A Task the Detail is open on
+      // while the matrix filters it out is not what the reader sees, and
+      // deleting it would come from nowhere.
+      if (!tasks.some((task) => task.id === selectedTaskId)) return;
+      event.preventDefault();
+      remove(selectedTaskId);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onDeleteTask, selectedTaskId, menu, editing, tasks]);
+
   const rules = useMemo(() => resolveMatrixRules(quadrantRules), [quadrantRules]);
   // Indexed once for every card the four boxes draw (§7.5).
   const tagsOf = useMemo(() => tagsByTaskId(allTags, taskTags), [allTags, taskTags]);

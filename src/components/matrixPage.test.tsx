@@ -985,3 +985,80 @@ describe("the header's ⋯, and the one switch on it", () => {
     expect(menuButton().className).toContain("is-filtered");
   });
 });
+
+// Delete/Backspace on the selected card. Same promise the calendar's key makes:
+// what the card's own menu does, the key does — and through `requestDeleteTask`,
+// so the confirm dialog and the undo toast come with it.
+describe("the Delete key", () => {
+  const press = (key: string, init: KeyboardEventInit = {}) =>
+    fireEvent.keyDown(window, { key, ...init });
+
+  it("deletes the card the Task Detail is open on", () => {
+    const onDeleteTask = vi.fn();
+    renderMatrix([task({ id: "t1", title: "Write it up" })], { selectedTaskId: "t1", onDeleteTask });
+    press("Delete");
+    expect(onDeleteTask).toHaveBeenCalledWith("t1");
+  });
+
+  it("takes Backspace too, which is the delete key on a Mac", () => {
+    const onDeleteTask = vi.fn();
+    renderMatrix([task({ id: "t1" })], { selectedTaskId: "t1", onDeleteTask });
+    press("Backspace");
+    expect(onDeleteTask).toHaveBeenCalledWith("t1");
+  });
+
+  it("does nothing when nothing is selected", () => {
+    const onDeleteTask = vi.fn();
+    renderMatrix([task({ id: "t1" })], { selectedTaskId: "", onDeleteTask });
+    press("Delete");
+    expect(onDeleteTask).not.toHaveBeenCalled();
+  });
+
+  it("does nothing for a selection the boxes are not drawing", () => {
+    // The Detail can be open on a Task this matrix filters out. Deleting it
+    // would come from nowhere — the reader is not looking at that card.
+    const onDeleteTask = vi.fn();
+    renderMatrix([task({ id: "t1" })], { selectedTaskId: "somewhere-else", onDeleteTask });
+    press("Delete");
+    expect(onDeleteTask).not.toHaveBeenCalled();
+  });
+
+  it("leaves the key alone while text is being typed", () => {
+    const onDeleteTask = vi.fn();
+    renderMatrix([task({ id: "t1" })], { selectedTaskId: "t1", onDeleteTask });
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(onDeleteTask).not.toHaveBeenCalled();
+    input.remove();
+  });
+
+  it("leaves modifier combos to the browser", () => {
+    // Cmd+Delete and Ctrl+Backspace belong to the OS and the browser, which is
+    // the rule App.tsx follows for every single-key shortcut.
+    const onDeleteTask = vi.fn();
+    renderMatrix([task({ id: "t1" })], { selectedTaskId: "t1", onDeleteTask });
+    press("Delete", { metaKey: true });
+    press("Backspace", { ctrlKey: true });
+    press("Delete", { altKey: true });
+    expect(onDeleteTask).not.toHaveBeenCalled();
+  });
+
+  it("stands aside while a menu owns the keyboard", () => {
+    // The menu's own Escape/arrow handling is what should hear the key there,
+    // and a card silently disappearing behind an open menu is not something
+    // the reader asked for.
+    const onDeleteTask = vi.fn();
+    renderMatrix([task({ id: "t1" })], { selectedTaskId: "t1", onDeleteTask });
+    fireEvent.click(screen.getByLabelText("View settings"));
+    press("Delete");
+    expect(onDeleteTask).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the caller cannot delete", () => {
+    // No handler, no key. Better than a card that vanishes with no way back.
+    renderMatrix([task({ id: "t1" })], { selectedTaskId: "t1" });
+    expect(() => press("Delete")).not.toThrow();
+  });
+});

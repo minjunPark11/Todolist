@@ -169,6 +169,7 @@ export function AppPages({
           onUpdateTask={planner.updateTask}
           onCreateTask={planner.createTask}
           onToggleDone={planner.toggleTaskDone}
+          onDeleteTask={requestDeleteTask}
           quadrantViews={appSettings.matrixQuadrantViews}
           quadrantRules={appSettings.matrixQuadrantRules}
           tags={planner.tags}
