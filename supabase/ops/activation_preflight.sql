@@ -77,6 +77,8 @@ from (values
   ('적용  034 까지 (read_google_task_sync_snapshot_retention_core)', true,
      exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
              where n.nspname='public' and p.proname='read_google_task_sync_snapshot_retention_core'), 'BLOCK'),
+  ('적용  035 전역 은퇴 테이블 (google_sync_protocol_state)', true,
+     to_regclass('public.google_sync_protocol_state') is not null, 'BLOCK'),
   ('적용  032 관리자 복구 (recover_google_task_no_write)', true,
      exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
              where n.nspname='public' and p.proname='recover_google_task_no_write'), 'BLOCK'),
@@ -87,11 +89,13 @@ from (values
   ('drain 이 계정의 minimum_google_protocol = 2', true,
      coalesce((select minimum_google_protocol = 2 from public.google_task_sync_accounts
                where user_id = (select user_id from target)), false), 'BLOCK'),
-  ('drain cutover 로부터 65분 경과', true,
-     coalesce((select google_protocol_cutover_at is not null
-                      and google_protocol_cutover_at + interval '65 minutes' <= clock_timestamp()
-               from public.google_task_sync_accounts
-               where user_id = (select user_id from target)), false), 'BLOCK'),
+  -- 035 가 계정별 65분을 전역 한 줄로 옮겼다. 옛 배포가 물러났는지는 배포의 속성이지
+  -- 계정의 속성이 아니어서, 사람마다 다시 셀 이유가 없었다. 계정별 안전은 아래
+  -- 토큰 만료 검사가 지키고 그쪽이 정확하다.
+  ('drain 전역 프로토콜 1 서빙 은퇴 + 65분 경과 (035)', true,
+     coalesce((select legacy_serving_retired_at is not null
+                      and legacy_serving_retired_at + interval '65 minutes' <= clock_timestamp()
+               from public.google_sync_protocol_state), false), 'BLOCK'),
   ('drain 구버전 토큰 만료 + 5분 경과', true,
      coalesce((select coalesce(legacy_google_token_valid_until + interval '5 minutes',
                                '-infinity'::timestamptz) <= clock_timestamp()
