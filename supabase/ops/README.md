@@ -123,3 +123,116 @@ inbox 행 존재를 먼저 해결해야 한다.
 PGlite PostgreSQL 에서 023→027 을 순서대로 적용해 확인했다. preflight 는 적용 전
 STOP 0 / NOTE 1, verify 는 적용 후 21개 항목 전부 OK, 위 동작 검사 5건 전부 통과,
 025 를 건너뛴 026 은 의도대로 거절된다.
+
+
+## 028–034 — 작업 동기화 설치
+
+**앞의 둘과 성격이 다르다.** 021+022 와 023–027 은 배포된 코드가 이미 부르고 있는 RPC 가
+없어서 고장 난 것을 되살리는 복구였다. 이 일곱 개는 **아직 아무도 부르지 않는 새 기능을
+설치한다.** 적용해도 동작은 그대로다 — 계정은 계속 `enabled=false`, 프로토콜은 1 이다.
+켜는 것은 별개의 결정이고 `activation_preflight.sql` 이 그 앞에 선다.
+
+선행: 023–027 이 먼저다. 029 가 027 의 `begin_google_oauth_operation` 을 감싼다.
+
+### 순서
+
+1. **운영 DB 백업.**
+2. `028_034_preflight.sql` 실행. **STOP 이 하나도 없어야** 한다.
+3. `supabase/migrations/` 의 028 → 029 → 030 → 031 → 032 → 033 → 034 를
+   **이 순서대로 통째로** 실행한다.
+4. `028_034_verify.sql` 실행. **모든 행이 OK** 여야 한다.
+
+### 순서가 강제되는 이유
+
+뒤의 파일이 앞의 함수를 `_core` 로 rename 한 뒤 감싼다. 재현 환경에서 하나씩 건너뛰어
+확인한 결과:
+
+| 건너뛰면 | 어디서 죽는가 |
+|---|---|
+| 027 | 029 — `begin_google_oauth_operation(uuid,uuid,text) does not exist` |
+| 028 | 034 — `commit_google_task_inbound_core(...) does not exist` |
+| 029 | 031 — `relation "google_task_outbound_operations" does not exist` |
+| 030 | 034 — `resolve_google_task_review(uuid,jsonb) does not exist` |
+| 031 | 033 — `constraint "google_task_outbound_operations_kind_check" does not exist` |
+| 033 | 034 — `reserve_google_task_recurrence(uuid,jsonb) does not exist` |
+| **032** | **아무 데서도 죽지 않는다** |
+
+**032 가 이 묶음에서 가장 위험하다.** 아무도 의존하지 않으므로 빠뜨려도 나머지 여섯 개가
+오류 없이 적용된다. 전부 정상으로 보이지만 관리자 복구 경로
+(`recover_google_task_no_write`, `google_task_recovery_audit`) 가 통째로 없다. 불확실한
+쓰기가 났을 때 쓸 수단이 없다는 뜻이다. `028_034_verify.sql` 이 유일한 방어선이다.
+
+### `_core` 사슬 — 부분 적용의 지문
+
+함수가 "있다" 는 것만으로는 부족하다. 마지막으로 감싼 판이 걸려 있어야 한다.
+
+| `_core` 함수 | 이것이 있으면 |
+|---|---|
+| `commit_google_task_inbound_core` | 028 까지 |
+| `read_google_task_sync_snapshot_core` | 028 까지 |
+| `begin_google_oauth_operation_outbound_core` | 029 까지 |
+| `commit_google_task_inbound_review_core` | 029 까지 |
+| `read_google_task_sync_snapshot_review_core` | 030 까지 |
+| `read_google_task_sync_snapshot_retention_core` | 034 까지 |
+
+`read_google_task_sync_snapshot` 은 021 이 만들고 028 → 030 → 034 가 세 번 감싼다.
+
+### 이 적용이 무엇을 켜지 않는가
+
+아무것도 켜지 않는다. verify 의 마지막 세 행이 그것을 확인한다 — 활성화된 계정 0개,
+프로토콜 2 계정 0개, `enabled` 기본값 `false`.
+
+### 검증 방법
+
+007 을 제외한 001–027 을 적용해 운영 상태를 재현한 PGlite PostgreSQL 에서 확인했다.
+preflight 는 적용 직전 STOP 0 / NOTE 1, 023–027 이 빠진 상태에서는 STOP 6,
+030 까지만 적용한 부분 상태에서는 STOP 5 를 낸다. verify 는 적용 후 29개 항목 전부 OK 이고,
+032 만 건너뛴 상태에서는 가드가 `032` 를 지목하고 멈춘다.
+
+
+## 활성화 — `activation_preflight.sql`
+
+021–034 를 전부 적용한 뒤, 계정을 실제로 켜기 전에 돌린다. **적용과 활성화는 다른 일이다.**
+이 스크립트가 보는 것은 "지금 켜면 무엇이 깨지는가" 다.
+
+사용법: 파일 안의 `target` CTE 에서 uuid 를 켜려는 계정의 것으로 바꾸고 통째로 실행한다.
+STOP 이 하나라도 있으면 켜지 않는다.
+
+### 무엇을 보는가
+
+| 묶음 | 내용 |
+|---|---|
+| 007 | `public.lists` 존재 · 이 계정의 살아 있는 inbox 행이 **정확히 하나** |
+| 적용 | 034 까지 · 032 관리자 복구 |
+| drain | `minimum_google_protocol=2` · cutover 65분 경과 · 구버전 토큰 만료 +5분 |
+| 연결 | 검증된 `google_subject` · 전용 캘린더 바인딩 및 검증 |
+| 대기 | 진행 중인 아웃바운드 0개 · 미해결 인바운드 검토 0개 |
+| note | `pg_cron` 설치 여부 |
+
+drain 세 줄은 022 의 `guard_google_protocol_activation` 이 강제하는 조건 그대로다
+(022 line 21–28). 맞지 않으면 `enabled=true` UPDATE 가 `GOOGLE_PROTOCOL_DRAIN_REQUIRED`
+로 거절된다. 이 스크립트는 그 거절을 **미리, 이유를 분리해서** 보여준다.
+
+### 007 이 없으면 검사표가 아니라 가드가 뜬다
+
+`public.lists` 를 직접 읽는 행이 있어 007 없이는 문장 전체가 파싱되지 않는다
+(`to_regclass` 로 감싸도 PostgreSQL 은 문장을 먼저 계획한다). 그래서 스크립트 맨 앞의
+`do $$` 가드가 먼저 멈추고 007 이 왜 선행 조건인지 설명한다.
+
+그 이유는 오류의 종류가 갈리기 때문이다. 재현 환경에서 확인했다:
+
+```
+lists 없음         → 42P01 relation "public.lists" does not exist   ← 하드 오류
+lists 있고 행 없음 → 40001 INBOX_CHANGED                            ← 설계된 거절
+```
+
+40001 은 직렬화 실패로 다시 시도되는 부류이고 42P01 은 그렇지 않다. **007 없이 켜면
+구글에서 온 새 일정을 작업으로 승격할 때마다 인바운드 패스가 통째로 실패한다.**
+
+### 검증 방법
+
+021–034 를 전부 적용한 PGlite PostgreSQL 에서 세 상태를 확인했다. 007 없는 상태는 가드가
+잡고, 007 은 있으나 계정·연결이 없는 상태는 STOP 6 을 낸다. inbox 행 · 검증된 연결 ·
+프로토콜 2 · cutover 66분 경과 · 구버전 토큰 만료를 모두 갖춘 계정에서는 10개 항목 전부
+OK 이고, 그 상태에서 `enabled=true` UPDATE 가 실제로 통과한다 — 즉 이 검사표는 통과할 수
+있는 검사다.
