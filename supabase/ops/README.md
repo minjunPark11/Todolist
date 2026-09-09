@@ -227,6 +227,27 @@ drain 세 줄은 022 의 `guard_google_protocol_activation` 이 강제하는 조
 (022 line 21–28). 맞지 않으면 `enabled=true` UPDATE 가 `GOOGLE_PROTOCOL_DRAIN_REQUIRED`
 로 거절된다. 이 스크립트는 그 거절을 **미리, 이유를 분리해서** 보여준다.
 
+### inbox 행은 어떻게 생기는가
+
+**손으로 넣지 않는다.** 007 을 적용해 `public.lists` 가 생기면 다음 동기화가 올려준다.
+
+클라이언트는 로드할 때마다 `ensureInboxList` 를 돌려 고정 id `list-inbox` 로 Inbox 를
+로컬에 만들어 둔다 (`hooks/usePlannerData.ts:215`, `domain/spaces/hierarchy.ts`). 그 행은
+줄곧 있었고, 테이블이 없어서 올라가지 못했을 뿐이다 — 클라이언트가 `lists` 를
+`optionalRemoteTables` 로 취급해 없으면 없는 대로 나머지를 동기화해 왔다
+(`domain/sync/buildSyncPlan.ts`).
+
+그래서 순서는 이렇다:
+
+1. 007 적용
+2. 앱을 열어 한 번 동기화시킨다 (활성화하려는 그 계정으로)
+3. `activation_preflight.sql` 의 "살아 있는 inbox 행이 정확히 하나" 로 확인한다
+
+2 를 건너뛰고 3 으로 가면 STOP 이 뜬다. 테이블만 있고 행이 없는 상태이기 때문이다.
+그때는 손으로 INSERT 하지 말고 앱을 한 번 더 열어 동기화시킨다 — 손으로 넣은 id 가
+`list-inbox` 와 다르면 클라이언트가 자기 것을 하나 더 만들어 **inbox 가 둘이 되고**,
+그 검사는 "정확히 하나" 를 요구한다.
+
 ### 007 이 없으면 검사표가 아니라 가드가 뜬다
 
 `public.lists` 를 직접 읽는 행이 있어 007 없이는 문장 전체가 파싱되지 않는다
