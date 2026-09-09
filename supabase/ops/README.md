@@ -269,6 +269,53 @@ update public.google_task_sync_accounts set enabled = true where user_id = '...'
 service_role 은 읽지 못한다.
 
 
+## 여러 계정 — `activation_status.sql`
+
+사람이 둘 이상이 되면 `activation_preflight.sql` 을 사람 수만큼 고쳐 돌리게 되고, 그것은
+실수를 부른다. 이 스크립트는 uuid 를 넣지 않고 **전 계정을 한 표로** 보여준다.
+
+- 첫 결과: 전역 소진 상태 (035). 미선언이면 아무도 켤 수 없다.
+- 둘째 결과: 계정마다 프로토콜 · 구버전 토큰 · `준비` · 연결 · inbox 행.
+
+`준비` 는 022+035 가드가 요구하는 조건 그대로다. true 면 지금 그 계정의 `enabled=true`
+UPDATE 가 통과한다.
+
+쓰는 순서: 이것으로 **누가 준비됐는지 고르고**, 고른 계정으로 `activation_preflight.sql`
+을 한 번 돌려 **켜면 무엇이 깨지는지** 본다. 얕게 전부 / 깊게 하나다.
+
+준비된 계정이 여럿이면 한 문장으로 켤 수 있다. 가드는 행마다 도는 트리거라 각각 따로
+판정된다:
+
+```sql
+update public.google_task_sync_accounts
+   set enabled = true
+ where user_id in ('...', '...');
+```
+
+### 계정이 늘어날 때 무엇을 반복하나
+
+| | 몇 번 |
+|---|---|
+| 035 적용 · 은퇴 선언 · 전역 65분 | **전체를 통틀어 한 번** |
+| `minimum_google_protocol = 2` | 계정마다 |
+| `enabled = true` | 계정마다 |
+
+두 UPDATE 사이에 그 계정의 구글 연동은 막힌다 — 클라이언트는 `enabled` 를 보고서야
+프로토콜 2 를 보내기 때문이다. 한 번도 연동한 적 없는 계정은 토큰 만료를 기다릴 것이
+없으므로 **둘을 한 트랜잭션에 넣으면 그 틈이 없다.**
+
+```sql
+begin;
+update public.google_task_sync_accounts set minimum_google_protocol = 2 where user_id = '...';
+update public.google_task_sync_accounts set enabled = true where user_id = '...';
+commit;
+```
+
+이미 연동해 온 계정은 그 계정의 구버전 토큰이 만료될 때까지(최대 65분) 두 번째 줄이
+거절되므로 한 트랜잭션에 넣을 수 없다. `activation_status.sql` 의 "구버전 토큰" 칸이
+얼마나 남았는지 말해 준다.
+
+
 ## 활성화 — `activation_preflight.sql`
 
 021–034 를 전부 적용한 뒤, 계정을 실제로 켜기 전에 돌린다. **적용과 활성화는 다른 일이다.**
