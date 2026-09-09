@@ -4,6 +4,21 @@
 명시적 반복 규칙 적용, 다른 연결 작업의 선택 복사, 30일 비교 사본 정리를 로컬 구현했다.
 이 문서는 운영 실행 기록이 아니다. 운영에는 아직 적용하지 않았다.
 
+## 먼저 — 클라이언트가 DB보다 앞서 나가 있다
+
+2026-09-09 확인: 운영 DB에 022가 없는데(`select proname from pg_proc where
+proname='authorize_google_token'` 0행) 프로토콜 게이트가 들어간 클라이언트와 서버 함수는
+이미 배포되어 있다. 022가 의존하는 021도 함께 빠졌을 것으로 보나, 확정은 preflight로 한다.
+`/api/google/token`과 `/api/google/calendar`가 호출하는 `authorize_google_token`이 없어
+fail-closed로 걸리고, 설정 화면은 "동기화 호환성을 확인하지 못해 Google 연결을 잠시
+중단했습니다"만 반복한다. 구글 연동이 멈춰 있는 상태다.
+
+아래 전환 순서를 시작하기 전에 `supabase/ops/README.md`의 021+022 복구를 먼저 수행해
+연동을 되살린다. 그 적용은 계정을 활성화하지 않으며 프로토콜 1을 그대로 허용한다.
+
+교훈: 게이트를 읽는 코드는 게이트를 만드는 migration보다 먼저 배포하면 안 된다.
+전환 순서 2의 "함께 배포한다"는 DB 우선을 뜻한다.
+
 ## 전환 순서
 
 1. 운영 DB 백업과 별도 검증 환경을 준비한다. Supabase 서버 URL/service role, Google OAuth
