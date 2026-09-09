@@ -4,7 +4,8 @@
 -- 적용과 활성화는 다른 일이다. 적용은 구조만 설치하고 아무 동작도 바꾸지 않는다.
 -- 이 스크립트가 보는 것은 "지금 켜면 무엇이 깨지는가" 다.
 --
--- 사용법: 아래 target CTE 의 uuid 를 켜려는 계정의 것으로 바꾸고 통째로 실행한다.
+-- 사용법: 맨 아래 set 한 줄의 uuid 만 바꾸고 파일을 통째로 실행한다.
+-- 바꾸지 않으면 가드가 멈춘다 — placeholder 로도 그럴듯한 표가 나오기 때문이다.
 -- STOP 이 하나라도 있으면 켜지 않는다.
 
 -- 007 이 없으면 아래 검사표 자체가 파싱되지 않는다. public.lists 를 직접 읽는 행이
@@ -27,9 +28,36 @@ begin
   end if;
 end $$;
 
+-- ↓↓↓ 바꿀 곳은 여기 하나다 ↓↓↓
+set ff.target_user = '00000000-0000-0000-0000-000000000000';
+
+-- 두 번째 가드: 대상 계정이 실재하는지.
+--
+-- uuid 를 바꾸지 않고 돌리면 계정별 검사가 전부 false 가 되고, 그 와중에 "진행 중인 작업
+-- 0개" 같은 줄은 OK 로 뜬다 — 없는 계정에는 행도 없기 때문이다. 그럴듯한 표가 나오고
+-- 아무도 틀렸다는 것을 모른다. 그래서 검사표 앞에서 멈춘다.
+do $$
+declare target uuid;
+begin
+  begin
+    target := nullif(current_setting('ff.target_user', true), '')::uuid;
+  exception when others then
+    raise exception '대상 계정 uuid 가 uuid 형식이 아닙니다: %', current_setting('ff.target_user', true);
+  end;
+  if target is null or target = '00000000-0000-0000-0000-000000000000' then
+    raise exception e'대상 계정 uuid 를 바꾸지 않았습니다.\n'
+      '이 파일 위쪽의 set ff.target_user 한 줄을 켜려는 계정의 것으로 바꾸고 다시 실행하세요.\n'
+      '계정 uuid 는 다음으로 찾습니다:\n'
+      '  select id, email from auth.users order by created_at;';
+  end if;
+  if not exists (select 1 from auth.users where id = target) then
+    raise exception e'auth.users 에 % 가 없습니다.\n'
+      '오타이거나 다른 프로젝트의 uuid 입니다. 위 쿼리로 다시 확인하세요.', target;
+  end if;
+end $$;
+
 with target as (
-  -- ↓↓↓ 켜려는 계정의 uuid 로 바꾼다 ↓↓↓
-  select '00000000-0000-0000-0000-000000000000'::uuid as user_id
+  select current_setting('ff.target_user')::uuid as user_id
 )
 select check_name, expected, actual,
        case when expected = actual then 'OK'
@@ -49,6 +77,8 @@ from (values
   ('적용  034 까지 (read_google_task_sync_snapshot_retention_core)', true,
      exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
              where n.nspname='public' and p.proname='read_google_task_sync_snapshot_retention_core'), 'BLOCK'),
+  ('적용  035 전역 은퇴 테이블 (google_sync_protocol_state)', true,
+     to_regclass('public.google_sync_protocol_state') is not null, 'BLOCK'),
   ('적용  032 관리자 복구 (recover_google_task_no_write)', true,
      exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
              where n.nspname='public' and p.proname='recover_google_task_no_write'), 'BLOCK'),
@@ -59,11 +89,13 @@ from (values
   ('drain 이 계정의 minimum_google_protocol = 2', true,
      coalesce((select minimum_google_protocol = 2 from public.google_task_sync_accounts
                where user_id = (select user_id from target)), false), 'BLOCK'),
-  ('drain cutover 로부터 65분 경과', true,
-     coalesce((select google_protocol_cutover_at is not null
-                      and google_protocol_cutover_at + interval '65 minutes' <= clock_timestamp()
-               from public.google_task_sync_accounts
-               where user_id = (select user_id from target)), false), 'BLOCK'),
+  -- 035 가 계정별 65분을 전역 한 줄로 옮겼다. 옛 배포가 물러났는지는 배포의 속성이지
+  -- 계정의 속성이 아니어서, 사람마다 다시 셀 이유가 없었다. 계정별 안전은 아래
+  -- 토큰 만료 검사가 지키고 그쪽이 정확하다.
+  ('drain 전역 프로토콜 1 서빙 은퇴 + 65분 경과 (035)', true,
+     coalesce((select legacy_serving_retired_at is not null
+                      and legacy_serving_retired_at + interval '65 minutes' <= clock_timestamp()
+               from public.google_sync_protocol_state), false), 'BLOCK'),
   ('drain 구버전 토큰 만료 + 5분 경과', true,
      coalesce((select coalesce(legacy_google_token_valid_until + interval '5 minutes',
                                '-infinity'::timestamptz) <= clock_timestamp()

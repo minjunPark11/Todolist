@@ -204,6 +204,118 @@ preflight 는 적용 직전 STOP 0 / NOTE 1, 023–027 이 빠진 상태에서�
 032 만 건너뛴 상태에서는 가드가 `032` 를 지목하고 멈춘다.
 
 
+## 035 — 프로토콜 1 서빙 은퇴 (전역)
+
+022 의 활성화 가드는 계정마다 65분을 요구했다. 035 는 그 65분을 전역 한 줄로 옮긴다.
+계정별 안전은 그대로 남는다.
+
+### 왜
+
+022 의 가드가 보던 것은 둘이었다.
+
+| 검사 | 무엇을 막는가 | 계정의 속성인가 |
+|---|---|---|
+| `legacy_google_token_valid_until` + 5분 | 이 계정에 나간 프로토콜 1 토큰이 아직 살아 있는 것 | **그렇다** |
+| cutover + 65분 | **022 이전 서버 배포**가 계속 토큰을 내주는 것 | 아니다 |
+
+두 번째는 배포의 속성이다. 022 이전 배포는 `authorize_google_token` 을 아예 부르지
+않으므로 어느 계정의 minimum 을 올려도 막히지 않는다. 그것을 계정마다 다시 세는 것은 같은
+사실을 사람 수만큼 확인하는 일이고, **한 번도 연동한 적 없는 새 계정까지 65분을 기다리게**
+만든다 — 소진할 토큰이 없는데도.
+
+첫 번째는 정확하다. 022 는 access token 을 클라이언트에 넘기기 **전에** 만료 시각을
+기록하므로(`functions/google/token.ts` 가 인가를 두 번 부르는 이유), 실제로 나간 토큰은
+하나도 빠짐없이 잡힌다. 계정별 안전은 이쪽이 지킨다.
+
+### 적용
+
+1. `035_google_protocol_retirement.sql` 을 통째로 실행한다.
+2. 이때부터 **아무 계정도 켜지지 않는다.** 전역 값이 null 이고 null 은 거절이다 —
+   fail-closed 다. DB 는 옛 배포가 물러났는지 알 수 없다.
+3. 022 이전 배포가 더는 트래픽을 받지 않는다고 판단되면 담당자가 선언한다:
+
+```sql
+update public.google_sync_protocol_state
+   set legacy_serving_retired_at = clock_timestamp(), updated_at = clock_timestamp();
+```
+
+4. 그로부터 65분이 지나면 전역 조건이 충족된다. **한 번만 하면 되고, 이후 계정은 자기
+   토큰이 만료됐는지만 보면 된다.**
+
+### 새 계정은 이제 어떻게 되는가
+
+`google_task_sync_accounts` 의 기본값은 `enabled=false`, `minimum_google_protocol=1`
+이므로 새 계정은 여전히 구버전으로 시작한다. 켜려면:
+
+```sql
+update public.google_task_sync_accounts set minimum_google_protocol = 2 where user_id = '...';
+-- 그 계정의 클라이언트가 프로토콜 1 로 마지막 토큰을 받은 지 65분이 지났으면 바로:
+update public.google_task_sync_accounts set enabled = true where user_id = '...';
+```
+
+한 번도 연동한 적 없는 계정은 `legacy_google_token_valid_until` 이 null 이라 두 번째
+줄이 **즉시** 통과한다. 전역 65분은 이미 지나 있기 때문이다.
+
+주의: 두 UPDATE 사이에 그 계정의 구글 연동은 막힌다. 클라이언트는 `enabled` 를 보고서야
+프로토콜 2 를 보내기 시작하기 때문이다(`lib/googleCalendar.ts`). 둘을 한 트랜잭션에 넣으면
+그 틈이 없다.
+
+### 검증 방법
+
+001–035 를 적용한 PGlite PostgreSQL 에서 확인했다. 은퇴 선언 전에는 다른 조건이 맞아도
+거절하고, 선언 후 64분에도 거절하고, 66분 뒤 토큰을 받은 적 없는 계정은 통과하고, 토큰이
+살아 있는 계정은 여전히 거절하고, 그 토큰이 만료되면 통과한다. 프로토콜 1 로 되돌리는 것도
+켜져 있는 동안에는 여전히 거절된다. 전역 행은 둘이 될 수 없고 anon·authenticated·
+service_role 은 읽지 못한다.
+
+
+## 여러 계정 — `activation_status.sql`
+
+사람이 둘 이상이 되면 `activation_preflight.sql` 을 사람 수만큼 고쳐 돌리게 되고, 그것은
+실수를 부른다. 이 스크립트는 uuid 를 넣지 않고 **전 계정을 한 표로** 보여준다.
+
+- 첫 결과: 전역 소진 상태 (035). 미선언이면 아무도 켤 수 없다.
+- 둘째 결과: 계정마다 프로토콜 · 구버전 토큰 · `준비` · 연결 · inbox 행.
+
+`준비` 는 022+035 가드가 요구하는 조건 그대로다. true 면 지금 그 계정의 `enabled=true`
+UPDATE 가 통과한다.
+
+쓰는 순서: 이것으로 **누가 준비됐는지 고르고**, 고른 계정으로 `activation_preflight.sql`
+을 한 번 돌려 **켜면 무엇이 깨지는지** 본다. 얕게 전부 / 깊게 하나다.
+
+준비된 계정이 여럿이면 한 문장으로 켤 수 있다. 가드는 행마다 도는 트리거라 각각 따로
+판정된다:
+
+```sql
+update public.google_task_sync_accounts
+   set enabled = true
+ where user_id in ('...', '...');
+```
+
+### 계정이 늘어날 때 무엇을 반복하나
+
+| | 몇 번 |
+|---|---|
+| 035 적용 · 은퇴 선언 · 전역 65분 | **전체를 통틀어 한 번** |
+| `minimum_google_protocol = 2` | 계정마다 |
+| `enabled = true` | 계정마다 |
+
+두 UPDATE 사이에 그 계정의 구글 연동은 막힌다 — 클라이언트는 `enabled` 를 보고서야
+프로토콜 2 를 보내기 때문이다. 한 번도 연동한 적 없는 계정은 토큰 만료를 기다릴 것이
+없으므로 **둘을 한 트랜잭션에 넣으면 그 틈이 없다.**
+
+```sql
+begin;
+update public.google_task_sync_accounts set minimum_google_protocol = 2 where user_id = '...';
+update public.google_task_sync_accounts set enabled = true where user_id = '...';
+commit;
+```
+
+이미 연동해 온 계정은 그 계정의 구버전 토큰이 만료될 때까지(최대 65분) 두 번째 줄이
+거절되므로 한 트랜잭션에 넣을 수 없다. `activation_status.sql` 의 "구버전 토큰" 칸이
+얼마나 남았는지 말해 준다.
+
+
 ## 활성화 — `activation_preflight.sql`
 
 021–034 를 전부 적용한 뒤, 계정을 실제로 켜기 전에 돌린다. **적용과 활성화는 다른 일이다.**
@@ -226,6 +338,27 @@ STOP 이 하나라도 있으면 켜지 않는다.
 drain 세 줄은 022 의 `guard_google_protocol_activation` 이 강제하는 조건 그대로다
 (022 line 21–28). 맞지 않으면 `enabled=true` UPDATE 가 `GOOGLE_PROTOCOL_DRAIN_REQUIRED`
 로 거절된다. 이 스크립트는 그 거절을 **미리, 이유를 분리해서** 보여준다.
+
+### inbox 행은 어떻게 생기는가
+
+**손으로 넣지 않는다.** 007 을 적용해 `public.lists` 가 생기면 다음 동기화가 올려준다.
+
+클라이언트는 로드할 때마다 `ensureInboxList` 를 돌려 고정 id `list-inbox` 로 Inbox 를
+로컬에 만들어 둔다 (`hooks/usePlannerData.ts:215`, `domain/spaces/hierarchy.ts`). 그 행은
+줄곧 있었고, 테이블이 없어서 올라가지 못했을 뿐이다 — 클라이언트가 `lists` 를
+`optionalRemoteTables` 로 취급해 없으면 없는 대로 나머지를 동기화해 왔다
+(`domain/sync/buildSyncPlan.ts`).
+
+그래서 순서는 이렇다:
+
+1. 007 적용
+2. 앱을 열어 한 번 동기화시킨다 (활성화하려는 그 계정으로)
+3. `activation_preflight.sql` 의 "살아 있는 inbox 행이 정확히 하나" 로 확인한다
+
+2 를 건너뛰고 3 으로 가면 STOP 이 뜬다. 테이블만 있고 행이 없는 상태이기 때문이다.
+그때는 손으로 INSERT 하지 말고 앱을 한 번 더 열어 동기화시킨다 — 손으로 넣은 id 가
+`list-inbox` 와 다르면 클라이언트가 자기 것을 하나 더 만들어 **inbox 가 둘이 되고**,
+그 검사는 "정확히 하나" 를 요구한다.
 
 ### 007 이 없으면 검사표가 아니라 가드가 뜬다
 
