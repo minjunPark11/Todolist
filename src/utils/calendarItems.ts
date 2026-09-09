@@ -450,3 +450,28 @@ export function buildCalendarItems({
 
   return items;
 }
+
+/**
+ * What the popover's memo box starts with.
+ *
+ * Two records, one box. A task's memo is `task.notes`; an external event's
+ * memo IS its Google `description` — the same field the quick edit writes back
+ * (`CalendarView.handleQuickEditSave`).
+ *
+ * Reading the external side back is not cosmetic. `toGoogleEventPatch` treats
+ * `""` as a real change, so a box that opened empty over a description Google
+ * held would wipe it the moment someone nudged the time and saved.
+ */
+export function popoverMemo(
+  item: Pick<CalendarItem, "sourceType" | "sourceId">,
+  tasks: Pick<Task, "id" | "notes">[],
+  externalEvents: Pick<ExternalCalendarEvent, "id" | "description">[],
+): string {
+  if (item.sourceType === "task") {
+    return tasks.find((task) => task.id === item.sourceId)?.notes ?? "";
+  }
+  if (item.sourceType === "external") {
+    return externalEvents.find((event) => event.id === item.sourceId)?.description ?? "";
+  }
+  return "";
+}

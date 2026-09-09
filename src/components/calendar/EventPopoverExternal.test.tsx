@@ -32,7 +32,8 @@ function item(extra: Partial<CalendarItem> = {}): CalendarItem {
   };
 }
 
-function mount(overrides: Partial<CalendarItem>, handlers: { onSaveQuickEdit?: unknown; onDelete?: unknown } = {}) {
+function mount(overrides: Partial<CalendarItem>,
+  handlers: { onSaveQuickEdit?: unknown; onDelete?: unknown } = {}, initialMemo?: string) {
   const onSaveQuickEdit = vi.fn();
   const onDelete = vi.fn();
   render(
@@ -41,6 +42,7 @@ function mount(overrides: Partial<CalendarItem>, handlers: { onSaveQuickEdit?: u
         item={item(overrides)}
         anchor={{ x: 0, y: 0 } as never}
         onClose={() => {}}
+        initialMemo={initialMemo}
         onSaveQuickEdit={handlers.onSaveQuickEdit === null ? undefined : onSaveQuickEdit}
         onDelete={handlers.onDelete === null ? undefined : onDelete}
       />
@@ -78,5 +80,23 @@ it("sends the edit as a description, which is what the box means here", () => {
   expect(onSaveQuickEdit).toHaveBeenCalledWith(
     expect.objectContaining({ sourceId: "google:cal:e1" }),
     expect.objectContaining({ startTime: "14:00", endTime: "14:30" }),
+  );
+});
+
+// The memo box IS the Google description here, so it has to arrive filled.
+// CalendarView used to pass `initialMemo` for tasks only and "" for external
+// events, which meant a quick edit that only moved the time submitted an empty
+// memo over whatever description Google held — and `toGoogleEventPatch` sends
+// "" as a real change, so the description was wiped.
+it("shows the description Google holds and does not wipe it on a time-only edit", () => {
+  const { onSaveQuickEdit } = mount({}, {}, "Agenda: roadmap, then Q4 budget");
+  fireEvent.click(screen.getByText("Add memo or URL"));
+  expect((screen.getByLabelText("Memo") as HTMLTextAreaElement).value)
+    .toBe("Agenda: roadmap, then Q4 budget");
+
+  fireEvent.submit(document.querySelector(".gcal-popover-edit") as HTMLFormElement);
+  expect(onSaveQuickEdit).toHaveBeenCalledWith(
+    expect.objectContaining({ sourceId: "google:cal:e1" }),
+    expect.objectContaining({ memo: "Agenda: roadmap, then Q4 budget" }),
   );
 });
