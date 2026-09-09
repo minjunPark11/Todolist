@@ -3,6 +3,8 @@ import { planTaskOutbound, toTaskSharedPatch } from "../domain/calendar/googleSy
 import { taskRecurrence } from "../domain/calendar/googleSync/taskRecurrence";
 import { object, parseGoogleTaskSnapshot, text } from "./googleTaskInboundSnapshot";
 import { runGoogleTaskInbound, type GoogleTaskInboundDeps } from "./googleTaskInboundExecutor";
+import { GoogleOccurrenceChanged, occurrenceCandidates, readOccurrence } from "./googleOccurrenceSync";
+import { sameTaskInboundFields } from "../domain/calendar/googleSync/taskInboundShape";
 
 export type GoogleTaskSnapshot = ReturnType<typeof parseGoogleTaskSnapshot>;
 export interface GoogleTaskChoice {
@@ -30,7 +32,7 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
   if (intent) {
     const saved = object(intent), args = object(saved.args);
     if (saved.userId !== request.userId || saved.generation !== request.generation ||
-      !["reserve_google_task_outbound", "resolve_google_task_review", "reserve_google_task_event", "reserve_google_task_recurrence"].includes(String(saved.name))) throw new Error("Invalid pending Google task intent.");
+      !["reserve_google_task_outbound", "resolve_google_task_review", "reserve_google_task_event", "reserve_google_task_recurrence", "reserve_google_task_occurrence"].includes(String(saved.name))) throw new Error("Invalid pending Google task intent.");
     try { await call(String(saved.name), args); }
     catch (error) {
       if (["40001", "22023", "P0001"].includes(String((error as {code?:string})?.code))) { await deps.assertCurrent(); deps.writeIntent(null); throw new GoogleTaskSelectionChanged(); }
@@ -133,7 +135,7 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
       ...[...current.tasks].filter(([id, row]) => {
         const mappings = current.snapshots.filter(s => s.taskId === id && s.eventId);
         const fields = current.snapshots.find(s => s.taskId === id)?.fields;
-        return !row.data.deletedAt && !["abandoned", "given_up"].includes(String(row.data.status)) &&
+        return !(row.data.occurrenceOf && row.data.recurrenceId) && !row.data.deletedAt && !["abandoned", "given_up"].includes(String(row.data.status)) &&
           fields && toTaskSharedPatch(fields, current.timezone) &&
           taskRecurrence(row.data, current.timezone) !== null &&
           (mappings.length ? mappings.every(s => s.remoteDeleted && s.state !== "active") : !row.data.googleEventId && !current.historicalTaskIds.has(id));
@@ -147,6 +149,20 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
       if (candidate.kind === "delete" && (!record || record.decision.reason === "excluded")) continue;
       const id = await reserve("reserve_google_task_event", { ...body(candidate.eventId), kind: candidate.kind,
         taskId: candidate.taskId, taskRevision: row?.revision ?? 0, recordRevision: record?.revision, source: record?.source });
+      if (await deps.dispatch(id) === "pending") return { snapshot: await snapshot(), pending: true };
+    }
+    current = await snapshot();
+    for (const candidate of occurrenceCandidates(current).slice(0, 30)) {
+      await deps.assertCurrent();
+      const source = await readOccurrence(candidate, current.scope.calendarId, request.accessToken, deps.fetch);
+      const remote = toTaskInboundFields(source, current.timezone);
+      if (source.status !== "cancelled" && (!remote.ok || !sameTaskInboundFields(remote.fields, candidate.base))) {
+        throw new GoogleOccurrenceChanged(candidate.desired?.title ?? candidate.base.title, candidate.occurrenceDate);
+      }
+      if (source.status === "cancelled" && candidate.kind !== "occurrence-delete") throw new GoogleOccurrenceChanged(candidate.base.title, candidate.occurrenceDate);
+      await claim(); current = await snapshot();
+      const id = await reserve("reserve_google_task_occurrence", { ...body(String(source.id)), ...candidate,
+        source, remote: remote.ok ? remote.fields : null });
       if (await deps.dispatch(id) === "pending") return { snapshot: await snapshot(), pending: true };
     }
     return { snapshot: await snapshot(), pending: false };

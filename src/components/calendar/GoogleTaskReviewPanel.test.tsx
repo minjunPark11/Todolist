@@ -20,6 +20,12 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); publishGoogleTaskSync({ enabled: false, busy: false, pending: false, error: "", snapshot: null }); });
 const mount = () => render(<I18nProvider lang="en"><GoogleTaskReviewPanel /></I18nProvider>);
+it("identifies the occurrence whose remote changes blocked automatic sending", () => {
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: "failed", occurrenceConflict: { title: "Weekly meeting", date: "2026-09-16" } });
+  mount();
+  expect(screen.getByRole("alert").textContent).toContain("Weekly meeting");
+  expect(screen.getByRole("alert").textContent).toContain("2026-09-16");
+});
 it("compares both versions and sends the displayed record and task revisions", () => {
   mount(); fireEvent.click(screen.getByText(/Google title — Conflicting/));
   expect(screen.getByText("Local notes")).toBeTruthy(); expect(screen.getByText("Google notes")).toBeTruthy();

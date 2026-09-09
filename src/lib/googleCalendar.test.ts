@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   currentAccessToken,
+  alignGoogleTimezone,
   disconnect,
   ensureDedicatedCalendar,
   exchangeCodeForAccess,
@@ -46,6 +47,25 @@ function deps(overrides: Partial<GoogleCalendarDeps> = {}): GoogleCalendarDeps {
     ...overrides,
   };
 }
+
+it("aligns through the verified binding endpoint using the existing calendar", async () => {
+  const { impl, calls } = fakeFetch({ "/api/google/calendar": { body: { bound: true } } });
+  await alignGoogleTimezone("existing", "Asia/Seoul", deps({ fetch: impl }));
+  expect(calls).toHaveLength(1);
+  expect(JSON.parse(String(calls[0].init?.body))).toEqual({ calendarId: "existing", timezone: "Asia/Seoul" });
+});
+
+it.each([
+  ["sync-in-progress", "syncInProgress"],
+  ["outbound-in-flight", "outboundInFlight"],
+  ["reviews-unresolved", "reviewsUnresolved"],
+  ["generation-changed", "bindingChanged"],
+  ["grant-changed", "bindingChanged"],
+  ["unknown", "calendarVerification"],
+])("preserves the recoverable binding reason %s", async (reason, expected) => {
+  const { impl } = fakeFetch({ "/api/google/calendar": { status: 409, body: { code: "google_calendar_verification_failed", reason } } });
+  await expect(alignGoogleTimezone("cal", "Asia/Seoul", deps({ fetch: impl }))).rejects.toMatchObject({ reason: expected });
+});
 
 describe("spending the code", () => {
   it("posts it as the signed-in user and hands back the access token", async () => {

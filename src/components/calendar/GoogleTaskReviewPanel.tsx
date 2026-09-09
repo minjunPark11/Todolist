@@ -54,7 +54,8 @@ export function GoogleTaskReviewPanel() {
   return <section className="ff-google-review" aria-label={t("googleTask.title")} aria-busy={state.busy}>
     <h4>{t("googleTask.title")} <span>({reviews.filter(r => r.decision.reason !== "excluded").length + repeatChanges.length + transfers.length})</span></h4>
     <p className="ff-settings-note">{t("googleTask.policy")}</p>
-    {state.error && <p role="alert">{t(state.error === "changed" ? "googleTask.changed" : "googleTask.failed")}</p>}
+    {state.error && <p role="alert">{state.occurrenceConflict ? t("googleTask.occurrenceChanged", state.occurrenceConflict)
+      : t(state.error === "changed" ? "googleTask.changed" : "googleTask.failed")}</p>}
     <button className="ff-btn ff-cal-btn-outline" type="button" disabled={state.busy} onClick={() => void state.run?.()}>{t(state.busy ? "googleTask.busy" : "googleTask.refresh")}</button>
     {snapshot?.operations.map(op => <div key={String(op.operation_id)} className="ff-google-review-item">
       <p role="status">{t("googleTask.pending")}</p>

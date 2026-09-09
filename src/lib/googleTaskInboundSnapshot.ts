@@ -75,6 +75,9 @@ export function parseGoogleTaskSnapshot(raw: unknown, userId: string, generation
     }
   }
   return {scope,timezone,inboxListId,syncToken,snapshots,holds,unverified,tasks,
+    occurrenceSyncEnabled: data.occurrenceSyncEnabled === true,
+    seriesSources: new Map(data.mappings.map(item => { const m = object(item); return [text(m.event_id), object(m.source ?? {})] as const; })),
+    occurrenceReceipts: Array.isArray(data.occurrenceReceipts) ? data.occurrenceReceipts.map(object) : [],
     records:data.records.map(item=>{const r=object(item);return {eventId:text(r.event_id),revision:revision(r.revision),source:object(r.source),decision:object(r.decision)};}),
     operations:Array.isArray(data.operations)?data.operations.map(object):[],
     historicalTaskIds:new Set(Array.isArray(data.historicalTaskIds)?data.historicalTaskIds.map(text):[])};

@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { runReservedGoogleTaskOutbound, type GoogleTaskOutboundDeps } from "../../integrations/google/taskOutbound";
 import { runGoogleTaskCycle } from "../../lib/googleTaskCoordinator";
+import { occurrenceCandidates } from "../../lib/googleOccurrenceSync";
+import { parseGoogleTaskSnapshot } from "../../lib/googleTaskInboundSnapshot";
 
 let db: PGlite;
 const user = "00000000-0000-0000-0000-000000000001";
@@ -14,6 +16,8 @@ const base = { title: "Base", description: "", startDate: "", dueDate: "2026-09-
 const local = { ...base, title: "App" };
 const source = { id: "e", etag: '"before"', summary: "Base", start: { date: "2026-09-09" }, end: { date: "2026-09-10" } };
 const applied = { ...source, summary: "App", etag: '"after"' };
+const instance = { ...source, id: "e_20260916", recurringEventId: "e", originalStartTime: { date: "2026-09-16" },
+  start: { date: "2026-09-16" }, end: { date: "2026-09-17" } };
 let op: string, dispatch: string, request: Record<string, unknown>;
 
 beforeAll(async () => {
@@ -25,13 +29,13 @@ beforeAll(async () => {
     insert into auth.users values('${user}'),('${other}');`);
   for (const file of ["001_initial_schema.sql", "007_lists.sql", "017_google_calendar.sql", "019_google_calendar_sources.sql",
     "021_google_inbound_cursor.sql", "022_google_sync_protocol.sql", "023_google_legacy_mapping_import.sql", "024_google_verified_grant.sql",
-    "025_google_calendar_binding.sql", "026_google_reconnect_mapping.sql", "027_google_oauth_lifecycle.sql", "028_google_inbound_execution.sql", "029_google_task_outbound.sql", "030_google_task_reviews.sql", "031_google_task_event_lifecycle.sql", "032_google_task_manual_recovery.sql", "033_google_task_repeat_transfer.sql", "034_google_task_history_retention.sql"]) {
+    "025_google_calendar_binding.sql", "026_google_reconnect_mapping.sql", "027_google_oauth_lifecycle.sql", "028_google_inbound_execution.sql", "029_google_task_outbound.sql", "030_google_task_reviews.sql", "031_google_task_event_lifecycle.sql", "032_google_task_manual_recovery.sql", "033_google_task_repeat_transfer.sql", "034_google_task_history_retention.sql", "037_google_task_occurrence_outbound.sql"]) {
     await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8").replace('create extension if not exists "pgcrypto";', ""));
   }
 }, 30000);
 beforeEach(async () => {
   op = randomUUID(); dispatch = randomUUID();
-  await db.exec(`reset role; truncate google_task_outbound_operations,google_oauth_operations,google_task_inbound_passes,
+  await db.exec(`reset role; truncate google_task_occurrence_receipts,google_task_outbound_operations,google_oauth_operations,google_task_inbound_passes,
     google_task_inbound_records,google_task_mappings,google_task_sync_accounts,google_calendar_connections,tasks;
     insert into google_task_sync_accounts(user_id,minimum_google_protocol) values('${user}',2);
     update google_task_sync_accounts set google_protocol_cutover_at=clock_timestamp()-interval '66 minutes',enabled=true;
@@ -46,6 +50,164 @@ beforeEach(async () => {
     taskId: "t", eventId: "e", taskRevision: 1, recordRevision: 1, local, remote: base, source, choice: "automatic" };
 });
 afterAll(async () => { await db?.close(); });
+
+async function occurrenceFixture(kind = "occurrence-patch") {
+  await db.exec(`reset role; update google_task_sync_accounts set occurrence_sync_enabled=true;
+    insert into lists(id,user_id,data) values('inbox','${user}','{"kind":"inbox"}') on conflict do nothing;`);
+  await db.query("update google_task_mappings set source=$1", [JSON.stringify({ ...source, recurrence: ["RRULE:FREQ=WEEKLY"] })]);
+  await db.query("update tasks set data=$1 where id='t'", [JSON.stringify({ id: "t", ...base, repeatType: "weekly", ...(kind === "occurrence-delete" ? { exdates: ["2026-09-16"] } : {}) })]);
+  const fields = { ...base, title: "This week only", dueDate: "2026-09-17" };
+  await db.query("insert into tasks(id,user_id,data) values('occ',$1,$2)", [user, JSON.stringify({ id: "occ", ...fields, occurrenceOf: "t", recurrenceId: "2026-09-16" })]);
+  await auth();
+  return { ...request, kind, taskId: kind === "occurrence-delete" ? "t" : "occ", taskRevision: kind === "occurrence-delete" ? 2 : 1, seriesId: "t", seriesRevision: 2,
+    masterEventId: "e", eventId: instance.id, occurrenceDate: "2026-09-16", originalStart: "2026-09-16", source: instance,
+    remote: { ...base, dueDate: "2026-09-16" }, desired: fields };
+}
+const reserveOccurrence = (body: Record<string, unknown>) => rpc("reserve_google_task_occurrence", { p_operation_id: op, p_request: body });
+
+it("M6 updates only the instance and recovers a lost response with no second PATCH", async () => {
+  const body = await occurrenceFixture();
+  expect(await reserveOccurrence(body)).toMatchObject({ state: "reserved" });
+  let remote: Record<string, unknown> = instance, writes = 0;
+  const deps = worker(async (url, init) => {
+    expect(String(url)).toContain(`/events/${instance.id}`);
+    if (init?.method === "PATCH") {
+      writes++; const patch = JSON.parse(String(init.body));
+      expect(patch).not.toHaveProperty("recurrence"); expect((init.headers as Record<string,string>)["If-Match"]).toBe('"before"');
+      remote = { ...instance, ...patch, start: { date: "2026-09-17" }, end: { date: "2026-09-18" }, etag: '"moved"' };
+      throw Error("response lost");
+    }
+    return Response.json(remote);
+  });
+  expect(await runReservedGoogleTaskOutbound(user, op, deps)).toEqual({ state: "pending" });
+  expect(await runReservedGoogleTaskOutbound(user, op, deps)).toEqual({ state: "completed" });
+  expect(writes).toBe(1);
+  expect((await mapping()).base).toEqual(base);
+  await auth(); expect(await reserveOccurrence(body)).toMatchObject({ state: "completed" });
+  const raw = await rpc("read_google_task_sync_snapshot", { p_generation: generation });
+  expect(occurrenceCandidates(parseGoogleTaskSnapshot(raw, user, generation))).toEqual([]);
+});
+
+it("M6 cancels only the skipped instance and keeps a durable receipt", async () => {
+  const body = await occurrenceFixture("occurrence-delete"); await reserveOccurrence(body);
+  let writes = 0;
+  const result = await runReservedGoogleTaskOutbound(user, op, worker(async (_url, init) => {
+    if (init?.method === "DELETE") { writes++; return new Response(null, { status: 204 }); }
+    return Response.json(instance);
+  }));
+  expect(result).toEqual({ state: "completed" }); expect(writes).toBe(1);
+  await auth(); const raw = await rpc("read_google_task_sync_snapshot", { p_generation: generation });
+  expect(occurrenceCandidates(parseGoogleTaskSnapshot(raw, user, generation))).toEqual([]);
+  expect((await mapping()).base).toEqual(base);
+});
+
+it("M6 is disabled by default and rejects standalone creation of occurrence rows", async () => {
+  const body = await occurrenceFixture();
+  await db.exec("reset role; update google_task_sync_accounts set occurrence_sync_enabled=false;"); await auth();
+  await expect(reserveOccurrence(body)).rejects.toThrow("OCCURRENCE_SYNC_DISABLED");
+  await expect(rpc("reserve_google_task_event", { p_operation_id: op, p_request: { ...body, kind: "create" } })).rejects.toThrow("OCCURRENCE_CANNOT_CREATE");
+});
+
+it("M6 rejects a different master or original date and checks task revisions again before dispatch", async () => {
+  const body = await occurrenceFixture();
+  await expect(reserveOccurrence({ ...body, source: { ...instance, recurringEventId: "foreign" } })).rejects.toThrow("INSTANCE_REQUIRED");
+  await expect(reserveOccurrence({ ...body, originalStart: "2026-09-17" })).rejects.toThrow("WRONG_OCCURRENCE");
+  await reserveOccurrence(body);
+  await rpc("write_task_revision", { p_task_id: "occ", p_expected_revision: 1, p_data: { id: "occ", ...base, title: "newer" } });
+  let calls = 0;
+  expect(await runReservedGoogleTaskOutbound(user, op, worker(async () => { calls++; return Response.json(instance); }))).toEqual({ state: "aborted" });
+  expect(calls).toBe(0);
+});
+
+it("M6 does not overwrite a newer Google version and allows a later fresh reservation", async () => {
+  const body = await occurrenceFixture(); await reserveOccurrence(body);
+  let writes = 0;
+  expect(await runReservedGoogleTaskOutbound(user, op, worker(async (_url, init) => {
+    if (init?.method === "PATCH") writes++;
+    return Response.json({ ...instance, etag: '"newer"' });
+  }))).toEqual({ state: "aborted" });
+  expect(writes).toBe(0);
+});
+
+it.each([401, 412, 429])("M6 retries a rejected HTTP %s write only through a fresh reservation", async (status) => {
+  const body = await occurrenceFixture(); await reserveOccurrence(body);
+  const result = await runReservedGoogleTaskOutbound(user, op, worker(async (_url, init) =>
+    init?.method === "PATCH" ? new Response(null, { status }) : Response.json(instance)));
+  expect(result).toEqual({ state: "aborted" });
+  op = randomUUID(); await auth(); expect(await reserveOccurrence(body)).toMatchObject({ state: "reserved" });
+});
+
+it("M6 holds an unchanged version after timeout and settles a later version without resending", async () => {
+  const body = await occurrenceFixture(); await reserveOccurrence(body);
+  let remote = instance, writes = 0;
+  const deps = worker(async (_url, init) => {
+    if (init?.method === "PATCH") { writes++; throw Error("timeout before outcome known"); }
+    return Response.json(remote);
+  });
+  expect(await runReservedGoogleTaskOutbound(user, op, deps)).toEqual({ state: "pending" });
+  expect(await runReservedGoogleTaskOutbound(user, op, deps)).toEqual({ state: "pending" });
+  remote = { ...instance, summary: "Edited elsewhere", etag: '"new-version"' };
+  expect(await runReservedGoogleTaskOutbound(user, op, deps)).toEqual({ state: "aborted" });
+  expect(writes).toBe(1);
+});
+
+it("M6 recovers a lost DELETE from a minimal cancelled instance", async () => {
+  const body = await occurrenceFixture("occurrence-delete"); await reserveOccurrence(body);
+  let removed = false, writes = 0;
+  const deps = worker(async (_url, init) => {
+    if (init?.method === "DELETE") { writes++; removed = true; throw Error("lost"); }
+    return Response.json(removed ? { id: instance.id, recurringEventId: "e", originalStartTime: instance.originalStartTime, status: "cancelled" } : instance);
+  });
+  expect(await runReservedGoogleTaskOutbound(user, op, deps)).toEqual({ state: "pending" });
+  expect(await runReservedGoogleTaskOutbound(user, op, deps)).toEqual({ state: "completed" });
+  expect(writes).toBe(1);
+});
+
+it("M6 keeps a reservation pending when recovery cannot reach Google", async () => {
+  const body = await occurrenceFixture(); await reserveOccurrence(body);
+  let unreachable = false, writes = 0;
+  const deps = worker(async (_url, init) => {
+    if (init?.method === "PATCH") { writes++; unreachable = true; throw Error("lost"); }
+    if (unreachable) throw Error("offline");
+    return Response.json(instance);
+  });
+  expect(await runReservedGoogleTaskOutbound(user, op, deps)).toEqual({ state: "pending" });
+  expect(await runReservedGoogleTaskOutbound(user, op, deps)).toEqual({ state: "pending" });
+  expect(writes).toBe(1);
+});
+
+it("M6 rejects another account and direct access to its receipt table", async () => {
+  const body = await occurrenceFixture(); await auth(other);
+  await expect(reserveOccurrence(body)).rejects.toThrow();
+  await expect(db.query("select * from google_task_occurrence_receipts")).rejects.toThrow("permission denied");
+});
+
+it("M6 runs two complete cycles without creating an event or reapplying an occurrence", async () => {
+  await occurrenceFixture();
+  await rpc("release_google_task_sync", { p_generation: generation, p_owner: owner, p_fence: 1 });
+  const master = { ...source, recurrence: ["RRULE:FREQ=WEEKLY"] };
+  let remote: Record<string, unknown> = instance, writes = 0, journal: unknown = null, intent: unknown = null;
+  const http: typeof fetch = async (url, init) => {
+    if (init?.method === "POST") throw Error("An occurrence must never be created.");
+    if (init?.method === "PATCH") {
+      writes++; expect(String(url)).toContain(`/events/${instance.id}`);
+      remote = { ...instance, summary: "This week only", start: { date: "2026-09-17" }, end: { date: "2026-09-18" }, etag: '"moved"' };
+      return Response.json(remote);
+    }
+    if (String(url).includes("/instances?")) return Response.json({ items: [remote] });
+    if (String(url).includes("/events?")) return Response.json({ items: [master, remote], nextSyncToken: "cycle-token" });
+    return Response.json(remote);
+  };
+  const deps = { rpc: async (name: string, args: Record<string, unknown>) => { await auth(); return rpc(name, args); }, fetch: http, uuid: randomUUID,
+    assertCurrent: async () => {}, exclusive: async <T>(work: () => Promise<T>) => work(), readJournal: async () => journal,
+    writeJournal: async (value: unknown) => { journal = value; }, readIntent: () => intent, writeIntent: (value: unknown) => { intent = value; },
+    dispatch: async (id: string) => (await runReservedGoogleTaskOutbound(user, id, worker(http))).state };
+  for (let i = 0; i < 2; i++) {
+    expect((await runGoogleTaskCycle({ userId: user, generation, accessToken: "access" }, deps)).pending).toBe(false);
+  }
+  expect(writes).toBe(1);
+  await db.exec("reset role;"); expect((await db.query("select id from tasks")).rows).toHaveLength(2);
+});
 async function auth(id = user) { await db.exec(`reset role; set request.jwt.claim.sub='${id}'; set role authenticated;`); }
 async function service() { await db.exec("reset role; set role service_role;"); }
 async function rpc(name: string, args: Record<string, unknown>): Promise<Record<string, any>> {

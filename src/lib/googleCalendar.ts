@@ -42,7 +42,7 @@ export interface GoogleConnection {
  * mints is refused for the same reason the last one was. Telling that reader to
  * sign in sends them round a loop they cannot leave.
  */
-export type FailureReason = "signedOut" | "rejected" | "network" | "google" | "store" | "identityMismatch" | "identityUnavailable" | "calendarVerification" | "lifecycleBusy" | "lifecycleRecovery" | GoogleSyncPolicyReason;
+export type FailureReason = "signedOut" | "rejected" | "network" | "google" | "store" | "identityMismatch" | "identityUnavailable" | "calendarVerification" | "lifecycleBusy" | "lifecycleRecovery" | "syncInProgress" | "outboundInFlight" | "reviewsUnresolved" | "bindingChanged" | GoogleSyncPolicyReason;
 
 export class GoogleCalendarError extends Error {
   constructor(
@@ -135,7 +135,13 @@ export const defaultDeps: GoogleCalendarDeps = {
  * "sign in first" hides the one fact that would end the search — which is why
  * the server's own words travel with this (see `describe` in the card).
  */
-function failureFor(status: number, code: string | undefined): FailureReason {
+function failureFor(status: number, code: string | undefined, reason?: string): FailureReason {
+  if (status === 409 && code === "google_calendar_verification_failed") {
+    if (reason === "sync-in-progress") return "syncInProgress";
+    if (reason === "outbound-in-flight") return "outboundInFlight";
+    if (reason === "reviews-unresolved") return "reviewsUnresolved";
+    if (reason === "generation-changed" || reason === "grant-changed") return "bindingChanged";
+  }
   if (code === "google_lifecycle_blocked" && status === 409) return "lifecycleBusy";
   if (code === "google_lifecycle_blocked" && status === 503) return "lifecycleRecovery";
   if ((status === 409 || status === 502) && code === "google_calendar_verification_failed") return "calendarVerification";
@@ -163,7 +169,7 @@ async function callOwnApi(path: string, deps: GoogleCalendarDeps, body?: unknown
     throw new GoogleCalendarError("network", "Could not reach the FocusFlow server.");
   }
 
-  const payload = (await response.json().catch(() => null)) as { error?: string; code?: string } | null;
+  const payload = (await response.json().catch(() => null)) as { error?: string; code?: string; reason?: string } | null;
   if (typeof window !== "undefined" && (path === "/api/google/token" || path === "/api/google/connect")) {
     const reason = failureFor(response.status, payload?.code);
     if (response.ok || reason === "updateRequired" || reason === "policyUnavailable") {
@@ -172,11 +178,16 @@ async function callOwnApi(path: string, deps: GoogleCalendarDeps, body?: unknown
   }
   if (!response.ok) {
     throw new GoogleCalendarError(
-      failureFor(response.status, payload?.code),
+      failureFor(response.status, payload?.code, payload?.reason),
       payload?.error || `Request failed (${response.status}).`,
     );
   }
   return payload;
+}
+
+/** Rebind the existing calendar without replacing its grant or generation. */
+export async function alignGoogleTimezone(calendarId: string, timezone: string, deps: GoogleCalendarDeps = defaultDeps): Promise<void> {
+  await callOwnApi("/api/google/calendar", deps, { calendarId, timezone });
 }
 
 /** Google's calendar API, as the user, with the short-lived token. */

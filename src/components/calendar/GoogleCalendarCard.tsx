@@ -25,6 +25,7 @@ import { useT } from "../../i18n";
 import { GOOGLE_SYNC_POLICY_EVENT, type GoogleSyncPolicyReason } from "../../domain/calendar/googleSync/protocol";
 import {
   disconnect as disconnectGoogle,
+  alignGoogleTimezone,
   ensureDedicatedCalendar,
   exchangeCodeForAccess,
   GoogleCalendarError,
@@ -67,6 +68,8 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
   const [signedIn, setSignedIn] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [aligning, setAligning] = useState(false);
+  const aligningRef = useRef(false);
   const [labelState, setLabelState] = useState<{ supported: boolean | null; overflow: number; failed: boolean } | null>(null);
   const manualSync = useRef(false);
   const policyReason = useRef<GoogleSyncPolicyReason | null>(null);
@@ -143,7 +146,7 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
         notifyGoogleConnectionChanged();
       } catch (thrown) {
         writePendingConnect(null);
-        if (thrown instanceof GoogleCalendarError && ["identityMismatch", "identityUnavailable", "calendarVerification", "lifecycleBusy", "lifecycleRecovery"].includes(thrown.reason)) {
+        if (thrown instanceof GoogleCalendarError && ["identityMismatch", "identityUnavailable", "calendarVerification", "lifecycleBusy", "lifecycleRecovery", "syncInProgress", "outboundInFlight", "reviewsUnresolved", "bindingChanged"].includes(thrown.reason)) {
           // The server retained the old grant. Keep its Disconnect action available.
           try {
             const connection = await readConnection();
@@ -299,6 +302,25 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
     }
   }
 
+  async function alignTimezone() {
+    if (status.kind !== "connected" || !timezone || aligningRef.current || syncing || taskSync.busy) return;
+    aligningRef.current = true;
+    setAligning(true);
+    setError(""); setNotice("");
+    const version = ++readVersion.current;
+    try {
+      await alignGoogleTimezone(status.connection.calendarId, timezone);
+      if (version !== readVersion.current) return;
+      setNotice(t("settings.google.timezoneAligned", { timezone }));
+      notifyGoogleConnectionChanged();
+    } catch (thrown) {
+      if (version === readVersion.current) setError(describe(thrown));
+    } finally {
+      aligningRef.current = false;
+      setAligning(false);
+    }
+  }
+
   async function confirmDisconnect() {
     setConfirmingDisconnect(false);
     setError("");
@@ -344,7 +366,7 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
               setRefresh((value) => value + 1);
             }}>{t("settings.google.retry")}</button>
           ) : status.kind === "connected" ? (
-            <button type="button" className="ff-btn ff-btn-danger" onClick={() => setConfirmingDisconnect(true)}>
+            <button type="button" className="ff-btn ff-btn-danger" disabled={aligning} onClick={() => setConfirmingDisconnect(true)}>
               {t("settings.google.disconnect")}
             </button>
           ) : (
@@ -373,7 +395,13 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
           ) : null}
           {labelState?.overflow ? <p className="ff-settings-note">{t("settings.google.labelsOverflow", { count: labelState.overflow })}</p> : null}
           {labelState?.failed && labelState.supported !== false ? <p className="ff-settings-note" aria-live="polite">{t("settings.google.labelsRetry")}</p> : null}
-          <button type="button" className="ff-btn ff-cal-btn-outline" disabled={syncing} onClick={() => {
+          {timezone ? <div>
+            <p className="ff-settings-note">{t("settings.google.timezoneHint", { timezone })}</p>
+            <button type="button" className="ff-btn ff-cal-btn-outline" disabled={aligning || syncing || taskSync.busy} onClick={() => void alignTimezone()}>
+              {t(aligning ? "settings.google.aligningTimezone" : "settings.google.alignTimezone")}
+            </button>
+          </div> : null}
+          <button type="button" className="ff-btn ff-cal-btn-outline" disabled={syncing || aligning} onClick={() => {
             setSyncing(true);
             manualSync.current = true;
             setNotice(""); setError("");
@@ -391,7 +419,7 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
           Google has no lock that could prevent it. */}
       <p className="ff-settings-note">{t(taskSync.enabled ? "googleTask.unsupported" : "settings.google.repeatWarning")}</p>
 
-      {notice ? <p className="ff-settings-note">{notice}</p> : null}
+      {notice ? <p className="ff-settings-note" aria-live="polite">{notice}</p> : null}
       {error ? <p className="auth-message error" role="alert">{error}</p> : null}
 
       {confirmingDisconnect ? (

@@ -14,9 +14,10 @@
 // for it while the series' own RRULE still draws the original date. The same
 // occurrence twice, on two days, is worse than not syncing it at all.
 //
-// The dispatch itself waits. §7.3 puts M6 after 021–034 reach production, and
-// the account this would run against is not there yet — so this decides and
-// nothing here sends.
+// The verified-mapping dispatch is now in lib/googleOccurrenceSync.ts and the
+// server reservation path (037). These early address helpers are not used by
+// that path: it must derive the original START from the mapped Google base,
+// distinguishing all-day dates and timed instances instead of using midnight.
 import type { Task } from "../../../types";
 
 /**

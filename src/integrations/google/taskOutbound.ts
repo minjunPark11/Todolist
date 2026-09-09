@@ -6,6 +6,7 @@ import type { GoogleEventResource } from "../../domain/calendar/googleSync/inbou
 import { readServiceRoleEnv, readGoogleOAuthEnv, type ServiceRoleEnv } from "./env";
 import { refreshAccessToken } from "./oauth";
 import { verifyGoogleIdentity } from "./identity";
+import { runOccurrenceOperation, reconcileOccurrenceOperation } from "./occurrenceOutbound";
 
 interface Binding { generation: string; calendarId: string }
 export interface GoogleTaskOutboundDeps {
@@ -56,6 +57,7 @@ export async function runReservedGoogleTaskOutbound(userId: string, operationId:
     }
     throw new GoogleTaskOutboundError();
   };
+  if (begin.kind === "occurrence-patch" || begin.kind === "occurrence-delete") return runOccurrenceOperation(begin, deps, finish);
   if (begin.kind === "create" || begin.kind === "delete") return runEventOperation(begin, operationId, deps, finish);
   let sent = false;
   try {
@@ -143,6 +145,7 @@ export async function reconcileGoogleTaskOutbound(userId: string, operationId: s
     const op = object(await deps.rpc("read_google_task_outbound", { p_user_id: userId, p_operation_id: operationId }));
     if (op.state === "completed") return { state: "completed" };
     if (op.state !== "running" && op.state !== "uncertain") return { state: "pending" };
+    if (op.kind === "occurrence-patch" || op.kind === "occurrence-delete") return await reconcileOccurrenceOperation(userId, operationId, op, deps);
     const calendarId = text(op.calendarId), eventId = text(op.eventId), generation = text(op.generation);
     const desired = op.kind === "delete" ? null : fields(op.fields), timezone = text(op.timezone), dispatchId = text(op.dispatchId);
     const access = await deps.accessToken({ generation, calendarId });

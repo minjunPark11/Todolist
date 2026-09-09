@@ -6,7 +6,7 @@ import { GoogleCalendarCard } from "./GoogleCalendarCard";
 import { routeGoogleCalendarReturn } from "./GoogleCalendarReturn";
 
 const mocks = vi.hoisted(() => ({
-  read: vi.fn(), exchange: vi.fn(), ensure: vi.fn(), open: vi.fn(),
+  read: vi.fn(), exchange: vi.fn(), ensure: vi.fn(), open: vi.fn(), align: vi.fn(),
   getSession: vi.fn(), authListener: vi.fn(),
 }));
 vi.mock("../../services/supabaseClient", () => ({ supabase: { auth: {
@@ -14,11 +14,13 @@ vi.mock("../../services/supabaseClient", () => ({ supabase: { auth: {
   onAuthStateChange: mocks.authListener,
 } } }));
 vi.mock("../../platform", () => ({ platform: { kind: "desktop", openExternal: mocks.open } }));
+vi.mock("./GoogleCalendarSourceList", () => ({ GoogleCalendarSourceList: () => null }));
 vi.mock("../../lib/googleCalendar", async () => ({
   ...await vi.importActual<typeof import("../../lib/googleCalendar")>("../../lib/googleCalendar"),
   readConnection: mocks.read,
   exchangeCodeForAccess: mocks.exchange,
   ensureDedicatedCalendar: mocks.ensure,
+  alignGoogleTimezone: mocks.align,
 }));
 
 beforeEach(() => {
@@ -28,12 +30,42 @@ beforeEach(() => {
   mocks.getSession.mockResolvedValue({ data: { session: { user: { id: "user" } } } });
   mocks.authListener.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
   mocks.read.mockResolvedValue(null);
+  mocks.align.mockResolvedValue(undefined);
   mocks.open.mockResolvedValue(undefined);
   mocks.exchange.mockResolvedValue("access");
   mocks.ensure.mockResolvedValue({ calendarId: "cal", accountEmail: "person@example.com" });
 });
 afterEach(cleanup);
 const mount = () => render(<I18nProvider lang="en"><GoogleCalendarCard /></I18nProvider>);
+
+it("aligns the existing calendar to the selected zone and prevents overlapping actions", async () => {
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email" });
+  let complete!: () => void;
+  mocks.align.mockImplementationOnce(() => new Promise<void>((resolve) => { complete = resolve; }));
+  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Shanghai" /></I18nProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: "Align time zone" }));
+  expect(mocks.align).toHaveBeenCalledWith("cal", "Asia/Shanghai");
+  expect(screen.getByRole("button", { name: "Aligning time zone…" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Disconnect" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Sync now" }).hasAttribute("disabled")).toBe(true);
+  await act(async () => complete());
+  expect(await screen.findByText(/Google sync time zone is now Asia\/Shanghai/)).toBeTruthy();
+  expect(mocks.exchange).not.toHaveBeenCalled();
+  expect(mocks.ensure).not.toHaveBeenCalled();
+});
+
+it("keeps the connection and offers retry after unresolved reviews block alignment", async () => {
+  const { GoogleCalendarError } = await import("../../lib/googleCalendar");
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email" });
+  mocks.align.mockRejectedValueOnce(new GoogleCalendarError("reviewsUnresolved", "blocked"));
+  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: "Align time zone" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("Resolve the pending items");
+  expect(screen.getByRole("button", { name: "Disconnect" }).hasAttribute("disabled")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Align time zone" }));
+  await screen.findByText(/Google sync time zone is now Asia\/Seoul/);
+  expect(screen.queryByRole("alert")).toBeNull();
+});
 
 it("keeps the retained connection's disconnect action after an identity mismatch", async () => {
   const { GoogleCalendarError } = await import("../../lib/googleCalendar");

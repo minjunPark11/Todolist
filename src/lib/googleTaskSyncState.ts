@@ -2,6 +2,7 @@ import type { GoogleTaskChoice, GoogleTaskSnapshot } from "./googleTaskCoordinat
 import type { Task } from "../types";
 export interface LocalTaskConflict { id: string; local: Task | null; remote: { id: string; revision: number; data: Task } | null }
 export interface GoogleTaskSyncState {
+  occurrenceConflict?: { title: string; date: string };
   enabled: boolean; busy: boolean; pending: boolean; error: "" | "changed" | "failed";
   snapshot: GoogleTaskSnapshot | null;
   run?: (choice?: GoogleTaskChoice) => Promise<void>;

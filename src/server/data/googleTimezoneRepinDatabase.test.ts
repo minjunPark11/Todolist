@@ -27,7 +27,7 @@ beforeAll(async () => {
     "027_google_oauth_lifecycle.sql", "028_google_inbound_execution.sql", "029_google_task_outbound.sql",
     "030_google_task_reviews.sql", "031_google_task_event_lifecycle.sql", "032_google_task_manual_recovery.sql",
     "033_google_task_repeat_transfer.sql", "034_google_task_history_retention.sql",
-    "035_google_protocol_retirement.sql", "036_google_sync_timezone_repin.sql"]) {
+    "035_google_protocol_retirement.sql", "036_google_sync_timezone_repin.sql", "037_google_task_occurrence_outbound.sql"]) {
     await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8").replace('create extension if not exists "pgcrypto";', ""));
   }
 }, 60000);
