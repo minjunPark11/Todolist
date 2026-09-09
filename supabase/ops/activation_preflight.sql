@@ -4,7 +4,8 @@
 -- 적용과 활성화는 다른 일이다. 적용은 구조만 설치하고 아무 동작도 바꾸지 않는다.
 -- 이 스크립트가 보는 것은 "지금 켜면 무엇이 깨지는가" 다.
 --
--- 사용법: 아래 target CTE 의 uuid 를 켜려는 계정의 것으로 바꾸고 통째로 실행한다.
+-- 사용법: 맨 아래 set 한 줄의 uuid 만 바꾸고 파일을 통째로 실행한다.
+-- 바꾸지 않으면 가드가 멈춘다 — placeholder 로도 그럴듯한 표가 나오기 때문이다.
 -- STOP 이 하나라도 있으면 켜지 않는다.
 
 -- 007 이 없으면 아래 검사표 자체가 파싱되지 않는다. public.lists 를 직접 읽는 행이
@@ -27,9 +28,36 @@ begin
   end if;
 end $$;
 
+-- ↓↓↓ 바꿀 곳은 여기 하나다 ↓↓↓
+set ff.target_user = '00000000-0000-0000-0000-000000000000';
+
+-- 두 번째 가드: 대상 계정이 실재하는지.
+--
+-- uuid 를 바꾸지 않고 돌리면 계정별 검사가 전부 false 가 되고, 그 와중에 "진행 중인 작업
+-- 0개" 같은 줄은 OK 로 뜬다 — 없는 계정에는 행도 없기 때문이다. 그럴듯한 표가 나오고
+-- 아무도 틀렸다는 것을 모른다. 그래서 검사표 앞에서 멈춘다.
+do $$
+declare target uuid;
+begin
+  begin
+    target := nullif(current_setting('ff.target_user', true), '')::uuid;
+  exception when others then
+    raise exception '대상 계정 uuid 가 uuid 형식이 아닙니다: %', current_setting('ff.target_user', true);
+  end;
+  if target is null or target = '00000000-0000-0000-0000-000000000000' then
+    raise exception e'대상 계정 uuid 를 바꾸지 않았습니다.\n'
+      '이 파일 위쪽의 set ff.target_user 한 줄을 켜려는 계정의 것으로 바꾸고 다시 실행하세요.\n'
+      '계정 uuid 는 다음으로 찾습니다:\n'
+      '  select id, email from auth.users order by created_at;';
+  end if;
+  if not exists (select 1 from auth.users where id = target) then
+    raise exception e'auth.users 에 % 가 없습니다.\n'
+      '오타이거나 다른 프로젝트의 uuid 입니다. 위 쿼리로 다시 확인하세요.', target;
+  end if;
+end $$;
+
 with target as (
-  -- ↓↓↓ 켜려는 계정의 uuid 로 바꾼다 ↓↓↓
-  select '00000000-0000-0000-0000-000000000000'::uuid as user_id
+  select current_setting('ff.target_user')::uuid as user_id
 )
 select check_name, expected, actual,
        case when expected = actual then 'OK'
