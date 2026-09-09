@@ -455,6 +455,11 @@ function addDays2(dateValue, days) {
   date.setDate(date.getDate() + days);
   return toDateInputValue(date);
 }
+function addMonths(dateValue, months) {
+  const date = /* @__PURE__ */ new Date(`${dateValue}T00:00:00`);
+  date.setMonth(date.getMonth() + months);
+  return toDateInputValue(date);
+}
 function daysBetween2(from, to) {
   const fromMs = (/* @__PURE__ */ new Date(`${from}T00:00:00`)).getTime();
   const toMs = (/* @__PURE__ */ new Date(`${to}T00:00:00`)).getTime();
@@ -1774,7 +1779,7 @@ function addDays3(dateValue, days) {
   date.setUTCDate(date.getUTCDate() + days);
   return toDateValue(date);
 }
-function addMonths(dateValue, months) {
+function addMonths2(dateValue, months) {
   const date = toUtcDate(dateValue);
   const day = date.getUTCDate();
   date.setUTCDate(1);
@@ -1836,7 +1841,7 @@ function occurrenceDates(rule, startDate, rangeEnd, untilDate) {
     const monthStep = rule.freq === "YEARLY" ? 12 * rule.interval : rule.interval;
     const named = [...rule.byMonthDay].sort((a, b) => a - b);
     for (let step = 0; step < MAX_OCCURRENCES_PER_EVENT && !full(); step += 1) {
-      const monthAnchor = addMonths(`${startDate.slice(0, 8)}01`, step * monthStep);
+      const monthAnchor = addMonths2(`${startDate.slice(0, 8)}01`, step * monthStep);
       if (!monthAnchor) continue;
       if (monthAnchor.slice(0, 7) > stopAt.slice(0, 7)) break;
       for (const day of named) {
@@ -1859,10 +1864,10 @@ function occurrenceDates(rule, startDate, rangeEnd, untilDate) {
         candidate = addDays3(startDate, 7 * step * rule.interval);
         break;
       case "MONTHLY":
-        candidate = addMonths(startDate, step * rule.interval);
+        candidate = addMonths2(startDate, step * rule.interval);
         break;
       default:
-        candidate = addMonths(startDate, 12 * step * rule.interval);
+        candidate = addMonths2(startDate, 12 * step * rule.interval);
         break;
     }
     if (!candidate) continue;
@@ -1938,6 +1943,94 @@ function expandIcsOccurrences(events, range, options = {}) {
   return expanded;
 }
 
+// src/utils/planner.ts
+function getNextDueDate(task, today = todayValue()) {
+  const interval = Math.max(task.repeatInterval || 1, 1);
+  const baseDate = task.dueDate && task.dueDate > today ? task.dueDate : today;
+  if (task.repeatType === "daily") return addDays2(baseDate, interval);
+  if (task.repeatType === "weekly") return nextWeeklyDate(baseDate, interval, task.repeatDays ?? []);
+  if (task.repeatType === "monthly") return addMonths(baseDate, interval);
+  if (task.repeatType === "yearly") return addMonths(baseDate, interval * 12);
+  return baseDate;
+}
+function nextWeeklyDate(baseDate, interval, days) {
+  if (days.length === 0) return addDays2(baseDate, interval * 7);
+  const allowed = new Set(days);
+  const baseWeekday = (/* @__PURE__ */ new Date(`${baseDate}T00:00:00Z`)).getUTCDay();
+  for (let ahead = 1; ahead <= 7; ahead += 1) {
+    if (!allowed.has((baseWeekday + ahead) % 7)) continue;
+    const wrapped = baseWeekday + ahead >= 7;
+    return addDays2(baseDate, ahead + (wrapped ? (interval - 1) * 7 : 0));
+  }
+  return addDays2(baseDate, interval * 7);
+}
+
+// src/utils/taskOccurrences.ts
+var OCCURRENCE_ID_SEPARATOR = "::";
+function occurrenceIdFor(seriesId, date) {
+  return `${seriesId}${OCCURRENCE_ID_SEPARATOR}${date}`;
+}
+var MAX_OCCURRENCES = 400;
+function isSeries(task) {
+  return Boolean(task.repeatType) && task.repeatType !== "none" && Boolean(task.dueDate) && !task.recurrenceId && isTaskAlive(task);
+}
+function expandTaskOccurrences(tasks, range, today = todayValue()) {
+  if (!range.from || !range.to || range.from > range.to) return [];
+  const from = range.from > today ? range.from : today;
+  const claimed = /* @__PURE__ */ new Set();
+  for (const task of tasks) {
+    if (task.recurrenceId && task.occurrenceOf) {
+      claimed.add(occurrenceIdFor(task.occurrenceOf, task.recurrenceId));
+    }
+  }
+  const occurrences = [];
+  for (const series of tasks) {
+    if (!isSeries(series)) continue;
+    const skipped = new Set(series.exdates ?? []);
+    let cursor = series.dueDate;
+    for (let step = 0; step < MAX_OCCURRENCES; step += 1) {
+      const date = getNextDueDate({ ...series, dueDate: cursor }, today);
+      if (date <= cursor) break;
+      cursor = date;
+      if (date > range.to) break;
+      if (series.repeatEndDate && date > series.repeatEndDate) break;
+      if (date < from || skipped.has(date)) continue;
+      const id = occurrenceIdFor(series.id, date);
+      if (claimed.has(id)) continue;
+      occurrences.push({
+        ...series,
+        id,
+        dueDate: date,
+        // A range keeps its length, the same way `planRecurringCompletion`
+        // shifts `startDate` with the deadline rather than stranding it.
+        startDate: series.startDate ? shift(series.startDate, series.dueDate, date) : series.startDate,
+        // The rule belongs to the series, not to a date it produced — and the
+        // exceptions with it. `expandIcsOccurrences` clears the same two.
+        repeatType: "none",
+        repeatInterval: 1,
+        repeatDays: [],
+        repeatEndDate: "",
+        exdates: void 0,
+        // What it is: this series' occurrence for this date. Written even
+        // though nothing stored it, so a virtual occurrence and a real one read
+        // the same (§4).
+        recurrenceId: date,
+        occurrenceOf: series.id,
+        // Not started, not finished, and not owning the series' focus session.
+        completedAt: "",
+        activeSessionId: ""
+      });
+    }
+  }
+  return occurrences;
+}
+function shift(date, from, to) {
+  const day = 864e5;
+  const moved = Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`);
+  if (!Number.isFinite(moved)) return date;
+  return new Date(Date.parse(`${date}T00:00:00Z`) + Math.round(moved / day) * day).toISOString().slice(0, 10);
+}
+
 // src/lib/calendar/categoryModel.ts
 var FOCUS_ACTUAL_CATEGORY_ID = "cat-focus-actual";
 var FOCUS_ACTUAL_COLOR = "#0d9488";
@@ -2003,7 +2096,8 @@ function buildCalendarItems({
   colorBy = DEFAULT_COLOR_BY,
   externalCalendars = [],
   externalCalendarEvents = [],
-  externalCalendarRange,
+  visibleRange,
+  today,
   viewerTimezone,
   focusSessions = [],
   layers,
@@ -2025,12 +2119,14 @@ function buildCalendarItems({
     if (!categoryId) return true;
     return visibleCategoryIds.has(categoryId);
   }
-  const taskById = new Map(tasks.map((entry) => [entry.id, entry]));
+  const drawnToday = today ?? todayValue();
+  const drawnTasks = visibleRange ? [...tasks, ...expandTaskOccurrences(tasks, visibleRange, drawnToday)] : tasks;
+  const taskById = new Map(drawnTasks.map((entry) => [entry.id, entry]));
   const listsById2 = new Map(lists.map((entry) => [entry.id, entry]));
   const viewItems = projectItems({
-    tasks,
+    tasks: drawnTasks,
     lists,
-    today: todayValue()
+    today: drawnToday
   });
   for (const item of viewItems) {
     const task = taskById.get(item.sourceId);
@@ -2085,7 +2181,7 @@ function buildCalendarItems({
   const externalCalendarById = new Map(
     externalCalendars.filter((calendar) => calendar.enabled && calendar.visible).map((calendar) => [calendar.id, calendar])
   );
-  const externalOccurrences = externalCalendarRange ? expandIcsOccurrences(externalCalendarEvents, externalCalendarRange, { viewerTimezone }) : externalCalendarEvents;
+  const externalOccurrences = visibleRange ? expandIcsOccurrences(externalCalendarEvents, visibleRange, { viewerTimezone }) : externalCalendarEvents;
   for (const event of externalOccurrences) {
     const calendar = externalCalendarById.get(event.externalCalendarId);
     if (!calendar) continue;
@@ -2224,7 +2320,13 @@ async function loadCalendar(ctx, slice, window) {
     lists: slice.data.lists,
     externalCalendars: subscriptions,
     externalCalendarEvents: expanded,
-    externalCalendarRange: { from: window.from, to: window.to },
+    visibleRange: { from: window.from, to: window.to },
+    // The viewer's today, not the machine's. Repeating tasks expand forward
+    // from it (RECURRING_OCCURRENCE_EDIT_DESIGN.md §5.3), and this runs on a
+    // server: `todayValue()` would be the host's date, which is the wrong day
+    // for anyone far enough east or west of it — the same reason
+    // `viewerTimezone` is passed on the line below.
+    today: todayFor(ctx),
     viewerTimezone: timezone,
     focusSessions: include.includes("focus") ? slice.data.focusSessions : [],
     layers: {

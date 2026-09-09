@@ -302,7 +302,7 @@ describe("external events that repeat", () => {
     const items = build({
       externalCalendars: [calendar],
       externalCalendarEvents: [weekly],
-      externalCalendarRange: { from: "2026-08-01", to: "2026-08-31" },
+      visibleRange: { from: "2026-08-01", to: "2026-08-31" },
     });
     expect(items.map((item) => item.date)).toEqual([
       "2026-08-03",
@@ -319,7 +319,7 @@ describe("external events that repeat", () => {
     const items = build({
       externalCalendars: [calendar],
       externalCalendarEvents: [weekly],
-      externalCalendarRange: { from: "2026-08-01", to: "2026-08-31" },
+      visibleRange: { from: "2026-08-01", to: "2026-08-31" },
     });
     expect(new Set(keys(items)).size).toBe(items.length);
   });
@@ -421,5 +421,73 @@ describe("popoverMemo", () => {
 
   it("does not read a task's notes onto an event that shares its id", () => {
     expect(popoverMemo({ sourceType: "external", sourceId: "t1" }, tasks, events)).toBe("");
+  });
+});
+
+// M2 of RECURRING_OCCURRENCE_EDIT_DESIGN.md, at the seam where it becomes
+// visible. `taskOccurrences.test.ts` pins the expansion itself; these pin that
+// the calendar actually asks for it, and the two rules that decide what it asks
+// for — a range makes occurrences finite, and today makes them forward-only.
+describe("a repeating task's later occurrences", () => {
+  const TODAY = "2026-08-15";
+  const weekly = () => task({
+    id: "series-1", title: "Water the plants", dueDate: TODAY,
+    repeatType: "weekly", repeatInterval: 1,
+  });
+
+  it("draws every week in the range, not just the one the record sits on", () => {
+    const items = build({
+      tasks: [weekly()],
+      visibleRange: { from: "2026-08-01", to: "2026-08-31" },
+      today: TODAY,
+    });
+    expect(items.map((item) => item.date)).toEqual([
+      "2026-08-15", "2026-08-22", "2026-08-29",
+    ]);
+  });
+
+  it("gives each occurrence its own key", () => {
+    const items = build({
+      tasks: [weekly()],
+      visibleRange: { from: "2026-08-01", to: "2026-08-31" },
+      today: TODAY,
+    });
+    expect(new Set(keys(items)).size).toBe(items.length);
+  });
+
+  it("draws one occurrence when the caller gives no range", () => {
+    // Pinned so a caller that draws no calendar keeps reading a repeating task
+    // as one thing rather than silently gaining a copy per week.
+    const items = build({ tasks: [weekly()], today: TODAY });
+    expect(items.map((item) => item.date)).toEqual([TODAY]);
+  });
+
+  it("adds nothing behind today, however far back the range reaches", () => {
+    // R8 (§5.3): a neglected repeat stays one thing. The record still draws on
+    // its own overdue date — that part is unchanged — and no missed week is
+    // invented around it.
+    const items = build({
+      tasks: [task({ id: "series-1", dueDate: "2026-07-25", repeatType: "weekly" })],
+      visibleRange: { from: "2026-07-01", to: "2026-08-15" },
+      today: TODAY,
+    });
+    expect(items.map((item) => item.date)).toEqual(["2026-07-25"]);
+  });
+
+  it("does not draw over an occurrence that was already finished", () => {
+    const done = task({
+      id: "done-1", title: "Water the plants", dueDate: "2026-08-22", repeatType: "none",
+      status: "completed", completedAt: "2026-08-22T09:00:00.000Z",
+      recurrenceId: "2026-08-22", occurrenceOf: "series-1",
+    });
+    const items = build({
+      tasks: [weekly(), done],
+      visibleRange: { from: "2026-08-01", to: "2026-08-31" },
+      today: TODAY,
+      layers: { ...defaultCalendarLayers, completed: true },
+    });
+    const onTheDay = items.filter((item) => item.date === "2026-08-22");
+    expect(onTheDay).toHaveLength(1);
+    expect(onTheDay[0].sourceId).toBe("done-1");
   });
 });

@@ -13,6 +13,7 @@ import {
   localDateTimeParts,
 } from "../lib/ics/parse";
 import { expandIcsOccurrences } from "../lib/ics/recurrence";
+import { expandTaskOccurrences } from "./taskOccurrences";
 import {
   externalCategoryId,
   FOCUS_ACTUAL_CATEGORY_ID,
@@ -191,15 +192,29 @@ export interface BuildCalendarItemsInput {
   externalCalendars?: ExternalCalendar[];
   externalCalendarEvents?: ExternalCalendarEvent[];
   /**
-   * The days worth drawing, so a repeating event can be expanded into the
-   * occurrences that fall inside them (`lib/ics/recurrence`).
+   * The days worth drawing, so a repeating thing can be expanded into the
+   * occurrences that fall inside them.
    *
    * Optional, and its absence is not free: without a range there is nothing to
    * expand within, so a weekly meeting draws once — on the day it was first
    * created — and every other week reads as empty. Callers drawing a calendar
    * should pass one.
+   *
+   * It was `externalCalendarRange` while only external events expanded
+   * (`lib/ics/recurrence`). Repeating TASKS expand within it too now
+   * (RECURRING_OCCURRENCE_EDIT_DESIGN.md M2, `utils/taskOccurrences`), and the
+   * old name would have said this range was not about them. Passing one is
+   * what makes a caller "a thing that draws a calendar" — which is exactly the
+   * line §9 draws between the surfaces that expand and the ones that must not
+   * (the Board would show one card fifty-two times).
    */
-  externalCalendarRange?: { from: string; to: string };
+  visibleRange?: { from: string; to: string };
+  /**
+   * Today, for the one rule that needs it: occurrences are expanded FORWARD
+   * only (§5.3, R8). A neglected repeat stays one thing rather than becoming a
+   * pile of missed weeks, because that is what completing it still does.
+   */
+  today?: string;
   /**
    * Whose "local" the external events are read in.
    *
@@ -226,7 +241,8 @@ export function buildCalendarItems({
   colorBy = DEFAULT_COLOR_BY,
   externalCalendars = [],
   externalCalendarEvents = [],
-  externalCalendarRange,
+  visibleRange,
+  today,
   viewerTimezone,
   focusSessions = [],
   layers,
@@ -278,12 +294,28 @@ export function buildCalendarItems({
   //
   // `taskById` carries the fields no view needs but this renderer does —
   // repeat, category, the raw status for the popover.
-  const taskById = new Map(tasks.map((entry) => [entry.id, entry]));
+  // A repeating task drew once, on the day it happens to sit on, because the
+  // Task model is rolling rather than a series (RECURRING_OCCURRENCE_EDIT_DESIGN.md
+  // §1.1). Its later occurrences are computed here and never stored — they are
+  // the same record on other days, and a range is what makes them finite (§3).
+  //
+  // No range, no expansion — a caller that draws no calendar keeps the old
+  // single-occurrence reading rather than silently gaining a copy per week.
+  // Both callers that DO pass a range want the expansion: the calendar views,
+  // and the AI context builder, whose whole job is answering what a window
+  // looks like. A repeating task occupies those days, so leaving it on one of
+  // them would make the reader and the screen disagree.
+  const drawnToday = today ?? todayValue();
+  const drawnTasks = visibleRange
+    ? [...tasks, ...expandTaskOccurrences(tasks, visibleRange, drawnToday)]
+    : tasks;
+
+  const taskById = new Map(drawnTasks.map((entry) => [entry.id, entry]));
   const listsById = new Map(lists.map((entry) => [entry.id, entry]));
   const viewItems = projectItems({
-    tasks,
+    tasks: drawnTasks,
     lists,
-    today: todayValue(),
+    today: drawnToday,
   });
 
   for (const item of viewItems) {
@@ -367,8 +399,8 @@ export function buildCalendarItems({
       .map((calendar) => [calendar.id, calendar]),
   );
 
-  const externalOccurrences = externalCalendarRange
-    ? expandIcsOccurrences(externalCalendarEvents, externalCalendarRange, { viewerTimezone })
+  const externalOccurrences = visibleRange
+    ? expandIcsOccurrences(externalCalendarEvents, visibleRange, { viewerTimezone })
     : externalCalendarEvents;
 
   for (const event of externalOccurrences) {

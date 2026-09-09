@@ -292,7 +292,7 @@ export function CalendarView({
    * its leading and trailing days, and the mini month beside it. Wider costs
    * only the occurrences nobody looks at; narrower leaves gaps in the grid.
    */
-  const externalCalendarRange = useMemo(() => {
+  const visibleRange = useMemo(() => {
     const year = anchorDate.getFullYear();
     const month = anchorDate.getMonth();
     return {
@@ -309,7 +309,7 @@ export function CalendarView({
         focusSessions,
         externalCalendars,
         externalCalendarEvents,
-        externalCalendarRange,
+        visibleRange,
         layers,
         colorBy: viewOptions.colorBy,
         categories: categoriesById,
@@ -322,7 +322,7 @@ export function CalendarView({
       focusSessions,
       externalCalendars,
       externalCalendarEvents,
-      externalCalendarRange,
+      visibleRange,
       layers,
       viewOptions.colorBy,
       categoriesById,

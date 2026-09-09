@@ -126,7 +126,13 @@ export async function loadCalendar(
     lists: slice.data.lists,
     externalCalendars: subscriptions,
     externalCalendarEvents: expanded,
-    externalCalendarRange: { from: window.from, to: window.to },
+    visibleRange: { from: window.from, to: window.to },
+    // The viewer's today, not the machine's. Repeating tasks expand forward
+    // from it (RECURRING_OCCURRENCE_EDIT_DESIGN.md §5.3), and this runs on a
+    // server: `todayValue()` would be the host's date, which is the wrong day
+    // for anyone far enough east or west of it — the same reason
+    // `viewerTimezone` is passed on the line below.
+    today: todayFor(ctx),
     viewerTimezone: timezone,
     focusSessions: include.includes("focus") ? slice.data.focusSessions : [],
     layers: {
