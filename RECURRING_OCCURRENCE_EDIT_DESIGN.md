@@ -1,6 +1,6 @@
 # 반복의 회차를 편집한다
 
-> 상태: **설계 · 착수 전** · 2026-09-09
+> 상태: **M1·M2 구현 완료 · M3~M6 착수 전** · 2026-09-09
 > 요청: "이번 회차만 옮기고, 이번 회차만 건너뛰고, 이번 회차만 고치고, 이 회차 이후 전부 바꾼다.
 > 구글에서 온 반복 일정과 앱에서 만든 반복 작업 **둘 다**. 앱 반복도 앞으로의 회차가 다 보였으면."
 > 선행 문서: `GOOGLE_CALENDAR_SYNC_DESIGN.md` §8 (반복 단방향) ·
@@ -378,7 +378,7 @@ Task 시리즈는 이미 RRULE 로 나간다 (§1.4). 회차를 실체화하면 
 | 단계 | 내용 | 크기 |
 |---|---|---|
 | ~~**M1**~~ | Task 에 `exdates`/`recurrenceId`/`occurrenceOf` 추가. 완료 스냅샷이 채우게 한다 | **완료** — `types.ts` · `utils/planner.ts` |
-| **M2** | `expandTaskOccurrences` + 캘린더가 미래 회차를 그린다. 범위는 `max(from, today)` | 중간 |
+| ~~**M2**~~ | `expandTaskOccurrences` + 캘린더가 미래 회차를 그린다. 범위는 `max(from, today)` | **완료** — `utils/taskOccurrences.ts` · `utils/calendarItems.ts` |
 | **M3** | §6.1~6.3 — 이동 · 건너뛰기 · 내용 수정. §8 의 3지 선택 | 중간 |
 | **M4** | §6.4 — 이 회차 이후 전부. 시리즈 쪼개기 | 중간 |
 | **M5** | §7.1 — 외부 일정 회차를 `events.instances` 로 편집. `readOnly` 를 조건부로 | 중간 |
