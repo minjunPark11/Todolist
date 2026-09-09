@@ -6,6 +6,7 @@
 // left with nothing but I/O and retries (§12 M1-2), which is the same split
 // `server/data/*` already uses.
 import { isTaskAlive, type TaskStateFields } from "../../tasks/taskState";
+import { isOccurrenceTask } from "./occurrenceOutbound";
 
 /**
  * The fields this mapper reads, and nothing else.
@@ -30,6 +31,13 @@ export interface SyncableTask extends TaskStateFields {
   /** JS weekday numbers, 0 = Sunday — see `domain/schedule/recurrence`. */
   repeatDays?: number[];
   repeatEndDate?: string;
+  /**
+   * Read only to be REFUSED (§7.2). A record carrying these two is one
+   * occurrence of a series, and the series' own RRULE already covers its date —
+   * so this path must not give it an event of its own.
+   */
+  recurrenceId?: string;
+  occurrenceOf?: string;
 }
 
 /** One end of a Google event. Exactly one of `date` / `dateTime` is set. */
@@ -76,6 +84,13 @@ function isTime(value: string | undefined): value is string {
  * up on are out.
  */
 export function isSyncEligible(task: SyncableTask): boolean {
+  // An occurrence of a series is NOT eligible on this path, however ordinary it
+  // looks from here (RECURRING_OCCURRENCE_EDIT_DESIGN.md §7.2, M6). Its series
+  // already goes out with an RRULE, so Google draws that date from the rule —
+  // creating a second event for the occurrence would put the same one on the
+  // calendar twice, on two different days. It goes out as an override of the
+  // series' event instead, which `occurrenceOutbound` addresses.
+  if (isOccurrenceTask(task)) return false;
   return isDate(task.dueDate) && isTaskAlive(task);
 }
 
