@@ -26,8 +26,9 @@ select proname from pg_proc where proname = 'authorize_google_token';
 ### 순서
 
 1. **운영 DB 백업.** 021 은 `public.tasks` 에 `revision` 컬럼과 트리거를 추가한다.
-2. `021_022_preflight.sql` 실행. **모든 행이 OK** 여야 한다.
-   STOP 이 있으면 부분 적용 상태이거나 선행 마이그레이션이 빠진 것이므로 적용하지 않는다.
+2. `021_022_preflight.sql` 실행. **STOP 이 하나도 없어야** 한다.
+   STOP 은 부분 적용 상태이거나 선행 마이그레이션이 빠졌다는 뜻이므로 적용하지 않는다.
+   NOTE 는 적용을 막지 않는다(아래 참고).
 3. `supabase/migrations/021_google_inbound_cursor.sql` 을 **통째로** 실행한다.
 4. `supabase/migrations/022_google_sync_protocol.sql` 을 **통째로** 실행한다.
 5. `021_022_verify.sql` 실행. **모든 행이 OK** 여야 한다.
@@ -45,8 +46,25 @@ select proname from pg_proc where proname = 'authorize_google_token';
 
 023–034 적용과 계정 활성화는 별개의 작업이며 `docs/google-task-rollout.md` 를 따른다.
 
+### NOTE: public.lists 가 없다
+
+2026-09-09 운영 확인: `public.lists` 가 없다. 007 을 적용한 적이 없는 프로젝트다.
+이것은 고장이 아니다. 클라이언트가 `lists` 를 `optionalRemoteTables` 로 취급해
+없으면 없는 대로 나머지를 동기화한다(`src/domain/sync/buildSyncPlan.ts`).
+
+이번 복구에는 지장이 없다. 021 은 `public.lists` 를 `commit_google_task_inbound` 의
+PL/pgSQL 본문에서만 참조하고, 본문은 함수를 만들 때 테이블을 확인하지 않는다.
+`lists` 없이 001–020 을 적용한 PostgreSQL 에서 021, 022 가 정상 적용되고
+`authorize_google_token(user,1,null)` 이 `{"allowed":true,"minimumProtocol":1}` 을
+돌려주는 것을 확인했다.
+
+다만 **나중에 인바운드(구글 일정 → 작업 생성)를 켤 때는 선행 조건이다.**
+`commit_google_task_inbound` 는 `public.lists` 에 살아 있는 inbox 행이 있어야 생성을
+허용하고, 없으면 `INBOX_CHANGED` 로 거절한다(021 line 312). 활성화 전에 007 적용과
+inbox 행 존재를 먼저 해결해야 한다.
+
 ### 검증 방법
 
-001–020 을 적용한 PGlite PostgreSQL 에 021, 022 를 순서대로 적용해 위 세 가지를 확인했다.
-preflight 는 적용 전 17개 항목 전부 OK, 021 만 적용한 부분 상태에서는 STOP 을 낸다.
-verify 는 적용 후 11개 항목 전부 OK.
+007 을 제외한 001–020 을 적용해 운영 상태를 그대로 재현한 PGlite PostgreSQL 에서
+021, 022 를 순서대로 적용해 확인했다. preflight 는 적용 전 STOP 0 / NOTE 1(lists),
+021 만 적용한 부분 상태에서는 STOP 9 를 낸다. verify 는 적용 후 11개 항목 전부 OK.
