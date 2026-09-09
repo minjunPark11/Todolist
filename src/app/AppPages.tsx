@@ -11,6 +11,7 @@ import type { FocusUserSettings } from "../lib/focusSettingsStorage";
 import type { SettingsUpdateStatus } from "../platform";
 import type { TaskDetailPresentation } from "../domain/tasks/responsive";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Task } from "../types";
+import { resolveOccurrence } from "../utils/taskOccurrences";
 
 type Planner = ReturnType<typeof usePlannerData>;
 
@@ -207,6 +208,9 @@ export function AppPages({
           onDeleteExternalEvent={onDeleteExternalEvent}
           onUpdateTask={planner.updateTask}
           onUpdateTaskSchedule={planner.updateTaskSchedule}
+          onEditOccurrence={planner.editOccurrence}
+          onSkipOccurrence={planner.skipOccurrence}
+          isOccurrence={(id) => resolveOccurrence(planner.tasks, id) !== null}
           onCreateTask={planner.createTask}
           onDeleteTask={requestDeleteTask}
           onOpenTask={onOpenTask}
