@@ -224,6 +224,31 @@ export interface Task {
   repeatDays: number[];
   repeatEndDate: string;
   /**
+   * Occurrences of this series that were skipped, as the dates they were on.
+   *
+   * On the SERIES only — an occurrence does not own the series' exceptions,
+   * the same way it does not own its `repeat*` rule.
+   *
+   * The name is `ExternalCalendarEvent`'s (RECURRING_OCCURRENCE_EDIT_DESIGN.md
+   * §4): the two recurrence models are converging on one vocabulary rather
+   * than growing a second one, so the calendar can read a Task occurrence and
+   * a Google occurrence through the same field names.
+   */
+  exdates?: string[];
+  /**
+   * The date the occurrence this record stands in for WAS on — not the date it
+   * now falls on. Present makes this Task one occurrence of a series rather
+   * than a task of its own.
+   *
+   * `planRecurringCompletion` fills it on the record it makes for a finished
+   * occurrence, which is already an override in everything but name (§4.1).
+   * Absent on every Task written before this field existed, and those keep
+   * working — nothing reads it yet (§10 M1).
+   */
+  recurrenceId?: string;
+  /** The id of the series Task this occurrence came from. */
+  occurrenceOf?: string;
+  /**
    * When to be reminded, as a `ReminderPreset` ("" = none).
    *
    * Stored as a plain string rather than the domain union so this file stays

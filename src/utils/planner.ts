@@ -201,9 +201,23 @@ export function planRecurringCompletion(
     repeatInterval: 1,
     repeatDays: [],
     repeatEndDate: "",
+    // Same reason as the four above, and easy to miss because the spread is
+    // silent about it: the skipped dates belong to the SERIES. Copied here they
+    // would say this one finished occurrence had exceptions of its own.
+    exdates: undefined,
     activeSessionId: "",
     createdAt: now,
     updatedAt: now,
+    // Which occurrence this was, and whose. The record already IS the override
+    // for this date (RECURRING_OCCURRENCE_EDIT_DESIGN.md §4.1) — it just never
+    // said so, and the date it stood for was lost the moment the parent rolled
+    // forward. Nothing reads these yet; M1 is where they start being written.
+    //
+    // `dueDate` is the date the occurrence was on, read BEFORE `patch` moves
+    // the parent. A repeating task with no due date has no occurrence date to
+    // name, and inventing one (today, say) would file the completion under a
+    // date the series never produced — so it stays unset.
+    ...(task.dueDate ? { recurrenceId: task.dueDate, occurrenceOf: task.id } : {}),
   };
 
   // A range keeps its length: the start moves by however far the end did,

@@ -184,3 +184,51 @@ describe("getNextDueDate — named weekdays and yearly", () => {
     expect(getNextDueDate(task({ repeatType: "yearly", dueDate: TODAY }), TODAY)).toBe("2027-08-13");
   });
 });
+
+// M1 of RECURRING_OCCURRENCE_EDIT_DESIGN.md. The record for a finished
+// occurrence was already an override in everything but name (§4.1) — it just
+// never said WHICH occurrence it was, and the parent rolling forward took that
+// date with it. These pin the three fields at the point they start being
+// written; nothing reads them yet.
+describe("planRecurringCompletion — the occurrence it stands for", () => {
+  it("names the date the occurrence was on, and the series it came from", () => {
+    const result = planRecurringCompletion(
+      task({ id: "series-1", dueDate: TODAY }), "done-1", NOW, TODAY);
+    expect(result.kind).toBe("rolled");
+    if (result.kind !== "rolled") return;
+    expect(result.occurrence.recurrenceId).toBe(TODAY);
+    expect(result.occurrence.occurrenceOf).toBe("series-1");
+  });
+
+  it("names the date it WAS on, not the one the series rolled to", () => {
+    const result = planRecurringCompletion(task({ dueDate: TODAY }), "done-1", NOW, TODAY);
+    if (result.kind !== "rolled") return;
+    expect(result.occurrence.recurrenceId).toBe(TODAY);
+    expect(result.patch.dueDate).toBe("2026-08-14");
+    expect(result.occurrence.recurrenceId).not.toBe(result.patch.dueDate);
+  });
+
+  it("leaves them unset when the series has no due date to name", () => {
+    // Filing the completion under today would put it on a date the series
+    // never produced, so it says nothing instead.
+    const result = planRecurringCompletion(task({ dueDate: "" }), "done-1", NOW, TODAY);
+    if (result.kind !== "rolled") return;
+    expect(result.occurrence.recurrenceId).toBeUndefined();
+    expect(result.occurrence.occurrenceOf).toBeUndefined();
+  });
+
+  it("does not carry the series' skipped dates onto one occurrence", () => {
+    // Same rule as the repeat fields: exceptions belong to the series. The
+    // spread would copy them silently.
+    const series = task({ dueDate: TODAY, exdates: ["2026-08-20"] });
+    const result = planRecurringCompletion(series, "done-1", NOW, TODAY);
+    if (result.kind !== "rolled") return;
+    expect(result.occurrence.exdates).toBeUndefined();
+    expect(result.occurrence.repeatType).toBe("none");
+  });
+
+  it("says nothing new on the last occurrence, which makes no record", () => {
+    const ending = task({ dueDate: TODAY, repeatEndDate: TODAY });
+    expect(planRecurringCompletion(ending, "done-1", NOW, TODAY).kind).toBe("final");
+  });
+});
