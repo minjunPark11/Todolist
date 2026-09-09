@@ -32,6 +32,8 @@ select proname from pg_proc where proname = 'authorize_google_token';
 3. `supabase/migrations/021_google_inbound_cursor.sql` 을 **통째로** 실행한다.
 4. `supabase/migrations/022_google_sync_protocol.sql` 을 **통째로** 실행한다.
 5. `021_022_verify.sql` 실행. **모든 행이 OK** 여야 한다.
+   3, 4 를 건너뛰었거나 실패했다면 검사표 대신 무엇이 빠졌는지 한국어 오류로 알려주고 멈춘다.
+   021 은 트랜잭션이므로 실패하면 아무것도 남기지 않는다. 다시 돌리기 전에 그 오류를 먼저 읽는다.
 6. 앱에서 구글 캘린더 카드의 "다시 확인" 을 누른다. 빨간 문구가 사라져야 한다.
 
 ### 이 적용이 무엇을 켜지 않는가
