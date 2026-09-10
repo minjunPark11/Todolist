@@ -22,11 +22,12 @@ const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "24-focus
 /**
  * 테마를 타지 않는 토큰들.
  *
- * 자·리듬·모양은 라이트와 다크가 같은 값을 쓰므로 다시 칠할 것이 없다. 뒤의 둘은
+ * 자·리듬·모양·모션은 라이트와 다크가 같은 값을 쓰므로 다시 칠할 것이 없다. 뒤의 둘은
  * 다시 칠하는 쪽이 아니라 **재료**다 — `.focus-immersive` 가 자기 판과 잉크를 만들
  * 때 읽는 값이고, 이름에 이미 "on dark" 와 "tile" 이 들어 있다.
  */
-const NOT_A_THEME_SURFACE = /^--(?:space|type|radius|weight|display|icon|focus-clock|shadow)-/;
+const NOT_A_THEME_SURFACE =
+  /^--(?:space|type|radius|weight|display|icon|focus-clock|shadow|motion)-/;
 const IMMERSIVE_INPUTS = new Set(["--color-on-dark", "--color-surface-tile-1"]);
 
 /** `.focus-immersive { … }` 선언 블록 하나. */

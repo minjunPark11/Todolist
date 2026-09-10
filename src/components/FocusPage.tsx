@@ -418,6 +418,33 @@ export function FocusPage({
       : flow || mode === "pomodoro"
         ? (flow?.settings ?? prefs).focusMinutes * 60
         : 0;
+  /* 포모도로 탭은 "지금 무슨 블록인지" 와 "얼마나 왔는지" 를 함께 말한다 (§4.3).
+     휴식은 별도 화면이 아니라 이 둘의 값이 바뀐 상태다 — 라벨 한 줄과 막대가
+     같은 자리에서 다른 것을 가리킬 뿐이다. */
+  const inPomodoro = tab === "pomodoro" || Boolean(flow) || isBreak;
+  /* 포모도로에서는 블록이 끝나는 순간 `result` 가 생기고 곧바로 휴식이 시작된다 —
+     그래서 `result` 가 있다는 것만으로는 결과 화면이 아니다. 결과는 도는 것이
+     아무것도 없을 때뿐이다. */
+  const showingResult = Boolean(result) && !activeSession && !isBreak;
+  const blockTotal =
+    isBreak && flow
+      ? flow.breakSeconds
+      : (activeSession?.targetSeconds ??
+        (flow?.settings ?? prefs).focusMinutes * 60);
+  /* 시계는 남은 시간을 세므로 진행률은 그 여집합이다. */
+  const blockProgress =
+    blockTotal > 0 ? Math.min(1, Math.max(0, 1 - display / blockTotal)) : 0;
+  const blockLabel = (() => {
+    if (isBreak && flow) {
+      const long = flow.completedBlocks % flow.settings.longBreakEvery === 0;
+      return `${long ? l("긴 휴식", "Long break") : l("짧은 휴식", "Short break")} · ${Math.round(flow.breakSeconds / 60)}${l("분", " min")}`;
+    }
+    const minutes = Math.round(blockTotal / 60);
+    const cycle = flow
+      ? ` · ${flow.completedBlocks % flow.settings.longBreakEvery}/${flow.settings.longBreakEvery}`
+      : "";
+    return `${l("집중 세션", "Focus block")} · ${minutes}${l("분", " min")}${cycle}`;
+  })();
   async function openMini() {
     if (!activeSession && !isBreak) return;
     const ok = await platform.miniFocusTimer.open({
@@ -441,6 +468,9 @@ export function FocusPage({
   }
   const stage = (
     <>
+      {inPomodoro && !showingResult && (
+        <p className="focus-eyebrow">{blockLabel}</p>
+      )}
       {/* 앵커 — 여섯 상태에서 **자리가 변하지 않는 유일한 요소**다. 유휴에서 고르는
           자리와 세션 중에 읽는 자리가 같아야 "시계가 무엇을 재는지" 가 한 곳에서
           답해진다. 그래서 작업명은 여기에만 있다 (§4.1). */}
@@ -475,28 +505,30 @@ export function FocusPage({
             <FocusIcon name="chevron" />
           </button>
         ))}
-      {!activeSession && !isBreak && !result && (mode === "pomodoro" || flow) && (
-        <button
-          className="focus-text-button"
-          onClick={() => setShowSettings(true)}
-        >
-          {flow?.settings.focusMinutes ?? prefs.focusMinutes}
-          {l("분 집중", " min focus")} ·{" "}
-          {flow?.settings.shortBreakMinutes ?? prefs.shortBreakMinutes}
-          {l("분 휴식", " min break")}
-        </button>
-      )}
 
       {/* 시계는 자리를 지킨다. 세션이 끝나도 화면이 바뀌는 것이 아니라 이 칸의 값이
           바뀐다 (§4.2) — 종료가 화면 전환으로 느껴지지 않게. */}
       <div className="focus-time" aria-label={l("타이머", "Timer")}>
         {formatFocusDuration(
-          result && !activeSession && !isBreak
-            ? result.accumulatedSeconds
-            : display,
+          showingResult && result ? result.accumulatedSeconds : display,
         )}
       </div>
 
+      {/* 막대는 시계가 말한 것을 한 번 더 그린다. **휴식이어도 색을 바꾸지 않는다** —
+          무엇인지는 위의 라벨이 말하고, 색이 상태를 나르기 시작하면 이 화면의
+          파랑이 다시 둘이 된다. */}
+      {inPomodoro && !showingResult && (
+        <div
+          className="focus-progress"
+          role="progressbar"
+          aria-label={blockLabel}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(blockProgress * 100)}
+        >
+          <span style={{ width: `${blockProgress * 100}%` }} />
+        </div>
+      )}
       {/* 상태는 시계 아래다. 위에 두면 시계에 닿기 전에 읽어야 하는 줄이 하나 더
           생기는데, 이 화면에서 사람이 보러 온 것은 시계다. */}
       {activeSession && (
@@ -517,7 +549,7 @@ export function FocusPage({
               : l("휴식 중", "Taking a break")}
         </p>
       )}
-      {result && !activeSession && !isBreak && (
+      {showingResult && (
         <p className="focus-status" role="status">
           {l("집중이 기록되었어요", "Focus recorded")}
         </p>
@@ -585,33 +617,29 @@ export function FocusPage({
         </>
       ) : isBreak && flow ? (
         <>
-          <p className="focus-muted">
-            {flow.completedBlocks % flow.settings.longBreakEvery === 0
-              ? l("긴 휴식", "Long break")
-              : l("짧은 휴식", "Short break")}{" "}
-            · {flow.completedBlocks}/{flow.settings.longBreakEvery}{" "}
-            {l("완료", "completed")}
-          </p>
-          <div className="focus-main-actions">
-            <button
-              onClick={() =>
-                run({
-                  type:
-                    flow.phase === "break_running"
-                      ? "break_pause"
-                      : flow.phase === "break_ready"
-                        ? "break_start"
-                        : "break_resume",
-                  id: flow.id,
-                })
-              }
-            >
-              {flow.phase === "break_running"
-                ? l("일시정지", "Pause")
-                : flow.phase === "break_ready"
-                  ? l("휴식 시작", "Start break")
-                  : l("휴식 재개", "Resume break")}
-            </button>
+          {/* 무슨 휴식인지는 위의 라벨이 이미 말했다. 여기서는 같은 규칙이다 —
+              주 버튼 하나, 나머지는 중립 (§4 규칙 1·2). */}
+          <button
+            className="focus-primary"
+            onClick={() =>
+              run({
+                type:
+                  flow.phase === "break_running"
+                    ? "break_pause"
+                    : flow.phase === "break_ready"
+                      ? "break_start"
+                      : "break_resume",
+                id: flow.id,
+              })
+            }
+          >
+            {flow.phase === "break_running"
+              ? l("일시정지", "Pause")
+              : flow.phase === "break_ready"
+                ? l("휴식 시작", "Start break")
+                : l("휴식 재개", "Resume break")}
+          </button>
+          <div className="focus-secondary">
             <button
               className="focus-text-button"
               onClick={() => {
@@ -619,7 +647,11 @@ export function FocusPage({
                 setResultId(null);
               }}
             >
-              {l("휴식 종료", "End break")}
+              {/* 아직 시작하지 않은 휴식을 '종료' 한다는 말은 틀리다 —
+                  그건 건너뛰는 것이다. 명령은 같고 이름만 상태를 따른다. */}
+              {flow.phase === "break_ready"
+                ? l("휴식 건너뛰기", "Skip break")
+                : l("휴식 종료", "End break")}
             </button>
           </div>
           <p className="focus-muted">
@@ -702,6 +734,19 @@ export function FocusPage({
               "You can start without choosing a task.",
             )}
           </p>
+          {/* 길이는 위의 라벨이 말하므로, 여기는 그것을 바꾸러 가는 문이다.
+             시계 위에 있던 "25 min focus · 5 min break" 는 값이면서 링크라
+             무엇을 하는 자리인지 말하지 않았다. */}
+          {inPomodoro && (
+            <div className="focus-secondary">
+              <button
+                className="focus-text-button"
+                onClick={() => setShowSettings(true)}
+              >
+                {l("포모도로 설정", "Pomodoro settings")}
+              </button>
+            </div>
+          )}
           {flow && (
             <button
               className="focus-text-button"
