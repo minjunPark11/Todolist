@@ -94,3 +94,23 @@ it("copies only the selected historical task using the displayed generation and 
   expect(screen.getByText("Tasks from another connection (1)")).toBeTruthy();
   expect(screen.getByText(/calendar c\./)).toBeTruthy();
 });
+
+it("says what was actually thrown, not only that something was", async () => {
+  // "Could not finish syncing" is true of every failure and useful for none.
+  // A lost lease, a connection needing attention, another window holding the
+  // lock, a snapshot that would not parse — one sentence, four fixes. The only
+  // way anyone learned which was to open a browser console, which is not a
+  // thing to ask of the person the sync belongs to.
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: "failed",
+    errorDetail: "Google task sync is running in another window." });
+  mount();
+  const said = screen.getByRole("alert").textContent ?? "";
+  expect(said).toContain("Sync could not finish");
+  expect(said).toContain("running in another window");
+});
+
+it("says only the sentence when nothing was thrown with a message", () => {
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: "failed" });
+  mount();
+  expect(screen.getByRole("alert").textContent).not.toContain("(");
+});

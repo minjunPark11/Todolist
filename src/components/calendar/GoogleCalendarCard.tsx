@@ -41,7 +41,6 @@ import {
 import { platform } from "../../platform";
 import { supabase } from "../../services/supabaseClient";
 import { ConfirmModal } from "../kit";
-import { GoogleCalendarSourceList } from "./GoogleCalendarSourceList";
 import { GoogleTaskReviewPanel } from "./GoogleTaskReviewPanel";
 import { readGoogleTaskSyncState, subscribeGoogleTaskSync } from "../../lib/googleTaskSyncState";
 
@@ -75,6 +74,15 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
   const aligningRef = useRef(false);
   /** The zone the reader picked, held until they confirm the re-read it costs. */
   const [pendingZone, setPendingZone] = useState("");
+  /**
+   * What the last pin attempt did, said BESIDE the picker.
+   *
+   * Separate from the card's shared `notice`/`error`, which render at the
+   * bottom — past the calendar list and the review panel. The answer to a
+   * button in the first row was arriving several hundred pixels below it,
+   * often off-screen, which reads exactly like nothing having happened.
+   */
+  const [timezoneMessage, setTimezoneMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const pinnedZone = status.kind === "connected" ? status.connection.syncTimezone ?? "" : "";
   // Four hundred options whose offsets only move on a DST boundary, so built
   // once per set of zones rather than per render. The pinned zone and the
@@ -328,10 +336,21 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
    * screen stays internally consistent about it.
    */
   async function alignTimezone(zone: string) {
-    if (status.kind !== "connected" || !zone || aligningRef.current || syncing || taskSync.busy) return;
+    if (status.kind !== "connected" || !zone || aligningRef.current) return;
+    // A sync in flight is a refusal, not a no-op.
+    //
+    // The picker is disabled while one runs, but the confirmation is a modal
+    // and outlives that: open it, have a background pass start underneath,
+    // press the button, and this used to return without a word. The reader
+    // then watches the pinned zone stay exactly where it was and has nothing
+    // to read — which is the report that brought this bug in.
+    if (syncing || taskSync.busy) {
+      setTimezoneMessage({ kind: "error", text: t("settings.google.error.syncInProgress") });
+      return;
+    }
     aligningRef.current = true;
     setAligning(true);
-    setError(""); setNotice("");
+    setTimezoneMessage(null);
     const version = ++readVersion.current;
     try {
       await alignGoogleTimezone(status.connection.calendarId, zone);
@@ -349,10 +368,10 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
         const connection = await readConnection();
         if (connection && version === readVersion.current) setStatus({ kind: "connected", connection });
       } catch { /* The next read settles it. */ }
-      setNotice(t("settings.google.timezoneAligned", { timezone: zone }));
+      setTimezoneMessage({ kind: "ok", text: t("settings.google.timezoneAligned", { timezone: zone }) });
       notifyGoogleConnectionChanged();
     } catch (thrown) {
-      if (version === readVersion.current) setError(describe(thrown));
+      if (version === readVersion.current) setTimezoneMessage({ kind: "error", text: describe(thrown) });
     } finally {
       aligningRef.current = false;
       setAligning(false);
@@ -466,6 +485,11 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
             </div>
           ) : null}
           {aligning ? <p className="ff-settings-note" role="status">{t("settings.google.aligningTimezone")}</p> : null}
+          {timezoneMessage ? (
+            timezoneMessage.kind === "error"
+              ? <p className="auth-message error" role="alert">{timezoneMessage.text}</p>
+              : <p className="ff-settings-note" role="status">{timezoneMessage.text}</p>
+          ) : null}
           {/* Still said out loud when the two disagree. The picker shows what
               is pinned but cannot say that it is wrong, and the general
               settings screen can still move the account's zone away from it. */}
@@ -480,7 +504,6 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
             setNotice(""); setError("");
             window.dispatchEvent(new Event(GOOGLE_SYNC_REQUESTED));
           }}>{t(syncing ? "settings.google.syncingNow" : "settings.google.syncNow")}</button>
-          <GoogleCalendarSourceList ownCalendarId={status.connection.calendarId} />
           <GoogleTaskReviewPanel />
         </>
       ) : null}

@@ -634,6 +634,10 @@
 /* 타이핑 중에 텅 비는 표면은 고장난 것으로 읽힌다. */
 .ff-timezone-empty { margin: 0; padding: 10px 8px; font-size: 12px; color: var(--text-tertiary); }
 
+/* 실제로 던져진 문장. 판정 옆에 작게 — 문장 하나에 원인이 넷이라 이것만이
+   그것들을 가른다. */
+.ff-google-review-detail { color: var(--text-tertiary); font-size: 12px; }
+
 .ff-import-btn { cursor: pointer; }
 .ff-settings-msg { color: var(--success-ink); font-size: 13px; padding: 8px 0; }
 .ff-settings-msg.is-error { color: var(--danger-ink); }
