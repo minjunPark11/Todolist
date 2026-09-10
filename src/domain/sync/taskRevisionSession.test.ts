@@ -104,7 +104,8 @@ describe("durable task revision session", () => {
     await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
     f.session.capture([{ ...original, title: "Second" }]); resolve({ id: "unused", deleted: true }); await saving;
     expect(f.session.hasPending).toBe(true);
-    expect(f.session.checkpoint.pending.t).toEqual({ data: { ...original, title: "Second" }, expectedRevision: 2 });
+    expect(f.session.checkpoint.pending.t).toEqual({ data: { ...original, title: "Second" }, expectedRevision: 2,
+      base: { ...original, title: "First" } });
     f.deps.write = normalWrite; await f.session.flush();
     expect(f.snapshot.rows[0]).toMatchObject({ revision: 3, data: { title: "Second" } });
   });
@@ -167,6 +168,73 @@ describe("durable task revision session", () => {
     // A fresh edit to a task nobody is arguing about is unsent again.
     f.session.capture([...f.session.visibleTasks().filter((t) => t.id !== "other"), { id: "other", title: "Changed again" }]);
     expect(f.session.hasUnsentEdits).toBe(true);
+  });
+
+  // M1 of TASK_CONFLICT_FIELD_MERGE_DESIGN.md: the base is recorded, nothing
+  // reads it yet. Its whole contract is one sentence — `base` is the data of
+  // `expectedRevision` — so these are about the places that could make the
+  // pair lie, not about merging.
+
+  it("pins the base where the edit left from, and keeps it as the content changes", async () => {
+    const f = fixture(); await f.session.refresh();
+    f.session.capture([{ ...original, title: "First" }]);
+    expect(f.session.checkpoint.pending.t).toMatchObject({ expectedRevision: 1, base: original });
+    // A second edit is still the same departure point. Moving the base here
+    // would pair today's data with the older revision.
+    f.session.capture([{ ...original, title: "Second" }]);
+    expect(f.session.checkpoint.pending.t).toMatchObject({ expectedRevision: 1, base: original });
+  });
+
+  it("moves the base with the revision when a write lands behind newer content", async () => {
+    const f = fixture(); await f.session.refresh(); f.session.capture([{ ...original, title: "First" }]);
+    const normalWrite = f.deps.write;
+    let resolve!: (v: RevisionReply<Item>) => void;
+    f.deps.write = vi.fn(async (request) => { const reply = await normalWrite(request); return new Promise<RevisionReply<Item>>((r) => { resolve = () => r(reply); }); });
+    const saving = f.session.flush();
+    await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
+    f.session.capture([{ ...original, title: "Second" }]); resolve({ id: "unused", deleted: true }); await saving;
+    // "Second" now leaves from what the server stored, not from where "First"
+    // left. The revision moved, so the base has to move with it.
+    const pending = f.session.checkpoint.pending.t;
+    expect(pending.expectedRevision).toBe(2);
+    expect(pending.base).toMatchObject({ title: "First" });
+  });
+
+  it("never puts the base on the wire or in the outbox", async () => {
+    // `flush` used to spread the pending entry into the write. Left alone,
+    // that would send a whole second copy of the task with every save and
+    // store one in the durable outbox too.
+    const f = fixture(); await f.session.refresh();
+    f.session.capture([{ ...original, title: "Sent" }]);
+    f.loseResponse = true; await expect(f.session.flush()).rejects.toThrow();
+    expect(Object.keys(f.session.checkpoint.inflight.t).sort()).toEqual(["data", "expectedRevision", "id", "writeId"]);
+    expect(f.write.mock.calls.every(([request]) => !("base" in request))).toBe(true);
+  });
+
+  it("leaves a stored outbox without a base exactly as it was", async () => {
+    // Every checkpoint that already exists has no base, and the version stays
+    // 1 so they all still load. Absent means "ask, as before" — never "fill it
+    // in from whatever the row says now".
+    const f = fixture(); await f.session.refresh();
+    f.session.capture([{ ...original, title: "Local" }]);
+    const aged = structuredClone(f.session.checkpoint);
+    delete aged.pending.t.base;
+    const restored = createTaskRevisionSession("u", f.deps, aged);
+    restored.capture([{ ...original, title: "Local again" }]);
+    expect("base" in restored.checkpoint.pending.t).toBe(false);
+    expect(restored.checkpoint.pending.t.expectedRevision).toBe(1);
+  });
+
+  it("records the base a preserved conflict and a kept-mine resolution leave from", async () => {
+    const f = fixture(); await f.session.refresh();
+    f.session.capture([{ ...original, title: "Mine" }]);
+    f.snapshot.rows[0] = { id: "t", revision: 5, data: { ...original, title: "Theirs" } };
+    await f.session.refresh();
+    await expect(f.session.flush()).rejects.toBeInstanceOf(TaskRevisionBlocked);
+    const conflict = f.session.checkpoint.conflicts.t;
+    f.session.resolveConflict("t", "local", conflict);
+    // Keeping mine writes against revision 5, so that is where it leaves from.
+    expect(f.session.checkpoint.pending.t).toMatchObject({ expectedRevision: 5, base: { title: "Theirs" } });
   });
 
   it("accepts convergent content and handles arbitrary task IDs as data", async () => {

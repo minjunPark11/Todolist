@@ -1,6 +1,6 @@
 # 같은 작업을 두 기기에서 고쳤을 때, 겹치지 않은 것은 묻지 않는다
 
-> 상태: **설계만. 구현 없음** · 2026-09-10
+> 상태: **M1 구현 완료 (동작 변화 없음) · M2~M4 미착수** · 2026-09-10
 > 요청: "다른 서비스들은 이거 어떻게 처리해?" → "그냥 1번 설계 하자"
 > 선행: `usePlannerData.ts`의 구글 다리, `domain/sync/taskRevisionSession.ts`
 > 계기: 기기 충돌 4개가 구글 동기화 전체를 몇 주간 세웠고, 그 4개 중 몇 개는
@@ -215,10 +215,20 @@ merge → pending{ data: merged, expectedRevision: remote.revision, base: remote
 
 ## 7. 단계
 
-**M1 — base를 기록한다.** `pending[id].base`. 병합은 아직 없다. 동작 변화 0.
+**M1 — base를 기록한다. ✅** `pending[id].base`. 병합은 아직 없다. 동작 변화 0.
 체크포인트에 필드 하나가 늘고, 없으면 오늘과 같다(D2). 이것만 먼저 내보내면
 사람들의 체크포인트에 base가 쌓이기 시작하고, M3이 켜질 때 이미 병합할 재료가
 있다.
+
+구현하며 나온 것 하나 — `flush`가 pending을 **스프레드**해서 쓰기 요청을 짓고
+있었다(`{ id, ...pending, writeId }`). 그대로 두면 base가 매 쓰기마다 네트워크로
+나가고 durable outbox에도 저장된다. 요청을 필드별로 짓도록 고쳤고, 테스트가
+그것을 고정한다. 이 설계에서 base가 "그냥 하나 더 담는 필드"가 아닌 첫 자리다.
+
+그리고 base를 놓는 자리가 네 곳이라는 것도 구현에서 확정됐다 — `capture`,
+`preserveConflict`, `resolveConflict`의 "내 것 유지", 그리고 `flush`가 쓰기 성공
+뒤에 expectedRevision을 옮기는 자리. 마지막 것을 빠뜨리면 pair가 조용히
+거짓말한다.
 
 **M2 — 순수 함수와 테스트.** `mergeTaskRevisions(base, local, remote)`.
 아무 데도 연결하지 않는다. 테스트가 고정할 것:

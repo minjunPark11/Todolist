@@ -3,7 +3,27 @@ export interface RevisionRow<T> { id: string; revision: number; data: T }
 export interface RevisionSnapshot<T> { userId: string; rows: RevisionRow<T>[]; tombstones: string[] }
 export interface RevisionWrite<T> { id: string; expectedRevision: number; data: T | null; writeId: string }
 export type RevisionReply<T> = RevisionRow<T> | { id: string; deleted: true };
-interface Pending<T> { data: T | null; expectedRevision: number }
+interface Pending<T> {
+  data: T | null;
+  expectedRevision: number;
+  /**
+   * The row as it stood at `expectedRevision` — the point this edit left from.
+   *
+   * Held so a conflict can be answered by looking at WHO CHANGED WHAT rather
+   * than only at "these two differ". Without it, a field-level merge cannot
+   * tell an edit from an untouched value, and would pick a side for fields
+   * neither device touched (TASK_CONFLICT_FIELD_MERGE_DESIGN.md §2.1).
+   *
+   * The invariant is one sentence: **this is the data of `expectedRevision`.**
+   * Everywhere that sets one sets the other, or the pair lies.
+   *
+   * Optional, and the checkpoint stays `version: 1`, because a stored outbox
+   * has no base and bumping the version would reject every one of them at
+   * load. Absent means "merge nothing here, ask as before" — the behaviour
+   * that shipped (§D2). The next edit writes a new entry and it has a base.
+   */
+  base?: T | null;
+}
 export interface RevisionCheckpoint<T> {
   version: 1;
   userId: string;
@@ -83,7 +103,13 @@ export function createTaskRevisionSession<T extends { id: string }>(
         delete state.pending[id]; delete state.conflicts[id];
       } else {
         const previous = state.pending[id];
-        state.pending[id] = { data, expectedRevision: previous?.expectedRevision ?? remote?.revision ?? 0 };
+        // A later capture replaces the content and keeps everything about
+        // where the edit started — including a base that is ABSENT. Filling it
+        // in from the current row here would pair today's data with an older
+        // `expectedRevision`, which is the one way this pair can lie.
+        state.pending[id] = previous
+          ? { ...previous, data }
+          : { data, expectedRevision: remote?.revision ?? 0, base: remote?.data ?? null };
         if (state.conflicts[id]) state.conflicts[id].local = data;
       }
     }
@@ -112,7 +138,7 @@ export function createTaskRevisionSession<T extends { id: string }>(
   }
   function preserveConflict(id: string, local: T | null) {
     assertActive();
-    state.pending[id] = { data: local, expectedRevision: rowOf(id)?.revision ?? 0 };
+    state.pending[id] = { data: local, expectedRevision: rowOf(id)?.revision ?? 0, base: rowOf(id)?.data ?? null };
     state.conflicts[id] = { local, remote: rowOf(id) ?? null };
     persist();
   }
@@ -126,7 +152,12 @@ export function createTaskRevisionSession<T extends { id: string }>(
         assertActive();
         if (state.conflicts[id]) continue;
         const pending = state.pending[id];
-        const request = state.inflight[id] ?? (pending ? { id, ...pending, writeId: deps.id() } : undefined);
+        // Built field by field rather than spread: `pending` carries the base
+        // document now, and spreading it would put a whole second copy of the
+        // task into every write on the wire and into the stored outbox.
+        const request = state.inflight[id] ?? (pending
+          ? { id, expectedRevision: pending.expectedRevision, data: pending.data, writeId: deps.id() }
+          : undefined);
         if (!request) continue;
         state.inflight[id] = request;
         persist();
@@ -166,7 +197,13 @@ export function createTaskRevisionSession<T extends { id: string }>(
         else state.rows.push(reply);
         delete state.inflight[id];
         if (sameRevisionData(state.pending[id]?.data, request.data)) delete state.pending[id];
-        else if (state.pending[id]) state.pending[id].expectedRevision = "deleted" in reply ? 0 : reply.revision;
+        else if (state.pending[id]) {
+          // The write landed and newer local content is already queued behind
+          // it. That content now leaves from what the server just stored, so
+          // the base moves with the revision — they are one fact.
+          state.pending[id].expectedRevision = "deleted" in reply ? 0 : reply.revision;
+          state.pending[id].base = "deleted" in reply ? null : reply.data;
+        }
         delete state.conflicts[id];
         persist();
       }
@@ -182,7 +219,8 @@ export function createTaskRevisionSession<T extends { id: string }>(
     else {
       const remote = rowOf(id), local = replacement ?? state.conflicts[id].local;
       if (local && !remote && state.tombstones.includes(id)) throw new TaskRevisionBlocked("This task was deleted. Copy it to a new task to keep local content.");
-      state.pending[id] = { data: local, expectedRevision: remote?.revision ?? 0 }; delete state.conflicts[id];
+      state.pending[id] = { data: local, expectedRevision: remote?.revision ?? 0, base: remote?.data ?? null };
+      delete state.conflicts[id];
     }
     persist();
   }
