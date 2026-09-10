@@ -24,6 +24,7 @@ import {
 import { useT } from "../../i18n";
 import { GOOGLE_SYNC_POLICY_EVENT, type GoogleSyncPolicyReason } from "../../domain/calendar/googleSync/protocol";
 import { listTimezones, timezoneLabel } from "../../domain/plannerData/timezones";
+import { TimezonePicker } from "../TimezonePicker";
 import {
   disconnect as disconnectGoogle,
   alignGoogleTimezone,
@@ -81,7 +82,7 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
   // `normalizeAppSettings` deliberately keeps a zone name this build has never
   // heard of, and a select with no matching option falls back to its first.
   const zoneOptions = useMemo(
-    () => listTimezones([pinnedZone, timezone]).map((zone) => [zone, timezoneLabel(zone)] as const),
+    () => listTimezones([pinnedZone, timezone]).map((zone) => ({ value: zone, label: timezoneLabel(zone) })),
     [pinnedZone, timezone],
   );
   const [labelState, setLabelState] = useState<{ supported: boolean | null; overflow: number; failed: boolean } | null>(null);
@@ -454,15 +455,13 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
                 <small>{t("settings.google.timezoneLabelHint")}</small>
               </div>
               <div className="ff-settings-row-control">
-                <select
+                <TimezonePicker
                   value={status.connection.syncTimezone}
+                  options={zoneOptions}
+                  label={t("settings.google.timezoneLabel")}
                   disabled={aligning || syncing || taskSync.busy}
-                  onChange={(event) => setPendingZone(event.target.value)}
-                >
-                  {zoneOptions.map(([zone, label]) => (
-                    <option key={zone} value={zone}>{label}</option>
-                  ))}
-                </select>
+                  onChange={setPendingZone}
+                />
               </div>
             </div>
           ) : null}

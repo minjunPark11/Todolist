@@ -10,6 +10,7 @@ import {
 import { clampHoursAtATime, HOURS_AT_A_TIME_CHOICES } from "../utils/calendarTime";
 import { detectTimezone } from "../domain/plannerData/normalize";
 import { listTimezones, timezoneChoicePatch, timezoneLabel } from "../domain/plannerData/timezones";
+import { TimezonePicker } from "./TimezonePicker";
 import { FOCUS_LENGTH_CHOICES, sanitizeFocusDefaultLength } from "../domain/focus/sessionLength";
 import {
   BACKUP_INTERVALS,
@@ -821,25 +822,21 @@ export function TimezoneRow({ settings, onUpdate }: { settings: AppSettings; onU
   // The list is four hundred options and the offsets only move on a DST
   // boundary, so it is built once per mount rather than per render. `detected`
   // and the stored value are folded in so the selection is always showable.
-  const zones = useMemo(
-    () => listTimezones([settings.timezone, detected]).map((zone) => [zone, timezoneLabel(zone)] as const),
-    [settings.timezone, detected],
-  );
+  const options = useMemo(() => [
+    {
+      value: "auto",
+      label: detected ? t("settings.timezoneAutoNamed").replace("{zone}", detected) : t("settings.timezoneAuto"),
+    },
+    ...listTimezones([settings.timezone, detected]).map((zone) => ({ value: zone, label: timezoneLabel(zone) })),
+  ], [settings.timezone, detected, t]);
   return (
     <SettingsRow title={t("settings.timezone")} hint={t("settings.timezoneHint")}>
-      <select
+      <TimezonePicker
         value={manual ? settings.timezone : "auto"}
-        onChange={(event) => onUpdate(timezoneChoicePatch(event.target.value, detected))}
-      >
-        <option value="auto">
-          {detected ? t("settings.timezoneAutoNamed").replace("{zone}", detected) : t("settings.timezoneAuto")}
-        </option>
-        {zones.map(([zone, label]) => (
-          <option key={zone} value={zone}>
-            {label}
-          </option>
-        ))}
-      </select>
+        options={options}
+        label={t("settings.timezone")}
+        onChange={(value) => onUpdate(timezoneChoicePatch(value, detected))}
+      />
     </SettingsRow>
   );
 }
