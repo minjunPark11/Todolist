@@ -11,7 +11,7 @@
 // fragment, and this is the component mounted to spend it. The desktop path is
 // the same code reached by a different road — `platform.deepLink` — because
 // Google will not redirect to a custom scheme (§4.4, chain step 1).
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   CALLBACK_LANDING_PATH,
   consentUrl,
@@ -23,6 +23,7 @@ import {
 } from "../../domain/calendar/googleSync/connectFlow";
 import { useT } from "../../i18n";
 import { GOOGLE_SYNC_POLICY_EVENT, type GoogleSyncPolicyReason } from "../../domain/calendar/googleSync/protocol";
+import { listTimezones, timezoneLabel } from "../../domain/plannerData/timezones";
 import {
   disconnect as disconnectGoogle,
   alignGoogleTimezone,
@@ -58,7 +59,8 @@ type Status =
  * or behind a VPN, and a connection pinned to it stays wrong afterwards
  * (025 line 57 refuses to re-bind a different one; 036 is the only way back).
  */
-export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
+export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
+  { timezone?: string; onTimezoneChange?: (zone: string) => void }) {
   const taskSync = useSyncExternalStore(subscribeGoogleTaskSync, readGoogleTaskSyncState, readGoogleTaskSyncState);
   const { t } = useT();
   const [status, setStatus] = useState<Status>({ kind: "loading" });
@@ -70,6 +72,18 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
   const [syncing, setSyncing] = useState(false);
   const [aligning, setAligning] = useState(false);
   const aligningRef = useRef(false);
+  /** The zone the reader picked, held until they confirm the re-read it costs. */
+  const [pendingZone, setPendingZone] = useState("");
+  const pinnedZone = status.kind === "connected" ? status.connection.syncTimezone ?? "" : "";
+  // Four hundred options whose offsets only move on a DST boundary, so built
+  // once per set of zones rather than per render. The pinned zone and the
+  // account's are folded in so the select can always show what is selected —
+  // `normalizeAppSettings` deliberately keeps a zone name this build has never
+  // heard of, and a select with no matching option falls back to its first.
+  const zoneOptions = useMemo(
+    () => listTimezones([pinnedZone, timezone]).map((zone) => [zone, timezoneLabel(zone)] as const),
+    [pinnedZone, timezone],
+  );
   const [labelState, setLabelState] = useState<{ supported: boolean | null; overflow: number; failed: boolean } | null>(null);
   const manualSync = useRef(false);
   const policyReason = useRef<GoogleSyncPolicyReason | null>(null);
@@ -302,15 +316,29 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
     }
   }
 
-  async function alignTimezone() {
-    if (status.kind !== "connected" || !timezone || aligningRef.current || syncing || taskSync.busy) return;
+  /**
+   * Pin this connection to `zone`, and move the account's own zone with it.
+   *
+   * The two are written together on purpose. Every date and time this app
+   * stores is a bare wall-clock string with no zone attached, so there is
+   * exactly ONE correct value for both — the zone its reader keeps clocks in.
+   * Letting them be set apart would be handing someone the disagreement this
+   * whole change exists to end: events arriving at the wrong hour while every
+   * screen stays internally consistent about it.
+   */
+  async function alignTimezone(zone: string) {
+    if (status.kind !== "connected" || !zone || aligningRef.current || syncing || taskSync.busy) return;
     aligningRef.current = true;
     setAligning(true);
     setError(""); setNotice("");
     const version = ++readVersion.current;
     try {
-      await alignGoogleTimezone(status.connection.calendarId, timezone);
+      await alignGoogleTimezone(status.connection.calendarId, zone);
       if (version !== readVersion.current) return;
+      // Only after the pin took. The account's zone is the cheap half to
+      // change and the one nothing else guards, so moving it first would leave
+      // the app claiming a zone the calendar refused.
+      onTimezoneChange?.(zone);
       // Read the connection back rather than assuming the write took: the row
       // below is drawn from `syncTimezone`, and a card that hid its own
       // warning on an assumption would be claiming an alignment it did not
@@ -320,7 +348,7 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
         const connection = await readConnection();
         if (connection && version === readVersion.current) setStatus({ kind: "connected", connection });
       } catch { /* The next read settles it. */ }
-      setNotice(t("settings.google.timezoneAligned", { timezone }));
+      setNotice(t("settings.google.timezoneAligned", { timezone: zone }));
       notifyGoogleConnectionChanged();
     } catch (thrown) {
       if (version === readVersion.current) setError(describe(thrown));
@@ -404,24 +432,49 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
           ) : null}
           {labelState?.overflow ? <p className="ff-settings-note">{t("settings.google.labelsOverflow", { count: labelState.overflow })}</p> : null}
           {labelState?.failed && labelState.supported !== false ? <p className="ff-settings-note" aria-live="polite">{t("settings.google.labelsRetry")}</p> : null}
-          {/* Only when the two actually disagree.
-              Offered unconditionally it is a button that re-reads the whole
-              calendar for no reason, and — worse — it says nothing about
-              whether anything is wrong. The disagreement is the one failure in
-              this sync that is otherwise silent: events arrive at the wrong
-              hour and every screen is internally consistent about it, because
-              both numbers are right in their own zone. Naming the pinned zone
-              IS the diagnosis. A connection from before `sync_timezone`
-              existed reports "", and offering to change a zone nobody can see
-              would be asking about something invisible. */}
-          {timezone && status.connection.syncTimezone && status.connection.syncTimezone !== timezone ? <div>
+          {/* The pinned zone, as the thing it is: a value you pick.
+              It was a button that said "align to the app setting", and that
+              made one action into three — go to another screen, change another
+              value, come back, press. The number that is wrong belongs on the
+              screen where its consequence lives, editable there.
+              Picking here writes BOTH this and the account's own zone. There
+              is one correct value for the pair: every date this app stores is
+              a bare wall-clock string, so a calendar pinned to a zone its
+              reader does not keep clocks in is exactly the silent failure this
+              replaces. Two independent pickers would be a way to recreate it.
+              Unlike Google's own time-zone setting, changing this is not free
+              — it re-reads the calendar and rewrites the times of everything
+              imported — so the choice is confirmed before it is spent.
+              A connection from before `sync_timezone` existed reports "", and
+              a picker with nothing to show is worse than none. */}
+          {status.connection.syncTimezone ? (
+            <div className="ff-settings-row">
+              <div className="ff-settings-row-text">
+                <strong>{t("settings.google.timezoneLabel")}</strong>
+                <small>{t("settings.google.timezoneLabelHint")}</small>
+              </div>
+              <div className="ff-settings-row-control">
+                <select
+                  value={status.connection.syncTimezone}
+                  disabled={aligning || syncing || taskSync.busy}
+                  onChange={(event) => setPendingZone(event.target.value)}
+                >
+                  {zoneOptions.map(([zone, label]) => (
+                    <option key={zone} value={zone}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : null}
+          {aligning ? <p className="ff-settings-note" role="status">{t("settings.google.aligningTimezone")}</p> : null}
+          {/* Still said out loud when the two disagree. The picker shows what
+              is pinned but cannot say that it is wrong, and the general
+              settings screen can still move the account's zone away from it. */}
+          {timezone && status.connection.syncTimezone && status.connection.syncTimezone !== timezone ? (
             <p className="ff-settings-note" aria-live="polite">
               {t("settings.google.timezoneHint", { pinned: status.connection.syncTimezone, timezone })}
             </p>
-            <button type="button" className="ff-btn ff-cal-btn-outline" disabled={aligning || syncing || taskSync.busy} onClick={() => void alignTimezone()}>
-              {t(aligning ? "settings.google.aligningTimezone" : "settings.google.alignTimezone")}
-            </button>
-          </div> : null}
+          ) : null}
           <button type="button" className="ff-btn ff-cal-btn-outline" disabled={syncing || aligning} onClick={() => {
             setSyncing(true);
             manualSync.current = true;
@@ -442,6 +495,16 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
 
       {notice ? <p className="ff-settings-note" aria-live="polite">{notice}</p> : null}
       {error ? <p className="auth-message error" role="alert">{error}</p> : null}
+
+      {pendingZone ? (
+        <ConfirmModal
+          title={t("settings.google.timezoneConfirmTitle")}
+          body={t("settings.google.timezoneConfirmBody", { timezone: pendingZone })}
+          confirmLabel={t("settings.google.timezoneConfirm")}
+          onConfirm={() => { const zone = pendingZone; setPendingZone(""); void alignTimezone(zone); }}
+          onCancel={() => setPendingZone("")}
+        />
+      ) : null}
 
       {confirmingDisconnect ? (
         <ConfirmModal
