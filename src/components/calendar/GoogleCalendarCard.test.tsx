@@ -15,7 +15,6 @@ vi.mock("../../services/supabaseClient", () => ({ supabase: { auth: {
   onAuthStateChange: mocks.authListener,
 } } }));
 vi.mock("../../platform", () => ({ platform: { kind: "desktop", openExternal: mocks.open } }));
-vi.mock("./GoogleCalendarSourceList", () => ({ GoogleCalendarSourceList: () => null }));
 vi.mock("../../lib/googleCalendar", async () => ({
   ...await vi.importActual<typeof import("../../lib/googleCalendar")>("../../lib/googleCalendar"),
   readConnection: mocks.read,

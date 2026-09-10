@@ -41,7 +41,6 @@ import {
 import { platform } from "../../platform";
 import { supabase } from "../../services/supabaseClient";
 import { ConfirmModal } from "../kit";
-import { GoogleCalendarSourceList } from "./GoogleCalendarSourceList";
 import { GoogleTaskReviewPanel } from "./GoogleTaskReviewPanel";
 import { readGoogleTaskSyncState, subscribeGoogleTaskSync } from "../../lib/googleTaskSyncState";
 
@@ -505,7 +504,6 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
             setNotice(""); setError("");
             window.dispatchEvent(new Event(GOOGLE_SYNC_REQUESTED));
           }}>{t(syncing ? "settings.google.syncingNow" : "settings.google.syncNow")}</button>
-          <GoogleCalendarSourceList ownCalendarId={status.connection.calendarId} />
           <GoogleTaskReviewPanel />
         </>
       ) : null}
