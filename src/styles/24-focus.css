@@ -772,79 +772,22 @@ body.focus-stage-visible .foc-global-bar {
     flex: 0 0 auto;
   }
 
-  /* 왼쪽은 시계가 주인이라 줄어들면 안 되고, 오른쪽은 목록이라 줄어들어도
-     읽힌다. 그래서 고정 비율이 아니라 최소 폭이다. */
+  /* 한 열이다. 타이머·포모도로 화면에는 시계 하나만 서므로 옆 칸도, 아래 칸도
+     없다 — 큐는 다이얼로그로, 요약은 기록 탭으로, 메모는 원래의 다이얼로그로
+     갔다. 그래서 여기 있던 2열 격자와 `.focus-main`/`.focus-side` 의 두 층도
+     함께 사라진다. */
   .focus-layout {
-    grid-template-columns: minmax(420px, 1.35fr) minmax(320px, 1fr);
-    align-items: stretch;
-    min-height: 0;
-    /* §3의 교훈 3. 두 카드가 각자 머리와 한 줄을 가질 수 있는 높이. */
-    min-height: 420px;
-  }
-
-  /* 세션이 도는 동안에는 후보 목록이 렌더되지 않는다(FocusPage.tsx의 조건).
-     그때 두 열을 유지하면 오른쪽이 빈칸으로 남으므로, 한 열로 접고 타이머가
-     가운데를 되찾는다. */
-  .focus-layout:not(:has(.focus-queue)) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* 오른쪽 열의 두 층: 큐가 남는 전부를 먹고 요약은 바닥에 자기 높이로 선다.
-     여기서도 `minmax(0, 1fr)`의 0이 없으면 큐가 자기 내용 높이로 부풀어
-     요약을 화면 밖으로 밀어낸다. */
-  .focus-side {
     display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
-    gap: var(--space-md);
+    place-items: center;
     min-height: 0;
   }
-
-  /* 왼쪽도 두 층 — 타이머가 남는 전부, 메모는 바닥에 자기 높이로.
-     오른쪽과 같은 모양이라 두 열의 바닥선이 맞는다.
-
-     오른쪽과 달리 여기 첫 줄은 `minmax(0, 1fr)`이 아니라 `1fr`이다. 그 0은
-     안쪽에 스크롤러를 두려고 넣는 것인데(§3의 교훈 3), 왼쪽 열에는 흐르는
-     것이 없다. 대신 0을 넣으면 줄이 내용보다 작아질 수 있고, 실제로 복구된
-     세션의 "저장되지 않은 구간" 카드가 붙은 상태에서 타이머 내용이 621px,
-     줄이 447px이 되어 카드가 줄 밖으로 174px 삐져나와 페이지 머리글을 덮었다
-     [실측]. `1fr`의 자동 최소값은 그 상황에서 줄을 늘리고, 그때는 `main`이
-     흐른다 — 화면을 덮는 것보다는 낫다. */
-  .focus-main {
-    display: grid;
-    grid-template-rows: 1fr auto;
-    gap: var(--space-md);
-    min-height: 0;
-  }
-
-  /* 카드가 눈에 보이게 된 뒤로 타이머는 줄을 채운다(§14). 내용은 카드 안에서
-     가운데를 잡으므로(place-items) 예전 `align-self: center`가 하던 일은
-     그대로고, 두 열의 위아래 선이 맞는다.
-
-     `min-height`를 자동으로 되돌리는 것이 위 `1fr`이 실제로 작동하기 위한
-     조건이다. 격자 항목에 min-height가 **명시돼** 있으면 내용 기반 자동
-     최소값이 적용되지 않는다 — 360px이 적힌 동안에는 줄이 447px에 머물렀고,
-     594px짜리 내용이 그 위아래로 삐져나와 페이지 머리글을 덮었다 [실측]. */
-  .focus-main > .focus-stage {
-    margin-top: 0;
-    justify-self: center;
-    width: 100%;
+  .focus-layout > .focus-stage {
+    width: min(100%, 640px);
+    margin: 0;
     min-height: auto;
-  }
-
-  /* 이 화면에서 흐르는 것은 이것 하나다. `overscroll-behavior: contain`이
-     없으면 목록 끝에서의 휠이 `main`으로 넘어가고, 그건 다른 화면에서는 그냥
-     스크롤 체이닝이지만 여기서는 "전체 화면이 안 움직인다"는 약속을 깨는 것이다. */
-  .focus-page-v2 .focus-queue {
-    min-height: 0;
-    /* 머리는 자기 높이, 목록이 남는 전부. 여기서도 `minmax(0, 1fr)`의 0이
-       없으면 안쪽 스크롤러가 자기 내용 높이로 부풀어 아무것도 흐르지 않는다. */
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-  .focus-page-v2 .focus-queue-scroller {
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    place-items: center;
+    align-content: center;
   }
 }
 
@@ -880,6 +823,10 @@ body.focus-stage-visible .foc-global-bar {
    채워야 바가 엉뚱한 상자 옆에 서지 않는다 (OverlayScrollbar.tsx §props). */
 .focus-queue-scroller {
   position: relative;
+  /* 다이얼로그 안이므로 화면이 아니라 자기 상한으로 흐른다. */
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .focus-queue-scroller > article {
@@ -930,90 +877,8 @@ body.focus-stage-visible .foc-global-bar {
 }
 
 
-/* ==========================================================================
-   오늘의 세션 요약 (FOCUS_LAYOUT_DESIGN.md Phase 3)
-   --------------------------------------------------------------------------
-   차트가 아니라 스탯 타일이다. dataviz 스킬의 첫 단계가 그렇게 말한다 —
-   "때로는 답이 차트가 아니다". 셋 다 하나의 숫자이고 비교할 기간도 시간축도
-   없으므로, 그릴 것이 없는데 그리면 장식이다.
-
-   같은 스킬의 두 규격을 지킨다.
-     · 히어로 숫자는 뷰당 하나. 이 화면의 그것은 시계(66~96px)이므로 타일의
-       값은 그것과 겨루지 않는 크기(--type-xl)에 둔다.
-     · 큰 독립 숫자에 `tabular-nums`를 쓰지 않는다. 그건 칼럼으로 줄맞춤할 때의
-       것이고, 여기 셋은 각자 서 있다.
-   ========================================================================== */
-.focus-side {
-  min-width: 0;
-}
-.focus-summary {
-  border-top: 1px solid var(--border-subtle);
-  padding-top: var(--space-sm);
-}
-.focus-summary h2 {
-  margin: 0 0 var(--space-xs);
-  font-size: var(--type-md);
-  font-weight: var(--weight-medium);
-  color: var(--text-secondary);
-}
-.focus-summary dl {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-sm);
-  margin: 0;
-}
-/* 라벨은 문장형이고 콜론을 달지 않는다 (dataviz 스탯 타일 계약). */
-.focus-summary dt {
-  color: var(--text-tertiary);
-  font-size: var(--type-sm);
-}
-.focus-summary dd {
-  margin: 2px 0 0;
-  font-size: var(--type-xl);
-  font-weight: var(--weight-medium);
-}
 
 
-/* ==========================================================================
-   작업 메모 (FOCUS_LAYOUT_DESIGN.md Phase 3.5)
-   ========================================================================== */
-.focus-main {
-  min-width: 0;
-}
-.focus-note {
-  border-top: 1px solid var(--border-subtle);
-  padding-top: var(--space-sm);
-}
-.focus-note > header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-xs);
-}
-.focus-note h2 {
-  margin: 0;
-  font-size: var(--type-md);
-  font-weight: var(--weight-medium);
-  color: var(--text-secondary);
-}
-.focus-note-scope {
-  color: var(--text-tertiary);
-  font-size: var(--type-sm);
-}
-.focus-page-v2 .focus-note textarea {
-  width: 100%;
-  min-height: 0;
-  resize: vertical;
-}
-/* 숫자는 세는 것이지 읽는 것이 아니다 — 그래서 작고, 그래서 `aria-hidden`이다
-   (textarea의 `maxLength`가 보조기술에 같은 사실을 이미 말한다). */
-.focus-note-count {
-  margin: 4px 0 0;
-  text-align: right;
-  color: var(--text-tertiary);
-  font-size: var(--type-xs);
-}
 
 
 /* ==========================================================================
@@ -1032,31 +897,14 @@ body.focus-stage-visible .foc-global-bar {
    그 관용구(헤어라인 + --radius-lg + --bg-surface-muted)이고, 칩은
    `.ff-projbadge`가 쓰는 그것이다. 같은 앱 안에서 같은 것은 같게 생겨야 한다.
    ========================================================================== */
+/* 카드로 남는 것은 스테이지 하나다. 큐·요약·메모가 화면에서 빠지면서 §14 가
+   카드로 만든 넷 중 셋이 함께 나갔다. */
 @media (min-width: 901px) {
-  .focus-stage,
-  .focus-note,
-  .focus-queue,
-  .focus-summary {
+  .focus-stage {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     background: var(--bg-surface-muted);
-    padding: var(--space-sm);
-  }
-
-  /* 카드가 경계를 갖게 됐으므로 안쪽의 윗줄은 두 번 그리는 선이 된다. */
-  .focus-note,
-  .focus-summary {
-    border-top: 1px solid var(--border-subtle);
-  }
-  .focus-queue > header {
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  /* 카드가 줄을 채우므로 내용은 카드 안에서 가운데를 잡는다. */
-  .focus-main > .focus-stage {
-    display: grid;
-    place-items: center;
-    align-content: center;
+    padding: var(--space-lg) var(--space-sm);
   }
 }
 

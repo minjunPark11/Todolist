@@ -34,9 +34,10 @@ test.describe("the Focus page's queue", () => {
 
     await page.goto("/focus");
 
-    // 큐는 이제 사용자가 담는다 (FOCUS_LAYOUT_DESIGN.md Phase 2, 결정 4).
-    // 예전에는 열린 작업 셋이 저절로 올라와서 이 줄이 그냥 있었지만, 저절로
-    // 오르는 목록은 "내가 정한 순서"가 아니다. 담는 것까지가 사용자의 경로다.
+    // 큐는 이제 사용자가 담고(FOCUS_LAYOUT_DESIGN.md Phase 2, 결정 4), 화면이
+    // 아니라 머리글의 대화상자에 있다(FOCUS_TABS_AND_RECORD_DESIGN.md §9.5) —
+    // 타이머 화면에는 시계 하나만 선다. 담는 것까지가 사용자의 경로다.
+    await page.getByRole("button", { name: "Task queue" }).click();
     await page.getByRole("button", { name: "Add task" }).click();
     await page.locator(".focus-choice-list button", { hasText: TASK }).click();
 
@@ -73,7 +74,8 @@ test.describe("the Focus page's queue", () => {
 
     await page.goto("/focus");
 
-    // 위 테스트와 같은 이유로 큐에 담고 시작한다 (결정 4).
+    // 위 테스트와 같은 이유로 큐를 열어 담는다 (결정 4 · §9.5).
+    await page.getByRole("button", { name: "Task queue" }).click();
     await page.getByRole("button", { name: "Add task" }).click();
     await page.locator(".focus-choice-list button", { hasText: TASK }).click();
 
@@ -81,7 +83,10 @@ test.describe("the Focus page's queue", () => {
     const before = (await focusPage.boundingBox())?.width ?? 0;
     expect(before).toBeGreaterThan(0);
 
+    // 줄을 누르면 큐가 닫히고 상세가 열린다 — 대화상자를 열어둔 채 뒤에서 패널이
+    // 열리면 어느 쪽이 지금 화면인지 알 수 없다.
     await page.locator(".foc-task-main", { hasText: TASK }).click();
+    await expect(page.locator(".focus-queue-scroller")).toHaveCount(0);
     await expect(page.locator(".tm-drawer")).toBeVisible();
     // The page really did yield a column — if it had not, the two widths would
     // be equal and the assertion below would pass for the wrong reason.
