@@ -114,3 +114,28 @@ it("says only the sentence when nothing was thrown with a message", () => {
   mount();
   expect(screen.getByRole("alert").textContent).not.toContain("(");
 });
+
+it("blames the conflicts on this screen, not the network", async () => {
+  // The sentence that sent a whole afternoon into the database. Four device
+  // conflicts sitting twenty pixels lower were the reason nothing would sync,
+  // and the screen said to check the connection.
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: "failed",
+    errorDetail: "Task revision sync is blocked.",
+    localConflicts: [
+      { id: "a", local: null, remote: null },
+      { id: "b", local: null, remote: null },
+    ] });
+  mount();
+  const said = screen.getByRole("alert").textContent ?? "";
+  expect(said).toContain("2 conflicting edit");
+  expect(said).not.toContain("Check the connection");
+  // And it does not also recite the internal message: the list below is the
+  // explanation, and a second sentence about revisions only muddies it.
+  expect(said).not.toContain("Task revision sync is blocked.");
+});
+
+it("still says check the connection when nothing on the screen explains it", () => {
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: "failed", localConflicts: [] });
+  mount();
+  expect(screen.getByRole("alert").textContent).toContain("Check the connection");
+});

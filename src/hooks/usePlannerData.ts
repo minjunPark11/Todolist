@@ -2429,7 +2429,7 @@ export function usePlannerData() {
     setData(emptyData());
   }
 
-  async function withGoogleTaskSync<T>(work: (userId: string) => Promise<T>): Promise<T> {
+  async function withGoogleTaskSync<T>(work: (userId: string, blockedTaskIds: string[]) => Promise<T>): Promise<T> {
     const drained = await saveQueueRef.current?.drain();
     if (drained && !drained.ok) throw new TaskRevisionBlocked();
     const session = taskRevisionSessionRef.current;
@@ -2437,9 +2437,30 @@ export function usePlannerData() {
     const epoch = taskRevisionEpochRef.current;
     googleTaskBridgeBusy.current = true;
     try {
-      session.capture(dataRef.current.tasks); await session.flush();
-      if (session.hasPending || session.hasConflicts) throw new TaskRevisionBlocked();
-      return await work(session.userId);
+      session.capture(dataRef.current.tasks);
+      // A conflict no longer holds the whole Google cycle.
+      //
+      // `flush` writes every uncontested row and then raises to say some rows
+      // are contested. Treating that as "the bridge is closed" meant four
+      // device conflicts froze Google sync entirely — reviews could not be
+      // answered, the sync time zone could not be re-pinned — and the screen
+      // said to check the connection. A conflict waits on a person, and
+      // nothing else should wait behind it.
+      //
+      // The same tolerance the local save queue already keeps (see the
+      // `taskConflict` catch above): a conflict raise is survivable, any other
+      // failure is not.
+      try { await session.flush(); }
+      catch (error) {
+        if (!(error instanceof TaskRevisionBlocked) || !session.hasConflicts || session.hasUnsentEdits) throw error;
+      }
+      // Unsent edits still stop it. Those wait on the network, and running the
+      // cycle without them would show Google a workspace that is missing one.
+      if (session.hasUnsentEdits) throw new TaskRevisionBlocked();
+      // The contested tasks are named so the cycle leaves them alone: their
+      // remote row is one side of a question nobody has answered, and sending
+      // it to Google would answer it.
+      return await work(session.userId, Object.keys(session.checkpoint.conflicts));
     } finally {
       try {
         if (epoch === taskRevisionEpochRef.current && session === taskRevisionSessionRef.current) {

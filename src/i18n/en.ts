@@ -28,6 +28,7 @@ export const en: Dictionary = {
   "googleTask.policy": "Conflicting edits stay intact until you choose a version.",
   "googleTask.changed": "Content changed. Refresh and compare the latest versions.",
   "googleTask.failed": "Sync could not finish. Your edits are kept. Check the connection and try again.",
+  "googleTask.blockedByConflicts": "Sync is waiting on {{count}} conflicting edit(s) below. Your edits are kept. Pick a version for each and syncing continues.",
   "googleTask.busy": "Syncing…",
   "googleTask.refresh": "Refresh and sync",
   "googleTask.pending": "A Google write is unconfirmed. Check its result before another write.",
