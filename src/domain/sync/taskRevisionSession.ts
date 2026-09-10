@@ -63,6 +63,8 @@ export interface RevisionSessionDeps<T> {
   persist: (state: RevisionCheckpoint<T>) => void;
   id: () => string;
   active: () => boolean;
+  merge?: (base: T, local: T, remote: T) => T | null;
+  onMerge?: (merged: T, local: T) => void;
 }
 
 export function createTaskRevisionSession<T extends { id: string }>(
@@ -78,16 +80,31 @@ export function createTaskRevisionSession<T extends { id: string }>(
     conflicts: Object.assign(Object.create(null), state.conflicts),
   };
   let busy = false;
+  const autoMergedIds = new Set<string>();
   function assertActive() { if (!deps.active()) throw new TaskRevisionBlocked("Account changed; task save stopped."); }
   function persist() { assertActive(); deps.persist(state); }
   const rowOf = (id: string) => state.rows.find((row) => row.id === id);
-  function reconcile() {
+  function reconcile(attempts?: Map<string, number>) {
     for (const [id, pending] of Object.entries(state.pending)) {
       if (state.inflight[id]) continue; // Resolve the original receipt before classifying response loss.
       const remote = rowOf(id);
+      if (state.conflicts[id]) {
+        state.conflicts[id] = { local: pending.data, remote: remote ?? null };
+        continue; // A displayed question stays until explicitly answered.
+      }
       if (sameRevisionData(remote?.data ?? null, pending.data) && (remote || state.tombstones.includes(id))) {
         delete state.pending[id]; delete state.conflicts[id];
       } else if ((remote?.revision ?? 0) !== pending.expectedRevision || state.tombstones.includes(id)) {
+        const used = attempts?.get(id) ?? 0;
+        const merged = pending.base && pending.data && remote && !state.tombstones.includes(id) && used < 2
+          ? deps.merge?.(pending.base, pending.data, remote.data) : null;
+        if (merged) {
+          state.pending[id] = { data: merged, expectedRevision: remote!.revision, base: remote!.data };
+          attempts?.set(id, used + 1);
+          autoMergedIds.add(id);
+          deps.onMerge?.(merged, pending.data!);
+          continue;
+        }
         state.conflicts[id] = { local: pending.data, remote: remote ?? null };
       }
     }
@@ -99,7 +116,7 @@ export function createTaskRevisionSession<T extends { id: string }>(
     for (const id of ids) {
       const data = desired.get(id) ?? null;
       const remote = rowOf(id);
-      if (sameRevisionData(data, remote?.data ?? null) && !state.inflight[id]) {
+      if (sameRevisionData(data, remote?.data ?? null) && !state.inflight[id] && !state.conflicts[id]) {
         delete state.pending[id]; delete state.conflicts[id];
       } else {
         const previous = state.pending[id];
@@ -146,68 +163,75 @@ export function createTaskRevisionSession<T extends { id: string }>(
     assertActive();
     if (busy) throw new TaskRevisionBlocked("Concurrent task save stopped.");
     busy = true;
+    const attempts = new Map<string, number>();
     try {
       // One pass snapshots IDs, but reads each latest pending value before sending.
       for (const id of new Set([...Object.keys(state.inflight), ...Object.keys(state.pending)])) {
-        assertActive();
-        if (state.conflicts[id]) continue;
-        const pending = state.pending[id];
-        // Built field by field rather than spread: `pending` carries the base
-        // document now, and spreading it would put a whole second copy of the
-        // task into every write on the wire and into the stored outbox.
-        const request = state.inflight[id] ?? (pending
-          ? { id, expectedRevision: pending.expectedRevision, data: pending.data, writeId: deps.id() }
-          : undefined);
-        if (!request) continue;
-        state.inflight[id] = request;
-        persist();
-        let reply: RevisionReply<T>;
-        try { reply = await deps.write(request); }
-        catch (error) {
+        while (state.inflight[id] || state.pending[id]) {
           assertActive();
-          if ((error as { code?: string })?.code === "40001" ||
-              String((error as { message?: string })?.message).includes("TASK_ID_RETIRED")) {
-            delete state.inflight[id];
-            const snapshot = await deps.read();
-            assertActive();
-            if (snapshot.userId !== userId) throw new TaskRevisionBlocked("Account changed while reading a conflict.");
-            // A save does not adopt the whole remote workspace into the visible
-            // UI. Track only this row here, or the next capture could mistake
-            // unseen tasks from another device for intentional local deletes.
-            state.rows = [...state.rows.filter((row) => row.id !== id), ...snapshot.rows.filter((row) => row.id === id)];
-            if (snapshot.tombstones.includes(id)) state.tombstones = [...new Set([...state.tombstones, id])];
-            reconcile();
-            if (state.pending[id]) state.conflicts[id] = { local: state.pending[id].data, remote: rowOf(id) ?? null };
-            persist();
-            continue;
-          }
-          throw error; // Includes response loss. Retry the same durable writeId.
-        }
-        assertActive();
-        if (reply.id !== id) throw new TaskRevisionBlocked("Unexpected task write response.");
-        const known = rowOf(id);
-        if (!("deleted" in reply) && known && known.revision > reply.revision) {
-          delete state.inflight[id];
-          reconcile();
+          if (state.conflicts[id]) break;
+          const pending = state.pending[id];
+          // Built field by field rather than spread: `pending` carries the base
+          // document now, and spreading it would put a whole second copy of the
+          // task into every write on the wire and into the stored outbox.
+          const request = state.inflight[id] ?? (pending
+            ? { id, expectedRevision: pending.expectedRevision, data: pending.data, writeId: deps.id() }
+            : undefined);
+          if (!request) break;
+          state.inflight[id] = request;
           persist();
-          continue;
-        }
-        state.rows = state.rows.filter((row) => row.id !== id);
-        if ("deleted" in reply) state.tombstones = [...new Set([...state.tombstones, id])];
-        else state.rows.push(reply);
-        delete state.inflight[id];
-        if (sameRevisionData(state.pending[id]?.data, request.data)) delete state.pending[id];
-        else if (state.pending[id]) {
-          // The write landed and newer local content is already queued behind
-          // it. That content now leaves from what the server just stored, so
-          // the base moves with the revision — they are one fact.
-          state.pending[id].expectedRevision = "deleted" in reply ? 0 : reply.revision;
-          state.pending[id].base = "deleted" in reply ? null : reply.data;
-        }
-        delete state.conflicts[id];
-        persist();
+          let reply: RevisionReply<T>;
+          try { reply = await deps.write(request); }
+          catch (error) {
+            assertActive();
+            if ((error as { code?: string })?.code === "40001" ||
+                String((error as { message?: string })?.message).includes("TASK_ID_RETIRED")) {
+              delete state.inflight[id];
+              const snapshot = await deps.read();
+              assertActive();
+              if (snapshot.userId !== userId) throw new TaskRevisionBlocked("Account changed while reading a conflict.");
+              // A save does not adopt the whole remote workspace into the visible
+              // UI. Track only this row here, or the next capture could mistake
+              // unseen tasks from another device for intentional local deletes.
+              state.rows = [...state.rows.filter((row) => row.id !== id), ...snapshot.rows.filter((row) => row.id === id)];
+              if (snapshot.tombstones.includes(id)) state.tombstones = [...new Set([...state.tombstones, id])];
+              const before = attempts.get(id) ?? 0;
+              reconcile(attempts);
+              if (state.pending[id] && (attempts.get(id) ?? 0) === before && !state.conflicts[id]) {
+                state.conflicts[id] = { local: state.pending[id].data, remote: rowOf(id) ?? null };
+              }
+              persist();
+              continue;
+            }
+            throw error; // Includes response loss. Retry the same durable writeId.
+          }
+          assertActive();
+          if (reply.id !== id) throw new TaskRevisionBlocked("Unexpected task write response.");
+          const known = rowOf(id);
+          if (!("deleted" in reply) && known && known.revision > reply.revision) {
+            delete state.inflight[id];
+            reconcile(attempts);
+            persist();
+            break;
+          }
+          state.rows = state.rows.filter((row) => row.id !== id);
+          if ("deleted" in reply) state.tombstones = [...new Set([...state.tombstones, id])];
+          else state.rows.push(reply);
+          delete state.inflight[id];
+          if (sameRevisionData(state.pending[id]?.data, request.data)) delete state.pending[id];
+          else if (state.pending[id]) {
+            // The write landed and newer local content is already queued behind
+            // it. That content now leaves from what the server just stored, so
+            // the base moves with the revision — they are one fact.
+            state.pending[id].expectedRevision = "deleted" in reply ? 0 : reply.revision;
+            state.pending[id].base = "deleted" in reply ? null : reply.data;
+          }
+          delete state.conflicts[id];
+          persist();
+          break; // New edits queued during I/O belong to the next pass.
+          }
       }
-      reconcile();
+      reconcile(attempts);
       persist();
       if (Object.keys(state.conflicts).length) throw new TaskRevisionBlocked();
     } finally { busy = false; }
@@ -225,6 +249,13 @@ export function createTaskRevisionSession<T extends { id: string }>(
     persist();
   }
   return { userId, capture, adopt, refresh, flush, visibleTasks, preserveConflict, resolveConflict,
+    takeAutoMergedCount() {
+      // A task that hit the retry limit still needs an answer; do not count it
+      // as an automatically resolved question just because a prior attempt merged.
+      const count = [...autoMergedIds].filter(id => !state.conflicts[id]).length;
+      autoMergedIds.clear();
+      return count;
+    },
     get rows() { return state.rows; },
     get hasConflicts() { return Object.keys(state.conflicts).length > 0; },
     get hasPending() { return Object.keys(state.pending).length > 0 || Object.keys(state.inflight).length > 0; },

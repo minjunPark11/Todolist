@@ -1,6 +1,6 @@
 // 겹치지 않은 편집은 묻지 않는다 (TASK_CONFLICT_FIELD_MERGE_DESIGN.md M2).
 //
-// 순수 함수다. 아무 데도 연결되어 있지 않다 — M3 이 세션에 붙인다.
+// 순수 함수다. usePlannerData가 revision 세션의 두 충돌 경로에 연결한다.
 //
 // A task is one revision, so any divergence is a conflict today, even when the
 // two devices touched nothing in common. This is the three-way merge that

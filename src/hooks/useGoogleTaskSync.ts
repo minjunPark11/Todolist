@@ -7,6 +7,7 @@ import { publishGoogleTaskSync, readGoogleTaskSyncState, type LocalTaskConflict 
 import type { Task } from "../types";
 
 interface Input { enabled: boolean; accountKey: string; tasks: Task[];
+  takeAutoMergedCount: () => number;
   bridge: <T>(work: (userId: string, blockedTaskIds: string[]) => Promise<T>) => Promise<T>;
   conflicts: () => LocalTaskConflict[]; resolveConflict: (id: string, choice: "local" | "remote" | "copy", expected: LocalTaskConflict) => Promise<void> }
 export function useGoogleTaskSync(input: Input) {
@@ -69,7 +70,8 @@ export function useGoogleTaskSync(input: Input) {
     } finally {
       running.current = false;
       if (valid()) {
-        publishGoogleTaskSync({ ...readGoogleTaskSyncState(), busy: false, localConflicts: latest.current.conflicts() });
+        publishGoogleTaskSync({ ...readGoogleTaskSyncState(), busy: false, localConflicts: latest.current.conflicts(),
+          autoMergedCount: latest.current.takeAutoMergedCount() });
         window.dispatchEvent(new CustomEvent(GOOGLE_SYNC_FINISHED, { detail: { ok } }));
       }
     }

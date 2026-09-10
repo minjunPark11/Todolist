@@ -31,7 +31,7 @@ function RepeatDescription({ rules, timezone }: { rules: unknown; timezone: stri
     <details><summary>{t("googleTask.ruleDetails")}</summary><pre>{lines.join("\n")}</pre></details></>;
 }
 
-export function GoogleTaskReviewPanel() {
+export function GoogleTaskReviewPanel({ onOpenDeviceReview }: { onOpenDeviceReview?: () => void } = {}) {
   const state = useSyncExternalStore(subscribeGoogleTaskSync, readGoogleTaskSyncState, readGoogleTaskSyncState);
   const { t } = useT(); const [limit, setLimit] = useState(30);
   if (!state.enabled) return null;
@@ -55,6 +55,9 @@ export function GoogleTaskReviewPanel() {
     <h4>{t("googleTask.title")} <span>({reviews.filter(r => r.decision.reason !== "excluded").length + repeatChanges.length + transfers.length
       + (state.occurrenceConflicts?.length ?? 0)})</span></h4>
     <p className="ff-settings-note">{t("googleTask.policy")}</p>
+    {!!state.localConflicts?.length && onOpenDeviceReview && <button type="button" className="ff-btn ff-cal-btn-outline" onClick={onOpenDeviceReview}>
+      {t("settings.reviewDevices", { count: state.localConflicts.length })}
+    </button>}
     {/* A failure that the list below explains does not send anyone to their
         network settings. "Check the connection" was the sentence shown while
         four device conflicts — sitting twenty pixels lower, on this very
@@ -80,19 +83,7 @@ export function GoogleTaskReviewPanel() {
       <button type="button" className="ff-btn" disabled={state.busy} onClick={() => void state.run?.()}>{t("googleTask.recheck")}</button>
       {op.state === "reserved" && <button type="button" className="ff-btn" disabled={state.busy} onClick={() => void state.cancel?.(String(op.operation_id))}>{t("googleTask.cancel")}</button>}
     </div>)}
-    {state.localConflicts?.map(conflict => <details className="ff-google-review-item" key={conflict.id}>
-      <summary>{conflict.local?.title ?? conflict.remote?.data.title ?? t("googleTask.untitled")} — {t("googleTask.deviceConflict")}</summary>
-      <p>{t("googleTask.wholeTask")}</p>
-      <div className="ff-google-review-versions">
-        {[conflict.local, conflict.remote?.data].map((task, index) => <div key={index}><strong>{t(index === 0 ? "googleTask.local" : "googleTask.saved")}</strong>
-          <p>{task?.title ?? t("googleTask.deleted")}</p><p>{task ? [task.dueDate, task.startTime, task.endTime].filter(Boolean).join(" · ") : ""}</p><pre>{task?.description}</pre></div>)}
-      </div>
-      <div className="ff-google-review-actions">
-        <button type="button" className="ff-btn" disabled={state.busy} onClick={() => void state.resolveLocal?.(conflict, !conflict.remote && conflict.local ? "copy" : "local")}>{t(!conflict.remote && conflict.local ? "googleTask.copy" : "googleTask.useApp")}</button>
-        <button type="button" className="ff-btn" disabled={state.busy} onClick={() => void state.resolveLocal?.(conflict, "remote")}>{t("googleTask.useSaved")}</button>
-      </div>
-    </details>)}
-    {!reviews.length && !state.localConflicts?.length && !state.pending && !localSkips.length && !repeatChanges.length && !transfers.length && snapshot && <p role="status">{t("googleTask.clear")}</p>}
+    {!reviews.length && !state.occurrenceConflicts?.length && !state.pending && !localSkips.length && !repeatChanges.length && !transfers.length && snapshot && <p role="status">{t("googleTask.clear")}</p>}
     {!!transfers.length && <details className="ff-google-review-item"><summary>{t("googleTask.transferTitle", { count: transfers.length })}</summary>
       <p>{t("googleTask.transferNote", { calendar: snapshot!.scope.calendarId })}</p>
       {transfers.slice(0, limit).map(([id, row]) => {

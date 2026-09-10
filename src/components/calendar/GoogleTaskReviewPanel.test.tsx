@@ -139,3 +139,14 @@ it("still says check the connection when nothing on the screen explains it", () 
   mount();
   expect(screen.getByRole("alert").textContent).toContain("Check the connection");
 });
+
+it("links to account review instead of rendering device conflicts inside Google", () => {
+  const open = vi.fn();
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), autoMergedCount: 3, localConflicts: [{ id: "local", local: null, remote: null }] });
+  render(<I18nProvider lang="en"><GoogleTaskReviewPanel onOpenDeviceReview={open} /></I18nProvider>);
+  fireEvent.click(screen.getByRole("button", { name: "Review 1 device conflicts" }));
+  expect(open).toHaveBeenCalledOnce();
+  expect(screen.queryByText(/automatically merged/)).toBeNull();
+  expect(screen.queryByText("Use saved version")).toBeNull();
+  expect(screen.getByRole("heading", { level: 4 }).textContent).toContain("(1)");
+});

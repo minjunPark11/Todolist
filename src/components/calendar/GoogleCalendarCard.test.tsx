@@ -46,7 +46,10 @@ const mount = () => render(<I18nProvider lang="en"><FloatingLayerProvider><Googl
 // lives, editable there.
 
 /** The picker, and the modal that stands between a pick and what it costs. */
-const zoneTrigger = () => screen.getByRole("button", { name: /^Sync time zone:/ });
+const zoneTrigger = () => {
+  if (!screen.queryByRole("button", { name: /^Sync time zone:/ })) fireEvent.click(screen.getByText("Connection settings"));
+  return screen.getByRole("button", { name: /^Sync time zone:/ });
+};
 /** What the closed picker says it is set to. */
 const shownZone = () => zoneTrigger().textContent ?? "";
 

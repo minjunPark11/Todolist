@@ -1,11 +1,11 @@
 .ff-google-review { margin-block: 1rem; padding-block: .75rem; border-block: 1px solid var(--border-subtle); overflow-wrap: anywhere; }
 .ff-google-review h4 { margin: .25rem 0 .5rem; }
-.ff-google-review button, .ff-google-review summary { min-height: 44px; }
-.ff-google-review summary { cursor: pointer; padding-block: .65rem; overflow-wrap: anywhere; }
+:is(.ff-google-review, .ff-device-review) button, :is(.ff-google-review, .ff-device-review) summary { min-height: 44px; }
+:is(.ff-google-review, .ff-device-review) summary { cursor: pointer; padding-block: .65rem; overflow-wrap: anywhere; }
 .ff-google-review-item { padding-block: .5rem; border-bottom: 1px solid var(--border-subtle); }
 .ff-google-review-versions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .ff-google-review-versions p { overflow-wrap: anywhere; }
-.ff-google-review pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; max-height: 16rem; overflow: auto; }
+:is(.ff-google-review, .ff-device-review) pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; max-height: 16rem; overflow: auto; }
 .ff-google-review-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.ff-google-review :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+:is(.ff-google-review, .ff-device-review) :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 @media (max-width: 600px) { .ff-google-review-versions { grid-template-columns: 1fr; } }

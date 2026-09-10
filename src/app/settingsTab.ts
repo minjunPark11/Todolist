@@ -1,31 +1,12 @@
-// Which tab the Settings screen opens on.
-//
-// It was `useState("account")` and nothing else, which is fine for someone who
-// walked to Settings on purpose and wrong for the one case where the app sends
-// them there on its own: the Google Calendar consent round trip lands on
-// `/settings` (`googleSync/connectFlow.ts` — CALLBACK_LANDING_PATH), and the
-// card that spends the code is drawn only while the Calendar tab is active.
-// So the code arrived, nothing was mounted to read it, and the connection did
-// not happen — until the user, with no reason to, clicked Calendar.
-//
-// Pure, and separate from the component, because the interesting part is a
-// decision about two inputs and neither of them needs React to be checked.
+// General is the default. OAuth returns must mount the connection card.
 import { parseCallback, type PendingConnect } from "../domain/calendar/googleSync/connectFlow";
 
-export const SETTINGS_TABS = [
-  "account",
-  "appearance",
-  "behavior",
-  "notifications",
-  "calendar",
-  "focus",
-  "data",
-] as const;
+export const SETTINGS_TABS = ["general", "notifications", "account", "connections", "data", "about"] as const;
 
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 /** Where Settings opens when nothing is asking for anything in particular. */
-export const DEFAULT_SETTINGS_TAB: SettingsTab = "account";
+export const DEFAULT_SETTINGS_TAB: SettingsTab = "general";
 
 export interface SettingsTabSignals {
   /** The whole address, callback fragment and all. `null` off the browser. */
@@ -50,7 +31,7 @@ export interface SettingsTabSignals {
  * the app finishing something it started.
  */
 export function initialSettingsTab({ href, pendingConnect }: SettingsTabSignals): SettingsTab {
-  if (parseCallback(href)) return "calendar";
-  if (pendingConnect) return "calendar";
+  if (parseCallback(href)) return "connections";
+  if (pendingConnect) return "connections";
   return DEFAULT_SETTINGS_TAB;
 }
