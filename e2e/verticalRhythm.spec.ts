@@ -98,9 +98,24 @@ async function offGrid(page: Page, allowed: string[]): Promise<Offender[]> {
       if ((allowList as string[]).some((sel) => el.closest(sel))) continue;
       const height = Math.round(box.height);
       const inSidebar = !!el.closest(".tm-sidebar, .space-sidebar, .ff-settings-nav");
-      // Focus v2 uses 44px touch controls and 52px primary/picker controls.
+      // Focus v2 has three sizes, and each one is a different KIND of control
+      // (FOCUS_TABS_AND_RECORD_DESIGN.md §7.1, §9.3.2):
+      //
+      //   52  the primary button and the task picker — what the screen is for
+      //   44  the touch controls beside them
+      //   36  the tab row and the anchor
+      //
+      // 36 is the navigation rhythm §4.86 sets, and that is what those two
+      // are: the tabs choose between three screens, and the anchor is a pill
+      // naming one thing — the same clause `radiusScale.spec.ts` lists it
+      // under. `inSidebar` is this file's proxy for "is this navigation", and
+      // a tab strip is the counterexample it did not anticipate; the strip is
+      // not in a sidebar and is navigation all the same.
+      //
+      // Loosening a number widens what it lets past, so the test below pins
+      // the two shapes it was loosened for.
       const inFocus = !!el.closest(".focus-page-v2");
-      const allowedHeights = inSidebar ? [NAV, CREATE, SECTION_ACTION] : inFocus ? [44, 52] : [CONTROL];
+      const allowedHeights = inSidebar ? [NAV, CREATE, SECTION_ACTION] : inFocus ? [NAV, 44, 52] : [CONTROL];
       if (allowedHeights.includes(height)) continue;
       const cls = String((el as HTMLElement).className ?? "").trim().split(/\s+/)[0] || el.tagName.toLowerCase();
       found.set(`${cls}|${height}`, { cls, height, where: inSidebar ? "navigation" : "control" });
@@ -126,6 +141,33 @@ test.describe("the vertical rhythm (§4.86, §11.2)", () => {
 
       expect(await offGrid(page, ALLOWED_OFF_GRID), `${route} draws a control off the grid`).toEqual([]);
     }
+  });
+
+  /**
+   * The other half of admitting 36 to the Focus page.
+   *
+   * The sweep above now walks past any 36px control there, so on its own it
+   * would say nothing if the tab row grew a third size or the anchor turned
+   * into a 36px button that is neither. This measures the two the number was
+   * loosened for — the same pairing `radiusScale.spec.ts` makes between an
+   * allow-list line and an `expectPill` that keeps looking.
+   */
+  test("the Focus 36 belongs to the tab row and the anchor", async ({ page }) => {
+    await openApp(page);
+    await page.goto("/focus");
+    await expect(page.getByRole("button", { name: "Start focus", exact: true })).toBeVisible();
+
+    const heights = await page.evaluate(() => {
+      const of = (sel: string) =>
+        Array.from(document.querySelectorAll(sel)).map((el) =>
+          Math.round(el.getBoundingClientRect().height),
+        );
+      return { tabs: of('.focus-tabs button[role="tab"]'), anchor: of(".focus-anchor") };
+    });
+
+    expect(heights.tabs, "three tabs on screen").toHaveLength(3);
+    expect(heights.tabs, "the tab row is the 36px navigation rhythm").toEqual([36, 36, 36]);
+    expect(heights.anchor, "the anchor is one 36px pill").toEqual([36]);
   });
 
   test("40px belongs to the Rail and to nothing else", async ({ page }) => {
