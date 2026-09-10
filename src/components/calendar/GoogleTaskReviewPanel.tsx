@@ -38,7 +38,7 @@ export function GoogleTaskReviewPanel({ onOpenDeviceReview }: { onOpenDeviceRevi
   if (!state.enabled) return null;
   const snapshot = state.snapshot;
   const reviews = snapshot?.records.filter(r => r.decision.kind === "review" || r.decision.kind === "conflict" || r.decision.reason === "excluded") ?? [];
-  const skips = snapshot?.records.filter(r => r.decision.kind === "skip" && !["excluded", "already-trashed", "cancelled-unmapped", "deleted"].includes(String(r.decision.reason))) ?? [];
+  const skips = snapshot?.records.filter(r => r.decision.kind === "skip" && !["excluded", "already-trashed", "cancelled-unmapped", "deleted", "recurring-instance"].includes(String(r.decision.reason))) ?? [];
   const transfers = snapshot ? [...snapshot.tasks].filter(([id, row]) => snapshot.historicalTaskIds.has(id) && !row.data.deletedAt &&
     !snapshot.snapshots.some(s => s.taskId === id && s.eventId) && !["abandoned", "given_up"].includes(String(row.data.status))) : [];
   const repeatChanges = snapshot?.records.filter(r => {
