@@ -1,5 +1,14 @@
 import { expect, it } from "vitest";
-import { sameRecurrence, taskRecurrence } from "./taskRecurrence";
+import { sameRecurrence, taskRecurrence, readTaskRecurrence } from "./taskRecurrence";
+
+it("imports supported Google rules only when every clause round-trips", () => {
+  expect(readTaskRecurrence(["RRULE:BYDAY=MO,FR;FREQ=WEEKLY;INTERVAL=2"], {}, "UTC"))
+    .toMatchObject({ repeatType: "weekly", repeatDays: [1,5], repeatInterval: 2 });
+  expect(readTaskRecurrence(["RRULE:FREQ=DAILY;COUNT=10"], {}, "UTC")).toBeNull();
+  expect(readTaskRecurrence(["RRULE:FREQ=MONTHLY;BYDAY=1MO"], {}, "UTC")).toBeNull();
+  const task = { dueDate: "2026-06-01", startTime: "09:00", repeatType: "daily", repeatEndDate: "2026-07-01" };
+  expect(readTaskRecurrence(taskRecurrence(task, "America/New_York"), task, "America/New_York"))?.toMatchObject({ repeatEndDate: "2026-07-01" });
+});
 
 it("writes validated weekly weekdays and intervals without mutating the task", () => {
   const task = { repeatType: "weekly", repeatDays: [5, 1, 1], repeatInterval: 2 };

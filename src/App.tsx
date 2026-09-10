@@ -765,7 +765,7 @@ export default function App() {
   // record: what comes back is an ExternalCalendarEvent and not a Task, so a
   // colleague's meeting never lands in the inbox (§6.2).
   useGoogleInboundSync({ signedIn: planner.auth.isSignedIn, apply: saveExternalState });
-  useGoogleTaskSync({ enabled: planner.auth.isSignedIn && planner.auth.remoteDataReady && planner.auth.taskSyncMode === "revision",
+  useGoogleTaskSync({ timezone: appSettings.timezone, enabled: planner.auth.isSignedIn && planner.auth.remoteDataReady && planner.auth.taskSyncMode === "revision",
     accountKey: planner.auth.userEmail, tasks: planner.tasks, bridge: planner.withGoogleTaskSync,
     conflicts: planner.taskSyncConflicts, resolveConflict: planner.resolveTaskSyncConflict,
     takeAutoMergedCount: planner.takeTaskAutoMergedCount });

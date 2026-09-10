@@ -13,15 +13,17 @@
 // this screen, and because the effect is behind the panel — you change it and
 // see the grid change.
 import type { CalendarViewOptions } from "../../types";
-import { Popover, PopoverContent, PopoverTrigger } from "../floating";
+import type { ReactNode } from "react";
+import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "../floating";
 import { useT } from "../../i18n";
 
 interface CalendarViewOptionsProps {
   options: CalendarViewOptions;
   onChange: (patch: Partial<CalendarViewOptions>) => void;
+  services?: ReactNode;
 }
 
-export function CalendarViewOptionsMenu({ options, onChange }: CalendarViewOptionsProps) {
+export function CalendarViewOptionsMenu({ options, onChange, services }: CalendarViewOptionsProps) {
   const { t } = useT();
 
   return (
@@ -70,7 +72,13 @@ export function CalendarViewOptionsMenu({ options, onChange }: CalendarViewOptio
             <span>{t("calendar.layerFocusRecords")}</span>
           </label>
         </div>
+        {services && <ServicesActions>{services}</ServicesActions>}
       </PopoverContent>
     </Popover>
   );
+}
+
+function ServicesActions({ children }: { children: ReactNode }) {
+  const { close } = usePopoverSurface();
+  return <div className="gcal-viewopts-group ff-calendar-service-actions" onClick={() => close("selection")}>{children}</div>;
 }

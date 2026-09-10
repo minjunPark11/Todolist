@@ -22,5 +22,5 @@ it("moves focus and selected destination together with the keyboard", () => {
 it("keeps the compact menu and desktop navigation on the same destination", () => {
   render(<I18nProvider lang="en"><Harness /></I18nProvider>);
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "connections" } });
-  expect(screen.getByRole("tab", { name: "Connections & sharing" }).getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByRole("tab", { name: "Connections" }).getAttribute("aria-selected")).toBe("true");
 });

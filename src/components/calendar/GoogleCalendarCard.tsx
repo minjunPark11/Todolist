@@ -11,7 +11,7 @@
 // fragment, and this is the component mounted to spend it. The desktop path is
 // the same code reached by a different road — `platform.deepLink` — because
 // Google will not redirect to a custom scheme (§4.4, chain step 1).
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   CALLBACK_LANDING_PATH,
   consentUrl,
@@ -23,11 +23,8 @@ import {
 } from "../../domain/calendar/googleSync/connectFlow";
 import { useT } from "../../i18n";
 import { GOOGLE_SYNC_POLICY_EVENT, type GoogleSyncPolicyReason } from "../../domain/calendar/googleSync/protocol";
-import { listTimezones, timezoneLabel } from "../../domain/plannerData/timezones";
-import { TimezonePicker } from "../TimezonePicker";
 import {
   disconnect as disconnectGoogle,
-  alignGoogleTimezone,
   ensureDedicatedCalendar,
   exchangeCodeForAccess,
   GoogleCalendarError,
@@ -41,6 +38,8 @@ import {
 import { platform } from "../../platform";
 import { supabase } from "../../services/supabaseClient";
 import { ConfirmModal } from "../kit";
+import { googleReviewCount } from "../../lib/googleReviewCount";
+import { GoogleSyncHistory } from "./GoogleSyncHistory";
 import { GoogleTaskReviewPanel } from "./GoogleTaskReviewPanel";
 import { readGoogleTaskSyncState, subscribeGoogleTaskSync } from "../../lib/googleTaskSyncState";
 
@@ -59,7 +58,7 @@ type Status =
  * or behind a VPN, and a connection pinned to it stays wrong afterwards
  * (025 line 57 refuses to re-bind a different one; 036 is the only way back).
  */
-export function GoogleCalendarCard({ timezone = "", onTimezoneChange, onOpenDeviceReview }:
+export function GoogleCalendarCard({ timezone = "", onOpenDeviceReview }:
   { timezone?: string; onTimezoneChange?: (zone: string) => void; onOpenDeviceReview?: () => void }) {
   const taskSync = useSyncExternalStore(subscribeGoogleTaskSync, readGoogleTaskSyncState, readGoogleTaskSyncState);
   const { t } = useT();
@@ -70,29 +69,7 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange, onOpenDevi
   const [signedIn, setSignedIn] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [syncing, setSyncing] = useState(false);
-  const [aligning, setAligning] = useState(false);
-  const aligningRef = useRef(false);
-  /** The zone the reader picked, held until they confirm the re-read it costs. */
-  const [pendingZone, setPendingZone] = useState("");
-  /**
-   * What the last pin attempt did, said BESIDE the picker.
-   *
-   * Separate from the card's shared `notice`/`error`, which render at the
-   * bottom — past the calendar list and the review panel. The answer to a
-   * button in the first row was arriving several hundred pixels below it,
-   * often off-screen, which reads exactly like nothing having happened.
-   */
-  const [timezoneMessage, setTimezoneMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
-  const pinnedZone = status.kind === "connected" ? status.connection.syncTimezone ?? "" : "";
-  // Four hundred options whose offsets only move on a DST boundary, so built
-  // once per set of zones rather than per render. The pinned zone and the
-  // account's are folded in so the select can always show what is selected —
-  // `normalizeAppSettings` deliberately keeps a zone name this build has never
-  // heard of, and a select with no matching option falls back to its first.
-  const zoneOptions = useMemo(
-    () => listTimezones([pinnedZone, timezone]).map((zone) => ({ value: zone, label: timezoneLabel(zone) })),
-    [pinnedZone, timezone],
-  );
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [labelState, setLabelState] = useState<{ supported: boolean | null; overflow: number; failed: boolean } | null>(null);
   const manualSync = useRef(false);
   const policyReason = useRef<GoogleSyncPolicyReason | null>(null);
@@ -335,49 +312,6 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange, onOpenDevi
    * whole change exists to end: events arriving at the wrong hour while every
    * screen stays internally consistent about it.
    */
-  async function alignTimezone(zone: string) {
-    if (status.kind !== "connected" || !zone || aligningRef.current) return;
-    // A sync in flight is a refusal, not a no-op.
-    //
-    // The picker is disabled while one runs, but the confirmation is a modal
-    // and outlives that: open it, have a background pass start underneath,
-    // press the button, and this used to return without a word. The reader
-    // then watches the pinned zone stay exactly where it was and has nothing
-    // to read — which is the report that brought this bug in.
-    if (syncing || taskSync.busy) {
-      setTimezoneMessage({ kind: "error", text: t("settings.google.error.syncInProgress") });
-      return;
-    }
-    aligningRef.current = true;
-    setAligning(true);
-    setTimezoneMessage(null);
-    const version = ++readVersion.current;
-    try {
-      await alignGoogleTimezone(status.connection.calendarId, zone);
-      if (version !== readVersion.current) return;
-      // Only after the pin took. The account's zone is the cheap half to
-      // change and the one nothing else guards, so moving it first would leave
-      // the app claiming a zone the calendar refused.
-      onTimezoneChange?.(zone);
-      // Read the connection back rather than assuming the write took: the row
-      // below is drawn from `syncTimezone`, and a card that hid its own
-      // warning on an assumption would be claiming an alignment it did not
-      // confirm. Failing to re-read is not failing to align, so a refusal here
-      // leaves the success notice standing.
-      try {
-        const connection = await readConnection();
-        if (connection && version === readVersion.current) setStatus({ kind: "connected", connection });
-      } catch { /* The next read settles it. */ }
-      setTimezoneMessage({ kind: "ok", text: t("settings.google.timezoneAligned", { timezone: zone }) });
-      notifyGoogleConnectionChanged();
-    } catch (thrown) {
-      if (version === readVersion.current) setTimezoneMessage({ kind: "error", text: describe(thrown) });
-    } finally {
-      aligningRef.current = false;
-      setAligning(false);
-    }
-  }
-
   async function confirmDisconnect() {
     setConfirmingDisconnect(false);
     setError("");
@@ -423,9 +357,10 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange, onOpenDevi
               setRefresh((value) => value + 1);
             }}>{t("settings.google.retry")}</button>
           ) : status.kind === "connected" ? (
-            <button type="button" className="ff-btn ff-btn-danger" disabled={aligning} onClick={() => setConfirmingDisconnect(true)}>
-              {t("settings.google.disconnect")}
-            </button>
+            <details className="ff-settings-details ff-google-manage"><summary>{t("settings.connectionSettings")}</summary>
+              <button type="button" className="ff-btn" disabled={syncing || taskSync.busy} onClick={() => { setSyncing(true); manualSync.current = true; window.dispatchEvent(new Event(GOOGLE_SYNC_REQUESTED)); }}>{t(syncing ? "settings.google.syncingNow" : "settings.google.syncNow")}</button>
+              <button type="button" className="ff-btn" disabled={taskSync.busy} onClick={() => setConfirmingDisconnect(true)}>{t("settings.google.disconnect")}</button>
+            </details>
           ) : (
             <button
               type="button"
@@ -452,62 +387,12 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange, onOpenDevi
           ) : null}
           {labelState?.overflow ? <p className="ff-settings-note">{t("settings.google.labelsOverflow", { count: labelState.overflow })}</p> : null}
           {labelState?.failed && labelState.supported !== false ? <p className="ff-settings-note" aria-live="polite">{t("settings.google.labelsRetry")}</p> : null}
-          {/* The pinned zone, as the thing it is: a value you pick.
-              It was a button that said "align to the app setting", and that
-              made one action into three — go to another screen, change another
-              value, come back, press. The number that is wrong belongs on the
-              screen where its consequence lives, editable there.
-              Picking here writes BOTH this and the account's own zone. There
-              is one correct value for the pair: every date this app stores is
-              a bare wall-clock string, so a calendar pinned to a zone its
-              reader does not keep clocks in is exactly the silent failure this
-              replaces. Two independent pickers would be a way to recreate it.
-              Unlike Google's own time-zone setting, changing this is not free
-              — it re-reads the calendar and rewrites the times of everything
-              imported — so the choice is confirmed before it is spent.
-              A connection from before `sync_timezone` existed reports "", and
-              a picker with nothing to show is worse than none. */}
-          <details className="ff-settings-details" open={!!timezone && !!status.connection.syncTimezone && timezone !== status.connection.syncTimezone || undefined}>
-            <summary>{t("settings.connectionSettings")}</summary>
-          {status.connection.syncTimezone ? (
-            <div className="ff-settings-row">
-              <div className="ff-settings-row-text">
-                <strong>{t("settings.google.timezoneLabel")}</strong>
-                <small>{t("settings.google.timezoneLabelHint")}</small>
-              </div>
-              <div className="ff-settings-row-control">
-                <TimezonePicker
-                  value={status.connection.syncTimezone}
-                  options={zoneOptions}
-                  label={t("settings.google.timezoneLabel")}
-                  disabled={aligning || syncing || taskSync.busy}
-                  onChange={setPendingZone}
-                />
-              </div>
-            </div>
-          ) : null}
-          </details>
-          {aligning ? <p className="ff-settings-note" role="status">{t("settings.google.aligningTimezone")}</p> : null}
-          {timezoneMessage ? (
-            timezoneMessage.kind === "error"
-              ? <p className="auth-message error" role="alert">{timezoneMessage.text}</p>
-              : <p className="ff-settings-note" role="status">{timezoneMessage.text}</p>
-          ) : null}
-          {/* Still said out loud when the two disagree. The picker shows what
-              is pinned but cannot say that it is wrong, and the general
-              settings screen can still move the account's zone away from it. */}
-          {timezone && status.connection.syncTimezone && status.connection.syncTimezone !== timezone ? (
-            <p className="ff-settings-note" aria-live="polite">
-              {t("settings.google.timezoneHint", { pinned: status.connection.syncTimezone, timezone })}
-            </p>
-          ) : null}
-          <button type="button" className="ff-btn ff-cal-btn-outline" disabled={syncing || aligning} onClick={() => {
-            setSyncing(true);
-            manualSync.current = true;
-            setNotice(""); setError("");
-            window.dispatchEvent(new Event(GOOGLE_SYNC_REQUESTED));
-          }}>{t(syncing ? "settings.google.syncingNow" : "settings.google.syncNow")}</button>
-          <GoogleTaskReviewPanel onOpenDeviceReview={onOpenDeviceReview} />
+          <p className="ff-settings-note" role="status">{t(taskSync.busy ? "googleTask.busy" : taskSync.error ? "googleTask.failed" : taskSync.pending ? "googleTask.pending" : "settings.google.automatic")}</p>
+          {taskSync.lastSuccessAt && <p className="ff-settings-note">{t("settings.calendar.lastSynced", { time: new Date(taskSync.lastSuccessAt).toLocaleString() })}</p>}
+          {googleReviewCount(taskSync) > 0 && <button type="button" className="ff-btn" aria-expanded={reviewOpen} onClick={() => setReviewOpen(!reviewOpen)}>{t("settings.google.exceptions", { count: googleReviewCount(taskSync) })}</button>}
+          {reviewOpen && <GoogleTaskReviewPanel onOpenDeviceReview={onOpenDeviceReview} />}
+          <GoogleSyncHistory />
+
         </>
       ) : null}
 
@@ -522,16 +407,6 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange, onOpenDevi
 
       {notice ? <p className="ff-settings-note" aria-live="polite">{notice}</p> : null}
       {error ? <p className="auth-message error" role="alert">{error}</p> : null}
-
-      {pendingZone ? (
-        <ConfirmModal
-          title={t("settings.google.timezoneConfirmTitle")}
-          body={t("settings.google.timezoneConfirmBody", { timezone: pendingZone })}
-          confirmLabel={t("settings.google.timezoneConfirm")}
-          onConfirm={() => { const zone = pendingZone; setPendingZone(""); void alignTimezone(zone); }}
-          onCancel={() => setPendingZone("")}
-        />
-      ) : null}
 
       {confirmingDisconnect ? (
         <ConfirmModal

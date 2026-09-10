@@ -623,28 +623,14 @@ export function usePlannerData() {
     };
   }, [data, remoteLoaded, userEmail]);
 
-  /**
-   * Keep `appSettings.timezone` honest — while the account still wants that.
-   *
-   * Runs after the remote load too, since that replaces appSettings with
-   * whatever the account holds — which may have been written by a device in
-   * another zone, or by a client that predates the field.
-   *
-   * `timezoneMode: "manual"` stops it, and that is the whole point of the
-   * mode: a chosen zone that the next start overwrites is not a choice. The
-   * check is on the mode and not on "did the value change", because both look
-   * identical from here — a person who picks Asia/Seoul on a laptop running in
-   * Europe/London is asking for exactly the difference this used to erase.
-   *
-   * Writes only on a real difference, so the usual case costs nothing: no
-   * state update, no save, no sync.
-   */
+  // Signed-in accounts keep their saved zone across devices. Local-only automatic
+  // mode follows this device; selecting the device option explicitly saves its zone.
   useEffect(() => {
-    if (data.appSettings.timezoneMode === "manual") return;
+    if (data.appSettings.timezoneMode === "manual" || (supabase && userEmail)) return;
     const detected = detectTimezone();
     if (!detected || detected === data.appSettings.timezone) return;
     updateAppSettings({ timezone: detected });
-  }, [data.appSettings.timezone, data.appSettings.timezoneMode, remoteLoaded]);
+  }, [data.appSettings.timezone, data.appSettings.timezoneMode, remoteLoaded, userEmail]);
 
   async function getUserId() {
     if (!supabase) {
@@ -2410,6 +2396,7 @@ export function usePlannerData() {
 
   // === App settings + recent items ===
   function updateAppSettings(patch: Partial<AppSettings>) {
+    if (patch.timezoneMode === "auto" && patch.timezone === undefined) patch = { ...patch, timezone: detectTimezone() || dataRef.current.appSettings.timezone };
     setData((current) => ({ ...current, appSettings: { ...current.appSettings, ...patch } }));
   }
 

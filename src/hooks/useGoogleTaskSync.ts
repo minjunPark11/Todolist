@@ -6,7 +6,7 @@ import { GoogleTaskSelectionChanged, runGoogleTaskCycle, type GoogleTaskChoice, 
 import { publishGoogleTaskSync, readGoogleTaskSyncState, type LocalTaskConflict } from "../lib/googleTaskSyncState";
 import type { Task } from "../types";
 
-interface Input { enabled: boolean; accountKey: string; tasks: Task[];
+interface Input { enabled: boolean; accountKey: string; timezone?: string; tasks: Task[];
   takeAutoMergedCount: () => number;
   bridge: <T>(work: (userId: string, blockedTaskIds: string[]) => Promise<T>) => Promise<T>;
   conflicts: () => LocalTaskConflict[]; resolveConflict: (id: string, choice: "local" | "remote" | "copy", expected: LocalTaskConflict) => Promise<void> }
@@ -47,12 +47,13 @@ export function useGoogleTaskSync(input: Input) {
         };
         return navigator.locks.request(`focusflow.google-cycle:${userId}`, { ifAvailable: true }, async lock => {
           if (!lock) throw new Error("Google task sync is running in another window.");
-          return runGoogleTaskCycle({ userId, generation, accessToken: token.accessToken, blockedTaskIds }, deps, choice);
+          return runGoogleTaskCycle({ userId, generation, accessToken: token.accessToken, blockedTaskIds, expectedTimezone: latest.current.timezone }, deps, choice);
         });
       });
       // The conflicts come off a pass that FINISHED. They are not an error:
       // the occurrences they name were skipped and everything else was sent.
       if (valid()) { publishGoogleTaskSync({ ...readGoogleTaskSyncState(), snapshot: result?.snapshot ?? null, pending: result?.pending ?? false, error: "", errorDetail: undefined,
+        lastSuccessAt: result && !result.pending ? new Date().toISOString() : readGoogleTaskSyncState().lastSuccessAt,
         occurrenceConflicts: result?.occurrenceConflicts?.length ? result.occurrenceConflicts : undefined }); ok = !result?.pending; }
     } catch (error) {
       // The thrown message travels with the verdict.
@@ -99,7 +100,7 @@ export function useGoogleTaskSync(input: Input) {
     if (!input.enabled) return;
     const timer = window.setTimeout(() => void run(), 1800);
     return () => window.clearTimeout(timer);
-  }, [input.enabled, input.tasks, run]);
+  }, [input.enabled, input.tasks, input.timezone, run]);
   useEffect(() => {
     const trigger = () => void run();
     window.addEventListener("focus", trigger); window.addEventListener("online", trigger);

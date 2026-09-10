@@ -869,6 +869,20 @@
 }
 .ff-toggle.on .ff-toggle-knob { transform: translateX(18px); }
 
+.ff-services-dialog { margin: auto; inset: 0; box-sizing: border-box; width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-primary); background: var(--bg-surface); }
+.ff-services-dialog::backdrop { background: rgba(0, 0, 0, 0.32); }
+.ff-services-body { padding: 16px; overflow-wrap: anywhere; }
+.ff-services-body .ff-cal-card-head { flex-wrap: wrap; }
+.ff-services-body input { max-width: 100%; min-width: 0; }
+.ff-services-body .ff-external-calendar-form { grid-template-columns: minmax(0, 1fr) auto; }
+.ff-services-body .ff-external-calendar-form input:not([type="color"]) { grid-column: 1 / -1; }
+@media (max-width: 600px) {
+  .ff-services-body .ff-external-calendar-item { grid-template-columns: 12px minmax(0, 1fr); }
+  .ff-services-body .ff-external-calendar-actions { grid-column: 1 / -1; flex-wrap: wrap; }
+}
+.ff-google-manage { position: relative; }
+.ff-google-manage button { display: block; margin-top: 8px; }
+
 /* ===== Planning: Eisenhower matrix (MatrixPage) =====
    A 2x2 grid, not four columns.
 
@@ -1440,3 +1454,6 @@
   margin: 0;
   flex: none;
 }
+
+.ff-services-dialog .ff-modal-head { margin: 0; padding: 16px; }
+.ff-calendar-service-actions { display: grid; gap: 8px; }

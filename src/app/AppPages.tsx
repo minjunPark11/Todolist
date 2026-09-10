@@ -1,4 +1,4 @@
-﻿import { CSSProperties, ReactNode, useState } from "react";
+﻿import { CSSProperties, ReactNode, useState, useRef } from "react";
 import { MatrixPage } from "../components/MatrixPage";
 import { CalendarView } from "../components/CalendarView";
 import { FocusPage } from "../components/FocusPage";
@@ -12,6 +12,9 @@ import type { SettingsUpdateStatus } from "../platform";
 import type { TaskDetailPresentation } from "../domain/tasks/responsive";
 import type { AppSettings, ExternalCalendar, ExternalCalendarEvent, PageId, Task } from "../types";
 import { resolveOccurrence } from "../utils/taskOccurrences";
+import { CalendarServices } from "../components/calendar/CalendarServices";
+import { CalendarServicesDialog } from "../components/calendar/CalendarServicesDialog";
+import { useT } from "../i18n";
 
 type Planner = ReturnType<typeof usePlannerData>;
 
@@ -129,6 +132,13 @@ export function AppPages({
   onPublishCalendarShare,
   accountSlot,
 }: AppPagesProps) {
+  const { t } = useT();
+  const [calendarService, setCalendarService] = useState<"share" | "subscriptions" | null>(null);
+  const serviceTrigger = useRef<HTMLButtonElement | null>(null);
+  const closeService = () => { setCalendarService(null); queueMicrotask(() => {
+    const target = serviceTrigger.current?.isConnected ? serviceTrigger.current : document.querySelector<HTMLButtonElement>(".gcal-viewopts-btn");
+    target?.focus();
+  }); };
   /**
    * The Detail is a column only where §15.17 says it is one.
    *
@@ -199,6 +209,10 @@ export function AppPages({
     return (
       <section className="gcal-page-shell">
         <CalendarView
+          services={<>
+            <button type="button" className="ff-btn" onClick={e => { serviceTrigger.current = e.currentTarget; setCalendarService("share"); }}>{t("calendar.share")}</button>
+            <button type="button" className="ff-btn" onClick={e => { serviceTrigger.current = e.currentTarget; setCalendarService("subscriptions"); }}>{t("calendar.manage")}</button>
+          </>}
           tasks={visibleTasks}
           lists={planner.lists}
           externalCalendars={externalCalendars}
@@ -225,6 +239,12 @@ export function AppPages({
         {/* §5: the Calendar draws the Detail now, so it renders the pane like
             the other two pages that do. */}
         {renderTaskDetail()}
+        {calendarService && <CalendarServicesDialog title={t(calendarService === "share" ? "calendar.share" : "calendar.manage")} onClose={closeService}>
+          <CalendarServices section={calendarService} externalCalendars={externalCalendars} onAddExternalCalendar={onAddExternalCalendar}
+            onUpdateExternalCalendar={onUpdateExternalCalendar} onDeleteExternalCalendar={onDeleteExternalCalendar} onSyncExternalCalendar={onSyncExternalCalendar}
+            calendarShare={calendarShare} onEnableCalendarShare={onEnableCalendarShare} onDisableCalendarShare={onDisableCalendarShare}
+            onRegenerateCalendarShare={onRegenerateCalendarShare} onPublishCalendarShare={onPublishCalendarShare} />
+        </CalendarServicesDialog>}
       </section>
     );
   }

@@ -1,4 +1,5 @@
 import type { GoogleEventResource } from "./inboundShape";
+import { mergeTaskInbound } from "./mergeTaskInbound";
 import { normalizeTaskInboundFields, sameTaskInboundFields, toTaskInboundFields, type TaskInboundFields } from "./taskInboundShape";
 
 /** All snapshots must come from one authoritative server scope, never a device-only task cache. */
@@ -26,11 +27,12 @@ export interface TaskInboundSnapshot {
 type Decision =
   | { kind: "create"; listId: string; fields: TaskInboundFields }
   | { kind: "update"; fields: TaskInboundFields }
+  | { kind: "merge"; fields: TaskInboundFields; remote: TaskInboundFields }
   | { kind: "acknowledge"; base: TaskInboundFields }
   | { kind: "keep-local" }
   | { kind: "trash" }
   | { kind: "conflict"; local: TaskInboundFields; remote: TaskInboundFields; base?: TaskInboundFields }
-  | { kind: "review"; reason: "duplicate-candidate" | "ambiguous-mapping" | "remote-restored"; taskIds: string[] }
+  | { kind: "review"; reason: "duplicate-candidate" | "ambiguous-mapping" | "remote-restored" | "deletion-conflict"; taskIds: string[] }
   | { kind: "skip"; reason: "recurring-instance" | "recurring-master" | "excluded" | "cancelled-unmapped" | "deleted" | "already-trashed" | "invalid-event" | "unsupported-schedule" };
 
 export interface TaskInboundEntry {
@@ -84,7 +86,8 @@ export function planTaskInbound(input: TaskInboundInput): TaskInboundPlan {
       decision = { kind: "review", reason: "ambiguous-mapping", taskIds: matches.map((s) => s.taskId) };
     } else if (source.status === "cancelled") {
       decision = !mine ? { kind: "skip", reason: "cancelled-unmapped" }
-        : mine.state === "active" ? { kind: "trash" }
+        : mine.state === "active" ? !mine.base || !sameTaskInboundFields(mine.fields, mine.base)
+          ? { kind: "review", reason: "deletion-conflict", taskIds: [mine.taskId] } : { kind: "trash" }
         : { kind: "skip", reason: mine.state === "deleted" ? "deleted" : "already-trashed" };
     } else if (mine?.state === "deleted") {
       decision = { kind: "skip", reason: "deleted" };
@@ -117,7 +120,9 @@ export function planTaskInbound(input: TaskInboundInput): TaskInboundPlan {
         } else if (mine.base && sameTaskInboundFields(local, mine.base)) {
           decision = { kind: "update", fields: remote };
         } else {
-          decision = { kind: "conflict", local, remote, ...(mine.base ? { base: normalizeTaskInboundFields(mine.base) } : {}) };
+          const merged = mine.base && mergeTaskInbound(mine.base, local, remote);
+          decision = merged ? { kind: "merge", fields: merged, remote }
+            : { kind: "conflict", local, remote, ...(mine.base ? { base: normalizeTaskInboundFields(mine.base) } : {}) };
         }
       }
     }
