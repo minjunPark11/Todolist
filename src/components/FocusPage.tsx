@@ -380,6 +380,37 @@ export function FocusPage({
     setPicker(id);
   };
   const isBreak = Boolean(flow?.phase.startsWith("break_"));
+  /* 도는 세션이 정한 측정 방식. 이것이 있으면 상대 탭은 잠긴다 (§3).
+     지금까지는 측정 토글을 세션 중에 **렌더하지 않아서** 그 사실을 말했는데,
+     탭 줄은 늘 보이므로 이유를 말할 자리가 필요해졌다. */
+  const lockedMode: "stopwatch" | "pomodoro" | null = activeSession
+    ? (activeSession.measurementMode ?? "stopwatch")
+    : flow
+      ? "pomodoro"
+      : null;
+  /* 새로고침하면 `mode` 는 기본값으로 돌아가지만 세션은 살아 있다. 선택된 탭이
+     화면에 도는 것과 달라지지 않게 맞춘다. */
+  useEffect(() => {
+    if (lockedMode && lockedMode !== mode) setMode(lockedMode);
+  }, [lockedMode]);
+  const tab = view === "records" ? "records" : mode;
+  const lockedReason = l(
+    "집중 중에는 측정 방식을 바꿀 수 없어요. 종료한 뒤 바꿔 주세요.",
+    "You cannot switch timers mid-session. Finish this one first.",
+  );
+  const selectTab = (next: "stopwatch" | "pomodoro" | "records") => {
+    if (next !== "records" && lockedMode && lockedMode !== next) {
+      setMessage(lockedReason);
+      return;
+    }
+    setMessage("");
+    if (next === "records") {
+      setView("records");
+      return;
+    }
+    setView("timer");
+    setMode(next);
+  };
   const display = activeSession
     ? focusDisplaySeconds(activeSession, now)
     : isBreak && flow
@@ -412,26 +443,6 @@ export function FocusPage({
     <>
       {!activeSession && !isBreak && !result && (
         <>
-          {!flow && (
-            <div
-              className="focus-mode"
-              role="group"
-              aria-label={l("측정 방식", "Timer mode")}
-            >
-              {(["stopwatch", "pomodoro"] as const).map((m) => (
-                <button
-                  key={m}
-                  aria-pressed={mode === m}
-                  onClick={() => setMode(m)}
-                >
-                  <FocusIcon name="clock" />
-                  {m === "stopwatch"
-                    ? l("스톱워치", "Stopwatch")
-                    : l("포모도로", "Pomodoro")}
-                </button>
-              ))}
-            </div>
-          )}
           <button
             className="focus-picker-trigger"
             onClick={() => openPicker("start")}
@@ -704,7 +715,7 @@ export function FocusPage({
       }}
     >
       <header className="focus-page-header" data-tauri-drag-region>
-        <div>
+        <div className="focus-page-title">
           <h1>
             {view === "records"
               ? l("집중 기록", "Focus records")
@@ -717,17 +728,52 @@ export function FocusPage({
             )}
           </p>
         </div>
+        {/* 셋을 같은 높이에 둔다 (§1). 측정 방식은 화면 안의 토글이었고 기록은
+            머리글의 버튼이어서, 세 개가 서로 다른 층위에 흩어져 있었다. */}
+        {!immersive && (
+          <div
+            className="focus-tabs"
+            role="tablist"
+            aria-label={l("집중 화면", "Focus views")}
+          >
+            {(["stopwatch", "pomodoro", "records"] as const).map((id) => {
+              const locked = id !== "records" && Boolean(lockedMode) && lockedMode !== id;
+              return (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={tab === id}
+                  /* `disabled` 가 아니라 `aria-disabled` 다. 진짜 `disabled` 는 초점을
+                     받지 못해서, 탭으로 훑는 사람은 그 탭이 있다는 것도 왜 잠겼는지도
+                     듣지 못한다.
+
+                     그리고 이유는 **누르기 전에** 닿아야 한다. 처음엔 누르면 말하게
+                     했는데, 보조기술도 자동화 도구도 `aria-disabled` 를 "누를 수 없음"
+                     으로 읽어서 누르는 일 자체가 일어나지 않는다 — 그 설계에서는 이유가
+                     영원히 도착하지 않는 사람이 생긴다. 그래서 설명을 컨트롤에 붙인다:
+                     보조기술은 `aria-describedby` 로, 마우스는 `title` 로, 그래도 누른
+                     사람에게는 `selectTab` 이 한 번 더. */
+                  aria-disabled={locked || undefined}
+                  aria-describedby={locked ? "focus-tab-lock" : undefined}
+                  title={locked ? lockedReason : undefined}
+                  onClick={() => selectTab(id)}
+                >
+                  {id === "stopwatch"
+                    ? l("타이머", "Timer")
+                    : id === "pomodoro"
+                      ? l("포모도로", "Pomodoro")
+                      : l("기록", "Records")}
+                </button>
+              );
+            })}
+            {lockedMode && (
+              <p id="focus-tab-lock" className="tm-visually-hidden">
+                {lockedReason}
+              </p>
+            )}
+          </div>
+        )}
         <nav aria-label={l("집중 도구", "Focus tools")}>
-          {!immersive && (
-            <button
-              onClick={() => setView(view === "records" ? "timer" : "records")}
-            >
-              <FocusIcon name={view === "records" ? "clock" : "records"} />
-              {view === "records"
-                ? l("집중으로", "Back to focus")
-                : l("기록", "Records")}
-            </button>
-          )}
           {settings.showMiniTimerButton && (
             <button
               aria-label={l("미니 창", "Mini timer")}

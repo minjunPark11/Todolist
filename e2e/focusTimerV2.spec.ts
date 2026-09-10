@@ -42,7 +42,7 @@ test("unassigned stopwatch, pause, finish, records and immersion share a session
   expect(done.focusSessions[0].taskId).toBeNull();
   expect(done.focusSessions[0].focusNote).toBe("A preserved focus note");
   expect(done.focusSessions[0].segments).toHaveLength(2);
-  await page.getByRole("button", { name: "Records", exact: true }).click();
+  await page.getByRole("tab", { name: "Records", exact: true }).click();
   await expect(page.locator(".focus-record-row")).toHaveCount(1);
 });
 test("pomodoro deadline saves focus once and keeps break out of records", async ({
@@ -52,7 +52,7 @@ test("pomodoro deadline saves focus once and keeps break out of records", async 
   await page.getByRole("button", {name:"Focus settings",exact:true}).click();
   await page.getByLabel("Focus (minutes)",{exact:true}).fill("1");
   await page.getByRole("button", {name:"Close",exact:true}).click();
-  await page.getByRole("button", { name: "Pomodoro", exact: true }).click();
+  await page.getByRole("tab", { name: "Pomodoro", exact: true }).click();
   await page.getByRole("button", { name: "Start focus", exact: true }).click();
   await expect(page.getByText("Focusing", { exact: true })).toBeVisible();
   
@@ -149,7 +149,7 @@ test("link, relink and delete preserve the task contribution balance",async({pag
   await page.locator(".focus-choice-list").getByRole("button",{name:/Focus task A/}).click();
   let d=await store(page); const seconds=d.focusSessions[0].accumulatedSeconds;
   expect(d.tasks.find((t:{title:string})=>t.title==="Focus task A").actualSeconds).toBe(seconds);
-  await page.getByRole("button",{name:"Records",exact:true}).click(); await page.locator(".focus-record-row").click();
+  await page.getByRole("tab",{name:"Records",exact:true}).click(); await page.locator(".focus-record-row").click();
   await page.getByRole("button",{name:"Change task",exact:true}).click(); await page.locator(".focus-choice-list").getByRole("button",{name:/Focus task B/}).click();
   d=await store(page); expect(d.tasks.find((t:{title:string})=>t.title==="Focus task A").actualSeconds).toBe(0); expect(d.tasks.find((t:{title:string})=>t.title==="Focus task B").actualSeconds).toBe(seconds);
   await page.getByRole("button",{name:"Delete",exact:true}).click(); await page.getByRole("button",{name:"Delete",exact:true}).click();

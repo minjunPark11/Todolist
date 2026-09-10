@@ -93,18 +93,19 @@ for (const theme of ["light", "dark"] as const) {
       `주 버튼 ${primary.color} on ${primary.bg}`,
     ).toBeGreaterThanOrEqual(4.5);
 
-    // 같은 규칙이 선택된 측정 토글에도 걸린다 — 이쪽은 13px 이라 더 분명하다.
-    const mode = await inkOn(page, '.focus-mode button[aria-pressed="true"]');
+    // 선택된 탭은 파랑 채움을 쓰지 않는다 — 그 자리는 주 버튼 하나의 것이다(§7.1).
+    // 그래도 13px 이므로 자기 면 위에서 읽히는지는 같은 기준으로 잰다.
+    const selected = await inkOn(page, '.focus-tabs button[aria-selected="true"]');
     expect(
-      contrast(mode.color, mode.bg),
-      `선택된 측정 토글 ${mode.color} on ${mode.bg}`,
+      contrast(selected.color, selected.bg),
+      `선택된 탭 ${selected.color} on ${selected.bg}`,
     ).toBeGreaterThanOrEqual(4.5);
   });
 
   test(`기록 뷰가 머리글과 같은 왼쪽 선에 선다 — ${theme}`, async ({ page }) => {
     await openApp(page, { theme });
     await page.goto("/focus");
-    await page.getByRole("button", { name: "Records", exact: true }).click();
+    await page.getByRole("tab", { name: "Records", exact: true }).click();
     await expect(page.locator(".focus-records")).toBeVisible();
 
     const edges = await page.evaluate(() => {
