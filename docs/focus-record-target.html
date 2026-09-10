@@ -41,6 +41,7 @@ main{flex:1;min-width:0;background:var(--bg-surface);height:100vh;
 .record{display:grid;gap:var(--space-md);padding:var(--space-lg) var(--space-xl) var(--space-xl)}
 
 .title{display:flex;align-items:center;justify-content:space-between;gap:var(--space-lg)}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:var(--space-lg);margin-top:calc(var(--space-xxs) * -1)}
 .title h1{font-size:var(--type-2xl);font-weight:700;letter-spacing:-.04em;line-height:32px}
 .datenav{display:flex;align-items:center;gap:var(--space-xs)}
 .datenav button{width:32px;height:32px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-tertiary)}
@@ -139,18 +140,19 @@ svg{display:block;width:100%;height:150px}
  <div class="scroll"><div class="record">
 
   <div class="title">
-    <div>
-      <h1>기록</h1>
+    <h1>기록</h1>
+  </div>
+
+  <!-- 기간과 날짜는 같은 일을 한다 — 무엇을 보느냐를 정한다. 그래서 한 줄이다. -->
+  <div class="toolbar">
+    <div class="chips">
+      <button class="on">오늘</button><button>이번 주</button><button>이번 달</button><button>전체</button>
     </div>
     <div class="datenav">
       <button>‹</button>
       <span class="lbl">▤ <b>2026년 9월 10일 (목)</b></span>
       <button>›</button>
     </div>
-  </div>
-
-  <div class="chips">
-    <button class="on">오늘</button><button>이번 주</button><button>이번 달</button><button>전체</button>
   </div>
 
   <section class="card">
