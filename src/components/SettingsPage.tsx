@@ -403,7 +403,14 @@ export function SettingsPage({
               that one subscribes to somebody else's calendar and can only
               read, this one writes. It draws itself and finishes the OAuth
               round trip, which is why the callback lands on this page. */}
-          <GoogleCalendarCard timezone={settings.timezone} />
+          <GoogleCalendarCard
+            timezone={settings.timezone}
+            // Manual, because it is: the reader named this zone rather than
+            // letting the device speak for them, and the refresh effect would
+            // otherwise put the device's back on the next start — leaving the
+            // calendar pinned to a zone the account no longer claims.
+            onTimezoneChange={(zone) => onUpdate({ timezoneMode: "manual", timezone: zone })}
+          />
 
           {/* "Sync status" used to be a seventh card below this one. It carried
               one line and one button, both about the list drawn here, and it
