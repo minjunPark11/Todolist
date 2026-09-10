@@ -96,9 +96,14 @@
   border: 0;
   background: transparent;
 }
+/* 면에는 `--accent-fill`, 글자에는 `--color-primary`.
+   `--color-primary`는 다크에서 #0a84ff 이고, 글자로 쓰면 4.66 이지만 그 위에 흰
+   글자를 얹으면 **3.65** 로 AA 에 미달한다 [실측]. `01-base.css` 가 이 경우를 위해
+   `--accent-fill`(다크 #0071e3, 흰 글자 4.70)을 이미 갖고 있고 그 주석이 같은 숫자를
+   적어두었다 — 액센트를 '글자'로만 재고 '면'으로는 재지 않아서 놓친 자리다. */
 .focus-mode button[aria-pressed="true"],
 .focus-page-v2 .focus-primary {
-  background: var(--color-primary);
+  background: var(--accent-fill);
   color: #fff;
   border-color: transparent;
 }
@@ -300,9 +305,11 @@
   display: block;
   overflow-wrap: anywhere;
 }
+/* `margin: auto` 가 이 블록을 가운데로 밀어서, 전폭인 페이지 머리글과 왼쪽 선이
+   어긋나 있었다 — 1440 에서 제목 116, 필터 502 [실측]. 한 페이지 안에 격자가 둘이다.
+   타이머 뷰에는 이 상한이 없으므로 여기서도 뗀다. */
 .focus-records {
-  max-width: 1040px;
-  margin: 32px auto;
+  margin: 32px 0;
 }
 .focus-filters {
   display: flex;
@@ -458,6 +465,17 @@
 body.focus-stage-visible .foc-global-bar {
   display: none;
 }
+/* 몰입은 어두운 판을 깔고 그 위에 이 페이지를 **다시 칠한다**. 그러므로 여기 목록은
+   `24-focus.css` 가 쓰는 표면·잉크 토큰 **전부**여야 한다. 하나라도 빠지면 그 토큰은
+   라이트 테마 값 그대로 어두운 판 위에 그려진다.
+
+   실제로 그랬다. §14 가 카드에 `--bg-surface-muted` 를 주었는데 이 목록에는 그것이
+   없어서, 라이트 테마의 몰입에서 카드가 #f5f5f7 로 남고 그 위에 흰 시계가 얹혔다 —
+   **대비 1.09** [실측]. 다크 테마에서는 같은 토큰이 #232325 라 15.69 로 멀쩡했으므로
+   라이트 사용자만 겪었다.
+
+   그래서 값을 하나 더 적는 것이 아니라 목록을 완성한다. 새 토큰이 이 파일에 들어오면
+   여기에도 들어와야 한다 — `e2e/focusImmersive.spec.ts` 가 그것을 검사한다. */
 .focus-immersive {
   position: fixed;
   inset: 0;
@@ -465,10 +483,21 @@ body.focus-stage-visible .foc-global-bar {
   overflow: auto;
   background: var(--color-surface-tile-1);
   --bg-surface: var(--color-surface-tile-1);
+  /* 판보다 한 단 밝은 면. 다크 테마의 #1c1c1e → #232325 와 같은 폭이다. */
+  --bg-surface-muted: #2e2e30;
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --bg-hover-content: rgba(255, 255, 255, 0.05);
   --text-primary: var(--color-on-dark);
   --text-secondary: #b9c4d3;
+  --text-tertiary: #98a3b3;
   --border-subtle: #495566;
   --color-primary: #2997ff;
+  --color-primary-tint: rgba(41, 151, 255, 0.16);
+  /* 몰입에서도 면은 면이다 — #2997ff 위의 흰 글자는 3.02 다 [실측]. */
+  --accent-fill: #0071e3;
+  --color-primary-focus: #2997ff;
+  --color-danger: #ff453a;
+  --danger-ink: #ff453a;
 }
 .focus-immersive .focus-page-header {
   border: 0;
