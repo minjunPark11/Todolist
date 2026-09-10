@@ -5,6 +5,7 @@ export interface GoogleTaskSyncState {
   /** Distinct tasks merged since the preceding review pass, including local saves.
    * This measures merges, not successful uploads. Reset with the account. */
   autoMergedCount?: number;
+  lastSuccessAt?: string;
   /**
    * Occurrences this pass could not send, and why a person has to look.
    *

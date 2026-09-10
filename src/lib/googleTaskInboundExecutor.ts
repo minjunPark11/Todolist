@@ -32,7 +32,7 @@ function pendingArgs(raw:unknown, request:GoogleTaskInboundRequest):Record<strin
   for(const rawEntry of args.p_entries) {
     const entry=object(rawEntry);
     if(text(entry.eventId)!==object(entry.source).id||!Array.isArray(entry.expected)) throw new Error("Invalid inbound journal entry.");
-    if(!["create","update","acknowledge","keep-local","trash","conflict","review","skip"].includes(text(object(entry.decision).kind))) throw new Error("Invalid journal decision.");
+    if(!["create","update","merge","acknowledge","keep-local","trash","conflict","review","skip"].includes(text(object(entry.decision).kind))) throw new Error("Invalid journal decision.");
     for(const expected of entry.expected) {const row=object(expected);text(row.taskId);revision(row.revision);}
   }
   return args;
@@ -94,9 +94,21 @@ export async function runGoogleTaskInbound(request:GoogleTaskInboundRequest,deps
         nextToken=text(body.nextSyncToken);break;
       }
       if(!nextToken) throw new Error("Inbound page limit reached; cursor retained.");
+      // A local edit or upgraded merge policy can resolve a persisted conflict
+      // even when Google has not emitted that event in this incremental page.
+      const received = new Set(items.map(item => item.id));
+      for (const record of snapshot.records) {
+        if (!received.has(record.eventId) && ["conflict", "keep-local"].includes(String(record.decision.kind))) {
+          items.push(record.source as GoogleEventResource);
+        }
+      }
       const plan=planTaskInbound({...snapshot,scope:snapshot.scope,items});
       if(!plan.ok) throw new Error(`Invalid inbound plan: ${plan.reason}`);
       for(const entry of plan.entries) {
+        if (entry.decision.kind === "merge" && !snapshot.automaticSyncEnabled) {
+          const mapped = snapshot.snapshots.find(s => s.eventId === entry.eventId)!;
+          entry.decision = { kind: "conflict", local: mapped.fields, remote: entry.decision.remote, base: mapped.base };
+        }
         const hold=snapshot.holds.get(entry.eventId);
         const legacy=snapshot.unverified.get(entry.eventId);
         if(hold && !(entry.expected.length && entry.source.status==='cancelled' && entry.source.recurringEventId===undefined && entry.source.originalStartTime===undefined)) entry.decision=hold;

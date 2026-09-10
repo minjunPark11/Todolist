@@ -6,6 +6,7 @@ import { toTaskInboundFields } from "../../domain/calendar/googleSync/taskInboun
 import { toTaskSharedPatch } from "../../domain/calendar/googleSync/taskOutboundPlan";
 import { sameRecurrence, taskRecurrence } from "../../domain/calendar/googleSync/taskRecurrence";
 import "./googleTaskReview.css";
+import { googleReviewCount } from "../../lib/googleReviewCount";
 
 function RepeatDescription({ rules, timezone }: { rules: unknown; timezone: string }) {
   const { t, lang } = useT();
@@ -52,8 +53,7 @@ export function GoogleTaskReviewPanel({ onOpenDeviceReview }: { onOpenDeviceRevi
       taskRecurrence(row.data, snapshot.timezone) === null || (!item.eventId && row.data.googleEventId && !snapshot.historicalTaskIds.has(id)));
   }) : [];
   return <section className="ff-google-review" aria-label={t("googleTask.title")} aria-busy={state.busy}>
-    <h4>{t("googleTask.title")} <span>({reviews.filter(r => r.decision.reason !== "excluded").length + repeatChanges.length + transfers.length
-      + (state.occurrenceConflicts?.length ?? 0)})</span></h4>
+    <h4>{t("googleTask.title")} <span>({googleReviewCount(state)})</span></h4>
     <p className="ff-settings-note">{t("googleTask.policy")}</p>
     {!!state.localConflicts?.length && onOpenDeviceReview && <button type="button" className="ff-btn ff-cal-btn-outline" onClick={onOpenDeviceReview}>
       {t("settings.reviewDevices", { count: state.localConflicts.length })}
@@ -83,7 +83,7 @@ export function GoogleTaskReviewPanel({ onOpenDeviceReview }: { onOpenDeviceRevi
       <button type="button" className="ff-btn" disabled={state.busy} onClick={() => void state.run?.()}>{t("googleTask.recheck")}</button>
       {op.state === "reserved" && <button type="button" className="ff-btn" disabled={state.busy} onClick={() => void state.cancel?.(String(op.operation_id))}>{t("googleTask.cancel")}</button>}
     </div>)}
-    {!reviews.length && !state.occurrenceConflicts?.length && !state.pending && !localSkips.length && !repeatChanges.length && !transfers.length && snapshot && <p role="status">{t("googleTask.clear")}</p>}
+    {!reviews.length && !state.occurrenceConflicts?.length && !state.pending && !localSkips.length && !skips.length && !repeatChanges.length && !transfers.length && snapshot && <p role="status">{t("googleTask.clear")}</p>}
     {!!transfers.length && <details className="ff-google-review-item"><summary>{t("googleTask.transferTitle", { count: transfers.length })}</summary>
       <p>{t("googleTask.transferNote", { calendar: snapshot!.scope.calendarId })}</p>
       {transfers.slice(0, limit).map(([id, row]) => {
@@ -112,11 +112,12 @@ export function GoogleTaskReviewPanel({ onOpenDeviceReview }: { onOpenDeviceRevi
       const task = snapshot!.snapshots.find(s => s.eventId === record.eventId);
       const remote = toTaskInboundFields(record.source, snapshot!.timezone);
       const isConflict = record.decision.kind === "conflict", excluded = record.decision.reason === "excluded";
+      const deleted = record.decision.reason === "deletion-conflict";
       const restored = record.decision.reason === "remote-restored" || task?.state === "trashed";
       const choose = (choice: GoogleTaskChoice["choice"]) => void state.run?.({ choice, eventId: record.eventId,
         generation: snapshot!.scope.connectionGeneration, recordRevision: record.revision, taskRevision: task?.revision, source: record.source });
       return <details key={record.eventId} className="ff-google-review-item">
-        <summary>{String(record.source.summary || t("googleTask.untitled"))} — {t(isConflict ? "googleTask.conflict" : excluded ? "googleTask.excluded" : restored ? "googleTask.restored" : "googleTask.duplicate")}</summary>
+        <summary>{String(record.source.summary || task?.fields.title || t("googleTask.untitled"))} — {t(deleted ? "googleTask.deletedConflict" : isConflict ? "googleTask.conflict" : excluded ? "googleTask.excluded" : restored ? "googleTask.restored" : "googleTask.duplicate")}</summary>
         <div className="ff-google-review-versions">
           {task && <div><strong>{t("googleTask.local")}</strong><p>{task.fields.title}</p><p>{[task.fields.startDate, task.fields.dueDate, task.fields.startTime, task.fields.endTime].filter(Boolean).join(" · ")}</p><pre>{task.fields.description}</pre></div>}
           <div><strong>{t("googleTask.remote")}</strong><p>{String(record.source.summary || t("googleTask.untitled"))}</p>
@@ -124,7 +125,10 @@ export function GoogleTaskReviewPanel({ onOpenDeviceReview }: { onOpenDeviceRevi
             <pre>{String(record.source.description || "")}</pre></div>
         </div>
         <div className="ff-google-review-actions">
-          {isConflict ? <>
+          {deleted ? <>
+            <button type="button" className="ff-btn" disabled={state.busy || state.pending} onClick={() => choose("keep-task")}>{t("googleTask.keepTask")}</button>
+            <button type="button" className="ff-btn" disabled={state.busy || state.pending} onClick={() => choose("accept-delete")}>{t("googleTask.acceptDelete")}</button>
+          </> : isConflict ? <>
             <button type="button" className="ff-btn" disabled={state.busy || state.pending} onClick={() => choose("app")}>{t("googleTask.useApp")}</button>
             <button type="button" className="ff-btn" disabled={state.busy || state.pending || !remote.ok} onClick={() => choose("google")}>{t("googleTask.useGoogle")}</button>
           </> : <>

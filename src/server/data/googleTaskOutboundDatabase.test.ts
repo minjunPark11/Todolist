@@ -2,6 +2,74 @@ import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+
+it("merges independent changes atomically and replays the receipt without losing the pre-merge version", async () => {
+  const remote = { ...base, description: "Google notes" };
+  const merged = { ...local, description: "Google notes" };
+  const args = { p_generation: generation, p_calendar_id: "cal", p_sync_revision: 0, p_owner: owner,
+    p_fence: request.fence, p_pass_id: randomUUID(), p_next_sync_token: "merged-token",
+    p_entries: [{ eventId: "e", source: { ...source, description: "Google notes" }, expected: [{ taskId: "t", revision: 1 }],
+      decision: { kind: "merge", fields: merged, remote } }] };
+  const result = await rpc("commit_google_task_inbound", args);
+  expect(result.tasks[0].data).toMatchObject({ ...merged, priority: "high" });
+  expect((await mapping()).base).toEqual(remote);
+  expect(await rpc("commit_google_task_inbound", args)).toEqual(result);
+  expect((await db.query("select data from google_task_versions")).rows).toEqual([{ data: { id: "t", ...local, priority: "high", listId: "inbox" } }]);
+});
+
+it("rejects a forged automatic merge and rolls back the cursor", async () => {
+  await expect(rpc("commit_google_task_inbound", { p_generation: generation, p_calendar_id: "cal", p_sync_revision: 0,
+    p_owner: owner, p_fence: request.fence, p_pass_id: randomUUID(), p_next_sync_token: "bad-token",
+    p_entries: [{ eventId: "e", source, expected: [{ taskId: "t", revision: 1 }],
+      decision: { kind: "merge", fields: { ...local, title: "Lost edit" }, remote: base } }] })).rejects.toThrow("INVALID_AUTOMATIC_MERGE");
+  await db.exec("reset role");
+  expect((await db.query("select sync_revision from google_calendar_connections")).rows).toEqual([{ sync_revision: 0 }]);
+});
+
+it("restores a version with CAS, preserves app metadata, and replays the same request", async () => {
+  await db.exec("reset role; update tasks set data=data||'{\"description\":\"new notes\"}'::jsonb");
+  const version = (await db.query<{id: string}>("select id from google_task_versions")).rows[0].id;
+  await auth();
+  const args = { p_version_id: version, p_expected_revision: 2, p_write_id: randomUUID() };
+  const result = await rpc("restore_google_task_version", args);
+  expect(await rpc("restore_google_task_version", args)).toEqual(result);
+  await expect(rpc("restore_google_task_version", { ...args, p_expected_revision: 1, p_write_id: randomUUID() })).rejects.toThrow("TASK_REVISION_CONFLICT");
+  await db.exec("reset role");
+  expect((await db.query<{data: unknown}>("select data from tasks")).rows[0].data).toMatchObject({ description: local.description, priority: "high" });
+  await auth(other);
+  await expect(rpc("restore_google_task_version", { ...args, p_write_id: randomUUID() })).rejects.toThrow();
+});
+
+it("accepts a remote-only repeat edit but rejects a competing app repeat edit", async () => {
+  await db.exec("reset role; update google_task_inbound_records set decision='{\"kind\":\"acknowledge\"}'");
+  await db.query("update google_task_mappings set base=$1", [JSON.stringify(local)]);
+  await auth();
+  const args = { ...request, choice: "baseline", base: null };
+  await rpc("accept_google_task_repeat", { p_request: args });
+  await db.exec("reset role");
+  const b = (await db.query<{repeat_base: unknown}>("select repeat_base from google_task_mappings")).rows[0].repeat_base;
+  const remote = { ...source, recurrence: ["RRULE:FREQ=DAILY"] };
+  await db.query("update google_task_inbound_records set source=$1,revision=2", [JSON.stringify(remote)]);
+  await auth();
+  const incoming = { ...args, base: b, recordRevision: 2, source: remote, choice: "google", patch: { repeatType: "daily", repeatInterval: 1, repeatDays: [], repeatEndDate: "" } };
+  expect(await rpc("accept_google_task_repeat", { p_request: incoming })).toEqual({ applied: true });
+  await expect(rpc("accept_google_task_repeat", { p_request: incoming })).rejects.toThrow("STALE_SELECTION");
+});
+
+it.each(["keep-task", "accept-delete"])("resolves a deletion conflict with %s without losing task identity", async choice => {
+  const cancelled = { id: "e", status: "cancelled" };
+  await db.exec("reset role");
+  await db.query("update google_task_inbound_records set source=$1,decision=$2", [JSON.stringify(cancelled), JSON.stringify({ kind: "review", reason: "deletion-conflict", taskIds: ["t"] })]);
+  await auth();
+  const args = { p_operation_id: randomUUID(), p_request: { ...request, source: cancelled, choice } };
+  const result = await rpc("resolve_google_task_review", args);
+  expect(await rpc("resolve_google_task_review", args)).toEqual(result);
+  await db.exec("reset role");
+  const row = (await db.query<{data: Record<string, unknown>}>("select data from tasks where id='t'")).rows[0].data;
+  expect(row.title).toBe(local.title);
+  expect(Boolean(row.deletedAt)).toBe(choice === "accept-delete");
+  expect((await mapping()).state).toBe("trashed");
+});
 import { runReservedGoogleTaskOutbound, type GoogleTaskOutboundDeps } from "../../integrations/google/taskOutbound";
 import { runGoogleTaskCycle } from "../../lib/googleTaskCoordinator";
 import { occurrenceCandidates } from "../../lib/googleOccurrenceSync";
@@ -29,14 +97,15 @@ beforeAll(async () => {
     insert into auth.users values('${user}'),('${other}');`);
   for (const file of ["001_initial_schema.sql", "007_lists.sql", "017_google_calendar.sql", "019_google_calendar_sources.sql",
     "021_google_inbound_cursor.sql", "022_google_sync_protocol.sql", "023_google_legacy_mapping_import.sql", "024_google_verified_grant.sql",
-    "025_google_calendar_binding.sql", "026_google_reconnect_mapping.sql", "027_google_oauth_lifecycle.sql", "028_google_inbound_execution.sql", "029_google_task_outbound.sql", "030_google_task_reviews.sql", "031_google_task_event_lifecycle.sql", "032_google_task_manual_recovery.sql", "033_google_task_repeat_transfer.sql", "034_google_task_history_retention.sql", "037_google_task_occurrence_outbound.sql"]) {
+    "025_google_calendar_binding.sql", "026_google_reconnect_mapping.sql", "027_google_oauth_lifecycle.sql", "028_google_inbound_execution.sql", "029_google_task_outbound.sql", "030_google_task_reviews.sql", "031_google_task_event_lifecycle.sql", "032_google_task_manual_recovery.sql", "033_google_task_repeat_transfer.sql", "034_google_task_history_retention.sql", "037_google_task_occurrence_outbound.sql", "038_google_occurrence_receipt_retention.sql", "039_google_automatic_merge.sql", "040_google_account_timezone.sql", "041_google_version_restore.sql", "042_google_repeat_baseline.sql", "043_google_deletion_review.sql", "044_google_timezone_compatibility.sql"]) {
     await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8").replace('create extension if not exists "pgcrypto";', ""));
   }
 }, 30000);
 beforeEach(async () => {
   op = randomUUID(); dispatch = randomUUID();
-  await db.exec(`reset role; truncate google_task_occurrence_receipts,google_task_outbound_operations,google_oauth_operations,google_task_inbound_passes,
+  await db.exec(`reset role; truncate settings,google_task_restore_receipts,google_task_versions,google_task_occurrence_receipts,google_task_outbound_operations,google_oauth_operations,google_task_inbound_passes,
     google_task_inbound_records,google_task_mappings,google_task_sync_accounts,google_calendar_connections,tasks;
+    insert into settings(id,user_id,data) values('app_settings','${user}','{"appSettings":{"timezone":"Asia/Seoul"}}');
     insert into google_task_sync_accounts(user_id,minimum_google_protocol) values('${user}',2);
     update google_task_sync_accounts set google_protocol_cutover_at=clock_timestamp()-interval '66 minutes',enabled=true;
     insert into google_calendar_connections(user_id,calendar_id,connection_generation,sync_timezone,google_subject,calendar_verified_at)
@@ -553,6 +622,41 @@ it("runs the full client coordinator against SQL and the server worker", async (
   });
   expect(result.pending).toBe(false); expect(journal).toBeNull(); expect(intent).toBeNull();
   expect((await mapping()).base).toEqual(local);
+});
+
+it("blocks old clients from claiming a lease in a timezone different from the account", async () => {
+  await db.exec("reset role; update settings set data='{\"appSettings\":{\"timezone\":\"Asia/Shanghai\"}}'; update google_calendar_connections set lease_owner=null,lease_until=null");
+  await auth();
+  await expect(rpc("claim_google_task_sync", { p_generation: generation, p_owner: owner })).rejects.toThrow("ACCOUNT_TIMEZONE_PENDING");
+  expect(await rpc("apply_google_account_timezone", { p_generation: generation, p_expected_timezone: "UTC" })).toMatchObject({ applied: false });
+  await db.exec("reset role");
+  expect((await db.query("select sync_timezone from google_calendar_connections")).rows).toEqual([{ sync_timezone: "Asia/Seoul" }]);
+});
+
+it("automatically merges both sides through the coordinator and recovers a lost Google response", async () => {
+  await db.exec(`reset role; insert into lists(id,user_id,data) values('inbox','${user}','{"kind":"inbox"}') on conflict do nothing;`);
+  await auth(); await rpc("release_google_task_sync", { p_generation: generation, p_owner: owner, p_fence: 1 });
+  let journal: unknown = null, intent: unknown = null, writes = 0;
+  let remote: Record<string, unknown> = { ...source, description: "Google notes", etag: '"remote-edited"' };
+  const http: typeof fetch = async (url, init) => {
+    if (init?.method === "PATCH") {
+      writes++;
+      remote = JSON.parse(JSON.stringify({ ...remote, ...JSON.parse(String(init.body)), etag: '"merged"' }), (_k, v) => v === null ? undefined : v);
+      throw Error("lost response");
+    }
+    return String(url).includes("events?") ? Response.json({ items: [remote], nextSyncToken: "automatic-token" }) : Response.json(remote);
+  };
+  const deps = {
+    rpc: async (name: string, args: Record<string, unknown>) => { await auth(); return rpc(name, args); }, fetch: http, uuid: randomUUID,
+    assertCurrent: async () => {}, exclusive: async <T,>(work: () => Promise<T>) => work(), readJournal: async () => journal, writeJournal: async (value: unknown) => { journal = value; },
+    readIntent: () => intent, writeIntent: (value: unknown) => { intent = value; },
+    dispatch: async (id: string) => (await runReservedGoogleTaskOutbound(user, id, worker(http))).state,
+  };
+  expect((await runGoogleTaskCycle({ userId: user, generation, accessToken: "read", expectedTimezone: "Asia/Seoul" }, deps)).pending).toBe(true);
+  const result = await runGoogleTaskCycle({ userId: user, generation, accessToken: "read", expectedTimezone: "Asia/Seoul" }, deps);
+  expect(result.pending).toBe(false); expect(writes).toBe(1);
+  expect((await mapping()).base).toEqual({ ...local, description: "Google notes" });
+  expect(result.snapshot.records[0].decision.kind).toBe("acknowledge");
 });
 it("uses a new etag as proof to release a lost patch whose remote content changed again", async () => {
   await reserve(); let remote = source;

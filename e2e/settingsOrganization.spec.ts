@@ -21,7 +21,7 @@ test("settings groups remain usable at each viewport", async ({ page }, info) =>
   await content.locator("summary").click();
   await expect(content.getByRole("button", { name: "Send", exact: true })).toBeVisible();
   await select("account", "Account & sync");
-  await expect(content.getByText("Connected AI", { exact: true })).toHaveCount(0);
+  await expect(content.locator("summary").filter({ hasText: "Access permissions" })).toHaveCount(1);
   // In-memory review fixture; no connected account or external writes.
   await page.evaluate(async () => {
     const modulePath = "/src/lib/googleTaskSyncState.ts";
@@ -39,7 +39,7 @@ test("settings groups remain usable at each viewport", async ({ page }, info) =>
     const { publishGoogleTaskSync } = await import(modulePath);
     publishGoogleTaskSync({ enabled: false, busy: false, pending: false, error: "", snapshot: null });
   });
-  await select("connections", "Connections & sharing");
+  await select("connections", "Connections");
   await page.screenshot({ path: info.outputPath("connections.png"), fullPage: true });
   await select("data", "Backup & restore");
   await expect(content.locator(".ff-settings-danger")).not.toHaveAttribute("open");

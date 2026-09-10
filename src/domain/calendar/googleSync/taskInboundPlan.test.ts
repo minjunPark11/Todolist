@@ -31,8 +31,8 @@ describe("task inbound content decisions", () => {
   });
   it.each(["1900-01-01T00:00:00Z", "2099-01-01T00:00:00Z"])("never uses remote updated %s to select a conflict winner", (updated) => {
     const local = { ...fields, title: "Local" };
-    const remote = { ...fields, description: "Remote" };
-    expect(run([{ ...event, description: "Remote", updated }], [{ ...held, fields: local }])[0].decision)
+    const remote = { ...fields, title: "Remote" };
+    expect(run([{ ...event, summary: "Remote", updated }], [{ ...held, fields: local }])[0].decision)
       .toEqual({ kind: "conflict", local, remote, base: fields });
   });
   it("preserves both sides when a legacy mapping has no base", () => {
@@ -71,8 +71,8 @@ describe("identity, recurrence and deletion", () => {
   it("records explicit user exclusions", () => {
     expect(planTaskInbound({ ...input, excludedEventIds: new Set(["e1"]) }).entries[0].decision).toEqual({ kind: "skip", reason: "excluded" });
   });
-  it("trashes on explicit cancellation despite unsent local edits without patching their contents", () => {
-    expect(run([{ id: "e1", status: "cancelled" }], [{ ...held, fields: { ...fields, title: "Unsent" } }])[0].decision).toEqual({ kind: "trash" });
+  it("holds a cancellation that competes with an unsent edit", () => {
+    expect(run([{ id: "e1", status: "cancelled" }], [{ ...held, fields: { ...fields, title: "Unsent" } }])[0].decision).toEqual({ kind: "review", reason: "deletion-conflict", taskIds: ["t1"] });
   });
   it("does not create a task from unknown cancellation", () => {
     expect(run([{ id: "unknown", status: "cancelled" }])[0].decision).toEqual({ kind: "skip", reason: "cancelled-unmapped" });

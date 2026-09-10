@@ -12,6 +12,30 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 
 let db: PGlite;
+
+it("automatically retimes from saved settings with unresolved reviews and is idempotent", async () => {
+  const c = await connectedInLondon();
+  const fields = { title: "Meeting", description: "", dueDate: "2026-09-10", startDate: "", startTime: "08:30", endTime: "09:30" };
+  await db.query("update tasks set data=data||$1::jsonb", [JSON.stringify(fields)]);
+  await db.query("update google_task_mappings set base=$1", [JSON.stringify(fields)]);
+  await db.query("insert into settings(id,user_id,data) values('app_settings',$1,$2)", [user, JSON.stringify({ appSettings: { timezone: "Asia/Shanghai" } })]);
+  await db.query("insert into google_task_inbound_records(user_id,generation,calendar_id,event_id,source,decision) values($1,$2,'cal','e','{\"id\":\"e\"}',$3)",
+    [user, c.connection_generation, JSON.stringify({ kind: "conflict", local: fields, remote: { ...fields, title: "Other" } })]);
+  await db.exec(`set request.jwt.claim.sub='${user}'; set request.headers='{"x-focusflow-google-sync-protocol":"2"}'; update google_sync_protocol_state set legacy_serving_retired_at=clock_timestamp()-interval '66 minutes'; update google_task_sync_accounts set minimum_google_protocol=2; update google_task_sync_accounts set google_protocol_cutover_at=clock_timestamp()-interval '66 minutes'; update google_task_sync_accounts set enabled=true;`);
+  const apply = async () => (await db.query<{r: unknown}>("select apply_google_account_timezone($1) r", [c.connection_generation])).rows[0].r;
+  expect(await apply()).toMatchObject({ applied: true, changed: true, timezone: "Asia/Shanghai" });
+  expect((await db.query<{data: unknown}>("select data from tasks")).rows[0].data).toMatchObject({ startTime: "15:30", endTime: "16:30" });
+  expect((await db.query("select source,revision from google_task_inbound_records")).rows).toEqual([{ source: { id: "e" }, revision: 2 }]);
+  expect(await apply()).toMatchObject({ applied: true, changed: false });
+  expect((await connection()).sync_token).toBeNull();
+});
+
+it("preserves all-day dates and converts winter offsets independently of summer", async () => {
+  const f = { title: "Day", description: "", dueDate: "2026-12-10", startDate: "", startTime: "", endTime: "" };
+  const retime = async (fields: unknown) => (await db.query<{f: unknown}>("select retime_google_task_fields($1,'Europe/London','Asia/Shanghai') f", [JSON.stringify(fields)])).rows[0].f;
+  expect(await retime(f)).toEqual(f);
+  expect(await retime({ ...f, startTime: "08:30", endTime: "09:30" })).toMatchObject({ startTime: "16:30", endTime: "17:30" });
+});
 const user = "00000000-0000-0000-0000-000000000001";
 
 beforeAll(async () => {
@@ -27,7 +51,7 @@ beforeAll(async () => {
     "027_google_oauth_lifecycle.sql", "028_google_inbound_execution.sql", "029_google_task_outbound.sql",
     "030_google_task_reviews.sql", "031_google_task_event_lifecycle.sql", "032_google_task_manual_recovery.sql",
     "033_google_task_repeat_transfer.sql", "034_google_task_history_retention.sql",
-    "035_google_protocol_retirement.sql", "036_google_sync_timezone_repin.sql", "037_google_task_occurrence_outbound.sql"]) {
+    "035_google_protocol_retirement.sql", "036_google_sync_timezone_repin.sql", "037_google_task_occurrence_outbound.sql", "038_google_occurrence_receipt_retention.sql", "039_google_automatic_merge.sql", "040_google_account_timezone.sql"]) {
     await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8").replace('create extension if not exists "pgcrypto";', ""));
   }
 }, 60000);
@@ -36,7 +60,7 @@ afterAll(async () => { await db?.close(); });
 
 beforeEach(async () => {
   await db.exec(`reset role;
-    truncate lists,google_verified_connection_history,google_calendar_sources,google_calendar_tokens,
+    truncate settings,google_task_versions,lists,google_verified_connection_history,google_calendar_sources,google_calendar_tokens,
       google_legacy_mapping_imports,google_task_inbound_records,google_task_outbound_operations,
       google_task_mappings,google_task_sync_accounts,google_calendar_connections,tasks;
     insert into google_task_sync_accounts(user_id) values('${user}');
@@ -224,4 +248,21 @@ it("keeps the function away from the roles the app runs as", async () => {
     )).rejects.toThrow();
   }
   await db.exec("reset role;");
+});
+
+it("applies the complete rollout over the old repin function and prevents legacy picker rebinding", async () => {
+  await connectedInLondon();
+  const before = await connection();
+  await db.exec("begin");
+  try {
+    for (const file of ["041_google_version_restore.sql", "042_google_repeat_baseline.sql", "043_google_deletion_review.sql", "044_google_timezone_compatibility.sql"]) {
+      await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8").replace(/^begin;\s*$/gm, "").replace(/^commit;\s*$/gm, ""));
+    }
+    await db.query("insert into settings(id,user_id,data) values('app_settings',$1,'{\"appSettings\":{\"timezone\":\"Asia/Shanghai\"}}')", [user]);
+    expect((await bind("UTC")).bound).toBe(true);
+    const after = await connection();
+    expect(after.sync_timezone).toBe("Europe/London");
+    expect(after.connection_generation).toBe(before.connection_generation);
+    expect(after.sync_token).toBe(before.sync_token);
+  } finally { await db.exec("rollback"); }
 });

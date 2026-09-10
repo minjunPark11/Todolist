@@ -163,6 +163,7 @@ interface CalendarViewProps {
   onToggleTaskDone?: (taskId: string) => void;
   /** Where the `⋯` panel's answers are kept (design §6.3). */
   appSettings: AppSettings;
+  services?: ReactNode;
   onUpdateAppSettings?: (patch: Partial<AppSettings>) => void;
   /** Recolouring a List from the calendar's left column (design §4). */
   onUpdateList?: (listId: string, patch: Partial<List>) => void;
@@ -194,6 +195,7 @@ export function CalendarView({
   onOpenTask,
   onToggleTaskDone,
   appSettings,
+  services,
   onUpdateAppSettings,
   onUpdateList,
   onMoveTaskToList,
@@ -930,7 +932,7 @@ export function CalendarView({
         onPrev={() => shift(-1)}
         onNext={() => shift(1)}
         onModeChange={switchMode}
-        viewOptions={<CalendarViewOptionsMenu options={viewOptions} onChange={setViewOptions} />}
+        viewOptions={<CalendarViewOptionsMenu options={viewOptions} onChange={setViewOptions} services={services} />}
       />
 
       <div className="gcal-body-container">

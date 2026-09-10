@@ -1,6 +1,6 @@
 import { normalizeTaskInboundFields, toTaskInboundFields } from "../domain/calendar/googleSync/taskInboundShape";
 import { planTaskOutbound, toTaskSharedPatch } from "../domain/calendar/googleSync/taskOutboundPlan";
-import { taskRecurrence } from "../domain/calendar/googleSync/taskRecurrence";
+import { taskRecurrence, sameRecurrence, readTaskRecurrence } from "../domain/calendar/googleSync/taskRecurrence";
 import { object, parseGoogleTaskSnapshot, text } from "./googleTaskInboundSnapshot";
 import { runGoogleTaskInbound, type GoogleTaskInboundDeps } from "./googleTaskInboundExecutor";
 import { GoogleOccurrenceChanged, occurrenceCandidates, occurrenceTitle, readOccurrence } from "./googleOccurrenceSync";
@@ -9,7 +9,7 @@ import { sameTaskInboundFields } from "../domain/calendar/googleSync/taskInbound
 export type GoogleTaskSnapshot = ReturnType<typeof parseGoogleTaskSnapshot>;
 export interface GoogleTaskChoice {
   eventId: string; recordRevision: number; taskRevision?: number;
-  choice: "app" | "google" | "import" | "exclude" | "restore" | "recurrence" | "transfer";
+  choice: "app" | "google" | "import" | "exclude" | "restore" | "recurrence" | "transfer" | "keep-task" | "accept-delete";
   taskId?: string;
   generation: string; source: Record<string, unknown>;
 }
@@ -50,7 +50,7 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
    * stop Google sync altogether, which left reviews unanswerable and the sync
    * time zone unpinnable for as long as nobody noticed the four.
    */
-  blockedTaskIds?: readonly string[] },
+  blockedTaskIds?: readonly string[]; expectedTimezone?: string },
   deps: GoogleTaskCoordinatorDeps, choice?: GoogleTaskChoice): Promise<GoogleTaskCycleResult> {
   const blocked = new Set(request.blockedTaskIds ?? []);
   const call = async (name: string, args: Record<string, unknown>) => { await deps.assertCurrent(); return deps.rpc(name, args); };
@@ -73,6 +73,12 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
   for (const operation of current.operations) {
     const result = await deps.dispatch(text(operation.operation_id));
     if (result === "pending") return { snapshot: await snapshot(), pending: true };
+  }
+  // Drain durable writes first, then atomically apply the saved account zone.
+  // The RPC takes no browser timezone and retains unresolved originals.
+  if (!choice && current.automaticSyncEnabled) {
+    const zone = object(await call("apply_google_account_timezone", { p_generation: request.generation, p_expected_timezone: request.expectedTimezone ?? null }));
+    if (zone.applied !== true) return { snapshot: current, pending: true };
   }
   if (!choice) {
     await runGoogleTaskInbound(request, deps);
@@ -117,11 +123,15 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
       await deps.assertCurrent();
       const response = await deps.fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(current.scope.calendarId)}/events/${encodeURIComponent(choice.eventId)}`,
         { headers: { Authorization: `Bearer ${request.accessToken}` }, redirect: "error" });
-      if (!response.ok) throw new GoogleTaskSelectionChanged();
-      const fresh = object(await response.json());
-      if (fresh.id !== choice.eventId || typeof fresh.etag !== "string" || fresh.etag !== record.source.etag) throw new GoogleTaskSelectionChanged();
+      const deletedChoice = ["keep-task", "accept-delete"].includes(choice.choice) && record.decision.reason === "deletion-conflict";
+      if (!response.ok && !(deletedChoice && [404,410].includes(response.status))) throw new GoogleTaskSelectionChanged();
+      const fresh = response.ok ? object(await response.json()) : record.source;
+      if (deletedChoice ? fresh.status !== "cancelled" : fresh.id !== choice.eventId || typeof fresh.etag !== "string" || fresh.etag !== record.source.etag) throw new GoogleTaskSelectionChanged();
       await claim();
-      if (choice.choice === "recurrence") {
+      if (deletedChoice) {
+        await reserve("resolve_google_task_review", { ...body(choice.eventId), taskRevision: mapped?.revision,
+          recordRevision: record.revision, source: record.source, choice: choice.choice });
+      } else if (choice.choice === "recurrence") {
         if (!mapped || record.decision.kind !== "acknowledge") throw new GoogleTaskSelectionChanged();
         const id = await reserve("reserve_google_task_recurrence", { ...body(choice.eventId), taskId: mapped.taskId,
           taskRevision: mapped.revision, recordRevision: record.revision, source: record.source, choice: "recurrence" });
@@ -156,6 +166,47 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
       const id = await reserve("reserve_google_task_outbound", { ...body(mapped.eventId), taskId: mapped.taskId, taskRevision: mapped.revision,
         recordRevision: record.revision, source: record.source, local: planned.action.fields, remote: mapped.base, choice: "automatic" });
       if (await deps.dispatch(id) === "pending") return { snapshot: await snapshot(), pending: true };
+    }
+    if (current.automaticSyncEnabled) {
+      const repeats = current.records.filter(r => {
+        if (r.decision.kind !== "acknowledge") return false;
+        const m = current.snapshots.find(m => m.eventId === r.eventId);
+        const row = m && current.tasks.get(m.taskId), b = current.repeatBases.get(r.eventId);
+        if (!row || !m || blocked.has(m.taskId)) return false;
+        const rule = taskRecurrence(row.data, current.timezone);
+        if (!rule || !m.base || !sameTaskInboundFields(m.fields, m.base)) return false;
+        const equal = sameRecurrence(rule, r.source.recurrence);
+        if (!b) return equal;
+        const scheduleChanged = ["startDate", "dueDate", "startTime", "endTime"].some(k => object(b.schedule)[k] !== m.fields[k as keyof typeof m.fields]);
+        if (equal) return scheduleChanged || !sameRecurrence(b.rules, rule);
+        if (scheduleChanged) return false;
+        const old = taskRecurrence({ ...row.data, repeatType: "none", repeatInterval: 1, repeatDays: [], repeatEndDate: "", ...object(b.task) }, current.timezone);
+        return sameRecurrence(r.source.recurrence, b.rules) || (old && sameRecurrence(rule, old) && !!readTaskRecurrence(r.source.recurrence, row.data, current.timezone));
+      }).slice(0, 30);
+      for (const candidate of repeats) {
+        await claim(); current = await snapshot();
+        const record = current.records.find(r => r.eventId === candidate.eventId && r.decision.kind === "acknowledge");
+        const mapped = current.snapshots.find(m => m.eventId === candidate.eventId && m.state === "active");
+        const row = mapped && current.tasks.get(mapped.taskId);
+        if (!record || !mapped || !row || blocked.has(mapped.taskId)) continue;
+        const rule = taskRecurrence(row.data, current.timezone); if (!rule) continue;
+        const base = current.repeatBases.get(record.eventId) ?? null;
+        const args = { ...body(record.eventId), taskRevision: row.revision, recordRevision: record.revision, source: record.source, base };
+        if (sameRecurrence(rule, record.source.recurrence)) {
+          await call("accept_google_task_repeat", { p_request: { ...args, choice: "baseline" } });
+        } else if (base) {
+          const oldRule = taskRecurrence({ ...row.data, repeatType: "none", repeatInterval: 1, repeatDays: [], repeatEndDate: "", ...object(base.task) }, current.timezone);
+          const schedule = normalizeTaskInboundFields(mapped.fields);
+          if (!["startDate", "dueDate", "startTime", "endTime"].every(k => schedule[k as keyof typeof schedule] === object(base.schedule)[k])) continue;
+          if (sameRecurrence(record.source.recurrence, base.rules)) {
+            const id = await reserve("reserve_google_task_recurrence", { ...args, taskId: mapped.taskId, choice: "recurrence" });
+            if (await deps.dispatch(id) === "pending") return { snapshot: await snapshot(), pending: true };
+          } else if (oldRule && sameRecurrence(rule, oldRule)) {
+            const patch = readTaskRecurrence(record.source.recurrence, row.data, current.timezone);
+            if (patch) await call("accept_google_task_repeat", { p_request: { ...args, choice: "google", patch } });
+          }
+        }
+      }
     }
     const lifecycle = [
       ...current.snapshots.filter(s => s.eventId && !blocked.has(s.taskId) && (s.state === "trashed" || s.state === "deleted") && s.remoteDeleted === false && !s.locallyRestored &&
