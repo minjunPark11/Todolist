@@ -1,6 +1,8 @@
 # 집중을 화면의 중심에 둔다 — Spatial Focus Field
 
-> 상태: **분석·설계. 구현 전** · 2026-09-10
+> 상태: **대체됨 — `FOCUS_TABS_AND_RECORD_DESIGN.md` 를 본다** · 2026-09-10
+> 세 번째 목업이 원·3열·바닥 리본을 쓰지 않는다. 이 문서에서 살아남은 것은 셋이다 —
+> 앵커(§4), 몰입을 감쇄로 처리한다는 결론(§5), 그리고 Phase 0의 선수정(§9).
 > 요청: 첨부 목업(`01_spatial_focus_field_v2.html`)의 배치로 집중 탭 메인 화면을 다시 짠다. **노트는 뺀다.**
 > 대상: `components/FocusPage.tsx`(1,408줄) · `styles/24-focus.css`(898줄)
 > 선행 문서: `FOCUS_LAYOUT_DESIGN.md`(직전 배치 — 2열·카드) ·
