@@ -552,7 +552,7 @@ export function TimezoneRow({ settings, onUpdate }: { settings: AppSettings; onU
   return (
     <SettingsRow title={t("settings.timezone")} hint={t("settings.timezoneHint")}>
       <TimezonePicker
-        value={manual ? settings.timezone : "auto"}
+        value={manual || settings.timezone !== detected ? settings.timezone : "auto"}
         options={options}
         label={t("settings.timezone")}
         onChange={(value) => onUpdate(timezoneChoicePatch(value, detected))}

@@ -41,7 +41,7 @@ function renderRow(settings: Partial<AppSettings>) {
 describe("the time zone row", () => {
   it("sits on the automatic option, and names the zone that means", () => {
     renderRow({ timezone: device });
-    expect(shown()).toContain("Automatic");
+    expect(shown()).toContain("Use this device’s time zone");
     expect(shown()).toContain(device);
   });
 
@@ -68,9 +68,16 @@ describe("the time zone row", () => {
 
   it("hands the device's zone back when automatic is chosen again", () => {
     const { onUpdate } = renderRow({ timezone: "America/Denver", timezoneMode: "manual" });
-    search("automatic");
-    fireEvent.click(screen.getByRole("option", { name: /Automatic/ }));
+    search("this device");
+    fireEvent.click(screen.getByRole("option", { name: /Use this device/ }));
     expect(onUpdate).toHaveBeenCalledWith({ timezoneMode: "auto", timezone: device });
+  });
+
+  it("shows the saved account zone when this device uses a different zone", () => {
+    const saved = device === "Asia/Seoul" ? "Europe/London" : "Asia/Seoul";
+    renderRow({ timezone: saved, timezoneMode: "auto" });
+    expect(shown()).toContain(saved);
+    expect(shown()).not.toContain("Use this device");
   });
 
   it("offers the whole database, not a shortlist someone will be missing from", () => {
