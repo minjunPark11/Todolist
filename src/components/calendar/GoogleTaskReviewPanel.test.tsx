@@ -20,6 +20,15 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); publishGoogleTaskSync({ enabled: false, busy: false, pending: false, error: "", snapshot: null }); });
 const mount = () => render(<I18nProvider lang="en"><GoogleTaskReviewPanel /></I18nProvider>);
+it("does not count routine master-managed instances as another review", () => {
+  const state = readGoogleTaskSyncState();
+  publishGoogleTaskSync({ ...state, snapshot: { ...state.snapshot!, records: [...state.snapshot!.records,
+    {eventId:"instance",revision:1,source:{id:"instance",recurringEventId:"master"},decision:{kind:"skip",reason:"recurring-instance"}},
+  ] } });
+  mount();
+  expect(screen.getByRole("heading", {level:4}).textContent).toContain("(1)");
+  expect(screen.queryByText(/Not imported:/)).toBeNull();
+});
 it("identifies the occurrence whose remote changes blocked automatic sending", () => {
   // Not an alert, and not paired with `error`: the pass that found this one
   // finished, and every occurrence it did not name was sent.

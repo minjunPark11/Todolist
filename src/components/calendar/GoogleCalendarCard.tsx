@@ -389,7 +389,7 @@ export function GoogleCalendarCard({ timezone = "", onOpenDeviceReview }:
           {labelState?.failed && labelState.supported !== false ? <p className="ff-settings-note" aria-live="polite">{t("settings.google.labelsRetry")}</p> : null}
           <p className="ff-settings-note" role="status">{t(taskSync.busy ? "googleTask.busy" : taskSync.error ? "googleTask.failed" : taskSync.pending ? "googleTask.pending" : "settings.google.automatic")}</p>
           {taskSync.lastSuccessAt && <p className="ff-settings-note">{t("settings.calendar.lastSynced", { time: new Date(taskSync.lastSuccessAt).toLocaleString() })}</p>}
-          {googleReviewCount(taskSync) > 0 && <button type="button" className="ff-btn" aria-expanded={reviewOpen} onClick={() => setReviewOpen(!reviewOpen)}>{t("settings.google.exceptions", { count: googleReviewCount(taskSync) })}</button>}
+          {(googleReviewCount(taskSync) > 0 || taskSync.error || taskSync.pending) && <button type="button" className="ff-btn" aria-expanded={reviewOpen} onClick={() => setReviewOpen(!reviewOpen)}>{googleReviewCount(taskSync) > 0 ? t("settings.google.exceptions", { count: googleReviewCount(taskSync) }) : t("googleTask.title")}</button>}
           {reviewOpen && <GoogleTaskReviewPanel onOpenDeviceReview={onOpenDeviceReview} />}
           <GoogleSyncHistory />
 

@@ -12,7 +12,7 @@ export function googleReviewCount(state: GoogleTaskSyncState): number {
   }).length;
   const transfers = [...s.tasks].filter(([id, row]) => s.historicalTaskIds.has(id) && !row.data.deletedAt &&
     !s.snapshots.some(m => m.taskId === id && m.eventId) && !["abandoned", "given_up"].includes(String(row.data.status))).length;
-  const skips = s.records.filter(r => r.decision.kind === "skip" && !["excluded", "already-trashed", "cancelled-unmapped", "deleted"].includes(String(r.decision.reason))).length;
+  const skips = s.records.filter(r => r.decision.kind === "skip" && !["excluded", "already-trashed", "cancelled-unmapped", "deleted", "recurring-instance"].includes(String(r.decision.reason))).length;
   const localSkips = [...s.tasks].filter(([id, row]) => {
     const item = s.snapshots.find(m => m.taskId === id);
     return !row.data.deletedAt && row.data.dueDate && item && (!toTaskSharedPatch(item.fields, s.timezone) ||

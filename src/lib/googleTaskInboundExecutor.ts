@@ -98,7 +98,8 @@ export async function runGoogleTaskInbound(request:GoogleTaskInboundRequest,deps
       // even when Google has not emitted that event in this incremental page.
       const received = new Set(items.map(item => item.id));
       for (const record of snapshot.records) {
-        if (!received.has(record.eventId) && ["conflict", "keep-local"].includes(String(record.decision.kind))) {
+        if (!received.has(record.eventId) && (["conflict", "keep-local"].includes(String(record.decision.kind)) ||
+          (snapshot.automaticSyncEnabled && record.decision.kind === "review" && record.source.status === "cancelled"))) {
           items.push(record.source as GoogleEventResource);
         }
       }
@@ -111,6 +112,10 @@ export async function runGoogleTaskInbound(request:GoogleTaskInboundRequest,deps
         }
         const hold=snapshot.holds.get(entry.eventId);
         const legacy=snapshot.unverified.get(entry.eventId);
+        // No verified mapping means cancellation cannot delete or alter a task.
+        // Retire its obsolete review while preserving explicit exclusions.
+        if (snapshot.automaticSyncEnabled && entry.decision.kind === "skip" && entry.decision.reason === "cancelled-unmapped" &&
+          !(hold?.kind === "skip" && hold.reason === "excluded")) continue;
         if(hold && !(entry.expected.length && entry.source.status==='cancelled' && entry.source.recurringEventId===undefined && entry.source.originalStartTime===undefined)) entry.decision=hold;
         else if(legacy?.length && !entry.expected.length) entry.decision={kind:"review",reason:"ambiguous-mapping",taskIds:[...new Set(legacy)]};
       }

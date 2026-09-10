@@ -26,6 +26,31 @@ it("rejects a forged automatic merge and rolls back the cursor", async () => {
   expect((await db.query("select sync_revision from google_calendar_connections")).rows).toEqual([{ sync_revision: 0 }]);
 });
 
+it("retires cancelled unmapped reviews without changing tasks and replays the receipt", async () => {
+  await db.exec("reset role; delete from google_task_mappings");
+  const cancelled = { id: "e", status: "cancelled" };
+  await db.query("update google_task_inbound_records set source=$1,decision=$2", [JSON.stringify(cancelled), JSON.stringify({kind:"review",reason:"ambiguous-mapping",taskIds:["t"]})]);
+  await auth();
+  const args = {p_generation:generation,p_calendar_id:"cal",p_sync_revision:0,p_owner:owner,p_fence:request.fence,p_pass_id:randomUUID(),p_next_sync_token:"retired",
+    p_entries:[{eventId:"e",source:cancelled,expected:[],decision:{kind:"skip",reason:"cancelled-unmapped"}}]};
+  const result = await rpc("commit_google_task_inbound",args);
+  expect(result.tasks).toEqual([]);
+  expect(await rpc("commit_google_task_inbound",args)).toEqual(result);
+  await db.exec("reset role");
+  expect((await db.query<{data:unknown}>("select data from tasks")).rows[0].data).toEqual({id:"t",...local,priority:"high",listId:"inbox"});
+  expect((await db.query("select source,decision from google_task_inbound_records")).rows[0]).toEqual({source:cancelled,decision:{kind:"skip",reason:"cancelled-unmapped"}});
+});
+
+it.each(["confirmed","excluded"])("does not retire a %s event as an obsolete review",async kind=>{
+  await db.exec("reset role; delete from google_task_mappings");
+  const remote = kind==="confirmed" ? {...source,status:"confirmed"} : {id:"e",status:"cancelled"};
+  const decision = kind==="excluded" ? {kind:"skip",reason:"excluded"} : {kind:"review",reason:"duplicate-candidate",taskIds:["t"]};
+  await db.query("update google_task_inbound_records set source=$1,decision=$2",[JSON.stringify(remote),JSON.stringify(decision)]);
+  await auth();
+  await expect(rpc("commit_google_task_inbound",{p_generation:generation,p_calendar_id:"cal",p_sync_revision:0,p_owner:owner,p_fence:request.fence,p_pass_id:randomUUID(),p_next_sync_token:"invalid",
+    p_entries:[{eventId:"e",source:remote,expected:[],decision:{kind:"skip",reason:"cancelled-unmapped"}}]})).rejects.toThrow(kind==="excluded" ? "EXCLUSION_RESOLUTION_REQUIRED" : "REVIEW_RESOLUTION_REQUIRED");
+});
+
 it("restores a version with CAS, preserves app metadata, and replays the same request", async () => {
   await db.exec("reset role; update tasks set data=data||'{\"description\":\"new notes\"}'::jsonb");
   const version = (await db.query<{id: string}>("select id from google_task_versions")).rows[0].id;
@@ -97,7 +122,7 @@ beforeAll(async () => {
     insert into auth.users values('${user}'),('${other}');`);
   for (const file of ["001_initial_schema.sql", "007_lists.sql", "017_google_calendar.sql", "019_google_calendar_sources.sql",
     "021_google_inbound_cursor.sql", "022_google_sync_protocol.sql", "023_google_legacy_mapping_import.sql", "024_google_verified_grant.sql",
-    "025_google_calendar_binding.sql", "026_google_reconnect_mapping.sql", "027_google_oauth_lifecycle.sql", "028_google_inbound_execution.sql", "029_google_task_outbound.sql", "030_google_task_reviews.sql", "031_google_task_event_lifecycle.sql", "032_google_task_manual_recovery.sql", "033_google_task_repeat_transfer.sql", "034_google_task_history_retention.sql", "037_google_task_occurrence_outbound.sql", "038_google_occurrence_receipt_retention.sql", "039_google_automatic_merge.sql", "040_google_account_timezone.sql", "041_google_version_restore.sql", "042_google_repeat_baseline.sql", "043_google_deletion_review.sql", "044_google_timezone_compatibility.sql"]) {
+    "025_google_calendar_binding.sql", "026_google_reconnect_mapping.sql", "027_google_oauth_lifecycle.sql", "028_google_inbound_execution.sql", "029_google_task_outbound.sql", "030_google_task_reviews.sql", "031_google_task_event_lifecycle.sql", "032_google_task_manual_recovery.sql", "033_google_task_repeat_transfer.sql", "034_google_task_history_retention.sql", "037_google_task_occurrence_outbound.sql", "038_google_occurrence_receipt_retention.sql", "039_google_automatic_merge.sql", "040_google_account_timezone.sql", "041_google_version_restore.sql", "042_google_repeat_baseline.sql", "043_google_deletion_review.sql", "044_google_timezone_compatibility.sql", "045_google_cancelled_review_retirement.sql"]) {
     await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8").replace('create extension if not exists "pgcrypto";', ""));
   }
 }, 30000);
