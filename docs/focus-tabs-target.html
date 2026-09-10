@@ -1,0 +1,265 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
+:root{
+  --bg-app:#eff1f5; --bg-rail:#dfe3ea; --bg-surface:#fff; --bg-surface-muted:#f5f5f7;
+  --text-primary:#1c1c1e; --text-secondary:#3c3c43; --text-tertiary:#68686d;
+  --border-subtle:rgba(25,25,25,.08); --surface-2:rgba(25,25,25,.06);
+  --accent:#0064d2; --radius-sm:4px; --radius-pill:9999px;
+  --space-xxs:4px; --space-xs:8px; --space-sm:12px; --space-md:16px; --space-lg:24px; --space-xl:32px;
+  --type-xs:11px; --type-sm:12px; --type-md:13px; --type-lg:15px; --type-xl:18px; --type-2xl:24px;
+  --clock:clamp(88px,10vw,140px);
+  --h1:#d6e5f6; --h2:#a3c4e8; --h3:#5b93d3; --h4:#0064d2;
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif;
+  color:var(--text-primary);background:var(--bg-app);height:100vh;overflow:hidden;display:flex}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+
+.rail{width:50px;flex:0 0 50px;background:var(--bg-rail);border-right:1px solid var(--border-subtle);
+  display:flex;flex-direction:column;align-items:center;padding:16px 4px 8px;gap:6px}
+.rail i{width:40px;height:40px;border-radius:var(--radius-sm);display:grid;place-items:center;
+  color:var(--text-tertiary);font-style:normal;font-size:15px}
+.rail i.on{background:var(--bg-surface);color:var(--accent)}
+.rail .sp{flex:1}
+
+main{position:relative;flex:1;min-width:0;background:var(--bg-surface);height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr)}
+
+/* §7.1 탭 줄 — 1fr · auto · 1fr 이라 ••• 가 탭을 덮지 않는다 */
+.tabs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:56px;
+  padding:0 var(--space-lg);border-bottom:1px solid var(--border-subtle)}
+.tabstrip{grid-column:2;display:inline-flex;gap:var(--space-xxs);padding:var(--space-xxs);
+  background:var(--surface-2);border-radius:var(--radius-sm)}
+.tabstrip button{min-width:112px;height:36px;padding:0 var(--space-md);border-radius:var(--radius-sm);
+  font-size:var(--type-md);font-weight:600;color:var(--text-secondary)}
+.tabstrip button.on{background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-primary)}
+.tabstrip button:disabled{color:var(--text-tertiary);opacity:.5;cursor:default}
+.tabs .more{grid-column:3;justify-self:end;width:36px;height:36px;border-radius:var(--radius-sm);
+  color:var(--text-tertiary);font-size:15px}
+
+.view{display:none;min-height:0;height:100%;position:relative}
+.view.on{display:block}
+
+/* ---------- 타이머 / 포모도로 ---------- */
+.stack{height:100%;display:grid;place-items:center;padding:var(--space-lg)}
+.col{display:flex;flex-direction:column;align-items:center;text-align:center}
+.eyebrow{font-size:var(--type-md);color:var(--text-tertiary);margin-bottom:var(--space-lg)}
+.anchor{display:inline-flex;align-items:center;gap:var(--space-xs);height:36px;padding:0 var(--space-sm);
+  border:1px solid var(--border-subtle);border-radius:var(--radius-pill);background:var(--bg-surface);
+  font-size:var(--type-md);font-weight:600;max-width:520px}
+.anchor .d{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+.anchor span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anchor .cv{color:var(--text-tertiary);font-weight:400}
+/* §6.1 시계는 얇다 — 400 은 로드된 세 페이스 중 하나다 */
+.clock{margin-top:var(--space-lg);font-size:var(--clock);font-weight:400;line-height:1;
+  letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.state{margin-top:var(--space-md);display:inline-flex;align-items:center;gap:var(--space-xs);
+  font-size:var(--type-md);font-weight:600;color:var(--text-secondary)}
+.state::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.primary{margin-top:var(--space-lg);min-width:220px;height:52px;border-radius:var(--radius-sm);
+  background:var(--accent);color:#fff;font-size:var(--type-xl);font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--space-xs)}
+.subacts{margin-top:var(--space-md);display:flex;gap:var(--space-lg);
+  font-size:var(--type-md);font-weight:600;color:var(--text-secondary)}
+.foot{position:absolute;left:var(--space-xl);bottom:var(--space-lg);font-size:var(--type-xs);color:var(--text-tertiary)}
+/* 포모도로 진행 막대 — 휴식이어도 색을 바꾸지 않는다 (§4.3) */
+.prog{margin-top:var(--space-lg);width:280px;height:6px;border-radius:var(--radius-pill);background:var(--surface-2);overflow:hidden}
+.prog span{display:block;height:100%;width:46%;background:var(--accent);border-radius:inherit}
+
+/* ---------- 기록 ---------- */
+.record{height:100%;min-height:0;display:grid;
+  grid-template-rows:auto auto auto minmax(0,1fr);gap:var(--space-md);padding:var(--space-md) var(--space-xl) var(--space-lg)}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:var(--space-lg)}
+.periods{display:flex;gap:var(--space-lg)}
+.periods button{position:relative;padding:0 0 var(--space-xs);font-size:var(--type-md);font-weight:600;color:var(--text-tertiary)}
+.periods button.on{color:var(--text-primary)}
+.periods button.on::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--accent)}
+.datenav{display:flex;align-items:center;gap:var(--space-sm);font-size:var(--type-md);font-weight:600;color:var(--text-secondary)}
+.datenav button{width:32px;height:32px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-tertiary)}
+.datenav b{min-width:150px;text-align:center;font-weight:600}
+
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);
+  border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle)}
+.kpi{position:relative;padding:var(--space-sm) var(--space-lg)}
+.kpi:first-child{padding-left:0}
+.kpi:not(:last-child)::after{content:"";position:absolute;right:0;top:var(--space-sm);bottom:var(--space-sm);width:1px;background:var(--border-subtle)}
+.kpi u{display:block;text-decoration:none;font-size:var(--type-sm);color:var(--text-tertiary);margin-bottom:var(--space-xxs)}
+.kpi b{display:block;font-size:var(--type-2xl);font-weight:600;letter-spacing:-.03em;line-height:1.1}
+.kpi s{display:block;text-decoration:none;margin-top:var(--space-xxs);font-size:var(--type-xs);color:var(--text-tertiary)}
+
+.card{background:var(--bg-surface-muted);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);min-height:0;overflow:hidden}
+.chead{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-md);padding:var(--space-sm) var(--space-md) var(--space-xs)}
+.chead h2{font-size:var(--type-lg);font-weight:700}
+.chead p{margin-top:2px;font-size:var(--type-xs);color:var(--text-tertiary)}
+.chead .meta{font-size:var(--type-xs);color:var(--text-tertiary);font-weight:600}
+
+/* 타임라인 — 단색. 색이 순위를 나르지 않는다 (§5.3) */
+.tl{position:relative;height:76px;margin:0 var(--space-md) var(--space-sm);
+  background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-sm)}
+.hours{position:absolute;inset:0 16px;display:grid;grid-template-columns:repeat(7,1fr)}
+.hours span{border-left:1px solid var(--border-subtle);position:relative}
+.hours span:last-child{border-right:1px solid var(--border-subtle)}
+.hours i{position:absolute;left:-8px;bottom:6px;font-style:normal;font-size:var(--type-xs);color:var(--text-tertiary)}
+.track{position:absolute;left:16px;right:16px;top:32px;height:10px}
+.seg{position:absolute;height:10px;border-radius:var(--radius-sm);background:var(--accent)}
+
+.lower{min-height:0;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,.95fr);gap:var(--space-md)}
+.rows{padding:0 var(--space-md) var(--space-sm);min-height:0;overflow:auto}
+.row{display:grid;grid-template-columns:10px 116px minmax(0,1fr) 56px 24px;align-items:center;
+  gap:var(--space-sm);min-height:56px;border-top:1px solid var(--border-subtle);text-align:left}
+.row .dt{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.row .tm{font-size:var(--type-xs);color:var(--text-tertiary);font-variant-numeric:tabular-nums}
+.row .tk{font-size:var(--type-md);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .du{font-size:var(--type-sm);font-weight:600;color:var(--text-secondary);text-align:right;font-variant-numeric:tabular-nums}
+.row .mo{color:var(--text-tertiary);text-align:center;font-size:var(--type-md)}
+
+.right{min-height:0;display:grid;grid-template-rows:minmax(0,.95fr) minmax(0,1.05fr);gap:var(--space-md)}
+.bars{padding:0 var(--space-md) var(--space-md);display:grid;gap:var(--space-sm);align-content:start}
+.brow{display:grid;gap:6px}
+.btop{display:flex;justify-content:space-between;gap:var(--space-sm);font-size:var(--type-sm)}
+.btop span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
+.btop span:last-child{font-weight:600;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.bar2{height:8px;border-radius:var(--radius-pill);background:var(--surface-2);overflow:hidden}
+.bar2 span{display:block;height:100%;background:var(--accent);border-radius:inherit}
+
+.pattern{padding:0 var(--space-md) var(--space-md);display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);align-content:start}
+.hdays,.hbody{display:grid;grid-template-columns:16px repeat(7,1fr);gap:4px}
+.hdays{margin-bottom:4px;font-size:var(--type-xs);color:var(--text-tertiary);text-align:center}
+.wk{font-size:var(--type-xs);color:var(--text-tertiary);display:flex;align-items:center}
+.hc{height:14px;border-radius:var(--radius-sm);background:var(--surface-2)}
+.hc.a{background:var(--h1)}.hc.b{background:var(--h2)}.hc.c{background:var(--h3)}.hc.d{background:var(--h4)}
+/* 순차 램프에는 스케일 범례가 붙는다 (§5.3) */
+.legend{margin-top:var(--space-xs);display:flex;align-items:center;gap:4px;font-size:var(--type-xs);color:var(--text-tertiary)}
+.legend i{width:12px;height:8px;border-radius:2px;display:block}
+.tlab{display:flex;justify-content:space-between;font-size:var(--type-xs);color:var(--text-tertiary);margin-bottom:var(--space-xxs)}
+.tlab b{font-size:var(--type-xs);color:var(--text-secondary);font-weight:600}
+svg{display:block;width:100%;height:104px}
+.axis{stroke:var(--border-subtle);stroke-width:1}
+.line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{fill:rgba(0,100,210,.10)}
+.dlab{font-size:9px;fill:#68686d}
+.endlab{font-size:10px;fill:#1c1c1e;font-weight:600}
+</style></head><body>
+
+<nav class="rail"><i>✓</i><i>▤</i><i>▦</i><i class="on">◎</i><i>○</i><div class="sp"></div><i>◇</i><i>○</i></nav>
+
+<main>
+  <div class="tabs">
+    <div class="tabstrip">
+      <button class="on" id="t1">타이머</button>
+      <button id="t2" disabled title="집중 중에는 측정 방식을 바꿀 수 없어요">포모도로</button>
+      <button id="t3">기록</button>
+    </div>
+    <button class="more">•••</button>
+  </div>
+
+  <!-- 타이머 : 실행 중 -->
+  <section class="view on" id="v1">
+    <div class="stack"><div class="col">
+      <div class="anchor"><span class="d"></span><span>연구 제안서 — 방법론 수정</span></div>
+      <div class="clock">27:14</div>
+      <div class="state">집중 중</div>
+      <button class="primary">❙❙ 일시정지</button>
+      <div class="subacts"><button>세션 종료</button><button>메모</button><button>큐 열기 (3)</button></div>
+    </div></div>
+    <div class="foot">기록은 자동으로 저장됩니다.</div>
+  </section>
+
+  <!-- 포모도로 : 집중 중 2/4 -->
+  <section class="view" id="v2">
+    <div class="stack"><div class="col">
+      <div class="eyebrow">집중 세션 · 25분 · 2/4</div>
+      <div class="anchor"><span class="d"></span><span>연구 제안서 — 방법론 수정</span></div>
+      <div class="clock">13:28</div>
+      <div class="prog"><span></span></div>
+      <button class="primary">❙❙ 일시정지</button>
+      <div class="subacts"><button>세션 종료</button><button>설정</button></div>
+    </div></div>
+  </section>
+
+  <!-- 기록 -->
+  <section class="view" id="v3">
+   <div class="record">
+    <div class="bar">
+      <div class="periods"><button class="on">오늘</button><button>이번 주</button><button>이번 달</button><button>전체</button></div>
+      <div class="datenav"><button>‹</button><b>2026년 9월 10일</b><button>›</button></div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><u>집중 시간</u><b>1h 42m</b><s>어제보다 +12%</s></div>
+      <div class="kpi"><u>완료 세션</u><b>3</b><s>어제 2회</s></div>
+      <div class="kpi"><u>평균 세션</u><b>34m</b><s>세션당 평균</s></div>
+      <div class="kpi"><u>가장 긴 집중</u><b>38m</b><s>18:32–19:10</s></div>
+    </div>
+
+    <section class="card">
+      <div class="chead">
+        <div><h2>집중 타임라인</h2><p>하루 중 집중이 발생한 시간대</p></div>
+        <span class="meta">세션 3 · 1h 42m</span>
+      </div>
+      <div class="tl">
+        <div class="hours"><span><i>06</i></span><span><i>09</i></span><span><i>12</i></span><span><i>15</i></span><span><i>18</i></span><span><i>21</i></span><span><i>24</i></span></div>
+        <div class="track">
+          <span class="seg" style="left:58%;width:3.2%"></span>
+          <span class="seg" style="left:71.2%;width:4%"></span>
+          <span class="seg" style="left:80.8%;width:3.6%"></span>
+        </div>
+      </div>
+    </section>
+
+    <div class="lower">
+      <section class="card" style="display:grid;grid-template-rows:auto minmax(0,1fr)">
+        <div class="chead">
+          <div><h2>세션 기록</h2><p>개별 작업에 사용한 실제 집중 시간</p></div>
+          <button class="meta">전체 보기</button>
+        </div>
+        <div class="rows">
+          <div class="row"><span class="dt"></span><span class="tm">20:14–20:48</span><span class="tk">연구 제안서 — 방법론 수정</span><span class="du">34m</span><span class="mo">···</span></div>
+          <div class="row"><span class="dt"></span><span class="tm">18:32–19:10</span><span class="tk">캘린더 회차 편집 QA</span><span class="du">38m</span><span class="mo">···</span></div>
+          <div class="row"><span class="dt"></span><span class="tm">16:05–16:35</span><span class="tk">주간 회고 정리</span><span class="du">30m</span><span class="mo">···</span></div>
+        </div>
+      </section>
+
+      <div class="right">
+        <section class="card">
+          <div class="chead"><div><h2>작업별 집중 시간</h2><p>오늘의 집중이 어디에 쓰였는지</p></div></div>
+          <div class="bars">
+            <div class="brow"><div class="btop"><span>연구 제안서 — 방법론 수정</span><span>1h 04m</span></div><div class="bar2"><span style="width:64%"></span></div></div>
+            <div class="brow"><div class="btop"><span>캘린더 회차 편집 QA</span><span>38m</span></div><div class="bar2"><span style="width:38%"></span></div></div>
+            <div class="brow"><div class="btop"><span>주간 회고 정리</span><span>30m</span></div><div class="bar2"><span style="width:30%"></span></div></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="chead"><div><h2>집중 패턴</h2><p>최근 4주 · 최근 7일 추이</p></div></div>
+          <div class="pattern">
+            <div>
+              <div class="hdays"><span></span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
+              <div class="hbody">
+                <span class="wk">4</span><span class="hc a"></span><span class="hc"></span><span class="hc b"></span><span class="hc a"></span><span class="hc c"></span><span class="hc"></span><span class="hc a"></span>
+                <span class="wk">3</span><span class="hc"></span><span class="hc a"></span><span class="hc c"></span><span class="hc b"></span><span class="hc a"></span><span class="hc b"></span><span class="hc"></span>
+                <span class="wk">2</span><span class="hc b"></span><span class="hc b"></span><span class="hc d"></span><span class="hc a"></span><span class="hc c"></span><span class="hc a"></span><span class="hc"></span>
+                <span class="wk">1</span><span class="hc a"></span><span class="hc c"></span><span class="hc d"></span><span class="hc b"></span><span class="hc c"></span><span class="hc"></span><span class="hc"></span>
+              </div>
+              <div class="legend">적음<i style="background:var(--surface-2)"></i><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i>많음</div>
+            </div>
+            <div>
+              <div class="tlab"><b>7일 추이</b><span>집중 시간</span></div>
+              <svg viewBox="0 0 250 104" role="img" aria-label="최근 7일 집중 시간 변화">
+                <line class="axis" x1="8" y1="26" x2="242" y2="26"/>
+                <line class="axis" x1="8" y1="55" x2="242" y2="55"/>
+                <path class="area" d="M12 68 L49 55 L86 61 L123 40 L160 48 L197 29 L232 44 L232 76 L12 76 Z"/>
+                <path class="line" d="M12 68 L49 55 L86 61 L123 40 L160 48 L197 29 L232 44"/>
+                <text class="endlab" x="212" y="36">1h 42m</text>
+                <text class="dlab" x="8" y="92">금</text><text class="dlab" x="45" y="92">토</text>
+                <text class="dlab" x="82" y="92">일</text><text class="dlab" x="119" y="92">월</text>
+                <text class="dlab" x="156" y="92">화</text><text class="dlab" x="193" y="92">수</text>
+                <text class="dlab" x="228" y="92">목</text>
+              </svg>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+   </div>
+  </section>
+</main>
+</body></html>
