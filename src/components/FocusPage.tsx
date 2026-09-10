@@ -17,7 +17,13 @@ import {
   sanitizePomodoro,
   type FocusCommand,
 } from "../domain/focus/engine";
-import { focusDate, focusRecords } from "../domain/focus/records";
+import {
+  focusDate,
+  focusRecords,
+  focusPeriodRange,
+  focusTimelineSpans,
+  type FocusPeriod,
+} from "../domain/focus/records";
 import { visibleQueue } from "../domain/focus/queue";
 import { OverlayScrollbar } from "./common/OverlayScrollbar";
 import { formatFocusDuration, useNowTick } from "../lib/focusTimer";
@@ -212,10 +218,17 @@ export function FocusPage({
   const [showGap, setShowGap] = useState(false);
   const [message, setMessage] = useState("");
   const today = focusDate(Date.now(), timezone);
-  const [from, setFrom] = useState(today),
-    [to, setTo] = useState(today),
-    [filter, setFilter] = useState("all"),
+  /* 기간 칩이 길이를 정하고 날짜 내비가 그것을 옮긴다 (§7.2.0). `from`/`to` 를
+     각각 들고 있던 자리다 — 두 날짜를 따로 두면 "이번 주" 같은 한 덩어리를
+     사용자가 손으로 맞춰야 했다. */
+  const [period, setPeriod] = useState<FocusPeriod>("today");
+  const [offset, setOffset] = useState(0);
+  const [filter, setFilter] = useState("all"),
     [limit, setLimit] = useState(20);
+  const { from, to } = useMemo(
+    () => focusPeriodRange(period, offset, today),
+    [period, offset, today],
+  );
   const now = useNowTick(
     activeSession?.status === "running" || flow?.phase === "break_running",
   );
@@ -313,6 +326,96 @@ export function FocusPage({
   );
   const counted = rows.filter((r) => r.ms > 0),
     total = counted.reduce((n, r) => n + r.ms, 0) / 1000;
+  /* 비교 기준은 **직전 동일 기간**이다 (§5.5). 기간 칩과 뜻이 맞고 라벨에 그대로
+     쓸 수 있다 — "어제보다", "지난주보다". 무엇 대비인지 화면이 말하지 않는
+     숫자는 값이 아니라 장식이다. */
+  const priorPeriod = useMemo(() => {
+    if (period === "all") return null;
+    const range = focusPeriodRange(period, offset - 1, today);
+    const rows = focusRecords(focusSessions, range.from, range.to, timezone, filter);
+    const counted = rows.filter((r) => r.ms > 0);
+    return {
+      seconds: counted.reduce((n, r) => n + r.ms, 0) / 1000,
+      sessions: counted.length,
+    };
+  }, [focusSessions, period, offset, today, timezone, filter]);
+  const spans = useMemo(
+    () => focusTimelineSpans(focusSessions, from, to, timezone),
+    [focusSessions, from, to, timezone],
+  );
+  /* 라벨은 겹치지 않을 때만 그린다 (§5.3.1). 값이 큰 구간부터 자리를 갖고, 이미
+     놓인 라벨에 너무 가까워지는 것은 그리지 않는다 — 하루가 한 줄에 펼쳐지면
+     30분과 38분의 길이 차이는 7px 이라 읽히지 않으므로 라벨이 답해야 하는데,
+     열 세션이면 그 라벨들이 서로를 덮는다. `spans` 가 이미 긴 것부터다. */
+  const timelineMarks = useMemo(() => {
+    const placed: number[] = [];
+    return spans.map((span) => {
+      const center = (span.start + span.end) / 2;
+      const clear = placed.every((at) => Math.abs(at - center) > 0.045);
+      if (clear) placed.push(center);
+      return { ...span, label: clear };
+    });
+  }, [spans]);
+  const timeFormat = useMemo(
+    () =>
+      new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-GB", {
+        timeZone: timezone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }),
+    [lang, timezone],
+  );
+  /** 세션이 실제로 돈 구간의 처음과 끝. 목록이 타임라인을 풀어 쓴 것이므로. */
+  const clockRange = (session: FocusSession) => {
+    const first = session.segments[0]?.startAt || session.startedAt;
+    const last =
+      session.segments[session.segments.length - 1]?.endAt || session.endedAt;
+    if (!first || !last) return "—";
+    return `${timeFormat.format(new Date(first))} – ${timeFormat.format(new Date(last))}`;
+  };
+  const longestRow = counted.length
+    ? counted.reduce((best, r) => (r.ms > best.ms ? r : best))
+    : null;
+  const longestWhen = longestRow ? clockRange(longestRow.session) : "—";
+  /* "무엇 대비" 를 말하지 않는 숫자는 값이 아니라 장식이다 (§5.5). */
+  const comparison = (() => {
+    const previousLabel =
+      period === "today"
+        ? l("어제", "yesterday")
+        : period === "week"
+          ? l("지난주", "last week")
+          : l("지난달", "last month");
+    if (!priorPeriod || !priorPeriod.seconds)
+      return l("비교할 기록이 아직 없어요", "No earlier period to compare");
+    const delta = Math.round(((total - priorPeriod.seconds) / priorPeriod.seconds) * 100);
+    if (delta === 0) return l(`${previousLabel}와 비슷해요`, `About the same as ${previousLabel}`);
+    return delta > 0
+      ? l(`${previousLabel}보다 ${delta}% 더 집중했어요`, `${delta}% more than ${previousLabel}`)
+      : l(`${previousLabel}보다 ${-delta}% 적어요`, `${-delta}% less than ${previousLabel}`);
+  })();
+  const rangeLabel = useMemo(() => {
+    if (period === "all") return l("전체 기간", "All time");
+    const locale = lang === "ko" ? "ko-KR" : "en-US";
+    const at = (date: string) => new Date(`${date}T12:00:00Z`);
+    if (period === "today")
+      return new Intl.DateTimeFormat(locale, {
+        timeZone: "UTC",
+        dateStyle: "full",
+      }).format(at(from));
+    if (period === "month")
+      return new Intl.DateTimeFormat(locale, {
+        timeZone: "UTC",
+        year: "numeric",
+        month: "long",
+      }).format(at(from));
+    const short = new Intl.DateTimeFormat(locale, {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+    });
+    return `${short.format(at(from))} – ${short.format(at(to))}`;
+  }, [period, from, to, lang]);
   const titleOf = (s?: FocusSession) => {
     if (!s?.taskId) return l("작업 미지정", "No task assigned");
     const linked = tasks.find(t => t.id === s.taskId);
@@ -752,12 +855,16 @@ export function FocusPage({
               ? l("집중 기록", "Focus records")
               : l("집중", "Focus")}
           </h1>
-          <p>
-            {l(
-              "지금, 더 깊이 집중해 보세요.",
-              "Make room for your next moment of focus.",
-            )}
-          </p>
+          {/* 부제는 타이머 탭의 것이다. 기록 탭은 카드 넷이 각자 부제를 달고
+              있어서, 페이지 부제가 그 위에 한 겹 더 얹히는 설명이 된다. */}
+          {view !== "records" && (
+            <p>
+              {l(
+                "지금, 더 깊이 집중해 보세요.",
+                "Make room for your next moment of focus.",
+              )}
+            </p>
+          )}
         </div>
         {/* 셋을 같은 높이에 둔다 (§1). 측정 방식은 화면 안의 토글이었고 기록은
             머리글의 버튼이어서, 세 개가 서로 다른 층위에 흩어져 있었다. */}
@@ -877,130 +984,214 @@ export function FocusPage({
         </div>
       ) : (
         <section className="focus-records">
-          <div className="focus-filters">
-            <label>
-              {l("시작일", "From")}
-              <input
-                type="date"
-                value={from}
-                max={to}
-                onChange={(e) => {
-                  setFrom(e.target.value);
-                  setLimit(20);
-                }}
-              />
-            </label>
-            <label>
-              {l("종료일", "To")}
-              <input
-                type="date"
-                value={to}
-                min={from}
-                onChange={(e) => {
-                  setTo(e.target.value);
-                  setLimit(20);
-                }}
-              />
-            </label>
-            <label>
-              {l("작업", "Task")}
-              <select
-                value={filter}
-                onChange={(e) => {
-                  setFilter(e.target.value);
+          {/* 기간과 날짜는 같은 일을 한다 — 칩이 범위의 길이를 정하고 내비가 그
+              범위를 옮긴다. 다른 줄에 있으면 그 관계가 끊긴다 (§7.2.0). */}
+          <div className="focus-record-toolbar">
+            <div className="focus-chips" role="group" aria-label={l("기간", "Period")}>
+              {(
+                [
+                  ["today", l("오늘", "Today")],
+                  ["week", l("이번 주", "This week")],
+                  ["month", l("이번 달", "This month")],
+                  ["all", l("전체", "All")],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  aria-pressed={period === id}
+                  onClick={() => {
+                    setPeriod(id);
+                    setOffset(0);
+                    setLimit(20);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="focus-datenav">
+              <button
+                aria-label={l("이전 기간", "Previous period")}
+                disabled={period === "all"}
+                onClick={() => {
+                  setOffset(offset - 1);
                   setLimit(20);
                 }}
               >
-                <option value="all">{l("전체 작업", "All tasks")}</option>
-                <option value="unassigned">
-                  {l("작업 미지정", "Unassigned")}
-                </option>
-                {tasks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+                ‹
+              </button>
+              <span className="focus-datenav-label">{rangeLabel}</span>
+              <button
+                aria-label={l("다음 기간", "Next period")}
+                /* 앞으로 가는 길은 지금까지만 있다 — 미래에는 기록이 없다. */
+                disabled={period === "all" || offset >= 0}
+                onClick={() => {
+                  setOffset(offset + 1);
+                  setLimit(20);
+                }}
+              >
+                ›
+              </button>
+            </div>
           </div>
-          <div className="focus-record-stats">
-            {[
+
+          {/* 히어로 숫자는 뷰당 하나다 (§5.2). 넷이 같은 크기면 무엇을 먼저 볼지
+              화면이 말하지 않는다. */}
+          <section className="focus-kpis" aria-label={l("집중 요약", "Focus summary")}>
+            <div className="focus-kpi is-hero">
+              <span className="focus-kpi-label">{l("집중 시간", "Focused")}</span>
+              <strong>{total ? formatFocusDuration(total, true) : "—"}</strong>
+              <span className="focus-kpi-note">{comparison}</span>
+            </div>
+            {(
               [
-                l("기록된 집중", "Recorded focus"),
-                formatFocusDuration(total, true),
-              ],
-              [l("세션 수", "Sessions"), String(counted.length)],
-              [
-                l("평균", "Average"),
-                counted.length
-                  ? formatFocusDuration(total / counted.length, true)
-                  : "—",
-              ],
-              [
-                l("최장", "Longest"),
-                counted.length
-                  ? formatFocusDuration(
-                      Math.max(...counted.map((r) => r.ms)) / 1000,
-                      true,
-                    )
-                  : "—",
-              ],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <small>{label}</small>
+                [
+                  l("완료 세션", "Sessions"),
+                  String(counted.length),
+                  priorPeriod?.sessions
+                    ? `${l("직전 기간", "Previous period")} ${priorPeriod.sessions}`
+                    : l("완료된 세션", "Completed sessions"),
+                ],
+                [
+                  l("평균 세션", "Average session"),
+                  counted.length ? formatFocusDuration(total / counted.length, true) : "—",
+                  l("세션당 평균", "Per session"),
+                ],
+                [
+                  l("가장 긴 집중", "Longest"),
+                  counted.length
+                    ? formatFocusDuration(Math.max(...counted.map((r) => r.ms)) / 1000, true)
+                    : "—",
+                  longestWhen,
+                ],
+              ] as const
+            ).map(([label, value, note]) => (
+              <div className="focus-kpi" key={label}>
+                <span className="focus-kpi-label">{label}</span>
                 <strong>{value}</strong>
+                <span className="focus-kpi-note">{note}</span>
               </div>
             ))}
-          </div>
-          <p className="focus-muted">
-            {l(
-              "선택 기간에 포함된 실행 구간 기준",
-              "Running segments within the selected range",
-            )}{" "}
-            · {timezone}
-          </p>
-          {!rows.length && (
-            <p className="focus-record-empty">
-              {l(
-                "이 기간의 집중 기록이 없어요.",
-                "No focus records in this period.",
-              )}
-            </p>
-          )}
-          {rows.slice(0, limit).map(({ session: s, ms }) => (
-            <button
-              className="focus-record-row"
-              key={s.id}
-              onClick={() => setDetailId(s.id)}
-            >
-              <span>
+          </section>
+
+          <section className="focus-card" aria-label={l("집중 타임라인", "Focus timeline")}>
+            <header className="focus-card-head">
+              <div>
+                <h2>{l("집중 타임라인", "Focus timeline")}</h2>
+                <p>
+                  {period === "today"
+                    ? l("하루 중 집중이 있었던 시간을 보여줍니다.", "When in the day the focus happened.")
+                    : l("기간 안의 집중을 하루 24시간 위에 겹쳐 보여줍니다.", "The period's focus, folded onto one 24-hour axis.")}
+                </p>
+              </div>
+              <span className="focus-card-meta">
+                {l("세션", "Sessions")} {counted.length} · {formatFocusDuration(total, true)}
+              </span>
+            </header>
+            <div className="focus-timeline">
+              {/* 눈금은 축과 같은 범위를 말해야 한다. 트랙이 0~24시를 쓰므로
+                  라벨도 00 에서 시작한다 — 06 부터 붙였더니 09:20 의 구간이
+                  14시 자리에 그려졌다 [실측]. 3시간마다 여덟 칸, 아홉 눈금. */}
+              <div className="focus-timeline-hours" aria-hidden="true">
+                {["00", "03", "06", "09", "12", "15", "18", "21"].map((h) => (
+                  <span key={h} data-hour={`${h}:00`} />
+                ))}
+              </div>
+              <div className="focus-timeline-track">
+                {timelineMarks.map((span, index) => (
+                  <span
+                    key={`${span.sessionId}-${index}`}
+                    className="focus-timeline-span"
+                    style={{
+                      left: `${span.start * 100}%`,
+                      width: `${Math.max(span.end - span.start, 0.004) * 100}%`,
+                    }}
+                    title={formatFocusDuration(span.seconds, true)}
+                  >
+                    {span.label && <b>{formatFocusDuration(span.seconds, true)}</b>}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="focus-card" aria-label={l("세션 기록", "Session records")}>
+            <header className="focus-card-head">
+              <div>
+                <h2>{l("세션 기록", "Session records")}</h2>
+                <p>
+                  {l("각 세션에서 어떤 작업에 집중했는지", "Which task each session went to")}
+                  {" · "}
+                  {timezone}
+                </p>
+              </div>
+              <label className="focus-card-meta">
+                <span className="tm-visually-hidden">{l("작업으로 거르기", "Filter by task")}</span>
+                <select
+                  value={filter}
+                  onChange={(e) => {
+                    setFilter(e.target.value);
+                    setLimit(20);
+                  }}
+                >
+                  <option value="all">{l("전체 작업", "All tasks")}</option>
+                  <option value="unassigned">{l("작업 미지정", "Unassigned")}</option>
+                  {tasks.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </header>
+            {!rows.length && (
+              <p className="focus-record-empty">
+                {l("이 기간의 집중 기록이 없어요.", "No focus records in this period.")}
+              </p>
+            )}
+            {rows.slice(0, limit).map(({ session: s, ms }) => (
+              <button
+                className="focus-record-row"
+                key={s.id}
+                onClick={() => setDetailId(s.id)}
+              >
+                {/* 언제 → 무엇 → 얼마나. 시각이 앞에 오는 것은 이 목록이
+                    타임라인 카드가 그린 것을 풀어 쓴 것이기 때문이다. */}
+                <span className="focus-record-when">{clockRange(s)}</span>
                 <strong>{titleOf(s)}</strong>
-                <small>
-                  {new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", {
-                    timeZone: timezone,
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  }).format(new Date(s.endedAt || s.startedAt))}
-                </small>
-              </span>
-              <span className="focus-record-mode">
-                {s.measurementMode === "pomodoro"
-                  ? l("포모도로", "Pomodoro")
-                  : l("스톱워치", "Stopwatch")}
-              </span>
-              <span>
-                {s.segments.length
-                  ? formatFocusDuration(ms / 1000)
-                  : l("구간 정보 없음", "No segment data")}
-              </span>
-              {s.focusNote && <FocusIcon name="note" />}
-            </button>
-          ))}
-          {rows.length > limit && (
-            <button onClick={() => setLimit(limit + 20)}>
-              {l("더 보기", "Load more")}
-            </button>
-          )}
+                <span className="focus-record-tags">
+                  {(() => {
+                    const task = s.taskId ? tasks.find((t) => t.id === s.taskId) : undefined;
+                    return task ? tagNamesForTask(task, tags, taskTags) : [];
+                  })()
+                    .slice(0, 2)
+                    .map((name) => (
+                      <span className="tm-tag-chip" key={name}>
+                        {name}
+                      </span>
+                    ))}
+                </span>
+                <span className="focus-record-duration">
+                  {s.segments.length
+                    ? formatFocusDuration(ms / 1000, true)
+                    : l("구간 없음", "No segments")}
+                </span>
+                <span className="focus-record-more" aria-hidden="true">
+                  {s.focusNote ? <FocusIcon name="note" /> : "···"}
+                </span>
+              </button>
+            ))}
+            {rows.length > limit && (
+              <div className="focus-secondary">
+                <button
+                  className="focus-text-button"
+                  onClick={() => setLimit(limit + 20)}
+                >
+                  {l("더 보기", "Load more")}
+                </button>
+              </div>
+            )}
+          </section>
         </section>
       )}
       {picker && (

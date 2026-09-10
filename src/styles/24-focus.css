@@ -421,83 +421,283 @@
   display: block;
   overflow-wrap: anywhere;
 }
-/* `margin: auto` 가 이 블록을 가운데로 밀어서, 전폭인 페이지 머리글과 왼쪽 선이
-   어긋나 있었다 — 1440 에서 제목 116, 필터 502 [실측]. 한 페이지 안에 격자가 둘이다.
-   타이머 뷰에는 이 상한이 없으므로 여기서도 뗀다. */
+/* ==========================================================================
+   기록 (FOCUS_TABS_AND_RECORD_DESIGN.md §7.2)
+
+   `margin: auto` 가 이 블록을 가운데로 밀어서 전폭인 머리글과 왼쪽 선이 어긋나
+   있었다 — 1440 에서 제목 116, 필터 502 [실측]. 한 페이지 안에 격자가 둘이다.
+   타이머 뷰에는 상한이 없으므로 여기서도 뗀다.
+
+   그리고 여섯 층이면 1440×900 에 들어가지 않는다. 타이머·포모도로 탭은 뷰포트에
+   갇힌 채로 두고 **이 탭에서만 페이지가 흐른다** — 안쪽 스크롤러를 따로 두지
+   않는 이유는 스크롤러 둘이 겹치면 휠이 어디로 갈지 예측할 수 없어서다.
+   ========================================================================== */
 .focus-records {
-  margin: 32px 0;
+  display: grid;
+  gap: var(--space-md);
+  margin: var(--space-md) 0 var(--space-xl);
+  align-content: start;
 }
-.focus-filters {
+
+/* 기간과 날짜는 한 줄이다 (§7.2.0) — 칩이 범위의 길이를 정하고 내비가 그것을
+   옮긴다. 왼쪽 끝이 길이, 오른쪽 끝이 위치다. */
+.focus-record-toolbar {
   display: flex;
-  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
   flex-wrap: wrap;
 }
-.focus-filters label,
-.focus-dialog label {
-  display: grid;
-  gap: 8px;
-  font-size: 13px;
+.focus-chips {
+  display: flex;
+  gap: var(--space-xs);
 }
-.focus-page-v2 input,
-.focus-page-v2 select,
-.focus-page-v2 textarea {
-  box-sizing: border-box;
-  min-height: 44px;
+.focus-page-v2 .focus-chips button {
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--type-md);
+}
+.focus-page-v2 .focus-chips button[aria-pressed="true"] {
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+}
+.focus-datenav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.focus-page-v2 .focus-datenav button {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0;
+  color: var(--text-tertiary);
+}
+.focus-datenav-label {
+  min-width: 180px;
+  text-align: center;
+  font-size: var(--type-md);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+/* KPI — 히어로 하나 + 셋 (§5.2). 크기가 무엇을 먼저 볼지 말한다. */
+.focus-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-muted);
+  padding: var(--space-md);
+}
+.focus-kpi {
+  position: relative;
+  padding: 0 var(--space-lg);
+  min-width: 0;
+}
+.focus-kpi:first-child {
+  padding-left: var(--space-xs);
+}
+.focus-kpi:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-subtle);
+}
+.focus-kpi-label {
+  display: block;
+  font-size: var(--type-sm);
+  color: var(--text-tertiary);
+}
+.focus-kpi strong {
+  display: block;
+  margin-top: var(--space-xs);
+  font-size: var(--type-xl);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.focus-kpi.is-hero strong {
+  /* 히어로는 크지만 자 밖의 값을 만들지는 않는다 — `--display-md` 가 이미
+     "본문 스케일 밖의 큰 숫자" 를 위해 있는 토큰이다 (§5.1의 디스플레이 단). */
+  font-size: var(--display-md);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+.focus-kpi-note {
+  display: block;
+  margin-top: var(--space-xs);
+  font-size: var(--type-xs);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.focus-kpi.is-hero .focus-kpi-note {
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+
+/* 기록의 카드 — 스테이지와 같은 관용구다 (§14). */
+.focus-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-muted);
+  min-width: 0;
+}
+.focus-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md) var(--space-xs);
+}
+.focus-card-head h2 {
+  margin: 0;
+  font-size: var(--type-lg);
+  font-weight: var(--weight-bold);
+}
+.focus-card-head p {
+  margin: 2px 0 0;
+  font-size: var(--type-xs);
+  color: var(--text-tertiary);
+}
+.focus-card-meta {
+  flex: 0 0 auto;
+  font-size: var(--type-xs);
+  color: var(--text-tertiary);
+  font-weight: var(--weight-medium);
+}
+.focus-page-v2 .focus-card-meta select {
+  min-height: 28px;
+  padding: 0 var(--space-xs);
+  font-size: var(--type-xs);
+}
+
+/* 타임라인 — 하루 24시간 축. 마크는 단색이다 (§5.3): 위치가 '언제' 를 말하고
+   라벨이 '얼마나' 를 말하므로 색이 할 일이 없다. */
+.focus-timeline {
+  position: relative;
+  height: 72px;
+  margin: 0 var(--space-md) var(--space-md);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
-  color: var(--text-primary);
-  font: inherit;
-  padding: 10px 12px;
-  max-width: 100%;
 }
-.focus-record-stats {
+.focus-timeline-hours {
+  position: absolute;
+  inset: 0 20px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin: 24px 0 12px;
+  grid-template-columns: repeat(8, 1fr);
 }
-.focus-record-stats div {
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border-subtle);
-  display: grid;
-  gap: 10px;
+.focus-timeline-hours span {
+  position: relative;
+  border-left: 1px solid var(--border-subtle);
 }
-.focus-record-stats small {
+.focus-timeline-hours span:last-child {
+  border-right: 1px solid var(--border-subtle);
+}
+/* 라벨은 눈금선 위에 앉는다. 마지막 선은 칸의 오른쪽 테두리이므로 그 하나만
+   `::after` 로 따로 붙인다 — 여덟 칸에 아홉 개의 선이 있기 때문이다. */
+.focus-timeline-hours span::before {
+  content: attr(data-hour);
+  position: absolute;
+  left: -14px;
+  bottom: 4px;
+  font-size: var(--type-xs);
+  color: var(--text-tertiary);
+}
+.focus-timeline-hours span:last-child::after {
+  content: "24:00";
+  position: absolute;
+  right: -14px;
+  bottom: 4px;
+  font-size: var(--type-xs);
+  color: var(--text-tertiary);
+}
+/* 축은 06:00 에서 시작하지 않는다 — 새벽 두 시의 집중도 기록이다. 눈금만 두
+   시간마다 06 부터 붙고, 자리는 0~24 전체를 쓴다. */
+.focus-timeline-track {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 26px;
+  height: 22px;
+}
+.focus-timeline-span {
+  position: absolute;
+  height: 22px;
+  min-width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-fill);
+}
+.focus-timeline-span b {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  font-size: var(--type-xs);
+  font-weight: var(--weight-medium);
   color: var(--text-secondary);
+  white-space: nowrap;
 }
-.focus-record-stats strong {
-  font-size: var(--type-2xl);
-}
+
+/* 세션 목록 — 언제 → 무엇 → 얼마나. */
 .focus-page-v2 .focus-record-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 100px 130px 24px;
+  grid-template-columns: 116px minmax(0, 1fr) auto 72px 24px;
+  align-items: center;
+  gap: var(--space-sm);
   width: 100%;
+  min-height: 52px;
+  padding: var(--space-xs) var(--space-md);
   border: 0;
-  border-bottom: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--border-subtle);
   border-radius: 0;
+  background: transparent;
   text-align: left;
-  padding: 16px 8px;
-  gap: 12px;
 }
-.focus-record-row > span:first-child {
-  display: grid;
-  gap: 8px;
+.focus-record-when {
+  font-size: var(--type-sm);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.focus-page-v2 .focus-record-row strong {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--type-md);
+  font-weight: var(--weight-medium);
 }
-.focus-record-row strong {
-  overflow-wrap: anywhere;
+.focus-record-tags {
+  display: flex;
+  gap: var(--space-xxs);
 }
-.focus-record-row small,
-.focus-record-mode {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 400;
+.focus-record-duration {
+  text-align: right;
+  font-size: var(--type-md);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+.focus-record-more {
+  display: grid;
+  place-items: center;
+  color: var(--text-tertiary);
 }
 .focus-record-empty {
+  padding: var(--space-xl) var(--space-md);
   text-align: center;
-  padding: 80px 0;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
+  font-size: var(--type-md);
 }
 .focus-dialog-backdrop {
   position: fixed;
@@ -672,14 +872,25 @@ body.focus-stage-visible .foc-global-bar {
     padding: 8px 12px;
     font-size: 13px;
   }
-  .focus-record-stats {
-    grid-template-columns: repeat(2, 1fr);
+  /* KPI 넷은 이 폭에서 2열이 된다. 히어로는 그대로 크다 — 무엇을 먼저 볼지는
+     화면이 좁아진다고 바뀌지 않는다. */
+  .focus-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md) 0;
   }
-  .focus-page-v2 .focus-record-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .focus-record-mode {
+  .focus-kpi:nth-child(2)::after {
     display: none;
+  }
+  /* 세션 줄에서 먼저 빠지는 것은 태그다 — 무엇을 했는지는 제목이 말하고,
+     태그는 그것을 거들 뿐이다. 시각과 길이는 이 목록의 이유라서 남는다. */
+  .focus-page-v2 .focus-record-row {
+    grid-template-columns: 100px minmax(0, 1fr) auto 24px;
+  }
+  .focus-record-tags {
+    display: none;
+  }
+  .focus-datenav-label {
+    min-width: 0;
   }
   .focus-task-label {
     display: none;
