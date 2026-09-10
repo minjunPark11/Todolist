@@ -2,6 +2,9 @@ import type { GoogleTaskChoice, GoogleTaskSnapshot } from "./googleTaskCoordinat
 import type { Task } from "../types";
 export interface LocalTaskConflict { id: string; local: Task | null; remote: { id: string; revision: number; data: Task } | null }
 export interface GoogleTaskSyncState {
+  /** Distinct tasks merged since the preceding review pass, including local saves.
+   * This measures merges, not successful uploads. Reset with the account. */
+  autoMergedCount?: number;
   /**
    * Occurrences this pass could not send, and why a person has to look.
    *

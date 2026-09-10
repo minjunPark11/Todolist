@@ -1,4 +1,4 @@
-import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import type { CalendarShareState } from "../lib/calendarShare";
 import { ConnectedAiCard } from "./oauth/ConnectedAiCard";
 import { useNotificationAccess } from "../hooks/useNotificationAccess";
@@ -11,7 +11,6 @@ import { clampHoursAtATime, HOURS_AT_A_TIME_CHOICES } from "../utils/calendarTim
 import { detectTimezone } from "../domain/plannerData/normalize";
 import { listTimezones, timezoneChoicePatch, timezoneLabel } from "../domain/plannerData/timezones";
 import { TimezonePicker } from "./TimezonePicker";
-import { FOCUS_LENGTH_CHOICES, sanitizeFocusDefaultLength } from "../domain/focus/sessionLength";
 import {
   BACKUP_INTERVALS,
   BACKUP_KEEP_CHOICES,
@@ -20,6 +19,8 @@ import {
 } from "../domain/backup/schedule";
 import type { AutoBackupState } from "../app/useAutoBackup";
 import { initialSettingsTab, type SettingsTab } from "../app/settingsTab";
+import { SettingsNavigation } from "./settings/SettingsNavigation";
+import { LocalTaskReviewPanel } from "./settings/LocalTaskReviewPanel";
 import { readPendingConnect } from "../lib/googleCalendar";
 import { parseCallback } from "../domain/calendar/googleSync/connectFlow";
 import type { FocusUserSettings } from "../lib/focusSettingsStorage";
@@ -28,7 +29,7 @@ import type { SettingsUpdateStatus } from "../platform";
 import type { AccentColor, AppSettings, ExternalCalendar, Language, Task, ThemeMode } from "../types";
 import { CalendarCategorySettings } from "./calendar/CalendarCategorySettings";
 import { GoogleCalendarCard } from "./calendar/GoogleCalendarCard";
-import { ConfirmModal, SegmentedTabs } from "./kit";
+import { SegmentedTabs } from "./kit";
 import { useT } from "../i18n";
 
 interface SettingsPageProps {
@@ -104,7 +105,7 @@ export function SettingsPage({
   autoBackup,
 }: SettingsPageProps) {
   const { t, lang } = useT();
-  /* Account, unless the app sent the reader here to finish something. The one
+  /* General, unless the app sent the reader here to finish something. The one
      case is the Google consent round trip: it lands on this page and the card
      that spends the code is drawn under Calendar, so opening on Account left
      the connection hanging on a tab click nothing asked for. */
@@ -116,7 +117,7 @@ export function SettingsPage({
   );
   useEffect(() => {
     const onReturn = () => {
-      if (parseCallback(window.location.href)) setTab("calendar");
+      if (parseCallback(window.location.href)) setTab("connections");
     };
     window.addEventListener("hashchange", onReturn);
     return () => window.removeEventListener("hashchange", onReturn);
@@ -146,7 +147,6 @@ export function SettingsPage({
 
   return (
     <div className="ff-page ff-settings-page">
-      {/* Doubles as the window caption on the desktop build (§3.3). */}
       <header className="ff-page-head" data-tauri-drag-region>
         <div>
           <h1 className="ff-page-title">{t("settings.title")}</h1>
@@ -154,22 +154,14 @@ export function SettingsPage({
         </div>
       </header>
 
-      <SegmentedTabs
-        tabs={[
-          ["account", t("settings.tabAccount")],
-          ["appearance", t("settings.tabAppearance")],
-          ["behavior", t("settings.tabBehavior")],
-          ["notifications", t("settings.tabNotifications")],
-          ["calendar", t("settings.tabCalendar")],
-          ["focus", t("settings.tabFocus")],
-          ["data", t("settings.tabData")],
-        ]}
-        active={tab}
-        onChange={setTab}
-      />
+      <div className="ff-settings-layout">
+        <SettingsNavigation active={tab} onChange={setTab} />
+        <div className="ff-settings-content" id={`settings-panel-${tab}`} role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
+          <h2 className="ff-settings-section-title">{t(`settings.nav.${tab}`)}</h2>
 
-      {tab === "appearance" ? (
+      {tab === "general" ? (
         <div className="ff-settings-card">
+          <h3>{t("settings.groupAppearance")}</h3>
           <SettingsRow title={t("settings.theme")} hint={t("settings.themeHint")}>
             <SegmentedTabs
               tabs={[
@@ -195,23 +187,7 @@ export function SettingsPage({
               ))}
             </div>
           </SettingsRow>
-          {/* `Font Size` stood here and moved almost nothing.
-              It drove `[data-font]`, which set the ROOT font size, so only
-              `rem` text and text that inherits could follow — and
-              `20-density.css` pins `main` to `var(--density-font)`, which cuts
-              that inheritance off at the top of the content area anyway. What
-              is left underneath is 356 hard-coded `px` font sizes across
-              eighteen stylesheets; the `--density-font` tokens meant to be the
-              ladder are referenced in three places, all inside the file that
-              defines them. Measured across a Small/Large switch: `/settings`
-              34 text elements, 0 moved; `/today` 13, 0 moved; `/calendar` 105,
-              97 moved — the Calendar is written in `rem` and was the only
-              screen the control ever reached, and even there the range was one
-              pixel either side of the 14px root.
-              The stored `fontSize` is left in `AppSettings`, the same way
-              `showCompletedInToday` was: an M0 field is not deleted from
-              anyone's account because a screen stopped asking about it. When
-              there is a real type scale, this row comes back. */}
+          <h3 className="ff-settings-group-heading">{t("settings.groupRegion")}</h3>
           <SettingsRow title={t("settings.language")} hint={t("settings.languageHint")}>
             <SegmentedTabs
               tabs={[
@@ -222,8 +198,6 @@ export function SettingsPage({
               onChange={(t) => onUpdate({ language: t as Language })}
             />
           </SettingsRow>
-          {/* SETTINGS_REVIEW.md 4.2 / 4.3. Beside Language because that is what
-              they follow — macOS files both under Language & Region. */}
           <SettingsRow title={t("settings.timeFormat")} hint={t("settings.timeFormatHint")}>
             <SegmentedTabs
               tabs={[
@@ -249,12 +223,14 @@ export function SettingsPage({
         </div>
       ) : null}
 
-      {tab === "behavior" ? (
+      {tab === "general" ? (
         <div className="ff-settings-card">
+          <h3>{t("settings.groupBehavior")}</h3>
           <SettingsRow title={t("settings.defaultStartPage")} hint={t("settings.defaultStartPageHint")}>
             <select
               // A stored "/planning" has no option of its own any more; showing
               // it as the Board keeps the picker from reading as unset.
+              aria-label={t("settings.defaultStartPage")}
               value={settings.defaultView === "/planning" ? "/board" : settings.defaultView}
               onChange={(e) => onUpdate({ defaultView: e.target.value as AppSettings["defaultView"] })}
             >
@@ -262,17 +238,9 @@ export function SettingsPage({
               <option value="/calendar">{t("sidebar.calendar")}</option>
               <option value="/board">{t("sidebar.board")}</option>
               <option value="/focus">{t("sidebar.focus")}</option>
-              {/* Named with the Tasks Module's own word, so the picker and the
-                  sidebar do not call one place two things. */}
               <option value="/inbox">{t("tasks.inbox")}</option>
             </select>
           </SettingsRow>
-          {/* `Show completed tasks in Today` stood here. The only screen that
-              read it was the Today PAGE, and that page is gone (P0-2). The
-              stored field is left alone — an M0 setting is not deleted from
-              anyone's account because a screen stopped asking about it — and
-              the Tasks Module's own Scopes answer the same question per Scope
-              (`⋯ → 완료 숨기기`). */}
           <Toggle
             label={t("settings.confirmBeforeDelete")}
             hint={t("settings.confirmBeforeDeleteHint")}
@@ -288,52 +256,29 @@ export function SettingsPage({
         </div>
       ) : null}
 
-      {tab === "notifications" ? <NotificationsTab /> : null}
+      {tab === "notifications" ? <>
+        <div className="ff-settings-card">
+          <Toggle
+            label={t("focus.optionCompletionNotification")}
+            hint={t("settings.focus.completionNotificationHint")}
+            value={focusSettings.enableCompletionNotification}
+            onChange={(v) => onUpdateFocusSettings({ enableCompletionNotification: v })}
+          />
+        </div>
+        <NotificationsTab />
+      </> : null}
 
-      {tab === "calendar" ? (
+      {tab === "connections" ? (
         <div className="ff-cal-settings-stack">
-          {/* SETTINGS_REVIEW.md 2 and 4.4. The row is here rather than beside
-              the time format in Appearance: that pair sits by Language because
-              both follow it, and this one follows nothing but the calendar.
-              macOS files it the same way — Calendar settings, not Language &
-              Region, where it is the General section this card stands in for.
-
-              The head is what §2 was actually about. Four cards in this column
-              carry one and this card did not, so a reader scanning titles down
-              the tab met them at two different left edges — x=20 here against
-              x=72 under an icon. Every card in a column that has any head needs
-              one. */}
-          <section className="ff-settings-card ff-cal-card">
-            <div className="ff-cal-card-head">
-              <span className="ff-cal-card-icon" aria-hidden="true">
-                <ClockIcon />
-              </span>
-              <div className="ff-cal-card-text">
-                <strong>{t("settings.calendar.generalTitle")}</strong>
-                <small>{t("settings.calendar.generalHint")}</small>
-              </div>
-            </div>
-            <SettingsRow title={t("settings.calendar.hoursAtATime")} hint={t("settings.calendar.hoursAtATimeHint")}>
-              <select
-                value={settings.hoursAtATime}
-                onChange={(e) => onUpdate({ hoursAtATime: clampHoursAtATime(e.target.value) })}
-              >
-                {HOURS_AT_A_TIME_CHOICES.map((hours) => (
-                  <option key={hours} value={hours}>
-                    {t("settings.calendar.hoursOption", { count: hours })}
-                  </option>
-                ))}
-              </select>
-            </SettingsRow>
-          </section>
-
-          <section className="ff-settings-card ff-cal-card">
-            <CalendarCategorySettings
-              externalCalendars={externalCalendars}
-              onUpdateExternalCalendar={onUpdateExternalCalendar}
-            />
-          </section>
-
+          <GoogleCalendarCard
+            onOpenDeviceReview={() => setTab("account")}
+            timezone={settings.timezone}
+            // Manual, because it is: the reader named this zone rather than
+            // letting the device speak for them, and the refresh effect would
+            // otherwise put the device's back on the next start — leaving the
+            // calendar pinned to a zone the account no longer claims.
+            onTimezoneChange={(zone) => onUpdate({ timezoneMode: "manual", timezone: zone })}
+          />
           <section className="ff-settings-card ff-cal-card">
             <div className="ff-cal-card-head">
               <span className="ff-cal-card-icon" aria-hidden="true">
@@ -377,6 +322,7 @@ export function SettingsPage({
                     </button>
                   </div>
                 ) : null}
+                <details className="ff-settings-details"><summary>{t("settings.shareManagement")}</summary>
                 <div className="ff-calendar-share-actions">
                   <small className="ff-cal-card-note">
                     {calendarShare.updatedAt
@@ -395,33 +341,11 @@ export function SettingsPage({
                     {t("settings.calendar.regenerateLink")}
                   </button>
                 </div>
+                </details>
               </div>
             ) : null}
           </section>
 
-          {/* Two-way Google Calendar (GOOGLE_CALENDAR_SYNC_DESIGN.md M1-4d).
-              Above the ICS card because it is the same subject done properly:
-              that one subscribes to somebody else's calendar and can only
-              read, this one writes. It draws itself and finishes the OAuth
-              round trip, which is why the callback lands on this page. */}
-          <GoogleCalendarCard
-            timezone={settings.timezone}
-            // Manual, because it is: the reader named this zone rather than
-            // letting the device speak for them, and the refresh effect would
-            // otherwise put the device's back on the next start — leaving the
-            // calendar pinned to a zone the account no longer claims.
-            onTimezoneChange={(zone) => onUpdate({ timezoneMode: "manual", timezone: zone })}
-          />
-
-          {/* "Sync status" used to be a seventh card below this one. It carried
-              one line and one button, both about the list drawn here, and it
-              drew them whether or not the list had anything in it — so the
-              default account met two cards about external calendars, one of
-              them reporting that a thing it had never done had never happened
-              and offering to redo it. It also wore the generic name while the
-              Google card above syncs too, which made it read as the tab's sync
-              status rather than this card's. It says the same things here, and
-              only once there is a calendar for them to be about. */}
           <section className="ff-settings-card ff-cal-card">
             <div className="ff-cal-card-head">
               <span className="ff-cal-card-icon" aria-hidden="true">
@@ -437,11 +361,6 @@ export function SettingsPage({
                       : t("settings.calendar.noLastSync")}
                 </small>
               </div>
-              {/* "Refresh all" used to sit here. §11.5: the Rail's sync button
-                  now refreshes every enabled subscription on each press, so
-                  this was the same call reached by a longer road. The per-
-                  calendar button below is not the same thing — it picks ONE,
-                  which is what you want when one of them is the broken one. */}
               <div className="ff-cal-card-actions">
                 <button
                   type="button"
@@ -457,11 +376,13 @@ export function SettingsPage({
               <div className="ff-external-calendar-form">
                 <input
                   value={calendarDraft.name}
+                  aria-label={t("settings.calendar.namePlaceholder")}
                   placeholder={t("settings.calendar.namePlaceholder")}
                   onChange={(event) => setCalendarDraft((draft) => ({ ...draft, name: event.target.value }))}
                 />
                 <input
                   value={calendarDraft.icsUrl}
+                  aria-label={t("settings.subscriptionUrl")}
                   placeholder="https://.../calendar.ics"
                   onChange={(event) => setCalendarDraft((draft) => ({ ...draft, icsUrl: event.target.value }))}
                 />
@@ -526,23 +447,13 @@ export function SettingsPage({
               </div>
             ) : null}
           </section>
+          <details className="ff-settings-card ff-settings-details"><summary>{t("settings.connectedAi")}</summary><ConnectedAiCard /></details>
         </div>
       ) : null}
 
-      {tab === "focus" ? (
-        <div className="ff-settings-card">
-          {/* The one row here that is an AppSettings value. The three below it
-              are per-device and stay in their own store; the reader is not
-              shown that seam because it is not theirs. */}
-          <SettingsRow title={lang === "ko" ? "타이머 측정 방식" : "Timer mode"} hint={lang === "ko" ? "집중 화면에서 스톱워치 또는 포모도로를 선택하세요. 포모도로 시간과 휴식은 집중 화면의 설정에서 변경할 수 있습니다." : "Choose Stopwatch or Pomodoro on the Focus page. Configure focus and break lengths in Focus settings."}>
-            <span>{lang === "ko" ? "기본: 스톱워치" : "Default: Stopwatch"}</span>
-          </SettingsRow>
-          {/* Where there is a browser tab to write into. The switch drives
-              `document.title`, and the desktop window takes its caption from
-              `tauri.conf.json` and never reads the document's — nothing calls
-              `setTitle` — so on the installed app this was a switch with
-              nowhere to show its result. The stored value is left alone: it is
-              this device's, and the same account in a browser still uses it. */}
+      {tab === "general" ? (
+        <details className="ff-settings-card ff-settings-details">
+          <summary>{t("settings.focusDisplay")}</summary>
           {platform.kind === "web" ? (
             <Toggle
               label={t("focus.optionTabTitleTimer")}
@@ -551,34 +462,60 @@ export function SettingsPage({
               onChange={(v) => onUpdateFocusSettings({ showTabTitleTimer: v })}
             />
           ) : null}
-          <Toggle
-            label={t("focus.optionCompletionNotification")}
-            hint={t("settings.focus.completionNotificationHint")}
-            value={focusSettings.enableCompletionNotification}
-            onChange={(v) => onUpdateFocusSettings({ enableCompletionNotification: v })}
-          />
+
           <Toggle
             label={t("focus.optionMiniTimerButton")}
             hint={t("settings.focus.miniTimerButtonHint")}
             value={focusSettings.showMiniTimerButton}
             onChange={(v) => onUpdateFocusSettings({ showMiniTimerButton: v })}
           />
-        </div>
+        </details>
       ) : null}
+
+      {tab === "general" && <details className="ff-settings-card ff-settings-details ff-settings-display">
+        <summary>{t("settings.calendarDisplay")}</summary>
+          <section className="ff-settings-card ff-cal-card">
+            <div className="ff-cal-card-head">
+              <span className="ff-cal-card-icon" aria-hidden="true">
+                <ClockIcon />
+              </span>
+              <div className="ff-cal-card-text">
+                <strong>{t("settings.calendar.generalTitle")}</strong>
+                <small>{t("settings.calendar.generalHint")}</small>
+              </div>
+            </div>
+            <SettingsRow title={t("settings.calendar.hoursAtATime")} hint={t("settings.calendar.hoursAtATimeHint")}>
+              <select
+                aria-label={t("settings.calendar.hoursAtATime")}
+                value={settings.hoursAtATime}
+                onChange={(e) => onUpdate({ hoursAtATime: clampHoursAtATime(e.target.value) })}
+              >
+                {HOURS_AT_A_TIME_CHOICES.map((hours) => (
+                  <option key={hours} value={hours}>
+                    {t("settings.calendar.hoursOption", { count: hours })}
+                  </option>
+                ))}
+              </select>
+            </SettingsRow>
+          </section>
+
+          <section className="ff-settings-card ff-cal-card">
+            <CalendarCategorySettings
+              externalCalendars={externalCalendars}
+              onUpdateExternalCalendar={onUpdateExternalCalendar}
+            />
+          </section>
+      </details>}
 
       {tab === "data" ? (
         <>
-          {/* SETTINGS_REVIEW.md 4.6. Above export and import because those are
-              things the reader does, and this is the one that happens without
-              them. The file it writes IS the export format, so the restore path
-              is the Import row below — there is no second reader to keep
-              correct. */}
           <div className="ff-settings-card">
             <SettingsRow
               title={t("settings.backup.auto")}
               hint={autoBackup.supported ? t("settings.backup.autoHint") : t("settings.backup.desktopOnly")}
             >
               <select
+                aria-label={t("settings.backup.auto")}
                 value={settings.autoBackup}
                 disabled={!autoBackup.supported}
                 onChange={(e) => onUpdate({ autoBackup: sanitizeBackupInterval(e.target.value) })}
@@ -593,6 +530,7 @@ export function SettingsPage({
             {autoBackup.supported && settings.autoBackup !== "off" ? (
               <SettingsRow title={t("settings.backup.keep")} hint={t("settings.backup.keepHint")}>
                 <select
+                  aria-label={t("settings.backup.keep")}
                   value={settings.autoBackupKeep}
                   onChange={(e) => onUpdate({ autoBackupKeep: sanitizeBackupKeep(e.target.value) })}
                 >
@@ -642,33 +580,31 @@ export function SettingsPage({
                 <input type="file" accept="application/json" onChange={onImport} hidden />
               </label>
             </SettingsRow>
+
+            {importMessage ? <p className="ff-settings-msg">{importMessage}</p> : null}
+          </div>
+          <details className="ff-settings-card ff-settings-details ff-settings-danger">
+            <summary>{t("settings.dangerZone")}</summary>
             <SettingsRow title={t("settings.resetAllData")} hint={t("settings.resetAllDataHint")}>
               <button type="button" className="ff-btn ff-btn-danger" onClick={onReset}>{t("settings.resetAllData")}</button>
             </SettingsRow>
-            {importMessage ? <p className="ff-settings-msg">{importMessage}</p> : null}
-          </div>
+          </details>
         </>
       ) : null}
-
-      {/* SETTINGS_REVIEW.md 3.2: signing in used to live under "delete
-          everything". It is the first tab now. */}
       {tab === "account" ? (
         <>
           {accountSlot}
-          {/* Who else can read this account (§6.4). Beside the account itself,
-              because that is what it is about — not a calendar setting and not
-              a data-export tool. */}
-          <ConnectedAiCard />
+          <LocalTaskReviewPanel />
+        </>
+      ) : null}
+      {tab === "about" ? (
+        <>
+
           <div className="ff-settings-card">
             <SettingsRow title={t("settings.appInfo")} hint="FocusFlow">
               <strong>{appVersion}</strong>
             </SettingsRow>
-            {/* Desktop only, and said so rather than shown failing. The web
-                build IS its latest version — there is no installer to run —
-                and the row used to prove it by reporting a cross-origin fetch
-                to github.com that a browser can only reject, so every web user
-                read "Could not check for updates" as a fault in the app. Same
-                shape as Automatic backup on the Data tab. */}
+            {updatesSupported && <>
             <SettingsRow
               title={t("settings.checkUpdates")}
               hint={updatesSupported ? formatUpdateStatus(updateStatus, t) : t("settings.updateWebOnly")}
@@ -691,9 +627,12 @@ export function SettingsPage({
                 </div>
               ) : null}
             </SettingsRow>
+            </>}
           </div>
         </>
       ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -768,6 +707,7 @@ function NotificationsTab() {
           </button>
         ) : null}
       </SettingsRow>
+      <details className="ff-settings-details"><summary>{t("settings.notificationTroubleshooting")}</summary>
       <SettingsRow title={t("settings.notif.testTitle")} hint={testResult || t("settings.notif.testHint")}>
         <button
           type="button"
@@ -784,6 +724,7 @@ function NotificationsTab() {
           {t("settings.notif.send")}
         </button>
       </SettingsRow>
+      </details>
     </div>
   );
 }
@@ -859,6 +800,7 @@ function Toggle({ label, hint, value, onChange }: { label: string; hint: string;
       <button
         type="button"
         role="switch"
+        aria-label={label}
         aria-checked={value}
         className={`ff-toggle${value ? " on" : ""}`}
         onClick={() => onChange(!value)}

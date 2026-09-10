@@ -97,7 +97,7 @@ async function offGrid(page: Page, allowed: string[]): Promise<Offender[]> {
       if (box.height < 12 || box.width < 24) continue;
       if ((allowList as string[]).some((sel) => el.closest(sel))) continue;
       const height = Math.round(box.height);
-      const inSidebar = !!el.closest(".tm-sidebar, .space-sidebar");
+      const inSidebar = !!el.closest(".tm-sidebar, .space-sidebar, .ff-settings-nav");
       // Focus v2 uses 44px touch controls and 52px primary/picker controls.
       const inFocus = !!el.closest(".focus-page-v2");
       const allowedHeights = inSidebar ? [NAV, CREATE, SECTION_ACTION] : inFocus ? [44, 52] : [CONTROL];

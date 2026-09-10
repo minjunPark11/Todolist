@@ -110,9 +110,12 @@ describe("typing at the row", () => {
 
   it("takes the first match on Enter, so a city can be reached without the mouse", () => {
     const { onUpdate } = renderRow({ timezone: device });
-    search("shanghai");
+    // The automatic option includes the device city; choose a different city
+    // so the first match means a manual zone on every test host.
+    const city = device === "Asia/Shanghai" ? "Seoul" : "Shanghai";
+    search(city);
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
-    expect(onUpdate).toHaveBeenCalledWith({ timezoneMode: "manual", timezone: "Asia/Shanghai" });
+    expect(onUpdate).toHaveBeenCalledWith({ timezoneMode: "manual", timezone: `Asia/${city}` });
   });
 
   it("moves the cursor with the arrows while the typing stays in the field", () => {

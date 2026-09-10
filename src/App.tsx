@@ -767,7 +767,8 @@ export default function App() {
   useGoogleInboundSync({ signedIn: planner.auth.isSignedIn, apply: saveExternalState });
   useGoogleTaskSync({ enabled: planner.auth.isSignedIn && planner.auth.remoteDataReady && planner.auth.taskSyncMode === "revision",
     accountKey: planner.auth.userEmail, tasks: planner.tasks, bridge: planner.withGoogleTaskSync,
-    conflicts: planner.taskSyncConflicts, resolveConflict: planner.resolveTaskSyncConflict });
+    conflicts: planner.taskSyncConflicts, resolveConflict: planner.resolveTaskSyncConflict,
+    takeAutoMergedCount: planner.takeTaskAutoMergedCount });
 
   useEffect(() => {
     if (!calendarShare.enabled || !calendarShare.token) return;

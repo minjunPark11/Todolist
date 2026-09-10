@@ -59,8 +59,8 @@ type Status =
  * or behind a VPN, and a connection pinned to it stays wrong afterwards
  * (025 line 57 refuses to re-bind a different one; 036 is the only way back).
  */
-export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
-  { timezone?: string; onTimezoneChange?: (zone: string) => void }) {
+export function GoogleCalendarCard({ timezone = "", onTimezoneChange, onOpenDeviceReview }:
+  { timezone?: string; onTimezoneChange?: (zone: string) => void; onOpenDeviceReview?: () => void }) {
   const taskSync = useSyncExternalStore(subscribeGoogleTaskSync, readGoogleTaskSyncState, readGoogleTaskSyncState);
   const { t } = useT();
   const [status, setStatus] = useState<Status>({ kind: "loading" });
@@ -467,6 +467,8 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
               imported — so the choice is confirmed before it is spent.
               A connection from before `sync_timezone` existed reports "", and
               a picker with nothing to show is worse than none. */}
+          <details className="ff-settings-details" open={!!timezone && !!status.connection.syncTimezone && timezone !== status.connection.syncTimezone || undefined}>
+            <summary>{t("settings.connectionSettings")}</summary>
           {status.connection.syncTimezone ? (
             <div className="ff-settings-row">
               <div className="ff-settings-row-text">
@@ -484,6 +486,7 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
               </div>
             </div>
           ) : null}
+          </details>
           {aligning ? <p className="ff-settings-note" role="status">{t("settings.google.aligningTimezone")}</p> : null}
           {timezoneMessage ? (
             timezoneMessage.kind === "error"
@@ -504,7 +507,7 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
             setNotice(""); setError("");
             window.dispatchEvent(new Event(GOOGLE_SYNC_REQUESTED));
           }}>{t(syncing ? "settings.google.syncingNow" : "settings.google.syncNow")}</button>
-          <GoogleTaskReviewPanel />
+          <GoogleTaskReviewPanel onOpenDeviceReview={onOpenDeviceReview} />
         </>
       ) : null}
 
@@ -513,7 +516,9 @@ export function GoogleCalendarCard({ timezone = "", onTimezoneChange }:
       {/* §8 asks for this to be said once, at the moment of connecting: a
           repeating event edited in Google is overwritten on the next write, and
           Google has no lock that could prevent it. */}
-      <p className="ff-settings-note">{t(taskSync.enabled ? "googleTask.unsupported" : "settings.google.repeatWarning")}</p>
+      <details className="ff-settings-details"><summary>{t("settings.syncScope")}</summary>
+        <p className="ff-settings-note">{t(taskSync.enabled ? "googleTask.unsupported" : "settings.google.repeatWarning")}</p>
+      </details>
 
       {notice ? <p className="ff-settings-note" aria-live="polite">{notice}</p> : null}
       {error ? <p className="auth-message error" role="alert">{error}</p> : null}

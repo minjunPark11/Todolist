@@ -58,6 +58,31 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+it("keeps a merged remote date in the UI and in later local saves", async () => {
+  const { result } = renderHook(() => usePlannerData());
+  await waitFor(() => expect(result.current.auth.remoteDataReady).toBe(true));
+  serverTask = { ...serverTask, dueDate: "2026-09-12" }; revision++;
+  act(() => result.current.updateTask("t", { title: "Local title" }));
+  await waitFor(() => expect(serverTask.title).toBe("Local title"), { timeout: 5000 });
+  expect(result.current.tasks[0]).toMatchObject({ title: "Local title", dueDate: "2026-09-12" });
+  act(() => result.current.updateTask("t", { description: "Next edit" }));
+  await waitFor(() => expect(serverTask.description).toBe("Next edit"), { timeout: 5000 });
+  expect(serverTask.dueDate).toBe("2026-09-12");
+  expect(result.current.taskSyncConflicts()).toEqual([]);
+});
+
+it("merges separate groups when adopting a Google snapshot", async () => {
+  const { result } = renderHook(() => usePlannerData());
+  await waitFor(() => expect(result.current.auth.remoteDataReady).toBe(true));
+  await act(async () => { await result.current.withGoogleTaskSync(async () => {
+    result.current.updateTask("t", { title: "Typing" });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    serverTask = { ...serverTask, dueDate: "2026-09-12" }; revision++;
+  }); });
+  expect(result.current.tasks[0]).toMatchObject({ title: "Typing", dueDate: "2026-09-12" });
+  expect(result.current.taskSyncConflicts()).toEqual([]);
+});
+
 it("loads server revisions and routes edited tasks through the RPC without direct upsert", async () => {
   const { result } = renderHook(() => usePlannerData());
   await waitFor(() => expect(result.current.auth.remoteDataReady).toBe(true));

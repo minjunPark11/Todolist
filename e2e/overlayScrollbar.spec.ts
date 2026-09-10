@@ -47,6 +47,7 @@ test.describe("the page scrollbar", () => {
     await openApp(page);
     await page.goto(SCROLLING_PAGE);
     await page.setViewportSize({ width: 1440, height: 1200 });
+    await page.getByRole("tab", { name: "About", exact: true }).click();
     await expect(page.locator(BAR)).toHaveCount(0);
   });
 

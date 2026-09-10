@@ -110,6 +110,7 @@ import { buildMigrationUpload } from "../domain/sync/buildMigrationUpload";
 import { createSaveQueue, type SaveQueue } from "../domain/sync/saveQueue";
 import { reapplyLocalEdits } from "../domain/sync/reapplyLocalEdits";
 import { createTaskRevisionSession, retryTaskSyncError, sameRevisionData, TaskRevisionBlocked, type RevisionSnapshot } from "../domain/sync/taskRevisionSession";
+import { mergeTaskRevisions } from "../domain/tasks/mergeTaskRevisions";
 import { readTaskRevisionSnapshot, restoreTaskRevisionCheckpoint, taskRevisionEnabled, taskRevisionStorageKey, writeTaskRevision } from "../lib/taskRevisionStore";
 import { acquireTaskRevisionOwnership } from "../lib/taskRevisionOwnership";
 import { addDays, addMonths, todayValue } from "../utils/date";
@@ -700,6 +701,20 @@ export function usePlannerData() {
         if (!revisionSession || revisionSession.userId !== userId) {
           const revisionEpoch = taskRevisionEpochRef.current;
           revisionSession = createTaskRevisionSession<Task>(userId, {
+            merge: (base, local, remote) => {
+              // Soft deletion is a deletion too, even though the row remains.
+              if (local.deletedAt || remote.deletedAt) return null;
+              const result = mergeTaskRevisions(base, local, remote, new Date().toISOString());
+              return result.ok ? result.task : null;
+            },
+            onMerge: (task, local) => {
+              if (revisionSession !== taskRevisionSessionRef.current) return;
+              if (!sameRevisionData(dataRef.current.tasks.find(item => item.id === task.id), local)) return;
+              const tasks = dataRef.current.tasks.map(item => item.id === task.id ? task : item);
+              storeRevisionRef.current++;
+              dataRef.current = { ...dataRef.current, tasks };
+              setDataState(dataRef.current);
+            },
             read: () => readTaskRevisionSnapshot(supabase!, userId),
             write: (request) => writeTaskRevision(supabase!, userId, request),
             persist: (checkpoint) => platform.storage.setSync(taskRevisionStorageKey(userId), JSON.stringify(checkpoint)),
@@ -2488,6 +2503,7 @@ export function usePlannerData() {
 
   return {
     withGoogleTaskSync,
+    takeTaskAutoMergedCount: () => taskRevisionSessionRef.current?.takeAutoMergedCount() ?? 0,
     taskSyncConflicts: () => Object.entries(taskRevisionSessionRef.current?.checkpoint.conflicts ?? {}).map(([id, value]) => ({ id, ...value })),
     resolveTaskSyncConflict: async (id: string, choice: "local" | "remote" | "copy", expected: { local: Task | null; remote: { id: string; revision: number; data: Task } | null }) => {
       const session = taskRevisionSessionRef.current;
