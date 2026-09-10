@@ -207,3 +207,107 @@ export function focusTimelineSpans(
   // 긴 것이 먼저 자리를 갖는다 — 라벨을 그릴 때 그 순서가 필요하다 (§5.3.1).
   return spans.sort((a, b) => b.seconds - a.seconds || a.start - b.start);
 }
+
+/* ==========================================================================
+   집중 패턴 (FOCUS_TABS_AND_RECORD_DESIGN.md §5.2)
+
+   히트맵과 추이는 고른 기간이 아니라 **그 기간의 끝을 기준으로 한 최근 N**을
+   본다 — 카드가 "최근 4주" 라고 말하기 때문이다. 날짜 내비를 옮기면 그 기준도
+   함께 옮겨서, 화면의 모든 조각이 같은 순간을 이야기하게 둔다.
+   ========================================================================== */
+
+/** 날짜별 집중 초. 범위 밖은 담기지 않는다. */
+export function focusDailyTotals(
+  sessions: FocusSession[],
+  from: string,
+  to: string,
+  timezone: string,
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const session of sessions) {
+    if (session.status !== "completed" || session.mode !== "focus") continue;
+    for (const segment of session.segments) {
+      let cursor = Date.parse(segment.startAt);
+      const end = Date.parse(segment.endAt);
+      if (!Number.isFinite(cursor) || !Number.isFinite(end) || end <= cursor) continue;
+      while (cursor < end) {
+        const date = focusDate(cursor, timezone);
+        if (date > to) break;
+        const partEnd = Math.min(end, nextBoundary(cursor, timezone));
+        if (date >= from) totals[date] = (totals[date] ?? 0) + (partEnd - cursor) / 1000;
+        cursor = partEnd;
+      }
+    }
+  }
+  return totals;
+}
+
+/**
+ * 히트맵의 날짜 격자. 월요일에 시작하는 주가 `weeks` 줄, 오래된 것이 위다.
+ *
+ * 마지막 줄은 `anchor` 가 든 주다 — 그 주의 남은 날들도 자리를 갖는다. 빈 칸이
+ * 있어야 "아직 오지 않은 날" 과 "집중하지 않은 날" 이 같은 격자 위에서 구별된다.
+ */
+export function focusHeatmapWeeks(anchor: string, weeks: number): string[][] {
+  const day = 86400000;
+  const [y, m, d] = anchor.split("-").map(Number);
+  const at = Date.UTC(y, m - 1, d);
+  const monday = at - ((new Date(at).getUTCDay() + 6) % 7) * day;
+  const rows: string[][] = [];
+  for (let week = weeks - 1; week >= 0; week -= 1) {
+    const start = monday - week * 7 * day;
+    rows.push(
+      Array.from({ length: 7 }, (_, i) => new Date(start + i * day).toISOString().slice(0, 10)),
+    );
+  }
+  return rows;
+}
+
+/** 추이의 가로축. `anchor` 로 끝나는 `days` 일, 오래된 것이 먼저. */
+export function focusTrendDays(anchor: string, days: number): string[] {
+  const day = 86400000;
+  const [y, m, d] = anchor.split("-").map(Number);
+  const at = Date.UTC(y, m - 1, d);
+  return Array.from({ length: days }, (_, i) =>
+    new Date(at - (days - 1 - i) * day).toISOString().slice(0, 10),
+  );
+}
+
+/**
+ * 순차 램프의 단 (0~4). 0 은 "없음" 이고 1~4 가 램프다.
+ *
+ * 사분위가 아니라 **최댓값 대비 비율**이다. 사분위는 값이 몇 개 없을 때 한 칸의
+ * 이동으로 전체가 다시 칠해지는데, 히트맵은 하루가 늘 때마다 색이 흔들리면
+ * "꾸준한가" 를 읽을 수 없다.
+ */
+export function focusHeatLevel(seconds: number, max: number): 0 | 1 | 2 | 3 | 4 {
+  if (seconds <= 0 || max <= 0) return 0;
+  const share = seconds / max;
+  if (share <= 0.25) return 1;
+  if (share <= 0.5) return 2;
+  if (share <= 0.75) return 3;
+  return 4;
+}
+
+export interface FocusTaskShare {
+  taskId: string | null;
+  seconds: number;
+  /** 0~1. 이 기간 전체에서 이 작업이 차지한 몫. */
+  share: number;
+}
+
+/** 작업별 집중 시간, 많은 것부터. */
+export function focusByTask(
+  rows: Array<{ session: FocusSession; ms: number }>,
+): FocusTaskShare[] {
+  const totals = new Map<string | null, number>();
+  for (const { session, ms } of rows) {
+    if (ms <= 0) continue;
+    const key = session.taskId || null;
+    totals.set(key, (totals.get(key) ?? 0) + ms / 1000);
+  }
+  const sum = [...totals.values()].reduce((n, v) => n + v, 0);
+  return [...totals.entries()]
+    .map(([taskId, seconds]) => ({ taskId, seconds, share: sum ? seconds / sum : 0 }))
+    .sort((a, b) => b.seconds - a.seconds);
+}

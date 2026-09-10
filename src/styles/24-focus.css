@@ -693,6 +693,157 @@
   place-items: center;
   color: var(--text-tertiary);
 }
+/* 아래 2열 — 왼쪽이 합계, 오른쪽이 낱개 (§7.2). 각자 자기 높이를 갖는다:
+   늘려놓고 못 채우면 빈 액자이고, 세션 수는 날마다 다르므로 맞출 높이가 애초에
+   없다. */
+.focus-record-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  align-items: start;
+}
+
+/* 작업별 막대 — 단색이다 (§5.3). 이름이 이미 각 줄을 구별하므로 색이 할 일이
+   없고, 사용자가 정하는 태그 색은 애초에 검증 대상이 될 수 없다. */
+.focus-bars {
+  display: grid;
+  gap: var(--space-sm);
+  padding: 0 var(--space-md) var(--space-md);
+}
+.focus-bar-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: var(--type-sm);
+}
+.focus-bar-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.focus-bar-top b {
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+.focus-bar-top small {
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.focus-bar {
+  margin-top: 6px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.focus-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-fill);
+}
+
+/* 집중 패턴 — 히트맵은 셀 크기가 폭을 정하므로 `auto`, 남는 전부는 추이가
+   가진다. 격자는 셀이 커진다고 더 읽히지 않지만 선은 가로가 길수록 기울기가
+   읽힌다. */
+.focus-pattern {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-xl);
+  padding: 0 var(--space-md) var(--space-md);
+  align-items: start;
+}
+.focus-heat-days,
+.focus-heat-row {
+  display: grid;
+  /* 셀 폭을 고정한다. 늘어나면 3:1 이 되어 격자가 아니라 막대 줄로 읽힌다. */
+  grid-template-columns: 84px repeat(7, 32px);
+  gap: var(--space-xxs);
+}
+.focus-heat-days {
+  margin-bottom: var(--space-xxs);
+  font-size: var(--type-xs);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+.focus-heat-row {
+  margin-bottom: var(--space-xxs);
+}
+.focus-heat-label {
+  display: flex;
+  align-items: center;
+  font-size: var(--type-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.focus-heat-cell {
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+/* 한 색 순차 램프. 무지개가 아니라 밝은 데서 어두운 데로. */
+.focus-heat-cell.is-1 {
+  background: color-mix(in srgb, var(--accent-fill) 22%, var(--bg-surface));
+}
+.focus-heat-cell.is-2 {
+  background: color-mix(in srgb, var(--accent-fill) 45%, var(--bg-surface));
+}
+.focus-heat-cell.is-3 {
+  background: color-mix(in srgb, var(--accent-fill) 70%, var(--bg-surface));
+}
+.focus-heat-cell.is-4 {
+  background: var(--accent-fill);
+}
+.focus-heat-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  margin: var(--space-xs) 0 0;
+  font-size: var(--type-xs);
+  color: var(--text-tertiary);
+}
+.focus-heat-legend i {
+  width: 20px;
+  height: 12px;
+}
+
+.focus-trend h3 {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--type-md);
+  font-weight: var(--weight-medium);
+}
+.focus-trend svg {
+  display: block;
+  width: 100%;
+  height: 186px;
+}
+.focus-trend-grid {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+.focus-trend-axis {
+  font-size: 10px;
+  fill: var(--text-tertiary);
+}
+.focus-trend-line {
+  fill: none;
+  stroke: var(--accent-fill);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.focus-trend-area {
+  fill: color-mix(in srgb, var(--accent-fill) 10%, transparent);
+}
+.focus-trend-mark {
+  fill: var(--bg-surface-muted);
+  stroke: var(--accent-fill);
+  stroke-width: 2;
+}
+
 .focus-record-empty {
   padding: var(--space-xl) var(--space-md);
   text-align: center;
@@ -891,6 +1042,16 @@ body.focus-stage-visible .foc-global-bar {
   }
   .focus-datenav-label {
     min-width: 0;
+  }
+  .focus-record-pair,
+  .focus-pattern {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-md);
+  }
+  /* 이 폭에서는 주 라벨이 먼저 줄어든다 — 셀은 정사각에 가까워야 격자로 읽힌다. */
+  .focus-heat-days,
+  .focus-heat-row {
+    grid-template-columns: 60px repeat(7, minmax(0, 1fr));
   }
   .focus-task-label {
     display: none;

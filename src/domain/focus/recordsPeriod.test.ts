@@ -7,9 +7,14 @@
 //   · 자정을 넘는 구간을 자르지 않으면 23:50→00:10 이 축을 **거꾸로** 가로지른다.
 import { describe, expect, it } from "vitest";
 import {
+  focusByTask,
+  focusDailyTotals,
+  focusHeatLevel,
+  focusHeatmapWeeks,
   focusMinuteOfDay,
   focusPeriodRange,
   focusTimelineSpans,
+  focusTrendDays,
 } from "./records";
 import type { FocusSession } from "../../types";
 
@@ -178,5 +183,105 @@ describe("focusTimelineSpans", () => {
       "UTC",
     );
     expect(spans.map((s) => s.sessionId)).toEqual(["long", "short"]);
+  });
+});
+
+describe("focusDailyTotals", () => {
+  it("날짜별로 모으고, 범위 밖은 담지 않는다", () => {
+    const totals = focusDailyTotals(
+      [
+        session("a", [["2026-09-09T09:00:00Z", "2026-09-09T09:30:00Z"]]),
+        session("b", [["2026-09-10T09:00:00Z", "2026-09-10T09:10:00Z"]]),
+        session("c", [["2026-09-10T14:00:00Z", "2026-09-10T14:20:00Z"]]),
+        session("out", [["2026-09-11T09:00:00Z", "2026-09-11T09:30:00Z"]]),
+      ],
+      "2026-09-09",
+      "2026-09-10",
+      "UTC",
+    );
+    expect(totals).toEqual({ "2026-09-09": 1800, "2026-09-10": 1800 });
+  });
+
+  it("자정을 넘는 구간은 두 날에 나뉜다", () => {
+    const totals = focusDailyTotals(
+      [session("a", [["2026-09-09T23:50:00Z", "2026-09-10T00:10:00Z"]])],
+      "2026-09-09",
+      "2026-09-10",
+      "UTC",
+    );
+    expect(totals["2026-09-09"]).toBe(600);
+    expect(totals["2026-09-10"]).toBe(600);
+  });
+});
+
+describe("focusHeatmapWeeks", () => {
+  it("월요일에 시작하는 주가 오래된 것부터 쌓인다", () => {
+    const weeks = focusHeatmapWeeks("2026-09-10", 4);
+    expect(weeks).toHaveLength(4);
+    expect(weeks.every((w) => w.length === 7)).toBe(true);
+    // 마지막 줄은 앵커가 든 주다.
+    expect(weeks[3][0]).toBe("2026-09-07");
+    expect(weeks[3]).toContain("2026-09-10");
+    // 위로 갈수록 오래된 주다.
+    expect(weeks[0][0]).toBe("2026-08-17");
+  });
+
+  it("앵커가 일요일이어도 그 주가 마지막 줄이다", () => {
+    const weeks = focusHeatmapWeeks("2026-09-13", 4);
+    expect(weeks[3][0]).toBe("2026-09-07");
+    expect(weeks[3][6]).toBe("2026-09-13");
+  });
+});
+
+describe("focusTrendDays", () => {
+  it("앵커로 끝나는 N 일이 오래된 것부터", () => {
+    const days = focusTrendDays("2026-09-10", 7);
+    expect(days).toHaveLength(7);
+    expect(days[0]).toBe("2026-09-04");
+    expect(days[6]).toBe("2026-09-10");
+  });
+
+  it("달을 거슬러 올라간다", () => {
+    expect(focusTrendDays("2026-03-02", 7)[0]).toBe("2026-02-24");
+  });
+});
+
+describe("focusHeatLevel", () => {
+  it("최댓값 대비 비율로 네 단을 나눈다 — 없음은 0 이다", () => {
+    expect(focusHeatLevel(0, 100)).toBe(0);
+    expect(focusHeatLevel(20, 100)).toBe(1);
+    expect(focusHeatLevel(40, 100)).toBe(2);
+    expect(focusHeatLevel(70, 100)).toBe(3);
+    expect(focusHeatLevel(100, 100)).toBe(4);
+  });
+
+  it("최댓값이 없으면 색도 없다", () => {
+    expect(focusHeatLevel(30, 0)).toBe(0);
+  });
+});
+
+describe("focusByTask", () => {
+  it("많은 것부터, 몫과 함께", () => {
+    const rows = [
+      { session: { ...session("a", []), taskId: "t1" }, ms: 3600000 },
+      { session: { ...session("b", []), taskId: "t2" }, ms: 1200000 },
+      { session: { ...session("c", []), taskId: "t1" }, ms: 1200000 },
+    ];
+    const shares = focusByTask(rows);
+    expect(shares.map((s) => s.taskId)).toEqual(["t1", "t2"]);
+    expect(shares[0].seconds).toBe(4800);
+    expect(shares[0].share).toBeCloseTo(4800 / 6000, 5);
+  });
+
+  it("작업 없는 세션은 하나로 모인다", () => {
+    const rows = [
+      { session: { ...session("a", []), taskId: null }, ms: 600000 },
+      { session: { ...session("b", []), taskId: "" as unknown as null }, ms: 600000 },
+    ];
+    expect(focusByTask(rows)).toEqual([{ taskId: null, seconds: 1200, share: 1 }]);
+  });
+
+  it("세지 않는 줄은 빼고 센다", () => {
+    expect(focusByTask([{ session: session("a", []), ms: 0 }])).toEqual([]);
   });
 });

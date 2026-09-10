@@ -22,6 +22,11 @@ import {
   focusRecords,
   focusPeriodRange,
   focusTimelineSpans,
+  focusDailyTotals,
+  focusHeatmapWeeks,
+  focusTrendDays,
+  focusHeatLevel,
+  focusByTask,
   type FocusPeriod,
 } from "../domain/focus/records";
 import { visibleQueue } from "../domain/focus/queue";
@@ -394,6 +399,72 @@ export function FocusPage({
       ? l(`${previousLabel}보다 ${delta}% 더 집중했어요`, `${delta}% more than ${previousLabel}`)
       : l(`${previousLabel}보다 ${-delta}% 적어요`, `${-delta}% less than ${previousLabel}`);
   })();
+  /* 작업별 몫 — 같은 rows 를 다시 접는다. 새 집계 모델을 만들지 않는다. */
+  const byTask = useMemo(() => focusByTask(rows).slice(0, 6), [rows]);
+  /* 히트맵과 추이는 고른 기간이 아니라 그 **끝을 기준으로 한 최근 N** 을 본다 —
+     카드가 "최근 4주" 라고 말하기 때문이다. 날짜 내비를 옮기면 이 기준도 함께
+     옮겨서 화면의 모든 조각이 같은 순간을 이야기한다. */
+  const anchor = period === "all" ? today : to > today ? today : to;
+  const heatWeeks = useMemo(() => focusHeatmapWeeks(anchor, 4), [anchor]);
+  const trendDays = useMemo(() => focusTrendDays(anchor, 7), [anchor]);
+  const patternTotals = useMemo(
+    () => focusDailyTotals(focusSessions, heatWeeks[0][0], anchor, timezone),
+    [focusSessions, heatWeeks, anchor, timezone],
+  );
+  const heatMax = useMemo(
+    () => Math.max(0, ...heatWeeks.flat().map((d) => patternTotals[d] ?? 0)),
+    [heatWeeks, patternTotals],
+  );
+  /* 축의 위쪽 끝. 두 가지를 맞춘다.
+
+     하나는 바닥이다 — 1시간을 최소로 두지 않으면 30분짜리 하루가 축을 가득
+     채워서 "많이 했다" 로 읽힌다.
+
+     또 하나는 눈금이 **읽히는 수**여야 한다는 것이다. 최댓값을 그냥 셋으로
+     나누면 2.6h·1.7h·0.9h 같은 눈금이 나온다. 한 단을 30분의 배수로 올려서
+     0·1h·2h·3h 처럼 세게 만든다. */
+  const trendStep = Math.max(
+    1800,
+    Math.ceil(Math.max(3600, ...trendDays.map((d) => patternTotals[d] ?? 0)) / 3 / 1800) * 1800,
+  );
+  const trendMax = trendStep * 3;
+  const trendTick = (seconds: number) =>
+    seconds === 0
+      ? "0"
+      : seconds % 3600 === 0
+        ? `${seconds / 3600}h`
+        : `${(seconds / 3600).toFixed(1)}h`;
+  const trendPoints = useMemo(() => {
+    const left = 60,
+      right = 830,
+      top = 24,
+      bottom = 138;
+    const weekday = new Intl.DateTimeFormat(lang === "ko" ? "ko-KR" : "en-US", {
+      timeZone: "UTC",
+      weekday: "short",
+    });
+    return trendDays.map((date, index) => {
+      const seconds = patternTotals[date] ?? 0;
+      return {
+        date,
+        seconds,
+        last: index === trendDays.length - 1,
+        x: left + ((right - left) * index) / Math.max(1, trendDays.length - 1),
+        y: bottom - (bottom - top) * Math.min(1, seconds / trendMax),
+        label: `${weekday.format(new Date(`${date}T12:00:00Z`))} ${Number(date.slice(8))}`,
+      };
+    });
+  }, [trendDays, patternTotals, trendMax, lang]);
+  const trendLine = trendPoints
+    .map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+    .join(" ");
+  const trendArea = trendPoints.length
+    ? `${trendLine} L${trendPoints[trendPoints.length - 1].x.toFixed(1)} 138 L${trendPoints[0].x.toFixed(1)} 138 Z`
+    : "";
+  const trendSummary = l(
+    `최근 7일 집중 시간. 마지막 날 ${formatFocusDuration(trendPoints[trendPoints.length - 1]?.seconds ?? 0, true)}`,
+    `Focus over the last 7 days. Latest ${formatFocusDuration(trendPoints[trendPoints.length - 1]?.seconds ?? 0, true)}`,
+  );
   const rangeLabel = useMemo(() => {
     if (period === "all") return l("전체 기간", "All time");
     const locale = lang === "ko" ? "ko-KR" : "en-US";
@@ -1115,6 +1186,53 @@ export function FocusPage({
             </div>
           </section>
 
+          {/* 왼쪽이 합계, 오른쪽이 낱개다. 막대가 "오늘의 집중이 어디에 쓰였나" 를
+              한 화면으로 답하고 목록이 "언제 무엇을 했나" 로 그것을 펼친다 —
+              위의 KPI → 타임라인이 이미 그린 순서를 한 번 더 쓴다. */}
+          <div className="focus-record-pair">
+          <section className="focus-card" aria-label={l("작업별 집중 시간", "Focus by task")}>
+            <header className="focus-card-head">
+              <div>
+                <h2>{l("작업별 집중 시간", "Focus by task")}</h2>
+                <p>{l("이 기간의 집중이 어떤 작업에 쓰였는지", "Where the period's focus went")}</p>
+              </div>
+            </header>
+            {!byTask.length ? (
+              <p className="focus-record-empty">
+                {l("아직 나눌 집중이 없어요.", "Nothing to break down yet.")}
+              </p>
+            ) : (
+              <div className="focus-bars">
+                {byTask.map((row) => {
+                  const name =
+                    (row.taskId && tasks.find((t) => t.id === row.taskId)?.title) ||
+                    l("작업 미지정", "No task assigned");
+                  return (
+                    <div className="focus-bar-row" key={row.taskId ?? "none"}>
+                      <div className="focus-bar-top">
+                        <span className="focus-bar-name" title={name}>
+                          {name}
+                        </span>
+                        <span>
+                          <b>{formatFocusDuration(row.seconds, true)}</b>{" "}
+                          <small>{Math.round(row.share * 100)}%</small>
+                        </span>
+                      </div>
+                      {/* 막대는 단색이다 (§5.3) — 이름이 이미 각 줄을 구별한다. */}
+                      <div
+                        className="focus-bar"
+                        role="img"
+                        aria-label={`${name} ${formatFocusDuration(row.seconds, true)} (${Math.round(row.share * 100)}%)`}
+                      >
+                        <span style={{ width: `${Math.max(row.share * 100, 1)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
           <section className="focus-card" aria-label={l("세션 기록", "Session records")}>
             <header className="focus-card-head">
               <div>
@@ -1191,6 +1309,107 @@ export function FocusPage({
                 </button>
               </div>
             )}
+          </section>
+          </div>
+
+          {/* 집중 패턴 — 전폭이다. 히트맵은 셀 크기가 정해지면 폭이 정해지므로
+              `auto`, 남는 전부는 추이가 가진다. 격자는 셀이 커진다고 더 읽히지
+              않지만 선은 가로가 길수록 기울기가 읽힌다. */}
+          <section className="focus-card" aria-label={l("집중 패턴", "Focus pattern")}>
+            <header className="focus-card-head">
+              <div>
+                <h2>{l("집중 패턴", "Focus pattern")}</h2>
+                <p>
+                  {l("최근 4주의 패턴과 지난 7일의 추이", "The last four weeks, and the last seven days")}
+                </p>
+              </div>
+            </header>
+            <div className="focus-pattern">
+              <div className="focus-heatwrap">
+                <div>
+                  <div className="focus-heat-days" aria-hidden="true">
+                    <span />
+                    {[
+                      l("월", "M"), l("화", "T"), l("수", "W"), l("목", "T"),
+                      l("금", "F"), l("토", "S"), l("일", "S"),
+                    ].map((d, i) => (
+                      <span key={i}>{d}</span>
+                    ))}
+                  </div>
+                  {heatWeeks.map((week) => (
+                    <div className="focus-heat-row" key={week[0]}>
+                      <span className="focus-heat-label">
+                        {week[0].slice(5).replace("-", ".")} –{" "}
+                        {week[6].slice(5).replace("-", ".")}
+                      </span>
+                      {week.map((date) => {
+                        const seconds = patternTotals[date] ?? 0;
+                        const level = focusHeatLevel(seconds, heatMax);
+                        return (
+                          <span
+                            key={date}
+                            className={`focus-heat-cell is-${level}`}
+                            title={`${date} · ${seconds ? formatFocusDuration(seconds, true) : l("기록 없음", "No focus")}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                  {/* 순차 램프에는 스케일 범례가 붙는다 (§5.3). */}
+                  <p className="focus-heat-legend">
+                    {l("적음", "Less")}
+                    {[0, 1, 2, 3, 4].map((level) => (
+                      <i key={level} className={`focus-heat-cell is-${level}`} />
+                    ))}
+                    {l("많음", "More")}
+                  </p>
+                </div>
+              </div>
+              <div className="focus-trend">
+                <h3>{l("최근 7일 집중 시간", "Focus over the last 7 days")}</h3>
+                <svg viewBox="0 0 860 186" role="img" aria-label={trendSummary}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <line
+                      key={i}
+                      className="focus-trend-grid"
+                      x1="44"
+                      x2="850"
+                      y1={24 + i * 38}
+                      y2={24 + i * 38}
+                    />
+                  ))}
+                  {[3, 2, 1, 0].map((step, i) => (
+                    <text key={step} className="focus-trend-axis" x="22" y={28 + i * 38}>
+                      {trendTick(step * trendStep)}
+                    </text>
+                  ))}
+                  <path className="focus-trend-area" d={trendArea} />
+                  <path className="focus-trend-line" d={trendLine} />
+                  {trendPoints.map((point) => (
+                    <circle
+                      key={point.date}
+                      className="focus-trend-mark"
+                      cx={point.x}
+                      cy={point.y}
+                      r={point.last ? 5 : 4}
+                    >
+                      <title>{`${point.date} · ${point.seconds ? formatFocusDuration(point.seconds, true) : l("기록 없음", "No focus")}`}</title>
+                    </circle>
+                  ))}
+                  {trendPoints.map((point) => (
+                    <text
+                      key={`x-${point.date}`}
+                      className="focus-trend-axis"
+                      x={point.x}
+                      y="168"
+                      textAnchor="middle"
+                    >
+                      {point.label}
+                    </text>
+                  ))}
+                </svg>
+              </div>
+            </div>
           </section>
         </section>
       )}
