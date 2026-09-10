@@ -376,7 +376,7 @@ export const ko: Dictionary = {
   "settings.google.alignTimezone": "시간대 맞추기",
   "googleTask.occurrenceChanged": "Google에서 ‘{{title}}’의 {{date}} 회차가 변경되거나 취소되어 앱의 변경을 보내지 않았습니다. 두 캘린더의 해당 회차를 확인해 주세요. 회차 충돌의 자동 해결은 아직 지원하지 않습니다.",
   "settings.google.aligningTimezone": "시간대 맞추는 중…",
-  "settings.google.timezoneHint": "Google 동기화 시간대를 앱 설정({{timezone}})에 맞춥니다. 다음 동기화에서 가져온 일정의 시각을 다시 확인합니다.",
+  "settings.google.timezoneHint": "구글 동기화는 {{pinned}} 로 고정돼 있는데 이 계정은 {{timezone}} 로 계획합니다. 맞추기 전까지 구글에서 오는 일정은 틀린 시각으로 저장됩니다.",
   "settings.google.timezoneAligned": "Google 동기화 시간대를 {{timezone}}에 맞췄습니다. 동기화 후 수정된 작업의 검토가 필요할 수 있습니다.",
   "settings.google.error.syncInProgress": "동기화가 진행 중입니다. 완료된 뒤 시간대 맞추기를 다시 시도해 주세요.",
   "settings.google.error.outboundInFlight": "Google에 변경 사항을 보내는 중입니다. 완료된 뒤 다시 시도해 주세요.",

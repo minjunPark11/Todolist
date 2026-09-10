@@ -39,7 +39,9 @@ afterEach(cleanup);
 const mount = () => render(<I18nProvider lang="en"><GoogleCalendarCard /></I18nProvider>);
 
 it("aligns the existing calendar to the selected zone and prevents overlapping actions", async () => {
-  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email" });
+  // The pinned zone has to disagree for the action to be offered at all — see
+  // the visibility tests at the end of this file.
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email", syncTimezone: "Europe/London" });
   let complete!: () => void;
   mocks.align.mockImplementationOnce(() => new Promise<void>((resolve) => { complete = resolve; }));
   render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Shanghai" /></I18nProvider>);
@@ -56,7 +58,7 @@ it("aligns the existing calendar to the selected zone and prevents overlapping a
 
 it("keeps the connection and offers retry after unresolved reviews block alignment", async () => {
   const { GoogleCalendarError } = await import("../../lib/googleCalendar");
-  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email" });
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email", syncTimezone: "Europe/London" });
   mocks.align.mockRejectedValueOnce(new GoogleCalendarError("reviewsUnresolved", "blocked"));
   render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
   fireEvent.click(await screen.findByRole("button", { name: "Align time zone" }));
@@ -183,4 +185,69 @@ it("explains unsupported labels and reports manual sync progress", async () => {
   expect(screen.getByText("Events synced.")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Sync now" }).hasAttribute("disabled")).toBe(false);
   window.removeEventListener(GOOGLE_SYNC_REQUESTED, requested);
+});
+
+// When the alignment is offered at all.
+//
+// Unconditionally it is a button that re-reads the whole calendar for no
+// reason, and it says nothing about whether anything is wrong. The pinned zone
+// disagreeing with the account's is the one failure in this sync that is
+// otherwise silent — events arrive at the wrong hour and every screen is
+// internally consistent about it, because both numbers are right in their own
+// zone. Naming the pinned zone is the diagnosis, so the row IS the feature and
+// the button is only its verb.
+const ALIGN = { name: "Align time zone" };
+
+it("names the pinned zone when it disagrees with the account's", async () => {
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Europe/London" });
+  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  const note = await screen.findByText(/pinned to Europe\/London/);
+  expect(note.textContent).toContain("Asia/Seoul");
+  expect(screen.getByRole("button", ALIGN)).toBeTruthy();
+});
+
+it("stays quiet when the two already agree", async () => {
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Asia/Seoul" });
+  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  await screen.findByRole("button", { name: "Sync now" });
+  expect(screen.queryByRole("button", ALIGN)).toBeNull();
+});
+
+it("stays quiet when the connection predates the pinned zone", async () => {
+  // "" is what a row written before `sync_timezone` existed reads as. Offering
+  // to change a zone nobody can see would be asking about something invisible.
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "" });
+  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  await screen.findByRole("button", { name: "Sync now" });
+  expect(screen.queryByRole("button", ALIGN)).toBeNull();
+});
+
+it("stays quiet when the account has no zone of its own to offer", async () => {
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Europe/London" });
+  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="" /></I18nProvider>);
+  await screen.findByRole("button", { name: "Sync now" });
+  expect(screen.queryByRole("button", ALIGN)).toBeNull();
+});
+
+it("drops the warning once the connection reports the new zone", async () => {
+  // Read back rather than assumed: hiding the card's own warning on an
+  // assumption would be claiming an alignment it never confirmed.
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Europe/London" });
+  mocks.align.mockImplementationOnce(async () => {
+    mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Asia/Seoul" });
+  });
+  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  fireEvent.click(await screen.findByRole("button", ALIGN));
+  await waitFor(() => expect(screen.queryByRole("button", ALIGN)).toBeNull());
+  expect(await screen.findByText(/Google sync time zone is now Asia\/Seoul/)).toBeTruthy();
+});
+
+it("keeps the warning when the server accepted nothing", async () => {
+  // The read is the card's only evidence. An unchanged zone means the warning
+  // still applies, whatever the call returned.
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Europe/London" });
+  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  fireEvent.click(await screen.findByRole("button", ALIGN));
+  await screen.findByText(/Google sync time zone is now Asia\/Seoul/);
+  expect(screen.getByRole("button", ALIGN)).toBeTruthy();
 });
