@@ -249,3 +249,20 @@ it("keeps the function away from the roles the app runs as", async () => {
   }
   await db.exec("reset role;");
 });
+
+it("applies the complete rollout over the old repin function and prevents legacy picker rebinding", async () => {
+  await connectedInLondon();
+  const before = await connection();
+  await db.exec("begin");
+  try {
+    for (const file of ["041_google_version_restore.sql", "042_google_repeat_baseline.sql", "043_google_deletion_review.sql", "044_google_timezone_compatibility.sql"]) {
+      await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8").replace(/^begin;\s*$/gm, "").replace(/^commit;\s*$/gm, ""));
+    }
+    await db.query("insert into settings(id,user_id,data) values('app_settings',$1,'{\"appSettings\":{\"timezone\":\"Asia/Shanghai\"}}')", [user]);
+    expect((await bind("UTC")).bound).toBe(true);
+    const after = await connection();
+    expect(after.sync_timezone).toBe("Europe/London");
+    expect(after.connection_generation).toBe(before.connection_generation);
+    expect(after.sync_token).toBe(before.sync_token);
+  } finally { await db.exec("rollback"); }
+});
