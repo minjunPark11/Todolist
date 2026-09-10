@@ -29,6 +29,7 @@ const LIST = { id: "list-radius", name: "Radius" };
 // several of these paint their shape onto an unclassed child, and a check that
 // only read the element it landed on would report that child as an offender.
 const ALLOWED_OFF_SCALE = [
+  ".ff-toggle", // a switch uses a pill track and circular thumb to express its two positions
   ".gcal-col-date", // a calendar day is a circle wherever this idiom appears (V-Q3)
   ".gcal-mini-day", // the same idiom, in the mini month
   ".gcal-cat-badge", // §11.2 keeps the pill for badges and counts
@@ -152,6 +153,17 @@ test.describe("the radius scale (§11.39)", () => {
       const offenders = await offScaleShapes(page, SCALE, ALLOWED_OFF_SCALE);
       expect(offenders, `${route} draws a shape outside {${SCALE.join(", ")}}`).toEqual([]);
     }
+  });
+
+  test("settings switches retain their pill track and circular thumb", async ({ page }) => {
+    await openApp(page);
+    await page.goto("/settings");
+    await expectPill(page, ".ff-toggle");
+    const thumb = page.locator(".ff-toggle-knob").first();
+    await expect(thumb).toHaveCSS("border-radius", "50%");
+    const box = await thumb.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBe(box!.height);
   });
 
   test("the layers that open over the app are on it too", async ({ page }) => {
