@@ -55,9 +55,16 @@ export function GoogleTaskReviewPanel() {
     <h4>{t("googleTask.title")} <span>({reviews.filter(r => r.decision.reason !== "excluded").length + repeatChanges.length + transfers.length
       + (state.occurrenceConflicts?.length ?? 0)})</span></h4>
     <p className="ff-settings-note">{t("googleTask.policy")}</p>
+    {/* A failure that the list below explains does not send anyone to their
+        network settings. "Check the connection" was the sentence shown while
+        four device conflicts — sitting twenty pixels lower, on this very
+        screen — were the whole reason nothing would sync. */}
     {state.error && <p role="alert">
-      {t(state.error === "changed" ? "googleTask.changed" : "googleTask.failed")}
-      {state.errorDetail ? <span className="ff-google-review-detail"> ({state.errorDetail})</span> : null}
+      {state.error === "changed" ? t("googleTask.changed")
+        : state.localConflicts?.length ? t("googleTask.blockedByConflicts", { count: state.localConflicts.length })
+        : t("googleTask.failed")}
+      {state.errorDetail && !state.localConflicts?.length
+        ? <span className="ff-google-review-detail"> ({state.errorDetail})</span> : null}
     </p>}
     {/* Not an alert and not tied to `error`: the pass that found these
         finished, and everything it did not name was sent. Each one is a

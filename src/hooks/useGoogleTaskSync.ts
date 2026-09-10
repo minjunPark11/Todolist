@@ -6,7 +6,8 @@ import { GoogleTaskSelectionChanged, runGoogleTaskCycle, type GoogleTaskChoice, 
 import { publishGoogleTaskSync, readGoogleTaskSyncState, type LocalTaskConflict } from "../lib/googleTaskSyncState";
 import type { Task } from "../types";
 
-interface Input { enabled: boolean; accountKey: string; tasks: Task[]; bridge: <T>(work: (userId: string) => Promise<T>) => Promise<T>;
+interface Input { enabled: boolean; accountKey: string; tasks: Task[];
+  bridge: <T>(work: (userId: string, blockedTaskIds: string[]) => Promise<T>) => Promise<T>;
   conflicts: () => LocalTaskConflict[]; resolveConflict: (id: string, choice: "local" | "remote" | "copy", expected: LocalTaskConflict) => Promise<void> }
 export function useGoogleTaskSync(input: Input) {
   const latest = useRef(input); latest.current = input;
@@ -18,7 +19,7 @@ export function useGoogleTaskSync(input: Input) {
     publishGoogleTaskSync({ ...readGoogleTaskSyncState(), enabled: true, busy: true, error: "", errorDetail: undefined, occurrenceConflicts: undefined });
     let ok = false;
     try {
-      const result = await latest.current.bridge(async userId => {
+      const result = await latest.current.bridge(async (userId, blockedTaskIds) => {
         const { data } = await supabase!.auth.getSession(); const session = data.session;
         if (!session || session.user.id !== userId || !valid()) throw new Error("Account changed.");
         const { data: connection, error } = await supabase!.from("google_calendar_connections").select("connection_generation").eq("user_id", userId).maybeSingle();
@@ -45,7 +46,7 @@ export function useGoogleTaskSync(input: Input) {
         };
         return navigator.locks.request(`focusflow.google-cycle:${userId}`, { ifAvailable: true }, async lock => {
           if (!lock) throw new Error("Google task sync is running in another window.");
-          return runGoogleTaskCycle({ userId, generation, accessToken: token.accessToken }, deps, choice);
+          return runGoogleTaskCycle({ userId, generation, accessToken: token.accessToken, blockedTaskIds }, deps, choice);
         });
       });
       // The conflicts come off a pass that FINISHED. They are not an error:

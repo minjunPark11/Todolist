@@ -141,3 +141,31 @@ it("moves unsent content to trash when Google cancels, retaining the edited titl
   expect(result.current.tasks[0]).toMatchObject({ title: "Unsent title", deletedAt: "2026-09-09" });
   expect(result.current.taskSyncConflicts()).toHaveLength(0);
 });
+
+it("keeps letting Google sync run while a conflict waits on a person, and names it", async () => {
+  // Four device conflicts used to close this bridge outright, which froze the
+  // whole Google cycle: reviews could not be answered and the sync time zone
+  // could not be re-pinned, for as long as nobody noticed the four. A conflict
+  // waits on a person; nothing else should wait behind it.
+  const { result } = renderHook(() => usePlannerData());
+  await waitFor(() => expect(result.current.auth.remoteDataReady).toBe(true));
+
+  // Make one, exactly the way the previous test does.
+  await act(async () => { await result.current.withGoogleTaskSync(async () => {
+    result.current.updateTask("t", { title: "Typing" });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    serverTask = { ...serverTask, title: "From Google" }; revision++;
+  }); });
+  expect(result.current.taskSyncConflicts()).toHaveLength(1);
+
+  // The next pass runs anyway, and hands the contested id to the cycle so it
+  // can leave that one task alone.
+  let ran = false, named: string[] = [];
+  await act(async () => { await result.current.withGoogleTaskSync(async (_userId, blockedTaskIds) => {
+    ran = true; named = blockedTaskIds;
+  }); });
+  expect(ran).toBe(true);
+  expect(named).toEqual(["t"]);
+  // And the question is still open — running past it is not answering it.
+  expect(result.current.taskSyncConflicts()).toHaveLength(1);
+});

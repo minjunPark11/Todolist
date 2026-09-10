@@ -134,6 +134,41 @@ describe("durable task revision session", () => {
     expect(() => createTaskRevisionSession("other", f.deps, f.checkpoint)).toThrow("Invalid");
     expect(() => f.session.adopt({ ...f.snapshot, userId: "other" })).toThrow("Account changed");
   });
+  it("separates work waiting on a person from work waiting on the network", async () => {
+    // `preserveConflict` parks a contested edit in `pending` as well as in
+    // `conflicts`, so `hasPending` stays true until somebody picks a version.
+    // Anything asking "is there still something to send?" in order to decide
+    // whether to WAIT gets the wrong answer from it — a conflict does not
+    // clear itself, and waiting on one waits forever. That is what froze
+    // Google sync behind four device conflicts.
+    const f = fixture(); await f.session.refresh();
+    f.session.capture([{ ...original, title: "Mine" }]);
+    f.snapshot.rows[0] = { id: "t", revision: 5, data: { ...original, title: "Theirs" } };
+    await f.session.refresh();
+    await expect(f.session.flush()).rejects.toBeInstanceOf(TaskRevisionBlocked);
+
+    expect(f.session.hasConflicts).toBe(true);
+    expect(f.session.hasPending).toBe(true);       // parked, and it always will be
+    expect(f.session.hasUnsentEdits).toBe(false);  // nothing the network can finish
+  });
+
+  it("counts an edit to an uncontested task as still unsent", async () => {
+    const f = fixture(); await f.session.refresh();
+    f.session.capture([{ ...original, title: "Mine" }, { id: "other", title: "Untouched elsewhere" }]);
+    f.snapshot.rows[0] = { id: "t", revision: 5, data: { ...original, title: "Theirs" } };
+    await f.session.refresh();
+    f.failPersist = false;
+    // The second row writes; the first is contested. Only the contested one
+    // is left parked, so once flush has run there is nothing unsent.
+    await expect(f.session.flush()).rejects.toBeInstanceOf(TaskRevisionBlocked);
+    expect(f.session.hasUnsentEdits).toBe(false);
+    expect(f.snapshot.rows.some((r) => r.id === "other")).toBe(true);
+
+    // A fresh edit to a task nobody is arguing about is unsent again.
+    f.session.capture([...f.session.visibleTasks().filter((t) => t.id !== "other"), { id: "other", title: "Changed again" }]);
+    expect(f.session.hasUnsentEdits).toBe(true);
+  });
+
   it("accepts convergent content and handles arbitrary task IDs as data", async () => {
     const f = fixture(); await f.session.refresh();
     f.session.capture([{ ...original, title: "Same" }, { id: "__proto__", title: "Safe ID" }]);

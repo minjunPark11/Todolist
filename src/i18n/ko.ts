@@ -28,6 +28,7 @@ export const ko: Dictionary = {
   "googleTask.policy": "서로 다르게 수정된 내용은 버전을 선택할 때까지 보존됩니다.",
   "googleTask.changed": "내용이 변경되었습니다. 새로고침한 뒤 최신 내용을 다시 확인해 주세요.",
   "googleTask.failed": "동기화를 마치지 못했습니다. 편집은 보존되어 있습니다. 연결을 확인하고 다시 시도해 주세요.",
+  "googleTask.blockedByConflicts": "아래 {{count}}개의 충돌 때문에 동기화가 기다리고 있습니다. 편집은 보존되어 있습니다. 각각 버전을 고르면 이어집니다.",
   "googleTask.busy": "동기화 중…",
   "googleTask.refresh": "새로고침 및 동기화",
   "googleTask.pending": "Google 쓰기 결과가 아직 확인되지 않았습니다. 다음 쓰기 전에 결과를 확인해 주세요.",

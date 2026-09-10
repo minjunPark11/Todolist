@@ -37,8 +37,22 @@ export interface GoogleTaskCycleResult {
 }
 
 /** The planner bridge drains local task writes before entering and adopts revisions after returning. */
-export async function runGoogleTaskCycle(request: { userId: string; generation: string; accessToken: string },
+export async function runGoogleTaskCycle(request: { userId: string; generation: string; accessToken: string;
+  /**
+   * Tasks a person has not finished deciding about.
+   *
+   * A device conflict parks two versions of one task and waits for someone to
+   * pick. The remote row is one of those two, so sending it to Google would
+   * answer the question on their behalf — quietly, and in favour of whichever
+   * side happens to be in the database. The cycle runs; these sit it out.
+   *
+   * The rest of the pass is not held up by them. Four contested tasks used to
+   * stop Google sync altogether, which left reviews unanswerable and the sync
+   * time zone unpinnable for as long as nobody noticed the four.
+   */
+  blockedTaskIds?: readonly string[] },
   deps: GoogleTaskCoordinatorDeps, choice?: GoogleTaskChoice): Promise<GoogleTaskCycleResult> {
+  const blocked = new Set(request.blockedTaskIds ?? []);
   const call = async (name: string, args: Record<string, unknown>) => { await deps.assertCurrent(); return deps.rpc(name, args); };
   const snapshot = async () => parseGoogleTaskSnapshot(await call("read_google_task_sync_snapshot", { p_generation: request.generation }), request.userId, request.generation);
   // Resolve ambiguous database replies with exactly the same durable request first.
@@ -127,6 +141,7 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
     }
     // Bounded pass: remaining items are retried on the next timer/manual request.
     const candidates = current.snapshots.filter(s => {
+      if (blocked.has(s.taskId)) return false;
       const r = current.records.find(r=>r.eventId===s.eventId && r.decision.kind==='keep-local');
       return r && planTaskOutbound({ scope: current.scope, snapshot: s, source: r.source, timezone: current.timezone }).action.kind === 'patch';
     });
@@ -143,10 +158,11 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
       if (await deps.dispatch(id) === "pending") return { snapshot: await snapshot(), pending: true };
     }
     const lifecycle = [
-      ...current.snapshots.filter(s => s.eventId && (s.state === "trashed" || s.state === "deleted") && s.remoteDeleted === false && !s.locallyRestored &&
+      ...current.snapshots.filter(s => s.eventId && !blocked.has(s.taskId) && (s.state === "trashed" || s.state === "deleted") && s.remoteDeleted === false && !s.locallyRestored &&
         current.records.some(r => r.eventId === s.eventId && r.decision.reason !== 'excluded'))
         .map(s => ({ kind: "delete", taskId: s.taskId, eventId: s.eventId })),
       ...[...current.tasks].filter(([id, row]) => {
+        if (blocked.has(id)) return false;
         const mappings = current.snapshots.filter(s => s.taskId === id && s.eventId);
         const fields = current.snapshots.find(s => s.taskId === id)?.fields;
         return !(row.data.occurrenceOf && row.data.recurrenceId) && !row.data.deletedAt && !["abandoned", "given_up"].includes(String(row.data.status)) &&
@@ -176,6 +192,7 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
     // These become the same kind of thing.
     const occurrenceConflicts: { title: string; date: string }[] = [];
     for (const candidate of occurrenceCandidates(current).slice(0, 30)) {
+      if (blocked.has(candidate.taskId) || blocked.has(candidate.seriesId)) continue;
       try {
         await deps.assertCurrent();
         const source = await readOccurrence(candidate, current.scope.calendarId, request.accessToken, deps.fetch);

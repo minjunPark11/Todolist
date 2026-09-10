@@ -190,6 +190,22 @@ export function createTaskRevisionSession<T extends { id: string }>(
     get rows() { return state.rows; },
     get hasConflicts() { return Object.keys(state.conflicts).length > 0; },
     get hasPending() { return Object.keys(state.pending).length > 0 || Object.keys(state.inflight).length > 0; },
+    /**
+     * Work that is waiting on the network rather than on a person.
+     *
+     * `preserveConflict` parks a contested edit in `pending` as well as in
+     * `conflicts`, so `hasPending` stays true for as long as nobody picks a
+     * version. Anything that asks "is there still something to send?" in order
+     * to decide whether to WAIT gets the wrong answer from it: a conflict is
+     * not going to clear itself, and waiting on one is waiting forever.
+     *
+     * `flush` already writes every uncontested row before it raises, so once
+     * it has run, what is left here is the true answer.
+     */
+    get hasUnsentEdits() {
+      return Object.keys(state.inflight).length > 0
+        || Object.keys(state.pending).some((id) => !state.conflicts[id]);
+    },
     get checkpoint() { return state; },
     get busy() { return busy; },
   };
