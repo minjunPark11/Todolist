@@ -145,7 +145,7 @@ test("link, relink and delete preserve the task contribution balance",async({pag
   await page.goto("/focus"); await page.getByRole("button",{name:"Start focus",exact:true}).click();
   await expect(page.getByText("Focusing",{exact:true})).toBeVisible();  await page.clock.runFor(18000);
   await page.getByRole("button",{name:"Finish",exact:true}).click();
-  await page.locator(".focus-result .focus-picker-trigger").click();
+  await page.locator(".focus-anchor").click();
   await page.locator(".focus-choice-list").getByRole("button",{name:/Focus task A/}).click();
   let d=await store(page); const seconds=d.focusSessions[0].accumulatedSeconds;
   expect(d.tasks.find((t:{title:string})=>t.title==="Focus task A").actualSeconds).toBe(seconds);

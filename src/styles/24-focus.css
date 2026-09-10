@@ -1,6 +1,9 @@
 /* Timer numerals are a display, not body typography. They hold a stable clock-sized area. */
 .focus-page-v2 {
-  --focus-clock-display: clamp(66px, 7.2vw, 96px);
+  /* 시계는 타입 스케일 밖의 디스플레이 값이므로, 새 값을 발명하는 것이 아니라
+     이 토큰을 올린다. 170 은 1024×720 에서 다른 요소를 밀어내고, 88 하한은 좁은
+     폭에서 `00:00` 이 한 줄에 들어가는 값이다 (§6.2). */
+  --focus-clock-display: clamp(88px, 10vw, 140px);
 }
 .focus-page-v2 {
   width: 100%;
@@ -147,6 +150,39 @@
   min-height: 52px;
   text-align: left;
 }
+
+/* 앵커 — 시계가 무엇을 재는지 말하는 한 줄. 알약인 것은 I1 이 `--radius-pill` 을
+   '모서리가 아니라 형태' 로 남겨둔 자리이기 때문이다. */
+.focus-page-v2 .focus-anchor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: min(100%, 520px);
+  min-height: 36px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: var(--type-md);
+  font-weight: var(--weight-medium);
+}
+.focus-anchor > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.focus-anchor-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+/* 세션 중에는 읽기 전용이다. `<p>` 이므로 버튼 규칙이 닿지 않아 여백만 맞춘다. */
+.focus-page-v2 .focus-anchor.is-static {
+  margin: 0;
+}
 .focus-picker-trigger span:first-of-type {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -160,11 +196,12 @@
 }
 .focus-time {
   font-size: var(--focus-clock-display);
-  font-weight: 600;
+  /* 큰 숫자는 얇다 (§6.1). 400 은 로드된 세 페이스 중 하나이므로 자 안이다. */
+  font-weight: var(--weight-normal);
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.045em;
-  min-height: 120px;
+  min-height: 148px;
   max-width: 100%;
   white-space: nowrap;
 }
@@ -201,6 +238,19 @@
   background: transparent;
   color: var(--text-secondary);
   font-size: var(--type-lg);
+}
+/* 주 버튼 아래의 중립 액션들. 색이 아니라 자리와 크기가 위계를 만든다. */
+.focus-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+}
+.focus-page-v2 .focus-secondary button {
+  min-width: 0;
+  padding: 10px 0;
+  font-size: var(--type-md);
 }
 .focus-muted {
   color: var(--text-secondary);
@@ -321,15 +371,34 @@
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+/* 셋이 한 색을 쓰고 있었다 — 저장 실패와 세션 복구와 안내가 전부
+   `--color-primary-tint` 였고, 그건 측정 토글의 트랙과도 같은 색이었다.
+   자리는 공유하되 색은 각자 의미를 진다 (§4 규칙 3). */
 .focus-error,
-.focus-recovery {
+.focus-recovery,
+.focus-notice {
   margin: 16px auto;
   padding: 16px;
   max-width: 640px;
-  background: var(--color-primary-tint);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   font-size: var(--type-lg);
   line-height: 1.6;
+}
+/* 실패는 danger 다. */
+.focus-page-v2 .focus-error {
+  border-color: color-mix(in srgb, var(--danger-ink) 30%, transparent);
+  background: color-mix(in srgb, var(--danger-ink) 8%, var(--bg-surface));
+}
+/* 복구는 주의다 — 잃은 것이 있을 수 있으니 봐 달라는 말이지 실패가 아니다. */
+.focus-page-v2 .focus-recovery {
+  border-color: color-mix(in srgb, var(--warning-ink) 34%, transparent);
+  background: color-mix(in srgb, var(--warning-ink) 10%, var(--bg-surface));
+}
+/* 그리고 안내는 중립이다. 탭 잠금 같은 것은 아무것도 잘못되지 않았다. */
+.focus-page-v2 .focus-notice {
+  border-color: var(--border-subtle);
+  background: var(--bg-surface-muted);
 }
 .focus-error span {
   display: block;
@@ -528,6 +597,7 @@ body.focus-stage-visible .foc-global-bar {
   --color-primary-focus: #2997ff;
   --color-danger: #ff453a;
   --danger-ink: #ff453a;
+  --warning-ink: #ff9f0a;
 }
 .focus-immersive .focus-page-header {
   border: 0;
@@ -662,10 +732,27 @@ body.focus-stage-visible .foc-global-bar {
     height: 100%;
     min-height: 0;
     padding-bottom: 0;
-    /* 헤더는 자기 높이, 나머지 전부가 배치다. `minmax(0, 1fr)`의 0이 핵심이다 —
-       그리드 항목의 기본 `min-height: auto`는 내용 높이를 바닥으로 삼아서,
-       그것을 0으로 내리지 않으면 안쪽의 `overflow-y`가 아무 일도 하지 않는다. */
-    grid-template-rows: auto minmax(0, 1fr);
+    /* 헤더는 자기 높이, 나머지 전부가 배치다.
+       `grid-template-rows: auto minmax(0, 1fr)` 이었는데, **자식 수를 가정한 값**
+       이었다. 에러·복구·안내 배너가 붙으면 배너가 그 `minmax(0, 1fr)` 행에
+       들어앉고 — 0 이 최소값이므로 자기 내용보다 작게 눌린다. 실제로 47px 로
+       눌린 배너에서 44px 짜리 '다시 시도' 버튼이 상자 밖으로 흘러나와 아래
+       카드에 깔렸고, 클릭이 스테이지에 가로채였다 [실측].
+       그 `0` 은 안쪽 스크롤러를 위한 것이었고 그 일은 `.focus-layout` 의
+       `min-height: 0` 이 그대로 한다. 자식 수를 가정하지 않는 flex 로 바꾼다 —
+       머리와 배너는 자기 높이, 배치가 남는 전부. */
+    display: flex;
+    flex-direction: column;
+  }
+  .focus-page-v2 > .focus-layout {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  /* 배너는 눌리지 않는다. 자기 내용만큼 서고 그만큼만 차지한다. */
+  .focus-page-v2 > .focus-error,
+  .focus-page-v2 > .focus-recovery,
+  .focus-page-v2 > .focus-notice {
+    flex: 0 0 auto;
   }
 
   /* 왼쪽은 시계가 주인이라 줄어들면 안 되고, 오른쪽은 목록이라 줄어들어도

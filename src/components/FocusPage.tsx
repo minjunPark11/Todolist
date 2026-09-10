@@ -441,69 +441,86 @@ export function FocusPage({
   }
   const stage = (
     <>
-      {!activeSession && !isBreak && !result && (
-        <>
+      {/* 앵커 — 여섯 상태에서 **자리가 변하지 않는 유일한 요소**다. 유휴에서 고르는
+          자리와 세션 중에 읽는 자리가 같아야 "시계가 무엇을 재는지" 가 한 곳에서
+          답해진다. 그래서 작업명은 여기에만 있다 (§4.1). */}
+      {!isBreak &&
+        (activeSession ? (
+          /* 세션 중에는 읽기 전용. 24px 헤드라인이던 시절에는 작업을 고르지 않은
+             세션이 "No task assigned" 를 화면에서 두 번째로 큰 글자로 외쳤다.
+             측정 방식을 말하던 eyebrow 도 뺀다 — 이제 탭이 그것을 말한다. */
+          <p className="focus-anchor is-static">
+            <span className="focus-anchor-dot" aria-hidden="true" />
+            <span>{titleOf(activeSession)}</span>
+          </p>
+        ) : result ? (
           <button
-            className="focus-picker-trigger"
+            className="focus-anchor"
+            onClick={() => openPicker(result.id)}
+          >
+            <span className="focus-anchor-dot" aria-hidden="true" />
+            <span>{titleOf(result)}</span>
+            <FocusIcon name="chevron" />
+          </button>
+        ) : (
+          <button
+            className="focus-anchor"
             onClick={() => openPicker("start")}
           >
-            <FocusIcon name="search" />
+            <span className="focus-anchor-dot" aria-hidden="true" />
             <span>
               {selected?.title ??
                 l("작업 선택 (선택 사항)", "Choose a task (optional)")}
             </span>
             <FocusIcon name="chevron" />
           </button>
-          {(mode === "pomodoro" || flow) && (
-            <button
-              className="focus-text-button"
-              onClick={() => setShowSettings(true)}
-            >
-              {flow?.settings.focusMinutes ?? prefs.focusMinutes}
-              {l("분 집중", " min focus")} ·{" "}
-              {flow?.settings.shortBreakMinutes ?? prefs.shortBreakMinutes}
-              {l("분 휴식", " min break")}
-            </button>
-          )}
-        </>
+        ))}
+      {!activeSession && !isBreak && !result && (mode === "pomodoro" || flow) && (
+        <button
+          className="focus-text-button"
+          onClick={() => setShowSettings(true)}
+        >
+          {flow?.settings.focusMinutes ?? prefs.focusMinutes}
+          {l("분 집중", " min focus")} ·{" "}
+          {flow?.settings.shortBreakMinutes ?? prefs.shortBreakMinutes}
+          {l("분 휴식", " min break")}
+        </button>
       )}
+
+      {/* 시계는 자리를 지킨다. 세션이 끝나도 화면이 바뀌는 것이 아니라 이 칸의 값이
+          바뀐다 (§4.2) — 종료가 화면 전환으로 느껴지지 않게. */}
+      <div className="focus-time" aria-label={l("타이머", "Timer")}>
+        {formatFocusDuration(
+          result && !activeSession && !isBreak
+            ? result.accumulatedSeconds
+            : display,
+        )}
+      </div>
+
+      {/* 상태는 시계 아래다. 위에 두면 시계에 닿기 전에 읽어야 하는 줄이 하나 더
+          생기는데, 이 화면에서 사람이 보러 온 것은 시계다. */}
       {activeSession && (
-        <>
-          <div className="focus-session-heading">
-            <span className="focus-eyebrow">
-              {activeSession.measurementMode === "pomodoro"
-                ? l("포모도로", "Pomodoro")
-                : l("스톱워치", "Stopwatch")}
-            </span>
-            <h2>{titleOf(activeSession)}</h2>
-          </div>
-          <p className="focus-status" role="status">
-            {activeSession.recoveryRequired
-              ? l("복구됨 · 일시정지", "Recovered · Paused")
-              : activeSession.status === "paused"
-                ? l("일시정지됨", "Paused")
-                : l("집중 중", "Focusing")}
-          </p>
-        </>
+        <p className="focus-status" role="status">
+          {activeSession.recoveryRequired
+            ? l("복구됨 · 일시정지", "Recovered · Paused")
+            : activeSession.status === "paused"
+              ? l("일시정지됨", "Paused")
+              : l("집중 중", "Focusing")}
+        </p>
       )}
       {isBreak && flow && (
-        <>
-          <span className="focus-eyebrow">
-            {l("집중 기록이 저장되었어요", "Your focus has been recorded")}
-          </span>
-          <p className="focus-status" role="status">
-            {flow.phase === "break_ready"
-              ? l("휴식 준비", "Ready for a break")
-              : flow.phase === "break_paused"
-                ? l("휴식 일시정지", "Break paused")
-                : l("휴식 중", "Taking a break")}
-          </p>
-        </>
+        <p className="focus-status" role="status">
+          {flow.phase === "break_ready"
+            ? l("휴식 준비", "Ready for a break")
+            : flow.phase === "break_paused"
+              ? l("휴식 일시정지", "Break paused")
+              : l("휴식 중", "Taking a break")}
+        </p>
       )}
-      {(!result || activeSession || isBreak) && (
-        <div className="focus-time" aria-label={l("타이머", "Timer")}>
-          {formatFocusDuration(display)}
-        </div>
+      {result && !activeSession && !isBreak && (
+        <p className="focus-status" role="status">
+          {l("집중이 기록되었어요", "Focus recorded")}
+        </p>
       )}
       {activeSession ? (
         <>
@@ -526,39 +543,45 @@ export function FocusPage({
               </button>
             </div>
           )}
-          <div className="focus-main-actions">
+          {/* 주 버튼은 언제나 하나다 (§4 규칙 1). 위계가 자리에서 결정되므로
+              두 번째 액션이 색으로 눈에 띌 이유가 없다 — 지금까지는 실행 중에
+              주 버튼이 아예 없고 화면에서 가장 강한 색이 빨간 '종료' 였다. */}
+          <button
+            className="focus-primary"
+            onClick={() =>
+              run({
+                type: activeSession.status === "paused" ? "resume" : "pause",
+                id: activeSession.id,
+              })
+            }
+          >
+            <FocusIcon
+              name={activeSession.status === "paused" ? "play" : "pause"}
+            />
+            {activeSession.status === "paused"
+              ? l("재개", "Resume")
+              : l("일시정지", "Pause")}
+          </button>
+          <div className="focus-secondary">
+            {/* 종료는 danger 를 벗는다 (§4 규칙 2). 집중을 끝내는 것은 성공적
+                완료이지 파괴가 아니다 — 빨강은 되돌릴 수 없는 삭제에만 남긴다. */}
             <button
-              onClick={() =>
-                run({
-                  type: activeSession.status === "paused" ? "resume" : "pause",
-                  id: activeSession.id,
-                })
-              }
-            >
-              <FocusIcon
-                name={activeSession.status === "paused" ? "play" : "pause"}
-              />
-              {activeSession.status === "paused"
-                ? l("재개", "Resume")
-                : l("일시정지", "Pause")}
-            </button>
-            <button
-              className="focus-danger"
+              className="focus-text-button"
               onClick={() => run({ type: "finish", id: activeSession.id })}
             >
               <FocusIcon name="stop" />
-              {l("종료", "Finish")}
+              {l("세션 종료", "Finish")}
+            </button>
+            <button
+              className="focus-text-button"
+              onClick={() => setNoteId(activeSession.id)}
+            >
+              <FocusIcon name="note" />
+              {activeSession.focusNote
+                ? l("메모 있음", "Edit note")
+                : l("메모", "Note")}
             </button>
           </div>
-          <button
-            className="focus-text-button"
-            onClick={() => setNoteId(activeSession.id)}
-          >
-            <FocusIcon name="note" />
-            {activeSession.focusNote
-              ? l("메모 있음", "Edit note")
-              : l("메모", "Note")}
-          </button>
         </>
       ) : isBreak && flow ? (
         <>
@@ -590,7 +613,7 @@ export function FocusPage({
                   : l("휴식 재개", "Resume break")}
             </button>
             <button
-              className="focus-danger"
+              className="focus-text-button"
               onClick={() => {
                 run({ type: "break_end", id: flow.id });
                 setResultId(null);
@@ -621,21 +644,9 @@ export function FocusPage({
           )}
         </>
       ) : result ? (
-        <div className="focus-result">
-          <p className="focus-status" role="status">
-            {l("집중이 기록되었어요", "Focus recorded")}
-          </p>
-          <h2>
-            {formatFocusDuration(result.accumulatedSeconds)}{" "}
-            {l("기록됨", "recorded")}
-          </h2>
-          <button
-            className="focus-picker-trigger"
-            onClick={() => openPicker(result.id)}
-          >
-            <span>{titleOf(result)}</span>
-            <span>{l("작업 연결", "Link task")}</span>
-          </button>
+        /* 결과는 화면이 아니라 상태다 (§4.2). 상태 줄·앵커·시계는 위에서 이미
+           같은 자리에 값만 바꿔 그렸으므로 여기 남는 것은 액션뿐이다. */
+        <>
           <button
             className="focus-primary"
             onClick={() =>
@@ -650,17 +661,24 @@ export function FocusPage({
             <FocusIcon name="play" />
             {l("다시 집중 시작", "Focus again")}
           </button>
-          <div className="focus-main-actions">
-            <button onClick={() => setNoteId(result.id)}>
+          <div className="focus-secondary">
+            <button
+              className="focus-text-button"
+              onClick={() => setNoteId(result.id)}
+            >
               {l("메모 추가", "Edit note")}
             </button>
             {result.taskId &&
               tasks.some((t) => t.id === result.taskId && isTaskOpen(t)) && (
-                <button onClick={() => onCompleteTask(result.taskId!)}>
+                <button
+                  className="focus-text-button"
+                  onClick={() => onCompleteTask(result.taskId!)}
+                >
                   {l("작업 완료", "Complete task")}
                 </button>
               )}
             <button
+              className="focus-text-button"
               onClick={() => {
                 if (flow) run({ type: "flow_end", id: flow.id });
                 setResultId(null);
@@ -669,7 +687,7 @@ export function FocusPage({
               {l("마치기", "Done")}
             </button>
           </div>
-        </div>
+        </>
       ) : (
         <>
           <button className="focus-primary" onClick={() => start()}>
@@ -815,8 +833,10 @@ export function FocusPage({
           <button onClick={onRetry}>{l("다시 시도", "Retry")}</button>
         </div>
       )}
+      {/* 안내는 실패가 아니다 — 탭 잠금처럼 아무것도 잘못되지 않은 경우가 여기로
+          온다. 지금까지 `.focus-error` 를 입고 나왔다 (§4 규칙 3). */}
       {message && (
-        <p role="status" className="focus-error">
+        <p role="status" className="focus-notice">
           {message}
         </p>
       )}

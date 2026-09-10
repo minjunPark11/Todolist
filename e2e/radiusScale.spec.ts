@@ -39,6 +39,10 @@ const ALLOWED_OFF_SCALE = [
   ".ff-board-count", // and the one on a Matrix quadrant
   ".ff-matrix-roman", // the quadrant's numeral, the same pill as the count beside it
   ".ff-projbadge", // §11.2's pill again, this time carrying a Project's name
+  // The Focus anchor: the one line that says what the clock is measuring. A pill
+  // because I1 kept `--radius-pill` as a SHAPE rather than a corner, and this is
+  // that shape doing what it does everywhere else here — naming one thing.
+  ".focus-anchor",
   ".ff-check", // a completion control is a circle; 6px on 22px is a different control
   ".ff-color-swatch", // a colour is a dot, not a control
   ".tm-swatch", // the same dot, in the Add List dialog
