@@ -15,7 +15,7 @@ export function useGoogleTaskSync(input: Input) {
     if (!latest.current.enabled || running.current || !supabase) return;
     running.current = true; const version = epoch.current;
     const valid = () => version === epoch.current && latest.current.enabled;
-    publishGoogleTaskSync({ ...readGoogleTaskSyncState(), enabled: true, busy: true, error: "", occurrenceConflicts: undefined });
+    publishGoogleTaskSync({ ...readGoogleTaskSyncState(), enabled: true, busy: true, error: "", errorDetail: undefined, occurrenceConflicts: undefined });
     let ok = false;
     try {
       const result = await latest.current.bridge(async userId => {
@@ -50,10 +50,21 @@ export function useGoogleTaskSync(input: Input) {
       });
       // The conflicts come off a pass that FINISHED. They are not an error:
       // the occurrences they name were skipped and everything else was sent.
-      if (valid()) { publishGoogleTaskSync({ ...readGoogleTaskSyncState(), snapshot: result?.snapshot ?? null, pending: result?.pending ?? false, error: "",
+      if (valid()) { publishGoogleTaskSync({ ...readGoogleTaskSyncState(), snapshot: result?.snapshot ?? null, pending: result?.pending ?? false, error: "", errorDetail: undefined,
         occurrenceConflicts: result?.occurrenceConflicts?.length ? result.occurrenceConflicts : undefined }); ok = !result?.pending; }
     } catch (error) {
-      if (valid()) publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: error instanceof GoogleTaskSelectionChanged ? "changed" : "failed" });
+      // The thrown message travels with the verdict.
+      //
+      // "Could not finish syncing" is true of every failure and useful for
+      // none of them. A lost lease, a connection that needs attention, another
+      // window holding the lock, a snapshot that would not parse — all of them
+      // read as the same sentence, and the only way anyone learned which was
+      // to open a console. The card already does this for the OAuth `rejected`
+      // reason and for the same reason: one sentence, several fixes.
+      if (valid()) publishGoogleTaskSync({ ...readGoogleTaskSyncState(),
+        error: error instanceof GoogleTaskSelectionChanged ? "changed" : "failed",
+        errorDetail: error instanceof GoogleTaskSelectionChanged ? undefined
+          : (error instanceof Error && error.message) || undefined });
     } finally {
       running.current = false;
       if (valid()) {

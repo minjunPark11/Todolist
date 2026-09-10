@@ -55,7 +55,10 @@ export function GoogleTaskReviewPanel() {
     <h4>{t("googleTask.title")} <span>({reviews.filter(r => r.decision.reason !== "excluded").length + repeatChanges.length + transfers.length
       + (state.occurrenceConflicts?.length ?? 0)})</span></h4>
     <p className="ff-settings-note">{t("googleTask.policy")}</p>
-    {state.error && <p role="alert">{t(state.error === "changed" ? "googleTask.changed" : "googleTask.failed")}</p>}
+    {state.error && <p role="alert">
+      {t(state.error === "changed" ? "googleTask.changed" : "googleTask.failed")}
+      {state.errorDetail ? <span className="ff-google-review-detail"> ({state.errorDetail})</span> : null}
+    </p>}
     {/* Not an alert and not tied to `error`: the pass that found these
         finished, and everything it did not name was sent. Each one is a
         separate occurrence a person has to reconcile in both calendars. */}

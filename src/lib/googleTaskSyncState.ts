@@ -11,6 +11,15 @@ export interface GoogleTaskSyncState {
    */
   occurrenceConflicts?: { title: string; date: string }[];
   enabled: boolean; busy: boolean; pending: boolean; error: "" | "changed" | "failed";
+  /**
+   * What was actually thrown, when something was.
+   *
+   * `error` says which sentence to show and that sentence is the same for
+   * every cause. This is the one fact that separates them, and without it the
+   * only way to learn why a sync will not run is to open a browser console —
+   * which is not a thing to ask of the person the sync belongs to.
+   */
+  errorDetail?: string;
   snapshot: GoogleTaskSnapshot | null;
   run?: (choice?: GoogleTaskChoice) => Promise<void>;
   cancel?: (operationId: string) => Promise<void>;
