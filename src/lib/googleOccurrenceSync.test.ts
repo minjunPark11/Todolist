@@ -65,3 +65,47 @@ it("does not treat an incomplete, failed, or mismatched lookup as a successful d
     await expect(readOccurrence(candidate, "cal", "access", vi.fn().mockResolvedValue(Response.json(body)))).rejects.toThrow();
   }
 });
+
+it("names the occurrence when it is gone or doubled, so the cycle can skip just that one", async () => {
+  // These two are about ONE occurrence and nothing else. Raised as a plain
+  // Error they would end the pass, and since a skipped candidate writes no
+  // receipt it would come back identical forever — one occurrence nobody
+  // reconciles freezing every other occurrence for good.
+  const { GoogleOccurrenceChanged } = await import("./googleOccurrenceSync");
+  const [candidate] = occurrenceCandidates(snapshot());
+  const instance = (id: string) => ({ id, recurringEventId: "master",
+    originalStartTime: { dateTime: "2026-09-16T09:00:00+09:00" } });
+
+  const gone = readOccurrence(candidate, "cal", "access", vi.fn().mockResolvedValue(Response.json({ items: [] })));
+  await expect(gone).rejects.toBeInstanceOf(GoogleOccurrenceChanged);
+  await expect(gone).rejects.toMatchObject({ title: "Moved", date: "2026-09-16" });
+
+  const doubled = readOccurrence(candidate, "cal", "access",
+    vi.fn().mockResolvedValue(Response.json({ items: [instance("a"), instance("b")] })));
+  await expect(doubled).rejects.toBeInstanceOf(GoogleOccurrenceChanged);
+});
+
+it("keeps a transport failure a transport failure", async () => {
+  // Not about this occurrence, and carrying on would only produce the same
+  // failure for every candidate left in the batch. The cycle must still end.
+  const { GoogleOccurrenceChanged } = await import("./googleOccurrenceSync");
+  const [candidate] = occurrenceCandidates(snapshot());
+  for (const responder of [
+    vi.fn().mockResolvedValue(new Response("", { status: 503 })),
+    vi.fn().mockResolvedValue(Response.json({ items: "not a list" })),
+  ]) {
+    const thrown = readOccurrence(candidate, "cal", "access", responder);
+    await expect(thrown).rejects.toThrow();
+    await expect(thrown).rejects.not.toBeInstanceOf(GoogleOccurrenceChanged);
+  }
+});
+
+it("returns a cancelled instance and leaves the verdict to the caller", async () => {
+  // There was an `if` here that returned the same value in both branches. It
+  // read as a guard against patching a cancelled occurrence and guarded
+  // nothing; the cycle makes that call one line later, in one place.
+  const [candidate] = occurrenceCandidates(snapshot());
+  const cancelled = { id: "instance", status: "cancelled", recurringEventId: "master",
+    originalStartTime: { dateTime: "2026-09-16T09:00:00+09:00" } };
+  expect(await readOccurrence(candidate, "cal", "access", vi.fn().mockResolvedValue(Response.json({ items: [cancelled] })))).toEqual(cancelled);
+});

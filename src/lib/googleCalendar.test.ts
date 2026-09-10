@@ -309,3 +309,21 @@ describe("disconnecting", () => {
     await expect(disconnect(deps({ fetch: impl }))).resolves.toEqual({ revoked: false });
   });
 });
+
+describe("aligning the sync time zone", () => {
+  it("refuses an empty zone before the request rather than aligning to nothing", async () => {
+    // An empty zone is not "leave it alone" on the way down: the binding reads
+    // a missing one as "keep the calendar's own", which is the value being
+    // escaped from. Without this the call reports success and aligns nothing.
+    const { impl, calls } = fakeFetch({ "/api/google/calendar": { body: { bound: true } } });
+    await expect(alignGoogleTimezone("cal", "  ", deps({ fetch: impl })))
+      .rejects.toBeInstanceOf(GoogleCalendarError);
+    expect(calls).toEqual([]);
+  });
+
+  it("sends the zone alongside the calendar it belongs to", async () => {
+    const { impl, calls } = fakeFetch({ "/api/google/calendar": { body: { bound: true } } });
+    await alignGoogleTimezone("cal", "Asia/Seoul", deps({ fetch: impl }));
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ calendarId: "cal", timezone: "Asia/Seoul" });
+  });
+});

@@ -35,6 +35,14 @@ export async function runOccurrenceOperation(op: Record<string, unknown>, deps: 
     if (!read.ok) return await finish("rejected");
     const source = record(await read.json());
     if (source.id !== a.eventId || !matchesOccurrence(source, a.master, a.original)) return await finish("rejected");
+    // Google may say the same instant a different way than it did at
+    // reservation — a dateTime at another offset, a date where there was a
+    // dateTime — and the server compares this field as exact jsonb. Sending
+    // the reserved spelling keeps a true match from reading as false. It also
+    // means the server's originalStartTime comparison can never fail for this
+    // client: the load-bearing identity check is the instance `id`, which is
+    // Google's own and is compared untouched (037 says the same beside it).
+    // `matchesOccurrence` above is what actually verifies the occurrence.
     const normalized = (value: Record<string, unknown>) => ({ ...value, originalStartTime: reserved.originalStartTime });
     if (op.kind === "occurrence-delete" && source.status === "cancelled") return await finish("applied", normalized(source));
     if (!etag || source.etag !== etag || source.status === "cancelled") return await finish("rejected");

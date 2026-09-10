@@ -380,7 +380,7 @@ export const en: Dictionary = {
   "settings.google.alignTimezone": "Align time zone",
   "googleTask.occurrenceChanged": "Google has changed or cancelled “{{title}}” ({{date}}). Local changes to this occurrence were not sent. Check the occurrence in both calendars; automatic conflict resolution for occurrences is not available yet.",
   "settings.google.aligningTimezone": "Aligning time zone…",
-  "settings.google.timezoneHint": "Align Google sync with your app time zone ({{timezone}}). Imported event times will be checked again on the next sync.",
+  "settings.google.timezoneHint": "Google sync is pinned to {{pinned}}, but this account plans in {{timezone}}. Events arriving from Google are stored at the wrong hour until these match.",
   "settings.google.timezoneAligned": "Google sync time zone is now {{timezone}}. Changes to imported tasks may need review after syncing.",
   "settings.google.error.syncInProgress": "A sync is running. Wait for it to finish, then try aligning the time zone again.",
   "settings.google.error.outboundInFlight": "Changes are being sent to Google. Wait for them to finish, then try again.",

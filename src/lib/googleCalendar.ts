@@ -27,6 +27,17 @@ export interface GoogleConnection {
   /** Which Google account this is, so the settings screen can name it. */
   accountEmail: string;
   labelsSupported?: boolean | null;
+  /**
+   * The zone this connection reads and writes wall-clock times in, as pinned
+   * at bind time — `google_calendar_connections.sync_timezone`.
+   *
+   * Read so the card can notice it disagreeing with the app's own zone. That
+   * disagreement is the one failure in the whole sync that says nothing:
+   * events arrive at the wrong hour and every screen is internally consistent
+   * about it, because both numbers are right in their own zone. "" when the
+   * connection predates the column.
+   */
+  syncTimezone?: string;
 }
 
 /**
@@ -76,7 +87,9 @@ async function supabaseReadConnection(): Promise<GoogleConnection | null> {
     .maybeSingle();
   if (error) throw new GoogleCalendarError("store", error.message);
   if (!data?.calendar_id) return null;
-  return { calendarId: data.calendar_id as string, accountEmail: (data.account_email as string) || "", labelsSupported: typeof data.labels_supported === "boolean" ? data.labels_supported : null };
+  return { calendarId: data.calendar_id as string, accountEmail: (data.account_email as string) || "",
+    labelsSupported: typeof data.labels_supported === "boolean" ? data.labels_supported : null,
+    syncTimezone: typeof data.sync_timezone === "string" ? data.sync_timezone : "" };
 }
 
 async function supabaseWriteConnection(connection: GoogleConnection, timezone: string): Promise<void> {
@@ -187,6 +200,11 @@ async function callOwnApi(path: string, deps: GoogleCalendarDeps, body?: unknown
 
 /** Rebind the existing calendar without replacing its grant or generation. */
 export async function alignGoogleTimezone(calendarId: string, timezone: string, deps: GoogleCalendarDeps = defaultDeps): Promise<void> {
+  // An empty zone is not "leave it alone" on the way down: the binding reads a
+  // missing zone as "keep the calendar's own" (`calendarBinding.ts`), which is
+  // the value being escaped from. Without this the call reports success and
+  // aligns nothing.
+  if (!timezone.trim()) throw new GoogleCalendarError("store", "No time zone to align to.");
   await callOwnApi("/api/google/calendar", deps, { calendarId, timezone });
 }
 

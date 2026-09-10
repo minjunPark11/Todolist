@@ -52,10 +52,18 @@ export function GoogleTaskReviewPanel() {
       taskRecurrence(row.data, snapshot.timezone) === null || (!item.eventId && row.data.googleEventId && !snapshot.historicalTaskIds.has(id)));
   }) : [];
   return <section className="ff-google-review" aria-label={t("googleTask.title")} aria-busy={state.busy}>
-    <h4>{t("googleTask.title")} <span>({reviews.filter(r => r.decision.reason !== "excluded").length + repeatChanges.length + transfers.length})</span></h4>
+    <h4>{t("googleTask.title")} <span>({reviews.filter(r => r.decision.reason !== "excluded").length + repeatChanges.length + transfers.length
+      + (state.occurrenceConflicts?.length ?? 0)})</span></h4>
     <p className="ff-settings-note">{t("googleTask.policy")}</p>
-    {state.error && <p role="alert">{state.occurrenceConflict ? t("googleTask.occurrenceChanged", state.occurrenceConflict)
-      : t(state.error === "changed" ? "googleTask.changed" : "googleTask.failed")}</p>}
+    {state.error && <p role="alert">{t(state.error === "changed" ? "googleTask.changed" : "googleTask.failed")}</p>}
+    {/* Not an alert and not tied to `error`: the pass that found these
+        finished, and everything it did not name was sent. Each one is a
+        separate occurrence a person has to reconcile in both calendars. */}
+    {state.occurrenceConflicts?.map(conflict => (
+      <p role="status" key={`${conflict.title}\u0000${conflict.date}`} className="ff-settings-note">
+        {t("googleTask.occurrenceChanged", conflict)}
+      </p>
+    ))}
     <button className="ff-btn ff-cal-btn-outline" type="button" disabled={state.busy} onClick={() => void state.run?.()}>{t(state.busy ? "googleTask.busy" : "googleTask.refresh")}</button>
     {snapshot?.operations.map(op => <div key={String(op.operation_id)} className="ff-google-review-item">
       <p role="status">{t("googleTask.pending")}</p>

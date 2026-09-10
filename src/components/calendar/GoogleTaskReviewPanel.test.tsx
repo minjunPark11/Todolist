@@ -21,10 +21,37 @@ beforeEach(() => {
 afterEach(() => { cleanup(); publishGoogleTaskSync({ enabled: false, busy: false, pending: false, error: "", snapshot: null }); });
 const mount = () => render(<I18nProvider lang="en"><GoogleTaskReviewPanel /></I18nProvider>);
 it("identifies the occurrence whose remote changes blocked automatic sending", () => {
-  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: "failed", occurrenceConflict: { title: "Weekly meeting", date: "2026-09-16" } });
+  // Not an alert, and not paired with `error`: the pass that found this one
+  // finished, and every occurrence it did not name was sent.
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), occurrenceConflicts: [{ title: "Weekly meeting", date: "2026-09-16" }] });
   mount();
-  expect(screen.getByRole("alert").textContent).toContain("Weekly meeting");
-  expect(screen.getByRole("alert").textContent).toContain("2026-09-16");
+  const said = screen.getAllByRole("status").map(node => node.textContent).join(" ");
+  expect(said).toContain("Weekly meeting");
+  expect(said).toContain("2026-09-16");
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("names every skipped occurrence, not just the first", () => {
+  // The whole point of skipping rather than throwing: one occurrence nobody
+  // reconciles must not hide the others behind it.
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), occurrenceConflicts: [
+    { title: "Weekly meeting", date: "2026-09-16" },
+    { title: "Standup", date: "2026-09-17" },
+  ] });
+  mount();
+  const said = screen.getAllByRole("status").map(node => node.textContent).join(" ");
+  expect(said).toContain("Weekly meeting");
+  expect(said).toContain("Standup");
+  // One review comes from the fixture, so the two skipped occurrences take the
+  // heading to three: they are counted as work waiting on a person, which is
+  // what they are.
+  expect(screen.getByRole("heading", { level: 4 }).textContent).toContain("(3)");
+});
+
+it("still says a failure is a failure when the pass did not finish", () => {
+  publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: "failed" });
+  mount();
+  expect(screen.getByRole("alert")).toBeTruthy();
 });
 it("compares both versions and sends the displayed record and task revisions", () => {
   mount(); fireEvent.click(screen.getByText(/Google title — Conflicting/));

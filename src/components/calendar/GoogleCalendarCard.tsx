@@ -311,6 +311,15 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
     try {
       await alignGoogleTimezone(status.connection.calendarId, timezone);
       if (version !== readVersion.current) return;
+      // Read the connection back rather than assuming the write took: the row
+      // below is drawn from `syncTimezone`, and a card that hid its own
+      // warning on an assumption would be claiming an alignment it did not
+      // confirm. Failing to re-read is not failing to align, so a refusal here
+      // leaves the success notice standing.
+      try {
+        const connection = await readConnection();
+        if (connection && version === readVersion.current) setStatus({ kind: "connected", connection });
+      } catch { /* The next read settles it. */ }
       setNotice(t("settings.google.timezoneAligned", { timezone }));
       notifyGoogleConnectionChanged();
     } catch (thrown) {
@@ -395,8 +404,20 @@ export function GoogleCalendarCard({ timezone = "" }: { timezone?: string }) {
           ) : null}
           {labelState?.overflow ? <p className="ff-settings-note">{t("settings.google.labelsOverflow", { count: labelState.overflow })}</p> : null}
           {labelState?.failed && labelState.supported !== false ? <p className="ff-settings-note" aria-live="polite">{t("settings.google.labelsRetry")}</p> : null}
-          {timezone ? <div>
-            <p className="ff-settings-note">{t("settings.google.timezoneHint", { timezone })}</p>
+          {/* Only when the two actually disagree.
+              Offered unconditionally it is a button that re-reads the whole
+              calendar for no reason, and — worse — it says nothing about
+              whether anything is wrong. The disagreement is the one failure in
+              this sync that is otherwise silent: events arrive at the wrong
+              hour and every screen is internally consistent about it, because
+              both numbers are right in their own zone. Naming the pinned zone
+              IS the diagnosis. A connection from before `sync_timezone`
+              existed reports "", and offering to change a zone nobody can see
+              would be asking about something invisible. */}
+          {timezone && status.connection.syncTimezone && status.connection.syncTimezone !== timezone ? <div>
+            <p className="ff-settings-note" aria-live="polite">
+              {t("settings.google.timezoneHint", { pinned: status.connection.syncTimezone, timezone })}
+            </p>
             <button type="button" className="ff-btn ff-cal-btn-outline" disabled={aligning || syncing || taskSync.busy} onClick={() => void alignTimezone()}>
               {t(aligning ? "settings.google.aligningTimezone" : "settings.google.alignTimezone")}
             </button>

@@ -5,7 +5,6 @@ import { createGoogleTaskInboundDeps } from "../lib/googleTaskInboundTransport";
 import { GoogleTaskSelectionChanged, runGoogleTaskCycle, type GoogleTaskChoice, type GoogleTaskCoordinatorDeps } from "../lib/googleTaskCoordinator";
 import { publishGoogleTaskSync, readGoogleTaskSyncState, type LocalTaskConflict } from "../lib/googleTaskSyncState";
 import type { Task } from "../types";
-import { GoogleOccurrenceChanged } from "../lib/googleOccurrenceSync";
 
 interface Input { enabled: boolean; accountKey: string; tasks: Task[]; bridge: <T>(work: (userId: string) => Promise<T>) => Promise<T>;
   conflicts: () => LocalTaskConflict[]; resolveConflict: (id: string, choice: "local" | "remote" | "copy", expected: LocalTaskConflict) => Promise<void> }
@@ -16,7 +15,7 @@ export function useGoogleTaskSync(input: Input) {
     if (!latest.current.enabled || running.current || !supabase) return;
     running.current = true; const version = epoch.current;
     const valid = () => version === epoch.current && latest.current.enabled;
-    publishGoogleTaskSync({ ...readGoogleTaskSyncState(), enabled: true, busy: true, error: "", occurrenceConflict: undefined });
+    publishGoogleTaskSync({ ...readGoogleTaskSyncState(), enabled: true, busy: true, error: "", occurrenceConflicts: undefined });
     let ok = false;
     try {
       const result = await latest.current.bridge(async userId => {
@@ -49,10 +48,12 @@ export function useGoogleTaskSync(input: Input) {
           return runGoogleTaskCycle({ userId, generation, accessToken: token.accessToken }, deps, choice);
         });
       });
-      if (valid()) { publishGoogleTaskSync({ ...readGoogleTaskSyncState(), snapshot: result?.snapshot ?? null, pending: result?.pending ?? false, error: "" }); ok = !result?.pending; }
+      // The conflicts come off a pass that FINISHED. They are not an error:
+      // the occurrences they name were skipped and everything else was sent.
+      if (valid()) { publishGoogleTaskSync({ ...readGoogleTaskSyncState(), snapshot: result?.snapshot ?? null, pending: result?.pending ?? false, error: "",
+        occurrenceConflicts: result?.occurrenceConflicts?.length ? result.occurrenceConflicts : undefined }); ok = !result?.pending; }
     } catch (error) {
-      if (valid()) publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: error instanceof GoogleTaskSelectionChanged ? "changed" : "failed",
-        occurrenceConflict: error instanceof GoogleOccurrenceChanged ? { title: error.title, date: error.date } : undefined });
+      if (valid()) publishGoogleTaskSync({ ...readGoogleTaskSyncState(), error: error instanceof GoogleTaskSelectionChanged ? "changed" : "failed" });
     } finally {
       running.current = false;
       if (valid()) {

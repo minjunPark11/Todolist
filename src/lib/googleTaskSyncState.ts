@@ -2,7 +2,14 @@ import type { GoogleTaskChoice, GoogleTaskSnapshot } from "./googleTaskCoordinat
 import type { Task } from "../types";
 export interface LocalTaskConflict { id: string; local: Task | null; remote: { id: string; revision: number; data: Task } | null }
 export interface GoogleTaskSyncState {
-  occurrenceConflict?: { title: string; date: string };
+  /**
+   * Occurrences this pass could not send, and why a person has to look.
+   *
+   * A list and not a single value, and set from a completed pass rather than
+   * from a caught error: the pass SKIPS these and carries on, so several can
+   * pile up in one run and none of them means the sync failed.
+   */
+  occurrenceConflicts?: { title: string; date: string }[];
   enabled: boolean; busy: boolean; pending: boolean; error: "" | "changed" | "failed";
   snapshot: GoogleTaskSnapshot | null;
   run?: (choice?: GoogleTaskChoice) => Promise<void>;
