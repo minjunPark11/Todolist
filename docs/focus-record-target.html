@@ -62,7 +62,7 @@ main{flex:1;min-width:0;background:var(--bg-surface);height:100vh;
 .chead .meta,.chead button.meta{font-size:var(--type-xs);color:var(--text-tertiary);font-weight:600}
 
 /* KPI — 첫째가 히어로 (§5.2) */
-.kpis{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;padding:var(--space-md)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);padding:var(--space-md)}
 .kpi{position:relative;padding:0 var(--space-lg)}
 .kpi:first-child{padding-left:0}
 .kpi:not(:last-child)::after{content:"";position:absolute;right:0;top:0;bottom:0;width:1px;background:var(--border-subtle)}
@@ -73,17 +73,17 @@ main{flex:1;min-width:0;background:var(--bg-surface);height:100vh;
 .kpi.hero s{color:var(--text-secondary);font-weight:600}
 
 /* 타임라인 — 단색 (§5.3) */
-.tl{position:relative;height:70px;margin:0 var(--space-md) var(--space-md);
+.tl{position:relative;height:52px;margin:0 var(--space-md) var(--space-md);
   background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-sm)}
 .hours{position:absolute;inset:0 20px;display:grid;grid-template-columns:repeat(10,1fr)}
 .hours span{border-left:1px solid var(--border-subtle);position:relative}
 .hours span:last-child{border-right:1px solid var(--border-subtle)}
 .hours span:last-child i{left:auto;right:-13px}
-.hours i{position:absolute;left:-13px;bottom:5px;font-style:normal;font-size:var(--type-xs);color:var(--text-tertiary)}
-.track{position:absolute;left:20px;right:20px;top:26px;height:10px}
-.seg{position:absolute;height:10px;border-radius:var(--radius-sm);background:var(--accent)}
+.hours i{position:absolute;left:-13px;bottom:4px;font-style:normal;font-size:var(--type-xs);color:var(--text-tertiary)}
+.track{position:absolute;left:20px;right:20px;top:8px;height:22px}
+.seg{position:absolute;height:22px;border-radius:var(--radius-sm);background:var(--accent)}
 
-.lower{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(380px,1fr);gap:var(--space-md)}
+.lower{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-md);align-items:start}
 .rows{padding:0 var(--space-md) var(--space-xs)}
 .row{display:grid;grid-template-columns:112px minmax(0,1fr) auto 56px 24px;align-items:center;
   gap:var(--space-sm);min-height:52px;border-top:1px solid var(--border-subtle);text-align:left}
@@ -107,19 +107,19 @@ main{flex:1;min-width:0;background:var(--bg-surface);height:100vh;
 .bar2 span{display:block;height:100%;background:var(--accent);border-radius:inherit}
 
 /* 집중 패턴 — 전폭 (§7.2) */
-.pattern{padding:0 var(--space-md) var(--space-md);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:var(--space-xl)}
+.pattern{padding:0 var(--space-md) var(--space-md);display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--space-xl)}
 .heatwrap{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--space-md);align-items:start}
-.hdays,.hrow{display:grid;grid-template-columns:76px repeat(7,minmax(0,1fr));gap:var(--space-xxs)}
+.hdays,.hrow{display:grid;grid-template-columns:76px repeat(7,36px);gap:var(--space-xxs)}
 .hdays{margin-bottom:var(--space-xxs);font-size:var(--type-xs);color:var(--text-tertiary);text-align:center}
 .hrow{margin-bottom:var(--space-xxs)}
 .hrow .wk{font-size:var(--type-xs);color:var(--text-tertiary);display:flex;align-items:center;font-variant-numeric:tabular-nums}
-.hc{height:20px;border-radius:var(--radius-sm);background:var(--surface-2)}
+.hc{height:28px;border-radius:var(--radius-sm);background:var(--surface-2)}
 .hc.a{background:var(--h1c)}.hc.b{background:var(--h2c)}.hc.c{background:var(--h3c)}.hc.d{background:var(--h4c)}
 /* 순차 램프에는 스케일 범례 (§5.3) */
 .vleg{display:grid;gap:var(--space-xxs);font-size:var(--type-xs);color:var(--text-tertiary);justify-items:center}
 .vleg i{width:14px;height:10px;border-radius:2px;display:block}
 .trend h3{font-size:var(--type-md);font-weight:600;margin-bottom:var(--space-xs)}
-svg{display:block;width:100%;height:150px}
+svg{display:block;width:100%;height:186px}
 .gl{stroke:var(--border-subtle);stroke-width:1}
 .line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .area{fill:rgba(0,100,210,.08)}
@@ -223,28 +223,31 @@ svg{display:block;width:100%;height:150px}
 
       <div class="trend">
         <h3>최근 7일 집중 시간</h3>
-        <svg viewBox="0 0 472 150" role="img" aria-label="최근 7일 집중 시간 변화">
-          <line class="gl" x1="34" y1="18" x2="458" y2="18"/>
-          <line class="gl" x1="34" y1="49" x2="458" y2="49"/>
-          <line class="gl" x1="34" y1="80" x2="458" y2="80"/>
-          <line class="gl" x1="34" y1="111" x2="458" y2="111"/>
-          <text class="ax" x="14" y="22">3h</text><text class="ax" x="14" y="53">2h</text>
-          <text class="ax" x="14" y="84">1h</text><text class="ax" x="20" y="115">0</text>
-          <path class="area" d="M52 96 L118 89 L184 74 L250 87 L316 66 L382 60 L438 63 L438 111 L52 111 Z"/>
-          <path class="line" d="M52 96 L118 89 L184 74 L250 87 L316 66 L382 60 L438 63"/>
-          <circle class="mk" cx="52" cy="96" r="4"/><circle class="mk" cx="118" cy="89" r="4"/>
-          <circle class="mk" cx="184" cy="74" r="4"/><circle class="mk" cx="250" cy="87" r="4"/>
-          <circle class="mk" cx="316" cy="66" r="4"/><circle class="mk" cx="382" cy="60" r="4"/>
-          <circle class="mk" cx="438" cy="63" r="5"/>
-          <rect x="406" y="32" width="64" height="20" rx="4" fill="#0064d2"/>
-          <text x="438" y="46" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">1h 42m</text>
-          <text class="ax" x="52" y="136" text-anchor="middle">9/4 (금)</text>
-          <text class="ax" x="118" y="136" text-anchor="middle">9/5 (토)</text>
-          <text class="ax" x="184" y="136" text-anchor="middle">9/6 (일)</text>
-          <text class="ax" x="250" y="136" text-anchor="middle">9/7 (월)</text>
-          <text class="ax" x="316" y="136" text-anchor="middle">9/8 (화)</text>
-          <text class="ax" x="382" y="136" text-anchor="middle">9/9 (수)</text>
-          <text class="ax" x="438" y="136" text-anchor="middle">9/10 (목)</text>
+        <svg viewBox="0 0 866 186" role="img" aria-label="최근 7일 집중 시간 변화">
+          <line class="gl" x1="44" y1="24" x2="856" y2="24"/>
+          <line class="gl" x1="44" y1="62" x2="856" y2="62"/>
+          <line class="gl" x1="44" y1="100" x2="856" y2="100"/>
+          <line class="gl" x1="44" y1="138" x2="856" y2="138"/>
+          <text class="ax" x="22" y="28">3h</text><text class="ax" x="22" y="66">2h</text>
+          <text class="ax" x="22" y="104">1h</text><text class="ax" x="30" y="142">0</text>
+          <path class="area" d="M52 121 L180 111 L308 94 L436 108 L564 83 L692 75 L820 73 L820 138 L52 138 Z"/>
+          <path class="line" d="M52 121 L180 111 L308 94 L436 108 L564 83 L692 75 L820 73"/>
+          <circle class="mk" cx="52" cy="121" r="4"/>
+          <circle class="mk" cx="180" cy="111" r="4"/>
+          <circle class="mk" cx="308" cy="94" r="4"/>
+          <circle class="mk" cx="436" cy="108" r="4"/>
+          <circle class="mk" cx="564" cy="83" r="4"/>
+          <circle class="mk" cx="692" cy="75" r="4"/>
+          <circle class="mk" cx="820" cy="73" r="5"/>
+          <rect x="788" y="42" width="64" height="20" rx="4" fill="#0064d2"/>
+          <text x="820" y="56" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">1h 42m</text>
+          <text class="ax" x="52" y="168" text-anchor="middle">9/4 (금)</text>
+          <text class="ax" x="180" y="168" text-anchor="middle">9/5 (토)</text>
+          <text class="ax" x="308" y="168" text-anchor="middle">9/6 (일)</text>
+          <text class="ax" x="436" y="168" text-anchor="middle">9/7 (월)</text>
+          <text class="ax" x="564" y="168" text-anchor="middle">9/8 (화)</text>
+          <text class="ax" x="692" y="168" text-anchor="middle">9/9 (수)</text>
+          <text class="ax" x="820" y="168" text-anchor="middle">9/10 (목)</text>
         </svg>
       </div>
     </div>
