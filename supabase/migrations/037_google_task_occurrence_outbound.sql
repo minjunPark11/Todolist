@@ -164,6 +164,19 @@ begin
     return '{"finished":false,"state":"uncertain"}';end if;
   if p_outcome='rejected' and op.state='running' then final_state:='aborted';
   else
+    -- 신원 증명. 무게를 지는 것은 앞의 두 줄이다: 인스턴스 id 는 그 인스턴스를 유일하게
+    -- 지목하고, recurringEventId 는 그것이 예약된 시리즈의 것임을 말한다. 두 값 모두
+    -- 구글이 돌려준 것 그대로 올라온다.
+    --
+    -- 세 번째 줄은 그렇지 않다. 클라이언트가 originalStartTime 을 예약 때 보낸 값으로
+    -- 덮어쓴 뒤 보내므로 (`integrations/google/occurrenceOutbound.ts` 의 `normalized`),
+    -- 이 비교는 자기 자신과의 비교이고 이 클라이언트로는 절대 실패하지 않는다. 그렇게
+    -- 하는 이유는 구글이 같은 순간을 다른 표기로 돌려줄 수 있어서 — 오프셋이 다른
+    -- dateTime, 날짜와 시각의 교차 — jsonb 정확 비교가 참인 것을 거짓으로 만들기
+    -- 때문이다. 회차가 맞는지는 클라이언트의 `matchesOccurrence` 가 순간 동치로 본다.
+    --
+    -- 그러므로 이 줄은 모양 검사이지 독립적인 증명이 아니다. 위의 id 검사가 이미 그
+    -- 일을 하고 있어서 잃는 것은 없지만, 이것을 두 번째 자물쇠로 읽으면 안 된다.
     if p_source->>'id' is distinct from op.event_id or p_source->>'recurringEventId' is distinct from op.request->>'masterEventId'
       or p_source->'originalStartTime' is distinct from op.request->'source'->'originalStartTime' then raise exception 'INSTANCE_PROOF_REQUIRED';end if;
     if p_outcome='superseded' then

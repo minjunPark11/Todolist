@@ -11,6 +11,19 @@ export interface OccurrenceCandidate {
   desired: TaskInboundFields | null; base: TaskInboundFields;
 }
 
+/**
+ * This one occurrence cannot be sent, and a person has to look at it.
+ *
+ * Deliberately narrower than "the sync failed". It names ONE occurrence, and
+ * the cycle skips it and carries on — the same way an inbound conflict becomes
+ * a review rather than stopping the pass. Throwing it out of the cycle would
+ * mean one occurrence nobody can reconcile freezes every other occurrence for
+ * good, because a skipped candidate writes no receipt and so comes back
+ * identical on the next pass, forever.
+ *
+ * A transport failure is NOT this. That is not about one occurrence, and
+ * carrying on would only produce the same failure twenty-nine more times.
+ */
 export class GoogleOccurrenceChanged extends Error {
   constructor(readonly title: string, readonly date: string) {
     super("The Google occurrence changed. Local edits were not sent.");
@@ -86,14 +99,28 @@ export async function readOccurrence(candidate: OccurrenceCandidate, calendarId:
     for (const item of page.items) {
       const source = object(item);
       if (!matchesOccurrence(source, candidate.masterEventId, candidate.originalStart)) continue;
-      if (found) throw new Error("Ambiguous Google occurrence.");
+      if (found) throw new GoogleOccurrenceChanged(occurrenceTitle(candidate), candidate.occurrenceDate);
       found = source;
     }
     if (!page.nextPageToken) break;
     if (typeof page.nextPageToken !== "string" || seen.has(page.nextPageToken) || seen.size >= 20) throw new Error("Invalid Google instance pagination.");
     seen.add(page.nextPageToken); params.set("pageToken", page.nextPageToken);
   } while (true);
-  if (!found || typeof found.id !== "string" || !found.id) throw new Error("Google occurrence no longer exists.");
-  if (found.status === "cancelled" && candidate.kind === "occurrence-delete") return found;
+  // Gone, or two instances answering to one original start. Both are about this
+  // occurrence and nothing else, so they are skipped and reported rather than
+  // ending the pass. `Ambiguous` above is raised before this for the same
+  // reason and is re-thrown as one of these by the caller's guard.
+  if (!found || typeof found.id !== "string" || !found.id) {
+    throw new GoogleOccurrenceChanged(occurrenceTitle(candidate), candidate.occurrenceDate);
+  }
+  // Whether a cancelled instance is acceptable depends on which way this
+  // occurrence is going, and the cycle decides that one line later. There was
+  // an `if` here that returned `found` in both branches; it read as a guard and
+  // guarded nothing.
   return found;
+}
+
+/** What to call this occurrence in a message to a person. */
+export function occurrenceTitle(candidate: OccurrenceCandidate): string {
+  return candidate.desired?.title || candidate.base.title;
 }

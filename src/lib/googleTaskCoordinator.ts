@@ -3,7 +3,7 @@ import { planTaskOutbound, toTaskSharedPatch } from "../domain/calendar/googleSy
 import { taskRecurrence } from "../domain/calendar/googleSync/taskRecurrence";
 import { object, parseGoogleTaskSnapshot, text } from "./googleTaskInboundSnapshot";
 import { runGoogleTaskInbound, type GoogleTaskInboundDeps } from "./googleTaskInboundExecutor";
-import { GoogleOccurrenceChanged, occurrenceCandidates, readOccurrence } from "./googleOccurrenceSync";
+import { GoogleOccurrenceChanged, occurrenceCandidates, occurrenceTitle, readOccurrence } from "./googleOccurrenceSync";
 import { sameTaskInboundFields } from "../domain/calendar/googleSync/taskInboundShape";
 
 export type GoogleTaskSnapshot = ReturnType<typeof parseGoogleTaskSnapshot>;
@@ -22,9 +22,23 @@ export class GoogleTaskSelectionChanged extends Error {
   constructor() { super("The content changed. Review the latest versions and choose again."); }
 }
 
+export interface GoogleTaskCycleResult {
+  snapshot: GoogleTaskSnapshot;
+  pending: boolean;
+  /**
+   * Occurrences this pass skipped because Google had moved on from them.
+   *
+   * Absent from the returns that never reach the occurrence phase, which is
+   * why it is optional rather than an empty array everywhere: "we did not get
+   * that far" and "we looked and found none" are different answers, and only
+   * the second should ever clear a warning on the screen.
+   */
+  occurrenceConflicts?: { title: string; date: string }[];
+}
+
 /** The planner bridge drains local task writes before entering and adopts revisions after returning. */
 export async function runGoogleTaskCycle(request: { userId: string; generation: string; accessToken: string },
-  deps: GoogleTaskCoordinatorDeps, choice?: GoogleTaskChoice): Promise<{ snapshot: GoogleTaskSnapshot; pending: boolean }> {
+  deps: GoogleTaskCoordinatorDeps, choice?: GoogleTaskChoice): Promise<GoogleTaskCycleResult> {
   const call = async (name: string, args: Record<string, unknown>) => { await deps.assertCurrent(); return deps.rpc(name, args); };
   const snapshot = async () => parseGoogleTaskSnapshot(await call("read_google_task_sync_snapshot", { p_generation: request.generation }), request.userId, request.generation);
   // Resolve ambiguous database replies with exactly the same durable request first.
@@ -152,20 +166,42 @@ export async function runGoogleTaskCycle(request: { userId: string; generation: 
       if (await deps.dispatch(id) === "pending") return { snapshot: await snapshot(), pending: true };
     }
     current = await snapshot();
+    // An occurrence Google has moved on from is skipped, not fatal.
+    //
+    // Every one of these leaves no receipt, so the candidate comes back
+    // identical on the next pass. Ending the cycle on the first of them would
+    // mean one occurrence nobody reconciles freezes every other occurrence
+    // permanently, and puts the account in a failing state it can never leave.
+    // An inbound conflict does not stop a pass either; it becomes a review.
+    // These become the same kind of thing.
+    const occurrenceConflicts: { title: string; date: string }[] = [];
     for (const candidate of occurrenceCandidates(current).slice(0, 30)) {
-      await deps.assertCurrent();
-      const source = await readOccurrence(candidate, current.scope.calendarId, request.accessToken, deps.fetch);
-      const remote = toTaskInboundFields(source, current.timezone);
-      if (source.status !== "cancelled" && (!remote.ok || !sameTaskInboundFields(remote.fields, candidate.base))) {
-        throw new GoogleOccurrenceChanged(candidate.desired?.title ?? candidate.base.title, candidate.occurrenceDate);
+      try {
+        await deps.assertCurrent();
+        const source = await readOccurrence(candidate, current.scope.calendarId, request.accessToken, deps.fetch);
+        const remote = toTaskInboundFields(source, current.timezone);
+        if (source.status !== "cancelled" && (!remote.ok || !sameTaskInboundFields(remote.fields, candidate.base))) {
+          throw new GoogleOccurrenceChanged(occurrenceTitle(candidate), candidate.occurrenceDate);
+        }
+        if (source.status === "cancelled" && candidate.kind !== "occurrence-delete") {
+          throw new GoogleOccurrenceChanged(occurrenceTitle(candidate), candidate.occurrenceDate);
+        }
+        await claim(); current = await snapshot();
+        const id = await reserve("reserve_google_task_occurrence", { ...body(String(source.id)), ...candidate,
+          source, remote: remote.ok ? remote.fields : null });
+        if (await deps.dispatch(id) === "pending") {
+          return { snapshot: await snapshot(), pending: true, occurrenceConflicts };
+        }
+      } catch (error) {
+        // Only this occurrence's own problems are skippable. A lost lease, a
+        // changed selection, an unreachable Google — none of those are about
+        // this candidate, and carrying on would repeat them for every one that
+        // is left.
+        if (!(error instanceof GoogleOccurrenceChanged)) throw error;
+        occurrenceConflicts.push({ title: error.title, date: error.date });
       }
-      if (source.status === "cancelled" && candidate.kind !== "occurrence-delete") throw new GoogleOccurrenceChanged(candidate.base.title, candidate.occurrenceDate);
-      await claim(); current = await snapshot();
-      const id = await reserve("reserve_google_task_occurrence", { ...body(String(source.id)), ...candidate,
-        source, remote: remote.ok ? remote.fields : null });
-      if (await deps.dispatch(id) === "pending") return { snapshot: await snapshot(), pending: true };
     }
-    return { snapshot: await snapshot(), pending: false };
+    return { snapshot: await snapshot(), pending: false, occurrenceConflicts };
   } finally {
     if (fence !== undefined) await call("release_google_task_sync", { p_generation: request.generation, p_owner: owner, p_fence: fence }).catch(() => undefined);
   }

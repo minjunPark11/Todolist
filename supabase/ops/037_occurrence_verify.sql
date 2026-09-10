@@ -3,7 +3,10 @@ select '037 receipt table' as check_name, to_regclass('public.google_task_occurr
 union all select '037 reservation', to_regprocedure('public.reserve_google_task_occurrence(uuid,jsonb)') is not null
 union all select '037 snapshot wrapper', to_regprocedure('public.read_google_task_sync_snapshot_occurrence_core(uuid)') is not null
 union all select '037 dispatch wrapper', to_regprocedure('public.begin_google_task_outbound_occurrence_core(uuid,uuid,uuid)') is not null
-union all select '037 settlement wrapper', to_regprocedure('public.finish_google_task_outbound_occurrence_core(uuid,uuid,uuid,text,jsonb,jsonb)') is not null;
+union all select '037 settlement wrapper', to_regprocedure('public.finish_google_task_outbound_occurrence_core(uuid,uuid,uuid,text,jsonb,jsonb)') is not null
+-- 038 없이 037 을 켜면 영수증이 세대 교체 때마다 영구히 쌓인다. 나이로는 지울 수 없는
+-- 표라서(멱등 장부다) 정리 규칙이 따로 필요했다.
+union all select '038 receipt retention', to_regprocedure('public.prune_google_task_history_occurrence_core(uuid)') is not null;
 
 -- to_jsonb allows this inventory to run before the new column exists.
 select a.user_id, a.enabled as task_sync_enabled,
