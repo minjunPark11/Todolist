@@ -73,15 +73,17 @@ main{flex:1;min-width:0;background:var(--bg-surface);height:100vh;
 .kpi.hero s{color:var(--text-secondary);font-weight:600}
 
 /* 타임라인 — 단색 (§5.3) */
-.tl{position:relative;height:52px;margin:0 var(--space-md) var(--space-md);
+.tl{position:relative;height:72px;margin:0 var(--space-md) var(--space-md);
   background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-sm)}
 .hours{position:absolute;inset:0 20px;display:grid;grid-template-columns:repeat(10,1fr)}
 .hours span{border-left:1px solid var(--border-subtle);position:relative}
 .hours span:last-child{border-right:1px solid var(--border-subtle)}
 .hours span:last-child i{left:auto;right:-13px}
 .hours i{position:absolute;left:-13px;bottom:4px;font-style:normal;font-size:var(--type-xs);color:var(--text-tertiary)}
-.track{position:absolute;left:20px;right:20px;top:8px;height:22px}
+.track{position:absolute;left:20px;right:20px;top:26px;height:22px}
 .seg{position:absolute;height:22px;border-radius:var(--radius-sm);background:var(--accent)}
+.seg b{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:4px;
+  font-size:var(--type-xs);font-weight:600;color:var(--text-secondary);white-space:nowrap}
 
 .lower{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-md);align-items:start}
 .rows{padding:0 var(--space-md) var(--space-xs)}
@@ -175,9 +177,9 @@ svg{display:block;width:100%;height:186px}
         <span><i>14:00</i></span><span><i>16:00</i></span><span><i>18:00</i></span><span><i>20:00</i></span><span><i>22:00</i></span><span><i>24:00</i></span>
       </div>
       <div class="track">
-        <span class="seg" style="left:55.5%;width:2.8%"></span>
-        <span class="seg" style="left:69.4%;width:3.5%"></span>
-        <span class="seg" style="left:79%;width:3.1%"></span>
+        <span class="seg" style="left:55.5%;width:2.8%"><b>30m</b></span>
+        <span class="seg" style="left:69.4%;width:3.5%"><b>38m</b></span>
+        <span class="seg" style="left:79%;width:3.1%"><b>34m</b></span>
       </div>
     </div>
   </section>
