@@ -24,15 +24,17 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
 main{flex:1;min-width:0;background:var(--bg-surface);height:100vh;
   display:grid;grid-template-rows:auto minmax(0,1fr)}
 
-/* §7.2.2 왼쪽 정렬 밑줄 탭. 오른쪽은 ••• 하나 — 검색·알림은 레일이 갖는다 */
-.tabs{display:flex;align-items:flex-end;justify-content:space-between;height:52px;
-  padding:0 var(--space-xl);border-bottom:1px solid var(--border-subtle)}
-.tabstrip{display:flex;gap:var(--space-lg);height:100%;align-items:flex-end}
-.tabstrip button{position:relative;padding:0 0 var(--space-sm);font-size:var(--type-md);
-  font-weight:600;color:var(--text-tertiary)}
-.tabstrip button.on{color:var(--text-primary)}
-.tabstrip button.on::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--accent)}
-.tabs .more{align-self:center;width:32px;height:32px;border-radius:var(--radius-sm);color:var(--text-tertiary)}
+/* §7.1 탭 줄 — 가운데 알약. 1fr·auto·1fr 이라 ••• 가 가운데 탭을 덮지 않는다.
+   검색·알림은 레일이 갖는다 (§7.2.2) */
+.tabs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:56px;
+  padding:0 var(--space-lg);border-bottom:1px solid var(--border-subtle)}
+.tabstrip{grid-column:2;display:inline-flex;gap:var(--space-xxs);padding:var(--space-xxs);
+  background:var(--surface-2);border-radius:var(--radius-sm)}
+.tabstrip button{min-width:112px;height:36px;padding:0 var(--space-md);border-radius:var(--radius-sm);
+  font-size:var(--type-md);font-weight:600;color:var(--text-secondary)}
+.tabstrip button.on{background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-primary)}
+.tabs .more{grid-column:3;justify-self:end;width:36px;height:36px;border-radius:var(--radius-sm);
+  color:var(--text-tertiary);font-size:15px}
 
 /* §7.2 기록 탭은 페이지가 흐른다 */
 .scroll{min-height:0;overflow:auto}
