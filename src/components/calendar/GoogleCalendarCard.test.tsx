@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nProvider } from "../../i18n";
+import { FloatingLayerProvider } from "../floating";
 import { GoogleCalendarCard } from "./GoogleCalendarCard";
 import { routeGoogleCalendarReturn } from "./GoogleCalendarReturn";
 
@@ -36,7 +37,7 @@ beforeEach(() => {
   mocks.ensure.mockResolvedValue({ calendarId: "cal", accountEmail: "person@example.com" });
 });
 afterEach(cleanup);
-const mount = () => render(<I18nProvider lang="en"><GoogleCalendarCard /></I18nProvider>);
+const mount = () => render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard /></FloatingLayerProvider></I18nProvider>);
 
 // The pinned zone is picked here, and picking is the whole action.
 //
@@ -46,8 +47,22 @@ const mount = () => render(<I18nProvider lang="en"><GoogleCalendarCard /></I18nP
 // lives, editable there.
 
 /** The picker, and the modal that stands between a pick and what it costs. */
+const zoneTrigger = () => screen.getByRole("button", { name: /^Sync time zone:/ });
+/** What the closed picker says it is set to. */
+const shownZone = () => zoneTrigger().textContent ?? "";
+
+/**
+ * Open the picker, type at it, and take the match.
+ *
+ * Typed rather than scrolled to on purpose: the search is the feature. A
+ * native select only matched from the start of the option text, so reaching
+ * Shanghai meant typing "Asia/Sha" — slash included — and knowing which
+ * region the city is filed under.
+ */
 function pick(zone: string) {
-  fireEvent.change(screen.getByRole("combobox"), { target: { value: zone } });
+  fireEvent.click(zoneTrigger());
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: zone.split("/").pop() ?? zone } });
+  fireEvent.click(screen.getByRole("option", { name: new RegExp(zone.replace("/", "\\/")) }));
 }
 const CONFIRM = { name: "Change it" };
 
@@ -56,25 +71,25 @@ it("spends nothing until the choice is confirmed", async () => {
   // calendar and rewrites the times of everything imported from it. A select
   // that did that on change would do it to a mis-click.
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email", syncTimezone: "Europe/London" });
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Europe/London" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Europe/London" /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
   pick("Asia/Shanghai");
   expect(mocks.align).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   expect(mocks.align).not.toHaveBeenCalled();
-  expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("Europe/London");
+  expect(shownZone()).toContain("Europe/London");
 });
 
 it("pins the picked zone and holds every other action while it does", async () => {
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email", syncTimezone: "Europe/London" });
   let complete!: () => void;
   mocks.align.mockImplementationOnce(() => new Promise<void>((resolve) => { complete = resolve; }));
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Europe/London" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Europe/London" /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
   pick("Asia/Shanghai");
   fireEvent.click(screen.getByRole("button", CONFIRM));
   expect(mocks.align).toHaveBeenCalledWith("cal", "Asia/Shanghai");
-  expect((screen.getByRole("combobox") as HTMLSelectElement).hasAttribute("disabled")).toBe(true);
+  expect(zoneTrigger().hasAttribute("disabled")).toBe(true);
   expect(screen.getByRole("button", { name: "Disconnect" }).hasAttribute("disabled")).toBe(true);
   expect(screen.getByRole("button", { name: "Sync now" }).hasAttribute("disabled")).toBe(true);
   await act(async () => complete());
@@ -89,9 +104,7 @@ it("moves the account's own zone with it, and only once the pin took", async () 
   // the app claiming a zone the calendar had refused.
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email", syncTimezone: "Europe/London" });
   const onTimezoneChange = vi.fn();
-  render(<I18nProvider lang="en">
-    <GoogleCalendarCard timezone="Europe/London" onTimezoneChange={onTimezoneChange} />
-  </I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Europe/London" onTimezoneChange={onTimezoneChange} /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
   pick("Asia/Shanghai");
   fireEvent.click(screen.getByRole("button", CONFIRM));
@@ -103,9 +116,7 @@ it("leaves the account's zone alone when the pin was refused", async () => {
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email", syncTimezone: "Europe/London" });
   mocks.align.mockRejectedValueOnce(new GoogleCalendarError("reviewsUnresolved", "blocked"));
   const onTimezoneChange = vi.fn();
-  render(<I18nProvider lang="en">
-    <GoogleCalendarCard timezone="Europe/London" onTimezoneChange={onTimezoneChange} />
-  </I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Europe/London" onTimezoneChange={onTimezoneChange} /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
   pick("Asia/Shanghai");
   fireEvent.click(screen.getByRole("button", CONFIRM));
@@ -117,7 +128,7 @@ it("keeps the connection and lets the pick be made again after a refusal", async
   const { GoogleCalendarError } = await import("../../lib/googleCalendar");
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "email", syncTimezone: "Europe/London" });
   mocks.align.mockRejectedValueOnce(new GoogleCalendarError("reviewsUnresolved", "blocked"));
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Europe/London" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Europe/London" /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
   pick("Asia/Seoul");
   fireEvent.click(screen.getByRole("button", CONFIRM));
@@ -254,23 +265,23 @@ it("shows the zone the connection is pinned to, not the account's", async () => 
   // screen. A picker that showed the app's zone would agree with itself while
   // events kept arriving at the wrong hour.
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Europe/London" });
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Asia/Seoul" /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
-  expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("Europe/London");
+  expect(shownZone()).toContain("Europe/London");
 });
 
 it("says out loud that the two disagree, which the picker alone cannot", async () => {
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Europe/London" });
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Asia/Seoul" /></FloatingLayerProvider></I18nProvider>);
   const note = await screen.findByText(/pinned to Europe\/London/);
   expect(note.textContent).toContain("Asia/Seoul");
 });
 
 it("keeps the picker but drops the warning once they agree", async () => {
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Asia/Seoul" });
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Asia/Seoul" /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
-  expect(screen.getByRole("combobox")).toBeTruthy();
+  expect(zoneTrigger()).toBeTruthy();
   expect(screen.queryByText(/pinned to/)).toBeNull();
 });
 
@@ -278,18 +289,18 @@ it("offers no picker when the connection predates the pinned zone", async () => 
   // "" is what a row written before `sync_timezone` existed reads as, and a
   // picker with nothing to show is worse than none.
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "" });
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Asia/Seoul" /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
-  expect(screen.queryByRole("combobox")).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Sync time zone:/ })).toBeNull();
 });
 
 it("still offers the picker when the account has no zone of its own", async () => {
   // The pinned zone is the one being edited here; the account's is what the
   // pick will set. Not knowing the second is no reason to hide the first.
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Europe/London" });
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="" /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
-  expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("Europe/London");
+  expect(shownZone()).toContain("Europe/London");
   expect(screen.queryByText(/pinned to/)).toBeNull();
 });
 
@@ -298,9 +309,9 @@ it("offers a pinned zone this build has never heard of rather than silently show
   // option matching its value falls back to the first one in the list, which
   // here would be some African city the reader has never chosen.
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Mars/Olympus_Mons" });
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Asia/Seoul" /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
-  expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("Mars/Olympus_Mons");
+  expect(shownZone()).toContain("Mars/Olympus_Mons");
 });
 
 it("moves the picker to the new zone once the connection reports it", async () => {
@@ -310,19 +321,19 @@ it("moves the picker to the new zone once the connection reports it", async () =
   mocks.align.mockImplementationOnce(async () => {
     mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Asia/Seoul" });
   });
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Asia/Seoul" /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
   pick("Asia/Seoul");
   fireEvent.click(screen.getByRole("button", CONFIRM));
-  await waitFor(() => expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("Asia/Seoul"));
+  await waitFor(() => expect(shownZone()).toContain("Asia/Seoul"));
 });
 
 it("leaves the picker where it was when the server accepted nothing", async () => {
   mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Europe/London" });
-  render(<I18nProvider lang="en"><GoogleCalendarCard timezone="Asia/Seoul" /></I18nProvider>);
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Asia/Seoul" /></FloatingLayerProvider></I18nProvider>);
   await screen.findByRole("button", { name: "Sync now" });
   pick("Asia/Seoul");
   fireEvent.click(screen.getByRole("button", CONFIRM));
   await screen.findByText(/Google sync time zone is now Asia\/Seoul/);
-  expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("Europe/London");
+  expect(shownZone()).toContain("Europe/London");
 });

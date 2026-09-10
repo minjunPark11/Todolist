@@ -578,6 +578,62 @@
   background: var(--bg-surface);
   color: var(--text-primary);
 }
+
+/* 시간대 피커.
+   네이티브 select 가 여기 있었고, 그 타이핑 이동은 옵션 텍스트의 **앞에서부터**만
+   맞춘다. 모든 시간대가 지역으로 시작하니 상하이에 닿으려면 슬래시까지 포함해
+   "Asia/Sha" 를 1초 안에 쳐야 했다. 실질적으로는 스크롤로만 닿는 400개였다.
+   목록 피커(§13.26)와 같은 뼈대 — 검색 칸에 포커스가 머무는 동안 화살표가 아래
+   목록의 커서를 움직인다. */
+.ff-timezone-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--type-md);
+  cursor: pointer;
+}
+.ff-timezone-trigger:disabled { cursor: default; opacity: 0.55; }
+.ff-timezone-surface { min-width: 280px; }
+.ff-timezone-picker { display: flex; flex-direction: column; gap: 6px; }
+.ff-timezone-search {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-muted);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+/* 스크롤이 표면이 아니라 여기 있어야 검색 칸이 제자리에 남는다 (§19.17). */
+.ff-timezone-options { overflow-y: auto; max-height: 260px; }
+.ff-timezone-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.ff-timezone-option.is-active { background: var(--bg-hover-content); }
+.ff-timezone-option.is-selected { font-weight: 600; }
+.ff-timezone-check { width: 12px; font-size: 11px; color: var(--color-primary); }
+/* 타이핑 중에 텅 비는 표면은 고장난 것으로 읽힌다. */
+.ff-timezone-empty { margin: 0; padding: 10px 8px; font-size: 12px; color: var(--text-tertiary); }
+
 .ff-import-btn { cursor: pointer; }
 .ff-settings-msg { color: var(--success-ink); font-size: 13px; padding: 8px 0; }
 .ff-settings-msg.is-error { color: var(--danger-ink); }

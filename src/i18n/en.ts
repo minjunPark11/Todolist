@@ -265,6 +265,8 @@ export const en: Dictionary = {
   "settings.timezoneHint": "The zone every date and time in this app is read in. Does not change Google Calendar sync, which uses the zone pinned when the calendar was connected.",
   "settings.timezoneAuto": "Automatic (from this device)",
   "settings.timezoneAutoNamed": "Automatic — {zone}",
+  "settings.timezoneSearch": "Search time zones",
+  "settings.timezoneNoMatch": "No time zone matches that.",
   "settings.tabFocus": "Focus",
   "settings.focus.tabTitleTimerHint": "The running timer appears in the browser tab, not just on the page.",
   "settings.focus.completionNotificationHint": "Requires notification permission, on the Notifications tab.",

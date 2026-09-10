@@ -149,3 +149,69 @@ export function timezoneChoicePatch(
   if (value !== "auto") return { timezoneMode: "manual", timezone: value };
   return { timezoneMode: "auto", ...(detected ? { timezone: detected } : {}) };
 }
+
+export interface TimezoneOption {
+  /** What gets stored. A zone name, or a caller's own token such as "auto". */
+  value: string;
+  /** What the reader sees and types against. */
+  label: string;
+}
+
+/**
+ * One option, split into the two things a query can be about.
+ *
+ * They are matched differently on purpose. A name is matched as a substring,
+ * because "sha" should find Shanghai. An offset must NOT be: "+1" is a
+ * substring of "+10:00", "+11:00" and "+12:00", so a reader asking for
+ * central Europe would be handed half of Asia.
+ *
+ * The offsets are listed in the spellings a person actually types. The label
+ * already carries "(UTC+08:00)", but "+8", "utc+8" and "gmt+8" are all things
+ * someone reaching for Shanghai will write, and none is derivable from the
+ * others by substring. Cheap to list; guessing which was meant is not.
+ */
+function searchText(option: TimezoneOption): { text: string; offsets: Set<string> } {
+  const text = normalize(`${option.value} ${option.label}`);
+  const offsets = new Set<string>();
+  const minutes = timezoneOffsetMinutes(option.value);
+  if (minutes !== null) {
+    const sign = minutes < 0 ? "-" : "+";
+    const total = Math.abs(minutes);
+    const hours = Math.floor(total / 60);
+    const mm = total % 60;
+    const forms = [`${sign}${String(hours).padStart(2, "0")}:${String(mm).padStart(2, "0")}`];
+    // A bare hour only when there are no minutes to lose. "+5" must not stand
+    // for +05:30, or a reader who meant Lima would be shown Delhi.
+    if (mm) forms.push(`${sign}${hours}:${mm}`);
+    else forms.push(`${sign}${hours}`, `${sign}${String(hours).padStart(2, "0")}`);
+    for (const form of forms) offsets.add(form).add(`utc${form}`).add(`gmt${form}`);
+  }
+  return { text, offsets };
+}
+
+/** Lowercase, with the punctuation nobody types turned into gaps. */
+function normalize(text: string): string {
+  return text.toLowerCase().replace(/[_/(),]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** A query piece that is asking about an offset rather than about a name. */
+function isOffsetQuery(token: string): boolean {
+  return /^(?:utc|gmt)?[+-]\d/.test(token);
+}
+
+/**
+ * The options `query` matches, in the order they were given.
+ *
+ * Every whitespace-separated piece of the query has to match, so "asia sha"
+ * and "sha asia" both work and neither depends on remembering which half of
+ * the name comes first. An empty query matches everything — an unfiltered list
+ * is the right answer to "you have not asked yet", not an empty one.
+ */
+export function filterTimezoneOptions<T extends TimezoneOption>(options: readonly T[], query: string): T[] {
+  const tokens = normalize(query).split(" ").filter(Boolean);
+  if (!tokens.length) return [...options];
+  return options.filter((option) => {
+    const { text, offsets } = searchText(option);
+    return tokens.every((token) => (isOffsetQuery(token) ? offsets.has(token) : text.includes(token)));
+  });
+}

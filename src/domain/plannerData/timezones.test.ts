@@ -5,7 +5,7 @@
 // the selected zone is always among them, and the offset is read the way a
 // person reads a clock rather than the way a Date happens to serialise.
 import { describe, expect, it } from "vitest";
-import { listTimezones, timezoneChoicePatch, timezoneLabel, timezoneOffsetMinutes } from "./timezones";
+import { filterTimezoneOptions, listTimezones, timezoneChoicePatch, timezoneLabel, timezoneOffsetMinutes } from "./timezones";
 import { normalizeAppSettings } from "./normalize";
 
 describe("the zone list", () => {
@@ -124,5 +124,84 @@ describe("choosing in the picker", () => {
     // No IANA zone is called "auto", so this is a guard against the option
     // value and the zone namespace ever being made to share a slot.
     expect(timezoneChoicePatch("Etc/GMT+0", "Europe/London").timezone).toBe("Etc/GMT+0");
+  });
+});
+
+describe("searching the zones", () => {
+  const options = [
+    { value: "auto", label: "Automatic — Asia/Shanghai" },
+    ...listTimezones().map((zone) => ({ value: zone, label: timezoneLabel(zone) })),
+  ];
+  const found = (query: string) => filterTimezoneOptions(options, query).map((option) => option.value);
+
+  it("finds a city without its region or its underscore", () => {
+    // Nobody types the underscore, and a picker that requires it is four
+    // hundred options you can only scroll.
+    expect(found("shanghai")).toContain("Asia/Shanghai");
+    expect(found("new york")).toContain("America/New_York");
+    expect(found("new_york")).toContain("America/New_York");
+  });
+
+  it("does not care about case or about which half comes first", () => {
+    expect(found("ASIA seoul")).toContain("Asia/Seoul");
+    expect(found("seoul asia")).toContain("Asia/Seoul");
+  });
+
+  it("finds a region", () => {
+    // The caller's own "auto" option says the device's zone out loud, so it
+    // answers to a region too. That is the behaviour, not a leak: someone
+    // typing their region should still be shown the way back to automatic.
+    const asia = found("asia");
+    expect(asia).toContain("Asia/Seoul");
+    expect(asia.filter((value) => value !== "auto").every((zone) => zone.startsWith("Asia/"))).toBe(true);
+  });
+
+  it("finds by offset, in the spellings a person actually types", () => {
+    for (const query of ["+08:00", "+8", "utc+8", "gmt+8", "UTC+08:00"]) {
+      expect(found(query), query).toContain("Asia/Shanghai");
+    }
+  });
+
+  // Asserted as a property of every match rather than by naming a city.
+  // Which city sits at an offset depends on the date the test runs (New York
+  // is -05:00 in January and -04:00 in July) and on which spelling the
+  // engine's tz database canonicalises to (Asia/Kolkata or Asia/Calcutta).
+  const offsetsOf = (query: string) =>
+    new Set(found(query).filter((value) => value !== "auto").map((zone) => timezoneOffsetMinutes(zone)));
+
+  it("finds half-hour zones by their minutes, in both spellings", () => {
+    for (const query of ["+5:30", "+05:30"]) {
+      expect(offsetsOf(query), query).toEqual(new Set([5 * 60 + 30]));
+    }
+  });
+
+  it("does not confuse a negative offset with a positive one", () => {
+    expect(offsetsOf("-5")).toEqual(new Set([-5 * 60]));
+    expect(found("-5")).not.toContain("Asia/Shanghai");
+  });
+
+  it("matches a whole offset, not a digit inside one", () => {
+    // "+1" must not drag in +10, +11 and +12 — the short form is a token in
+    // the haystack, so a longer offset does not contain it.
+    expect(offsetsOf("+1")).toEqual(new Set([60]));
+  });
+
+  it("keeps a caller's own option searchable by what it says", () => {
+    // "auto" is not a zone and has no offset of its own. It still has to be
+    // reachable by typing, or the way back to automatic is scroll-only.
+    expect(found("automatic")).toEqual(["auto"]);
+  });
+
+  it("returns everything for an empty query", () => {
+    expect(filterTimezoneOptions(options, "   ")).toHaveLength(options.length);
+  });
+
+  it("returns nothing rather than everything when nothing matches", () => {
+    expect(found("olympus mons")).toEqual([]);
+  });
+
+  it("keeps the order it was given", () => {
+    const asia = filterTimezoneOptions(options, "asia");
+    expect(asia).toEqual(options.filter((option) => asia.includes(option)));
   });
 });

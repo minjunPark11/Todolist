@@ -261,6 +261,8 @@ export const ko: Dictionary = {
   "settings.timezoneHint": "앱의 모든 날짜와 시각을 읽는 기준. 구글 캘린더 동기화는 바꾸지 않습니다 — 그쪽은 캘린더를 연결할 때 고정된 시간대를 씁니다.",
   "settings.timezoneAuto": "자동 (이 기기 기준)",
   "settings.timezoneAutoNamed": "자동 — {zone}",
+  "settings.timezoneSearch": "시간대 검색",
+  "settings.timezoneNoMatch": "해당하는 시간대가 없습니다.",
   "settings.tabFocus": "Focus",
   "settings.focus.tabTitleTimerHint": "진행 중인 타이머가 페이지뿐 아니라 브라우저 탭에도 보입니다.",
   "settings.focus.completionNotificationHint": "알림 탭의 알림 권한이 필요합니다.",
