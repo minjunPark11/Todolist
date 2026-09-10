@@ -13,7 +13,8 @@ export function createGoogleTaskInboundDeps(input:{userId:string;generation:stri
         headers:{Authorization:`Bearer ${jwt}`,apikey:anonKey,"Content-Type":"application/json"},body:JSON.stringify(args)});
       if(!response.ok) {
         const body=await response.json().catch(()=>null);
-        throw Object.assign(new Error(`Google task RPC failed (${response.status}); pending pass retained.`),{code:body?.code});
+        const detail = typeof body?.message === "string" ? body.message.slice(0, 300) : "Request failed";
+        throw Object.assign(new Error(`${name}: ${detail} (${body?.code ?? response.status})`),{code:body?.code});
       }
       return response.json();
     },

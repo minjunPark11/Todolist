@@ -5,6 +5,7 @@ import { I18nProvider } from "../../i18n";
 import { FloatingLayerProvider } from "../floating";
 import { GoogleCalendarCard } from "./GoogleCalendarCard";
 import { routeGoogleCalendarReturn } from "./GoogleCalendarReturn";
+import { publishGoogleTaskSync } from "../../lib/googleTaskSyncState";
 
 const mocks = vi.hoisted(() => ({
   read: vi.fn(), exchange: vi.fn(), ensure: vi.fn(), open: vi.fn(), align: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("../../lib/googleCalendar", async () => ({
 }));
 
 beforeEach(() => {
+  publishGoogleTaskSync({ enabled: false, busy: false, pending: false, error: "", snapshot: null });
   vi.clearAllMocks();
   localStorage.clear();
   history.replaceState(null, "", "/settings");
@@ -37,6 +39,14 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 const mount = () => render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard /></FloatingLayerProvider></I18nProvider>);
+
+it("keeps failure details reachable when a sync fails before returning its snapshot", async () => {
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "person@example.com" });
+  publishGoogleTaskSync({ enabled: true, busy: false, pending: false, error: "failed", errorDetail: "SYNC_BUSY", snapshot: null });
+  mount();
+  fireEvent.click(await screen.findByRole("button", { name: "Google sync review" }));
+  expect(screen.getByText(/SYNC_BUSY/)).toBeTruthy();
+});
 
 it("keeps the retained connection's disconnect action after an identity mismatch", async () => {
   const { GoogleCalendarError } = await import("../../lib/googleCalendar");
