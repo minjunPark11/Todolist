@@ -337,3 +337,43 @@ it("leaves the picker where it was when the server accepted nothing", async () =
   await screen.findByText(/Google sync time zone is now Asia\/Seoul/);
   expect(shownZone()).toContain("Europe/London");
 });
+
+// The report that brought this in: the confirmation appeared, [Change it] was
+// pressed, and the pinned zone stayed exactly where it was with nothing to
+// read anywhere on the screen.
+
+it("says a sync is in the way rather than doing nothing", async () => {
+  // The picker is disabled while a pass runs, but the confirmation is a modal
+  // and outlives that: open it, have a background pass start underneath, press
+  // the button. This used to return without a word.
+  const { publishGoogleTaskSync, readGoogleTaskSyncState } = await import("../../lib/googleTaskSyncState");
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Europe/London" });
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Asia/Seoul" /></FloatingLayerProvider></I18nProvider>);
+  await screen.findByRole("button", { name: "Sync now" });
+
+  fireEvent.click(zoneTrigger());
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "Seoul" } });
+  fireEvent.click(screen.getByRole("option", { name: /Asia\/Seoul/ }));
+  act(() => publishGoogleTaskSync({ ...readGoogleTaskSyncState(), enabled: true, busy: true }));
+  fireEvent.click(screen.getByRole("button", CONFIRM));
+
+  expect(mocks.align).not.toHaveBeenCalled();
+  expect((await screen.findByRole("alert")).textContent).toContain("A sync is running");
+  act(() => publishGoogleTaskSync({ ...readGoogleTaskSyncState(), enabled: false, busy: false }));
+});
+
+it("answers beside the picker, not at the bottom of the card", async () => {
+  // The card's shared notice line renders past the calendar list and the
+  // review panel. An answer to a control in the first row was arriving several
+  // hundred pixels below it, which reads exactly like nothing happening.
+  mocks.read.mockResolvedValue({ calendarId: "cal", accountEmail: "e", syncTimezone: "Europe/London" });
+  render(<I18nProvider lang="en"><FloatingLayerProvider><GoogleCalendarCard timezone="Asia/Seoul" /></FloatingLayerProvider></I18nProvider>);
+  await screen.findByRole("button", { name: "Sync now" });
+  pick("Asia/Seoul");
+  fireEvent.click(screen.getByRole("button", CONFIRM));
+
+  const said = await screen.findByText(/Google sync time zone is now Asia\/Seoul/);
+  // Between the picker and the manual sync button — the block it belongs to.
+  expect(zoneTrigger().compareDocumentPosition(said) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Sync now" }).compareDocumentPosition(said) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+});
