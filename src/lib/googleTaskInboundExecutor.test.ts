@@ -66,6 +66,18 @@ it("does not treat legacy task IDs as verified mappings",async()=>{
   await runGoogleTaskInbound(request,f.deps);
   expect((f.commit()?.p_entries as {decision:unknown;expected:unknown}[])[0]).toMatchObject({decision:{kind:"review",reason:"ambiguous-mapping"},expected:[]});
 });
+
+it("retires a cancelled unmapped review on an empty incremental page without changing legacy tasks or exclusions",async()=>{
+  const cancelled={id:"a",status:"cancelled"};
+  const records=[{generation:"gen",calendar_id:"cal",event_id:"a",decision:{kind:"review",reason:"ambiguous-mapping",taskIds:["old"]},revision:1,source:cancelled},
+    {generation:"gen",calendar_id:"cal",event_id:"b",decision:{kind:"skip",reason:"excluded"},revision:1,source:{id:"b",status:"cancelled"}}];
+  const f=setup([{items:[{id:"b",status:"cancelled"}],nextSyncToken:"n"}],{automaticSyncEnabled:true,records,tasks:[{id:"old",revision:1,data:{title:"Keep my task",googleEventId:"a"}}]});
+  await runGoogleTaskInbound(request,f.deps);
+  expect(f.commit()?.p_entries).toEqual([
+    expect.objectContaining({eventId:"b",decision:{kind:"skip",reason:"excluded"},expected:[]}),
+    expect.objectContaining({eventId:"a",decision:{kind:"skip",reason:"cancelled-unmapped"},expected:[]}),
+  ]);
+});
 it("does not send a commit when local journal storage fails",async()=>{
   const f=setup([{items:[],nextSyncToken:"n"}]);f.deps.writeJournal=async()=>{throw new Error("quota");};
   await expect(runGoogleTaskInbound(request,f.deps)).rejects.toThrow("quota");expect(f.commit()).toBeUndefined();
