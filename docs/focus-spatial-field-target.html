@@ -1,0 +1,155 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
+:root{
+  --bg-app:#eff1f5; --bg-rail:#dfe3ea; --bg-surface:#fff; --bg-surface-muted:#f5f5f7;
+  --text-primary:#1c1c1e; --text-secondary:#3c3c43; --text-tertiary:#68686d;
+  --border-subtle:rgba(25,25,25,.08); --surface-2:rgba(25,25,25,.06);
+  --color-primary:#0064d2; --radius-sm:4px; --radius-pill:9999px;
+  --space-xxs:4px; --space-xs:8px; --space-sm:12px; --space-md:16px; --space-lg:24px; --space-xl:32px;
+  --type-xs:11px; --type-sm:12px; --type-md:13px; --type-lg:15px; --type-xl:18px; --type-2xl:24px;
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+  color:var(--text-primary);background:var(--bg-app);height:100vh;overflow:hidden;display:flex}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+
+/* rail — 앱 셸 그대로 (§7.3: 레일 < 캔버스) */
+.rail{width:50px;flex:0 0 50px;background:var(--bg-rail);border-right:1px solid var(--border-subtle);
+  display:flex;flex-direction:column;align-items:center;padding:16px 4px 8px;gap:6px}
+.rail i{width:40px;height:40px;border-radius:var(--radius-sm);display:grid;place-items:center;
+  color:var(--text-tertiary);font-style:normal;font-size:16px}
+.rail i.on{background:var(--bg-surface);color:var(--color-primary)}
+.rail .sp{flex:1}
+
+/* page */
+main{flex:1;min-width:0;background:var(--bg-surface);height:100vh;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto;padding:var(--space-lg) var(--space-xl) 0}
+
+/* head */
+.head{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;
+  gap:var(--space-lg);padding-bottom:var(--space-lg);border-bottom:1px solid var(--border-subtle)}
+.head h1{font-size:var(--type-2xl);font-weight:700;letter-spacing:-.04em;line-height:32px}
+.head p{margin-top:2px;font-size:var(--type-md);color:var(--text-secondary)}
+.toggle{justify-self:center;display:inline-flex;gap:var(--space-xxs);padding:var(--space-xxs);
+  background:var(--surface-2);border-radius:var(--radius-sm)}
+.toggle button{padding:0 var(--space-md);height:36px;border-radius:var(--radius-sm);
+  font-size:var(--type-md);font-weight:600;color:var(--text-secondary)}
+.toggle button.on{background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-primary)}
+.acts{justify-self:end;display:flex;gap:var(--space-xs)}
+.acts button{height:36px;padding:0 var(--space-sm);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-sm);font-size:var(--type-md);font-weight:600;
+  display:inline-flex;align-items:center;gap:6px;background:var(--bg-surface)}
+
+/* field — 1fr | 코어 | 1fr : 왼쪽은 비우고 원이 정중앙에 선다 (§3 A안) */
+.field{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  gap:var(--space-lg);align-items:center;min-height:0;padding:var(--space-lg) 0}
+
+.corecol{display:flex;flex-direction:column;align-items:center;gap:var(--space-md)}
+/* 앵커 — 원이 무엇을 재는지 먼저 말한다. 실행 중에는 읽기 전용 */
+.anchor{display:inline-flex;align-items:center;gap:var(--space-xs);height:36px;padding:0 var(--space-sm);
+  border:1px solid var(--border-subtle);border-radius:var(--radius-pill);background:var(--bg-surface);
+  font-size:var(--type-md);font-weight:600;max-width:400px}
+.anchor .dot{width:6px;height:6px;border-radius:50%;background:var(--color-primary);flex:0 0 auto}
+.anchor span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 원 — 헤어라인 링 한 겹, 칸 안에 가둔다 (§6.1 · D3) */
+.coreWrap{position:relative;display:grid;place-items:center;padding:20px}
+.coreWrap::before{content:"";position:absolute;inset:0;border-radius:50%;border:1px solid var(--border-subtle)}
+.core{width:414px;height:414px;border-radius:50%;background:var(--bg-surface-muted);
+  border:1px solid var(--border-subtle);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:var(--space-xs)}
+.status{display:inline-flex;align-items:center;gap:var(--space-xs);font-size:var(--type-md);font-weight:600}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--color-primary)}
+.clock{font-size:96px;font-weight:600;line-height:1.05;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.sub{font-size:var(--type-sm);color:var(--text-tertiary);font-variant-numeric:tabular-nums}
+.primary{margin-top:var(--space-sm);min-width:200px;height:52px;border-radius:var(--radius-sm);
+  background:var(--color-primary);color:#fff;font-size:var(--type-xl);font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--space-xs)}
+/* 원 밖 — 두 번째 액션은 중립이다. 종료는 danger 를 벗는다 (§4 규칙 2) */
+.outside{display:flex;gap:var(--space-lg);font-size:var(--type-md);font-weight:600;color:var(--text-secondary)}
+.outside button{display:inline-flex;align-items:center;gap:6px}
+
+/* queue — 면 없음, 헤어라인 구분선 (§7.3) */
+.queue{justify-self:start;width:100%;max-width:380px;align-self:stretch;min-height:0;
+  display:grid;grid-template-rows:auto minmax(0,1fr);padding-top:var(--space-xs)}
+.queue header{padding-bottom:var(--space-sm);border-bottom:1px solid var(--border-subtle)}
+.queue h2{font-size:var(--type-xl);font-weight:700}
+.queue h2 b{font-weight:400;color:var(--text-tertiary)}
+.queue header p{margin-top:var(--space-xxs);font-size:var(--type-sm);color:var(--text-tertiary)}
+.row{display:grid;grid-template-columns:10px 28px minmax(0,1fr) auto auto 24px;align-items:center;
+  gap:var(--space-xs);padding:var(--space-sm) 0;border-bottom:1px solid var(--border-subtle)}
+.grab{width:10px;height:16px;background-image:radial-gradient(circle,var(--text-tertiary) 1px,transparent 1px);
+  background-size:4px 4px;opacity:.55}
+.play{color:var(--color-primary);font-size:12px}
+.row strong{font-size:var(--type-lg);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip{padding:2px var(--space-xs);border-radius:var(--radius-pill);background:var(--surface-2);
+  color:var(--text-secondary);font-size:var(--type-xs);white-space:nowrap}
+.row small{font-size:var(--type-sm);color:var(--text-tertiary);font-variant-numeric:tabular-nums}
+.row .x{color:var(--text-tertiary);font-size:14px;text-align:center}
+.addq{margin-top:var(--space-sm);font-size:var(--type-md);font-weight:600;color:var(--color-primary);text-align:left}
+
+/* ribbon — 바닥 전폭. 헤어라인 하나, 면 없음 */
+.ribbon{display:grid;grid-template-columns:repeat(3,minmax(120px,180px)) 1fr;align-items:end;
+  gap:var(--space-xl);border-top:1px solid var(--border-subtle);
+  padding:var(--space-sm) 0 var(--space-lg)}
+.metric b{display:block;font-size:var(--type-xl);font-weight:600;letter-spacing:-.02em}
+.metric span{font-size:var(--type-sm);color:var(--text-tertiary)}
+.saving{justify-self:end;align-self:center;display:inline-flex;align-items:center;gap:var(--space-xs);
+  font-size:var(--type-sm);color:var(--text-tertiary)}
+.saving::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--text-tertiary)}
+</style></head><body>
+
+<nav class="rail">
+  <i>✓</i><i>▤</i><i>▦</i><i class="on">◎</i><i>○</i>
+  <div class="sp"></div><i>◇</i><i>○</i>
+</nav>
+
+<main>
+  <header class="head">
+    <div><h1>집중</h1><p>지금 할 한 가지를 중심에 두세요.</p></div>
+    <div class="toggle"><button class="on">스톱워치</button><button>포모도로</button></div>
+    <div class="acts">
+      <button>기록</button><button>몰입 보기</button><button>•••</button>
+    </div>
+  </header>
+
+  <section class="field">
+    <div></div><!-- 왼쪽: 비운다. 테두리를 그리지 않는다 (§3) -->
+
+    <div class="corecol">
+      <div class="anchor"><span class="dot"></span><span>연구 제안서 — 방법론 수정</span></div>
+      <div class="coreWrap">
+        <div class="core">
+          <div class="status">집중 중</div>
+          <div class="clock">27:14</div>
+          <div class="sub">오늘 누적 1:42:00</div>
+          <button class="primary">❙❙ 일시정지</button>
+        </div>
+      </div>
+      <div class="outside"><button>■ 종료</button><button>✎ 메모</button></div>
+    </div>
+
+    <aside class="queue">
+      <header>
+        <h2>작업 큐 <b>3</b></h2>
+        <p>집중할 순서를 직접 만들어 두세요.</p>
+      </header>
+      <div>
+        <div class="row"><span class="grab"></span><button class="play">▶</button>
+          <strong>캘린더 회차 편집 QA</strong><span class="chip">업무</span><small>12m</small><span class="x">×</span></div>
+        <div class="row"><span class="grab"></span><button class="play">▶</button>
+          <strong>설정 화면 접근성 점검</strong><span class="chip">Inbox</span><small></small><span class="x">×</span></div>
+        <div class="row"><span class="grab"></span><button class="play">▶</button>
+          <strong>주간 회고 정리</strong><span class="chip">업무</span><small></small><span class="x">×</span></div>
+        <button class="addq">＋ 작업 추가</button>
+      </div>
+    </aside>
+  </section>
+
+  <section class="ribbon">
+    <div class="metric"><b>1h 42m</b><span>오늘 집중</span></div>
+    <div class="metric"><b>2</b><span>완료한 작업</span></div>
+    <div class="metric"><b>34m</b><span>평균 세션</span></div>
+    <div class="saving">기록 자동 저장 중</div>
+  </section>
+</main>
+</body></html>
