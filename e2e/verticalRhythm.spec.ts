@@ -54,6 +54,11 @@ const ALLOWED_OFF_GRID = [
   // somewhere" in a column where they sit one above the other.
   ".tm-quickadd-trigger",
   ".tm-quickadd-more",
+  // The segmented view picker. The CONTROL is the 34px track; the pills inside
+  // it are 28 because the track is 34 with 3px of padding, which is geometry
+  // rather than a third size. Same clause as `.tm-quickadd-date` three entries
+  // up — the row is the control on the grid, and what it holds is not.
+  ".gcal-modes",
   // The Matrix box header. Its two icon buttons are 28px section actions
   // (§4.87), sized against the 22px badge they sit beside rather than against
   // the 32px grid — the same clause `.ff-btn-sm` above is listed under.
@@ -104,7 +109,13 @@ async function offGrid(page: Page, allowed: string[]): Promise<Offender[]> {
       if (box.height < 12 || box.width < 24) continue;
       if ((allowList as string[]).some((sel) => el.closest(sel))) continue;
       const height = Math.round(box.height);
-      const inSidebar = !!el.closest(".tm-sidebar, .space-sidebar, .ff-settings-nav");
+      // `.gcal-sidebar` joined this list with the calendar's parity work
+      // (CALENDAR_REFERENCE_PARITY_DESIGN.md). It is navigation by role — it
+      // chooses which calendars are on screen and which date the grid shows —
+      // and it was missing from the proxy rather than being an exception to
+      // it. Its rows measured 36, which is §4.86's navigation rhythm, and were
+      // being read as 32px controls.
+      const inSidebar = !!el.closest(".tm-sidebar, .space-sidebar, .ff-settings-nav, .gcal-sidebar");
       // Focus v2 has three sizes, and each one is a different KIND of control
       // (FOCUS_TABS_AND_RECORD_DESIGN.md §7.1, §9.3.2):
       //

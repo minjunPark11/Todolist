@@ -78,7 +78,12 @@
 /* 사이드바가 전체 높이가 된다 — 툴바가 위를 지나지 않게 된 결과이지
    따로 정한 규칙이 아니다(§3). */
 .gcal-sidebar {
+  /* 220px은 레퍼런스의 값이고 `02-calendar.css`가 이미 쓰던 값이기도 하다.
+     `09-calendar-redesign.css`가 그것을 200으로 덮고 있었다 — 여기서 되돌린다.
+     `padding`은 그 파일의 좌우 12px 둘을 한 선언으로 대신한다. */
+  width: 220px;
   padding: 12px;
+  gap: 18px;
   border-radius: var(--cal-card-radius);
   background: var(--cal-sidebar-bg);
   border: 1px solid var(--border-subtle);
@@ -115,4 +120,384 @@
   /* 카드는 줄바꿈하지 않는다 — 56px 고정이므로 두 줄이 되면 넘친다.
      좁은 화면의 스택은 아래 미디어 쿼리가 다시 연다. */
   flex-wrap: nowrap;
+}
+
+/* ============================================================================
+   C2 — 툴바 안쪽 (§4.2)
+
+   56px 카드 안에 [이동 묶음 · 범위 제목]과 [세그먼트 · 더보기]. 레퍼런스의
+   컨트롤은 전부 조용하다 — 테두리 없음, 채움 없음, hover에서만 옅은 바닥.
+   ========================================================================== */
+
+.gcal-toolbar-left,
+.gcal-toolbar-right {
+  gap: 8px;
+}
+
+/* 이동 묶음은 제목과 붙어 있지 않다. 18px이 "이 셋은 한 덩어리이고 제목은
+   다른 것"이라고 말하는 거리다. */
+.gcal-nav {
+  gap: 2px;
+  margin-right: 18px;
+}
+
+.gcal-nav button,
+.gcal-toolbar .gcal-icon-btn {
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.gcal-nav button:hover,
+.gcal-toolbar .gcal-icon-btn:hover:not(:disabled) {
+  background: var(--bg-hover-content);
+}
+
+/* `오늘`은 테두리 있는 상자가 아니라 옆의 화살표들과 같은 조용한 버튼이다 —
+   셋이 한 묶음이므로 셋이 같은 언어여야 한다. */
+.gcal-today-btn {
+  height: 32px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.gcal-today-btn:hover {
+  background: var(--bg-hover-content);
+}
+
+/* 화면에서 가장 큰 글자. 레퍼런스의 음수 자간이 23px에서 숫자와 구분자를
+   한 덩어리로 묶는다. */
+.gcal-range-label {
+  font-size: 23px;
+  /* 레퍼런스는 670이다. 자에 없는 칸이고, 650과 20 차이는 가변 폰트에서도
+     구분되지 않는다 — 타임라인이 620을 650으로 스냅한 것과 같은 자리. */
+  font-weight: 650;
+  letter-spacing: -0.45px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 세그먼트: 회색 트랙 위의 흰 알약. 활성 칸의 그림자는 §2.1대로 테두리로
+   바꾼다 — 트랙이 회색이고 알약이 흰색이므로 경계는 이미 색으로 서 있고,
+   테두리는 그것을 1px 더 또렷하게 할 뿐이다. */
+.gcal-modes {
+  height: 34px;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 9px;
+  background: var(--cal-seg-track);
+}
+
+.gcal-modes button {
+  height: 28px;
+  min-width: 38px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  /* 레퍼런스는 7px인데 자에 없다. 6이 맞는 값이기도 하다: 바깥 트랙이 9px
+     반경에 3px 패딩이므로 안쪽 모서리는 9 − 3 = 6에서 트랙과 동심이 된다.
+     7은 그 동심을 1px 어긋나게 하던 값이다. */
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.gcal-modes button:hover {
+  color: var(--text-secondary);
+}
+
+.gcal-modes button.active {
+  border-color: var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+/* ============================================================================
+   C3 — 요일 머리 (§4.3)
+
+   42px 고정. 날짜가 크고 요일이 조용하며, 오늘은 날짜가 채워진 원이 된다.
+
+   **순서는 건드리지 않는다.** `dayHeadParts`가 이미 로케일의 규칙을 따르고
+   (CALENDAR_GEOMETRY_DESIGN R3), 한국어는 거기서 이미 날짜가 먼저다 —
+   `26일 (수)`. 영어의 `Wed 26`은 Calendar.app의 순서이고, 그것을 뒤집으면
+   `26 Wed`가 되어 어느 레퍼런스와도 맞지 않는다. 레퍼런스와 달라 보이던 것은
+   순서가 아니라 이 아래의 크기와 색이었다. */
+.gcal-timegrid-head {
+  height: 42px;
+  min-height: 42px;
+  grid-template-columns: 68px repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.gcal-timegrid.is-day .gcal-timegrid-head,
+.gcal-timegrid.is-day .gcal-allday-row,
+.gcal-timegrid.is-day .gcal-timegrid-body {
+  grid-template-columns: 68px minmax(0, 1fr);
+}
+
+/* 세로가 아니라 가로다 — 42px 안에 두 줄은 들어가지 않고, 레퍼런스도
+   `6일 일`을 한 줄로 쓴다. */
+.gcal-col-head {
+  flex-direction: row;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 4px;
+  border-right: 1px solid var(--cal-grid-v);
+  font-size: 13px;
+}
+
+.gcal-col-head:last-child {
+  border-right: 0;
+}
+
+.gcal-col-weekday {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+  color: var(--text-secondary);
+}
+
+.gcal-col-date {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gcal-col-head.is-today .gcal-col-weekday {
+  color: var(--accent);
+}
+
+.gcal-col-head.is-today .gcal-col-date,
+.gcal-col-head.is-selected .gcal-col-date {
+  min-width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+
+/* 구분자는 원 안에 들어가면 안 된다 — 한국어의 `(수)` 괄호가 날짜 원 옆에
+   붙는 자리다. */
+.gcal-col-sep {
+  color: var(--text-tertiary);
+}
+
+/* ============================================================================
+   C4 — 종일 행 (§4.3, §2.2)
+
+   상한 98px. 레퍼런스는 98px 고정인데 그러면 종일 일정이 없는 주에 100px짜리
+   빈 띠가 되고 그 높이는 그대로 시간 격자에서 빠진다. 칩 디자인과 최대 높이는
+   가져오고 바닥만 내용에 맡긴다.
+   ========================================================================== */
+
+.gcal-allday-row {
+  grid-template-columns: 68px repeat(7, minmax(0, 1fr));
+  min-height: 30px;
+  max-height: 98px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.gcal-allday-cell {
+  padding: 6px;
+  gap: 4px;
+  border-left: 1px solid var(--cal-grid-v);
+}
+
+.gcal-allday-cell.is-today {
+  background: var(--cal-today-wash);
+}
+
+.gcal-time-corner,
+.gcal-time-gutter {
+  border-right: 1px solid var(--border-subtle);
+}
+
+.gcal-time-corner.small {
+  align-items: flex-start;
+  padding: 13px 10px;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+/* ============================================================================
+   C5 — 시간 격자 (§4.4)
+
+   눈금 열이 56 → 68px. 레퍼런스가 그 폭을 쓰는 이유는 현재 시각 칩이 이
+   안에 들어앉기 때문이다 — `오후 9:59`가 56px에서는 넘친다.
+   ========================================================================== */
+
+.gcal-timegrid-body {
+  grid-template-columns: 68px repeat(7, minmax(0, 1fr));
+}
+
+/* 가로(시간)가 진하고 세로(날짜)가 옅다. 읽는 축이 시간이기 때문이다. */
+.gcal-time-slot {
+  border-bottom: 1px solid var(--cal-grid-h);
+}
+
+.gcal-time-col {
+  border-left: 1px solid var(--cal-grid-v);
+}
+
+.gcal-time-col.is-today {
+  background: var(--cal-today-wash);
+}
+
+/* 주말 음영을 걷는다. 레퍼런스에는 없고, 오늘 열의 옅은 액센트와 겹치면
+   "칠해진 열"이 둘이 되어 어느 쪽이 오늘인지 흐려진다. */
+.gcal-time-col.is-weekend {
+  background: transparent;
+}
+
+.gcal-time-label {
+  padding: 0 8px;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+/* ============================================================================
+   C6 — 이벤트 블록과 사이드바 (§4.4, §4.5)
+   ========================================================================== */
+
+/* 레퍼런스의 이벤트 카드는 **왼쪽에 3px 액센트 띠**를 세우고 나머지는 연한
+   바닥이다. 색이 어느 캘린더인지 말하는 자리가 면 전체가 아니라 그 띠라서,
+   같은 열에 블록이 여럿 겹쳐도 띠들이 세로로 줄을 서서 읽힌다.
+
+   `--ev-*`는 `eventColorVars.ts`가 블록마다 인라인으로 놓는다 — 여기서는
+   그 변수들을 **다시 배치**할 뿐 색을 정하지 않는다. */
+.gcal-time-block {
+  left: 5px;
+  right: 5px;
+  gap: 4px;
+  padding: 8px 8px 7px 9px;
+  border-radius: 5px;
+  border-left: 3px solid var(--ev-accent, var(--accent));
+  box-shadow: none;
+}
+
+.gcal-tb-title {
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.gcal-tb-time {
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+/* 종일 칩 (§4.3). 레퍼런스의 두 종류 중 `soft`가 이 앱의 기본형이다 —
+   `dark`는 목업에서 카테고리 없는 작업 하나에만 붙어 있고, 여기서는 그
+   구분을 카테고리 색이 이미 하고 있다. */
+.gcal-chip {
+  height: 23px;
+  padding: 0 8px;
+  gap: 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  /* 레퍼런스는 620. 타임라인이 같은 값을 만난 자리에서 내린 결론을 따른다. */
+  font-weight: 650;
+}
+
+/* ---- 사이드바 (§4.5) -----------------------------------------------------
+   색 점은 넣지 않는다. 레퍼런스는 회색 체크 + 색 점 둘로 말하는데, 이 앱은
+   §16.3에서 **체크박스가 자기 카테고리 색을 입는** 쪽을 골랐고("the checkbox
+   carries the category color itself, so no separate color dot") 그쪽이 같은
+   사실을 한 번만 말한다. 가져오는 것은 비율이다. */
+.gcal-sidebar-head {
+  margin-bottom: 6px;
+}
+
+.gcal-create-btn {
+  /* 레퍼런스는 38이다. §4.86의 격자는 컨트롤 32 · 내비 행 36이고, 사이드바
+     안이므로 이 자리의 격자는 36이다. 2px 스냅이라 화면에서 구분되지 않고,
+     레퍼런스가 이 버튼을 아래 행들과 구분하는 것은 높이 2px이 아니라
+     채워진 액센트다 — 그쪽은 그대로 남는다. */
+  height: 36px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.gcal-sidebar-section {
+  gap: 2px;
+}
+
+.gcal-sidebar-section h3 {
+  margin: 0 0 6px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+
+.gcal-cat-row {
+  min-height: 36px;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 6px;
+}
+
+.gcal-cat-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+
+.gcal-cat-name {
+  font-size: 13px;
+  /* 레퍼런스는 530이다. 자에 없는 칸이고 550과 구분되지 않는다. */
+  font-weight: 550;
+}
+
+.gcal-mini-month-head {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gcal-mini-day {
+  height: 22px;
+  border-radius: 50%;
+  font-size: 10.5px;
+}
+
+/* ============================================================================
+   좁은 화면 (§4.6)
+
+   레퍼런스는 1350px 아래에서 사이드바 205 · 제목 21px으로 줄인다. 레일은
+   우리 값(40)을 지키므로 그쪽은 따르지 않는다.
+   ========================================================================== */
+
+@media (max-width: 1350px) {
+  .gcal-sidebar {
+    width: 205px;
+  }
+
+  .gcal-range-label {
+    font-size: 20px;
+  }
+
+  .gcal-modes button {
+    min-width: 34px;
+    padding: 0 9px;
+  }
+}
+
+/* 56px 카드에 두 덩어리가 다 들어가지 않는 폭에서는 툴바가 다시 쌓인다 —
+   `02-calendar.css`의 `@container gcalbar`가 그 일을 이미 하고 있고, 여기서
+   할 일은 고정 높이를 풀어주는 것뿐이다. */
+@container gcalbar (max-width: 620px) {
+  .gcal-toolbar {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+  }
 }
