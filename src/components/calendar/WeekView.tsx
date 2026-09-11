@@ -1,4 +1,4 @@
-import { CSSProperties, DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, DragEvent, memo, MutableRefObject, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { CalendarItem } from "../../utils/calendarItems";
 import {
@@ -21,6 +21,8 @@ import { todayValue } from "../../utils/date";
 import { dayHeadFormatter, dayHeadParts } from "../../utils/calendarHeader";
 import { formatClock, formatClockRange, formatHourLabel } from "../../utils/clock";
 import { useHoursAtATime, useTimeFormat } from "../../utils/appPrefs";
+import type { TimeFormat } from "../../types";
+import { useStableCallback } from "../../hooks/useStableCallback";
 import { blockIsTight, blockShowsTime } from "../../utils/eventBlock";
 import { eventColorVars } from "./eventColorVars";
 import { activateOnKey } from "./blockActivation";
@@ -138,6 +140,174 @@ function asDate(value: string) {
 const gridStartMin = DAY_START * 60;
 const hours = Array.from({ length: DAY_END - DAY_START }, (_, index) => DAY_START + index);
 
+/**
+ * The empty hour rows behind one day's blocks.
+ *
+ * Twenty-four divs, drawn once per day column, so seven of these is 168
+ * elements that depend on nothing but the row height — and were rebuilt on
+ * every render of the grid, which during a pointer drag is every pointer
+ * event.
+ */
+const HourSlots = memo(function HourSlots({ slotHeight }: { slotHeight: number }) {
+  return (
+    <>
+      {hours.map((hour) => (
+        <div key={hour} className="gcal-time-slot" style={{ height: slotHeight }} />
+      ))}
+    </>
+  );
+});
+
+/**
+ * One event on the time grid.
+ *
+ * Memoized, and for the same reason the task rows are: the grid redraws far
+ * more often than its blocks change. Dragging one block fires a state update
+ * per pointer event — up to 120 a second — and each one used to rebuild every
+ * block in the week, `motion.div` and all, when at most one of them had moved.
+ * Opening a popover, picking a block and scrolling did the same.
+ *
+ * The props are the item plus numbers and booleans, and `items` upstream is
+ * memoized on the data it is built from, so during any of the above the
+ * shallow compare answers "nothing changed" for every block but the one the
+ * reader is actually touching. The handlers come from the grid and are stable
+ * for as long as it is mounted.
+ */
+interface TimeBlockProps {
+  item: CalendarItem;
+  top: number;
+  height: number;
+  col: number;
+  cols: number;
+  startMin: number;
+  endMin: number;
+  picked: boolean;
+  resizing: boolean;
+  motionEnabled: boolean;
+  timeFormat: TimeFormat;
+  clockLocale: "ko" | "en";
+  /** Set while a drag is being finished, so the click it ends with is ignored. */
+  suppressClickRef: MutableRefObject<boolean>;
+  onClickItem: (item: CalendarItem, anchor: PopoverAnchor) => void;
+  onToggleDone?: (taskId: string) => void;
+  onStartMove: (event: ReactPointerEvent<HTMLElement>, item: CalendarItem, startMin: number, endMin: number, allDay?: boolean) => void;
+  onStartResize: (event: ReactPointerEvent<HTMLElement>, item: CalendarItem, edge: "start" | "end", startMin: number, endMin: number) => void;
+}
+
+const TimeBlock = memo(function TimeBlock({
+  item,
+  top,
+  height,
+  col,
+  cols,
+  startMin,
+  endMin,
+  picked,
+  resizing,
+  motionEnabled,
+  timeFormat,
+  clockLocale,
+  suppressClickRef,
+  onClickItem,
+  onToggleDone,
+  onStartMove,
+  onStartResize,
+}: TimeBlockProps) {
+  const widthPct = 100 / cols;
+  return (
+          <motion.div
+            // §2.1/D2-A: a div, not a button — §4 puts a real
+            // checkbox inside, and a <button> may not contain one.
+            role="button"
+            tabIndex={0}
+            data-calendar-interactive="true"
+            variants={motionEnabled ? calendarBlockVariants : undefined}
+            initial={motionEnabled ? "initial" : false}
+            animate={motionEnabled ? "animate" : undefined}
+            exit={motionEnabled ? "exit" : undefined}
+            transition={motionEnabled ? transitions.soft : reducedTransition}
+            className={[
+              "gcal-time-block",
+              picked ? "is-picked" : "",
+              resizing ? "is-resizing" : "",
+              item.layer === "external" ? "is-external" : "",
+              item.layer === "focus-actual" ? "is-focus-actual" : "",
+              item.done ? "is-done" : "",
+              blockIsTight(height) ? "is-tight" : "",
+            ].filter(Boolean).join(" ")}
+            onPointerDown={item.draggable ? (event) => onStartMove(event, item, startMin, endMin) : undefined}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (suppressClickRef.current) return;
+              onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
+            }}
+            onKeyDown={activateOnKey<HTMLDivElement>((event) => {
+              onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
+            })}
+            // The category colour is handed to CSS as a variable and
+            // every derived colour — tint, left bar, title and time —
+            // is mixed there. A hard-coded `${color}22` could not vary
+            // by theme, and 13% over the dark canvas is invisible.
+            // The focus-actual hatching moved to CSS for the same
+            // reason (`.is-focus-actual`).
+            style={{
+              top,
+              height,
+              left: `${col * widthPct}%`,
+              width: cols > 1 ? `calc(${widthPct}% - 2px)` : "100%",
+              zIndex: 10 + col,
+              ...eventColorVars(item.color),
+            } as CSSProperties}
+          >
+            {/* §4.1-A: the box is drawn even on a 24px block. The
+                alternative was "some events cannot be ticked", a
+                rule with nothing on screen to explain it. */}
+            <CalendarItemCheck item={item} onToggleDone={onToggleDone} size="block" />
+            <span className="gcal-tb-text">
+              <span className="gcal-tb-title">
+                {item.repeating ? "↺ " : null}
+                {item.title}
+              </span>
+              {/* R1 made the row height follow the window, so a short
+                  event can be shorter than its own two lines. §2.4:
+                  Calendar.app draws the time "only when the block is
+                  tall enough". */}
+              {blockShowsTime(height) ? (
+                <span className="gcal-tb-time">
+                  {resizing
+                    ? formatClockRange(minutesToTime(startMin), minutesToTime(endMin), timeFormat, clockLocale)
+                    : formatClockRange(item.startTime, item.endTime, timeFormat, clockLocale)}
+                </span>
+              ) : null}
+            </span>
+            {item.draggable ? (
+              <>
+                <span
+                  role="presentation"
+                  className="gcal-resize-handle is-start"
+                  data-calendar-interactive="true"
+                  onPointerDown={(event) => onStartResize(event, item, "start", startMin, endMin)}
+                  onDragStart={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                />
+                <span
+                  role="presentation"
+                  className="gcal-resize-handle is-end"
+                  data-calendar-interactive="true"
+                  onPointerDown={(event) => onStartResize(event, item, "end", startMin, endMin)}
+                  onDragStart={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                />
+              </>
+            ) : null}
+          </motion.div>
+  );
+});
+
 function timeToMinutesOrNull(value: string): number | null {
   if (!value) return null;
   const [hour, minute] = value.split(":").map(Number);
@@ -222,6 +392,28 @@ export function WeekView({
   // without doing side effects inside a setState updater.
   const resizeRef = useRef<LiveResize | null>(null);
   const [move, setMove] = useState<LiveMove | null>(null);
+  /**
+   * The two drag starters, and the grid's two callbacks, fixed for as long as
+   * the grid is mounted.
+   *
+   * Every block on screen holds all four. Rebuilt each render — which the two
+   * below are, and which the props from `CalendarView` are too, being inline
+   * arrows there — they are a changed prop on every block, and `TimeBlock`'s
+   * memo never gets to say no. The whole point of memoizing the block is that
+   * dragging one of them does not redraw the rest.
+   */
+  const startResize = useStableCallback(
+    (...args: Parameters<typeof startResizeImpl>) => startResizeImpl(...args),
+  );
+  const startMove = useStableCallback(
+    (...args: Parameters<typeof startMoveImpl>) => startMoveImpl(...args),
+  );
+  const clickItem = useStableCallback(onClickItem);
+  // Stable, but still absent when the caller gave nothing: `CalendarItemCheck`
+  // draws no box without a handler, so a wrapper that is always a function
+  // would put a dead checkbox on every item the caller meant to leave alone.
+  const toggleDoneStable = useStableCallback((taskId: string) => onToggleDone?.(taskId));
+  const toggleDone = onToggleDone ? toggleDoneStable : undefined;
   const moveRef = useRef<LiveMove | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const alldayRowRef = useRef<HTMLDivElement>(null);
@@ -394,7 +586,7 @@ export function WeekView({
     setSelection(null);
   }
 
-  function startResize(
+  function startResizeImpl(
     event: ReactPointerEvent<HTMLElement>,
     item: CalendarItem,
     edge: "start" | "end",
@@ -446,7 +638,7 @@ export function WeekView({
   // existing time-slot position — the block's duration (and grab offset)
   // fall back to the source task's usual estimate instead of the block's
   // current start/end.
-  function startMove(
+  function startMoveImpl(
     event: ReactPointerEvent<HTMLElement>,
     item: CalendarItem,
     startMin: number,
@@ -794,9 +986,7 @@ export function WeekView({
                 onPointerUp={(event) => handlePointerUp(event as ReactPointerEvent<HTMLDivElement>)}
                 onPointerCancel={(event) => handlePointerCancel(event as ReactPointerEvent<HTMLDivElement>)}
               >
-                {hours.map((hour) => (
-                  <div key={hour} className="gcal-time-slot" style={{ height: slotHeight }} />
-                ))}
+                <HourSlots slotHeight={slotHeight} />
                 {liveRange ? (
                   <div
                     className="gcal-selection-block"
@@ -895,97 +1085,26 @@ export function WeekView({
                   const { col, cols } = overlapLayout.get(item.key) ?? { col: 0, cols: 1 };
                   const widthPct = 100 / cols;
                   return (
-                    <motion.div
+                    <TimeBlock
                       key={item.key}
-                      // §2.1/D2-A: a div, not a button — §4 puts a real
-                      // checkbox inside, and a <button> may not contain one.
-                      role="button"
-                      tabIndex={0}
-                      data-calendar-interactive="true"
-                      variants={motionEnabled ? calendarBlockVariants : undefined}
-                      initial={motionEnabled ? "initial" : false}
-                      animate={motionEnabled ? "animate" : undefined}
-                      exit={motionEnabled ? "exit" : undefined}
-                      transition={motionEnabled ? transitions.soft : reducedTransition}
-                      className={[
-                        "gcal-time-block",
-                        item.key === selectedKey ? "is-picked" : "",
-                        resize?.key === item.key ? "is-resizing" : "",
-                        item.layer === "external" ? "is-external" : "",
-                        item.layer === "focus-actual" ? "is-focus-actual" : "",
-                        item.done ? "is-done" : "",
-                        blockIsTight(height) ? "is-tight" : "",
-                      ].filter(Boolean).join(" ")}
-                      onPointerDown={item.draggable ? (event) => startMove(event, item, startMin, endMin) : undefined}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (suppressClickRef.current) return;
-                        onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
-                      }}
-                      onKeyDown={activateOnKey<HTMLDivElement>((event) => {
-                        onClickItem(item, anchorFromRect(event.currentTarget.getBoundingClientRect()));
-                      })}
-                      // The category colour is handed to CSS as a variable and
-                      // every derived colour — tint, left bar, title and time —
-                      // is mixed there. A hard-coded `${color}22` could not vary
-                      // by theme, and 13% over the dark canvas is invisible.
-                      // The focus-actual hatching moved to CSS for the same
-                      // reason (`.is-focus-actual`).
-                      style={{
-                        top,
-                        height,
-                        left: `${col * widthPct}%`,
-                        width: cols > 1 ? `calc(${widthPct}% - 2px)` : "100%",
-                        zIndex: 10 + col,
-                        ...eventColorVars(item.color),
-                      } as CSSProperties}
-                    >
-                      {/* §4.1-A: the box is drawn even on a 24px block. The
-                          alternative was "some events cannot be ticked", a
-                          rule with nothing on screen to explain it. */}
-                      <CalendarItemCheck item={item} onToggleDone={onToggleDone} size="block" />
-                      <span className="gcal-tb-text">
-                        <span className="gcal-tb-title">
-                          {item.repeating ? "↺ " : null}
-                          {item.title}
-                        </span>
-                        {/* R1 made the row height follow the window, so a short
-                            event can be shorter than its own two lines. §2.4:
-                            Calendar.app draws the time "only when the block is
-                            tall enough". */}
-                        {blockShowsTime(height) ? (
-                          <span className="gcal-tb-time">
-                            {resize?.key === item.key
-                              ? formatClockRange(minutesToTime(startMin), minutesToTime(endMin), timeFormat, clockLocale)
-                              : formatClockRange(item.startTime, item.endTime, timeFormat, clockLocale)}
-                          </span>
-                        ) : null}
-                      </span>
-                      {item.draggable ? (
-                        <>
-                          <span
-                            role="presentation"
-                            className="gcal-resize-handle is-start"
-                            data-calendar-interactive="true"
-                            onPointerDown={(event) => startResize(event, item, "start", startMin, endMin)}
-                            onDragStart={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                            }}
-                          />
-                          <span
-                            role="presentation"
-                            className="gcal-resize-handle is-end"
-                            data-calendar-interactive="true"
-                            onPointerDown={(event) => startResize(event, item, "end", startMin, endMin)}
-                            onDragStart={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                            }}
-                          />
-                        </>
-                      ) : null}
-                    </motion.div>
+                      item={item}
+                      top={top}
+                      height={height}
+                      col={col}
+                      cols={cols}
+                      startMin={startMin}
+                      endMin={endMin}
+                      picked={item.key === selectedKey}
+                      resizing={resize?.key === item.key}
+                      motionEnabled={motionEnabled}
+                      timeFormat={timeFormat}
+                      clockLocale={clockLocale}
+                      suppressClickRef={suppressClickRef}
+                      onClickItem={clickItem}
+                      onToggleDone={toggleDone}
+                      onStartMove={startMove}
+                      onStartResize={startResize}
+                    />
                   );
                   });
                 })()}
