@@ -280,7 +280,19 @@
    이 버그를 갖고 있고, 모든 열이 정확히 7일이라 드러나지 않을 뿐이다. */
 .ff-timeline-band {
   min-width: 0;
-  padding-left: 8px;
+  /* `text-indent`, NOT `padding-left`, and this is the whole reason the band
+     edges line up with the rules under them.
+
+     With `box-sizing: border-box` a `flex-basis: 0` item cannot be narrower
+     than its own padding, so 8px of padding is taken off the top before the
+     ratio is applied: each band came out `8 + (W − 16) × share` instead of
+     `W × share`, and the second band's edge landed 4.8px right of the rule it
+     names [실측, e2e/ganttBars]. Indenting the TEXT costs the box nothing.
+
+     The reference writes `padding-left: 8px` here and gets away with it
+     because it sizes its segments with an explicit `width: %`, where
+     border-box puts the padding inside. */
+  text-indent: 8px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
