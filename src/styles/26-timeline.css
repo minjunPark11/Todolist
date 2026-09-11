@@ -1035,6 +1035,21 @@
   display: none;
 }
 
+/* 그리고 Main은 자기가 몇 번째 열인지 말해야 한다.
+
+   `.tm-shell`은 `사이드바 | 본문 | Detail` 세 열이고 배치를 자동에 맡긴다.
+   사이드바를 `display: none`으로 빼면 자동 배치가 본문을 **첫 번째** 열로
+   옮기는데, 접혔을 때 그 열은 0px이다 — 화면이 통째로 빈다 [실측].
+
+   `19-app-shell.css`가 `.app-shell`에 대해 정확히 이 함정을 이미 진단하고
+   `grid-column: 2`로 고쳐뒀다("Auto-placement was doing the right thing only
+   while a sidebar happened to be sitting in front of it"). `.tm-shell`에는
+   그 수정이 없었고, 그때는 이 셸에서 사이드바가 사라질 일이 없어서 드러나지
+   않았을 뿐이다. 접기가 그 일을 만들었으므로 같은 수정을 여기에도 한다. */
+.app-frame.is-sidebar-collapsed .tm-shell > .tm-main {
+  grid-column: 2;
+}
+
 /* 솔기 위, 그리고 조준하기 전까지 조용하다. */
 .context-sidebar-fold {
   position: absolute;

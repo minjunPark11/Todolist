@@ -156,6 +156,49 @@ test.describe("the Context Sidebar frame", () => {
   // left of §3.30's "zero width" case is CS-07 below, where the module has no
   // sidebar at all.
 
+  // The collapse control, and the trap under it
+  // (TIMELINE_REFERENCE_PARITY_DESIGN.md §4.6).
+  //
+  // `.tm-shell` is `sidebar | main | detail` and leaves placement to the
+  // browser. Hiding the sidebar moves Main into the FIRST column, which is 0px
+  // while collapsed — the whole screen went blank and nothing in the suite
+  // noticed, because nothing pressed this button. A screenshot found it.
+  test("CS-12 — collapsing gives the column to the content, not to nothing", async ({ page }) => {
+    await openApp(page);
+    await expect(page.locator("#context-sidebar")).toBeVisible();
+
+    const before = (await page.locator(".tm-main").boundingBox())?.width ?? 0;
+    expect(before).toBeGreaterThan(0);
+
+    await page.getByRole("button", { name: /접기|Collapse/ }).click();
+    // Hidden, not removed: `display: none` is what takes it out of the tab
+    // order and the accessibility tree, and the element stays in the DOM.
+    await expect(page.locator("#context-sidebar")).toBeHidden();
+
+    const after = (await page.locator(".tm-main").boundingBox())?.width ?? 0;
+    // Main got WIDER, rather than being pushed into the column that just went
+    // to 0. Not an exact sum: the Detail column is `auto` and takes its share
+    // of what was freed, and `.tm-main`'s own padding follows the responsive
+    // mode, which the extra width can flip. The bug this pins made Main 0px —
+    // what has to be true is that it grew.
+    expect(after).toBeGreaterThan(before);
+  });
+
+  test("CS-13 — the width the reader chose survives a collapse", async ({ page }) => {
+    await openApp(page);
+    await expect(page.locator("#context-sidebar")).toBeVisible();
+
+    // Collapsed is stored apart from the width, so reopening restores the
+    // number rather than the default — the rule `contextSidebar.ts` has
+    // carried since before the control was removed.
+    await page.getByRole("button", { name: /접기|Collapse/ }).click();
+    await page.reload();
+    await expect(page.locator("#context-sidebar")).toBeHidden();
+
+    await page.getByRole("button", { name: /펼치기|Expand/ }).click();
+    await expectSidebarWidth(page, DEFAULT_WIDTH);
+  });
+
   test("CS-07 — a module without a sidebar hides it, and Tasks gets its width back", async ({ page }) => {
     await openApp(page);
     await dragHandle(page, 56);
