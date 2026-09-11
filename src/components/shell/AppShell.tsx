@@ -20,7 +20,13 @@
 // top-left corner. It sat on top of the first row of whatever sidebar was
 // underneath — on the Tasks sidebar, squarely on "오늘" — and a control that
 // covers a row to save a column the user can already drag to any width was not
-// worth the overlap. Below the desktop breakpoint the sidebar is still a drawer
+// worth the overlap.
+//
+// Collapse is back, and the shape is why
+// (TIMELINE_REFERENCE_PARITY_DESIGN.md §4.6): the reference's handle sits on
+// the sidebar's right EDGE rather than over its first row, and is invisible
+// until the pointer is near it. That is the recorded objection answered rather
+// than overruled. Below the desktop breakpoint the sidebar is still a drawer
 // with a menu button of its own; that is a different control and it stays.
 import { useEffect, type ReactNode } from "react";
 import {
@@ -59,7 +65,11 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
 
   return (
     <div
-      className={["app-frame", sidebar.isResizing ? "is-sidebar-resizing" : ""]
+      className={[
+        "app-frame",
+        sidebar.isResizing ? "is-sidebar-resizing" : "",
+        sidebar.isCollapsed ? "is-sidebar-collapsed" : "",
+      ]
         .filter(Boolean)
         .join(" ")}
       data-sidebar-mode={sidebar.mode}
@@ -92,7 +102,40 @@ export function AppShell({ rail, sidebar, children }: AppShellProps) {
       {/* §3.15/§3.20. Absolutely positioned at the sidebar's right edge rather
           than rendered inside it, because the sidebar still belongs to the
           inner shell's grid — the handle has to reach across that boundary. */}
+      {/* §4.6: on the seam, and quiet until pointed at.
+
+          It is a sibling of the resize handle and sits at the same x, which is
+          deliberate — one edge, two gestures: drag it to choose a width, press
+          it to put the column away. */}
       {hasSidebar ? (
+        <button
+          type="button"
+          className="context-sidebar-fold"
+          aria-expanded={!sidebar.isCollapsed}
+          aria-controls={CONTEXT_SIDEBAR_ID}
+          aria-label={t(sidebar.isCollapsed ? "shell.expandSidebar" : "shell.collapseSidebar")}
+          title={t(sidebar.isCollapsed ? "shell.expandSidebar" : "shell.collapseSidebar")}
+          onClick={sidebar.toggleCollapsed}
+        >
+          <span className="context-sidebar-fold-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
+              <path
+                d="m14 6-6 6 6 6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        </button>
+      ) : null}
+
+      {/* The resize handle is hidden while the column is folded away: there is
+          nothing to size, and a 10px drag target over the Rail's edge would
+          catch presses meant for the Rail. */}
+      {hasSidebar && !sidebar.isCollapsed ? (
         <div
           className="context-sidebar-handle"
           role="separator"

@@ -29,6 +29,8 @@ function sidebarState(overrides: Partial<ContextSidebarState> = {}): ContextSide
     width: 248,
     effectiveWidth: 248,
     isResizing: false,
+    isCollapsed: false,
+    toggleCollapsed: vi.fn(),
     beginResize: vi.fn(),
     resizeByKey: vi.fn(() => false),
     resetWidth: vi.fn(),
@@ -110,7 +112,7 @@ describe("the resize handle (§3.51)", () => {
 
     expect(handle.getAttribute("aria-orientation")).toBe("vertical");
     expect(handle.getAttribute("aria-valuenow")).toBe("300");
-    expect(handle.getAttribute("aria-valuemin")).toBe("216");
+    expect(handle.getAttribute("aria-valuemin")).toBe("144");
     expect(handle.getAttribute("aria-valuemax")).toBe("360");
     expect(handle.getAttribute("aria-label")).toBeTruthy();
     // Without this the keyboard resize §3.17 defines is unreachable.
@@ -127,10 +129,36 @@ describe("the resize handle (§3.51)", () => {
 // here. Neither button exists any more: the collapse control sat on top of the
 // sidebar's first row, and a column the user can already drag to any width did
 // not need one (AppShell).
-describe("the frame draws no collapse control", () => {
-  it("leaves the sidebar's first row unobstructed", () => {
+// The collapse control is back, and the SHAPE is why
+// (TIMELINE_REFERENCE_PARITY_DESIGN.md §4.6). It was removed because its
+// button sat over the sidebar's first row — on the Tasks sidebar, squarely on
+// `오늘`. The reference's handle is on the right edge instead.
+describe("the collapse control (§4.6)", () => {
+  it("leaves the sidebar's first row unobstructed, being on the far edge", () => {
     renderShell();
-    expect(screen.queryByRole("button", { name: /접기|펼치기/ })).toBeNull();
+    const fold = screen.getByRole("button", { name: /접기|펼치기|Collapse|Expand/ });
+
+    // The seam, not the corner: the Rail plus the sidebar's own width, less
+    // half the control. A control at the first row would be at `left: 0`.
+    expect(fold.style.left).toBe("");
+    expect(fold.className).toContain("context-sidebar-fold");
+    expect(fold.getAttribute("aria-controls")).toBe(CONTEXT_SIDEBAR_ID);
+  });
+
+  it("says which way it goes, and which way it would go", () => {
+    renderShell();
+    expect(screen.getByRole("button", { name: /접기|Collapse/ }).getAttribute("aria-expanded")).toBe("true");
+
+    cleanup();
+    renderShell(sidebarState({ isCollapsed: true, effectiveWidth: 0 }));
+    expect(screen.getByRole("button", { name: /펼치기|Expand/ }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  // Nothing to size, and a 10px drag target over the Rail's edge would catch
+  // presses meant for the Rail.
+  it("takes the resize handle away while the column is folded", () => {
+    renderShell(sidebarState({ isCollapsed: true, effectiveWidth: 0 }));
+    expect(screen.queryByRole("separator")).toBeNull();
   });
 });
 

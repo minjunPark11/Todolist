@@ -23,15 +23,19 @@ import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./addList.helpers";
 
 const WIDTH_KEY = "focusflow-sidebar-width";
-// 232 since the reference set the sidebar's width
-// (POLISHED_REFERENCE_PARITY_DESIGN.md §2.1); `CONTEXT_SIDEBAR_DEFAULT_WIDTH`
-// in `src/app/contextSidebar` is where it is decided.
-const DEFAULT_WIDTH = 232;
+// 144 since the timeline reference set the sidebar's width
+// (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.1, §4.6). The list mockup says 232
+// and the timeline mockup says 144; the two disagree and the sidebar is one
+// shared column, so `CONTEXT_SIDEBAR_DEFAULT_WIDTH` in
+// `src/app/contextSidebar` is where that is decided and why.
+const DEFAULT_WIDTH = 144;
 // 화살표 한 칸. 위 값들이 `DEFAULT_WIDTH + n`으로 적힌 이유는 이번에 드러났다 —
 // 336·304·288·264가 리터럴이라, 기본폭이 248에서 232로 내려가자 넷이 한꺼번에
 // 빨개졌다. 재는 대상은 "기본값에서 얼마나 움직였나"이지 절대 픽셀이 아니다.
 const STEP = 16;
-const MIN_WIDTH = 216;
+// The default is also the floor now: there is no reason to go narrower than
+// the reference, and the handle's job is to make the column WIDER.
+const MIN_WIDTH = 144;
 const MAX_WIDTH = 360;
 
 /** The width the layout is actually using, read off the frame (not declared). */
@@ -97,10 +101,10 @@ test.describe("the Context Sidebar frame", () => {
     expect(Math.round(mainBefore - mainAfter)).toBe(40);
     // §2.3.3, the invariant the whole frame rests on.
     expect((await page.locator(".global-rail").boundingBox())?.width).toBe(railBefore);
-    // 52 since the reference set the Rail's width
-    // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.1). What this line is really
+    // 40 since the timeline reference set the Rail's width
+    // (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.1). What this line is really
     // about is that the drag did not move it at all — the assertion above.
-    expect(railBefore).toBe(52);
+    expect(railBefore).toBe(40);
   });
 
   test("CS-02 — dragging far left stops at the minimum, leaving the sidebar there", async ({ page }) => {
@@ -161,7 +165,7 @@ test.describe("the Context Sidebar frame", () => {
     await expect(page).toHaveURL(/\/calendar$/);
     // §2.16: a Global Module owns its whole width.
     await expect(page.locator("#context-sidebar")).toHaveCount(0);
-    expect((await page.locator(".global-rail").boundingBox())?.width).toBe(52);
+    expect((await page.locator(".global-rail").boundingBox())?.width).toBe(40);
 
     await rail(page, "Tasks").click();
     await expect(page.locator("#context-sidebar")).toBeVisible();

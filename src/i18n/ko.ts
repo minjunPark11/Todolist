@@ -183,6 +183,8 @@ export const ko: Dictionary = {
   "rail.search": "검색",
   "shell.chrome": "사이드바 컨트롤",
   "shell.resizeSidebar": "사이드바 너비 조절",
+  "shell.collapseSidebar": "사이드바 접기",
+  "shell.expandSidebar": "사이드바 펼치기",
 
   // 앱이 직접 그리는 창 캡션(WindowTitleBar.tsx). 아이콘뿐이라 이 문자열이
   // 툴팁이자 접근성 이름이다.

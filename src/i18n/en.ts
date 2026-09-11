@@ -184,6 +184,8 @@ export const en: Dictionary = {
   "rail.search": "Search",
   "shell.chrome": "Sidebar controls",
   "shell.resizeSidebar": "Resize sidebar",
+  "shell.collapseSidebar": "Collapse the sidebar",
+  "shell.expandSidebar": "Expand the sidebar",
 
   // The app-drawn window caption (WindowTitleBar.tsx). Icon-only buttons, so
   // these are the accessible names as well as the tooltips.

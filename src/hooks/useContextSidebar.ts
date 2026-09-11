@@ -12,6 +12,7 @@
 // is no way for it to disagree with the address.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  COLLAPSED_STORAGE_KEY,
   CONTEXT_SIDEBAR_DEFAULT_WIDTH,
   WIDTH_STORAGE_KEY,
   clampContextSidebarWidth,
@@ -26,6 +27,9 @@ export interface ContextSidebarState {
   mode: ContextSidebarMode;
   width: number;
   isResizing: boolean;
+  /** Folded away entirely, so the canvas gets the column (§4.6). */
+  isCollapsed: boolean;
+  toggleCollapsed: () => void;
   /** What the layout uses: 0 when there is no sidebar. */
   effectiveWidth: number;
   /** pointerdown on the resize handle. */
@@ -54,6 +58,20 @@ export function useContextSidebar(path: string): ContextSidebarState {
     }
   });
   const [isResizing, setIsResizing] = useState(false);
+  /**
+   * Collapsed, remembered (§4.6).
+   *
+   * Its own key rather than a width of 0, for the reason `contextSidebar.ts`
+   * has carried since before the control was removed: a collapsed sidebar that
+   * forgets its width reopens at the default and loses what the reader chose.
+   */
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(COLLAPSED_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   // The drag's own bookkeeping. A ref rather than state: these change on every
   // pointermove and none of them belong in a render.
@@ -64,6 +82,13 @@ export function useContextSidebar(path: string): ContextSidebarState {
   const beginResize = useCallback((clientX: number) => {
     dragRef.current = { startX: clientX, startWidth: widthRef.current };
     setIsResizing(true);
+  }, []);
+
+  const toggleCollapsed = useCallback(() => {
+    setIsCollapsed((collapsed) => {
+      persist(COLLAPSED_STORAGE_KEY, collapsed ? "0" : "1");
+      return !collapsed;
+    });
   }, []);
 
   const resetWidth = useCallback(() => {
@@ -139,11 +164,16 @@ export function useContextSidebar(path: string): ContextSidebarState {
       mode,
       width,
       isResizing,
-      effectiveWidth: effectiveContextSidebarWidth({ mode, width }),
+      isCollapsed,
+      toggleCollapsed,
+      /* Collapsed is 0 HERE and not in `width`: the grid track and the number
+         the reader chose are different questions, and only this one is the
+         layout's (§4.6). `width` keeps the choice, so reopening restores it. */
+      effectiveWidth: isCollapsed ? 0 : effectiveContextSidebarWidth({ mode, width }),
       beginResize,
       resizeByKey,
       resetWidth,
     }),
-    [mode, width, isResizing, beginResize, resizeByKey, resetWidth],
+    [mode, width, isResizing, isCollapsed, toggleCollapsed, beginResize, resizeByKey, resetWidth],
   );
 }

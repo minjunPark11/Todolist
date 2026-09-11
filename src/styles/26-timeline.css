@@ -54,15 +54,23 @@
   /* 링이 아닌 그림자는 자가 리터럴로 못 쓰게 한다 — 토큰이 그 통로다.
      `scale.test.ts`의 RING이 `0 0 0 …`만 통과시키는 이유는 I2-B가 걷어내는
      것이 흐림이 만든 가짜 깊이이지 링이 아니기 때문이고, 아래 넷은 전부
-     진짜 흐림이라 이름을 갖는다. */
-  --shadow-bar-selected: inset 0 0 0 1px var(--selected-ring), 0 1px 3px rgba(44, 48, 80, 0.08);
-  --shadow-tray: -10px 0 26px rgba(20, 25, 35, 0.035);
-  --shadow-float: 0 10px 26px rgba(25, 30, 40, 0.1);
-  --shadow-toast: 0 10px 28px rgba(25, 30, 40, 0.11);
-  --shadow-edge-toggle: 0 2px 7px rgba(25, 30, 40, 0.06);
+     진짜 흐림이라 이름을 갖는다.
 
-  /* 진행 중 노드의 두 겹 링. 흐림이 0이라 RING을 통과하지만, 두 겹이
-     한 값이라 이름이 있는 편이 읽힌다. */
+     **색은 레퍼런스에서 가져오지 않는다.** 목업은 전부 푸른기가 도는 그림자를
+     쓰는데(`rgba(25,30,40,.06)` 따위), 이 앱에는 §11.6이 있고
+     `e2e/surfaceHierarchy.spec.ts`가 화면의 모든 그림자를 훑으며 r=g=b를
+     확인한다 — 실제로 이 토큰들이 그 테스트에 걸렸다. 기울기(offset·blur·알파)만
+     옮기고 색은 집의 `rgba(0,0,0,α)`로 맞춘다. 화면에서 구분되지 않고,
+     구분되는 쪽이 규칙이 막으려던 것이다. */
+  --shadow-bar-selected: inset 0 0 0 1px var(--selected-ring), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-tray: -10px 0 26px rgba(0, 0, 0, 0.05);
+  --shadow-float: 0 10px 26px rgba(0, 0, 0, 0.1);
+  --shadow-toast: 0 10px 28px rgba(0, 0, 0, 0.11);
+  --shadow-edge-toggle: 0 2px 7px rgba(0, 0, 0, 0.07);
+
+  /* 진행 중 노드의 두 겹 링. 흐림이 0이라 그림자가 아니라 링이고 — 위 규칙이
+     다스리는 곳이 아니다 — 바깥 겹은 액센트여야 한다. 그것이 이 점을 "지금"
+     으로 만드는 색이고, 흰 안쪽 겹은 그 아래 막대에서 점을 떼어내는 테두리다. */
   --ring-focus-node: 0 0 0 2px rgba(255, 255, 255, 0.96), 0 0 0 3px rgba(86, 94, 231, 0.18);
 }
 
@@ -1002,4 +1010,96 @@
   z-index: 1;
   width: var(--timeline-label-width);
   background: var(--timeline-ground);
+}
+
+/* ============================================================================
+   P7 — 셸 (§2.1, §4.6)
+
+   레퍼런스는 레일 40px에 사이드바 144px이고, 사이드바를 통째로 접을 수 있다.
+   접기 손잡이는 사이드바의 **오른쪽 모서리**에 있고 평소에는 보이지 않는다 —
+   그것이 이 앱에서 접기를 지웠던 이유("버튼이 사이드바 첫 행 위에, Tasks에서는
+   '오늘' 정통으로 올라앉았다")를 정확히 피해가는 모양이다.
+   ========================================================================== */
+
+/* 레일. 폭은 `25-reference.css`가 정의하는 자리라 거기서 갈아끼운다. */
+:root {
+  --rail-w: 40px;
+  --rail-item: 30px;
+}
+
+/* 접힌 사이드바는 폭이 0이다 — 그것은 `effectiveWidth`가 이미 말하고 있고
+   (useContextSidebar), 그리드는 그 값을 읽는다. 여기서 할 일은 접근성 트리와
+   탭 순서에서 빼는 것뿐이다: 보이지 않는 열로 탭이 들어가면 안 된다. */
+.app-frame.is-sidebar-collapsed .tm-sidebar,
+.app-frame.is-sidebar-collapsed .app-shell > .ff-sidebar {
+  display: none;
+}
+
+/* 솔기 위, 그리고 조준하기 전까지 조용하다. */
+.context-sidebar-fold {
+  position: absolute;
+  top: 14px;
+  /* 크기 조절 손잡이와 같은 x다 — 한 모서리에 두 제스처: 끌면 폭을 고르고
+     누르면 열을 치운다. */
+  left: calc(var(--rail-w) + var(--context-sidebar-w, 248px) - 11px);
+  z-index: 26;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  box-shadow: var(--shadow-edge-toggle);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    left var(--motion-panel) cubic-bezier(0.2, 0, 0, 1),
+    opacity var(--motion-row) ease,
+    background var(--motion-row) ease,
+    color var(--motion-row) ease;
+}
+
+/* 사이드바 위에 포인터가 있을 때, 자기가 조준됐을 때, 키보드로 닿았을 때. */
+.app-frame:hover .context-sidebar-fold,
+.context-sidebar-fold:hover,
+.context-sidebar-fold:focus-visible {
+  opacity: 1;
+}
+
+.context-sidebar-fold:hover {
+  background: var(--bg-hover-content);
+  color: var(--text-secondary);
+}
+
+/* 접혀 있으면 레일 모서리에 붙고, 반쯤 보인다 — 사라진 열을 되찾는 길이
+   화면에 남아 있어야 한다. */
+.app-frame.is-sidebar-collapsed .context-sidebar-fold {
+  left: calc(var(--rail-w) - 11px);
+  opacity: 0.62;
+}
+
+.app-frame.is-sidebar-collapsed .context-sidebar-fold:hover,
+.app-frame.is-sidebar-collapsed .context-sidebar-fold:focus-visible {
+  opacity: 1;
+}
+
+.context-sidebar-fold-icon {
+  display: grid;
+  place-items: center;
+  transition: transform var(--motion-panel) cubic-bezier(0.2, 0, 0, 1);
+}
+
+.app-frame.is-sidebar-collapsed .context-sidebar-fold-icon {
+  transform: rotate(180deg);
+}
+
+/* 손잡이와 같은 이유로 데스크톱 전용이다: 그 아래에서 사이드바는 서랍이고,
+   자기 버튼이 따로 있다. */
+@media (max-width: 1023px) {
+  .context-sidebar-fold {
+    display: none;
+  }
 }

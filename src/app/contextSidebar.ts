@@ -4,26 +4,39 @@
 // Everything here is pure so the rules can be tested without a DOM. The React
 // state that uses them is `hooks/useContextSidebar.ts`.
 //
-// The sidebar could also be COLLAPSED, and the rule then was that width and
-// visibility stayed independent — storing "collapsed" as width 0 would have
-// lost the number the user picked. The collapse control is gone (AppShell), so
-// only the width is left, and the rule has nothing left to separate.
+// The sidebar can also be COLLAPSED, and the rule is that width and visibility
+// stay independent — storing "collapsed" as width 0 would lose the number the
+// user picked. That rule was briefly moot: the collapse control was removed
+// because its button sat on top of the sidebar's first row. The reference's
+// handle is at the sidebar's right EDGE and invisible until pointed at, which
+// is the objection answered rather than overruled, so collapse is back and so
+// is the separation (TIMELINE_REFERENCE_PARITY_DESIGN.md §4.6).
 import { pageForPath } from "./pageRoute";
 
 /**
- * §3.6이 248을 적었고, 레퍼런스는 232다
- * (POLISHED_REFERENCE_PARITY_DESIGN.md §2.1).
+ * 레퍼런스 둘이 이 숫자에서 어긋난다.
  *
- * 기본값만 옮긴다. 범위(216–360)는 그대로고 손잡이도 그대로다 — 폭은 저장되는
- * 사용자 설정이라, 첫 화면을 레퍼런스에 맞추는 일이 사람이 끌어놓은 값을
- * 버릴 이유는 되지 않는다. `--tm-detail-w`와 같은 자리이고 같은 결론이다(§4.7).
+ * §3.6이 248을 적었고, 목록 목업은 232이며
+ * (POLISHED_REFERENCE_PARITY_DESIGN.md §2.1), 타임라인 목업은 **144**다
+ * (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.1). 같은 앱의 두 목업이고
+ * 사이드바는 둘이 나눠 쓰는 한 열이라, 둘 다 맞출 수는 없다.
+ *
+ * 타임라인 쪽을 택한다 — 그 화면이 가로를 가장 아쉬워하고, 사이드바에서
+ * 88px을 받으면 그만큼이 곧 날짜다. 목록 화면에서 리스트 이름이 더 자주
+ * 잘리는 것이 그 대가이고, 그것이 이 결정의 알려진 비용이다.
+ *
+ * 손잡이는 그대로고 저장도 그대로다. 폭은 저장되는 사용자 설정이라 첫 화면을
+ * 레퍼런스에 맞추는 일이 사람이 끌어놓은 값을 버릴 이유는 되지 않는다 —
+ * 이미 232로 쓰던 계정은 232로 남고, 되돌리는 길은 손잡이 더블클릭이다.
+ * `--tm-detail-w`와 같은 자리이고 같은 결론이다(§4.7).
  *
  * CSS에서 `!important`로 누르는 방법도 있었다. 실제로 그렇게 했다가 되돌렸다:
  * 저장된 폭까지 같이 눌려서 손잡이가 죽었고, `e2e/navShell.spec.ts`의 CS-01~11이
  * 아홉 개 한꺼번에 그것을 잡았다. 폭을 정하는 곳은 여기다.
  */
-export const CONTEXT_SIDEBAR_DEFAULT_WIDTH = 232;
-export const CONTEXT_SIDEBAR_MIN_WIDTH = 216;
+export const CONTEXT_SIDEBAR_DEFAULT_WIDTH = 144;
+/** 기본값이 바닥이기도 하다 — 레퍼런스보다 좁아질 이유는 없다. */
+export const CONTEXT_SIDEBAR_MIN_WIDTH = 144;
 export const CONTEXT_SIDEBAR_MAX_WIDTH = 360;
 
 /**
@@ -46,6 +59,14 @@ export const CONTEXT_SIDEBAR_STEP = 16;
 export const CONTEXT_SIDEBAR_BIG_STEP = 32;
 
 export const WIDTH_STORAGE_KEY = "focusflow-sidebar-width";
+/**
+ * 접힘 상태 (TIMELINE_REFERENCE_PARITY_DESIGN.md §4.6).
+ *
+ * 폭과 따로 저장한다. 접힘을 폭 0으로 적으면 사람이 고른 숫자를 잃는다 —
+ * 이 파일의 머리주석이 그 이유를 적어놨고, 접기가 돌아왔으므로 그 문장도
+ * 다시 유효하다.
+ */
+export const COLLAPSED_STORAGE_KEY = "focusflow-sidebar-collapsed";
 
 /**
  * D-14 added a third, `space`, for the Space/Project tree that stood in this
