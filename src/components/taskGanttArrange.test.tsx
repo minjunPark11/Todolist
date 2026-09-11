@@ -82,8 +82,20 @@ function draw(
   return { onOpenItem, onMutateTask };
 }
 
-const chips = () =>
-  [...document.querySelectorAll(".tgv-chip")].map((chip) => chip.textContent ?? "");
+/**
+ * The tray is a drawer now and opens shut (§4.3), so every test that looks
+ * inside it opens it first — which is itself the change worth having in one
+ * place rather than spread over a dozen lines.
+ */
+function openTray() {
+  const toggle = screen.queryByRole("button", { name: /Arrange tasks/ });
+  if (toggle) fireEvent.click(toggle);
+}
+
+const chips = () => {
+  openTray();
+  return [...document.querySelectorAll(".tgv-chip")].map((chip) => chip.textContent ?? "");
+};
 
 /**
  * Pick a zoom (§9.4).
@@ -121,6 +133,7 @@ describe("Arrange tasks", () => {
 
   it("names itself and counts what is waiting", () => {
     draw([task({ id: "a", title: "One" }), task({ id: "b", title: "Two" })]);
+    openTray();
 
     const panel = screen.getByRole("complementary", { name: "Arrange tasks" });
     expect(panel.querySelector("h3")?.textContent).toBe("Arrange tasks");
@@ -129,9 +142,27 @@ describe("Arrange tasks", () => {
     expect(panel.querySelector(".tm-count")?.textContent).toBe("2");
   });
 
+  // §4.3: shut by default, which is the change from the column it replaces.
+  // That one was on screen whenever anything was waiting in it, and on this
+  // app's data something usually is. The count on the toggle says so without
+  // spending 288px on saying it.
+  it("opens shut, with the count on its own toggle", () => {
+    draw([task({ id: "a", title: "One" }), task({ id: "b", title: "Two" })]);
+
+    const toggle = screen.getByRole("button", { name: /Arrange tasks/ });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.querySelector("strong")?.textContent).toBe("2");
+    expect(document.querySelector(".ff-timeline-tray.is-open")).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector(".ff-timeline-tray.is-open")).toBeTruthy();
+  });
+
   it("is absent when there is nothing to arrange", () => {
     draw([task({ id: "dated", dueDate: "2026-09-04" })]);
     expect(screen.queryByRole("complementary", { name: "Arrange tasks" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Arrange tasks/ })).toBeNull();
   });
 
   // §3.5: the chip opens the Task, and will still open it after phase 3 adds
@@ -139,25 +170,30 @@ describe("Arrange tasks", () => {
   // cannot use at all.
   it("opens a Task from its chip", async () => {
     const { onOpenItem } = draw([task({ id: "bare", title: "Has neither" })]);
+    openTray();
 
     (document.querySelector(".tgv-chip") as HTMLButtonElement).click();
     expect(onOpenItem).toHaveBeenCalledTimes(1);
     expect(onOpenItem.mock.calls[0][0].sourceId).toBe("bare");
   });
 
-  // The grid and the panel are siblings in one row now. They used to be
-  // stacked, and the panel was a `<section>` after the grid rather than a
-  // column beside it.
-  it("puts the grid and the panel in the same row", () => {
+  // §4.3: it PUSHES the card rather than covering it, which is what answers
+  // §3.1's objection to the reference's overlay — "a panel over the grid hides
+  // days that are on screen". So the tray is a sibling of the body rather than
+  // a column inside it, and the body carries the margin.
+  it("pushes the grid aside rather than covering it", () => {
     draw([
       task({ id: "dated", dueDate: "2026-09-04" }),
       task({ id: "bare", title: "Has neither" }),
     ]);
 
-    const body = document.querySelector(".tgv-body");
-    expect(body).toBeTruthy();
-    expect(body?.querySelector(":scope > .ff-timeline")).toBeTruthy();
-    expect(body?.querySelector(":scope > .tgv-arrange")).toBeTruthy();
+    const root = document.querySelector(".tgv");
+    expect(root?.querySelector(":scope > .tgv-body > .ff-timeline")).toBeTruthy();
+    expect(root?.querySelector(":scope > .ff-timeline-tray")).toBeTruthy();
+
+    expect(root?.classList.contains("is-tray-open")).toBe(false);
+    openTray();
+    expect(root?.classList.contains("is-tray-open")).toBe(true);
   });
 });
 
@@ -254,7 +290,7 @@ describe("Arrange tasks at its edges", () => {
   // `undated.length > 0`, so there is no "nothing here yet" card to write.
   it("draws no empty panel", () => {
     draw([task({ id: "dated", dueDate: "2026-09-04" })]);
-    expect(document.querySelector(".tgv-arrange")).toBeNull();
+    expect(document.querySelector(".ff-timeline-tray")).toBeNull();
     // And the grid is still there to receive one later.
     expect(document.querySelector(".ff-timeline")).toBeTruthy();
   });
@@ -265,7 +301,7 @@ describe("Arrange tasks at its edges", () => {
   it("keeps the grid and its columns when every Task is still unplaced", () => {
     draw([task({ id: "bare", title: "Has neither" })], vi.fn(), vi.fn());
 
-    expect(document.querySelector(".tgv-arrange")).toBeTruthy();
+    expect(document.querySelector(".ff-timeline-tray")).toBeTruthy();
     expect(document.querySelectorAll(".ff-timeline-row")).toHaveLength(0);
     expect(document.querySelectorAll(".ff-timeline-col").length).toBeGreaterThan(0);
     // Not the empty state: that is for a Scope with no Tasks at all.
@@ -276,7 +312,7 @@ describe("Arrange tasks at its edges", () => {
   it("shows the empty state only when there is nothing either side", () => {
     draw([]);
     expect(document.querySelector(".ff-empty")).toBeTruthy();
-    expect(document.querySelector(".tgv-arrange")).toBeNull();
+    expect(document.querySelector(".ff-timeline-tray")).toBeNull();
   });
 
   // §3.5. The hint names the way in that this timeline actually has: a
@@ -284,11 +320,11 @@ describe("Arrange tasks at its edges", () => {
   // be an instruction they cannot follow.
   it("names the drag only where the drag exists", () => {
     draw([task({ id: "bare" })], vi.fn(), vi.fn());
-    expect(document.querySelector(".tgv-arrange-hint")?.textContent).toContain("Drag");
+    expect(document.querySelector(".ff-timeline-tray-hint")?.textContent).toContain("Drag");
 
     cleanup();
     draw([task({ id: "bare" })]);
-    expect(document.querySelector(".tgv-arrange-hint")?.textContent).not.toContain("Drag");
+    expect(document.querySelector(".ff-timeline-tray-hint")?.textContent).not.toContain("Drag");
   });
 });
 
@@ -305,37 +341,54 @@ describe("dropping a chip on a day", () => {
     } as unknown as DataTransfer;
   }
 
-  const chip = () => document.querySelector(".tgv-chip") as HTMLButtonElement;
-  const lanes = () => [...document.querySelectorAll(".ff-timeline-lane")];
+  function chip() {
+    openTray();
+    return document.querySelector(".tgv-chip") as HTMLButtonElement;
+  }
+  /**
+   * ONE drop target now, not one per column (§9.5).
+   *
+   * The lanes were a hit area cut into pieces that nothing read: every one of
+   * them answered by measuring the pointer against the track. What replaced
+   * the tint on the aimed-at lane is a preview that names the DAY.
+   */
+  const dropArea = () => document.querySelector(".ff-timeline-droparea");
 
-  // They cover the grid, so leaving them up would put a sheet of drop
-  // targets over every bar.
-  it("draws no lanes until a chip is in the air", () => {
+  // It covers the grid, so leaving it up would put a sheet over every bar.
+  it("draws no drop target until a chip is in the air", () => {
     draw([task({ id: "bare", title: "Has neither" })], vi.fn(), vi.fn());
-    expect(lanes()).toHaveLength(0);
+    expect(dropArea()).toBeNull();
 
     fireEvent.dragStart(chip(), { dataTransfer: dataTransfer(TRAY_DRAG_MIME, "bare") });
-    expect(lanes().length).toBeGreaterThan(0);
+    expect(dropArea()).toBeTruthy();
   });
 
   // A cancelled drag ends with `dragend` and no drop, which is the case that
   // would otherwise leave the sheet up.
-  it("takes the lanes away again when the drag ends", () => {
+  it("takes it away again when the drag ends", () => {
     draw([task({ id: "bare" })], vi.fn(), vi.fn());
     fireEvent.dragStart(chip(), { dataTransfer: dataTransfer(TRAY_DRAG_MIME, "bare") });
     fireEvent.dragEnd(chip());
-    expect(lanes()).toHaveLength(0);
+    expect(dropArea()).toBeNull();
   });
 
   /**
-   * jsdom has no layout, so a lane reports a zero-width box and the date the
-   * pointer named would always come back empty (§13). The box is stood up by
-   * hand here — which is itself the fact worth pinning: the drop reads the
-   * POINTER now, not the column it fell in.
+   * jsdom has no layout, so the drop area reports a zero-width box and the
+   * date the pointer named would always come back empty (§13). The box is
+   * stood up by hand — which is itself the fact worth pinning: the drop reads
+   * the POINTER against the whole track, not the column it fell in.
    */
-  function standUp(lane: Element, left = 0, width = 100) {
-    lane.getBoundingClientRect = () =>
-      ({ left, width, right: left + width, top: 0, bottom: 24, height: 24, x: left, y: 0 }) as DOMRect;
+  function standUp(node: Element, left = 0, width = 700) {
+    node.getBoundingClientRect = () =>
+      ({ left, width, right: left + width, top: 0, bottom: 400, height: 400, x: left, y: 0 }) as DOMRect;
+  }
+
+  /** A drag event carrying a coordinate, which `fireEvent` alone will not. */
+  function dragAt(node: Element, kind: "dragOver" | "drop", clientX: number, transfer: DataTransfer) {
+    const event = kind === "drop" ? createEvent.drop(node, { dataTransfer: transfer }) : createEvent.dragOver(node, { dataTransfer: transfer });
+    Object.defineProperty(event, "clientX", { value: clientX });
+    Object.defineProperty(event, "clientY", { value: 100 });
+    fireEvent(node, event);
   }
 
   it("writes the day the pointer named, not the column's first", () => {
@@ -349,13 +402,12 @@ describe("dropping a chip on a day", () => {
 
     const transfer = dataTransfer(TRAY_DRAG_MIME, "bare");
     fireEvent.dragStart(chip(), { dataTransfer: transfer });
-    standUp(lanes()[3]);
-    // `fireEvent.drop(node, { clientX })` does not carry the coordinate through
-    // this jsdom [실측] — the event has to be built and the property defined on
-    // it. Halfway across the lane, which at this zoom is halfway through a week.
-    const drop = createEvent.drop(lanes()[3], { dataTransfer: transfer });
-    Object.defineProperty(drop, "clientX", { value: 50 });
-    fireEvent(lanes()[3], drop);
+    const area = dropArea()!;
+    standUp(area);
+    // A five-week window over a 700px track: 20px a day. Aiming at 510px is
+    // the 25th day, which is the fourth day of the fourth week — NOT the
+    // Sunday that week starts on, which is the whole of §13.
+    dragAt(area, "drop", 510, transfer);
 
     expect(onMutateTask).toHaveBeenCalledTimes(1);
     const [target, mutation] = onMutateTask.mock.calls[0];
@@ -369,8 +421,8 @@ describe("dropping a chip on a day", () => {
     // the pointer, three days into that week rather than the Sunday it starts
     // on. That difference is the whole of §13.
     const window = timelineWindow("month", TODAY);
-    expect(patch).toEqual({ dueDate: dateAtColumnOffset(window, 3, 0.5) });
-    expect(patch.dueDate).not.toBe(window.edges[3]);
+    expect(patch).toEqual({ dueDate: dateAtColumnOffset(window, 3, 4 / 7) });
+    expect(patch.dueDate).not.toBe(window.edges[3].slice(0, 10));
     // And only the deadline (§3.2).
     expect(patch).not.toHaveProperty("startDate");
   });
@@ -378,16 +430,18 @@ describe("dropping a chip on a day", () => {
   // The bug the running app found: a successful drop takes the Task out of
   // the panel, so the chip UNMOUNTS and its `onDragEnd` goes with it. `dragend`
   // then reaches nothing and the lanes stay up as a sheet over the whole grid.
-  it("takes the lanes away after a drop, without waiting for dragend", () => {
+  it("takes the drop target away after a drop, without waiting for dragend", () => {
     const onMutateTask = vi.fn();
     draw([task({ id: "bare" })], vi.fn(), onMutateTask);
 
     const transfer = dataTransfer(TRAY_DRAG_MIME, "bare");
     fireEvent.dragStart(chip(), { dataTransfer: transfer });
-    fireEvent.drop(lanes()[2], { dataTransfer: transfer });
+    const area = dropArea()!;
+    standUp(area);
+    dragAt(area, "drop", 200, transfer);
 
     // No `dragEnd` fired here on purpose — that is the case being pinned.
-    expect(lanes()).toHaveLength(0);
+    expect(dropArea()).toBeNull();
   });
 
   // A bar drag carries `text/timeline` and nothing else, so a lane must find
@@ -396,9 +450,50 @@ describe("dropping a chip on a day", () => {
     const onMutateTask = vi.fn();
     draw([task({ id: "bare" })], vi.fn(), onMutateTask);
     fireEvent.dragStart(chip(), { dataTransfer: dataTransfer(TRAY_DRAG_MIME, "bare") });
+    const area = dropArea()!;
+    standUp(area);
 
-    fireEvent.drop(lanes()[1], { dataTransfer: dataTransfer("text/timeline", "move") });
+    dragAt(area, "drop", 200, dataTransfer("text/timeline", "move"));
     expect(onMutateTask).not.toHaveBeenCalled();
+  });
+
+  // §9.5: what replaced the tinted lane. The lane could say which COLUMN —
+  // at month zoom, which WEEK — and the reader let go hoping. This names the
+  // day and shows the bar that day would make.
+  it("previews the day under the pointer before the chip is let go", () => {
+    draw([task({ id: "bare", title: "Has neither" })], vi.fn(), vi.fn());
+    zoomTo("1 month");
+
+    const transfer = dataTransfer(TRAY_DRAG_MIME, "bare");
+    fireEvent.dragStart(chip(), { dataTransfer: transfer });
+    const area = dropArea()!;
+    standUp(area);
+    dragAt(area, "dragOver", 510, transfer);
+
+    // The chip names the day, unpadded, as the rest of this screen writes a
+    // date. 510/700 of a 35-day window is the 25th day — 9.24, counting from
+    // the Sunday (8.30) the month window opens on.
+    expect(document.querySelector(".ff-timeline-drop-chip")?.textContent).toBe("9.24");
+
+    // And the ghost is one DAY wide, snapped to that day's own left edge —
+    // it is the bar that would be created, and a bar starts at midnight.
+    const ghost = document.querySelector(".ff-timeline-drop-ghost") as HTMLElement;
+    expect(ghost.style.width).toBe(`${(1 / 35) * 100}%`);
+    expect(ghost.style.left).toBe(`${(25 / 35) * 100}%`);
+  });
+
+  it("takes the preview away when the pointer leaves the grid", () => {
+    draw([task({ id: "bare" })], vi.fn(), vi.fn());
+
+    const transfer = dataTransfer(TRAY_DRAG_MIME, "bare");
+    fireEvent.dragStart(chip(), { dataTransfer: transfer });
+    const area = dropArea()!;
+    standUp(area);
+    dragAt(area, "dragOver", 200, transfer);
+    expect(document.querySelector(".ff-timeline-drop-chip")).toBeTruthy();
+
+    fireEvent.dragLeave(area);
+    expect(document.querySelector(".ff-timeline-drop-chip")).toBeNull();
   });
 
   // §3.5: a panel that can only be dragged from is a panel some readers

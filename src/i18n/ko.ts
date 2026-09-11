@@ -164,6 +164,7 @@ export const ko: Dictionary = {
   "timeline.empty": "아직 놓을 것이 없습니다",
   "timeline.emptyHint": "날짜가 하나라도 있으면 여기에 나타납니다.",
   "timeline.arrangeTitle": "작업 배치",
+  "timeline.closeTray": "미배치 닫기",
   "timeline.trayHint": "시작일이나 마감일을 넣으면 기간이 생깁니다.",
   "timeline.arrangeHint": "날짜 위로 끌어다 놓거나, 열어서 날짜를 넣으세요.",
   "timeline.dependencies": "의존 관계",

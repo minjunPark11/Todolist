@@ -1405,7 +1405,16 @@ export function TasksModule(props: TasksModuleProps) {
           ) : null}
         </header>
 
-        {!missing && !props.loading ? (
+        {/* Above the views that are lists, INSIDE the one that is a grid
+            (TIMELINE_REFERENCE_PARITY_DESIGN.md §9.7).
+
+            The reference puts its create row in the first row's own place, in
+            the task column, with the track beside it left empty — because a
+            new task has no dates yet and the grid has nothing to draw for it.
+            A box floating above a card says the same thing in a place that
+            belongs to neither. One component either way; where it is rendered
+            is the whole difference. */}
+        {!missing && !props.loading && state.view !== "gantt" ? (
           <TaskQuickAdd
             scope={scope}
             lists={lists}
@@ -1478,6 +1487,26 @@ export function TasksModule(props: TasksModuleProps) {
                `NotificationCenter` already takes the same list. */
             focusSessions={props.focusSessions}
             timezone={props.timezone}
+            /* §9.7: the same quick-add, in the first row's place. */
+            createRow={
+              !missing && !props.loading ? (
+                <TaskQuickAdd
+                  scope={scope}
+                  lists={lists}
+                  inboxListId={lists.find(isInboxList)?.id ?? ""}
+                  today={today}
+                  folderLists={folderLists}
+                  folders={sidebarFolders}
+                  tags={tags}
+                  savedFilters={savedFilters}
+                  draftTitle={props.draftTitle}
+                  onCreate={(title, resolution) => {
+                    props.onDraftConsumed();
+                    props.onCreate(title, resolution);
+                  }}
+                />
+              ) : null
+            }
             workspaceTitle={
               <>
                 <h1 className="ff-timeline-scope">{title}</h1>

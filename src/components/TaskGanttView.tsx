@@ -78,6 +78,8 @@ interface TaskGanttViewProps {
    */
   focusSessions?: FocusSession[];
   timezone?: string;
+  /** The quick-add, for the first row's place (§9.7). */
+  createRow?: ReactNode;
 }
 
 export function TaskGanttView({
@@ -94,6 +96,7 @@ export function TaskGanttView({
   workspaceTitle,
   focusSessions,
   timezone,
+  createRow,
 }: TaskGanttViewProps) {
   const { t, lang } = useT();
   // Five weeks: long enough to hold a piece of work end to end, short
@@ -131,6 +134,15 @@ export function TaskGanttView({
    * real data behind it.
    */
   const [showMilestones, setShowMilestones] = useState(true);
+  /**
+   * Whether the unscheduled tray is out (§4.3).
+   *
+   * Shut by default, which is the change from the column it replaces: that
+   * one was on screen whenever anything was waiting in it, and on this app's
+   * data something usually is. The count on the toggle says so without
+   * spending 288px on saying it.
+   */
+  const [trayOpen, setTrayOpen] = useState(false);
   /**
    * Pressed `오늘`, so put today back on screen (§17).
    *
@@ -228,7 +240,12 @@ export function TaskGanttView({
     if (task.startDate) patch.startDate = "";
     if (task.dueDate) patch.dueDate = "";
     const mutation = dateMutation(task, patch);
-    if (mutation) onMutateTask(task, mutation);
+    if (!mutation) return;
+    onMutateTask(task, mutation);
+    // The Task has just left the grid; the tray is where it went. Opening it
+    // is what makes that visible rather than leaving the row to vanish
+    // (§9.8), and it is the same move `submitNewTask` makes in the reference.
+    setTrayOpen(true);
   }
 
   /** A chip let go over a column (§3.2, §3.3). */
@@ -361,15 +378,38 @@ export function TaskGanttView({
     </>
   );
 
+  /**
+   * The tray's own affordance, in the task column's utility row (§2.2).
+   *
+   * Beside the Scope's name rather than out with the view controls: what is
+   * waiting in it is TASKS, and the left-hand column is where this screen
+   * keeps tasks.
+   */
+  const trayToggle =
+    undated.length > 0 ? (
+      <button
+        type="button"
+        className="ff-timeline-tray-toggle"
+        aria-expanded={trayOpen}
+        onClick={() => setTrayOpen((open) => !open)}
+      >
+        <span>{t("timeline.arrangeTitle")}</span>
+        <strong>{undated.length}</strong>
+        <Caret open={trayOpen} />
+      </button>
+    ) : null;
+
   return (
-    <div className="tgv">
-      {/* §3.1: the panel takes a COLUMN beside the grid rather than lying
-          over it. The reference lies over the days it does not need; it can,
-          because it scrolls sideways — and since §17 so do we, which removes
-          the reason this was written but not the preference. A panel over the
-          grid hides days that are on screen; a panel beside it narrows the
-          track, and a narrower track is now scrolled rather than crushed. The
-          column stays because the reader can see both at once. */}
+    /* The tray PUSHES the grid rather than covering it
+       (TIMELINE_REFERENCE_PARITY_DESIGN.md §4.3).
+
+       It was a column standing beside the grid at all times. §3.1 chose that
+       over the reference's overlay, and the reason it gave was "a panel over
+       the grid hides days that are on screen" — which the reference's own
+       tray does not do: `margin-right` moves the card out from under it.
+       So §3.1's objection is answered rather than overruled, and what is
+       gained is the column back when nothing is waiting in it. */
+    <div className={`tgv${trayOpen && undated.length > 0 ? " is-tray-open" : ""}`}>
       <div className="tgv-body">
       {onWindow.length === 0 && undated.length === 0 ? (
         <EmptyState icon="📆" title={t("timeline.empty")} text={t("timeline.emptyHint")} />
@@ -395,11 +435,15 @@ export function TaskGanttView({
           recenterKey={recenterKey}
           controls={controls}
           workspaceTitle={workspaceTitle}
+          trayToggle={trayToggle}
           showMilestones={showMilestones}
           focusSessions={focusSessions}
           timezone={timezone}
+          createRow={createRow}
         />
       )}
+
+      </div>
 
       {/* T-GV06: an Item with no dates is not given invented ones. It stays
           in the scope and is listed here, where it can be opened and given
@@ -407,15 +451,27 @@ export function TaskGanttView({
 
           `Arrange tasks` is the reference app's name for this, and it is a
           better one than ours was (`No dates (3)`): the panel is not a
-          report of what is missing, it is the pile you work through. The
-          count stays, beside the name rather than inside it — §13.6.4's
-          rule from the Board's columns, where `Overdue 1` reads as two
-          words and a count in its own column did not. */}
+          report of what is missing, it is the pile you work through.
+
+          Outside `.tgv-body` now: it is positioned against `.tgv`, which is
+          what lets the card slide out from under it rather than be squeezed. */}
       {undated.length > 0 ? (
-        <aside className="tgv-arrange" aria-label={t("timeline.arrangeTitle")}>
-          <header className="tgv-arrange-head">
+        <aside
+          className={`ff-timeline-tray${trayOpen ? " is-open" : ""}`}
+          aria-label={t("timeline.arrangeTitle")}
+          aria-hidden={trayOpen ? undefined : true}
+        >
+          <header className="ff-timeline-tray-head">
             <h3>{t("timeline.arrangeTitle")}</h3>
             <span className="tm-count">{undated.length}</span>
+            <button
+              type="button"
+              className="ff-timeline-tray-close ff-icon-btn"
+              aria-label={t("timeline.closeTray")}
+              onClick={() => setTrayOpen(false)}
+            >
+              ✕
+            </button>
           </header>
           {/* Two ways in, and the hint names the one this timeline has.
 
@@ -424,7 +480,7 @@ export function TaskGanttView({
               cannot use at all — but where the drag exists it is the
               shorter sentence, so it is the one worth spending a line on.
               A read-only timeline gets the other. */}
-          <p className="tgv-arrange-hint">
+          <p className="ff-timeline-tray-hint">
             {t(onMutateTask ? "timeline.arrangeHint" : "timeline.trayHint")}
           </p>
           <ul>
@@ -443,7 +499,7 @@ export function TaskGanttView({
                     setDraggingChip(true);
                   }}
                   // Fires on a cancelled drag too, which is the case that
-                  // would otherwise leave the lanes up over the whole grid.
+                  // would otherwise leave the drop area up over the whole grid.
                   onDragEnd={() => setDraggingChip(false)}
                   onClick={() => onOpenItem(item)}
                 >
@@ -454,7 +510,6 @@ export function TaskGanttView({
           </ul>
         </aside>
       ) : null}
-      </div>
     </div>
   );
 }

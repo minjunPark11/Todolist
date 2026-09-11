@@ -138,6 +138,15 @@ function useFocusTick(live: boolean): number {
   return now;
 }
 
+/** Where a chip in the air would land (§9.5). Percentages of the track. */
+interface DropPreview {
+  date: string;
+  left: number;
+  width: number;
+  /** Pixels down the drop area — the pointer, since the Task has no row yet. */
+  top: number;
+}
+
 export interface TimelineRow {
   item: Item;
   /** Indented one step when the parent is also on screen (D9). */
@@ -245,6 +254,22 @@ interface TimelineViewProps {
    */
   workspaceTitle?: ReactNode;
   /**
+   * The unscheduled tray's toggle, at the far end of the same row (§4.3).
+   *
+   * Its own slot rather than part of `workspaceTitle`, because the two come
+   * from different places — the Scope owns its name, the timeline owns what it
+   * could not place — and they sit at opposite ends of the row.
+   */
+  trayToggle?: ReactNode;
+  /**
+   * The quick-add, drawn in the first row's place (§9.7).
+   *
+   * In the TASK column only, with the track beside it left blank: a task that
+   * does not exist yet has no dates, so there is nothing for the grid to draw
+   * — and the blank is what says so.
+   */
+  createRow?: ReactNode;
+  /**
    * Whether single-date work is drawn at all (§4.5).
    *
    * The reference's `마일스톤 표시`. It hides the DIAMONDS and nothing else —
@@ -291,6 +316,8 @@ export function TimelineView({
   recenterKey = 0,
   controls,
   workspaceTitle,
+  trayToggle,
+  createRow,
   showMilestones = true,
   focusSessions,
   timezone = "UTC",
@@ -349,9 +376,14 @@ export function TimelineView({
    */
   const nowAt = windowFraction(window, Date.now());
   const [dragKey, setDragKey] = useState("");
-  // Which lane the pointer is over, so the reader can see the day before
-  // letting go. A drop with no aim is a date chosen by accident.
-  const [overLane, setOverLane] = useState<number | null>(null);
+  /**
+   * Where the chip in the air would land (§9.5).
+   *
+   * A drop with no aim is a date chosen by accident, and the tinted lane this
+   * replaces could only say which COLUMN — at month zoom, which week. This
+   * says the day, and shows the bar that day would produce.
+   */
+  const [dropAt, setDropAt] = useState<DropPreview | null>(null);
   /**
    * The canvas, not the scrollport (§17).
    *
@@ -421,19 +453,47 @@ export function TimelineView({
   }, [window.anchor, window.zoom, recenterKey]);
 
   /**
-   * The day a chip was let go over (§13).
+   * The day under the pointer, and the bar it would make (§9.5, §13).
    *
-   * A lane IS one column, so the ratio is measured against the lane itself
-   * rather than the whole track. Same reading as the row's gestures: the day
-   * under the pointer, not the first day of the column it fell in.
+   * `instantAtWindowFraction` and NOT a lane index: the columns are cut by
+   * time, so `across * columns` is true only where every column is the same
+   * width — and §17.13 exists because that stopped being so. A preview
+   * computed a second way would name a different day from the drop that
+   * follows it, which is the one thing a preview must not do.
+   *
+   * The day's WIDTH comes from the same cut: a day is `24 / total hours` of
+   * the track, which at month zoom is a fifth of a column and at year zoom a
+   * thirtieth.
    */
-  function dateInLane(event: { clientX: number; currentTarget: Element }, index: number): string {
+  function previewAt(event: { clientX: number; clientY: number; currentTarget: Element }): DropPreview | null {
     const box = event.currentTarget.getBoundingClientRect();
-    if (box.width <= 0) return "";
-    const across = Math.min(Math.max((event.clientX - box.left) / box.width, 0), 0.999999);
+    if (box.width <= 0) return null;
+    const across = (event.clientX - box.left) / box.width;
     // The DATE only: a chip carries no schedule yet, and §3.2 has it declaring
     // one day rather than an hour of one.
-    return dateAtColumnOffset(window, index, across);
+    const date = instantAtWindowFraction(window, across).date;
+    if (!date) return null;
+
+    const totalHours = columnHours(window).reduce((sum, hours) => sum + hours, 0);
+    const width = totalHours > 0 ? (24 / totalHours) * 100 : 0;
+    // Snapped to the day's own left edge rather than left under the pointer:
+    // the ghost is the bar that would be created, and that bar starts at
+    // midnight.
+    const dayStart = new Date(`${date}T00:00:00`).getTime();
+    const from = new Date(`${window.edges[0]}:00`).getTime();
+    const span = totalHours * 3600000;
+    const left = span > 0 ? ((dayStart - from) / span) * 100 : 0;
+
+    return {
+      date,
+      left: Math.min(Math.max(left, 0), 100 - width),
+      width,
+      // No row to sit on: an undated Task is not on the grid at all, so the
+      // reference's "the dragged task's own row" has nothing to point at here.
+      // The ghost follows the pointer instead, which is the honest answer —
+      // where it lands vertically is decided by the sort once it has a date.
+      top: Math.max(event.clientY - box.top - 14, 0),
+    };
   }
 
   const gridStyle = {
@@ -477,33 +537,62 @@ export function TimelineView({
         ))}
       </div>
 
-      {/* The one thing this design had to build: a drop target that belongs
-          to a COLUMN and not to a row. Every existing target is a cell in
-          some Item's own row, and a chip has no row — what it needs to say
-          is a DATE. */}
+      {/* ONE drop target, not one per column
+          (TIMELINE_REFERENCE_PARITY_DESIGN.md §9.5).
+
+          It was `columns` lanes, and every one of them answered by measuring
+          the pointer against the track — so the lanes were a hit area cut into
+          pieces that nothing read, and the only thing that made them worth
+          drawing was the tint on the one being aimed at.
+
+          The preview replaces that tint with something that says more: a ghost
+          the width of a day where the bar will go, a chip naming the date, and
+          a guide down the grid. The reader sees the DAY before letting go,
+          which is what the lane's tint was standing in for.
+
+          Positioned against the canvas rather than `position: fixed` as the
+          reference does it — the canvas is already the box every other overlay
+          is measured against, so there is no viewport arithmetic and nothing
+          to re-measure when the pane scrolls. */}
       {onDropTray && trayDragging ? (
-        <div className="ff-timeline-lanes">
-          {Array.from({ length: columns }, (_, index) => (
-            <div
-              key={index}
-              className={`ff-timeline-lane${overLane === index ? " is-over" : ""}`}
-              onDragOver={(event) => {
-                // Without this the browser refuses the drop and the chip
-                // springs back with no explanation.
-                event.preventDefault();
-                setOverLane(index);
-              }}
-              onDragLeave={() => setOverLane((current) => (current === index ? null : current))}
-              onDrop={(event) => {
-                event.preventDefault();
-                setOverLane(null);
-                const sourceId = event.dataTransfer.getData(TRAY_DRAG_MIME);
-                // The same reading every other gesture uses: the day under the
-                // pointer, not the first day of the column it fell in (§13).
-                if (sourceId) onDropTray(sourceId, dateInLane(event, index));
-              }}
-            />
-          ))}
+        <div
+          className="ff-timeline-droparea"
+          onDragOver={(event) => {
+            // Without this the browser refuses the drop and the chip springs
+            // back with no explanation.
+            event.preventDefault();
+            setDropAt(previewAt(event));
+          }}
+          onDragLeave={() => setDropAt(null)}
+          onDrop={(event) => {
+            event.preventDefault();
+            const sourceId = event.dataTransfer.getData(TRAY_DRAG_MIME);
+            const at = dropAt ?? previewAt(event);
+            setDropAt(null);
+            if (sourceId && at) onDropTray(sourceId, at.date);
+          }}
+        >
+          {dropAt ? (
+            <>
+              <span
+                className="ff-timeline-drop-guide"
+                style={{ left: `${dropAt.left}%` }}
+                aria-hidden="true"
+              />
+              <span
+                className="ff-timeline-drop-ghost"
+                style={{ left: `${dropAt.left}%`, width: `${dropAt.width}%`, top: `${dropAt.top}px` }}
+                aria-hidden="true"
+              />
+              <span
+                className="ff-timeline-drop-chip"
+                style={{ left: `${dropAt.left + dropAt.width / 2}%` }}
+                aria-hidden="true"
+              >
+                {shortDate(dropAt.date)}
+              </span>
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -529,7 +618,10 @@ export function TimelineView({
           the two 42px rows; P2 fills the ruler. */}
       <header className="ff-timeline-head">
         <div className="ff-timeline-rowhead">
-          <div className="ff-timeline-rowhead-tool">{workspaceTitle}</div>
+          <div className="ff-timeline-rowhead-tool">
+            {workspaceTitle}
+            {trayToggle}
+          </div>
           <div className="ff-timeline-rowhead-label">{t("timeline.taskColumn")}</div>
         </div>
         <div className="ff-timeline-headside">
@@ -586,6 +678,10 @@ export function TimelineView({
           </div>
         </div>
       </header>
+
+      {createRow ? (
+        <div className="ff-timeline-create">{createRow}</div>
+      ) : null}
 
       {groups.map((group) => (
         <section key={group.id || "ungrouped"} className="ff-timeline-group">

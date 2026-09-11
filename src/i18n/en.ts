@@ -165,6 +165,7 @@ export const en: Dictionary = {
   "timeline.empty": "Nothing to place yet",
   "timeline.emptyHint": "A task appears here as soon as it has any date.",
   "timeline.arrangeTitle": "Arrange tasks",
+  "timeline.closeTray": "Close the tray",
   "timeline.trayHint": "Give one a start date or a deadline and it gets a bar.",
   "timeline.arrangeHint": "Drag one onto a day, or open it to give it dates.",
   "timeline.dependencies": "Dependencies",
