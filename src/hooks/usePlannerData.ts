@@ -438,6 +438,17 @@ export function usePlannerData() {
   const [storageError, setStorageError] = useState(false);
   const localSaveRetryRef = useRef<number | null>(null);
   const localSaveDelayRef = useRef(LOCAL_SAVE_RETRY_MS);
+  // The exact snapshot object last written to local storage. The focus path
+  // writes the store itself — a focus transition that cannot be saved has to
+  // be rolled back before it reaches the screen, so it cannot wait for an
+  // effect — and the `setDataState` that follows then ran the effect below on
+  // data already on disk. Serialising the whole store a second time is a
+  // visible stall, and a focus session does it on every checkpoint.
+  //
+  // Identity is the entire test, and it is a safe one: every other path
+  // reaches the effect with a freshly built object, and the follower merge
+  // inside `attempt` replaces `dataRef.current` outright before it writes.
+  const lastPersistedRef = useRef<PlannerData | null>(null);
 
   // Writing the snapshot to local storage is the one save this app cannot do
   // without: the account is optional, local storage is not. It fails for real
@@ -475,12 +486,31 @@ export function usePlannerData() {
             const latest = normalizeData(JSON.parse(raw));
             // A follower editing a task must not overwrite the host's timer.
             const local = dataRef.current;
-            const contribution = (snapshot: PlannerData, id: string) => snapshot.focusSessions.reduce((sum,s)=>sum+(s.taskId===id && s.status==="completed"?s.accumulatedSeconds:0),0);
+            // Indexed rather than searched. Written as a `find` per task and a
+            // pair of full `reduce`s per task, this cost O(tasks x (tasks +
+            // sessions)) — and it runs on every save a follower tab makes, so
+            // a few thousand tasks turned each keystroke into millions of
+            // comparisons. Same three answers, read from maps built once.
+            const liveById = new Map(latest.tasks.map(n => [n.id, n]));
+            const contributions = (snapshot: PlannerData) => {
+              const totals = new Map<string, number>();
+              for (const session of snapshot.focusSessions) {
+                // A session with no task never matched a task id in the
+                // `reduce` this replaces, so it still contributes to nothing.
+                if (session.status !== "completed" || !session.taskId) continue;
+                totals.set(session.taskId, (totals.get(session.taskId) ?? 0) + session.accumulatedSeconds);
+              }
+              return totals;
+            };
+            const latestSeconds = contributions(latest), localSeconds = contributions(local);
             dataRef.current = { ...local, focusSessions: latest.focusSessions, activeSessionId: latest.activeSessionId, focusFlow: latest.focusFlow,
-              tasks: local.tasks.map(t => { const live=latest.tasks.find(n=>n.id===t.id); return live ? {...t,actualSeconds:Math.max(0,t.actualSeconds+contribution(latest,t.id)-contribution(local,t.id)),activeSessionId:live.activeSessionId,lastFocusedAt:live.lastFocusedAt} : t; }) };
+              tasks: local.tasks.map(t => { const live=liveById.get(t.id); return live ? {...t,actualSeconds:Math.max(0,t.actualSeconds+(latestSeconds.get(t.id) ?? 0)-(localSeconds.get(t.id) ?? 0)),activeSessionId:live.activeSessionId,lastFocusedAt:live.lastFocusedAt} : t; }) };
           }
         }
-        persistPlannerData(dataRef.current);
+        if (dataRef.current !== lastPersistedRef.current) {
+          persistPlannerData(dataRef.current);
+          lastPersistedRef.current = dataRef.current;
+        }
         if (taskRevisionSessionRef.current && remoteOwnerRef.current === userEmailRef.current) {
           taskRevisionSessionRef.current.capture(dataRef.current.tasks);
         }
@@ -519,6 +549,7 @@ export function usePlannerData() {
     localSaveDelayRef.current = LOCAL_SAVE_RETRY_MS;
     try {
       persistPlannerData(dataRef.current);
+      lastPersistedRef.current = dataRef.current;
       if (taskRevisionSessionRef.current && remoteOwnerRef.current === userEmailRef.current) {
         taskRevisionSessionRef.current.capture(dataRef.current.tasks);
       }
@@ -1944,7 +1975,7 @@ export function usePlannerData() {
       if (current.focusSessions.some(s => (s.schemaVersion ?? 1) > 2 && s.status === "running")) throw new Error("Update required / 업데이트가 필요합니다.");
       const next = reduceFocus(current, command);
       if (next === dataRef.current) return true;
-      try { persistPlannerData(next); }
+      try { persistPlannerData(next); lastPersistedRef.current = next; }
       catch (error) {
         const failedAt = Date.now();
         let held = next;
@@ -2014,7 +2045,7 @@ export function usePlannerData() {
         return stored && before ? { ...t, actualSeconds: Math.max(0, t.actualSeconds + stored.actualSeconds - before.actualSeconds), activeSessionId: stored.activeSessionId !== before.activeSessionId ? stored.activeSessionId : t.activeSessionId, lastFocusedAt: stored.lastFocusedAt !== before.lastFocusedAt ? stored.lastFocusedAt : t.lastFocusedAt } : t;
       });
       const retried = { ...current, tasks, focusSessions: next.focusSessions, activeSessionId: next.activeSessionId, focusFlow: next.focusFlow ? { ...next.focusFlow, phase: next.focusFlow.phase === "break_running" ? "break_ready" as const : next.focusFlow.phase } : null };
-      persistPlannerData(retried); pendingFocusRef.current = null; pendingFocusBaseRef.current = null;
+      persistPlannerData(retried); lastPersistedRef.current = retried; pendingFocusRef.current = null; pendingFocusBaseRef.current = null;
       dataRef.current = retried; setDataState(retried); setFocusCommandError(""); emitFocusTransitions(current, retried);
     } catch { setFocusCommandError("기록 저장 실패 · 다시 시도해 주세요 / Could not save. Retry."); }
   }
