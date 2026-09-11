@@ -23,7 +23,14 @@ import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./addList.helpers";
 
 const WIDTH_KEY = "focusflow-sidebar-width";
-const DEFAULT_WIDTH = 248;
+// 232 since the reference set the sidebar's width
+// (POLISHED_REFERENCE_PARITY_DESIGN.md §2.1); `CONTEXT_SIDEBAR_DEFAULT_WIDTH`
+// in `src/app/contextSidebar` is where it is decided.
+const DEFAULT_WIDTH = 232;
+// 화살표 한 칸. 위 값들이 `DEFAULT_WIDTH + n`으로 적힌 이유는 이번에 드러났다 —
+// 336·304·288·264가 리터럴이라, 기본폭이 248에서 232로 내려가자 넷이 한꺼번에
+// 빨개졌다. 재는 대상은 "기본값에서 얼마나 움직였나"이지 절대 픽셀이 아니다.
+const STEP = 16;
 const MIN_WIDTH = 216;
 const MAX_WIDTH = 360;
 
@@ -90,7 +97,10 @@ test.describe("the Context Sidebar frame", () => {
     expect(Math.round(mainBefore - mainAfter)).toBe(40);
     // §2.3.3, the invariant the whole frame rests on.
     expect((await page.locator(".global-rail").boundingBox())?.width).toBe(railBefore);
-    expect(railBefore).toBe(50);
+    // 52 since the reference set the Rail's width
+    // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.1). What this line is really
+    // about is that the drag did not move it at all — the assertion above.
+    expect(railBefore).toBe(52);
   });
 
   test("CS-02 — dragging far left stops at the minimum, leaving the sidebar there", async ({ page }) => {
@@ -112,7 +122,7 @@ test.describe("the Context Sidebar frame", () => {
   test("CS-04 — double-clicking the handle returns to the default", async ({ page }) => {
     await openApp(page);
     await dragHandle(page, 88);
-    expect(await sidebarWidth(page)).toBe(336);
+    expect(await sidebarWidth(page)).toBe(DEFAULT_WIDTH + 88);
 
     await page.getByRole("separator", { name: "Resize sidebar" }).dblclick();
 
@@ -126,7 +136,7 @@ test.describe("the Context Sidebar frame", () => {
     await handle.focus();
 
     await handle.press("ArrowRight");
-    await expectSidebarWidth(page, 264);
+    await expectSidebarWidth(page, DEFAULT_WIDTH + STEP);
     await handle.press("ArrowLeft");
     await expectSidebarWidth(page, DEFAULT_WIDTH);
     // §3.20's ends, which a drag can only approach.
@@ -145,17 +155,17 @@ test.describe("the Context Sidebar frame", () => {
   test("CS-07 — a module without a sidebar hides it, and Tasks gets its width back", async ({ page }) => {
     await openApp(page);
     await dragHandle(page, 56);
-    expect(await sidebarWidth(page)).toBe(304);
+    expect(await sidebarWidth(page)).toBe(DEFAULT_WIDTH + 56);
 
     await rail(page, "Calendar").click();
     await expect(page).toHaveURL(/\/calendar$/);
     // §2.16: a Global Module owns its whole width.
     await expect(page.locator("#context-sidebar")).toHaveCount(0);
-    expect((await page.locator(".global-rail").boundingBox())?.width).toBe(50);
+    expect((await page.locator(".global-rail").boundingBox())?.width).toBe(52);
 
     await rail(page, "Tasks").click();
     await expect(page.locator("#context-sidebar")).toBeVisible();
-    expect(await sidebarWidth(page)).toBe(304);
+    expect(await sidebarWidth(page)).toBe(DEFAULT_WIDTH + 56);
   });
 
   // Not in §3.85, and the reason it is here is §3.68: persistence is written
@@ -165,12 +175,13 @@ test.describe("the Context Sidebar frame", () => {
   test("the width survives a reload", async ({ page }) => {
     await openApp(page);
     await dragHandle(page, 40);
-    expect(await sidebarWidth(page)).toBe(288);
+    const dragged = DEFAULT_WIDTH + 40;
+    expect(await sidebarWidth(page)).toBe(dragged);
 
     await page.reload();
     await expect(page.locator("#context-sidebar")).toBeVisible();
-    expect(await sidebarWidth(page)).toBe(288);
-    expect(await page.evaluate((key) => localStorage.getItem(key), WIDTH_KEY)).toBe("288");
+    expect(await sidebarWidth(page)).toBe(dragged);
+    expect(await page.evaluate((key) => localStorage.getItem(key), WIDTH_KEY)).toBe(String(dragged));
   });
 
   /**
@@ -230,18 +241,30 @@ test.describe("the Context Sidebar frame", () => {
     }
   });
 
-  test("the Main header starts on the same line as the sidebar (§7, P0-6)", async ({ page }) => {
+  test("the columns cascade rather than align (P0-6 → 레퍼런스 §2.6)", async ({ page }) => {
     await openApp(page);
 
-    const offset = await page.evaluate(() => {
-      const header = document.querySelector(".tm-header")!.getBoundingClientRect();
-      const firstRow = document.querySelector("#context-sidebar .tm-row")!.getBoundingClientRect();
-      return Math.round(header.top - firstRow.top);
+    const tops = await page.evaluate(() => {
+      const y = (css: string) => Math.round(document.querySelector(css)!.getBoundingClientRect().top);
+      return {
+        rail: y(".global-rail button"),
+        sidebar: y("#context-sidebar .tm-row"),
+        header: y(".tm-header"),
+      };
     });
 
-    // P0-6 matched the two heights and left the top edges to chance; they were
-    // eight pixels out of true, which reads as a design choice until measured.
-    expect(offset).toBe(0);
+    // P0-6은 두 헤더의 위 모서리를 맞췄다 — "두 열 사이의 이음매는 둘이 맞을
+    // 때에만 안 보인다". 레퍼런스는 맞추지 않는다. 브라우저에서 재보면
+    // 레일 버튼 14 · 사이드바 행 22 · 제목 34로 계단이고, 그 계단이 목업의
+    // 여백감을 만드는 것 중 하나다
+    // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6).
+    //
+    // 그래서 어긋남을 허용하는 것이 아니라 어긋남의 값을 고정한다. 0을 기대하던
+    // 자리가 "아무 값이나"가 되면 P0-6이 잡던 것 — 우연히 8px 틀어지는 것 —
+    // 이 다시 통과한다. 세 값을 못박아 둬야 다음에 하나가 움직일 때 잡힌다.
+    expect(tops.rail).toBe(14);
+    expect(tops.sidebar).toBe(22);
+    expect(tops.header).toBe(34);
   });
 
   test("a stored width the app never wrote recovers to the default (§3.58)", async ({ page }) => {

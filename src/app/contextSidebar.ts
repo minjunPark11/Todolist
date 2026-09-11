@@ -10,8 +10,19 @@
 // only the width is left, and the rule has nothing left to separate.
 import { pageForPath } from "./pageRoute";
 
-/** §3.6, verbatim. */
-export const CONTEXT_SIDEBAR_DEFAULT_WIDTH = 248;
+/**
+ * §3.6이 248을 적었고, 레퍼런스는 232다
+ * (POLISHED_REFERENCE_PARITY_DESIGN.md §2.1).
+ *
+ * 기본값만 옮긴다. 범위(216–360)는 그대로고 손잡이도 그대로다 — 폭은 저장되는
+ * 사용자 설정이라, 첫 화면을 레퍼런스에 맞추는 일이 사람이 끌어놓은 값을
+ * 버릴 이유는 되지 않는다. `--tm-detail-w`와 같은 자리이고 같은 결론이다(§4.7).
+ *
+ * CSS에서 `!important`로 누르는 방법도 있었다. 실제로 그렇게 했다가 되돌렸다:
+ * 저장된 폭까지 같이 눌려서 손잡이가 죽었고, `e2e/navShell.spec.ts`의 CS-01~11이
+ * 아홉 개 한꺼번에 그것을 잡았다. 폭을 정하는 곳은 여기다.
+ */
+export const CONTEXT_SIDEBAR_DEFAULT_WIDTH = 232;
 export const CONTEXT_SIDEBAR_MIN_WIDTH = 216;
 export const CONTEXT_SIDEBAR_MAX_WIDTH = 360;
 

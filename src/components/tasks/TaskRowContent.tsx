@@ -191,6 +191,10 @@ export function TaskRowContent({
   // that has been ticked has had it done — a red date under a strike-through is
   // an alarm about a job that is already over.
   const overdue = !done && Boolean(task.dueDate) && task.dueDate < (today ?? todayValue());
+  // 오늘은 지난 것도 먼 것도 아니라서 자기 색을 갖는다
+  // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6). `is-overdue`가 이미 같은 자리에서
+  // 같은 일을 하고 있었고, 없던 것은 그 사이의 한 칸이다.
+  const dueToday = !done && Boolean(task.dueDate) && task.dueDate === (today ?? todayValue());
   const repeats = task.repeatType !== undefined && task.repeatType !== "none";
   // Either body counts: `contentMode` decides which one a Task is using, and a
   // row only reports that there IS more behind the title.
@@ -325,7 +329,7 @@ export function TaskRowContent({
               </span>
             ) : null}
             {dueLabel ? (
-              <span className={`tm-task-due${overdue ? " is-overdue" : ""}`}>{dueLabel}</span>
+              <span className={`tm-task-due${overdue ? " is-overdue" : ""}${dueToday ? " is-today" : ""}`}>{dueLabel}</span>
             ) : null}
           </span>
         ) : null}

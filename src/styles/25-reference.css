@@ -1,0 +1,678 @@
+/* ============================================================================
+   25-reference.css — Polished Tasks 레퍼런스 정합 레이어
+   POLISHED_REFERENCE_PARITY_DESIGN.md §5
+
+   목업(focusflow_tasks_polished_9plus_v3.html)의 실측값을 토큰과 기하로 옮긴다.
+   기존 파일은 건드리지 않는다 — 롤백이 styles.css의 import 한 줄이다.
+
+   자(scale.test.ts)는 §4.5의 파일별 2자 구조를 따른다. 이 파일은 REFERENCE 자로
+   판정되며, 그 자에 없는 값이 들어오면 잡힌다.
+   ========================================================================== */
+
+/* ============================================================================
+   §4.1 — 가변 폰트 둘.
+
+   레퍼런스는 `font-family: Inter, …`라고 적어놓고 Inter를 로드하지 않는다
+   (@font-face도 <link>도 없다). 그래서 거기 적힌 520·540·550·650·680·750은
+   폴백 정적 폰트에서 400/500/600/700 네 칸으로 스냅되고, 그 위계의 절반은
+   목업을 만든 화면에도 도달한 적이 없다.
+
+   여기서는 실제로 보간되게 만든다 — 그래야 §4.2의 스케일이 그림이 된다.
+   Inter가 라틴과 숫자를, Pretendard가 한글을 가져간다. 순서가 레퍼런스와
+   같고, Pretendard는 Inter 골격 위에 그려진 서체라 한 줄에서 섞여도 골격이
+   어긋나지 않는다 (01-base.css 머리주석이 적어둔 이유).
+
+   정적 3종(2,286KB) → 가변 3파일(2,191KB). 로컬 로드라 왕복도 없다.
+   ========================================================================== */
+
+@font-face {
+  font-family: "Inter var";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/InterVariable-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter var";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/InterVariable-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Pretendard var";
+  font-style: normal;
+  font-weight: 45 920;
+  font-display: swap;
+  src: url("/fonts/PretendardVariable.woff2") format("woff2");
+}
+
+
+:root {
+  /* --- §5.2 표면 · 선 (리터럴 기준, §1.1) --- */
+  --bg-app: #f6f6f4;
+  --bg-rail: #f1f1ef;
+  --bg-context-sidebar: #f8f8f6;
+  --bg-sidebar: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-detail: #fafaf9;
+  --bg: #ffffff;
+
+  --border-subtle: rgba(20, 20, 20, 0.075);
+  --border: rgba(20, 20, 20, 0.075);
+  --border-float: rgba(20, 20, 20, 0.08);
+
+  /* hover 사다리 4단. 기준색이 둘인 것까지 레퍼런스 그대로다. */
+  --hover-row: rgba(30, 35, 45, 0.025);
+  --hover-nav: rgba(30, 35, 45, 0.035);
+  --hover-icon: rgba(20, 20, 20, 0.045);
+  --hover-rail: rgba(30, 35, 45, 0.055);
+  --bg-hover-nav: var(--hover-nav);
+  --bg-hover-content: var(--hover-row);
+  --surface-2: var(--hover-icon);
+
+  --selected-row: rgba(89, 111, 232, 0.055);
+  --selected: var(--selected-row);
+  --bg-selected: var(--selected-row);
+  --focus-ring: rgba(89, 111, 232, 0.25);
+  --accent-ring: rgba(89, 111, 232, 0.08);
+
+  /* --- §5.3 액센트 (§4.4 보정: #596FE8 → #556BE7, 4.32 → 4.52) --- */
+  --accent: #556be7;
+  --accent-fill: var(--accent);
+  --accent-soft: #eef1ff;
+  --accent-active: #eef1ff;
+  --accent-ink: #3348b6;
+  --ff-blue: var(--accent);
+  --ff-blue-soft: var(--accent-soft);
+  --ff-focus-ring: var(--accent);
+
+  /* --- §5.4 회색 · 의미색 --- */
+  --text-primary: #1b1c1e;
+  --text-task: #25282d;
+  --text-detail-title: #1e2023;
+  --text-nav: #3a3e43;
+  --text-value: #34383d;
+  --text-secondary: #555a61;
+  --text-meta: #6a6f76;
+  --text-label: #666b72;
+  --text-rail: #4d5157;
+  --text-nav-icon: #73777e;
+  --text-prop-icon: #81858b;   /* 그래픽, 3.55:1 — 비텍스트 3:1 통과 */
+  --check-border: #7c828a;     /* 그래픽, 3.88:1 — 통과 */
+  /* §4.4 — 미달 회색 9자리가 이 하나로 수렴한다 */
+  --text-faint: #72777e;
+  --text-tertiary: var(--text-label);
+  --text-muted: var(--text-meta);
+  --placeholder: var(--text-faint);
+  --ff-text: var(--text-primary);
+  --ff-muted: var(--text-secondary);
+
+  --danger: #d2453e;           /* §4.4 보정: #D6544D 4.01 → 4.51 */
+  --danger-ink: var(--danger);
+  --success: #2f8a55;
+  --badge-sync: #dd5c55;
+  --dot-list: #93c83d;
+
+  /* --- §5.5 그림자 · 모션 --- */
+  --shadow-pop: 0 12px 32px rgba(20, 24, 32, 0.12), 0 2px 8px rgba(20, 24, 32, 0.06);
+  --shadow-palette: 0 24px 60px rgba(20, 24, 32, 0.18);
+  --shadow-toast: 0 14px 34px rgba(20, 24, 32, 0.24);
+  --shadow-drawer: -18px 0 48px rgba(22, 25, 31, 0.1);
+  --shadow-sheet: 16px 0 40px rgba(22, 25, 31, 0.1);
+  --shadow-md: var(--shadow-pop);
+  --shadow-lg: var(--shadow-palette);
+  --shadow-panel: var(--shadow-pop);
+
+  --motion-fast: 120ms;
+  --motion-row: 140ms;
+  --motion-base: 160ms;
+  --motion-panel: 180ms;
+
+  /* --- §4.3 반경 --- */
+  --r-bar: 3px;
+  --r-chip: 5px;
+  --r-row: 6px;
+  --r-btn: 8px;
+  --r-rail: 9px;
+  --r-panel: 12px;
+  --radius-sm: var(--r-row);
+  --radius-md: var(--r-row);
+  --radius-lg: var(--r-row);
+  --radius-xl: var(--r-row);
+  --density-radius: var(--r-row);
+
+  /* --- §4.2 타입 · 굵기 --- */
+  --t-keycap: 10px;
+  --t-hint: 10.5px;
+  --t-count: 11px;
+  --t-label: 11.5px;
+  --t-meta: 12px;
+  --t-compact: 12.5px;
+  --t-body: 13px;
+  --t-ui: 13.5px;
+  --t-task: 13.6px;
+  --t-input: 14px;
+  --t-detail-title: 20px;
+  --t-page-title: 25px;
+
+  --w-normal: 400;
+  --w-ui: 520;
+  --w-task: 540;
+  --w-due: 550;
+  --w-tag: 600;
+  --w-strong: 650;
+  --w-label: 680;
+  --w-title: 700;
+  --w-caps: 750;
+
+  /* 체크박스는 17px 원형이다 (§2.6) */
+  --check-size: 17px;
+
+  /* §2.1 그리드 */
+  --rail-w: 52px;
+  --rail-item: 40px;
+}
+
+/* §4.1 — Inter가 라틴을, Pretendard가 한글을 가져간다. 순서가 레퍼런스와 같다. */
+body,
+.app-frame,
+main {
+  font-family: "Inter var", "Inter", "Pretendard var", "Pretendard", ui-sans-serif,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ===== §2.6 레일 ===== */
+
+.global-rail {
+  padding: 14px 6px 12px;
+  background: var(--bg-rail);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.rail-primary,
+.rail-utilities {
+  gap: 8px;
+}
+
+.rail-item {
+  border-radius: var(--r-rail);
+  color: var(--text-rail);
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
+}
+
+.rail-item svg {
+  width: 20px;
+  height: 20px;
+}
+
+.rail-item:hover {
+  background: var(--hover-rail);
+}
+
+.rail-item:active {
+  transform: scale(0.96);
+}
+
+.rail-item.is-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ===== §2.6 사이드바 ===== */
+
+.tm-sidebar {
+  gap: 18px;
+  padding: 22px 14px 18px;
+  background: var(--bg-context-sidebar);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.tm-section-title {
+  margin: 0 0 6px;
+  padding: 0 10px;
+  font-size: var(--t-meta);
+  line-height: 17px;
+  font-weight: var(--w-label);
+  letter-spacing: 0.045em;
+  text-transform: none;
+  color: var(--text-label);
+}
+
+.tm-row {
+  min-height: 36px;
+  gap: 9px;
+  padding: 0 10px;
+  border-radius: var(--r-row);
+  color: var(--text-nav);
+  font-size: var(--t-ui);
+  line-height: 20px;
+  font-weight: var(--w-ui);
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.tm-row-icon svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-nav-icon);
+}
+
+.tm-row:hover {
+  background: var(--hover-nav);
+}
+
+.tm-row.is-current {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+.tm-row.is-current .tm-row-icon svg {
+  color: var(--accent);
+}
+
+.tm-count {
+  color: var(--text-label);
+  font-size: var(--t-count);
+  font-weight: var(--w-tag);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== §2.6 메인 · 헤더 ===== */
+
+.tm-main {
+  padding: 34px 40px 24px;
+  background: var(--bg-surface);
+}
+
+.tm-shell.is-wideDesktop .tm-main { padding-inline: 40px; }
+.tm-shell.is-compactDesktop .tm-main { padding-inline: 34px; }
+
+/* P0-6을 명시적으로 덮는다 (§2.6).
+
+   `19-app-shell.css`의 `.app-frame .tm-main { padding-top: 16px }`은 사이드바의
+   16px에 제목을 맞추려고 선 규칙이다 — "두 열은 한 줄이거나 눈에 보이는 계단이다".
+   레퍼런스는 계단 쪽을 고른다: 레일 14 · 사이드바 22 · 제목 34로, 재보면 셋 다
+   다르다. 그 계단이 목업의 여백감을 만드는 것 중 하나다.
+
+   같은 특정도(`.app-frame` 한 겹)로 적지 않으면 못 이긴다. 클래스 하나짜리
+   `.tm-main`으로 적었다가 제목이 16에 머물렀고, `navShell.spec.ts`가 잡았다. */
+.app-frame .tm-main {
+  padding-top: 34px;
+}
+
+.tm-header,
+.app-frame .tm-header {
+  gap: 8px;
+  min-height: 0;
+  margin-bottom: 24px;
+}
+
+.tm-title {
+  font-size: var(--t-page-title);
+  line-height: 32px;
+  font-weight: var(--w-title);
+  letter-spacing: -0.035em;
+  color: var(--text-primary);
+}
+
+.tm-title-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-row);
+  display: inline-grid;
+  place-items: center;
+  background: var(--hover-icon);
+  color: var(--text-faint);
+  font-size: var(--t-label);
+  line-height: 20px;
+  font-weight: var(--w-title);
+  letter-spacing: 0;
+}
+
+.ff-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-btn);
+  color: var(--text-faint);
+  transition: background var(--motion-fast) ease, transform var(--motion-fast) ease;
+}
+
+.ff-icon-btn:hover {
+  background: var(--hover-row);
+}
+
+.ff-icon-btn:active {
+  transform: scale(0.96);
+}
+
+/* ===== §2.6 빠른 추가 =====
+   2상태(트리거↔편집)는 컴포넌트 변경이라 §6.1(b)로 미뤄져 있다. 여기서는
+   한 줄짜리 폼을 레퍼런스의 42px 트리거와 같은 기하에 앉힌다. */
+
+.tm-quickadd {
+  margin-bottom: 8px;
+}
+
+.tm-quickadd-box {
+  min-height: 42px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+  gap: 9px;
+}
+
+.tm-quickadd-box:focus-within {
+  border-color: var(--border-subtle);
+  box-shadow: none;
+}
+
+.tm-quickadd-line {
+  gap: 9px;
+}
+
+.tm-quickadd-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-row);
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.tm-quickadd-box:hover .tm-quickadd-icon {
+  background: var(--accent-soft);
+}
+
+.tm-quickadd-title {
+  font-size: var(--t-ui);
+  color: var(--text-primary);
+}
+
+.tm-quickadd-title::placeholder {
+  color: var(--text-faint);
+}
+
+/* ===== §2.6 태스크 행 ===== */
+
+.tm-list {
+  padding-right: 2px;
+}
+
+.tm-task {
+  position: relative;
+  min-height: 44px;
+  gap: 8px;
+  margin: 1px 0;
+  padding: 5px 2px;
+  border: 0;
+  border-radius: var(--r-row);
+  font-size: var(--t-task);
+  transition: background var(--motion-row) ease, transform var(--motion-row) ease;
+}
+
+.tm-task:hover {
+  background: var(--hover-row);
+}
+
+/* §6.1(a) — 선택 상태. `.is-open`은 이미 있었고, 없던 것은 좌측 바다. */
+.tm-task.is-open {
+  background: var(--selected-row);
+}
+
+.tm-task.is-open::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: var(--r-bar);
+  background: var(--accent);
+}
+
+/* 핸들은 레퍼런스에 없지만 지우지 않는다 (§6.2) — 행 밖 여백으로 물러난다.
+   좌측 3px 선택 바가 left:0에 서므로 그 바깥이어야 겹치지 않는다. */
+.tm-task-handle {
+  position: absolute;
+  left: -16px;
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
+}
+
+/* 포커스로는 뜨지 않는다. 선택된 행은 항상 `:focus-within`이라, 그 규칙이
+   살아 있으면 레퍼런스에 없는 핸들이 선택된 행에서만 상시 보인다. */
+.tm-task:focus-within .tm-task-handle {
+  opacity: 0;
+}
+
+.tm-task:hover .tm-task-handle {
+  opacity: 1;
+}
+
+/* 30px 칸에 17px 원을 그리되, 누를 수 있는 넓이는 행 전체다.
+   레퍼런스의 `.check`는 30×30 고정이라 44px 행 안에서 위아래 7px씩을 놓친다 —
+   목업에는 그려지지 않았을 뿐인 것과 없는 것은 다르고(§6.2), 여기서 작은 쪽은
+   접근성을 깎는 쪽이다. 그림은 레퍼런스를, 타깃은 §3.1을 따른다.
+   음수 마진으로 행의 5px 패딩까지 덮는다 — 그러지 않으면 44px 행에 34px 타깃이
+   남고, `e2e/taskRow.spec.ts`가 그것을 정확히 잡는다. */
+.tm-task-check {
+  width: 30px;
+  align-self: stretch;
+  justify-content: center;
+  margin-block: -5px;
+  padding: 5px 0;
+}
+
+.tm-task:has(.tm-task-tagline) .tm-task-check {
+  align-items: flex-start;
+  padding-top: 9px;
+}
+
+/* 17px 원형. 채워지면 액센트. */
+.tm-check {
+  width: var(--check-size);
+  height: var(--check-size);
+  border: 1.5px solid var(--check-border);
+  border-radius: 50%;
+  background: #ffffff;
+  transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.tm-task-check:hover .tm-check {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.tm-check:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.tm-task-open {
+  gap: 8px;
+}
+
+.tm-task-title {
+  font-size: var(--t-task);
+  line-height: 20px;
+  font-weight: var(--w-task);
+  letter-spacing: -0.01em;
+  color: var(--text-task);
+}
+
+.tm-task-title.is-done {
+  color: var(--text-faint);
+  text-decoration: line-through;  /* §6.3 — 레퍼런스를 따라 되돌린다 */
+}
+
+.tm-task-tagline {
+  margin-top: 1px;
+}
+
+/* 메타 줄의 태그는 알약이 아니라 `#` 접두 글자다 (§2.6). */
+.tm-task-tagline .tm-tag-chip {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-meta);
+  font-size: var(--t-meta);
+  line-height: 17px;
+  font-weight: var(--w-tag);
+}
+
+.tm-task-tagline .tm-tag-chip::before {
+  content: "#";
+  margin-right: 2px;
+  color: var(--text-faint);
+}
+
+.tm-task-due {
+  padding: 4px 5px;
+  border-radius: var(--r-chip);
+  color: var(--text-label);
+  font-size: var(--t-meta);
+  line-height: 17px;
+  font-weight: var(--w-due);
+  transition: background var(--motion-fast) ease;
+}
+
+.tm-task-due:hover {
+  background: var(--hover-icon);
+}
+
+.tm-task-due.is-today {
+  color: var(--accent);
+}
+
+.tm-task-due.is-overdue {
+  color: var(--danger);
+  font-weight: var(--w-due);
+}
+
+.tm-task-menu {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-row);
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity var(--motion-fast) ease, background var(--motion-fast) ease;
+}
+
+.tm-task:hover .tm-task-menu,
+.tm-task.is-open .tm-task-menu,
+.tm-task:focus-within .tm-task-menu {
+  opacity: 1;
+}
+
+.tm-task-menu:hover {
+  background: var(--hover-icon);
+}
+
+/* ===== §2.6 · §4.7 인스펙터 ===== */
+
+/* 폭은 CSS가 아니라 `taskDetailWidth.ts`가 정한다 (§4.7) — 기본값 320,
+   하한 320, 리사이즈 유지. 여기서 !important로 눌렀더니 저장된 사용자 폭까지
+   같이 눌렸다: 첫 화면을 맞추려다 손잡이를 죽이는 것이라 자리를 옮겼다. */
+.tm-drawer {
+  background: var(--bg-detail);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.tm-drawer-head {
+  min-height: 48px;
+  gap: 8px;
+  padding: 0 16px;
+  background: var(--bg-detail);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tm-drawer-scroll {
+  gap: 16px;
+  padding: 26px 24px 28px;
+}
+
+.tm-drawer-title {
+  padding: 0;
+  font-size: var(--t-detail-title);
+  line-height: 27px;
+  font-weight: var(--w-strong);
+  letter-spacing: -0.035em;
+  color: var(--text-detail-title);
+}
+
+.tm-drawer-content textarea {
+  font-size: var(--t-ui);
+  line-height: 21px;
+  color: var(--text-secondary);
+}
+
+.tm-drawer-content textarea::placeholder {
+  color: var(--text-faint);
+}
+
+.tm-drawer-close,
+.tm-drawer-more {
+  color: var(--text-faint);
+  border-radius: var(--r-row);
+}
+
+/* ===== 떠 있는 것들 (§2.6) ===== */
+
+.ff-menu,
+.ff-popover,
+.ff-surface {
+  border: 1px solid var(--border-float);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop);
+}
+
+/* ===== §2.6 스크롤바 — 목록만 얇게 보인다 ===== */
+
+.tm-main {
+  scrollbar-width: thin;
+  scrollbar-color: #dadde2 transparent;
+}
+
+/* ===== §15.12의 바닥, 다시 세운다 =====
+
+   17-tasks-module.css:2740이 `@media (pointer: coarse)`에서 `.tm-row`와
+   `.tm-task-open`을 44로 올려둔다. 이 파일이 나중에 로드되므로 같은 특정도의
+   `.tm-row { min-height: 36px }`가 미디어 쿼리 안쪽까지 이겨버렸다 — 손가락이
+   36px 행을 받았고, `navShell.spec.ts`와 `taskRow.spec.ts`가 모바일에서
+   그것을 잡았다.
+
+   레퍼런스는 이 질문에 답하지 않는다. 목업은 데스크톱 한 장이고 coarse 포인터를
+   가정한 적이 없다 — 그리지 않은 것과 없는 것이 다른 또 하나의 자리다(§6.2).
+   그림은 레퍼런스를 따르고, 바닥은 손가락을 따른다. */
+@media (pointer: coarse) {
+  .tm-row,
+  .tm-task-open {
+    min-height: 44px;
+  }
+
+  /* 17px 원은 그대로 두고 라벨이 폭을 가져간다: 17 + 2×14 = 45. */
+  .tm-task-check {
+    width: auto;
+    padding: 5px 14px;
+  }
+
+  .tm-task-menu,
+  .ff-icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

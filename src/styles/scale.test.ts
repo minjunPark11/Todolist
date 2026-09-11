@@ -65,6 +65,56 @@ const MOTION_EASE_OK = new Set(["ease-out", "linear", "cubic-bezier(0.2,0,0,1)"]
 
 const SPACE_ANCHORED = new Set(["40px", "42px", "44px", "52px", "64px", "68px", "80px", "90px", "110px"]);
 
+/**
+ * 자가 둘인 이유 (POLISHED_REFERENCE_PARITY_DESIGN.md §4.5).
+ *
+ * 레퍼런스 정합 레이어는 위의 자를 다섯 축에서 전부 벗어난다 — 13.5px, 굵기 540,
+ * 반경 6px, 간격 9px, 맨 `ease`. 처음엔 두 목록을 합쳐서 한 자를 넓히려 했다.
+ * 그게 틀린 이유는 세보면 나온다: 레퍼런스 목록에 15·18·24px과 4px, 32·48px이
+ * 없는데 기존 파일에는 그 값들이 43곳 살아 있다. 합치면 자가 21단이 되고, 그
+ * 순간부터 이 테스트는 아무것도 막지 못한다 — §7이 "문서만으로는 안 지켜진다"고
+ * 적어둔 그 상태로 정확히 돌아간다.
+ *
+ * 그래서 넓히는 대신 나눈다. 파일마다 자가 하나씩 있고, 둘 다 무관용이다:
+ * 레퍼런스 파일에 15px이 들어와도 잡히고, Calendar에 13.5px이 들어와도 잡힌다.
+ * 마이그레이션 경계가 이 표에 적히는 것은 부수 효과다 — 나중에 한 파일을
+ * 레퍼런스로 옮기면 아래 `REFERENCE_FILES`에 한 줄 더하면 된다.
+ */
+const REFERENCE = {
+  size: new Set([
+    "10px", "10.5px", "11px", "11.5px", "12px", "12.5px", "13px", "13.5px",
+    "13.6px", "14px", "17px", "20px", "23px", "25px",
+    "inherit", "0", "100%",
+  ]),
+  weight: new Set(["400", "520", "540", "550", "600", "650", "680", "700", "750", "inherit", "normal", "bold", "initial"]),
+  radius: new Set(["0", "3px", "5px", "6px", "8px", "9px", "12px", "50%", "100%", "9999px", "inherit", "initial", "unset"]),
+  space: new Set([
+    "0", "1px", "2px", "3px", "4px", "5px", "6px", "7px", "8px", "9px", "10px",
+    "11px", "12px", "13px", "14px", "16px", "18px", "22px", "24px", "26px", "28px", "34px",
+    "auto", "inherit", "initial", "unset", "100%", "50%",
+  ]),
+  // 레퍼런스는 거의 모든 전환에 맨 `ease`를 쓴다. 스위스 쪽 `ease-out`과 달리
+  // 이건 값 하나가 아니라 곡선의 선택이고, 목업이 고른 곡선이 그것이다.
+  ease: new Set(["ease", "ease-out", "linear", "cubic-bezier(0.2,0,0,1)"]),
+} as const;
+
+const LEGACY = {
+  size: SIZE_OK,
+  weight: WEIGHT_OK,
+  radius: RADIUS_OK,
+  space: SPACE_OK,
+  ease: MOTION_EASE_OK,
+} as const;
+
+type Ruler = { size: ReadonlySet<string>; weight: ReadonlySet<string>; radius: ReadonlySet<string>; space: ReadonlySet<string>; ease: ReadonlySet<string> };
+
+/** 레퍼런스 자로 재는 파일. 한 줄이 한 번의 마이그레이션이다. */
+const REFERENCE_FILES = new Set(["25-reference.css"]);
+
+function rulerFor(name: string): Ruler {
+  return REFERENCE_FILES.has(name) ? REFERENCE : LEGACY;
+}
+
 // offset도 blur도 0인 box-shadow는 그림자가 아니라 링이다 — 포커스 링과
 // 헤어라인이 이 모양으로 그려진다. I2-B가 걷어내는 것은 흐림이 만든 가짜
 // 깊이이지 링이 아니고, 포커스 링은 접근성이라 애초에 협상 대상이 아니다.
@@ -143,14 +193,18 @@ function literals(declaration: string): string[] {
  * 자기가 스스로 자다(`--icon-glyph` 16px · `--display-md` 34px).
  * `title(?!bar)`는 `--titlebar-h`가 창 크롬의 높이이지 글자 크기가 아니기 때문이다.
  */
-function tokenScale(name: string): Set<string> | null {
-  if (name.includes("radius")) return RADIUS_OK;
-  if (name.includes("weight")) return WEIGHT_OK;
-  if (/font|title(?!bar)|size/.test(name)) return SIZE_OK;
+function tokenScale(name: string, ruler: Ruler): ReadonlySet<string> | null {
+  if (name.includes("radius") || name.startsWith("--r-")) return ruler.radius;
+  // `--w-` 접두사가 `title`보다 먼저 온다. 레퍼런스 레이어는 굵기를 자리 이름으로
+  // 부르는데(`--w-title: 700`), 아래 heuristic이 그 "title"을 보고 크기 토큰으로
+  // 읽어 700을 위반으로 잡았다 — 이름이 틀린 것이 아니라 읽는 쪽이 틀렸다.
+  if (name.includes("weight") || name.startsWith("--w-")) return ruler.weight;
+  if (name.startsWith("--t-")) return ruler.size;
+  if (/font|title(?!bar)|size/.test(name)) return ruler.size;
   return null;
 }
 
-function scan(css: string): Violation[] {
+function scan(css: string, ruler: Ruler = LEGACY): Violation[] {
   // 주석은 지우되 줄 수는 남긴다 — 줄번호가 있어야 고칠 곳을 짚어준다.
   const source = css.replace(/\/\*[\s\S]*?\*\//g, (m) => "\n".repeat((m.match(/\n/g) ?? []).length));
   const found: Violation[] = [];
@@ -163,11 +217,15 @@ function scan(css: string): Violation[] {
     // 셀렉터는 자기 줄에 온다(이 리포의 포매팅). 뒤따르는 선언들이 그것에 속한다.
     if (line.includes("{")) selector = line.slice(0, line.indexOf("{")).trim() || selector;
     if (EXEMPT.some((exempt) => exempt.selector.test(selector))) return;
+    // `@font-face`의 `font-weight: 100 900`은 굵기를 고르는 것이 아니라 이 폰트가
+    // 그려낼 수 있는 범위를 적는 서술자다. 가변 폰트를 들이면서 드러난 틈이고,
+    // 자가 다스리는 곳이 아니다 (POLISHED_REFERENCE_PARITY_DESIGN.md §4.1).
+    if (selector.startsWith("@font-face")) return;
 
     for (const [property, allowed, kind] of [
-      ["border-radius", RADIUS_OK, "radius"],
-      ["font-size", SIZE_OK, "size"],
-      ["font-weight", WEIGHT_OK, "weight"],
+      ["border-radius", ruler.radius, "radius"],
+      ["font-size", ruler.size, "size"],
+      ["font-weight", ruler.weight, "weight"],
     ] as const) {
       const hit = new RegExp(String.raw`(?<![-\w])${property}\s*:\s*([^;{}]+)`).exec(line);
       if (hit && literals(hit[1]).some((value) => !allowed.has(value))) {
@@ -179,7 +237,7 @@ function scan(css: string): Violation[] {
     // 없어서 위 루프가 지나친다 — 타임라인의 잘린 막대가 그 틈으로 2px을 그리고
     // 있었고, 화면을 재다가 나왔다(§12). 노출은 네 곳이었지만 틈은 틈이다.
     const longhand = /(?<![-\w])border-(?:top|bottom)-(?:left|right)-radius\s*:\s*([^;{}]+)/.exec(line);
-    if (longhand && literals(longhand[1]).some((value) => !RADIUS_OK.has(value))) {
+    if (longhand && literals(longhand[1]).some((value) => !ruler.radius.has(value))) {
       found.push({ line: at, kind: "radius", text: longhand[0].trim() });
     }
 
@@ -196,7 +254,7 @@ function scan(css: string): Violation[] {
     const space = /(?<![-\w])(?:padding|margin|gap|row-gap|column-gap|(?:padding|margin)-(?:top|right|bottom|left|inline|block))\s*:\s*([^;{}]+)/.exec(line);
     if (space) {
       const bad = literals(space[1]).filter(
-        (value) => /^-?[\d.]+(px|rem|em)$/.test(value) && !SPACE_OK.has(value.replace(/^-/, "")) && !SPACE_ANCHORED.has(value.replace(/^-/, "")),
+        (value) => /^-?[\d.]+(px|rem|em)$/.test(value) && !ruler.space.has(value.replace(/^-/, "")) && !SPACE_ANCHORED.has(value.replace(/^-/, "")),
       );
       if (bad.length) found.push({ line: at, kind: "space", text: `${space[0].trim().slice(0, 46)}  ← ${bad.join(" ")}` });
     }
@@ -209,7 +267,7 @@ function scan(css: string): Violation[] {
       const bad = durations.filter((d) => !MOTION_DUR_OK.has(d));
       const eases = [...value.matchAll(/(?<![-\w])(ease-in-out|ease-out|ease-in|ease|linear|cubic-bezier\([^)]*\))/g)]
         .map((m) => m[1].replace(/\s+/g, ""));
-      const badEase = eases.filter((e) => !MOTION_EASE_OK.has(e));
+      const badEase = eases.filter((e) => !ruler.ease.has(e));
       // 이징을 적지 않으면 CSS 기본값이 `ease`다 — 적어둔 `ease`를 걷어내면서
       // 생략을 놔두면 같은 곡선이 이름 없이 남는다. `.overlay-scrollbar`가
       // 정확히 그렇게 통과하고 있었다 (§15).
@@ -223,7 +281,7 @@ function scan(css: string): Violation[] {
     // 안에 line-height가 섞여 있어 크기로 읽으면 틀린다.
     const token = /^\s*(--[\w-]+)\s*:\s*([^;{}]+);\s*$/.exec(line);
     if (token) {
-      const allowed = tokenScale(token[1]);
+      const allowed = tokenScale(token[1], ruler);
       const value = token[2].trim();
       if (allowed && /^[\d.]+(px|rem|em)?$/.test(value) && !allowed.has(value)) {
         found.push({ line: at, kind: "token", text: `${token[1]}: ${value}` });
@@ -239,7 +297,7 @@ describe("스위스 스케일 (SWISS_MINIMAL_DESIGN.md §5)", () => {
   const files = Object.keys(CEILING).sort();
 
   it.skipIf(files.length === 0).each(files)("%s — 스케일 밖 리터럴이 늘지 않는다", (name) => {
-    const violations = scan(readFileSync(join(here, name), "utf8"));
+    const violations = scan(readFileSync(join(here, name), "utf8"), rulerFor(name));
     const ceiling = CEILING[name];
 
     if (violations.length > ceiling) {
@@ -262,13 +320,14 @@ describe("스위스 스케일 (SWISS_MINIMAL_DESIGN.md §5)", () => {
     }
   });
 
+
   it("목록에 없는 CSS 파일은 0이다", () => {
     const all = readFileSync(join(here, "..", "styles.css"), "utf8")
       .matchAll(/@import\s+"\.\/styles\/([^"]+)"/g);
     const unlisted = [...all]
       .map((m) => m[1])
       .filter((name) => !(name in CEILING))
-      .map((name) => [name, scan(readFileSync(join(here, name), "utf8")).length] as const)
+      .map((name) => [name, scan(readFileSync(join(here, name), "utf8"), rulerFor(name)).length] as const)
       .filter(([, count]) => count > 0);
 
     expect(unlisted).toEqual([]);

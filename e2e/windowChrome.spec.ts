@@ -41,7 +41,11 @@ test.describe("the desktop build's caption row", () => {
     await asDesktopApp(page);
 
     // Before §3 these three began at y=48: 32px of empty caption and the
-    // page's own 16. The 32 is what went.
+    // page's own padding. The 32 is what went — that is what this measures,
+    // and it is why the numbers below are "small" rather than exact: the
+    // Rail's own top padding is 14 since the reference set it
+    // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6), and moving between 14 and
+    // 16 says nothing about whether a caption band is reserved.
     const tops = await page.evaluate(() => {
       const y = (css: string) => {
         const el = document.querySelector(css);
@@ -55,9 +59,14 @@ test.describe("the desktop build's caption row", () => {
       };
     });
 
-    expect(tops.rail).toBe(16);
-    expect(tops.sidebar).toBe(16);
-    expect(tops.title).toBe(16);
+    // 세 열은 이제 같은 줄에서 시작하지 않는다 — 레일 14 · 사이드바 22 ·
+    // 제목 34로 계단이고, 그건 레퍼런스가 그렇게 그리기 때문이다
+    // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6, navShell.spec.ts가 그 값을
+    // 못박는다). 이 테스트가 묻는 것은 정렬이 아니라 32px 캡션 띠가 사라졌는지다:
+    // 그게 있었을 때 셋은 48부터 시작했다.
+    expect(tops.rail).toBe(14);
+    expect(tops.sidebar).toBe(22);
+    expect(tops.title).toBe(34);
     expect(tops.bodyPadding).toBe("0px");
   });
 
@@ -118,6 +127,9 @@ test.describe("the desktop build's caption row", () => {
     const top = await page.evaluate(() =>
       Math.round(document.querySelector(".global-rail button")!.getBoundingClientRect().top),
     );
-    expect(top).toBe(16);
+    // 14 is the Rail's own top padding (§2.6). The assertion is that the app
+    // starts at the window edge rather than below a 32px caption — so what
+    // matters is that this is the Rail's padding and not 48.
+    expect(top).toBe(14);
   });
 });

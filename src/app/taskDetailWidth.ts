@@ -9,17 +9,29 @@
 // the sidebar's width and not on a record that syncs to every device and every
 // collaborator.
 
-/** §1.12's constraint, verbatim. */
-export const TASK_DETAIL_MIN_WIDTH = 360;
+/**
+ * §1.12's constraint was 360–600. The floor comes down to the reference's
+ * width (POLISHED_REFERENCE_PARITY_DESIGN.md §4.7).
+ *
+ * The mockup's inspector is 320 and has no handle at all. Taking the handle
+ * away is the part this does NOT do: the width is a stored preference (§1.14),
+ * and dropping it would throw away something the person set, which is a bigger
+ * thing than the 160px this is about. So the DEFAULT moves and the range opens
+ * far enough to hold it — the first screen matches the reference to the pixel,
+ * and anyone who wants it wider still drags it wider.
+ */
+export const TASK_DETAIL_MIN_WIDTH = 320;
 export const TASK_DETAIL_MAX_WIDTH = 600;
 
 /**
- * Between the two, and close to §1.14's own example of 486.
+ * The reference's 320 (§2.6).
  *
- * Wide enough for a Title and a property row on one line, narrow enough that
- * the list beside it still shows what a row says.
+ * It was 480 — "wide enough for a Title and a property row on one line". That
+ * reasoning survives the change: at 320 the reference puts the label and the
+ * value on one line too, in a `64px | 1fr` grid that is narrower than the row
+ * this replaced because the label column is fixed rather than fluid.
  */
-export const TASK_DETAIL_DEFAULT_WIDTH = 480;
+export const TASK_DETAIL_DEFAULT_WIDTH = 320;
 
 /** §1.13's arrow-key step, matching the sidebar's so the two handles agree. */
 export const TASK_DETAIL_STEP = 16;

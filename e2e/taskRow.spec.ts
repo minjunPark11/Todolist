@@ -82,14 +82,26 @@ test.describe("what a Task row can do", () => {
         rowContent: row.clientHeight,
         target: Math.round(label.getBoundingClientRect().height),
         box: Math.round(input.getBoundingClientRect().width),
+        round: getComputedStyle(input).borderTopLeftRadius,
         token: getComputedStyle(document.documentElement).getPropertyValue("--check-size").trim(),
       };
     });
     expect(geometry.target).toBe(geometry.rowContent);
     expect(geometry.box).toBe(Number.parseInt(geometry.token, 10));
-    // Smaller than the 14px title it sits beside, which is the proportion the
-    // reference draws and the thing 17px got wrong.
-    expect(geometry.box).toBeLessThan(17);
+    // 17 again, and this time it is not the thing that went wrong
+    // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6).
+    //
+    // The line this replaces read `toBeLessThan(17)`, because 17 SQUARE beside
+    // a 14px title was the loudest thing in the row. What changed is not the
+    // tolerance but the shape: the reference's box is a 17px CIRCLE with a
+    // 1.5px stroke, and a circle covers π·r² where the square covered the
+    // whole 289px² — about 78% of the ink at the same bounding box. That is
+    // how the reference gets to 17 beside a 13.6px title without shouting.
+    //
+    // So the guard is on the shape rather than on the number. A future 17px
+    // SQUARE fails here, which is the case the original line was written for.
+    expect(geometry.box).toBeLessThanOrEqual(17);
+    expect(geometry.round, "a 17px box is only quiet enough while it is round").toBe("50%");
   });
 
   test("completing can be undone, and the undo is what the account keeps", async ({ page }) => {
@@ -241,6 +253,7 @@ test.describe("the row under a finger", () => {
         // would clear the floor in one direction and miss in the other.
         targetWidth: Math.round(label.getBoundingClientRect().width),
         box: Math.round((label.querySelector("input") as HTMLElement).getBoundingClientRect().width),
+        round: getComputedStyle(label.querySelector("input") as HTMLElement).borderTopLeftRadius,
         handleShown: getComputedStyle(row.querySelector(".tm-task-handle") as HTMLElement).display !== "none",
       };
     });
@@ -248,8 +261,12 @@ test.describe("the row under a finger", () => {
     expect(geometry.target).toBeGreaterThanOrEqual(43);
     expect(geometry.targetWidth).toBeGreaterThanOrEqual(43);
     // The drawing does not grow with the target: a 22px tick beside a 14px
-    // title is what read as too big.
-    expect(geometry.box).toBeLessThan(17);
+    // title is what read as too big. 17 is allowed again now that the box is a
+    // CIRCLE rather than a square — about 78% of the ink at the same bounding
+    // box — which is the same trade the desktop test above records
+    // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6).
+    expect(geometry.box).toBeLessThanOrEqual(17);
+    expect(geometry.round, "a 17px box is only quiet enough while it is round").toBe("50%");
     // A handle revealed on hover is useless where there is no hover.
     expect(geometry.handleShown).toBe(false);
   });

@@ -1,42 +1,22 @@
 /* ============================================================================
-   Pretendard — SWISS_MINIMAL_DESIGN.md I4-A
-   ----------------------------------------------------------------------------
-   서체를 런타임에 구글 CDN에서 받고 있었다(§4). 이건 Tauri 데스크톱 앱이고,
-   `public/`에 폰트 파일은 0개였다 — 비행기에서 켜면 다른 서체로 떴다.
+   서체는 25-reference.css로 옮겼다
+   (POLISHED_REFERENCE_PARITY_DESIGN.md §4.1).
 
-   Inter가 아니라 Pretendard인 이유: 이 앱은 한국어로 돈다(`i18n/ko.ts`, 한글
-   6,754자). Inter에는 한글이 없어서, 번들해봐야 화면의 거의 모든 글자는 OS
-   폴백으로 떨어진다 — 고치려던 문제가 한글로 옮겨갈 뿐이다. Pretendard는
-   Inter 골격 위에 그려진 한국어 서체라 라틴과 한글을 한 패밀리가 덮는다.
+   여기 있던 것은 Pretendard 정적 3종(400/600/700)이었고, 그 선택의 근거는 바로
+   아래 §5.2가 굵기를 3단으로 접었다는 것이었다 — "550·570·620·650·680은 같은
+   픽셀로 떨어졌다. 계층을 만들려고 적은 차이의 절반이 화면에 도달한 적이 없다."
 
-   가변형(2,009KB)이 아니라 정적 3개(2,286KB)인 이유: 가변은 100~900을 전부
-   그려낸다. CSS에 흩어진 550·570·620·650·680·750·850(§3)이 지금은 접혀
-   있다가 살아나서, Phase 3 전까지 오히려 더 들쭉날쭉해진다. 정적 3개는
-   §5.2의 3단을 규칙이 아니라 물리적 제약으로 만든다.
+   레퍼런스 정합이 그 전제를 뒤집는다. 목업이 요구하는 굵기는 일곱이고, 정적
+   3종으로는 그중 넷이 도달하지 못한다. 그래서 가변으로 간다 — 접는 대신
+   보간한다. 브라우저에서 재보면 400·520·540·550·600·650·680·700·750이 전부
+   다른 폭으로 떨어진다(134.6 … 139.9px).
 
-   SIL OFL 1.1 · github.com/orioncactus/pretendard
+   라틴과 한글을 나누는 이유는 그대로다: Inter에는 한글이 없고 이 앱은
+   한국어로 돈다. Inter가 라틴을, Pretendard가 한글을 가져가며, Pretendard는
+   Inter 골격 위에 그려진 서체라 한 줄에서 섞여도 골격이 어긋나지 않는다.
+
+   SIL OFL 1.1 · github.com/orioncactus/pretendard · rsms.me/inter
    ========================================================================== */
-@font-face {
-  font-family: "Pretendard";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("/fonts/Pretendard-Regular.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Pretendard";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("/fonts/Pretendard-SemiBold.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Pretendard";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("/fonts/Pretendard-Bold.woff2") format("woff2");
-}
 
 :root {
   /* The tick a task is finished with, everywhere it is drawn.
