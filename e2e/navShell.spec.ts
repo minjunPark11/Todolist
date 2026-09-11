@@ -175,13 +175,20 @@ test.describe("the Context Sidebar frame", () => {
     // order and the accessibility tree, and the element stays in the DOM.
     await expect(page.locator("#context-sidebar")).toBeHidden();
 
-    const after = (await page.locator(".tm-main").boundingBox())?.width ?? 0;
+    // POLLED, not measured once: the grid's columns tween over
+    // `--motion-base` (§3.18), and `toBeHidden` above resolves the instant
+    // `display: none` applies — which is before the track has moved. Measured
+    // straight after the click this read the old width and failed, but only
+    // in a full run [실측]; alone it won the race.
+    //
     // Main got WIDER, rather than being pushed into the column that just went
     // to 0. Not an exact sum: the Detail column is `auto` and takes its share
     // of what was freed, and `.tm-main`'s own padding follows the responsive
     // mode, which the extra width can flip. The bug this pins made Main 0px —
     // what has to be true is that it grew.
-    expect(after).toBeGreaterThan(before);
+    await expect
+      .poll(async () => (await page.locator(".tm-main").boundingBox())?.width ?? 0, { timeout: 2000 })
+      .toBeGreaterThan(before);
   });
 
   test("CS-13 — the width the reader chose survives a collapse", async ({ page }) => {
