@@ -38,4 +38,24 @@ test.describe("the accent colour setting", () => {
       expect(accent, `[data-accent="${id}"] draws its own colour`).toBe(expected);
     });
   }
+
+  // The other half: the picker has to show the colour it applies. Blue drifted
+  // through two accent changes saying `#007aff` while the app drew something
+  // else, and nothing noticed because a swatch is only ever compared to itself.
+  test("every swatch shows the colour it would apply", async ({ page }) => {
+    await openApp(page);
+    await page.goto("/settings");
+
+    for (const { id, expected } of CHOICES) {
+      const swatch = await page
+        .locator(`.ff-color-swatch[aria-label="${id}"]`)
+        .evaluate((el) => getComputedStyle(el).backgroundColor);
+      // `rgb(r, g, b)` from the browser, against the hex the CSS declares.
+      const [r, g, b] = expected
+        .slice(1)
+        .match(/../g)!
+        .map((h) => Number.parseInt(h, 16));
+      expect(swatch, `the ${id} swatch matches the accent it sets`).toBe(`rgb(${r}, ${g}, ${b})`);
+    }
+  });
 });

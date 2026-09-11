@@ -68,8 +68,21 @@ interface SettingsPageProps {
   autoBackup: AutoBackupState;
 }
 
+/**
+ * The swatch and the colour it applies, which have to be the same thing.
+ *
+ * Blue drifted twice: §10 moved the accent to `#0064d2` for contrast and
+ * POLISHED_REFERENCE_PARITY_DESIGN.md §5.3 moved it again to `#556be7`, and
+ * this list said `#007aff` through both — a picker offering a colour the app
+ * does not draw. The other four have never moved.
+ *
+ * The values live in CSS (`[data-accent="…"]` in `01-base.css`, with blue's
+ * current value in `25-reference.css`) because that is where a theme is
+ * chosen; these are the preview of them, and `e2e/accentChoice.spec.ts`
+ * measures the two against each other so the next move cannot be silent.
+ */
 const ACCENTS: { id: AccentColor; color: string }[] = [
-  { id: "blue", color: "#007aff" },
+  { id: "blue", color: "#556be7" },
   { id: "purple", color: "#af52de" },
   { id: "green", color: "#34c759" },
   { id: "orange", color: "#ff9500" },
