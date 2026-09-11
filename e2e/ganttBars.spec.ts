@@ -170,48 +170,70 @@ test.describe("opening a task from the timeline", () => {
   });
 });
 
-// §6, I3: today is marked three ways, and only one of them needs a browser —
-// the line is placed from the clock at render, and where it lands is layout.
+// Today (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.2). Only a browser can say
+// this: both marks are placed from the clock at render, and whether they line
+// up is layout.
+//
+// It used to be three marks — a pill round the column's first day, a band down
+// that column, and the line. The first two named a COLUMN and had to be
+// switched off at four of the five zooms to stop them saying something false.
+// The chip replaced them: placed from the same fraction the line is, so it is
+// exact everywhere.
 test.describe("the mark for today", () => {
   test.skip(({ viewport }) => (viewport?.width ?? 0) < 1280, "the timeline wants a desktop window");
 
-  test("is a line inside today's own column", async ({ page }) => {
+  test("is a chip in the ruler over a line down the grid", async ({ page }) => {
     await openTimeline(page);
     await page.locator(".ff-board-control select").selectOption("week");
 
     const line = page.locator(".ff-timeline-now-line");
+    const chip = page.locator(".ff-timeline-now-chip");
     await expect(line).toBeVisible();
-
-    // The pill and the band say WHICH column; this says where in it. The two
-    // must agree, and a line that drifted out of the marked column would mean
-    // `windowFraction` and `columnOf` had come apart. The HEADING's cell, of
-    // which there is one — the band is drawn per row, so those come one per
-    // task and any of them would do.
-
-    const column = page.locator(".ff-timeline-col.is-today");
-    await expect(column).toHaveCount(1);
-
-    const lineBox = await line.boundingBox();
-    const columnBox = await column.boundingBox();
-    expect(lineBox && columnBox).toBeTruthy();
-    const x = (lineBox?.x ?? 0) + (lineBox?.width ?? 0) / 2;
-    expect(x).toBeGreaterThanOrEqual(columnBox?.x ?? 0);
-    expect(x).toBeLessThanOrEqual((columnBox?.x ?? 0) + (columnBox?.width ?? 0));
+    await expect(chip).toHaveCount(1);
   });
 
-  test("names the day in the heading, in a pill", async ({ page }) => {
+  // The whole point of replacing the pill. `columnOf` could not answer this at
+  // four of five zooms; `windowFraction` answers it at all of them.
+  test("is drawn at every zoom", async ({ page }) => {
+    await openTimeline(page);
+    const select = page.locator(".ff-board-control select");
+
+    for (const zoom of ["day", "week", "month", "halfYear", "year"]) {
+      await select.selectOption(zoom);
+      await expect(page.locator(".ff-timeline-now-chip"), `missing at ${zoom}`).toHaveCount(1);
+    }
+  });
+
+  // They are drawn from one fraction, so a drift here means something
+  // re-derived it. Centres rather than edges: the chip is centred on the stem
+  // and the line is centred on the instant.
+  test("puts the chip over the line", async ({ page }) => {
     await openTimeline(page);
     await page.locator(".ff-board-control select").selectOption("week");
 
-    const head = page.locator(".ff-timeline-col.is-today .ff-timeline-col-mark");
-    await expect(head).toHaveCount(1);
-    // A weekday in the label is I7; a filled pill around it is §6.
-    await expect(head).toHaveText(/\(\w+\)$/);
-    // 알약이라는 것이 요점이지 999라는 숫자가 아니었다. 자가 움직여도 이 문장은
-    // 같은 것을 묻는다 (SWISS_MINIMAL_DESIGN.md I1-B).
-    const pill = await page.evaluate(() =>
-      getComputedStyle(document.documentElement).getPropertyValue("--radius-pill").trim(),
-    );
-    await expect(head).toHaveCSS("border-radius", pill);
+    const lineBox = await page.locator(".ff-timeline-now-line").boundingBox();
+    const chipBox = await page.locator(".ff-timeline-now-chip").boundingBox();
+    expect(lineBox && chipBox).toBeTruthy();
+
+    const lineX = (lineBox?.x ?? 0) + (lineBox?.width ?? 0) / 2;
+    const chipX = (chipBox?.x ?? 0) + (chipBox?.width ?? 0) / 2;
+    // A pixel of rounding on each side of a 1px stem.
+    expect(Math.abs(lineX - chipX)).toBeLessThanOrEqual(2);
+  });
+
+  // The two tiers of one ruler, and the rule that joins them. A band edge that
+  // missed its rule would mean the strip was sized by column count rather than
+  // by time — the bug the reference has and §7.2 refuses.
+  test("lands a band edge on the rule it names", async ({ page }) => {
+    await openTimeline(page);
+    await page.locator(".ff-board-control select").selectOption("month");
+
+    const bands = page.locator(".ff-timeline-band");
+    await expect(bands).toHaveCount(2);
+
+    const secondBand = await bands.nth(1).boundingBox();
+    const markedColumn = await page.locator(".ff-timeline-col.is-band").first().boundingBox();
+    expect(secondBand && markedColumn).toBeTruthy();
+    expect(Math.abs((secondBand?.x ?? 0) - (markedColumn?.x ?? 0))).toBeLessThanOrEqual(1);
   });
 });

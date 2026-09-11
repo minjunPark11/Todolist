@@ -360,37 +360,110 @@ describe("the heading of a column", () => {
     expect(labels()[0]).toBe("2026-09");
   });
 
-  it("marks the column today falls in", () => {
+  it("names the hour where a column IS an hour", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    zoomTo("day");
+    expect(labels()[0]).toBe("00");
+  });
+});
+
+// Today, in the ruler (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.2).
+//
+// This replaces a pill around the column's first day and a band down that
+// column. Both named a COLUMN, so both had to be switched off at four of the
+// five zooms to stop them making a false statement rather than a vague one —
+// on a month window the pill badged `8.30` while today was `9.2`.
+//
+// The chip is placed from the CLOCK, by the same `windowFraction` the line
+// below it uses. So it is exact at every zoom, and the two marks cannot come
+// apart. The clock is faked here for exactly that reason: the chip's presence
+// is now a fact about `Date.now()` rather than about the `today` prop.
+describe("the today chip", () => {
+  const zoomTo = (value: string) => fireEvent.change(screen.getByRole("combobox"), { target: { value } });
+  const chip = () => document.querySelector(".ff-timeline-now-chip");
+
+  afterEach(() => vi.useRealTimers());
+
+  function atNoonOnToday() {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(`${TODAY}T12:00:00`));
+  }
+
+  it("is drawn at every zoom, which is what the column pill could not be", () => {
+    atNoonOnToday();
+    draw([task({ id: "b1", dueDate: TODAY })]);
+
+    for (const zoom of ["day", "week", "month", "halfYear", "year"]) {
+      zoomTo(zoom);
+      expect(chip(), `missing at ${zoom}`).not.toBeNull();
+    }
+  });
+
+  it("goes with the line when today leaves the window", () => {
+    vi.useFakeTimers();
+    // Two months on. Every window anchored on `today` is behind it.
+    vi.setSystemTime(new Date("2026-11-02T12:00:00"));
+    draw([task({ id: "b1", dueDate: TODAY })]);
+
+    zoomTo("week");
+    expect(chip()).toBeNull();
+    expect(document.querySelector(".ff-timeline-now-line")).toBeNull();
+  });
+
+  // The one thing the two marks must agree on. They are drawn from the same
+  // fraction, so this is really a test that nothing re-derived it.
+  it("sits at the same fraction as the line", () => {
+    atNoonOnToday();
     draw([task({ id: "b1", dueDate: TODAY })]);
     zoomTo("week");
 
-    expect(document.querySelectorAll(".ff-timeline-col.is-today")).toHaveLength(1);
-    expect(document.querySelector(".ff-timeline-col.is-today")?.textContent).toBe("9.2 (Wed)");
+    const head = document.querySelector(".ff-timeline-now-head") as HTMLElement;
+    const line = document.querySelector(".ff-timeline-now-line") as HTMLElement;
+    expect(head.style.left).toBe(line.style.left);
   });
+});
 
-  // A day window is 24 columns of one date: `columnOf` puts today in the first
-  // of them, so a mark there would badge midnight and call it now.
-  it("marks none of them at the hour zoom, where every column is today", () => {
+// The ruler's upper tier (§7.2). The domain decides where the bands fall
+// (`rulerBands`); what is pinned here is that the view draws them in the same
+// `fr` units as the columns, and marks the boundary under them.
+describe("the ruler's month strip", () => {
+  const zoomTo = (value: string) => fireEvent.change(screen.getByRole("combobox"), { target: { value } });
+  const bands = () => [...document.querySelectorAll(".ff-timeline-band")] as HTMLElement[];
+
+  it("names the month over week columns, splitting where the month does", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("day");
-
-    expect(labels()[0]).toBe("00");
-    expect(document.querySelectorAll(".ff-timeline-col.is-today")).toHaveLength(0);
-  });
-
-  // The other end, and the same clause. A pill is drawn around the column's
-  // FIRST day, so on a month window it badged `8.30` while today was `9.2` —
-  // not a vaguer statement than the line's, a wrong one. Above the day column
-  // the line carries the moment alone.
-  it("marks none of them where a column is a week or a month", () => {
-    draw([task({ id: "b1", dueDate: TODAY })]);
-
     zoomTo("month");
-    expect(labels()[0]).toBe("8.30");
-    expect(document.querySelectorAll(".ff-timeline-col.is-today")).toHaveLength(0);
 
+    // Five weeks from 8.30 — only the first starts in August.
+    expect(bands().map((band) => band.textContent)).toEqual(["2026-08", "2026-09"]);
+  });
+
+  it("names the year over month columns", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
     zoomTo("year");
-    expect(document.querySelectorAll(".ff-timeline-col.is-today")).toHaveLength(0);
+
+    expect(bands().map((band) => band.textContent)).toEqual(["2026", "2027"]);
+  });
+
+  // Hours, not column count. A band given an even share drifts away from the
+  // rules under it wherever the columns differ in length, which is the
+  // arithmetic §17.13 already fixed once for the bars.
+  it("sizes a band by time, so an uneven month is drawn the width it is", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    zoomTo("halfYear");
+
+    // Sep–Dec = 30+31+30+31 = 122 days; Jan–Feb = 31+28 = 59.
+    expect(bands().map((band) => band.style.flexGrow)).toEqual([String(122 * 24), String(59 * 24)]);
+  });
+
+  it("marks the column where a band begins, and never the first", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    zoomTo("month");
+
+    const marked = [...document.querySelectorAll(".ff-timeline-col")].map((col) =>
+      col.classList.contains("is-band"),
+    );
+    expect(marked).toEqual([false, true, false, false, false]);
   });
 });
 

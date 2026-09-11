@@ -15,7 +15,8 @@ import {
   placeBar,
   shiftWindow,
   timelineWindow,
-  todayColumn,
+  rulerBands,
+  bandBoundaries,
   windowDays,
   ZOOM_COLUMNS,
   ZOOM_SPEC,
@@ -149,16 +150,84 @@ describe("placeBar", () => {
   });
 });
 
-describe("todayColumn", () => {
-  it("finds the column holding today", () => {
-    const w = timelineWindow("week", "2026-08-15");
-    expect(todayColumn(w, "2026-08-15")).toBe(1);
-    expect(todayColumn(w, "2026-08-20")).toBe(6);
+// §7.2. The band names the unit one step coarser than the column, which is
+// §13's rule about what a column can name, moved up a level.
+describe("rulerBands", () => {
+  it("names the month over day columns, and splits where the month does", () => {
+    // 8.30 is a Sunday, so a week window from it runs 8.30 – 9.5.
+    const w = timelineWindow("week", "2026-08-30");
+    const bands = rulerBands(w);
+
+    expect(bands.map((band) => [band.start, band.unit, band.columns])).toEqual([
+      ["2026-08-30", "month", 2],
+      ["2026-09-01", "month", 5],
+    ]);
   });
 
-  it("reports nothing when today is off-window, so no marker is drawn", () => {
-    const w = timelineWindow("week", "2026-08-15");
-    expect(todayColumn(w, "2026-09-01")).toBeNull();
+  it("names the month over week columns, quantised to the week's first day", () => {
+    // Five weeks from 8.30: 8.30, 9.6, 9.13, 9.20, 9.27. Only the first
+    // starts in August — and the last one RUNS INTO October without saying
+    // so, which is the week-quantisation §7.2 accepts: a band edge mid-column
+    // is a boundary the ruler below cannot draw.
+    const bands = rulerBands(timelineWindow("month", "2026-08-30"));
+
+    expect(bands.map((band) => [band.start, band.columns])).toEqual([
+      ["2026-08-30", 1],
+      ["2026-09-06", 4],
+    ]);
+  });
+
+  it("names the year over month columns", () => {
+    const bands = rulerBands(timelineWindow("year", "2026-09-01"));
+
+    expect(bands.map((band) => [band.start, band.unit, band.columns])).toEqual([
+      ["2026-09-01", "year", 4],
+      ["2027-01-01", "year", 8],
+    ]);
+  });
+
+  it("names the date over hour columns, where all 24 share one", () => {
+    const bands = rulerBands(timelineWindow("day", "2026-09-11"));
+
+    expect(bands).toHaveLength(1);
+    expect(bands[0]).toMatchObject({ start: "2026-09-11", unit: "date", columns: 24 });
+  });
+
+  // The reason this carries hours rather than a column count (§17.13): the
+  // columns are cut by TIME, so a band sized by count drifts away from the
+  // rules drawn under it. The reference has exactly that bug and escapes it
+  // only because every one of its columns is seven days.
+  it("measures a band in hours, so an uneven month is drawn the width it is", () => {
+    const bands = rulerBands(timelineWindow("halfYear", "2026-11-01"));
+
+    // Nov(30) + Dec(31) = 61 days; Jan–Apr = 31+28+31+30 = 120.
+    expect(bands.map((band) => band.hours)).toEqual([61 * 24, 120 * 24]);
+    // Column count alone would have said 2 and 4 — a 33.3%/66.7% split where
+    // the true one is 33.7%/66.3%.
+    expect(bands.map((band) => band.columns)).toEqual([2, 4]);
+  });
+
+  it("sums to the whole track, whatever the zoom", () => {
+    for (const zoom of ["day", "week", "month", "halfYear", "year"] as const) {
+      const w = timelineWindow(zoom, "2026-09-11");
+      const bands = rulerBands(w);
+      const total = columnHours(w).reduce((sum, hours) => sum + hours, 0);
+
+      expect(bands.reduce((sum, band) => sum + band.hours, 0)).toBe(total);
+      expect(bands.reduce((sum, band) => sum + band.columns, 0)).toBe(ZOOM_COLUMNS[zoom]);
+    }
+  });
+});
+
+describe("bandBoundaries", () => {
+  it("marks where a band begins, never the track's own left edge", () => {
+    const bands = rulerBands(timelineWindow("week", "2026-08-30"));
+    expect([...bandBoundaries(bands)]).toEqual([2]);
+  });
+
+  it("is empty when one band covers the window", () => {
+    const bands = rulerBands(timelineWindow("day", "2026-09-11"));
+    expect(bandBoundaries(bands).size).toBe(0);
   });
 });
 

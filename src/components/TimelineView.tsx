@@ -41,7 +41,6 @@ import {
   type Instant,
   minTrackWidth,
   placeBar,
-  todayColumn,
   windowFraction,
   ZOOM_COLUMNS,
   type TimelineWindow,
@@ -83,6 +82,21 @@ const DRAG_MIME = "text/timeline";
  */
 export const TRAY_DRAG_MIME = "text/timeline-tray";
 
+/** One cell of the ruler's upper tier, already named (§7.2). */
+export interface TimelineBand {
+  label: string;
+  /** How many columns it covers — where the heavier rule goes. */
+  columns: number;
+  /**
+   * Its share of the track, in hours.
+   *
+   * Sized like the columns below it and NOT by column count, for the reason
+   * §17.13 exists: the columns are cut by time, so a band given an even share
+   * drifts away from the rules drawn under it.
+   */
+  hours: number;
+}
+
 export interface TimelineRow {
   item: Item;
   /** Indented one step when the parent is also on screen (D9). */
@@ -101,6 +115,14 @@ interface TimelineViewProps {
   groupLabel: (groupId: string) => string;
   /** Column headings, already abbreviated for the viewport (D11). */
   columnLabels: string[];
+  /**
+   * The ruler's upper tier — the month over a row of weeks (§7.2).
+   *
+   * Labelled by the caller, like `columnLabels` and for the same reason: the
+   * domain is pure and has no language, so `9월` / `September` is the view's
+   * word rather than `rulerBands`'s.
+   */
+  bands: TimelineBand[];
   selectedTaskId?: string;
   /**
    * Opens the Task, and says where from
@@ -159,6 +181,7 @@ export function TimelineView({
   tasks,
   groupLabel,
   columnLabels,
+  bands,
   selectedTaskId = "",
   onOpenItem,
   barColorOf,
@@ -170,26 +193,21 @@ export function TimelineView({
   const { t } = useT();
   const columns = ZOOM_COLUMNS[window.zoom];
   /**
-   * Which column carries today's marks — only where a column IS a day.
+   * Where a band begins, so the rule under it is drawn heavier (§2.3).
    *
-   * Both of those marks name a COLUMN, so neither can be more precise than
-   * one, and at every other zoom that imprecision turns into a false
-   * statement rather than a vague one.
-   *
-   * Below: `columnOf` compares dates, and the 24 columns of a day window all
-   * share one, so today lands in column 0 and both marks go on `00:00`
-   * whatever the time is.
-   *
-   * Above: the pill is drawn around the column's FIRST day. On a month window
-   * it badged `8.30` while today was `9.5` [실측] — it did not say "this week
-   * contains today", it said the wrong date. The band was worse: a whole week
-   * of `--accent-soft`, 90.8px of a 454px track, the largest colour field on a
-   * screen whose bars are each their own List's colour.
-   *
-   * So everywhere else the line (§6) carries the moment alone. It is placed
-   * from a clock rather than from a column, which is why it can be.
+   * The reference's `.week.month-break`. It lets the eye find a month boundary
+   * without reading the strip above it, which matters most at the zoom where
+   * the strip is quietest — five week columns under two month names.
    */
-  const nowColumn = columnUnitOf(window.zoom) === "day" ? todayColumn(window, today) : null;
+  const boundaries = useMemo(() => {
+    const at = new Set<number>();
+    let index = 0;
+    for (const band of bands) {
+      if (index > 0) at.add(index);
+      index += band.columns;
+    }
+    return at;
+  }, [bands]);
   /**
    * Where the line goes (§6, I3).
    *
@@ -323,7 +341,7 @@ export function TimelineView({
         {Array.from({ length: columns }, (_, index) => (
           <span
             key={index}
-            className={`ff-timeline-rule${nowColumn === index + 1 ? " is-today" : ""}`}
+            className={`ff-timeline-rule${boundaries.has(index) ? " is-band" : ""}`}
           />
         ))}
       </div>
@@ -386,18 +404,54 @@ export function TimelineView({
         <div className="ff-timeline-headside">
           <div className="ff-timeline-controls" />
           <div className="ff-timeline-ruler">
+            {/* The upper tier (§7.2). Sized in the same `fr` units as the
+                columns below — `hours`, not an even share — so a band edge
+                lands exactly on the rule it names. */}
+            <div className="ff-timeline-bands">
+              {bands.map((band, index) => (
+                <span
+                  key={`${band.label}-${index}`}
+                  className="ff-timeline-band"
+                  /* Longhands rather than the `flex` shorthand: the shorthand
+                     is what a stylesheet writes, and this is a measured ratio
+                     that the test reads back off the element. */
+                  style={{ flexGrow: band.hours, flexShrink: 0, flexBasis: 0 }}
+                >
+                  {band.label}
+                </span>
+              ))}
+            </div>
             <div className="ff-timeline-columns">
               {columnLabels.map((label, index) => (
                 <span
                   key={`${label}-${index}`}
-                  className={`ff-timeline-col${nowColumn === index + 1 ? " is-today" : ""}`}
+                  className={`ff-timeline-col${boundaries.has(index) ? " is-band" : ""}`}
                 >
-                  {/* The label in its own box, because §6's pill is drawn around
-                      the DATE and the cell is a whole column wide. */}
                   <span className="ff-timeline-col-mark">{label}</span>
                 </span>
               ))}
             </div>
+            {/* Today, in the ruler (§2.2).
+
+                It replaces a pill around the column's first day and a band
+                down that column. Both named a COLUMN and had to be switched
+                off at four of the five zooms to stop them saying something
+                false — on a month window the pill badged `8.30` while today
+                was `9.5`. This is placed from the CLOCK, by the same
+                `windowFraction` the line below it uses, so it is exact
+                everywhere and the two marks cannot drift apart.
+
+                The short stem joins the chip to that line: in the reference
+                they are 82px apart and read as two unrelated things (§1.2c). */}
+            {nowAt === null ? null : (
+              <div
+                className="ff-timeline-now-head"
+                style={{ left: `${nowAt * 100}%` }}
+                aria-hidden="true"
+              >
+                <span className="ff-timeline-now-chip">{t("timeline.today")}</span>
+              </div>
+            )}
           </div>
         </div>
       </header>

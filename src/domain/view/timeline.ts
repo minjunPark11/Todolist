@@ -294,6 +294,96 @@ export function columnStartDate(window: TimelineWindow, index: number): string {
   return window.edges[index]?.slice(0, 10) ?? "";
 }
 
+// ---------------------------------------------------------------------------
+// The ruler's upper band (TIMELINE_REFERENCE_PARITY_DESIGN.md §7.2)
+//
+// The reference draws its dates in TWO tiers: a month strip over a row of week
+// starts. One tier can only ever say one thing, and the thing a date column
+// cannot say is which larger period it belongs to — `9.6`, `9.13`, `9.20`,
+// `9.27`, `10.4` crosses a month boundary and none of the five labels mentions
+// it.
+//
+// Generalised to all five zooms rather than copied for the reference's one:
+// the band names the unit ONE STEP COARSER than the column, which is the same
+// rule §13 states for what a column can name, moved up a level.
+// ---------------------------------------------------------------------------
+
+export interface RulerBand {
+  /** First day of the band's first column. The caller formats it. */
+  start: string;
+  /**
+   * What the band names — NOT a formatted string.
+   *
+   * This module is pure and has no language, the same reason `barText` takes
+   * `allDay` as an argument. The view owns `9월` and `September`.
+   */
+  unit: "date" | "month" | "year";
+  /** How many columns the band covers. */
+  columns: number;
+  /**
+   * Hours those columns cover — the band's share of the track.
+   *
+   * Hours and not `columns / total`, for the reason §17.13 exists: the columns
+   * are cut by TIME and a 28-day February is not a sixth of a six-month
+   * window. A band sized by column COUNT would drift away from the rules drawn
+   * under it, which is the one thing a two-tier ruler must not do.
+   *
+   * The reference has this bug — `buildTimeHeader` sizes a month segment
+   * `count / visibleWeeks` — and gets away with it only because every one of
+   * its columns is exactly seven days.
+   */
+  hours: number;
+}
+
+/**
+ * The bands over `window`'s columns, in order.
+ *
+ * A band runs while consecutive columns share the period it names, so a week
+ * column that straddles a month boundary belongs to the month its FIRST day is
+ * in. That is week-quantisation, and it is correct here rather than a
+ * rounding error: the columns below are weeks, and a band edge that fell
+ * mid-column would name a boundary the ruler cannot draw.
+ */
+export function rulerBands(window: TimelineWindow): RulerBand[] {
+  const unit = columnUnitOf(window.zoom);
+  // One step coarser than the column. A day window's columns are hours, so its
+  // band is the date; a year's columns are months, so its band is the year.
+  const bandUnit: RulerBand["unit"] =
+    unit === "hour" ? "date" : unit === "month" ? "year" : "month";
+  const keyLength = bandUnit === "date" ? 10 : bandUnit === "month" ? 7 : 4;
+
+  const hours = columnHours(window);
+  const bands: RulerBand[] = [];
+  for (let i = 0; i < hours.length; i += 1) {
+    const edge = window.edges[i];
+    const last = bands[bands.length - 1];
+    if (last && last.start.slice(0, keyLength) === edge.slice(0, keyLength)) {
+      last.columns += 1;
+      last.hours += hours[i];
+    } else {
+      bands.push({ start: edge.slice(0, 10), unit: bandUnit, columns: 1, hours: hours[i] });
+    }
+  }
+  return bands;
+}
+
+/**
+ * Column indices where a band begins, except the first (§2.3).
+ *
+ * The reference draws a heavier rule there — `.week.month-break` — so the eye
+ * can find a month boundary without reading the strip above it. Index 0 is
+ * excluded because the track's own left edge is already that line.
+ */
+export function bandBoundaries(bands: RulerBand[]): Set<number> {
+  const at = new Set<number>();
+  let index = 0;
+  for (const band of bands) {
+    if (index > 0) at.add(index);
+    index += band.columns;
+  }
+  return at;
+}
+
 /**
  * The day at `ratio` through a column (§13).
  *
@@ -413,11 +503,15 @@ export function columnEndDate(window: TimelineWindow, index: number): string {
   return addDays(window.edges[index + 1].slice(0, 10), -1);
 }
 
-/** True when the column contains today, for the "now" marker. */
-export function todayColumn(window: TimelineWindow, today: string): number | null {
-  const index = columnOf(today, window);
-  return index === -1 ? null : index + 1;
-}
+// `todayColumn` stood here — the column index today falls in, for a pill in
+// the heading and a band down that column.
+//
+// Both marks named a COLUMN, so neither could be more precise than one, and
+// `TimelineView` had to switch them off at four of the five zooms to stop them
+// making a false statement rather than a vague one. The reference marks today
+// with a chip placed from a CLOCK instead (§2.2), which `windowFraction`
+// already answers — so the mark is exact at every zoom and nothing asks which
+// column any more.
 
 /**
  * Where `at` falls across the window, 0 to 1 — or null when it is outside

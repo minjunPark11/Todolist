@@ -22,12 +22,14 @@ import { dateMutation, patchForSpanDrag, patchForTrayDrop, type SpanDrag } from 
 import { spanForItem, spanIntersects } from "../domain/view/span";
 import {
   columnUnitOf,
+  rulerBands,
   shiftWindow,
   timelineWindow,
   ZOOM_COLUMNS,
+  type RulerBand,
   type TimelineZoom,
 } from "../domain/view/timeline";
-import { TimelineView, TRAY_DRAG_MIME } from "./TimelineView";
+import { TimelineView, TRAY_DRAG_MIME, type TimelineBand } from "./TimelineView";
 import { EmptyState } from "./kit";
 import type { Rect } from "../domain/floating";
 import { useT } from "../i18n";
@@ -130,6 +132,24 @@ export function TaskGanttView({
     [window, zoom, lang],
   );
 
+  /**
+   * The ruler's upper tier, named here (§7.2).
+   *
+   * Beside `columnLabels` and for the same reason: `rulerBands` answers which
+   * periods the columns fall into and how wide each is, and this file is where
+   * the app knows that a month is `9월` in one language and `2026-09` in the
+   * other.
+   */
+  const bands = useMemo<TimelineBand[]>(
+    () =>
+      rulerBands(window).map((band) => ({
+        label: bandLabel(band, lang),
+        columns: band.columns,
+        hours: band.hours,
+      })),
+    [window, lang],
+  );
+
   function handleDrag(item: Item, drag: SpanDrag) {
     if (!onMutateTask) return;
     const task = context.taskById.get(item.sourceId);
@@ -225,6 +245,7 @@ export function TaskGanttView({
           tasks={tasks}
           groupLabel={groupLabel}
           columnLabels={columnLabels}
+          bands={bands}
           selectedTaskId={selectedTaskId}
           onOpenItem={onOpenItem}
           barColorOf={barColorOf}
@@ -291,6 +312,29 @@ export function TaskGanttView({
       </div>
     </div>
   );
+}
+
+/**
+ * What the ruler's upper tier says (§7.2).
+ *
+ * One step coarser than `columnLabel`, and written in the same two forms: the
+ * Korean side names the period (`9월`), the English side writes the ISO prefix
+ * (`2026-09`) — which is what `columnLabel` already does for a month column,
+ * so the two tiers of one ruler stay one notation.
+ */
+function bandLabel(band: RulerBand, lang: string): string {
+  if (band.unit === "year") {
+    const year = band.start.slice(0, 4);
+    return lang === "ko" ? `${year}년` : year;
+  }
+  if (band.unit === "month") {
+    return lang === "ko" ? `${Number(band.start.slice(5, 7))}월` : band.start.slice(0, 7);
+  }
+  // A day window: all 24 columns share one date, so the band is the date the
+  // hour labels below it have no room to repeat.
+  return lang === "ko"
+    ? `${Number(band.start.slice(5, 7))}월 ${Number(band.start.slice(8, 10))}일`
+    : band.start;
 }
 
 /** The same names the calendar's month grid uses, so a `일` is a `일`. */
