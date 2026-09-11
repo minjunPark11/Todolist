@@ -27,18 +27,19 @@ import type { Project, Task } from "../types";
 import { timelineLinks, type TimelineBadge } from "../domain/view/connectors";
 import { TimelineConnectors } from "./TimelineConnectors";
 import { OverlayScrollbar } from "./common/OverlayScrollbar";
+import { TaskCheck } from "./tasks/TaskCheck";
+import { MoreMenu, type MoreMenuItem } from "./kit";
 import type { Item } from "../domain/view/item";
 import { applyView, type GroupContext, type ViewSpec } from "../domain/view/viewSpec";
 import { spanForItem } from "../domain/view/span";
 import {
-  barText,
-  barTextShort,
   columnOf,
   columnHours,
   columnUnitOf,
   dateAtColumnOffset,
   instantAtWindowFraction,
   type Instant,
+  metaText,
   minTrackWidth,
   placeBar,
   windowFraction,
@@ -150,6 +151,22 @@ interface TimelineViewProps {
   /** Absent makes the timeline read-only, which is what P1 shipped. */
   onDragItem?: (item: Item, drag: SpanDrag) => void;
   /**
+   * Ticks the box in the task column (§2.3).
+   *
+   * The reference's row can finish a task, and so can every other list in this
+   * app — a column that shows tasks and cannot tick one is a legend. Absent
+   * leaves the box off entirely rather than drawing a dead one.
+   */
+  onToggleDone?: (item: Item) => void;
+  /**
+   * Clears the dates, which drops the Task into the tray (§9.8).
+   *
+   * The one destructive thing the row's menu offers. It is a date change like
+   * every other one on this screen, so it goes back through `onMutateTask` and
+   * is undoable by the same route.
+   */
+  onClearDates?: (item: Item) => void;
+  /**
    * A chip is being dragged right now, so the date lanes are live (§4).
    *
    * They are drawn ONLY then. A lane spans the full height of the grid and
@@ -186,6 +203,8 @@ export function TimelineView({
   onOpenItem,
   barColorOf,
   onDragItem,
+  onToggleDone,
+  onClearDates,
   trayDragging = false,
   onDropTray,
   recenterKey = 0,
@@ -473,6 +492,15 @@ export function TimelineView({
               // Only tasks carry the date fields a drag writes; a goal's
               // schedule is edited where it lives.
               draggable={Boolean(onDragItem) && item.source === "task"}
+              // Only a Task has a box to tick and dates to clear; a goal's
+              // schedule is edited where it lives, which is what `draggable`
+              // above already says about the other gesture.
+              onToggleDone={
+                onToggleDone && item.source === "task" ? () => onToggleDone(item) : undefined
+              }
+              onClearDates={
+                onClearDates && item.source === "task" ? () => onClearDates(item) : undefined
+              }
               badges={badgeByKey.get(item.key) ?? []}
               isDragging={dragKey === item.key}
               onDragStateChange={(active) => setDragKey(active ? item.key : "")}
@@ -505,6 +533,8 @@ function TimelineRowView({
   isDragging,
   onDragStateChange,
   onDrag,
+  onToggleDone,
+  onClearDates,
 }: {
   item: Item;
   indented: boolean;
@@ -517,6 +547,8 @@ function TimelineRowView({
   isDragging: boolean;
   onDragStateChange: (active: boolean) => void;
   onDrag: (drag: SpanDrag) => void;
+  onToggleDone?: () => void;
+  onClearDates?: () => void;
 }) {
   const { t } = useT();
   /**
@@ -535,30 +567,41 @@ function TimelineRowView({
   // than paint an empty one that reads as "this has no dates".
   if (!placement || !span) return null;
 
+  /**
+   * The row's menu (§9.8).
+   *
+   * The reference offers four items and two of them call the same handler —
+   * `미배치로 이동` and `일정 제거` both run `unscheduleTask`. Two words, one
+   * action; that is the mockup being unfinished, not a distinction to copy.
+   * `날짜 수정` is the Task itself, which `작업 열기` already opens.
+   */
+  const menuItems: MoreMenuItem[] = [
+    { label: t("timeline.openTask"), onClick: () => onOpen() },
+    ...(onClearDates ? [{ label: t("timeline.clearDates"), onClick: onClearDates, danger: true }] : []),
+  ];
+
   const unit = columnUnitOf(window.zoom);
   /**
-   * The bar's text is ONE date rather than a range (§4).
+   * One date, drawn as a point rather than as a rectangle
+   * (D8, and TIMELINE_REFERENCE_PARITY_DESIGN.md §4.5).
    *
-   * Which the stylesheet needs to know, because its thresholds are measured
-   * against `12.31 – 12.31` — the widest line a bar can hold — and a bar
-   * holding `9.5` was being silenced at more than twice the width its own
-   * text asks for. At week zoom on a 1280 window a day is 64.9px and the
-   * threshold was 72 [실측], so the most common record in this app said
-   * nothing at any zoom but `day`.
+   * D8 decided the shape for the zooms where a day has no width — 12.97px at
+   * month zoom, under a pixel at year — where a rectangle "is not a short
+   * span, it is a rectangle that failed to be one".
+   *
+   * The reference draws a single date as a diamond at EVERY width it reaches,
+   * because what it is marking is a KIND (`schedule.kind: 'milestone'`) and
+   * not a measurement. We have no such field and §4.5 refused to add one, so
+   * the shape stays derived — but derived by the reference's rule rather than
+   * by width, which is the `unit !== "day"` clause that used to be here.
+   *
+   * The hour zoom is the one exception, and it falls out rather than being
+   * written: there a bar's width IS the length of the work and its ends are
+   * clock values, so `singleDate` is false by construction. That is also the
+   * only place the reference never had to have an opinion about.
    */
   const singleDate = span.start === span.end && unit !== "hour";
-  /**
-   * One date, drawn where a column is coarser than a day — no width to
-   * describe, which is what D8's marker was written for.
-   *
-   * D8 decided the shape and `12-timeline.css` has carried it since P1;
-   * nothing ever rendered the class [실측]. A day at month zoom is 12.97px
-   * beside a 24px height and at year zoom it is under a pixel, so a rectangle
-   * there is not a short span — it is a rectangle that failed to be one. A
-   * diamond on the day is the same fact, drawn as a point because that is
-   * what it is.
-   */
-  const asMarker = singleDate && unit !== "day";
+  const asMarker = singleDate;
 
   /**
    * The day under the pointer, from anywhere on this row's track (§13).
@@ -598,7 +641,10 @@ function TimelineRowView({
 
   return (
     <div
-      className={`ff-timeline-row${selected ? " is-selected" : ""}`}
+      /* `is-done` on the ROW, not only on the bar: the name and the date in
+         the task column have to read as finished too, and they are not inside
+         the bar that already carried the class. */
+      className={`ff-timeline-row${selected ? " is-selected" : ""}${item.done ? " is-done" : ""}`}
       /* One declaration for the whole row: the dot beside the name and the bar
          out on the track are the same List saying so twice.
 
@@ -614,18 +660,53 @@ function TimelineRowView({
           : undefined
       }
     >
-      <button
-        type="button"
-        className={`ff-timeline-label${indented ? " is-child" : ""}`}
-        onClick={(event) => onOpen(rectOf(event.currentTarget))}
-        title={item.title}
-      >
+      {/* The task column is a ROW now, not a name
+          (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.3).
+
+          It was one button holding a dot and a title. The reference puts four
+          things on this side — tick, name, when it ends, and the row's menu —
+          and that is what makes the column worth 264px: it is the task list,
+          beside the dates, rather than a legend for the bars.
+
+          A `div` rather than a `button`, because three of the four are
+          controls of their own and a button cannot hold a button. The name
+          keeps the click that opens the Task. */}
+      <div className={`ff-timeline-label${indented ? " is-child" : ""}`}>
         {indented ? <span className="ff-timeline-child-mark" aria-hidden="true">↳</span> : null}
+        {/* The app's own checkbox, not a copy of the reference's circle: a
+            tick box has one meaning across this app and it is drawn once.
+            `none` for the priority — the timeline never showed a level and a
+            coloured box here would be a fact this screen does not otherwise
+            carry. */}
+        {onToggleDone ? (
+          <TaskCheck
+            priority="none"
+            checked={item.done}
+            label={t(item.done ? "tasks.reopenTask" : "tasks.completeTask", { title: item.title })}
+            onToggle={() => onToggleDone()}
+          />
+        ) : null}
         {/* I6: which List, before the name — the Tasks sidebar marks a List
             with the same dot, so the two screens agree on what a colour is. */}
         {barColor ? <span className="ff-timeline-dot" aria-hidden="true" /> : null}
-        <span className="ff-timeline-label-text">{item.title}</span>
-      </button>
+        <button
+          type="button"
+          className="ff-timeline-label-text"
+          onClick={(event) => onOpen(rectOf(event.currentTarget))}
+          title={item.title}
+        >
+          {item.title}
+        </button>
+        {/* When it ends — the fact that came out of the bar when the name went
+            in (§4.1). One value with one meaning, which is what lets it be
+            38px of tabular numbers rather than a sentence. */}
+        <span className="ff-timeline-meta">{metaText(span, window.zoom)}</span>
+        {/* Only where there is something the row cannot already do. A
+            read-only timeline's menu would hold `작업 열기` alone — a second
+            way to do what clicking the name does — and a ⋯ on every row is
+            the largest mark in this column when it opens onto nothing. */}
+        {onClearDates ? <MoreMenu items={menuItems} label={t("timeline.rowMenu")} /> : null}
+      </div>
 
       {/* The whole row is the drop target (§17.13). It was `columns` cells,
           and every one of them answered by measuring the pointer against THIS
@@ -722,32 +803,24 @@ function TimelineRowView({
           <button
             type="button"
             className="ff-timeline-bar-text"
-            /* The name, which the bar stopped saying out loud (§4). Sighted
-               readers have it one column to the left; a screen reader walking
-               the bars would otherwise hear four dates and no work. */
-            aria-label={`${item.title} · ${barText(span, window.zoom, t("calendar.allDay"))}`}
+            /* The span, which the bar no longer spells out (§4.1). A sighted
+               reader has it from the bar's own geometry against the ruler; a
+               screen reader walking the bars has only this. */
+            aria-label={`${item.title} · ${span.start} → ${span.end}`}
             /* The BAR's rect, not the text's: the text is an inset label and a
                popover hung off it would sit inside the bar it belongs to. */
             onClick={(event) => onOpen(rectOf(event.currentTarget.closest(".ff-timeline-bar")))}
           >
             {item.done ? "✓ " : ""}
-            {/* WHEN, not what (§4 — I1-B). The name is in the label column on
-                every row, so a title here was the same word twice, and it was
-                the copy that broke first: under 80px the text is dropped and
-                what the reader loses is the name. The dates are the fact only
-                this side of the row holds.
+            {/* WHAT, not when (§4.1). The reverse of TIMELINE_V2 §4, and still
+                nothing said twice: the date moved to the task column in the
+                same change.
 
-                Both forms are rendered and the container query shows one of
-                them (12-timeline.css). Which one to draw is a question about
-                the BAR's width in pixels, and this component knows the bar as
-                a fraction of a track it never measures — CSS is where that
-                number exists. */}
-            <span className="ff-timeline-bar-long">
-              {barText(span, window.zoom, t("calendar.allDay"))}
-            </span>
-            <span className="ff-timeline-bar-short" aria-hidden="true">
-              {barTextShort(span, window.zoom, t("calendar.allDay"))}
-            </span>
+                One form rather than two. The old pair existed because a date
+                range has a shorter half — `8.31 –` for `8.31 – 9.3` — and a
+                title has no such half; below the width where it fits, the bar
+                drops it and the focus trace (§7.1) has the space instead. */}
+            {item.title}
           </button>
 
           {badges.includes("dependent") ? (

@@ -4,7 +4,7 @@ import { addDays } from "../../utils/date";
 import { spanBounds } from "./span";
 import {
   alignToZoom,
-  barText,
+  metaText,
   windowFraction,
   columnUnitOf,
   dateAtColumnOffset,
@@ -332,10 +332,13 @@ describe("spanBounds with times", () => {
   });
 });
 
-// What the bar itself says (TIMELINE_V2_DESIGN.md §4). The title moved out
-// because the label column was already carrying it; these are about the fact
-// that took its place.
-describe("barText", () => {
+// What the task column says beside a name
+// (TIMELINE_REFERENCE_PARITY_DESIGN.md §4.1).
+//
+// `barText` stood here and put the dates INSIDE the bar. The reference divides
+// the same two facts the other way — name in the bar, date in the column — and
+// §4.1 records why that division is the better one.
+describe("metaText", () => {
   const timed = (start: string, end: string, startTime: string, endTime: string): Span => ({
     start,
     end,
@@ -344,46 +347,31 @@ describe("barText", () => {
     endTime,
   });
 
-  it("is one date when the work is one day", () => {
-    expect(barText(span("2026-09-03"), "week", "All day")).toBe("9.3");
+  it("is the day the work ends", () => {
+    expect(metaText(span("2026-08-31", "2026-09-03"), "week")).toBe("9.3");
   });
 
-  it("is the range when it is more than one", () => {
-    expect(barText(span("2026-08-31", "2026-09-03"), "week", "All day")).toBe("8.31 – 9.3");
+  it("is that same day when the work is one day long", () => {
+    expect(metaText(span("2026-09-03"), "week")).toBe("9.3");
   });
 
-  // The coarse zooms cut into weeks and months, and none of them can draw a
-  // clock — so they all say what the week zoom says.
-  it("says dates at every zoom above a day", () => {
+  // Every row of a day window shares one date, so a date there separates
+  // nothing. §15 called the clock the one fact that zoom can show and no other
+  // can; this is where that sentence went when the bar stopped saying it.
+  it("says the clock at the hour zoom, where every row shares the date", () => {
+    expect(metaText(timed("2026-09-03", "2026-09-03", "14:00", "16:00"), "day")).toBe("16:00");
+  });
+
+  it("says the date at every zoom above a day, times or not", () => {
     for (const zoom of ["week", "month", "halfYear", "year"] as const) {
-      expect(barText(timed("2026-09-03", "2026-09-03", "14:00", "16:00"), zoom, "All day")).toBe("9.3");
+      expect(metaText(timed("2026-09-03", "2026-09-03", "14:00", "16:00"), zoom)).toBe("9.3");
     }
   });
 
-  it("says the clock at the hour zoom, where the column is an hour", () => {
-    expect(barText(timed("2026-09-03", "2026-09-03", "14:00", "16:00"), "day", "All day")).toBe(
-      "14:00 – 16:00",
-    );
-  });
-
-  // I9-C. The bar fills all 24 columns, and this is the only line that says
-  // why; a date would repeat the heading the window already carries.
-  it("says all-day for a task with no times, in the caller's language", () => {
-    expect(barText(span("2026-09-03"), "day", "All day")).toBe("All day");
-    expect(barText(span("2026-09-03"), "day", "종일")).toBe("종일");
-  });
-
-  it("writes an open end as an open end", () => {
-    expect(barText(timed("2026-09-03", "2026-09-03", "14:00", ""), "day", "All day")).toBe("14:00 –");
-    expect(barText(timed("2026-09-03", "2026-09-03", "", "16:00"), "day", "All day")).toBe("– 16:00");
-  });
-
-  // Two clock values from two different days describe neither. The range does,
-  // and it also says why the bar runs off both edges of a one-day window.
-  it("falls back to dates at the hour zoom when the span crosses midnight", () => {
-    expect(barText(timed("2026-09-02", "2026-09-03", "22:00", "02:00"), "day", "All day")).toBe(
-      "9.2 – 9.3",
-    );
+  // `spanBounds` runs an open end to the end of its day, so there is no clock
+  // to show — `16:00` would be a time the record does not hold.
+  it("falls back to the date when the end has no clock", () => {
+    expect(metaText(timed("2026-09-03", "2026-09-03", "14:00", ""), "day")).toBe("9.3");
   });
 });
 

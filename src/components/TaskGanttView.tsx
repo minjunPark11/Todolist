@@ -15,7 +15,8 @@
 // component asks that module and draws the answer.
 import { useMemo, useState } from "react";
 import type { Project, Task } from "../types";
-import type { TaskMutation } from "../domain/tasks/mutations";
+import { completeTask, reopenTask, type TaskMutation } from "../domain/tasks/mutations";
+import { isCompleted } from "../domain/tasks/taskState";
 import type { Item } from "../domain/view/item";
 import type { GroupContext, ViewSpec } from "../domain/view/viewSpec";
 import { dateMutation, patchForSpanDrag, patchForTrayDrop, type SpanDrag } from "../domain/view/board";
@@ -161,6 +162,44 @@ export function TaskGanttView({
     if (mutation) onMutateTask(task, mutation);
   }
 
+  /**
+   * The box in the task column (§2.3).
+   *
+   * `completeTask`/`reopenTask` rather than a patch, for the same reason
+   * `onMutateTask` is a mutation at all (§3.4): everything done on this screen
+   * has to be undoable by the route the rest of the app uses, and those two
+   * carry the `completedAt` that §12.12 found stored twice.
+   */
+  function handleToggleDone(item: Item) {
+    if (!onMutateTask) return;
+    const task = context.taskById.get(item.sourceId);
+    if (!task) return;
+    const now = new Date().toISOString();
+    onMutateTask(task, isCompleted(task) ? reopenTask(task) : completeTask(task, now));
+  }
+
+  /**
+   * `일정 제거` from the row's menu (§9.8).
+   *
+   * A date change like every other one here, so it goes through `dateMutation`
+   * and is taken back the same way. The Task does not leave the Scope — it
+   * leaves the GRID, and lands in the tray, which is where something with no
+   * dates belongs (T-GV06).
+   */
+  function handleClearDates(item: Item) {
+    if (!onMutateTask) return;
+    const task = context.taskById.get(item.sourceId);
+    if (!task) return;
+    // Only what is actually set: `dateMutation` refuses an empty patch, and a
+    // Task holding one of the two fields must not have the other written as
+    // `""` where it was already absent.
+    const patch: Partial<Task> = {};
+    if (task.startDate) patch.startDate = "";
+    if (task.dueDate) patch.dueDate = "";
+    const mutation = dateMutation(task, patch);
+    if (mutation) onMutateTask(task, mutation);
+  }
+
   /** A chip let go over a column (§3.2, §3.3). */
   function handleTrayDrop(sourceId: string, date: string) {
     // Here and not only in the chip's `onDragEnd`. A successful drop takes the
@@ -250,6 +289,8 @@ export function TaskGanttView({
           onOpenItem={onOpenItem}
           barColorOf={barColorOf}
           onDragItem={onMutateTask ? handleDrag : undefined}
+          onToggleDone={onMutateTask ? handleToggleDone : undefined}
+          onClearDates={onMutateTask ? handleClearDates : undefined}
           trayDragging={draggingChip}
           onDropTray={onMutateTask ? handleTrayDrop : undefined}
           recenterKey={recenterKey}

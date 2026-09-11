@@ -15,6 +15,8 @@ import { cleanup, createEvent, fireEvent, render, screen } from "@testing-librar
 import type { List, Task } from "../types";
 import type { TaskMutation } from "../domain/tasks/mutations";
 import { I18nProvider } from "../i18n";
+// The row menu is a Popover (§9.8), and a floating surface needs its layer.
+import { FloatingLayerProvider } from "./floating";
 import { TaskGanttView } from "./TaskGanttView";
 import { TRAY_DRAG_MIME } from "./TimelineView";
 import { projectItems } from "../domain/view/item";
@@ -56,6 +58,7 @@ function draw(tasks: Task[], onOpenItem = vi.fn(), onMutateTask?: (task: Task, m
   const items = projectItems({ tasks, lists: [list], today: TODAY });
   render(
     <I18nProvider lang="en">
+      <FloatingLayerProvider>
       <TaskGanttView
         items={items}
         spec={specForSpaceView("gantt", { folderId: "", listId: "l1" }, "School")}
@@ -66,6 +69,7 @@ function draw(tasks: Task[], onOpenItem = vi.fn(), onMutateTask?: (task: Task, m
         onOpenItem={onOpenItem}
         onMutateTask={onMutateTask}
       />
+      </FloatingLayerProvider>
     </I18nProvider>,
   );
   return { onOpenItem, onMutateTask };
@@ -147,19 +151,73 @@ describe("what a bar says", () => {
     expect(bar?.getAttribute("title")).toBe("Project A · 2026-09-08 → 2026-09-15");
   });
 
-  // Which of the two is shown is a container query on the bar's own width,
-  // which jsdom has no layout to answer — the thresholds were measured in the
-  // running app (§4). What this asserts is that both forms are there to pick
-  // from, and that the name did not go with the title.
-  it("writes the dates inside, in both the widths it may be given", () => {
+  // §4.1 turned this around. The bar says WHAT and the task column says WHEN —
+  // still nothing said twice, and what survives a bar too narrow for its text
+  // is now the focus trace rather than nothing at all.
+  it("writes its name inside, and leaves the date to the task column", () => {
     draw([task({ id: "b1", title: "Project A", startDate: "2026-09-08", dueDate: "2026-09-15" })]);
 
-    const text = document.querySelector(".ff-timeline-bar-text");
-    expect(text?.querySelector(".ff-timeline-bar-long")?.textContent).toBe("9.8 – 9.15");
-    expect(text?.querySelector(".ff-timeline-bar-short")?.textContent).toBe("9.8 –");
-    // The button is what a screen reader lands on, and dates alone would not
-    // say which task it had reached.
-    expect(text?.getAttribute("aria-label")).toBe("Project A · 9.8 – 9.15");
+    expect(document.querySelector(".ff-timeline-bar-text")?.textContent).toBe("Project A");
+    expect(document.querySelector(".ff-timeline-meta")?.textContent).toBe("9.15");
+  });
+
+  // One form, not two. A date range has a shorter half (`9.8 –`) and a title
+  // has none: below the width where it fits, the bar drops it.
+  it("draws one form of its name rather than a long and a short", () => {
+    draw([task({ id: "b1", title: "Project A", startDate: "2026-09-08", dueDate: "2026-09-15" })]);
+
+    expect(document.querySelector(".ff-timeline-bar-long")).toBeNull();
+    expect(document.querySelector(".ff-timeline-bar-short")).toBeNull();
+  });
+
+  // A reader who cannot see the bar has no ruler to read it against, so the
+  // span has to be said. The task column's `9.15` is one end of it.
+  it("says the whole span to a screen reader, which has no ruler", () => {
+    draw([task({ id: "b1", title: "Project A", startDate: "2026-09-08", dueDate: "2026-09-15" })]);
+
+    expect(document.querySelector(".ff-timeline-bar-text")?.getAttribute("aria-label")).toBe(
+      "Project A · 2026-09-08 → 2026-09-15",
+    );
+  });
+});
+
+// The task column is a row, not a legend (§2.3).
+describe("the task column's row", () => {
+  it("ticks a task off from the timeline", () => {
+    const onMutateTask = vi.fn();
+    draw([task({ id: "b1", title: "Project A", dueDate: "2026-09-08" })], vi.fn(), onMutateTask);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Project A/ }));
+
+    expect(onMutateTask).toHaveBeenCalledTimes(1);
+    expect(onMutateTask.mock.calls[0][1].patch.status).toBe("completed");
+  });
+
+  // §9.8: `미배치로 이동` and `일정 제거` are one action, so there is one item.
+  // Clearing the dates does not remove the Task — it moves it to the tray,
+  // which is where something with no dates belongs (T-GV06).
+  it("clears the dates from the row menu, which drops it into the tray", async () => {
+    const onMutateTask = vi.fn();
+    draw(
+      [task({ id: "b1", title: "Project A", startDate: "2026-09-08", dueDate: "2026-09-15" })],
+      vi.fn(),
+      onMutateTask,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Task menu" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Clear dates" }));
+
+    expect(onMutateTask).toHaveBeenCalledTimes(1);
+    expect(onMutateTask.mock.calls[0][1].patch).toEqual({ startDate: "", dueDate: "" });
+  });
+
+  // A read-only timeline has no box to tick and no dates to clear, and draws
+  // neither rather than drawing them dead.
+  it("offers neither where the timeline cannot be written to", () => {
+    draw([task({ id: "b1", title: "Project A", dueDate: "2026-09-08" })]);
+
+    expect(screen.queryByRole("checkbox", { name: /Project A/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Task menu" })).toBeNull();
   });
 });
 
@@ -472,19 +530,31 @@ describe("a bar with one date", () => {
   const zoomTo = (value: string) => fireEvent.change(screen.getByRole("combobox"), { target: { value } });
   const bar = () => document.querySelector(".ff-timeline-bar");
 
-  // A column IS a day here, so the bar is a day wide and a rectangle is what
-  // that means.
-  it("stays a rectangle where a column is a day", () => {
+  // §4.5 turned this around. D8 chose the diamond for the zooms where a day
+  // has no width, and the reference draws one at EVERY width it reaches —
+  // because what it marks is a kind, not a measurement. Having refused to add
+  // a `milestone` field, the shape stays derived, but by the reference's rule.
+  it("is a marker wherever a column is a day or coarser", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("week");
 
-    expect(bar()?.classList.contains("is-single")).toBe(true);
+    for (const zoom of ["week", "month", "halfYear", "year"]) {
+      zoomTo(zoom);
+      expect(bar()?.classList.contains("is-marker"), `not a marker at ${zoom}`).toBe(true);
+    }
+  });
+
+  // The one exception, and it falls out rather than being written: at the hour
+  // zoom a bar's width IS the length of the work and its ends are clock
+  // values, so a single date is not "one date with no width" at all.
+  it("stays a rectangle at the hour zoom, where a day has real width", () => {
+    draw([task({ id: "b1", dueDate: TODAY })]);
+    zoomTo("day");
+
+    expect(bar()?.classList.contains("is-single")).toBe(false);
     expect(bar()?.classList.contains("is-marker")).toBe(false);
   });
 
-  // Coarser than a day and there is no width left to read: 12.97px at month
-  // zoom, under a pixel at year [실측].
-  it("becomes a marker where a column is a week or a month", () => {
+  it("is placed by its centre, having no width to place", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
 
     zoomTo("month");
@@ -494,9 +564,6 @@ describe("a bar with one date", () => {
     // opens on 8.30 and runs 35, so 3.5/35.
     expect((bar() as HTMLElement).style.left).toBe("10%");
     expect((bar() as HTMLElement).style.width).toBe("");
-
-    zoomTo("year");
-    expect(bar()?.classList.contains("is-marker")).toBe(true);
   });
 
   // Two dates that differ have a width, and a width is the thing a Gantt draws.

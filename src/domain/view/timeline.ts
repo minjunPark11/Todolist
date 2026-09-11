@@ -314,7 +314,7 @@ export interface RulerBand {
   /**
    * What the band names — NOT a formatted string.
    *
-   * This module is pure and has no language, the same reason `barText` takes
+   * This module is pure and has no language, the same reason `metaText` takes
    * `allDay` as an argument. The view owns `9월` and `September`.
    */
   unit: "date" | "month" | "year";
@@ -534,80 +534,45 @@ export function windowFraction(window: TimelineWindow, at: number): number | nul
 }
 
 // ---------------------------------------------------------------------------
-// What is written inside a bar (TIMELINE_V2_DESIGN.md §4 — I1-B, I9-C)
+// What the task column says beside a name
+// (TIMELINE_REFERENCE_PARITY_DESIGN.md §4.1)
 //
-// It was the title, and GANTT §11.2 chose that while writing down the reason
-// not to: "라벨 열이 언제나 읽히는 제목이므로, 중복은 반대쪽에서 없앤다." The
-// label column already says the name on every row, so the copy inside the bar
-// was the same word twice — and the one that broke first, because a bar under
-// 80px drops its text and a title is what the reader loses.
+// `barText` / `barTextShort` stood here, and put the DATES inside the bar.
+// TIMELINE_V2 §4 chose that to stop the screen saying one thing twice: the
+// label column already carried the name on every row.
 //
-// The bar says what only the bar can say instead: WHEN. Which unit that is in
-// depends on the zoom, because the zoom is what a column already measures.
+// The reference divides the same two facts the other way round — the name in
+// the bar, the date beside it in the task column — and nothing is said twice
+// there either. Two things make its division the better one:
+//
+//   A bar too narrow for its text drops the text. With dates inside, what the
+//   reader lost was the DATE and what was left was an unnamed coloured chip.
+//   With the name inside, what is left when the name goes is the focus trace
+//   (§7.1) — a different fact takes the space rather than nothing.
+//
+//   And the bar's own geometry already says the dates: it starts where the
+//   work starts and ends where it ends, against a ruler. The column cannot
+//   say the name any better than the bar says the span.
 // ---------------------------------------------------------------------------
 
 /** `2026-08-31` → `8.31`. Unpadded, as the reference screen writes it. */
-function shortDate(date: string): string {
+export function shortDate(date: string): string {
   return `${Number(date.slice(5, 7))}.${Number(date.slice(8, 10))}`;
 }
 
-/** En dash with spaces, the range separator the reference uses. */
-const RANGE = " – ";
-
 /**
- * The line inside a bar.
+ * The one value beside a name in the task column — when the work ENDS.
  *
- * `allDay` is passed in rather than looked up: this module is pure and has no
- * language. The caller hands it `calendar.allDay` — the same word the calendar
- * puts on its own all-day row, so the two screens say one thing one way.
+ * A date everywhere except the hour zoom, where every row shares one date and
+ * the clock is the only thing that separates two records (§15). That zoom is
+ * the one place `barText` said something no other could, and this is where
+ * that sentence went rather than being dropped.
  *
- * At the hour zoom the bar's WIDTH is already the length of the work, and the
- * clock is the one fact that zoom can show and no other can (`ZOOM_SPEC.day`
- * says as much). A record with no times fills the window there, and `allDay`
- * is the only line that explains why — a date would repeat the heading, and
- * nothing at all would leave the one silent bar in a row of times.
- *
- * A span crossing midnight keeps its DATES even at the hour zoom: its two
- * clock values belong to different days, so `14:00 – 16:00` would describe a
- * bar that is neither, and the range says why the bar runs off both edges.
- *
- * An open end is written as one — `14:00 –` — because that is what the record
- * holds. `spanBounds` runs such a bar to the end of the day, and a bar labelled
- * `14:00` alone would read as a moment rather than as the rest of an afternoon.
+ * An open end has no clock to show, so it falls back to the date like the
+ * rest — `spanBounds` runs such a record to the end of its day, and `16:00`
+ * would be a time the record does not hold.
  */
-export function barText(span: Span, zoom: TimelineZoom, allDay: string): string {
-  if (columnUnitOf(zoom) === "hour" && span.start === span.end) {
-    if (!span.startTime && !span.endTime) return allDay;
-    if (!span.endTime) return `${span.startTime}${RANGE}`.trimEnd();
-    if (!span.startTime) return `${RANGE}${span.endTime}`.trimStart();
-    return `${span.startTime}${RANGE}${span.endTime}`;
-  }
-  const from = shortDate(span.start);
-  const to = shortDate(span.end);
-  return from === to ? from : `${from}${RANGE}${to}`;
-}
-
-/**
- * The same line with only its leading half, for a bar too narrow for both.
- *
- * §4 said to re-measure the 80px threshold the title used, and measuring is
- * what produced this: at 12px/600 the widest range — `12.31 – 12.31`, plus the
- * `✓` a finished bar carries and the 12px of handles — needs 103px, while a
- * two-hour meeting at the hour zoom is about 40 [실측]. One threshold set
- * honestly at 104 would take the text off more bars than the old wrong one
- * did, so there are two, and this is what the middle one says.
- *
- * The leading value with an open dash after it: `8.31 –` says the work starts
- * there and runs on, which the bar's own width then measures. A bare `8.31`
- * would say the opposite — one day — and that is the one reading a squeezed
- * label must not produce.
- */
-export function barTextShort(span: Span, zoom: TimelineZoom, allDay: string): string {
-  const full = barText(span, zoom, allDay);
-  if (columnUnitOf(zoom) === "hour" && span.start === span.end) {
-    // Only the both-times case has a half to drop; `14:00 –` and `종일` are
-    // already as short as they get.
-    return span.startTime && span.endTime ? `${span.startTime}${RANGE}`.trimEnd() : full;
-  }
-  return span.start === span.end ? full : `${shortDate(span.start)}${RANGE}`.trimEnd();
+export function metaText(span: Span, zoom: TimelineZoom): string {
+  if (columnUnitOf(zoom) === "hour" && span.endTime) return span.endTime;
+  return shortDate(span.end);
 }

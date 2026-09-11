@@ -349,8 +349,13 @@
   bottom: 0;
   width: 1px;
   transform: translateX(-50%);
-  background: var(--accent);
-  opacity: 0.55;
+  /* 색을 옅게 하는 것이지 `opacity`를 쓰는 것이 아니다.
+
+     `opacity`는 자식까지 통째로 투명하게 만든다. 칩에 `opacity: 1`을 적어도
+     부모의 0.55를 되돌릴 수 없어서, 오늘이 창의 첫날일 때 칩의 불투명한
+     바닥 너머로 월 띠 글자가 비쳐 보였다 [실측]. 칩이 월 띠를 뚫고
+     올라앉는다는 것이 이 배치의 전제다. */
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
   pointer-events: none;
   /* 열 이름 위 */
   z-index: 1;
@@ -370,6 +375,132 @@
   font-weight: var(--w-live);
   line-height: 14px;
   white-space: nowrap;
-  /* 기둥의 불투명도를 물려받지 않는다 — 글자는 선보다 진해야 읽힌다. */
+}
+
+/* ============================================================================
+   P3 — 작업 열이 이름 하나에서 행 하나가 된다 (§2.3, §4.1)
+
+   264px가 값어치를 하는 이유가 여기다. 왼쪽은 막대의 범례가 아니라 **날짜 옆에
+   놓인 작업 목록**이고, 그러려면 네 칸이 필요하다: 체크 · 이름 · 끝나는 날 ·
+   메뉴.
+
+   고정으로 나가는 폭: 패딩 12+7, 체크 15+8, 점 8+4, 날짜 38, 메뉴 28+4 = 124px.
+   264에서 이름에 140px이 남는다 — 한글 14px로 열 글자 남짓. 좁은 화면에서는
+   점과 날짜를 접는다(아래 미디어 쿼리).
+   ========================================================================== */
+
+.ff-timeline-label {
+  gap: 0;
+  padding: 0 7px 0 12px;
+  /* 버튼이 아니라 상자다 — 안의 셋이 각자 컨트롤이라 버튼 안에 버튼을 둘 수
+     없다. 커서는 이름이 가져간다. */
+  cursor: default;
+}
+
+.ff-timeline-label .tm-check {
+  flex: 0 0 auto;
+  margin-right: 8px;
+}
+
+.ff-timeline-dot {
+  margin-right: 4px;
+}
+
+/* 이름만 버튼이다. 열리는 것은 작업이고, 그것을 여는 것은 이름이다. */
+.ff-timeline-label-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 끝나는 날. 막대에서 이름이 들어오면서 나온 사실이고(§4.1), 뜻이 하나라
+   문장이 아니라 38px짜리 숫자 칸일 수 있다. */
+.ff-timeline-meta {
+  flex: 0 0 38px;
+  width: 38px;
+  margin-left: auto;
+  text-align: right;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 행 메뉴는 조용히 있다가 필요할 때 나온다 — 열두 행에 ⋯이 열두 개 떠 있으면
+   그것이 그 열에서 가장 큰 무늬가 된다. */
+.ff-timeline-label .ff-anchor {
+  flex: 0 0 auto;
+  margin-left: 4px;
+}
+
+.ff-timeline-label .ff-icon-btn {
+  opacity: 0;
+  transition: opacity var(--motion-fast) ease;
+}
+
+.ff-timeline-row:hover .ff-icon-btn,
+.ff-timeline-row.is-selected .ff-icon-btn,
+.ff-timeline-label:focus-within .ff-icon-btn,
+.ff-timeline-label .ff-icon-btn[aria-expanded="true"] {
   opacity: 1;
+}
+
+/* 완료한 작업 (§2.3) */
+.ff-timeline-row.is-done .ff-timeline-label-text {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.ff-timeline-row.is-done .ff-timeline-meta {
+  opacity: 0.48;
+}
+
+/* ---- 막대 안의 글자 (§4.1) ------------------------------------------------
+   날짜에서 이름으로 바뀌었으므로 문턱이 다시 재어져야 한다.
+
+   12-timeline.css의 104/72/40은 `12.31 – 12.31`과 그 짧은 절반을 재서 나온
+   값이다. 이름에는 짧은 절반이 없다 — 줄이면 말줄임표뿐이다. 그래서 문턱도
+   하나이고, 레퍼런스가 고른 그 값(72px)이다. 그 아래에서 사라지는 것은
+   글자이고, 그 자리에 집중 트레이스(P5)가 남는다. */
+.ff-timeline-bar-text {
+  padding: 0 9px;
+  font-weight: 600;
+}
+
+@container (max-width: 72px) {
+  .ff-timeline-bar .ff-timeline-bar-text {
+    display: none;
+  }
+}
+
+/* ---- 좁은 화면 -----------------------------------------------------------
+   900px 아래에서 라벨 열은 130px이었다. 거기에 네 칸은 들어가지 않는다 —
+   고정분만 124px이라 이름에 6px이 남는다. 레퍼런스의 가장 좁은 값(190px)을
+   쓰고, 두 칸을 접는다: 점은 막대가 이미 리스트 색이라 두 번째 표시이고,
+   날짜는 막대의 오른쪽 끝이 이미 가리키고 있다. */
+@media (max-width: 900px) {
+  .ff-timeline {
+    --timeline-label-width: 190px;
+  }
+
+  .ff-timeline-dot,
+  .ff-timeline-meta {
+    display: none;
+  }
+
+  /* 손가락에는 hover가 없다. */
+  .ff-timeline-label .ff-icon-btn {
+    opacity: 1;
+  }
 }
