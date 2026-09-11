@@ -22,7 +22,7 @@
 // content's, so the lanes, the now-line and the connectors would each have
 // stopped at the fold. `placeBar` is untouched: a bar is a fraction of the
 // track either way.
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { Project, Task } from "../types";
 import { timelineLinks, type TimelineBadge } from "../domain/view/connectors";
 import { TimelineConnectors } from "./TimelineConnectors";
@@ -42,6 +42,7 @@ import {
   metaText,
   minTrackWidth,
   placeBar,
+  shortDate,
   windowFraction,
   ZOOM_COLUMNS,
   type TimelineWindow,
@@ -50,6 +51,20 @@ import type { SpanDrag } from "../domain/view/board";
 import { useT } from "../i18n";
 import type { Rect } from "../domain/floating";
 import { tintForDarkInk } from "../domain/calendar/readableInk";
+import {
+  focusBins,
+  focusByDay,
+  formatFocusDuration,
+  formatLiveDuration,
+  liveFocusSeconds,
+  runningFocus,
+  totalFocusSeconds,
+  traceHeight,
+  type FocusBin,
+  type FocusDay,
+} from "../domain/view/focusTrace";
+import type { FocusSession } from "../types";
+import { addDays } from "../utils/date";
 
 /** The floating layer's shape, from whatever was clicked. */
 function rectOf(element: Element | null): Rect | undefined {
@@ -96,6 +111,31 @@ export interface TimelineBand {
    * drifts away from the rules drawn under it.
    */
   hours: number;
+}
+
+/**
+ * A clock, but only while there is something to count (§9.10).
+ *
+ * This file deliberately does NOT tick — the comment on `nowAt` says why: a
+ * planning grid whose smallest mark is a day would be re-rendering every row
+ * to move a line by a pixel an hour. That is still true, and it is true of the
+ * ordinary case: nothing is running.
+ *
+ * So the interval exists only when a session does. `live` false means no timer
+ * is created at all and this hook costs one `useState` — the screen is exactly
+ * what it was before the trace existed. `live` true means one second, because
+ * the thing being drawn is a stopwatch and a stopwatch that moved once a
+ * minute would read as broken.
+ */
+function useFocusTick(live: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!live) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [live]);
+  return now;
 }
 
 export interface TimelineRow {
@@ -214,6 +254,20 @@ interface TimelineViewProps {
    * name, date and menu are still in the task column.
    */
   showMilestones?: boolean;
+  /**
+   * Every focus session, for the trace inside the bars (§7.1).
+   *
+   * All of them rather than a per-task map: which sessions belong to which bar
+   * is `focusByDay`'s question, and handing this component a pre-grouped shape
+   * would put that grouping in the caller — where it would have to be redone
+   * whenever the window moves.
+   *
+   * Absent draws no trace at all, which is what a screen with no focus feature
+   * behind it should look like.
+   */
+  focusSessions?: FocusSession[];
+  /** The app's timezone. A session's DAY is a local question (`records.ts`). */
+  timezone?: string;
 }
 
 export function TimelineView({
@@ -238,9 +292,37 @@ export function TimelineView({
   controls,
   workspaceTitle,
   showMilestones = true,
+  focusSessions,
+  timezone = "UTC",
 }: TimelineViewProps) {
   const { t } = useT();
   const columns = ZOOM_COLUMNS[window.zoom];
+
+  /**
+   * The session in flight, and a clock that only runs while there is one.
+   *
+   * `runningFocus` scans a list that is usually short and always has at most
+   * one answer; it is the whole of what makes the tick conditional (§9.10).
+   */
+  const live = useMemo(() => (focusSessions ? runningFocus(focusSessions) : null), [focusSessions]);
+  const nowMs = useFocusTick(Boolean(live));
+  /**
+   * Focus per task, recomputed when the clock ticks.
+   *
+   * One pass over the sessions for the whole grid rather than one per row: a
+   * row that asked on its own would walk the entire list, so a screen of
+   * thirty rows would walk it thirty times every second a session is running.
+   */
+  const focusByTask = useMemo(() => {
+    if (!focusSessions || focusSessions.length === 0) return null;
+    const map = new Map<string, ReturnType<typeof focusByDay>>();
+    for (const item of items) {
+      if (item.source !== "task") continue;
+      const byDay = focusByDay(focusSessions, item.sourceId, timezone, nowMs);
+      if (byDay.size > 0) map.set(item.sourceId, byDay);
+    }
+    return map;
+  }, [focusSessions, items, timezone, nowMs]);
   /**
    * Where a band begins, so the rule under it is drawn heavier (§2.3).
    *
@@ -536,6 +618,12 @@ export function TimelineView({
               onDragStateChange={(active) => setDragKey(active ? item.key : "")}
               onDrag={(drag) => onDragItem?.(item, drag)}
               showMilestones={showMilestones}
+              focusDays={focusByTask?.get(item.sourceId) ?? null}
+              liveSeconds={
+                live && live.taskId === item.sourceId ? liveFocusSeconds(live, nowMs) : null
+              }
+              nowAt={nowAt}
+              today={today}
             />
           ))}
         </section>
@@ -567,6 +655,10 @@ function TimelineRowView({
   onToggleDone,
   onClearDates,
   showMilestones,
+  focusDays,
+  liveSeconds,
+  nowAt,
+  today,
 }: {
   item: Item;
   indented: boolean;
@@ -582,6 +674,13 @@ function TimelineRowView({
   onToggleDone?: () => void;
   onClearDates?: () => void;
   showMilestones: boolean;
+  /** Focus against this task, by day. Null where there is none (§7.1). */
+  focusDays: Map<string, FocusDay> | null;
+  /** Seconds on THIS task's running session, or null when it is not this one. */
+  liveSeconds: number | null;
+  /** Where now falls across the track, for the live node (§9.11). */
+  nowAt: number | null;
+  today: string;
 }) {
   const { t } = useT();
   /**
@@ -644,6 +743,22 @@ function TimelineRowView({
    * track's readability and not about which work the Scope holds.
    */
   const hideBar = asMarker && !showMilestones;
+
+  /**
+   * The stripes, and the total that sits at the bar's right end (§7.1).
+   *
+   * A marker gets neither: it is 14px of diamond with no inside, and a stripe
+   * along the bottom of it would be a line under a point.
+   */
+  const bins = focusDays && !asMarker ? focusBins(focusDays, span, window) : [];
+  const focusTotal = focusDays ? totalFocusSeconds(focusDays) : 0;
+  /**
+   * Is the work happening inside the days it was planned for (§9.11)?
+   *
+   * Compared as dates rather than as instants: a plan is a run of days, and
+   * "am I inside it" is a question about which day it is, not about the hour.
+   */
+  const nowWithinSpan = today >= span.start && today <= span.end;
 
   /**
    * The day under the pointer, from anywhere on this row's track (§13).
@@ -742,7 +857,23 @@ function TimelineRowView({
         {/* When it ends — the fact that came out of the bar when the name went
             in (§4.1). One value with one meaning, which is what lets it be
             38px of tabular numbers rather than a sentence. */}
-        <span className="ff-timeline-meta">{metaText(span, window.zoom)}</span>
+        {/* The date, or — while this task is being worked on — the stopwatch.
+
+            The reference replaces the value rather than adding a second one,
+            and that is the right trade in 38px: a running session is the one
+            thing about this row that is changing, and the end date is on the
+            bar's own right edge against the ruler. */}
+        {liveSeconds === null ? (
+          <span className="ff-timeline-meta">{metaText(span, window.zoom)}</span>
+        ) : (
+          <span
+            className="ff-timeline-meta is-live"
+            title={t("timeline.focusRunning")}
+            aria-label={t("timeline.focusRunning")}
+          >
+            {formatLiveDuration(liveSeconds)}
+          </span>
+        )}
         {/* Only where there is something the row cannot already do. A
             read-only timeline's menu would hold `작업 열기` alone — a second
             way to do what clicking the name does — and a ⋯ on every row is
@@ -866,6 +997,32 @@ function TimelineRowView({
             {item.title}
           </button>
 
+          {/* The total, at the bar's right end (§2.4).
+
+              Only where the bar is wide enough to hold it beside the name —
+              a container query decides that, as it does for the name itself.
+              A running session shows its stopwatch here instead, with a dot,
+              because that is what the reader is watching. */}
+          {focusTotal > 0 || liveSeconds !== null ? (
+            <span className={`ff-timeline-focus-total${liveSeconds === null ? "" : " is-live"}`}>
+              {liveSeconds === null ? formatFocusDuration(focusTotal) : formatLiveDuration(liveSeconds)}
+            </span>
+          ) : null}
+
+          {/* The trace itself (§7.1).
+
+              `aria-hidden`: every stripe restates focus that the bar's own
+              label already totals, and a screen reader walking eleven stripes
+              would hear eleven durations and no work. The tooltip is a
+              pointer affordance on top of that total. */}
+          {bins.length > 0 ? (
+            <span className="ff-timeline-trace" aria-hidden="true">
+              {bins.map((bin) => (
+                <FocusStripe key={bin.start} bin={bin} />
+              ))}
+            </span>
+          ) : null}
+
           {badges.includes("dependent") ? (
             <span className="ff-timeline-badge is-dependent" title={t("timeline.dependentOffWindow")}>
               ⇥
@@ -890,7 +1047,70 @@ function TimelineRowView({
           ) : null}
         </div>
         )}
+
+        {/* Today × this task = the app's live temporal signature (§9.11).
+
+            x is NOW and y is this row, so a session running outside the dates
+            it was planned for is visible as exactly that: a node sitting off
+            the end of its own bar. `outside` is not an error state and is not
+            drawn as one — it is hollow rather than red. */}
+        {liveSeconds !== null && nowAt !== null ? (
+          <span
+            className={`ff-timeline-focus-node${nowWithinSpan ? "" : " is-outside"}`}
+            style={{ left: `${nowAt * 100}%` }}
+            title={t(nowWithinSpan ? "timeline.focusRunning" : "timeline.focusOutside")}
+            aria-hidden="true"
+          />
+        ) : null}
       </div>
     </div>
   );
+}
+
+/**
+ * One stripe of the trace, and the tooltip it opens (§9.9).
+ *
+ * A component of its own because it owns a piece of state — whether it is
+ * being pointed at — and a row with eleven stripes would otherwise re-render
+ * all of them every time the pointer crossed one.
+ *
+ * The stripe takes the pointer while the band around it does not: the band
+ * runs the full width of the bar and would swallow the drag that moves it.
+ */
+function FocusStripe({ bin }: { bin: FocusBin }) {
+  const { t, lang } = useT();
+  const height = traceHeight(bin.seconds);
+  if (height <= 0) return null;
+
+  const when =
+    bin.grain === "week"
+      ? `${shortDate(bin.start)} – ${shortDate(addDays(bin.endExclusive, -1))}`
+      : longDate(bin.start, lang);
+
+  return (
+    <span
+      className={`ff-timeline-stripe${bin.live ? " is-live" : ""}`}
+      style={{
+        left: `${bin.left}%`,
+        width: `${Math.max(bin.width, 0.35)}%`,
+        height: `${height}px`,
+      }}
+      /* The whole tooltip in one attribute rather than a floating surface.
+
+         §9.9 proposed reusing `domain/floating`, and measuring the cost said
+         not to: a bar can hold a dozen of these, a floating surface is a
+         portal with its own dismissal and focus rules, and what this has to
+         say is three short lines that never need to be interacted with. The
+         native tip is also the one that survives a touch-and-hold. */
+      title={`${when}\n${formatFocusDuration(bin.seconds)} ${t("timeline.focused")}\n${t("timeline.sessionCount", { count: bin.sessionCount })}`}
+    />
+  );
+}
+
+/** `2026-09-09` → `9월 9일` / `Sep 9`. The tooltip's own wording. */
+function longDate(date: string, lang: string): string {
+  const month = Number(date.slice(5, 7));
+  const day = Number(date.slice(8, 10));
+  if (lang === "ko") return `${month}월 ${day}일`;
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en", { month: "short", day: "numeric" });
 }

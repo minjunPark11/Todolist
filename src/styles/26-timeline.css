@@ -649,3 +649,148 @@
   display: flex;
   align-items: center;
 }
+
+/* ============================================================================
+   P5 — 집중 트레이스 (§2.4, §7.1)
+
+   레퍼런스의 시그니처이고, 이 앱의 타임라인에서 다른 화면이 못 보여주는 유일한
+   것이다: **계획과 실제가 한 모양 안에** 있다. 막대는 계획이고(연한 리스트 색),
+   바닥의 액센트 줄무늬가 그 계획에 실제로 쓴 시간이다.
+
+   색이 갈리는 것이 요점이다(§4.2). 계획은 옅은 리스트 색이고 실제는 진한
+   액센트라, 한 막대 안에서 둘이 겹쳐 읽힌다.
+   ========================================================================== */
+
+/* 막대가 flex 한 줄이고 그 안에 이름 · 총합 · 트레이스가 있다. 트레이스는
+   절대 배치라 줄에서 빠지고, 총합은 오른쪽 끝으로 밀린다. */
+.ff-timeline-focus-total {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-right: 9px;
+  color: inherit;
+  font-size: 10.5px;
+  font-weight: var(--w-ruler);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.78;
+  white-space: nowrap;
+}
+
+/* 진행 중이면 앞에 점이 붙고 조금 진해진다 — 기록이 아니라 지금 일어나는
+   일이라는 표시이고, 작업 열의 `is-live`와 같은 점이다. */
+.ff-timeline-focus-total.is-live {
+  opacity: 0.94;
+  font-weight: var(--w-live);
+}
+
+.ff-timeline-focus-total.is-live::before,
+.ff-timeline-meta.is-live::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
+}
+
+.ff-timeline-meta.is-live {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 60px;
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* 띠. 막대 바닥에서 1px 띄우고, 아래 두 모서리를 막대와 같이 깎는다. */
+.ff-timeline-trace {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1px;
+  z-index: 1;
+  height: var(--timeline-trace-h);
+  overflow: hidden;
+  border-radius: 0 0 6px 6px;
+  /* 띠는 막대 폭 전체를 덮으므로, 이것이 포인터를 받으면 막대를 옮기는
+     드래그를 통째로 삼킨다. 줄무늬만 받는다. */
+  pointer-events: none;
+}
+
+.ff-timeline-stripe {
+  position: absolute;
+  bottom: 0;
+  min-width: 1px;
+  /* 2~6px 높이에 1~20px 폭이라 둥근 모서리가 보이지 않는다. 각지게 둔다. */
+  border-radius: 0;
+  background: var(--accent);
+  opacity: 0.92;
+  pointer-events: auto;
+  cursor: default;
+  transition: opacity var(--motion-fast) ease;
+}
+
+.ff-timeline-stripe:hover,
+.ff-timeline-stripe.is-live {
+  opacity: 1;
+}
+
+/* 선택된 막대 위에서도 액센트 그대로다. 선택은 기하(안쪽 링)로 말하기로
+   했으므로(§2.4) 트레이스의 색을 건드릴 이유가 없다. */
+
+/* ---- 지금 집중 중 (§9.11) -------------------------------------------------
+   x는 지금, y는 그 작업의 행. 계획한 기간 밖에서 집중 중이면 자기 막대 끝
+   너머에 점이 하나 떠 있게 되고, 그것이 정확히 그 사실이다. 오류 상태가
+   아니므로 빨갛지 않고 속이 빈다. */
+.ff-timeline-focus-node {
+  position: absolute;
+  top: 50%;
+  z-index: 6;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: var(--ring-focus-node);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: ff-focus-breath 1.8s ease-in-out infinite;
+}
+
+.ff-timeline-focus-node.is-outside {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--accent);
+}
+
+@keyframes ff-focus-breath {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 레퍼런스는 prefers-reduced-motion만 본다. 이 앱은 자기 설정도 갖고 있으므로
+   둘 다 건다 (01-base.css). */
+[data-reduce-motion] .ff-timeline-focus-node {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-timeline-focus-node {
+    animation: none;
+  }
+}
+
+/* ---- 폭에 따른 밀도 (§2.4) ------------------------------------------------
+   레퍼런스의 세 등급을 두 등급으로 줄인다. 거기서 `bar-mid`가 하는 일은 총합만
+   숨기는 것이고, 우리 총합은 이미 `margin-left: auto`로 이름에 밀려 있으므로
+   좁아지면 자기가 먼저 줄어든다. 남는 결정은 하나 — 언제 글자를 전부 버리고
+   트레이스만 남길 것인가이고, 그 값이 레퍼런스의 72px이다(P3). */
+@container (max-width: 130px) {
+  .ff-timeline-bar .ff-timeline-focus-total {
+    display: none;
+  }
+}

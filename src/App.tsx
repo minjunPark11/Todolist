@@ -1588,6 +1588,10 @@ export default function App() {
           tags={planner.tags}
           taskTags={planner.taskTags}
           today={today}
+          // §7.1: the timeline draws actual focus inside the bar that planned
+          // it, which is the one thing on that screen no other screen shows.
+          focusSessions={planner.focusSessions}
+          timezone={appSettings.timezone}
           url={canonical ?? currentUrl}
           onNavigate={navigateUrl}
           // §25.6: the Detail hands over an id, the focus engine does the

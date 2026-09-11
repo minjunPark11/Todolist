@@ -149,6 +149,11 @@ const EXEMPT: { selector: RegExp; why: string }[] = [
   // §11.3에서 이것을 드리프트로 착각해 -6으로 스냅했다가 되돌렸다.
   // 스피너는 전환이 아니라 루프다 — 1.1s는 한 바퀴 도는 시간이고 사다리와 무관하다.
   { selector: /\.rail-sync\.is-syncing/, why: "루프 애니메이션 (SWISS_MINIMAL_DESIGN.md §15)" },
+  // 같은 자리, 같은 이유. 1.8s는 전환이 아니라 한 번 숨쉬는 시간이고,
+  // `ease-in-out`은 그 숨을 대칭으로 만드는 곡선이다 — `ease-out`이면 들이쉬고
+  // 흘러나오는 모양이 되어 숨이 아니라 깜빡임이 된다
+  // (TIMELINE_REFERENCE_PARITY_DESIGN.md §9.11).
+  { selector: /\.ff-timeline-focus-node/, why: "루프 애니메이션 (§9.11)" },
   // 두 가지가 스케일 밖이고 둘 다 이유가 적혀 있다: `margin-left: -7px`은 위
   // `width: 14px`의 절반(파생값)이고, `border-radius: 3px`은 §11.39가 형태라고
   // 부르는 20px 아래의 마름모라 반경 스케일이 다스리는 곳이 아니다. 이행이 그

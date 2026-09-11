@@ -12,7 +12,7 @@
 // measured in the running app and recorded in §7.2 instead.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
-import type { List, Task } from "../types";
+import type { FocusSession, List, Task } from "../types";
 import type { TaskMutation } from "../domain/tasks/mutations";
 import { I18nProvider } from "../i18n";
 // The row menu is a Popover (§9.8), and a floating surface needs its layer.
@@ -54,7 +54,12 @@ function task(over: Partial<Task> = {}): Task {
   } as Task;
 }
 
-function draw(tasks: Task[], onOpenItem = vi.fn(), onMutateTask?: (task: Task, mutation: TaskMutation) => void) {
+function draw(
+  tasks: Task[],
+  onOpenItem = vi.fn(),
+  onMutateTask?: (task: Task, mutation: TaskMutation) => void,
+  focusSessions?: FocusSession[],
+) {
   const items = projectItems({ tasks, lists: [list], today: TODAY });
   render(
     <I18nProvider lang="en">
@@ -68,6 +73,8 @@ function draw(tasks: Task[], onOpenItem = vi.fn(), onMutateTask?: (task: Task, m
         groupLabel={() => "School"}
         onOpenItem={onOpenItem}
         onMutateTask={onMutateTask}
+        focusSessions={focusSessions}
+        timezone="Asia/Seoul"
       />
       </FloatingLayerProvider>
     </I18nProvider>,
@@ -647,5 +654,121 @@ describe("a track as wide as its days", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
     const today = screen.getByRole("button", { name: "Today" }) as HTMLButtonElement;
     expect(today.disabled).toBe(false);
+  });
+});
+
+// The focus trace (TIMELINE_REFERENCE_PARITY_DESIGN.md §7.1).
+//
+// The arithmetic is `focusTrace.test.ts`'s. What is pinned here is that the
+// view asks it at all, that a stripe lands inside the bar rather than on the
+// track, and that a running session turns the row's date into a stopwatch.
+describe("the focus trace", () => {
+  const at = (local: string) => new Date(`${local}+09:00`).toISOString();
+
+  function focusSession(over: Partial<FocusSession>): FocusSession {
+    return {
+      id: "f1",
+      taskId: "b1",
+      title: "",
+      mode: "focus",
+      status: "completed",
+      durationMinutes: 0,
+      accumulatedSeconds: 0,
+      completed: true,
+      startAt: "",
+      endAt: "",
+      startedAt: "",
+      endedAt: "",
+      pausedAt: "",
+      segments: [],
+      source: "focus_page",
+      projectId: "",
+      projectName: "",
+      focusNote: "",
+      createdAt: "",
+      updatedAt: "",
+      ...over,
+    } as FocusSession;
+  }
+
+  it("draws a stripe inside the bar for the day the work happened", () => {
+    draw(
+      [task({ id: "b1", startDate: "2026-09-01", dueDate: "2026-09-04" })],
+      vi.fn(),
+      vi.fn(),
+      [focusSession({ segments: [{ startAt: at("2026-09-02T09:00:00"), endAt: at("2026-09-02T10:00:00") }] })],
+    );
+
+    const stripe = document.querySelector(".ff-timeline-bar .ff-timeline-stripe") as HTMLElement;
+    expect(stripe).not.toBeNull();
+    // The 2nd is the second of four days: a quarter in, a quarter wide.
+    expect(stripe.style.left).toBe("25%");
+    expect(stripe.style.width).toBe("25%");
+    // An hour is the ladder's third rung — `< 60` is the rung below it, so
+    // exactly 60 minutes is already "an afternoon of it".
+    expect(stripe.style.height).toBe("4.5px");
+  });
+
+  it("totals the focus at the bar's right end", () => {
+    draw(
+      [task({ id: "b1", startDate: "2026-09-01", dueDate: "2026-09-04" })],
+      vi.fn(),
+      vi.fn(),
+      [focusSession({ segments: [{ startAt: at("2026-09-02T09:00:00"), endAt: at("2026-09-02T10:35:00") }] })],
+    );
+
+    expect(document.querySelector(".ff-timeline-focus-total")?.textContent).toBe("1h 35m");
+  });
+
+  it("draws nothing at all when no session touches the task", () => {
+    draw([task({ id: "b1", dueDate: "2026-09-04" })], vi.fn(), vi.fn(), []);
+
+    expect(document.querySelector(".ff-timeline-trace")).toBeNull();
+    expect(document.querySelector(".ff-timeline-focus-total")).toBeNull();
+  });
+
+  // §9.11: x is now, y is the row. A session running outside the days it was
+  // planned for shows up as a node off the end of its own bar, drawn hollow —
+  // it is a fact, not an error.
+  it("marks a running session on the row, and says when it is off-plan", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(`${TODAY}T12:00:00`));
+    try {
+      draw(
+        [task({ id: "b1", startDate: "2026-09-01", dueDate: "2026-09-04" })],
+        vi.fn(),
+        vi.fn(),
+        [focusSession({ status: "running", startAt: new Date(`${TODAY}T11:00:00`).toISOString(), segments: [] })],
+      );
+
+      // The task column's date became a stopwatch.
+      const meta = document.querySelector(".ff-timeline-meta.is-live");
+      expect(meta?.textContent).toBe("1:00:00");
+
+      // TODAY is 9.2, which is inside 9.1 – 9.4, so the node is solid.
+      const node = document.querySelector(".ff-timeline-focus-node");
+      expect(node).not.toBeNull();
+      expect(node?.classList.contains("is-outside")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("draws the node hollow when the work is happening off-plan", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(`${TODAY}T12:00:00`));
+    try {
+      // Planned for later in the week; being worked on today.
+      draw(
+        [task({ id: "b1", startDate: "2026-09-05", dueDate: "2026-09-06" })],
+        vi.fn(),
+        vi.fn(),
+        [focusSession({ status: "running", startAt: new Date(`${TODAY}T11:00:00`).toISOString(), segments: [] })],
+      );
+
+      expect(document.querySelector(".ff-timeline-focus-node")?.classList.contains("is-outside")).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

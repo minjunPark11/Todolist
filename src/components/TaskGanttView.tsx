@@ -14,7 +14,7 @@
 // stays off the grid, and an inferred start is marked rather than stored. This
 // component asks that module and draws the answer.
 import { useMemo, useState, type ReactNode } from "react";
-import type { Project, Task } from "../types";
+import type { FocusSession, Project, Task } from "../types";
 import { completeTask, reopenTask, type TaskMutation } from "../domain/tasks/mutations";
 import { isCompleted } from "../domain/tasks/taskState";
 import type { Item } from "../domain/view/item";
@@ -70,6 +70,14 @@ interface TaskGanttViewProps {
    * appears; below 960 the header comes back and CSS hides this instead.
    */
   workspaceTitle?: ReactNode;
+  /**
+   * Every focus session, for the trace inside the bars (§7.1).
+   *
+   * Straight through, like `barColorOf`: the timeline paints, and which
+   * sessions exist is the app's question rather than this component's.
+   */
+  focusSessions?: FocusSession[];
+  timezone?: string;
 }
 
 export function TaskGanttView({
@@ -84,6 +92,8 @@ export function TaskGanttView({
   barColorOf,
   onMutateTask,
   workspaceTitle,
+  focusSessions,
+  timezone,
 }: TaskGanttViewProps) {
   const { t, lang } = useT();
   // Five weeks: long enough to hold a piece of work end to end, short
@@ -386,6 +396,8 @@ export function TaskGanttView({
           controls={controls}
           workspaceTitle={workspaceTitle}
           showMilestones={showMilestones}
+          focusSessions={focusSessions}
+          timezone={timezone}
         />
       )}
 

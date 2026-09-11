@@ -10,6 +10,7 @@
 import { useMemo, useState } from "react";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import type {
+  FocusSession,
   Folder,
   List,
   ListSection,
@@ -135,6 +136,16 @@ interface TasksModuleProps {
   tags: Tag[];
   taskTags: TaskTag[];
   today: string;
+  /**
+   * Every focus session, for the timeline's trace
+   * (TIMELINE_REFERENCE_PARITY_DESIGN.md §7.1).
+   *
+   * Optional: the list and board views never ask, and a test that mounts this
+   * module to check a row menu should not have to invent focus data.
+   */
+  focusSessions?: FocusSession[];
+  /** The app's timezone. A session's DAY is a local question. */
+  timezone?: string;
   /** Path plus query, exactly as the address bar has it. */
   url: string;
   onNavigate: (url: string, mode?: "push" | "replace") => void;
@@ -1462,6 +1473,11 @@ export function TasksModule(props: TasksModuleProps) {
                deletes the page header on desktop and puts the title inside the
                workspace; `.tm-header` is still rendered and CSS hides it above
                960, which is exactly what the mockup does. */
+            /* §7.1: the plan and what actually happened to it, in one shape.
+               The sessions come from the app rather than being fetched here —
+               `NotificationCenter` already takes the same list. */
+            focusSessions={props.focusSessions}
+            timezone={props.timezone}
             workspaceTitle={
               <>
                 <h1 className="ff-timeline-scope">{title}</h1>
