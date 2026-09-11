@@ -369,19 +369,36 @@ export function TimelineView({
         </div>
       )}
 
+      {/* The head is 82px and two-tier on BOTH sides
+          (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.2).
+
+          It used to be one 6px-padded row: the corner, then the column names.
+          The reference splits it into a 42px utility row and a 40px ruler, and
+          runs that split across the whole width — so the task column gets a
+          toolbar of its own above a `작업` label that shares the ruler's
+          baseline, and the track gets its controls above the dates. P4 fills
+          the two 42px rows; P2 fills the ruler. */}
       <header className="ff-timeline-head">
-        <div className="ff-timeline-rowhead" />
-        <div className="ff-timeline-columns">
-          {columnLabels.map((label, index) => (
-            <span
-              key={`${label}-${index}`}
-              className={`ff-timeline-col${nowColumn === index + 1 ? " is-today" : ""}`}
-            >
-              {/* The label in its own box, because §6's pill is drawn around
-                  the DATE and the cell is a whole column wide. */}
-              <span className="ff-timeline-col-mark">{label}</span>
-            </span>
-          ))}
+        <div className="ff-timeline-rowhead">
+          <div className="ff-timeline-rowhead-tool" />
+          <div className="ff-timeline-rowhead-label">{t("timeline.taskColumn")}</div>
+        </div>
+        <div className="ff-timeline-headside">
+          <div className="ff-timeline-controls" />
+          <div className="ff-timeline-ruler">
+            <div className="ff-timeline-columns">
+              {columnLabels.map((label, index) => (
+                <span
+                  key={`${label}-${index}`}
+                  className={`ff-timeline-col${nowColumn === index + 1 ? " is-today" : ""}`}
+                >
+                  {/* The label in its own box, because §6's pill is drawn around
+                      the DATE and the cell is a whole column wide. */}
+                  <span className="ff-timeline-col-mark">{label}</span>
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </header>
 

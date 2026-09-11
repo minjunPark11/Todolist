@@ -148,6 +148,7 @@ export const en: Dictionary = {
   "timeline.prev": "Back",
   "timeline.next": "Forward",
   "timeline.today": "Today",
+  "timeline.taskColumn": "Tasks",
   "timeline.showDone": "Show completed",
   "timeline.ungrouped": "Unsorted",
   "timeline.noBars": "Nothing falls in this window.",

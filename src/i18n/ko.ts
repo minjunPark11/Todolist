@@ -147,6 +147,7 @@ export const ko: Dictionary = {
   "timeline.prev": "이전",
   "timeline.next": "다음",
   "timeline.today": "오늘",
+  "timeline.taskColumn": "작업",
   "timeline.showDone": "완료 표시",
   "timeline.ungrouped": "미분류",
   "timeline.noBars": "이 기간에 해당하는 항목이 없습니다.",

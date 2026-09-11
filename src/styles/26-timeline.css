@@ -101,3 +101,155 @@
      gap을 0으로 만들면 이 파생값이 라벨 폭과 같아진다. */
   --timeline-track-left: var(--timeline-label-width);
 }
+
+/* ============================================================================
+   P1 — 기하.
+
+   §2가 실측한 비율을 상자에 앉힌다. 레퍼런스의 타임라인은 **두 열이 붙어 있고**
+   (사이에 1px 경계선뿐), 행은 서로 맞붙어 있으며(행 사이 규칙선 없음), 위
+   구조가 82px 2단이다. 지금 것은 8px gap · 2px 행 간격 · inset 규칙선 ·
+   6px 패딩짜리 한 줄 머리였다.
+   ========================================================================== */
+
+/* 두 열 사이의 8px과 행 사이의 2px이 사라진다. `--timeline-track-left`가
+   라벨 폭과 같아지는 것(§6.3)이 이 gap을 0으로 만든 결과다 — 덮개 셋이 그
+   값으로 offset되므로 둘은 함께 움직여야 한다. */
+.ff-timeline-canvas {
+  gap: 0;
+}
+
+.ff-timeline-head,
+.ff-timeline-row {
+  gap: 0;
+}
+
+/* 작업 열의 바닥. 레퍼런스는 #fcfcfd — 페이지 바탕(#eff1f5)이 아니라
+   흰색에 아주 가깝다. 트랙(#fff)과의 차이가 두 열을 가르는 유일한 색이고,
+   경계선은 그 위에 1px로 얹힌다. */
+.ff-timeline {
+  --timeline-ground: #fcfcfd;
+}
+
+[data-theme="dark"] .ff-timeline {
+  --timeline-ground: var(--bg-surface-muted);
+}
+
+/* ---- 위 구조 82px (§2.2) -------------------------------------------------
+   도구줄 42 + 눈금 40. 두 열이 같은 높이를 나눠 갖는다: 왼쪽은
+   [워크스페이스 제목 | "작업"], 오른쪽은 [컨트롤 | 월 띠 + 열 이름].
+   P4가 42px 두 칸을 채운다. */
+.ff-timeline-head {
+  height: var(--timeline-head-h);
+  min-height: var(--timeline-head-h);
+  padding: 0;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ff-timeline-rowhead,
+.ff-timeline-headside {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 모서리는 작업 열의 바닥을 쓴다 — 머리에서도 두 열의 경계가 이어져야 한다.
+   `12-timeline.css`는 여기에 `--bg-surface`를 줬는데, 그때는 라벨 열이
+   페이지 바탕이라 모서리만 희어야 할 이유가 있었다. 이제 둘이 같다. */
+.ff-timeline-rowhead {
+  background: var(--timeline-ground);
+}
+
+.ff-timeline-rowhead-tool,
+.ff-timeline-controls {
+  display: flex;
+  align-items: center;
+  height: var(--timeline-tool-h);
+  min-height: var(--timeline-tool-h);
+}
+
+/* 눈금 열의 이름. 아래에 붙어 열 이름들과 기준선을 맞춘다. */
+.ff-timeline-rowhead-label {
+  display: flex;
+  align-items: flex-end;
+  height: var(--timeline-ruler-h);
+  min-height: var(--timeline-ruler-h);
+  padding: 0 12px 8px;
+  font-size: 11px;
+  font-weight: var(--w-ruler);
+  color: var(--text-tertiary);
+}
+
+.ff-timeline-rowhead-tool {
+  padding: 0 10px 0 12px;
+  gap: 6px;
+}
+
+.ff-timeline-controls {
+  padding: 0 10px;
+  gap: 3px;
+}
+
+/* 눈금. `position: relative`는 오늘 칩(P2)이 매달릴 곳이고,
+   `overflow: visible`은 그 칩이 눈금 위로 삐져나오기 때문이다. */
+.ff-timeline-ruler {
+  position: relative;
+  height: var(--timeline-ruler-h);
+  min-height: var(--timeline-ruler-h);
+  overflow: visible;
+}
+
+/* ---- 행 (§2.3) -----------------------------------------------------------
+   42px, 그리고 행 사이 규칙선이 사라진다. 12-timeline.css가 규칙선을 넣은
+   이유는 "12.97px짜리 마크가 454px 떨어진 이름까지 따라갈 것이 없었다"였다.
+   레퍼런스는 그 문제를 다르게 푼다 — 행이 42px이고, hover가 이름과 막대를
+   **한 번에** 칠하며(행 전체가 하나의 상자다), 막대가 28px으로 행을 거의
+   채운다. 선을 그리는 대신 행을 읽히게 만든 것이고, 그쪽이 더 조용하다. */
+.ff-timeline-row {
+  height: var(--timeline-row-height);
+  box-shadow: none;
+}
+
+.ff-timeline-label {
+  box-shadow: none;
+}
+
+/* 두 열의 경계. 레퍼런스는 작업 열의 `border-right` 1px인데, 여기서는
+   inset 그림자로 그린다 — 테두리는 트랙의 패딩 상자를 1px 옮기고, 막대와
+   덮개 셋이 전부 그 상자를 기준으로 재어지기 때문이다(12-timeline.css가
+   적어둔 이유). 색만 레퍼런스의 #e7e9ed 쪽으로 낮춘다. */
+.ff-timeline-track,
+/* 머리 쪽은 `.ff-timeline-columns`가 아니라 바깥 상자가 그린다 — 눈금이
+   2단이 되면서 열 이름 줄만으로는 월 띠까지 선이 닿지 않게 됐다. */
+.ff-timeline-headside {
+  box-shadow: inset 1px 0 0 var(--border-subtle);
+}
+
+.ff-timeline-columns {
+  box-shadow: none;
+}
+
+/* ---- 막대 (§2.4) ---------------------------------------------------------
+   28px / top 7px. 42px 행에서 위아래 7px씩이라 가운데 정렬이다. 지금은
+   `top`을 아무도 쓰지 않아 정적 위치(트랙 맨 위)에 붙어 있었다. */
+.ff-timeline-bar {
+  top: var(--timeline-bar-top);
+  height: var(--timeline-bar-h);
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* 마름모는 높이가 자기 것이라 가운데 정렬도 자기가 한다. 14px는 §11.39가
+   형태라고 부르는 20px 아래이고, D8이 고른 크기다 — 레퍼런스의 8px보다
+   크지만 그 결정을 이 작업이 다시 열 이유가 없다. */
+.ff-timeline-bar.is-marker {
+  top: calc((var(--timeline-row-height) - 14px) / 2);
+}
+
+/* 선택 상태가 채움이 아니라 **기하**가 된다(§2.4). 레퍼런스 V15의 결정이고,
+   이 앱에서는 그것이 더 맞는다 — 막대의 채움은 이미 리스트 색이 쓰고 있어서
+   선택이 채움을 가져가면 그 행만 리스트를 잃는다. */
+.ff-timeline-row.is-selected .ff-timeline-bar:not(.is-marker) {
+  box-shadow: var(--shadow-bar-selected);
+}
