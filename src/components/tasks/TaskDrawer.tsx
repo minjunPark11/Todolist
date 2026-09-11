@@ -23,7 +23,6 @@ import type { TaskDetailPresentation } from "../../domain/tasks/responsive";
 import type { TaskChild } from "../../domain/tasks/children";
 import type { TaskActionGroup, TaskActionId } from "../../domain/tasks/actions";
 import { DETAIL_REVEAL_ACTIONS } from "../../domain/tasks/actions";
-import { tagsForTask } from "../../domain/tags/tags";
 import type { TaskActivityEntry } from "../../domain/tasks/activity";
 import { childProgress } from "../../domain/tasks/children";
 import { isCompleted, isNote, isPinned, isTrashed } from "../../domain/tasks/taskState";
@@ -42,7 +41,7 @@ import { useT } from "../../i18n";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import type { TaskDetailWidthState } from "../../hooks/useTaskDetailWidth";
 import { TASK_DETAIL_MAX_WIDTH, TASK_DETAIL_MIN_WIDTH } from "../../app/taskDetailWidth";
-import { DeferredInput, DeferredTextarea } from "../kit";
+import { DeferredTextarea } from "../kit";
 import { useFloatingPosition } from "../floating";
 import type { Rect } from "../../domain/floating";
 
@@ -331,12 +330,9 @@ export function TaskDrawer({
   }, [revealCount]);
 
   // What the body actually has to draw. Content, then whatever this Task uses.
-  const held = tagsForTask(task.id, tags, taskTags);
   const showSubtasks = children.length > 0 || isRevealed("addSubtask");
-  const showTags = held.length > 0 || isRevealed("addTag");
   const showDependency =
     Boolean(task.blockedByTaskId) || blocking.length > 0 || isRevealed("setBlocker");
-  const showNote = Boolean(task.notes?.trim()) || isRevealed("addNote");
 
   function submitSubtask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -458,38 +454,15 @@ export function TaskDrawer({
             header keeps its other two controls; nothing stands where the box
             was, because a disabled tick would say the note COULD be finished
             and simply is not. */}
-        {isNote(task) ? null : (
-        <label className={`tm-drawer-done${frozen ? " is-frozen" : ""}`}>
-          {/* The same box a row draws, priority colour and all
-              (TASK_PRIORITY_CHECKBOX_DESIGN.md §4.1) — the reference app
-              colours this one too, and a Detail whose checkbox disagreed with
-              the card it was opened from would be saying the level twice in
-              two colours. */}
-          <TaskCheck
-            priority={task.priority}
-            checked={isCompleted(task)}
-            disabled={frozen}
-            label={t("tasks.markDone")}
-            onToggle={onComplete}
-          />
-          <span>{t("tasks.markDone")}</span>
-        </label>
-        )}
+        {/* The completion box moved to the title line
+            (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6): the reference puts it
+            beside the name it finishes, in a `30px | 1fr` grid, rather than on
+            a labelled row of its own above it. The word `완료` goes with it —
+            a tick beside a title needs no caption, and the header has no room
+            for one at 48px. */}
 
-        {/* The whole schedule, not a due date (§5, audit §6).
-            `<input type="date">` could write one field, so a Task's start,
-            its times, its reminder and its repeat were unreachable from here
-            — and the legacy panel, which has had the full editor all along,
-            disagreed with this one about what a schedule was. The editor is
-            the same component; only the trigger and the surface are new. */}
-        <SchedulePicker
-          task={task}
-          reminders={reminders}
-          today={today}
-          onCommit={onCommitSchedule}
-          restoreFocusTo={() => root.current}
-          readOnly={frozen}
-        />
+        {/* The schedule trigger moved to the `날짜` property row below (§2.6).
+            The editor is unchanged — only where its trigger stands. */}
 
         {/* §8.2, §8.5: a flag that opens a popover, not a dropdown. The
             `<select>` this replaces could show no flag, could not be undone
@@ -580,14 +553,57 @@ export function TaskDrawer({
           §11.15's single undo are `onSetContentMode`'s, and this is a
           different way to call it. */}
       <div className="tm-drawer-title-row">
-        <DeferredInput
-          className="tm-drawer-title"
-          value={task.title}
-          onCommit={(title) => onUpdate({ title })}
-          resetKey={task.id}
-          required
-          aria-label={t("tasks.titleLabel")}
-        />
+        {/* §2.6's title line: `30px | 1fr`, the tick and the name it finishes.
+            A note has no completion (QUICK_ADD_INPUT_BOX_DESIGN.md §7.1), so
+            nothing stands in the first column — the grid keeps the column so
+            a note's title starts on the same left edge as every other. */}
+        {isNote(task) ? (
+          <span className="tm-drawer-done is-note" aria-hidden="true" />
+        ) : (
+          <label className={`tm-drawer-done${frozen ? " is-frozen" : ""}`}>
+            <TaskCheck
+              priority={task.priority}
+              checked={isCompleted(task)}
+              disabled={frozen}
+              label={t("tasks.markDone")}
+              onToggle={onComplete}
+            />
+          </label>
+        )}
+        {/* A textarea, so a long name wraps instead of being cut off (§2.6).
+            It was an `<input>`, which cannot wrap — fine in the 480px panel it
+            was written for, and a title clipped mid-glyph in the 320px one
+            §4.7 replaced it with.
+
+            Enter still commits rather than opening a second line. A textarea
+            treats Enter as a paragraph break (see `DeferredTextarea`), which is
+            right for a body and wrong for a name — a title carrying a newline
+            is bad data that every list would then have to render around. The
+            handler sits in the CAPTURE phase because the field binds its own
+            `onKeyDown` after the spread, so a handler passed in as a prop
+            never runs. */}
+        <div
+          className="tm-drawer-title-box"
+          onKeyDownCapture={(event) => {
+            if (event.key !== "Enter" || event.shiftKey) return;
+            // An IME candidate window uses Enter to choose a word; committing
+            // there would end the edit mid-word and lose the choice.
+            if (event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            (event.target as HTMLTextAreaElement).blur();
+          }}
+        >
+          <DeferredTextarea
+            className="tm-drawer-title"
+            value={task.title}
+            onCommit={(title) => onUpdate({ title })}
+            resetKey={task.id}
+            rows={1}
+            autoGrow
+            required
+            aria-label={t("tasks.titleLabel")}
+          />
+        </div>
         {/* The count the content heading used to carry. It followed the
             heading out (§2) and landed here rather than being dropped: it is
             the one thing that heading said which the body does not say for
@@ -732,17 +748,76 @@ export function TaskDrawer({
           `+`, with no label over them, and nothing at all on a Task with no
           tags (its `.detail-tag-view` measures 0 there too;
           TICKTICK_COMPONENT_07_TASK_DETAIL_PANEL.md §3). */}
-      {showTags ? (
-        <section className="tm-drawer-tags">
-          <TagPicker
-            task={task}
-            tags={tags}
-            taskTags={taskTags}
-            onToggle={onToggleTag}
-            restoreFocusTo={() => root.current}
-          />
-        </section>
-      ) : null}
+      {/* §2.6's property rows, and a reversal worth naming.
+
+          `TICKTICK_DETAIL_ANATOMY_DESIGN.md` §2 took these OUT, with evidence:
+          the reference app it measured draws no labelled rows — its date sits
+          in the header, its List in the footer, and its tags appear only when
+          the Task has some. That reasoning was sound about THAT reference.
+
+          This mockup is a different one, and it draws all three as labelled
+          rows that are always there (`날짜` · `태그` · `리스트`, 42px each, a
+          fixed 64px label column so the values line up). Nothing about the
+          editors changes — the same SchedulePicker, TagPicker and ListPicker
+          open the same popovers. What changes is that each now stands on a row
+          that says what it is, and that the row is there before you have used
+          it.
+
+          The cost the anatomy doc named is real and is paid here: three rows
+          on every Task for the sake of the ones that use them. It is the price
+          of the layout being asked for, and it is recorded rather than
+          hidden. */}
+      <section className="tm-drawer-props">
+        <div className="tm-drawer-prop">
+          {/* `날짜`, which is what the mockup calls it — though this trigger
+              opens the whole schedule (start, times, repeat, reminder), not a
+              date. The shorter word is the one on screen in the design being
+              matched; if it ever reads as a promise the popover breaks, this
+              is the line to revisit. */}
+          <span className="tm-drawer-prop-label">{t("taskDetail.propDate")}</span>
+          <div className="tm-drawer-prop-value">
+            <SchedulePicker
+              task={task}
+              reminders={reminders}
+              today={today}
+              onCommit={onCommitSchedule}
+              restoreFocusTo={() => root.current}
+              readOnly={frozen}
+            />
+          </div>
+        </div>
+
+        <div className="tm-drawer-prop tm-drawer-tags">
+          <span className="tm-drawer-prop-label">{t("tasks.sectionTags")}</span>
+          <div className="tm-drawer-prop-value">
+            <TagPicker
+              task={task}
+              tags={tags}
+              taskTags={taskTags}
+              onToggle={onToggleTag}
+              restoreFocusTo={() => root.current}
+            />
+          </div>
+        </div>
+
+        {/* A thrown-away Task cannot be moved (TRASH_PERMANENT_DELETE_DESIGN.md
+            §3.2) — the row goes rather than standing there disabled, which is
+            the rule the footer applied to the same picker before it moved. */}
+        {isTrashed(task) ? null : (
+          <div className="tm-drawer-prop">
+            <span className="tm-drawer-prop-label">{t("taskDetail.propList")}</span>
+            <div className="tm-drawer-prop-value">
+              <ListPicker
+                task={task}
+                lists={lists}
+                folders={folders}
+                onMove={onMoveToList}
+                restoreFocusTo={() => root.current}
+              />
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* What this Task is waiting on, and what waits on it.
 
@@ -811,21 +886,24 @@ export function TaskDrawer({
           always-present box under the subtasks, which put an empty textarea on
           every Task in the account for the sake of the few that use it — the
           same charge §2 lays against the property rows. */}
-      {showNote ? (
-        <section className="tm-drawer-notes">
-          <h3>{t("taskDetail.notes")}</h3>
-          <DeferredTextarea
-            value={task.notes}
-            rows={1}
-            autoGrow
-            placeholder={t("taskDetail.addNotes")}
-            onCommit={(notes) => onUpdate({ notes })}
-            resetKey={task.id}
-            aria-label={t("taskDetail.notes")}
-            data-reveal-focus={isRevealed("addNote") && !task.notes?.trim() ? "true" : undefined}
-          />
-        </section>
-      ) : null}
+      {/* Always drawn now (§2.6). The comment above recorded why it was not:
+          an always-present box "put an empty textarea on every Task in the
+          account for the sake of the few that use it". The mockup draws `메모`
+          and its placeholder on every Task, under a rule, so the charge is
+          accepted for the same reason the property rows above accept it. */}
+      <section className="tm-drawer-notes">
+        <h3>{t("taskDetail.notes")}</h3>
+        <DeferredTextarea
+          value={task.notes}
+          rows={1}
+          autoGrow
+          placeholder={t("taskDetail.addNotes")}
+          onCommit={(notes) => onUpdate({ notes })}
+          resetKey={task.id}
+          aria-label={t("taskDetail.notes")}
+          data-reveal-focus={isRevealed("addNote") && !task.notes?.trim() ? "true" : undefined}
+        />
+      </section>
 
       {/* The height nothing else asked for.
 
@@ -872,13 +950,10 @@ export function TaskDrawer({
           <TrashedFooter onRunAction={onRunAction} />
         ) : (
           <>
-        <ListPicker
-          task={task}
-          lists={lists}
-          folders={folders}
-          onMove={onMoveToList}
-          restoreFocusTo={() => root.current}
-        />
+        {/* The List picker moved to the `리스트` property row (§2.6). The
+            footer keeps the ⋯, which is what the mockup keeps too — it draws
+            it in the header, and moving it there would cost the focus order
+            and the drag region more than the two pixels it buys. */}
 
         {/* §15.2's entry point. Everything §15.3 calls secondary or structural
             lives behind it, and since §2 that includes the four that open a

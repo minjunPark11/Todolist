@@ -233,6 +233,10 @@ describe("a Folder's list view (§5)", () => {
 describe("the Folder's quick add (§4)", () => {
   it("says it will land in the top List without being asked", () => {
     renderModule([], { sidebarFolders: folders });
+    // The quick add opens idle (POLISHED_REFERENCE_PARITY_DESIGN.md §6.1b);
+    // the trigger carries the same sentence, and the field carries it once
+    // pressed. Pressing keeps the subject of this test the placeholder.
+    fireEvent.click(screen.getByRole("button", { name: /^Add a task/ }));
     const field = screen.getByRole("textbox", { name: /^Add a task/ }) as HTMLInputElement;
     expect(field.placeholder).toBe("Add a task to Home");
   });
@@ -247,6 +251,7 @@ describe("the Folder's quick add (§4)", () => {
         list("list-work", "Work", 1, { sidebarFolderId: "f1", sidebarSortKey: 1 }),
       ],
     });
+    fireEvent.click(screen.getByRole("button", { name: /^Add a task/ }));
     expect((screen.getByRole("textbox", { name: /^Add a task/ }) as HTMLInputElement).placeholder).toBe(
       "Add a task to Work",
     );

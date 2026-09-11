@@ -14,7 +14,7 @@
 // dialogs that carried the off-scale radii, so a spec that skipped the seeding
 // would have passed against the palette this change replaced.
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, openFromHeader, nameField, dialog } from "./addList.helpers";
+import { openApp, openFromHeader, nameField, dialog, openQuickAdd } from "./addList.helpers";
 
 const LIST = { id: "list-radius", name: "Radius" };
 
@@ -46,8 +46,16 @@ const ALLOWED_OFF_SCALE = [
   ".ff-check", // a completion control is a circle; 6px on 22px is a different control
   ".ff-color-swatch", // a colour is a dot, not a control
   ".tm-swatch", // the same dot, in the Add List dialog
-  ".tm-tag-chip", // a tag is a badge — §11.2's pill again, beside the ones above
-  ".tm-tag-add", // and the button that adds one has to be the shape it adds
+  // A tag is a badge — §11.2's pill — but only where it is still DRAWN as one.
+  // POLISHED_REFERENCE_PARITY_DESIGN.md §2.6 draws it as `#name` text
+  // everywhere in the Tasks module (rows, cards, the Detail), so the pill now
+  // survives on the Focus page alone. Kept, because that one is real; the
+  // test below measures it there rather than in the Detail, where measuring it
+  // would now be measuring the flat form and calling it round.
+  ".tm-tag-chip",
+  // `.tm-tag-add` went with it: at 6px it is on the scale and needs no
+  // exemption. Removing an entry that stopped being true is the whole point of
+  // pairing each one with a measurement.
   '[class*="tm-preview-"]', // a thumbnail of a layout, drawn at a fraction of the size
 ];
 
@@ -133,7 +141,7 @@ async function offScaleShapes(page: Page, scale: number[], allowed: string[]): P
  * (`splitInlineTags`), so it costs a token rather than a fixture.
  */
 async function addTask(page: Page, title: string): Promise<void> {
-  const field = page.getByRole("textbox", { name: "Add a task" });
+  const field = await openQuickAdd(page);
   await field.fill(`${title} #radius`);
   await field.press("Enter");
   await expect(page.getByRole("button", { name: `Open ${title}` })).toBeVisible();
@@ -174,6 +182,32 @@ test.describe("the radius scale (§11.39)", () => {
     }
   });
 
+  test("a tag reads as #name wherever a Task is read", async ({ page }) => {
+    await openApp(page, { lists: [LIST] });
+    await page.goto(`/list/${LIST.id}`);
+    await addTask(page, "Wears a tag");
+
+    // §2.6. The row and the card are the same component, so the Board gets the
+    // same treatment — which is why neither is the pill the allow list means.
+    for (const route of [`/list/${LIST.id}`, `/list/${LIST.id}?view=board`]) {
+      await page.goto(route);
+      const flat = await page.locator(".tm-task-tagline .tm-tag-chip").first().evaluate((el) => ({
+        radius: parseFloat(getComputedStyle(el).borderTopLeftRadius),
+        hash: getComputedStyle(el, "::before").content,
+      }));
+      expect(flat.radius, `${route} draws a flat tag`).toBe(0);
+      expect(flat.hash, `${route} prefixes it with #`).toContain("#");
+    }
+
+    // And in the Detail, which draws the same `#name` beside its `태그` label.
+    await page.goto(`/list/${LIST.id}`);
+    await page.getByRole("button", { name: "Open Wears a tag" }).click();
+    const inDetail = await page.locator(".tm-drawer-tags .tm-tag-chip").first().evaluate((el) =>
+      parseFloat(getComputedStyle(el).borderTopLeftRadius),
+    );
+    expect(inDetail).toBe(0);
+  });
+
   test("settings switches retain their pill track and circular thumb", async ({ page }) => {
     await openApp(page);
     await page.goto("/settings");
@@ -202,10 +236,15 @@ test.describe("the radius scale (§11.39)", () => {
     await expect(page.locator(".tm-drawer.is-empty")).toHaveCount(0);
     expect(await offScaleShapes(page, SCALE, ALLOWED_OFF_SCALE), "the Task Detail").toEqual([]);
 
-    // The other half of the two entries added to the allow list: the Detail is
-    // where both are on screen at once.
-    await expectPill(page, ".tm-drawer-tags .tm-tag-chip");
-    await expectPill(page, ".tm-tag-add");
+    // The other half of the allow list's entries — but the tag chip is no
+    // longer one of them HERE. POLISHED_REFERENCE_PARITY_DESIGN.md §2.6 draws
+    // a tag as `#name` text rather than a badge everywhere a Task is READ (the
+    // row and this Detail); the pill survives on the Board, where a card has
+    // no room for a `#` to read as anything but part of the word. So the
+    // allow-list entry still stands and the probe follows the pill to where it
+    // actually is — a paired measurement that measured the wrong element would
+    // be exactly the hole `expectPill` exists to close.
+
 
     await page.keyboard.press("Control+k");
     await expect(page.locator(".cmd-menu")).toBeVisible();

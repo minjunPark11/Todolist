@@ -38,9 +38,16 @@ test.describe("Add List", () => {
     await createListNamed(page, "School");
 
     // READY_FOR_FIRST_TASK, which §17.2 calls the finish line rather than the row.
+    //
+    // The quick add is a trigger rather than an open field since
+    // POLISHED_REFERENCE_PARITY_DESIGN.md §6.1b, so "ready" is one press (or
+    // ⌘N) away rather than zero. §17.4's "typing must work with no click of
+    // its own" is about the NAME field in the dialog above, which still
+    // focuses itself — this line is about landing on the new List with its
+    // way in on screen, and that is what it asks.
     await expect(page).toHaveURL(/\/list\/list-/);
     await expect(page.locator(".tm-row.is-current")).toHaveText(/School/);
-    await expect(page.locator(".tm-quickadd-title")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Add a task/ })).toBeVisible();
   });
 
   test("E2E-02 — a Folder's own entry fills the Folder in", async ({ page }, info) => {

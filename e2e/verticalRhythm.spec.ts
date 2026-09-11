@@ -13,7 +13,7 @@
 // Controls keep 32: `--density-control-h` is 32, a button is not a navigation
 // row, and §4.86 puts the create row at 32 alongside the 36 ones.
 import { expect, test, type Page } from "@playwright/test";
-import { openApp } from "./addList.helpers";
+import { openApp, openQuickAdd } from "./addList.helpers";
 
 const LIST = { id: "list-rhythm", name: "Rhythm" };
 
@@ -46,6 +46,13 @@ const ALLOWED_OFF_GRID = [
   // control on the grid, and the date chip and the caret are what it holds.
   // A 32px chip inside a 32px row would have to overflow it.
   ".tm-quickadd-date",
+  // The quick add's IDLE row, at the reference's 42
+  // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6). It is the same clause as the
+  // three entries above and not a new exception: the row is the control, and
+  // 42 is the height the mockup gives it — one step above the 36 a navigation
+  // row takes, which is what makes "add something" read as bigger than "go
+  // somewhere" in a column where they sit one above the other.
+  ".tm-quickadd-trigger",
   ".tm-quickadd-more",
   // The Matrix box header. Its two icon buttons are 28px section actions
   // (§4.87), sized against the 22px badge they sit beside rather than against
@@ -130,7 +137,7 @@ test.describe("the vertical rhythm (§4.86, §11.2)", () => {
   test("navigation rows are 36 and controls are 32, on both shells", async ({ page }) => {
     await openApp(page, { lists: [LIST] });
     await page.goto(`/list/${LIST.id}`);
-    const field = page.getByRole("textbox", { name: "Add a task" });
+    const field = await openQuickAdd(page);
     await field.fill("Measure the rows");
     await field.press("Enter");
     await expect(page.getByRole("button", { name: "Open Measure the rows" })).toBeVisible();

@@ -12,7 +12,7 @@
 // about what a schedule was. One editor, one `updateTaskSchedule`, one answer.
 import type { Task } from "../../types";
 import type { ReminderSpec, Schedule, ScheduleIssue } from "../../domain/schedule";
-import { formatScheduleTrigger, overdueDays, scheduleFromTask } from "../../domain/schedule";
+import { addDays, formatScheduleTrigger, overdueDays, scheduleFromTask, scheduleSpan } from "../../domain/schedule";
 import { isCompleted } from "../../domain/tasks/taskState";
 import { ScheduleEditor } from "../schedule/ScheduleEditor";
 import { CalendarIcon } from "../schedule/icons";
@@ -45,11 +45,45 @@ export interface SchedulePickerProps {
   readOnly?: boolean;
 }
 
+/**
+ * `오늘` / `내일`, or "" when the day has no name to use.
+ *
+ * Deliberately narrower than the row's `taskTimeLabel`, which also names
+ * weekdays (`다음 월`). That one lives beside `formatWeekday` and `formatDate`
+ * in the row's own module; reaching for it here would mean moving three
+ * functions to share two words.
+ */
+function namedDay(
+  schedule: Schedule,
+  today: string,
+  t: (key: string) => string,
+): string {
+  if (schedule.startTime) return "";
+  const span = scheduleSpan(schedule);
+  if (span === null || span.start !== span.end) return "";
+  if (span.start === today) return t("common.today");
+  if (span.start === addDays(today, 1)) return t("common.tomorrow");
+  return "";
+}
+
 export function SchedulePicker({ task, reminders, today, onCommit, restoreFocusTo, readOnly }: SchedulePickerProps) {
   const { t, lang } = useT();
   const locale = lang === "ko" ? "ko-KR" : "en-US";
   const schedule = scheduleFromTask({ ...task, reminders });
-  const label = formatScheduleTrigger(schedule, today, locale);
+  /* `오늘` rather than `9월 11일` where the day has a name
+     (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6).
+
+     The mockup's `날짜` row reads `오늘`, and so does the task row beside it —
+     this trigger was the one place on the screen still writing the raw date,
+     so the same Task said two different things about the same day depending
+     on where you looked.
+
+     Only the two days the catalogue has a word for, and only when the
+     schedule is one day with no time on it: `formatScheduleTrigger` is the
+     one that knows about ranges, times and years, and re-deciding any of that
+     here would be a second formatter to keep in step. */
+  const named = namedDay(schedule, today, t);
+  const label = named || formatScheduleTrigger(schedule, today, locale);
   const late = isCompleted(task) ? 0 : overdueDays(schedule, today);
   const lateLabel = t("schedule.overdueDays", { days: late });
 

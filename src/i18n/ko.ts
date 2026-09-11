@@ -600,6 +600,8 @@ export const ko: Dictionary = {
   "taskDetail.blockedByNone": "없음",
   "taskDetail.blockedByHint": "선행 작업이 끝나야 시작할 수 있습니다. 오늘 큐에서 자동으로 뒤로 밀립니다.",
   "taskDetail.blocks": "이 작업을 기다리는 항목",
+  "taskDetail.propDate": "날짜",
+  "taskDetail.propList": "리스트",
   "taskDetail.notes": "메모",
   "taskDetail.addNotes": "메모 추가",
 

@@ -10,12 +10,12 @@
 // a menu: Escape closes it and gives focus back, and it closes what it opened
 // and nothing underneath.
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, STORAGE_KEY } from "./addList.helpers";
+import { openApp, STORAGE_KEY, openQuickAdd } from "./addList.helpers";
 
 const LIST = { id: "list-menu", name: "Menu" };
 
 async function addTask(page: Page, title: string): Promise<void> {
-  const field = page.getByRole("textbox", { name: "Add a task" });
+  const field = await openQuickAdd(page);
   await field.fill(title);
   await field.press("Enter");
   await expect(page.getByRole("button", { name: `Open ${title}` })).toBeVisible();

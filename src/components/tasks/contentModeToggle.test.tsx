@@ -97,7 +97,11 @@ function setup(overrides: Partial<Task> = {}, checkItems: CheckItem[] = []) {
 describe("the content-mode toggle", () => {
   it("sits beside the title, not inside the body it changes", () => {
     setup();
-    const row = screen.getByRole("textbox", { name: "Title" }).parentElement!;
+    // `closest` rather than `parentElement`: the title sits inside its own box
+    // now (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6 — it is a textarea so a
+    // long name wraps, and the box carries the Enter handler), so its parent is
+    // that box and not the row the toggle shares with it.
+    const row = screen.getByRole("textbox", { name: "Title" }).closest(".tm-drawer-title-row")!;
     expect(row.querySelector(".tm-drawer-content-toggle")).toBeTruthy();
   });
 
@@ -135,8 +139,13 @@ describe("the content-mode toggle", () => {
     setup();
     expect(screen.queryByRole("group", { name: "Content type" })).toBeNull();
     expect(document.querySelector(".tm-drawer-content-head")).toBeNull();
-    // The word survives only as the toggle's own label.
-    expect(screen.queryByText("Notes")).toBeNull();
+    // The word survives as the toggle's label and, since §2.6, as the heading
+    // over the always-present note field at the bottom of the Detail. What
+    // this line is about is the BODY — that nothing stands over the
+    // description naming a field its placeholder already names — so it asks
+    // the body rather than the document.
+    const body = document.querySelector(".tm-drawer-content") as HTMLElement;
+    expect(body.querySelector("h3")).toBeNull();
     expect(screen.getByRole("button", { name: "Turn into a checklist" })).toBeTruthy();
   });
 });

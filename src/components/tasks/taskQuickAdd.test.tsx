@@ -7,7 +7,7 @@
 // key did nothing and the button was the only way through. That refusal is
 // gone (createResolver "upcoming"), and leaving the field now commits too.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { I18nProvider } from "../../i18n";
 import { FloatingLayerProvider } from "../floating";
@@ -24,7 +24,16 @@ const FOLDER_LISTS = [
 const TODAY = "2026-08-29";
 const INBOX = "list-inbox";
 
-function setup(scope: TaskScopeRef = { kind: "upcoming" }, folderLists: never[] = []) {
+/** Renders and stops — for the tests that are about the idle state itself. */
+function renderIdle(scope: TaskScopeRef = { kind: "upcoming" }, folderLists: never[] = []) {
+  return setup(scope, folderLists, { open: false });
+}
+
+function setup(
+  scope: TaskScopeRef = { kind: "upcoming" },
+  folderLists: never[] = [],
+  options: { open?: boolean } = {},
+) {
   const onCreate = vi.fn();
   render(
     <I18nProvider lang="en">
@@ -44,6 +53,12 @@ function setup(scope: TaskScopeRef = { kind: "upcoming" }, folderLists: never[] 
       </FloatingLayerProvider>
     </I18nProvider>,
   );
+  // The quick add opens idle now (POLISHED_REFERENCE_PARITY_DESIGN.md §6.1b):
+  // a 42px trigger, and the field only once it is pressed. Every test below is
+  // about what the FIELD does, so the press is setup rather than subject —
+  // `renderIdle` is for the handful that are about the trigger.
+  if (options.open === false) return { onCreate, field: null as unknown as HTMLInputElement };
+  fireEvent.click(screen.getByRole("button", { name: /^Add a task/ }));
   // The field's name carries the List the task will land in now
   // (TICKTICK_COMPONENT_10 §10.3), so this matches the head of it rather than
   // the whole string.
@@ -293,5 +308,107 @@ describe("the date chip", () => {
     expect(onCreate).toHaveBeenCalledWith("Dated", expect.objectContaining({
       patch: expect.objectContaining({ dueDate: "2026-08-30" }),
     }));
+  });
+});
+
+/**
+ * The two states, and the three keys that move between them (§6.1b).
+ *
+ * Written because the behaviour is new and nothing else asks for it: the
+ * suite above all runs against the field, which `setup` opens for it, so
+ * every one of those tests would still pass on a quick add that could not be
+ * closed at all.
+ */
+/** A render whose Scope can be swapped without remounting the component. */
+function renderSwitchable(scope: TaskScopeRef) {
+  const tree = (next: TaskScopeRef) => (
+    <I18nProvider lang="en">
+      <FloatingLayerProvider>
+        <TaskQuickAdd
+          scope={next}
+          lists={[{ id: INBOX, name: "Inbox", kind: "inbox" } as never]}
+          inboxListId={INBOX}
+          today={TODAY}
+          folderLists={[]}
+          folders={[]}
+          tags={[]}
+          savedFilters={[]}
+          draftTitle=""
+          onCreate={vi.fn()}
+        />
+      </FloatingLayerProvider>
+    </I18nProvider>
+  );
+  const { rerender } = render(tree(scope));
+  return { rerender, tree };
+}
+
+describe("the two states (§6.1b)", () => {
+  it("starts as a trigger, with no field on the screen", () => {
+    renderIdle();
+    expect(screen.getByRole("button", { name: /^Add a task/ })).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: /^Add a task/ })).toBeNull();
+  });
+
+  it("opens on the trigger, and puts the caret in the field", async () => {
+    renderIdle();
+    fireEvent.click(screen.getByRole("button", { name: /^Add a task/ }));
+    const field = screen.getByRole("textbox", { name: /^Add a task/ });
+    // The focus lands on the next tick — `open()` cannot focus a field that
+    // the render it just asked for has not painted yet.
+    await waitFor(() => expect(document.activeElement).toBe(field));
+  });
+
+  it("opens on ⌘N / Ctrl+N", () => {
+    renderIdle();
+    fireEvent.keyDown(document, { key: "n", ctrlKey: true });
+    expect(screen.getByRole("textbox", { name: /^Add a task/ })).toBeTruthy();
+  });
+
+  it("closes on Escape, and adds nothing", () => {
+    const { onCreate } = setup();
+    const field = screen.getByRole("textbox", { name: /^Add a task/ });
+    fireEvent.change(field, { target: { value: "Half a thought" } });
+    fireEvent.keyDown(field, { key: "Escape" });
+
+    // Leaving by the door marked cancel and finding the row added anyway is
+    // the worst of both.
+    expect(onCreate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("textbox", { name: /^Add a task/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /^Add a task/ })).toBeTruthy();
+  });
+
+  /**
+   * The bug this exists for cost the whole app, and no desktop test saw it.
+   *
+   * `resolution.enabled` has its own `return null` — a Scope that takes no new
+   * Task (Completed, the Trash) draws no quick add at all. The two hooks §6.1b
+   * added went in UNDER that return, so on those Scopes they did not run, the
+   * hook count changed between renders, and React tore the tree down with
+   * "Rendered fewer hooks than expected". `navShell.spec.ts` CS-09 caught it
+   * on mobile, three specs away from anything about adding a Task.
+   *
+   * A rerender rather than two renders: the crash needs the same fiber to be
+   * reused across the flip, which is what navigating between Scopes does.
+   */
+  it("survives a Scope that draws no quick add at all", () => {
+    const { rerender, tree } = renderSwitchable({ kind: "upcoming" });
+    expect(screen.getByRole("button", { name: /^Add a task/ })).toBeTruthy();
+
+    rerender(tree({ kind: "completed" }));
+    expect(screen.queryByRole("button", { name: /^Add a task/ })).toBeNull();
+
+    rerender(tree({ kind: "upcoming" }));
+    expect(screen.getByRole("button", { name: /^Add a task/ })).toBeTruthy();
+  });
+
+  it("stays open after Enter, so the next one can be typed straight away", () => {
+    const { onCreate } = setup();
+    const field = screen.getByRole("textbox", { name: /^Add a task/ });
+    fireEvent.change(field, { target: { value: "Write it up" } });
+    fireEvent.submit(field.closest("form") as HTMLFormElement);
+
+    expect(onCreate).toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: /^Add a task/ })).toBeTruthy();
   });
 });

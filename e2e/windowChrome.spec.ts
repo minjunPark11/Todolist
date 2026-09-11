@@ -14,7 +14,7 @@
 // what broke when the row was empty and would break again if a reservation
 // went missing.
 import { expect, test, type Page } from "@playwright/test";
-import { openApp } from "./addList.helpers";
+import { openApp, openQuickAdd } from "./addList.helpers";
 
 /** 46 × 3, Windows' own caption metrics. */
 const BUTTONS_W = 138;
@@ -106,7 +106,7 @@ test.describe("the desktop build's caption row", () => {
     await asDesktopApp(page);
     // Nothing to open on an empty account; a Task is added the way the other
     // specs add one.
-    const field = page.getByRole("textbox", { name: "Add a task" });
+    const field = await openQuickAdd(page);
     await field.fill("Under the buttons");
     await field.press("Enter");
     await page.getByRole("button", { name: "Open Under the buttons" }).click();

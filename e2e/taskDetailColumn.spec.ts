@@ -13,7 +13,7 @@
 // would still pass if both numbers changed together — which is the one thing
 // that must not happen.
 import { expect, test, type Page } from "@playwright/test";
-import { openApp } from "./addList.helpers";
+import { openApp, openQuickAdd } from "./addList.helpers";
 
 const LIST = { id: "list-audit", name: "Audit" };
 
@@ -24,7 +24,7 @@ async function listWidth(page: Page): Promise<number> {
 }
 
 async function addTask(page: Page, title: string): Promise<void> {
-  const field = page.getByRole("textbox", { name: "Add a task" });
+  const field = await openQuickAdd(page);
   await field.fill(title);
   await field.press("Enter");
   await expect(page.getByRole("button", { name: `Open ${title}` })).toBeVisible();

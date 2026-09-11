@@ -215,30 +215,42 @@ describe("the property header (§1.7)", () => {
     expect(scroller?.contains(header!)).toBe(false);
   });
 
-  // §1.7 draws `□ │ date │ ⚑` as one row, so all three live in the header
-  // rather than as stacked property rows further down.
-  it("holds Complete, the schedule and Priority", () => {
+  // §1.7 drew `□ │ date │ ⚑` as one row and this asserted all three were in
+  // the header. Two of the three have moved
+  // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6): the tick to the title line,
+  // beside the name it finishes, and the date to a labelled `날짜` row. The
+  // flag stays — the mockup draws no priority at all, and §6.2 keeps what the
+  // mockup merely did not draw.
+  it("keeps Priority in the header, and moves Complete and the schedule into the body", () => {
     renderDrawer();
     const header = pane().querySelector(".tm-drawer-head") as HTMLElement;
-    expect(header.querySelector("input[type='checkbox']")).not.toBeNull();
-    expect(header.querySelector(".sched-trigger")).not.toBeNull();
+    const scroller = pane().querySelector(".tm-drawer-scroll") as HTMLElement;
+
     expect(header.querySelector(".tm-priority-trigger")).not.toBeNull();
+    expect(header.querySelector("input[type='checkbox']")).toBeNull();
+    expect(header.querySelector(".sched-trigger")).toBeNull();
+
+    expect(scroller.querySelector(".tm-drawer-title-row input[type='checkbox']")).not.toBeNull();
+    expect(scroller.querySelector(".tm-drawer-props .sched-trigger")).not.toBeNull();
   });
 
   // TASK_PRIORITY_CHECKBOX_DESIGN.md §4.1. The Detail is opened FROM a card,
-  // and a header box that disagreed with the card's would be the same level
-  // said twice in two colours.
+  // and a box that disagreed with the card's would be the same level said
+  // twice in two colours. It is on the title line now rather than the header,
+  // which changes where this looks and not what it is asserting.
   it("draws the same priority-coloured box the rows draw", () => {
     renderDrawer("inline-drawer", "medium");
-    const header = pane().querySelector(".tm-drawer-head") as HTMLElement;
-    expect(header.querySelector(".tm-check")?.className).toBe("tm-check is-medium");
+    const titleRow = pane().querySelector(".tm-drawer-title-row") as HTMLElement;
+    expect(titleRow.querySelector(".tm-check")?.className).toBe("tm-check is-medium");
   });
 
   // §4.1 again, from the other side: the subtask and checklist ticks are not
-  // a Task's completion and have no priority to report.
+  // a Task's completion and have no priority to report. The completion box is
+  // inside the scroll region now, so "no `.tm-check` in the scroller" would be
+  // false for the wrong reason — the claim is about the ticks BELOW the title.
   it("leaves the checklist's own ticks alone", () => {
     renderDrawer("inline-drawer", "high");
-    const scroller = pane().querySelector(".tm-drawer-scroll") as HTMLElement;
-    expect(scroller.querySelector(".tm-check")).toBeNull();
+    const content = pane().querySelector(".tm-drawer-content") as HTMLElement;
+    expect(content.querySelector(".tm-check")).toBeNull();
   });
 });

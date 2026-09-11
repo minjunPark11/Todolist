@@ -605,6 +605,8 @@ export const en: Dictionary = {
   "taskDetail.blockedByNone": "Nothing",
   "taskDetail.blockedByHint": "This cannot start until that one is done. Today's queue moves it down on its own.",
   "taskDetail.blocks": "Waiting on this",
+  "taskDetail.propDate": "Date",
+  "taskDetail.propList": "List",
   "taskDetail.notes": "Notes",
   "taskDetail.addNotes": "Add notes",
 

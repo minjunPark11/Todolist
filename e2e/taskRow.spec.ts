@@ -11,12 +11,12 @@
 // A line through a title is a style; `status: "completed"` is what the account
 // holds, and it is what has to survive a reload.
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, STORAGE_KEY } from "./addList.helpers";
+import { openApp, STORAGE_KEY, openQuickAdd } from "./addList.helpers";
 
 const LIST = { id: "list-rows", name: "Rows" };
 
 async function addTask(page: Page, title: string): Promise<void> {
-  const field = page.getByRole("textbox", { name: "Add a task" });
+  const field = await openQuickAdd(page);
   await field.fill(title);
   await field.press("Enter");
   await expect(page.getByRole("button", { name: `Open ${title}` })).toBeVisible();

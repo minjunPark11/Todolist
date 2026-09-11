@@ -176,18 +176,22 @@ describe("the Detail, opened by a surface that is not the Tasks module", () => {
     const { bundle } = bundleFor();
     renderPane({ tasks: [task()], openId: "t1", onMutate: vi.fn(), bundle });
 
-    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Ship it");
+    expect((screen.getByLabelText("Title") as HTMLTextAreaElement).value).toBe("Ship it");
     expect(screen.getByLabelText("Description")).toBeTruthy();
-    // §2: a Task with no note, no blocker, no subtask and no tag draws none of
-    // them. "Nothing else" is meant literally now — the four sections and the
-    // three property rows that stood here are what the reference app does not
-    // have (TICKTICK_DETAIL_ANATOMY_DESIGN.md).
-    expect(screen.queryByLabelText("Notes")).toBeNull();
+    // §2 said "nothing else" literally: a Task with no note, no blocker, no
+    // subtask and no tag drew none of them, and no property rows either.
+    // POLISHED_REFERENCE_PARITY_DESIGN.md §2.6 brings back three of those rows
+    // and the note field, because the mockup being matched draws all four on
+    // every Task. What §2 still holds is the rest: a section whose content the
+    // Task does not have stays away.
     expect(screen.queryByLabelText("Waiting on")).toBeNull();
     expect(screen.queryByText("Subtasks")).toBeNull();
-    // The List did not go away — it moved to the footer, where the reference
-    // app draws it.
-    expect(document.querySelector(".tm-drawer-foot .tm-list-trigger")).toBeTruthy();
+    // Date, Tags and List as labelled rows; the note field under them.
+    const props = document.querySelector(".tm-drawer-props") as HTMLElement;
+    expect(props.querySelector(".sched-trigger")).toBeTruthy();
+    expect(props.querySelector(".tm-list-trigger")).toBeTruthy();
+    expect(props.querySelectorAll(".tm-drawer-prop").length).toBe(3);
+    expect(screen.getByLabelText("Notes")).toBeTruthy();
   });
 
   it("completes through the command path, with the undo beside it", () => {

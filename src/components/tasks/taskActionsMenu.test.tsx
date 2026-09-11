@@ -178,10 +178,23 @@ async function openMore(user: ReturnType<typeof userEvent.setup>) {
  * about what a trashed Task is OFFERED has to ask the surface that still
  * offers it.
  */
+/**
+ * The Task's row, and only the row.
+ *
+ * `getByText` used to be enough. The Detail's title is a textarea since
+ * POLISHED_REFERENCE_PARITY_DESIGN.md §2.6 (so a long name wraps in the 320px
+ * panel), and a textarea's value IS its text content — so the same string now
+ * matches the row's title AND the Detail's, and every right-click through this
+ * helper failed on the ambiguity rather than on anything it was testing.
+ */
+function rowTitle(): HTMLElement {
+  return screen.getByText("Write the release notes", { selector: ".tm-task-title" });
+}
+
 async function openRowMore(user: ReturnType<typeof userEvent.setup>) {
   // Right-click, the way the row's own suite below opens it. The ⋯ on a row
   // appears on hover, which jsdom has no pointer to give it.
-  await user.pointer({ keys: "[MouseRight]", target: screen.getByText("Write the release notes") });
+  await user.pointer({ keys: "[MouseRight]", target: rowTitle() });
   return screen.getByRole("menu");
 }
 
@@ -299,7 +312,12 @@ describe("the Detail's More menu (§15.2, §15.3)", () => {
     renderModule();
 
     const footer = document.querySelector(".tm-drawer-foot")!;
-    expect(footer.querySelector(".tm-list-trigger")).toBeTruthy();
+    // The List picker moved to the `리스트` property row
+    // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6); the footer keeps the ⋯. What
+    // this test is about is unchanged: a live Task's footer is not a trashed
+    // one's, so it offers no way back from somewhere it has not been.
+    expect(document.querySelector(".tm-drawer-props .tm-list-trigger")).toBeTruthy();
+    expect(footer.querySelector(".tm-task-more, .ff-anchor, button")).toBeTruthy();
     expect(within(footer as HTMLElement).queryByRole("button", { name: "Restore" })).toBeNull();
   });
 
@@ -746,6 +764,21 @@ describe("View Options", () => {
   // setting off left the column with NO way in — and the reference app's own
   // screen says otherwise: the header grows a `+` the moment the row goes.
   // The setting chooses WHERE the door is, not WHETHER there is one.
+/**
+ * The per-column `+` doors on the Board, and not the module's own quick add.
+ *
+ * The module's quick add is a BUTTON while it is idle
+ * (POLISHED_REFERENCE_PARITY_DESIGN.md §6.1b) and carries the same
+ * "Add a task to …" name the column doors do, so a document-wide
+ * `getAllByRole` counts one door too many. Scoping to the columns asks the
+ * question these two tests are actually asking: one door per column.
+ */
+function columnDoors(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>(".tm-column")).flatMap((column) =>
+    within(column).queryAllByRole("button", { name: /^Add a task to/ }),
+  );
+}
+
   it("moves the column's way in rather than taking it away", () => {
     renderModule({}, { url: "/list/l1?view=board" });
     expect(document.querySelector(".tm-column-add-row")).toBeTruthy();
@@ -762,7 +795,7 @@ describe("View Options", () => {
     expect(document.querySelector(".tm-column-add-row")).toBeNull();
     expect(document.querySelector(".tm-column-add-head")).toBeTruthy();
     // Still one per column and no more: the two are never both drawn.
-    const doors = screen.getAllByRole("button", { name: /^Add a task to/ });
+    const doors = columnDoors();
     expect(doors.length).toBe(document.querySelectorAll(".tm-column").length);
   });
 
@@ -779,14 +812,14 @@ describe("View Options", () => {
       },
     );
 
-    const door = screen.getAllByRole("button", { name: /^Add a task to/ })[0];
+    const door = columnDoors()[0];
     const name = door.getAttribute("aria-label") ?? "";
     await user.click(door);
 
     expect(screen.getByRole("textbox", { name })).toBeTruthy();
     // Its own `+` steps aside while the form is open — one door at a time —
     // and the other columns keep theirs.
-    expect(screen.queryByRole("button", { name })).toBeNull();
+    expect(columnDoors().some((d) => d.getAttribute("aria-label") === name)).toBe(false);
     expect(document.querySelectorAll(".tm-column-add-head").length).toBe(
       document.querySelectorAll(".tm-column").length - 1,
     );
@@ -903,7 +936,7 @@ describe("the row's menu (§15.63)", () => {
   it("shows the same actions as the Detail's, around its own choice sets", async () => {
     const user = userEvent.setup();
     renderModule();
-    await user.pointer({ keys: "[MouseRight]", target: screen.getByText("Write the release notes") });
+    await user.pointer({ keys: "[MouseRight]", target: rowTitle() });
 
     const labels = rows();
     // Registry rows on both sides of the priority and date sets — §15.42's

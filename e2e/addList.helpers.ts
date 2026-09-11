@@ -4,7 +4,7 @@
 // writing the account into localStorage before the first paint. That is also
 // why the specs can assert against storage directly — what is written there IS
 // what the account holds.
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export const STORAGE_KEY = "focusflow.appData.v1";
 
@@ -127,6 +127,25 @@ export async function openApp(page: Page, seed: SeedOptions = {}): Promise<void>
   // off-canvas — waiting for it to be visible would wait for a click nobody
   // has made yet. `.tm-shell` is the module having rendered, in every mode.
   await expect(page.locator(".tm-shell")).toBeVisible();
+}
+
+/**
+ * Opens the quick add and hands back its field.
+ *
+ * The quick add is idle until it is pressed
+ * (POLISHED_REFERENCE_PARITY_DESIGN.md §6.1b), so every spec that types a Task
+ * has to press it first. Shared rather than copied into each `addTask` because
+ * it was copied into six of them and all six broke on the same day — the next
+ * change to how a Task is typed should be one edit, not six.
+ */
+export async function openQuickAdd(page: Page): Promise<Locator> {
+  // By class, not by name. On the Board a column's own `+` door carries the
+  // same "Add a task to …" name as the module's quick add, so the accessible
+  // name matches two controls and Playwright's strict mode refuses the click —
+  // which is what the Task popup specs hit. The class says which one is meant.
+  const trigger = page.locator(".tm-quickadd-trigger");
+  if (await trigger.isVisible()) await trigger.click();
+  return page.locator(".tm-quickadd-title");
 }
 
 /** The stored account, as the app would read it back. */

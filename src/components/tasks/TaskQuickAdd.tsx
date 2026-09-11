@@ -5,7 +5,7 @@
 // this component asks for the missing answers and hands the resolution back.
 // §12.16 exists because there are many `+ 작업` entry points and each one that
 // works the owner out for itself is a copy of the rule that can drift.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { List, SavedFilter, SidebarFolder, Tag, TaskPriority } from "../../types";
 import type { TaskScopeRef } from "../../domain/tasks/scopeRegistry";
 import { canCommit, resolveCreateContext, type CreateResolution } from "../../domain/tasks/createResolver";
@@ -49,6 +49,23 @@ interface TaskQuickAddProps {
   draftTitle?: string;
   onCreate: (title: string, resolution: CreateResolution) => void;
   /** §25.8's saved shapes, for the ones that can be started from here. */
+}
+
+/**
+ * Which key the trigger prints.
+ *
+ * `navigator.platform` is deprecated and `userAgentData` is not everywhere, so
+ * this reads whichever is present and falls back to the Ctrl label — being
+ * wrong about the glyph on an unknown platform is better than throwing on one.
+ */
+function isMac(): boolean {
+  const nav = typeof navigator === "undefined" ? null : navigator;
+  if (!nav) return false;
+  const platform =
+    (nav as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ??
+    nav.platform ??
+    "";
+  return /mac/i.test(platform);
 }
 
 export function TaskQuickAdd({
@@ -95,6 +112,65 @@ export function TaskQuickAdd({
   const [priority, setPriority] = useState<TaskPriority>("none");
   const [tagNames, setTagNames] = useState<string[]>([]);
   const [isNote, setIsNote] = useState(false);
+  /**
+   * Idle or editing (POLISHED_REFERENCE_PARITY_DESIGN.md §6.1b).
+   *
+   * The reference draws a 42px row that says `할 일 추가` and nothing else,
+   * and REPLACES it with the field when it is pressed. That is a different
+   * claim from the always-open form this had: an open field is a screen asking
+   * to be typed into, and a list you came to read should not open by asking.
+   *
+   * The two never coexist — the mockup toggles `display` between them — so
+   * this is one state and not a `.is-focused` class on a field that is always
+   * there.
+   */
+  const [editing, setEditing] = useState(false);
+  const field = useRef<HTMLInputElement | null>(null);
+
+  /* Both of these stand ABOVE `resolution.enabled`'s `return null` below, and
+     that is the whole point of where they are.
+
+     They were under it at first. A Scope that takes no new Task — Completed,
+     the Trash — returns null there, so on those screens the two hooks never
+     ran and the hook count changed between renders: "Rendered fewer hooks than
+     expected", and the app came down. It survived every desktop test and fell
+     over on the first navigation from the mobile drawer to Completed, which is
+     where `navShell.spec.ts` CS-09 caught it.
+
+     A hook cannot sit behind a conditional return. `close()` is a plain
+     function and could live anywhere; it stays here so the pair reads
+     together. */
+  const open = useCallback(() => {
+    setEditing(true);
+    // After the field exists. `setEditing` has not painted yet at this point,
+    // so focusing here would be focusing nothing.
+    window.setTimeout(() => field.current?.focus(), 0);
+  }, []);
+
+  function close() {
+    setEditing(false);
+    setTitle("");
+  }
+
+  /* §2.7's `⌘N`. The mockup prints the shortcut on the trigger, which is a
+     promise; this is the half that keeps it.
+
+     Not while something else is being typed into — a Task title, a note, the
+     search field — or the shortcut would interrupt the writing it is offering
+     to start. */
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "n") return;
+      const el = document.activeElement;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (el as HTMLElement | null)?.isContentEditable) return;
+      event.preventDefault();
+      open();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
 
   const resolution = resolveCreateContext(scope, {
     inboxListId,
@@ -193,8 +269,38 @@ export function TaskQuickAdd({
     commit();
   }
 
+  /* The idle half (§6.1b). A button, not a styled div: it is pressed, it takes
+     focus, and `⌘N` and a click have to reach the same thing. */
+  if (!editing) {
+    return (
+      <div className="tm-quickadd is-idle">
+        <button
+          type="button"
+          className="tm-quickadd-trigger"
+          onClick={open}
+          /* The name is the sentence, not the sentence plus a keycap. Read
+             out, "Add a task to Inbox ⌘N" is the shortcut pronounced as part
+             of the label; `aria-keyshortcuts` is where that belongs, and the
+             kbd is then decoration. */
+          aria-label={label}
+          aria-keyshortcuts={isMac() ? "Meta+N" : "Control+N"}
+        >
+          <span className="tm-quickadd-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="14" height="14" focusable="false">
+              <path d="M12 5.5v13M5.5 12h13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </span>
+          <span className="tm-quickadd-trigger-label">{label}</span>
+          <kbd className="tm-quickadd-key" aria-hidden="true">
+            {isMac() ? "⌘N" : "Ctrl+N"}
+          </kbd>
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <form className="tm-quickadd" onSubmit={submit}>
+    <form className="tm-quickadd is-editing" onSubmit={submit}>
       {/* One quiet row, which is what the reference draws and what this was
           not (TICKTICK_COMPONENT_10 §10.1): a bordered field beside a filled
           accent button made the top of every list a FORM, and the brightest
@@ -235,9 +341,19 @@ export function TaskQuickAdd({
           )}
         </span>
       <input
+        ref={field}
         className="tm-quickadd-title"
         value={title}
         onChange={(event) => setTitle(event.target.value)}
+        /* Escape is the way back out (§2.7). It does NOT commit — leaving by
+           the door marked cancel and finding the row added anyway is the
+           worst of both. */
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          event.stopPropagation();
+          close();
+        }}
         placeholder={isNote ? t("tasks.quickAdd.notePlaceholder") : label}
         aria-label={isNote ? t("tasks.quickAdd.notePlaceholder") : label}
         /**
@@ -255,6 +371,11 @@ export function TaskQuickAdd({
           const next = event.relatedTarget as Node | null;
           if (next && event.currentTarget.form?.contains(next)) return;
           commit();
+          // Back to the trigger once the field is both empty and left. With
+          // text in it the commit above just added a row, and staying open is
+          // what lets the next one be typed straight away (§5.2's reason for
+          // keeping the date and the List).
+          if (!title.trim()) close();
         }}
       />
 

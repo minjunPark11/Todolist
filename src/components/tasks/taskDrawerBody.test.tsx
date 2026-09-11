@@ -108,11 +108,16 @@ describe("the Drawer's two bodies", () => {
     expect(screen.queryByText("Description")).toBeNull();
   });
 
-  it("keeps the notes field out of a Task that has no note", () => {
-    // The rule the whole body follows now: a section appears because the Task
-    // uses it, not because the field exists.
+  it("draws the notes field on every Task, empty", () => {
+    // The rule the rest of the body follows — a section appears because the
+    // Task uses it — no longer covers notes
+    // (POLISHED_REFERENCE_PARITY_DESIGN.md §2.6). The mockup draws `메모` and
+    // its placeholder under a rule on every Task, so the cost §2 named (an
+    // empty textarea on every Task for the sake of the few that use one) is
+    // accepted here, the same way the property rows above accept it.
     renderDrawer();
-    expect(screen.queryByLabelText("Notes")).toBeNull();
+    const notes = screen.getByLabelText("Notes") as HTMLTextAreaElement;
+    expect(notes.value).toBe("");
   });
 
   it("shows what was typed into notes elsewhere", () => {
@@ -156,15 +161,19 @@ describe("the sections a Task has to ask for", () => {
     expect(rows.slice(0, 4)).toEqual(["Add a subtask", "Tags", "Waiting on", "Notes"]);
   });
 
-  it("opens the note field, and puts the caret in it", () => {
+  it("puts the caret in the note field", () => {
+    // The row used to OPEN the field; the field is always there now (§2.6), so
+    // what is left of the action is the half that still has somewhere to go —
+    // it takes you to the box rather than making one appear. Worth keeping:
+    // the box is below the property rows, and a Detail with a long body needs
+    // scrolling to reach it.
     renderDrawer();
-    expect(screen.queryByLabelText("Notes")).toBeNull();
+    const notes = screen.getByLabelText("Notes");
+    expect(document.activeElement).not.toBe(notes);
 
     openMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "Notes" }));
 
-    const notes = screen.getByLabelText("Notes");
-    expect(notes).toBeTruthy();
     expect(document.activeElement).toBe(notes);
   });
 

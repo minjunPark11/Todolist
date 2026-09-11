@@ -79,6 +79,20 @@
   --bg-hover-content: var(--hover-row);
   --surface-2: var(--hover-icon);
 
+  /* 떠 있는 면의 두 값. 리터럴로 적었다가 되돌렸다 — `#f5f6f7`과 `#363a40`은
+     흰 바탕에서만 맞는 값이라, 다크에서 메뉴가 밝은 회색 위의 어두운 글자가
+     된다. §4.6이 "새 토큰은 :root에만, 다크는 같은 이름에 다른 값"이라고
+     적어둔 그대로 하지 않으면 정확히 이렇게 샌다. */
+  --menu-hover: #f5f6f7;
+  --menu-ink: #363a40;
+  --keycap-bg: #fafafa;
+  --hint-glyph: #8e939a;
+  --scrollbar: #dadde2;
+  /* 토스트는 라이트에서도 어두운 면이다 — 뒤집지 않는다. */
+  --toast-bg: #24262a;
+  --toast-ink: #ffffff;
+  --toast-action: #afc0ff;
+
   --selected-row: rgba(89, 111, 232, 0.055);
   --selected: var(--selected-row);
   --bg-selected: var(--selected-row);
@@ -404,6 +418,230 @@ main {
   color: var(--text-faint);
 }
 
+/* --- P6: 유휴 상태의 트리거 (§2.6, §6.1b) ---
+   42px 한 줄, 아래 1px 선. 편집 상태와 공존하지 않는다 — 컴포넌트가 둘 중
+   하나만 그린다. */
+.tm-quickadd.is-idle {
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tm-quickadd-trigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--t-ui);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--motion-fast) ease;
+}
+
+.tm-quickadd-trigger:hover {
+  color: var(--text-secondary);
+}
+
+.tm-quickadd-trigger .tm-quickadd-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-row);
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  transition: background var(--motion-fast) ease;
+}
+
+.tm-quickadd-trigger:hover .tm-quickadd-icon {
+  background: var(--accent-soft);
+}
+
+.tm-quickadd-trigger-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 키캡 (§2.6). 손가락에는 단축키가 없으므로 coarse 포인터에서는 지운다. */
+.tm-quickadd-key {
+  margin-left: auto;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-chip);
+  background: var(--keycap-bg);
+  color: var(--text-faint);
+  font-family: inherit;
+  font-size: var(--t-keycap);
+  font-weight: var(--w-strong);
+}
+
+@media (pointer: coarse) {
+  .tm-quickadd-key {
+    display: none;
+  }
+
+  .tm-quickadd-trigger {
+    min-height: 44px;
+  }
+}
+
+/* --- P7: 떠 있는 것들 (§2.6) --- */
+
+/* 팝오버 · 메뉴 · 피커 표면 */
+.ff-menu,
+.ff-popover,
+.ff-surface,
+.sched-surface,
+.tm-list-surface,
+.tm-tag-surface,
+.tm-priority-surface {
+  border: 1px solid var(--border-float);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop);
+  padding: 7px;
+}
+
+/* 메뉴 항목 — min-h 34, r6, 12.5px */
+.ff-menu-item,
+.tm-list-option,
+.tm-tag-option,
+.tm-priority-option {
+  min-height: 34px;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: var(--r-row);
+  color: var(--menu-ink);
+  font-size: var(--t-compact);
+}
+
+.ff-menu-item:hover,
+.tm-list-option:hover,
+.tm-tag-option:hover,
+.tm-priority-option:hover,
+.tm-list-option.is-active,
+.tm-tag-option.is-active {
+  background: var(--menu-hover);
+}
+
+.tm-list-option.is-selected,
+.tm-tag-option.is-selected {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+/* 표면 제목 — 10px/750, 대문자, 자간 .09em */
+.tm-list-group-head {
+  padding: 6px 8px 7px;
+  font-size: var(--t-keycap);
+  font-weight: var(--w-caps);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* 표면 안의 입력 — h34, r6 */
+.tm-list-search,
+.tm-tag-search {
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-row);
+  font-size: var(--t-compact);
+}
+
+.tm-list-search:focus,
+.tm-tag-search:focus {
+  border-color: rgba(89, 111, 232, 0.45);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* 커맨드 팔레트 (§2.6) — 실제 클래스 이름은 `cmd-menu-*`다. */
+.cmd-menu-backdrop {
+  padding-top: 12vh;
+  background: rgba(20, 22, 26, 0.18);
+  backdrop-filter: blur(2px);
+}
+
+.cmd-menu {
+  width: min(560px, calc(100vw - 40px));
+  border: 1px solid var(--border-float);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-palette);
+}
+
+.cmd-menu-input {
+  height: 52px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--t-input);
+}
+
+.cmd-menu-results {
+  max-height: 330px;
+  padding: 6px;
+}
+
+.cmd-menu-group h3 {
+  margin: 6px 8px 7px;
+  font-size: var(--t-keycap);
+  font-weight: var(--w-caps);
+  letter-spacing: 0.09em;
+  color: var(--text-faint);
+}
+
+.cmd-menu-row {
+  min-height: 40px;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: var(--r-btn);
+  color: var(--menu-ink);
+  font-size: var(--t-body);
+}
+
+.cmd-menu-row:hover,
+.cmd-menu-row.is-active {
+  background: var(--menu-hover);
+}
+
+/* 토스트 (§2.6) — 하단 중앙, 어두운 알약 */
+.tm-undo {
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 310px;
+  min-height: 44px;
+  gap: 12px;
+  padding: 0 12px 0 14px;
+  border: 0;
+  border-radius: var(--r-panel);
+  background: var(--toast-bg);
+  color: var(--toast-ink);
+  box-shadow: var(--shadow-toast);
+  font-size: var(--t-compact);
+}
+
+.tm-undo button {
+  padding: 7px 8px;
+  border-radius: var(--r-row);
+  background: transparent;
+  color: var(--toast-action);
+  font-size: var(--t-meta);
+  font-weight: var(--w-strong);
+}
+
+.tm-undo button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* ===== §2.6 태스크 행 ===== */
 
 .tm-list {
@@ -605,8 +843,18 @@ main {
   padding: 26px 24px 28px;
 }
 
+.tm-drawer-title-box {
+  min-width: 0;
+}
+
 .tm-drawer-title {
+  display: block;
+  width: 100%;
   padding: 0;
+  border: 0;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
   font-size: var(--t-detail-title);
   line-height: 27px;
   font-weight: var(--w-strong);
@@ -630,6 +878,222 @@ main {
   border-radius: var(--r-row);
 }
 
+/* --- P5: 제목 줄 (§2.6) ---
+   `30px | 1fr`, 체크와 그것이 끝내는 이름. gap 11은 실측값이다. */
+.tm-drawer-title-row {
+  display: grid;
+  /* 네 칸이다: 체크 · 제목 · (체크리스트 진행 카운트) · 모드 토글. 셋으로
+     적었더니 카운트가 있는 태스크에서 토글이 2행으로 밀렸다 — 카운트는
+     체크리스트에 항목이 있을 때만 그려지므로 평소엔 보이지 않는 버그였다.
+     없을 때 `auto`는 0으로 접히므로 빈 칸이 자리를 먹지 않는다. */
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
+  gap: 11px;
+  align-items: start;
+}
+
+.tm-drawer-done {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  min-height: 27px;
+  margin: 0;
+  padding: 0;
+}
+
+/* 메모(note)에는 완료가 없다. 칸은 남겨서 제목의 왼쪽 모서리가 흔들리지 않게 한다. */
+.tm-drawer-done.is-note {
+  visibility: hidden;
+}
+
+/* --- P5: 속성 행 (§2.6) ---
+   `64px | 1fr`에 42px 행. 라벨 폭이 고정이라 값이 세로로 정렬된다 — 그게
+   이 그리드가 스택보다 나은 유일한 이유이고, `auto`로 두면 사라진다. */
+.tm-drawer-props {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tm-drawer-prop {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  position: relative;
+  /* 좌우 음수 마진 — hover 면이 글자보다 넓게 퍼져야 행으로 읽힌다. */
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border-radius: var(--r-row);
+  transition: background var(--motion-fast) ease;
+}
+
+.tm-drawer-prop:hover {
+  background: var(--hover-icon);
+}
+
+/* 행 끝의 `›` (§2.6). 내용이 아니라 "이 행은 눌린다"는 표시라 `::after`다 —
+   DOM에 글리프를 넣으면 스크린리더가 값의 일부로 읽는다.
+
+   그리드 아이템이 아니라 absolute다. `grid-column: 2`로 두면 명시 배치가 자동
+   배치보다 먼저 일어나서 (1,2)를 이 글리프가 차지하고, 값이 2행으로 밀려난다 —
+   라벨과 값이 위아래로 쌓이고 `9월 11일`이 두 줄로 접혔다. */
+.tm-drawer-prop::after {
+  content: "›";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.42;
+  font-size: 17px;
+  line-height: 18px;
+  color: var(--hint-glyph);
+  transition: opacity var(--motion-fast) ease, transform var(--motion-fast) ease;
+  pointer-events: none;
+}
+
+.tm-drawer-prop:hover::after {
+  opacity: 0.9;
+  transform: translateY(-50%) translateX(1px);
+}
+
+.tm-drawer-prop-label {
+  font-size: var(--t-label);
+  line-height: 16px;
+  font-weight: var(--w-strong);
+  letter-spacing: 0.035em;
+  color: var(--text-label);
+}
+
+.tm-drawer-prop-value {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 24px;
+  /* `›`가 absolute로 오른쪽 8px에 서므로 값이 그 밑으로 흘러가지 않게 비워둔다. */
+  padding-right: 16px;
+  font-size: var(--t-body);
+  line-height: 20px;
+  font-weight: var(--w-ui);
+  color: var(--text-value);
+}
+
+/* 속성 행 안의 트리거는 면이 아니라 글자다 — 행 자체가 이미 hover 면을 갖는다. */
+.tm-drawer-prop-value .sched-trigger,
+.tm-drawer-prop-value .tm-list-trigger {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-value);
+  font-size: var(--t-body);
+  font-weight: var(--w-ui);
+}
+
+.tm-drawer-prop-value .sched-trigger:hover,
+.tm-drawer-prop-value .tm-list-trigger:hover,
+.tm-drawer-prop-value .tm-list-trigger[aria-expanded="true"] {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.tm-drawer-prop-value .sched-trigger svg,
+.tm-drawer-prop-value .tm-list-trigger-icon svg {
+  width: 14px;
+  height: 14px;
+  color: var(--text-prop-icon);
+}
+
+/* 오늘과 지남은 이 행에서도 자기 색을 갖는다 (§2.6). */
+.tm-drawer-prop-value .sched-trigger.is-late {
+  color: var(--danger);
+}
+
+/* 인스펙터의 태그는 알약이 아니라 `#` 접두 글자다 (§2.6) — 행 리스트와 같다. */
+.tm-drawer-tags .tm-tags-row {
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tm-drawer-tags .tm-tag-chips {
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tm-drawer-tags .tm-tag-chip {
+  max-width: none;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-value);
+  font-size: var(--t-compact);
+  line-height: 20px;
+  font-weight: var(--w-tag);
+}
+
+.tm-drawer-tags .tm-tag-chip::before {
+  content: "#";
+  margin-right: 3px;
+  color: var(--text-faint);
+}
+
+/* ×는 hover에서만. 레퍼런스의 태그 행에는 없지만 지우지는 않는다(§6.2) —
+   보이지 않을 뿐 제거는 여전히 한 번의 클릭이다. */
+.tm-drawer-tags .tm-tag-chip-remove {
+  opacity: 0;
+  transition: opacity var(--motion-fast) ease;
+}
+
+.tm-drawer-tags .tm-tag-chip:hover .tm-tag-chip-remove,
+.tm-drawer-tags .tm-tag-chip-remove:focus-visible {
+  opacity: 1;
+}
+
+.tm-drawer-tags .tm-tag-add {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-row);
+  color: var(--text-faint);
+}
+
+.tm-drawer-tags .tm-tag-add:hover {
+  background: var(--hover-icon);
+  color: var(--text-primary);
+}
+
+/* --- P5: 메모 (§2.6) --- */
+.tm-drawer-notes {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tm-drawer-notes h3 {
+  margin: 0 0 8px;
+  font-size: var(--t-label);
+  line-height: 16px;
+  font-weight: var(--w-strong);
+  letter-spacing: 0.035em;
+  color: var(--text-label);
+}
+
+.tm-drawer-notes textarea {
+  min-height: 110px;
+  font-size: var(--t-body);
+  line-height: 21px;
+  color: var(--text-secondary);
+}
+
+.tm-drawer-notes textarea::placeholder {
+  color: var(--text-faint);
+}
+
 /* ===== 떠 있는 것들 (§2.6) ===== */
 
 .ff-menu,
@@ -644,7 +1108,7 @@ main {
 
 .tm-main {
   scrollbar-width: thin;
-  scrollbar-color: #dadde2 transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 /* ===== §15.12의 바닥, 다시 세운다 =====
@@ -675,4 +1139,88 @@ main {
     min-width: 44px;
     min-height: 44px;
   }
+}
+
+/* ============================================================================
+   §4.6 — 다크는 같은 이름에 다른 값이다.
+
+   레퍼런스에 다크가 없으므로 새 값을 외삽하지 않는다. 여기 있는 것은 이 레이어가
+   새로 들인 이름들이 다크에서 무엇을 가리켜야 하는가뿐이고, 표면·글자·경계는
+   `01-base.css`의 다크 블록이 이미 정의한 것을 그대로 쓴다.
+
+   액센트는 라이트의 `#556be7`을 그대로 둘 수 없다 — 어두운 카드 위에서 3.3:1로
+   §4.4가 라이트에서 고친 것과 같은 문제가 반대 방향으로 생긴다. 같은 남보라를
+   밝은 쪽으로 올린다.
+   ========================================================================== */
+[data-theme="dark"] {
+  --bg-app: #141417;
+  --bg-rail: #08080a;
+  --bg-context-sidebar: #0e0e11;
+  --bg-surface: #1c1c1e;
+  --bg-detail: #1c1c1e;
+  --bg: #1c1c1e;
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-float: rgba(255, 255, 255, 0.1);
+
+  --hover-row: rgba(255, 255, 255, 0.05);
+  --hover-nav: rgba(255, 255, 255, 0.03);
+  --hover-icon: rgba(255, 255, 255, 0.06);
+  --hover-rail: rgba(255, 255, 255, 0.07);
+  --bg-hover-nav: var(--hover-nav);
+  --bg-hover-content: var(--hover-row);
+  --surface-2: var(--hover-icon);
+
+  --accent: #8d9cf2;
+  --accent-fill: #4f63d8;
+  --accent-soft: rgba(89, 111, 232, 0.2);
+  --accent-active: rgba(89, 111, 232, 0.24);
+  --accent-ink: #b3bef8;
+  --selected-row: rgba(141, 156, 242, 0.12);
+  --selected: var(--selected-row);
+  --bg-selected: var(--selected-row);
+  --focus-ring: rgba(141, 156, 242, 0.4);
+  --accent-ring: rgba(141, 156, 242, 0.16);
+
+  --text-primary: #f5f5f7;
+  --text-task: #ececf0;
+  --text-detail-title: #f5f5f7;
+  --text-nav: #d1d1d6;
+  --text-value: #dcdce0;
+  --text-secondary: #c7c7cc;
+  --text-meta: #a1a1a8;
+  --text-label: #9a9aa2;
+  --text-rail: #b0b0b8;
+  --text-nav-icon: #9a9aa2;
+  --text-prop-icon: #8e8e96;
+  --check-border: #6e6e78;
+  --text-faint: #8e8e96;
+  --text-tertiary: var(--text-label);
+  --text-muted: var(--text-meta);
+
+  --danger: #ff6b63;
+  --success: #4cc98a;
+
+  --menu-hover: rgba(255, 255, 255, 0.07);
+  --menu-ink: #e5e5ea;
+  --keycap-bg: rgba(255, 255, 255, 0.06);
+  --hint-glyph: #8e8e96;
+  --scrollbar: rgba(255, 255, 255, 0.22);
+  /* 라이트에서 어두웠던 토스트는 다크에서 밝을 필요가 없다 — 면과 글자를
+     한 단계씩만 올려 카드와 구별되게 한다. */
+  --toast-bg: #303035;
+  --toast-ink: #f5f5f7;
+  --toast-action: #b3bef8;
+
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.34);
+  --shadow-palette: 0 24px 60px rgba(0, 0, 0, 0.58);
+  --shadow-toast: 0 14px 34px rgba(0, 0, 0, 0.55);
+  --shadow-drawer: -18px 0 48px rgba(0, 0, 0, 0.4);
+  --shadow-sheet: 16px 0 40px rgba(0, 0, 0, 0.4);
+}
+
+/* 체크박스의 흰 속을 다크에서도 흰색으로 두면 행마다 흰 점이 박힌다. */
+[data-theme="dark"] .tm-check {
+  background: transparent;
 }
