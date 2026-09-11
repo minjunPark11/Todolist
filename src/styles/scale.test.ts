@@ -86,7 +86,12 @@ const REFERENCE = {
     "13.6px", "14px", "17px", "20px", "23px", "25px",
     "inherit", "0", "100%",
   ]),
-  weight: new Set(["400", "520", "540", "550", "600", "650", "680", "700", "750", "inherit", "normal", "bold", "initial"]),
+  // 500·560은 타임라인 정합이 연 두 칸이다
+  // (TIMELINE_REFERENCE_PARITY_DESIGN.md §6.2). 레퍼런스의 눈금·본문이 500,
+  // 진행 중 집중 시간이 560이고, 목업의 620 한 곳(`.view-option.active`)은
+  // 650으로 스냅했다 — 30 차이는 화면에서 구분되지 않고, 자에 한 칸을 더 여는
+  // 값이 아니다.
+  weight: new Set(["400", "500", "520", "540", "550", "560", "600", "650", "680", "700", "750", "inherit", "normal", "bold", "initial"]),
   radius: new Set(["0", "3px", "5px", "6px", "8px", "9px", "12px", "50%", "100%", "9999px", "inherit", "initial", "unset"]),
   space: new Set([
     "0", "1px", "2px", "3px", "4px", "5px", "6px", "7px", "8px", "9px", "10px",
@@ -109,7 +114,7 @@ const LEGACY = {
 type Ruler = { size: ReadonlySet<string>; weight: ReadonlySet<string>; radius: ReadonlySet<string>; space: ReadonlySet<string>; ease: ReadonlySet<string> };
 
 /** 레퍼런스 자로 재는 파일. 한 줄이 한 번의 마이그레이션이다. */
-const REFERENCE_FILES = new Set(["25-reference.css"]);
+const REFERENCE_FILES = new Set(["25-reference.css", "26-timeline.css"]);
 
 function rulerFor(name: string): Ruler {
   return REFERENCE_FILES.has(name) ? REFERENCE : LEGACY;

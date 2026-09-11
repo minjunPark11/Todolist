@@ -34,3 +34,6 @@
 @import "./styles/22-floating.css";
 @import "./styles/24-focus.css";
 @import "./styles/25-reference.css";
+/* 타임라인 레퍼런스 정합 (TIMELINE_REFERENCE_PARITY_DESIGN.md §6).
+   25-reference.css 다음: 액센트와 전환 토큰을 그 파일에서 물려받는다. */
+@import "./styles/26-timeline.css";
