@@ -191,6 +191,45 @@ test.describe("the Context Sidebar frame", () => {
       .toBeGreaterThan(before);
   });
 
+  // The floor applies to the frame's OWN controls too (§15.12).
+  //
+  // The drawer's test below has covered the sidebar's contents since P0-11,
+  // and the two controls on the seam — the resize handle and the collapse
+  // toggle — were outside it because they are the frame's, not the module's.
+  // The collapse toggle shipped at 22px wide because that is what the
+  // reference mockup draws, which is under this app's own minimum [실측].
+  test("CS-14 — the frame's own controls clear the floor (§15.12)", async ({ page }) => {
+    await openApp(page);
+    await expect(page.locator("#context-sidebar")).toBeVisible();
+
+    const coarse = await page.evaluate(() => window.matchMedia("(pointer: coarse)").matches);
+    // 44 for a finger; 24 for a pointer that can be aimed, which is WCAG 2.2's
+    // own minimum. Same two numbers the drawer's test reads.
+    const floor = coarse ? 44 : 24;
+
+    const tooSmall = await page
+      .locator(".context-sidebar-fold, .context-sidebar-handle")
+      .evaluateAll((nodes, min) =>
+        nodes
+          .map((node) => {
+            const box = node.getBoundingClientRect();
+            return {
+              name: String((node as HTMLElement).className).split(" ")[0],
+              w: Math.round(box.width),
+              h: Math.round(box.height),
+            };
+          })
+          // The handle is a 10px strip of paint over a wider hit area, and it
+          // is a separator rather than a button — the pointer finds it by the
+          // cursor, not by aiming at a target.
+          .filter((box) => box.name === "context-sidebar-fold")
+          .filter((box) => box.w < min || box.h < min),
+        floor,
+      );
+
+    expect({ floor, tooSmall }).toEqual({ floor, tooSmall: [] });
+  });
+
   test("CS-13 — the width the reader chose survives a collapse", async ({ page }) => {
     await openApp(page);
     await expect(page.locator("#context-sidebar")).toBeVisible();
