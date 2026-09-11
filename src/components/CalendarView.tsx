@@ -922,19 +922,6 @@ export function CalendarView({
 
   return (
     <div className="gcal-shell" ref={shellRef}>
-      <CalendarToolbar
-        mode={mode}
-        rangeLabel={rangeLabel}
-        onToday={() => {
-          clearTransient();
-          setAnchor(today);
-        }}
-        onPrev={() => shift(-1)}
-        onNext={() => shift(1)}
-        onModeChange={switchMode}
-        viewOptions={<CalendarViewOptionsMenu options={viewOptions} onChange={setViewOptions} services={services} />}
-      />
-
       <div className="gcal-body-container">
       <div className={sidebarCollapsed ? "gcal-body is-sidebar-rail" : "gcal-body"}>
         <CalendarLeftSidebar
@@ -959,6 +946,31 @@ export function CalendarView({
         />
 
         <div className="gcal-main-column">
+          {/* The toolbar lives in the MAIN column, not across the whole shell
+              (CALENDAR_REFERENCE_PARITY_DESIGN.md §3).
+
+              It used to sit above everything, crossing the sidebar. But the
+              two sides are about different things: the sidebar's `새 일정` and
+              its mini month are about this CALENDAR, while Previous/Today/Next
+              and 일·주·월·년 are about the GRID on the right. A control that
+              belongs to the grid had its left half hanging over a column it
+              does not act on, and nothing on screen said where one ended.
+
+              Moving it here is the whole of that change — the sidebar becomes
+              full height by consequence, not by a rule of its own. */}
+          <CalendarToolbar
+            mode={mode}
+            rangeLabel={rangeLabel}
+            onToday={() => {
+              clearTransient();
+              setAnchor(today);
+            }}
+            onPrev={() => shift(-1)}
+            onNext={() => shift(1)}
+            onModeChange={switchMode}
+            viewOptions={<CalendarViewOptionsMenu options={viewOptions} onChange={setViewOptions} services={services} />}
+          />
+
           <section className={isTimeGrid ? "gcal-main is-timegrid" : "gcal-main"}>
             {aiStatus === "preview" ? (
               <div className="gcal-suggestion-bar">

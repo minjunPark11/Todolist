@@ -114,7 +114,7 @@ const LEGACY = {
 type Ruler = { size: ReadonlySet<string>; weight: ReadonlySet<string>; radius: ReadonlySet<string>; space: ReadonlySet<string>; ease: ReadonlySet<string> };
 
 /** 레퍼런스 자로 재는 파일. 한 줄이 한 번의 마이그레이션이다. */
-const REFERENCE_FILES = new Set(["25-reference.css", "26-timeline.css"]);
+const REFERENCE_FILES = new Set(["25-reference.css", "26-timeline.css", "27-calendar.css"]);
 
 function rulerFor(name: string): Ruler {
   return REFERENCE_FILES.has(name) ? REFERENCE : LEGACY;
