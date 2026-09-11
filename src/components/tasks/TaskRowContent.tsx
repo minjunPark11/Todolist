@@ -26,6 +26,7 @@
 // views — the List's drag handle and its ⋯ menu, the Board's move-to-column
 // select, the matrix card's drag-to-a-day. Those are not a row; they are what
 // the view does with a row.
+import { memo } from "react";
 import type { Language, Tag, Task } from "../../types";
 import { isCompleted, isNote } from "../../domain/tasks/taskState";
 import { useT } from "../../i18n";
@@ -154,7 +155,27 @@ function firstLine(text: string): string {
   const cut = text.indexOf(String.fromCharCode(10));
   return (cut === -1 ? text : text.slice(0, cut)).trim();
 }
-export function TaskRowContent({
+/**
+ * Memoized, and the one component in this app where that is worth the words.
+ *
+ * A row is drawn once per Task, and every screen that draws rows draws all of
+ * them — there is no windowing. So a store change anywhere (a tick of a focus
+ * session, a Google sync landing, a checkbox on one other row) re-rendered
+ * every row on screen, and a row is not cheap: it formats a date in the
+ * reader's language, asks for a countdown or a weekday name, reads the week
+ * start off the document, and lays out some thirty elements.
+ *
+ * Almost none of that changes when some OTHER task does. The props are the
+ * task itself plus primitives and one tag array, and the task objects are
+ * shared structurally — an edit replaces the one task it edits and leaves the
+ * rest identical — so the default shallow compare is exactly the right
+ * question, and for every row but the edited one the answer is "nothing".
+ *
+ * What this costs is a rule for callers: `onOpen` and `onToggleDone` have to
+ * be stable, or the compare fails on them every time and the memo does
+ * nothing. `useStableCallback` is how the callers here hold up their end.
+ */
+export const TaskRowContent = memo(function TaskRowContent({
   task,
   onOpen,
   onToggleDone,
@@ -350,4 +371,4 @@ export function TaskRowContent({
       </button>
     </>
   );
-}
+});

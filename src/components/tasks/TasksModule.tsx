@@ -8,6 +8,7 @@
 //
 // List rendering only, per §16.26 — Board and the rich Drawer come later.
 import { useMemo, useState } from "react";
+import { useStableCallback } from "../../hooks/useStableCallback";
 import type {
   Folder,
   List,
@@ -445,9 +446,14 @@ export function TasksModule(props: TasksModuleProps) {
    * exists means the store is mid-something, not that the reader needs a
    * dangling name.
    */
+  // Indexed for the same reason `tagsOf` above is: this is asked once per row,
+  // and a `find` per row over every Task is the list drawing itself in time
+  // proportional to the square of its length.
+  const titleById = useMemo(() => new Map(tasks.map((row) => [row.id, row.title])), [tasks]);
+
   function parentTitleOf(task: Task): string {
     if (!task.parentTaskId) return "";
-    return tasks.find((row) => row.id === task.parentTaskId)?.title ?? "";
+    return titleById.get(task.parentTaskId) ?? "";
   }
 
   const scopeMenuItems: MoreMenuItem[] = [
@@ -529,10 +535,13 @@ export function TasksModule(props: TasksModuleProps) {
    * belongs in no link and survives no reload — and does not need to: with no
    * anchor the popup centres itself.
    */
-  function openTask(taskId: string, anchor?: Rect) {
+  // Stable, because every row on screen holds it: see `TaskRowContent`. It
+  // reads `state` and `onNavigate`, both of which change freely, so a
+  // dependency list would have to name them and would change with them.
+  const openTask = useStableCallback((taskId: string, anchor?: Rect) => {
     setTaskAnchor(anchor ?? null);
     onNavigate(taskUrlFor({ ...state, taskId }));
-  }
+  });
 
   function closeTask() {
     setTaskAnchor(null);
@@ -629,7 +638,11 @@ export function TasksModule(props: TasksModuleProps) {
   });
   // Pulled out by name because the rows and the two menus below call them on
   // every line; the Detail takes `commands` whole.
-  const { mutate, toggleDone, runTaskAction } = commands;
+  const { mutate, runTaskAction } = commands;
+  // The rows' other held handler, stabilised here rather than in
+  // `useTaskCommands`: the Detail takes `commands` whole and re-renders with
+  // this module anyway, so the rows are the only caller that needs it fixed.
+  const toggleDone = useStableCallback(commands.toggleDone);
 
   /** The registry's answer for this Task, as rows a menu can draw. */
   function actionItemsFor(task: Task, groupIds: readonly string[], promoted?: TaskActionId[]) {
