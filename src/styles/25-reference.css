@@ -99,12 +99,14 @@
   --focus-ring: rgba(89, 111, 232, 0.25);
   --accent-ring: rgba(89, 111, 232, 0.08);
 
-  /* --- §5.3 액센트 (§4.4 보정: #596FE8 → #556BE7, 4.32 → 4.52) --- */
-  --accent: #556be7;
-  --accent-fill: var(--accent);
-  --accent-soft: #eef1ff;
-  --accent-active: #eef1ff;
-  --accent-ink: #3348b6;
+  /* --- §5.3 액센트 (§4.4 보정: #596FE8 → #556BE7, 4.32 → 4.52) ---
+
+     `--accent` 자체는 여기서 정의하지 않는다. `App.tsx`가 `data-accent`를 항상
+     쓰고, `01-base.css`의 `[data-accent="purple"]` 따위는 `:root`와 같은
+     (0,1,0)인데 이 파일이 나중에 로드된다 — 여기 한 줄을 적으면 그 넷을 전부
+     덮어서 **고른 색이 화면에 도달하지 않는다.** 실제로 그렇게 죽여놨었다.
+
+     값은 아래 `[data-accent="blue"]`에서 기본값 자리만 갈아끼운다. */
   --ff-blue: var(--accent);
   --ff-blue-soft: var(--accent-soft);
   --ff-focus-ring: var(--accent);
@@ -194,6 +196,33 @@
   /* §2.1 그리드 */
   --rail-w: 52px;
   --rail-item: 40px;
+}
+
+/* ============================================================================
+   액센트 선택을 되살린다.
+
+   `App.tsx`가 `data-accent`를 항상 쓴다(기본값 "blue"). `01-base.css`의
+   `[data-accent="purple"]` 따위는 특정도가 `:root`와 같은 (0,1,0)이고, 이
+   파일이 나중에 로드되므로 — 여기 `:root`에 `--accent`를 적는 것만으로
+   **purple·green·orange·pink 선택이 전부 죽었다.** 고른 색이 화면에 도달하지
+   않는다. 스크린샷에서 파랑이 제대로 나와서 오래 못 알아봤다: 기본값이 blue라
+   맞는 것처럼 보였을 뿐이다.
+
+   그래서 기본값은 `blue` 자리에서 갈아끼우고, 나머지 넷은 건드리지 않는다.
+   ========================================================================== */
+[data-accent="blue"] {
+  --accent: #556be7;
+  --accent-fill: var(--accent);
+  --accent-soft: #eef1ff;
+  --accent-active: #eef1ff;
+  --accent-ink: #3348b6;
+}
+
+/* `--accent-ink`는 연면 위에 얹는 글자색이고, 위 블록의 것은 파랑 전용이다.
+   다른 색을 고른 사람에게 남보라 잉크를 얹으면 색이 둘 섞인다 — 그 자리에는
+   자기 액센트가 잉크다. */
+:root:not([data-accent="blue"]) {
+  --accent-ink: var(--accent);
 }
 
 /* §4.1 — Inter가 라틴을, Pretendard가 한글을 가져간다. 순서가 레퍼런스와 같다. */
