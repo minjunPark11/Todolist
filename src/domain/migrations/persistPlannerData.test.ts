@@ -20,7 +20,12 @@ import {
   LEGACY_LOCAL_SPACES_MIGRATED_KEY,
 } from "../../lib/spaces/legacyLocalSpaces";
 import type { PlannerData } from "../../types";
-import { persistPlannerData, PLANNER_STORAGE_KEY, FOCUS_V2_BACKUP_KEY } from "./persistPlannerData";
+import {
+  persistPlannerData,
+  resetFocusBackupCheckForTests,
+  PLANNER_STORAGE_KEY,
+  FOCUS_V2_BACKUP_KEY,
+} from "./persistPlannerData";
 
 function plannerData(): PlannerData {
   return {
@@ -52,6 +57,9 @@ describe("persistPlannerData", () => {
   beforeEach(() => {
     storage.clear();
     failPlannerWrite = false;
+    // The legacy look happens once per session, not once per write. Each test
+    // here IS a fresh session, and they share one module instance.
+    resetFocusBackupCheckForTests();
   });
   it("backs up the exact legacy snapshot only once before rewriting focus data", () => {
     const original = JSON.stringify({focusSessions:[{id:"old",accumulatedSeconds:73}]});

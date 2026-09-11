@@ -28,7 +28,8 @@
 // (a List, a tag, the deletion of a deadline), so a box that would need one of
 // those REFUSES the card while it is still in the air rather than rewriting
 // what the task belongs to.
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useStableCallback } from "../hooks/useStableCallback";
 import { AnimatePresence } from "framer-motion";
 import type { List, Tag, Task, TaskPriority, TaskTag } from "../types";
 import { tagsByTaskId } from "../domain/tags/tags";
@@ -72,6 +73,11 @@ import { MotionTaskRow } from "./motion/MotionTaskRow";
 import { TaskRowContent } from "./tasks/TaskRowContent";
 import { useT } from "../i18n";
 import type { Rect } from "../domain/floating";
+
+// One array for every card that has no tags. A fresh `[]` is a different
+// array, and a different array is a changed prop — enough on its own to put
+// every untagged card back on screen for any change anywhere on the page.
+const NO_TAGS: Tag[] = [];
 
 const ALL_LISTS = "";
 
@@ -125,10 +131,10 @@ export function MatrixPage({
   tasks,
   lists,
   selectedTaskId,
-  onOpenTask,
+  onOpenTask: openTaskProp,
   onUpdateTask,
   onCreateTask,
-  onToggleDone,
+  onToggleDone: toggleDoneProp,
   onDeleteTask,
   quadrantViews,
   onChangeQuadrantView,
@@ -144,6 +150,20 @@ export function MatrixPage({
   const today = todayValue();
   const [listId, setListId] = useState<string>(ALL_LISTS);
   const [draggingId, setDraggingId] = useState("");
+  /**
+   * The page's two card handlers, fixed at this boundary.
+   *
+   * They arrive from `App`, which rebuilds them on every store change, and
+   * they reach every card in all four boxes. Left as they arrive they are a
+   * changed prop on every card, and `MatrixCard`'s memo never gets to say no
+   * — so the whole matrix redraws whenever anything anywhere in the store
+   * moves. Fixing them here rather than at the source keeps the change to the
+   * component that has the memoized children.
+   */
+  const onOpenTask = useStableCallback(openTaskProp);
+  const onToggleDone = useStableCallback(toggleDoneProp);
+  // Held by every card too, and an inline arrow at four call sites below.
+  const clearDragging = useStableCallback(() => setDraggingId(""));
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [editing, setEditing] = useState<MatrixQuadrant | "">("");
   /**
@@ -505,7 +525,7 @@ export function MatrixPage({
             onOpenTask={onOpenTask}
             onToggleDone={onToggleDone}
             onDragStart={setDraggingId}
-            onDragEnd={() => setDraggingId("")}
+            onDragEnd={clearDragging}
             onDropTask={(taskId) => handleDrop(taskId, quadrant)}
             onAdd={(title) => handleAdd(quadrant, title)}
           />
@@ -533,7 +553,7 @@ export function MatrixPage({
           onOpenTask={onOpenTask}
           onToggleDone={onToggleDone}
           onDragStart={setDraggingId}
-          onDragEnd={() => setDraggingId("")}
+          onDragEnd={clearDragging}
         />
       ) : null}
       {menu ? <ContextMenu state={menu} onClose={() => setMenu(null)} /> : null}
@@ -799,13 +819,13 @@ function UnmatchedStrip({
               key={task.id}
               task={task}
               lists={lists}
-              tags={tagsOf.get(task.id) ?? []}
+              tags={tagsOf.get(task.id) ?? NO_TAGS}
               today={today}
               selected={task.id === selectedTaskId}
               isDragging={task.id === draggingId}
-              onOpen={(_id, anchor) => onOpenTask(task.id, anchor)}
-              onToggleDone={() => onToggleDone(task.id)}
-              onDragStart={() => onDragStart(task.id)}
+              onOpen={onOpenTask}
+              onToggleDone={onToggleDone}
+              onDragStart={onDragStart}
               onDragEnd={onDragEnd}
             />
           ))}
@@ -942,13 +962,13 @@ function MatrixGroupSection({
                 key={task.id}
                 task={task}
                 lists={lists}
-                tags={tagsOf.get(task.id) ?? []}
+                tags={tagsOf.get(task.id) ?? NO_TAGS}
                 today={today}
                 selected={task.id === selectedTaskId}
                 isDragging={task.id === draggingId}
-                onOpen={(_id, anchor) => onOpenTask(task.id, anchor)}
-                onToggleDone={() => onToggleDone(task.id)}
-                onDragStart={() => onDragStart(task.id)}
+                onOpen={onOpenTask}
+                onToggleDone={onToggleDone}
+                onDragStart={onDragStart}
                 onDragEnd={onDragEnd}
               />
             ))}
@@ -979,7 +999,7 @@ function MatrixGroupSection({
  *
  * It was 90 lines of its own tick, its own icons and its own date until §28.
  */
-function MatrixCard({
+const MatrixCard = memo(function MatrixCard({
   task,
   lists,
   tags,
@@ -997,12 +1017,24 @@ function MatrixCard({
   today: string;
   selected: boolean;
   isDragging: boolean;
+  /**
+   * The page's handlers, as the page writes them — each takes the id of the
+   * task it acts on, and the card supplies its own.
+   *
+   * They used to arrive already bound, as four inline arrows per card. That is
+   * four new functions on every render of the box, which is a changed prop on
+   * every card in it, which is every card redrawing whenever anything on the
+   * page moved. Binding here instead costs nothing and lets the memo above
+   * actually answer "no".
+   */
   onOpen: (taskId: string, anchor?: Rect) => void;
-  onToggleDone: () => void;
-  onDragStart: () => void;
+  onToggleDone: (taskId: string) => void;
+  onDragStart: (taskId: string) => void;
   onDragEnd: () => void;
 }) {
   const list = lists.find((candidate) => candidate.id === listIdFor(task, lists));
+  // The row hands back the whole task; the page wants the id.
+  const toggleDone = useStableCallback((row: Task) => onToggleDone(row.id));
 
   return (
     <MotionTaskRow
@@ -1015,7 +1047,7 @@ function MatrixCard({
         // it, so a card can be dragged from here onto a day to schedule it.
         event.dataTransfer.setData("text/task", task.id);
         event.dataTransfer.effectAllowed = "move";
-        onDragStart();
+        onDragStart(task.id);
       }}
       onNativeDragEnd={onDragEnd}
     >
@@ -1037,8 +1069,8 @@ function MatrixCard({
         tagPlacement="tips"
         showPriority={false}
         onOpen={onOpen}
-        onToggleDone={() => onToggleDone()}
+        onToggleDone={toggleDone}
       />
     </MotionTaskRow>
   );
-}
+});
