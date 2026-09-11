@@ -85,8 +85,21 @@ function rowLabels(page: Page) {
   return page.locator(".ff-timeline-label-text");
 }
 
-function showCompleted(page: Page) {
-  return page.locator(".ff-timeline-toggle input[type='checkbox']");
+/** Flip one of the two `View` switches, by the words on it (§9.4). */
+async function toggleDisplay(page: Page, label: string): Promise<void> {
+  await page.getByRole("button", { name: "View" }).click();
+  await page.getByRole("menuitemcheckbox", { name: label, exact: true }).click();
+  await page.keyboard.press("Escape");
+}
+
+/** Whether that switch is on, read without opening anything twice. */
+async function displayState(page: Page, label: string): Promise<boolean> {
+  await page.getByRole("button", { name: "View" }).click();
+  const on = await page
+    .getByRole("menuitemcheckbox", { name: label, exact: true })
+    .getAttribute("aria-checked");
+  await page.keyboard.press("Escape");
+  return on === "true";
 }
 
 test.describe("the timeline's completed work", () => {
@@ -96,7 +109,7 @@ test.describe("the timeline's completed work", () => {
     await openGantt(page);
     // D12: shown by default, and one click from gone. Before the fix this row
     // never arrived at all.
-    await expect(showCompleted(page)).toBeChecked();
+    expect(await displayState(page, "Show completed")).toBe(true);
     await expect(rowLabels(page)).toHaveText(["Already finished", "Still going"]);
   });
 
@@ -108,10 +121,10 @@ test.describe("the timeline's completed work", () => {
 
   test("goes when the switch is turned off, and the open work stays", async ({ page }) => {
     await openGantt(page);
-    await showCompleted(page).uncheck();
+    await toggleDisplay(page, "Show completed");
     await expect(rowLabels(page)).toHaveText(["Still going"]);
 
-    await showCompleted(page).check();
+    await toggleDisplay(page, "Show completed");
     await expect(rowLabels(page)).toHaveText(["Already finished", "Still going"]);
   });
 

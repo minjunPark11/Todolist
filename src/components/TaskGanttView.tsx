@@ -13,7 +13,7 @@
 // (G-GANTT-01, §0.3.5): any one date produces a bar, only an Item with none
 // stays off the grid, and an inferred start is marked rather than stored. This
 // component asks that module and draws the answer.
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Project, Task } from "../types";
 import { completeTask, reopenTask, type TaskMutation } from "../domain/tasks/mutations";
 import { isCompleted } from "../domain/tasks/taskState";
@@ -31,7 +31,8 @@ import {
   type TimelineZoom,
 } from "../domain/view/timeline";
 import { TimelineView, TRAY_DRAG_MIME, type TimelineBand } from "./TimelineView";
-import { EmptyState } from "./kit";
+import { EmptyState, MoreMenu } from "./kit";
+import { Caret } from "./common/Caret";
 import type { Rect } from "../domain/floating";
 import { useT } from "../i18n";
 
@@ -60,6 +61,15 @@ interface TaskGanttViewProps {
    * was written that everything on it can be.
    */
   onMutateTask?: (task: Task, mutation: TaskMutation) => void;
+  /**
+   * The Scope's name and count, for the head's left-hand utility row (§2.2).
+   *
+   * Passed in rather than built here: the Scope owns its own title, and this
+   * component has been scope-free by construction since §50C.29. On desktop
+   * the page header is folded away and this is the only place the name
+   * appears; below 960 the header comes back and CSS hides this instead.
+   */
+  workspaceTitle?: ReactNode;
 }
 
 export function TaskGanttView({
@@ -73,6 +83,7 @@ export function TaskGanttView({
   onOpenItem,
   barColorOf,
   onMutateTask,
+  workspaceTitle,
 }: TaskGanttViewProps) {
   const { t, lang } = useT();
   // Five weeks: long enough to hold a piece of work end to end, short
@@ -100,6 +111,16 @@ export function TaskGanttView({
   const [draggingChip, setDraggingChip] = useState(false);
   // D12: shown by default, and one click from gone.
   const [showDone, setShowDone] = useState(true);
+  /**
+   * The reference's `마일스톤 표시` (§4.5, §12.5).
+   *
+   * On by default, and it is the switch worth watching: the reference has four
+   * milestones among twelve tasks, while GANTT §14 records that the standard
+   * record in THIS app is one day long — so turning this off may empty most of
+   * the grid rather than tidying it. Shipped on, and re-read once there is
+   * real data behind it.
+   */
+  const [showMilestones, setShowMilestones] = useState(true);
   /**
    * Pressed `오늘`, so put today back on screen (§17).
    *
@@ -217,53 +238,121 @@ export function TaskGanttView({
     if (mutation) onMutateTask(task, mutation);
   }
 
-  return (
-    <div className="tgv">
-      <div className="ff-timeline-bar-controls">
-        <div className="ff-timeline-nav">
-          <button type="button" className="ff-btn ff-btn-sm" onClick={() => setAnchor(shiftWindow(window, -1))}>
-            ‹ {t("timeline.prev")}
-          </button>
-          {/* Two things at once since §17, and never disabled.
-              It sets the window back to the one today is in — which is what it
-              always did — and asks the grid to scroll to the moment, which is
-              new and is why `isCurrentWindow` no longer switches it off: a
-              `6개월` track is about two and a half screens wide, so "today is
-              in this window" and "today is on this screen" stopped being the
-              same sentence the moment the track outgrew the fold. */}
-          <button
-            type="button"
-            className="ff-btn ff-btn-sm"
-            onClick={() => {
-              setAnchor(today);
-              setRecenterKey((key) => key + 1);
-            }}
-          >
-            {t("timeline.today")}
-          </button>
-          <button type="button" className="ff-btn ff-btn-sm" onClick={() => setAnchor(shiftWindow(window, 1))}>
-            {t("timeline.next")} ›
-          </button>
-          <span className="ff-timeline-range">
-            {window.from} – {window.to}
-          </span>
-        </div>
-        <label className="ff-board-control">
-          <span>{t("timeline.zoom")}</span>
-          <select value={zoom} onChange={(event) => setZoom(event.target.value as TimelineZoom)}>
-            {ZOOMS.map((option) => (
-              <option key={option} value={option}>
-                {t(`timeline.zoom.${option}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="ff-timeline-toggle">
-          <input type="checkbox" checked={showDone} onChange={(event) => setShowDone(event.target.checked)} />
-          <span>{t("timeline.showDone")}</span>
-        </label>
+  /**
+   * The 42px utility row, which lives in the timeline's own head now
+   * (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.2).
+   *
+   * It was a wrapped flex row of its own above the grid: two `ff-btn`s and a
+   * `Today`, a `<select>` with a `Zoom` label beside it, and a checkbox
+   * spelling out `Show completed`. Three different control languages in one
+   * line, none of them the reference's.
+   *
+   * The reference puts one row inside the head — paging on the left, the
+   * scale and what the grid SHOWS on the right — and makes every one of them
+   * quiet: no borders, no fills, a tint on hover. The window's date range went
+   * with the row; the ruler under it says the same thing and says it in the
+   * place the reader is already looking.
+   */
+  const controls = (
+    <>
+      {/* Previous / Today / Next. Three independent quiet buttons rather than
+          a bordered capsule — V15's last word on this control, and the reason
+          is that a capsule reads as one thing with three parts while these are
+          three separate moves. */}
+      <div className="ff-timeline-nav" role="group" aria-label={t("timeline.navigate")}>
+        <button
+          type="button"
+          className="ff-timeline-step"
+          aria-label={t("timeline.prev")}
+          title={t("timeline.prev")}
+          onClick={() => setAnchor(shiftWindow(window, -1))}
+        >
+          <Chevron direction="left" />
+        </button>
+        {/* Two things at once since §17, and never disabled.
+            It sets the window back to the one today is in — which is what it
+            always did — and asks the grid to scroll to the moment, which is
+            new and is why `isCurrentWindow` no longer switches it off: a
+            `6개월` track is about two and a half screens wide, so "today is
+            in this window" and "today is on this screen" stopped being the
+            same sentence the moment the track outgrew the fold. */}
+        <button
+          type="button"
+          className="ff-timeline-step is-today"
+          onClick={() => {
+            setAnchor(today);
+            setRecenterKey((key) => key + 1);
+          }}
+        >
+          {t("timeline.today")}
+        </button>
+        <button
+          type="button"
+          className="ff-timeline-step"
+          aria-label={t("timeline.next")}
+          title={t("timeline.next")}
+          onClick={() => setAnchor(shiftWindow(window, 1))}
+        >
+          <Chevron direction="right" />
+        </button>
       </div>
 
+      <div className="ff-timeline-control-spacer" />
+
+      {/* The scale, saying its own value. A `<select>` said `Zoom` beside a
+          box; this says `1주`, which is the fact the reader wants back from
+          it. `options` and not `choices` — a zoom is words, not shapes. */}
+      <MoreMenu
+        label={t("timeline.zoom")}
+        triggerClassName="ff-timeline-control"
+        icon={
+          <>
+            <span>{t(`timeline.zoom.${zoom}`)}</span>
+            <Caret open={false} />
+          </>
+        }
+        items={[
+          {
+            heading: t("timeline.zoom"),
+            options: ZOOMS.map((option) => ({
+              id: option,
+              label: t(`timeline.zoom.${option}`),
+              selected: option === zoom,
+              onClick: () => setZoom(option),
+            })),
+          },
+        ]}
+      />
+
+      {/* What the grid SHOWS. Two independent switches, so two
+          `menuitemcheckbox` rows rather than one closed choice (§9.4). */}
+      <MoreMenu
+        label={t("timeline.display")}
+        triggerClassName="ff-timeline-control"
+        icon={
+          <>
+            <span>{t("timeline.display")}</span>
+            <Caret open={false} />
+          </>
+        }
+        items={[
+          {
+            label: t("timeline.showDone"),
+            checked: showDone,
+            onClick: () => setShowDone((on) => !on),
+          },
+          {
+            label: t("timeline.showMilestones"),
+            checked: showMilestones,
+            onClick: () => setShowMilestones((on) => !on),
+          },
+        ]}
+      />
+    </>
+  );
+
+  return (
+    <div className="tgv">
       {/* §3.1: the panel takes a COLUMN beside the grid rather than lying
           over it. The reference lies over the days it does not need; it can,
           because it scrolls sideways — and since §17 so do we, which removes
@@ -294,6 +383,9 @@ export function TaskGanttView({
           trayDragging={draggingChip}
           onDropTray={onMutateTask ? handleTrayDrop : undefined}
           recenterKey={recenterKey}
+          controls={controls}
+          workspaceTitle={workspaceTitle}
+          showMilestones={showMilestones}
         />
       )}
 
@@ -352,6 +444,29 @@ export function TaskGanttView({
       ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * The paging arrows (§2.2).
+ *
+ * Drawn rather than typed. `‹` and `›` are punctuation from the text font —
+ * a different weight and optical size from the app's icons — and the
+ * reference's arrows are 14px strokes on the same 24 grid as everything else
+ * in the rail and the menus.
+ */
+function Chevron({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+      <path
+        d={direction === "left" ? "M14 6l-6 6 6 6" : "M10 6l6 6-6 6"}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

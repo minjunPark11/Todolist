@@ -79,7 +79,19 @@ async function openTimeline(page: Page): Promise<void> {
   // A week, not the default month. The bar's own text is what carries the
   // click that matters here, and below 80px the container query takes it away
   // (§11) — at month zoom a six-day task is 40px of a five-column grid.
-  await page.locator(".ff-board-control select").selectOption("week");
+  await zoomTo(page, "1 week");
+}
+
+/**
+ * Pick a zoom (TIMELINE_REFERENCE_PARITY_DESIGN.md §9.4).
+ *
+ * The `<select>` became a control that says its own value over a menu of
+ * `menuitemradio` rows, so this is two presses — and it takes the LABEL a
+ * reader sees (`1 week`) rather than the zoom's id.
+ */
+async function zoomTo(page: Page, label: string): Promise<void> {
+  await page.getByRole("button", { name: "Zoom" }).click();
+  await page.getByRole("menuitemradio", { name: label, exact: true }).click();
 }
 
 function row(page: Page, title: string) {
@@ -184,7 +196,7 @@ test.describe("the mark for today", () => {
 
   test("is a chip in the ruler over a line down the grid", async ({ page }) => {
     await openTimeline(page);
-    await page.locator(".ff-board-control select").selectOption("week");
+    await zoomTo(page, "1 week");
 
     const line = page.locator(".ff-timeline-now-line");
     const chip = page.locator(".ff-timeline-now-chip");
@@ -196,10 +208,8 @@ test.describe("the mark for today", () => {
   // four of five zooms; `windowFraction` answers it at all of them.
   test("is drawn at every zoom", async ({ page }) => {
     await openTimeline(page);
-    const select = page.locator(".ff-board-control select");
-
-    for (const zoom of ["day", "week", "month", "halfYear", "year"]) {
-      await select.selectOption(zoom);
+    for (const zoom of ["1 day", "1 week", "1 month", "6 months", "1 year"]) {
+      await zoomTo(page, zoom);
       await expect(page.locator(".ff-timeline-now-chip"), `missing at ${zoom}`).toHaveCount(1);
     }
   });
@@ -209,7 +219,7 @@ test.describe("the mark for today", () => {
   // and the line is centred on the instant.
   test("puts the chip over the line", async ({ page }) => {
     await openTimeline(page);
-    await page.locator(".ff-board-control select").selectOption("week");
+    await zoomTo(page, "1 week");
 
     const lineBox = await page.locator(".ff-timeline-now-line").boundingBox();
     const chipBox = await page.locator(".ff-timeline-now-chip").boundingBox();
@@ -226,7 +236,7 @@ test.describe("the mark for today", () => {
   // by time — the bug the reference has and §7.2 refuses.
   test("lands a band edge on the rule it names", async ({ page }) => {
     await openTimeline(page);
-    await page.locator(".ff-board-control select").selectOption("month");
+    await zoomTo(page, "1 month");
 
     const bands = page.locator(".ff-timeline-band");
     await expect(bands).toHaveCount(2);

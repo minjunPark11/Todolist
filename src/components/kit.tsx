@@ -228,17 +228,23 @@ export function MoreMenu({
   // component because what they open is identical (TODAY_TICKTICK_REDESIGN.md
   // §3.4).
   icon = "⋯",
+  // A trigger that says its current VALUE rather than wearing a glyph — the
+  // timeline's `1주 ⌄` (TIMELINE_REFERENCE_PARITY_DESIGN.md §9.4). Still the
+  // same menu underneath, which is the whole reason this is a parameter and
+  // not a second component.
+  triggerClassName = "ff-icon-btn",
 }: {
   items: MoreMenuItem[];
   label?: string;
-  icon?: string;
+  icon?: ReactNode;
+  triggerClassName?: string;
 }) {
   const { t } = useT();
   const resolvedLabel = label ?? t("common.more");
   return (
     <div className="ff-anchor" onClick={(e) => e.stopPropagation()}>
       <Popover type="menu" placement="bottom-end">
-        <PopoverTrigger className="ff-icon-btn" aria-label={resolvedLabel}>
+        <PopoverTrigger className={triggerClassName} aria-label={resolvedLabel}>
           {icon}
         </PopoverTrigger>
         <PopoverContent label={resolvedLabel} role="menu">
@@ -264,6 +270,73 @@ function MoreMenuItems({ items }: { items: MoreMenuItem[] }) {
         // word saying what they are a choice OF — and it is the group's
         // accessible name too, rather than a second string saying the same
         // thing in a place only some readers get.
+        // A closed choice drawn as LABELLED ROWS rather than as a row of
+        // icons (TIMELINE_REFERENCE_PARITY_DESIGN.md §9.4).
+        //
+        // The icon form below says "this is a choice OF shapes" — three views,
+        // three sizes — and its own comment refuses to be a general way of
+        // making menus smaller. A zoom is not a shape: `1주` and `6개월` are
+        // words, and drawing them as glyphs would be inventing a picture for
+        // a number. Same role (`menuitemradio`), same arrow walk, one row each.
+        if (item.options) {
+          const headingId = `${surfaceId}-${index}`;
+          return (
+            <div key={index} className="ff-menu-group">
+              {item.heading ? (
+                <p className="ff-menu-heading" id={headingId}>
+                  {item.heading}
+                </p>
+              ) : null}
+              <div role="group" aria-labelledby={item.heading ? headingId : undefined}>
+                {item.options.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={option.selected}
+                    className={`ff-menu-item${option.selected ? " is-on" : ""}`}
+                    onClick={() => {
+                      close();
+                      option.onClick();
+                    }}
+                  >
+                    <span>{option.label}</span>
+                    <span className="ff-menu-tick" aria-hidden="true">
+                      {option.selected ? "✓" : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        // An independent on/off (§9.4). NOT `options`: two switches that can
+        // both be on are not one closed choice, and `menuitemradio` would
+        // announce them as if turning one on turned the other off.
+        if (item.checked !== undefined) {
+          return (
+            <button
+              key={index}
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={item.checked}
+              className={`ff-menu-item${item.checked ? " is-on" : ""}`}
+              /* Deliberately NOT closed first, unlike every other item here.
+                 These toggle what the screen behind the menu SHOWS, and the
+                 reference lets a reader turn two of them on without reopening
+                 the menu between. Nothing is removed under the focus, which is
+                 the case the close-first rule was written for. */
+              onClick={() => item.onClick?.()}
+            >
+              <span>{item.label}</span>
+              <span className="ff-menu-tick" aria-hidden="true">
+                {item.checked ? "✓" : ""}
+              </span>
+            </button>
+          );
+        }
+
         if (item.choices) {
           const headingId = `${surfaceId}-${index}`;
           return (
@@ -354,6 +427,28 @@ export interface MoreMenuItem {
    * row: this is not a general-purpose way to make a menu smaller.
    */
   choices?: MoreMenuChoice[];
+  /**
+   * One closed choice drawn as labelled rows (§9.4).
+   *
+   * `choices` for a choice of SHAPES, this for a choice of words. A zoom is
+   * words: `1주` and `6개월` have no picture that says them.
+   */
+  options?: MoreMenuOption[];
+  /**
+   * An independent on/off, drawn with a tick (§9.4).
+   *
+   * `undefined` leaves the row an ordinary action; `false` draws it unticked.
+   * Separate from `options` because two switches that can both be on are not
+   * one closed choice.
+   */
+  checked?: boolean;
+}
+
+export interface MoreMenuOption {
+  id: string;
+  label: string;
+  selected: boolean;
+  onClick: () => void;
 }
 
 export interface MoreMenuChoice {

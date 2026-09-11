@@ -93,8 +93,17 @@ async function openTimeline(page: Page): Promise<void> {
 }
 
 const scroll = (page: Page) => page.locator(".ff-timeline-scroll");
-const zoomTo = (page: Page, value: string) =>
-  page.locator(".ff-board-control select").selectOption(value);
+/**
+ * Pick a zoom (TIMELINE_REFERENCE_PARITY_DESIGN.md §9.4).
+ *
+ * The `<select>` became a control that says its own value over a menu of
+ * `menuitemradio` rows, so this is two presses — and it takes the LABEL a
+ * reader sees (`1 week`) rather than the zoom's id.
+ */
+async function zoomTo(page: Page, label: string): Promise<void> {
+  await page.getByRole("button", { name: "Zoom" }).click();
+  await page.getByRole("menuitemradio", { name: label, exact: true }).click();
+}
 
 async function metrics(page: Page) {
   return scroll(page).evaluate((node) => ({
@@ -113,17 +122,17 @@ test.describe("a track as wide as its days", () => {
   test("fills at the short zooms and overflows at the long ones", async ({ page }) => {
     await openTimeline(page);
 
-    for (const zoom of ["day", "week", "month"]) {
+    for (const zoom of ["1 day", "1 week", "1 month"]) {
       await zoomTo(page, zoom);
       const { scrollWidth, clientWidth } = await metrics(page);
       expect(scrollWidth, `${zoom} should not scroll`).toBe(clientWidth);
     }
 
-    await zoomTo(page, "halfYear");
+    await zoomTo(page, "6 months");
     const half = await metrics(page);
     expect(half.scrollWidth).toBeGreaterThan(half.clientWidth);
 
-    await zoomTo(page, "year");
+    await zoomTo(page, "1 year");
     const year = await metrics(page);
     // A year is twice the window of six months at half the scale, so the two
     // tracks are close in length — the coarser zoom buys time, not distance.
@@ -135,7 +144,7 @@ test.describe("a track as wide as its days", () => {
   // longer than a task with none. It was not — 13.5px against 19.8 [실측].
   test("draws a span wider than a single date, at the longest zoom", async ({ page }) => {
     await openTimeline(page);
-    await zoomTo(page, "year");
+    await zoomTo(page, "1 year");
 
     // By key rather than by title: `Row 1` is a prefix of `Row 10`.
     const width = (key: string) =>
@@ -150,7 +159,7 @@ test.describe("a track as wide as its days", () => {
   // not joined to it.
   test("keeps the names in place while the days slide past", async ({ page }) => {
     await openTimeline(page);
-    await zoomTo(page, "year");
+    await zoomTo(page, "1 year");
 
     const label = page
       .locator(".ff-timeline-row", { has: page.locator('[data-bar-key="task:t-0"]') })
@@ -170,7 +179,7 @@ test.describe("a track as wide as its days", () => {
   // ride up with the rows.
   test("keeps the column headings in place while the rows scroll", async ({ page }) => {
     await openTimeline(page);
-    await zoomTo(page, "year");
+    await zoomTo(page, "1 year");
 
     const head = page.locator(".ff-timeline-head");
     const before = await head.evaluate((node) => node.getBoundingClientRect().top);
@@ -190,7 +199,7 @@ test.describe("a track as wide as its days", () => {
   // shows it, nothing else does.
   test("reports the position with the app's own thumb, lying down", async ({ page }) => {
     await openTimeline(page);
-    await zoomTo(page, "year");
+    await zoomTo(page, "1 year");
 
     const thumb = page.locator(".overlay-scrollbar.is-horizontal");
     await scroll(page).evaluate((node) => {
@@ -204,7 +213,7 @@ test.describe("a track as wide as its days", () => {
   // is no longer switched off inside the window it returns to.
   test("Today brings the moment back onto the screen", async ({ page }) => {
     await openTimeline(page);
-    await zoomTo(page, "year");
+    await zoomTo(page, "1 year");
 
     // Scoped to the timeline: the quick-add above it carries a date button
     // whose accessible name is the same word.

@@ -78,6 +78,26 @@ function draw(tasks: Task[], onOpenItem = vi.fn(), onMutateTask?: (task: Task, m
 const chips = () =>
   [...document.querySelectorAll(".tgv-chip")].map((chip) => chip.textContent ?? "");
 
+/**
+ * Pick a zoom (§9.4).
+ *
+ * It was a `<select>` and this was `fireEvent.change`. The reference's control
+ * says its own value and opens a menu of `menuitemradio` rows, so choosing one
+ * is two presses — and the label is what the reader sees, which is why this
+ * takes `1 week` rather than `week`.
+ */
+function zoomTo(label: string) {
+  fireEvent.click(screen.getByRole("button", { name: "Zoom" }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: new RegExp(`^${label}`) }));
+}
+
+/** Flip one of the two `View` switches by the words on it. */
+function toggleDisplay(label: string) {
+  fireEvent.click(screen.getByRole("button", { name: "View" }));
+  fireEvent.click(screen.getByRole("menuitemcheckbox", { name: new RegExp(`^${label}`) }));
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+}
+
 afterEach(cleanup);
 
 describe("Arrange tasks", () => {
@@ -318,7 +338,7 @@ describe("dropping a chip on a day", () => {
     // Said out loud rather than relied on. §13 is only visible where a column
     // holds more than one day, so this test is about the month zoom whether or
     // not that is the zoom the view happens to open on.
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "month" } });
+    zoomTo("1 month");
 
     const transfer = dataTransfer(TRAY_DRAG_MIME, "bare");
     fireEvent.dragStart(chip(), { dataTransfer: transfer });
@@ -395,11 +415,10 @@ describe("dropping a chip on a day", () => {
 // a real clock and is asserted in `e2e/ganttBars.spec.ts`.
 describe("the heading of a column", () => {
   const labels = () => [...document.querySelectorAll(".ff-timeline-col")].map((col) => col.textContent ?? "");
-  const zoomTo = (value: string) => fireEvent.change(screen.getByRole("combobox"), { target: { value } });
 
   it("names the weekday where a column IS a day (I7)", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("week");
+    zoomTo("1 week");
 
     // 2026-09-02 is a Wednesday, and the window starts on the day itself.
     expect(labels()[0]).toBe("9.2 (Wed)");
@@ -410,17 +429,17 @@ describe("the heading of a column", () => {
   // first would be implying the rest.
   it("says none where a column is a week or a month", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("month");
+    zoomTo("1 month");
     // The week the 2nd falls in, which starts on the Sunday before it.
     expect(labels()[0]).toBe("8.30");
 
-    zoomTo("halfYear");
+    zoomTo("6 months");
     expect(labels()[0]).toBe("2026-09");
   });
 
   it("names the hour where a column IS an hour", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("day");
+    zoomTo("1 day");
     expect(labels()[0]).toBe("00");
   });
 });
@@ -437,7 +456,6 @@ describe("the heading of a column", () => {
 // apart. The clock is faked here for exactly that reason: the chip's presence
 // is now a fact about `Date.now()` rather than about the `today` prop.
 describe("the today chip", () => {
-  const zoomTo = (value: string) => fireEvent.change(screen.getByRole("combobox"), { target: { value } });
   const chip = () => document.querySelector(".ff-timeline-now-chip");
 
   afterEach(() => vi.useRealTimers());
@@ -451,7 +469,7 @@ describe("the today chip", () => {
     atNoonOnToday();
     draw([task({ id: "b1", dueDate: TODAY })]);
 
-    for (const zoom of ["day", "week", "month", "halfYear", "year"]) {
+    for (const zoom of ["1 day", "1 week", "1 month", "6 months", "1 year"]) {
       zoomTo(zoom);
       expect(chip(), `missing at ${zoom}`).not.toBeNull();
     }
@@ -463,7 +481,7 @@ describe("the today chip", () => {
     vi.setSystemTime(new Date("2026-11-02T12:00:00"));
     draw([task({ id: "b1", dueDate: TODAY })]);
 
-    zoomTo("week");
+    zoomTo("1 week");
     expect(chip()).toBeNull();
     expect(document.querySelector(".ff-timeline-now-line")).toBeNull();
   });
@@ -473,7 +491,7 @@ describe("the today chip", () => {
   it("sits at the same fraction as the line", () => {
     atNoonOnToday();
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("week");
+    zoomTo("1 week");
 
     const head = document.querySelector(".ff-timeline-now-head") as HTMLElement;
     const line = document.querySelector(".ff-timeline-now-line") as HTMLElement;
@@ -485,12 +503,11 @@ describe("the today chip", () => {
 // (`rulerBands`); what is pinned here is that the view draws them in the same
 // `fr` units as the columns, and marks the boundary under them.
 describe("the ruler's month strip", () => {
-  const zoomTo = (value: string) => fireEvent.change(screen.getByRole("combobox"), { target: { value } });
   const bands = () => [...document.querySelectorAll(".ff-timeline-band")] as HTMLElement[];
 
   it("names the month over week columns, splitting where the month does", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("month");
+    zoomTo("1 month");
 
     // Five weeks from 8.30 — only the first starts in August.
     expect(bands().map((band) => band.textContent)).toEqual(["2026-08", "2026-09"]);
@@ -498,7 +515,7 @@ describe("the ruler's month strip", () => {
 
   it("names the year over month columns", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("year");
+    zoomTo("1 year");
 
     expect(bands().map((band) => band.textContent)).toEqual(["2026", "2027"]);
   });
@@ -508,7 +525,7 @@ describe("the ruler's month strip", () => {
   // arithmetic §17.13 already fixed once for the bars.
   it("sizes a band by time, so an uneven month is drawn the width it is", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("halfYear");
+    zoomTo("6 months");
 
     // Sep–Dec = 30+31+30+31 = 122 days; Jan–Feb = 31+28 = 59.
     expect(bands().map((band) => band.style.flexGrow)).toEqual([String(122 * 24), String(59 * 24)]);
@@ -516,7 +533,7 @@ describe("the ruler's month strip", () => {
 
   it("marks the column where a band begins, and never the first", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("month");
+    zoomTo("1 month");
 
     const marked = [...document.querySelectorAll(".ff-timeline-col")].map((col) =>
       col.classList.contains("is-band"),
@@ -527,7 +544,6 @@ describe("the ruler's month strip", () => {
 
 // The shape a bar takes when it has no width to describe (D8, 재검토 §1-2).
 describe("a bar with one date", () => {
-  const zoomTo = (value: string) => fireEvent.change(screen.getByRole("combobox"), { target: { value } });
   const bar = () => document.querySelector(".ff-timeline-bar");
 
   // §4.5 turned this around. D8 chose the diamond for the zooms where a day
@@ -537,7 +553,7 @@ describe("a bar with one date", () => {
   it("is a marker wherever a column is a day or coarser", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
 
-    for (const zoom of ["week", "month", "halfYear", "year"]) {
+    for (const zoom of ["1 week", "1 month", "6 months", "1 year"]) {
       zoomTo(zoom);
       expect(bar()?.classList.contains("is-marker"), `not a marker at ${zoom}`).toBe(true);
     }
@@ -548,7 +564,7 @@ describe("a bar with one date", () => {
   // values, so a single date is not "one date with no width" at all.
   it("stays a rectangle at the hour zoom, where a day has real width", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
-    zoomTo("day");
+    zoomTo("1 day");
 
     expect(bar()?.classList.contains("is-single")).toBe(false);
     expect(bar()?.classList.contains("is-marker")).toBe(false);
@@ -557,7 +573,7 @@ describe("a bar with one date", () => {
   it("is placed by its centre, having no width to place", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
 
-    zoomTo("month");
+    zoomTo("1 month");
     expect(bar()?.classList.contains("is-marker")).toBe(true);
     // Placed by its CENTRE, which is what the stylesheet's -7px pulls back.
     // Half a day into the window: the 2nd is the fourth day of a window that
@@ -570,10 +586,10 @@ describe("a bar with one date", () => {
   it("leaves a range as a bar at every zoom", () => {
     draw([task({ id: "b1", startDate: "2026-09-02", dueDate: "2026-09-15" })]);
 
-    zoomTo("week");
+    zoomTo("1 week");
     expect(bar()?.classList.contains("is-marker")).toBe(false);
 
-    zoomTo("month");
+    zoomTo("1 month");
     expect(bar()?.classList.contains("is-single")).toBe(false);
     expect(bar()?.classList.contains("is-marker")).toBe(false);
     expect((bar() as HTMLElement).style.width).not.toBe("");
@@ -585,22 +601,20 @@ describe("a bar with one date", () => {
 // asserted here is the CONTRACT between this component and the stylesheet: a
 // floor in pixels, and a ruler cut by time.
 describe("a track as wide as its days", () => {
-  const zoomTo = (value: string) =>
-    fireEvent.change(screen.getByRole("combobox"), { target: { value } });
   const pane = () => document.querySelector(".ff-timeline") as HTMLElement;
   const varOf = (name: string) => pane().style.getPropertyValue(name);
 
   it("hands the stylesheet the floor the zoom asks for", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
 
-    zoomTo("month");
+    zoomTo("1 month");
     expect(varOf("--timeline-track-min")).toBe("560px");
 
     // The two that scroll. 181 days at 7px and 365 at 4 — against a pane that
     // measured 842px in the running app [실측], about 1.8 and 2.0 screens.
-    zoomTo("halfYear");
+    zoomTo("6 months");
     expect(varOf("--timeline-track-min")).toBe("1267px");
-    zoomTo("year");
+    zoomTo("1 year");
     expect(varOf("--timeline-track-min")).toBe("1460px");
   });
 
@@ -608,11 +622,11 @@ describe("a track as wide as its days", () => {
     draw([task({ id: "b1", dueDate: TODAY })]);
 
     // Seven day columns of 24 hours each.
-    zoomTo("week");
+    zoomTo("1 week");
     expect(varOf("--timeline-column-template")).toBe("24fr 24fr 24fr 24fr 24fr 24fr 24fr");
     // Six month columns, and September is not December. `repeat(6, 1fr)` drew
     // those the same width while the bars inside them were placed by time.
-    zoomTo("halfYear");
+    zoomTo("6 months");
     expect(varOf("--timeline-column-template")).toBe("720fr 744fr 720fr 744fr 744fr 672fr");
   });
 

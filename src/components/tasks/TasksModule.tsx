@@ -1457,6 +1457,19 @@ export function TasksModule(props: TasksModuleProps) {
              membership exactly as it does for the list and the board and the
              timeline never asks a second question about it. */
           <TaskGanttView
+            /* The Scope's name, for the head's own utility row
+               (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.2). The reference
+               deletes the page header on desktop and puts the title inside the
+               workspace; `.tm-header` is still rendered and CSS hides it above
+               960, which is exactly what the mockup does. */
+            workspaceTitle={
+              <>
+                <h1 className="ff-timeline-scope">{title}</h1>
+                {!missing && count > 0 ? (
+                  <span className="ff-timeline-scope-count">{count}</span>
+                ) : null}
+              </>
+            }
             items={ganttItems}
             spec={ganttSpec}
             context={ganttContext}

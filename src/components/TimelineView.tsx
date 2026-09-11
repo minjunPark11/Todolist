@@ -22,7 +22,7 @@
 // content's, so the lanes, the now-line and the connectors would each have
 // stopped at the fold. `placeBar` is untouched: a bar is a fraction of the
 // track either way.
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { Project, Task } from "../types";
 import { timelineLinks, type TimelineBadge } from "../domain/view/connectors";
 import { TimelineConnectors } from "./TimelineConnectors";
@@ -187,6 +187,33 @@ interface TimelineViewProps {
    * it, which is the one thing that button promises.
    */
   recenterKey?: number;
+  /**
+   * The 42px utility row above the ruler, on the track's side (§2.2).
+   *
+   * A slot rather than something this file builds: paging the window, the
+   * zoom and what the grid SHOWS all belong to `TaskGanttView`, which owns
+   * that state. What belongs here is the 82px the reference gives them.
+   */
+  controls?: ReactNode;
+  /**
+   * The same row on the task column's side — the Scope's name and count.
+   *
+   * The reference deletes the page header on desktop and puts the title here
+   * (V14, `--page-head-h: 0`), which is what makes the screen one workspace
+   * rather than a header over a card. Below 960 the page header comes back and
+   * CSS hides this instead; both are rendered, exactly as the reference does.
+   */
+  workspaceTitle?: ReactNode;
+  /**
+   * Whether single-date work is drawn at all (§4.5).
+   *
+   * The reference's `마일스톤 표시`. It hides the DIAMONDS and nothing else —
+   * a task with a span keeps its bar — so this is a question about one shape,
+   * not about which Items the Scope holds. That is why it lives here and not
+   * in the split `TaskGanttView` does above: the row still exists, and its
+   * name, date and menu are still in the task column.
+   */
+  showMilestones?: boolean;
 }
 
 export function TimelineView({
@@ -208,6 +235,9 @@ export function TimelineView({
   trayDragging = false,
   onDropTray,
   recenterKey = 0,
+  controls,
+  workspaceTitle,
+  showMilestones = true,
 }: TimelineViewProps) {
   const { t } = useT();
   const columns = ZOOM_COLUMNS[window.zoom];
@@ -417,11 +447,11 @@ export function TimelineView({
           the two 42px rows; P2 fills the ruler. */}
       <header className="ff-timeline-head">
         <div className="ff-timeline-rowhead">
-          <div className="ff-timeline-rowhead-tool" />
+          <div className="ff-timeline-rowhead-tool">{workspaceTitle}</div>
           <div className="ff-timeline-rowhead-label">{t("timeline.taskColumn")}</div>
         </div>
         <div className="ff-timeline-headside">
-          <div className="ff-timeline-controls" />
+          <div className="ff-timeline-controls">{controls}</div>
           <div className="ff-timeline-ruler">
             {/* The upper tier (§7.2). Sized in the same `fr` units as the
                 columns below — `hours`, not an even share — so a band edge
@@ -505,6 +535,7 @@ export function TimelineView({
               isDragging={dragKey === item.key}
               onDragStateChange={(active) => setDragKey(active ? item.key : "")}
               onDrag={(drag) => onDragItem?.(item, drag)}
+              showMilestones={showMilestones}
             />
           ))}
         </section>
@@ -535,6 +566,7 @@ function TimelineRowView({
   onDrag,
   onToggleDone,
   onClearDates,
+  showMilestones,
 }: {
   item: Item;
   indented: boolean;
@@ -549,6 +581,7 @@ function TimelineRowView({
   onDrag: (drag: SpanDrag) => void;
   onToggleDone?: () => void;
   onClearDates?: () => void;
+  showMilestones: boolean;
 }) {
   const { t } = useT();
   /**
@@ -602,6 +635,15 @@ function TimelineRowView({
    */
   const singleDate = span.start === span.end && unit !== "hour";
   const asMarker = singleDate;
+  /**
+   * `마일스톤 표시`, off (§4.5).
+   *
+   * The diamond goes; the ROW stays. Its name, its date and its menu are in
+   * the task column and none of them is a milestone — what the switch is about
+   * is a grid whose every mark is a point, which is a question about the
+   * track's readability and not about which work the Scope holds.
+   */
+  const hideBar = asMarker && !showMilestones;
 
   /**
    * The day under the pointer, from anywhere on this row's track (§13).
@@ -727,6 +769,7 @@ function TimelineRowView({
         }
       >
 
+        {hideBar ? null : (
         <div
           className={[
             "ff-timeline-bar",
@@ -846,6 +889,7 @@ function TimelineRowView({
             />
           ) : null}
         </div>
+        )}
       </div>
     </div>
   );
