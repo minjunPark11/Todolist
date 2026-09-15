@@ -1870,7 +1870,7 @@ main {
   position: fixed;
   /* Transient feedback outranks everything, modals included — a toast that
      appears behind an open drawer takes its undo button with it. */
-  z-index: 1500;
+  z-index: var(--z-toast);
   right: 96px;
   bottom: 24px;
   display: flex;

@@ -24,6 +24,16 @@ export const Z = {
   overlay: 200,
   modal: 300,
   toast: 400,
+  // 토스트 위의 두 단. 어느 것도 떠 있는 층(`LayerType`)이 아니라 `BY_TYPE` 에는
+  // 없다 — 컴포넌트가 요청하는 것이 아니라 앱이 하나씩만 가지는 자리다.
+  //
+  // `alert`: 사라지지 않는 알림. 저장 실패 막대가 여기다 (19-app-shell.css §9.x).
+  //   토스트는 지나가지만 이것은 쓰기가 성공할 때까지 남고, 디스크의 사본을 잃는
+  //   일은 지나가는 피드백보다 위다.
+  // `window`: OS 의 창 단추. 최소화·최대화·닫기는 운영체제의 약속이고, 그것을
+  //   덮는 표면은 작업 표시줄로만 닫을 수 있는 창을 남긴다.
+  alert: 500,
+  window: 600,
 } as const;
 
 const BY_TYPE: Record<LayerType, number> = {

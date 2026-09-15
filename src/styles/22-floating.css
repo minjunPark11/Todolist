@@ -21,6 +21,8 @@
   --z-overlay: 200;
   --z-modal: 300;
   --z-toast: 400;
+  --z-alert: 500;
+  --z-window: 600;
 }
 
 .ff-layer {
