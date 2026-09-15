@@ -445,7 +445,18 @@ export function TimelineView({
     // which is a measurement and not `--timeline-label-width + 8`, because
     // that sum is written in the stylesheet and would be a second copy here.
     const at = box.left - base.left + (nowAt ?? 0) * box.width;
-    scroller.scrollLeft = Math.max(0, at - scroller.clientWidth / 3);
+    // 라벨 열은 스크롤러 왼쪽에 **붙어 있다**(`position: sticky`). 그러니 스크롤러의
+    // 왼쪽 3분의 1 안에는 이름 열이 덮고 있는 띠가 통째로 들어간다 — 폰에서 그
+    // 띠가 190px이고 스크롤러가 361px이라, "3분의 1"인 120px 자리는 이름 뒤였다.
+    // 오늘의 막대 넷이 전부 그 뒤에 숨어서 화면에는 빈 격자만 보였다
+    // [실측 · 393px].
+    //
+    // 그래서 3분의 1은 스크롤러가 아니라 **보이는 트랙**의 3분의 1이다. 폭은
+    // 재서 가져온다 — 위 주석이 `--timeline-label-width + 8`을 마다한 것과 같은
+    // 이유로, 그 합은 스타일시트에 있고 여기 두 번째 사본을 두지 않는다.
+    const label = canvas.querySelector(".ff-timeline-rowhead")?.getBoundingClientRect().width ?? 0;
+    const track = Math.max(0, scroller.clientWidth - label);
+    scroller.scrollLeft = Math.max(0, at - label - track / 3);
     // `nowAt` is deliberately absent: it changes on every render (it is read
     // from the clock) and this is a jump, not a follow. The window and the
     // reader's own press are what may move the scroll under them.

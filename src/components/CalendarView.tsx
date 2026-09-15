@@ -225,6 +225,19 @@ export function CalendarView({
     // leaves the choice to the user (they can re-pick "week" any time).
     if (isNarrow) setMode((current) => (current === "week" ? "day" : current));
   }, [isNarrow]);
+  useEffect(() => {
+    // 사이드바도 같은 손짓으로 접는다.
+    //
+    // `.gcal-body`는 좁아지면 한 열이 되고, 그러면 사이드바가 **위에 통째로**
+    // 쌓인다 — 폰에서 재보니 727px 중 314px을 가져가서 정작 달력이 접힌 아래에
+    // 있었다 [실측 · 393px]. 레일로 접으면 그 자리가 버튼 둘이 되고, 달력은
+    // 첫 화면으로 올라온다.
+    //
+    // 한쪽 방향인 것도 위와 같은 이유다. 좁아질 때는 접어주되, 넓어질 때 펴지는
+    // 것은 사람이 정한다 — 폰에서 일부러 펼쳐 둔 사람의 선택을 창 크기가
+    // 되돌리지 않는다.
+    if (isNarrow) setSidebarCollapsed(true);
+  }, [isNarrow]);
   const [dragOverId, setDragOverId] = useState("");
   const [quickCreate, setQuickCreate] = useState<QuickCreateDefaults | null>(null);
   const [popover, setPopover] = useState<PopoverState>(null);

@@ -31,9 +31,9 @@
   /* Never let the column-flex shell crush the toolbar below its content when
      it wraps to multiple rows on narrow widths (otherwise rows spill out). */
   flex-shrink: 0;
-  /* Query container so the view tabs can go full-width when the calendar is
-     narrow (tracks the app sidebar, matching the body's collapse). */
-  container: gcalbar / inline-size;
+  /* 질의 컨테이너는 이 요소가 아니라 부모(`.gcal-main-column`)가 든다 —
+     `27-calendar.css`가 그 이유를 적어뒀다. 여기 두면 아래 `@container` 규칙
+     중 `.gcal-toolbar` 자신을 겨누는 것이 영영 맞지 않는다. */
 }
 
 /* Narrow: stack the toolbar into clean rows —
@@ -1402,9 +1402,18 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .gcal-sidebar {
-    display: none;
-  }
+  /* 여기 `.gcal-sidebar { display: none }`이 있었다. 한 번도 적용된 적이 없다 —
+     `09-calendar-redesign.css:130`이 나중에 로드되며 `display: flex`로 덮었고,
+     컨테이너 질의는 특정도를 더해주지 않으므로 순서가 이긴다. 폰에서 사이드바가
+     통째로 위에 쌓여 있던 이유의 절반이 이것이다 [실측 · 393px].
+     되살리지 않고 지운다. 이 규칙이 쓰일 때 레일은 없었고, 지금은 있다 —
+     통째로 감추면 폰에서 일정을 만들 길과 목록을 다시 열 길이 함께 사라진다.
+     좁아지면 접는 쪽은 `CalendarView`가 `isNarrow`로 한다. */
+
+  /* 한 열이 되면 레일이 가로 줄이 되는 규칙은 `27-calendar.css` 끝에 있다 —
+     `10-calendar-apple.css:857`이 "레일은 버튼 둘이라 세로여야 한다"를 같은
+     특정도로 나중에 적어뒀고, 컨테이너 질의는 특정도를 더해주지 않으므로 여기
+     적으면 그 줄에 진다. */
 }
 
 .board-grid {
