@@ -495,7 +495,7 @@
 .foc-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: var(--z-modal);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -529,7 +529,10 @@
   left: max(260px, calc(env(safe-area-inset-left) + 24px));
   right: 24px;
   bottom: 18px;
-  z-index: 45;
+  /* 모든 페이지에 뜨는 앱 루트의 막대다 (`GlobalFocusBar`). 레일과 같은 가족 —
+     사라지지 않는 크롬이므로 스티키 단이고, 솔기 가구와 스크롤바(+2) 위에
+     앉는다. 페이지를 덮는 것(서랍·스크림·모달)은 전부 이 위다. */
+  z-index: calc(var(--z-sticky) + 4);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 16px;

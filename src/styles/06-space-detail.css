@@ -405,7 +405,9 @@
   position: fixed;
   inset: 0;
   background: rgba(15, 15, 20, 0.42);
-  z-index: 60;
+  /* 서랍 뒷막이 모달과 한 규칙을 쓰는 것은 이 파일이 이미 내린 결정이다
+     (§32). 단만 바꾼다. */
+  z-index: var(--z-modal);
   display: flex;
 }
 

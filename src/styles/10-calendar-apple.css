@@ -510,8 +510,11 @@
   outline-offset: 2px;
   /* The grid clips at the column edge, so an outline drawn outside the block
      would be cut on the left and right. Raising it above its neighbours is
-     what makes it fully visible. */
-  z-index: 30;
+     what makes it fully visible.
+
+     이웃 칩들 위로만 올리면 되는 자리다 — 그것들은 z 를 갖지 않으므로 1 이면
+     족하고, 30 은 앱의 층위 눈금에 적힌 국소 순서였다. */
+  z-index: 2;
 }
 
 /* ============================================================================

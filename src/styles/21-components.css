@@ -645,8 +645,11 @@ textarea {
   position: absolute;
   top: 0;
   right: 2px;
-  /* Over the calendar's sticky header band, which sits at 30. */
-  z-index: 40;
+  /* Over the calendar's sticky header band. That band is `--z-sticky` now, so
+     this is the same band plus §19.64's one step rather than a number chosen
+     to beat it — the previous comment named "30" and would have gone stale the
+     moment the header moved. */
+  z-index: calc(var(--z-sticky) + 2);
   width: 6px;
   border-radius: var(--radius-pill);
   background: var(--scrollbar-thumb);

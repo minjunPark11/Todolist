@@ -120,7 +120,7 @@
   /* Sits ON the seam: the sidebar starts after the Rail, so its right edge is
      the sum of the two. */
   left: calc(var(--rail-w) + var(--context-sidebar-w, 248px));
-  z-index: 25;
+  z-index: var(--z-sticky);
   /* §3.15: 1px of paint, but a hit target a person can actually land on. */
   width: 10px;
   margin-left: -4px;
@@ -163,7 +163,7 @@
 .global-rail {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: var(--z-sticky);
   flex: 0 0 var(--rail-w);
   width: var(--rail-w);
   min-width: var(--rail-w);
@@ -297,7 +297,7 @@
   /* placement: right, 8px offset */
   left: calc(100% + 8px);
   top: 50%;
-  z-index: 40;
+  z-index: var(--z-tooltip);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -402,7 +402,11 @@
 .cmd-menu-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  /* 아래 §10.5 주석은 "a light menu … not a modal covering the screen" 이라고
+     말하는데 그것은 **무게**에 대한 말이다. 층으로는 어느 페이지 위에든 뜨는
+     앱 수준의 덮개이므로 모달 단이다 — 토큰은 보이는 무게가 아니라 자리를
+     가리킨다. */
+  z-index: var(--z-modal);
   display: flex;
   justify-content: center;
   /* §10.5: a light menu near the top, not a modal covering the screen. */

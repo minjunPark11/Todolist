@@ -292,7 +292,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: var(--z-modal);
+  /* 앱 루트의 확인 대화상자다 (`AppModals`). 목록 관리자 위에서도, 집중
+     대화상자 위에서도, 몰입 화면 위에서도 열리므로 §19.67 의 뜻에서 언제나
+     자식이다. 모달 띠는 세 칸이 됐다: 페이지 모달(300) < 그 위에서 열린
+     모달(302) < 앱 루트의 확인(304). 예전에는 `.focus-immersive` 와
+     같은 값이었고 `AppModals` 가 `<motion.main>` 뒤에 그려진다는 DOM 순서로만
+     이기고 있었다. 그 우연을 없앤다. */
+  z-index: calc(var(--z-modal) + 4);
   padding: 24px;
 }
 .ff-modal {
@@ -368,7 +374,7 @@
 
   .mobile-menu-button {
     position: fixed;
-    z-index: 220;
+    z-index: calc(var(--z-overlay) + 4);
     top: 12px;
     left: 12px;
     display: inline-flex;
@@ -404,10 +410,13 @@
     transform: translateY(-6px) rotate(-45deg);
   }
 
+  /* 뒷막(200) < 시트(202) < 여닫는 단추(204). 단추가 맨 위인 것은 열린 뒤에도
+     X 로 바뀌어 같은 자리에서 닫히기 때문이다 (아래 span 회전 규칙). 예전 값
+     180 · 210 · 220 이 적어두려던 순서가 그것이다. */
   .mobile-menu-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 180;
+    z-index: var(--z-overlay);
     display: block;
     border: 0;
     background: rgba(0, 0, 0, 0.34);
@@ -415,7 +424,7 @@
 
   .sidebar {
     position: fixed;
-    z-index: 210;
+    z-index: calc(var(--z-overlay) + 2);
     top: 0;
     left: 0;
     width: min(82vw, 320px);

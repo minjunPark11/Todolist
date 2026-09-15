@@ -1065,7 +1065,9 @@
      누르면 열을 치운다. */
   /* 절반이 상자 안으로 들어가 솔기에 걸터앉는다 — 폭의 절반이다. */
   left: calc(var(--rail-w) + var(--context-sidebar-w, 248px) - 14px);
-  z-index: 26;
+  /* 손잡이와 같은 자리에 겹쳐 앉으므로 그 한 칸 위다 (§19.64 의 중첩 한 칸).
+     끌기와 누르기가 한 모서리에 있고, 누르는 쪽이 위여야 조준이 된다. */
+  z-index: calc(var(--z-sticky) + 2);
   display: grid;
   place-items: center;
   /* 레퍼런스는 22×28인데 그것은 이 앱의 바닥 아래다.

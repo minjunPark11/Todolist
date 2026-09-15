@@ -112,7 +112,7 @@
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  z-index: 30;
+  z-index: var(--z-popover);
   display: grid;
   grid-template-columns: repeat(5, 20px);
   gap: 6px;
@@ -429,7 +429,7 @@
   position: absolute;
   right: 0;
   top: calc(100% + 4px);
-  z-index: 30;
+  z-index: var(--z-menu);
   min-width: 180px;
   display: grid;
   padding: 6px;
