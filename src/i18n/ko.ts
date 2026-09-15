@@ -925,6 +925,8 @@ export const ko: Dictionary = {
   "tasks.menu.dueToday": "오늘로",
   "tasks.menu.dueTomorrow": "내일로",
   "tasks.menu.clearDue": "날짜 지우기",
+  "tasks.menu.moveUp": "위로",
+  "tasks.menu.moveDown": "아래로",
   "tasks.menu.trash": "휴지통으로",
   "tasks.menu.restore": "복원",
   "tasks.menu.deleteForever": "영구 삭제",

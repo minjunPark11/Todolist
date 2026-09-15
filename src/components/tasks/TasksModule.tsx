@@ -744,9 +744,67 @@ export function TasksModule(props: TasksModuleProps) {
               ],
             },
             ]),
+        // 드래그 없이 순서를 바꾸는 길 (WCAG 2.2 · 2.5.7 Dragging Movements).
+        //
+        // 그 기준은 "드래그로 되는 모든 기능은 드래그 없이 한 포인터로도 되어야
+        // 한다"이고, 순서 바꾸기는 예외로 두는 '본질적인' 경우가 아니다. 행을
+        // 옮기는 방법이 드래그뿐이면 그것을 할 수 없는 사람에게는 목록의 순서가
+        // 아예 없는 기능이 된다.
+        //
+        // 보드는 이미 그 답을 갖고 있었다 — `TaskBoard`의 열 이동 셀렉트가
+        // 시각적으로 숨겨진 채 같은 일을 한다(§11의 `moveToColumn`). 목록 행에만
+        // 없었고, 터치에서는 더 좁았다: 핸들이 hover 로만 나타나므로
+        // (`e2e/taskRow.spec.ts`가 그것을 단언한다) 손가락에게는 잡을 것조차
+        // 보이지 않는다.
+        //
+        // 여기 있는 이유는 이 메뉴가 행마다 `⋯` 버튼으로도 열리기 때문이다 —
+        // 키보드로 닿고, 한 번의 탭으로 열리고, 드래그가 없다.
+        ...(policy.canManualReorder && !isTrashed(task) ? reorderSectionFor(task) : []),
         ...actionItemsFor(task, ["status", "danger"]),
       ],
     };
+  }
+
+  /**
+   * 한 칸 위로, 한 칸 아래로.
+   *
+   * 끝에 닿은 방향은 **적지 않는다**. 바로 위 날짜 섹션이 같은 판단을 한 줄로
+   * 적어뒀다 — "아무것도 하지 않는 항목은 읽는 사람이 매번 걸러내야 하는
+   * 항목이다". 첫 행에 '위로'가 회색으로 남아 있는 것과 없는 것 중, §15.5의
+   * "disabled + 설명"이 값을 갖는 자리는 *왜* 못 하는지가 설명거리일 때이고
+   * 여기서는 그것이 "첫 행이라서"다.
+   */
+  function reorderSectionFor(task: Task) {
+    const index = listRows.findIndex((row) => row.id === task.id);
+    if (index < 0) return [];
+    const steps = [
+      ...(index > 0 ? [{ id: "reorder-up", label: t("tasks.menu.moveUp"), run: () => reorderStep(task, -1) }] : []),
+      ...(index < listRows.length - 1
+        ? [{ id: "reorder-down", label: t("tasks.menu.moveDown"), run: () => reorderStep(task, 1) }]
+        : []),
+    ];
+    return steps.length > 0 ? [{ id: "reorder", items: steps }] : [];
+  }
+
+  /**
+   * 드래그가 놓는 자리를, 방향 하나로 옮긴다.
+   *
+   * `placeTask`의 `targetIndex`는 **옮기는 행을 뺀 목록에서** 세는 자리다. 그래서
+   * 위로도 아래로도 `index + delta` 하나로 맞는다 — [A,B,C]에서 B를 뺀 [A,C] 기준으로
+   * 위는 0(=1-1), 아래는 2(=1+1)이고, 각각 [B,A,C]와 [A,C,B]가 된다. 이 뺄셈을
+   * 잊으면 '아래로'가 제자리걸음이 된다.
+   *
+   * `listRows`를 그대로 넘기는 것은 드래그와 같은 열을 보기 위해서다. 그룹으로
+   * 나뉘어 그려지는 것은 Folder 스코프뿐이고(§`folderGroups`), 그 스코프는
+   * `canManualReorder`가 false라 이 함수에 닿지 않는다 — 화면의 순서와 여기서 세는
+   * 순서가 어긋날 수 있는 자리가 없다.
+   */
+  function reorderStep(task: Task, delta: -1 | 1) {
+    const index = listRows.findIndex((row) => row.id === task.id);
+    if (index < 0) return;
+    for (const row of placeTask(listRows, task.id, index + delta)) {
+      props.onMutate(row.id, { order: row.order });
+    }
   }
 
   function reorderOnto(ordered: Task[], draggedId: string, targetId: string) {

@@ -320,3 +320,66 @@ test.describe("the Task popup", () => {
     await expect(page.locator(".tm-drawer .tm-drawer-title")).toHaveValue("Second");
   });
 });
+
+// 순서를 바꾸는 두 번째 길 (WCAG 2.2 · 2.5.7 Dragging Movements).
+//
+// 위의 드래그 테스트가 재는 것이 이 앱에 있던 유일한 길이었다. 기준은 "드래그로
+// 되는 모든 기능은 드래그 없이 한 포인터로도 되어야 한다"이고, 순서 바꾸기는
+// 예외로 두는 '본질적인' 경우가 아니다.
+//
+// 이 블록에만 위의 1024 스킵이 없다. 그것이 요점이다 — 터치에서는 드래그 핸들이
+// 아예 그려지지 않고(바로 위 "the checkbox clears the touch floor"가 `handleShown`
+// 으로 단언한다), 그래서 좁은 화면이 이 길을 가장 필요로 한다. 데스크톱에서만
+// 재면 정확히 못 쓰는 쪽을 빼고 재는 셈이다.
+test.describe("순서를 드래그 없이", () => {
+  const menuFor = (page: Page, title: string) => page.getByRole("button", { name: `Actions for ${title}` });
+
+  test("행 메뉴가 한 칸씩 옮기고, 그 순서가 저장된다", async ({ page }) => {
+    await openApp(page, { lists: [LIST] });
+    await page.goto(`/list/${LIST.id}`);
+    await addTask(page, "First");
+    await addTask(page, "Second");
+    await addTask(page, "Third");
+
+    const titles = () => page.locator(".tm-task-title").allTextContents();
+    expect(await titles()).toEqual(["First", "Second", "Third"]);
+
+    // 마지막을 두 칸 올린다. 한 칸이 아니라 두 칸인 이유는 `placeTask`의 자리
+    // 계산이 옮기는 행을 뺀 목록에서 세기 때문이다 — 한 번만 하면 그 뺄셈을
+    // 틀려도 통과하는 경우가 있고, 두 번이면 남지 않는다.
+    await menuFor(page, "Third").click();
+    await page.getByRole("menuitem", { name: "Move up" }).click();
+    await expect.poll(titles).toEqual(["First", "Third", "Second"]);
+
+    await menuFor(page, "Third").click();
+    await page.getByRole("menuitem", { name: "Move up" }).click();
+    await expect.poll(titles).toEqual(["Third", "First", "Second"]);
+
+    // 그리고 다시 내려온다. 위로만 되는 구현은 반쪽이다.
+    await menuFor(page, "Third").click();
+    await page.getByRole("menuitem", { name: "Move down" }).click();
+    await expect.poll(titles).toEqual(["First", "Third", "Second"]);
+
+    // 그려진 것이 아니라 계정이 가진 것: 위의 드래그 테스트와 같은 기준이다.
+    await page.reload();
+    await expect.poll(titles).toEqual(["First", "Third", "Second"]);
+  });
+
+  test("끝에 닿은 방향은 적지 않는다", async ({ page }) => {
+    await openApp(page, { lists: [LIST] });
+    await page.goto(`/list/${LIST.id}`);
+    await addTask(page, "Top");
+    await addTask(page, "Bottom");
+
+    // 날짜 섹션이 `--accent-soft`를 두고 적어둔 규칙과 같다 — "아무것도 하지 않는
+    // 항목은 읽는 사람이 매번 걸러내야 하는 항목이다".
+    await menuFor(page, "Top").click();
+    await expect(page.getByRole("menuitem", { name: "Move up" })).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "Move down" })).toHaveCount(1);
+    await page.keyboard.press("Escape");
+
+    await menuFor(page, "Bottom").click();
+    await expect(page.getByRole("menuitem", { name: "Move down" })).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "Move up" })).toHaveCount(1);
+  });
+});

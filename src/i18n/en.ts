@@ -958,6 +958,8 @@ export const en: Dictionary = {
   "tasks.menu.dueToday": "Due today",
   "tasks.menu.dueTomorrow": "Due tomorrow",
   "tasks.menu.clearDue": "Clear the date",
+  "tasks.menu.moveUp": "Move up",
+  "tasks.menu.moveDown": "Move down",
   "tasks.menu.trash": "Move to trash",
   "tasks.menu.restore": "Restore",
   "tasks.menu.deleteForever": "Delete forever",
