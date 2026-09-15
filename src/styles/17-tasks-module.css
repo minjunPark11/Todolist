@@ -1224,6 +1224,13 @@
    to colour, and at rest the title reads as writing rather than as a form. */
 .tm-drawer-title {
   width: 100%;
+  /* 한글은 어절이 아니라 글자 사이에서 갈린다 — 기본값 `normal`은 320px 서랍에서
+     "분기 보고서 초안 넘기기"를 "…넘기 / 기"로 끊었다. `keep-all`은 공백에서만
+     끊게 하고, `anywhere`는 한 어절이 정말 한 줄보다 길 때(붙여 쓴 URL 같은 것)
+     넘치는 대신 끊을 길을 남긴다. 둘이 짝이다: 앞엣것만 있으면 긴 토큰이 상자를
+     삐져나간다. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   padding: 6px 8px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
