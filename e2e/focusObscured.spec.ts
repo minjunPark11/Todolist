@@ -68,6 +68,8 @@ const TASKS = Array.from({ length: 16 }, (_, i) => ({
 }));
 
 interface Offender {
+  /** 어느 방향으로 걷다 만났는가. */
+  direction: "앞으로" | "뒤로";
   /** 어떤 컨트롤인가 — 태그와 클래스. */
   what: string;
   /** 왜 걸렸는가. */
@@ -110,20 +112,45 @@ interface Sweep {
  * 위에 오는 것이 자기 조상이라는 말은 그 자리에 남의 것이 얹혀 있지 않다는 뜻이고,
  * 포커스 윤곽은 그 위에 그려진다.
  */
-async function sweep(page: Page, maxStops = 200): Promise<Sweep> {
+/**
+ * 한 방향으로 한 바퀴.
+ *
+ * 방향이 둘인 이유는 이 스펙이 한동안 절반만 보고 있었기 때문이다. Tab 만 누르면
+ * 브라우저는 다음 컨트롤을 **아래쪽** 가장자리에 맞춰 끌어들이므로, 위에 붙어 있는
+ * 머리와는 영영 만나지 않는다. Shift+Tab 은 위쪽 가장자리에 맞춰 끌어들이고 —
+ * 거기가 붙은 머리 아래다. 타임라인이 정확히 그 자리였다: 앞으로는 깨끗하고
+ * 뒤로는 행이 `.ff-timeline-head` 뒤로 들어갔다 [실측 · 1440px].
+ *
+ * 2.4.11은 방향을 가리지 않는다. 한쪽만 걷는 그물은 기준의 절반을 재고 초록을
+ * 준다.
+ */
+async function walk(page: Page, key: "Tab" | "Shift+Tab", direction: Offender["direction"], maxStops: number): Promise<Sweep> {
   await page.evaluate(() => {
     (window as unknown as { __focusSeen?: WeakSet<Element> }).__focusSeen = new WeakSet<Element>();
   });
 
   const offenders: Offender[] = [];
   let focused = 0;
+  /**
+   * 탭 순서가 페이지 밖으로 나간 횟수.
+   *
+   * 문서의 마지막(또는 처음)을 지나면 포커스는 브라우저 크롬으로 가고 이쪽의
+   * `activeElement`는 `body`가 된다. 한 번 더 누르면 페이지로 돌아온다. 한 바퀴를
+   * 돌 때는 그 한 칸이 곧 끝 신호였지만, 두 방향을 이어 걸으면 **시작이 거기서**
+   * 되는 경우가 생긴다 — 앞으로 한 바퀴를 돈 뒤 뒤로 걸으면 첫 걸음이 그 밖이고,
+   * 그것을 끝으로 치면 두 번째 바퀴가 0걸음으로 끝난다. 자기 점검이 `focused`를
+   * 66에서 0으로 받아 그것을 잡았다.
+   *
+   * 그래서 밖은 한 번까지 지나쳐 준다. 두 번 이어지면 정말 끝이다.
+   */
+  let outside = 0;
 
   for (let step = 0; step < maxStops; step += 1) {
-    await page.keyboard.press("Tab");
+    await page.keyboard.press(key);
     const stop = await page.evaluate(() => {
       const seen = (window as unknown as { __focusSeen: WeakSet<Element> }).__focusSeen;
       const el = document.activeElement as HTMLElement | null;
-      if (!el || el === document.body || el === document.documentElement) return { done: true as const };
+      if (!el || el === document.body || el === document.documentElement) return { outside: true as const };
       if (seen.has(el)) return { done: true as const };
       seen.add(el);
 
@@ -173,12 +200,34 @@ async function sweep(page: Page, maxStops = 200): Promise<Sweep> {
       };
     });
 
+    if ("outside" in stop) {
+      outside += 1;
+      if (outside > 1) break;
+      continue;
+    }
+    outside = 0;
     if (stop.done) break;
     focused += 1;
-    if (stop.offender) offenders.push(stop.offender);
+    if (stop.offender) offenders.push({ direction, ...stop.offender });
   }
 
   return { focused, offenders };
+}
+
+/**
+ * 두 방향을 한 번에.
+ *
+ * 앞으로 한 바퀴를 돌고, 그 자리에서 뒤로 한 바퀴를 돈다. 뒤로 도는 쪽이 새
+ * `WeakSet`으로 시작하는 것은 같은 컨트롤을 반대 방향에서 다시 재야 하기
+ * 때문이다 — 끌려 들어오는 가장자리가 반대라서, 같은 자리에서 답이 달라진다.
+ *
+ * `focused`는 앞으로 도는 쪽의 수다. 두 바퀴를 더하면 한 화면의 컨트롤을 두 번
+ * 센 숫자가 되어, 바닥값이 무엇을 뜻하는지가 흐려진다.
+ */
+async function sweep(page: Page, maxStops = 200): Promise<Sweep> {
+  const forward = await walk(page, "Tab", "앞으로", maxStops);
+  const backward = await walk(page, "Shift+Tab", "뒤로", maxStops);
+  return { focused: forward.focused, offenders: [...forward.offenders, ...backward.offenders] };
 }
 
 /**
