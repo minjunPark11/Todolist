@@ -74,19 +74,26 @@ interface SettingsPageProps {
  * Blue drifted twice: §10 moved the accent to `#0064d2` for contrast and
  * POLISHED_REFERENCE_PARITY_DESIGN.md §5.3 moved it again to `#556be7`, and
  * this list said `#007aff` through both — a picker offering a colour the app
- * does not draw. The other four have never moved.
+ * does not draw.
  *
- * The values live in CSS (`[data-accent="…"]` in `01-base.css`, with blue's
- * current value in `25-reference.css`) because that is where a theme is
- * chosen; these are the preview of them, and `e2e/accentChoice.spec.ts`
- * measures the two against each other so the next move cannot be silent.
+ * The other four have now moved once, for the same reason blue moved the first
+ * time: they were Apple's system colours, picked when an accent was a FILL, and
+ * they do not carry text or a focus outline — green and orange sat at 2.2 and
+ * 2.0 on white, under even the 3:1 that a non-text mark needs. Re-picked in the
+ * reference's tone (`25-reference.css` §나머지 넷도 같은 톤으로) and measured by
+ * `src/styles/contrast.test.ts`.
+ *
+ * The values live in CSS (`[data-accent="…"]`, the current five in
+ * `25-reference.css`) because that is where a theme is chosen; these are the
+ * preview of them, and `e2e/accentChoice.spec.ts` measures the two against each
+ * other so the next move cannot be silent.
  */
 const ACCENTS: { id: AccentColor; color: string }[] = [
   { id: "blue", color: "#556be7" },
-  { id: "purple", color: "#af52de" },
-  { id: "green", color: "#34c759" },
-  { id: "orange", color: "#ff9500" },
-  { id: "pink", color: "#ff2d55" },
+  { id: "purple", color: "#ac36d3" },
+  { id: "green", color: "#1c7d49" },
+  { id: "orange", color: "#ab5726" },
+  { id: "pink", color: "#cd2d62" },
 ];
 
 export function SettingsPage({

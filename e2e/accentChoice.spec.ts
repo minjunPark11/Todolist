@@ -16,10 +16,16 @@ import { openApp } from "./addList.helpers";
 const CHOICES = [
   // The default, carrying §4.4's corrected value rather than the old #0064d2.
   { id: "blue", expected: "#556be7" },
-  { id: "purple", expected: "#af52de" },
-  { id: "green", expected: "#34c759" },
-  { id: "orange", expected: "#ff9500" },
-  { id: "pink", expected: "#ff2d55" },
+  // The other four carry the tone they were re-picked in — Apple's system
+  // colours could not hold text or a focus outline at the contrast the app
+  // needs (25-reference.css §나머지 넷도 같은 톤으로). The ratios are measured
+  // by `src/styles/contrast.test.ts`; what this spec still asks is the older
+  // question, and the one that grep cannot answer: does the choice REACH the
+  // screen, or does a later layer eat it.
+  { id: "purple", expected: "#ac36d3" },
+  { id: "green", expected: "#1c7d49" },
+  { id: "orange", expected: "#ab5726" },
+  { id: "pink", expected: "#cd2d62" },
 ] as const;
 
 test.describe("the accent colour setting", () => {

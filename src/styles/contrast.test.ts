@@ -298,49 +298,15 @@ const KNOWN: Record<string, number> = {
   // 이 테스트가 바꿀 값이 아니고, 바꾼다면 그 문서에서 바꿀 일이다.
   "light/blue | --accent on --bg-app": 4.18,
 
-  // ── 나머지 26줄은 하나의 원인이다 ──────────────────────────────────────────
-  // `01-base.css:533-536`의 네 액센트는 Apple 시스템 색이고, 고를 당시 그것들은
-  // '면'이었다 — 점 하나, 채워진 체크박스 하나. 레퍼런스 정합이 액센트를 글자와
-  // 포커스 윤곽으로도 쓰기 시작했고(`color: var(--accent)` 73곳,
-  // `outline: 2px solid var(--ff-focus-ring)`), blue만 #556be7로 갈아끼웠다.
-  // 넷은 그때의 값 그대로 남아 새 역할을 맡고 있다.
+  // 스물여섯 줄이 여기 있었다 — purple·green·pink·orange가 액센트를 글자와 포커스
+  // 윤곽으로 쓰면서 3.2~4.1(purple·pink)과 1.94~2.22(green·orange)로 미달했다.
+  // 그 줄들이 "고치는 방법은 색을 다시 고르는 것뿐이고 blue가 #0064d2 → #556be7로
+  // 간 것과 같은 작업을 넷에 하면 사라진다"고 적어뒀고, 그 작업을 했다
+  // (25-reference.css §나머지 넷도 같은 톤으로). 지금 넷은 모든 쌍에서 4.55 이상이다.
   //
-  // 심각도가 둘로 갈린다. purple·pink는 3.2~4.1로 AA에 못 미치고, green·orange는
-  // 1.94~2.22로 **글자가 아닌 것의 3:1(1.4.11)까지** 미달한다 — 포커스 윤곽이
-  // 바탕에서 갈라지지 않는다는 뜻이고, 키보드로 쓰는 사람에게는 지금 자기가 어디
-  // 있는지 보이지 않는다는 뜻이다.
-  //
-  // 고치는 방법은 색을 다시 고르는 것뿐이고, 그것은 이 파일의 일이 아니다.
-  // blue가 #0064d2 → #556be7로 간 것과 같은 작업을 넷에 하면 이 26줄이 사라진다.
-  "light/purple | --accent on --bg-surface": 4.13,
-  "light/purple | --accent on --bg-app": 3.82,
-  "light/purple | --accent-ink on --accent-soft": 3.56,
-  "light/purple | --color-on-dark on --accent-fill": 4.13,
-
-  "light/pink | --accent on --bg-surface": 3.65,
-  "light/pink | --accent on --bg-app": 3.37,
-  "light/pink | --accent-ink on --accent-soft": 3.17,
-  "light/pink | --color-on-dark on --accent-fill": 3.65,
-
-  "light/green | --accent on --bg-surface": 2.22,
-  "light/green | --accent on --bg-app": 2.05,
-  "light/green | --accent-ink on --accent-soft": 2.01,
-  "light/green | --color-on-dark on --accent-fill": 2.22,
-  "light/green | --accent-fill on --bg-surface": 2.22,
-  "light/green | --ff-blue on --bg-rail": 1.96,
-  "light/green | --ff-focus-ring on --bg-surface": 2.22,
-  "light/green | --ff-focus-ring on --bg-app": 2.05,
-  "light/green | --ff-focus-ring on --bg-rail": 1.96,
-
-  "light/orange | --accent on --bg-surface": 2.2,
-  "light/orange | --accent on --bg-app": 2.03,
-  "light/orange | --accent-ink on --accent-soft": 2,
-  "light/orange | --color-on-dark on --accent-fill": 2.2,
-  "light/orange | --accent-fill on --bg-surface": 2.2,
-  "light/orange | --ff-blue on --bg-rail": 1.94,
-  "light/orange | --ff-focus-ring on --bg-surface": 2.2,
-  "light/orange | --ff-focus-ring on --bg-app": 2.03,
-  "light/orange | --ff-focus-ring on --bg-rail": 1.94,
+  // 줄이 지워지는 과정이 이 표의 쓸모였다: 색을 갈아끼운 직후 스물여섯 개가 전부
+  // "이제 통과한다, KNOWN에서 지워라"로 실패했다. 고쳐졌다는 것을 사람이 기억해서
+  // 지운 것이 아니라, 지우라고 빨간불이 켜졌다.
 };
 
 /** 문맥 이름. 액센트로 값이 갈리지 않는 쌍은 테마 이름만 갖는다. */
