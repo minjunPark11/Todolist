@@ -28,6 +28,25 @@ export interface SeedOptions {
    * the media afterwards would be asserting against the palette it started in.
    */
   theme?: "light" | "dark";
+  /**
+   * Tasks the account starts with.
+   *
+   * Every spec until now typed its Tasks through the quick add, which is the
+   * right shape when what is under test is the typing. It is the wrong shape
+   * when a spec needs a list LONGER THAN THE VIEWPORT — thirty round trips
+   * through the form to set up one scroll. Seeded rows are the same records
+   * the app would have written, minus the typing.
+   */
+  tasks?: Array<{
+    id: string;
+    title: string;
+    listId?: string;
+    dueDate?: string;
+    description?: string;
+    /** A timed row, which is what puts a block on the Calendar rather than a chip. */
+    startTime?: string;
+    endTime?: string;
+  }>;
 }
 
 /**
@@ -38,7 +57,39 @@ export interface SeedOptions {
  */
 export async function openApp(page: Page, seed: SeedOptions = {}): Promise<void> {
   const data = {
-    tasks: [],
+    tasks: (seed.tasks ?? []).map((task, index) => ({
+      id: task.id,
+      title: task.title,
+      description: task.description ?? "",
+      status: "todo",
+      priority: "none",
+      dueDate: task.dueDate ?? "",
+      startDate: "",
+      startTime: task.startTime ?? "",
+      endTime: task.endTime ?? "",
+      projectId: "",
+      listId: task.listId ?? "list-inbox",
+      categoryId: "",
+      parentTaskId: "",
+      tags: [],
+      notes: "",
+      estimatedMinutes: 0,
+      actualSeconds: 0,
+      activeSessionId: "",
+      lastFocusedAt: "",
+      isSomeday: false,
+      waitingReason: "",
+      waitingFollowUpDate: "",
+      order: index,
+      createdAt: NOW,
+      updatedAt: NOW,
+      completedAt: "",
+      blockedByTaskId: "",
+      repeatType: "none",
+      repeatInterval: 0,
+      repeatDays: [],
+      repeatEndDate: "",
+    })),
     projects: (seed.projects ?? []).map((project, index) => ({
       id: project.id,
       name: project.name,
