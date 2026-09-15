@@ -43,15 +43,6 @@ const TASKS = Array.from({ length: 16 }, (_, i) => ({
   description: "한 줄\n두 줄\n세 줄",
 }));
 
-const FOCUSABLE = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  '[tabindex]:not([tabindex="-1"])',
-].join(",");
-
 interface Offender {
   /** 어떤 컨트롤인가 — 태그와 클래스. */
   what: string;
@@ -69,45 +60,57 @@ interface Sweep {
 }
 
 /**
- * 포커스를 하나씩 옮겨가며, 그 자리에서 실제로 보이는지 묻는다.
+ * 진짜 Tab 으로 걸으면서, 멈추는 자리마다 그것이 보이는지 묻는다.
  *
- * 두 가지가 이 함수를 순진한 구현과 가른다.
+ * 처음에는 포커스 가능한 것을 전부 찾아 `focus()`로 하나씩 옮겨 다녔다. 그 구현은
+ * **틀린 것을 잡는다.** 덮는 상세(`right-sheet` · `full-screen`)는 이미
+ * `useFocusTrap`이 Tab 을 서랍 안에 가두고 있고(§15.20, TaskDrawer.tsx:213),
+ * 그 덫은 `keydown`으로 동작하므로 스크립트가 직접 부르는 `focus()`는 그냥
+ * 통과한다. 그렇게 해서 뒤에 있는 목록의 컨트롤 열일곱 개가 "가려진 채 포커스를
+ * 받는다"고 잡혔는데, 키보드로는 애초에 닿지 않는 자리였다. 2.4.11이 말하는 것은
+ * **키보드 포커스**이고, 키보드가 갈 수 없는 곳은 이 기준의 자리가 아니다.
  *
- * 하나, `document.activeElement === el`로 거른다. 셀렉터에 걸리는 것과 포커스를
- * 받는 것은 다르다 — 모바일에서 닫힌 사이드바는 `visibility: hidden`이고
- * (`.tm-sidebar`, transform으로 -280px), 그 안의 행 일곱 개는 셀렉터에 걸리지만
- * 브라우저가 포커스를 주지 않는다. 그것을 세면 고칠 것이 없는 위반이 일곱 개
- * 잡히고, 실제로 첫 구현이 그렇게 잡았다.
+ * 그래서 진짜 Tab 을 누른다. 왕복이 한 번 더 들지만, 덫이든 `inert`든
+ * `tabindex="-1"`이든 브라우저가 실제로 적용한 결과 위를 걷게 된다 —
+ * `dispatchEvent`로 만든 Tab 은 핸들러에는 닿아도 포커스를 옮기지 않으므로
+ * 여기서는 쓸 수 없다(같은 이유가 TASK_DETAIL_PANEL_MERGE_DESIGN.md §8.7에도
+ * 적혀 있다).
  *
- * 둘, 점 하나가 아니라 격자로 친다. 가운데 한 점만 보면 컨트롤 한가운데를 지나는
- * 얇은 구분선 하나에도 "가려졌다"가 나온다. 25점 중 하나라도 자기 자신(또는 자기
- * 자손·조상)에게 닿으면 그 자리는 보인다 — 기준이 말하는 것은 '완전히' 가려지는
- * 것이다.
+ * 한 바퀴를 돈 것을 어떻게 아는가: 들른 노드를 `WeakSet`에 담아두고 다시 만나면
+ * 멈춘다. 서랍처럼 갇힌 자리는 열 몇 걸음에 돌아오고, 목록은 마지막 컨트롤을
+ * 지나 주소창으로 나갔다가 처음으로 돌아온다. 둘 다 같은 신호다.
  *
- * 조상을 통과로 세는 이유: 어떤 점에서 제일 위에 오는 것이 자기 조상이라는 말은,
- * 그 자리에 남의 것이 얹혀 있지 않다는 뜻이다. 컨트롤의 투명한 여백을 지나 부모가
- * 잡히는 경우이고, 포커스 윤곽은 그 위에 그려진다.
+ * 점 하나가 아니라 25점 격자로 치는 이유는 그대로다. 컨트롤 한가운데를 지나는
+ * 얇은 구분선 하나에 "가려졌다"가 나오지 않아야 하고, 기준이 말하는 것은
+ * '완전히' 가려지는 것이다. 조상을 통과로 세는 것도 같은 자리 — 어떤 점에서 제일
+ * 위에 오는 것이 자기 조상이라는 말은 그 자리에 남의 것이 얹혀 있지 않다는 뜻이고,
+ * 포커스 윤곽은 그 위에 그려진다.
  */
-async function sweep(page: Page): Promise<Sweep> {
-  return page.evaluate((selector) => {
-    const offenders: Offender[] = [];
-    let focused = 0;
+async function sweep(page: Page, maxStops = 200): Promise<Sweep> {
+  await page.evaluate(() => {
+    (window as unknown as { __focusSeen?: WeakSet<Element> }).__focusSeen = new WeakSet<Element>();
+  });
 
-    const name = (el: Element | null): string => {
-      if (!el) return "(없음)";
-      const cls = typeof el.className === "string" ? el.className.trim().split(/\s+/).join(".") : "";
-      return `${el.tagName.toLowerCase()}${cls ? `.${cls}` : ""}`;
-    };
+  const offenders: Offender[] = [];
+  let focused = 0;
 
-    for (const el of document.querySelectorAll<HTMLElement>(selector)) {
-      // 스크롤을 막지 않는다 — 포커스가 화면 안으로 끌려 들어오는 그 동작이
-      // 기준이 말하는 상황을 만든다. 막으면 재는 것이 달라진다.
-      el.focus();
-      if (document.activeElement !== el) continue;
-      focused += 1;
+  for (let step = 0; step < maxStops; step += 1) {
+    await page.keyboard.press("Tab");
+    const stop = await page.evaluate(() => {
+      const seen = (window as unknown as { __focusSeen: WeakSet<Element> }).__focusSeen;
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || el === document.body || el === document.documentElement) return { done: true as const };
+      if (seen.has(el)) return { done: true as const };
+      seen.add(el);
+
+      const name = (node: Element | null): string => {
+        if (!node) return "(없음)";
+        const cls = typeof node.className === "string" ? node.className.trim().split(/\s+/).join(".") : "";
+        return `${node.tagName.toLowerCase()}${cls ? `.${cls}` : ""}`;
+      };
 
       const rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) continue;
+      if (rect.width === 0 || rect.height === 0) return { done: false as const, offender: null };
 
       const vw = window.innerWidth;
       const vh = window.innerHeight;
@@ -119,8 +122,10 @@ async function sweep(page: Page): Promise<Sweep> {
       // 브라우저가 끌어들이고도 화면 안에 들이지 못했다면, 덮인 것과 결과가
       // 같다 — 포커스가 어디 있는지 보이지 않는다.
       if (right <= left || bottom <= top) {
-        offenders.push({ what: name(el), why: "화면 밖", top: Math.round(rect.top) });
-        continue;
+        return {
+          done: false as const,
+          offender: { what: name(el), why: "화면 밖" as const, top: Math.round(rect.top) },
+        };
       }
 
       let visible = 0;
@@ -135,13 +140,21 @@ async function sweep(page: Page): Promise<Sweep> {
         }
       }
 
-      if (visible === 0) {
-        offenders.push({ what: name(el), why: "가려짐", by, top: Math.round(rect.top) });
-      }
-    }
+      return {
+        done: false as const,
+        offender:
+          visible === 0
+            ? { what: name(el), why: "가려짐" as const, by, top: Math.round(rect.top) }
+            : null,
+      };
+    });
 
-    return { focused, offenders };
-  }, FOCUSABLE);
+    if (stop.done) break;
+    focused += 1;
+    if (stop.offender) offenders.push(stop.offender);
+  }
+
+  return { focused, offenders };
 }
 
 /**
@@ -155,37 +168,6 @@ async function expectNothingHidden(page: Page, atLeast: number): Promise<void> {
   const { focused, offenders } = await sweep(page);
   expect(offenders).toEqual([]);
   expect(focused).toBeGreaterThanOrEqual(atLeast);
-}
-
-/**
- * 아직 지고 있는 하나 — 덮는 상세가 뒤를 재우지 않는다.
- *
- * 상세는 다섯 가지로 발표된다(`TASK_DETAIL_PRESENTATION`). 넓은 데스크톱의
- * `inline-drawer`는 자기 열을 차지하므로 뒤를 덮지 않고, 이 스펙도 거기서는
- * 통과한다. 태블릿의 `right-sheet`와 모바일의 `full-screen`은 목록 위에 얹히는데,
- * 그 아래 목록의 행·체크박스·메뉴 버튼이 여전히 포커스를 받는다 — 완전히 가려진
- * 채로. 2.4.11이 말하는 바로 그 상태다.
- *
- * 설계가 이미 반대편을 적어뒀다는 점이 이것을 틈으로 만든다. §15.13은
- * "전체 화면 상세가 화면을 가진다. 뒤에 있는 것은 흐려지는 것이 아니라 비켜난다"
- * 이고, CSS는 그 말대로 메뉴 트리거까지 숨긴다(17-tasks-module.css:2724). 비켜나지
- * 않은 것은 탭 순서뿐이다. 마우스에게는 비켜났고 키보드에게는 아니다.
- *
- * 고치는 자리는 이 스펙이 아니라 `TasksModule`이고(덮는 발표일 때 뒤의 영역을
- * `inert`로), 그것은 포커스 관리의 결정이라 이 파일이 혼자 내릴 것이 아니다.
- * 그때까지 `test.fail()`로 적어둔다 — Playwright는 이 표시가 붙은 테스트가
- * **통과하면** 실패로 뒤집는다. 고쳐지는 순간 이 줄을 지우라고 빨간불이 켜지는
- * 쪽이고, KNOWN 목록과 같은 래칫이다.
- *
- * 프로젝트 이름이 아니라 DOM에서 발표 방식을 읽는 이유: 이 표시가 "모바일에서는
- * 봐준다"가 아니라 "덮는 발표에서는 아직 못 고쳤다"를 뜻하게 하려는 것이다.
- * 브레이크포인트가 옮겨가도 표시는 같은 것을 가리킨다.
- */
-async function expectOverlayDetailIsKnownToFail(page: Page): Promise<void> {
-  const drawer = page.locator(".tm-drawer").first();
-  if ((await drawer.count()) === 0) return;
-  const classes = (await drawer.getAttribute("class")) ?? "";
-  if (/is-right-sheet|is-full-screen/.test(classes)) test.fail();
 }
 
 test.describe("포커스가 가려지지 않는다 (WCAG 2.2 · 2.4.11)", () => {
@@ -206,7 +188,11 @@ test.describe("포커스가 가려지지 않는다 (WCAG 2.2 · 2.4.11)", () => 
     ["보드", `/list/${LIST.id}?view=board`, 20],
     ["타임라인", `/list/${LIST.id}?view=gantt`, 20],
     ["캘린더", "/calendar", 20],
-    ["상세 서랍", `/list/${LIST.id}?task=t0`, 20],
+    // 서랍의 바닥만 낮다. 덮는 발표에서는 `useFocusTrap`이 Tab 을 서랍 안에
+    // 가두므로(§15.20) 한 바퀴가 열 몇 걸음이고, 뒤의 목록은 세어지지 않는다 —
+    // 세어지지 않는 것이 옳다. 스무 걸음을 요구하면 그 덫이 있다는 이유로
+    // 실패한다.
+    ["상세 서랍", `/list/${LIST.id}?task=t0`, 8],
   ] as const) {
     test(`${what}`, async ({ page }) => {
       await page.goto(url);
@@ -214,7 +200,6 @@ test.describe("포커스가 가려지지 않는다 (WCAG 2.2 · 2.4.11)", () => 
       // 붙어 있는 것들은 첫 페인트가 아니라 레이아웃이 자리를 잡은 뒤에 제자리에
       // 온다. 그 전에 재면 아직 아무것도 덮고 있지 않다.
       await page.waitForTimeout(500);
-      await expectOverlayDetailIsKnownToFail(page);
       await expectNothingHidden(page, atLeast);
     });
   }
