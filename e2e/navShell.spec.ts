@@ -23,18 +23,20 @@ import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./addList.helpers";
 
 const WIDTH_KEY = "focusflow-sidebar-width";
-// 144 since the timeline reference set the sidebar's width
-// (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.1, §4.6). The list mockup says 232
-// and the timeline mockup says 144; the two disagree and the sidebar is one
-// shared column, so `CONTEXT_SIDEBAR_DEFAULT_WIDTH` in
-// `src/app/contextSidebar` is where that is decided and why.
-const DEFAULT_WIDTH = 144;
+// 목업 셋이 어긋난다 — §3.6이 248, 목록 목업이 232
+// (POLISHED_REFERENCE_PARITY_DESIGN.md §2.1), 타임라인 목업이 144
+// (TIMELINE_REFERENCE_PARITY_DESIGN.md §2.1, §4.6). 사이드바는 셋이 나눠 쓰는 한
+// 열이라 `CONTEXT_SIDEBAR_DEFAULT_WIDTH`가 그것을 정하는 자리이고, 왜 200인지도
+// 거기 적혀 있다 — 144에서는 트리의 이름이 7~15px만 받아 두 글자짜리 폴더도
+// 못 읽었다 [실측].
+const DEFAULT_WIDTH = 200;
 // 화살표 한 칸. 위 값들이 `DEFAULT_WIDTH + n`으로 적힌 이유는 이번에 드러났다 —
 // 336·304·288·264가 리터럴이라, 기본폭이 248에서 232로 내려가자 넷이 한꺼번에
 // 빨개졌다. 재는 대상은 "기본값에서 얼마나 움직였나"이지 절대 픽셀이 아니다.
 const STEP = 16;
-// The default is also the floor now: there is no reason to go narrower than
-// the reference, and the handle's job is to make the column WIDER.
+// 바닥은 타임라인 목업의 144다. 기본값이 그 위로 올라갔으므로 손잡이는 이제
+// 양쪽으로 쓸모가 있다 — 넓히는 쪽뿐 아니라, 목업의 폭을 원하는 사람이 거기까지
+// 끄는 쪽으로도.
 const MIN_WIDTH = 144;
 const MAX_WIDTH = 360;
 
