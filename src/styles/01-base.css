@@ -48,7 +48,6 @@
   --color-canvas-parchment: #f5f5f7;
   --color-surface-pearl: #fafafc;
   --color-surface-tile-1: #272729;
-  --color-surface-black: #000000;
   --color-on-dark: #ffffff;
   /* Tint of Action Blue for soft button fills */
   --color-primary-tint: rgba(0, 102, 204, 0.1);
@@ -87,7 +86,6 @@
      하고 있었고, "밋밋하다"의 정체가 액센트가 아니라 이것이었다.
      1.07씩 벌린다 — 1.01은 안 보이고 1.15는 계단이 눈에 띈다. */
   --bg-app: #eff1f5;
-  --bg-sidebar: #ffffff;
   --bg-surface: #ffffff;
   --bg-surface-muted: #f5f5f7;
   /* One ladder, six steps, and five of them are measured. §3.1 collected the
@@ -277,11 +275,9 @@
   --weight-medium: 600;
   --weight-bold: 700;
 
-  /* 위 두 스케일로 다시 쓴 기존 축약형. 22/16은 스케일에 없던 값이었다. */
-  --font-page-title: var(--weight-bold) var(--type-2xl) / 32px var(--font-sans, inherit);
-  --font-section-title: var(--weight-medium) var(--type-xl) / 24px var(--font-sans, inherit);
   /* 스케일의 최소 단을 가리킨다. 이름은 한 곳(09-calendar-redesign.css)이
-     아직 부르고 있어 남긴다. */
+     아직 부르고 있어 남긴다. 같은 규칙으로 `--font-page-title`·
+     `--font-section-title` 은 지웠다 — 부르는 곳이 없었다. */
   --label-size: var(--type-2xs);
   --label-tracking: 0.08em;
 
@@ -452,7 +448,6 @@
      itself with — finding out what colour the Rail was meant to be started
      by grepping the calendar. Same values, moved (P0-10). */
   --ff-page: var(--bg-app);
-  --ff-sidebar: var(--bg-sidebar);
   --ff-surface: var(--bg-surface);
   --ff-surface-muted: var(--bg-surface-muted);
   --ff-blue: var(--accent);
@@ -554,7 +549,6 @@ body {
   --bg-selected-hover: rgba(255, 255, 255, 0.1);
   --bg-pressed: rgba(255, 255, 255, 0.12);
   --bg-app: #141417;
-  --bg-sidebar: #1c1c1e;
   --bg-surface: #1c1c1e;
   --bg-surface-muted: #232325;
   /* The same six steps as light — see the ladder in `:root`. */

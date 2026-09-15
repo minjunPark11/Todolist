@@ -1,7 +1,6 @@
 /* === Space Detail work hub (SPACE_DETAIL_COMPLETE_IMPLEMENTATION_SPEC) === */
 
 .sdv-page {
-  --sdv-accent: #6d4aff;
   display: grid;
   gap: 16px;
   min-width: 0;
