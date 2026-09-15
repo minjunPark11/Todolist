@@ -100,6 +100,17 @@ function themeBlocks(): Block[] {
       else if (/^\[data-accent="\w+"\]$/.test(selector)) {
         const accent = selector.slice('[data-accent="'.length, -2);
         applies = (c) => c.accent === accent;
+      } else if (/^\[data-theme="dark"\]\[data-accent="\w+"\]$/.test(selector)) {
+        // (0,2,0). 다크에서 액센트별로 갈라지는 자리다.
+        //
+        // 이 갈래가 없을 때 이 파일은 **그 블록들을 통째로 못 봤다.** 위의
+        // `[data-accent="…"]` 정규식이 `^…$`로 묶여 있어 복합 셀렉터에 걸리지
+        // 않았고, 걸리지 않은 블록은 `applies`가 null이라 조용히 건너뛰어진다 —
+        // 다크 네 색을 새로 적고 테스트를 돌렸는데 케이스 수가 88 그대로였다.
+        // 재는 쪽이 못 보는 것은 없는 것과 같아서, 통과가 아니라 침묵이었다.
+        const accent = selector.slice(selector.indexOf('[data-accent="') + '[data-accent="'.length, -2);
+        applies = (c) => c.theme === "dark" && c.accent === accent;
+        rank = 2;
       } else if (selector === ':root:not([data-accent="blue"])') {
         // (0,2,0). `--accent-ink`가 blue 전용 잉크를 덮는 자리이고, 특정도가
         // 높아서 소스 순서와 무관하게 이긴다 (25-reference.css).
