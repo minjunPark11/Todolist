@@ -26,6 +26,15 @@ export type RailItem = (typeof RAIL_ITEMS)[number];
 export type RailNavItem = Exclude<RailItem, "search">;
 
 /**
+ * 같은 목록을 값으로도 쓴다 — 폰의 아래쪽 막대가 그리는 칸들이다.
+ *
+ * 타입에서 검색을 뺀 이유가 그대로 막대에서 뺀 이유다: §2.14의 검색은 이동이
+ * 아니라 대화상자를 여는 것이고, 활성 상태를 갖지 않는 것은 그것이 장소가
+ * 아니기 때문이다. 내비게이션 막대는 장소를 담는다 (`MobileNav`).
+ */
+export const RAIL_NAV_ITEMS = RAIL_ITEMS.filter((item): item is RailNavItem => item !== "search");
+
+/**
  * Where Tasks goes when there is no last location to return to.
  *
  * The Tasks Module's own Today, not the legacy `/app` one: the Rail is the

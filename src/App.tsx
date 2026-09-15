@@ -46,6 +46,7 @@ import {
 } from "./app/railNav";
 import { AppShell } from "./components/shell/AppShell";
 import { GlobalRail } from "./components/shell/GlobalRail";
+import { MobileNav } from "./components/shell/MobileNav";
 import { taskUrlFor } from "./app/taskScopeUrl";
 import { useContextSidebar } from "./hooks/useContextSidebar";
 import { useRecents } from "./hooks/useRecents";
@@ -1443,7 +1444,12 @@ export default function App() {
       calendars: externalCalendarState.calendars,
     });
 
+    // 레일과 폰의 막대는 한 자리에서 나간다. 둘은 서로를 배제하고(CSS의 767px),
+    // 프레임이 받는 것은 "전역 탐색" 하나이므로 그 하나가 두 모양을 다 들고 간다 —
+    // `AppShell`이 `{rail}`을 `.app-frame`의 직계로 그리므로 막대도 그 자리에서
+    // 제 랜드마크가 된다.
     return (
+      <>
       <GlobalRail
         active={railItem}
         onNavigate={navigateRail}
@@ -1499,6 +1505,8 @@ export default function App() {
           />
         }
       />
+      <MobileNav active={railItem} onNavigate={navigateRail} />
+      </>
     );
   }
 

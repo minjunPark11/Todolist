@@ -879,3 +879,78 @@
   color: var(--text-tertiary);
   max-width: 30ch;
 }
+
+/* ============================================================================
+   폰의 아래쪽 내비게이션 (Nav Shell spec §2.39 · 2026-09-15)
+
+   위 §2.39 블록이 레일을 767px 아래에서 감추며 "레거시 셸의 햄버거와 Tasks의
+   오버레이 사이드바가 모든 목적지에 여전히 닿으므로 레일은 비켜난다"고 적어뒀다.
+   앱을 띄워 재보니 그 문장이 사실이 아니었다 — Tasks 드로어가 그리는 것은
+   Tasks의 Scope뿐이고(오늘 · 다음 7일 · 기본함 · 리스트 · 태그 · 필터 · 완료 ·
+   휴지통), 캘린더 · 매트릭스 · 집중 · 설정으로 가는 링크는 화면 어디에도 없다.
+   레거시 햄버거는 `contextSidebar.mode`가 `none`인 페이지에서 아무것도 열지
+   않는다. 네 곳이 주소창 말고는 닿을 길이 없었다 [실측 · 393px].
+
+   같은 블록이 "Restoring it as a bottom bar is §2.39's mobile shell"이라고도
+   적어뒀는데, 그 문장은 스펙을 거꾸로 읽은 것이다. §2.39의 실제 문장은
+   "향후 완전한 mobile navigation이 필요하면 **별도 설계한다**"와
+   "P0 Desktop/Web Rail을 **억지로 bottom bar로 변환하지 않는다**"이다.
+   그래서 레일을 눕히지 않고 `MobileNav`를 따로 만들었다. 아래는 그 막대의 옷이고,
+   왜 라벨이 보이는지와 왜 검색이 없는지는 그 파일에 적혀 있다.
+   ========================================================================== */
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .mobile-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 60;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    /* 안전 영역은 패딩으로 받는다 — 막대의 배경은 화면 끝까지 내려가고 손가락이
+       닿는 칸만 그 위로 올라온다. */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    /* 44는 이 앱이 스스로 세운 터치 바닥이고(taskRow.spec.ts), 49는 그 위에서
+       아이콘 28과 라벨 한 줄이 함께 서는 높이다. 패딩이 6/2인 것은 §11의
+       사다리 위에 있는 값이기 때문이다 — 5px으로 적었다가 `scale.test.ts`가
+       잡았고, 그 사다리에 5는 없다. */
+    min-height: 49px;
+    padding: 6px 2px;
+    border: 0;
+    background: transparent;
+    color: var(--text-tertiary);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .mobile-nav-item.is-active {
+    color: var(--accent);
+  }
+
+  .mobile-nav-label {
+    font-size: var(--type-2xs);
+    line-height: 1.1;
+  }
+
+  /* 막대가 마지막 줄을 덮지 않도록 프레임이 자리를 비운다. 높이를 두 번 적지
+     않으려고 변수 하나로 묶는다. */
+  .app-frame {
+    --mobile-nav-h: calc(49px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--mobile-nav-h);
+  }
+}
