@@ -453,7 +453,20 @@ export function WeekView({
     const el = scrollRef.current;
     if (!el) return;
     const sticky = el.querySelector<HTMLElement>(".gcal-timegrid-sticky");
-    const measure = () => setSlotHeight(slotHeightFor(el.clientHeight - (sticky?.offsetHeight ?? 0), hoursAtATime));
+    const measure = () => {
+      const head = sticky?.offsetHeight ?? 0;
+      // WCAG 2.2 · 2.4.11: Tab 으로 격자 아래쪽의 칩에 닿으면 브라우저가 그것을
+      // 스크롤해 들이는데, 그 기준점은 스크롤 상자의 위 끝이다 — 머리가 그 위에
+      // 붙어 있으므로 13px짜리 체크박스는 통째로 머리 뒤로 들어간다. 포커스가
+      // 어디 있는지 보이지 않는다는 뜻이고, `e2e/focusObscured.spec.ts`가
+      // 그것을 재다가 잡았다.
+      //
+      // 여기서 주는 이유는 머리의 높이가 상수가 아니기 때문이다 — 종일 줄이
+      // 자라면 같이 자란다. 바로 위에서 그 높이를 이미 재고 있고 `ResizeObserver`가
+      // 그것을 따라가므로, 한 줄을 더하는 것이 CSS에 숫자를 박는 것보다 정확하다.
+      el.style.scrollPaddingTop = `${head}px`;
+      setSlotHeight(slotHeightFor(el.clientHeight - head, hoursAtATime));
+    };
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);

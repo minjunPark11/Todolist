@@ -23,7 +23,31 @@ import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./addList.helpers";
 
 const LIST = { id: "list-focus", name: "Focus" };
-const TODAY = new Date().toISOString().slice(0, 10);
+
+/**
+ * 시계를 세워 둔다.
+ *
+ * 시간 격자는 "지금"으로 스크롤해서 열린다(WeekView.tsx §6.4). 그래서 벽시계가
+ * 몇 시냐에 따라 Tab 이 칩을 끌어들이느라 스크롤을 하기도 하고 안 하기도 하고,
+ * 스크롤을 해야 비로소 붙어 있는 머리 아래로 들어가는 자리가 생긴다. 이 스펙은
+ * 실제로 그렇게 움직였다 — 아침 다섯 시에 통과하고 여덟 시에 실패했다. 벽시계에
+ * 따라 답이 달라지는 그물은 어느 쪽으로든 못 믿는다.
+ *
+ * 그래서 시각을 한 자리에 묶되, 아무 자리나 고르지 않는다. 격자는 `지금 - 1시간`에
+ * 열리고 아래 할 일들은 05시부터 21시까지 걸쳐 있으므로, 몇 시로 묶느냐에 따라
+ * Tab 이 칩을 끌어들이며 스크롤을 하는지가 갈린다. 실제로 재봤다 — 머리 높이를
+ * 0으로 되돌려 놓고 (즉 고치기 전 상태로) 세 시각을 돌렸을 때:
+ *
+ *   08시  실패  ← 머리 뒤로 들어간다
+ *   10시  통과
+ *   17시  통과
+ *
+ * 통과하는 시각으로 묶었다면 이 스펙은 결정적이면서 아무것도 증명하지 않는
+ * 초록이 된다 — 벽시계에 매달린 것보다 나쁘다. 그래서 08시다. 대신 이 그물이
+ * 재는 것은 그 한 시각의 기하이고, 다른 시각의 다른 배치까지 보는 것은 아니다.
+ */
+const NOW = new Date("2026-09-15T08:00:00");
+const TODAY = "2026-09-15";
 
 /**
  * 화면이 스크롤될 만큼의 데이터.
@@ -172,6 +196,9 @@ async function expectNothingHidden(page: Page, atLeast: number): Promise<void> {
 
 test.describe("포커스가 가려지지 않는다 (WCAG 2.2 · 2.4.11)", () => {
   test.beforeEach(async ({ page }) => {
+    // 첫 탐색보다 먼저. 앱이 마운트하면서 읽는 그 `Date`를 바꾸는 것이므로,
+    // `openApp`의 `goto` 뒤에 걸면 이미 지나간 뒤다.
+    await page.clock.setFixedTime(NOW);
     await openApp(page, { lists: [LIST], tasks: TASKS });
   });
 
