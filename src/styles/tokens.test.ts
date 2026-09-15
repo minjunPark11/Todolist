@@ -193,18 +193,55 @@ const LADDER = [640, 768, 900, 1120, 1240];
  */
 const onLadder = (w: number) => LADDER.some((step) => Math.abs(w - step) <= 1);
 
-/** 아직 사다리 밖인 `@media` 선언의 수. 0 이 목표다. */
-const OFF_LADDER: Record<string, number> = {
-  "03-planning.css": 2,
-  "08-calendar-categories.css": 1,
-  "13-list-view.css": 1,
-  "14-scope-calendar.css": 1,
-  "15-goals-section.css": 1,
-  "16-overview-section.css": 2,
-  "17-tasks-module.css": 2,
-  "19-app-shell.css": 3,
-  "26-timeline.css": 4,
-  "27-calendar.css": 1,
+/**
+ * 사다리 밖에 서 있어도 되는 자리와, 그 근거.
+ *
+ * 18곳을 훑고 나서 이 표의 모양이 바뀌었다. 처음에는 파일별 숫자를 0으로
+ * 줄여가는 래칫이었는데, 읽어보니 그중 **열한 곳은 드리프트가 아니었다**.
+ * 스펙이나 실측이 그 폭을 이름으로 정하고 있었다.
+ *
+ * 그래서 이 표가 말하는 것은 "0 으로 가라"가 아니라 "근거 없이 늘지 마라"다.
+ * 근거를 한 줄로 못 적겠으면 그 질의는 사다리로 와야 한다.
+ *
+ * 여기서 드러난 사실 하나: 01-base.css 의 `--bp-*` 주석은 "반드시 이 5개만
+ * 사용한다"고 말하는데 그것은 이미 사실이 아니다. 앱은 두 사다리 위에서 돈다 —
+ * 반응형 감사가 정한 다섯 단과, 스펙이 정한 데스크톱 단(960 · 1024 · 1280).
+ * 뒤엣것이 아홉 번 나오므로 드리프트라고 부를 수 없다. 그 사실을 01-base.css
+ * 쪽에도 적어뒀다.
+ *
+ * 키는 `파일:폭` 이다. 줄번호는 위에 한 줄만 들어와도 밀리고, 같은 파일의 같은
+ * 폭은 같은 근거를 갖는다.
+ */
+const LADDER_EXCEPTIONS: Record<string, string> = {
+  // 실측이다: "Account, Appearance and Data hold at 680 and wrap by 660".
+  // 같은 주석이 컨테이너 질의가 더 옳은 방아쇠라는 것과, `ConfirmModal` 이
+  // `.ff-settings-page` 안에 인라인으로 그려져서 `container-type` 이 그
+  // `position: fixed` 뒷막의 포함 블록이 되어버리기 때문에 쓸 수 없다는 것까지
+  // 적어뒀다. 639 로 내리면 660 에서 깨지는 것을 내가 깨뜨리는 셈이다.
+  "03-planning.css:680": "실측 — 680에서 버티고 660에서 무너진다",
+
+  // §14.2 의 네 띠. "Compact desktop, 960-1279" 와 "§2.3.2's floor for two
+  // panels is 960" 이 그 파일에 적혀 있다.
+  "17-tasks-module.css:1279": "§14.2 의 띠 경계",
+  "17-tasks-module.css:959": "§2.3.2 — 두 판이 서는 바닥이 960",
+
+  // "§3.33: all of this is the PERSISTENT sidebar, which exists at >=1024px
+  // only." 1023 은 그 짝이다.
+  "19-app-shell.css:1024": "§3.33 — 상주 사이드바는 1024 이상에만 있다",
+  "19-app-shell.css:1023": "§3.33 의 짝",
+  // "At >= 1280 the module reserves that column whether or not a Task is
+  // open (audit D1-1)".
+  "19-app-shell.css:1279": "audit D1-1 — 1280 이상에서 상세 열을 예약한다",
+
+  // 960 을 세 번 명시한다 — 페이지 헤더가 접히고, 툴바가 사라지고, 트레이가
+  // 밀지 않고 덮는 지점. 17-tasks-module.css 의 §2.3.2 와 같은 자리다.
+  "26-timeline.css:961": "960 임계의 짝",
+  "26-timeline.css:960": "§2.3.2 와 같은 자리 — 두 열이 서는 바닥",
+  "26-timeline.css:1023": "§3.33 의 짝 — 손잡이와 같은 이유로 데스크톱 전용",
+
+  // "레퍼런스는 1350px 아래에서 사이드바 205 · 제목 21px으로 줄인다."
+  // 25-reference.css 와 같은 종류의 전사다.
+  "27-calendar.css:1350": "레퍼런스 전사 (§4.6)",
 };
 
 /**
@@ -231,39 +268,48 @@ function stylesheets(): string[] {
   return [...barrel.matchAll(/@import\s+"\.\/styles\/([^"]+)"/g)].map((m) => m[1]);
 }
 
+/** 이 리포가 실제로 쓰는 사다리 밖 폭 전부, `파일:폭` 으로. */
+function survey(): Map<string, { line: number; width: number; query: string; file: string }> {
+  const seen = new Map<string, { line: number; width: number; query: string; file: string }>();
+  for (const file of stylesheets()) {
+    for (const hit of offLadder(readFileSync(join(HERE, file), "utf8"))) {
+      const key = `${file}:${hit.width}`;
+      if (!seen.has(key)) seen.set(key, { ...hit, file });
+    }
+  }
+  return seen;
+}
+
 describe("중단점 사다리 (01-base.css --bp-*)", () => {
-  const listed = Object.keys(OFF_LADDER).sort();
+  it("근거 없는 폭이 새로 생기지 않는다", () => {
+    const unlisted = [...survey().entries()]
+      .filter(([key]) => !(key in LADDER_EXCEPTIONS))
+      .map(([key, hit]) => `  ${hit.file}:${hit.line}  ${hit.query.slice(0, 56)}  → ${key}`)
+      .sort();
 
-  it.each(listed)("%s — 사다리 밖 @media 가 늘지 않는다", (name) => {
-    const found = offLadder(readFileSync(join(HERE, name), "utf8"));
-    const ceiling = OFF_LADDER[name];
-
-    if (found.length > ceiling) {
-      throw new Error(
-        `${name}: 사다리 밖 ${found.length}곳 (천장 ${ceiling}).\n` +
-          `다섯 단(${LADDER.join(" · ")}) 중 하나로 맞추거나, 이 폭이어야 하는 이유를\n` +
-          `주석으로 남기고 천장을 올려라.\n` +
-          found
-            .slice(ceiling)
-            .map((f) => `  ${name}:${f.line}  ${f.width}px  ${f.query.slice(0, 60)}`)
-            .join("\n"),
-      );
-    }
-
-    if (found.length < ceiling) {
-      throw new Error(
-        `${name}: ${ceiling} → ${found.length}로 줄었다. tokens.test.ts 의 OFF_LADDER 를\n` +
-          `  "${name}": ${found.length},\n로 내려라 — 그래야 이 자리가 다시 늘 때 잡힌다.`,
-      );
-    }
+    expect(
+      unlisted,
+      `사다리(${LADDER.join(" · ")}) 밖의 @media 가 생겼다. 다섯 단 중 하나로
+` +
+        `맞추거나 — max-width 는 위 단으로 올리는 쪽이 안전하다, 좁은 배치가 더
+` +
+        `일찍 걸릴 뿐이다 — 이 폭이어야 하는 근거를 한 줄로 적어
+` +
+        `LADDER_EXCEPTIONS 에 넣어라:
+${unlisted.join("\n")}`,
+    ).toEqual([]);
   });
 
-  it("목록에 없는 스타일시트는 사다리 위에 있다", () => {
-    const unlisted = stylesheets()
-      .filter((name) => !(name in OFF_LADDER))
-      .map((name) => [name, offLadder(readFileSync(join(HERE, name), "utf8")).length] as const)
-      .filter(([, count]) => count > 0);
+  it("표의 자리가 사라지면 표에서도 빠진다", () => {
+    const live = survey();
+    const stale = Object.keys(LADDER_EXCEPTIONS).filter((key) => !live.has(key)).sort();
 
-    expect(unlisted).toEqual([]);
+    expect(
+      stale,
+      `LADDER_EXCEPTIONS 에 적힌 자리가 이제 없다. 항목을 지워라 — 남겨두면
+` +
+        `다음 사람은 어느 예외가 아직 살아 있는지 알 수 없다:
+${stale.map((k) => `  ${k}`).join("\n")}`,
+    ).toEqual([]);
   });
 });

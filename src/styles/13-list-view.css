@@ -169,7 +169,7 @@
 /* §50A.24 / T-LV11 — never squeeze seven columns into an unreadable width.
  * The secondary fields go, the table keeps its shape, and the horizontal
  * scroll above stays available for what remains. */
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .tlv-table th:nth-child(3),
   .tlv-table td:nth-child(3),
   .tlv-table th:nth-child(6),

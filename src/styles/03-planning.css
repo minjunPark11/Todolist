@@ -885,7 +885,9 @@
 .ff-services-body input { max-width: 100%; min-width: 0; }
 .ff-services-body .ff-external-calendar-form { grid-template-columns: minmax(0, 1fr) auto; }
 .ff-services-body .ff-external-calendar-form input:not([type="color"]) { grid-column: 1 / -1; }
-@media (max-width: 600px) {
+/* xs(640)의 짝. 600 은 어디서 온 숫자인지 적혀 있지 않았고, 올리는 쪽이라
+   좁은 배치가 40px 더 일찍 걸릴 뿐 넘칠 일은 없다. */
+@media (max-width: 639px) {
   .ff-services-body .ff-external-calendar-item { grid-template-columns: 12px minmax(0, 1fr); }
   .ff-services-body .ff-external-calendar-actions { grid-column: 1 / -1; flex-wrap: wrap; }
 }

@@ -29,7 +29,7 @@
   margin-left: auto;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .tcv-toolbar { flex-wrap: wrap; }
   .tcv-today { margin-left: 0; }
 }

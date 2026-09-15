@@ -711,7 +711,9 @@
    The basis is the column minus the icon and its gap, which is what forces the
    line to break rather than letting the text shrink toward nothing under
    `min-width: 0`. */
-@media (max-width: 680px) {
+/* sm(768)의 짝. 03-planning.css 의 설정 행은 680 을 실측으로 지키지만
+   (거기 주석 참조) 이쪽 카드 머리에는 그런 측정이 없었다 — 사다리로 온다. */
+@media (max-width: 767px) {
   .ff-cal-card-head {
     flex-wrap: wrap;
   }
