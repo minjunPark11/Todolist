@@ -32,6 +32,40 @@ const TICK_MS = 30_000;
 
 const STORAGE_KEY = "focusflow.remindersFired.v1";
 
+/**
+ * 쓸기를 한 번에 한 탭만 하도록 묶는 자물쇠.
+ *
+ * 울린 기록(`STORAGE_KEY`)은 저장소에 있지만 각 탭은 그것을 **뜰 때 한 번**
+ * 읽어 메모리에 들고 있었다. 탭 둘이 이미 열려 있는 채로 시각이 도래하면
+ * 둘 다 자기 집합에서 그 열쇠를 못 찾고 둘 다 울린다 — 재보니 한 리마인더에
+ * OS 알림이 정확히 두 번 떴다 [실측: 탭별 [1,1]].
+ *
+ * 그래서 두 가지가 같이 필요하다. 쓸기를 시작할 때 저장소를 **다시 읽고**,
+ * 읽고-보고-쓰는 그 구간을 자물쇠로 묶는다. 다시 읽기만 하면 두 탭의 tick 이
+ * 같은 순간에 겹칠 때 여전히 둘 다 울릴 수 있다.
+ *
+ * `navigator.locks` 는 이 앱이 이미 쓰는 장치다 — `lib/focusHost.ts` 가
+ * 같은 것으로 "타이머를 쓰는 탭은 하나"를 정한다. 없는 환경(보안 컨텍스트가
+ * 아닌 곳)에서는 그냥 돈다: 그때의 최악은 예전과 같고, 더 나쁘지 않다.
+ */
+const SWEEP_LOCK = "focusflow.reminders.sweep.v1";
+
+function withSweepLock(run: () => void): void {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  if (!locks) {
+    run();
+    return;
+  }
+  // 대기하는 쪽을 고른다(`ifAvailable` 이 아니라). 자물쇠를 못 얻어 이번
+  // 차례를 건너뛰면 그 리마인더는 30 초를 늦게 도착한다 — 줄을 서면 앞
+  // 사람이 기록을 남긴 뒤에 들어가므로, 우리가 할 일은 "이미 울렸다"를
+  // 읽고 조용히 물러나는 것뿐이다. 콜백은 동기이고 짧아서 줄이 길어지지
+  // 않는다.
+  void locks.request(SWEEP_LOCK, () => {
+    run();
+  });
+}
+
 function readSeen(): Set<string> {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -87,10 +121,15 @@ export function useReminders({ tasks, describe, onFallback }: RemindersOptions) 
 
   useEffect(() => {
     if (seenRef.current === null) seenRef.current = readSeen();
+    let stopped = false;
 
-    function tick() {
+    function sweep() {
       const seen = seenRef.current;
-      if (seen === null) return;
+      if (seen === null || stopped) return;
+
+      // 매번 저장소에서 다시 읽어 합친다. 이 집합은 이 탭이 뜬 순간의
+      // 사진이고, 그 뒤에 옆 탭이 울린 것은 거기 없다.
+      for (const key of readSeen()) seen.add(key);
 
       const now = nowMoment();
       const { due, expired } = sweepReminders(latest.current.tasks, now, seen);
@@ -121,11 +160,18 @@ export function useReminders({ tasks, describe, onFallback }: RemindersOptions) 
       }
     }
 
+    const tick = () => withSweepLock(sweep);
+
     // Once immediately, so a reminder that came due in the last few minutes
     // arrives on opening the app rather than up to half a minute later.
     tick();
     const timer = window.setInterval(tick, TICK_MS);
-    return () => window.clearInterval(timer);
+    return () => {
+      // 자물쇠를 기다리던 차례가 언마운트 뒤에 들어올 수 있다. 그때 울리면
+      // 화면에 없는 앱이 알림을 내는 것이 된다.
+      stopped = true;
+      window.clearInterval(timer);
+    };
   }, []);
 }
 

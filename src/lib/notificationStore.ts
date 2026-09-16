@@ -42,6 +42,28 @@ function load(): AppNotification[] {
 let state: AppNotification[] = load();
 const listeners = new Set<() => void>();
 
+/**
+ * 옆 탭이 적은 것을 이 탭도 본다.
+ *
+ * 이 목록은 **장치의** 목록이지 탭의 목록이 아니다 (§3.1). 그런데 `state` 는
+ * 모듈이 처음 실행될 때 한 번 읽고 그 뒤로는 저장소를 다시 보지 않았고,
+ * 쓸 때는 자기 메모리 목록을 **통째로** 썼다. 그래서 한 탭이 적은 줄을 다른
+ * 탭의 다음 쓰기가 지웠다 — 재보니 옆 탭이 적어둔 줄이 이 탭의 리마인더
+ * 하나에 통째로 덮여 사라졌다 [실측].
+ *
+ * `storage` 이벤트는 다른 문서의 쓰기에서만 오므로, 이것이 곧 "옆 탭이
+ * 무언가 적었다"는 신호다.
+ */
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key !== null && event.key !== STORAGE_KEY) return;
+    const next = load();
+    if (JSON.stringify(next) === JSON.stringify(state)) return;
+    state = next;
+    listeners.forEach((listener) => listener());
+  });
+}
+
 function setState(next: AppNotification[]) {
   if (next === state) return;
   state = next;
@@ -82,8 +104,11 @@ export function useUnreadNotificationCount(): number {
  */
 export function recordNotification(draft: NotificationDraft): void {
   const at = draft.at || new Date().toISOString();
+  // 저장소에서 다시 읽은 것 위에 더한다. `storage` 이벤트가 이 탭에 닿기
+  // 전에 적는 경우(같은 틱에 두 탭이 적는 경우)가 남아 있고, 그때 메모리
+  // 목록을 그대로 쓰면 옆 탭의 줄이 사라진다.
   setState(
-    addNotification(state, {
+    addNotification(load(), {
       id: createId(),
       kind: draft.kind,
       title: draft.title,
@@ -97,7 +122,9 @@ export function recordNotification(draft: NotificationDraft): void {
 
 /** Opening the panel is the read (§3.3). */
 export function markNotificationsRead(): void {
-  setState(markAllRead(state, new Date().toISOString()));
+  // 같은 이유로 여기서도 다시 읽는다 — 읽음 표시는 목록 전체를 다시 쓰므로,
+  // 오래된 목록 위에 표시하면 그 사이에 들어온 줄을 지운다.
+  setState(markAllRead(load(), new Date().toISOString()));
 }
 
 /** Test seam: nothing in the app clears the list. */
