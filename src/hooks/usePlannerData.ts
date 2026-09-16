@@ -2041,6 +2041,18 @@ export function usePlannerData() {
         // Task rows from shared local storage have no trusted server revision.
         // Keep this tab's task drafts; revision loads adopt remote task updates.
         if (taskRevisionSessionRef.current) next.tasks = dataRef.current.tasks;
+        // 저장소가 옆 탭의 것으로 바뀌었다. 줄 서 있는 되돌리기 항목은
+        // 저마다 `PlannerData` 전체를 들고 있고, 그것들은 전부 바뀌기 **전**
+        // 저장소에서 떠온 것이다 — 지금 그중 하나를 되살리면 편집 한 걸음을
+        // 물리는 것이 아니라 옆 탭이 그 사이에 만든 것을 통째로 떨어뜨린다.
+        // 그러고 나면 다음 저장이 그 없음을 삭제로 읽어 계정에서도 지운다.
+        //
+        // 저장소를 갈아끼우는 다른 다섯 곳(원격 적재, 마이그레이션 업로드,
+        // 집중 전이, 구글 병합, 구글 충돌 해소)은 모두 이 번호를 올리고
+        // 있었다. 이 경로만 빠져 있었고, §16.21 이 말하는 일이 실제로
+        // 일어났다: A 와 B 두 탭에서 각각 하나씩 만든 뒤 A 에서 Ctrl+Z 를
+        // 누르면 저장소가 비었다 [실측].
+        storeRevisionRef.current += 1;
         dataRef.current = next; setDataState(next);
       } catch { /* Ignore malformed external storage events. */ }
     };

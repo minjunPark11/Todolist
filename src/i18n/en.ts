@@ -207,6 +207,8 @@ export const en: Dictionary = {
   "app.toastTasksArchived": "Archived {{n}} tasks.",
   "app.toastTaskDeleted": "Task deleted.",
   "app.toastUndone": "Undone.",
+  "app.toastNothingToUndo": "Nothing to undo.",
+  "app.toastUndoUnavailable": "That edit can no longer be undone — the data changed elsewhere.",
   "app.resetAllDataTitle": "Reset all data?",
   "app.resetAllDataBody": "This permanently deletes all user data on this device, including tasks, projects, goals, focus sessions, Project notes, and Project settings. This cannot be undone.",
   "app.resetAllDataBodySignedIn": "This permanently deletes all user data in the account {{email}}, on every signed-in device — tasks, projects, goals, focus sessions, Project notes, and Project settings. This cannot be undone.",

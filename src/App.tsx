@@ -65,7 +65,7 @@ import { isBackupDue } from "./domain/backup/schedule";
 import { useDataPortability } from "./app/useDataPortability";
 import { dismissToast, enqueueToast, type QueuedToast } from "./lib/toastQueue";
 import { formatFocusDuration, useNowTick } from "./lib/focusTimer";
-import { popUndo, pushUndo } from "./lib/undoStack";
+import { popUndo, pushUndo, undoDepth } from "./lib/undoStack";
 import { recordNotification } from "./lib/notificationStore";
 import { NotificationCenter } from "./components/shell/NotificationCenter";
 import { reducedTransition, transitions } from "./motion/transitions";
@@ -534,7 +534,12 @@ export default function App() {
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
       event.preventDefault();
+      const queued = undoDepth();
       if (popUndo()) showToast({ message: t("app.toastUndone") });
+      // 아무 일도 없었으면 그렇다고 말한다. 줄 서 있던 것이 있었는데도
+      // 물러나지 않았다면 그것은 §16.21 의 거절이고, 사람이 알아야 하는
+      // 것은 "되돌릴 것이 없다"가 아니라 "그 편집은 이제 되돌릴 수 없다"다.
+      else showToast({ message: t(queued > 0 ? "app.toastUndoUnavailable" : "app.toastNothingToUndo") });
     }
     window.addEventListener("keydown", onUndoKey);
     return () => window.removeEventListener("keydown", onUndoKey);

@@ -206,6 +206,8 @@ export const ko: Dictionary = {
   "app.toastTasksArchived": "할 일 {{n}}개를 보관했습니다.",
   "app.toastTaskDeleted": "할 일을 삭제했습니다.",
   "app.toastUndone": "실행 취소했습니다.",
+  "app.toastNothingToUndo": "되돌릴 것이 없습니다.",
+  "app.toastUndoUnavailable": "그 편집은 이제 되돌릴 수 없습니다 — 그 사이 데이터가 다른 곳에서 바뀌었습니다.",
   "app.resetAllDataTitle": "전체 데이터를 초기화할까요?",
   "app.resetAllDataBody": "이 기기의 모든 사용자 데이터가 영구적으로 삭제됩니다. 할 일, 프로젝트, 학습 주제, 노트, 집중 기록, 프로젝트 노트와 설정이 모두 삭제되며 되돌릴 수 없습니다.",
   "app.resetAllDataBodySignedIn": "{{email}} 계정의 모든 사용자 데이터가 로그인된 모든 기기에서 영구적으로 삭제됩니다. 할 일, 프로젝트, 학습 주제, 노트, 집중 기록, 프로젝트 노트와 설정이 모두 삭제되며 되돌릴 수 없습니다.",

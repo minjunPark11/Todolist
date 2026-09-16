@@ -41,6 +41,18 @@ export function pushUndo(fn: UndoFn) {
 // A group whose restores all decline is discarded and the next one tried, so
 // Ctrl+Z reaches the newest edit it can still undo instead of doing nothing
 // visible while the caller reports success.
+/**
+ * 지금 줄 서 있는 묶음의 수.
+ *
+ * `popUndo` 가 `false` 를 돌린 뒤에는 스택이 비어 있으므로, 그것만으로는
+ * "되돌릴 것이 없었다"와 "있었지만 전부 거절됐다"를 구분할 수 없다. 누르기
+ * **전에** 한 번 세면 구분된다. 거절은 옳은 동작이지만, 옳은 거절을 아무 말
+ * 없이 하면 누른 사람에게는 키가 죽은 것과 같아 보인다.
+ */
+export function undoDepth(): number {
+  return stack.length;
+}
+
 export function popUndo(): boolean {
   for (;;) {
     const group = stack.pop();
