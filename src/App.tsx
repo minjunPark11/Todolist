@@ -104,6 +104,7 @@ import type {
 import { useReminders } from "./hooks/useReminders";
 import { formatLocalTime, remindersForTask, specOf } from "./domain/schedule";
 import { todayValue } from "./utils/date";
+import { useDayRollover } from "./hooks/useDayRollover";
 import { I18nProvider, translate, useT } from "./i18n";
 import { isWontDo } from "./domain/tasks/taskState";
 import { isTaskActive } from "./domain/tasks/scopeQuery";
@@ -262,7 +263,9 @@ export default function App() {
   const externalCalendarCloudHydratedRef = useRef(false);
   const sharePublishTimerRef = useRef<number | null>(null);
 
-  const today = todayValue();
+  // 날이 바뀌면 따라온다. `todayValue()` 를 그냥 부르면 값은 맞지만 자정에 다시
+  // 묻는 사람이 없어서, 켜둔 채 밤을 넘기면 어제의 "Today" 가 그대로 남았다.
+  const today = useDayRollover();
 
   /**
    * The Task Detail these pages open — the same one the Tasks module opens.
