@@ -4,9 +4,9 @@ import { readGoogleTaskSyncState, subscribeGoogleTaskSync } from "../../lib/goog
 import type { GoogleTaskChoice } from "../../lib/googleTaskCoordinator";
 import { toTaskInboundFields } from "../../domain/calendar/googleSync/taskInboundShape";
 import { toTaskSharedPatch } from "../../domain/calendar/googleSync/taskOutboundPlan";
-import { sameRecurrence, taskRecurrence } from "../../domain/calendar/googleSync/taskRecurrence";
+import { taskRecurrence } from "../../domain/calendar/googleSync/taskRecurrence";
 import "./googleTaskReview.css";
-import { googleReviewCount } from "../../lib/googleReviewCount";
+import { googleReviewCount, googleReviewGroups } from "../../lib/googleReviewCount";
 
 function RepeatDescription({ rules, timezone }: { rules: unknown; timezone: string }) {
   const { t, lang } = useT();
@@ -37,21 +37,11 @@ export function GoogleTaskReviewPanel({ onOpenDeviceReview }: { onOpenDeviceRevi
   const { t } = useT(); const [limit, setLimit] = useState(30);
   if (!state.enabled) return null;
   const snapshot = state.snapshot;
-  const reviews = snapshot?.records.filter(r => r.decision.kind === "review" || r.decision.kind === "conflict" || r.decision.reason === "excluded") ?? [];
-  const skips = snapshot?.records.filter(r => r.decision.kind === "skip" && !["excluded", "already-trashed", "cancelled-unmapped", "deleted", "recurring-instance"].includes(String(r.decision.reason))) ?? [];
-  const transfers = snapshot ? [...snapshot.tasks].filter(([id, row]) => snapshot.historicalTaskIds.has(id) && !row.data.deletedAt &&
-    !snapshot.snapshots.some(s => s.taskId === id && s.eventId) && !["abandoned", "given_up"].includes(String(row.data.status))) : [];
-  const repeatChanges = snapshot?.records.filter(r => {
-    const mapped = snapshot.snapshots.find(s => s.eventId === r.eventId && s.state === "active");
-    const row = mapped && snapshot.tasks.get(mapped.taskId);
-    const rule = row && taskRecurrence(row.data, snapshot.timezone);
-    return mapped && row && rule && !sameRecurrence(rule, r.source.recurrence) && r.decision.kind === "acknowledge";
-  }) ?? [];
-  const localSkips = snapshot ? [...snapshot.tasks].filter(([id, row]) => {
-    const item = snapshot.snapshots.find(s => s.taskId === id);
-    return !row.data.deletedAt && row.data.dueDate && item && (!toTaskSharedPatch(item.fields, snapshot.timezone) ||
-      taskRecurrence(row.data, snapshot.timezone) === null || (!item.eventId && row.data.googleEventId && !snapshot.historicalTaskIds.has(id)));
-  }) : [];
+  // 묶는 일은 `googleReviewGroups` 한 곳에서 한다. 여기에 같은 필터를 다시
+  // 쓰면 세는 쪽과 그리는 쪽이 갈라지고, 실제로 갈라져 있었다 — 제외해 둔
+  // 일정이 줄로는 보이는데 숫자에는 없어서, 그 줄이 하나만 남으면 패널을
+  // 여는 버튼 자체가 사라졌다.
+  const { reviews, skips, transfers, repeatChanges, localSkips } = googleReviewGroups(snapshot);
   return <section className="ff-google-review" aria-label={t("googleTask.title")} aria-busy={state.busy}>
     <h4>{t("googleTask.title")} <span>({googleReviewCount(state)})</span></h4>
     <p className="ff-settings-note">{t("googleTask.policy")}</p>

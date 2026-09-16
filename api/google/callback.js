@@ -1053,8 +1053,10 @@ function parseIcsDate(value2, timezone) {
   const match = value2.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/);
   if (!match) return null;
   const [, year, month, day, hour, minute, second = "00", z] = match;
-  const iso = z ? (/* @__PURE__ */ new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`)).toISOString() : `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-  return { value: iso, allDay: false, timezone };
+  if (!z) return { value: `${year}-${month}-${day}T${hour}:${minute}:${second}`, allDay: false, timezone };
+  const parsed = /* @__PURE__ */ new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return { value: parsed.toISOString(), allDay: false, timezone };
 }
 function pad2(value2) {
   return String(value2).padStart(2, "0");
