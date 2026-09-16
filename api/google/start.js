@@ -489,6 +489,28 @@ var verifier = lazyVerifier();
 function first(value) {
   return Array.isArray(value) ? value[0] : value;
 }
+function wantsHtml(req) {
+  return (first(req.headers?.accept) ?? "").includes("text/html");
+}
+function page(title, body) {
+  const escape = (text) => text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escape(title)}</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    padding: 24px; }
+  main { max-width: 34rem; }
+  h1 { font-size: 1.25rem; margin: 0 0 .5rem; }
+  p { margin: 0 0 1rem; opacity: .85; }
+</style></head><body><main>
+<h1>${escape(title)}</h1>
+<p>${escape(body)}</p>
+<p><a href="/">Back to FocusFlow</a></p>
+</main></body></html>`;
+}
 function handler(req, res) {
   if (req.method && req.method !== "GET" && req.method !== "HEAD") {
     res.setHeader("Allow", "GET, HEAD");
@@ -497,6 +519,16 @@ function handler(req, res) {
   }
   const state = first(req.query?.state);
   if (!decodeOAuthState(state)) {
+    if (wantsHtml(req)) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.status(400).end(
+        page(
+          "This sign-in link is not one we started",
+          "Open FocusFlow and press Connect there. A link opened on its own cannot begin a connection."
+        )
+      );
+      return;
+    }
     res.status(400).json({ error: "Missing or malformed state." });
     return;
   }
@@ -504,6 +536,16 @@ function handler(req, res) {
   try {
     env = readGoogleOAuthEnv();
   } catch (error) {
+    if (wantsHtml(req)) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.status(500).end(
+        page(
+          "Google Calendar sync is not set up on this server",
+          "Nothing is wrong with your account. Whoever runs this deployment has to finish the Google setup before the connection can begin."
+        )
+      );
+      return;
+    }
     res.status(500).json({ error: error instanceof Error ? error.message : "Not configured." });
     return;
   }
