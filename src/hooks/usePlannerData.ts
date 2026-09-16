@@ -482,8 +482,22 @@ export function usePlannerData() {
       try {
         if (!focusHostRef.current?.owned) {
           const raw = platform.storage.getSync(STORAGE_KEY);
+          // 읽을 수 없는 스냅샷은 **병합할 원본이 아니다**. 여기서 던지게 두면
+          // 저장 전체가 실패하고, 다시 시도는 같은 바이트를 또 파싱하므로 영원히
+          // 실패한다 — 손상된 저장소를 만난 앱이 읽기 전용이 되어 그 뒤의 모든
+          // 편집을 창 닫을 때 잃는다 [실측 · 잘린 JSON 과 쓰레기 둘 다].
+          //
+          // `readStorage()` 는 부팅에서 같은 판단을 이미 내린다: 파싱이 실패하면
+          // 빈 상태로 시작한다. 저장 쪽만 그 판단을 안 하고 있었다.
+          let latest: PlannerData | null = null;
           if (raw) {
-            const latest = normalizeData(JSON.parse(raw));
+            try {
+              latest = normalizeData(JSON.parse(raw));
+            } catch {
+              latest = null;
+            }
+          }
+          if (latest) {
             // A follower editing a task must not overwrite the host's timer.
             const local = dataRef.current;
             // Indexed rather than searched. Written as a `find` per task and a
