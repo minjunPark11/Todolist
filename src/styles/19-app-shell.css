@@ -183,7 +183,19 @@
      nothing to spare on either side. 4 puts the hit area where §2.1 measured
      it, at x 5–45 of 50. */
   padding: 16px 4px 8px;
-  overflow: hidden;
+  /* `overflow: hidden` 이 여기 있었다 — 이 규칙에서 유일하게 이유가 적히지 않은
+     줄이었고, 실제로 담고 있던 것이 없었다. 레일의 속은 `rail-primary`(212) +
+     `rail-spacer`(늘어남) + `rail-utilities`(80) 이라 스페이서가 남는 높이를
+     흡수한다: 900 · 760 · 640 · 560 · 480 · 400px 어디서도 내용이 보이는
+     높이를 넘지 않는다 [실측].
+
+     자른 것은 §2.28 의 툴팁이었다. 레일은 40px 아이콘 전용이고 `.rail-tip` 은
+     `left: calc(100% + 8px)` 로 그 밖에 앉으므로, 클리핑이 켜져 있는 동안
+     46..159 에 `opacity: 1` 로 존재하되 화면에는 없었다 [실측 — 호버 후 그
+     자리를 찍으면 툴팁이 아니라 뒤의 목록 행이 잡힌다]. 아이콘만 있는 막대에서
+     툴팁은 눈으로 보는 사람이 이름을 얻는 유일한 길이다. 스크린리더 쪽은
+     `aria-label` 이 따로 대고 있어서(shell/a11y.test.tsx) 이 결함은 한쪽
+     사용자에게만 보였다. */
   color: var(--ff-text);
   /* §11.6: Rail, Sidebar and Main are three surfaces, not one. They were all
      the same white before P0-10, which left the three-column structure to be
