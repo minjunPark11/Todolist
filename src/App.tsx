@@ -1689,6 +1689,47 @@ export default function App() {
         {/* 이 분기에도 같은 바. 없으면 세션이 도는 동안 Tasks 화면에서만
             집중 상태가 사라진다. */}
         {globalFocusBar}
+        {/* 같은 이유로 이 둘도 여기 있어야 한다 — 그리고 이쪽이 더 무겁다.
+
+            이 분기는 일찍 반환하므로 아래 분기가 그리는 것을 하나도 그리지
+            않는다. 집중 막대는 그것을 알아채고 위에 기워뒀는데, 오류 막대와
+            `AppModals`는 남아 있었다. 그 결과 **앱의 기본 화면에서만** 두 가지가
+            사라진다:
+
+            - 로컬 저장이 실패해도 아무 말이 없다. `setStorageError(true)`는
+              불리고 `storage.saveFailed`("Couldn't save to this device. Your
+              changes are still here, but they may be lost if you close the
+              app.")라는 문장도 있는데, 그리는 쪽이 없으니 화면에 닿지 않는다.
+              할 일은 추가된 것처럼 보이고, 창을 닫으면 사라진다
+              [실측 — `setItem`을 던지게 만들고 재현했다. 콘솔에는
+              "[storage] local save failed"가 찍히는데 화면은 조용했다].
+            - `AppModals`가 토스트 더미를 들고 있으므로 토스트가 하나도 뜨지
+              않는다. `App.tsx`의 리마인더 토스트도 여기 포함된다 — 타이머가
+              쏘지만 Tasks 화면에서는 보이지 않는다. 일곱 화면 중 여섯은
+              토스트 더미를 갖고 Tasks만 없었다 [실측].
+
+            실행 취소 띠와 영구 삭제 관문은 일부러 두지 않는다. 위 §6.3 주석이
+            적어둔 대로 이 모듈은 목록의 확인 절차를 스스로 다르게 다루고,
+            그것은 이 결함과 다른 이야기다. */}
+        {planner.storageError ? (
+          <div className="storage-error-bar" role="alert">
+            <span>{t("storage.saveFailed")}</span>
+            <button type="button" onClick={planner.retryLocalSave}>
+              {t("storage.retry")}
+            </button>
+          </div>
+        ) : null}
+        <AppModals
+          pendingDeleteTaskId={pendingDeleteTaskId}
+          pendingResetAllData={pendingResetAllData}
+          resetReachesAccount={planner.auth.isSignedIn ? planner.auth.userEmail : ""}
+          toasts={toasts}
+          onCancelDeleteTask={() => setPendingDeleteTaskId("")}
+          onConfirmDeleteTask={confirmDeleteTask}
+          onCancelResetAllData={() => setPendingResetAllData(false)}
+          onConfirmResetAllData={confirmResetAllData}
+          onDismissToast={handleDismissToast}
+        />
       </I18nProvider>
     );
   }
