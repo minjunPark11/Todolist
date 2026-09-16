@@ -20,6 +20,7 @@ import { reducedTransition, transitions } from "../motion/transitions";
 import { backdropVariants, modalVariants } from "../motion/variants";
 import { useMotionEnabled } from "../motion/reducedMotion";
 import { Popover, PopoverContent, PopoverTrigger, usePopoverSurface } from "./floating";
+import { useDialogFocus } from "./dialogFocus";
 
 // ============================================================================
 // Primitives
@@ -178,6 +179,10 @@ export function DeferredTextarea({
  * §19.55 give a dialog different rules: it traps focus, it dims what is
  * behind it, and whether its backdrop dismisses at all is the dialog's own
  * decision rather than the manager's.
+ *
+ * The trap in that sentence was a description of the spec, not of this file:
+ * until `useDialogFocus` there was none, and Tab walked straight out into the
+ * dimmed page. Dismissal is still this hook's job; focus is that one's.
  *
  * They are still not on the layer STACK, so an Escape with a dialog above a
  * popover is decided by registration order rather than by §19.93. Nothing in
@@ -877,10 +882,13 @@ export function ConfirmModal({
     else setClosing(true);
   };
   const ref = useOutsideClose(requestCancel);
+  useDialogFocus(ref);
   const confirmRef = useRef<HTMLButtonElement>(null);
 
-  // Focus the confirm button so Enter activates it right away; Tab still
-  // moves to Cancel, where Enter cancels instead.
+  // Focus the confirm button so Enter activates it right away. Tab from there
+  // reaches Cancel by WRAPPING — Cancel is earlier in the DOM, so a forward
+  // Tab is the leaving direction, and before `useDialogFocus` it left: one
+  // press landed on the sidebar's collapse button behind the backdrop.
   useEffect(() => {
     confirmRef.current?.focus();
   }, []);
@@ -996,6 +1004,7 @@ export function Modal({
     else setClosing(true);
   };
   const ref = useOutsideClose(requestClose);
+  useDialogFocus(ref);
   return (
     <motion.div
       className="ff-modal-backdrop"
