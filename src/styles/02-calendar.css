@@ -903,10 +903,14 @@
 .gcal-now-badge span {
   /* 같은 `--calendar-now-color`가 선과 알약 둘 다를 칠하는데, 요구가 반대다:
      선은 밝아야 눈에 띄고 알약은 흰 글자를 얹으니 어두워야 한다. 그대로 쓰면
-     3.55:1이라 AA에 미달했다. 검정과 78% 섞어 어느 now 색이 오든 한 방향으로
+     3.55:1이라 AA에 미달했다. 검정과 섞어 어느 now 색이 오든 한 방향으로
      내린다 — 값을 박지 않는 것은 이 토큰이 레이어마다 다른 색을 받기 때문이다
-     (09는 액센트, 10은 danger). */
-  background: color-mix(in srgb, var(--calendar-now-color) 78%, #000);
+     (09는 액센트, 10은 danger).
+
+     78%였는데 그것은 라이트만 잰 숫자였다. 다크의 now 색(#ff6b64)은 같은 78%
+     에서 4.39 로 여전히 AA 에 미달한다 [실측 — 브라우저 axe 스윕]. 72%로
+     내리면 다크 5.01 · 라이트 8.75 로 두 테마가 같이 선다. */
+  background: color-mix(in srgb, var(--calendar-now-color) 72%, #000);
   color: #fff;
   font-size: var(--type-xs);
   font-weight: 600;

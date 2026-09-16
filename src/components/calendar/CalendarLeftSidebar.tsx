@@ -146,19 +146,23 @@ export function CalendarLeftSidebar({
             if (active) rowClasses.push("is-active");
             if (category.isReadOnly) rowClasses.push("is-readonly");
             return (
+              /* 이 행은 `role="button" tabIndex={0}` 이었다. 그런데 그 안에
+                 체크박스·⋯ 메뉴·팔레트의 라디오·색 입력이 들어 있어서 axe 의
+                 `nested-interactive` 에 걸렸다 [실측] — 버튼 안의 버튼은 보조
+                 기술이 안쪽 컨트롤에 닿지 못하게 한다.
+
+                 §16.3 이 "체크박스가 행의 선택을 건드리면 안 된다"고 적어두고
+                 `stopPropagation` 으로 막아둔 것을 보면 충돌 자체는 알고 있었다.
+                 막은 것은 클릭이고, 남은 것은 구조였다.
+
+                 이름을 진짜 버튼으로 만든다. 행은 평범한 상자로 돌아가고 포인터
+                 편의를 위해 클릭만 남긴다 — 그 자리는 이제 이름 버튼이라는 진짜
+                 컨트롤이 있으므로 중복 타깃이지 유일한 타깃이 아니다. */
               <div
                 key={category.id}
                 className={rowClasses.join(" ")}
-                role="button"
-                tabIndex={0}
                 style={active ? { background: `${category.color}1a` } : undefined}
                 onClick={() => onSelectCategory(category)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onSelectCategory(category);
-                  }
-                }}
               >
                 {/* §16.3: the checkbox must never trigger the row's select.
                     The checkbox carries the category color itself (Apple
@@ -171,7 +175,17 @@ export function CalendarLeftSidebar({
                   onClick={(event) => event.stopPropagation()}
                   onChange={() => onToggleCategory(category)}
                 />
-                <span className="gcal-cat-name">{category.name}</span>
+                <button
+                  type="button"
+                  className="gcal-cat-name"
+                  aria-pressed={active}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectCategory(category);
+                  }}
+                >
+                  {category.name}
+                </button>
                 {category.isDefault ? <span className="gcal-cat-badge">{t("calendar.defaultBadge")}</span> : null}
                 {category.isReadOnly ? <span className="gcal-cat-badge">{t("calendar.readOnlyBadge")}</span> : null}
                 <span className="gcal-cat-palette-wrap">

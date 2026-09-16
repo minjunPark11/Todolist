@@ -1007,7 +1007,11 @@
 .ff-matrix-cell-I { --q-color: var(--danger); --q-ink: var(--danger-ink); grid-area: qI; }
 .ff-matrix-cell-II { --q-color: var(--accent); --q-ink: var(--accent-ink); grid-area: qII; }
 .ff-matrix-cell-III { --q-color: var(--warning); --q-ink: var(--warning-ink); grid-area: qIII; }
-.ff-matrix-cell-IV { --q-color: var(--text-tertiary); --q-ink: var(--text-tertiary); grid-area: qIV; }
+/* IV 만 `--q-color` 와 `--q-ink` 가 같은 값이었다 — 위 세 칸은 danger/danger-ink
+   처럼 짝을 갖는데 이 칸만 면의 색을 글자에도 썼고, 그래서 자기 16% 틴트 위에서
+   4.03(라이트) · 4.31(다크)으로 AA 에 미달했다 [실측]. 위 주석이 적어둔 규칙을
+   이 칸에도 적용한다. */
+.ff-matrix-cell-IV { --q-color: var(--text-tertiary); --q-ink: var(--text-secondary); grid-area: qIV; }
 
 /* The page's own ⋯, where the List `<select>` used to be (§33.2).
 

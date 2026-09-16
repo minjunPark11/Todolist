@@ -812,7 +812,22 @@ export function WeekView({
 
   return (
     <div className={isDay ? "gcal-timegrid is-day" : "gcal-timegrid"}>
-      <div className="gcal-time-scroll" ref={scrollRef}>
+      {/* 키보드로 스크롤할 수 있어야 한다. 이 상자는 하루치 시간 격자를
+          담은 스크롤 영역인데 포커스를 받지 않아서, 마우스 휠이나 트랙패드가
+          없으면 이른 아침과 늦은 밤에 닿을 방법이 없었다 — axe 의
+          `scrollable-region-focusable` 이 잡은 자리다 [실측].
+
+          `tabIndex={0}` 이 방향키·PageUp/PageDown 을 돌려주고, `role="region"`
+          과 이름이 스크린리더에게 여기가 어디인지 말한다. 안에 초점 가능한
+          일정이 하나라도 있으면 규칙 자체는 통과하지만, 일정이 없는 날에도
+          격자는 스크롤되어야 하므로 내용과 무관하게 붙인다. */}
+      <div
+        className="gcal-time-scroll"
+        ref={scrollRef}
+        tabIndex={0}
+        role="region"
+        aria-label={t("calendar.timeGridAria")}
+      >
       <div className="gcal-timegrid-sticky">
         {isDay ? (
           <div className="gcal-day-title">

@@ -582,7 +582,11 @@ main {
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-chip);
   background: var(--keycap-bg);
-  color: var(--text-faint);
+  /* `--text-faint` 는 이 자리에서 4.32(라이트) · 4.41(다크)로 AA 에 미달했다
+     [실측]. 캔버스 위에서는 통과하는 잉크인데 키캡은 자기 면(`--keycap-bg`)을
+     갖고 있어서 대비가 다르다 — 잉크는 배경과 짝으로 골라야 한다. 한 단 올려
+     5.14 · 5.13 이 되고, 힌트가 힌트로 남는 가장 조용한 단이다. */
+  color: var(--text-tertiary);
   font-family: inherit;
   font-size: var(--t-keycap);
   font-weight: var(--w-strong);

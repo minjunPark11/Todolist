@@ -58,12 +58,24 @@
   outline-offset: 2px;
 }
 
+/* span 이 아니라 button 이다 — 행이 `role="button"` 을 내려놓으면서 카테고리를
+   고르는 진짜 컨트롤이 여기로 왔다. 브라우저 기본 옷을 벗겨 보이는 것은 그대로
+   두되, 포커스 링은 `:focus-visible` 이 그린다 (01-base.css §11.42). */
 .gcal-cat-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: inherit;
 }
 
 .gcal-cat-row.is-active .gcal-cat-name {
@@ -163,7 +175,11 @@
   padding: 1px 6px;
   border-radius: var(--rounded-pill, 999px);
   background: var(--color-fill-tertiary, rgba(0, 0, 0, 0.06));
-  color: var(--color-ink-muted-48, #8e8e93);
+  /* 이 배지는 행 위에 앉고 행은 선택되면 카테고리 색 틴트를 깐다. 그래서 잉크가
+     겨루는 배경이 캔버스가 아니라 틴트 위의 틴트다 — `--color-ink-muted-48` 은
+     활성 행에서 3.92, 기본 행에서 4.43 으로 둘 다 AA 에 미달했다 [실측].
+     5.08 · 5.73 이 된다. */
+  color: var(--text-secondary);
 }
 
 /* Event popover: category color button + dropdown (§12–§13). */

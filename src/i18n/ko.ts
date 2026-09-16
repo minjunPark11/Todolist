@@ -621,6 +621,7 @@ export const ko: Dictionary = {
 
   // ---- Calendar Month/Week/Forms (additions) ----
   "calendar.allDay": "종일",
+  "calendar.timeGridAria": "시간 격자 — 방향키로 스크롤",
   "calendar.allDayResize": "종일 영역 크기 조절",
   "calendar.group.personal": "내 캘린더",
   // CALENDAR_TASK_CHECKBOX_DESIGN.md §1, §10

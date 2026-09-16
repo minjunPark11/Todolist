@@ -626,6 +626,7 @@ export const en: Dictionary = {
 
   // ---- Calendar Month/Week/Forms (additions) ----
   "calendar.allDay": "All day",
+  "calendar.timeGridAria": "Time grid — scroll with the arrow keys",
   "calendar.allDayResize": "Resize all-day area",
   "calendar.group.personal": "My Calendars",
   // CALENDAR_TASK_CHECKBOX_DESIGN.md §1, §10 — what the grid draws, as
