@@ -89,6 +89,7 @@ import {
 import {
   createExternalCalendarDraft,
   fetchExternalCalendarEvents,
+  isIcsSubscription,
   loadExternalCalendarState,
   saveExternalCalendarState,
   shouldSyncExternalCalendar,
@@ -1022,6 +1023,10 @@ export default function App() {
     if (syncingExternalCalendarsRef.current.has(calendarId)) return;
     const calendar = calendarOverride ?? externalCalendarState.calendars.find((item) => item.id === calendarId);
     if (!calendar || !calendar.enabled) return;
+    // 구글 캘린더는 인바운드 패스가 채운다. 여기로 끌고 오면 던지고, 그
+    // 예외가 "이 캘린더는 고장 났다"는 실패 표시와 벨 알림이 된다 — 멀쩡히
+    // 동기화되고 있는 캘린더에 대해서.
+    if (!isIcsSubscription(calendar)) return;
     syncingExternalCalendarsRef.current.add(calendarId);
     const attemptedAt = new Date().toISOString();
     saveExternalState((current) => ({

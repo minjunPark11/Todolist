@@ -164,9 +164,27 @@ export function useGoogleInboundSync({ signedIn, apply }: GoogleInboundSyncInput
         if (outcome.failed) continue;
 
         update((current) => {
+          const events = applyInboundPlan(current.events, externalCalendarId, outcome.plan);
+          const syncedAt = new Date().toISOString();
+          const count = events.filter((event) => event.externalCalendarId === externalCalendarId).length;
+          // 이 줄이 이 캘린더의 동기화다. 설정의 목록은 `lastSyncedAt` 과
+          // `eventCount` 로 그 캘린더가 어떤 상태인지 말하는데, 그것을 채우는
+          // 쪽은 ICS 경로뿐이었다 — 구글 캘린더는 영원히 "아직 동기화되지
+          // 않음"으로 남았다. 방금 읽어놓고 안 읽었다고 말하는 셈이다.
           const next = {
-            calendars: current.calendars,
-            events: applyInboundPlan(current.events, externalCalendarId, outcome.plan),
+            calendars: current.calendars.map((calendar) =>
+              calendar.id === externalCalendarId
+                ? {
+                    ...calendar,
+                    syncStatus: calendar.visible ? ("success" as const) : ("hidden" as const),
+                    lastSyncedAt: syncedAt,
+                    lastError: "",
+                    eventCount: count,
+                    updatedAt: syncedAt,
+                  }
+                : calendar,
+            ),
+            events,
           };
           snapshot = next;
           return next;

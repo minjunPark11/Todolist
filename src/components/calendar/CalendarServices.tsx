@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useT } from "../../i18n";
 import type { CalendarShareState } from "../../lib/calendarShare";
+import { isIcsSubscription } from "../../lib/externalCalendars";
 import type { ExternalCalendar } from "../../types";
 export interface CalendarServicesProps {
   externalCalendars: ExternalCalendar[];
@@ -195,9 +196,14 @@ export function CalendarServices({ externalCalendars, onAddExternalCalendar, onU
                       <button type="button" className="ff-btn" onClick={() => onUpdateExternalCalendar(calendar.id, { enabled: !calendar.enabled })}>
                         {calendar.enabled ? t("settings.calendar.disable") : t("settings.calendar.enable")}
                       </button>
-                      <button type="button" className="ff-btn" disabled={!calendar.enabled} onClick={() => onSyncExternalCalendar(calendar.id)}>
-                        {t("settings.calendar.refreshNow")}
-                      </button>
+                      {/* ICS 구독에만 있는 버튼이다. 구글 캘린더는 인바운드
+                          패스가 채우므로 여기서 부를 것이 없고, 부르면 "ICS
+                          구독이 아니다"라는 내부 문장이 실패로 화면에 올라온다. */}
+                      {isIcsSubscription(calendar) ? (
+                        <button type="button" className="ff-btn" disabled={!calendar.enabled} onClick={() => onSyncExternalCalendar(calendar.id)}>
+                          {t("settings.calendar.refreshNow")}
+                        </button>
+                      ) : null}
                       <button type="button" className="ff-btn ff-btn-danger" onClick={() => onDeleteExternalCalendar(calendar.id)}>
                         {t("common.delete")}
                       </button>
