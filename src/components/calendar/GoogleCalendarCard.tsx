@@ -40,6 +40,7 @@ import { supabase } from "../../services/supabaseClient";
 import { ConfirmModal } from "../kit";
 import { googleReviewCount } from "../../lib/googleReviewCount";
 import { GoogleSyncHistory } from "./GoogleSyncHistory";
+import { GoogleCalendarSourceList } from "./GoogleCalendarSourceList";
 import { GoogleTaskReviewPanel } from "./GoogleTaskReviewPanel";
 import { readGoogleTaskSyncState, subscribeGoogleTaskSync } from "../../lib/googleTaskSyncState";
 
@@ -381,6 +382,11 @@ export function GoogleCalendarCard({ timezone = "", onOpenDeviceReview }:
               ? t("settings.google.connectedAs", { email: status.connection.accountEmail })
               : t("settings.google.connectedNoEmail")}
           </p>
+          {/* 계정 줄 바로 아래다. "어느 것?"이라는 질문은 "연결됐나?"의 답이
+              이미 있는 자리에서 물어야 한다 — 이 컴포넌트를 처음 놓았을 때의
+              자리이고, 그 뒤에 카드가 자란 것들(라벨 · 검토 · 이력)은 모두
+              "무엇이 오갔나"에 대한 것이므로 그 앞이 맞다. */}
+          <GoogleCalendarSourceList ownCalendarId={status.connection.calendarId} />
           {!taskSync.enabled && <p className="ff-settings-note">{t("settings.google.labelsOwnership")}</p>}
           {(labelState?.supported ?? status.connection.labelsSupported) === false ? (
             <p className="ff-settings-note" aria-live="polite">{t("settings.google.labelsUnsupported")}</p>
