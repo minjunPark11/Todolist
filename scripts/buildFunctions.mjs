@@ -31,14 +31,24 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE_DIR = join(root, "src", "functions");
 const OUTPUT_DIR = join(root, "api");
 
-/** Every `.ts` under `src/functions`, as paths relative to that directory. */
+/**
+ * Every `.ts` under `src/functions` that is a handler, as paths relative to
+ * that directory.
+ *
+ * Tests are not handlers. A `*.test.ts` beside a handler is the same kind of
+ * file every other directory in this repo keeps beside its source, but here
+ * the directory's shape IS the routing table: bundling `start.test.ts` would
+ * publish `/api/google/start.test` as a live endpoint. Caught by seeing
+ * `api/google/start.test.js` appear in `git status` after adding the first
+ * test in this directory.
+ */
 async function sources(dir = SOURCE_DIR, prefix = "") {
   const entries = await readdir(dir, { withFileTypes: true });
   const found = [];
   for (const entry of entries) {
     const next = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isDirectory()) found.push(...(await sources(join(dir, entry.name), next)));
-    else if (entry.name.endsWith(".ts")) found.push(next);
+    else if (entry.name.endsWith(".ts") && !/\.(test|spec)\.ts$/.test(entry.name)) found.push(next);
   }
   return found;
 }
