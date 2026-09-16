@@ -53,11 +53,26 @@
 | 09 | `09-calendar-redesign.css` | 486 | 캘린더 재설계 오버라이드 | 75% |
 | 10 | `10-calendar-apple.css` | 281 | 캘린더 Apple 스킨 (다크 블록 8/12개가 여기) | 77% |
 | 12 | `12-timeline.css` | 241 | 타임라인 | 73% |
-| 13 | `13-list-view.css` | 181 | 리스트 뷰 = `tlv-*` | 76% |
-| 14 | `14-scope-calendar.css` | 35 | 스코프 캘린더 | — |
-| 15 | `15-goals-section.css` | 159 | 목표 | 80% |
-| 16 | `16-overview-section.css` | 198 | 오버뷰 = `ovs-*` | 73% |
+| 13 | ~~`13-list-view.css`~~ | ~~181~~ | 리스트 뷰 = `tlv-*` — **제거됨** (아래 참조) | — |
+| 14 | ~~`14-scope-calendar.css`~~ | ~~35~~ | 스코프 캘린더 = `tcv-*` — **제거됨** | — |
+| 15 | ~~`15-goals-section.css`~~ | ~~159~~ | 목표 = `gls-*` — **제거됨** | — |
+| 16 | ~~`16-overview-section.css`~~ | ~~198~~ | 오버뷰 = `ovs-*` — **제거됨** | — |
 | 17 | `17-tasks-module.css` | 1,962 | **Tasks Module = 신규 표준** | 71% |
+
+> **13~16 제거 (2026-09)** — 위 네 파일의 클래스 계열 `tlv-*` · `tcv-*` ·
+> `gls-*` · `ovs-*` 를 `.ts`/`.tsx` 어디에서도 쓰지 않는다는 것이 확인됐다.
+> 그 이름이 나오는 곳은 자기 CSS 파일 안뿐이었고, 백틱 동적 조립도 없었다.
+> 573줄이 barrel 에 import 되어 배포되고 있었다.
+>
+> 이 표의 퍼센트는 감사 시점의 스냅샷이므로 값은 그대로 둔다 — 76% · 80% ·
+> 73% 는 "토큰을 쓰는 비율"이었지 "쓰이는 비율"이 아니었고, 그 구분이 이번에
+> 드러난 것이다. 한 파일이 토큰을 아무리 잘 써도 아무도 그 클래스를 그리지
+> 않으면 화면에는 없다.
+>
+> 같이 정리한 것: `21-components.css` 의 `.ovs-card-head`(같은 계열의 남은
+> 조각)와 `01-base.css` 의 `--surface-selected`(유일한 독자가
+> `13-list-view.css:105` 였다).
+
 | 18 | `18-schedule-editor.css` | 525 | 일정 편집기 = `sched-*` | 76% |
 | 19 | `19-app-shell.css` | 617 | Rail·Context Sidebar·헤더 | 76% |
 | 20 | `20-density.css` | 126 | 밀도 통일 레이어(zoom 대체) | — |

@@ -448,7 +448,6 @@
   --bg: var(--bg-surface);
   --surface: var(--bg-surface);
   --surface-muted: var(--bg-surface-muted);
-  --surface-selected: var(--bg-selected);
   --text: var(--text-primary);
   --text-muted: var(--text-tertiary);
   --border: var(--border-subtle);

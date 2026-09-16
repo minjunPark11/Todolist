@@ -619,18 +619,6 @@ textarea {
   font-size: 13px;
 }
 
-/* The card heading and the one action that belongs to it, on a line. */
-.ovs-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.ovs-card-head h3 {
-  margin: 0;
-}
-
 /* --- the overlay scrollbar -----------------------------------------------
    Every value here is measured (TICKTICK_COMPONENT_02 §4): 6px wide, radius 7,
    the foreground at 30%, `right: 2px`, and `transition: opacity var(--motion-slow) ease-out` — which
