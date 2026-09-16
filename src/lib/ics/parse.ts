@@ -92,10 +92,20 @@ export function parseIcsDate(value: string, timezone?: string) {
   const match = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/);
   if (!match) return null;
   const [, year, month, day, hour, minute, second = "00", z] = match;
-  const iso = z
-    ? new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`).toISOString()
-    : `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-  return { value: iso, allDay: false, timezone };
+  if (!z) return { value: `${year}-${month}-${day}T${hour}:${minute}:${second}`, allDay: false, timezone };
+
+  // 정규식은 자릿수만 본다. `99999999T000000Z` 는 year=9999 · month=99 · day=99
+  // 로 통과하고, 그 `Date` 는 Invalid 가 되며 `toISOString()` 은 `RangeError` 를
+  // 던진다. 던지면 그 이벤트 하나가 아니라 **피드 전체의 파싱이 죽는다** —
+  // 앱 쪽 경로(`externalCalendars.ts`)는 이 호출을 감싸지 않으므로 달력 하나가
+  // 통째로 사라진다 [실측 · 적대적 입력 스물한 가지 중 이것만 던졌다].
+  //
+  // 이 함수의 계약은 이미 "못 읽으면 `null`" 이고(위의 `!value` 와 `!match` 가
+  // 그렇다), `parseIcsEvents` 는 start 가 null 인 블록을 건너뛴다. 읽을 수 없는
+  // 날짜도 같은 길로 보낸다.
+  const parsed = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return { value: parsed.toISOString(), allDay: false, timezone };
 }
 
 function pad2(value: number) {
