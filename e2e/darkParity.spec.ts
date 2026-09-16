@@ -34,7 +34,36 @@ function luminance(key: string): number {
  * 반투명(알파 < 0.9)은 아래 면에 얹히는 것이라 그 자체로는 테마를 말하지
  * 않는다. 작은 조각(24x12 미만)도 뺀다 — 점과 선은 면이 아니다.
  */
+/**
+ * 칠이 멎을 때까지 기다린다.
+ *
+ * 배경에 전이가 걸린 면이 있다 — `.context-sidebar-fold` 는
+ * `transition: background var(--motion-row)` 를 갖는다. 테마가 붙는 순간
+ * 그 버튼은 라이트의 면에서 다크의 면으로 **건너가며**, 그 사이의 중간색은
+ * 둘 중 어느 테마의 색도 아니다. 그 중간을 재면 "다크에 밝은 면이 있다"고
+ * 읽힌다.
+ *
+ * 실제로 그렇게 읽혔다: `--repeat-each=8` 로 3 번 실패했고, 잡힌 것은 언제나
+ * `rgb(226,226,227) button.context-sidebar-fold` 하나였다 [실측]. 앱의
+ * 결함이 아니라 이 그물이 셔터를 너무 일찍 누른 것이다.
+ *
+ * 전이만 기다린다. 애니메이션 전부를 기다리면 끝나지 않는 것(도는 스피너)에
+ * 걸려 매 호출마다 만료를 기다리게 된다.
+ */
+async function settle(page: Page): Promise<void> {
+  await page
+    .waitForFunction(
+      () => !document.getAnimations().some((a) => a.constructor.name === "CSSTransition" && a.playState === "running"),
+      null,
+      { timeout: 2000 },
+    )
+    // 멎지 않는 전이가 있다면 그것 자체가 다른 검사의 일이다. 여기서는
+    // 기다릴 만큼 기다리고 찍는다.
+    .catch(() => {});
+}
+
 async function surfaces(page: Page): Promise<Map<string, string>> {
+  await settle(page);
   const rows = await page.evaluate(() => {
     const seen = new Map<string, string>();
     for (const el of document.querySelectorAll("body *")) {
@@ -130,7 +159,10 @@ test.describe("두 테마의 면", () => {
     await openApp(page, { lists: [{ id: "l1", name: "목록" }], theme: "dark" });
 
     const before = await surfaces(page);
-    expect([...before.keys()].filter((k) => luminance(k) > BRIGHT), "심기 전에 이미 밝은 면이 있으면 아래 점검이 무엇을 잡았는지 알 수 없다").toEqual([]);
+    expect(
+      [...before.entries()].filter(([k]) => luminance(k) > BRIGHT).map(([k, who]) => `rgb(${k}) ${who}`),
+      "심기 전에 이미 밝은 면이 있으면 아래 점검이 무엇을 잡았는지 알 수 없다",
+    ).toEqual([]);
 
     await page.evaluate(() => {
       const probe = document.createElement("div");
