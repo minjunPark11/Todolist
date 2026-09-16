@@ -76,6 +76,10 @@
   color: inherit;
   text-align: left;
   cursor: inherit;
+  /* 행의 높이를 그대로 받는다. `span` 이었을 때는 글자 높이(16px)가 곧 그 요소의
+     크기였는데, 이제 이것이 카테고리를 고르는 진짜 컨트롤이므로 누를 자리도 행만큼
+     이어야 한다 — 행은 `align-items: center` 라서 여기서 다시 늘려준다. */
+  align-self: stretch;
 }
 
 .gcal-cat-row.is-active .gcal-cat-name {

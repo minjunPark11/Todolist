@@ -35,6 +35,14 @@ const ALLOWED_OFF_GRID = [
   ".foc-task-main", // a task row carrying a title AND a meta line: the grid is for single-line rows
   ".motion-task-row", // the same two-line row, on the Matrix
   ".tm-task-open", // a Task row is content: its hit target is as tall as the row, not as the grid
+  // The same clause, for the calendar sidebar's category name. It was a `span`
+  // until the row stopped being a `role="button"` with focusable children
+  // inside it (axe's `nested-interactive`), and the selectable thing moved
+  // here. Nothing about the row's size changed — the sweep counts controls,
+  // and where there was text there is now a button. The row (`.gcal-cat-row`,
+  // 32 with 4px of padding) is what sits on the grid; this fills its content
+  // box and holds the name.
+  ".gcal-cat-name",
   // The quick add's input, which stopped being a CONTROL when the row became
   // one (TICKTICK_COMPONENT_10_QUICK_ADD.md §10): the 32px box around it is
   // what sits on the grid, and the input is the text inside it, 30 tall
