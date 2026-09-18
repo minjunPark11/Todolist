@@ -1123,7 +1123,10 @@ export default function App() {
   }
 
   function buildCurrentShareSnapshot() {
-    return buildCalendarShareSnapshot({ tasks: visibleTasks });
+    // 이미 걸러진 `visibleTasks` 가 아니라 날것을 넘긴다. 무엇이 나가는지는
+    // `buildCalendarShareSnapshot` 이 정하고, 그 규칙이 여기에도 있으면
+    // 둘이 갈라질 자리가 생긴다.
+    return buildCalendarShareSnapshot({ tasks: planner.tasks, lists: planner.lists });
   }
 
   async function publishCurrentCalendarShare(token = calendarShare.token || createShareToken(), enabled = true, options?: { silent?: boolean }) {

@@ -400,6 +400,7 @@ export const en: Dictionary = {
   "settings.calendar.hoursOption": "{{count}} hours",
   "settings.calendar.shareTitle": "Share my calendar",
   "settings.calendar.shareHint": "Create a read-only ICS link that others can subscribe to.",
+  "settings.calendar.shareContents": "Dated tasks go out with their title, date and time — including finished ones. Notes, checklists, tags and list names do not.",
   "settings.calendar.shareOn": "Sharing",
   "settings.calendar.shareOff": "Sharing off",
   "settings.calendar.disableShare": "Turn off sharing",

@@ -158,7 +158,7 @@ async function handler(req, res) {
     typeof row.updated_at === "string" && row.updated_at ? row.updated_at : (/* @__PURE__ */ new Date()).toISOString()
   );
   res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=300");
+  res.setHeader("Cache-Control", "private, no-store");
   res.status(200).end(req.method === "HEAD" ? "" : ics);
 }
 export {

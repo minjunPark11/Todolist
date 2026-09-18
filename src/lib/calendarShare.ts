@@ -1,6 +1,6 @@
 import { isSupabaseConfigured, supabase } from "../services/supabaseClient";
-import type { Task } from "../types";
-import { isTaskAlive } from "../domain/tasks/taskState";
+import type { List, Task } from "../types";
+import { isTaskActive } from "../domain/tasks/scopeQuery";
 
 export type CalendarShareStatus = "unavailable" | "idle" | "loading" | "saving" | "ready" | "error";
 
@@ -53,11 +53,33 @@ export function getCalendarShareUrl(token: string) {
   return `${window.location.origin}/api/calendar/${token}.ics`;
 }
 
-export function buildCalendarShareSnapshot(input: { tasks: Task[] }): CalendarShareSnapshot {
+/**
+ * 이 기기를 떠나는 것 전부.
+ *
+ * 나가는 것은 **제목 · 날짜 · 시각** 셋뿐이다. 설명도, 체크리스트도, 태그도,
+ * 어느 목록에 있는지도 실리지 않는다 — 링크를 받은 사람은 구독자이지
+ * 동료가 아니다.
+ *
+ * 나가는 자격은 `isTaskActive` 다. 전에는 `isTaskAlive` 였고, 그 둘의 차이가
+ * 이 파일의 문제였다: `isTaskAlive` 는 할 일 자신의 상태만 보므로
+ * **휴지통에 버린 목록과 보관한 목록의 할 일이 그대로 나간다** [실측].
+ * 실제로 새지는 않았다 — 부르는 쪽이 `isTaskActive` 로 한 번 거른 목록을
+ * 넘기고 있었기 때문이다. 그러나 무엇이 밖으로 나가는지를 정하는 파일이
+ * 자기보다 약한 규칙을 들고 있고, 맞는 규칙은 부르는 쪽에만 있었다.
+ * 부르는 쪽이 하나 더 생기거나 그 한 줄이 바뀌는 순간이 곧 사고다.
+ *
+ * 그래서 규칙을 여기로 가져온다. 목록을 함께 받는 것이 그 값이다 — 목록을
+ * 버리는 것은 그 안의 할 일에 아무것도 쓰지 않으므로(§6.56), 할 일만 봐서는
+ * 알 수 없다.
+ *
+ * 완료한 것은 나간다. 끝난 일도 그날 있었던 일이고, 달력은 그것을 적는
+ * 물건이다 (`taskState.isTaskAlive` 의 주석이 같은 것을 말한다).
+ */
+export function buildCalendarShareSnapshot(input: { tasks: Task[]; lists: List[] }): CalendarShareSnapshot {
   const events: SharedCalendarEvent[] = [];
 
   input.tasks.forEach((task) => {
-    if (!task.title || !isTaskAlive(task)) return;
+    if (!task.title || !isTaskActive(task, input.lists)) return;
     // One event per task. This used to emit two — a timed block on the work
     // day and a separate all-day deadline marker — because the record carried
     // both dates. It carries one now (SCHEDULE_EDITOR_PHASE0_AUDIT.md §7

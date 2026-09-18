@@ -119,6 +119,16 @@ export default async function handler(req: AdapterRequest, res: AdapterResponse)
     typeof row.updated_at === "string" && row.updated_at ? row.updated_at : new Date().toISOString(),
   );
   res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=300");
+  // 취소는 곧바로 들어야 한다.
+  //
+  // `public, max-age=300` 이었다. 그러면 공유 캐시(엣지 · 회사 프록시)가
+  // 이 응답을 들고 있다가 5 분 동안 계속 내준다 — 링크를 다시 만들거나
+  // 공유를 끈 **뒤에도**. 토큰을 갈아끼우는 것은 옛 주소를 404 로 만드는
+  // 진짜 취소인데(`regenerateCalendarShare` 가 그렇게 한다), 그 취소가
+  // 5 분 늦게 듣는다면 그것은 취소가 아니라 예약이다.
+  //
+  // 캐시로 아끼는 것도 거의 없다. 구독하는 달력들은 원래 몇십 분에서 몇
+  // 시간에 한 번 가져가지, 5 분 안에 두 번 오지 않는다.
+  res.setHeader("Cache-Control", "private, no-store");
   res.status(200).end(req.method === "HEAD" ? "" : ics);
 }

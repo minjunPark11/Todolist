@@ -48,6 +48,11 @@ export function CalendarServices({ externalCalendars, onAddExternalCalendar, onU
               <div className="ff-cal-card-text">
                 <strong>{t("settings.calendar.shareTitle")}</strong>
                 <small>{t("settings.calendar.shareHint")}</small>
+                {/* 무엇이 나가는지는 링크를 만들기 **전에** 읽혀야 한다.
+                    "읽기 전용 ICS 링크"는 누가 무엇을 보게 되는지 말하지
+                    않는다 — 완료한 할 일까지 나간다는 것도, 설명은 나가지
+                    않는다는 것도. 둘 다 알아야 고를 수 있다. */}
+                <small className="ff-settings-note">{t("settings.calendar.shareContents")}</small>
               </div>
               <div className="ff-cal-card-actions">
                 <span className={`ff-cal-chip${calendarShare.enabled ? " on" : ""}`}>

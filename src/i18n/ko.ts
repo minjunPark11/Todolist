@@ -396,6 +396,7 @@ export const ko: Dictionary = {
   "settings.calendar.hoursOption": "{{count}}시간",
   "settings.calendar.shareTitle": "내 캘린더 공유",
   "settings.calendar.shareHint": "다른 사람이 구독할 수 있는 읽기 전용 ICS 링크를 생성합니다.",
+  "settings.calendar.shareContents": "날짜가 있는 할 일이 제목·날짜·시각만 나갑니다 — 완료한 것도 포함됩니다. 설명·체크리스트·태그·목록 이름은 나가지 않습니다.",
   "settings.calendar.shareOn": "공유 중",
   "settings.calendar.shareOff": "공유 꺼짐",
   "settings.calendar.disableShare": "공유 끄기",
