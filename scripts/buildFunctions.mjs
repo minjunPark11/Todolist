@@ -58,8 +58,10 @@ async function sources(dir = SOURCE_DIR, prefix = "") {
  *
  * The generated paths are exactly the top-level names in `src/functions` — a
  * directory there becomes a directory here, a file becomes a file. Anything
- * else under `api/` is hand-written (`ics.js`, `calendar/[token].js`) and is
- * never touched, because no source has its name.
+ * else under `api/` is hand-written (`ics.js`) and is never touched, because
+ * no source has its name. `calendar/[token].js` used to be in that list and
+ * is now generated like the rest — being outside the build is what kept the
+ * ICS it writes away from `tsc` and `vitest`.
  */
 async function clearPrevious(names) {
   for (const name of names) {
