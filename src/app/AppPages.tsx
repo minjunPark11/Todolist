@@ -61,6 +61,9 @@ type AppPagesProps = {
   /** The Focus queue's way out, now that Today is a Scope and not a page. */
   onGoToTasks: () => void;
   exportJson: () => void;
+  importPreview: import("../components/settings/ImportReplaceGate").ImportPreview | null;
+  onConfirmImport: () => void;
+  onCancelImport: () => void;
   handleImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
   importMessage: string;
   appVersion: string;
@@ -106,6 +109,9 @@ export function AppPages({
   onNavigate,
   onGoToTasks,
   exportJson,
+  importPreview,
+  onConfirmImport,
+  onCancelImport,
   handleImport,
   importMessage,
   appVersion,
@@ -294,6 +300,9 @@ export function AppPages({
       onImport={handleImport}
       onReset={requestResetAllData}
       importMessage={importMessage}
+      importPreview={importPreview}
+      onConfirmImport={onConfirmImport}
+      onCancelImport={onCancelImport}
       appVersion={appVersion}
       updateStatus={updateStatus}
       onCheckUpdate={onCheckUpdate}

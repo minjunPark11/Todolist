@@ -30,6 +30,7 @@ import type { AccentColor, AppSettings, ExternalCalendar, Language, Task, ThemeM
 import { CalendarCategorySettings } from "./calendar/CalendarCategorySettings";
 import { GoogleCalendarCard } from "./calendar/GoogleCalendarCard";
 import { SegmentedTabs } from "./kit";
+import { ImportReplaceGate, type ImportPreview } from "./settings/ImportReplaceGate";
 import { useT } from "../i18n";
 
 interface SettingsPageProps {
@@ -37,6 +38,10 @@ interface SettingsPageProps {
   onUpdate: (patch: Partial<AppSettings>) => void;
   onExport: () => void;
   onImport: (event: ChangeEvent<HTMLInputElement>) => void;
+  /** 고른 파일이 관문 앞에 서 있을 때의 숫자들. 없으면 `null`. */
+  importPreview: ImportPreview | null;
+  onConfirmImport: () => void;
+  onCancelImport: () => void;
   onReset: () => void;
   importMessage: string;
   appVersion: string;
@@ -101,6 +106,9 @@ export function SettingsPage({
   onUpdate,
   onExport,
   onImport,
+  importPreview,
+  onConfirmImport,
+  onCancelImport,
   onReset,
   importMessage,
   appVersion,
@@ -399,7 +407,11 @@ export function SettingsPage({
               </label>
             </SettingsRow>
 
-            {importMessage ? <p className="ff-settings-msg">{importMessage}</p> : null}
+            {/* `importMessage` 는 i18n 키다 — 화면이 번역한다. 전에는 훅이
+                영어 문장을 만들어 돌려줬고, 한국어로 쓰는 사람에게도
+                "Import complete." 가 그대로 떴다. */}
+            {importMessage ? <p className="ff-settings-msg">{t(importMessage)}</p> : null}
+            <ImportReplaceGate preview={importPreview} onCancel={onCancelImport} onConfirm={onConfirmImport} />
           </div>
           <details className="ff-settings-card ff-settings-details ff-settings-danger">
             <summary>{t("settings.dangerZone")}</summary>

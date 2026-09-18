@@ -339,7 +339,7 @@ export default function App() {
     ? planner.tasks.find((task) => task.id === planner.activeFocusSession?.taskId) ?? null
     : null;
   const activeFocusElapsed = planner.activeFocusSession ? focusDisplaySeconds(planner.activeFocusSession, focusNow) : 0;
-  const { importMessage, exportJson, handleImport } = useDataPortability({
+  const { importMessage, exportJson, handleImport, importPreview, confirmImport, cancelImport } = useDataPortability({
     today,
     exportData: planner.exportData,
     importData: planner.importData,
@@ -1795,6 +1795,9 @@ export default function App() {
         onGoToTasks={() => navigateUrl(TASKS_HOME)}
         onNavigate={navigateSection}
         exportJson={exportJson}
+        importPreview={importPreview}
+        onConfirmImport={confirmImport}
+        onCancelImport={cancelImport}
         handleImport={handleImport}
         importMessage={importMessage}
         appVersion={appVersion}
