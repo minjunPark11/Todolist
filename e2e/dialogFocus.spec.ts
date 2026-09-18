@@ -31,6 +31,27 @@ async function focused(page: Page): Promise<string> {
   });
 }
 
+/**
+ * 포커스가 **멎을 때까지** 기다렸다가 그 자리를 돌려준다.
+ *
+ * 두 번 연속 같은 자리를 읽어야 멎은 것으로 친다. 처음에는
+ * `expect.poll(...).toBe(before)` 로 썼는데 그것은 아무것도 기다리지 않는다 —
+ * 첫 번째 읽기가 방금 읽은 값과 같으므로 즉시 통과한다. 값이 자기 자신과
+ * 같은지를 확인했을 뿐이다. 전체 실행에서만 흔들린 이유가 그것이다:
+ * 격리해서 돌리면 10/10 통과하고, 스무 파일쯤 뒤에서 앱이 느려지면 메뉴가
+ * 첫 항목을 잡는 시점이 우리가 Tab 을 누른 뒤로 밀린다.
+ */
+async function settled(page: Page): Promise<string> {
+  let last = await focused(page);
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await page.waitForTimeout(100);
+    const next = await focused(page);
+    if (next === last) return next;
+    last = next;
+  }
+  return last;
+}
+
 /** 포커스가 대화상자 안(또는 거기서 연 떠 있는 층 안)에 있는가. */
 async function focusInsideDialog(page: Page): Promise<boolean> {
   return page.evaluate(() => {
@@ -190,8 +211,7 @@ test.describe("대화상자의 포커스", () => {
     await expect
       .poll(async () => focused(page), { message: "메뉴가 첫 항목을 잡을 때까지" })
       .toContain("ff-context-menu-item");
-    const before = await focused(page);
-    await expect.poll(async () => focused(page), { message: "포커스가 멈출 때까지" }).toBe(before);
+    const before = await settled(page);
 
     await page.keyboard.press("Tab");
     await expect
