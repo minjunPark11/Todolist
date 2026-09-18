@@ -1,0 +1,46 @@
+-- 019 는 캘린더의 이름·색·쓰기 권한을 적어뒀지만 시간대는 적지 않았다.
+--
+-- 구글은 `calendarList` 에서 캘린더마다 `timeZone` 을 준다. 그 값이 있어야
+-- 인바운드가 `defaultTimezone` 을 넘길 수 있고 (§6.1), 그것은
+-- `inboundShape.moment()` 가 **자기 시간대를 말하지 않는 일정**에 붙이는
+-- 라벨이 된다. 컬럼이 없어서 `rowToSource` 가 그 값을 채우지 못했고, 매
+-- 패스가 `defaultTimezone` 없이 돌았다.
+--
+-- 시각이 틀렸던 것은 아니다. 절대 시각은 구글이 주는 RFC3339 의 오프셋에서
+-- 오므로 `new Date(dateTime)` 은 언제나 맞았다. 빠진 것은 그 일정이 어느
+-- 지역의 시계로 잡힌 것인지였다.
+--
+-- `summary`·`color` 와 같은 모양으로 둔다 — `not null default ''`. 그 둘처럼
+-- 이 값도 구글의 것이지 사람의 것이 아니므로, 목록을 새로 읽을 때마다
+-- 통째로 덮는 것이 맞다. 같은 이유로 **백필이 없다**: 기존 행은 `''` 로
+-- 시작하고 설정에서 목록을 한 번 여는 순간 `rememberGoogleCalendars` 가
+-- 채운다.
+--
+-- `if not exists` 인 것은 이 리포의 운영 절차가 부분 적용과 재실행을 가장
+-- 경계하기 때문이다 (`supabase/ops/README.md`).
+--
+-- 순서 — **이 파일이 클라이언트보다 먼저다.**
+--
+-- `readGoogleSources` 는 이 컬럼을 이름으로 달라고 하고, PostgREST 는 없는
+-- 컬럼을 물으면 오류를 돌려준다. 그러면 `GoogleCalendarError("store")` 가
+-- 던져지고, 인바운드 패스는 그것을 삼키므로 (`useGoogleInboundSync` 의 바깥
+-- try/catch) **외부 캘린더가 조용히 안 들어온다.** 설정의 목록은 오류와
+-- 재시도 버튼을 그리지만, 재시도로는 절대 풀리지 않는다 — 021·022 가 남긴
+-- 것과 같은 모양이다 (`supabase/ops/README.md` 의 첫 절).
+--
+-- 다른 테이블을 건드리지 않는다. 이 테이블을 참조하는 다른 객체는
+-- 026 의 `delete` 한 줄뿐이고, `%rowtype` 이나 위치 기반 insert 는 없다.
+--
+-- 여기 적은 것은 전부 Postgres 16 에서 돌려 본 것이다 [실측]: 019 위에
+-- 적용되고, 재실행하면 `already exists, skipping` 으로 지나가고, 적용 전에
+-- 클라이언트의 질의는 `column "timezone" does not exist` 로 죽고, 적용 뒤
+-- 기존 행은 `''` 이며 `selected` 는 그대로다.
+--
+-- 적용됐는지 묻는 한 줄:
+--
+--   select column_name from information_schema.columns
+--   where table_schema='public' and table_name='google_calendar_sources'
+--     and column_name='timezone';
+begin;
+alter table public.google_calendar_sources add column if not exists timezone text not null default '';
+commit;

@@ -15,6 +15,11 @@ function plan(items: GoogleEventResource[], known: Record<string, KnownEvent> = 
   return planInbound({ items, known: new Map(Object.entries(known)), options });
 }
 
+/** 캘린더 자신의 시간대를 아는 채로 도는 패스 (§6.1). */
+function planInZone(items: GoogleEventResource[], defaultTimezone: string) {
+  return planInbound({ items, known: new Map(), options: { ...options, defaultTimezone } });
+}
+
 function held(externalUid: string, extra: Partial<ExternalCalendarEvent> = {}): ExternalCalendarEvent {
   return {
     id: `${CAL}:${externalUid}`,
@@ -105,6 +110,36 @@ describe("the record a response produces", () => {
     expect(event.allDay).toBe(false);
     expect(event.timezone).toBe("Asia/Seoul");
     expect(event.updatedAt).toBe("2026-09-07T10:00:00.000Z");
+  });
+
+  it("자기 시간대를 말하지 않는 일정에는 캘린더의 시간대를 붙인다", () => {
+    // 구글은 `dateTime` 에 오프셋을 실어 주므로 **시각**은 언제나 맞는다.
+    // 빠지는 것은 "이 일정이 어느 지역의 시계로 잡혔는가"라는 라벨이고,
+    // 그 답은 캘린더 자신의 시간대다. 그 값을 적어둘 컬럼이 019 에 없어서
+    // 046 이 추가했다 — 그 전까지 이 경로는 언제나 라벨 없이 돌았다.
+    const floating: GoogleEventResource = {
+      id: "e-floating",
+      status: "confirmed",
+      start: { dateTime: "2026-09-08T14:00:00+09:00" },
+      end: { dateTime: "2026-09-08T14:30:00+09:00" },
+    };
+
+    const [labelled] = planInZone([floating], "Asia/Seoul").upsert;
+    expect(labelled.timezone).toBe("Asia/Seoul");
+    expect(labelled.start, "라벨이 시각을 바꾸지는 않는다").toBe("2026-09-08T05:00:00.000Z");
+
+    // 그물의 자기 점검: 캘린더의 시간대를 모르면 붙일 것이 없다. 이쪽이
+    // 046 이전의 모습이고, 여기서 무언가를 지어내면 그것이 더 나쁘다.
+    const [bare] = plan([floating]).upsert;
+    expect(bare.timezone ?? "", "모르는 것을 아는 척하면 안 된다").toBe("");
+    expect(bare.start, "그래도 시각은 같다").toBe("2026-09-08T05:00:00.000Z");
+  });
+
+  it("일정이 자기 시간대를 말하면 캘린더의 것보다 그쪽이 이긴다", () => {
+    // 폴백은 **없을 때의** 답이다. 있는 것을 덮으면 한국 캘린더에 잡힌
+    // 뉴욕 회의가 한국 시각으로 읽힌다.
+    const [event] = planInZone([timed], "America/New_York").upsert;
+    expect(event.timezone).toBe("Asia/Seoul");
   });
 
   it("leaves an all-day event as a bare date, which is how it is recognised", () => {

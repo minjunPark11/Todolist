@@ -92,6 +92,10 @@ function rowToSource(row: Record<string, unknown>): GoogleCalendarSource {
     writable: row.writable === true,
     selected: row.selected === true,
     ...(typeof row.sync_token === "string" && row.sync_token ? { syncToken: row.sync_token } : {}),
+    // 빈 문자열은 "구글이 이 캘린더의 시간대를 말하지 않았다"와 "046 이전에
+    // 쓰인 행이다"를 둘 다 뜻한다. 어느 쪽이든 붙일 라벨이 없다는 결론은
+    // 같으므로, 키를 아예 두지 않는다 — `syncToken` 과 같은 이유로 같은 모양.
+    ...(typeof row.timezone === "string" && row.timezone ? { timezone: row.timezone } : {}),
     primary: false,
   };
 }
@@ -101,7 +105,7 @@ export async function readGoogleSources(): Promise<GoogleCalendarSource[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("google_calendar_sources")
-    .select("calendar_id, summary, color, writable, selected, sync_token");
+    .select("calendar_id, summary, color, writable, selected, sync_token, timezone");
   if (error) throw new GoogleCalendarError("store", error.message);
   return (data ?? []).map((row) => rowToSource(row as Record<string, unknown>));
 }
@@ -132,6 +136,9 @@ export async function rememberGoogleCalendars(calendars: GoogleCalendarSummary[]
     summary: calendar.summary,
     color: calendar.color,
     writable: calendar.writable,
+    // 구글의 것이지 사람의 것이 아니므로 `selected` 와 달리 매번 덮는다.
+    // 캘린더를 다른 지역으로 옮기면 여기도 따라와야 한다.
+    timezone: calendar.timezone ?? "",
     // Only for rows this is creating. An existing row keeps its own answer.
     ...(known.has(calendar.calendarId) ? {} : { selected: false }),
   }));
