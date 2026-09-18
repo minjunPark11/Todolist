@@ -1300,6 +1300,7 @@ function createRegistry(tools) {
 
 // src/server/mcp/handler.ts
 var MAX_RESULT_BYTES = 256 * 1024;
+var ENCODER = new TextEncoder();
 
 // src/server/mcp/jwks.ts
 var DEFAULT_CACHE_TTL_MS = 6 * 60 * 60 * 1e3;
@@ -1321,8 +1322,12 @@ function protectedResourceMetadata(input) {
     authorization_servers: [issuerFor(input.supabaseUrl)],
     bearer_methods_supported: ["header"],
     // Supabase's own list (§26.4). FocusFlow adds none of its own: custom
-    // scopes are not supported, which is why read-only is enforced by the
-    // database rather than by a scope (§6.5).
+    // scopes are not supported.
+    //
+    // 그래서 이 토큰은 범위가 좁혀지지 않은 사용자 토큰이다. 전에 여기에는
+    // "그래서 읽기 전용은 범위가 아니라 데이터베이스가 강제한다 (§6.5)"라고
+    // 적혀 있었는데, 그런 정책은 없다(registry.ts 의 실측을 보라). 읽기
+    // 전용은 이 서버가 쓰기 도구를 하나도 등록하지 않는 것으로만 지켜진다.
     scopes_supported: ["openid", "profile", "email"]
   };
 }

@@ -6,7 +6,7 @@
 // the real ones are chosen.
 import { readSupabaseEnv, supabaseTableReader } from "../data/repository";
 import { loadExternalEvents } from "../data/calendar/icsSource";
-import type { TokenVerifier } from "./auth";
+import { VerifierUnavailableError, type TokenVerifier } from "./auth";
 import { handleMcpHttp, type McpDeps, type McpHttpRequest, type McpHttpResponse } from "./handler";
 import { supabaseTokenVerifier } from "./jwks";
 import { issuerFor, protectedResourceUrl, readAppUrl } from "./protectedResource";
@@ -32,7 +32,14 @@ function lazySupabaseVerifier(): TokenVerifier {
   let inner: TokenVerifier | null = null;
   return {
     async verify(bearer) {
-      inner ??= supabaseTokenVerifier({ issuer: issuerFor(readSupabaseEnv().url) });
+      if (!inner) {
+        try {
+          inner = supabaseTokenVerifier({ issuer: issuerFor(readSupabaseEnv().url) });
+        } catch (error) {
+          // 설정이 빠진 것은 부르는 쪽이 고칠 수 있는 일이 아니다.
+          throw new VerifierUnavailableError(error instanceof Error ? error.message : "Not configured.");
+        }
+      }
       return inner.verify(bearer);
     },
   };

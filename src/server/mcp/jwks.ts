@@ -16,7 +16,7 @@
 // project would need `getClaims` to make a round trip per request, and this
 // project is not one (§26.4, SEC-1). Refusing loudly beats silently adding a
 // network hop nobody asked for.
-import { UnauthorizedError, type TokenVerifier } from "./auth";
+import { UnauthorizedError, VerifierUnavailableError, type TokenVerifier } from "./auth";
 
 export interface JwtHeader {
   alg: string;
@@ -143,23 +143,31 @@ export function supabaseTokenVerifier(options: SupabaseVerifierOptions): TokenVe
  * The address is in the message because without it this failure is unreadable.
  * It says nothing about the token, the user, or the request: the only way it
  * happens is that this deployment is pointed at the wrong Supabase project, or
- * cannot reach the right one. Both are answered by seeing the URL, and neither
- * is answerable without it — a 401 reading only "could not be read right now"
- * sends the reader to check their session, which is the one thing that is fine.
+ * cannot reach the right one. Both are answered by seeing the URL.
  *
  * Nothing secret is disclosed. The URL is built from `SUPABASE_URL`, which is
  * the project's own public address — the browser bundle ships it, and the JWKS
  * it names is served to anonymous callers by design.
+ *
+ * 그 주소가 **어디로 가는지**는 바뀌었다. 전에는 이것이
+ * `UnauthorizedError` 였으므로 401 의 본문으로 부르는 쪽에 돌아갔고, 그
+ * 401 을 받은 사람이 자기 세션을 의심하지 않도록 주소가 필요하다는 것이
+ * 위 문단의 논지였다. 지금은 `VerifierUnavailableError` 이므로 503 이 되고,
+ * "당신 토큰 이야기가 아니다"를 상태 코드가 먼저 말한다. 주소는 운영자의
+ * 로그로 간다 — 답에는 실리지 않는다.
  */
 async function fetchKeys(url: string, fetchImpl: typeof fetch, now: () => Date): Promise<CachedKeys> {
   let response: Response;
   try {
     response = await fetchImpl(url, { headers: { Accept: "application/json" } });
   } catch {
-    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} could not be reached.`);
+    // 우리 쪽이 발행자에게 닿지 못한 것이다. 이것을 `invalid_token` 으로
+    // 답하면, 발행자가 잠깐 흔들리는 동안 붙어 있던 클라이언트가 전부
+    // 재인증을 돌기 시작한다 — 고쳐줄 토큰이 없는데도.
+    throw new VerifierUnavailableError(`The signing keys at ${url} could not be reached.`);
   }
   if (!response.ok) {
-    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} came back ${response.status}.`);
+    throw new VerifierUnavailableError(`The signing keys at ${url} came back ${response.status}.`);
   }
 
   const body = (await response.json()) as { keys?: Array<JsonWebKey & { kid?: string }> };

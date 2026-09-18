@@ -8,6 +8,12 @@ var UnauthorizedError = class extends Error {
     this.reason = reason;
   }
 };
+var VerifierUnavailableError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "VerifierUnavailableError";
+  }
+};
 function bearerFrom(headerValue) {
   if (!headerValue) return null;
   const match = /^Bearer\s+(.+)$/i.exec(headerValue.trim());
@@ -97,10 +103,10 @@ async function fetchKeys(url, fetchImpl, now) {
   try {
     response = await fetchImpl(url, { headers: { Accept: "application/json" } });
   } catch {
-    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} could not be reached.`);
+    throw new VerifierUnavailableError(`The signing keys at ${url} could not be reached.`);
   }
   if (!response.ok) {
-    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} came back ${response.status}.`);
+    throw new VerifierUnavailableError(`The signing keys at ${url} came back ${response.status}.`);
   }
   const body = await response.json();
   const keys = /* @__PURE__ */ new Map();

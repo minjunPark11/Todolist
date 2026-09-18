@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { UnauthorizedError } from "./auth";
+import { UnauthorizedError, VerifierUnavailableError } from "./auth";
 import { supabaseTokenVerifier } from "./jwks";
 
 const ISSUER = "https://project.supabase.co/auth/v1";
@@ -149,7 +149,14 @@ describe("a token this project did not issue", () => {
       now: () => NOW,
     });
 
-    await expect(failing.verify(await sign(goodClaims()))).rejects.toBeInstanceOf(UnauthorizedError);
+    // 받아주지 않는 것이 이 검사의 요지이고, 그것은 그대로다. 달라진 것은
+    // **누구의 잘못이라고 말하느냐**다: 발행자에게 닿지 못한 것은 토큰에
+    // 대한 판정이 아니므로 `UnauthorizedError` 가 아니다. 그것을 401 로
+    // 답하면 발행자가 흔들리는 동안 붙어 있던 클라이언트가 전부 재인증을
+    // 돌기 시작한다 — 고쳐줄 토큰이 없는데도 (`handler.ts` 가 이것을 503
+    // 으로 옮긴다).
+    await expect(failing.verify(await sign(goodClaims()))).rejects.toBeInstanceOf(VerifierUnavailableError);
+    await expect(failing.verify(await sign(goodClaims()))).rejects.not.toBeInstanceOf(UnauthorizedError);
   });
 });
 

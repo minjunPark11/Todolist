@@ -46,6 +46,28 @@ export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11
 /** §16.1. Serialized, per tool answer. */
 export const MAX_RESULT_BYTES = 256 * 1024;
 
+const ENCODER = new TextEncoder();
+
+/**
+ * How big an answer really is, on the wire.
+ *
+ * `JSON.stringify(x).length` counts UTF-16 code units, and the constant above
+ * says BYTES. For ASCII those are the same number, which is why the ceiling
+ * looked correct for as long as nobody measured it in this app's own language
+ * [실측]: the largest answer that got past the old check was
+ *
+ *   영문   262088 코드단위 = 262088 바이트  (상한의 1.00배)
+ *   한글   262126 코드단위 = 510426 바이트  (상한의 1.95배)
+ *   이모지 262082 코드단위 = 469154 바이트  (상한의 1.79배)
+ *
+ * 한글 제목을 쓰는 사람에게만 상한이 두 배로 열려 있었다 — 상한이 지키려던
+ * 것(모델의 창, 응답 한 덩어리의 크기)은 코드 단위가 아니라 바이트로 세는
+ * 것들이다.
+ */
+function byteLength(value: unknown): number {
+  return ENCODER.encode(JSON.stringify(value)).length;
+}
+
 export interface McpHttpRequest {
   method: string;
   headers: Record<string, string | undefined>;
@@ -125,13 +147,40 @@ export async function handleMcpHttp(request: McpHttpRequest, deps: McpDeps): Pro
     if (!bearer) throw new UnauthorizedError("missing_token", "This endpoint needs an access token.");
     verified = await deps.verifier.verify(bearer);
   } catch (error) {
-    const reason = error instanceof UnauthorizedError ? error.reason : "invalid_token";
-    const message = error instanceof Error ? error.message : "Unauthorized.";
+    // 401 은 **토큰에 대한 판정일 때만**이다.
+    //
+    // 전에는 확인 중에 난 모든 오류가 401 이었고 그 메시지가 본문에 그대로
+    // 실렸다. 그래서 서버에 환경 변수가 없는 배포는 모양만 맞는 JWT 에
+    // 이렇게 답했다 [실측]: `401` · `error="invalid_token"` ·
+    // `{"error":"SUPABASE_URL and SUPABASE_ANON_KEY must be set ..."}`.
+    //
+    // 두 가지가 한꺼번에 틀렸다. 붙어 있는 에이전트는 토큰을 고치면 될
+    // 일이라 믿고 재인증을 영원히 돈다 — 어떤 토큰으로도 낫지 않는데.
+    // 그리고 서버의 설정 사정이 인증도 안 된 호출자에게 나간다.
+    if (!(error instanceof UnauthorizedError)) {
+      // 왜인지는 운영자의 로그로만 간다. `McpLogRecord` 에 자유 문구 자리를
+      // 두지 않는 것은 §16.2 의 결정이므로(거기에 사적인 것이 섞여 들어올
+      // 자리를 만들지 않는다) 이유는 따로 적는다.
+      console.error(JSON.stringify({
+        scope: "mcp",
+        requestId,
+        event: "verifier-unavailable",
+        reason: error instanceof Error ? error.message : String(error),
+      }));
+      log({ requestId, method: "auth", outcome: "error", errorCode: "INTERNAL", latencyMs: Date.now() - startedAt });
+      return {
+        status: 503,
+        // 다시 와도 된다고 말하되, 재인증하라고는 하지 않는다 —
+        // `WWW-Authenticate` 를 붙이지 않는 것이 그 뜻이다.
+        headers: { "Retry-After": "30" },
+        body: { error: "This server cannot verify access tokens right now." },
+      };
+    }
     log({ requestId, method: "auth", outcome: "error", errorCode: "UNAUTHORIZED", latencyMs: Date.now() - startedAt });
     return {
       status: 401,
-      headers: { "WWW-Authenticate": challenge(reason, deps.resourceMetadataUrl) },
-      body: { error: message },
+      headers: { "WWW-Authenticate": challenge(error.reason, deps.resourceMetadataUrl) },
+      body: { error: error.message },
     };
   }
 
@@ -337,7 +386,7 @@ function toolError(id: RpcResponse["id"], error: unknown, scope: DispatchScope, 
  * model, and in `_meta` for the client.
  */
 export function capResult(result: unknown): { payload: unknown; truncated: boolean } {
-  if (JSON.stringify(result).length <= MAX_RESULT_BYTES) return { payload: result, truncated: false };
+  if (byteLength(result) <= MAX_RESULT_BYTES) return { payload: result, truncated: false };
   if (!result || typeof result !== "object") return { payload: result, truncated: false };
 
   const payload = { ...(result as Record<string, unknown>) };
@@ -346,7 +395,7 @@ export function capResult(result: unknown): { payload: unknown; truncated: boole
   // Halve the longest list, repeatedly, until it fits. Ten rounds takes any
   // plausible answer under the cap; the guard is against a shape that has no
   // lists to trim at all.
-  for (let round = 0; round < 10 && JSON.stringify(payload).length > MAX_RESULT_BYTES; round += 1) {
+  for (let round = 0; round < 10 && byteLength(payload) > MAX_RESULT_BYTES; round += 1) {
     const longest = arrayKeys
       .map((key) => ({ key, length: (payload[key] as unknown[]).length }))
       .sort((a, b) => b.length - a.length)[0];

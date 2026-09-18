@@ -14,7 +14,7 @@ function bearerFrom(headerValue) {
   const match = /^Bearer\s+(.+)$/i.exec(headerValue.trim());
   return match ? match[1].trim() : null;
 }
-var UnauthorizedError;
+var UnauthorizedError, VerifierUnavailableError;
 var init_auth = __esm({
   "src/server/mcp/auth.ts"() {
     "use strict";
@@ -25,6 +25,12 @@ var init_auth = __esm({
         super(message);
         this.name = "UnauthorizedError";
         this.reason = reason;
+      }
+    };
+    VerifierUnavailableError = class extends Error {
+      constructor(message) {
+        super(message);
+        this.name = "VerifierUnavailableError";
       }
     };
   }
@@ -115,10 +121,10 @@ async function fetchKeys(url, fetchImpl, now) {
   try {
     response = await fetchImpl(url, { headers: { Accept: "application/json" } });
   } catch {
-    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} could not be reached.`);
+    throw new VerifierUnavailableError(`The signing keys at ${url} could not be reached.`);
   }
   if (!response.ok) {
-    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} came back ${response.status}.`);
+    throw new VerifierUnavailableError(`The signing keys at ${url} came back ${response.status}.`);
   }
   const body = await response.json();
   const keys = /* @__PURE__ */ new Map();

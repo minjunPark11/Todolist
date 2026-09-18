@@ -17,6 +17,32 @@ export class UnauthorizedError extends Error {
   }
 }
 
+/**
+ * 확인을 **할 수 없다** — 토큰이 틀린 것이 아니라.
+ *
+ * `UnauthorizedError` 와 나뉘어 있어야 하는 이유는 답이 달라지기 때문이다.
+ * 토큰이 틀렸다면 401 이 맞고, 부르는 쪽은 새 토큰을 받아 다시 온다. 서명
+ * 키를 못 읽거나 서버에 환경 변수가 없는 것은 어떤 토큰으로도 낫지 않는데,
+ * 그것마저 401 로 답하면 연결한 에이전트는 인증을 영원히 다시 시도한다.
+ *
+ * 실제로 그랬다 [실측]. 환경 변수가 비어 있는 배포에 모양만 맞는 JWT 를
+ * 보내면 이렇게 돌아왔다:
+ *
+ *   HTTP/1.1 401 Unauthorized
+ *   WWW-Authenticate: Bearer error="invalid_token"
+ *   {"error":"SUPABASE_URL and SUPABASE_ANON_KEY must be set for the
+ *             server data layer."}
+ *
+ * 토큰 이야기가 아닌 것을 토큰 탓으로 돌렸고, 서버의 설정 사정을 인증도 안
+ * 된 호출자에게 알려줬다.
+ */
+export class VerifierUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VerifierUnavailableError";
+  }
+}
+
 export interface VerifiedToken {
   userId: string;
   clientId?: string;

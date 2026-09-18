@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fixtureReader, settingsRows, task, type TableRows } from "../test/fixtures";
-import { unverifiedClaimsVerifier } from "./auth";
+import { unverifiedClaimsVerifier, UnauthorizedError, VerifierUnavailableError, type TokenVerifier } from "./auth";
 import { capResult, handleMcpHttp, MAX_RESULT_BYTES, SUPPORTED_PROTOCOL_VERSIONS, type McpDeps } from "./handler";
 import type { McpLogRecord } from "./logging";
 import { createRegistry, describe as describeTool, type ToolDefinition } from "./registry";
@@ -81,6 +81,65 @@ describe("the HTTP shape", () => {
 
     expect(response.status).toBe(401);
     expect(response.headers["WWW-Authenticate"]).toContain('error="invalid_token"');
+  });
+
+  it("확인할 수 없는 것은 401 이 아니다 — 503 이고, 재인증을 시키지 않는다", async () => {
+    // 401 은 토큰에 대한 판정이다. 서버가 서명 키를 못 읽거나 설정이 빠진
+    // 것은 어떤 토큰으로도 낫지 않으므로, 그것을 401 로 답하면 붙어 있는
+    // 에이전트가 재인증을 영원히 돈다.
+    //
+    // 실제로 그랬다 [실측 — 환경 변수가 비어 있는 개발 서버에 모양만 맞는
+    // JWT 를 보냈다]:
+    //
+    //   401 · WWW-Authenticate: Bearer error="invalid_token"
+    //   {"error":"SUPABASE_URL and SUPABASE_ANON_KEY must be set ..."}
+    const broken: TokenVerifier = {
+      async verify() {
+        throw new VerifierUnavailableError("SUPABASE_URL and SUPABASE_ANON_KEY must be set.");
+      },
+    };
+    const response = await handleMcpHttp(post({}, `Bearer ${USER_TOKEN}`), deps(rows(), { verifier: broken }));
+
+    expect(response.status).toBe(503);
+    expect(response.headers["Retry-After"], "다시 와도 된다고는 말해야 한다").toBe("30");
+    expect(
+      response.headers["WWW-Authenticate"],
+      "이 헤더가 있으면 커넥터는 토큰을 고치면 될 일이라고 읽는다",
+    ).toBeUndefined();
+
+    const body = JSON.stringify(response.body);
+    expect(body, "서버의 설정 사정은 인증도 안 된 호출자가 알 일이 아니다").not.toContain("SUPABASE_URL");
+    expect(body).toContain("cannot verify");
+  });
+
+  it("확인기가 무엇을 던지든 설정 문구가 새지 않는다 — 그물의 자기 점검", async () => {
+    // 위 검사는 `VerifierUnavailableError` 만 본다. `UnauthorizedError` 가
+    // 아닌 것은 전부 같은 취급이어야 한다 — 우리가 예상하지 못한 throw 도.
+    const surprising: TokenVerifier = {
+      async verify() {
+        throw new Error("connect ECONNREFUSED 10.0.0.5:5432");
+      },
+    };
+    const response = await handleMcpHttp(post({}, `Bearer ${USER_TOKEN}`), deps(rows(), { verifier: surprising }));
+
+    expect(response.status).toBe(503);
+    expect(JSON.stringify(response.body)).not.toContain("10.0.0.5");
+  });
+
+  it("토큰에 대한 판정은 여전히 401 이고 이유를 말한다 — 그물의 자기 점검", async () => {
+    // 위 둘이 "무엇이든 503" 인 구현으로도 통과하므로, 반대편을 같이
+    // 고정한다. 토큰이 틀렸다면 부르는 쪽이 고칠 수 있고, 고치라고 말해야
+    // 한다.
+    const refusing: TokenVerifier = {
+      async verify() {
+        throw new UnauthorizedError("invalid_token", "That token was issued for a different service.");
+      },
+    };
+    const response = await handleMcpHttp(post({}, `Bearer ${USER_TOKEN}`), deps(rows(), { verifier: refusing }));
+
+    expect(response.status).toBe(401);
+    expect(response.headers["WWW-Authenticate"]).toContain('error="invalid_token"');
+    expect(JSON.stringify(response.body)).toContain("different service");
   });
 
   it("reports a malformed body as a parse error", async () => {
@@ -170,12 +229,20 @@ describe("tools/list", () => {
   });
 
   it("hides a write tool, and refuses to call it", async () => {
+    // 이것이 **유일한** 자물쇠다. registry.ts 의 실측대로 데이터베이스에는
+    // OAuth 클라이언트의 쓰기를 막는 정책이 없으므로, 이 검사가 무너지면
+    // 그 아래에 받아줄 것이 없다. 그래서 거절만이 아니라 손이 닿지
+    // 않았다는 것까지 본다.
+    let ran = false;
     const writeTool: ToolDefinition = {
       name: "create_task",
       mode: "write",
       description: describeTool("Would create a task."),
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      handler: async () => ({ created: true }),
+      handler: async () => {
+        ran = true;
+        return { created: true };
+      },
     };
     const withWrite = deps(rows(), { tools: createRegistry([...readTools, writeTool]) });
 
@@ -185,6 +252,7 @@ describe("tools/list", () => {
 
     const attempt = await handleMcpHttp(post(call("create_task")), withWrite);
     expect((attempt.body as { error: { message: string } }).error.message).toContain("no tool called");
+    expect(ran).toBe(false);
   });
 });
 
@@ -332,5 +400,29 @@ describe("capResult", () => {
     expect(JSON.stringify(payload).length).toBeLessThanOrEqual(MAX_RESULT_BYTES);
     expect((payload as { items: unknown[] }).items.length).toBeLessThan(items.length);
     expect((payload as { meta: { truncated: boolean } }).meta.truncated).toBe(true);
+  });
+
+  it("measures the ceiling in bytes, so a Korean answer is capped at the same size as an English one", () => {
+    // 이 고정값의 요점은 **옛 검사를 통과했다는 것**이다: 코드 단위로는
+    // 상한 안이고, 바이트로는 밖이다. 그 둘이 갈리지 않는 고정값이었다면
+    // 이 검사는 아무것도 잡지 못한 채 통과했을 것이다 — 바로 위 검사의
+    // "x".repeat(100) 이 그랬다.
+    const items = Array.from({ length: 2600 }, (_, index) => ({
+      id: `task-${index}`,
+      title: "플랫폼 팀 분기 보고서 초안을 작성하고 검토 요청까지 보내기".repeat(2),
+    }));
+    const oversized = { items, meta: { truncated: false } };
+    const asJson = JSON.stringify(oversized);
+
+    // 자기 점검: 고정값이 정말 그 틈에 놓여 있는가.
+    expect(asJson.length).toBeLessThanOrEqual(MAX_RESULT_BYTES);
+    expect(Buffer.byteLength(asJson, "utf8")).toBeGreaterThan(MAX_RESULT_BYTES);
+
+    const { payload, truncated } = capResult(oversized);
+
+    expect(truncated).toBe(true);
+    // 구현과 같은 자를 쓰지 않는다 — 바이트를 따로 센다.
+    expect(Buffer.byteLength(JSON.stringify(payload), "utf8")).toBeLessThanOrEqual(MAX_RESULT_BYTES);
+    expect((payload as { items: unknown[] }).items.length).toBeLessThan(items.length);
   });
 });

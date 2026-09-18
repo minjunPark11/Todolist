@@ -2276,6 +2276,28 @@ async function loadExternalEvents(calendars, options = {}) {
   };
 }
 
+// src/server/mcp/auth.ts
+var UnauthorizedError = class extends Error {
+  /** What goes in `WWW-Authenticate`, so a connector starts an OAuth flow. */
+  reason;
+  constructor(reason, message) {
+    super(message);
+    this.name = "UnauthorizedError";
+    this.reason = reason;
+  }
+};
+var VerifierUnavailableError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "VerifierUnavailableError";
+  }
+};
+function bearerFrom(headerValue) {
+  if (!headerValue) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(headerValue.trim());
+  return match ? match[1].trim() : null;
+}
+
 // src/server/data/context.ts
 function resolveTimezone(stored, hint) {
   const candidate = (stored || "").trim() || (hint || "").trim();
@@ -2353,22 +2375,6 @@ function minutesOfDay(time) {
   const [hours, minutes] = time.split(":").map(Number);
   if (hours > 24 || minutes > 59) return void 0;
   return hours * 60 + minutes;
-}
-
-// src/server/mcp/auth.ts
-var UnauthorizedError = class extends Error {
-  /** What goes in `WWW-Authenticate`, so a connector starts an OAuth flow. */
-  reason;
-  constructor(reason, message) {
-    super(message);
-    this.name = "UnauthorizedError";
-    this.reason = reason;
-  }
-};
-function bearerFrom(headerValue) {
-  if (!headerValue) return null;
-  const match = /^Bearer\s+(.+)$/i.exec(headerValue.trim());
-  return match ? match[1].trim() : null;
 }
 
 // src/server/mcp/args.ts
@@ -2537,6 +2543,10 @@ var SERVER_NAME = "focusflow";
 var SERVER_VERSION = "0.1.0";
 var SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 var MAX_RESULT_BYTES = 256 * 1024;
+var ENCODER = new TextEncoder();
+function byteLength(value2) {
+  return ENCODER.encode(JSON.stringify(value2)).length;
+}
 var TIMEZONE_ARGUMENT = {
   timezone: {
     type: "string",
@@ -2567,13 +2577,27 @@ async function handleMcpHttp(request, deps) {
     if (!bearer) throw new UnauthorizedError("missing_token", "This endpoint needs an access token.");
     verified = await deps.verifier.verify(bearer);
   } catch (error) {
-    const reason = error instanceof UnauthorizedError ? error.reason : "invalid_token";
-    const message = error instanceof Error ? error.message : "Unauthorized.";
+    if (!(error instanceof UnauthorizedError)) {
+      console.error(JSON.stringify({
+        scope: "mcp",
+        requestId,
+        event: "verifier-unavailable",
+        reason: error instanceof Error ? error.message : String(error)
+      }));
+      log({ requestId, method: "auth", outcome: "error", errorCode: "INTERNAL", latencyMs: Date.now() - startedAt });
+      return {
+        status: 503,
+        // 다시 와도 된다고 말하되, 재인증하라고는 하지 않는다 —
+        // `WWW-Authenticate` 를 붙이지 않는 것이 그 뜻이다.
+        headers: { "Retry-After": "30" },
+        body: { error: "This server cannot verify access tokens right now." }
+      };
+    }
     log({ requestId, method: "auth", outcome: "error", errorCode: "UNAUTHORIZED", latencyMs: Date.now() - startedAt });
     return {
       status: 401,
-      headers: { "WWW-Authenticate": challenge(reason, deps.resourceMetadataUrl) },
-      body: { error: message }
+      headers: { "WWW-Authenticate": challenge(error.reason, deps.resourceMetadataUrl) },
+      body: { error: error.message }
     };
   }
   let parsed;
@@ -2704,11 +2728,11 @@ function toolError(id, error, scope, tool) {
   return failure(id, RPC_INTERNAL_ERROR, "That tool failed.");
 }
 function capResult(result) {
-  if (JSON.stringify(result).length <= MAX_RESULT_BYTES) return { payload: result, truncated: false };
+  if (byteLength(result) <= MAX_RESULT_BYTES) return { payload: result, truncated: false };
   if (!result || typeof result !== "object") return { payload: result, truncated: false };
   const payload = { ...result };
   const arrayKeys = Object.keys(payload).filter((key) => Array.isArray(payload[key]));
-  for (let round = 0; round < 10 && JSON.stringify(payload).length > MAX_RESULT_BYTES; round += 1) {
+  for (let round = 0; round < 10 && byteLength(payload) > MAX_RESULT_BYTES; round += 1) {
     const longest = arrayKeys.map((key) => ({ key, length: payload[key].length })).sort((a, b) => b.length - a.length)[0];
     if (!longest || longest.length === 0) break;
     payload[longest.key] = payload[longest.key].slice(0, Math.floor(longest.length / 2));
@@ -2840,10 +2864,10 @@ async function fetchKeys(url, fetchImpl, now) {
   try {
     response = await fetchImpl(url, { headers: { Accept: "application/json" } });
   } catch {
-    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} could not be reached.`);
+    throw new VerifierUnavailableError(`The signing keys at ${url} could not be reached.`);
   }
   if (!response.ok) {
-    throw new UnauthorizedError("invalid_token", `The signing keys at ${url} came back ${response.status}.`);
+    throw new VerifierUnavailableError(`The signing keys at ${url} came back ${response.status}.`);
   }
   const body = await response.json();
   const keys = /* @__PURE__ */ new Map();
@@ -4644,7 +4668,13 @@ function lazySupabaseVerifier() {
   let inner = null;
   return {
     async verify(bearer) {
-      inner ??= supabaseTokenVerifier({ issuer: issuerFor(readSupabaseEnv().url) });
+      if (!inner) {
+        try {
+          inner = supabaseTokenVerifier({ issuer: issuerFor(readSupabaseEnv().url) });
+        } catch (error) {
+          throw new VerifierUnavailableError(error instanceof Error ? error.message : "Not configured.");
+        }
+      }
       return inner.verify(bearer);
     }
   };
