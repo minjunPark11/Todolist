@@ -134,6 +134,35 @@ test("web mini window pauses the same session and clears after finish",async({pa
   await expect(popup.locator("#status")).toHaveText("Idle"); await expect(popup.locator("#finish")).toBeDisabled();
 });
 
+test("미니 창은 거절당한 명령 뒤에도 계속 쓸 수 있고, 거절을 연결 문제라 말하지 않는다",async({page})=>{
+  // 미니 창은 명령을 보내는 순간 두 버튼을 잠그고, 답(ack)이 와야 푼다.
+  // 그런데 푸는 조건이 `ok === true` 하나뿐이라, 거절당한 명령은 잠금을
+  // 영영 남긴다 — 그리고 5초 뒤 감시자가 "Connection lost" 라고 적는다.
+  // 연결은 멀쩡하다. 거절당한 것이다.
+  await openFocus(page); await page.getByRole("button",{name:"Start focus",exact:true}).click();
+  await expect(page.getByText("Focusing",{exact:true})).toBeVisible();
+  const popupPromise=page.waitForEvent("popup"); await page.getByRole("button",{name:"Mini timer",exact:true}).click(); const popup=await popupPromise;
+  await expect(popup.locator("#toggle")).toBeEnabled();
+
+  // 저장을 깨뜨려 명령이 진짜로 거절되게 만든다.
+  await page.evaluate(() => {
+    const original=Storage.prototype.setItem;
+    Storage.prototype.setItem=function(key,value) { if(key==="focusflow.appData.v1")throw new Error("test quota failure"); original.call(this,key,value); };
+  });
+  await popup.getByRole("button",{name:"Pause",exact:true}).click();
+
+  // 자기 점검: 정말 거절당했는지 주 창에서 확인한다. 거절되지 않았다면
+  // 아래 두 줄은 아무것도 재지 않는다.
+  await expect(page.getByRole("alert")).toContainText("Could not save focus");
+
+  // 거절은 거절이라고 말해야 한다.
+  await expect(popup.locator("#status")).toHaveText(/not saved/i);
+  await expect(popup.locator("#status")).not.toHaveText(/connection lost/i);
+  // 그리고 창은 계속 쓸 수 있어야 한다.
+  await expect(popup.locator("#toggle")).toBeEnabled();
+  await expect(popup.locator("#finish")).toBeEnabled();
+});
+
 test("link, relink and delete preserve the task contribution balance",async({page})=>{
   await page.clock.install(); await openApp(page); await page.goto("/board");
   const cell=page.locator(".ff-matrix-cell-II");

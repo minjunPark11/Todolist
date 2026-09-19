@@ -6,6 +6,18 @@ export type MiniFocusTimerSnapshot = {
   status: "running" | "paused" | "completed" | "cancelled";
   phase?: "focus" | "break";
   revision?: number;
+  /**
+   * 주 창이 아직 저장하지 못한 상태인가.
+   *
+   * 없을 때 이런 일이 벌어졌다 [실측, e2e]: 저장이 실패한 채 일시정지를
+   * 누르면 주 창은 "Could not save focus" 와 Retry 를 내놓는데, 미니 창은
+   * 그냥 "Paused" 였다. 창이 둘인데 이야기가 둘이었다 — 작은 창만 보던
+   * 사람은 멈췄고 적혔다고 믿는다.
+   *
+   * ack 의 `ok:false` 로 한 번만 알리는 방법도 있었지만, 그러면 그 순간을
+   * 놓친 창은 영영 모른다. 상태에 실어 보내면 매 갱신마다 사실이 실린다.
+   */
+  unsaved?: boolean;
 };
 
 let miniWindow: Window | null = null;
@@ -66,13 +78,20 @@ function renderMiniTimerDocument(target: Window) {
         document.getElementById("finish").disabled = !next.sessionId || !!pending;
         document.getElementById("time").textContent = next.time;
         document.getElementById("title").textContent = next.title || "Focus session";
-        document.getElementById("status").textContent = !next.sessionId ? "Idle" : next.phase === "break" ? (next.status === "paused" ? "Break paused" : "Taking a break") : next.status === "paused" ? "Paused" : "Running";
+        var state = !next.sessionId ? "Idle" : next.phase === "break" ? (next.status === "paused" ? "Break paused" : "Taking a break") : next.status === "paused" ? "Paused" : "Running";
+        // 저장되지 않은 상태를 멀쩡한 상태로 그리지 않는다. 주 창은 이때
+        // Retry 를 내놓고 있다.
+        document.getElementById("status").textContent = next.unsaved ? "Not saved \u00b7 retry in the main window" : state;
         document.getElementById("toggle").textContent = next.status === "paused" ? "Resume" : "Pause";
         document.getElementById("finish").textContent = next.phase === "break" ? "End break" : "Finish";
       };
       window.addEventListener("message", function(event) {
         if (event.origin !== window.location.origin || event.source !== window.opener || event.data?.type !== "focusflow-mini-ack" || event.data.commandId !== pending?.id) return;
-        if (event.data.ok) pending = null;
+        // 성공이든 거절이든 답이 온 것이고, 기다림은 끝났다. 전에는 ok 가
+        // 참일 때만 풀어서, 답이 오지 않는 경로와 거절을 구별하지 못했다.
+        // (여기는 템플릿 리터럴 안이다 - 역따옴표를 쓰면 문서가 잘린다.)
+        pending = null;
+        if (snapshot) window.updateFocusTimer(snapshot);
       });
       setInterval(function() {
         if (!window.opener || window.opener.closed || Date.now() - lastUpdate > 45000 || (pending && Date.now() - pending.at > 5000)) {

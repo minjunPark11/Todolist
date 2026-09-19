@@ -66,6 +66,32 @@ test("휴식은 같은 화면의 한 상태다 — 라벨과 값만 바뀐다", 
   await expect(page.getByRole("button", { name: "Start next focus", exact: true })).toBeVisible();
 });
 
+test("휴식이 끝나면 탭 제목도 휴식을 놓는다", async ({ page }) => {
+  // 제목을 쓰는 곳이 둘이다. 하나는 집중 세션을 보고 쓰고, 세션이 없으면
+  // 원래 제목으로 되돌린다. 다른 하나는 휴식 중에 남은 시간을 쓴다.
+  //
+  // 되돌리는 쪽은 자기 의존성이 바뀔 때만 다시 돈다 - 그런데 휴식이 끝나는
+  // 순간 그 의존성은 하나도 바뀌지 않는다. 세션은 계속 없고(null), 그래서
+  // 경과도 계속 0 이다. 쓰는 쪽은 멈추고 되돌리는 쪽은 돌지 않아, 제목만
+  // 휴식에 남는다.
+  await openPomodoro(page, "1");
+  await page.getByRole("button", { name: "Start focus", exact: true }).click();
+  await expect(page.getByText("Focusing", { exact: true })).toBeVisible();
+
+  await page.clock.runFor(61 * 1000);
+  await expect(page.getByText("Taking a break", { exact: true })).toBeVisible();
+
+  // 자기 점검: 제목이 애초에 휴식을 말하고 있어야 아래가 무언가를 잰다.
+  await expect.poll(() => page.title()).toMatch(/break/i);
+
+  await page.getByRole("button", { name: "End break", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Start next focus", exact: true })).toBeVisible();
+
+  // 휴식은 끝났다. 제목이 계속 휴식을 말하면 탭 목록에서 이 탭은 영영
+  // 쉬고 있는 것으로 보인다.
+  await expect.poll(() => page.title()).not.toMatch(/break/i);
+});
+
 test("스톱워치에는 블록이 없으므로 라벨도 막대도 없다", async ({ page }) => {
   await page.clock.install();
   await openApp(page);

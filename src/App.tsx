@@ -501,30 +501,53 @@ export default function App() {
     appSettings.language,
   ]);
 
+  // 탭 제목의 주인은 여기 하나다.
+  //
+  // 전에는 둘이었다. 이 효과가 집중 세션을 쓰고, 세션이 없으면 원래 제목으로
+  // 되돌렸다. 그리고 미니 타이머를 갱신하는 아래 효과가 휴식 중에 남은
+  // 시간을 따로 썼다.
+  //
+  // 휴식이 끝나는 순간 되돌릴 사람이 없었다 [실측, e2e]: 쓰던 쪽은 조건이
+  // 거짓이 되어 멈추고, 되돌리는 쪽은 자기 의존성이 하나도 바뀌지 않아
+  // 다시 돌지 않는다 — 세션은 계속 없고(null), 그래서 `activeFocusElapsed`
+  // 도 계속 0 이다. 탭 제목은 "05:00 · Break" 에 그대로 남았다. 탭 목록에서
+  // 그 탭은 영영 쉬고 있는 것으로 보인다.
   useEffect(() => {
-    const session = planner.activeFocusSession;
-    if (!session || !focusSettings.showTabTitleTimer) {
+    const session = planner.activeFocusSession, flow = planner.focusFlow;
+    if (!focusSettings.showTabTitleTimer) {
       document.title = originalTitleRef.current;
       return;
     }
-
-    if (session.status === "paused") {
-      document.title = `Paused · ${activeFocusTask?.title || session.title || "Focus"}`;
+    if (session) {
+      const name = activeFocusTask?.title || session.title || "Focus";
+      document.title =
+        session.status === "paused"
+          ? `Paused · ${name}`
+          : `${formatFocusDuration(activeFocusElapsed)} · ${name}`;
       return;
     }
-
-    document.title = `${formatFocusDuration(activeFocusElapsed)} · ${activeFocusTask?.title || session.title || "Focus"}`;
-  }, [activeFocusTask, activeFocusElapsed, focusSettings.showTabTitleTimer, planner.activeFocusSession]);
+    if (flow && flow.phase.startsWith("break_")) {
+      document.title = `${formatFocusDuration(breakRemaining(flow, focusNow))} · Break`;
+      return;
+    }
+    document.title = originalTitleRef.current;
+  }, [
+    activeFocusTask,
+    activeFocusElapsed,
+    focusSettings.showTabTitleTimer,
+    planner.activeFocusSession,
+    planner.focusFlow,
+    focusNow,
+  ]);
 
   useEffect(() => {
     const session = planner.activeFocusSession, flow = planner.focusFlow;
     if (session) {
-      void platform.miniFocusTimer.update({ sessionId: session.id, title: activeFocusTask?.title || session.title || (appSettings.language === "ko" ? "작업 미지정" : "No task assigned"), time: formatFocusDuration(activeFocusElapsed), status: session.status, phase: "focus", revision: session.revision ?? 0 });
+      void platform.miniFocusTimer.update({ sessionId: session.id, title: activeFocusTask?.title || session.title || (appSettings.language === "ko" ? "작업 미지정" : "No task assigned"), time: formatFocusDuration(activeFocusElapsed), status: session.status, phase: "focus", revision: session.revision ?? 0, unsaved: Boolean(planner.focusCommandError) });
     } else if (flow && flow.phase.startsWith("break_")) {
-      void platform.miniFocusTimer.update({ sessionId: flow.id, title: appSettings.language === "ko" ? "휴식" : "Break", time: formatFocusDuration(breakRemaining(flow, focusNow)), status: flow.phase === "break_running" ? "running" : "paused", phase: "break", revision: flow.revision });
-      if (focusSettings.showTabTitleTimer) document.title = formatFocusDuration(breakRemaining(flow, focusNow)) + " · Break";
+      void platform.miniFocusTimer.update({ sessionId: flow.id, title: appSettings.language === "ko" ? "휴식" : "Break", time: formatFocusDuration(breakRemaining(flow, focusNow)), status: flow.phase === "break_running" ? "running" : "paused", phase: "break", revision: flow.revision, unsaved: Boolean(planner.focusCommandError) });
     } else void platform.miniFocusTimer.clear();
-  }, [activeFocusTask, activeFocusElapsed, planner.activeFocusSession, planner.focusFlow, focusNow, appSettings.language, focusSettings.showTabTitleTimer]);
+  }, [activeFocusTask, activeFocusElapsed, planner.activeFocusSession, planner.focusFlow, planner.focusCommandError, focusNow, appSettings.language, focusSettings.showTabTitleTimer]);
 
   // Global Ctrl/Cmd+Z: undo the latest user edit across all data stores.
   // Typing fields keep their native text undo.
@@ -553,12 +576,16 @@ export default function App() {
       if (event.origin !== window.location.origin || !isMiniFocusTimerSource(event.source)) return;
       const data = event.data as { type?: string; action?: string; sessionId?: string; revision?: number; commandId?: string };
       if (data?.type !== "focusflow-mini-timer" || !data.sessionId) return;
+      // 어느 갈래로 빠지든 답은 보낸다. 전에는 세 갈래가 조용히 돌아갔고,
+      // 답을 못 받은 미니 창은 두 버튼을 잠근 채 기다리다 5초 뒤
+      // "Connection lost" 라고 적었다 — 연결은 멀쩡한데.
+      const reply = (ok: boolean) =>
+        (event.source as Window)?.postMessage({ type: "focusflow-mini-ack", commandId: data.commandId, ok }, event.origin);
       const session = planner.activeFocusSession;
-      if (!session) { handleBreakAction(data.sessionId, data.action); return; }
-      if (session.id !== data.sessionId) return;
-      if (data.action !== "pause" && data.action !== "resume" && data.action !== "finish") return;
-      const ok = planner.focusCommand({ type: data.action, id: session.id, revision: data.revision });
-      (event.source as Window)?.postMessage({ type: "focusflow-mini-ack", commandId: data.commandId, ok }, event.origin);
+      if (!session) { reply(handleBreakAction(data.sessionId, data.action)); return; }
+      if (session.id !== data.sessionId) { reply(false); return; }
+      if (data.action !== "pause" && data.action !== "resume" && data.action !== "finish") { reply(false); return; }
+      reply(planner.focusCommand({ type: data.action, id: session.id, revision: data.revision }));
     }
 
     window.addEventListener("message", handleMiniTimerMessage);
@@ -885,11 +912,12 @@ export default function App() {
     onFallback: (message) => showToast({ message }),
   });
 
-  function handleBreakAction(id: string, action?: string) {
+  // 성공 여부를 돌려준다: 미니 창의 답(ack)이 이 값을 그대로 싣는다.
+  function handleBreakAction(id: string, action?: string): boolean {
     const flow = planner.focusFlow;
-    if (!flow || flow.id !== id) return;
+    if (!flow || flow.id !== id) return false;
     const type = action === "finish" ? "break_end" : action === "pause" ? "break_pause" : flow.phase === "break_ready" ? "break_start" : "break_resume";
-    planner.focusCommand({ type, id });
+    return planner.focusCommand({ type, id });
   }
   function stopFocusWithNotification(sessionId: string, completeTask = false) {
     planner.stopFocusSession(sessionId, completeTask);
