@@ -125,4 +125,56 @@ test.describe("탭 두 개", () => {
     await expect(page.getByText("방송 뒤에 만든 것"), "그 뒤로도 계속 쓸 수 있어야 한다").toBeVisible();
     expect(await storedTitles(page)).toEqual(["방송 뒤에 만든 것", "방송 전에 만든 것"].sort());
   });
+
+  test("집중 저장이 보류된 탭이 다시 저장해도 옆 탭이 만든 것을 지우지 않는다", async ({ context }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "폭과 무관하다 — 한 번만 돈다");
+    testInfo.setTimeout(testInfo.timeout * 3);
+
+    await context.addInitScript(
+      ([key, value]) => {
+        if (!window.localStorage.getItem(key as string)) window.localStorage.setItem(key as string, value as string);
+      },
+      [KEY, SEED] as const,
+    );
+
+    const a = await openTab(context);
+    const b = await openTab(context);
+
+    // A 에서 집중을 시작하고, 저장을 깨뜨린 채 끝낸다. 기록은 보류된다.
+    await a.keyboard.press("Control+4");
+    await expect(a.getByRole("button", { name: "Start focus", exact: true })).toBeVisible();
+    await a.getByRole("button", { name: "Start focus", exact: true }).click();
+    await expect(a.getByText("Focusing", { exact: true })).toBeVisible();
+    await a.evaluate((key) => {
+      const original = Storage.prototype.setItem;
+      (window as unknown as { failSave: boolean }).failSave = true;
+      Storage.prototype.setItem = function (k, v) {
+        if (k === key && (window as unknown as { failSave: boolean }).failSave) throw new Error("test quota failure");
+        original.call(this, k, v);
+      };
+    }, KEY);
+    await a.getByRole("button", { name: "Finish", exact: true }).click();
+    await expect(a.getByRole("alert")).toContainText("Could not save focus");
+
+    // 보류된 동안 A 는 `storage` 이벤트를 통째로 무시한다
+    // (`pendingFocusRef.current` 이면 처리기가 곧바로 돌아간다).
+    // 그동안 B 가 할 일을 하나 만든다.
+    await addTask(b, "옆 탭이 만든 것");
+    expect(await storedTitles(b), "B 의 쓰기는 저장소에 닿아야 한다").toEqual(["옆 탭이 만든 것"]);
+
+    // A 가 다시 저장한다. `retryFocusSave` 는 `dataRef.current` — 귀를 닫고
+    // 있던 동안의 자기 스냅샷 — 을 기준으로 저장소를 통째로 덮어쓴다.
+    await a.evaluate(() => { (window as unknown as { failSave: boolean }).failSave = false; });
+    await a.getByRole("button", { name: "Retry", exact: true }).click();
+    await expect(a.getByText("Focus recorded", { exact: true })).toBeVisible();
+
+    // 자기 점검: 다시 저장이 실제로 일어났어야 아래가 무언가를 잰다.
+    const sessions = await a.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      return raw ? ((JSON.parse(raw).focusSessions ?? []) as { status?: string }[]).filter((s) => s.status === "completed").length : 0;
+    }, KEY);
+    expect(sessions, "집중 기록이 저장됐어야 한다").toBe(1);
+
+    expect(await storedTitles(a), "옆 탭이 만든 것이 남아 있어야 한다").toEqual(["옆 탭이 만든 것"]);
+  });
 });

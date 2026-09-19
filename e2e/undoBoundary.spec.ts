@@ -68,6 +68,15 @@ async function addTask(page: Page, title: string): Promise<void> {
   await page.locator(".tm-quickadd-title").press("Escape");
 }
 
+function storedSessions(page: Page): Promise<number> {
+  return page.evaluate((key) => {
+    const raw = localStorage.getItem(key);
+    if (!raw) return 0;
+    const sessions = (JSON.parse(raw).focusSessions ?? []) as { status?: string }[];
+    return sessions.filter((s) => s.status === "completed").length;
+  }, KEY);
+}
+
 function storedTitles(page: Page): Promise<string[]> {
   return page.evaluate((key) => {
     const raw = localStorage.getItem(key);
@@ -179,5 +188,63 @@ test.describe("되돌리기의 경계", () => {
     // 단언이다: 빈 스택에서 누른 Ctrl+Z 가 **아무것도 지우지 않아야** 한다.
     await pressUndo(page);
     expect(await storedTitles(page), "빈 스택의 Ctrl+Z 가 무언가를 지우면 안 된다").toEqual(["새로고침을 건널 것"]);
+  });
+
+  test("보류된 집중 기록을 다시 저장한 뒤의 Ctrl+Z 는 그 기록을 떨어뜨리지 않는다", async ({ context }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "같은 이유");
+    testInfo.setTimeout(testInfo.timeout * 3);
+    await seed(context);
+    const page = await openTab(context);
+
+    // 되돌리기가 살아 있다는 것부터 고정한다. 이게 없으면 아래는
+    // "되돌리기가 아무것도 안 해서" 통과할 수 있다.
+    await addTask(page, "살아 있는지 보는 것");
+    await pressUndo(page);
+    expect(await storedTitles(page), "자기 편집은 물러나야 한다").toEqual([]);
+
+    // 이제 진짜로 줄 세울 항목 하나.
+    await addTask(page, "남아 있어야 할 것");
+
+    // 같은 페이지 적재 안에서 집중 화면으로 간다 — `goto` 는 되돌리기
+    // 스택이 사는 모듈 변수를 비운다.
+    await page.keyboard.press("Control+4");
+    await expect(page.getByRole("button", { name: "Start focus", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Start focus", exact: true }).click();
+    await expect(page.getByText("Focusing", { exact: true })).toBeVisible();
+
+    // 저장이 깨진 채 끝내면 기록은 보류된다.
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      (window as unknown as { failSave: boolean }).failSave = true;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === "focusflow.appData.v1" && (window as unknown as { failSave: boolean }).failSave) throw new Error("test quota failure");
+        original.call(this, key, value);
+      };
+    });
+    await page.getByRole("button", { name: "Finish", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("Could not save focus");
+
+    await page.evaluate(() => { (window as unknown as { failSave: boolean }).failSave = false; });
+    await page.getByRole("button", { name: "Retry", exact: true }).click();
+    await expect(page.getByText("Focus recorded", { exact: true })).toBeVisible();
+    expect(await storedSessions(page), "다시 저장했으니 기록이 하나 있어야 한다").toBe(1);
+
+    // 이 검사가 무엇을 잡고 무엇을 잡지 않는지 적어 둔다.
+    //
+    // 처음에는 `retryFocusSave` 가 `storeRevisionRef` 를 올리지 않는 것을
+    // 잡으려고 썼다. 실제로 올리지 않는다 — 같은 전이를 곧바로 성공시키는
+    // `applyFocusCommand` 는 올리는데도. 그런데 재보니 이 경로에서는 해가
+    // 드러나지 않는다 [실측]: 바로 앞의 "Start focus" 가 이미 번호를 올려
+    // 두어서, 여기 줄 서 있는 항목은 어차피 거절된다.
+    //
+    // 그러니 이 검사는 그 비대칭을 잡지 못한다. 대신 사용자가 실제로 겪는
+    // 성질 하나를 못 박는다: **실패했다가 다시 저장한 집중 기록은 Ctrl+Z
+    // 에 떨어지지 않는다.** 그것이 깨지면 여기서 걸린다.
+    //
+    // (같은 화면에서 Ctrl+Z 가 살아 있다는 것은 위 자기 점검이 보인다.)
+    await pressUndo(page);
+
+    expect(await storedSessions(page), "되돌리기가 집중 기록을 떨어뜨리면 안 된다").toBe(1);
+    expect(await storedTitles(page), "저장소가 바뀌었으므로 이 되돌리기는 거절돼야 한다").toEqual(["남아 있어야 할 것"]);
   });
 });

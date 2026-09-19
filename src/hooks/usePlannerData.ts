@@ -2065,12 +2065,37 @@ export function usePlannerData() {
     try {
       // Preserve unrelated task edits made while the focus write was failing.
       const current = dataRef.current;
-      const tasks = current.tasks.map(t => {
+      // 옆 탭이 그 사이에 쓴 것도 마찬가지로 지켜야 한다.
+      //
+      // 보류돼 있는 동안 이 탭은 `storage` 이벤트를 통째로 무시한다 — 위
+      // 처리기의 첫 줄이 `pendingFocusRef.current` 면 곧바로 돌아간다. 그래서
+      // 여기서 저장소를 되읽지 않으면 아래 `persistPlannerData(retried)` 가
+      // 귀를 닫고 있던 동안의 스냅샷으로 저장소를 통째로 덮어쓴다. 실제로
+      // 그랬다 [실측, e2e]:
+      //
+      //   A 에서 집중 저장이 실패해 보류된다   → A 는 귀를 닫는다
+      //   B 가 할 일을 하나 만든다             → 저장소 ["옆 탭이 만든 것"]
+      //   A 에서 다시 저장을 누른다            → 저장소 []
+      //
+      // 그러고 나면 다음 동기화가 그 없음을 삭제로 읽어 계정에서도 지운다 —
+      // 이 파일의 다른 주석들이 되풀이해 경고하는 바로 그 길이다.
+      //
+      // 3자 병합은 이미 있고 검사도 있다: `reapplyLocalEdits(loaded, before,
+      // now)` 는 결과가 `loaded` 의 **상위집합**임을 보장하므로, 옆 탭의 것을
+      // 지우지 않으면서 이 탭이 만진 레코드만 위에 얹는다.
+      const base = pendingFocusBaseRef.current;
+      let latest: PlannerData | null = null;
+      const raw = platform.storage.getSync(STORAGE_KEY);
+      if (raw) {
+        try { latest = normalizeData(JSON.parse(raw)); } catch { latest = null; }
+      }
+      const rebased = latest && base ? reapplyLocalEdits(latest, base, current) : current;
+      const tasks = rebased.tasks.map(t => {
         const stored = next.tasks.find(n => n.id === t.id);
         const before = pendingFocusBaseRef.current?.tasks.find(n => n.id === t.id);
         return stored && before ? { ...t, actualSeconds: Math.max(0, t.actualSeconds + stored.actualSeconds - before.actualSeconds), activeSessionId: stored.activeSessionId !== before.activeSessionId ? stored.activeSessionId : t.activeSessionId, lastFocusedAt: stored.lastFocusedAt !== before.lastFocusedAt ? stored.lastFocusedAt : t.lastFocusedAt } : t;
       });
-      const retried = { ...current, tasks, focusSessions: next.focusSessions, activeSessionId: next.activeSessionId, focusFlow: next.focusFlow ? { ...next.focusFlow, phase: next.focusFlow.phase === "break_running" ? "break_ready" as const : next.focusFlow.phase } : null };
+      const retried = { ...rebased, tasks, focusSessions: next.focusSessions, activeSessionId: next.activeSessionId, focusFlow: next.focusFlow ? { ...next.focusFlow, phase: next.focusFlow.phase === "break_running" ? "break_ready" as const : next.focusFlow.phase } : null };
       persistPlannerData(retried); lastPersistedRef.current = retried; pendingFocusRef.current = null; pendingFocusBaseRef.current = null;
       dataRef.current = retried; setDataState(retried); setFocusCommandError(""); emitFocusTransitions(current, retried);
     } catch { setFocusCommandError("기록 저장 실패 · 다시 시도해 주세요 / Could not save. Retry."); }
