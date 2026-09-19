@@ -45,10 +45,14 @@ export function protectedResourceMetadata(input: ProtectedResourceInput): Protec
     // Supabase's own list (§26.4). FocusFlow adds none of its own: custom
     // scopes are not supported.
     //
-    // 그래서 이 토큰은 범위가 좁혀지지 않은 사용자 토큰이다. 전에 여기에는
-    // "그래서 읽기 전용은 범위가 아니라 데이터베이스가 강제한다 (§6.5)"라고
-    // 적혀 있었는데, 그런 정책은 없다(registry.ts 의 실측을 보라). 읽기
-    // 전용은 이 서버가 쓰기 도구를 하나도 등록하지 않는 것으로만 지켜진다.
+    // 그래서 이 토큰은 범위가 좁혀지지 않은 사용자 토큰이다. Supabase 문서가
+    // 그대로 말한다 — "All OAuth access tokens have full access to user data
+    // (same as regular session tokens), with the addition of the `client_id`
+    // claim."
+    //
+    // 읽기 전용은 그 `client_id` 로 지킨다. 범위로는 지킬 수 없기 때문이고,
+    // 그것이 바로 047 이 `public` 의 모든 표에 붙인 트리거가 보는 것이다.
+    // 여기에 커스텀 범위를 적어 넣고 싶어지거든 그쪽을 먼저 보라.
     scopes_supported: ["openid", "profile", "email"],
   };
 }
