@@ -1309,7 +1309,29 @@ export function usePlannerData() {
     const projectMappings = new Map((result.projectMappings ?? []).map((row) => [row.projectId, row.googleLabelId]));
     if (mapped.size === 0 && unlinked.size === 0 && cleared.length === 0 && projectMappings.size === 0) return;
 
-    setData((current) => {
+    // 시스템 경로다 — `setData` 가 아니다.
+    //
+    // 이 함수는 배경에서 도는 `useGoogleOutboundSync` 가 결과를 들고 부른다.
+    // 사용자가 한 편집이 아니므로 되돌리기 스택에 올라가면 안 되는데,
+    // `setData` 를 쓰고 있어서 올라갔다. 그리고 `pushUndo` 는 150ms 안의
+    // 연속 푸시를 한 묶음으로 묶으므로, 사용자의 편집 바로 뒤에 동기화가
+    // 내려오면 **같은 항목에 합쳐진다** [실측]:
+    //
+    //   되돌리기 깊이 : 편집 뒤 1 → 구글 동기화 뒤 1   (별도 항목이 아니다)
+    //   googleEventId : 동기화 뒤 "ev-1" → Ctrl+Z 뒤 undefined
+    //
+    // 즉 자기 편집을 물리려고 누른 Ctrl+Z 한 번이 구글 연결까지 같이
+    // 벗겨내고, 둘을 갈라 물릴 방법이 없다. 그 다음이 더 나쁘다 — 아래
+    // `unlinked` 주석이 적어둔 대로 "연결이 없고 자격이 되면 다음 패스가
+    // 다시 만든다". 사용자의 구글 캘린더에 같은 일정이 하나 더 생긴다.
+    //
+    // 다른 시스템 경로들(원격 적재, 마이그레이션 업로드, 집중 전이)이 하는
+    // 대로 한다: 되돌리기 스택을 거치지 않고, 저장소가 통째로 바뀌었음을
+    // `storeRevisionRef` 로 알린다. 그 결과 줄 서 있던 되돌리기는 거절되고,
+    // 거절은 조용하지 않다 — 토스트가 "can no longer be undone" 이라고
+    // 말한다. 말없이 구글 연결을 벗기는 것보다 낫다.
+    const current = dataRef.current;
+    const next = (() => {
       const tasks =
         mapped.size === 0 && unlinked.size === 0
           ? current.tasks
@@ -1348,7 +1370,11 @@ export function usePlannerData() {
         projects,
         appSettings: ids === current.appSettings.googleDeletedEventIds ? current.appSettings : { ...current.appSettings, googleDeletedEventIds: ids },
       };
-    });
+    })();
+    if (next === current) return;
+    storeRevisionRef.current += 1;
+    dataRef.current = next;
+    setDataState(next);
   }
 
   /**
