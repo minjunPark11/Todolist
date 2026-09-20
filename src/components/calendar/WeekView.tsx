@@ -23,7 +23,7 @@ import { formatClock, formatClockRange, formatHourLabel } from "../../utils/cloc
 import { useHoursAtATime, useTimeFormat } from "../../utils/appPrefs";
 import type { TimeFormat } from "../../types";
 import { useStableCallback } from "../../hooks/useStableCallback";
-import { blockIsTight, blockShowsTime } from "../../utils/eventBlock";
+import { blockIsTight, blockShowsTime, blockTitleLines } from "../../utils/eventBlock";
 import { eventColorVars } from "./eventColorVars";
 import { activateOnKey } from "./blockActivation";
 import { CalendarItemCheck } from "./CalendarItemCheck";
@@ -264,7 +264,13 @@ const TimeBlock = memo(function TimeBlock({
                 rule with nothing on screen to explain it. */}
             <CalendarItemCheck item={item} onToggleDone={onToggleDone} size="block" />
             <span className="gcal-tb-text">
-              <span className="gcal-tb-title">
+              {/* 제목도 높이를 묻는다. `blockShowsTime` 이 시간 줄에 하는
+                  것과 같은 산술이고, 그 전까지 제목은 블록이 아무리 높아도
+                  한 줄이라 78px 블록에서 절반만 보였다 [실측]. */}
+              <span
+                className="gcal-tb-title"
+                style={{ "--tb-title-lines": blockTitleLines(height) } as CSSProperties}
+              >
                 {item.repeating ? "↺ " : null}
                 {item.title}
               </span>

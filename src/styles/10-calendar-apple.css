@@ -670,13 +670,32 @@
    `blockShowsTime` decides whether there is room for the time by HEIGHT; the
    width is the ellipsis's job here, the same way it always was for the
    title. `flex: none` is what stops one line from paying for the other. */
-.gcal-tb-text > .gcal-tb-title,
 .gcal-tb-text > .gcal-tb-time {
   flex: none;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 제목은 블록이 내주는 줄 수만큼 쓴다.
+   `--tb-title-lines` 는 `blockTitleLines(height)` 가 계산해 넣는다 — 위
+   주석의 "높이로 정한다"를 제목에도 적용한 것이다. 값이 1 이면 이전과
+   똑같이 한 줄에 말줄임이고, 기본값 1 은 그 변수를 넣지 않는 곳(드래그
+   중인 유령 블록)이 전과 같이 동작하게 한다. */
+.gcal-tb-text > .gcal-tb-title {
+  flex: none;
+  min-width: 0;
+  /* 02-calendar.css 의 `.gcal-tb-title` 이 `nowrap` 을 걸어둔다. 그것을
+     풀지 않으면 `-webkit-line-clamp` 이 3 이어도 줄바꿈이 없어 한 줄에
+     머문다 [실측 — 고치고 재보니 제목 상자가 여전히 14px 였다]. */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--tb-title-lines, 1);
+  line-clamp: var(--tb-title-lines, 1);
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 /* ============================================================================

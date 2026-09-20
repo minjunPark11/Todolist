@@ -31,3 +31,25 @@ export function blockShowsTime(height: number): boolean {
 export function blockIsTight(height: number): boolean {
   return height - BLOCK_CHROME < TITLE_LINE && height - TIGHT_CHROME >= TITLE_LINE;
 }
+
+/**
+ * 제목이 쓸 수 있는 줄 수.
+ *
+ * `blockShowsTime` 은 시간 줄을 그릴지를 높이로 정한다. 제목은 그 질문을 한
+ * 번도 받지 않았고, 그래서 블록이 아무리 높아도 늘 한 줄이었다 [실측,
+ * 생산 빌드 1440x900]:
+ *
+ *   블록 높이 78px · 제목 상자 99x14px · 제목이 원한 너비 189px / 243px
+ *   → 52% 와 41% 만 보이고 나머지는 잘렸다. 그 블록 안에서 44px 이 비어 있었다.
+ *
+ * 이 모듈의 머리말이 적어둔 대로 "블록이 담을 수 있는 글의 양은 스타일
+ * 질문이 아니라 격자가 계산한 숫자에 대한 산술"이다. 제목도 같은 산술을
+ * 받는다.
+ *
+ * 세 줄에서 끊는 것은 두 시간짜리 블록이 글 벽이 되지 않게 하기 위해서다 —
+ * 블록은 일정을 알아보는 자리이지 읽는 자리가 아니다.
+ */
+export function blockTitleLines(height: number): number {
+  const room = height - BLOCK_CHROME - (blockShowsTime(height) ? TIME_LINE : 0);
+  return Math.max(1, Math.min(3, Math.floor(room / TITLE_LINE)));
+}
