@@ -167,9 +167,20 @@ export async function disableCalendarShare(token: string): Promise<CalendarShare
   if (userError || !userData.user) throw new Error("로그인이 필요합니다.");
 
   const now = new Date().toISOString();
+  // 스냅샷도 같이 지운다.
+  //
+  // `enabled: false` 만 쓰면 행은 그대로 남는다 — 끄기 전에 마지막으로 올린
+  // 제목·날짜 묶음을 통째로 들고. 주소는 그 순간 404 가 되므로
+  // (`functions/calendar/[token].ts` 가 `enabled=is.true` 로 찾는다) 새지는
+  // 않지만, 남겨둘 이유도 없다: 다시 켜는 길은 `publishCurrentCalendarShare`
+  // 하나뿐이고 그것은 언제나 새 스냅샷을 올린다. 즉 이 `data` 는 두 번 다시
+  // 읽히지 않는 사본이다.
+  //
+  // 이 파일은 취소에 대해 이미 같은 태도를 적어뒀다 — "취소는 곧바로 들어야
+  // 한다"(캐시 헤더). 껐는데 내용이 그대로 남아 있는 것은 그 태도와 어긋난다.
   const { error } = await supabase
     .from("calendar_shares")
-    .update({ enabled: false, updated_at: now })
+    .update({ enabled: false, data: {}, updated_at: now })
     .eq("user_id", userData.user.id);
   if (error) throw new Error(formatCalendarShareError(error));
 

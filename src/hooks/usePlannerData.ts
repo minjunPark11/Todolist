@@ -105,6 +105,7 @@ import {
   collectionTables,
   isEmptySyncPlan,
   optionalRemoteTables,
+  type SyncCollectionKey,
 } from "../domain/sync/buildSyncPlan";
 import { buildMigrationUpload } from "../domain/sync/buildMigrationUpload";
 import { createSaveQueue, type SaveQueue } from "../domain/sync/saveQueue";
@@ -759,6 +760,12 @@ export function usePlannerData() {
       }
       const partial: Partial<PlannerData> = {};
       missingRemoteTablesRef.current = new Set();
+      // Collections where what ends up on screen is the DEVICE's copy standing
+      // in for an answer the account could not give — either the table is not
+      // there yet or it is there and empty. The records are real, but the
+      // ACCOUNT does not hold them, and the baseline below has to say so or
+      // the next save sees no difference and never sends them (measured).
+      const localFallbackKeys: SyncCollectionKey[] = [];
 
       for (const [key, table] of collectionTables) {
         if (table === "tasks" && revisionSnapshot) {
@@ -770,6 +777,7 @@ export function usePlannerData() {
           if (optionalRemoteTables.has(table) && isMissingRemoteTableError(error)) {
             missingRemoteTablesRef.current.add(table);
             partial[key] = localAtStart[key] as never;
+            localFallbackKeys.push(key);
             continue;
           }
           // Required tables should still fail loudly with the table name so a
@@ -796,6 +804,7 @@ export function usePlannerData() {
           remote.length === 0 &&
           optionalRemoteTables.has(table) &&
           (localAtStart[key] as unknown[]).length > 0;
+        if (keepLocal) localFallbackKeys.push(key);
         partial[key] = (keepLocal ? localAtStart[key] : remote) as never;
       }
 
@@ -887,7 +896,25 @@ export function usePlannerData() {
       // The baseline is what the ACCOUNT holds, which is `loaded` and not the
       // merged state: the difference between the two is exactly the edits put
       // back above, so the next save pushes those and only those.
-      syncedSnapshotRef.current = revisionSession ? { ...loaded, tasks: revisionSession.rows.map((row) => row.data) } : loaded;
+      //
+      // Except where `loaded` is not the account's answer. A collection the
+      // account could not answer for carries this device's copy — right for
+      // the screen, wrong here, and it used to be copied into the baseline
+      // unchanged, which told the save "the account already has these". It
+      // did not, and nothing said so again [실측]:
+      //
+      //   표 없을 때 로컬 체크항목                     1개
+      //   표가 생긴 뒤 첫 적재, 로컬                   1개   (지워지지 않는다)
+      //   그 뒤 무관한 편집을 해도 계정에 올라간 횟수  0회   ← 영영
+      //   그 항목 자체를 건드리면                      1회
+      //
+      // So each record stayed on one device until someone happened to edit
+      // that exact record. Empty here is the truthful baseline: the diff then
+      // uploads them, and it can never produce a delete, because deletions
+      // come from ids the BASELINE holds and the local state no longer does.
+      const accountBaseline = { ...loaded };
+      for (const key of localFallbackKeys) accountBaseline[key] = [] as never;
+      syncedSnapshotRef.current = revisionSession ? { ...accountBaseline, tasks: revisionSession.rows.map((row) => row.data) } : accountBaseline;
       remoteOwnerRef.current = userEmail;
       setRemoteLoaded(true);
       setSyncStatus(revisionSession?.hasConflicts ? "sync.syncFailed" : revisionSession?.hasPending ? "sync.syncing" : "sync.synced");
