@@ -721,6 +721,7 @@ export const ko: Dictionary = {
   "calendar.groupEmpty.personal": "카테고리가 없습니다.",
   "calendar.groupEmpty.project": "프로젝트가 없습니다.",
   "calendar.groupEmpty.external": "추가된 외부 캘린더가 없습니다.",
+  "calendar.categoryLabel": "분류",
   "calendar.toggleCategoryAria": "{{name}} 표시",
   "calendar.recolorAria": "{{name}} 색상 변경",
   "calendar.recolorCustomAria": "사용자 지정 색상",

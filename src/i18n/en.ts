@@ -728,6 +728,7 @@ export const en: Dictionary = {
   "calendar.groupEmpty.personal": "No categories yet.",
   "calendar.groupEmpty.project": "No projects yet.",
   "calendar.groupEmpty.external": "No external calendars added.",
+  "calendar.categoryLabel": "Category",
   "calendar.toggleCategoryAria": "Show {{name}}",
   "calendar.recolorAria": "Change color of {{name}}",
   "calendar.recolorCustomAria": "Custom color",

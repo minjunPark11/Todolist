@@ -102,4 +102,40 @@ describe("every key in the catalogue", () => {
 
     expect(orphans, "no screen says these").toEqual([]);
   });
+
+  /**
+   * 그리고 그 반대편.
+   *
+   * 위 검사는 한 방향만 본다 — 목록에 있는 키를 아무도 말하지 않는 경우(고아).
+   * 반대는 보지 않았다: **코드가 말하는데 목록에 없는 키**. `translate` 는
+   * 그때 키 자체를 돌려주므로(index.tsx), 화면에는 "calendar.categoryLabel"
+   * 같은 문자열이 그대로 나온다. aria-label 이면 스크린 리더가 그것을 읽는다.
+   *
+   * 실제로 하나 있었다 [실측]: 문자열 리터럴로 쓰인 키 686개 중
+   * `calendar.categoryLabel` 하나가 두 목록 어디에도 없었고,
+   * `EventPopover.tsx` 의 분류 목록(role="listbox")이 그 이름을 달고 있었다.
+   *
+   * 여기서는 **문자열 리터럴만** 본다. `` t(`calendar.group.${type}`) `` 처럼
+   * 런타임에 조립되는 키는 이 검사가 판단할 수 없고, 위 고아 검사가 접두사로
+   * 봐주는 것과 같은 이유다. 그래서 놓치는 것은 있어도, 여기서 나온 것은
+   * 전부 진짜다.
+   */
+  it("exists for every key the code says as a literal", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const said = new Map<string, string>();
+    for (const file of ROOTS.flatMap((root) => filesUnder(resolve(here, root)))) {
+      for (const match of readFileSync(file, "utf8").matchAll(/\bt\(\s*"([^"${}]+)"\s*[,)]/g)) {
+        if (!said.has(match[1])) said.set(match[1], file);
+      }
+    }
+
+    // 자기 점검: 스캐너가 실제로 키를 찾아내야 아래가 무언가를 잰다.
+    expect(said.size, "t(\"...\") 를 하나도 못 찾았다면 아래 단언은 빈 목록을 본다").toBeGreaterThan(300);
+
+    const missing = [...said]
+      .filter(([key]) => !(key in en) || !(key in ko))
+      .map(([key, file]) => `${key} ← ${file.slice(file.indexOf("src"))}`);
+
+    expect(missing, "화면이 이 키를 말하는데 목록에 없다 — 사용자에게 키 문자열이 그대로 보인다").toEqual([]);
+  });
 });
