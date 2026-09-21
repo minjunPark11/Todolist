@@ -101,7 +101,9 @@ const CLAIMS: Record<string, Claim> = {
     what: "호출부 없는 클래스의 총수 (orphans.test.ts의 천장 합계)",
     of: () => {
       const css = readFileSync(join(stylesDir, "orphans.test.ts"), "utf8");
-      const block = /const CEILING: Record<string, number> = \{([\s\S]*?)\n\};/.exec(css);
+      // `= {};` 한 줄짜리 빈 형태도 읽어야 한다 — 빚을 다 갚으면 그 모양이 되고,
+      // 못 읽으면 추출기가 빈 배열을 돌려 "문서 [0] vs 코드 []"로 어긋난다.
+      const block = /const CEILING: Record<string, number> = \{([\s\S]*?)\};/.exec(css);
       if (!block) return [];
       const sum = [...block[1].matchAll(/:\s*(\d+),/g)].reduce((a, m) => a + Number(m[1]), 0);
       return [String(sum)];

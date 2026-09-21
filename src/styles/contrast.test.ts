@@ -90,7 +90,14 @@ const GRAPHIC_TOKENS: { token: string; why: string }[] = [
  * 남겨 둔다.
  */
 const DECORATIVE: { token: string; why: string }[] = [
-  { token: "--hint-glyph", why: "opacity .42의 장식 셰브런 — 행이 이미 어포던스다" },
+  {
+    token: "--hint-glyph",
+    why:
+      "드로어 속성 행의 `›`. 쉬는 상태는 opacity .42의 장식이고(실효 1.51) 행 자체가 " +
+      "어포던스다 — WCAG 1.4.11이 장식을 제외하는 자리. 정보를 주는 hover 상태는 " +
+      "따로 쟀고, 거기서 3:1을 넘도록 색과 불투명도를 고쳤다(실효 3.04, 25-reference.css). " +
+      "이 파일은 불투명도를 모르므로 raw 값으로는 잴 수 없다.",
+  },
 ];
 
 /**

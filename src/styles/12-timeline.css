@@ -85,8 +85,7 @@
    width they are, the rule for a month lands exactly under the bar that starts
    on its 1st, and a gesture aimed at that rule writes that day (§17.13). */
 .ff-timeline-columns,
-.ff-timeline-rules,
-.ff-timeline-lanes {
+.ff-timeline-rules {
   display: grid;
   grid-template-columns: var(--timeline-column-template);
 }
@@ -116,23 +115,6 @@
 .ff-timeline-col.is-today .ff-timeline-col-mark {
   background: var(--accent-fill);
   color: #fff;
-}
-
-/* The date lanes (TIMELINE_ARRANGE_TASKS_DESIGN.md §4, phase 3).
-
-   One transparent column per day, over the whole grid, live only while a chip
-   is being dragged. `.ff-timeline-canvas` is the positioning context — the
-   connector overlay and the rules use it too — and `--timeline-track-left` is
-   where the track begins. */
-.ff-timeline-lanes {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: var(--timeline-track-left);
-  /* Above the bars, so the drop is the lane's and not a bar's. Below the
-     sticky header's 2, which has to stay readable while aiming. */
-  z-index: 1;
 }
 
 /* The column rules and the today band, for the WHOLE grid (§17.13).
@@ -187,17 +169,6 @@
   border-radius: var(--radius-sm);
   background: var(--accent);
   opacity: 0.55;
-}
-
-/* Quiet until aimed at. A grid painted with a dozen boxes the moment a drag
-   starts is a grid the reader has to re-find their day in. */
-.ff-timeline-lane {
-  border-radius: 4px;
-}
-
-.ff-timeline-lane.is-over {
-  background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 /* No gap: what separates two rows is a RULE now, not air.
@@ -400,25 +371,9 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bar-color, var(--accent)) 30%, transparent);
 }
 
-/* Two thresholds, both measured rather than guessed (§4).
-   At 12px/600 the widest line the bar can hold — `12.31 – 12.31`, plus the
-   `✓` of a finished bar and the 12px the two handles take — is 103px, and the
-   shortest form of the same line is 69. So: the full range above 104, its
-   leading half between there and 72, and nothing below that, where any text
-   would be an ellipsis with one character in front of it.
-   The old single threshold was 80px and was set for a TITLE, which had no
-   predictable width to measure at all — that is what §11 could only guess at
-   and this can compute. */
-.ff-timeline-bar-short {
-  display: none;
-}
-
 @container (max-width: 104px) {
   .ff-timeline-bar:not(.is-single) .ff-timeline-bar-long {
     display: none;
-  }
-  .ff-timeline-bar:not(.is-single) .ff-timeline-bar-short {
-    display: inline;
   }
 }
 
@@ -592,19 +547,7 @@
   cursor: help;
 }
 .ff-timeline-bar.is-inferred .ff-timeline-badge { color: var(--text-secondary); }
-
-.ff-timeline-bar-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 10px 0;
-}
 .ff-timeline-nav { display: flex; align-items: center; gap: 8px; }
-.ff-timeline-range { font-size: 12px; color: var(--text-tertiary); }
-.ff-timeline-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-.ff-timeline-toggle input { width: auto; }
 
 .ff-timeline-empty {
   color: var(--text-tertiary);
@@ -683,68 +626,6 @@
   max-height: 100%;
 }
 
-.tgv-arrange {
-  flex: 0 0 220px;
-  /* `flex-basis: 220px` is not enough on its own. A flex item's `min-width` is
-     `auto`, which resolves to its MIN-CONTENT width — and a chip with
-     `white-space: nowrap` has the whole title as its min-content. One long
-     title pushed this panel to 429px [실측] and squeezed the grid to zero.
-     The ellipsis cannot help until the box is allowed to be narrower than the
-     string it holds. */
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2, rgba(25, 25, 25, 0.04));
-  /* The queue is as long as the pile is, and the pile has no bound. Fifteen
-     chips made this panel 791.5px beside a 387.5px grid — it ran 404px past
-     the bottom of the timeline it stands next to [실측], and that overhang is
-     the empty half of the screen. It stops and scrolls its own list instead.
-     `100%` rather than the `60vh` this first shipped as: §17 gave `.tgv-body`
-     a definite height, so the panel can be bounded by the box it stands in
-     rather than by a fraction of the window that has no relation to it. */
-  display: flex;
-  flex-direction: column;
-  max-height: 100%;
-}
-
-/* Name and count together, then the hint. §13.6.4's rule from the Board's
-   column heads: the count is part of the name, not a column of its own. */
-.tgv-arrange-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tgv-arrange-head h3 {
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.tgv-arrange-hint {
-  margin: 4px 0 10px;
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-/* A column, not a wrapped row. The chips were pills in a horizontal tray and
-   read as tags; stacked full-width they read as a queue to work through,
-   which is what `Arrange tasks` says they are. */
-.tgv-arrange ul {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  /* The part that scrolls, so the name, the count and the hint stay put.
-     `min-height: 0` because a flex item will not shrink below its content
-     otherwise, and an overflow that never triggers is not an overflow. */
-  min-height: 0;
-  overflow-y: auto;
-  /* So the scrollbar does not sit on the chips' right edge. */
-  padding-right: 2px;
-}
-
-.tgv-arrange li { list-style: none; }
-
 .tgv-chip {
   display: block;
   width: 100%;
@@ -776,12 +657,6 @@
 @media (max-width: 900px) {
   .ff-timeline { --timeline-label-width: 130px; }
   .ff-timeline-col { font-size: var(--type-2xs); }
-
-  /* Once it has wrapped, 220px of panel with empty space beside it is a
-     column pretending it still has a neighbour. It takes the line. */
-  .tgv-arrange {
-    flex-basis: 100%;
-  }
 }
 
 /* --- Dark theme ------------------------------------------------------------

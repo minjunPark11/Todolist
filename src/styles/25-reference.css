@@ -99,7 +99,13 @@
   --menu-hover: #f5f6f7;
   --menu-ink: #363a40;
   --keycap-bg: #fafafa;
-  --hint-glyph: #8e939a;
+  /* 드로어 속성 행의 `›` 하나. 쉬는 상태는 `opacity: .42`의 장식이고 행 자체가
+     어포던스지만, **hover는 다르다** — 거기서는 이 글리프가 "눌리면 열린다"를
+     말하므로 비텍스트 3:1이 적용된다. `#8e939a`에 hover `.9`였을 때 실효 대비가
+     2.61로 미달이었다. 색을 1%만 내리고(나란히 놓아도 안 보인다) hover를 완전
+     불투명으로 올려 3.04를 만든다 — hover는 보여주는 상태이니 `.9`로 흐릴 이유가
+     애초에 없다. 쉬는 1.51은 그대로 둔다. */
+  --hint-glyph: #8c9198;
   --scrollbar: #dadde2;
   /* 토스트는 라이트에서도 어두운 면이다 — 뒤집지 않는다. */
   --toast-bg: #24262a;
@@ -562,8 +568,6 @@ main {
 
 /* 팝오버 · 메뉴 · 피커 표면 */
 .ff-menu,
-.ff-popover,
-.ff-surface,
 .sched-surface,
 .tm-list-surface,
 .tm-tag-surface,
@@ -1019,7 +1023,8 @@ main {
 }
 
 .tm-drawer-prop:hover::after {
-  opacity: 0.9;
+  /* `.9`가 아니라 1 — 위 `--hint-glyph` 주석 참조. */
+  opacity: 1;
   transform: translateY(-50%) translateX(1px);
 }
 
@@ -1159,9 +1164,7 @@ main {
 
 /* ===== 떠 있는 것들 (§2.6) ===== */
 
-.ff-menu,
-.ff-popover,
-.ff-surface {
+.ff-menu {
   border: 1px solid var(--border-float);
   border-radius: var(--r-panel);
   box-shadow: var(--shadow-pop);

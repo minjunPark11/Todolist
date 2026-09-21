@@ -38,26 +38,11 @@
    `.ff-settings-card`, and a mention is not a call site.
    `.ff-card` stays without a call site of its own on purpose — it is the name
    a new card is meant to reach for. */
-.ff-card,
-.foc-card,
-.sdv-metric-card {
+.ff-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--density-radius);
   padding: var(--density-card-pad);
-  box-shadow: var(--shadow-card);
-}
-
-/* The surfaces that are cards in appearance and containers in behaviour: what
-   they hold owns its own padding — the grid or the list inside is what decides
-   it — so they take the surface and nothing else. Splitting the rule is the
-   honest way to say that. (The Matrix quadrant and the calendar columns that
-   used to be named here were removed with the rest of the dead CSS; the two
-   that remain are the ones any screen actually renders.) */
-.board-column {
-  background: var(--bg-surface);
-  border-color: var(--border-subtle);
-  border-radius: var(--density-radius);
   box-shadow: var(--shadow-card);
 }
 
@@ -67,16 +52,20 @@
    `.sdv-btn` (radius 11, 9px/14px padding). Same control, three shapes and
    two primaries — Today's was navy, everything else's was the accent.
 
-   `tdy-` is down to a mention: the Today page it dressed is gone (P0-2), so
-   one of the five languages this file unified no longer has a screen. The
-   unification stands — it is what let the page be removed without the other
-   four noticing.
+   Two of the three are down to a mention now. The Today page `tdy-` dressed
+   is gone (P0-2), and the Space Detail screen `sdv-` dressed left with
+   `RETIRED_ROUTES` — `06-space-detail.css` went with it, and these aliases
+   followed once `orphans.test.ts` made it plain that their only reader was
+   the test asserting they matched `.ff-btn`. An alias whose last call site is
+   its own equality check is a loop, not a call site.
+
+   **The unification stands, and that is the point** — it is what let two
+   screens be removed without the other three noticing.
 
    One base, and the variants the plan asks for: primary, secondary, ghost.
    Danger is the fourth because destructive is not a shade of secondary, and
    `-sm` is a size rather than a variant. */
-.ff-btn,
-.sdv-btn {
+.ff-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -95,13 +84,11 @@
   transition: background var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
 }
 
-.ff-btn:not(:disabled):hover,
-.sdv-btn:not(:disabled):hover {
+.ff-btn:not(:disabled):hover {
   background: var(--bg-hover-content);
 }
 
-.ff-btn:disabled,
-.sdv-btn:disabled {
+.ff-btn:disabled {
   opacity: 0.55;
   cursor: default;
 }
@@ -109,29 +96,15 @@
 /* Primary — the accent, filled. `.tdy-btn-navy` was on this list rather than
    keeping `--tdy-navy`: two primaries in two colours is the thing V-6 exists
    to end, and §11.3's accent is the one the user can change. */
-.ff-btn-primary,
-.sdv-btn-primary {
+.ff-btn-primary {
   border-color: var(--accent);
   background: var(--accent-fill);
   color: #fff;
 }
 
-.ff-btn-primary:not(:disabled):hover,
-.sdv-btn-primary:not(:disabled):hover {
+.ff-btn-primary:not(:disabled):hover {
   background: var(--accent);
   filter: brightness(0.95);
-}
-
-/* Secondary — the accent at reading weight, for the second-most-likely action
-   on a screen that already has a primary. */
-.ff-btn-secondary {
-  border-color: transparent;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.ff-btn-secondary:not(:disabled):hover {
-  background: var(--accent-active);
 }
 
 /* Ghost — no surface until you touch it. */
@@ -146,25 +119,14 @@
 
 /* Danger. Outlined rather than filled: a red fill on a list of buttons reads
    as the primary action, which is the opposite of what it is. */
-.ff-btn-danger,
-.sdv-btn-danger {
+.ff-btn-danger {
   border-color: color-mix(in srgb, var(--danger) 30%, transparent);
   background: transparent;
   color: var(--danger);
 }
 
-.ff-btn-danger:not(:disabled):hover,
-.sdv-btn-danger:not(:disabled):hover {
+.ff-btn-danger:not(:disabled):hover {
   background: var(--danger-soft);
-}
-
-/* The small size. `--density-control-h` minus one step, and the tap floor
-   still applies underneath it. */
-.ff-btn-sm,
-.sdv-btn-sm {
-  height: 28px;
-  padding-inline: 12px;
-  font-size: 12px;
 }
 
 /* The Detail's title is the one input that is not a field.
@@ -245,31 +207,6 @@ select,
 textarea {
   padding: 8px var(--density-control-pad-x);
 }
-
-/* The Detail's title is the second field to leave this rule, for the same
-   reason the quick add's did: it is not a FIELD the reader fills in, it is the
-   task's name, and a name in a box is a form
-   (CALENDAR_CREATE_AND_TASK_POPUP_DESIGN.md §4). 17-tasks-module.css has drawn
-   it frameless since the anatomy work — the rule was there and losing, because
-   four `:not()`s outweigh four class names.
-
-   The border comes back on hover and focus, where "this is editable" is the
-   question being asked. */
-
-/* --- the row -------------------------------------------------------------
-   Three kinds of row exist in this app and only one of them is this one. The
-   distinction is worth stating, because collapsing it is how a Task row ends
-   up as tall as a menu item:
-
-     navigation row   `.tm-row`, 36px, §4.86's rhythm (V-5)
-     content row      `.tm-task`, `.tdy-triage-row`, `.foc-task-main` — as
-                      tall as what is in them, one line or three
-     list row         this one: a single line you point at and choose
-
-   What the list rows share is not a height but a hit surface — the corner
-   radius, the hover, the selected fill, and the gap between an icon and its
-   label. */
-.ff-row,
 .gcal-cat-row {
   display: flex;
   align-items: center;
@@ -280,15 +217,9 @@ textarea {
   cursor: pointer;
 }
 
-.ff-row:hover {
-  background: var(--bg-hover-content);
-}
-
 .gcal-cat-row:hover {
   background: var(--bg-hover-nav);
 }
-
-.ff-row.is-selected,
 .gcal-cat-row.is-selected {
   background: var(--bg-selected);
 }
@@ -443,180 +374,6 @@ textarea {
   width: auto;
   height: auto;
   clip-path: none;
-}
-
-/* --- the Projects home (SPACE_REMOVAL_IA D-1) -----------------------------
-   Layout only. Every shape on this screen — the row, the field, the buttons,
-   the menu — is one of the ones above, because a new screen is exactly where
-   a fourth button language starts. What is left is a column, a gap, and the
-   two spans that hang off a row's ends. */
-.pjh {
-  display: grid;
-  gap: 16px;
-  align-content: start;
-  max-width: 720px;
-  /* padding removed: <main> already provides --density-page-y/x (24px 32px).
-     The old 24px here doubled the top gap to 48px vs GoalsPage's 24px. */
-}
-
-.pjh-title {
-  margin: 0;
-  font-size: var(--type-xl);
-  font-weight: var(--weight-bold);
-  letter-spacing: -0.01em;
-}
-
-.pjh-create {
-  display: flex;
-  gap: 8px;
-}
-
-.pjh-list {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* The row and its ⋯ share a line: the button is not IN the row, because a
-   button inside a button is not a thing the browser will draw. */
-.pjh-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.pjh-row {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-}
-
-.pjh-row.is-archived {
-  color: var(--text-muted);
-  cursor: default;
-}
-
-.pjh-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.pjh-pin {
-  flex: none;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.pjh-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Inline rename input — replaces .pjh-name while editing.
-   Matches the row's font exactly so the layout does not shift. */
-.pjh-name-input {
-  flex: 1;
-  min-width: 0;
-  height: var(--density-control-h);
-  padding: 0 6px;
-  font: inherit;
-  font-size: 13px;
-  color: var(--ff-text);
-  background: var(--ff-input-bg, var(--surface));
-  border: 1px solid var(--ff-focus-ring);
-  border-radius: var(--radius-sm);
-  outline: none;
-}
-
-.pjh-count {
-  flex: none;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* 24 wide, the control height tall — the shape the Task row's ⋯ was put on
-   when the rhythm guard caught it at 24 square. */
-.pjh-menu {
-  flex: none;
-  width: 24px;
-  height: var(--density-control-h);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.pjh-menu:hover,
-.pjh-menu:focus-visible {
-  background: var(--bg-hover-content);
-  color: var(--text-primary);
-}
-
-.pjh-section-title {
-  margin: 0 0 8px;
-  color: var(--text-muted);
-  font-size: var(--type-sm);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-/* --- Folder management (SPACE_REMOVAL_IA D-2) -----------------------------
-   A drawer's worth of rows, each one a field: the name IS the control, so
-   there is nothing here but the spacing between them. */
-.fdm {
-  display: grid;
-  gap: 12px;
-}
-
-.fdm-create,
-.fdm-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.fdm-list {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.fdm-name {
-  flex: 1;
-  min-width: 0;
-}
-
-.fdm-count {
-  flex: none;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.fdm-empty {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 13px;
 }
 
 /* --- the overlay scrollbar -----------------------------------------------

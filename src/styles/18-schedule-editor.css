@@ -452,25 +452,6 @@
   max-width: calc(100vw - 24px);
 }
 
-.sched-time-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sched-time-label {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.sched-time-label em {
-  font-style: normal;
-  color: var(--text-tertiary);
-}
-
 /* ---- Time field and its list (SCHEDULE_TIME_FIELD_DESIGN.md §3.4, §4.1) ----
 
    The box that used to be a bare `<input type="time">`. It looks the same as

@@ -377,18 +377,6 @@
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-.ff-cat-drag-handle {
-  display: inline-flex;
-  color: var(--text-tertiary);
-  cursor: grab;
-}
-
-.ff-cat-drag-handle svg {
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
-}
-
 .ff-cat-color-chip {
   width: 22px;
   height: 22px;
@@ -404,63 +392,6 @@
   gap: 8px;
   font-size: var(--type-md);
   font-weight: var(--weight-normal);
-}
-
-.ff-cat-default-badge {
-  font-style: normal;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--accent-soft, rgba(0, 102, 204, 0.1));
-  color: var(--accent);
-}
-
-.ff-cat-menu-wrap {
-  position: relative;
-}
-
-.ff-cat-menu-btn {
-  font-size: var(--icon-glyph);
-  padding: 2px 10px;
-  color: var(--text-tertiary);
-}
-
-.ff-cat-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 30;
-  min-width: 180px;
-  display: grid;
-  padding: 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
-}
-
-.ff-cat-menu button {
-  border: none;
-  background: transparent;
-  text-align: left;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.ff-cat-menu button:hover:not(:disabled) {
-  background: var(--bg-hover-content);
-}
-
-.ff-cat-menu button:disabled {
-  color: var(--text-tertiary);
-  cursor: default;
-}
-
-.ff-cat-menu button.danger:not(:disabled) {
-  color: var(--danger);
 }
 
 /* Derived category sections (project / external / focus): color-only
@@ -501,73 +432,10 @@
   color: var(--text-tertiary);
 }
 
-.ff-cat-footnote-icon {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-}
-
 /* 카테고리 추가/수정 모달 */
 .ff-cat-editor {
   display: grid;
   gap: 16px;
-}
-
-.ff-cat-editor-field {
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.ff-cat-editor-field input:not([type="color"]) {
-  padding: 8px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  font-size: var(--type-md);
-  font-weight: 400;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-}
-
-.ff-cat-color-palette {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.ff-cat-color-swatch {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
-  border: 2px solid transparent;
-  cursor: pointer;
-  padding: 0;
-}
-
-.ff-cat-color-swatch.active {
-  border-color: var(--text-primary);
-}
-
-.ff-cat-color-custom {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  cursor: pointer;
-}
-
-.ff-cat-delete-body {
-  display: grid;
-  gap: 10px;
 }
 
 .expandable-add {
@@ -636,15 +504,6 @@
 .motion-drop-zone {
   transform-origin: center;
 }
-
-.eis-cell-roman {
-  font-weight: var(--weight-bold);
-  font-variant-numeric: tabular-nums;
-}
-.eis-q-I { color: var(--danger); }
-.eis-q-II { color: var(--warning); }
-.eis-q-III { color: var(--accent); }
-.eis-q-IV { color: var(--success); }
 
 .motion-task-row {
   position: relative;
@@ -725,81 +584,4 @@
     justify-content: flex-start;
     flex-wrap: wrap;
   }
-}
-
-/* The "Completed work" switch (CALENDAR_TASK_CHECKBOX_DESIGN.md §1, D1-B).
-
-   It borrows `.gcal-cat-row` for the box, because it asks the same kind of
-   question the calendar rows do — what gets drawn. What it is NOT is a
-   calendar, so it takes the app's own accent rather than a category colour,
-   and it has no active state: there is nothing here to file an event under. */
-.gcal-view-row {
-  --cat-color: var(--accent);
-}
-
-.gcal-view-row .gcal-cat-name {
-  color: var(--text-secondary);
-}
-
-/* Which Google calendars to read (GOOGLE_CALENDAR_SYNC_DESIGN.md §6.1).
-   Sits inside the connect card, under the account line, so the question
-   "which ones?" is asked where the answer to "connected?" already is. */
-.ff-google-sources {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-separator, rgba(0, 0, 0, 0.08));
-}
-
-.ff-google-sources > strong {
-  font-size: var(--type-md);
-}
-
-.ff-google-source-list {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.ff-google-source-list label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 4px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.ff-google-source-list label:hover {
-  background: var(--color-fill-quaternary, rgba(0, 0, 0, 0.04));
-}
-
-.ff-google-source-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-/* The name is the part that may be long; everything else keeps its size. */
-.ff-google-source-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ff-google-source-badge {
-  flex-shrink: 0;
-  font-size: var(--type-xs, 11px);
-  color: var(--text-tertiary);
-  border: 1px solid var(--color-separator, rgba(0, 0, 0, 0.12));
-  border-radius: var(--radius-sm);
-  padding: 1px 6px;
 }

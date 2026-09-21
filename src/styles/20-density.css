@@ -40,10 +40,6 @@
 main {
   font-size: var(--density-font);
 }
-
-/* --- page titles ---------------------------------------------------------- */
-
-.foc-header h1,
 .ff-page-title {
   font-size: var(--density-title);
   line-height: 1.3;

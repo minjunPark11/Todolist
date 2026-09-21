@@ -34,43 +34,31 @@ const root = join(here, "..", "..");
  * 파일의 마지막 테스트가 정본 이름들로 화면을 만들어 각각이 무언가를 그리는지
  * 검사한다."*
  *
- * `sdv-*`도 같은 자리다 — 기능 스타일이 아니라 컴포넌트 언어의 별칭이고, 그
- * 스펙이 "`.ff-btn`과 같은 것"이라는 불변식으로 지킨다. 지우면 테스트가 함께
- * 바뀌므로 별도 판단이다.
+ * `sdv-*`가 한때 여기 있었다. 같은 자리처럼 보였지만 아니었다 — `.ff-card`는
+ * **새 카드가 집어야 할 이름**이고, `.sdv-btn`은 사라진 화면이 쓰던 **옛 이름**
+ * 이었다. 그 별칭의 유일한 독자가 "그 별칭이 `.ff-btn`과 같다"고 단언하는
+ * 테스트뿐이면 그것은 호출부가 아니라 고리다. 스타일시트와 스펙에서 함께
+ * 지웠다 — `.sdv-card`를 포함한 여덟 이름이 이미 그렇게 갔던 그대로.
  */
 const KEEP: { pattern: RegExp; why: string }[] = [
   { pattern: /^ff-card$/, why: "새 카드가 집어야 할 정본 이름 (componentLanguage.spec.ts)" },
   { pattern: /^ff-field$/, why: "정본 필드 — 같은 스펙이 불변식으로 지킨다" },
-  { pattern: /^sdv-(btn|metric-card)/, why: "컴포넌트 언어의 별칭 — componentLanguage · verticalRhythm이 참조한다" },
 ];
 
 /**
  * 아직 0이 아닌 파일과, 그 숫자.
  *
- * 은퇴한 기능의 잔해가 대부분이다 — `05-spaces`는 Spaces가, `03-planning`과
- * `02-calendar`는 보드/매트릭스의 옛 화면이 빠지면서 남았다.
+ * **비어 있다.** 160개로 시작했고 한 번에 갚았다 — 셀렉터 1,538줄이 은퇴한 기능의
+ * 잔해였기 때문이다. `foc-*` 33개는 `focus-*`로 다시 지어진 Focus의 옛 마크업이고,
+ * `pjh-*`와 `fdm-*`는 Projects와 폴더 매니저, `eis-*`는 매트릭스, `board-*`는 옛
+ * 보드다. 섬세한 작업이 아니라 삭제였다.
  *
- * 갚는 것은 파일별로, 그 파일을 만지는 커밋에서. 숫자를 늘리는 것은 답이 아니다.
+ * 그때부터 이 파일이 지키는 것은 천장이 아니라 불변식이다 — `styles.css`가 부르는
+ * 모든 CSS의 모든 클래스는 어딘가에서 불린다. 새 고아가 들어오면 여기 숫자를 적는
+ * 것이 아니라, 지우거나 KEEP에 이유를 적는 것이 답이다(`scale.test.ts`가 CEILING을
+ * 비우며 못박은 그대로).
  */
-const CEILING: Record<string, number> = {
-  "01-base.css": 6,
-  "02-calendar.css": 8,
-  "03-planning.css": 34,
-  "05-spaces.css": 33,
-  "08-calendar-categories.css": 22,
-  "09-calendar-redesign.css": 7,
-  "10-calendar-apple.css": 1,
-  "12-timeline.css": 9,
-  "17-tasks-module.css": 6,
-  "18-schedule-editor.css": 2,
-  // `.foc-header` 하나다. CSS 다섯 파일이 그것을 꾸미는데 그리는 컴포넌트가 없다 —
-  // 앞선 손계산에서는 살아 있는 것으로 셌었다. `scale.test.ts`의 **주석**이 그
-  // 이름을 적고 있었기 때문이다. 호출부를 셀 때 테스트를 빼는 이유가 그것이다.
-  "20-density.css": 1,
-  "21-components.css": 25,
-  "24-focus.css": 4,
-  "25-reference.css": 2,
-};
+const CEILING: Record<string, number> = {};
 
 function loadedFiles(): string[] {
   const css = readFileSync(join(root, "src", "styles.css"), "utf8");

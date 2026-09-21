@@ -67,24 +67,6 @@
   color: var(--text-muted, #8e8e93);
 }
 
-/* Page-navigation doors (Projects, Goals). Visually separated from scope
- * rows by a top border — a door takes you to a different screen, a scope
- * row narrows what is already on this one. */
-.tm-section-doors {
-  border-top: 1px solid var(--border, #e5e7eb);
-  padding-top: 4px;
-  margin-top: 2px;
-}
-
-.tm-section-doors .tm-row {
-  color: var(--text-muted, #8e8e93);
-}
-
-.tm-section-doors .tm-row:hover,
-.tm-section-doors .tm-row.is-current {
-  color: var(--ff-text, #111);
-}
-
 .tm-row {
   display: flex;
   align-items: center;
@@ -884,10 +866,6 @@
   color: var(--text-tertiary, #8e8e93);
 }
 
-.tm-quickadd-dates {
-  min-width: 168px;
-}
-
 /* --- Note mode (§7.2) --- */
 
 /* Two rows: what is being written, and what it will be. The box stops being a
@@ -934,26 +912,6 @@
 .tm-quickadd-submit:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-/* §25.8's entry point, beside Add rather than in place of it. Quiet, because
-   typing a title is the common case and starting from a template is not. */
-.tm-quickadd-templates {
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--border-subtle, rgba(25, 25, 25, 0.08));
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted, #8e8e93);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.tm-quickadd-templates:hover,
-.tm-quickadd-templates[aria-expanded="true"] {
-  background: var(--bg-hover-content);
-  color: var(--text, #1c1c1e);
 }
 
 .tm-quickadd-hint {
@@ -2356,15 +2314,6 @@
   cursor: pointer;
 }
 
-.tm-manager-group h3 {
-  margin: 16px 0 4px;
-  color: var(--text-muted, #8e8e93);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 .tm-manager .tm-task button {
   flex: none;
   padding: 3px 8px;
@@ -2375,17 +2324,6 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
-}
-
-.tm-manager-danger {
-  color: var(--danger, #d70015) !important;
-}
-
-.tm-manager-warn {
-  flex: 1;
-  min-width: 0;
-  color: var(--danger, #d70015);
-  font-size: 12px;
 }
 
 /* The Trash's List section (TRASH_PERMANENT_DELETE_DESIGN.md §16.3).

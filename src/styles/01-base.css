@@ -827,11 +827,6 @@ textarea {
   font-weight: 400;
 }
 
-.settings-message {
-  margin: 12px 0 0;
-  color: var(--color-ink-muted-80);
-}
-
 .section-title {
   display: flex;
   align-items: center;
@@ -849,30 +844,10 @@ textarea {
   font-weight: 600;
 }
 
-.task-group {
-  display: grid;
-  gap: 8px;
-}
-
 .priority {
   border-radius: var(--rounded-pill);
   padding: 3px 8px;
   background: var(--color-canvas-parchment);
-}
-
-.priority-high {
-  color: #9f1239;
-  background: #ffe4e6;
-}
-
-.priority-medium {
-  color: #92400e;
-  background: #fef3c7;
-}
-
-.priority-low {
-  color: #166534;
-  background: #dcfce7;
 }
 
 .danger {
@@ -885,9 +860,4 @@ textarea {
 
 .soft {
   color: var(--color-ink-muted-48) !important;
-}
-
-.empty-state {
-  margin: 0;
-  color: var(--color-ink-muted-48);
 }
