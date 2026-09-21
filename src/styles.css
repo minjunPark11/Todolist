@@ -36,17 +36,19 @@
    26-timeline.css 다음: 두 화면이 같은 액센트와 전환 토큰 위에 선다. */
 @import "./styles/27-calendar.css";
 
-/* 은퇴한 다섯 파일은 여기서 부르지 않는다 (1,278줄).
+/* 다섯 파일이 여기 있었다 (1,278줄). 지웠다.
 
    `06-space-detail`(sdv-) · `13-list-view`(tlv-) · `14-scope-calendar`(tcv-) ·
    `15-goals-section`(gls-) · `16-overview-section`(ovs-). 다섯 접두사 모두
-   `src/` 전체에서 등장 0회다 — 문자열 조립으로도 만들어지지 않는다. Goals ·
-   Projects · Spaces가 `PAGE_ROUTES`에서 빠지면서(`app/pageRoute.ts`의
-   `RETIRED_ROUTES`) 그 화면을 그리던 CSS만 남은 것이다.
+   `src/` 전체에서 등장이 0회였다 — 문자열 조립으로도 만들어지지 않았다.
+   Goals · Projects · Spaces가 `PAGE_ROUTES`에서 빠지면서
+   (`app/pageRoute.ts`의 `RETIRED_ROUTES`) 그 화면을 그리던 CSS만 남은 것이다.
 
    `componentLanguage.spec.ts`가 적어 둔 규칙 그대로다 — "별칭은 어딘가에서
    불려야 그 줄을 얻는다." 그 규칙으로 `.sdv-card`를 포함한 여덟 이름이 이미
-   지워졌고, 이 다섯 파일은 같은 이유로 더 이상 번들에 들어가지 않는다.
+   지워졌고, 이 다섯 파일도 같은 이유로 갔다.
 
-   파일 자체는 아직 디스크에 있다. 지우는 것은 별도 결정으로 남긴다. */
+   이 주석은 순서표에 뚫린 번호(06 · 13 · 14 · 15 · 16)를 설명하려고 남긴다.
+   `@import` 순서 = cascade 순서이므로 번호가 건너뛴 것이 실수처럼 보일 수
+   있는데, 그게 아니라는 것. 필요하면 git 이력에 그대로 있다. */
 
