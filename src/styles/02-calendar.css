@@ -31,9 +31,6 @@
   /* Never let the column-flex shell crush the toolbar below its content when
      it wraps to multiple rows on narrow widths (otherwise rows spill out). */
   flex-shrink: 0;
-  /* Query container so the view tabs can go full-width when the calendar is
-     narrow (tracks the app sidebar, matching the body's collapse). */
-  container: gcalbar / inline-size;
 }
 
 /* Narrow: stack the toolbar into clean rows —
@@ -279,6 +276,19 @@
 /* --- Main column: month/week/day view + unscheduled backlog --- */
 
 .gcal-main-column {
+  /* Query container so the view tabs can go full-width when the calendar is
+     narrow (tracks the app sidebar, matching the body's collapse).
+
+     It sat on `.gcal-toolbar` itself, which cannot work: `@container` matches
+     the container's DESCENDANTS, never the container. So every
+     `@container gcalbar` rule aimed at `.gcal-toolbar` — the one that released
+     its fixed 56px height when the bar stacks — was dead, while the rules
+     aimed at its children were live. The children went `width: 100%` expecting
+     two rows inside a bar that was still `nowrap` and 56px tall, and the date
+     title was crushed to 0px behind the view tabs (viewport 769px). Moving the
+     container one level up makes the toolbar a descendant, so both halves of
+     that design apply together. */
+  container: gcalbar / inline-size;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
