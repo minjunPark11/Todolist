@@ -61,7 +61,20 @@
   --bg-app: #f6f6f4;
   --bg-rail: #f1f1ef;
   --bg-context-sidebar: #f8f8f6;
-  --bg-sidebar: #ffffff;
+  /* `--bg-sidebar`는 여기서 정의하지 않는다.
+
+     `01-base.css`가 라이트 #ffffff(:90)와 다크 #1c1c1e(:557) 한 쌍으로 이미
+     갖고 있는데, 여기 `:root` 한 줄이 그 쌍을 깨고 있었다 — `[data-theme="dark"]`와
+     `:root`는 같은 (0,1,0)이고 이 파일이 나중에 로드되므로, 다크에서도 #ffffff가
+     이겼다. 브라우저에서 재보면 실제로 그랬다.
+
+     §5.3이 `--accent`에 대해 적어 둔 것과 같은 함정이다 — *"여기 한 줄을 적으면
+     그 넷을 전부 덮어서 고른 색이 화면에 도달하지 않는다. 실제로 그렇게
+     죽여놨었다."* 같은 실수가 표면 토큰에서 한 번 더 있었다.
+
+     지금은 소비자가 없어(`--ff-sidebar`를 부르는 자리가 0곳) 화면에 닿지
+     않았지만, 다음 사람이 `background: var(--bg-sidebar)`라고 적는 날 다크에
+     흰 사이드바가 생긴다. `contrast.test.ts`가 그 흰색을 잡아서 드러났다. */
   --bg-surface: #ffffff;
   --bg-detail: #fafaf9;
   --bg: #ffffff;
