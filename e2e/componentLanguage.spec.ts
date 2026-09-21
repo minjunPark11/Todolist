@@ -35,19 +35,24 @@ import { openApp } from "./addList.helpers";
  * four-column grid template was quietly capping that panel's content at 160px
  * (TASK_CONTENT_MODE_DESIGN.md §12.2).
  *
- * `sdv-` followed the other eight, one round later. `.sdv-btn` and
- * `.sdv-metric-card` outlasted `.sdv-card` only because the equality was still
- * written here — but the Space Detail screen they dressed left with
- * `RETIRED_ROUTES`, and `06-space-detail.css` went with it. An alias whose
+ * `sdv-` and `foc-` followed the other eight, one round later. They outlasted
+ * `.sdv-card` only because the equality was still written here — but the Space
+ * Detail screen `sdv-` dressed left with `RETIRED_ROUTES`, and the Focus page
+ * `foc-card` dressed was rebuilt as `focus-*` (`24-focus.css`). An alias whose
  * only remaining reader is the test asserting the alias is not a call site;
  * it is a loop. `src/styles/orphans.test.ts` now counts this automatically.
+ *
+ * So CARDS is down to one name. That is not the list losing its point — it is
+ * the point having been reached: the five languages this file unified are one,
+ * and the surviving name is the canonical one. The last test still proves that
+ * name draws something.
  *
  * `.ff-card` has no call site either and stays anyway, because it is the name
  * a new card is supposed to reach for. What keeps it honest is the last test
  * in this file, which builds a screen out of the canonical names and checks
  * that each one draws something.
  */
-const CARDS = ["ff-card", "foc-card"];
+const CARDS = ["ff-card"];
 
 /** Same claim, for the button — base, primary and the small size. */
 const BUTTONS = {

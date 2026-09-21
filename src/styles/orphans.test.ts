@@ -41,8 +41,18 @@ const root = join(here, "..", "..");
  * 지웠다 — `.sdv-card`를 포함한 여덟 이름이 이미 그렇게 갔던 그대로.
  */
 const KEEP: { pattern: RegExp; why: string }[] = [
-  { pattern: /^ff-card$/, why: "새 카드가 집어야 할 정본 이름 (componentLanguage.spec.ts)" },
-  { pattern: /^ff-field$/, why: "정본 필드 — 같은 스펙이 불변식으로 지킨다" },
+  // V-6이 다섯 언어를 하나로 접으며 남긴 어휘다. 호출부가 아니라 **다음 코드가
+  // 집어야 할 이름**이라는 점에서 `sdv-*`와 자리가 다르다 — 그쪽은 사라진 화면이
+  // 쓰던 옛 이름이었다.
+  //
+  // 처음엔 `ff-card`와 `ff-field` 둘만 적었고, 그래서 `ff-row` · `ff-btn-secondary`
+  // · `ff-btn-sm`이 정리에 쓸려 나갔다. `componentLanguage.spec.ts`의 "정본
+  // 이름만으로 화면을 만들 수 있다"가 그것을 잡았다 — `.ff-row`가 아무것도
+  // 그리지 않았다. **어휘는 낱개가 아니라 한 벌이다.**
+  {
+    pattern: /^ff-(card|row|field|btn(-(primary|secondary|ghost|danger|sm))?)$/,
+    why: "V-6의 정본 어휘 한 벌 — componentLanguage.spec.ts가 각 이름이 무언가를 그리는지 검사한다",
+  },
 ];
 
 /**

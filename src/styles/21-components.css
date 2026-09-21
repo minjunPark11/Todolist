@@ -108,6 +108,17 @@
 }
 
 /* Ghost — no surface until you touch it. */
+/* Secondary — the accent as a soft fill rather than a solid one. */
+.ff-btn-secondary {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ff-btn-secondary:not(:disabled):hover {
+  background: var(--accent-active);
+}
+
 .ff-btn-ghost {
   border-color: transparent;
   background: transparent;
@@ -127,6 +138,16 @@
 
 .ff-btn-danger:not(:disabled):hover {
   background: var(--danger-soft);
+}
+
+/* `-sm` is a size rather than a variant. 28px: §4.87 gives a section action
+   exactly that number, and V-6 made one `-sm` out of the three the families
+   had. `e2e/verticalRhythm.spec.ts` excludes it from the 32px grid for that
+   reason. */
+.ff-btn-sm {
+  height: 28px;
+  padding-inline: 12px;
+  font-size: 12px;
 }
 
 /* The Detail's title is the one input that is not a field.
@@ -207,6 +228,7 @@ select,
 textarea {
   padding: 8px var(--density-control-pad-x);
 }
+.ff-row,
 .gcal-cat-row {
   display: flex;
   align-items: center;
@@ -217,9 +239,14 @@ textarea {
   cursor: pointer;
 }
 
+.ff-row:hover {
+  background: var(--bg-hover-content);
+}
+
 .gcal-cat-row:hover {
   background: var(--bg-hover-nav);
 }
+.ff-row.is-selected,
 .gcal-cat-row.is-selected {
   background: var(--bg-selected);
 }
