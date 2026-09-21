@@ -3468,7 +3468,9 @@
  * the preview goes — §8.36 and §8.37 make it the half that yields, because the
  * form must work identically without it and does not work squeezed.
  */
-@media (max-width: 959px) {
+/* 960 — 26-timeline.css가 960/961 짝으로 쓰는 그 경계다. 여기 혼자 959여서
+   정확히 960px에서 이 규칙만 꺼진 채 타임라인 쪽은 켜져 있었다. */
+@media (max-width: 960px) {
   .tm-modal.has-preview {
     display: flex;
     width: min(520px, calc(100vw - 32px));
