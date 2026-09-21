@@ -96,6 +96,17 @@ const CLAIMS: Record<string, Claim> = {
     what: "좁은 폭 @media 규칙의 수",
     of: () => [String(mediaMaxWidths().filter((w) => w <= 900).length)],
   },
+  "orphans.count": {
+    shape: "numbers",
+    what: "호출부 없는 클래스의 총수 (orphans.test.ts의 천장 합계)",
+    of: () => {
+      const css = readFileSync(join(stylesDir, "orphans.test.ts"), "utf8");
+      const block = /const CEILING: Record<string, number> = \{([\s\S]*?)\n\};/.exec(css);
+      if (!block) return [];
+      const sum = [...block[1].matchAll(/:\s*(\d+),/g)].reduce((a, m) => a + Number(m[1]), 0);
+      return [String(sum)];
+    },
+  },
   "styles.count": {
     shape: "numbers",
     what: "`styles.css`가 부르는 CSS 파일 수",
@@ -111,7 +122,11 @@ const CLAIMS: Record<string, Claim> = {
   },
 };
 
-const MARKER = /<!--@\s*([\w.]+)(?:\s+(\S+))?\s*-->([\s\S]*?)<!--@-->/g;
+// 인자는 식별자로 한정한다. `(\S+)`였을 때 `-->`까지 삼켜서, 한 줄에 표식이 둘
+// 있으면 첫 여는 표식이 둘째 표식까지 하나로 먹었다 — 본문에 남의 숫자가 섞여
+// 들어오고 닫힘 검사도 어긋났다. `--text-meta`처럼 `-->` 앞에 공백이 있는 자리만
+// 우연히 맞아서, 표식을 한 줄에 둘 적기 전까지 드러나지 않았다.
+const MARKER = /<!--@\s*([\w.]+)(?:\s+([\w.-]+))?\s*-->([\s\S]*?)<!--@-->/g;
 
 function markdownFiles(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
