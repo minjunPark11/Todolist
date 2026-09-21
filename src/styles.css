@@ -40,9 +40,15 @@
 
    `06-space-detail`(sdv-) · `13-list-view`(tlv-) · `14-scope-calendar`(tcv-) ·
    `15-goals-section`(gls-) · `16-overview-section`(ovs-). 다섯 접두사 모두
-   `src/` 전체에서 등장이 0회였다 — 문자열 조립으로도 만들어지지 않았다.
-   Goals · Projects · Spaces가 `PAGE_ROUTES`에서 빠지면서
+   **호출부가 0회였다** — `.tsx`/`.ts` 어디에도 없고 문자열 조립으로도
+   만들어지지 않았다. Goals · Projects · Spaces가 `PAGE_ROUTES`에서 빠지면서
    (`app/pageRoute.ts`의 `RETIRED_ROUTES`) 그 화면을 그리던 CSS만 남은 것이다.
+
+   CSS에는 남아 있는 것이 하나 있다 — `21-components.css`의 `.sdv-btn` 계열과
+   `.sdv-metric-card`. 이쪽은 기능 스타일이 아니라 컴포넌트 언어의 별칭이고,
+   `componentLanguage.spec.ts`가 "`.ff-btn`과 같은 것"이라는 불변식으로 지키고
+   있다. 호출부가 없다는 점은 같지만 지우면 그 테스트가 함께 바뀌므로, 별도
+   판단으로 남긴다(`.ff-card`도 같은 이유로 호출부 없이 남아 있다).
 
    `componentLanguage.spec.ts`가 적어 둔 규칙 그대로다 — "별칭은 어딘가에서
    불려야 그 줄을 얻는다." 그 규칙으로 `.sdv-card`를 포함한 여덟 이름이 이미
