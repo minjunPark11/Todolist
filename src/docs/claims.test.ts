@@ -134,21 +134,26 @@ function found(text: string, shape: Shape): string[] {
 type Marked = { file: string; line: number; name: string; arg: string; body: string };
 
 /**
- * 코드 펜스 안은 주장이 아니라 예시다.
+ * 코드 안은 주장이 아니라 예시다 — 펜스도, 인라인 백틱도.
  *
- * `DRIFT_GUARD_DESIGN.md` §4 G4가 표식의 생김새를 보여주려고 펜스 안에
- * `<!--@ breakpoints -->…`를 적어 뒀고, 처음에 그것이 "없는 이름"으로 잡혔다.
- * 문서가 자기 장치를 설명하는 일은 앞으로도 있을 것이므로, 펜스는 비운다 —
- * 줄 번호를 지키려고 개행만 남긴다.
+ * 두 번 물렸다. `DRIFT_GUARD_DESIGN.md` §4 G4가 표식의 생김새를 보여주려고
+ * 펜스 안에 `<!--@ breakpoints -->…`를 적어 뒀고 그것이 "없는 이름"으로 잡혔다.
+ * 고치고 나서, §4.4.1이 산문 한가운데서 인라인 백틱으로 여는 표식만 언급하자
+ * 이번엔 "닫히지 않았다"로 잡혔다.
+ *
+ * **문서가 자기 장치를 설명하는 일은 앞으로도 있다.** 그래서 코드 표기는 전부
+ * 비운다 — 줄 번호를 지키려고 개행만 남긴다.
  */
-function stripFences(md: string): string {
-  return md.replace(/^```[\s\S]*?^```/gm, (b) => b.replace(/[^\n]/g, " "));
+function stripCode(md: string): string {
+  return md
+    .replace(/^```[\s\S]*?^```/gm, (b) => b.replace(/[^\n]/g, " "))
+    .replace(/`[^`\n]*`/g, (b) => b.replace(/[^\n]/g, " "));
 }
 
 function markedClaims(): Marked[] {
   const out: Marked[] = [];
   for (const file of markdownFiles(root)) {
-    const text = stripFences(readFileSync(file, "utf8"));
+    const text = stripCode(readFileSync(file, "utf8"));
     if (!text.includes("<!--@")) continue;
     for (const m of text.matchAll(MARKER)) {
       out.push({
@@ -188,12 +193,37 @@ describe("산문의 주장 (DRIFT_GUARD §4 G4)", () => {
     expect(wrong, "산문이 낡았다 — 문서를 고치거나, 그 사실을 산문에서 지운다").toEqual([]);
   });
 
+  it("표식이 백틱 안에 갇혀 있지 않다", () => {
+    // 조용히 검사에서 빠진 표식이 가장 나쁘다 — 있는 줄 알았던 가드가 없는 상태다.
+    // §4.4.1에 첫 `token` 표식을 달면서 문장째 인라인 백틱으로 감쌌고, 값을 일부러
+    // 틀리게 바꿔도 통과했다. 그때 알았다.
+    //
+    // 설명하려고 **여는 표식만** 적는 것(`<!--@ token -->` 같은)은 정상이다.
+    // 백틱 안에 **짝이 온전히** 들어 있으면 그건 예시가 아니라 갇힌 표식이다 —
+    // 예시는 펜스에 적는다.
+    const trapped: string[] = [];
+    for (const file of markdownFiles(root)) {
+      const raw = readFileSync(file, "utf8");
+      if (!raw.includes("<!--@")) continue;
+      const noFence = raw.replace(/^```[\s\S]*?^```/gm, (b) => b.replace(/[^\n]/g, " "));
+      for (const m of noFence.matchAll(/`[^`\n]*`/g)) {
+        if (MARKER.test(m[0])) {
+          MARKER.lastIndex = 0;
+          trapped.push(
+            `${relative(root, file)}:${noFence.slice(0, m.index).split("\n").length} ${m[0].trim()}`,
+          );
+        }
+      }
+    }
+    expect(trapped, "백틱을 벗기면 검사된다 — 예시로 보여줄 것이면 펜스에 적는다").toEqual([]);
+  });
+
   it("표식은 닫혀 있다", () => {
     // 여는 표식 수와 전체 짝의 수가 다르면 어딘가가 `<!--@-->`를 잃었고, 그 블록은
     // 조용히 검사에서 빠진다 — 있는 줄 알았던 가드가 없는 상태가 가장 나쁘다.
     const broken: string[] = [];
     for (const file of markdownFiles(root)) {
-      const text = stripFences(readFileSync(file, "utf8"));
+      const text = stripCode(readFileSync(file, "utf8"));
       const opens = (text.match(/<!--@\s*[\w.]/g) ?? []).length;
       const pairs = [...text.matchAll(MARKER)].length;
       if (opens !== pairs) broken.push(`${relative(root, file)}: 여는 표식 ${opens} · 짝 ${pairs}`);
