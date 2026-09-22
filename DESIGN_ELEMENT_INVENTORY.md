@@ -41,6 +41,14 @@
 
 `src/styles.css`는 배럴이고 @import 순서가 곧 cascade다(순서를 바꾸면 오버라이드가 깨진다).
 
+> **이 표는 감사 시점의 스냅샷이고 지금과 다르다.** 줄 수는 그 뒤의 분할·정리로
+> 전부 달라졌고, `04-today.css`처럼 표에만 남은 이름도 있다. 특히 아래 다섯은
+> 삭제됐다 — 호출부가 하나도 없었다(접두사가 `src/` 전체에서 등장 0회):
+> `06-space-detail`(sdv-) · `13-list-view`(tlv-) · `14-scope-calendar`(tcv-) ·
+> `15-goals-section`(gls-) · `16-overview-section`(ovs-). Goals · Projects ·
+> Spaces가 `RETIRED_ROUTES`로 빠지면서 화면만 사라지고 CSS가 남아 있던 것이다.
+> 현재 목록은 `src/styles.css`의 `@import` 순서가 정본이다.
+
 | # | 파일 | 줄 | 담당 | 색 토큰 채택률 |
 |---|---|---|---|---|
 | 01 | `01-base.css` | 1,782 | **토큰 정의 전부** + 레거시 원시 컴포넌트 | 63% |

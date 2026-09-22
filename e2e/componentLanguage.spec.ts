@@ -35,18 +35,30 @@ import { openApp } from "./addList.helpers";
  * four-column grid template was quietly capping that panel's content at 160px
  * (TASK_CONTENT_MODE_DESIGN.md §12.2).
  *
+ * `sdv-` and `foc-` followed the other eight, one round later. They outlasted
+ * `.sdv-card` only because the equality was still written here — but the Space
+ * Detail screen `sdv-` dressed left with `RETIRED_ROUTES`, and the Focus page
+ * `foc-card` dressed was rebuilt as `focus-*` (`24-focus.css`). An alias whose
+ * only remaining reader is the test asserting the alias is not a call site;
+ * it is a loop. `src/styles/orphans.test.ts` now counts this automatically.
+ *
+ * So CARDS is down to one name. That is not the list losing its point — it is
+ * the point having been reached: the five languages this file unified are one,
+ * and the surviving name is the canonical one. The last test still proves that
+ * name draws something.
+ *
  * `.ff-card` has no call site either and stays anyway, because it is the name
  * a new card is supposed to reach for. What keeps it honest is the last test
  * in this file, which builds a screen out of the canonical names and checks
  * that each one draws something.
  */
-const CARDS = ["ff-card", "foc-card", "sdv-metric-card"];
+const CARDS = ["ff-card"];
 
 /** Same claim, for the button — base, primary and the small size. */
 const BUTTONS = {
-  base: ["ff-btn", "sdv-btn"],
-  primary: ["ff-btn ff-btn-primary", "sdv-btn sdv-btn-primary"],
-  small: ["ff-btn ff-btn-sm", "sdv-btn sdv-btn-sm"],
+  base: ["ff-btn"],
+  primary: ["ff-btn ff-btn-primary"],
+  small: ["ff-btn ff-btn-sm"],
 };
 
 /** And for the field. `.ff-field` on a div proves the class alone carries it. */
@@ -78,11 +90,12 @@ async function appearanceOf(
       probe.className = name;
       host.appendChild(probe);
       const style = getComputedStyle(probe);
-      // Height is deliberately absent for cards: `.sdv-metric-card` sets a
-      // 140px minimum because of what goes in it, and V-6 is not trying to
-      // make a metric tile the same size as a settings panel. What it makes
-      // the same is the surface. The controls add their own height check
-      // below, where the height IS the point.
+      // Height is deliberately absent for cards: a card's height comes from
+      // what goes in it, and V-6 is not trying to make every card the same
+      // size. What it makes the same is the surface. The controls add their
+      // own height check below, where the height IS the point.
+      // (`.sdv-metric-card` was the example here — a 140px minimum. It went
+      // with the rest of `sdv-`.)
       seen[name] = [
         style.backgroundColor,
         `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`,
@@ -132,8 +145,9 @@ test.describe("the component language (§V.3, V-6)", () => {
     // Today's primary used to be `--tdy-navy`. Two primaries in two colours
     // is the thing this stage exists to end, and the accent is the one the
     // user can change (§11.3). The `tdy-` half of that comparison went with
-    // the Today page (P0-2); what is left is the rule it was made to hold.
-    const appearance = await appearanceOf(page, ["ff-btn ff-btn-primary", "sdv-btn sdv-btn-primary"], "button");
+    // the Today page (P0-2) and the `sdv-` half with the Space Detail screen;
+    // what is left is the rule they were made to hold.
+    const appearance = await appearanceOf(page, ["ff-btn ff-btn-primary"], "button");
     // 액센트의 값이 아니라 "주 버튼이 액센트다"가 이 테스트의 문장이다. 숫자를
     // 박아두면 액센트가 움직일 때마다 이 스펙이 그 뒤를 따라다닌다 — 실제로
     // `#007aff`가 흰 면 위 4.02:1로 AA에 미달해 `#0064d2`로 내려올 때 그랬다.

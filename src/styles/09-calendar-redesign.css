@@ -35,8 +35,7 @@
 /* The segmented control sits in the middle of the bar. A flex spacer of equal
    weight on the right is what makes "middle" mean the bar's middle rather than
    the middle of whatever is left over. */
-.gcal-toolbar-left,
-.gcal-toolbar-spacer {
+.gcal-toolbar-left {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -445,16 +444,6 @@
 .gcal-month-cell {
   border-color: var(--grid-line, rgba(0, 0, 0, 0.05));
 }
-
-/* --- Right task panel: reference task cards --- *
-
-/* The Global Sidebar's rules stood here — `.side-item`, `.side-item-badge`,
-   `.side-section-title`, `.brand-mark`, `.side-avatar`. That component was
-   deleted in P0-5 and this was the last layer still repainting it. Removed in
-   P0-10; none of these class names appears in any component. */
-
-/* --- Page titles: unified Display 22/700 (reference type scale) --- */
-.foc-header h1,
 .ff-page-title {
   font-size: var(--type-2xl);
   line-height: 30px;
@@ -470,19 +459,6 @@
 .gcal-day-title span {
   font-size: 13px;
   color: var(--text-tertiary);
-}
-
-/* The Today page's navy CTAs were mapped onto the accent here. The page is
-   gone (P0-2: the Tasks Module's Today is the one that survived), and its
-   three variables with it. */
-.eis-q-I { color: var(--danger); }
-.eis-q-II { color: var(--accent); }
-.eis-q-III { color: var(--warning); }
-.eis-q-IV { color: var(--text-tertiary); }
-
-.eis-cell-roman {
-  font-size: 11px;
-  font-weight: 700;
 }
 body:has(.mini-focus-window) {
   margin: 0;

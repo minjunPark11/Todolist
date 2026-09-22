@@ -67,24 +67,6 @@
   color: var(--text-muted, #8e8e93);
 }
 
-/* Page-navigation doors (Projects, Goals). Visually separated from scope
- * rows by a top border — a door takes you to a different screen, a scope
- * row narrows what is already on this one. */
-.tm-section-doors {
-  border-top: 1px solid var(--border, #e5e7eb);
-  padding-top: 4px;
-  margin-top: 2px;
-}
-
-.tm-section-doors .tm-row {
-  color: var(--text-muted, #8e8e93);
-}
-
-.tm-section-doors .tm-row:hover,
-.tm-section-doors .tm-row.is-current {
-  color: var(--ff-text, #111);
-}
-
 .tm-row {
   display: flex;
   align-items: center;
@@ -884,10 +866,6 @@
   color: var(--text-tertiary, #8e8e93);
 }
 
-.tm-quickadd-dates {
-  min-width: 168px;
-}
-
 /* --- Note mode (§7.2) --- */
 
 /* Two rows: what is being written, and what it will be. The box stops being a
@@ -934,26 +912,6 @@
 .tm-quickadd-submit:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-/* §25.8's entry point, beside Add rather than in place of it. Quiet, because
-   typing a title is the common case and starting from a template is not. */
-.tm-quickadd-templates {
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--border-subtle, rgba(25, 25, 25, 0.08));
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted, #8e8e93);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.tm-quickadd-templates:hover,
-.tm-quickadd-templates[aria-expanded="true"] {
-  background: var(--bg-hover-content);
-  color: var(--text, #1c1c1e);
 }
 
 .tm-quickadd-hint {
@@ -1097,9 +1055,20 @@
 }
 
 .tm-drawer-resize:hover::after,
-.tm-drawer-resize:focus-visible::after,
 .tm-drawer.is-resizing .tm-drawer-resize::after {
   background: var(--color-primary, #0066cc);
+}
+
+/* 키보드 포커스는 hover와 같은 1px 선으로 끝나면 안 된다.
+
+   이 핸들은 `tabIndex={0}`에 `role="separator"`이고 키보드로 실제 끌 수 있다
+   (`TaskDrawer.tsx`). 그런데 포커스 표시가 hover와 똑같은 1px 선이어서, 같은
+   일을 하는 `.context-sidebar-handle`(19-app-shell.css §150)이 box-shadow로
+   3px을 만드는 것과 어긋나 있었다 — 같은 뜻의 컨트롤이 두 생김새를 가질
+   이유가 없다. 둘을 맞추면 WCAG 2.4.13(AAA)의 2px 둘레도 따라온다. */
+.tm-drawer-resize:focus-visible::after {
+  background: var(--color-primary, #0066cc);
+  box-shadow: 0 0 0 1px var(--color-primary, #0066cc);
 }
 
 .tm-drawer-resize:focus-visible {
@@ -2345,15 +2314,6 @@
   cursor: pointer;
 }
 
-.tm-manager-group h3 {
-  margin: 16px 0 4px;
-  color: var(--text-muted, #8e8e93);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 .tm-manager .tm-task button {
   flex: none;
   padding: 3px 8px;
@@ -2364,17 +2324,6 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
-}
-
-.tm-manager-danger {
-  color: var(--danger, #d70015) !important;
-}
-
-.tm-manager-warn {
-  flex: 1;
-  min-width: 0;
-  color: var(--danger, #d70015);
-  font-size: 12px;
 }
 
 /* The Trash's List section (TRASH_PERMANENT_DELETE_DESIGN.md §16.3).
@@ -3457,7 +3406,9 @@
  * the preview goes — §8.36 and §8.37 make it the half that yields, because the
  * form must work identically without it and does not work squeezed.
  */
-@media (max-width: 959px) {
+/* 960 — 26-timeline.css가 960/961 짝으로 쓰는 그 경계다. 여기 혼자 959여서
+   정확히 960px에서 이 규칙만 꺼진 채 타임라인 쪽은 켜져 있었다. */
+@media (max-width: 960px) {
   .tm-modal.has-preview {
     display: flex;
     width: min(520px, calc(100vw - 32px));

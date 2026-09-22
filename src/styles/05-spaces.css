@@ -30,149 +30,6 @@
   min-width: 0;
 }
 
-.foc-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.foc-header h1 {
-  margin: 0;
-  font-size: var(--display-md);
-  line-height: 1;
-  letter-spacing: 0;
-}
-
-.foc-header p {
-  margin: 8px 0 0;
-  color: var(--text-secondary);
-  font-size: var(--type-lg);
-}
-
-.foc-header-chips {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-  position: relative;
-}
-
-.foc-header-chips span,
-.foc-header-chips strong {
-  display: inline-flex;
-  align-items: center;
-  min-height: 42px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 0 16px;
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-card);
-  font-size: var(--type-md);
-}
-
-.foc-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
-  grid-template-areas:
-    "timer summary"
-    "queue rail";
-  gap: 16px;
-  align-items: start;
-  padding-bottom: 110px;
-}
-
-.foc-timer { grid-area: timer; }
-.foc-queue { grid-area: queue; }
-.foc-summary { grid-area: summary; }
-.foc-insights { grid-area: rail; }
-
-/* Summary card is now a direct grid item (pulled out of .foc-insights so it
-   shares the top row with the timer and the middle divider lines up). */
-.foc-summary {
-  display: grid;
-  gap: 16px;
-  padding: 16px;
-}
-
-/* Match the top-row card heights so the middle divider is a single clean line
-   across both columns (queue/rail already share the row-2 start line). */
-.foc-timer,
-.foc-summary {
-  align-self: stretch;
-}
-
-.foc-queue,
-.foc-timer,
-.foc-insights {
-  display: grid;
-  gap: 16px;
-}
-
-
-.foc-insights {
-  align-content: start;
-}
-
-.foc-insights .foc-card {
-  display: grid;
-  gap: 16px;
-}
-
-.foc-card-head,
-.foc-group-title,
-.foc-status,
-.foc-controls,
-.foc-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.foc-card h2,
-.foc-card-head h2 {
-  margin: 0;
-  font-size: var(--type-xl);
-  letter-spacing: 0;
-}
-
-.foc-card-head button {
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-secondary);
-  font-weight: 700;
-}
-
-.foc-group {
-  display: grid;
-  gap: 8px;
-}
-
-.foc-group-title {
-  justify-content: flex-start;
-  color: var(--text-primary);
-  font-weight: var(--weight-bold);
-}
-
-.foc-group-title small {
-  display: inline-grid;
-  place-items: center;
-  min-width: 24px;
-  height: 22px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text-secondary);
-}
-
-.foc-task-list {
-  display: grid;
-  gap: 8px;
-}
-
 .foc-task {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto;
@@ -188,30 +45,6 @@
 .foc-task.is-active {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-.foc-play {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  font-weight: var(--weight-bold);
-}
-
-.foc-task.is-active .foc-play,
-.foc-play:not(:disabled):hover {
-  border-color: transparent;
-  color: #fff;
-  background: var(--accent-fill);
-}
-
-.foc-play:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .foc-task-main {
@@ -243,90 +76,6 @@
   color: var(--text-secondary);
   font-size: 12px;
 }
-
-.foc-tag,
-.foc-task-pills span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  border-radius: var(--radius-sm);
-  padding: 0 8px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: var(--weight-bold);
-}
-
-.foc-red .foc-tag { color: #b42318; background: #ffe8e5; }
-.foc-purple .foc-tag { color: #6741d9; background: #eee7ff; }
-.foc-green .foc-tag { color: #137a4b; background: #e7f8ee; }
-
-.foc-timer {
-  min-height: 280px;
-  justify-items: center;
-  align-content: center;
-  text-align: center;
-}
-
-.foc-status {
-  justify-self: stretch;
-  justify-content: flex-start;
-  color: var(--accent);
-  font-weight: var(--weight-bold);
-  font-size: 13px;
-}
-
-.foc-status span {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-.foc-status span.is-paused {
-  background: var(--warning);
-}
-
-.foc-task-pills {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.foc-timer h2 {
-  max-width: 100%;
-  margin: 10px 0 0;
-  font-size: var(--display-sm);
-  overflow-wrap: anywhere;
-}
-
-.foc-clock {
-  margin-top: 10px;
-  color: var(--text-primary);
-  font-size: var(--display-lg);
-  line-height: 1;
-  font-weight: var(--weight-bold);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-}
-
-.foc-note {
-  width: 100%;
-  min-height: 70px;
-  border-radius: var(--radius-sm);
-  font-size: var(--type-md);
-}
-
-.foc-controls {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-}
-
-.foc-controls button,
-.foc-empty button,
-.foc-modal button,
 .foc-global-actions button {
   min-height: 32px;
   border: 1px solid var(--accent-soft);
@@ -335,193 +84,10 @@
   color: var(--accent);
   font-weight: var(--weight-bold);
 }
-
-.foc-controls button.danger,
 .foc-global-actions button.danger {
   color: var(--danger);
   border-color: rgba(255, 59, 48, 0.25);
   background: rgba(255, 59, 48, 0.05);
-}
-
-.foc-controls button.foc-mini-open {
-  color: var(--text-primary);
-  border-color: var(--border-subtle);
-  background: var(--bg-surface-muted);
-}
-
-.foc-meta {
-  width: 100%;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 12px;
-  background: var(--bg-surface-muted);
-}
-
-.foc-meta span {
-  display: grid;
-  gap: 4px;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.foc-meta strong {
-  color: var(--text-primary);
-  font-size: var(--type-lg);
-}
-
-.foc-no-session,
-.foc-empty {
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  padding: 24px 10px;
-  color: var(--text-secondary);
-}
-
-.foc-no-session span {
-  display: grid;
-  place-items: center;
-  width: 66px;
-  height: 66px;
-  border-radius: var(--radius-sm);
-  color: var(--accent);
-  background: var(--accent-soft);
-  font-size: var(--display-md);
-}
-
-.foc-stat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.foc-stat-grid span {
-  display: grid;
-  gap: 6px;
-  min-height: 84px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 16px;
-  background: var(--bg-surface-muted);
-}
-
-.foc-stat-grid small {
-  color: var(--text-secondary);
-}
-
-.foc-stat-grid strong {
-  font-size: var(--display-sm);
-}
-
-.foc-project-bars {
-  display: grid;
-  gap: 12px;
-}
-
-.foc-project-bars p {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-.foc-project-bars div {
-  display: grid;
-  grid-template-columns: 100px minmax(0, 1fr) 56px;
-  gap: 10px;
-  align-items: center;
-}
-
-.foc-project-bars i {
-  height: 8px;
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  background: var(--surface-2);
-}
-
-.foc-project-bars b {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-}
-
-.foc-project-bars span,
-.foc-project-bars strong {
-  font-size: 13px;
-}
-
-.foc-recent {
-  display: grid;
-}
-
-.foc-recent-session {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  min-height: 54px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.foc-recent-main {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  min-height: 54px;
-  border: 0;
-  background: transparent;
-  text-align: left;
-}
-
-.foc-recent-delete {
-  min-height: 34px;
-  border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
-  border-radius: var(--radius-pill);
-  padding: 6px 12px;
-  color: var(--danger);
-  background: var(--danger-soft);
-  font-weight: 700;
-}
-
-.foc-recent-main span {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  color: var(--success);
-  background: #e7f8ee;
-}
-
-.foc-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.24);
-}
-
-.foc-modal {
-  display: grid;
-  gap: 16px;
-  width: min(420px, 100%);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 24px;
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-panel);
-}
-
-.foc-modal h2,
-.foc-modal p {
-  margin: 0;
-}
-
-.foc-modal div {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
 }
 
 .foc-global-bar {
@@ -604,50 +170,15 @@
   font-weight: var(--weight-bold);
 }
 
-@media (max-width: 1240px) {
-  .foc-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: none;
-  }
-
-  /* Dropping the areas is not enough to un-place the items that used them.
-     `grid-area: queue` with no such area left is read as a LINE named `queue`,
-     which does not exist either — so the browser invents implicit tracks and
-     drops the four cards on top of each other. Measured at 800px: the queue
-     card and the summary card both started at x=428 and the summary, painted
-     last, took every click meant for a task in the queue. Sending them back to
-     `auto` is what actually stacks them. */
-  .foc-timer,
-  .foc-queue,
-  .foc-summary,
-  .foc-insights {
-    grid-area: auto;
-  }
-
-  .foc-timer {
-    min-height: 320px;
-  }
-}
-
 @media (max-width: 768px) {
   .foc-page {
     padding: 16px;
   }
-
-  .foc-header,
   .foc-global-bar {
     align-items: stretch;
   }
-
-  .foc-header,
   .foc-global-bar {
     display: grid;
-  }
-
-  /* Keep the date / today / settings chips on one horizontal row even when
-     the header stacks below the title. */
-  .foc-header-chips {
-    justify-content: flex-start;
   }
 
   .foc-global-bar {
@@ -656,20 +187,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .foc-stat-grid,
-  .foc-controls {
-    grid-template-columns: 1fr;
-  }
-
   .foc-task {
     grid-template-columns: 44px minmax(0, 1fr);
   }
-
-  .foc-tag {
-    grid-column: 2;
-    justify-self: start;
-  }
 }
-
 
 

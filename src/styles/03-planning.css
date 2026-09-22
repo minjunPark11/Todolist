@@ -117,12 +117,6 @@
   white-space: nowrap;
 }
 .ff-badge-arrow { font-weight: 700; }
-.ff-badge-danger { background: var(--danger-soft); color: var(--tint-red-text); }
-.ff-badge-warning { background: var(--warning-soft); color: var(--tint-orange-text); }
-.ff-badge-success { background: var(--success-soft); color: var(--tint-green-text); }
-.ff-badge-accent { background: var(--accent-soft); color: var(--accent); }
-.ff-badge-purple { background: var(--purple-soft); color: var(--purple); }
-.ff-badge-muted { background: var(--surface-2); color: var(--text-secondary); }
 .ff-badge-ghost { background: transparent; color: var(--text-tertiary); }
 
 .ff-pill {
@@ -139,11 +133,6 @@
   white-space: nowrap;
 }
 .ff-pill-icon { font-size: 11px; }
-.ff-pill-danger { background: var(--danger-soft); color: var(--tint-red-text); }
-.ff-pill-warning { background: var(--warning-soft); color: var(--tint-orange-text); }
-.ff-pill-accent { background: var(--accent-soft); color: var(--accent); }
-.ff-pill-danger-ghost { background: var(--danger-soft); color: var(--danger); }
-.ff-pill-muted { background: var(--surface-2); color: var(--text-secondary); }
 
 .ff-projbadge {
   border: none;
@@ -160,11 +149,6 @@
 }
 .ff-projbadge-empty { color: var(--text-tertiary); background: transparent; }
 .ff-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.ff-dot-danger { background: var(--danger); }
-.ff-dot-warning { background: var(--warning); }
-.ff-dot-success { background: var(--success); }
-.ff-dot-accent { background: var(--accent); }
-.ff-dot-muted { background: var(--text-tertiary); }
 
 /* `.ff-popover` stood here and is gone with the component it dressed. It was
    `position: absolute` inside the anchor, which is what made every menu in
@@ -313,26 +297,6 @@
 .ff-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .ff-confirm-body { color: var(--text-secondary); font-size: var(--type-md); }
 
-.ff-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-.ff-form input,
-.ff-form select,
-.ff-form textarea {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  font-size: var(--type-md);
-  font-weight: 400;
-  color: var(--text-primary);
-  background: var(--bg-surface);
-}
-
 /* Toast */
 .ff-toast {
   position: fixed;
@@ -479,72 +443,6 @@
 .ff-color-row { display: flex; gap: 8px; }
 .ff-color-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; }
 .ff-color-swatch.active { border-color: var(--text-primary); }
-
-/* ===== Planning: Board ===== */
-/* Columns keep a workable width and scroll sideways rather than being squeezed
-   — a Space with eight statuses is a scrolling board, not eight slivers. */
-.ff-board {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(260px, 1fr);
-  gap: 16px;
-  overflow-x: auto;
-  align-items: start;
-  padding-bottom: 8px;
-}
-.ff-board-controls { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
-.ff-board-quick-add { min-width: 148px; }
-@media (max-width: 768px) {
-  .ff-board-controls { width: 100%; }
-  .ff-board-quick-add { min-width: 0; flex: 1 1 140px; }
-}
-.ff-board-control { display: flex; flex-direction: column; gap: 4px; }
-.ff-board-control > span { font-size: 12px; font-weight: 600; color: var(--text-tertiary); }
-.ff-board-control select { min-width: 160px; padding: 0 10px; height: 32px; font-size: 13px; }
-.ff-board-col-head strong { display: flex; align-items: center; gap: 6px; }
-.ff-board-chip {
-  background: var(--surface-2);
-  border-radius: var(--radius-pill);
-  padding: 2px 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.ff-board-chip.is-warn { background: var(--accent-soft); color: var(--accent); }
-.ff-board-card.is-done .ff-board-card-title { color: var(--text-tertiary); }
-
-.ff-board-col {
-  background: var(--bg-surface-muted);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 120px;
-  transition: background var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
-}
-.ff-board-col.is-over { border-color: var(--accent); background: var(--accent-soft); }
-.ff-board-col-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px; }
-.ff-board-col-head strong { font-size: var(--type-md); }
-.ff-board-count { background: var(--surface-2); border-radius: var(--radius-pill); padding: 1px 8px; font-size: 12px; font-weight: 700; color: var(--text-secondary); }
-.ff-board-col-body { display: flex; flex-direction: column; gap: 8px; }
-
-.ff-board-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  cursor: grab;
-}
-.ff-board-card:active { cursor: grabbing; }
-.ff-board-card.is-selected { border-color: var(--accent); }
-.ff-board-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.ff-board-card-title { font-size: var(--type-md); color: var(--text-primary); line-height: 1.4; }
-.ff-board-card-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* ===== Planning: Matrix ===== */
 
@@ -990,13 +888,6 @@
   border-color: var(--q-color);
   background: color-mix(in srgb, var(--q-color) 10%, var(--bg-surface-muted));
 }
-/* `--q-color`는 테두리와 틴트를 칠하는 면의 색이고, `--q-ink`는 그 위에 얹는
-   글자의 색이다. 로마숫자가 `--q-color`를 그대로 쓰면서 III이 2.02:1로
-   읽히지 않고 있었다. */
-.ff-matrix-cell-I { --q-color: var(--danger); --q-ink: var(--danger-ink); grid-area: qI; }
-.ff-matrix-cell-II { --q-color: var(--accent); --q-ink: var(--accent-ink); grid-area: qII; }
-.ff-matrix-cell-III { --q-color: var(--warning); --q-ink: var(--warning-ink); grid-area: qIII; }
-.ff-matrix-cell-IV { --q-color: var(--text-tertiary); --q-ink: var(--text-tertiary); grid-area: qIV; }
 
 /* The page's own ⋯, where the List `<select>` used to be (§33.2).
 

@@ -5,6 +5,11 @@ src-tauri/target/
 .env.*
 !.env.example
 *.local
+# `*.local`은 확장자가 붙으면 걸리지 않는다 — `vite.config.local.ts`,
+# `pw.local.config.ts` 같은 로컬 전용 오버라이드가 그 자리다. 컨테이너나
+# 개인 머신의 경로(예: 사전 설치 브라우저의 executablePath)를 담으므로
+# 저장소에 들어가면 안 된다.
+*.local.*
 *.log
 *.err
 *.tsbuildinfo

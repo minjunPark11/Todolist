@@ -118,7 +118,8 @@
   padding: 0 14px 0 12px;
   gap: 12px;
   /* 카드는 줄바꿈하지 않는다 — 56px 고정이므로 두 줄이 되면 넘친다.
-     좁은 화면의 스택은 아래 미디어 쿼리가 다시 연다. */
+     좁은 폭의 스택은 아래 `@container`가 다시 연다. 그 블록은 컨테이너가
+     `.gcal-main-column`으로 올라간 뒤에야 실제로 걸린다(02-calendar.css). */
   flex-wrap: nowrap;
 }
 
@@ -491,9 +492,10 @@
 }
 
 /* 56px 카드에 두 덩어리가 다 들어가지 않는 폭에서는 툴바가 다시 쌓인다 —
-   `02-calendar.css`의 `@container gcalbar`가 그 일을 이미 하고 있고, 여기서
-   할 일은 고정 높이를 풀어주는 것뿐이다. */
-@container gcalbar (max-width: 620px) {
+   `02-calendar.css`의 `@container gcalbar (max-width: 640px)`가 자손들에게
+   `width: 100%`를 걸어 그 일을 하고, 여기서 할 일은 고정 높이와 `nowrap`을
+   풀어주는 것뿐이다. 임계값은 그쪽과 같아야 하므로 640이다. */
+@container gcalbar (max-width: 640px) {
   .gcal-toolbar {
     height: auto;
     min-height: 56px;

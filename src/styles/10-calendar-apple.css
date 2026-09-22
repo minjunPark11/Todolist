@@ -676,23 +676,6 @@
   text-overflow: ellipsis;
 }
 
-/* ============================================================================
-   The `⋯` panel (CALENDAR_COLOR_SOURCE_AND_VIEW_OPTIONS_DESIGN.md §6)
-
-   Two switches used to sit in the left column beside the calendars, which put
-   two different questions under the same kind of checkbox: "whose calendar is
-   this" and "draw this layer at all". They are here now, with the axis the
-   fill reads.
-   ========================================================================== */
-
-/* R2's spacer held nothing and existed to balance the centred segmented
-   control. It holds the control it was standing in for. */
-.gcal-toolbar-spacer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
 .gcal-viewopts {
   display: flex;
   flex-direction: column;

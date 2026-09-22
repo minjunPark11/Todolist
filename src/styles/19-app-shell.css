@@ -343,7 +343,16 @@
    Module has an overlay sidebar — both still reach every destination, so the
    Rail steps aside rather than competing with them. Restoring it as a bottom
    bar is §2.39's mobile shell, and belongs with the rest of P0-3. */
-@media (max-width: 767px) {
+/* 768 — 이 앱이 "좁다"고 말하는 폭. 여기 혼자 767이었다.
+
+   `min-width: 768`은 어디에도 없으므로 767은 짝이 맞춰 줄 상대가 없는 단독
+   값이었고, 같은 경계를 02-calendar · 03-planning · 05-spaces · 24-focus가
+   768로 적고 있다. 정확히 768px에서 레일만 남고 나머지가 전부 좁은 폭 규칙으로
+   넘어가 있었다 — 한 픽셀짜리 모순이다. 다수 표기로 맞춘다.
+
+   (06-space-detail도 그 목록에 있었으나, 호출부 없는 파일이라 지워졌다 —
+   `styles.css`의 끝 주석.) */
+@media (max-width: 768px) {
   .global-rail {
     display: none;
   }
